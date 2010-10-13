@@ -25,8 +25,8 @@ import tempfile
 from mrjob.conf import dump_mrjob_conf
 from mrjob.job import MRJob, _IDENTITY_MAPPER
 from mrjob.local import LocalMRJobRunner
-from mrjob.tests.mr_verbose_job import MRVerboseJob
-from mrjob.tests.mr_two_step_job import MRTwoStepJob
+from tests.mr_verbose_job import MRVerboseJob
+from tests.mr_two_step_job import MRTwoStepJob
 
 class LocalMRJobRunnerEndToEndTestCase(TestCase):
 

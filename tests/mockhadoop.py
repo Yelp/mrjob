@@ -14,7 +14,7 @@ MOCK_HADOOP_OUTPUT -- a directory containing directories containing
 fake job output (to add output, use add_mock_output())
 
 
-This is designed to run as: python -m mrjob.tests.mockhadoop <hadoop args>
+This is designed to run as: python -m tests.mockhadoop <hadoop args>
 
 mrjob requires a single binary (no args) to stand in for hadoop, so
 use create_mock_hadoop_script() to write out a shell script that runs

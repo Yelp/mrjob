@@ -20,7 +20,7 @@ from testify import TestCase, assert_equal, assert_raises
 
 from mrjob.job import MRJob, _IDENTITY_MAPPER
 from mrjob.parse import parse_mr_job_stderr
-from mrjob.tests.mr_two_step_job import MRTwoStepJob
+from tests.mr_two_step_job import MRTwoStepJob
 
 ### Test classes ###
 

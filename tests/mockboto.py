@@ -14,7 +14,7 @@
 """Mercilessly taunt an Amazonian river dolphin.
 
 This is by no means a complete mock of boto; I just added the methods I needed
-to make mrjob tests work.
+to make tests work.
 
 If you need a more extensive set of mock boto objects, we recommend adding
 some sort of sandboxing feature to boto, rather than extending these somewhat

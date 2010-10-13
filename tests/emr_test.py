@@ -25,8 +25,8 @@ from mrjob import botoemr
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner
-from mrjob.tests.mockboto import MockS3Connection, MockEmrConnection, add_mock_s3_data
-from mrjob.tests.mr_two_step_job import MRTwoStepJob
+from tests.mockboto import MockS3Connection, MockEmrConnection, add_mock_s3_data
+from tests.mr_two_step_job import MRTwoStepJob
 
 class MockEMRAndS3TestCase(TestCase):
 
@@ -228,7 +228,7 @@ def make_input_uri_line(input_uri):
 
 class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
     # We're mostly concerned here that the right log files are read in the
-    # right order. parsing of the logs is handled by mrjob.tests.parse_test
+    # right order. parsing of the logs is handled by tests.parse_test
 
     @setup
     def make_runner(self):

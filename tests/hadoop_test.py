@@ -23,8 +23,8 @@ import sys
 import tempfile
 from testify import TestCase, assert_equal, setup, teardown
 
-from mrjob.tests.mockhadoop import create_mock_hadoop_script, add_mock_hadoop_output
-from mrjob.tests.mr_two_step_job import MRTwoStepJob
+from tests.mockhadoop import create_mock_hadoop_script, add_mock_hadoop_output
+from tests.mr_two_step_job import MRTwoStepJob
 from mrjob.hadoop import *
 
 class TestFindHadoopStreamingJar(TestCase):

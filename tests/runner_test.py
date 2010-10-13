@@ -21,7 +21,7 @@ import tempfile
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
-from mrjob.tests.mr_two_step_job import MRTwoStepJob
+from tests.mr_two_step_job import MRTwoStepJob
 
 class WithStatementTestCase(TestCase):
 

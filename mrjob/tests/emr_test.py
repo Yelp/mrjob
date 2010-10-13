@@ -219,7 +219,6 @@ HADOOP_ERR_LINE_PREFIX = '2010-07-27 19:53:35,451 ERROR org.apache.hadoop.stream
 USEFUL_HADOOP_ERROR = 'Error launching job , Output path already exists : Output directory s3://yourbucket/logs/2010/07/23/ already exists and is not empty'
 
 BORING_HADOOP_ERROR = 'Job not Successful!'
-
 TASK_ATTEMPTS_DIR = LOG_DIR + 'task-attempts/'
 
 ATTEMPT_DIR = TASK_ATTEMPTS_DIR + 'attempt_201007271720_0001_m_000126_0/'
@@ -233,14 +232,14 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
 
     @setup
     def make_runner(self):
-        self.runner = EMRJobRunner(s3_sync_wait_time=0, cleanup='NONE')
+        self.runner = EMRJobRunner(s3_sync_wait_time=0,
+                                   s3_scratch_uri='s3://walrus/tmp',
+                                   conf_path=False)
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
 
-    @setup
+    @teardown
     def cleanup_runner(self):
-        # mockboto doesn't support this yet
-        #self.runner.cleanup()
-        pass
+        self.runner.cleanup()
 
     def test_empty(self):
         self.add_mock_s3_data({'walrus': {}})
@@ -410,7 +409,9 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
 class TestLs(MockEMRAndS3TestCase):
 
     def test_s3_ls(self):
-        runner = EMRJobRunner()
+        runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
+                              conf_path=False)
+
         self.add_mock_s3_data({'walrus': {'one': '', 'two': '', 'three': ''}})
 
         assert_equal(set(runner._s3_ls('s3://walrus/')),
@@ -430,3 +431,4 @@ class TestLs(MockEMRAndS3TestCase):
         # probably be owned by other people, and we'll get some sort
         # of permissions error)
         assert_raises(Exception, set, runner._s3_ls('s3://lolcat/'))
+    

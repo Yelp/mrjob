@@ -178,7 +178,11 @@ class LocalMRJobRunner(MRJobRunner):
         """
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
-        env = combine_envs(os.environ, self._opts['hadoop_env'], env or {})
+        env = combine_envs(
+            {'PYTHONPATH': os.getcwd()},
+            os.environ,
+            self._opts['hadoop_env'],
+            env or {})
         
         # decide where to get input
         if self._prev_outfile is not None:

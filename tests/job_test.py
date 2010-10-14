@@ -325,13 +325,12 @@ class StepNumTestCase(TestCase):
         
         def test_mapper0(mr_job, input_lines):
             mr_job.sandbox(input_lines)
-            assert_equal(mr_job.options.step_num, 0)
-            mr_job.run_mapper()
+            mr_job.run_mapper(0)
             assert_equal(mr_job.parse_output(),
                          [(None, 'foo'), ('foo', None),
                           (None, 'bar'), ('bar', None),])
 
-        mapper0 = MRTwoStepJob(['--mapper', '--step-num=0'])
+        mapper0 = MRTwoStepJob()
         test_mapper0(mapper0, mapper0_input_lines)
 
         # --step-num=0 shouldn't actually be necessary
@@ -345,12 +344,11 @@ class StepNumTestCase(TestCase):
 
         def test_reducer0(mr_job, input_lines):
             mr_job.sandbox(input_lines)
-            assert_equal(mr_job.options.step_num, 0)
-            mr_job.run_reducer()
+            mr_job.run_reducer(0)
             assert_equal(mr_job.parse_output(),
                          [('bar', 1), ('foo', 1), (None, 2),])
 
-        reducer0 = MRTwoStepJob(['--reducer', '--step-num=0'])
+        reducer0 = MRTwoStepJob()
         test_reducer0(reducer0, reducer0_input_lines)
 
         # --step-num=0 shouldn't actually be necessary
@@ -362,26 +360,19 @@ class StepNumTestCase(TestCase):
 
         def test_mapper1(mr_job, input_lines):
             mr_job.sandbox(input_lines)
-            assert_equal(mr_job.options.step_num, 1)
-            mr_job.run_mapper()
+            mr_job.run_mapper(1)
             assert_equal(mr_job.parse_output(),
                          [(1, 'bar'), (1, 'foo'), (2, None),])
 
-        mapper1 = MRTwoStepJob(['--mapper', '--step-num=1'])
+        mapper1 = MRTwoStepJob()
         test_mapper1(mapper1, mapper1_input_lines)
 
     def test_nonexistent_steps(self):
-        reducer1 = MRTwoStepJob(['--reducer', '--step-num=1'])
-        reducer1.sandbox()
-        assert_raises(ValueError, reducer1.run_reducer)
-
-        mapper2 = MRTwoStepJob(['--reducer', '--step-num=2'])
-        mapper2.sandbox()
-        assert_raises(ValueError, mapper2.run_mapper)
-
-        reducer_neg1 = MRTwoStepJob(['--reducer', '--step-num=-1'])
-        reducer_neg1.sandbox()
-        assert_raises(ValueError, reducer_neg1.run_reducer)
+        mr_job = MRTwoStepJob()
+        mr_job.sandbox()
+        assert_raises(ValueError, mr_job.run_reducer, 1)
+        assert_raises(ValueError, mr_job.run_mapper, 2)
+        assert_raises(ValueError, mr_job.run_reducer, -1)
 
 class CommandLineArgsTest(TestCase):
 

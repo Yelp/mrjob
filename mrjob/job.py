@@ -212,10 +212,10 @@ files. It automatically decompresses .gz and .bz2 files:
             mr_job.show_steps()
 
         elif mr_job.options.run_mapper:
-            mr_job.run_mapper()
+            mr_job.run_mapper(self.options.step_num)
 
         elif mr_job.options.run_reducer:
-            mr_job.run_reducer()
+            mr_job.run_reducer(self.options.step_num)
 
         else:
             mr_job.run_job()
@@ -228,8 +228,7 @@ files. It automatically decompresses .gz and .bz2 files:
         """Print information about how many mappers and reducers there are."""
         print >> self.stdout, ' '.join(self.steps_desc())
 
-    def run_mapper(self):
-        step_num = self.options.step_num or 0
+    def run_mapper(self, step_num=0):
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
@@ -253,8 +252,7 @@ files. It automatically decompresses .gz and .bz2 files:
             for out_key, out_value in mapper_final():
                 write_line(out_key, out_value)
 
-    def run_reducer(self):
-        step_num = self.options.step_num or 0
+    def run_reducer(self, step_num=0):
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
@@ -819,6 +817,13 @@ files. It automatically decompresses .gz and .bz2 files:
     def parse_output(self, protocol=DEFAULT_PROTOCOL):
         """Convenience method for reading output. Return output, as a list
         of tuples.
+
+        This helps you test individual mappers and reducers by calling
+        run_mapper() or run_reducer(). For example:
+
+        mr_job.sandbox(stdin=your_input)
+        mr_job.run_mapper(step_num=0)
+        output = mrjob.parse_output()
 
         Args:
         protocol -- the protocol to use (e.g. 'json'). We don't set this

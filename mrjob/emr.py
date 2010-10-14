@@ -294,13 +294,11 @@ class EMRJobRunner(MRJobRunner):
         """
         # set s3_scratch_uri
         if not self._opts['s3_scratch_uri']:
-            log.warning('s3_scratch_uri is not set; attempting to arbitrarily make a temp dir on a bucket you own.')
             s3_conn = self.make_s3_conn()
             buckets = s3_conn.get_all_buckets()
             if buckets:
                 self._opts['s3_scratch_uri'] = 's3://%s/tmp/mrjob/' % buckets[0].name
-                log.warning('Using %s as our scratch dir on S3' %
-                            self._opts['s3_scratch_uri'])
+                log.info('s3_scratch_uri is not set; using %s as our scratch dir on S3' % self._opts['s3_scratch_uri'])
             else:
                 raise Exception('s3_scratch_uri is not set, and you own no S3 buckets')
 

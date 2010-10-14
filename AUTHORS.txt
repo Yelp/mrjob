@@ -1,0 +1,11 @@
+mrjob 0.x:
+========================================
+Primary authors:
+
+* David Marin <dave@yelp.com>
+
+Contributors (in order of contribution, latest first):
+
+* Julian Krause <juliank@yelp.com> :: Code reviews
+* Paul Wais <pwais@yelp.com> :: Code reviews
+* Matt Jones <mattj@yelp.com> :: Original design

@@ -4,24 +4,29 @@ except ImportError:
     from distutils.core import setup
 
 setup(
-    name='mrjob',
-    version='0.1',
-    provides='mrjob',
     author='David Marin',
     author_email='dave@yelp.com',
-    url='http://github.com/Yelp/mrjob',
     classifiers=[
-        'Programming Language :: Python',
-        'Operating System :: OS Independent',
-        'License :: OSI Approved :: Apache Software License',
-        'Topic :: System :: Distributed Computing',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
-        'Development Status :: 3 - Alpha',
+        'License :: OSI Approved :: Apache Software License',
+        'Natural Language :: English',
+        'Operating System :: Unix',
+        'Operating System :: POSIX',
+        'Operating System :: POSIX :: Linux',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 2.5',
+        'Operating System :: OS Independent',
+        'Topic :: System :: Distributed Computing',
     ],
-    packages=['mrjob', 'mrjob.examples'],
-    install_requires=['boto>=1.6'],
     description='Python MapReduce framework',
-    long_description='Write multi-step MapReduce jobs in Python, and run them on your own Hadoop cluster or Amazon Elastic MapReduce',
-
-    zip_safe=False, # so that we can run examples
+    install_requires=['boto>=1.6','PyYAML'],
+    license='Apache',
+    long_description='Write multi-step MapReduce jobs and run them on Amazon Elastic MapReduce or your own Hadoop Cluster',
+    name='mrjob',
+    packages=['mrjob', 'mrjob.examples'],
+    provides='mrjob',
+    url='http://github.com/Yelp/mrjob',
+    version='0.1.0-pre1',
+    zip_safe=False, # so that we can easily bootstrap mrjob
 )

@@ -65,7 +65,7 @@ def find_mrjob_conf():
             log.info('using configs in %s' % path)
             return path
     else:
-        log.warning("couldn't find mrjob.conf; you should create it")
+        log.info("no configs found; falling back on auto-configuration")
         return None
 
 def load_mrjob_conf(conf_path=None):

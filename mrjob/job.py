@@ -212,10 +212,10 @@ files. It automatically decompresses .gz and .bz2 files:
             mr_job.show_steps()
 
         elif mr_job.options.run_mapper:
-            mr_job.run_mapper(self.options.step_num)
+            mr_job.run_mapper(mr_job.options.step_num)
 
         elif mr_job.options.run_reducer:
-            mr_job.run_reducer(self.options.step_num)
+            mr_job.run_reducer(mr_job.options.step_num)
 
         else:
             mr_job.run_job()

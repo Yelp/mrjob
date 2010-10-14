@@ -17,7 +17,7 @@ The classic MapReduce job: count the frequency of words.
 """
 import re
 
-WORD_RE = re.compile(r'\w+')
+WORD_RE = re.compile(r"[\w']+")
 
 from mrjob.job import MRJob
 

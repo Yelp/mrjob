@@ -1322,7 +1322,8 @@ class EMRJobRunner(MRJobRunner):
             """Retry if we get a server error indicating throttling."""
             return (isinstance(ex, boto.exception.BotoServerError) and
                     ('Throttling' in ex.body or
-                     'RequestExpired' in ex.body))
+                     'RequestExpired' in ex.body or
+                     'Connection reset by peer' in ex.body))
 
         return RetryWrapper(raw_conn,
                             retry_if=retry_if,

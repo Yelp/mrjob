@@ -21,13 +21,17 @@ See MRJob's docstring for typical usage.
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
-from cStringIO import StringIO
 import inspect
 import itertools
 import logging
 from optparse import OptionParser, OptionGroup, OptionError
 import sys
 import time
+
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
@@ -771,8 +775,8 @@ files. It automatically decompresses .gz and .bz2 files:
     def sandbox(self, stdin=None, stdout=None, stderr=None):
         """Redirect stdin, stdout, and stderr, for ease of testing.
 
-        You can set stdin, stdout, and stderr to file objects; by
-        default, they'll be set to cStringIO.StringIO objects.
+        You can set stdin, stdout, and stderr to file objects. By
+        default, they'll be set to StringIOs.
 
         You can then access the job's file handles through self.stdin,
         self.stdout, and self.stderr. You can use parse_counters(), below,

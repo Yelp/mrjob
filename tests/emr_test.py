@@ -15,7 +15,7 @@
 from __future__ import with_statement
 
 import boto
-from cStringIO import StringIO
+from StringIO import StringIO
 import os
 import shutil
 import tempfile

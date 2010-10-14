@@ -14,7 +14,7 @@
 """Unit testing of LocalMRJobRunner"""
 from __future__ import with_statement
 
-from cStringIO import StringIO
+from StringIO import StringIO
 import gzip
 import os
 import shutil

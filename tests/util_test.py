@@ -19,7 +19,7 @@ import os
 import shutil
 import stat
 from subprocess import Popen, PIPE, CalledProcessError
-from cStringIO import StringIO
+from StringIO import StringIO
 import tempfile
 from testify import TestCase, assert_equal, assert_raises, class_setup, class_teardown
 

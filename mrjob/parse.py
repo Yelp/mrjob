@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utilities for parsing errors, counters, and status messages."""
-from cStringIO import StringIO
 import re
+
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 def find_python_traceback(lines):
     """Scan a log file or other iterable for a Python traceback,

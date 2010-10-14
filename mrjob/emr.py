@@ -13,15 +13,6 @@
 # limitations under the License.
 from __future__ import with_statement
 
-try:
-    import boto
-    import boto.ec2
-    import boto.exception
-    import boto.utils
-except ImportError:
-    # don't require boto; MRJobs don't actually need it when running
-    # inside hadoop streaming
-    boto = None
 from cStringIO import StringIO
 import fnmatch
 import logging
@@ -34,7 +25,22 @@ import socket
 from subprocess import Popen, PIPE
 import time
 
-from mrjob import botoemr
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
+
+try:
+    import boto
+    import boto.ec2
+    import boto.exception
+    import boto.utils
+    from mrjob import botoemr
+except ImportError:
+    # don't require boto; MRJobs don't actually need it when running
+    # inside hadoop streaming
+    boto = None
+    botoemr = None
 
 from mrjob.conf import combine_dicts, combine_lists, combine_paths, combine_path_lists
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error

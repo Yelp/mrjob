@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cStringIO import StringIO
 import logging
 import os
 import posixpath
 import re
 from subprocess import Popen, PIPE, CalledProcessError
+
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 from mrjob.conf import combine_dicts, combine_paths
 from mrjob.runner import MRJobRunner

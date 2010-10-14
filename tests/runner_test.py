@@ -14,7 +14,7 @@
 """Unit testing of MRJobRunner"""
 from __future__ import with_statement
 
-from cStringIO import StringIO
+from StringIO import StringIO
 import os
 from testify import TestCase, assert_equal, assert_not_equal, assert_raises, setup, teardown
 import tempfile

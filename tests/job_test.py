@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """Unit testing of MRJob."""
-from cStringIO import StringIO
+from StringIO import StringIO
 from optparse import OptionError
 from subprocess import Popen, PIPE
 from testify import TestCase, assert_equal, assert_raises

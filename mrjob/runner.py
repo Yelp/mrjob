@@ -16,7 +16,6 @@
 
 See MRJobRunner's docstring for typical usage.
 """
-from cStringIO import StringIO
 import datetime
 import glob
 import gzip
@@ -28,6 +27,11 @@ import shutil
 import sys
 from subprocess import Popen, PIPE
 import tarfile
+
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 from mrjob.conf import combine_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
 from mrjob.util import cmd_line, file_ext, tar_and_gzip

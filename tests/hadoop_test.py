@@ -15,7 +15,7 @@
 """Test the hadoop job runner."""
 from __future__ import with_statement
 
-from cStringIO import StringIO
+from StringIO import StringIO
 import os
 import shutil
 from subprocess import check_call

@@ -75,11 +75,10 @@ STEP_LOG_URI_RE = re.compile(r'^.*/steps/(?P<step_num>\d+)/syslog$')
 def parse_s3_uri(uri):
     """Parse an S3 URI into (bucket, key)
 
-    For example
+    >>> parse_s3_uri('s3://walrus/tmp/')
+    ('walrus', 'tmp/')
 
-    s3://emr-land/tmp/ -> 'emr-land', 'tmp/'
-
-    If it's not an s3 uri, it'll raise a ValueError
+    If ``uri`` is not an S3 URI, raise a ValueError
     """
     match = S3_URI_RE.match(uri)
     if match:
@@ -88,107 +87,95 @@ def parse_s3_uri(uri):
         raise ValueError('Invalid S3 URI: %s' % uri)
 
 def s3_key_to_uri(s3_key):
-    """Convert a boto Key object into an s3:// URI"""
+    """Convert a boto Key object into an ``s3://`` URI"""
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
 class EMRJobRunner(MRJobRunner):
-    """Class to run a single MRJob once on Amazon Elastic MapReduce.
+    """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
 
-    MRJobRunners are typically instantiated through MRJob's make_runner()
-    method; see the docstring of mrjob.job.MRJob for more info.
+    :py:class:`EMRJobRunner` runs your job in an EMR job flow, which is
+    basically a temporary Hadoop cluster. Normally, it creates a job flow
+    just for your job; it's also possible to run your job in an existing
+    job flow by setting *emr_job_flow_id* (or :option:`--emr-job-flow-id`).
+
+    Input and support files can be either local or on S3; use ``s3://...``
+    URLs to refer to files on S3.
+
+    This class has some useful utilities for talking directly to S3 and EMR,
+    so you may find it useful to instantiate it without a script::
+
+        from mrjob.emr import EMRJobRunner
+
+        emr_conn = EMRJobRunner().make_emr_conn()
+        job_flows = emr_conn.describe_jobflows()
+        ...
+
+    See also: :py:meth:`EMRJobRunner.__init__`.
     """
+    alias = 'emr'
+    
     def __init__(self, **kwargs):
-        """EMRJobRunner takes the same arguments as MRJobRunner
-        except for some additional (keyword) opts.
+        """:py:class:`EMRJobRunner` takes the same arguments as
+        :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
+        which can be defaulted in :py:mod:`mrjob.conf`.
 
-        s3_scratch_uri is required in principle, though if you don't set it,
-        we'll look at the list of buckets you own, and try to use tmp/
-        inside that bucket as our scratch directory (we'll yell at you for
-        it though)
-
-        aws_access_key_id and aws_secret_access_key are required if you
+        *aws_access_key_id* and *aws_secret_access_key* are required if you
         haven't set them up already for boto (e.g. by setting the environment
-        variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY)
+        variables :envvar:`$AWS_ACCESS_KEY_ID` and
+        :envvar:`$AWS_SECRET_ACCESS_KEY`)
 
-        opts:
-        aws_access_key_id -- "username" for Amazon web services.
-        aws_secret_access_key -- your "password" on AWS
-        aws_region -- region to connect to S3 and EMR on (e.g. 'us-west-1').
-            If you want to use separate regions for S3 and EMR, set the
-            endpoints we connect to explicitly using emr_endpoint and
-            s3_endpoint.
-        bootstrap_cmds -- a list of commands to run on the master node to set
-            up libraries, etc. Like setup_cmds, these can be strings, which
-            will be run in the shell, or lists of args, which will be run
-            directly. We'll automatically prepend 'sudo' to each command
-        bootstrap_files -- files to upload to the master node before
-            running bootstrap_cmds (for example, python libraries). These
-            will be made public on S3 (due to a limitation of the bootstrap
-            feature)
-        bootstrap_mrjob -- This is actually an option in the base MRJobRunner
-            class. If this is True (the default), we'll tar up mrjob from
-            the local filesystem, and install it on the master node (when
-            other runners bootstrap mrjob, it's part of the wrapper script
-            that runs mappers/reducers).
-        bootstrap_python_packages -- paths of python modules to install on EMR
-            These should be standard python module tarballs. If a module
-            is named foo.tar.gz, we expect to be able to run:
-            
-            tar xfz foo.tar.gz
-            cd foo
-            sudo python setup.py install
+        Additional options:
 
-            For anything that varies from this, use bootstrap_files and
-            bootstrap_cmds/bootstrap_scripts
-
-            modules will be installed in the order you specify
-
-        bootstrap_scripts -- scripts to upload, and run (a combination of
-            bootstrap_cmds and bootstrap_files). These are run after
-            the command from bootstrap_cmds. We'll automatically run these
-            through sudo.
-        check_emr_status_every -- how often to check on the status of EMR jobs.
-            Default is 30 seconds (too often and AWS will throttle you).
-            Even very simple jobs typically take about 5 minutes to complete
-            because of the overhead of setting up instances.
-        ec2_instance_type -- what sort of EC2 instance to use. Current choices
-            seem to be m1.small, m1.large, m1.xlarge, c1.medium, c1.xlarge,
-            m2.2xlarge, and m2.4xlarge. Default is m1.small
-        ec2_key_pair -- name of the SSH key you set up for EMR.
-        ec2_key_pair_file -- path to file containing the SSH key for EMR
-        ec2_master_instance_type -- same as instance_type, but only for master
-            Hadoop nodes
-        ec2_slave_instance_type -- same as instance_type, but only for slave
-            nodes
-        emr_endpoint -- optional host to connect to when communicating with S3
-            (e.g. 'us-west-1.elasticmapreduce.amazonaws.com'). We can also
-            guess this from region.
-        emr_job_flow_id -- the ID of a persistent EMR job flow to run jobs in
-            (normally we launch our own job). You can create such a job by
-            making a separate EMRJobRunner, and calling
-            make_persistent_job_flow() on it. It's fine for other jobs to
-            be using the job flow; we give our job's steps a unique ID.
-        num_ec2_instances -- number of instances to start up. Default is 1.
-        s3_endpoint -- optional host to connect to when communicating with S3
-            (e.g. 's3-us-west-1.amazonaws.com'). We can also infer this from
-            region.
-        s3_log_uri -- where on S3 to put logs, for example
-            's3://yourbucket/logs/' (logs will go into a subdirectory,
-            in this example s3://yourbucket/logs/j-YOURJOBID/). Default
-            is to append 'logs/' to scratch_uri.
-        s3_scratch_uri -- S3 directory to use as scratch space, for example
-            's3://yourbucket/tmp/'.
-        ssh_bin -- path to the ssh binary. Defaults to 'ssh'
-        ssh_bind_ports -- a set/list/tuple of ports that are safe to listen on
-        ssh_tunnel_to_job_tracker -- if True, create an ssh tunnel to the job
-            tracker and listen on a randomly chosen port. This requires
-            you to have a key-pair file (e.g. EMR.pem); which you can set
-            through aws_key_pair_file.
-        ssh_tunnel_is_open -- if True, any host can connect to the job
-            tracker through the tunnel you open (by default, you can only
-            connect to the tunnel via localhost).
+        :type aws_access_key_id: str
+        :param aws_access_key_id: "username" for Amazon web services.
+        :type aws_secret_access_key: str
+        :param aws_secret_access_key: your "password" on AWS
+        :type aws_region: str
+        :param aws_region: region to connect to S3 and EMR on (e.g. ``us-west-1``). If you want to use separate regions for S3 and EMR, set *emr_endpoint* and *s3_endpoint*.
+        :type bootstrap_cmds: list
+        :param bootstrap_cmds: a list of commands to run on the master node to set up libraries, etc. Like *setup_cmds*, these can be strings, which will be run in the shell, or lists of args, which will be run directly. We'll automatically prepend ``sudo`` to each command
+        :type bootstrap_files: list of str
+        :param bootstrap_files: files to upload to the master node before running *bootstrap_cmds* (for example, debian packages). These will be made public on S3 due to a limitation of the bootstrap feature.
+        :type bootstrap_mrjob: boolean
+        :param bootstrap_mrjob: This is actually an option in the base MRJobRunner class. If this is ``True`` (the default), we'll tar up :mod:`mrjob` from the local filesystem, and install it on the master node.
+        :type bootstrap_python_packages: list of str
+        :param bootstrap_python_packages: paths of python modules to install on EMR. These should be standard python module tarballs. If a module is named ``foo.tar.gz``, we expect to be able to run ``tar xfz foo.tar.gz; cd foo; sudo python setup.py install``.
+        :type bootstrap_scripts: list of str
+        :param bootstrap_scripts: scripts to upload and then run on the master node (a combination of *bootstrap_cmds* and *bootstrap_files*). These are run after the command from bootstrap_cmds. We'll automatically run these through ``sudo``.
+        :type check_emr_status_every: float
+        :param check_emr_status_every: How often to check on the status of EMR jobs.Default is 30 seconds (too often and AWS will throttle you).
+        :type ec2_instance_type: str
+        :param ec2_instance_type: what sort of EC2 instance(s) to use (see http://aws.amazon.com/ec2/instance-types/). Default is ``m1.small``
+        :type ec2_key_pair: str
+        :param ec2_key_pair: name of the SSH key you set up for EMR.
+        :type ec2_key_pair_file: str
+        :param ec2_key_pair_file: path to file containing the SSH key for EMR
+        :type ec2_master_instance_type: str
+        :param ec2_master_instance_type: same as *ec2_instance_type*, but only for the master Hadoop node
+        :type ec2_slave_instance_type: str
+        :param ec2_slave_instance_type: same as *ec2_instance_type*, but only for the slave Hadoop nodes
+        :type emr_endpoint: str
+        :param emr_endpoint: optional host to connect to when communicating with S3 (e.g. ``us-west-1.elasticmapreduce.amazonaws.com``). Default is to infer this from *region*.
+        :type emr_job_flow_id: str
+        :param emr_job_flow_id: the ID of a persistent EMR job flow to run jobs in (normally we launch our own job). It's fine for other jobs to be using the job flow; we give our job's steps a unique ID.
+        :type num_ec2_instances: int
+        :param num_ec2_instances: number of instances to start up. Default is ``1``.
+        :type s3_endpoint: str
+        :param s3_endpoint: Host to connect to when communicating with S3 (e.g. ``s3-us-west-1.amazonaws.com``). Default is to infer this from *region*.
+        :type s3_log_uri: str
+        :param s3_log_uri:  where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for your job flow will go into a subdirectory, e.g. ``s3://yourbucket/logs/j-JOBFLOWID/``. in this example s3://yourbucket/logs/j-YOURJOBID/). Default is to append ``logs/`` to *s3_scratch_uri*.
+        :type s3_scratch_uri: str
+        :param s3_scratch_uri: S3 directory (URI ending in ``/``) to use as scratch space, e.g. ``s3://yourbucket/tmp/``. Default is ``tmp/mrjob/`` in the first bucket belonging to you.
+        :type ssh_bin: str
+        :param ssh_bin: path to the ssh binary. Defaults to ``ssh``
+        :type ssh_bind_ports: list of int
+        :param ssh_bind_ports: a list of ports that are safe to listen on. Defaults to ports ``40001`` thru ``40840``.
+        :type ssh_tunnel_to_job_tracker: bool
+        :param ssh_tunnel_to_job_tracker: If True, create an ssh tunnel to the job tracker and listen on a randomly chosen port. This requires you to set *ec2_key_pair* and *ec2_key_pair_file*.
+        :type ssh_tunnel_is_open: bool
+        :param ssh_tunnel_is_open: if True, any host can connect to the job tracker through the SSH tunnel you open. Mostly useful if your browser is running on a different machine from your job.
         """
-        super(EMRJobRunner, self).__init__('emr', **kwargs)
+        super(EMRJobRunner, self).__init__(**kwargs)
 
         self._fix_s3_scratch_and_log_uri_opts()
 
@@ -247,9 +234,9 @@ class EMRJobRunner(MRJobRunner):
         self._uri_of_downloaded_log_file = None
 
     @classmethod
-    def allowed_opts(cls):
+    def _allowed_opts(cls):
         """A list of which keyword args we can pass to __init__()"""
-        return super(EMRJobRunner, cls).allowed_opts() + [
+        return super(EMRJobRunner, cls)._allowed_opts() + [
             'aws_access_key_id', 'aws_secret_access_key', 'aws_region',
             'bootstrap_cmds', 'bootstrap_files', 'bootstrap_python_packages',
             'bootstrap_scripts', 'check_emr_status_every', 'ec2_instance_type',
@@ -261,9 +248,9 @@ class EMRJobRunner(MRJobRunner):
             'ssh_tunnel_to_job_tracker']
 
     @classmethod
-    def default_opts(cls):
+    def _default_opts(cls):
         """A dictionary giving the default value of options."""
-        return combine_dicts(super(EMRJobRunner, cls).default_opts(), {
+        return combine_dicts(super(EMRJobRunner, cls)._default_opts(), {
             'check_emr_status_every': 30,
             'ec2_instance_type': 'm1.small',
             'num_ec2_instances': 1,
@@ -271,14 +258,15 @@ class EMRJobRunner(MRJobRunner):
             'ssh_bin': 'ssh',
             'ssh_bind_ports': range(40001, 40841),
             'ssh_tunnel_to_job_tracker': False,
+            'ssh_tunnel_is_open': False,
         })
 
     @classmethod
-    def opts_combiners(cls):
+    def _opts_combiners(cls):
         """Map from option name to a combine_*() function used to combine
         values for that option. This allows us to specify that some options
         are lists, or contain environment variables, or whatever."""
-        return combine_dicts(super(EMRJobRunner, cls).opts_combiners(), {
+        return combine_dicts(super(EMRJobRunner, cls)._opts_combiners(), {
             'bootstrap_cmds': combine_lists,
             'bootstrap_files': combine_path_lists,
             'bootstrap_python_packages': combine_path_lists,
@@ -286,6 +274,7 @@ class EMRJobRunner(MRJobRunner):
             'ec2_key_pair_file': combine_paths,
             's3_log_uri': combine_paths,
             's3_scratch_uri': combine_paths,
+            'ssh_bin': combine_paths,
         })
 
     def _fix_s3_scratch_and_log_uri_opts(self):
@@ -659,11 +648,11 @@ class EMRJobRunner(MRJobRunner):
             # other arguments passed directly to hadoop streaming
             step_args = []
             
-            for key, value in self._hadoop_env.iteritems():
+            for key, value in sorted(self._cmdenv.iteritems()):
                 step_args.extend(['-cmdenv', '%s=%s' % (key, value)])
 
-            for jobconf_arg in self._opts['jobconf_args']:
-                step_args.extend(['-jobconf', jobconf_arg])
+            for key, value in sorted(self._opts['jobconf'].iteritems()):
+                step_args.extend(['-jobconf', '%s=%s' % (key, value)])
 
             step_args.extend(self._opts['hadoop_extra_args'])
 
@@ -1336,9 +1325,10 @@ class EMRJobRunner(MRJobRunner):
                             max_tries=EMR_MAX_TRIES)
 
     def make_emr_conn(self):
-        """Get our connection to EMR, creating it if necessary. This
-        is a boto EmrConnection object wrapped in an
-        EmrConnectionRetryWrapper"""
+        """Create a connection to EMR.
+
+        :return: a :py:class:`mrjob.botoemr.connection.EmrConnection`, wrapped in a :py:class:`mrjob.retry.RetryWrapper`
+        """
         log.debug('creating EMR connection')
         region = self._get_region_info_for_emr_conn()
         raw_emr_conn = botoemr.EmrConnection(
@@ -1348,7 +1338,8 @@ class EMRJobRunner(MRJobRunner):
         return self._wrap_aws_conn(raw_emr_conn)
 
     def _get_region_info_for_emr_conn(self):
-        """Get a RegionInfo object to initialize EMR connections with.
+        """Get a :py:class:`boto.ec2.regioninfo.RegionInfo` object to
+        initialize EMR connections with.
 
         This is kind of silly because all EmrConnection ever does with
         this object is extract the hostname, but that's how boto rolls.
@@ -1371,8 +1362,10 @@ class EMRJobRunner(MRJobRunner):
     # need to do something S3-specific (e.g. setting file permissions)
 
     def make_s3_conn(self):
-        """Get our connection to S3, creating if it necessary. This
-        is a boto Connection object."""
+        """Create a connection to S3.
+
+        :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a :py:class:`mrjob.retry.RetryWrapper`
+        """
         log.debug('creating S3 connection')
         raw_s3_conn = boto.connect_s3(
             aws_access_key_id=self._opts['aws_access_key_id'],
@@ -1392,9 +1385,9 @@ class EMRJobRunner(MRJobRunner):
         """Get the boto Key object matching the given S3 uri, or
         return None if that key doesn't exist.
 
-        uri is an S3 URI (like s3://foo/bar)
+        uri is an S3 URI: ``s3://foo/bar``
         
-        You may optionally pass in an existing s3 connection through s3_conn
+        You may optionally pass in an existing s3 connection through ``s3_conn``
         """
         if not s3_conn:
             s3_conn = self.make_s3_conn()
@@ -1406,9 +1399,9 @@ class EMRJobRunner(MRJobRunner):
         """Create the given S3 key, and return the corresponding
         boto Key object.
 
-        uri is an S3 URI (like s3://foo/bar)
+        uri is an S3 URI: ``s3://foo/bar``
 
-        You may optionally pass in an existing s3 connection through s3_conn
+        You may optionally pass in an existing S3 connection through ``s3_conn``
         """
         if not s3_conn:
             s3_conn = self.make_s3_conn()
@@ -1418,11 +1411,11 @@ class EMRJobRunner(MRJobRunner):
 
     def get_s3_keys(self, uri, s3_conn=None):
         """Get a stream of boto Key objects for each key inside
-        the given dir on s3. Save any key objects we see in our internal cache
+        the given dir on S3.
 
-        uri is an S3 URI (like s3://foo/bar)
+        uri is an S3 URI: ``s3://foo/bar``
         
-        You may optionally pass in an existing s3 connection through s3_conn
+        You may optionally pass in an existing S3 connection through s3_conn
         """
         if not s3_conn:
             s3_conn = self.make_s3_conn()
@@ -1433,15 +1426,27 @@ class EMRJobRunner(MRJobRunner):
             yield key
 
     def get_s3_folder_keys(self, uri, s3_conn=None):
-        """Get all the *_$folder$ keys created by EMR that are associated with
-        the given URI, as boto Key objects. This is useful if you want to
-        grant read access to another user to a given URI; you'll have to
-        give read access to all associated *_$folder$ files as well or EMR
-        will fail.
+        """Background: S3 is even less of a filesystem than HDFS in that it
+        doesn't have directories. EMR fakes directories by creating special
+        ``*_$folder$`` keys in S3.
+
+        For example if your job outputs ``s3://walrus/tmp/output/part-00000``,
+        EMR will also create these keys:
+
+        - ``s3://walrus/tmp_$folder$``
+        - ``s3://walrus/tmp/output_$folder$``
+
+        If you want to grant another Amazon user access to your files so they
+        can use them in S3, you must grant read access on the actual keys,
+        plus any ``*_$folder$`` keys that "contain" your keys; otherwise
+        EMR will error out with a permissions error.
+
+        This gets all the ``*_$folder$`` keys associated with the given URI,
+        as boto Key objects.
 
         This does not support globbing.
 
-        You may optionally pass in an existing s3 connection through s3_conn
+        You may optionally pass in an existing S3 connection through ``s3_conn``
         """
         if not s3_conn:
             s3_conn = self.make_s3_conn()

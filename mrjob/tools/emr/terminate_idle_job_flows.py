@@ -1,7 +1,9 @@
 """Find EMR job flows that have been idle for a long time (by default, one
 hour) and terminate them.
 
-Suggested usage: run this as a cron job with the -q option.
+Suggested usage: run this as a cron job with the -q option::
+
+    */30 * * * * python -m mrjob.tools.emr.terminate_idle_emr_job_flows -q
 """
 from boto.utils import ISO8601
 from datetime import datetime, timedelta

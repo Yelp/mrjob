@@ -20,7 +20,7 @@ runners:
     ec2_instance_type: c1.xlarge
     # use our local time zone (this is important for deciding when
     # days start and end, for instance)
-    hadoop_env:
+    cmdenv:
       TZ: America/Los_Angeles
     num_ec2_instances: 1
     # we create the src-tree.tar.gz tarball with a Makefile. It only contains

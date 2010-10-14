@@ -1,6 +1,8 @@
 """Terminate an existing EMR job flow.
 
-NOTE: this doesn't actually clean up temp files associated with the job.
+Usage::
+
+    python -m mrjob.tools.emr.terminate_job_flow j-JOBFLOWID
 """
 from __future__ import with_statement
 

@@ -130,7 +130,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         add_mock_hadoop_output([''])
         add_mock_hadoop_output(['1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n'])
         
-        mr_job = MRTwoStepJob(['--runner', 'hadoop', '-v',
+        mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
                                '--no-conf',
                                '-', local_input_path, remote_input_path])
         mr_job.sandbox(stdin=stdin)

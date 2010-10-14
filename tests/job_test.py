@@ -385,6 +385,22 @@ class CommandLineArgsTest(TestCase):
         stderr, stdout = proc.communicate()
         assert_equal(proc.returncode, 2)
 
+    def test_custom_key_value_option_parsing(self):
+        # simple example
+        mr_job = MRBoringJob(['--cmdenv', 'FOO=bar'])
+        assert_equal(mr_job.options.cmdenv, {'FOO': 'bar'})
+
+        # trickier example
+        mr_job = MRBoringJob(
+            ['--cmdenv', 'FOO=bar',
+             '--cmdenv', 'FOO=baz',
+             '--cmdenv', 'BAZ=qux=quux'])
+        assert_equal(mr_job.options.cmdenv,
+                     {'FOO': 'baz', 'BAZ': 'qux=quux'})
+
+        # must have KEY=VALUE
+        assert_raises(ValueError, MRBoringJob, ['--cmdenv', 'FOO'])
+
     def test_passthrough_options_defaults(self):
         mr_job = MRCustomBoringJob()
 

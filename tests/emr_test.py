@@ -108,7 +108,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.mock_emr_output = {('j-MOCKJOBFLOW0', 1): [
             '1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n']}
 
-        mr_job = MRTwoStepJob(['--runner', 'emr', '-v',
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '-c', self.mrjob_conf_path,
                                '-', local_input_path, remote_input_path])
         mr_job.sandbox(stdin=stdin)
@@ -150,7 +150,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         assert_equal(job_flow.state, 'TERMINATED')
 
     def test_failed_job(self):
-        mr_job = MRTwoStepJob(['--runner', 'emr', '-v',
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '-c', self.mrjob_conf_path])
         mr_job.sandbox()
 

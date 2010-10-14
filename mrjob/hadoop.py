@@ -56,7 +56,7 @@ def find_hadoop_streaming_jar(path):
         return None
 
 def fully_qualify_hdfs_path(path):
-    """If path isn't an hdfs:// URL, turn it into one."""
+    """If path isn't an ``hdfs://`` URL, turn it into one."""
     if path.startswith('hdfs://'):
         return path
     elif path.startswith('/'):
@@ -65,33 +65,37 @@ def fully_qualify_hdfs_path(path):
         return 'hdfs:///user/%s/%s' % (os.environ['USER'], path)
 
 class HadoopJobRunner(MRJobRunner):
-    """Class to run a single MRJob once on a Hadoop cluster.
+    """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.
     
-    MRJobRunners are typically instantiated through MRJob's make_runner()
-    method; see the docstring of mrjob.job.MRJob for more info.
+    Input and support files can be either local or on HDFS; use ``hdfs://...``
+    URLs to refer to files on HDFS.
+
+    It's rare to need to instantiate this class directly (see
+    :py:meth:`~HadoopJobRunner.__init__` for details).
     """
+    alias = 'hadoop'
+    
     def __init__(self, **kwargs):
-        """
-        All arguments that take files can take a path or an hdfs:// URI.
-        paths are assumed to refer to local files, except for scratch_dir
-        and output_dir (which always have to be on HDFS)
+        """:py:class:`HadoopJobRunner` takes the same arguments as
+        :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
+        which can be defaulted in :py:mod:`mrjob.conf`.
 
-        mr_job_script and other keyword args (**kwargs) are handled by
-        mrjob.runner.MRJobRunner.__init__().
+        *output_dir* and *hdfs_scratch_dir* need not be fully qualified
+        ``hdfs://`` URIs because its understood that they have to be on
+        HDFS (e.g. ``tmp/mrjob/`` would be okay)
 
-        Additional opts taken by HadoopJobRunner (as keyword args):
-        hadoop_bin -- name/path of your hadoop program (default is 'hadoop')
-        hadoop_home -- alternative to setting the HADOOP_HOME environment
-            variable. We only use this to set/find the hadoop binary
-            and the streaming jar. (we default to tmp/mrjob, which goes
-            in your HDFS home dir)
-        hdfs_scratch_dir -- tmp directory on HDFS. Default is a temp dir inside
-            your home directory. Need not be an hdfs:// URI because it's
-            assumed to be in HDFS
-        hadoop_streaming_jar -- path to your hadoop streaming jar. If not set,
-            we'll search for it inside hadoop_home
+        Additional options:
+
+        :type hadoop_bin: str
+        :param hadoop_bin: name/path of your hadoop program. Defaults to *hadoop_home* plus ``bin/hadoop``
+        :type hadoop_home: str
+        :param hadoop_home: alternative to setting :envvar:`$HADOOP_HOME` variable.
+        :type hdfs_scratch_dir: str
+        :param hdfs_scratch_dir: temp directory on HDFS. Default is ``tmp/mrjob``
+        :type hadoop_streaming_jar: str
+        :param hadoop_streaming_jar: path to your hadoop streaming jar. If not set, we'll search for it inside :envvar:`$HADOOP_HOME`
         """
-        super(HadoopJobRunner, self).__init__('hadoop', **kwargs)
+        super(HadoopJobRunner, self).__init__(**kwargs)
 
         # fix hadoop_home
         if not self._opts['hadoop_home']:
@@ -133,26 +137,26 @@ class HadoopJobRunner(MRJobRunner):
         self._hdfs_input_dir = None
 
     @classmethod
-    def allowed_opts(cls):
+    def _allowed_opts(cls):
         """A list of which keyword args we can pass to __init__()"""
-        return super(HadoopJobRunner, cls).allowed_opts() + [
+        return super(HadoopJobRunner, cls)._allowed_opts() + [
             'hadoop_bin', 'hadoop_home', 'hdfs_scratch_dir',
             'hadoop_streaming_jar']
 
     @classmethod
-    def default_opts(cls):
+    def _default_opts(cls):
         """A dictionary giving the default value of options."""
-        return combine_dicts(super(HadoopJobRunner, cls).default_opts(), {
+        return combine_dicts(super(HadoopJobRunner, cls)._default_opts(), {
             'hadoop_home': os.environ.get('HADOOP_HOME'),
             'hdfs_scratch_dir': 'tmp/mrjob',
         })
 
     @classmethod
-    def opts_combiners(cls):
+    def _opts_combiners(cls):
         """Map from option name to a combine_*() function used to combine
         values for that option. This allows us to specify that some options
         are lists, or contain environment variables, or whatever."""
-        return combine_dicts(super(HadoopJobRunner, cls).opts_combiners(), {
+        return combine_dicts(super(HadoopJobRunner, cls)._opts_combiners(), {
             'hadoop_bin': combine_paths,
             'hadoop_home': combine_paths,
             'hdfs_scratch_dir': combine_paths,
@@ -268,7 +272,7 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args = [self._opts['hadoop_bin'], 'jar', self._opts['hadoop_streaming_jar']]
 
             # add environment variables
-            for key, value in self._hadoop_env.iteritems():
+            for key, value in sorted(self._cmdenv.iteritems()):
                 streaming_args.append('-cmdenv')
                 streaming_args.append('%s=%s' % (key, value))
 
@@ -283,6 +287,13 @@ class HadoopJobRunner(MRJobRunner):
             # set up uploading from HDFS to the working dir
             streaming_args.extend(self._upload_args())
 
+            # add jobconf args
+            for key, value in sorted(self._opts['jobconf'].iteritems()):
+                streaming_args.extend(['-jobconf', '%s=%s' % (key, value)])
+
+            # add extra hadoop args
+            streaming_args.extend(self._opts['hadoop_extra_args'])
+
             # set up mapper and reducer
             streaming_args.append('-mapper')
             streaming_args.append(cmd_line(self._mapper_args(step_num)))
@@ -291,13 +302,6 @@ class HadoopJobRunner(MRJobRunner):
                 streaming_args.append(cmd_line(self._reducer_args(step_num)))
             else:
                 streaming_args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
-
-            # add jobconf args
-            for jobconf_arg in self._opts['jobconf_args']:
-                streaming_args.extend(['-jobconf', jobconf_arg])
-
-            # add extra hadoop args
-            streaming_args.extend(self._opts['hadoop_extra_args'])
 
             log.debug('> %s' % cmd_line(streaming_args))
             step_proc = Popen(streaming_args, stdout=PIPE, stderr=PIPE)

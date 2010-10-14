@@ -145,8 +145,6 @@ class StreamingStep(Step):
 
         if self.reducer:
             args.extend(['-reducer', self.reducer])
-        else:
-            args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
 
         if self.input:
             if isinstance(self.input, list):
@@ -167,6 +165,9 @@ class StreamingStep(Step):
 
         if self.step_args:
             args.extend(self.step_args)
+
+        if not self.reducer:
+            args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
 
         return args
 

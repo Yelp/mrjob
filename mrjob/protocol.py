@@ -12,7 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Protocols for inputting and outputting data from hadoop."""
+"""Protocols are what allow :py:class:`mrjob.job.MRJob` to input and
+output arbitrary values, rather than just strings.
+
+We use JSON as our default protocol rather than something more
+powerful because we want to encourage interoperability with other
+languages. If you need more power, you can represent values as reprs
+or pickles.
+
+Also, if know that your input will always be in JSON format, consider
+the ``json_value`` protocol as an alternative to ``raw_value``.
+
+For more information on using alternate protocols in your job, see
+:ref:`job-protocols`.
+"""
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
 import cPickle
@@ -25,31 +38,35 @@ except ImportError:
     import json # built in to Python 2.6 and later
 
 class HadoopStreamingProtocol(object):
-    """An ABC that reads & writes the protocol hadoop understands
-
-    This class isn't usable by itself: inherit from it and define
-    your own decode & encode functions (see JSONProtocol or
-    ReprProtocol as an example).
+    """Abstract base class for all protocols. Inherit from it and define
+    your own :py:meth:`read` and :py:meth:`write` functions.
     """
     @classmethod
     def read(cls, line):
-        """Read in a line from hadoop (without trailing \n), and return
-        (key, value)."""
+        """Decode a line of input.
+
+        :type line: str
+        :param line: A line of raw input to the job, without trailing newline.
+
+        :return: A tuple of ``(key, value)``."""
         raise NotImplementedError
 
     @classmethod
     def write(cls, key, value):
-        """Write out key and value as a line (without trailing \n)."""
+        """Encode a key and value.
+        
+        :param key: A key (of any type) yielded by a mapper/reducer
+        :param value: A value (of any type) yielded by a mapper/reducer
+
+        :rtype: str
+        :return: A line, without trailing newline."""
         raise NotImplementedError
 
 class JSONProtocol(HadoopStreamingProtocol):
-    """Encoder / decoder for storing data using JSON. The default format
-    for output and communication between steps.
+    """Encode ``(key, value)`` as two JSONs separated by a tab.
 
     Note that JSON has some limitations; dictionary keys must be strings,
-    and there's no distinction between lists and tuples. We use it as
-    the default protocol rather than something with more support for Python
-    data structures to make it easy to work with other languages."""
+    and there's no distinction between lists and tuples."""
     @classmethod
     def read(cls, line):
         key, value = line.split('\t')
@@ -60,9 +77,8 @@ class JSONProtocol(HadoopStreamingProtocol):
         return '%s\t%s' % (json.dumps(key), json.dumps(value))
 
 class JSONValueProtocol(HadoopStreamingProtocol):
-    """Encoder / decoder for reading in lines containing a single JSON
-    as (None, decoded_json). A useful alternative to RawValueProtocol
-    for reading input.
+    """Encode ``value`` as a JSON and discard ``key``
+    (``key`` is read in as ``None``).
     """
     @classmethod
     def read(cls, line):
@@ -73,8 +89,14 @@ class JSONValueProtocol(HadoopStreamingProtocol):
         return json.dumps(value)
 
 class PickleProtocol(HadoopStreamingProtocol):
-    """Encoder / decoder for storing data using cPickle. We also string-escape
-    the pickles to avoid having to deal with stray \t and \n characters
+    """Encode ``(key, value)`` as two string-escaped pickles separated
+    by a tab.
+
+    We string-escape the pickles to avoid having to deal with stray
+    ``\\t`` and ``\\n`` characters, which would confuse Hadoop
+    Streaming.
+
+    Ugly, but should work for any type.
     """
     @classmethod
     def read(cls, line):
@@ -89,9 +111,8 @@ class PickleProtocol(HadoopStreamingProtocol):
             cPickle.dumps(value).encode('string_escape'))
 
 class PickleValueProtocol(HadoopStreamingProtocol):
-    """Encoder / decoder for reading in lines containing a single string-escaped
-    pickle as (None, unpickled_value). A useful alternative to RawValueProtocol
-    for reading input.
+    """Encode ``value`` as a string-escaped pickle and discard ``key``
+    (``key`` is read in as ``None``).
     """
     @classmethod
     def read(cls, line):
@@ -102,8 +123,10 @@ class PickleValueProtocol(HadoopStreamingProtocol):
         return cPickle.dumps(value).encode('string_escape')
 
 class RawValueProtocol(HadoopStreamingProtocol):
-    """Read in a line as (None, line). Write out key, value as value. The
-    default way of reading input files.
+    """Read in a line as ``(None, line)``. Write out ``(key, value)``
+    as ``value``. ``value`` must be a ``str``.
+
+    The default way for a job to read its initial input.
     """
     @classmethod
     def read(cls, line):
@@ -114,8 +137,10 @@ class RawValueProtocol(HadoopStreamingProtocol):
         return value
 
 class ReprProtocol(HadoopStreamingProtocol):
-    """Encoder / decoder for storing basic Python data types using
-    safeeval()."""
+    """Encode ``(key, value)`` as two reprs separated by a tab.
+
+    This only works for basic types (we use :py:func:`mrjob.util.safeeval`).
+    """
     @classmethod
     def read(cls, line):
         key, value = line.split('\t')
@@ -126,9 +151,10 @@ class ReprProtocol(HadoopStreamingProtocol):
         return '%s\t%s' % (repr(key), repr(value))
 
 class ReprValueProtocol(HadoopStreamingProtocol):
-    """Encoder / decoder for reading in lines containing a single repr
-    as (None, evaled_repr). A useful alternative to RawValueProtocol
-    for reading input.
+    """Encode ``value`` as a repr and discard ``key`` (``key`` is read
+    in as None).
+
+    This only works for basic types (we use :py:func:`mrjob.util.safeeval`).
     """
     @classmethod
     def read(cls, line):
@@ -138,6 +164,22 @@ class ReprValueProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return repr(value)
 
+#: The default protocol for all encoded input and output: ``'json'``
+DEFAULT_PROTOCOL = 'json'
+
+#: Default mapping from protocol name to class:
+#:
+#: ============ ===============================
+#: name         class
+#: ============ ===============================
+#: json         :py:class:`JSONProtocol`
+#: json_value   :py:class:`JSONValueProtocol`
+#: pickle       :py:class:`PickleProtocol`
+#: pickle_value :py:class:`PickleValueProtocol`
+#: raw_value    :py:class:`RawValueProtocol`
+#: repr         :py:class:`ReprProtocol`
+#: repr_value   :py:class:`ReprValueProtocol`
+#: ============ ===============================
 PROTOCOL_DICT = {
     'json': JSONProtocol,
     'json_value': JSONValueProtocol,
@@ -147,5 +189,3 @@ PROTOCOL_DICT = {
     'repr': ReprProtocol,
     'repr_value': ReprValueProtocol,
 }
-
-DEFAULT_PROTOCOL = 'json'

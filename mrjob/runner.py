@@ -11,10 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""Base class for running MRJobs and fetching their output.
-
-See MRJobRunner's docstring for typical usage.
+"""Base class for all runners.
 """
 import datetime
 import glob
@@ -33,7 +30,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from mrjob.conf import combine_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
+from mrjob.conf import combine_dicts, combine_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
 from mrjob.util import cmd_line, file_ext, tar_and_gzip
 
 log = logging.getLogger('mrjob.runner')
@@ -41,107 +38,98 @@ log = logging.getLogger('mrjob.runner')
 # use to detect globs and break into the part before and after the glob
 GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
-# cleanup options:
-# NONE: disable cleanup
-# IF_SUCCESSFUL: clean up only if job succeeded
-# SCRATCH: clean up scratch space but not logs
-# ALL: always clean up, even on failure
+#: cleanup options:
+#: 
+#: - ``'NONE'``: disable cleanup
+#: - ``'IF_SUCCESSFUL'``: clean up only if job succeeded
+#: - ``'SCRATCH'``: clean up scratch space but not logs
+#: - ``'ALL'``: always clean up, even on failure
 CLEANUP_CHOICES = sorted(['NONE', 'IF_SUCCESSFUL', 'SCRATCH', 'ALL'])
+
+#: the default cleanup option: ``'IF_SUCCESSFUL'``
 CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
 
 class MRJobRunner(object):
-    """Base class for running a single MRJob once.
+    """Abstract base class for all runners.
 
-    MRJobRunner is an abstract base class; subclasses are:
-    - mrjob.local.LocalMRJobRunner (test job locally)
-    - mrjob.hadoop.HadoopMRJobRunner (run job on your own Hadoop cluster)
-    - mrjob.emr.EMRJobRunner (run job on Amazon Elastic MapReduce)
+    Runners are responsible for launching your job on Hadoop Streaming and
+    fetching the results.
 
-    MRJobRunners are typically instantiated through MRJob's make_runner()
-    method; see the docstring of mrjob.job.MRJob for more info.
+    Most of the time, you won't have any reason to construct a runner directly;
+    it's more like a utility that allows an :py:class:`~mrjob.job.MRJob`
+    to run itself. Normally things work something like this:
+
+    - Get a runner by calling :py:meth:`~mrjob.job.MRJob.make_runner` on your job
+    - Call :py:meth:`~mrjob.runner.MRJobRunner.run` on your runner. This will:
+ 
+      - Run your job with :option:`--steps` to find out how many mappers/reducers to run
+      - Copy your job and supporting files to Hadoop
+      - Instruct Hadoop to run your job with the appropriate :option:`--mapper`, :option:`--reducer`, and :option:`--step-num` arguments
+
+    Each runner runs a single job once; if you want to run a job multiple
+    times, make multiple runners.
+
+    Subclasses: :py:class:`~mrjob.local.LocalMRJobRunner`, 
+    :py:class:`~mrjob.emr.EMRJobRunner`,
+    :py:class:`~mrjob.hadoop.HadoopJobRunner`
     """
+
+    #: alias for this runner; used for picking section of
+    #: :py:mod:``mrjob.conf`` to load one of ``'local'``, ``'emr'``,
+    #: or ``'hadoop'``
+    alias = None
 
     ### methods to call from your batch script ###
 
-    def __init__(self, runner_type,
-                 mr_job_script=None, conf_path=None,
+    def __init__(self, mr_job_script=None, conf_path=None,
                  extra_args=None, file_upload_args=None,
                  input_paths=None, output_dir=None, stdin=None,
                  **opts):
-        """Base __init__() method for the various runners. You shouldn't
-        need to call this directly.
+        """All runners take the following keyword arguments:
+        
+        :type mr_job_script: str
+        :param mr_job_script: the path of the ``.py`` file containing the :py:class:`~mrjob.job.MRJob`. If this is None, you won't actually be able to :py:meth:`run` the job, but other utilities (e.g. :py:meth:`ls`) will work.
+        :type conf_path: str
+        :param conf_path: Alternate path to read configs from, or ``False`` to ignore all config files.
+        :type extra_args: list of str
+        :param extra_args: a list of extra cmd-line arguments to pass to the mr_job script. For example: ``['--protocol', 'repr']``. This is a hook to allow jobs to take additional arguments.
+        :param file_upload_args: a list of tuples of ``('--ARGNAME', path)``. The file at the given path will be uploaded to the local directory of the mr_job script when it runs, and then passed into the script with ``--ARGNAME``. Useful for passing in SQLite DBs and other configuration files to your job.
+        :type input_paths: list of str
+        :param input_paths: Input files for your job. Supports globs and recursively walks directories (e.g. ``['data/common/', 'data/training/*.gz']``). If this is left blank, we'll read from stdin
+        :type output_dir: str
+        :param output_dir: an empty/non-existent directory where Hadoop streaming should put the final output from the job. If you don't specify an output directory, we'll output into a subdirectory of this job's temporary directory. You can control this from the command line with ``--output-dir``.
+        :param stdin: an iterable (can be a ``StringIO`` or even a list) to use as stdin. This is a hook for testing; if you set ``stdin`` via :py:meth:`~mrjob.job.MRJob.sandbox`, it'll get passed through to the runner. If for some reason your lines are missing newlines, we'll add them; this makes it easier to write automated tests.
 
-        __init__() methods for this class and may read from the outside
-        environment (e.g. mrjob.conf) but not write to it.
-
-        Args:
-        runner_type -- one of 'emr', 'hadoop', 'local'; this will tell
-            us which configs to load
-        mr_job_script -- the path of the .py file containing the MRJob.
-            If this is None, you won't actually be able to run() the job,
-            but other utilities (e.g. ls()) will work.
-        conf_path -- alternate path for mrjob.conf to read from, or False
-            to ignore all config files.
-        extra_args -- a list of extra cmd-line arguments to pass to the
-            mr_job script. For example: ['--protocol', 'repr']. This is
-            a hook to allow MRJob scripts to take additional arguments.
-        file_upload_args -- a list of tuples of ('--argname', path). The file
-            at the given path will be uploaded to the local directory of
-            the mr_job script when it runs, and then passed into the script
-            with the given argname. Useful for passing in SQLite DBs and
-            other configuration files to MRJob scripts.
-        input_paths -- list of files that the first mapper in the job will
-            read from. If this is left blank, we'll read from stdin
-        output_dir -- where to put the final output from the job (rather than
-            outputting it into a temporary directory). Format may vary
-            depending on the runner (for example EMRJobRunner requires an
-            s3:// URI). If you specify output_dir, the output will persist
-            in output_dir until you decide to delete it; MRJobRunner won't
-            clean it up automatically.
-        stdin -- an iterable (can be a StringIO or even a list) to use as
-            stdin. If for some reason your lines are missing newlines,
-            we'll add them; this makes it easier to write automated tests.
-
-        opts -- keyword arguments to configure the job, which can be defaulted
-            mrjob.conf. specific opts:
-
-        base_tmp_dir -- path to put local temp dirs inside
-        bootstrap_mrjob -- should we automatically tar up the mrjob library
-            and install it when we run the mrjob. Default is True. You can
-            safely set this to False if you know mrjob is already installed
-            on your hadoop cluster.
-        cleanup -- is cleanup() allowed to clean up logs and scratch files?
-            see constants above
-        hadoop_env -- environment variables to pass to the job inside hadoop
-        hadoop_extra_args -- extra arguments to pass to hadoop streaming
-        jobconf_args -- extra -jobconf args to pass to hadoop streaming. This
-            should be a list of strings like KEY=VALUE. Equivalent to passing
-            ['-jobconf', 'KEY=VALUE'] to hadoop_extra_args.
-        job_name_prefix -- description of this job to use as part of its name
-            (by default, we infer a prefix from the name of the mrjob script)
-        python_archives -- same as upload_archives, except they get added
-            to the map-reduce job's PYTHONPATH
-        setup_cmds -- a list of commands to run before each mapper/reducer
-            step (e.g. ['cd my-src-tree; make', 'mkdir -p /tmp/foo']). Note
-            that multiple mappers/reducers may run on the same node, but
-            we'll use file locking to keep them from running the setup_cmds
-            simultaneously (they will run on the same files though). You
-            can specify setup cmds as strings, which will be run through
-            the shell, or lists of args, which will be invoked directly.
-        setup_scripts -- files that will be copied into the local working
-            directory and then run. These are run after setup_cmds.
-        upload_archives -- a list of archives (e.g. tarballs) to unpack
-            in the local directory of the mr_job script when it runs.
-            You can set the local name of the dir we unpack into by
-            appending #localname to the path; otherwise we just use
-            the name of the archive file (e.g. 'foo.tar.gz')
-        upload_files -- a list of files to copy to the local directory
-            of the mr_job script when it runs. You can set the local name of
-            the dir we unpack into by appending #localname to the path;
-            otherwise we just use the name of the file
+        All runners also take the following options as keyword arguments.
+        These can be defaulted in your :mod:`mrjob.conf` file:
+        
+        :type base_tmp_dir: str
+        :param base_tmp_dir: path to put local temp dirs inside
+        :type bootstrap_mrjob: bool
+        :param bootstrap_mrjob: should we automatically tar up the mrjob library and install it when we run the mrjob? Set this to ``False`` if you've already installed ``mrjob`` on your Hadoop cluster.
+        :type cleanup: str
+        :param cleanup: is :py:meth:`cleanup` allowed to clean up logs and scratch files? See :py:data:`CLEANUP_CHOICES`.
+        :type cmdenv: dict
+        :param cmdenv: environment variables to pass to the job inside Hadoop streaming
+        :type hadoop_extra_args: list of str
+        :param hadoop_extra_args: extra arguments to pass to hadoop streaming
+        :type jobconf: dict
+        :param jobconf: ``-jobconf`` args to pass to hadoop streaming. This should be a map from property name to value. Equivalent to passing ``['-jobconf', 'KEY1=VALUE1', '-jobconf', 'KEY2=VALUE2', ...]`` to ``hadoop_extra_args``.
+        :type job_name_prefix: str
+        :param job_name_prefix: description of this job to use as part of its name (by default, we infer a prefix from the name of the mrjob script)
+        :type python_archives: list of str
+        :param python_archives: same as upload_archives, except they get added to the job's :envvar:`PYTHONPATH`
+        :type setup_cmds: list
+        :param setup_cmds: a list of commands to run before each mapper/reducer step (e.g. ``['cd my-src-tree; make', 'mkdir -p /tmp/foo']``). You can specify commands as strings, which will be run through the shell, or lists of args, which will be invoked directly. We'll use file locking to ensure that multiple mappers/reducers running on the same node won't run *setup_cmds* simultaneously (it's safe to run ``make``).
+        :type setup_scripts: list of str
+        :param setup_scripts: files that will be copied into the local working directory and then run. These are run after *setup_cmds*. Like with *setup_cmds*, we use file locking to keep multiple mappers/reducers on the same node from running *setup_scripts* simultaneously.
+        :type upload_archives: list of str
+        :param upload_archives: a list of archives (e.g. tarballs) to unpack in the local directory of the mr_job script when it runs. You can set the local name of the dir we unpack into by appending ``#localname`` to the path; otherwise we just use the name of the archive file (e.g. ``foo.tar.gz``)
+        :type upload_files: list of str
+        :param upload_files: a list of files to copy to the local directory of the mr_job script when it runs. You can set the local name of the dir we unpack into by appending ``#localname`` to the path; otherwise we just use the name of the file
         """
         # enforce correct arguments
-        allowed_opts = set(self.allowed_opts())
+        allowed_opts = set(self._allowed_opts())
         unrecognized_opts = set(opts) - allowed_opts
         if unrecognized_opts:
             raise TypeError('got unexpected keyword arguments: ' +
@@ -149,8 +137,8 @@ class MRJobRunner(object):
 
         # issue a warning for unknown opts from mrjob.conf and filter them out
         mrjob_conf_opts = load_opts_from_mrjob_conf(
-            runner_type, conf_path=conf_path)
-        unrecognized_opts = set(mrjob_conf_opts) - set(self.allowed_opts())
+            self.alias, conf_path=conf_path)
+        unrecognized_opts = set(mrjob_conf_opts) - set(self._allowed_opts())
         if unrecognized_opts:
             log.warn('got unexpected opts from mrjob.conf: ' +
                      ', '.join(sorted(unrecognized_opts)))
@@ -163,7 +151,7 @@ class MRJobRunner(object):
 
         # combine all of these options
         # only __init__() methods should modify self._opts!
-        self._opts = self.combine_opts(blank_opts, self.default_opts(),
+        self._opts = self.combine_opts(blank_opts, self._default_opts(),
                                        mrjob_conf_opts, opts)
 
         # we potentially have a lot of files to copy, so we keep track
@@ -213,7 +201,7 @@ class MRJobRunner(object):
 
         # set up hadoop environment (going to add on to this in a moment,
         # so making it an instance variable)
-        self._hadoop_env = self._opts['hadoop_env'].copy()
+        self._cmdenv = self._opts['cmdenv'].copy()
 
         # set up uploading
         for path in self._opts['upload_archives']:
@@ -252,15 +240,15 @@ class MRJobRunner(object):
         self._steps = None
 
     @classmethod
-    def allowed_opts(cls):
+    def _allowed_opts(cls):
         """A list of which keyword args we can pass to __init__()"""
-        return ['base_tmp_dir', 'bootstrap_mrjob', 'cleanup', 'hadoop_env',
-                'hadoop_extra_args', 'jobconf_args', 'job_name_prefix',
+        return ['base_tmp_dir', 'bootstrap_mrjob', 'cleanup', 'cmdenv',
+                'hadoop_extra_args', 'jobconf', 'job_name_prefix',
                 'python_archives', 'setup_cmds', 'setup_scripts',
                 'upload_archives', 'upload_files']
 
     @classmethod
-    def default_opts(cls):
+    def _default_opts(cls):
         """A dictionary giving the default value of options."""
         return {
             'base_tmp_dir': os.environ.get('TMPDIR') or '/tmp',
@@ -269,15 +257,15 @@ class MRJobRunner(object):
         }
 
     @classmethod
-    def opts_combiners(cls):
+    def _opts_combiners(cls):
         """Map from option name to a combine_*() function used to combine
         values for that option. This allows us to specify that some options
         are lists, or contain environment variables, or whatever."""
         return {
             'base_tmp_dir': combine_paths,
-            'hadoop_env': combine_envs,
+            'cmdenv': combine_envs,
             'hadoop_extra_args': combine_lists,
-            'jobconf_args': combine_lists,
+            'jobconf': combine_dicts,
             'python_archives': combine_path_lists,
             'setup_cmds': combine_lists,
             'setup_scripts': combine_path_lists,
@@ -292,9 +280,9 @@ class MRJobRunner(object):
 
         You don't need to re-implement this in a subclass
         """
-        return combine_opts(cls.opts_combiners(), *opts_list)
+        return combine_opts(cls._opts_combiners(), *opts_list)
 
-    ### METHODS TO CALL FROM YOUR BATCH SCRIPT ###
+    ### Running the job and parsing output ###
 
     def run(self):
         """Run the job, and block until it finishes.
@@ -344,12 +332,16 @@ class MRJobRunner(object):
         pass 
 
     def cleanup(self, mode=None):
-        """Clean up running jobs, scratch dirs, and logs (scratch dir
-        and log cleanup is subject to the cleanup option passed to init)
+        """Clean up running jobs, scratch dirs, and logs, subject to the *cleanup* option passed to the constructor.
 
-        Args:
-        mode -- override cleanup in self._opts
-        
+        If you create your runner in a :keyword:`with` block, :py:meth:`cleanup` will be called automatically::
+
+            with mr_job.make_runner() as runner:
+                ...
+
+            # cleanup() called automatically here
+
+        :param mode: override *cleanup* passed into the constructor. Should be one of :py:data:`CLEANUP_CHOICES`
         """
         mode = mode or self._opts['cleanup']
 
@@ -376,15 +368,21 @@ class MRJobRunner(object):
 
     ### file management utilties ###
 
-    # Some simple filesystem operations that are easy to implement.
+    # Some simple filesystem operations that work for all runners.
 
-    # You need to re-implement these in your subclass to handle files
-    # that aren't on the local filesystem (on HDFS, S3, etc.)
+    # To access files on HDFS (when using 
+    # :py:class:``~mrjob.hadoop.HadoopJobRunner``) and S3 (when using 
+    # ``~mrjob.emr.EMRJobRunner``), use ``hdfs://...`` and  ``s3://...``, 
+    # respectively.
+
+    # We don't currently support ``mv()`` and ``cp()`` because S3 doesn't
+    # really have directories, so the semantics get a little weird.
+
+    # Some simple filesystem operations that are easy to implement.
 
     # We don't support mv() and cp() because they don't totally make sense
     # on S3, which doesn't really have moves or directories!
 
-    # you probably don't need to redefine get_output_dir()
     def get_output_dir(self):
         """Find the directory containing the job output. If the job hasn't
         run yet, returns None"""
@@ -394,9 +392,9 @@ class MRJobRunner(object):
         return self._output_dir
 
     def du(self, path_glob):
-        """Get the total size of files matching path_glob
+        """Get the total size of files matching ``path_glob``
 
-        Corresponds roughly to: hadoop fs -dus
+        Corresponds roughly to: ``hadoop fs -dus path_glob``
         """
         return sum(os.path.getsize(path) for path in self.ls(path_glob))
 
@@ -406,7 +404,7 @@ class MRJobRunner(object):
         We don't return directories for compatibility with S3 (which
         has no concept of them)
 
-        Corresponds roughly to: hadoop fs -lsr
+        Corresponds roughly to: ``hadoop fs -lsr path_glob``
         """
         for path in glob.glob(path_glob):
             if os.path.isdir(path):
@@ -420,16 +418,15 @@ class MRJobRunner(object):
         """Create the given dir and its subdirs (if they don't already
         exist).
 
-        Corresponds roughly to: hadoop fs -mkdir    
+        Corresponds roughly to: ``hadoop fs -mkdir path``
         """
         if not os.path.isdir(path):
             os.makedirs(path)
 
     def path_exists(self, path_glob):
-        """Does the given path exist? (Mostly so we know if we want to delete
-        it).
+        """Does the given path exist?
 
-        Corresponds roughly to: hadoop fs -test -e
+        Corresponds roughly to: ``hadoop fs -test -e path_glob``
         """
         return bool(glob.glob(path_glob))
 
@@ -440,7 +437,7 @@ class MRJobRunner(object):
     def rm(self, path_glob):
         """Recursively delete the given file/directory, if it exists
 
-        Corresponds roughly to: hadoop fs -rmr
+        Corresponds roughly to: ``hadoop fs -rmr path_glob``
         """
         for path in glob.glob(path_glob):
             if os.path.isdir(path):
@@ -450,17 +447,17 @@ class MRJobRunner(object):
                 log.debug('Deleting %s' % path)
                 os.remove(path)
 
-    def touchz(self, dest):
+    def touchz(self, path):
         """Make an empty file in the given location. Raises an error if
         a non-zero length file already exists in that location.
 
-        Correponds to: hadoop fs -touchz
+        Correponds to: ``hadoop fs -touchz path``
         """
-        if os.path.isfile(dest) and os.path.getsize(dest) != 0:
-            raise OSError('Non-empty file %r already exists!' % (dest,))
+        if os.path.isfile(path) and os.path.getsize(path) != 0:
+            raise OSError('Non-empty file %r already exists!' % (path,))
 
         # zero out the file
-        open(dest, 'w').close()
+        open(path, 'w').close()
 
     ### other methods you need to implement in your subclass ###
 
@@ -526,8 +523,8 @@ class MRJobRunner(object):
     def _add_python_archive(self, path):
         file_dict = self._add_archive_for_upload(path)
         log.debug('adding %s to PYTHONPATH' % file_dict['name'])
-        self._hadoop_env = combine_envs(
-            self._hadoop_env, {'PYTHONPATH': file_dict['name']})
+        self._cmdenv = combine_envs(
+            self._cmdenv, {'PYTHONPATH': file_dict['name']})
         self._python_archives.append(file_dict)
 
     def _assign_unique_names_to_files(self, name_field, prefix='', match=None):

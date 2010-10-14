@@ -23,7 +23,7 @@ def find_python_traceback(lines):
     """Scan a log file or other iterable for a Python traceback,
     and return it as a list of lines.
 
-    In logs from EMR, we find python tracebacks in task-attempts/*/stderr
+    In logs from EMR, we find python tracebacks in ``task-attempts/*/stderr``
     """
     for line in lines:
         if line.startswith('Traceback (most recent call last):'):
@@ -40,21 +40,22 @@ def find_hadoop_java_stack_trace(lines):
     """Scan a log file or other iterable for a java stack trace from Hadoop,
     and return it as a list of lines.
 
-    In logs from EMR, we find java stack traces in task-attempts/*/syslog
+    In logs from EMR, we find java stack traces in ``task-attempts/*/syslog``
 
-    Sample stack trace:
-    2010-07-27 18:25:48,397 WARN org.apache.hadoop.mapred.TaskTracker (main): Error running child
-    java.lang.OutOfMemoryError: Java heap space
-            at org.apache.hadoop.mapred.IFile$Reader.readNextBlock(IFile.java:270)
-            at org.apache.hadoop.mapred.IFile$Reader.next(IFile.java:332)
-            at org.apache.hadoop.mapred.Merger$Segment.next(Merger.java:147)
-            at org.apache.hadoop.mapred.Merger$MergeQueue.adjustPriorityQueue(Merger.java:238)
-            at org.apache.hadoop.mapred.Merger$MergeQueue.next(Merger.java:255)
-            at org.apache.hadoop.mapred.Merger.writeFile(Merger.java:86)
-            at org.apache.hadoop.mapred.Merger$MergeQueue.merge(Merger.java:377)
-            at org.apache.hadoop.mapred.Merger.merge(Merger.java:58)
-            at org.apache.hadoop.mapred.ReduceTask.run(ReduceTask.java:277)
-            at org.apache.hadoop.mapred.TaskTracker$Child.main(TaskTracker.java:2216)
+    Sample stack trace::
+    
+        2010-07-27 18:25:48,397 WARN org.apache.hadoop.mapred.TaskTracker (main): Error running child
+        java.lang.OutOfMemoryError: Java heap space
+                at org.apache.hadoop.mapred.IFile$Reader.readNextBlock(IFile.java:270)
+                at org.apache.hadoop.mapred.IFile$Reader.next(IFile.java:332)
+                at org.apache.hadoop.mapred.Merger$Segment.next(Merger.java:147)
+                at org.apache.hadoop.mapred.Merger$MergeQueue.adjustPriorityQueue(Merger.java:238)
+                at org.apache.hadoop.mapred.Merger$MergeQueue.next(Merger.java:255)
+                at org.apache.hadoop.mapred.Merger.writeFile(Merger.java:86)
+                at org.apache.hadoop.mapred.Merger$MergeQueue.merge(Merger.java:377)
+                at org.apache.hadoop.mapred.Merger.merge(Merger.java:58)
+                at org.apache.hadoop.mapred.ReduceTask.run(ReduceTask.java:277)
+                at org.apache.hadoop.mapred.TaskTracker$Child.main(TaskTracker.java:2216)
 
     (We omit the "Error running child" line from the results)
     """
@@ -78,11 +79,11 @@ def find_input_uri_for_mapper(lines):
     for the first mapper on Hadoop. Just returns the path, or None if
     no match.
 
-    In logs from EMR, we find python tracebacks in task-attempts/*/syslog
+    In logs from EMR, we find python tracebacks in ``task-attempts/*/syslog``
 
-    Matching log lines look like:
+    Matching log lines look like::
 
-    2010-07-27 17:54:54,344 INFO org.apache.hadoop.fs.s3native.NativeS3FileSystem (main): Opening 's3://yourbucket/logs/2010/07/23/log2-00077.gz' for reading
+        2010-07-27 17:54:54,344 INFO org.apache.hadoop.fs.s3native.NativeS3FileSystem (main): Opening 's3://yourbucket/logs/2010/07/23/log2-00077.gz' for reading
     """
     for line in lines:
         match = _OPENING_FOR_READING_RE.match(line)
@@ -98,11 +99,11 @@ def find_interesting_hadoop_streaming_error(lines):
     other than "Job not Successful!". Return the error as a string, or None
     if nothing found.
 
-    In logs from EMR, we find java stack traces in steps/*/syslog
+    In logs from EMR, we find java stack traces in ``steps/*/syslog``
 
-    Example line:
+    Example line::
 
-    2010-07-27 19:53:35,451 ERROR org.apache.hadoop.streaming.StreamJob (main): Error launching job , Output path already exists : Output directory s3://yourbucket/logs/2010/07/23/ already exists and is not empty
+        2010-07-27 19:53:35,451 ERROR org.apache.hadoop.streaming.StreamJob (main): Error launching job , Output path already exists : Output directory s3://yourbucket/logs/2010/07/23/ already exists and is not empty
     """
     for line in lines:
         match = _HADOOP_STREAMING_ERROR_RE.match(line)
@@ -120,19 +121,17 @@ _STATUS_RE = re.compile(r'reporter:status:(.*)$')
 def parse_mr_job_stderr(stderr, counters=None):
     """Parse counters and status messages out of MRJob output.
 
-    Args:
-    data -- a filehandle, a list of lines, or a str containing data
-    counters -- Counters so far, to update. counters should be a map from
-        group to counter name to count.
+    :param data: a filehandle, a list of lines, or a str containing data
+    :type counters: Counters so far, to update; a map from group to counter name to count.
 
-    Returns a dictionary with the keys 'counters', 'statuses', 'other':
-    counters -- counters so far; same format as above
-    statuses -- a list of status messages encountered
-    other -- lines that aren't either counters or status messages
+    Returns a dictionary with the keys *counters*, *statuses*, *other*:
 
-    For the corresponding code in Hadoop Streaming, see incrCounter() in
-    http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup
+    - *counters*: counters so far; same format as above
+    - *statuses*: a list of status messages encountered
+    - *other*: lines that aren't either counters or status messages
     """
+    # For the corresponding code in Hadoop Streaming, see ``incrCounter()`` in
+    # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup
     if isinstance(stderr, str):
         stderr = StringIO(stderr)
 

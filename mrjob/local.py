@@ -29,10 +29,6 @@ from mrjob.util import cmd_line, file_ext
 
 log = logging.getLogger('mrjob.local')
 
-# recognize hadoop streaming
-HADOOP_COUNTER_RE = re.compile(r'reporter:counter:(.*),(.*),(\d+)$')
-HADOOP_STATUS_RE = re.compile(r'reporter:satus:(.*)$')
-
 # the archive types supported by EMR (and presumably, hadoop streaming)
 HOW_TO_UNARCHIVE = {
     '.jar': ['jar', 'xf'],
@@ -43,18 +39,23 @@ HOW_TO_UNARCHIVE = {
 }
 
 class LocalMRJobRunner(MRJobRunner):
-    """Class to run a single MRJob once locally, for testing purposes.
-    
-    MRJobRunners are typically instantiated through MRJob's make_runner()
-    method; see the docstring of mrjob.job.MRJob for more info.
+    """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing
+    purposes.
+
+    This is the default way of running jobs; we assume you'll spend some
+    time debugging your job before you're ready to run it on EMR or
+    Hadoop.
+
+    It's rare to need to instantiate this class directly (see
+    :py:meth:`~LocalMRJobRunner.__init__` for details).
     """
 
-    def __init__(self, **kwargs):
-        """LocalMRJobRunner takes the same kwargs as MRJobRunner
+    alias = 'local'
 
-        We just add some instance variables for file management."""
-        super(LocalMRJobRunner, self).__init__(
-            'local', **kwargs)
+    def __init__(self, **kwargs):
+        """LocalMRJobRunner takes the same keyword args as MRJobRunner.
+        """
+        super(LocalMRJobRunner, self).__init__(**kwargs)
 
         self._working_dir = None
         self._prev_outfile = None
@@ -181,7 +182,7 @@ class LocalMRJobRunner(MRJobRunner):
         env = combine_envs(
             {'PYTHONPATH': os.getcwd()},
             os.environ,
-            self._opts['hadoop_env'],
+            self._cmdenv,
             env or {})
         
         # decide where to get input

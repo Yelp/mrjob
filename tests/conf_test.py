@@ -248,6 +248,7 @@ class CombineOptsTestCase(TestCase):
             combine_opts(combiners,
                          {'foo': ['bar'], 'baz': ['qux']},
                          {'foo': ['baz'], 'baz': ['quux'], 'bar': 'garply'},
+                         None,
                          {}),
             # "baz" doesn't use the list combiner, so ['qux'] is overwritten
             {'foo': ['bar', 'baz'], 'baz': ['quux'], 'bar': 'garply'})

@@ -23,8 +23,6 @@
 This module contains EMR response objects
 """
 
-import time
-
 from boto.resultset import ResultSet
 
 class EmrObject(object):
@@ -71,6 +69,23 @@ class Step(EmrObject):
             self.args = ResultSet([('member', Arg)])
             return self.args
 
+class InstanceGroup(EmrObject):
+    Fields = set(['CreationDateTime',
+                  'EndDateTime',
+                  'InstanceGroupId',
+                  'InstanceRequestCount',
+                  'InstanceRole',
+                  'InstanceRunningCount',
+                  'InstanceType',
+                  'LastStateChangeReason',
+                  'LaunchGroup',
+                  'Market',
+                  'Name',
+                  'ReadyDateTime',
+                  'SpotPrice',
+                  'StartDateTime',
+                  'State'])
+
 class JobFlow(EmrObject):
     Fields = set(['CreationDateTime',
                   'StartDateTime',
@@ -110,6 +125,9 @@ class JobFlow(EmrObject):
         elif name == 'BootstrapActions':
             self.bootstrap_actions = ResultSet([('member', BootstrapAction)])
             return self.bootstrap_actions
+        elif name == 'InstanceGroups':
+            self.instance_groups = ResultSet([('member', InstanceGroup)])
+            return self.instance_groups
         else:
             return None
 

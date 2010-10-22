@@ -42,11 +42,11 @@ mrjob will work in other AWS regions (e.g. Asia), but you'll have to set up
 Try it out!
 ===========
     # locally
-    python mrjob/examples/mr_word_freq_count.py README.txt > counts
+    python mrjob/examples/mr_word_freq_count.py README.md > counts
 	# on EMR
-    python mrjob/examples/mr_word_freq_count.py README.txt -r emr > counts
+    python mrjob/examples/mr_word_freq_count.py README.md -r emr > counts
     # on your Hadoop cluster
-    python mrjob/examples/mr_word_freq_count.py README.txt -r hadoop > counts
+    python mrjob/examples/mr_word_freq_count.py README.md -r hadoop > counts
 
 
 Advanced Configuration

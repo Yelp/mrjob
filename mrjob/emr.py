@@ -1098,7 +1098,7 @@ class EMRJobRunner(MRJobRunner):
         writeln('import distutils.sysconfig')
         writeln('import os')
         writeln('import stat')
-        writeln('from subprocess import check_call')
+        writeln('from subprocess import call, check_call')
         writeln()
 
         # download all our files using wget
@@ -1127,8 +1127,9 @@ class EMRJobRunner(MRJobRunner):
             writeln("check_call(['sudo', 'tar', 'xfz', %r, '-C', mrjob_dir])" %
                     self._mrjob_tar_gz_file['name'])
             # re-compile pyc files now, since mappers/reducers can't
-            # write to this directory.
-            writeln("check_call(['sudo', 'python', '-m', 'compileall', mrjob_dir])")
+            # write to this directory. Don't fail if there is extra
+            # un-compileable crud in the tarball.
+            writeln("call(['sudo', 'python', '-m', 'compileall', '-f', mrjob_dir])")
             writeln()
 
         # install our python modules

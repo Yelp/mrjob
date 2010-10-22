@@ -792,11 +792,13 @@ class MRJobRunner(object):
 
             def filter_path(path):
                 filename = os.path.basename(path)
-                return not(file_ext(filename) in ('.pyc', '.pyo') or
-                           # filter out emacs backup files. not strictly
-                           # necessary; just makes developing mrjob nicer.
-                           filename.endswith('~') or
-                           filename.startswith('.#'))
+                return not(file_ext(filename).lower() in ('.pyc', '.pyo') or
+                    # filter out emacs backup files
+                    filename.endswith('~') or
+                    # filter out emacs lock files
+                    filename.startswith('.#') or
+                    # filter out MacFuse resource forks
+                    filename.startswith('._'))
 
             tar_and_gzip(mrjob_dir, tar_gz_path, filter=filter_path)
             self._mrjob_tar_gz_path = tar_gz_path

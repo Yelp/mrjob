@@ -11,10 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""Python MapReduce framework.
+"""Write and run Hadoop Streaming jobs on Amazon Elastic MapReduce or your own Hadoop cluster.
 """
-
 __author__ = 'David Marin <dave@yelp.com>'
 __credits__ = ['Matt Jones <mattj@yelp.com>', 'Julian Krause <juliank@yelp.com>']
-__version__ = '0.1'
+__version__ = '0.1.0-pre1'

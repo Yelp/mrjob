@@ -38,7 +38,7 @@ output a file with tab-separated lines like: ``"stars"\t5``.
 
 For one-step jobs, you can also just redefine :py:meth:`~mrjob.job.MRJob.mapper` and :py:meth:`~mrjob.job.MRJob.reducer`::
 
-	from mrjob.job import MRJob
+    from mrjob.job import MRJob
 
     class MRWordCounter(MRJob):
         def mapper(self, key, line):
@@ -1078,10 +1078,10 @@ class MRJob(object):
             
             fake_input = '"foo"\\t"bar"\\n"foo"\\t"baz"\\n'
             mr_job.sandbox(stdin=StringIO(fake_input))
-            
+
             mr_job.run_reducer(link_num=0)
-            assert_equal(mr_job.parse_output(), '...')
-            assert_equal(mr_job.parse_counters(), {...})
+            assert_equal(mr_job.parse_output(), ...)
+            assert_equal(mr_job.parse_counters(), ...)
         """
         self.stdin = stdin or StringIO()
         self.stdout = stdout or StringIO()

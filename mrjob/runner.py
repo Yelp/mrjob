@@ -118,7 +118,7 @@ class MRJobRunner(object):
         :type job_name_prefix: str
         :param job_name_prefix: description of this job to use as part of its name (by default, we infer a prefix from the name of the mrjob script)
         :type python_archives: list of str
-        :param python_archives: same as upload_archives, except they get added to the job's :envvar:`PYTHONPATH`
+        :param python_archives: same as upload_archives, except they get added to the job's :envvar:`$PYTHONPATH`
         :type setup_cmds: list
         :param setup_cmds: a list of commands to run before each mapper/reducer step (e.g. ``['cd my-src-tree; make', 'mkdir -p /tmp/foo']``). You can specify commands as strings, which will be run through the shell, or lists of args, which will be invoked directly. We'll use file locking to ensure that multiple mappers/reducers running on the same node won't run *setup_cmds* simultaneously (it's safe to run ``make``).
         :type setup_scripts: list of str

@@ -81,7 +81,7 @@ class HadoopJobRunner(MRJobRunner):
         which can be defaulted in :py:mod:`mrjob.conf`.
 
         *output_dir* and *hdfs_scratch_dir* need not be fully qualified
-        ``hdfs://`` URIs because its understood that they have to be on
+        ``hdfs://`` URIs because it's understood that they have to be on
         HDFS (e.g. ``tmp/mrjob/`` would be okay)
 
         Additional options:

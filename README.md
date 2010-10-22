@@ -17,27 +17,22 @@ Some important features:
      * Setup handled transparently by `mrjob.conf` config file
  * Automatically interpret error logs from EMR
  * SSH tunnel to hadoop job tracker on EMR
- * Zero setup on Hadoop (no need to install mrjob on your Hadoop cluster)
+ * Minimal setup
+     * To run on EMR, set `$AWS_ACCESS_KEY_ID` and `$AWS_SECRET_ACCESS_KEY`
+     * To run on your Hadoop cluster, set `$HADOOP_HOME`
 
 Installation
 ============
 `python setup.py install`
 
-Works out-of-the box with your hadoop cluster (just set `$HADOOP_HOME`)
-
-Minimal EMR setup:
+Setting up EMR on Amazon
+========================
 
  * create an Amazon Web Services account: <http://aws.amazon.com/>
  * sign up for Elastic MapReduce: <http://aws.amazon.com/elasticmapreduce/>
  * Get your access and secret keys (go to <http://aws.amazon.com/account/> and
    click on "Security Credentials") and set the environment variables 
    `$AWS_ACCESS_KEY_ID` and `$AWS_SECRET_ACCESS_KEY` accordingly
- * create at least one S3 bucket in the "US Standard" region to use for logs 
-   and scratch space: <https://console.aws.amazon.com/s3/home>
-
-mrjob will work in other AWS regions (e.g. Asia), but you'll have to set up 
-`mrjob.conf`. See below.
-
 
 Try it out!
 ===========

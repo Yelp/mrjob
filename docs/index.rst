@@ -15,6 +15,7 @@ own Hadoop cluster
    
    writing-and-running.rst
    library.rst
+   amazon.rst
 
 Indices and tables
 ==================

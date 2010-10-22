@@ -7,7 +7,7 @@ These can be set:
 
 - from :py:mod:`mrjob.conf`
 - from the command line
-- by re-defining `~mrjob.job.MRJob.job_runner_kwargs` etc in your `~mrjob.MRJob` (see :ref:`job-configuration`)
+- by re-defining :py:meth:`~mrjob.job.MRJob.job_runner_kwargs` etc in your :py:class:`~mrjob.job.MRJob` (see :ref:`job-configuration`)
 - by instantiating the runner directly
 
 All runners

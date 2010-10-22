@@ -12,6 +12,7 @@
 # serve to show the default.
 
 import sys, os
+import mrjob
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the

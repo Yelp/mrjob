@@ -32,7 +32,7 @@ setup(
               'mrjob.examples',
               'mrjob.tools',
               'mrjob.tools.emr'],
-    provides='mrjob',
+    provides=['mrjob'],
     url='http://github.com/Yelp/mrjob',
     version='0.1.0-pre1',
     zip_safe=False, # so that we can bootstrap mrjob

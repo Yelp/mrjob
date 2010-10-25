@@ -124,8 +124,8 @@ def read_input(path, stdin=sys.stdin):
 def tar_and_gzip(dir, out_path, filter=None):
     """Tar and gzip the given *dir* to a tarball at *out_path*.
 
-    This mostly exists because ``tarfile`` is not fully integrated with
-    ``gzip`` on Python 2.5. In later versions of Python, it will make more
+    This mostly exists because ``tarfile`` is not fully-featured in
+    Python 2.5. In later versions of Python, it will make more
     sense to just use the ``tarfile`` module directly.
 
     :type dir: str
@@ -139,9 +139,10 @@ def tar_and_gzip(dir, out_path, filter=None):
 
     if not filter:
         filter = lambda path: True
-    
-    out_file = gzip.GzipFile(out_path, 'w')
-    tar_gz = tarfile.TarFile(mode='w', fileobj=out_file)
+
+    # supposedly you can also call tarfile.TarFile(), but I couldn't
+    # get this to work in Python 2.5.1. Please leave as-is.
+    tar_gz = tarfile.open(out_path, mode='w:gz')
 
     for dirpath, dirnames, filenames in os.walk(dir):
         for filename in filenames:
@@ -152,7 +153,6 @@ def tar_and_gzip(dir, out_path, filter=None):
                 tar_gz.add(path, arcname=path_in_tar_gz, recursive=False)
 
     tar_gz.close()
-    out_file.close()
 
 # Thanks to http://lybniz2.sourceforge.net/safeeval.html for
 # explaining how to do this!

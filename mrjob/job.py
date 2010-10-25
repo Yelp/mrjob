@@ -366,7 +366,7 @@ class MRJob(object):
             return LocalMRJobRunner(**self.local_job_runner_kwargs())
 
     def run_job(self):
-        """Run the all steps of the job, logging errors (and debugging output
+        """Run all steps of the job, logging errors (and debugging output
         if :option:`--verbose` is specified) to STDERR and streaming the
         output to STDOUT.
 
@@ -596,7 +596,7 @@ class MRJob(object):
             help='run a reducer')
 
         self.option_parser.add_option(
-            '--step-num', dest='step_num', type='int', default=0, default=False,
+            '--step-num', dest='step_num', type='int', default=0,
             help='which step to execute (default is 0)')
 
         # protocol stuff

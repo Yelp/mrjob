@@ -255,8 +255,11 @@ class ProtocolsTestCase(TestCase):
         # good data should still get through
         assert_equal(mr_job.stdout.getvalue(), '"foo"\t["bar"]\n')
 
-        assert_equal(mr_job.parse_counters(),
-                     {'Undecodable input': {'ValueError': 3}})
+        # exception type varies between versions of simplejson,
+        # so just make sure there were three exceptions of some sort
+        counters = mr_job.parse_counters()
+        assert_equal(counters.keys(), ['Undecodable input'])
+        assert_equal(sum(counters['Undecodable input'].itervalues()), 3)
         
     def test_unencodable_output(self):
         UNENCODABLE_RAW_INPUT = StringIO('foo\n' +

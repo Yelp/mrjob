@@ -625,7 +625,8 @@ class MRJobRunner(object):
             if not self._script:
                 self._steps = []
             else:
-                args = ['python', self._script['path'], '--steps']
+                args = (['python', self._script['path'], '--steps'] +
+                        self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))
                 steps_proc = Popen(args, stdout=PIPE, stderr=PIPE)
                 stdout, stderr = steps_proc.communicate()
@@ -649,17 +650,30 @@ class MRJobRunner(object):
         
         return self._steps
 
-    def _mr_job_extra_args(self):
-        """Return arguments to add to every invocation of MRJob."""
+    def _mr_job_extra_args(self, local=False):
+        """Return arguments to add to every invocation of MRJob.
+
+        :type local: boolean
+        :param local: if this is True, use files' local paths rather than
+        	the path they'll have inside Hadoop streaming
+        """
         return self._get_file_upload_args() + self._extra_args
     
-    def _get_file_upload_args(self):
+    def _get_file_upload_args(self, local=False):
         """Arguments used to pass through config files, etc from the job
-        runner through to the local directory where the script is run."""
+        runner through to the local directory where the script is run.
+
+        :type local: boolean
+        :param local: if this is True, use files' local paths rather than
+        	the path they'll have inside Hadoop streaming
+        """
         args = []
         for arg, file_dict in self._file_upload_args:
             args.append(arg)
-            args.append(file_dict['name'])
+            if local:
+                args.append(file_dict['path'])
+            else:
+                args.append(file_dict['name'])
         return args
 
     def _wrapper_script_content(self):

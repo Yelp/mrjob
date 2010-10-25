@@ -295,17 +295,16 @@ class EMRJobRunner(MRJobRunner):
                 scratch_bucket_name = scratch_bucket.name
                 # if we're not using an ancient version of boto, set region
                 # based on the bucket's region
-                if (not self._aws_region and
-                    hasattr(scratch_bucket, 'get_location')):
+                if (hasattr(scratch_bucket, 'get_location')):
                     self._aws_region = scratch_bucket.get_location()
                     if self._aws_region:
-                        log.info(
-                            "using bucket's region (%s) to connect to AWS" %
-                            self._aws_region)
+                        log.info("using scratch bucket's region (%s) to connect to AWS" %
+                                 self._aws_region)
             else:
                 # need to create a bucket
                 scratch_bucket_name = 'mrjob-%016x' % random.randint(0, 2**64-1)
-                log.info('creating bucket %s to use as scratch space')
+                log.info('creating S3 bucket %r to use as scratch space' %
+                         scratch_bucket_name)
                 s3_conn.create_bucket(scratch_bucket_name,
                                       location=(self._aws_region or ''))
             
@@ -1336,10 +1335,11 @@ class EMRJobRunner(MRJobRunner):
         throttled."""
         def retry_if(ex):
             """Retry if we get a server error indicating throttling."""
-            return (isinstance(ex, boto.exception.BotoServerError) and
-                    ('Throttling' in ex.body or
-                     'RequestExpired' in ex.body or
-                     'Connection reset by peer' in ex.body))
+            return ((isinstance(ex, boto.exception.BotoServerError) and
+                     ('Throttling' in ex.body or
+                      'RequestExpired' in ex.body)) or
+                    (isinstance(ex, socket.error) and
+                     ex.args == (104, 'Connection reset by peer')))
 
         return RetryWrapper(raw_conn,
                             retry_if=retry_if,
@@ -1370,12 +1370,14 @@ class EMRJobRunner(MRJobRunner):
         if not (self._aws_region or self._opts['emr_endpoint']):
             return None # use the default region
 
-        endpoint = (
-            self._opts['emr_endpoint'] or 
-            '%s.elasticmapreduce.amazonaws.com' % self._aws_region)
+        if self._opts['emr_endpoint']:
+            endpoint = self._opts['emr_endpoint']
+        elif self._aws_region.upper() == 'EU':
+            endpoint = 'eu-west-1.elasticmapreduce.amazonaws.com'
+        else:
+            endpoint = '%s.elasticmapreduce.amazonaws.com' % self._aws_region
         
-        return boto.ec2.regioninfo.RegionInfo(
-            None, self._aws_region, endpoint)
+        return boto.ec2.regioninfo.RegionInfo(None, self._aws_region, endpoint)
             
     ### S3-specific FILESYSTEM STUFF ###
 
@@ -1389,18 +1391,23 @@ class EMRJobRunner(MRJobRunner):
 
         :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a :py:class:`mrjob.retry.RetryWrapper`
         """
-        log.debug('creating S3 connection')
+        s3_endpoint = self._get_s3_endpoint()
+        log.debug('creating S3 connection (to %s)' % s3_endpoint)
         raw_s3_conn = boto.connect_s3(
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
-            host=self._get_s3_endpoint())
+            host=s3_endpoint)
         return self._wrap_aws_conn(raw_s3_conn)
 
     def _get_s3_endpoint(self):
         if self._opts['s3_endpoint']:
             return self._opts['s3_endpoint']
+        # no region-specific endpoint for EU
         elif self._aws_region:
-            return 's3-%s.amazonaws.com' % self._aws_region
+            if self._aws_region.upper() == 'EU':
+                return 's3-external-3.amazonaws.com'
+            else:
+                return 's3-%s.amazonaws.com' % self._aws_region
         else:
             return 's3.amazonaws.com'
 

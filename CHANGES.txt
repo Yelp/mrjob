@@ -1,1 +1,10 @@
+v0.1.0-pre2, 2010-01-25 -- Second pre-release after testing
+ * Fixed small bugs that broke Python 2.5.1 and Python 2.7
+ * Fixed reading mrjob.conf without yaml installed
+ * Fix tests to work with modern simplejson and pipes.quote()
+ * Auto-create temp bucket on S3 if we don't have one (Issue #16)
+ * Auto-infer AWS region from bucket (Issue #7)
+ * --steps now passes in all extra args (e.g. --protocol) (Issue #4)
+ * Better docs
+
 v0.1.0-pre1, 2010-10-21 -- Initial pre-release. YMMV!

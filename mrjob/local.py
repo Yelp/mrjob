@@ -77,10 +77,13 @@ class LocalMRJobRunner(MRJobRunner):
             log.warning('ignoring extra args to hadoop streaming: %r' %
                         (self._opts['hadoop_extra_args'],))
 
-        wrapper_args = ['python']
+        # use the same python interpreter that we're currently running in
+        python_bin = sys.executable or 'python'
+
+        wrapper_args = [python_bin]
         if self._wrapper_script:
             wrapper_args = (
-                ['python', self._wrapper_script['name']] + wrapper_args)
+                [python_bin, self._wrapper_script['name']] + wrapper_args)
 
         # run mapper, sort, reducer for each step
         for i, step in enumerate(self._get_steps()):

@@ -163,7 +163,7 @@ def load_mrjob_conf(conf_path=None):
         if yaml:
             return yaml.safe_load(f)
         else:
-            return json.loads(f)
+            return json.load(f)
 
 def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
     """Load the options to initialize a runner from mrjob.conf, or return

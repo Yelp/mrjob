@@ -21,7 +21,7 @@ import stat
 from subprocess import Popen, PIPE, CalledProcessError
 from StringIO import StringIO
 import tempfile
-from testify import TestCase, assert_equal, assert_raises, class_setup, class_teardown
+from testify import TestCase, assert_equal, assert_in, assert_raises, class_setup, class_teardown
 
 from mrjob.util import *
 
@@ -30,8 +30,9 @@ class CmdLineTestCase(TestCase):
     def test_cmd_line(self):
         assert_equal(cmd_line(['cut', '-f', 2, '-d', ' ']),
                      "cut -f 2 -d ' '")
-        assert_equal(cmd_line(['grep', '-e', "# DON'T USE$"]),
-                     "grep -e \"# DON'T USE\\$\"")
+        assert_in(cmd_line(['grep', '-e', "# DON'T USE$"]),
+                  ("grep -e \"# DON'T USE\\$\"",
+                   'grep -e \'# DON\'"\'"\'T USE$\''))
 
 class FileExtTestCase(TestCase):
 

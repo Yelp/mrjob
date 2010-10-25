@@ -14,19 +14,23 @@
 """Unit testing for EMRJobRunner"""
 from __future__ import with_statement
 
-import boto
 from StringIO import StringIO
 import os
 import shutil
 import tempfile
 from testify import TestCase, assert_equal, assert_raises, setup, teardown
 
-from mrjob import botoemr
-
 from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner
 from tests.mockboto import MockS3Connection, MockEmrConnection, add_mock_s3_data
 from tests.mr_two_step_job import MRTwoStepJob
+
+try:
+    import boto
+    from mrjob import botoemr
+except ImportError:
+    boto = None
+    botoemr = None
 
 class MockEMRAndS3TestCase(TestCase):
 

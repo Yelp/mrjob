@@ -137,7 +137,6 @@ class MRJobConfTestCase(TestCase):
         dump_mrjob_conf(conf, open(conf_path, 'w'))
         assert_equal(conf, load_mrjob_conf(conf_path=conf_path))
 
-
 class CombineValuesTestCase(TestCase):
 
     def test_empty(self):

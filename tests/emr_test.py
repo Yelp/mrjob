@@ -179,15 +179,31 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         job_flow = emr_conn.describe_jobflow(job_flow_id)
         assert_equal(job_flow.state, 'TERMINATED')
 
-    def test_pick_s3_scratch_uri(self):
-        self.add_mock_s3_data({'walrus': {}, 'zebra': {}})
+    def test_pick_scratch_uri(self):
+        self.add_mock_s3_data({'mrjob-walrus': {}, 'zebra': {}})
         runner = EMRJobRunner(conf_path=False)
 
         assert_equal(runner._opts['s3_scratch_uri'],
-                     's3://walrus/tmp/mrjob/')
+                     's3://mrjob-walrus/tmp/')
 
-    def test_cant_pick_s3_scratch_uri_with_no_buckets(self):
-        assert_raises(Exception, EMRJobRunner, conf_path=False)
+    def test_create_scratch_uri(self):
+        # "walrus" bucket will be ignored; it doesn't start with "mrjob-"
+        self.add_mock_s3_data({'walrus': {}, 'zebra': {}})
+
+        runner = EMRJobRunner(conf_path=False)
+
+        # bucket name should be mrjob- plus 16 random hex digits
+        s3_scratch_uri = runner._opts['s3_scratch_uri']
+        assert_equal(s3_scratch_uri[:11], 's3://mrjob-')
+        assert_equal(s3_scratch_uri[27:], '/tmp/')
+
+        # once our scratch bucket is created, we should re-use it
+        runner2 = EMRJobRunner(conf_path=False)
+        assert_equal(runner2._opts['s3_scratch_uri'], s3_scratch_uri)
+        s3_scratch_uri = runner._opts['s3_scratch_uri']
+
+
+        
 
 ### tests for error parsing ###
 

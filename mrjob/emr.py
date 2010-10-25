@@ -155,13 +155,13 @@ class EMRJobRunner(MRJobRunner):
         :type ec2_slave_instance_type: str
         :param ec2_slave_instance_type: same as *ec2_instance_type*, but only for the slave Hadoop nodes
         :type emr_endpoint: str
-        :param emr_endpoint: optional host to connect to when communicating with S3 (e.g. ``us-west-1.elasticmapreduce.amazonaws.com``). Default is to infer this from *region*.
+        :param emr_endpoint: optional host to connect to when communicating with S3 (e.g. ``us-west-1.elasticmapreduce.amazonaws.com``). Default is to infer this from *aws_region*.
         :type emr_job_flow_id: str
         :param emr_job_flow_id: the ID of a persistent EMR job flow to run jobs in (normally we launch our own job). It's fine for other jobs to be using the job flow; we give our job's steps a unique ID.
         :type num_ec2_instances: int
         :param num_ec2_instances: number of instances to start up. Default is ``1``.
         :type s3_endpoint: str
-        :param s3_endpoint: Host to connect to when communicating with S3 (e.g. ``s3-us-west-1.amazonaws.com``). Default is to infer this from *region*.
+        :param s3_endpoint: Host to connect to when communicating with S3 (e.g. ``s3-us-west-1.amazonaws.com``). Default is to infer this from *aws_region*.
         :type s3_log_uri: str
         :param s3_log_uri:  where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for your job flow will go into a subdirectory, e.g. ``s3://yourbucket/logs/j-JOBFLOWID/``. in this example s3://yourbucket/logs/j-YOURJOBID/). Default is to append ``logs/`` to *s3_scratch_uri*.
         :type s3_scratch_uri: str
@@ -176,6 +176,10 @@ class EMRJobRunner(MRJobRunner):
         :param ssh_tunnel_is_open: if True, any host can connect to the job tracker through the SSH tunnel you open. Mostly useful if your browser is running on a different machine from your job.
         """
         super(EMRJobRunner, self).__init__(**kwargs)
+
+        # make aws_region an instance variable; we might want to set it
+        # based on the scratch bucket
+        self._aws_region = self._opts['aws_region']
 
         self._fix_s3_scratch_and_log_uri_opts()
 
@@ -285,11 +289,29 @@ class EMRJobRunner(MRJobRunner):
         if not self._opts['s3_scratch_uri']:
             s3_conn = self.make_s3_conn()
             buckets = s3_conn.get_all_buckets()
-            if buckets:
-                self._opts['s3_scratch_uri'] = 's3://%s/tmp/mrjob/' % buckets[0].name
-                log.info('s3_scratch_uri is not set; using %s as our scratch dir on S3' % self._opts['s3_scratch_uri'])
+            mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
+            if mrjob_buckets:
+                scratch_bucket = mrjob_buckets[0]
+                scratch_bucket_name = scratch_bucket.name
+                # if we're not using an ancient version of boto, set region
+                # based on the bucket's region
+                if (not self._aws_region and
+                    hasattr(scratch_bucket, 'get_location')):
+                    self._aws_region = scratch_bucket.get_location()
+                    if self._aws_region:
+                        log.info(
+                            "using bucket's region (%s) to connect to AWS" %
+                            self._aws_region)
             else:
-                raise Exception('s3_scratch_uri is not set, and you own no S3 buckets')
+                # need to create a bucket
+                scratch_bucket_name = 'mrjob-%016x' % random.randint(0, 2**64-1)
+                log.info('creating bucket %s to use as scratch space')
+                s3_conn.create_bucket(scratch_bucket_name,
+                                      location=(self._aws_region or ''))
+            
+            self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
+            log.info('using %s as our scratch dir on S3' %
+                     self._opts['s3_scratch_uri'])
 
         self._opts['s3_scratch_uri'] = self._check_and_fix_s3_dir(
             self._opts['s3_scratch_uri'])
@@ -1345,15 +1367,15 @@ class EMRJobRunner(MRJobRunner):
         This is kind of silly because all EmrConnection ever does with
         this object is extract the hostname, but that's how boto rolls.
         """
-        if not (self._opts['aws_region'] or self._opts['emr_endpoint']):
+        if not (self._aws_region or self._opts['emr_endpoint']):
             return None # use the default region
 
         endpoint = (
             self._opts['emr_endpoint'] or 
-            '%s.elasticmapreduce.amazonaws.com' % self._opts['aws_region'])
+            '%s.elasticmapreduce.amazonaws.com' % self._aws_region)
         
         return boto.ec2.regioninfo.RegionInfo(
-            None, self._opts['aws_region'], endpoint)
+            None, self._aws_region, endpoint)
             
     ### S3-specific FILESYSTEM STUFF ###
 
@@ -1377,8 +1399,8 @@ class EMRJobRunner(MRJobRunner):
     def _get_s3_endpoint(self):
         if self._opts['s3_endpoint']:
             return self._opts['s3_endpoint']
-        elif self._opts['aws_region']:
-            return 's3-%s.amazonaws.com' % self._opts['aws_region']
+        elif self._aws_region:
+            return 's3-%s.amazonaws.com' % self._aws_region
         else:
             return 's3.amazonaws.com'
 

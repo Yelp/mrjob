@@ -61,7 +61,7 @@ class MockS3Connection(object):
         by specifying mock_s3_fs. The mock filesystem is just a map
         from bucket name to key name to bytes.
         """
-        self.mock_s3_fs = combine_values({}, mock_s3_fs)
+        self.mock_s3_fs = mock_s3_fs or {}
 
     def get_bucket(self, bucket_name):
         if bucket_name in self.mock_s3_fs:
@@ -71,6 +71,13 @@ class MockS3Connection(object):
 
     def get_all_buckets(self):
         return [self.get_bucket(name) for name in self.mock_s3_fs]
+
+    def create_bucket(self, bucket_name, headers=None, location='',
+                      policy=None):
+        if bucket_name in self.mock_s3_fs:
+            raise boto.exception.S3CreateError(409, 'Conflict')
+        else:
+            self.mock_s3_fs[bucket_name] = {}
 
 class MockBucket:
     """Mock out boto.s3.Bucket
@@ -100,6 +107,9 @@ class MockBucket:
             return MockKey(bucket=self, name=key_name)
         else:
             return None
+
+    def get_location(self):
+        return 'us-west-1'
 
     def list(self, prefix=''):
         for key_name in sorted(self.mock_state()):

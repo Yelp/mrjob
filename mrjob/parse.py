@@ -13,14 +13,7 @@
 # limitations under the License.
 """Utilities for parsing errors, counters, and status messages."""
 import re
-
-try:
-    from cStringIO import StringIO
-except ImportError:
-    try:
-        from StringIO import StringIO
-    except ImportError:
-        from io import StringIO
+from mrjob.compat import str_func, StringIO
 
 def find_python_traceback(lines):
     """Scan a log file or other iterable for a Python traceback,

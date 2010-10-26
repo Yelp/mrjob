@@ -25,13 +25,7 @@ import sys
 from subprocess import Popen, PIPE
 import tarfile
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    try:
-        from StringIO import StringIO
-    except ImportError:
-        from io import StringIO
+from mrjob.compat import str_func, StringIO
 
 from mrjob.conf import combine_dicts, combine_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
 from mrjob.util import cmd_line, file_ext, tar_and_gzip
@@ -638,10 +632,7 @@ class MRJobRunner(object):
                     raise Exception(
                         'error getting step information: %s', stderr)
                 
-                try:
-                    str_func = unicode
-                except NameError:
-                    str_func = str
+                
                 stdout_str = str_func(stdout, encoding='utf8')
                 steps = stdout_str.strip().split(' ')
 

@@ -18,13 +18,7 @@ import posixpath
 import re
 from subprocess import Popen, PIPE, CalledProcessError
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    try:
-        from StringIO import StringIO
-    except ImportError:
-        from io import StringIO
+from mrjob.compat import StringIO
 
 from mrjob.conf import combine_dicts, combine_paths
 from mrjob.runner import MRJobRunner

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-from io import StringIO
 import fnmatch
 import logging
 import os
@@ -25,13 +24,7 @@ import socket
 from subprocess import Popen, PIPE
 import time
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    try:
-        from StringIO import StringIO
-    except ImportError:
-        from io import StringIO
+from mrjob.compat import StringIO
 
 try:
     import boto

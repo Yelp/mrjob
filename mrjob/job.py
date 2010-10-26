@@ -101,13 +101,7 @@ from optparse import Option, OptionParser, OptionGroup, OptionError, OptionValue
 import sys
 import time
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    try:
-        from StringIO import StringIO
-    except ImportError:
-        from io import StringIO
+from mrjob.compat import StringIO
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts

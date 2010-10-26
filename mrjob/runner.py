@@ -25,7 +25,7 @@ import sys
 from subprocess import Popen, PIPE
 import tarfile
 
-from mrjob.compat import str_func, StringIO
+from mrjob.compat import str_func, StringIO, executable_name
 
 from mrjob.conf import combine_dicts, combine_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
 from mrjob.util import cmd_line, file_ext, tar_and_gzip
@@ -622,7 +622,7 @@ class MRJobRunner(object):
             if not self._script:
                 self._steps = []
             else:
-                args = (['python3', self._script['path'], '--steps'] +
+                args = ([executable_name, self._script['path'], '--steps'] +
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))
                 steps_proc = Popen(args, stdout=PIPE, stderr=PIPE)
@@ -639,6 +639,7 @@ class MRJobRunner(object):
                 # verify that this is a proper step description
                 if not steps:
                     raise ValueError('step description is empty!')
+                
                 for step in steps:
                     if step not in ('MR', 'M'):
                         raise ValueError(

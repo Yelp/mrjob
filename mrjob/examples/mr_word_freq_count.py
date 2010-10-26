@@ -16,9 +16,6 @@
 The classic MapReduce job: count the frequency of words.
 """
 
-import sys
-sys.path.append('/Users/stephen/Development/3p/mrjob')
-
 import re
 
 WORD_RE = re.compile(r"[\w']+")

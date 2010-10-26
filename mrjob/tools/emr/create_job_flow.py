@@ -7,7 +7,7 @@ Usage::
 
 **WARNING**: do not run this without having :py:mod:`mrjob.emr.tools.terminate.idle_job_flows` in your crontab; job flows left idle can quickly become expensive!
 """
-from __future__ import with_statement
+
 
 from optparse import OptionParser
 import sys
@@ -37,7 +37,7 @@ def main():
     }
     runner = EMRJobRunner(**runner_kwargs)
     emr_job_flow_id = runner.make_persistent_job_flow()
-    print emr_job_flow_id
+    print(emr_job_flow_id)
 
 def make_option_parser():
     usage = '%prog [options]'

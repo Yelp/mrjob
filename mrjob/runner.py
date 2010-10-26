@@ -26,9 +26,9 @@ from subprocess import Popen, PIPE
 import tarfile
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
 except ImportError:
-    from StringIO import StringIO
+    from io import StringIO
 
 from mrjob.conf import combine_dicts, combine_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
 from mrjob.util import cmd_line, file_ext, tar_and_gzip
@@ -317,7 +317,7 @@ class MRJobRunner(object):
             log.info('removing tmp directory %s' % self._local_tmp_dir)
             try:
                 shutil.rmtree(self._local_tmp_dir)
-            except OSError, e:
+            except OSError as e:
                 log.exception(e)
 
         self._local_tmp_dir = None
@@ -625,7 +625,7 @@ class MRJobRunner(object):
             if not self._script:
                 self._steps = []
             else:
-                args = (['python', self._script['path'], '--steps'] +
+                args = (['python3', self._script['path'], '--steps'] +
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))
                 steps_proc = Popen(args, stdout=PIPE, stderr=PIPE)
@@ -634,8 +634,9 @@ class MRJobRunner(object):
                 if steps_proc.returncode != 0:
                     raise Exception(
                         'error getting step information: %s', stderr)
-
-                steps = stdout.strip().split(' ')
+                
+                stdout_str = str(stdout, encoding='utf8')
+                steps = stdout_str.strip().split(' ')
 
                 # verify that this is a proper step description
                 if not steps:
@@ -708,7 +709,7 @@ class MRJobRunner(object):
                 # with the mapper/reducer's output
                 writeln(
                     "check_call(%r, shell=%r, stdout=open('/dev/null', 'w'))"
-                    % (cmd, bool(isinstance(cmd, basestring))))
+                    % (cmd, bool(isinstance(cmd, str))))
             writeln()
 
         # run setup scripts
@@ -814,7 +815,7 @@ class MRJobRunner(object):
                     # filter out MacFuse resource forks
                     filename.startswith('._'))
 
-            tar_and_gzip(mrjob_dir, tar_gz_path, filter=filter_path)
+            tar_and_gzip(mrjob_dir, tar_gz_path, path_filter=filter_path)
             self._mrjob_tar_gz_path = tar_gz_path
 
         return self._mrjob_tar_gz_path

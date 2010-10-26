@@ -28,7 +28,7 @@ For more information on using alternate protocols in your job, see
 """
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-import cPickle
+import pickle
 
 from mrjob.util import safeeval
 
@@ -101,14 +101,14 @@ class PickleProtocol(HadoopStreamingProtocol):
     @classmethod
     def read(cls, line):
         key, value = line.split('\t')
-        return (cPickle.loads(key.decode('string_escape')),
-                cPickle.loads(value.decode('string_escape')))
+        return (pickle.loads(key.decode('string_escape')),
+                pickle.loads(value.decode('string_escape')))
 
     @classmethod
     def write(cls, key, value):
         return '%s\t%s' % (
-            cPickle.dumps(key).encode('string_escape'),
-            cPickle.dumps(value).encode('string_escape'))
+            pickle.dumps(key).encode('string_escape'),
+            pickle.dumps(value).encode('string_escape'))
 
 class PickleValueProtocol(HadoopStreamingProtocol):
     """Encode ``value`` as a string-escaped pickle and discard ``key``
@@ -116,11 +116,11 @@ class PickleValueProtocol(HadoopStreamingProtocol):
     """
     @classmethod
     def read(cls, line):
-        return (None, cPickle.loads(line.decode('string_escape')))
+        return (None, pickle.loads(line.decode('string_escape')))
 
     @classmethod
     def write(cls, key, value):
-        return cPickle.dumps(value).encode('string_escape')
+        return pickle.dumps(value).encode('string_escape')
 
 class RawValueProtocol(HadoopStreamingProtocol):
     """Read in a line as ``(None, line)``. Write out ``(key, value)``

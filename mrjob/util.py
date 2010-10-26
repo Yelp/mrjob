@@ -121,7 +121,7 @@ def read_input(path, stdin=sys.stdin):
     for line in f:
         yield line
 
-def tar_and_gzip(dir, out_path, filter=None):
+def tar_and_gzip(dir, out_path, path_filter=None):
     """Tar and gzip the given *dir* to a tarball at *out_path*.
 
     This mostly exists because ``tarfile`` is not fully-featured in
@@ -137,8 +137,8 @@ def tar_and_gzip(dir, out_path, filter=None):
     if not os.path.isdir(dir):
         raise IOError('Not a directory: %r' % (dir,))
 
-    if not filter:
-        filter = lambda path: True
+    if not path_filter:
+        path_filter = lambda path: True
 
     # supposedly you can also call tarfile.TarFile(), but I couldn't
     # get this to work in Python 2.5.1. Please leave as-is.
@@ -149,7 +149,7 @@ def tar_and_gzip(dir, out_path, filter=None):
             path = os.path.join(dirpath, filename)
             # janky version of os.path.relpath (Python 2.6):
             path_in_tar_gz = path[len(os.path.join(dir, '')):]
-            if filter(path_in_tar_gz):
+            if path_filter(path_in_tar_gz):
                 tar_gz.add(path, arcname=path_in_tar_gz, recursive=False)
 
     tar_gz.close()

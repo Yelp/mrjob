@@ -88,7 +88,7 @@ See :doc:`configs-runners` for the entire dizzying array of configurable
 options.
 """
 
-from __future__ import with_statement
+
 
 import glob
 import logging
@@ -260,7 +260,7 @@ def combine_envs(*envs):
     result = {}
     for env in envs:
         if env:
-            for key, value in env.iteritems():
+            for key, value in env.items():
                 if key.endswith('PATH') and result.get(key):
                     result[key] = '%s:%s' % (value, result[key])
                 else:

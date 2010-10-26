@@ -19,9 +19,9 @@ import re
 from subprocess import Popen, PIPE, CalledProcessError
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
 except ImportError:
-    from StringIO import StringIO
+    from io import StringIO
 
 from mrjob.conf import combine_dicts, combine_paths
 from mrjob.runner import MRJobRunner
@@ -272,7 +272,7 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args = [self._opts['hadoop_bin'], 'jar', self._opts['hadoop_streaming_jar']]
 
             # add environment variables
-            for key, value in sorted(self._cmdenv.iteritems()):
+            for key, value in sorted(self._cmdenv.items()):
                 streaming_args.append('-cmdenv')
                 streaming_args.append('%s=%s' % (key, value))
 
@@ -288,7 +288,7 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args.extend(self._upload_args())
 
             # add jobconf args
-            for key, value in sorted(self._opts['jobconf'].iteritems()):
+            for key, value in sorted(self._opts['jobconf'].items()):
                 streaming_args.extend(['-jobconf', '%s=%s' % (key, value)])
 
             # add extra hadoop args
@@ -456,7 +456,7 @@ class HadoopJobRunner(MRJobRunner):
 
             try:
                 self._invoke_hadoop(['fs', '-rmr', self._hdfs_tmp_dir])
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)
 
     ### FILESYSTEM STUFF ###

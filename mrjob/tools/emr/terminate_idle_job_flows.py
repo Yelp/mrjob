@@ -81,8 +81,8 @@ def terminate_and_notify(emr_conn, to_terminate, options):
     for job_flow_id, name, idle_time in to_terminate:
         if not options.dry_run:
             emr_conn.terminate_jobflow(job_flow_id)
-        print 'Terminated job flow %s (%s); was idle for %s' % (
-            (job_flow_id, name, idle_time))
+        print('Terminated job flow %s (%s); was idle for %s' % (
+            (job_flow_id, name, idle_time)))
 
 def make_option_parser():
     usage = '%prog [options]'

@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import with_statement
 
-from cStringIO import StringIO
+
+from io import StringIO
 import fnmatch
 import logging
 import os
@@ -26,9 +26,9 @@ from subprocess import Popen, PIPE
 import time
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
 except ImportError:
-    from StringIO import StringIO
+    from io import StringIO
 
 try:
     import boto
@@ -260,7 +260,7 @@ class EMRJobRunner(MRJobRunner):
             'num_ec2_instances': 1,
             's3_sync_wait_time': 5.0,
             'ssh_bin': 'ssh',
-            'ssh_bind_ports': range(40001, 40841),
+            'ssh_bind_ports': list(range(40001, 40841)),
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
         })
@@ -511,7 +511,7 @@ class EMRJobRunner(MRJobRunner):
                 try:
                     os.kill(self._ssh_proc.pid, signal.SIGKILL)
                     self._ssh_proc = None
-                except Exception, e:
+                except Exception as e:
                     log.exception(e)
 
         # stop the job flow if it belongs to us (it may have stopped on its
@@ -520,7 +520,7 @@ class EMRJobRunner(MRJobRunner):
             log.info('Terminating job flow: %s' % self._emr_job_flow_id)
             try:
                 self.make_emr_conn().terminate_jobflow(self._emr_job_flow_id)
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)            
 
     def _cleanup_scratch(self):
@@ -532,7 +532,7 @@ class EMRJobRunner(MRJobRunner):
                 log.info('Removing all files in %s' % self._s3_tmp_uri)
                 self.rm(self._s3_tmp_uri)
                 self._s3_tmp_uri = None
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)
 
     def _cleanup_logs(self):
@@ -545,7 +545,7 @@ class EMRJobRunner(MRJobRunner):
                 log.info('Removing all files in %s' % self._s3_job_log_uri)
                 self.rm(self._s3_job_log_uri)
                 self._s3_job_log_uri = None
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)
 
     def _wait_for_s3_eventual_consistency(self):
@@ -603,7 +603,7 @@ class EMRJobRunner(MRJobRunner):
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (
             self._job_name, self._opts['s3_log_uri'],
-            ', '.join('%s=%s' % (k, v) for k, v in args.iteritems())))
+            ', '.join('%s=%s' % (k, v) for k, v in args.items())))
         emr_job_flow_id = emr_conn.run_jobflow(
             self._job_name, self._opts['s3_log_uri'], **args)
  
@@ -669,10 +669,10 @@ class EMRJobRunner(MRJobRunner):
             # other arguments passed directly to hadoop streaming
             step_args = []
             
-            for key, value in sorted(self._cmdenv.iteritems()):
+            for key, value in sorted(self._cmdenv.items()):
                 step_args.extend(['-cmdenv', '%s=%s' % (key, value)])
 
-            for key, value in sorted(self._opts['jobconf'].iteritems()):
+            for key, value in sorted(self._opts['jobconf'].items()):
                 step_args.extend(['-jobconf', '%s=%s' % (key, value)])
 
             step_args.extend(self._opts['hadoop_extra_args'])
@@ -1170,7 +1170,7 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['bootstrap_cmds']:
             writeln('# run bootstrap cmds:')
             for cmd in self._opts['bootstrap_cmds']:
-                if isinstance(cmd, basestring):
+                if isinstance(cmd, str):
                     cmd = 'sudo ' + cmd
                     writeln('check_call(%r, shell=True)' % cmd)
                 else:

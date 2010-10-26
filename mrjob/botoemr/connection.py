@@ -135,7 +135,7 @@ class EmrConnection(AWSQueryConnection):
         :type steps: list(boto.emr.Step)
         :param steps: A list of steps to add to the job
         """
-        if type(steps) != types.ListType:
+        if type(steps) != list:
             steps = [steps]
         params = {}
         params['JobFlowId'] = jobflow_id
@@ -248,22 +248,22 @@ class EmrConnection(AWSQueryConnection):
         return step_params
 
     def _build_bootstrap_action_list(self, bootstrap_actions):
-        if type(bootstrap_actions) != types.ListType:
+        if type(bootstrap_actions) != list:
             bootstrap_actions = [bootstrap_actions]
 
         params = {}
         for i, bootstrap_action in enumerate(bootstrap_actions):
-            for key, value in bootstrap_action.iteritems():
+            for key, value in bootstrap_action.items():
                 params['BootstrapActions.memeber.%s.%s' % (i + 1, key)] = value
         return params
 
     def _build_step_list(self, steps):
-        if type(steps) != types.ListType:
+        if type(steps) != list:
             steps = [steps]
 
         params = {}
         for i, step in enumerate(steps):
-            for key, value in step.iteritems():
+            for key, value in step.items():
                 params['Steps.memeber.%s.%s' % (i+1, key)] = value
         return params
 

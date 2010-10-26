@@ -91,7 +91,7 @@ See :py:mod:`mrjob.examples` for more examples.
 """
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-from __future__ import with_statement
+
 
 import inspect
 import itertools
@@ -101,9 +101,9 @@ import sys
 import time
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
 except ImportError:
-    from StringIO import StringIO
+    from io import StringIO
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
@@ -242,10 +242,18 @@ class MRJob(object):
         """
         # Use mapper(), mapper_final(), and reducer() only if they've been
         # re-defined
-        kwargs = dict((func_name, getattr(self, func_name))
-                      for func_name in ('mapper', 'mapper_final', 'reducer')
-                      if (getattr(self, func_name).im_func is not
-                          getattr(MRJob, func_name).im_func))
+        try:
+            kwargs = dict((func_name, getattr(self, func_name))
+                          for func_name in ('mapper', 'mapper_final', 'reducer')
+                          if (getattr(self, func_name).__func__ is not
+                              getattr(MRJob, func_name).__func__))
+        except AttributeError as e:
+            # Python 3 treats unbound methods differently, only the *instance* methods
+            # have __func__
+            kwargs = dict((func_name, getattr(self, func_name))
+                          for func_name in ('mapper', 'mapper_final', 'reducer')
+                          if (getattr(self, func_name).__func__ is not
+                              getattr(MRJob, func_name)))
 
         return [self.mr(**kwargs)]
 
@@ -285,7 +293,7 @@ class MRJob(object):
         with semicolons (commas confuse Hadoop streaming).
         """
         # don't allow people to pass in floats
-        if not isinstance(amount, (int, long)):
+        if not isinstance(amount, int):
             raise TypeError('amount must be an integer, not %r' % (amount,))
 
         # Extra commas screw up hadoop and there's no way to escape them. So
@@ -446,7 +454,7 @@ class MRJob(object):
         # be careful to use generators for everything, to allow for
         # very large groupings of values
         for key, kv_pairs in itertools.groupby(read_lines(),
-                                               key=lambda(k, v): k):
+                                               key=lambda k_v: k_v[0]):
             values = (v for k, v in kv_pairs)
             for out_key, out_value in reducer(key, values):
                 write_line(out_key, out_value)
@@ -462,7 +470,7 @@ class MRJob(object):
         We currently output something like ``MR M R``, but expect this to
         change!
         """
-        print >> self.stdout, ' '.join(self._steps_desc())
+        print(' '.join(self._steps_desc()), file=self.stdout)
 
     def _steps_desc(self):
         return ['MR' if reducer else 'M' for (mapper, reducer) in self.steps()]
@@ -511,14 +519,14 @@ class MRJob(object):
                 try:
                     key, value = read(line.rstrip('\n'))
                     yield key, value
-                except Exception, e:
+                except Exception as e:
                     self.increment_counter('Undecodable input',
                                            e.__class__.__name__)
 
         def write_line(key, value):
             try:
-                print >> self.stdout, write(key, value)
-            except Exception, e:
+                print(write(key, value), file=self.stdout)
+            except Exception as e:
                 self.increment_counter('Unencodable output',
                                        e.__class__.__name__)
 

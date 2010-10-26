@@ -15,9 +15,9 @@
 import re
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
 except ImportError:
-    from StringIO import StringIO
+    from io import StringIO
 
 def find_python_traceback(lines):
     """Scan a log file or other iterable for a Python traceback,
@@ -141,6 +141,7 @@ def parse_mr_job_stderr(stderr, counters=None):
     other = []
 
     for line in stderr:
+        line = str(line, encoding='utf8')
         m = _COUNTER_RE.match(line)
         if m:
             group, counter, amount_str = m.groups()

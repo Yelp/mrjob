@@ -4,7 +4,7 @@ Usage::
 
     python -m mrjob.tools.emr.terminate_job_flow j-JOBFLOWID
 """
-from __future__ import with_statement
+
 
 import logging
 from optparse import OptionParser

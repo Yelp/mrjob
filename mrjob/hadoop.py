@@ -19,9 +19,12 @@ import re
 from subprocess import Popen, PIPE, CalledProcessError
 
 try:
-    from io import StringIO
+    from cStringIO import StringIO
 except ImportError:
-    from io import StringIO
+    try:
+        from StringIO import StringIO
+    except ImportError:
+        from io import StringIO
 
 from mrjob.conf import combine_dicts, combine_paths
 from mrjob.runner import MRJobRunner

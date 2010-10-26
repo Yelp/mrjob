@@ -92,6 +92,7 @@ See :py:mod:`mrjob.examples` for more examples.
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
 
+from __future__ import print_function
 
 import inspect
 import itertools
@@ -101,9 +102,12 @@ import sys
 import time
 
 try:
-    from io import StringIO
+    from cStringIO import StringIO
 except ImportError:
-    from io import StringIO
+    try:
+        from StringIO import StringIO
+    except ImportError:
+        from io import StringIO
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts

@@ -233,9 +233,6 @@ class MRJobRunner(object):
         # access/make this using self._get_local_tmp_dir()
         self._local_tmp_dir = None
 
-        # did we successfully stream output?
-        self._streamed_output = False
-
         # info about our steps. this is basically a cache for self._get_steps()
         self._steps = None
 
@@ -297,12 +294,10 @@ class MRJobRunner(object):
         """Stream raw lines from the job's output. You can parse these
         using the read() method of the appropriate HadoopStreamingProtocol
         class."""
-        assert self._ran_job and not self._streamed_output
+        assert self._ran_job
         
         for line in self._stream_output():
             yield line
-
-        self._streamed_output = True
 
     def _cleanup_scratch(self):
         """Cleanup any files/directories we create while running this job.

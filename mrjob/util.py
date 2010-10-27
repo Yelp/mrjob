@@ -124,9 +124,7 @@ def read_input(path, stdin=sys.stdin):
 def tar_and_gzip(dir, out_path, filter=None):
     """Tar and gzip the given *dir* to a tarball at *out_path*.
 
-    This mostly exists because ``tarfile`` is not fully-featured in
-    Python 2.5. In later versions of Python, it will make more
-    sense to just use the ``tarfile`` module directly.
+    If we encounter symlinks, include the actual file, not the symlink.
 
     :type dir: str
     :param dir: dir to tar up
@@ -150,7 +148,9 @@ def tar_and_gzip(dir, out_path, filter=None):
             # janky version of os.path.relpath (Python 2.6):
             path_in_tar_gz = path[len(os.path.join(dir, '')):]
             if filter(path_in_tar_gz):
-                tar_gz.add(path, arcname=path_in_tar_gz, recursive=False)
+                # copy over real files, not symlinks
+                real_path = os.path.realpath(path)
+                tar_gz.add(real_path, arcname=path_in_tar_gz, recursive=False)
 
     tar_gz.close()
 

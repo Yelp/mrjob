@@ -13,6 +13,8 @@
 # limitations under the License.
 
 """Tests of all the amazing utilities in mrjob.util"""
+from __future__ import with_statement
+
 import bz2
 import gzip
 import os
@@ -20,8 +22,9 @@ import shutil
 import stat
 from subprocess import Popen, PIPE, CalledProcessError
 from StringIO import StringIO
+import tarfile
 import tempfile
-from testify import TestCase, assert_equal, assert_in, assert_raises, class_setup, class_teardown
+from testify import TestCase, assert_equal, assert_in, assert_raises, class_setup, class_teardown, setup, teardown
 
 from mrjob.util import *
 
@@ -139,3 +142,64 @@ class SafeEvalTestCase(TestCase):
         a = -0.2
         assert_equal(abs(a), safeeval('abs(a)', globals={'abs': abs}, locals={'a': a}))
 
+class TarAndGzTestCase(TestCase):
+
+    @setup
+    def setup_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def test_tar_and_gz(self):
+        join = os.path.join
+
+        os.mkdir(join(self.tmp_dir, 'a')) # contains files to tar
+
+        # create a/foo
+        with open(join(self.tmp_dir, 'a', 'foo'), 'w') as foo:
+            foo.write('FOO\n')
+
+        # a/bar symlinks to a/foo
+        os.symlink('foo', join(self.tmp_dir, 'a', 'bar'))
+
+        # create a/baz; going to filter this out
+        with open(join(self.tmp_dir, 'a', 'baz'), 'w') as baz:
+            baz.write('BAZ\n')
+
+        # create a/qux/quux
+        os.mkdir(join(self.tmp_dir, 'a', 'qux'))
+        with open(join(self.tmp_dir, 'a', 'qux', 'quux'), 'w') as quux:
+            quux.write('QUUX\n')
+
+        # tar it up
+        tar_and_gzip(dir=join(self.tmp_dir, 'a'),
+                     out_path=join(self.tmp_dir, 'a.tar.gz'),
+                     filter=lambda path: not path.endswith('z'))
+
+        # untar it into b
+        os.mkdir(join(self.tmp_dir, 'b'))
+        t = tarfile.open(join(self.tmp_dir, 'a.tar.gz'), 'r:gz')
+        t.extractall(join(self.tmp_dir, 'b'))
+        t.close()
+
+        # make sure the files we expect are there
+        assert_equal(sorted(os.listdir(join(self.tmp_dir, 'b'))),
+                     ['bar', 'foo', 'qux'])
+        assert_equal(os.listdir(join(self.tmp_dir, 'b', 'qux')),
+                     ['quux'])
+
+        # make sure their contents are intact
+        with open(join(self.tmp_dir, 'b', 'foo')) as foo:
+            assert_equal(foo.read(), 'FOO\n')
+
+        with open(join(self.tmp_dir, 'b', 'bar')) as bar:
+            assert_equal(bar.read(), 'FOO\n')
+
+        with open(join(self.tmp_dir, 'b', 'qux', 'quux')) as quux:
+            assert_equal(quux.read(), 'QUUX\n')
+
+        # make sure symlinks are converted to files
+        assert os.path.isfile(join(self.tmp_dir, 'b', 'bar'))
+        assert not os.path.islink(join(self.tmp_dir, 'b', 'bar'))

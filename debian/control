@@ -6,7 +6,7 @@ Build-Depends: cdbs, debhelper (>= 5), python-support (>= 0.5.3), python-central
 XS-Python-Version: >=2.5
 Standards-Version: 3.7.2
 
-Package: mrjob
+Package: python-mrjob
 Architecture: any
 Homepage: http://packages.python.org/mrjob/
 XB-Python-Version: ${python:Versions}

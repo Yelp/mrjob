@@ -34,6 +34,6 @@ setup(
               'mrjob.tools.emr'],
     provides=['mrjob'],
     url='http://github.com/Yelp/mrjob',
-    version='0.1.0-pre2',
+    version='0.1.0-pre3',
     zip_safe=False, # so that we can bootstrap mrjob
 )

@@ -1,3 +1,9 @@
+mrjob (0.1.0-pre3-1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- James Brown <jbrown@yelp.com>  Wed, 27 Oct 2010 14:50:11 -0700
+
 mrjob (0.1.0-pre3) unstable; urgency=low
 
   * Initial Release.

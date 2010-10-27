@@ -1,4 +1,8 @@
-v0.1.0-pre2, 2010-01-25 -- Second pre-release after testing
+v0.1.0-pre3, 2010-10-27 -- Pre-release to run Yelp code against
+ * Added debian packaging
+ * MRJobRunner.stream_output() can now be called multiple times
+
+v0.1.0-pre2, 2010-10-25 -- Second pre-release after testing
  * Fixed small bugs that broke Python 2.5.1 and Python 2.7
  * Fixed reading mrjob.conf without yaml installed
  * Fix tests to work with modern simplejson and pipes.quote()

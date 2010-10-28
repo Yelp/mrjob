@@ -24,6 +24,7 @@ import signal
 import socket
 from subprocess import Popen, PIPE
 import time
+import urllib2
 
 try:
     from cStringIO import StringIO
@@ -51,6 +52,7 @@ from mrjob.util import cmd_line
 log = logging.getLogger('mrjob.emr')
 
 S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-]+)/(.*)$')
+JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?
 EMR_BACKOFF = 20
@@ -236,6 +238,12 @@ class EMRJobRunner(MRJobRunner):
 
         # cache for _download_log_file()
         self._uri_of_downloaded_log_file = None
+
+        # store the tracker URL for completion status
+        self._tracker_url = None
+
+        # turn off tracker progress until tunnel is up
+        self._show_tracker_progress = False
 
     @classmethod
     def _allowed_opts(cls):
@@ -496,9 +504,10 @@ class EMRJobRunner(MRJobRunner):
                 bind_host = socket.getfqdn()
             else:
                 bind_host = 'localhost'
-            log.info(
-                'Connect to job tracker at: http://%s:%d%s' %
-                (bind_host, bind_port, EMR_JOB_TRACKER_PATH))
+            self._tracker_url = 'http://%s:%d%s' % (
+                bind_host, bind_port, EMR_JOB_TRACKER_PATH)
+            self._show_tracker_progress = True
+            log.info( 'Connect to job tracker at: %s' % (self._tracker_url))
 
     def cleanup(self, mode=None):
         super(EMRJobRunner, self).cleanup(mode=mode)
@@ -774,6 +783,21 @@ class EMRJobRunner(MRJobRunner):
             if running_step_name:
                 log.info('Job launched %.1fs ago, status %s: %s (%s)' %
                          (running_time, job_state, reason, running_step_name))
+                if self._show_tracker_progress:
+                    try:
+                        tracker_handle = urllib2.urlopen(self._tracker_url)
+                        tracker_page = ''.join(tracker_handle.readlines())
+                        tracker_handle.close()
+                        # first two formatted percentages, map then reduce
+                        map_complete, reduce_complete = [float(complete)
+                            for complete in JOB_TRACKER_RE.findall(
+                                tracker_page)[:2]]
+                        log.info('map %3.0f%% reduce %3.0f%%' % (
+                                 map_complete, reduce_complete))
+                    except:
+                        log.error('Unable to load progress from job tracker')
+                        # turn off progress for rest of job
+                        self._show_tracker_progress = False
                 # once a step is running, it's safe to set up the ssh tunnel to
                 # the job tracker
                 job_host = getattr(job_flow, 'masterpublicdnsname', None)

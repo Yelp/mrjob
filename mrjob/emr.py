@@ -792,7 +792,7 @@ class EMRJobRunner(MRJobRunner):
                         map_complete, reduce_complete = [float(complete)
                             for complete in JOB_TRACKER_RE.findall(
                                 tracker_page)[:2]]
-                        log.info('map %3.0f%% reduce %3.0f%%' % (
+                        log.info(' map %3.0f%% reduce %3.0f%%' % (
                                  map_complete, reduce_complete))
                     except:
                         log.error('Unable to load progress from job tracker')

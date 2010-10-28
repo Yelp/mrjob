@@ -15,4 +15,4 @@
 """
 __author__ = 'David Marin <dave@yelp.com>'
 __credits__ = ['Matt Jones <mattj@yelp.com>', 'Julian Krause <juliank@yelp.com>', 'Paul Wais <pwais@yelp.com>']
-__version__ = '0.1.0-pre3'
+__version__ = '0.1.0'

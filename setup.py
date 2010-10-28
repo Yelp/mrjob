@@ -3,6 +3,8 @@ try:
 except ImportError:
     from distutils.core import setup
 
+import mrjob
+
 setup(
     author='David Marin',
     author_email='dave@yelp.com',
@@ -34,6 +36,6 @@ setup(
               'mrjob.tools.emr'],
     provides=['mrjob'],
     url='http://github.com/Yelp/mrjob',
-    version='0.1.0-pre3',
+    version=mrjob.__version__,
     zip_safe=False, # so that we can bootstrap mrjob
 )

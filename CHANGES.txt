@@ -1,3 +1,5 @@
+v0.1.0, 2010-10-28 -- Same code, better version. It's official!
+
 v0.1.0-pre3, 2010-10-27 -- Pre-release to run Yelp code against
  * Added debian packaging
  * mrjob bootstrapping can now deal with symlinks in site-packages/mrjob

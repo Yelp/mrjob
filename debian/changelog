@@ -1,3 +1,9 @@
+mrjob (0.1.0) unstable; urgency=low
+
+  * Initial Release.
+
+ -- David Marin <dave@yelp.com>  Thu, 28 Oct 2010 11:04:20 -0700
+
 mrjob (0.1.0-pre3-1) unstable; urgency=low
 
   * Initial Release.

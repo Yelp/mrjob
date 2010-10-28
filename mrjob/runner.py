@@ -652,7 +652,7 @@ class MRJobRunner(object):
         :param local: if this is True, use files' local paths rather than
         	the path they'll have inside Hadoop streaming
         """
-        return self._get_file_upload_args() + self._extra_args
+        return self._get_file_upload_args(local=local) + self._extra_args
     
     def _get_file_upload_args(self, local=False):
         """Arguments used to pass through config files, etc from the job

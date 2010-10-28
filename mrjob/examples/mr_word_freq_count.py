@@ -15,11 +15,10 @@
 """
 The classic MapReduce job: count the frequency of words.
 """
+from mrjob.job import MRJob
 import re
 
 WORD_RE = re.compile(r"[\w']+")
-
-from mrjob.job import MRJob
 
 class MRWordFreqCount(MRJob):
 

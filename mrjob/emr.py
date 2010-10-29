@@ -135,7 +135,7 @@ class EMRJobRunner(MRJobRunner):
         :type aws_region: str
         :param aws_region: region to connect to S3 and EMR on (e.g. ``us-west-1``). If you want to use separate regions for S3 and EMR, set *emr_endpoint* and *s3_endpoint*.
         :type bootstrap_cmds: list
-        :param bootstrap_cmds: a list of commands to run on the master node to set up libraries, etc. Like *setup_cmds*, these can be strings, which will be run in the shell, or lists of args, which will be run directly. We'll automatically prepend ``sudo`` to each command
+        :param bootstrap_cmds: a list of commands to run on the master node to set up libraries, etc. Like *setup_cmds*, these can be strings, which will be run in the shell, or lists of args, which will be run directly. Prepend ``sudo`` to commands to do things that require root privileges.
         :type bootstrap_files: list of str
         :param bootstrap_files: files to upload to the master node before running *bootstrap_cmds* (for example, debian packages). These will be made public on S3 due to a limitation of the bootstrap feature.
         :type bootstrap_mrjob: boolean
@@ -143,7 +143,7 @@ class EMRJobRunner(MRJobRunner):
         :type bootstrap_python_packages: list of str
         :param bootstrap_python_packages: paths of python modules to install on EMR. These should be standard python module tarballs. If a module is named ``foo.tar.gz``, we expect to be able to run ``tar xfz foo.tar.gz; cd foo; sudo python setup.py install``.
         :type bootstrap_scripts: list of str
-        :param bootstrap_scripts: scripts to upload and then run on the master node (a combination of *bootstrap_cmds* and *bootstrap_files*). These are run after the command from bootstrap_cmds. We'll automatically run these through ``sudo``.
+        :param bootstrap_scripts: scripts to upload and then run on the master node (a combination of *bootstrap_cmds* and *bootstrap_files*). These are run after the command from bootstrap_cmds.
         :type check_emr_status_every: float
         :param check_emr_status_every: How often to check on the status of EMR jobs.Default is 30 seconds (too often and AWS will throttle you).
         :type ec2_instance_type: str
@@ -1195,10 +1195,8 @@ class EMRJobRunner(MRJobRunner):
             writeln('# run bootstrap cmds:')
             for cmd in self._opts['bootstrap_cmds']:
                 if isinstance(cmd, basestring):
-                    cmd = 'sudo ' + cmd
                     writeln('check_call(%r, shell=True)' % cmd)
                 else:
-                    cmd = ['sudo'] + list(cmd)
                     writeln('check_call(%r)' % cmd)
             writeln()
 
@@ -1207,7 +1205,7 @@ class EMRJobRunner(MRJobRunner):
             writeln('# run bootstrap scripts:')
             for file_dict in self._bootstrap_scripts:
                 writeln('check_call(%r)' % (
-                    ['sudo', './' + file_dict['name']],))
+                    ['./' + file_dict['name']],))
             writeln()
 
         return out.getvalue()

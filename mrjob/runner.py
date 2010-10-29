@@ -620,7 +620,8 @@ class MRJobRunner(object):
             if not self._script:
                 self._steps = []
             else:
-                args = (['python', self._script['path'], '--steps'] +
+                python_bin = sys.executable or 'python'
+                args = ([python_bin, self._script['path'], '--steps'] +
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))
                 steps_proc = Popen(args, stdout=PIPE, stderr=PIPE)

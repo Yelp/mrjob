@@ -69,7 +69,7 @@ def encode_document(text, cats=None, id=None):
                 in (cats or {}).iteritems())
 
     return JSONValueProtocol.write(
-        None, {'text': text, 'cats': cats, 'id': id})
+        None, {'text': text, 'cats': cats, 'id': id}) + '\n'
 
 def count_ngrams(text, max_ngram_size, stop_words):
     """Break text down into ngrams, and return a dictionary mapping

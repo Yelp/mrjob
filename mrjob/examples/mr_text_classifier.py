@@ -173,11 +173,11 @@ class MRTextClassifier(MRJob):
     def parse_doc(self, _, doc):
         """Mapper: parse documents and emit ngram information.
 
-        Input: JSON-encoded documents (see encode_document())
+        Input: JSON-encoded documents (see :py:func:`encode_document`)
 
         Output:
-        ('ngram', (n, ngram)), (count, cats) OR
-        ('doc', doc_id), doc
+        ``('ngram', (n, ngram)), (count, cats)`` OR
+        ``('doc', doc_id), doc``
 
         n: ngram length
         ngram: ngram encoded encoded as a string (e.g. "pad thai")

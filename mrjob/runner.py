@@ -132,8 +132,10 @@ class MRJobRunner(object):
         allowed_opts = set(self._allowed_opts())
         unrecognized_opts = set(opts) - allowed_opts
         if unrecognized_opts:
-            raise TypeError('got unexpected keyword arguments: ' +
-                            ', '.join(sorted(unrecognized_opts)))
+            log.warn('got unexpected keyword arguments: ' +
+                     ', '.join(sorted(unrecognized_opts)))
+            opts = dict((k, v) for k, v in opts.iteritems()
+                        if k in allowed_opts)
 
         # issue a warning for unknown opts from mrjob.conf and filter them out
         mrjob_conf_opts = load_opts_from_mrjob_conf(
@@ -142,9 +144,9 @@ class MRJobRunner(object):
         if unrecognized_opts:
             log.warn('got unexpected opts from mrjob.conf: ' +
                      ', '.join(sorted(unrecognized_opts)))
-            mrjob_conf_opts = dict((key, mrjob_conf_opts[key])
-                                   for key in allowed_opts
-                                   if key in mrjob_conf_opts)
+            mrjob_conf_opts = dict((k, v)
+                                   for k, v in mrjob_conf_opts.iteritems()
+                                   if k in allowed_opts)
 
         # make sure all opts are at least set to None
         blank_opts = dict((key, None) for key in allowed_opts)

@@ -16,7 +16,7 @@ from __future__ import with_statement
 
 from StringIO import StringIO
 import os
-from testify import TestCase, assert_equal, assert_not_equal, assert_raises, setup, teardown
+from testify import TestCase, assert_equal, assert_not_equal, assert_not_in, assert_raises, setup, teardown
 import tempfile
 
 from mrjob.conf import dump_mrjob_conf
@@ -52,7 +52,11 @@ class TestExtraKwargs(TestCase):
     def test_extra_kwargs_in_mrjob_conf_okay(self):
         with LocalMRJobRunner(conf_path=self.mrjob_conf_path) as runner:
             assert_equal(runner._opts['setup_cmds'], ['echo foo'])
+            assert_not_in('qux', runner._opts)
 
-    def test_extra_kwargs_passed_in_directly_not_okay(self):
-        assert_raises(TypeError,
-                      LocalMRJobRunner, qux='quux', setup_cmds=['echo foo'])
+    def test_extra_kwargs_passed_in_directly_okay(self):
+        with LocalMRJobRunner(
+            conf_path=False, base_tmp_dir='/var/tmp', foo='bar') as runner:
+            assert_equal(runner._opts['base_tmp_dir'], '/var/tmp')
+            assert_not_in('bar', runner._opts)
+

@@ -16,7 +16,8 @@
 from StringIO import StringIO
 from optparse import OptionError
 from subprocess import Popen, PIPE
-from testify import TestCase, assert_equal, assert_raises
+from testify import TestCase, assert_equal, assert_raises, setup, teardown
+import time
 
 from mrjob.job import MRJob, _IDENTITY_MAPPER
 from mrjob.parse import parse_mr_job_stderr
@@ -95,6 +96,23 @@ class MRTestCase(TestCase):
         assert_equal(MRJob.mr(reducer=reducer), (_IDENTITY_MAPPER, reducer))
         assert_equal(MRJob.mr(reducer=reducer, mapper_final=mapper_final),
                      ((_IDENTITY_MAPPER, mapper_final), reducer))
+
+class NoTzsetTestCase(TestCase):
+    """Test systems without time.tzset() (e.g. Windows). See Issue #46."""
+    
+    @setup
+    def remove_time_tzset(self):
+        if hasattr(time, 'tzset'):
+            self._real_time_tzset = time.tzset
+            del time.tzset
+
+    @teardown
+    def restore_time_tzset(self):
+        if hasattr(self, '_real_time_tzset'):
+            time.tzset = self._real_time_tzset
+
+    def test_init(self):
+        mr_job = MRJob()
 
 class CountersAndStatusTestCase(TestCase):
 

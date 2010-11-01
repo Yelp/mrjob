@@ -77,6 +77,20 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
         assert_equal(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
+class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):
+    """Test systems without os.symlink (e.g. Windows). See Issue #46"""
+
+    @setup
+    def remove_os_symlink(self):
+        if hasattr(os, 'symlink'):
+            self._real_os_symlink = os.symlink
+            del os.symlink # sorry, were you using that? :)
+
+    @teardown
+    def restore_os_symlink(self):
+        if hasattr(self, '_real_os_symlink'):
+            os.symlink = self._real_os_symlink
+
 class TimeoutException(Exception):
     pass
 

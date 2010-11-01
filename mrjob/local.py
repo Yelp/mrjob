@@ -129,7 +129,7 @@ class LocalMRJobRunner(MRJobRunner):
             dest = os.path.join(self._working_dir, file_dict['name'])
             
             if file_dict.get('upload') == 'file':
-                self._symlink_to_file(path, dest)
+                self._symlink_to_file_or_copy(path, dest)
             elif file_dict.get('upload') == 'archive':
                 self._unarchive_file(path, dest)
 
@@ -141,10 +141,17 @@ class LocalMRJobRunner(MRJobRunner):
             log.debug('Creating output directory %s' % self._output_dir)
             self.mkdir(self._output_dir)
 
-    def _symlink_to_file(self, path, dest):
-        path = os.path.abspath(path)
-        log.debug('creating symlink %s <- %s' % (path, dest))
-        os.symlink(path, dest)
+    def _symlink_to_file_or_copy(self, path, dest):
+        """Symlink from *dest* to the absolute version of *path*.
+
+        If symlinks aren't available, copy *path* to *dest* instead."""
+        if hasattr(os, 'symlink'):
+            path = os.path.abspath(path)
+            log.debug('creating symlink %s <- %s' % (path, dest))
+            os.symlink(path, dest)
+        else:
+            log.debug('copying %s -> %s' % (path, dest))
+            shutil.copyfile(path, dest)
 
     def _unarchive_file(self, path, dest):
         path = os.path.abspath(path)

@@ -159,7 +159,8 @@ class MRJob(object):
         ``python -m mrjob.job --help``
         """
         # make sure we respect the $TZ (time zone) environment variable
-        time.tzset()
+        if hasattr(time, 'tzset'):
+            time.tzset()
 
         self._passthrough_options = []
         self._file_options = []

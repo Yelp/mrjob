@@ -512,14 +512,14 @@ class MRJob(object):
                     key, value = read(line.rstrip('\n'))
                     yield key, value
                 except Exception, e:
-                    self.increment_counter('Undecodable input',
+                    self.increment_counter('Undecodable input: ',
                                            e.__class__.__name__)
 
         def write_line(key, value):
             try:
                 print >> self.stdout, write(key, value)
             except Exception, e:
-                self.increment_counter('Unencodable output',
+                self.increment_counter('Unencodable output: ',
                                        e.__class__.__name__)
 
         return read_lines, write_line

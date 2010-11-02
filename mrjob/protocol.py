@@ -150,6 +150,33 @@ class ReprProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return '%s\t%s' % (repr(key), repr(value))
 
+class HiveValueProtocol(HadoopStreamingProtocol):
+    """Encode Primitive Types using ^A seperated fields, which Hive uses as a
+    default format.  Types are stored in Hive metadata, so when reading the
+    files directly, all values are returned as strings.
+    """
+    @classmethod
+    def read(cls, line):
+        return (None, [safeeval("u'%s'" % v) for v in line.split("\01")])
+
+    @staticmethod
+    def cast_list(value_or_list):
+        try:
+            if isinstance(value_or_list, basestring):
+                lst = [value_or_list]
+            elif iter(value_or_list):
+                lst = list(value_or_list)
+        except TypeError: # if we can't iterate over value_or_list
+            lst = [value_or_list]
+
+        return lst
+
+    @classmethod
+    def write(cls, key, value):
+        """To avoid writing a custom SerDe in Hive, store Primitive Type values as simple strings in columns."""
+        # unquote (u'i') for native Hive usage
+        return "\01".join(repr(unicode(i))[2:-1] for i in cls.cast_list(value))
+
 class ReprValueProtocol(HadoopStreamingProtocol):
     """Encode ``value`` as a repr and discard ``key`` (``key`` is read
     in as None).
@@ -179,6 +206,7 @@ DEFAULT_PROTOCOL = 'json'
 #: raw_value    :py:class:`RawValueProtocol`
 #: repr         :py:class:`ReprProtocol`
 #: repr_value   :py:class:`ReprValueProtocol`
+#: hive         :py:class:`HiveProtocol`
 #: ============ ===============================
 PROTOCOL_DICT = {
     'json': JSONProtocol,
@@ -188,4 +216,5 @@ PROTOCOL_DICT = {
     'raw_value': RawValueProtocol,
     'repr': ReprProtocol,
     'repr_value': ReprValueProtocol,
+    'hive_value': HiveValueProtocol,
 }

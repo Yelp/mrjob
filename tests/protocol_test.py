@@ -225,3 +225,41 @@ class ReprValueProtocolTestCase(TestCase):
     def test_can_encode_point_but_not_decode(self):
         points_encoded = ReprValueProtocol.write(None, Point(1, 4))
         assert_cant_decode(ReprValueProtocol, points_encoded)
+
+def assert_hive_round_trip_ok(protocol, key, value):
+    """Hive files read all values as strings (since metadata is stored separately)"""
+    assert_equal((None, [unicode(v) for v in value]), protocol.read(protocol.write(key, value)))
+
+class HiveValueProtocolTestCase(TestCase):
+
+    # currently limited to a list of Primitive Types
+    HIVE_KEYS_AND_VALUES = [
+            (None, [None]),
+            (1, [2]),
+            ('foo', ['bar']),
+            (1, [2, 3, 4]),
+            (2, ['']),
+            ('apples', ['apples', 5, 'oranges', 30]),
+            (u'Qu\xe9bec', [u'Ph\u1ede', u'Qu\xe9bec']),
+            ('\t', ['\n', '\t']),
+            (u'Qu\xe9bec', [u'Ph\u1ede', '\t', u'Qu\xe9bec\nEncoded!\n']),
+            (Point(2, 3), [Point(1, 4)])] # can encode, but Hive won't be able to use natively
+
+    def test_round_trip(self):
+        for k, v in self.HIVE_KEYS_AND_VALUES:
+            assert_hive_round_trip_ok(HiveValueProtocol, k, v)
+
+    def test_uses_repr_format(self):
+        VALUE = [unicode(i) for i in range(20)]
+        SEPARATOR = "\01" # ^A
+        ENCODED = SEPARATOR.join(VALUE)
+
+        assert_equal((None, VALUE), HiveValueProtocol.read(ENCODED))
+        assert_equal(ENCODED, HiveValueProtocol.write(None, VALUE))
+
+    def test_cant_discern_empty_list(self):
+        assert_equal((None, ['']), HiveValueProtocol.read(HiveValueProtocol.write(None, [])))
+
+    def test_can_encode_single_value_but_not_decode(self):
+        single_value = HiveValueProtocol.write(1,2)
+        assert_equal((None, ['2']), HiveValueProtocol.read(single_value))

@@ -150,6 +150,25 @@ class ReprProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return '%s\t%s' % (repr(key), repr(value))
 
+class HiveProtocol(HadoopStreamingProtocol):
+    """Encode using ^A seperated fields, which Hive uses as a default format"""
+    @classmethod
+    def read(cls, line):
+        key, value = line.split("\01",1)
+        return key, value.split("\01")
+
+    @classmethod
+    def write(cls, key, value):
+        try:
+            if isinstance(value, basestring):
+                lov = [value]
+            elif iter(value):
+                lov = value
+        except TypeError: # if we can't iterate over value
+            lov = [value]
+
+        return "\01".join(str(i) for i in [key]+lov)
+
 class ReprValueProtocol(HadoopStreamingProtocol):
     """Encode ``value`` as a repr and discard ``key`` (``key`` is read
     in as None).
@@ -179,6 +198,7 @@ DEFAULT_PROTOCOL = 'json'
 #: raw_value    :py:class:`RawValueProtocol`
 #: repr         :py:class:`ReprProtocol`
 #: repr_value   :py:class:`ReprValueProtocol`
+#: hive         :py:class:`HiveProtocol`
 #: ============ ===============================
 PROTOCOL_DICT = {
     'json': JSONProtocol,
@@ -188,4 +208,5 @@ PROTOCOL_DICT = {
     'raw_value': RawValueProtocol,
     'repr': ReprProtocol,
     'repr_value': ReprValueProtocol,
+    'hive': HiveProtocol,
 }

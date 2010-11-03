@@ -612,7 +612,7 @@ class EMRJobRunner(MRJobRunner):
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (
             self._job_name, self._opts['s3_log_uri'],
-            ', '.join('%s=%s' % (k, v) for k, v in args.iteritems())))
+            ', '.join('%r=%r' % (k, v) for k, v in args.iteritems())))
         emr_job_flow_id = emr_conn.run_jobflow(
             self._job_name, self._opts['s3_log_uri'], **args)
  
@@ -732,8 +732,8 @@ class EMRJobRunner(MRJobRunner):
             job_flow = emr_conn.describe_jobflow(self._emr_job_flow_id)
 
             job_state = job_flow.state
-            reason = job_flow.reason
-            log_uri = job_flow.log_uri
+            reason = job_flow.laststatechangereason
+            log_uri = job_flow.loguri
 
             # find all steps belonging to us, and get their state
             step_states = []

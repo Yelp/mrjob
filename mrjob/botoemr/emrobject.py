@@ -49,7 +49,9 @@ class Arg(EmrObject):
         self.value = value
 
 class BootstrapAction(EmrObject):
-    pass
+    Fields = set(['Name',
+                  'Args',
+                  'Path'])
 
 class Step(EmrObject):
     Fields = set(['Name',
@@ -70,21 +72,21 @@ class Step(EmrObject):
             return self.args
 
 class InstanceGroup(EmrObject):
-    Fields = set(['CreationDateTime',
-                  'EndDateTime',
-                  'InstanceGroupId',
-                  'InstanceRequestCount',
-                  'InstanceRole',
+    Fields = set(['Name',
+                  'CreationDateTime',
                   'InstanceRunningCount',
-                  'InstanceType',
-                  'LastStateChangeReason',
-                  'LaunchGroup',
-                  'Market',
-                  'Name',
-                  'ReadyDateTime',
-                  'SpotPrice',
                   'StartDateTime',
-                  'State'])
+                  'ReadyDateTime',
+                  'State',
+                  'EndDateTime',
+                  'InstanceRequestCount',
+                  'InstanceType',
+                  'Market',
+                  'LastStateChangeReason',
+                  'InstanceRole',
+                  'InstanceGroupId',
+                  'LaunchGroup',
+                  'SpotPrice'])
 
 class JobFlow(EmrObject):
     Fields = set(['CreationDateTime',
@@ -108,33 +110,24 @@ class JobFlow(EmrObject):
                   'MasterInstanceType',
                   'Ec2KeyName',
                   'InstanceCount',
-                  'KeepJobFlowAliveWhenNoSteps'])
+                  'KeepJobFlowAliveWhenNoSteps',
+                  'LastStateChangeReason'])
 
     def __init__(self, connection=None):
         self.connection = connection
-        self.name = None
-        self.state = None
-        self.reason = ''
-        self.log_uri = None
         self.steps = None
+        self.instancegroups = None
+        self.bootstrapactions = None
 
     def startElement(self, name, attrs, connection):
         if name == 'Steps':
             self.steps = ResultSet([('member', Step)])
             return self.steps
-        elif name == 'BootstrapActions':
-            self.bootstrap_actions = ResultSet([('member', BootstrapAction)])
-            return self.bootstrap_actions
         elif name == 'InstanceGroups':
-            self.instance_groups = ResultSet([('member', InstanceGroup)])
-            return self.instance_groups
+            self.instancegroups = ResultSet([('member', InstanceGroup)])
+            return self.instancegroups
+        elif name == 'BootstrapActions':
+            self.bootstrapactions = ResultSet([('member', BootstrapAction)])
+            return self.bootstrapactions
         else:
             return None
-
-    def endElement(self, name, value, connection):
-        if name == 'LastStageChangeReason':
-            self.reason = value
-        elif name == 'LogUri':
-            self.log_uri = value
-        elif name in self.Fields:
-            setattr(self, name.lower(), value)

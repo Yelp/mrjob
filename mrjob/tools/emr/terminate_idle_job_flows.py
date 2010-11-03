@@ -41,7 +41,7 @@ def main():
     if not options.quiet:
         log_to_stream(name='mrjob', debug=options.verbose)
 
-    emr_conn = EMRJobRunner().make_emr_conn()
+    emr_conn = EMRJobRunner(conf_path=options.conf_path).make_emr_conn()
 
     log.info(
         'getting info about all job flows (this goes back about 2 weeks)')

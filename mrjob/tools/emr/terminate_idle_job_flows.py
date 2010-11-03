@@ -1,3 +1,16 @@
+# Copyright 2009-2010 Yelp
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Find EMR job flows that have been idle for a long time (by default, one
 hour) and terminate them.
 
@@ -33,7 +46,7 @@ def main():
     log.info(
         'getting info about all job flows (this goes back about 2 weeks)')
     job_flows = emr_conn.describe_jobflows()
-        
+
     now = datetime.utcnow()
 
     num_running = 0

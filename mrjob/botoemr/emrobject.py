@@ -111,7 +111,9 @@ class JobFlow(EmrObject):
                   'Ec2KeyName',
                   'InstanceCount',
                   'KeepJobFlowAliveWhenNoSteps',
-                  'LastStateChangeReason'])
+                  'LastStateChangeReason',
+                  'NormalizedInstanceHours',
+                  'HadoopVersion'])
 
     def __init__(self, connection=None):
         self.connection = connection

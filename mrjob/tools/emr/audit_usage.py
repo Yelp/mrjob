@@ -18,9 +18,11 @@ from __future__ import with_statement
 import boto.utils
 from collections import defaultdict
 import datetime
+import math
 import logging
-import re
 from optparse import OptionParser
+import re
+import time
 
 from mrjob.emr import EMRJobRunner, describe_all_job_flows
 from mrjob.util import log_to_stream
@@ -83,12 +85,16 @@ def print_report(options):
 
         job_flow_info['name'] = jf.name
 
-        job_flow_info['created'] = datetime.datetime.strptime(
-            jf.creationdatetime, boto.utils.ISO8601)
+        job_flow_info['created'] = to_datetime(jf.creationdatetime)
 
         # this looks to be an integer, but let's protect against
         # future changes
         job_flow_info['hours'] = float(jf.normalizedinstancehours)
+
+        # estimate hours billed but not used
+        job_flow_info['hours_bbnu'] = (
+            job_flow_info['hours'] *
+            estimate_proportion_billed_but_not_used(jf))
 
         # split out mr job name and user
         # jobs flows created by MRJob have names like:
@@ -114,7 +120,7 @@ def print_report(options):
     print 'Total # of Job Flows: %d' % len(job_flow_infos)
     print
 
-    print 'All times are in UTC'
+    print '* All times are in UTC.'
     print
 
     # Techincally, I should be using ISO8601 time format here, but it's
@@ -128,13 +134,21 @@ def print_report(options):
         now.strftime(ISOISH_TIME_FORMAT))
     print
 
-    print 'All usage is measured in Normalized Instance Hours, which are'
-    print 'roughly equivalent to running an m1.small instance for an hour'
+    print '* All usage is measured in Normalized Instance Hours, which are'
+    print '  roughly equivalent to running an m1.small instance for an hour.'
     print
 
     # total compute-unit hours used
     total_hours = sum(info['hours'] for info in job_flow_infos)
     print 'Total Usage: %d' % total_hours
+    print
+
+    print '* Time billed but not used is estimated, and may not match'
+    print "  Amazon's billing system exactly."
+    print
+
+    total_hours_bbnu = sum(info['hours_bbnu'] for info in job_flow_infos)
+    print 'Total time billed but not used: %.2f' % total_hours_bbnu
     print
     
     def fmt(mr_job_name_or_user):
@@ -143,33 +157,115 @@ def print_report(options):
         else:
             return '(not started by mrjob)'
 
+    print '* Job flows are considered to belong to the user and job that'
+    print '  started them (even if other jobs use the job flow).'
+    print
+
     # Top jobs
-    print 'Top jobs (based on which job started the job flow):'
+    print 'Top jobs, by total usage:'
     mr_job_name_to_hours = defaultdict(float)
     for info in job_flow_infos:
         mr_job_name_to_hours[info['mr_job_name']] += info['hours']
     for mr_job_name, hours in sorted(mr_job_name_to_hours.iteritems(),
                                      key=lambda (n, h): (-h, n)):
-        print '  %5d %s' % (hours, fmt(mr_job_name))
+        print '  %6d %s' % (hours, fmt(mr_job_name))
     print
 
+    print 'Top jobs, by time billed but not used:'
+    mr_job_name_to_hours_bbnu = defaultdict(float)
+    for info in job_flow_infos:
+        mr_job_name_to_hours_bbnu[info['mr_job_name']] += info['hours_bbnu']
+    for mr_job_name, hours_bbnu in sorted(mr_job_name_to_hours_bbnu.iteritems(),
+                                     key=lambda (n, h): (-h, n)):
+        print '  %9.2f %s' % (hours_bbnu, fmt(mr_job_name))
+    print
+    
     # Top users
-    print 'Top users (based on which user started the job flow):'
+    print 'Top users, by total usage:'
     user_to_hours = defaultdict(float)
     for info in job_flow_infos:
         user_to_hours[info['user']] += info['hours']
     for user, hours in sorted(user_to_hours.iteritems(),
                               key=lambda (n, h): (-h, n)):
-        print '  %5d %s' % (hours, fmt(user))
+        print '  %6d %s' % (hours, fmt(user))
     print
-    
+
+    print 'Top users, by time billed but not used:'
+    user_to_hours_bbnu = defaultdict(float)
+    for info in job_flow_infos:
+        user_to_hours_bbnu[info['user']] += info['hours_bbnu']
+    for user, hours_bbnu in sorted(user_to_hours_bbnu.iteritems(),
+                              key=lambda (n, h): (-h, n)):
+        print '  %9.2f %s' % (hours_bbnu, fmt(user))
+    print
+
     # Top job flows
-    print 'Top job flows:'
+    print 'All job flows:'
     top_job_flows = sorted(job_flow_infos,
                            key=lambda i: (-i['hours'], i['name']))
     for info in top_job_flows:
-        print '  %5d %-15s %s' % (info['hours'], info['id'], info['name'])
+        print '  %6d %9.2f %-15s %s' % (info['hours'], info['hours_bbnu'],
+                                        info['id'], info['name'])
     print
+
+def estimate_proportion_billed_but_not_used(job_flow):
+    """Estimate what proportion of time that a job flow was billed for
+    was not used.
+
+    We look at the job's start and end time, and consider the job to
+    have been billed up to the next full hour (unless the job is currently
+    running).
+
+    We then calculate what proportion of that time was actually used
+    by steps.
+
+    This is a little bit of a fudge (the billing clock can actually start
+    at different times for different instances), but it's good enough.
+    """
+    if not hasattr(job_flow, 'startdatetime'):
+        return 0.0
+    else:
+        now = time.time()
+
+        # find out how long the job flow has been running
+        jf_start = to_timestamp(job_flow.startdatetime)
+        if hasattr(job_flow, 'enddatetime'):
+            jf_end = to_timestamp(job_flow.enddatetime)
+        else:
+            jf_end = now
+
+        hours = (jf_end - jf_start) / 60.0 / 60.0
+        # if job is still running, don't bill for full hour
+        # (we might actually make use of that time still)
+        if hasattr(job_flow, 'enddatetime'):
+            hours_billed = math.ceil(hours)
+        else:
+            hours_billed = hours
+
+        if hours_billed <= 0:
+            return 0.0
+
+        # find out how much time has been used by steps
+        secs_used = 0
+        for step in job_flow.steps:
+            if hasattr(step, 'startdatetime'):
+                step_start = to_timestamp(step.startdatetime)
+                if hasattr(step, 'enddatetime'):
+                    step_end = to_timestamp(step.enddatetime)
+                else:
+                    step_end = jf_end
+
+                secs_used += step_end - step_start
+
+        hours_used = secs_used / 60.0 / 60.0
+
+        return (hours_billed - hours_used) / hours_billed
+
+def to_timestamp(iso8601_time):
+    return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
+
+def to_datetime(iso8601_time):
+    return datetime.datetime.strptime(iso8601_time, boto.utils.ISO8601)
 
 if __name__ == '__main__':
     main()

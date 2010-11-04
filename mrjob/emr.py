@@ -14,6 +14,7 @@
 from __future__ import with_statement
 
 from cStringIO import StringIO
+import datetime
 import fnmatch
 import logging
 import os
@@ -74,6 +75,9 @@ TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/task-attempts/attempt_(?P<timestamp>
 # regex for matching step log URIs
 STEP_LOG_URI_RE = re.compile(r'^.*/steps/(?P<step_num>\d+)/syslog$')
 
+# the maximum number of results the EMR API will return for DescribeJobFlows
+JOB_FLOW_API_LIMIT = 500
+
 def parse_s3_uri(uri):
     """Parse an S3 URI into (bucket, key)
 
@@ -91,6 +95,52 @@ def parse_s3_uri(uri):
 def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
+
+def describe_job_flows(emr_conn, states=None, jobflow_ids=None,
+                       created_after=None, created_before=None,
+                       api_limit=JOB_FLOW_API_LIMIT):
+    """Iteratively call ``emr_conn.describe_job_flows()`` until we really
+    get all the job flows. This is a way of getting around the limits
+    of the EMR API.
+
+    :type states: list
+    :param states: A list of strings with job flow states wanted
+
+    :type jobflow_ids: list
+    :param jobflow_ids: A list of job flow IDs
+    :type created_after: datetime
+    :param created_after: Bound on job flow creation time
+
+    :type created_before: datetime
+    :param created_before: Bound on job flow creation time
+
+    :type api_limit: int
+    :param api_limit: maximum number of job flows we expect to receive in one response. If we ever get less than this many job flows, we can stop.
+    """
+    all_job_flows = []
+
+    while True:
+        if created_before and created_after and created_before < created_after:
+            break
+
+        log.debug('Calling describe_jobflows(states=%r, jobflow_ids=%r, created_after=%r, created_before=%r)' % (states, jobflow_ids, created_after, created_before))
+        job_flows = emr_conn.describe_jobflows(
+            states=states, jobflow_ids=jobflow_ids,
+            created_after=created_after, created_before=created_before)
+        log.debug('  got %d results' % len(job_flows))
+        all_job_flows.extend(job_flows)
+
+        if not job_flows or len(job_flows) < api_limit:
+            break
+
+        # set created_before to be the same as the start time of the
+        # earliest job flow returned
+        created_before = min(
+            datetime.datetime.strptime(jf.creationdatetime, boto.utils.ISO8601)
+            for jf in job_flows)
+
+    return all_job_flows
+
 
 class EMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
@@ -1512,4 +1562,3 @@ class EMRJobRunner(MRJobRunner):
             key = bucket.get_key(folder_name)
             if key:
                 yield key
-

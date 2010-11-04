@@ -602,7 +602,7 @@ class MRJobRunner(object):
             else:
                 job_name_prefix = 'no_script'
 
-        now = datetime.datetime.now()
+        now = datetime.datetime.utcnow()
         return '%s.%s.%s.%06d' % (
             job_name_prefix, os.environ.get('USER'),
             now.strftime('%Y%m%d.%H%M%S'), now.microsecond)

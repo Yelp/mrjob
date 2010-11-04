@@ -25,6 +25,7 @@ Represents a connection to the EMR service
 import types
 
 import boto
+import boto.utils
 from boto.ec2.regioninfo import RegionInfo
 from mrjob.botoemr.emrobject import JobFlow, RunJobFlowResponse
 from mrjob.botoemr.step import JarStep
@@ -100,9 +101,11 @@ class EmrConnection(AWSQueryConnection):
         if jobflow_ids:
             self.build_list_params(params, jobflow_ids, 'JobFlowIds.member')
         if created_after:
-            params['CreatedAfter'] = created_after.strftime('%Y-%m-%dT%H:%M:%S')
+            params['CreatedAfter'] = created_after.strftime(
+                boto.utils.ISO8601)
         if created_before:
-            params['CreatedBefore'] = created_before.strftime('%Y-%m-%dT%H:%M:%S')
+            params['CreatedBefore'] = created_before.strftime(
+                boto.utils.ISO8601)
 
         return self.get_list('DescribeJobFlows', params, [('member', JobFlow)])
 

@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 import logging
 from optparse import OptionParser
 
-from mrjob.emr import EMRJobRunner, describe_job_flows
+from mrjob.emr import EMRJobRunner, describe_all_job_flows
 from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
@@ -40,12 +40,14 @@ def main():
     # set up logging
     if not options.quiet:
         log_to_stream(name='mrjob', debug=options.verbose)
+    # suppress No handlers could be found for logger "boto" message
+    log_to_stream(name='boto', level=logging.CRITICAL)
 
     emr_conn = EMRJobRunner(conf_path=options.conf_path).make_emr_conn()
 
     log.info(
-        'getting info about all job flows (this goes back about 2 weeks)')
-    job_flows = describe_job_flows(emr_conn)
+        'getting info about all job flows (this goes back about 2 months)')
+    job_flows = describe_all_job_flows(emr_conn)
 
     now = datetime.utcnow()
 

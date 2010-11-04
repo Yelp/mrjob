@@ -15,13 +15,13 @@
 """
 from __future__ import with_statement
 
+import boto.utils
 from collections import defaultdict
 import datetime
 import logging
 from optparse import OptionParser
-import sys
 
-from mrjob.emr import EMRJobRunner, describe_job_flows
+from mrjob.emr import EMRJobRunner, describe_all_job_flows
 from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.audit_emr_usage')
@@ -37,6 +37,8 @@ def main():
     # set up logging
     if not options.quiet:
         log_to_stream(name='mrjob', debug=options.verbose)
+    # suppress No handlers could be found for logger "boto" message
+    log_to_stream(name='boto', level=logging.CRITICAL)
 
     print_report(options)
 
@@ -66,17 +68,28 @@ def print_report(options):
     emr_conn = EMRJobRunner(conf_path=options.conf_path).make_emr_conn()
     
     log.info(
-        'getting info about all job flows (this goes back about 2 weeks)')
-    job_flows = describe_job_flows(emr_conn)
+        'getting info about all job flows (this goes back about 2 months)')
+    now = datetime.datetime.utcnow()
+    job_flows = describe_all_job_flows(emr_conn)
 
     job_flow_infos = []
     for jf in job_flows:
         job_flow_info = {}
+
+        job_flow_info['id'] = jf.jobflowid
+
+        job_flow_info['name'] = jf.name
+
+        job_flow_info['created'] = datetime.datetime.strptime(
+            jf.creationdatetime, boto.utils.ISO8601)
+
+        # this looks to be an integer, but let's protect against
+        # future changes
+        job_flow_info['hours'] = float(jf.normalizedinstancehours)
+
         # split out mr job name and user
         # jobs flows created by MRJob have names like:
         # mr_word_freq_count.dave.20101103.121249.638552
-        job_flow_info['id'] = jf.jobflowid
-        job_flow_info['name'] = jf.name
         name_parts = jf.name.split('.')
         if len(name_parts) == 5:
             job_flow_info['mr_job_name'] = name_parts[0]
@@ -86,20 +99,39 @@ def print_report(options):
             job_flow_info['mr_job_name'] = None
             job_flow_info['user'] = None
 
-        job_flow_info['hours'] = float(jf.normalizedinstancehours)
-
         job_flow_infos.append(job_flow_info)
 
-    # legend
-    print 'All usage is measured in (EC2 Compute Units * hours)'
+    if not job_flow_infos:
+        print 'No job flows created in the past two months!'
+        return
+
+    earliest = min(info['created'] for info in job_flow_infos)
+    latest = max(info['created'] for info in job_flow_infos)
+
+    print 'Total # of Job Flows: %d' % len(job_flow_infos)
     print
 
-    print 'Total Job Flows: %d' % len(job_flow_infos)
+    print 'All times are in UTC'
+    print
+
+    # Techincally, I should be using ISO8601 time format here, but it's
+    # ugly and hard to read.
+    ISOISH_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+    print 'Min create time: %s' % (
+        earliest.strftime(ISOISH_TIME_FORMAT))
+    print 'Max create time: %s' % (
+        latest.strftime(ISOISH_TIME_FORMAT))
+    print '   Current time: %s' % (
+        now.strftime(ISOISH_TIME_FORMAT))
+    print
+
+    print 'All usage is measured in Normalized Instance Hours, which are'
+    print 'roughly equivalent to running an m1.small instance for an hour'
     print
 
     # total compute-unit hours used
     total_hours = sum(info['hours'] for info in job_flow_infos)
-    print 'Total Usage: %.1f' % total_hours
+    print 'Total Usage: %d' % total_hours
     print
     
     def fmt(mr_job_name_or_user):
@@ -115,7 +147,7 @@ def print_report(options):
         mr_job_name_to_hours[info['mr_job_name']] += info['hours']
     for mr_job_name, hours in sorted(mr_job_name_to_hours.iteritems(),
                                      key=lambda (n, h): (-h, n)):
-        print '  %6.1f %s' % (hours, fmt(mr_job_name))
+        print '  %5d %s' % (hours, fmt(mr_job_name))
     print
 
     # Top users
@@ -125,7 +157,7 @@ def print_report(options):
         user_to_hours[info['user']] += info['hours']
     for user, hours in sorted(user_to_hours.iteritems(),
                               key=lambda (n, h): (-h, n)):
-        print '  %6.1f %s' % (hours, fmt(user))
+        print '  %5d %s' % (hours, fmt(user))
     print
     
     # Top job flows
@@ -133,7 +165,7 @@ def print_report(options):
     top_job_flows = sorted(job_flow_infos,
                            key=lambda i: (-i['hours'], i['name']))
     for info in top_job_flows:
-        print '  %6.1f %-15s %s' % (info['hours'], info['id'], info['name'])
+        print '  %5d %-15s %s' % (info['hours'], info['id'], info['name'])
     print
 
 if __name__ == '__main__':

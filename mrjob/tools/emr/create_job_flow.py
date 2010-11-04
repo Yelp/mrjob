@@ -23,7 +23,6 @@ Usage::
 from __future__ import with_statement
 
 from optparse import OptionParser
-import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.util import log_to_stream

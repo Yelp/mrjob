@@ -96,12 +96,12 @@ def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
-def describe_job_flows(emr_conn, states=None, jobflow_ids=None,
-                       created_after=None, created_before=None,
-                       api_limit=JOB_FLOW_API_LIMIT):
-    """Iteratively call ``emr_conn.describe_job_flows()`` until we really
+def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
+                            created_after=None, created_before=None):
+    """Iteratively call ``EmrConnection.describe_job_flows()`` until we really
     get all the job flows. This is a way of getting around the limits
-    of the EMR API.
+    of the EMR API, both on number of job flows returned, and how far
+    back in time we can go.
 
     :type states: list
     :param states: A list of strings with job flow states wanted
@@ -113,31 +113,47 @@ def describe_job_flows(emr_conn, states=None, jobflow_ids=None,
 
     :type created_before: datetime
     :param created_before: Bound on job flow creation time
-
-    :type api_limit: int
-    :param api_limit: maximum number of job flows we expect to receive in one response. If we ever get less than this many job flows, we can stop.
     """
     all_job_flows = []
+    ids_seen = set()
 
     while True:
         if created_before and created_after and created_before < created_after:
             break
 
         log.debug('Calling describe_jobflows(states=%r, jobflow_ids=%r, created_after=%r, created_before=%r)' % (states, jobflow_ids, created_after, created_before))
-        job_flows = emr_conn.describe_jobflows(
-            states=states, jobflow_ids=jobflow_ids,
-            created_after=created_after, created_before=created_before)
-        log.debug('  got %d results' % len(job_flows))
+        try:
+            results = emr_conn.describe_jobflows(
+                states=states, jobflow_ids=jobflow_ids,
+                created_after=created_after, created_before=created_before)
+        except boto.exception.BotoServerError, ex:
+            if 'ValidationError' in ex.body:
+                log.debug('  reached earliest allowed created_before time, done!')
+                break
+            else:
+                raise
+
+        # don't count the same job flow twice
+        job_flows = [jf for jf in results if jf.jobflowid not in ids_seen]
+        log.debug('  got %d results (%d new)' % (len(results), len(job_flows)))
+                                                 
         all_job_flows.extend(job_flows)
+        ids_seen.update(jf.jobflowid for jf in job_flows)
 
-        if not job_flows or len(job_flows) < api_limit:
-            break
-
-        # set created_before to be the same as the start time of the
-        # earliest job flow returned
-        created_before = min(
+        if job_flows:
+            # set created_before to be just after the start time of
+            # the first job returned, to deal with job flows started
+            # in the same second
+            created_before = min(
             datetime.datetime.strptime(jf.creationdatetime, boto.utils.ISO8601)
-            for jf in job_flows)
+            for jf in job_flows) + datetime.timedelta(seconds=1)
+            # if someone managed to start 501 job flows in the same second,
+            # they are still screwed (the EMR API only returns up to 500),
+            # but this seems unlikely. :)
+        else:
+            if not created_before:
+                created_before = datetime.datetime.utcnow()
+            created_before -= datetime.timedelta(weeks=2)
 
     return all_job_flows
 

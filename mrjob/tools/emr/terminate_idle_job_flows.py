@@ -10,7 +10,7 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License.
+# limitations under the License
 """Find EMR job flows that have been idle for a long time (by default, one
 hour) and terminate them.
 
@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 import logging
 from optparse import OptionParser
 
-from mrjob.emr import EMRJobRunner
+from mrjob.emr import EMRJobRunner, describe_job_flows
 from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
@@ -45,7 +45,7 @@ def main():
 
     log.info(
         'getting info about all job flows (this goes back about 2 weeks)')
-    job_flows = emr_conn.describe_jobflows()
+    job_flows = describe_job_flows(emr_conn)
 
     now = datetime.utcnow()
 
@@ -59,28 +59,33 @@ def main():
         # check if job flow is done
         if hasattr(jf, 'enddatetime'):
             num_done += 1
+            continue
+
+        active_steps = [step for step in jf.steps
+                        if step.state != 'CANCELLED']
+
         # check if job flow is currently running
-        elif jf.steps and not hasattr(jf.steps[-1], 'enddatetime'):
+        if active_steps and not hasattr(active_steps[-1], 'enddatetime'):
             num_running += 1
-        # job flow is idle. how long?
+            continue
+
+        num_idle += 1
+        if active_steps:
+            idle_since = datetime.strptime(
+                active_steps[-1].enddatetime, ISO8601)
         else:
-            num_idle += 1
-            if jf.steps:
-                idle_since = datetime.strptime(
-                    jf.steps[-1].enddatetime, ISO8601)
-            else:
-                idle_since = datetime.strptime(
-                    jf.creationdatetime, ISO8601)
-            idle_time = now - idle_since
+            idle_since = datetime.strptime(
+                jf.creationdatetime, ISO8601)
+        idle_time = now - idle_since
 
-            # don't care about fractions of a second
-            idle_time = timedelta(idle_time.days, idle_time.seconds)
+        # don't care about fractions of a second
+        idle_time = timedelta(idle_time.days, idle_time.seconds)
 
-            log.debug('Job flow %s (%s) idle for %s' %
-                           (jf.jobflowid, jf.name, idle_time))
-            if idle_time > timedelta(hours=options.max_hours_idle):
-                to_terminate.append(
-                    (jf.jobflowid, jf.name, idle_time))
+        log.debug('Job flow %s (%s) idle for %s' %
+                  (jf.jobflowid, jf.name, idle_time))
+        if idle_time > timedelta(hours=options.max_hours_idle):
+            to_terminate.append(
+                (jf.jobflowid, jf.name, idle_time))
 
     log.info('Job flow statuses: %d running, %d idle, %d done' %
                   (num_running, num_idle, num_done))

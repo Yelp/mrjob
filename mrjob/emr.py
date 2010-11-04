@@ -136,7 +136,7 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
         # don't count the same job flow twice
         job_flows = [jf for jf in results if jf.jobflowid not in ids_seen]
         log.debug('  got %d results (%d new)' % (len(results), len(job_flows)))
-                                                 
+
         all_job_flows.extend(job_flows)
         ids_seen.update(jf.jobflowid for jf in job_flows)
 

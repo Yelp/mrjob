@@ -21,7 +21,7 @@ import logging
 from optparse import OptionParser
 import sys
 
-from mrjob.emr import EMRJobRunner
+from mrjob.emr import EMRJobRunner, describe_job_flows
 from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.audit_emr_usage')
@@ -67,7 +67,7 @@ def print_report(options):
     
     log.info(
         'getting info about all job flows (this goes back about 2 weeks)')
-    job_flows = emr_conn.describe_jobflows()
+    job_flows = describe_job_flows(emr_conn)
 
     job_flow_infos = []
     for jf in job_flows:

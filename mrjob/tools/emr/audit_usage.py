@@ -19,12 +19,15 @@ import boto.utils
 from collections import defaultdict
 import datetime
 import logging
+import re
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner, describe_all_job_flows
 from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.audit_emr_usage')
+
+JOB_FLOW_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
 
 def main():
     # parser command-line args
@@ -90,10 +93,10 @@ def print_report(options):
         # split out mr job name and user
         # jobs flows created by MRJob have names like:
         # mr_word_freq_count.dave.20101103.121249.638552
-        name_parts = jf.name.split('.')
-        if len(name_parts) == 5:
-            job_flow_info['mr_job_name'] = name_parts[0]
-            job_flow_info['user'] = name_parts[1]
+        match = JOB_FLOW_NAME_RE.match(jf.name)
+        if match:
+            job_flow_info['mr_job_name'] = match.group(1)
+            job_flow_info['user'] = match.group(2)
         else:
             # not run by mrjob
             job_flow_info['mr_job_name'] = None

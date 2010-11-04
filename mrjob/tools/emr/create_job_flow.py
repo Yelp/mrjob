@@ -45,6 +45,7 @@ def main():
         'ec2_instance_type': options.ec2_instance_type,
         'ec2_master_instance_type': options.ec2_master_instance_type,
         'ec2_slave_instance_type': options.ec2_slave_instance_type,
+        'job_name_prefix': options.job_name_prefix,
         'num_ec2_instances': options.num_ec2_instances,
     }
     runner = EMRJobRunner(**runner_kwargs)
@@ -56,32 +57,35 @@ def make_option_parser():
     description = 'Create a persistent EMR job flow to run jobs in. WARNING: do not run this without mrjob.emr.tools.terminate.idle_job_flows in your crontab; job flows left idle can quickly become expensive!'
     option_parser = OptionParser(usage=usage, description=description)
     option_parser.add_option(
-            '-v', '--verbose', dest='verbose', default=False,
-            action='store_true',
-            help='print more messages to stderr')
+        '-v', '--verbose', dest='verbose', default=False, action='store_true',
+        help='print more messages to stderr')
     option_parser.add_option(
-            '-q', '--quiet', dest='quiet', default=False,
-            action='store_true',
-            help='just print job flow ID to stdout')
+        '-q', '--quiet', dest='quiet', default=False, action='store_true',
+        help='just print job flow ID to stdout')
     option_parser.add_option(
-            '-c', '--conf-path', dest='conf_path', default=None,
-            help='Path to alternate mrjob.conf file to read from')
+        '-c', '--conf-path', dest='conf_path', default=None,
+        help='Path to alternate mrjob.conf file to read from')
     option_parser.add_option(
-            '--no-conf', dest='conf_path', action='store_false',
-            help="Don't load mrjob.conf even if it's available")
+        '--no-conf', dest='conf_path', action='store_false',
+        help="Don't load mrjob.conf even if it's available")
     option_parser.add_option(
-            '--ec2-instance-type', dest='ec2_instance_type', default=None,
-            help='Type of EC2 instance(s) to launch (e.g. m1.small, c1.xlarge, m2.xlarge). See http://aws.amazon.com/ec2/instance-types/ for the full list.')
+        '--ec2-instance-type', dest='ec2_instance_type', default=None,
+        help='Type of EC2 instance(s) to launch (e.g. m1.small, c1.xlarge, m2.xlarge). See http://aws.amazon.com/ec2/instance-types/ for the full list.')
     option_parser.add_option(
-            '--ec2-master-instance-type', dest='ec2_master_instance_type', default=None,
-            help='Type of EC2 instance for master node only')
+        '--ec2-master-instance-type', dest='ec2_master_instance_type', default=None,
+        help='Type of EC2 instance for master node only')
     option_parser.add_option(
-            '--ec2-slave-instance-type', dest='ec2_slave_instance_type', default=None,
-            help='Type of EC2 instance for slave nodes only')
+        '--ec2-slave-instance-type', dest='ec2_slave_instance_type', default=None,
+        help='Type of EC2 instance for slave nodes only')
     option_parser.add_option(
-            '--num-ec2-instances', dest='num_ec2_instances', default=None,
-            type='int',
-            help='Number of EC2 instances to launch')
+        '--num-ec2-instances', dest='num_ec2_instances', default=None,
+        type='int',
+        help='Number of EC2 instances to launch')
+    option_parser.add_option(
+        '--label', '--job-name-prefix', dest='job_name_prefix',
+        default='create_job_flow',
+        help="Optional label for this job flow; useful for auditing. default: %default")
+
 
     return option_parser
 

@@ -82,7 +82,7 @@ def make_option_parser():
         type='int',
         help='Number of EC2 instances to launch')
     option_parser.add_option(
-        '--label', '--job-name-prefix', dest='job_name_prefix',
+        '-l', '--label', dest='job_name_prefix',
         default='create_job_flow',
         help="Optional label for this job flow; useful for auditing. default: %default")
 

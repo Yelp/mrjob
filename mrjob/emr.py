@@ -275,7 +275,6 @@ class EMRJobRunner(MRJobRunner):
             if not path.endswith('.tar.gz'):
                 raise ValueError('bootstrap_python_packages only accepts .tar.gz files!')
             file_dict = self._add_bootstrap_file(path)
-            self._files.append(file_dict)
             self._bootstrap_python_packages.append(file_dict)
 
         # if we're bootstrapping mrjob, keep track of the file_dict

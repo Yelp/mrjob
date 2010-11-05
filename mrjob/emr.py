@@ -75,9 +75,6 @@ TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/task-attempts/attempt_(?P<timestamp>
 # regex for matching step log URIs
 STEP_LOG_URI_RE = re.compile(r'^.*/steps/(?P<step_num>\d+)/syslog$')
 
-# the maximum number of results the EMR API will return for DescribeJobFlows
-JOB_FLOW_API_LIMIT = 500
-
 def parse_s3_uri(uri):
     """Parse an S3 URI into (bucket, key)
 

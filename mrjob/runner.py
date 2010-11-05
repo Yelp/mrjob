@@ -626,7 +626,10 @@ class MRJobRunner(object):
                 args = ([python_bin, self._script['path'], '--steps'] +
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))
-                steps_proc = Popen(args, stdout=PIPE, stderr=PIPE)
+                # add . to PYTHONPATH (in case mrjob isn't actually installed)
+                env = combine_envs(os.environ,
+                                   {'PYTHONPATH': os.path.abspath('.')})
+                steps_proc = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
                 stdout, stderr = steps_proc.communicate()
 
                 if steps_proc.returncode != 0:

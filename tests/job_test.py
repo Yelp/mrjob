@@ -13,12 +13,14 @@
 # limitations under the License.
 
 """Unit testing of MRJob."""
-from StringIO import StringIO
 from optparse import OptionError
+import os
 from subprocess import Popen, PIPE
+from StringIO import StringIO
 from testify import TestCase, assert_equal, assert_raises, setup, teardown
 import time
 
+from mrjob.conf import combine_envs
 from mrjob.job import MRJob, _IDENTITY_MAPPER
 from mrjob.parse import parse_mr_job_stderr
 from tests.mr_two_step_job import MRTwoStepJob
@@ -402,7 +404,10 @@ class CommandLineArgsTest(TestCase):
 
     def test_should_exit_when_invoked_as_script(self):
         args = ['python', MRJob.mr_job_script(), '--quux', 'baz']
-        proc = Popen(args, stderr=PIPE, stdout=PIPE)
+        # add . to PYTHONPATH (in case mrjob isn't actually installed)
+        env = combine_envs(os.environ,
+                           {'PYTHONPATH': os.path.abspath('.')})
+        proc = Popen(args, stderr=PIPE, stdout=PIPE, env=env)
         stderr, stdout = proc.communicate()
         assert_equal(proc.returncode, 2)
 

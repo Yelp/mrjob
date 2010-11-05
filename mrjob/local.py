@@ -97,7 +97,7 @@ class LocalMRJobRunner(MRJobRunner):
                 # sort the output
                 self._invoke_step(['sort'], 'step-%d-mapper-sorted' % i,
                        env={'LC_ALL': 'C'}) # ignore locale
-                
+
                 # run the reducer
                 reducer_args = (wrapper_args + [self._script['name'],
                                  '--step-num=%d' % i, '--reducer'] +

@@ -14,5 +14,9 @@
 """Write and run Hadoop Streaming jobs on Amazon Elastic MapReduce or your own Hadoop cluster.
 """
 __author__ = 'David Marin <dave@yelp.com>'
-__credits__ = ['Adam Derewicki <derwiki@yelp.com>', 'Matt Jones <mattj@yelp.com>', 'Julian Krause <juliank@yelp.com>', 'Paul Wais <pwais@yelp.com>']
+__credits__ = ['Adam Derewicki <derwiki@yelp.com>',
+               'Matt Jones <mattj@yelp.com>',
+               'Julian Krause <juliank@yelp.com>',
+               'Jimmy Retzlaff <jretz@yelp.com>',
+               'Paul Wais <pwais@yelp.com>']
 __version__ = '0.1.0'

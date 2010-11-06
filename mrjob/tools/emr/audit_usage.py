@@ -52,20 +52,20 @@ def make_option_parser():
     description = 'Print a report on emr usage over the past 2 weeks.'
     option_parser = OptionParser(usage=usage, description=description)
     option_parser.add_option(
-            '-v', '--verbose', dest='verbose', default=False,
-            action='store_true',
-            help='print more messages to stderr')
+        '-v', '--verbose', dest='verbose', default=False, action='store_true',
+        help='print more messages to stderr')
     option_parser.add_option(
-            '-q', '--quiet', dest='quiet', default=False,
-            action='store_true',
-            help='just print job flow ID to stdout')
+        '-q', '--quiet', dest='quiet', default=False, action='store_true',
+        help='just print job flow ID to stdout')
     option_parser.add_option(
-            '-c', '--conf-path', dest='conf_path', default=None,
-            help='Path to alternate mrjob.conf file to read from')
+        '-c', '--conf-path', dest='conf_path', default=None,
+        help='Path to alternate mrjob.conf file to read from')
     option_parser.add_option(
-            '--no-conf', dest='conf_path', action='store_false',
-            help="Don't load mrjob.conf even if it's available")
-
+        '--no-conf', dest='conf_path', action='store_false',
+        help="Don't load mrjob.conf even if it's available")
+    option_parser.add_option(
+        '--max-days-ago', dest='max_days_ago', type='float', default=None,
+        help='Max number of days ago to look at jobs')
     return option_parser
 
 def print_report(options):
@@ -74,8 +74,15 @@ def print_report(options):
     
     log.info(
         'getting info about all job flows (this goes back about 2 months)')
-    now = datetime.datetime.utcnow()
-    job_flows = describe_all_job_flows(emr_conn)
+    # microseconds just make our report messy
+    now = datetime.datetime.utcnow().replace(microsecond=0)
+
+    # if --max-days-ago is set, only look at recent jobs
+    created_after = None
+    if options.max_days_ago is not None:
+        created_after = now - datetime.timedelta(days=options.max_days_ago)
+
+    job_flows = describe_all_job_flows(emr_conn, created_after=created_after)
 
     job_flow_infos = []
     for jf in job_flows:
@@ -86,6 +93,17 @@ def print_report(options):
         job_flow_info['name'] = jf.name
 
         job_flow_info['created'] = to_datetime(jf.creationdatetime)
+
+        start_time = to_datetime(getattr(jf, 'startdatetime', None))
+        if start_time:
+            end_time = to_datetime(getattr(jf, 'enddatetime', None)) or now
+            job_flow_info['ran'] = end_time - start_time
+        else:
+            job_flow_info['ran'] = datetime.timedelta(0)
+        
+        job_flow_info['state'] = jf.state
+
+        job_flow_info['num_steps'] = len(jf.steps or [])
 
         # this looks to be an integer, but let's protect against
         # future changes
@@ -123,15 +141,10 @@ def print_report(options):
     print '* All times are in UTC.'
     print
 
-    # Techincally, I should be using ISO8601 time format here, but it's
-    # ugly and hard to read.
-    ISOISH_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
-    print 'Min create time: %s' % (
-        earliest.strftime(ISOISH_TIME_FORMAT))
-    print 'Max create time: %s' % (
-        latest.strftime(ISOISH_TIME_FORMAT))
-    print '   Current time: %s' % (
-        now.strftime(ISOISH_TIME_FORMAT))
+
+    print 'Min create time: %s' % earliest
+    print 'Max create time: %s' % latest
+    print '   Current time: %s' % now
     print
 
     print '* All usage is measured in Normalized Instance Hours, which are'
@@ -200,13 +213,32 @@ def print_report(options):
     print
 
     # Top job flows
-    print 'All job flows:'
+    print 'All job flows, by total usage:'
     top_job_flows = sorted(job_flow_infos,
                            key=lambda i: (-i['hours'], i['name']))
     for info in top_job_flows:
-        print '  %6d %9.2f %-15s %s' % (info['hours'], info['hours_bbnu'],
-                                        info['id'], info['name'])
+        print '  %6d %-15s %s' % (info['hours'], info['id'], info['name'])
     print
+
+    print 'All job flows, by time billed but not used:'
+    top_job_flows_bbnu = sorted(job_flow_infos,
+                           key=lambda i: (-i['hours_bbnu'], i['name']))
+    for info in top_job_flows_bbnu:
+        print '  %9.2f %-15s %s' % (
+            info['hours_bbnu'], info['id'], info['name'])
+    print
+
+    print 'Details for all job flows:'
+    print
+    print ' id              state         created             steps        time ran  usage     waste   user   name'
+
+    all_job_flows = sorted(job_flow_infos, key=lambda i: i['created'],
+                           reverse=True)
+    for info in all_job_flows:
+        print ' %-15s %-13s %19s %3d %17s %6d %9.2f %8s %s' % (
+            info['id'], info['state'], info['created'], info['num_steps'], 
+            info['ran'], info['hours'], info['hours_bbnu'],
+            (info['user'] or ''), fmt(info['mr_job_name']))
 
 def estimate_proportion_billed_but_not_used(job_flow):
     """Estimate what proportion of time that a job flow was billed for
@@ -262,9 +294,11 @@ def estimate_proportion_billed_but_not_used(job_flow):
         return (hours_billed - hours_used) / hours_billed
 
 def to_timestamp(iso8601_time):
+    if iso8601_time is None: return None
     return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
 
 def to_datetime(iso8601_time):
+    if iso8601_time is None: return None
     return datetime.datetime.strptime(iso8601_time, boto.utils.ISO8601)
 
 if __name__ == '__main__':

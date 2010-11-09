@@ -18,25 +18,16 @@ import logging
 import os
 import pprint
 import shutil
-from subprocess import Popen, PIPE, check_call, CalledProcessError
+from subprocess import Popen, PIPE
 import sys
 import re
 
 from mrjob.conf import combine_envs
 from mrjob.parse import find_python_traceback, parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line, file_ext
+from mrjob.util import cmd_line, file_ext, unarchive
 
 log = logging.getLogger('mrjob.local')
-
-# the archive types supported by EMR (and presumably, hadoop streaming)
-HOW_TO_UNARCHIVE = {
-    '.jar': ['jar', 'xf'],
-    '.tar': ['tar', 'xf'],
-    '.tar.gz': ['tar', 'xfz'],
-    '.tgz': ['tar', 'xfz'],
-    '.zip': ['unzip'],
-}
 
 class LocalMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing
@@ -131,7 +122,7 @@ class LocalMRJobRunner(MRJobRunner):
             if file_dict.get('upload') == 'file':
                 self._symlink_to_file_or_copy(path, dest)
             elif file_dict.get('upload') == 'archive':
-                self._unarchive_file(path, dest)
+                unarchive(path, dest)
 
     def _setup_output_dir(self):
         if not self._output_dir:
@@ -152,19 +143,6 @@ class LocalMRJobRunner(MRJobRunner):
         else:
             log.debug('copying %s -> %s' % (path, dest))
             shutil.copyfile(path, dest)
-
-    def _unarchive_file(self, path, dest):
-        path = os.path.abspath(path)
-        
-        # figure out how to unarchive the file, based on its extension
-        unarchive_args = HOW_TO_UNARCHIVE.get(file_ext(path))
-
-        if not unarchive_args:
-            raise ValueError("Don't know how to unarchive %s" % path)
-
-        log.debug('unarchiving %s -> %s' % (path, dest))
-        self.mkdir(dest)
-        check_call(unarchive_args + [path], cwd=dest)
 
     def _stream_output(self):
         """Read output from the final outfile."""

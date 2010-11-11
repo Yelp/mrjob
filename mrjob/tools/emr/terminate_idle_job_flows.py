@@ -22,8 +22,10 @@ from boto.utils import ISO8601
 from datetime import datetime, timedelta
 import logging
 from optparse import OptionParser
+import posixpath
 
 from mrjob.emr import EMRJobRunner, describe_all_job_flows
+from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
@@ -54,10 +56,12 @@ def main():
     num_running = 0
     num_idle = 0
     num_done = 0
+    num_non_streaming = 0
     # a list of tuples of job flow id, name, idle time (as a timedelta)
     to_terminate = []
 
     for jf in job_flows:
+
         # check if job flow is done
         if hasattr(jf, 'enddatetime'):
             num_done += 1
@@ -66,11 +70,21 @@ def main():
         active_steps = [step for step in jf.steps
                         if step.state != 'CANCELLED']
 
+        # check for non-streaming job flows (Issue #60)
+        if hasattr(jf, 'steps') and jf.steps and not any(
+            hasattr(step, 'jar') and
+            HADOOP_STREAMING_JAR_RE.match(posixpath.basename(step.jar))
+            for step in jf.steps):
+            print jf.jobflowid
+            num_non_streaming += 1
+            continue
+
         # check if job flow is currently running
         if active_steps and not hasattr(active_steps[-1], 'enddatetime'):
             num_running += 1
             continue
 
+        # okay, job is idle. how long has it been idle?
         num_idle += 1
         if active_steps:
             idle_since = datetime.strptime(
@@ -89,8 +103,8 @@ def main():
             to_terminate.append(
                 (jf.jobflowid, jf.name, idle_time))
 
-    log.info('Job flow statuses: %d running, %d idle, %d done' %
-                  (num_running, num_idle, num_done))
+    log.info('Job flow statuses: %d running, %d idle, %d active non-streaming, %d done' %
+                  (num_running, num_idle, num_non_streaming, num_done))
 
     terminate_and_notify(emr_conn, to_terminate, options)
 

@@ -31,8 +31,6 @@ log = logging.getLogger('mrjob.hadoop')
 
 HDFS_URI_RE = re.compile(r'^hdfs://(.*?)(/.*?)$')
 
-HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*\.jar$')
-
 # to filter out the log4j stuff that hadoop streaming prints out
 HADOOP_STREAMING_OUTPUT_RE = re.compile(r'^(\S+ \S+ \S+ \S+: )?(.*)$')
 

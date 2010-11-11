@@ -60,7 +60,8 @@ class Step(EmrObject):
                   'StartDateTime',
                   'EndDateTime',
                   'LastStateChangeReason',
-                  'State'])
+                  'State',
+                  'Jar'])
     
     def __init__(self, connection=None):
         self.connection = connection

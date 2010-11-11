@@ -252,3 +252,8 @@ class ArchiveTestCase(TestCase):
         # this test requires that zip is present
         self.archive_and_unarchive('zip', ['zip', '-qr',
                                    '%(archive_name)s', '%(files_to_archive)s'])
+
+    def test_unarchive_non_archive(self):
+        join = os.path.join
+
+        assert_raises(IOError, unarchive, join(self.tmp_dir, 'a', 'foo'), join(self.tmp_dir, 'b'))

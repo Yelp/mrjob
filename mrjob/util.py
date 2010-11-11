@@ -125,6 +125,26 @@ def read_input(path, stdin=sys.stdin):
     for line in f:
         yield line
 
+# Thanks to http://lybniz2.sourceforge.net/safeeval.html for
+# explaining how to do this!
+def safeeval(expr, globals=None, locals=None):
+    """Like eval, but with nearly everything in the environment
+    blanked out, so that it's difficult to cause mischief.
+
+    *globals* and *locals* are optional dictionaries mapping names to
+    values for those names (just like in :py:func:`eval`).
+    """
+    # blank out builtins, but keep None, True, and False
+    safe_globals = {'__builtins__': None, 'True': True, 'False': False,
+                    'None': None, 'set': set, 'xrange': xrange}
+
+    # add the user-specified global variables
+    if globals:
+        safe_globals.update(globals)
+
+    return eval(expr, safe_globals, locals)
+
+
 def tar_and_gzip(dir, out_path, filter=None):
     """Tar and gzip the given *dir* to a tarball at *out_path*.
 
@@ -158,25 +178,6 @@ def tar_and_gzip(dir, out_path, filter=None):
 
     tar_gz.close()
 
-# Thanks to http://lybniz2.sourceforge.net/safeeval.html for
-# explaining how to do this!
-def safeeval(expr, globals=None, locals=None):
-    """Like eval, but with nearly everything in the environment
-    blanked out, so that it's difficult to cause mischief.
-
-    *globals* and *locals* are optional dictionaries mapping names to
-    values for those names (just like in :py:func:`eval`).
-    """
-    # blank out builtins, but keep None, True, and False
-    safe_globals = {'__builtins__': None, 'True': True, 'False': False,
-                    'None': None, 'set': set, 'xrange': xrange}
-
-    # add the user-specified global variables
-    if globals:
-        safe_globals.update(globals)
-
-    return eval(expr, safe_globals, locals)
-
 def unarchive(archive_path, dest):
     """Extract the contents of a tar or zip file at *archive_path* into the directory *dest*.
 
@@ -208,3 +209,5 @@ def unarchive(archive_path, dest):
                 if filename:
                     with open(dest_path, 'wb') as dest_file:
                         dest_file.write(archive.read(name))
+    else:
+        raise IOError('Unknown archive type: %s' % (archive_path,))

@@ -49,7 +49,7 @@ def main():
 
 def make_option_parser():
     usage = '%prog [options]'
-    description = 'Print a report on emr usage over the past 2 weeks.'
+    description = 'Print a giant report on EMR usage.'
     option_parser = OptionParser(usage=usage, description=description)
     option_parser.add_option(
         '-v', '--verbose', dest='verbose', default=False, action='store_true',
@@ -65,15 +65,14 @@ def make_option_parser():
         help="Don't load mrjob.conf even if it's available")
     option_parser.add_option(
         '--max-days-ago', dest='max_days_ago', type='float', default=None,
-        help='Max number of days ago to look at jobs')
+        help='Max number of days ago to look at jobs. By default, we go back as far as EMR supports (currently about 2 months)')
     return option_parser
 
 def print_report(options):
 
     emr_conn = EMRJobRunner(conf_path=options.conf_path).make_emr_conn()
     
-    log.info(
-        'getting info about all job flows (this goes back about 2 months)')
+    log.info('getting job flow history...')
     # microseconds just make our report messy
     now = datetime.datetime.utcnow().replace(microsecond=0)
 
@@ -161,9 +160,24 @@ def print_report(options):
     print
 
     total_hours_bbnu = sum(info['hours_bbnu'] for info in job_flow_infos)
-    print 'Total time billed but not used: %.2f' % total_hours_bbnu
+    print 'Total time billed but not used (waste): %.2f' % total_hours_bbnu
     print
-    
+
+    date_to_hours = defaultdict(float)
+    date_to_hours_bbnu = defaultdict(float)
+    for info in job_flow_infos:
+        date_created = info['created'].date()
+        date_to_hours[date_created] += info['hours']
+        date_to_hours_bbnu[date_created] += info['hours_bbnu']
+    print 'Daily statistics:'
+    print
+    print ' date        usage     waste'
+    d = latest.date()
+    while d >= earliest.date():
+        print ' %10s %6d %9.2f' % (d, date_to_hours[d], date_to_hours_bbnu[d])
+        d -= datetime.timedelta(days=1)
+    print
+
     def fmt(mr_job_name_or_user):
         if mr_job_name_or_user:
             return mr_job_name_or_user

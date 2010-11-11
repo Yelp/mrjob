@@ -1422,8 +1422,9 @@ class EMRJobRunner(MRJobRunner):
             return ((isinstance(ex, boto.exception.BotoServerError) and
                      ('Throttling' in ex.body or
                       'RequestExpired' in ex.body)) or
-                    (isinstance(ex, socket.error) and
-                     ex.args == (104, 'Connection reset by peer')))
+                    (isinstance(ex, socket.error) and 
+                     ex.args in ((104, 'Connection reset by peer'),
+                                 (110, 'Connection timed out'))))
 
         return RetryWrapper(raw_conn,
                             retry_if=retry_if,

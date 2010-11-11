@@ -15,7 +15,10 @@
 """Utility functions for MRJob that have no external dependencies."""
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
+from __future__ import with_statement
+
 import bz2
+import contextlib
 import glob
 import gzip
 import logging
@@ -23,6 +26,7 @@ import os
 import pipes
 import sys
 import tarfile
+import zipfile
 
 def cmd_line(args):
     """build a command line that works in a shell.
@@ -172,3 +176,35 @@ def safeeval(expr, globals=None, locals=None):
         safe_globals.update(globals)
 
     return eval(expr, safe_globals, locals)
+
+def unarchive(archive_path, dest):
+    """Extract the contents of a tar or zip file at *archive_path* into the directory *dest*.
+
+    :type archive_path: str
+    :param archive_path: path to archive file
+    :type dest: str
+    :param dest: path to directory where archive will be extracted
+
+    *dest* will be created if it doesn't already exist.
+
+    tar files can be gzip compressed, bzip2 compressed, or uncompressed. Files within zip
+    files can be deflated or stored.
+    """
+    if tarfile.is_tarfile(archive_path):
+        with contextlib.closing(tarfile.open(archive_path, 'r')) as archive:
+            archive.extractall(dest)
+    elif zipfile.is_zipfile(archive_path):
+        with contextlib.closing(zipfile.ZipFile(archive_path, 'r')) as archive:
+            for name in archive.namelist():
+                # the zip spec specifies that front slashes are always
+                # used as directory separators
+                dest_path = os.path.join(dest, *name.split('/'))
+
+                # now, split out any dirname and filename and create
+                # one and/or the other
+                dirname, filename = os.path.split(dest_path)
+                if dirname and not os.path.exists(dirname):
+                    os.makedirs(dirname)
+                if filename:
+                    with open(dest_path, 'wb') as dest_file:
+                        dest_file.write(archive.read(name))

@@ -20,7 +20,7 @@ import gzip
 import os
 import shutil
 import stat
-from subprocess import Popen, PIPE, CalledProcessError
+from subprocess import Popen, PIPE, CalledProcessError, check_call
 from StringIO import StringIO
 import tarfile
 import tempfile
@@ -142,20 +142,15 @@ class SafeEvalTestCase(TestCase):
         a = -0.2
         assert_equal(abs(a), safeeval('abs(a)', globals={'abs': abs}, locals={'a': a}))
 
-class TarAndGzTestCase(TestCase):
+class ArchiveTestCase(TestCase):
 
     @setup
     def setup_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    @teardown
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
-    def test_tar_and_gz(self):
         join = os.path.join
 
-        os.mkdir(join(self.tmp_dir, 'a')) # contains files to tar
+        self.tmp_dir = tempfile.mkdtemp()
+
+        os.mkdir(join(self.tmp_dir, 'a')) # contains files to archive
 
         # create a/foo
         with open(join(self.tmp_dir, 'a', 'foo'), 'w') as foo:
@@ -173,20 +168,18 @@ class TarAndGzTestCase(TestCase):
         with open(join(self.tmp_dir, 'a', 'qux', 'quux'), 'w') as quux:
             quux.write('QUUX\n')
 
-        # tar it up
-        tar_and_gzip(dir=join(self.tmp_dir, 'a'),
-                     out_path=join(self.tmp_dir, 'a.tar.gz'),
-                     filter=lambda path: not path.endswith('z'))
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
 
-        # untar it into b
-        os.mkdir(join(self.tmp_dir, 'b'))
-        t = tarfile.open(join(self.tmp_dir, 'a.tar.gz'), 'r:gz')
-        t.extractall(join(self.tmp_dir, 'b'))
-        t.close()
+    def ensure_expected_results(self, added_files=[], excluded_files=[]):
+        join = os.path.join
 
         # make sure the files we expect are there
+        expected_files = ['bar', 'baz', 'foo', 'qux']
+        expected_files = set(expected_files + added_files) - set(excluded_files)
         assert_equal(sorted(os.listdir(join(self.tmp_dir, 'b'))),
-                     ['bar', 'foo', 'qux'])
+                     sorted(expected_files))
         assert_equal(os.listdir(join(self.tmp_dir, 'b', 'qux')),
                      ['quux'])
 
@@ -203,3 +196,59 @@ class TarAndGzTestCase(TestCase):
         # make sure symlinks are converted to files
         assert os.path.isfile(join(self.tmp_dir, 'b', 'bar'))
         assert not os.path.islink(join(self.tmp_dir, 'b', 'bar'))
+
+    def test_tar_and_gz(self):
+        join = os.path.join
+
+        # tar it up
+        tar_and_gzip(dir=join(self.tmp_dir, 'a'),
+                     out_path=join(self.tmp_dir, 'a.tar.gz'),
+                     filter=lambda path: not path.endswith('z'))
+
+        # untar it into b
+        os.mkdir(join(self.tmp_dir, 'b'))
+        t = tarfile.open(join(self.tmp_dir, 'a.tar.gz'), 'r:gz')
+        t.extractall(join(self.tmp_dir, 'b'))
+        t.close()
+
+        self.ensure_expected_results(excluded_files=['baz'])
+
+    def archive_and_unarchive(self, extension, archive_template, added_files=[]):
+        join = os.path.join
+
+        # archive it up
+        archive_name = 'a.' + extension
+        variables = dict(archive_name=join('..', archive_name), files_to_archive='.')
+        archive_command = [arg % variables for arg in archive_template]
+        check_call(archive_command, cwd=join(self.tmp_dir, 'a'))
+
+        # unarchive it into b
+        unarchive(join(self.tmp_dir, archive_name), join(self.tmp_dir, 'b'))
+
+        self.ensure_expected_results(added_files=added_files)
+
+    def test_unarchive_tar(self):
+        # this test requires that tar is present
+        self.archive_and_unarchive('tar',
+                                   ['tar', 'chf', '%(archive_name)s', '%(files_to_archive)s'])
+
+    def test_unarchive_tar_gz(self):
+        # this test requires that tar is present and supports the "z" option
+        self.archive_and_unarchive('tar.gz',
+                                   ['tar', 'czhf', '%(archive_name)s', '%(files_to_archive)s'])
+
+    def test_unarchive_tar_bz2(self):
+        # this test requires that tar is present and supports the "j" option
+        self.archive_and_unarchive('tar.bz2',
+                                   ['tar', 'cjhf', '%(archive_name)s', '%(files_to_archive)s'])
+
+    def test_unarchive_jar(self):
+        # this test requires that jar is present
+        self.archive_and_unarchive('jar',
+                                   ['jar', 'cf', '%(archive_name)s', '%(files_to_archive)s'],
+                                   added_files=['META-INF'])
+
+    def test_unarchive_zip(self):
+        # this test requires that zip is present
+        self.archive_and_unarchive('zip', ['zip', '-qr',
+                                   '%(archive_name)s', '%(files_to_archive)s'])

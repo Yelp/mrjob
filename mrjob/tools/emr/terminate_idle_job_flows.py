@@ -18,11 +18,16 @@ Suggested usage: run this as a cron job with the -q option::
 
     */30 * * * * python -m mrjob.tools.emr.terminate_idle_emr_job_flows -q
 """
-from boto.utils import ISO8601
 from datetime import datetime, timedelta
 import logging
 from optparse import OptionParser
 import posixpath
+import sys
+
+try:
+    import boto.utils
+except ImportError:
+    boto = None
 
 from mrjob.emr import EMRJobRunner, describe_all_job_flows
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
@@ -45,13 +50,20 @@ def main():
     # suppress No handlers could be found for logger "boto" message
     log_to_stream(name='boto', level=logging.CRITICAL)
 
-    emr_conn = EMRJobRunner(conf_path=options.conf_path).make_emr_conn()
+    inspect_and_maybe_terminate_job_flows(
+        conf_path=options.conf_path,
+        max_hours_idle=options.max_hours_idle,
+        now=datetime.utcnow(),
+        dry_run=options.dry_run)
+
+def inspect_and_maybe_terminate_job_flows(
+    conf_path, max_hours_idle, now, dry_run):
+    
+    emr_conn = EMRJobRunner(conf_path=conf_path).make_emr_conn()
 
     log.info(
         'getting info about all job flows (this goes back about 2 months)')
     job_flows = describe_all_job_flows(emr_conn)
-
-    now = datetime.utcnow()
 
     num_running = 0
     num_idle = 0
@@ -63,60 +75,97 @@ def main():
     for jf in job_flows:
 
         # check if job flow is done
-        if hasattr(jf, 'enddatetime'):
+        if is_job_flow_done(jf):
             num_done += 1
-            continue
 
-        active_steps = [step for step in jf.steps
-                        if step.state != 'CANCELLED']
-
-        # check for non-streaming job flows (Issue #60)
-        if hasattr(jf, 'steps') and jf.steps and not any(
-            hasattr(step, 'jar') and
-            HADOOP_STREAMING_JAR_RE.match(posixpath.basename(step.jar))
-            for step in jf.steps):
-            print jf.jobflowid
+        # we can't really tell if non-streaming jobs are idle or not, so
+        # let them be (see Issue #60)
+        elif is_job_flow_non_streaming(jf):
             num_non_streaming += 1
-            continue
 
-        # check if job flow is currently running
-        if active_steps and not hasattr(active_steps[-1], 'enddatetime'):
+        elif is_job_flow_running(jf):
             num_running += 1
-            continue
 
-        # okay, job is idle. how long has it been idle?
-        num_idle += 1
-        if active_steps:
-            idle_since = datetime.strptime(
-                active_steps[-1].enddatetime, ISO8601)
         else:
-            idle_since = datetime.strptime(
-                jf.creationdatetime, ISO8601)
-        idle_time = now - idle_since
+            num_idle += 1
+            time_idle = time_job_flow_idle(jf, now=now)
 
-        # don't care about fractions of a second
-        idle_time = timedelta(idle_time.days, idle_time.seconds)
-
-        log.debug('Job flow %s (%s) idle for %s' %
-                  (jf.jobflowid, jf.name, idle_time))
-        if idle_time > timedelta(hours=options.max_hours_idle):
-            to_terminate.append(
-                (jf.jobflowid, jf.name, idle_time))
+            # don't care about fractions of a second
+            time_idle = timedelta(time_idle.days, time_idle.seconds)
+            
+            log.debug('Job flow %s (%s) idle for %s' %
+                      (jf.jobflowid, jf.name, time_idle))
+            if time_idle > timedelta(hours=max_hours_idle):
+                to_terminate.append(
+                    (jf.jobflowid, jf.name, time_idle))
 
     log.info('Job flow statuses: %d running, %d idle, %d active non-streaming, %d done' %
                   (num_running, num_idle, num_non_streaming, num_done))
 
-    terminate_and_notify(emr_conn, to_terminate, options)
+    terminate_and_notify(emr_conn, to_terminate, dry_run=dry_run)
 
-def terminate_and_notify(emr_conn, to_terminate, options):
+def is_job_flow_done(job_flow):
+    """Return True if the given job flow is done running."""
+    return hasattr(job_flow, 'enddatetime')
+
+def is_job_flow_non_streaming(job_flow):
+    """Return True if the give job flow has steps, but not of them are
+    Hadoop streaming steps (for example, if the job flow is running Hive).
+    """
+    if not job_flow.steps:
+        return False
+
+    for step in job_flow.steps:
+        if HADOOP_STREAMING_JAR_RE.match(posixpath.basename(step.jar)):
+            return False
+
+    # job has at least one step, and none are streaming steps
+    return True
+
+def is_job_flow_running(job_flow):
+    """Return true if the given job has any steps which are currently running."""
+    active_steps = [step for step in job_flow.steps
+                    if step.state != 'CANCELLED']
+
+    if not active_steps:
+        return False
+
+    return not getattr(active_steps[-1], 'enddatetime', None)
+
+def time_job_flow_idle(job_flow, now):
+    """How long has the given job flow been idle?
+
+    :param job_flow: job flow to inspect
+    :type now: :py:class:`datetime.datetime`
+    :param now: the current time, in UTC
+
+    :rtype: :py:class:`datetime.timedelta`
+    """
+    if is_job_flow_done(job_flow):
+        return timedelta(0)
+
+    active_steps = [step for step in job_flow.steps
+                    if step.state != 'CANCELLED']
+
+    if active_steps:
+        if not getattr(active_steps[-1], 'enddatetime', None):
+            return timedelta(0)
+        else:
+            return now - datetime.strptime(
+                active_steps[-1].enddatetime, boto.utils.ISO8601)
+    else:
+        return now - datetime.strptime(job_flow.creationdatetime,
+                                       boto.utils.ISO8601)
+
+def terminate_and_notify(emr_conn, to_terminate, dry_run=False):
     if not to_terminate:
         return
 
-    for job_flow_id, name, idle_time in to_terminate:
-        if not options.dry_run:
+    for job_flow_id, name, time_idle in to_terminate:
+        if not dry_run:
             emr_conn.terminate_jobflow(job_flow_id)
         print 'Terminated job flow %s (%s); was idle for %s' % (
-            (job_flow_id, name, idle_time))
+            (job_flow_id, name, time_idle))
 
 def make_option_parser():
     usage = '%prog [options]'

@@ -24,6 +24,7 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob.conf import combine_dicts, combine_paths
+from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.runner import MRJobRunner
 from mrjob.util import cmd_line
 

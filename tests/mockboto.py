@@ -21,7 +21,7 @@ some sort of sandboxing feature to boto, rather than extending these somewhat
 ad-hoc mock objects.
 """
 from __future__ import with_statement
-import time
+import datetime
 
 try:
     import boto.exception
@@ -32,8 +32,10 @@ except ImportError:
 from mrjob.conf import combine_values
 from mrjob.emr import S3_URI_RE, parse_s3_uri
 
-### S3 ###
+DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
+DEFAULT_MAX_DAYS_AGO = 61
 
+### S3 ###
 
 def add_mock_s3_data(mock_s3_fs, data):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
@@ -158,6 +160,11 @@ class MockKey(object):
 
 ### EMR ###
 
+def to_iso8601(when):
+    """Convert a datetime to ISO8601 format.
+    """
+    return when.strftime(boto.utils.ISO8601)
+
 class MockEmrConnection(object):
     """Mock out boto.emr.EmrConnection. This actually handles a small
     state machine that simulates EMR job flows."""
@@ -168,6 +175,8 @@ class MockEmrConnection(object):
                  https_connection_factory=None, region=None,
                  mock_s3_fs=None, mock_emr_job_flows=None,
                  mock_emr_failures=None, mock_emr_output=None,
+                 max_days_ago=DEFAULT_MAX_DAYS_AGO,
+                 max_job_flows_returned=DEFAULT_MAX_JOB_FLOWS_RETURNED,
                  max_simulation_steps=100):
         """Create a mock version of EmrConnection. Most of these args are
         the same as for the real EmrConnection, and are ignored.
@@ -181,23 +190,23 @@ class MockEmrConnection(object):
         Step numbers are 0-indexed.
 
         Extra args:
-        mock_s3_fs -- a mock S3 filesystem to point to (just a dictionary
-            mapping bucket name to key name to bytes)
-        mock_emr_job_flows -- a mock set of EMR job flows to point to
-            (just a map from job flow ID to a MockEmrObject representing
-            a job flow)
-        mock_emr_failures -- a map from (job flow ID, step_num) to a failure
-            message (or None for the default message)
-        mock_emr_output -- a map from (job flow ID, step_num) to a list of
-            strs representing file contents to output when the job completes
-        max_simulation_steps -- the maximum number of times we can simulate the
-            the progress of EMR job flows (to protect against simulating
-            forever)
+        :param mock_s3_fs: a mock S3 filesystem to point to (just a dictionary mapping bucket name to key name to bytes)
+        :param mock_emr_job_flows: a mock set of EMR job flows to point to (just a map from job flow ID to a :py:class:`MockEmrObject` representing a job flow)
+        :param mock_emr_failures: a map from ``(job flow ID, step_num)`` to a failure message (or ``None`` for the default message)
+        :param mock_emr_output: a map from ``(job flow ID, step_num)`` to a list of ``str``s representing file contents to output when the job completes
+        :type max_job_flows_returned: int
+        :param max_job_flows_returned: the maximum number of job flows that :py:meth:`describe_jobflows` can return, to simulate a real limitation of EMR
+        :type max_days_ago: int
+        :param max_days_ago: the maximum amount of days that EMR will go back in time
+        :type max_simulation_steps: int
+        :param max_simulation_steps: the maximum number of times we can simulate the progress of EMR job flows (to protect against simulating forever)
         """
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.mock_emr_job_flows = combine_values({}, mock_emr_job_flows)
         self.mock_emr_failures = combine_values({}, mock_emr_failures)
         self.mock_emr_output = combine_values({}, mock_emr_output)
+        self.max_days_ago = max_days_ago
+        self.max_job_flows_returned = max_job_flows_returned
         self.simulation_steps_left = max_simulation_steps
 
     def run_jobflow(self,
@@ -208,7 +217,11 @@ class MockEmrConnection(object):
                     enable_debugging=False,
                     hadoop_version='0.18',
                     steps=[],
-                    bootstrap_actions=[]):
+                    bootstrap_actions=[],
+                    now=None):
+        if now is None:
+            now = datetime.datetime.utcnow()
+
         init_args = locals().copy()
         del init_args['self']
 
@@ -218,11 +231,12 @@ class MockEmrConnection(object):
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
+            creationdatetime=to_iso8601(now),
             state='STARTING',
             laststatechangereason='Provisioning Amazon EC2 capacity',
             loguri=log_uri,
             keepjobalivewhennosteps=keep_alive,
-            steps = [],
+            steps=[],
         )
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
@@ -230,13 +244,54 @@ class MockEmrConnection(object):
 
         return jobflow_id
 
-    def describe_jobflow(self, jobflow_id):
+    def describe_jobflow(self, jobflow_id, now=None):
         if not jobflow_id in self.mock_emr_job_flows:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
-        self.simulate_progress(jobflow_id)
+        self.simulate_progress(jobflow_id, now=now)
 
         return self.mock_emr_job_flows[jobflow_id]
+
+    def describe_jobflows(self, states=None, jobflow_ids=None,
+                          created_after=None, created_before=None):
+
+        # mrjob.emr.describe_all_job_flows() needs this particular error
+        if created_before:
+            min_created_before = (datetime.datetime.utcnow() -
+                                  datetime.timedelta(days=self.max_days_ago))
+            if created_before < min_created_before:
+                raise boto.exception.BotoServerError(
+                    400, 'Bad Request', body="""<ErrorResponse xmlns="http://elasticmapreduce.amazonaws.com/doc/2009-03-31">
+  <Error>
+    <Type>Sender</Type>
+    <Code>ValidationError</Code>
+    <Message>Created-before field is before earliest allowed value</Message>
+  </Error>
+  <RequestId>eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee</RequestId>
+</ErrorResponse>""")
+
+        jfs = sorted(self.mock_emr_job_flows.itervalues(),
+                     key=lambda jf: jf.creationdatetime,
+                     reverse=True)
+
+        if states:
+            jfs = [jf for jf in jfs if jf.state in states]
+
+        if jobflow_ids:
+            jfs = [jf for jf in jfs if jf.jobflowid in jobflow_ids]
+
+        if created_after:
+            after_timestamp = to_iso8601(created_after)
+            jfs = [jf for jf in jfs if jf.creationdatetime > after_timestamp]
+
+        if created_before:
+            before_timestamp = to_iso8601(created_before)
+            jfs = [jf for jf in jfs if jf.creationdatetime < before_timestamp]
+
+        if self.max_job_flows_returned:
+            jfs = jfs[:self.max_job_flows_returned]
+
+        return jfs
 
     def add_jobflow_steps(self, jobflow_id, steps):
         if not jobflow_id in self.mock_emr_job_flows:
@@ -277,15 +332,29 @@ class MockEmrConnection(object):
         else:
             return None
 
-    def simulate_progress(self, jobflow_id):
+    def simulate_progress(self, jobflow_id, now=None):
         """Simulate progress on the given job flow. This is automatically
-        run when we call describe_jobflow()."""
+        run when we call describe_jobflow().
+
+        :type jobflow_id: str
+        :param jobflow_id: fake job flow ID
+        :type now: py:class:`datetime.datetime`
+        :param now: alternate time to use as the current time (should be UTC)
+        """
+        if now is None:
+            now = datetime.datetime.utcnow()
+        
         if self.simulation_steps_left <= 0:
             raise AssertionError(
                 'Simulated progress too many times; bailing out')
         self.simulation_steps_left -= 1
 
         job_flow = self.mock_emr_job_flows[jobflow_id]
+
+        # if job is STARTING, move it along to WAITING
+        if job_flow.state == 'STARTING':
+            job_flow.state = 'WAITING'
+            job_flow.startdatetime = to_iso8601(now)
 
         # if job is done, don't advance it
         if job_flow.state in ('COMPLETED', 'TERMINATED', 'FAILED'):
@@ -297,6 +366,7 @@ class MockEmrConnection(object):
                 job_flow.state = 'FAILED'
             else:
                 job_flow.state = 'TERMINATED'
+            job_flow.enddatetime = to_iso8601(now)
             return
 
         # if a step is currently running, advance it
@@ -308,14 +378,12 @@ class MockEmrConnection(object):
             # found currently running step! going to handle it, then exit
             if step.state == 'PENDING':
                 step.state = 'RUNNING'
-                step.startdatetime = time.strftime(boto.utils.ISO8601,
-                                                   time.gmtime())
+                step.startdatetime = to_iso8601(now)
                 return
 
             assert step.state == 'RUNNING'
-            step.enddatetime = time.strftime(boto.utils.ISO8601,
-                                                   time.gmtime())
-                
+            step.enddatetime = to_iso8601(now)
+
             # check if we're supposed to have an error
             if (jobflow_id, step_num) in self.mock_emr_failures:
                 step.state = 'FAILED'

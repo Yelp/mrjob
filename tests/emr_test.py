@@ -14,15 +14,16 @@
 """Unit testing for EMRJobRunner"""
 from __future__ import with_statement
 
-from StringIO import StringIO
+import datetime
 import os
 import shutil
+from StringIO import StringIO
 import tempfile
-from testify import TestCase, assert_equal, assert_raises, setup, teardown
+from testify import TestCase, assert_equal, assert_raises, assert_gt, setup, teardown
 
 from mrjob.conf import dump_mrjob_conf
-from mrjob.emr import EMRJobRunner
-from tests.mockboto import MockS3Connection, MockEmrConnection, add_mock_s3_data
+from mrjob.emr import EMRJobRunner, describe_all_job_flows
+from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
 
 try:
@@ -206,8 +207,30 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         assert_equal(runner2._opts['s3_scratch_uri'], s3_scratch_uri)
         s3_scratch_uri = runner._opts['s3_scratch_uri']
 
+class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
 
-        
+    def test_can_get_all_job_flows(self):
+        now = datetime.datetime.utcnow()
+
+        NUM_JOB_FLOWS = 2222
+        assert_gt(NUM_JOB_FLOWS, DEFAULT_MAX_JOB_FLOWS_RETURNED)
+    
+        for i in range(NUM_JOB_FLOWS):
+            jfid = 'j-%04d' % i
+            self.mock_emr_job_flows[jfid] = MockEmrObject(
+                creationdatetime=to_iso8601(now - datetime.timedelta(minutes=i)),
+                jobflowid=jfid)
+
+        emr_conn = EMRJobRunner().make_emr_conn()
+
+        # ordinary describe_jobflows() hits the limit on number of job flows
+        some_jfs = emr_conn.describe_jobflows()
+        assert_equal(len(some_jfs), DEFAULT_MAX_JOB_FLOWS_RETURNED)
+
+        all_jfs = describe_all_job_flows(emr_conn)
+        assert_equal(len(all_jfs), NUM_JOB_FLOWS)
+        assert_equal(sorted(jf.jobflowid for jf in all_jfs),
+                     [('j-%04d' % i) for i in range(NUM_JOB_FLOWS)])
 
 ### tests for error parsing ###
 

@@ -224,6 +224,30 @@ class CombineEnvsTestCase(TestCase):
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
 
+class CombineLocalEnvsTestCase(TestCase):
+
+    @setup
+    def set_os_pathsep(self):
+        self._real_os_pathsep = os.pathsep
+        os.pathsep = ';'
+
+    @teardown
+    def restore_os_pathsep(self):
+        os.pathsep = self._real_os_pathsep
+
+    def test_paths(self):
+        assert_equal(combine_local_envs(
+            {'PATH': '/bin:/usr/bin',
+             'PYTHONPATH': '/usr/lib/python/site-packages',
+             'PS1': '> '},
+            {'PATH': '/home/dave/bin',
+             'PYTHONPATH': '/home/dave/python',
+             'CLASSPATH': '/home/dave/java',
+             'PS1': '\w> '}),
+            {'PATH': '/home/dave/bin;/bin:/usr/bin',
+             'PYTHONPATH': '/home/dave/python;/usr/lib/python/site-packages',
+             'CLASSPATH': '/home/dave/java',
+             'PS1': '\w> '})
 
 class CombineListsTestCase(TestCase):
 

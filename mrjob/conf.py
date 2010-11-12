@@ -257,12 +257,26 @@ def combine_envs(*envs):
 
     If you pass in ``None`` in place of a dictionary, it will be ignored.
     """
+    return _combine_envs_helper(envs, local=False)
+
+def combine_local_envs(*envs):
+    """Same as :py:func:`combine_envs`, except that paths are combined
+    using the local path separator (e.g ``;`` on Windows rather than ``:``).
+    """
+    return _combine_envs_helper(envs, local=True)
+
+def _combine_envs_helper(envs, local):
+    if local:
+        pathsep = os.pathsep
+    else:
+        pathsep = ':'
+    
     result = {}
     for env in envs:
         if env:
             for key, value in env.iteritems():
                 if key.endswith('PATH') and result.get(key):
-                    result[key] = '%s:%s' % (value, result[key])
+                    result[key] = value + pathsep + result[key]
                 else:
                     result[key] = value
 

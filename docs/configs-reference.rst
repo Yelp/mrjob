@@ -38,7 +38,7 @@ Option              Default                        Combined by                  
 
 See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
 
-:py:class:`~mrjob.local.LocalMRJobRunner` takes no additional options.
+:py:class:`~mrjob.local.LocalMRJobRunner` takes no additional options, but *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs` instead.
 
 Additional options for :py:class:`~mrjob.emr.EMRJobRunner`
 ----------------------------------------------------------

@@ -33,7 +33,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from mrjob.conf import combine_dicts, combine_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
+from mrjob.conf import combine_dicts, combine_envs, combine_local_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
 from mrjob.util import cmd_line, file_ext, tar_and_gzip
 
 log = logging.getLogger('mrjob.runner')
@@ -556,7 +556,9 @@ class MRJobRunner(object):
     def _add_python_archive(self, path):
         file_dict = self._add_archive_for_upload(path)
         log.debug('adding %s to PYTHONPATH' % file_dict['name'])
-        self._cmdenv = combine_envs(
+        # on Windows, PYTHONPATH should be separated by ;, not :
+        cmdenv_combiner = self._opts_combiners()['cmdenv']
+        self._cmdenv = cmdenv_combiner(
             self._cmdenv, {'PYTHONPATH': file_dict['name']})
         self._python_archives.append(file_dict)
 
@@ -666,7 +668,7 @@ class MRJobRunner(object):
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))
                 # add . to PYTHONPATH (in case mrjob isn't actually installed)
-                env = combine_envs(os.environ,
+                env = combine_local_envs(os.environ,
                                    {'PYTHONPATH': os.path.abspath('.')})
                 steps_proc = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
                 stdout, stderr = steps_proc.communicate()

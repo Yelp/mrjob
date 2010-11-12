@@ -22,7 +22,7 @@ from subprocess import Popen, PIPE
 import sys
 import re
 
-from mrjob.conf import combine_envs
+from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.parse import find_python_traceback, parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
 from mrjob.util import cmd_line, file_ext, unarchive
@@ -52,6 +52,13 @@ class LocalMRJobRunner(MRJobRunner):
         self._prev_outfile = None
         self._final_outfile = None
         self._counters = {}
+
+    @classmethod
+    def _opts_combiners(cls):
+        # on windows, PYTHONPATH should use ;, not :
+        return combine_dicts(
+            super(LocalMRJobRunner, cls)._opts_combiners(),
+            {'cmdenv': combine_local_envs})
 
     def _run(self):
         if self._opts['bootstrap_mrjob']:
@@ -167,7 +174,7 @@ class LocalMRJobRunner(MRJobRunner):
         """
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
-        env = combine_envs(
+        env = combine_local_envs(
             {'PYTHONPATH': os.getcwd()},
             os.environ,
             self._cmdenv,

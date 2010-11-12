@@ -47,6 +47,7 @@ def main():
         'ec2_slave_instance_type': options.ec2_slave_instance_type,
         'label': options.label,
         'num_ec2_instances': options.num_ec2_instances,
+        'owner': options.owner,
     }
     runner = EMRJobRunner(**runner_kwargs)
     emr_job_flow_id = runner.make_persistent_job_flow()
@@ -84,8 +85,11 @@ def make_option_parser():
     option_parser.add_option(
         '-l', '--label', dest='label',
         default='create_job_flow',
-        help="Optional label for this job flow; useful for auditing. default: %default")
-
+        help='Optional label for this job flow; useful for auditing. default: %default')
+    option_parser.add_option(
+        '-o', '--owner', dest='owner',
+        default=None,
+        help='Optional owner for this job; useful for auditing. Default is your username.')
 
     return option_parser
 

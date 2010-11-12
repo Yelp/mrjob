@@ -22,6 +22,9 @@ except ImportError:
 # match the filename of a hadoop streaming jar
 HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*\.jar$')
 
+# match an mrjob job name (these are used to name EMR job flows)
+JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
+
 def find_python_traceback(lines):
     """Scan a log file or other iterable for a Python traceback,
     and return it as a list of lines.

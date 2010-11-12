@@ -15,6 +15,7 @@
 from __future__ import with_statement
 
 import datetime
+import getpass
 import os
 import shutil
 from StringIO import StringIO
@@ -23,6 +24,7 @@ from testify import TestCase, assert_equal, assert_raises, assert_gt, setup, tea
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner, describe_all_job_flows
+from mrjob.parse import JOB_NAME_RE
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
 
@@ -137,6 +139,9 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             emr_conn = runner.make_emr_conn()
             job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
             assert_equal(job_flow.state, 'COMPLETED')
+            name_match = JOB_NAME_RE.match(job_flow.name)
+            assert_equal(name_match.group(1), 'mr_two_step_job')
+            assert_equal(name_match.group(2), getpass.getuser())
 
         assert_equal(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])

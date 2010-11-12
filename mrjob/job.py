@@ -665,6 +665,10 @@ class MRJob(object):
             help='custom prefix for job name, to help us identify the job')
 
         self.runner_opt_group.add_option(
+            '--owner', dest='owner', default=None,
+            help='custom username to use, to help us identify who ran the job')
+
+        self.runner_opt_group.add_option(
             '--jobconf', dest='jobconf', default={}, action='set_key',
             help='-jobconf arg to pass through to hadoop streaming; '
             'should take the form KEY=VALUE. You can use --jobconf '
@@ -857,7 +861,9 @@ class MRJob(object):
             'input_paths': self.args,
             'jobconf': self.options.jobconf,
             'mr_job_script': self.mr_job_script(),
+            'label': self.options.label,
             'output_dir': self.options.output_dir,
+            'owner': self.options.owner,
             'stdin': self.stdin,
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,

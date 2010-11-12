@@ -15,12 +15,15 @@
 from __future__ import with_statement
 
 from StringIO import StringIO
+import datetime
+import getpass
 import os
-from testify import TestCase, assert_equal, assert_not_equal, assert_not_in, assert_raises, setup, teardown
+from testify import TestCase, assert_equal, assert_not_equal, assert_gte, assert_lte, assert_not_in, assert_raises, setup, teardown
 import tempfile
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
+from mrjob.parse import JOB_NAME_RE
 from tests.mr_two_step_job import MRTwoStepJob
 
 class WithStatementTestCase(TestCase):
@@ -72,3 +75,71 @@ class TestDeprecatedKwargs(TestCase):
         assert_equal(old_opts, new_opts)
         assert_equal(old_opts['label'], 'ads_chain')
         assert_not_in('job_name_prefix', old_opts)
+
+class TestJobName(TestCase):
+    
+    @setup
+    def blank_out_environment(self):
+        self._old_environ = os.environ.copy()
+        # don't do os.environ = {}! This won't actually set environment
+        # variables; it just monkey-patches os.environ
+        os.environ.clear()
+
+    @teardown
+    def restore_environment(self):
+        os.environ.clear()
+        os.environ.update(self._old_environ)
+
+    def test_empty(self):
+        runner = LocalMRJobRunner(conf_path=False)
+        match = JOB_NAME_RE.match(runner.get_job_name())
+
+        assert_equal(match.group(1), 'no_script')
+        assert_equal(match.group(2), getpass.getuser())
+
+    def test_auto_label(self):
+        runner = MRTwoStepJob(['--no-conf']).make_runner()
+        match = JOB_NAME_RE.match(runner.get_job_name())
+
+        assert_equal(match.group(1), 'mr_two_step_job')
+        assert_equal(match.group(2), getpass.getuser())
+
+    def test_auto_owner(self):
+        os.environ['USER'] = 'mcp'
+        runner = LocalMRJobRunner(conf_path=False)
+        match = JOB_NAME_RE.match(runner.get_job_name())
+
+        assert_equal(match.group(1), 'no_script')
+        assert_equal(match.group(2), 'mcp')
+
+    def test_auto_everything(self):
+        test_start = datetime.datetime.utcnow()
+
+        os.environ['USER'] = 'mcp'
+        runner = MRTwoStepJob(['--no-conf']).make_runner()
+        match = JOB_NAME_RE.match(runner.get_job_name())
+
+        assert_equal(match.group(1), 'mr_two_step_job')
+        assert_equal(match.group(2), 'mcp')
+
+        job_start = datetime.datetime.strptime(
+            match.group(3) + match.group(4), '%Y%m%d%H%M%S')
+        job_start = job_start.replace(microsecond=int(match.group(5)))
+        assert_gte(job_start, test_start)
+        assert_lte(job_start - test_start, datetime.timedelta(seconds=5))
+
+    def test_owner_and_label_switches(self):
+        runner_opts = ['--no-conf', '--owner=ads', '--label=ads_chain']
+        runner = MRTwoStepJob(runner_opts).make_runner()
+        match = JOB_NAME_RE.match(runner.get_job_name())
+
+        assert_equal(match.group(1), 'ads_chain')
+        assert_equal(match.group(2), 'ads')
+
+    def test_owner_and_label_kwargs(self):
+        runner = LocalMRJobRunner(conf_path=False,
+                                  owner='ads', label='ads_chain')
+        match = JOB_NAME_RE.match(runner.get_job_name())
+
+        assert_equal(match.group(1), 'ads_chain')
+        assert_equal(match.group(2), 'ads')

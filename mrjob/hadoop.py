@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import getpass
 import logging
 import os
 import posixpath
@@ -61,7 +61,7 @@ def fully_qualify_hdfs_path(path):
     elif path.startswith('/'):
         return 'hdfs://' + path
     else:
-        return 'hdfs:///user/%s/%s' % (os.environ['USER'], path)
+        return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
 
 class HadoopJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.

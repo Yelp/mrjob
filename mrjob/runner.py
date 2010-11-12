@@ -15,6 +15,7 @@
 """
 import copy
 import datetime
+import getpass
 import glob
 import gzip
 import logging
@@ -25,6 +26,7 @@ import shutil
 import sys
 from subprocess import Popen, PIPE
 import tarfile
+import tempfile
 
 try:
     from cStringIO import StringIO
@@ -105,7 +107,7 @@ class MRJobRunner(object):
         These can be defaulted in your :mod:`mrjob.conf` file:
         
         :type base_tmp_dir: str
-        :param base_tmp_dir: path to put local temp dirs inside
+        :param base_tmp_dir: path to put local temp dirs inside. By default we just call :py:func:`tempfile.gettempdir`
         :type bootstrap_mrjob: bool
         :param bootstrap_mrjob: should we automatically tar up the mrjob library and install it when we run the mrjob? Set this to ``False`` if you've already installed ``mrjob`` on your Hadoop cluster.
         :type cleanup: str
@@ -117,7 +119,9 @@ class MRJobRunner(object):
         :type jobconf: dict
         :param jobconf: ``-jobconf`` args to pass to hadoop streaming. This should be a map from property name to value. Equivalent to passing ``['-jobconf', 'KEY1=VALUE1', '-jobconf', 'KEY2=VALUE2', ...]`` to ``hadoop_extra_args``.
         :type label: str
-        :param label: description of this job to use as the part of its name. By default, we use the script's module name. This used to be called *job_name_prefix* (which still works but is deprecated).
+        :param label: description of this job to use as the part of its name. By default, we use the script's module name, or ``no_script`` if there is none. This used to be called *job_name_prefix* (which still works but is deprecated).
+        :type owner: str
+        :param owner: who is running this job. Used solely to set the job name. By default, we use :py:func:`getpass.getuser`, or ``no_user`` if it fails.
         :type python_archives: list of str
         :param python_archives: same as upload_archives, except they get added to the job's :envvar:`$PYTHONPATH`
         :type setup_cmds: list
@@ -231,7 +235,8 @@ class MRJobRunner(object):
         self._output_dir = output_dir
         
         # give this job a unique name
-        self._job_name = self._make_unique_job_name(self._opts['label'])
+        self._job_name = self._make_unique_job_name(
+            label=self._opts['label'], owner=self._opts['owner'])
 
         # a local tmp directory that will be cleaned up when we're done
         # access/make this using self._get_local_tmp_dir()
@@ -244,17 +249,24 @@ class MRJobRunner(object):
     def _allowed_opts(cls):
         """A list of which keyword args we can pass to __init__()"""
         return ['base_tmp_dir', 'bootstrap_mrjob', 'cleanup', 'cmdenv',
-                'hadoop_extra_args', 'jobconf', 'label',
+                'hadoop_extra_args', 'jobconf', 'label', 'owner',
                 'python_archives', 'setup_cmds', 'setup_scripts',
                 'upload_archives', 'upload_files']
 
     @classmethod
     def _default_opts(cls):
         """A dictionary giving the default value of options."""
+        # getpass.getuser() isn't available on all systems, and may fail
+        try:
+            owner = getpass.getuser()
+        except:
+            owner = None
+        
         return {
-            'base_tmp_dir': os.environ.get('TMPDIR') or '/tmp',
+            'base_tmp_dir': tempfile.gettempdir(),
             'bootstrap_mrjob': True,
             'cleanup': CLEANUP_DEFAULT,
+            'owner': owner,
         }
 
     @classmethod
@@ -280,7 +292,7 @@ class MRJobRunner(object):
         version of opts with the current versions of the options.
         """
         if 'job_name_prefix' in opts:
-            log.warn('job_name_prefix is DEPRECATED in v0.1.1; use label instead')
+            log.warn('job_name_prefix is DEPRECATED in v0.2.0; use label instead')
             opts['label'] = opts['job_name_prefix']
 
     @classmethod
@@ -291,11 +303,6 @@ class MRJobRunner(object):
         You don't need to re-implement this in a subclass
         """
         return combine_opts(cls._opts_combiners(), *opts_list)
-
-    def get_opts(self):
-        """Get options set for this reducer (either by default, from
-        mrjob.conf, or as a keyword argument."""
-        return copy.deepcopy(self._opts)
 
     ### Running the job and parsing output ###
 
@@ -378,6 +385,19 @@ class MRJobRunner(object):
     def __exit__(self, type, value, traceback):
         """Call self.cleanup() at end of with block."""
         self.cleanup()
+
+    ### more runner information ###
+        
+    def get_opts(self):
+        """Get options set for this reducer (either by default, from
+        mrjob.conf, or as a keyword argument."""
+        return copy.deepcopy(self._opts)
+
+    def get_job_name(self):
+        """Get the unique name for the job run by this runner.
+        This has the format ``label.owner.date.time.microseconds``
+        """
+        return self._job_name
 
     ### file management utilties ###
 
@@ -604,7 +624,7 @@ class MRJobRunner(object):
 
         return self._local_tmp_dir
     
-    def _make_unique_job_name(self, label=None):
+    def _make_unique_job_name(self, label=None, owner=None):
         """Come up with a useful unique ID for this job.
 
         We use this to choose the output directory, etc. for the job.
@@ -618,9 +638,12 @@ class MRJobRunner(object):
             else:
                 label = 'no_script'
 
+        if not owner:
+            owner = 'no_user'
+
         now = datetime.datetime.utcnow()
         return '%s.%s.%s.%06d' % (
-            label, os.environ.get('USER'),
+            label, owner,
             now.strftime('%Y%m%d.%H%M%S'), now.microsecond)
             
     def _get_steps(self):

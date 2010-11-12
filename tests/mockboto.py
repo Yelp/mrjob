@@ -232,10 +232,11 @@ class MockEmrConnection(object):
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
             creationdatetime=to_iso8601(now),
-            state='STARTING',
+            keepjobalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
             loguri=log_uri,
-            keepjobalivewhennosteps=keep_alive,
+            name=name,
+            state='STARTING',
             steps=[],
         )
         self.mock_emr_job_flows[jobflow_id] = job_flow

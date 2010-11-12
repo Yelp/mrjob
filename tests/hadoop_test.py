@@ -16,6 +16,7 @@
 from __future__ import with_statement
 
 from StringIO import StringIO
+import getpass
 import os
 import shutil
 from subprocess import check_call
@@ -154,7 +155,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             # make sure we're writing to the correct path in HDFS
             hdfs_root = os.environ['MOCK_HDFS_ROOT']
             assert_equal(sorted(os.listdir(hdfs_root)), ['data', 'user'])
-            home_dir = os.path.join(hdfs_root, 'user', os.environ['USER'])
+            home_dir = os.path.join(hdfs_root, 'user', getpass.getuser())
             assert_equal(os.listdir(home_dir), ['tmp'])
             assert_equal(os.listdir(os.path.join(home_dir, 'tmp')), ['mrjob'])
 

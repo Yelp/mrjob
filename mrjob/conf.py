@@ -119,8 +119,8 @@ def find_mrjob_conf():
     Return ``None`` if we can't find it.
     """
     def candidates():
-        if 'HOME' in os.environ:
-            yield os.path.join(os.environ['HOME'], '.mrjob')
+        # $HOME isn't necessarily set on Windows, but ~ works
+        yield expand_path('~/.mrjob')
 
         if os.environ.get('PYTHONPATH'):
             for dirname in os.environ['PYTHONPATH'].split(os.pathsep):

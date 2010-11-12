@@ -26,8 +26,8 @@ Option              Default                        Combined by                  
 *cleanup*           ``'IF_SUCCESSFUL'``            :py:func:`~mrjob.conf.combine_values`     :option:`--cleanup`
 *cmdenv*            ``{}``                         :py:func:`~mrjob.conf.combine_envs`
 *hadoop_extra_args* ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--hadoop-arg`
-*job_name_prefix*   (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--job-name-prefix`
 *jobconf*           ``{}``                         :py:func:`~mrjob.conf.combine_dicts`      :option:`--jobconf`
+*label*             (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--label`
 *python_archives*   ``[]``                         :py:func:`~mrjob.conf.combine_path_lists`
 *setup_cmds*        ``[]``                         :py:func:`~mrjob.conf.combine_lists`
 *setup_scripts*     ``[]``                         :py:func:`~mrjob.conf.combine_path_lists`

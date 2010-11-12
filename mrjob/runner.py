@@ -13,6 +13,7 @@
 # limitations under the License.
 """Base class for all runners.
 """
+import copy
 import datetime
 import glob
 import gzip
@@ -115,8 +116,8 @@ class MRJobRunner(object):
         :param hadoop_extra_args: extra arguments to pass to hadoop streaming
         :type jobconf: dict
         :param jobconf: ``-jobconf`` args to pass to hadoop streaming. This should be a map from property name to value. Equivalent to passing ``['-jobconf', 'KEY1=VALUE1', '-jobconf', 'KEY2=VALUE2', ...]`` to ``hadoop_extra_args``.
-        :type job_name_prefix: str
-        :param job_name_prefix: description of this job to use as part of its name (by default, we infer a prefix from the name of the mrjob script)
+        :type label: str
+        :param label: description of this job to use as the part of its name. By default, we use the script's module name. This used to be called *job_name_prefix* (which still works but is deprecated).
         :type python_archives: list of str
         :param python_archives: same as upload_archives, except they get added to the job's :envvar:`$PYTHONPATH`
         :type setup_cmds: list
@@ -129,6 +130,7 @@ class MRJobRunner(object):
         :param upload_files: a list of files to copy to the local directory of the mr_job script when it runs. You can set the local name of the dir we unpack into by appending ``#localname`` to the path; otherwise we just use the name of the file
         """
         # enforce correct arguments
+        self._fix_deprecated_opts(opts)
         allowed_opts = set(self._allowed_opts())
         unrecognized_opts = set(opts) - allowed_opts
         if unrecognized_opts:
@@ -140,6 +142,7 @@ class MRJobRunner(object):
         # issue a warning for unknown opts from mrjob.conf and filter them out
         mrjob_conf_opts = load_opts_from_mrjob_conf(
             self.alias, conf_path=conf_path)
+        self._fix_deprecated_opts(mrjob_conf_opts)
         unrecognized_opts = set(mrjob_conf_opts) - set(self._allowed_opts())
         if unrecognized_opts:
             log.warn('got unexpected opts from mrjob.conf: ' +
@@ -228,8 +231,7 @@ class MRJobRunner(object):
         self._output_dir = output_dir
         
         # give this job a unique name
-        self._job_name = self._make_unique_job_name(
-            self._opts['job_name_prefix'])
+        self._job_name = self._make_unique_job_name(self._opts['label'])
 
         # a local tmp directory that will be cleaned up when we're done
         # access/make this using self._get_local_tmp_dir()
@@ -242,7 +244,7 @@ class MRJobRunner(object):
     def _allowed_opts(cls):
         """A list of which keyword args we can pass to __init__()"""
         return ['base_tmp_dir', 'bootstrap_mrjob', 'cleanup', 'cmdenv',
-                'hadoop_extra_args', 'jobconf', 'job_name_prefix',
+                'hadoop_extra_args', 'jobconf', 'label',
                 'python_archives', 'setup_cmds', 'setup_scripts',
                 'upload_archives', 'upload_files']
 
@@ -273,6 +275,15 @@ class MRJobRunner(object):
         }
 
     @classmethod
+    def _fix_deprecated_opts(cls, opts):
+        """Scan opts for deprecated options, and issue warnings. Return a new
+        version of opts with the current versions of the options.
+        """
+        if 'job_name_prefix' in opts:
+            log.warn('job_name_prefix is DEPRECATED in v0.1.1; use label instead')
+            opts['label'] = opts['job_name_prefix']
+
+    @classmethod
     def combine_opts(cls, *opts_list):
         """Combine options from several sources (e.g. defaults, mrjob.conf,
         command line). Options later in the list take precedence.
@@ -280,6 +291,11 @@ class MRJobRunner(object):
         You don't need to re-implement this in a subclass
         """
         return combine_opts(cls._opts_combiners(), *opts_list)
+
+    def get_opts(self):
+        """Get options set for this reducer (either by default, from
+        mrjob.conf, or as a keyword argument."""
+        return copy.deepcopy(self._opts)
 
     ### Running the job and parsing output ###
 
@@ -588,23 +604,23 @@ class MRJobRunner(object):
 
         return self._local_tmp_dir
     
-    def _make_unique_job_name(self, job_name_prefix=None):
+    def _make_unique_job_name(self, label=None):
         """Come up with a useful unique ID for this job.
 
         We use this to choose the output directory, etc. for the job.
         """
         # use the name of the script if one wasn't explicitly
         # specified
-        if not job_name_prefix:
+        if not label:
             if self._script:
-                job_name_prefix = os.path.basename(
+                label = os.path.basename(
                     self._script['path']).split('.')[0]
             else:
-                job_name_prefix = 'no_script'
+                label = 'no_script'
 
         now = datetime.datetime.utcnow()
         return '%s.%s.%s.%06d' % (
-            job_name_prefix, os.environ.get('USER'),
+            label, os.environ.get('USER'),
             now.strftime('%Y%m%d.%H%M%S'), now.microsecond)
             
     def _get_steps(self):

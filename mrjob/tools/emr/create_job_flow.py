@@ -45,7 +45,7 @@ def main():
         'ec2_instance_type': options.ec2_instance_type,
         'ec2_master_instance_type': options.ec2_master_instance_type,
         'ec2_slave_instance_type': options.ec2_slave_instance_type,
-        'job_name_prefix': options.job_name_prefix,
+        'label': options.label,
         'num_ec2_instances': options.num_ec2_instances,
     }
     runner = EMRJobRunner(**runner_kwargs)
@@ -82,7 +82,7 @@ def make_option_parser():
         type='int',
         help='Number of EC2 instances to launch')
     option_parser.add_option(
-        '-l', '--label', dest='job_name_prefix',
+        '-l', '--label', dest='label',
         default='create_job_flow',
         help="Optional label for this job flow; useful for auditing. default: %default")
 

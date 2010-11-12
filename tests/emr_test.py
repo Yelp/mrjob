@@ -212,6 +212,19 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         assert_equal(runner2._opts['s3_scratch_uri'], s3_scratch_uri)
         s3_scratch_uri = runner._opts['s3_scratch_uri']
 
+    def test_bootstrap_files_only_get_uploaded_once(self):
+        # just a regression test for Issue #8
+
+        # use self.mrjob_conf_path because it's easier than making a new file
+        bootstrap_file = self.mrjob_conf_path
+        
+        runner = EMRJobRunner(conf_path=False,
+                              bootstrap_files=[bootstrap_file])
+
+        matching_file_dicts = [fd for fd in runner._files
+                               if fd['path'] == bootstrap_file]
+        assert_equal(len(matching_file_dicts), 1)
+
 class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
 
     def test_can_get_all_job_flows(self):

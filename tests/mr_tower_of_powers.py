@@ -17,6 +17,9 @@ This is basically a contrived way of taking a number to the nth power,
 n times."""
 from __future__ import with_statement
 
+import os
+from testify import assert_equal, assert_not_equal
+
 from mrjob.job import MRJob
 
 class MRTowerOfPowers(MRJob):
@@ -36,10 +39,31 @@ class MRTowerOfPowers(MRJob):
             self.n = int(f.read().strip())
 
     def mapper(self, _, value):
+        # mapper should always be reading from the "uploaded" file
+        assert_not_equal(self.options.n_file,
+                         os.environ['LOCAL_N_FILE_PATH'])
+
         yield None, value ** self.n
 
+    def reducer(self, key, values):
+        # reducer should always be reading from the "uploaded" file
+        assert_not_equal(self.options.n_file,
+                         os.environ['LOCAL_N_FILE_PATH'])
+
+        # just pass through values as-is
+        for value in values:
+            yield key, value
+
     def steps(self):
-        return [self.mr(self.mapper)] * self.n
+        return [self.mr(self.mapper, self.reducer)] * self.n
+
+    def show_steps(self):
+        # when we invoke the job with --steps, it should
+        # be reading from the original version of n_file
+        assert_equal(self.options.n_file,
+                     os.environ['LOCAL_N_FILE_PATH'])
+        
+        super(MRTowerOfPowers, self).show_steps()
 
 if __name__ == '__main__':
     MRTowerOfPowers.run()

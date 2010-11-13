@@ -75,6 +75,25 @@ TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/task-attempts/attempt_(?P<timestamp>
 # regex for matching step log URIs
 STEP_LOG_URI_RE = re.compile(r'^.*/steps/(?P<step_num>\d+)/syslog$')
 
+# map from AWS region to EMR endpoint
+# see http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?ConceptsRequestEndpoints.html
+REGION_TO_EMR_ENDPOINT = {
+    'EU': 'eu-west-1.elasticmapreduce.amazonaws.com',
+    'us-east-1': 'us-east-1.elasticmapreduce.amazonaws.com',
+    'us-west-1': 'us-west-1.elasticmapreduce.amazonaws.com',
+    None: 'elasticmapreduce.amazonaws.com', # when no region specified
+}
+
+# map from AWS region to S3 endpoint
+# see http://docs.amazonwebservices.com/AmazonS3/latest/dev/index.html?RequestEndpoints.html
+REGION_TO_S3_ENDPOINT = {
+    'EU': 's3-eu-west-1.amazonaws.com',
+    'us-east-1': 's3.amazonaws.com', # no region-specific endpoint
+    'us-west-1': 's3-us-west-1.amazonaws.com',
+    'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com', # no EMR endpoint yet
+    None: 's3.amazonaws.com',
+}
+
 def parse_s3_uri(uri):
     """Parse an S3 URI into (bucket, key)
 
@@ -153,7 +172,6 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
             created_before -= datetime.timedelta(weeks=2)
 
     return all_job_flows
-
 
 class EMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
@@ -1452,8 +1470,8 @@ class EMRJobRunner(MRJobRunner):
 
         :return: a :py:class:`mrjob.botoemr.connection.EmrConnection`, wrapped in a :py:class:`mrjob.retry.RetryWrapper`
         """
-        log.debug('creating EMR connection')
         region = self._get_region_info_for_emr_conn()
+        log.debug('creating EMR connection (to %s)' % region.endpoint)
         raw_emr_conn = botoemr.EmrConnection(
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
@@ -1467,16 +1485,16 @@ class EMRJobRunner(MRJobRunner):
         This is kind of silly because all EmrConnection ever does with
         this object is extract the hostname, but that's how boto rolls.
         """
-        if not (self._aws_region or self._opts['emr_endpoint']):
-            return None # use the default region
-
         if self._opts['emr_endpoint']:
             endpoint = self._opts['emr_endpoint']
-        elif self._aws_region.upper() == 'EU':
-            endpoint = 'eu-west-1.elasticmapreduce.amazonaws.com'
         else:
-            endpoint = '%s.elasticmapreduce.amazonaws.com' % self._aws_region
-        
+            # look up endpoint in our table
+            try:
+                endpoint = REGION_TO_EMR_ENDPOINT[self._aws_region]
+            except KeyError:
+                raise Exception(
+                    "Don't know the EMR endpoint for %s; try setting emr_endpoint explicitly" % self._aws_region)
+
         return boto.ec2.regioninfo.RegionInfo(None, self._aws_region, endpoint)
             
     ### S3-specific FILESYSTEM STUFF ###
@@ -1502,14 +1520,13 @@ class EMRJobRunner(MRJobRunner):
     def _get_s3_endpoint(self):
         if self._opts['s3_endpoint']:
             return self._opts['s3_endpoint']
-        # no region-specific endpoint for EU
-        elif self._aws_region:
-            if self._aws_region.upper() == 'EU':
-                return 's3-external-3.amazonaws.com'
-            else:
-                return 's3-%s.amazonaws.com' % self._aws_region
         else:
-            return 's3.amazonaws.com'
+            # look it up in our table
+            try:
+                return REGION_TO_S3_ENDPOINT[self._aws_region]
+            except KeyError:
+                raise Exception(
+                    "Don't know the S3 endpoint for %s; try setting s3_endpoint explicitly" % self._aws_region)
 
     def get_s3_key(self, uri, s3_conn=None):
         """Get the boto Key object matching the given S3 uri, or

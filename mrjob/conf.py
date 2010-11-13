@@ -201,7 +201,7 @@ def dump_mrjob_conf(conf, f):
     if yaml:
         yaml.safe_dump(conf, f, default_flow_style=False)
     else:
-        json.dumps(conf, f, indent=2)
+        json.dump(conf, f, indent=2)
     f.flush()
 
 ### COMBINING OPTIONS ###

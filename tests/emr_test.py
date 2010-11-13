@@ -14,6 +14,7 @@
 """Unit testing for EMRJobRunner"""
 from __future__ import with_statement
 
+import copy
 import datetime
 import getpass
 import os
@@ -92,7 +93,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
         dump_mrjob_conf({'runners': {'emr': {
             'check_emr_status_every': 0.01,
-            's3_scratch_uri': 's3://walrus/tmp',
             's3_sync_wait_time': 0.01,
         }}}, open(self.mrjob_conf_path, 'w'))
 
@@ -123,8 +123,15 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         local_tmp_dir = None
         results = []
 
+        mock_s3_fs_snapshot = copy.deepcopy(self.mock_s3_fs)
+
         with mr_job.make_runner() as runner:
             assert isinstance(runner, EMRJobRunner)
+
+            # make sure that initializing the runner doesn't affect S3
+            # (Issue #50)
+            assert_equal(mock_s3_fs_snapshot, self.mock_s3_fs)
+            
             runner.run()
 
             for line in runner.stream_output():
@@ -206,6 +213,11 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         s3_scratch_uri = runner._opts['s3_scratch_uri']
         assert_equal(s3_scratch_uri[:11], 's3://mrjob-')
         assert_equal(s3_scratch_uri[27:], '/tmp/')
+
+        # need to do something to ensure that the bucket actually gets
+        # created. let's launch a (mock) job flow
+        jfid = runner.make_persistent_job_flow()
+        runner.make_emr_conn().terminate_jobflow(jfid)
 
         # once our scratch bucket is created, we should re-use it
         runner2 = EMRJobRunner(conf_path=False)

@@ -246,6 +246,11 @@ class EMRJobRunner(MRJobRunner):
         # based on the scratch bucket
         self._aws_region = self._opts['aws_region']
 
+        # if we're going to create a bucket to use as temp space, we don't
+        # want to actually create it until we run the job (Issue #50).
+        # This variable helps us create the bucket as needed
+        self._s3_temp_bucket_to_create = None
+
         self._fix_s3_scratch_and_log_uri_opts()
 
         # pick a tmp dir based on the job name
@@ -371,12 +376,10 @@ class EMRJobRunner(MRJobRunner):
                         log.info("using scratch bucket's region (%s) to connect to AWS" %
                                  self._aws_region)
             else:
-                # need to create a bucket
+                # We'll need to create a bucket if and when we need to use
+                # scratch space.
                 scratch_bucket_name = 'mrjob-%016x' % random.randint(0, 2**64-1)
-                log.info('creating S3 bucket %r to use as scratch space' %
-                         scratch_bucket_name)
-                s3_conn.create_bucket(scratch_bucket_name,
-                                      location=(self._aws_region or ''))
+                self._s3_temp_bucket_to_create = scratch_bucket_name
             
             self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
             log.info('using %s as our scratch dir on S3' %
@@ -391,6 +394,15 @@ class EMRJobRunner(MRJobRunner):
                 self._opts['s3_log_uri'])
         else:
             self._opts['s3_log_uri'] = self._opts['s3_scratch_uri'] + 'logs/'
+
+    def _create_s3_temp_bucket_if_needed(self):
+        if self._s3_temp_bucket_to_create:
+            s3_conn = self.make_s3_conn()
+            log.info('creating S3 bucket %r to use as scratch space' %
+                     self._s3_temp_bucket_to_create)
+            s3_conn.create_bucket(self._s3_temp_bucket_to_create,
+                                  location=(self._aws_region or ''))
+            self._s3_temp_bucket_to_create = None
 
     def _check_and_fix_s3_dir(self, s3_uri):
         if not S3_URI_RE.match(s3_uri):
@@ -420,6 +432,7 @@ class EMRJobRunner(MRJobRunner):
         
         Set self._s3_input_uris
         """
+        self._create_s3_temp_bucket_if_needed()
         # winnow out s3 files from local ones
         self._s3_input_uris = []
         local_input_paths = []
@@ -471,6 +484,7 @@ class EMRJobRunner(MRJobRunner):
         """Copy files to S3
 
         Pick S3 URIs for them if we haven't already."""
+        self._create_s3_temp_bucket_if_needed()
         self._pick_s3_uris_for_files()
                 
         s3_files_dir = self._s3_tmp_uri + 'files/'
@@ -759,6 +773,7 @@ class EMRJobRunner(MRJobRunner):
     def _launch_emr_job(self):
         """Create an empty jobflow on EMR, and set self._emr_job_flow_id to
         the ID for that job."""
+        self._create_s3_temp_bucket_if_needed()
         # define out steps
         steps = self._build_steps()
         

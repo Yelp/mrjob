@@ -21,10 +21,10 @@ import os
 import shutil
 from StringIO import StringIO
 import tempfile
-from testify import TestCase, assert_equal, assert_raises, assert_gt, setup, teardown
+from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in, assert_raises, setup, teardown
 
 from mrjob.conf import dump_mrjob_conf
-from mrjob.emr import EMRJobRunner, describe_all_job_flows
+from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
 from mrjob.parse import JOB_NAME_RE
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
@@ -214,9 +214,14 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         assert_equal(s3_scratch_uri[:11], 's3://mrjob-')
         assert_equal(s3_scratch_uri[27:], '/tmp/')
 
+        # bucket shouldn't actually exist yet
+        scratch_bucket, _ = parse_s3_uri(s3_scratch_uri)
+        assert_not_in(scratch_bucket, self.mock_s3_fs.keys()) 
+
         # need to do something to ensure that the bucket actually gets
         # created. let's launch a (mock) job flow
         jfid = runner.make_persistent_job_flow()
+        assert_in(scratch_bucket, self.mock_s3_fs.keys())
         runner.make_emr_conn().terminate_jobflow(jfid)
 
         # once our scratch bucket is created, we should re-use it

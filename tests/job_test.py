@@ -13,16 +13,22 @@
 # limitations under the License.
 
 """Unit testing of MRJob."""
+from __future__ import with_statement
+
 from optparse import OptionError
 import os
+import shutil
 from subprocess import Popen, PIPE
 from StringIO import StringIO
+import tempfile
 from testify import TestCase, assert_equal, assert_raises, setup, teardown
 import time
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob, _IDENTITY_MAPPER
+from mrjob.local import LocalMRJobRunner
 from mrjob.parse import parse_mr_job_stderr
+from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 
 ### Test classes ###
@@ -524,5 +530,39 @@ class CommandLineArgsTest(TestCase):
             ('--accordian-file', 'WeirdAl.mp3'),
             ('--accordian-file', '/home/dave/JohnLinnell.ogg')])
 
-# we don't test run_job() or *_job_runner_kwargs() here; those should be tested
-# by the tests of the various MRJobRunner classes
+class FileOptionsTestCase(TestCase):
+    # make sure custom file options work with --steps (Issue #45)
+
+    @setup
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def test_end_to_end(self):
+        n_file_path = os.path.join(self.tmp_dir, 'n_file')
+
+        with open(n_file_path, 'w') as f:
+            f.write('3')
+
+        stdin = ['0\n', '1\n', '2\n']
+
+        mr_job = MRTowerOfPowers(['--no-conf', '-v', '--cleanup=NONE', '--n-file', n_file_path])
+        assert_equal(len(mr_job.steps()), 3)
+
+        mr_job.sandbox(stdin=stdin)
+
+        with mr_job.make_runner() as runner:
+            assert isinstance(runner, LocalMRJobRunner)
+            # make sure our file gets "uploaded"
+            assert [fd for fd in runner._files if fd['path'] == n_file_path]
+
+            runner.run()
+            output = set()
+            for line in runner.stream_output():
+                _, value = mr_job.parse_output_line(line)
+                output.add(value)
+
+        assert_equal(set(output), set([0, 1, ((2**3)**3)**3]))

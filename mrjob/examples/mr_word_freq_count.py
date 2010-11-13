@@ -28,6 +28,6 @@ class MRWordFreqCount(MRJob):
         yield (word, sum(counts))
 
 if __name__ == '__main__':
-    MRWordFreqCount().run()
+    MRWordFreqCount.run()
 
 

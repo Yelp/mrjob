@@ -86,7 +86,7 @@ def log_to_stream(name=None, stream=None, format=None, level=None, debug=False):
     logger.setLevel(level)
     logger.addHandler(handler)
 
-def read_input(path, stdin=sys.stdin):
+def read_input(path, stdin=None):
     """Stream input the way Hadoop would.
 
     - Resolve globs (``foo_*.gz``).
@@ -97,6 +97,9 @@ def read_input(path, stdin=sys.stdin):
     You can redefine *stdin* for ease of testing. *stdin* can actually be
     any iterable that yields lines (e.g. a list).
     """
+    if stdin is None:
+        stdin = sys.stdin
+    
     # handle '-' (special case)
     if path == '-':
         for line in stdin:

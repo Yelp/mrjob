@@ -8,8 +8,7 @@ v0.2.0, 2010-11-15 -- Many bugfixes, Windows support
      auditing usage. (Issue #59)
    * The job_name_prefix option has been renamed to label (the old name still 
      works but is deprecated)
-   * bootstrap_cmds and bootstrap_scripts are no longer automatically run with 
-     sudo
+   * bootstrap_cmds and bootstrap_scripts no longer automatically invoke sudo
  * Bugs Fixed/Cleanup:
    * bootstrap files no longer get uploaded to S3 twice (Issue #8)
    * When using add_file_option(), show_steps() can now see the local version 

@@ -112,6 +112,12 @@ def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
+def _to_timestamp(iso8601_time):
+    return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
+
+def _to_datetime(iso8601_time):
+    return datetime.datetime.strptime(iso8601_time, boto.utils.ISO8601)
+
 def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
                            created_after=None, created_before=None):
     """Iteratively call ``EmrConnection.describe_job_flows()`` until we really
@@ -162,9 +168,9 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
             # set created_before to be just after the start time of
             # the first job returned, to deal with job flows started
             # in the same second
-            created_before = min(
-            datetime.datetime.strptime(jf.creationdatetime, boto.utils.ISO8601)
-            for jf in job_flows) + datetime.timedelta(seconds=1)
+            min_create_time = min(_to_datetime(jf.creationdatetime)
+                                  for jf in job_flows)
+            created_before = min_create_time + datetime.timedelta(seconds=1)
             # if someone managed to start 501 job flows in the same second,
             # they are still screwed (the EMR API only returns up to 500),
             # but this seems unlikely. :)
@@ -853,10 +859,8 @@ class EMRJobRunner(MRJobRunner):
 
                 if (hasattr(step, 'startdatetime') and
                     hasattr(step, 'enddatetime')):
-                    start_time = time.mktime(time.strptime(
-                        step.startdatetime, boto.utils.ISO8601))
-                    end_time = time.mktime(time.strptime(
-                        step.enddatetime, boto.utils.ISO8601))
+                    start_time = _to_timestamp(step.startdatetime)
+                    end_time = _to_timestamp(step.enddatetime)
                     total_step_time += end_time - start_time
 
             if not step_states:

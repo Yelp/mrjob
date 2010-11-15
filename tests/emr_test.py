@@ -207,7 +207,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         # "walrus" bucket will be ignored; it doesn't start with "mrjob-"
         self.add_mock_s3_data({'walrus': {}, 'zebra': {}})
 
-        runner = EMRJobRunner(conf_path=False)
+        runner = EMRJobRunner(conf_path=False, s3_sync_wait_time=0.01)
 
         # bucket name should be mrjob- plus 16 random hex digits
         s3_scratch_uri = runner._opts['s3_scratch_uri']

@@ -90,12 +90,37 @@ class TestJobName(TestCase):
         os.environ.clear()
         os.environ.update(self._old_environ)
 
+    @setup
+    def monkey_patch_getuser(self):
+        self._real_getuser = getpass.getuser
+        self.getuser_should_fail = False
+
+        def fake_getuser():
+            if self.getuser_should_fail:
+                raise Exception('fake getuser() was instructed to fail')
+            else:
+                return self._real_getuser()
+
+        getpass.getuser = fake_getuser
+
+    @teardown
+    def restore_getuser(self):
+        getpass.getuser = self._real_getuser
+
     def test_empty(self):
         runner = LocalMRJobRunner(conf_path=False)
         match = JOB_NAME_RE.match(runner.get_job_name())
 
         assert_equal(match.group(1), 'no_script')
         assert_equal(match.group(2), getpass.getuser())
+
+    def test_empty_no_user(self):
+        self.getuser_should_fail = True
+        runner = LocalMRJobRunner(conf_path=False)
+        match = JOB_NAME_RE.match(runner.get_job_name())
+
+        assert_equal(match.group(1), 'no_script')
+        assert_equal(match.group(2), 'no_user')
 
     def test_auto_label(self):
         runner = MRTwoStepJob(['--no-conf']).make_runner()

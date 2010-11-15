@@ -1,7 +1,7 @@
 v0.2.0, 2010-11-15 -- Many bugfixes, Windows support
  * New Features/Changes:
-  * EMRJobRunner now prints % of mappers and reducers completed when you e
-     nable the SSH tunnel.
+   * EMRJobRunner now prints % of mappers and reducers completed when you 
+     enable the SSH tunnel.
    * Added mr_page_rank example
    * Added mrjob.tools.emr.audit_usage script (Issue #21)
    * You can specify alternate job owners with the "owner" option. Useful for 

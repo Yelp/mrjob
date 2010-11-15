@@ -37,6 +37,8 @@ class CmdLineTestCase(TestCase):
                   ("grep -e \"# DON'T USE\\$\"",
                    'grep -e \'# DON\'"\'"\'T USE$\''))
 
+# expand_path() is tested by tests.conf.CombineAndExpandPathsTestCase
+
 class FileExtTestCase(TestCase):
 
     def test_file_ext(self):

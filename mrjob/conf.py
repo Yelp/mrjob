@@ -94,12 +94,14 @@ import glob
 import logging
 import os
 
+from mrjob.util import expand_path
+
 try:
     import simplejson as json # preferred because of C speedups
 except ImportError:
     import json # built in to Python 2.6 and later
 
-# yaml is nice to have, but we can fall back on json if need be
+# yaml is nice to have, but we can fall back on JSON if need be
 try:
     import yaml
 except ImportError:
@@ -327,13 +329,3 @@ def combine_opts(combiners, *opts_list):
         final_opts[key] = combine_func(*values)
 
     return final_opts
-
-def expand_path(path):
-    """Resolve ``~`` (home dir) and environment variables in *path*.
-
-    If *path* is ``None``, return ``None``.
-    """
-    if path is None:
-        return None
-    else:
-        return os.path.expanduser(os.path.expandvars(path))

@@ -34,6 +34,16 @@ def cmd_line(args):
     args = [str(x) for x in args]
     return ' '.join(pipes.quote(x) for x in args)
 
+def expand_path(path):
+    """Resolve ``~`` (home dir) and environment variables in *path*.
+
+    If *path* is ``None``, return ``None``.
+    """
+    if path is None:
+        return None
+    else:
+        return os.path.expanduser(os.path.expandvars(path))
+
 def file_ext(path):
     """return the file extension, including the ``.``
 

@@ -25,7 +25,6 @@ import datetime
 import math
 import logging
 from optparse import OptionParser
-import re
 import time
 
 from mrjob.emr import EMRJobRunner, describe_all_job_flows

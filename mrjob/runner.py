@@ -17,7 +17,6 @@ import copy
 import datetime
 import getpass
 import glob
-import gzip
 import logging
 import os
 import random
@@ -25,7 +24,6 @@ import re
 import shutil
 import sys
 from subprocess import Popen, PIPE
-import tarfile
 import tempfile
 
 try:

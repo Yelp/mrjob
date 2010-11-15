@@ -22,7 +22,6 @@ from datetime import datetime, timedelta
 import logging
 from optparse import OptionParser
 import posixpath
-import sys
 
 try:
     import boto.utils

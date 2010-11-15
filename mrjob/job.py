@@ -95,7 +95,6 @@ from __future__ import with_statement
 
 import inspect
 import itertools
-import logging
 from optparse import Option, OptionParser, OptionGroup, OptionError, OptionValueError
 import sys
 import time
@@ -1018,7 +1017,7 @@ class MRJob(object):
     #:
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
     #: protocols. Can be overridden by :option:`--protocol`.
-    DEFAULT_PROTOCOL = 'json'
+    DEFAULT_PROTOCOL = DEFAULT_PROTOCOL # i.e. the one from mrjob.protocols
 
     #: Default protocol to use for writing output. By default, this is set to
     #: ``None``, which means to fall back on ``DEFAULT_PROTOCOL``.

@@ -20,12 +20,11 @@ import pprint
 import shutil
 from subprocess import Popen, PIPE
 import sys
-import re
 
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.parse import find_python_traceback, parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line, file_ext, unarchive
+from mrjob.util import cmd_line, unarchive
 
 log = logging.getLogger('mrjob.local')
 
@@ -69,7 +68,6 @@ class LocalMRJobRunner(MRJobRunner):
         self._setup_output_dir()
 
         assert self._script # shouldn't be able to run if no script
-        script_name = self._script['name']
 
         if self._opts['hadoop_extra_args']:
             log.warning('ignoring extra args to hadoop streaming: %r' %

@@ -86,7 +86,7 @@ def hdfs_path_to_real_path(hdfs_path):
 
 def real_path_to_hdfs_path(real_path):
     hdfs_root = os.environ['MOCK_HDFS_ROOT']
-    
+
     if not real_path.startswith(hdfs_root):
         raise ValueError('path %s is not in %s' % (real_path, hdfs_root))
 
@@ -170,7 +170,7 @@ def hadoop_fs_lsr(*args):
         # the path
         path_is_dir = os.path.isdir(real_path)
         return (
-            '%srwxrwxrwx - dave supergroup      18321 2010-10-01 15:16 %s' % 
+            '%srwxrwxrwx - dave supergroup      18321 2010-10-01 15:16 %s' %
             ('d' if path_is_dir else '-', hdfs_path))
 
     failed = False

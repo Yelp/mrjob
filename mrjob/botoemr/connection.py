@@ -114,9 +114,9 @@ class EmrConnection(AWSQueryConnection):
         Terminate an Elastic MapReduce job flow
 
         :type jobflow_id: str
-        :param jobflow_id: A jobflow id 
+        :param jobflow_id: A jobflow id
         """
-        self.terminate_jobflows([jobflow_id]) 
+        self.terminate_jobflows([jobflow_id])
 
     def terminate_jobflows(self, jobflow_ids):
         """

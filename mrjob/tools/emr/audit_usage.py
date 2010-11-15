@@ -73,7 +73,7 @@ def make_option_parser():
 def print_report(options):
 
     emr_conn = EMRJobRunner(conf_path=options.conf_path).make_emr_conn()
-    
+
     log.info('getting job flow history...')
     # microseconds just make our report messy
     now = datetime.datetime.utcnow().replace(microsecond=0)
@@ -101,7 +101,7 @@ def print_report(options):
             job_flow_info['ran'] = end_time - start_time
         else:
             job_flow_info['ran'] = datetime.timedelta(0)
-        
+
         job_flow_info['state'] = jf.state
 
         job_flow_info['num_steps'] = len(jf.steps or [])
@@ -208,7 +208,7 @@ def print_report(options):
                                      key=lambda (n, h): (-h, n)):
         print '  %9.2f %s' % (hours_bbnu, fmt(mr_job_name))
     print
-    
+
     # Top users
     print 'Top users, by total usage:'
     user_to_hours = defaultdict(float)
@@ -252,7 +252,7 @@ def print_report(options):
                            reverse=True)
     for info in all_job_flows:
         print ' %-15s %-13s %19s %3d %17s %6d %9.2f %8s %s' % (
-            info['id'], info['state'], info['created'], info['num_steps'], 
+            info['id'], info['state'], info['created'], info['num_steps'],
             info['ran'], info['hours'], info['hours_bbnu'],
             (info['user'] or ''), fmt(info['mr_job_name']))
 
@@ -320,4 +320,4 @@ def to_datetime(iso8601_time):
 if __name__ == '__main__':
     main()
 
-    
+

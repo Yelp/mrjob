@@ -27,7 +27,7 @@ class MRWordCountUtility(MRJob):
 
     def mapper(self, _, line):
         if False: yield # I'm a generator!
-        
+
         self.chars += len(line) + 1 # +1 for newline
         self.words += sum(1 for word in line.split() if word.strip())
         self.lines += 1
@@ -43,4 +43,4 @@ class MRWordCountUtility(MRJob):
 if __name__ == '__main__':
     MRWordCountUtility.run()
 
-    
+

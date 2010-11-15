@@ -19,7 +19,7 @@ class MRTwoStepJob(MRJob):
     def mapper(self, key, value):
         yield key, value
         yield value, key
-        
+
     def reducer(self, key, values):
         yield key, len(list(values))
 

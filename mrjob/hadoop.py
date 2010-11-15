@@ -65,7 +65,7 @@ def fully_qualify_hdfs_path(path):
 
 class HadoopJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.
-    
+
     Input and support files can be either local or on HDFS; use ``hdfs://...``
     URLs to refer to files on HDFS.
 
@@ -73,7 +73,7 @@ class HadoopJobRunner(MRJobRunner):
     :py:meth:`~HadoopJobRunner.__init__` for details).
     """
     alias = 'hadoop'
-    
+
     def __init__(self, **kwargs):
         """:py:class:`HadoopJobRunner` takes the same arguments as
         :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
@@ -171,7 +171,7 @@ class HadoopJobRunner(MRJobRunner):
 
     def _setup_input(self):
         """Copy local input files (if any) to a special directory on HDFS.
-        
+
         Set self._hdfs_input_files
         """
         # winnow out HDFS files from local ones
@@ -198,11 +198,11 @@ class HadoopJobRunner(MRJobRunner):
             for i, path in enumerate(local_input_files):
                 if path == '-':
                     path = self._dump_stdin_to_local_file()
-                
+
                 target = '%s/%05i-%s' % (
                     hdfs_input_dir, i, os.path.basename(path))
                 self._upload_to_hdfs(path, target)
-            
+
             self._hdfs_input_files.append(hdfs_input_dir)
 
     def _pick_hdfs_uris_for_files(self):
@@ -229,7 +229,7 @@ class HadoopJobRunner(MRJobRunner):
             # don't bother with files already in HDFS
             if HDFS_URI_RE.match(path):
                 continue
-            
+
             self._upload_to_hdfs(path, file_dict['hdfs_uri'])
 
     def _mkdir_on_hdfs(self, path):
@@ -252,7 +252,7 @@ class HadoopJobRunner(MRJobRunner):
             stdin_file.write(line)
 
         return stdin_path
-                
+
     def _run_job_in_hadoop(self):
         # figure out local names for our files
         self._name_files()
@@ -347,12 +347,12 @@ class HadoopJobRunner(MRJobRunner):
         return args
 
     def _mapper_args(self, step_num):
-        return (self._script_args() + 
+        return (self._script_args() +
                 ['--step-num=%d' % step_num, '--mapper'] +
                 self._mr_job_extra_args())
 
     def _reducer_args(self, step_num):
-        return (self._script_args() + 
+        return (self._script_args() +
                 ['--step-num=%d' % step_num, '--reducer'] +
                 self._mr_job_extra_args())
 
@@ -476,14 +476,14 @@ class HadoopJobRunner(MRJobRunner):
 
     def ls(self, path_glob):
         hdfs_match = HDFS_URI_RE.match(path_glob)
-        
+
         if not hdfs_match:
             for path in super(HadoopJobRunner, self).ls(path_glob):
                 yield path
             return
 
         hdfs_prefix = hdfs_match.group(1)
-        
+
         stdout = self._invoke_hadoop(
             ['fs', '-lsr', path_glob],
             return_stdout=True,
@@ -547,7 +547,7 @@ class HadoopJobRunner(MRJobRunner):
 
         self._invoke_hadoop(['fs', '-touchz', dest])
 
-            
-        
-        
-    
+
+
+
+

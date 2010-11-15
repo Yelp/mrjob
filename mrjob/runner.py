@@ -40,7 +40,7 @@ log = logging.getLogger('mrjob.runner')
 GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 #: cleanup options:
-#: 
+#:
 #: - ``'NONE'``: disable cleanup
 #: - ``'IF_SUCCESSFUL'``: clean up only if job succeeded
 #: - ``'SCRATCH'``: clean up scratch space but not logs
@@ -62,7 +62,7 @@ class MRJobRunner(object):
 
     - Get a runner by calling :py:meth:`~mrjob.job.MRJob.make_runner` on your job
     - Call :py:meth:`~mrjob.runner.MRJobRunner.run` on your runner. This will:
- 
+
       - Run your job with :option:`--steps` to find out how many mappers/reducers to run
       - Copy your job and supporting files to Hadoop
       - Instruct Hadoop to run your job with the appropriate :option:`--mapper`, :option:`--reducer`, and :option:`--step-num` arguments
@@ -70,7 +70,7 @@ class MRJobRunner(object):
     Each runner runs a single job once; if you want to run a job multiple
     times, make multiple runners.
 
-    Subclasses: :py:class:`~mrjob.local.LocalMRJobRunner`, 
+    Subclasses: :py:class:`~mrjob.local.LocalMRJobRunner`,
     :py:class:`~mrjob.emr.EMRJobRunner`,
     :py:class:`~mrjob.hadoop.HadoopJobRunner`
     """
@@ -87,7 +87,7 @@ class MRJobRunner(object):
                  input_paths=None, output_dir=None, stdin=None,
                  **opts):
         """All runners take the following keyword arguments:
-        
+
         :type mr_job_script: str
         :param mr_job_script: the path of the ``.py`` file containing the :py:class:`~mrjob.job.MRJob`. If this is None, you won't actually be able to :py:meth:`run` the job, but other utilities (e.g. :py:meth:`ls`) will work.
         :type conf_path: str
@@ -103,7 +103,7 @@ class MRJobRunner(object):
 
         All runners also take the following options as keyword arguments.
         These can be defaulted in your :mod:`mrjob.conf` file:
-        
+
         :type base_tmp_dir: str
         :param base_tmp_dir: path to put local temp dirs inside. By default we just call :py:func:`tempfile.gettempdir`
         :type bootstrap_mrjob: bool
@@ -231,7 +231,7 @@ class MRJobRunner(object):
 
         # store output_dir
         self._output_dir = output_dir
-        
+
         # give this job a unique name
         self._job_name = self._make_unique_job_name(
             label=self._opts['label'], owner=self._opts['owner'])
@@ -259,7 +259,7 @@ class MRJobRunner(object):
             owner = getpass.getuser()
         except:
             owner = None
-        
+
         return {
             'base_tmp_dir': tempfile.gettempdir(),
             'bootstrap_mrjob': True,
@@ -318,7 +318,7 @@ class MRJobRunner(object):
         using the read() method of the appropriate HadoopStreamingProtocol
         class."""
         assert self._ran_job
-        
+
         for line in self._stream_output():
             yield line
 
@@ -347,7 +347,7 @@ class MRJobRunner(object):
 
     def _cleanup_jobs(self):
         """Stop any jobs that we created that are still running."""
-        pass 
+        pass
 
     def cleanup(self, mode=None):
         """Clean up running jobs, scratch dirs, and logs, subject to the *cleanup* option passed to the constructor.
@@ -385,7 +385,7 @@ class MRJobRunner(object):
         self.cleanup()
 
     ### more runner information ###
-        
+
     def get_opts(self):
         """Get options set for this reducer (either by default, from
         mrjob.conf, or as a keyword argument."""
@@ -401,9 +401,9 @@ class MRJobRunner(object):
 
     # Some simple filesystem operations that work for all runners.
 
-    # To access files on HDFS (when using 
-    # :py:class:``~mrjob.hadoop.HadoopJobRunner``) and S3 (when using 
-    # ``~mrjob.emr.EMRJobRunner``), use ``hdfs://...`` and  ``s3://...``, 
+    # To access files on HDFS (when using
+    # :py:class:``~mrjob.hadoop.HadoopJobRunner``) and S3 (when using
+    # ``~mrjob.emr.EMRJobRunner``), use ``hdfs://...`` and  ``s3://...``,
     # respectively.
 
     # We don't currently support ``mv()`` and ``cp()`` because S3 doesn't
@@ -464,7 +464,7 @@ class MRJobRunner(object):
     def path_join(self, dirname, filename):
         """Join a directory name and filename."""
         return os.path.join(dirname, filename)
-    
+
     def rm(self, path_glob):
         """Recursively delete the given file/directory, if it exists
 
@@ -542,7 +542,7 @@ class MRJobRunner(object):
 
         file_dict = {'path': path, 'name': name, 'upload': what}
         self._files.append(file_dict)
-        
+
         return file_dict
 
     def _add_file_for_upload(self, path):
@@ -579,7 +579,7 @@ class MRJobRunner(object):
                 path = file_dict['path']
                 if match(path) and not file_dict.get(name_field):
                     file_dict[name_field] = path
-        
+
         # check for name collisions
         name_to_path = {}
 
@@ -623,7 +623,7 @@ class MRJobRunner(object):
             self._local_tmp_dir = path
 
         return self._local_tmp_dir
-    
+
     def _make_unique_job_name(self, label=None, owner=None):
         """Come up with a useful unique ID for this job.
 
@@ -645,7 +645,7 @@ class MRJobRunner(object):
         return '%s.%s.%s.%06d' % (
             label, owner,
             now.strftime('%Y%m%d.%H%M%S'), now.microsecond)
-            
+
     def _get_steps(self):
         """Call the mr_job to find out how many steps it has, and whether
         there are mappers and reducers for each step. Validate its
@@ -687,7 +687,7 @@ class MRJobRunner(object):
                                          (step, stdout))
 
                 self._steps = steps
-        
+
         return self._steps
 
     def _mr_job_extra_args(self, local=False):
@@ -698,7 +698,7 @@ class MRJobRunner(object):
         	the path they'll have inside Hadoop streaming
         """
         return self._get_file_upload_args(local=local) + self._extra_args
-    
+
     def _get_file_upload_args(self, local=False):
         """Arguments used to pass through config files, etc from the job
         runner through to the local directory where the script is run.
@@ -723,7 +723,7 @@ class MRJobRunner(object):
         This will give names to our files if they don't already have names.
         """
         self._name_files()
-        
+
         out = StringIO()
         def writeln(line=''):
             out.write(line + '\n')
@@ -762,7 +762,7 @@ class MRJobRunner(object):
         # unlock the lock file
         writeln('flock(lock_file, LOCK_UN)')
         writeln()
-        
+
         # run the real script
         writeln('# run the real mapper/reducer')
         writeln('check_call(sys.argv[1:])')

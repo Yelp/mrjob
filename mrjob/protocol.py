@@ -54,7 +54,7 @@ class HadoopStreamingProtocol(object):
     @classmethod
     def write(cls, key, value):
         """Encode a key and value.
-        
+
         :param key: A key (of any type) yielded by a mapper/reducer
         :param value: A value (of any type) yielded by a mapper/reducer
 

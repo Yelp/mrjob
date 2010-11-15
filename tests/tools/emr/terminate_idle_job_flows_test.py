@@ -34,7 +34,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
     @setup
     def create_fake_job_flows(self):
         self.now = datetime.utcnow().replace(microsecond=0)
-        
+
         # empty job
         self.mock_emr_job_flows['j-EMPTY'] = MockEmrObject(
             state='WAITING',
@@ -135,7 +135,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                     state='CANCELLED',
                 )
             ],
-        )        
+        )
 
         # add job flow IDs and fake names to the mock job flows
         for jfid, jf in self.mock_emr_job_flows.iteritems():
@@ -152,7 +152,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
     def test_currently_running(self):
         now = datetime.utcnow().replace(microsecond=0)
-        
+
         jf = self.mock_emr_job_flows['j-CURRENTLY_RUNNING']
         assert_equal(is_job_flow_done(jf), False)
         assert_equal(is_job_flow_running(jf), True)
@@ -232,13 +232,13 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         # terminate 2-hour-old jobs
         inspect_and_maybe_terminate_job_flows(
             conf_path=False, max_hours_idle=2,
-            now=self.now, dry_run=False) 
+            now=self.now, dry_run=False)
 
         # picky edge case: two jobs are EXACTLY 2 hours old, so they're
         # not over the maximum
 
         assert_equal(terminated_jfs(), ['j-EMPTY', 'j-IDLE_AND_FAILED'])
-      
+
         # all the job flows we can terminate are at least 1 hour old
         inspect_and_maybe_terminate_job_flows(
             conf_path=False, max_hours_idle=1,
@@ -257,4 +257,4 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                      ['j-DONE_AND_IDLE', 'j-EMPTY', 'j-HADOOP_DEBUGGING',
                       'j-IDLE_AND_FAILED'])
 
-       
+

@@ -282,10 +282,10 @@ class MRTextClassifier(MRJob):
         # don't bother with very rare ngrams
         if total_df < self.options.min_df:
             return
-        
+
         yield (('global', None),
                ((n, ngram), (cat_to_df.items(), cat_to_tf.items())))
-        
+
     def score_ngrams(self, type_and_key, values):
         """Reducer: Look at all ngrams together, and assign scores by
         ngram and category. Also farm out documents to the reducer for
@@ -353,7 +353,7 @@ class MRTextClassifier(MRJob):
             cat_to_d, cat_to_t = ngram_to_info[(n, None)]
 
             # calculate the probability of any given term being
-            # this term for documents of each type    
+            # this term for documents of each type
             cat_to_p = {}
             for cat, t in cat_to_t.iteritems():
                 tf = cat_to_tf.get(cat) or 0
@@ -397,7 +397,7 @@ class MRTextClassifier(MRJob):
         doc: the encoded document
         """
         key_type, key = type_and_key
-        
+
         # pass documents through
         if key_type == 'doc':
             doc_id = key
@@ -428,12 +428,12 @@ class MRTextClassifier(MRJob):
             return
 
         # send score info for this ngram to this document
-        for doc_id in doc_ids:            
+        for doc_id in doc_ids:
             yield ('doc', doc_id), ('scores', ((n, ngram), cat_to_score))
-    
+
         # keep scoring info
         yield ('cat_to_score', (n, ngram)), cat_to_score
-        
+
     def score_documents(self, type_and_key, types_and_values):
         """Reducer: combine all scoring information for each document, and
         add it to the document. Also pass ngram scores through as-is.
@@ -477,7 +477,7 @@ class MRTextClassifier(MRJob):
         # store the document and scoring info
         doc = None
         ngrams_and_scores = []
-        
+
         for value_type, value in types_and_values:
             if value_type == 'doc':
                 doc = value
@@ -490,9 +490,9 @@ class MRTextClassifier(MRJob):
         # total scores for each ngram size
         ngram_counts = dict(((n, ngram), count)
                             for (n, ngram), count in doc['ngram_counts'])
-                            
+
         cat_to_n_to_total_score = defaultdict(lambda: defaultdict(float))
-        
+
         for (n, ngram), cat_to_score in ngrams_and_scores:
             tf = ngram_counts[(n, ngram)]
             for cat, score in cat_to_score.iteritems():
@@ -514,7 +514,7 @@ class MRTextClassifier(MRJob):
         del doc['ngram_counts']
 
         yield ('doc', doc_id), doc
-        
+
 if __name__ == '__main__':
     MRTextClassifier.run()
 

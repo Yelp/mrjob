@@ -51,7 +51,7 @@ class TestExtraKwargs(TestCase):
     @teardown
     def delete_mrjob_conf(self):
         os.unlink(self.mrjob_conf_path)
-    
+
     def test_extra_kwargs_in_mrjob_conf_okay(self):
         with LocalMRJobRunner(conf_path=self.mrjob_conf_path) as runner:
             assert_equal(runner._opts['setup_cmds'], ['echo foo'])
@@ -77,7 +77,7 @@ class TestDeprecatedKwargs(TestCase):
         assert_not_in('job_name_prefix', old_opts)
 
 class TestJobName(TestCase):
-    
+
     @setup
     def blank_out_environment(self):
         self._old_environ = os.environ.copy()

@@ -88,7 +88,7 @@ class LocalMRJobRunner(MRJobRunner):
                             '--step-num=%d' % i, '--mapper'] +
                            self._mr_job_extra_args())
             self._invoke_step(mapper_args, 'step-%d-mapper' % i)
-            
+
             if 'R' in step:
                 # sort the output
                 self._invoke_step(['sort'], 'step-%d-mapper-sorted' % i,
@@ -104,7 +104,7 @@ class LocalMRJobRunner(MRJobRunner):
         self._final_outfile = os.path.join(self._output_dir, 'part-00000')
         log.info('Moving %s -> %s' % (self._prev_outfile, self._final_outfile))
         shutil.move(self._prev_outfile, self._final_outfile)
-        
+
     def _setup_working_dir(self):
         """Make a working directory with symlinks to our script and
         external files. Return name of the script"""
@@ -113,7 +113,7 @@ class LocalMRJobRunner(MRJobRunner):
             self._script['upload'] = 'file'
         if self._wrapper_script:
             self._wrapper_script['upload'] = 'file'
-        
+
         # create the working directory
         self._working_dir = os.path.join(self._get_local_tmp_dir(), 'working_dir')
         self.mkdir(self._working_dir)
@@ -123,7 +123,7 @@ class LocalMRJobRunner(MRJobRunner):
         for file_dict in self._files:
             path = file_dict['path']
             dest = os.path.join(self._working_dir, file_dict['name'])
-            
+
             if file_dict.get('upload') == 'file':
                 self._symlink_to_file_or_copy(path, dest)
             elif file_dict.get('upload') == 'archive':
@@ -154,7 +154,7 @@ class LocalMRJobRunner(MRJobRunner):
         if self._final_outfile:
             output_file = self._final_outfile
         else:
-            output_file = os.path.join(self._output_dir, 'part-00000') 
+            output_file = os.path.join(self._output_dir, 'part-00000')
         log.info('streaming final output from %s' % output_file)
 
         for line in open(output_file):
@@ -164,7 +164,7 @@ class LocalMRJobRunner(MRJobRunner):
         """Run the given command, outputting into outfile, and reading
         from the previous outfile (or, for the first step, from our
         original output files).
-        
+
         outfile is a path relative to our local tmp dir. commands are run
         inside self._working_dir
 
@@ -177,7 +177,7 @@ class LocalMRJobRunner(MRJobRunner):
             os.environ,
             self._cmdenv,
             env or {})
-        
+
         # decide where to get input
         if self._prev_outfile is not None:
             input_paths = [self._prev_outfile]
@@ -194,7 +194,7 @@ class LocalMRJobRunner(MRJobRunner):
             args.append(os.path.abspath(path))
 
         log.info('> %s' % cmd_line(args))
-        
+
         # set up outfile
         outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
         log.info('writing to %s' % outfile)

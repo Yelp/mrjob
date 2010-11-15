@@ -68,10 +68,10 @@ class MockEMRAndS3TestCase(TestCase):
             kwargs['mock_emr_failures'] = self.mock_emr_failures
             kwargs['mock_emr_output'] = self.mock_emr_output
             return MockEmrConnection(*args, **kwargs)
-        
+
         self._real_boto_connect_s3 = boto.connect_s3
         boto.connect_s3 = mock_boto_connect_s3
-        
+
         self._real_botoemr_EmrConnection = botoemr.EmrConnection
         botoemr.EmrConnection = mock_botoemr_EmrConnection
 
@@ -131,7 +131,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             # make sure that initializing the runner doesn't affect S3
             # (Issue #50)
             assert_equal(mock_s3_fs_snapshot, self.mock_s3_fs)
-            
+
             runner.run()
 
             for line in runner.stream_output():
@@ -216,7 +216,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         # bucket shouldn't actually exist yet
         scratch_bucket, _ = parse_s3_uri(s3_scratch_uri)
-        assert_not_in(scratch_bucket, self.mock_s3_fs.keys()) 
+        assert_not_in(scratch_bucket, self.mock_s3_fs.keys())
 
         # need to do something to ensure that the bucket actually gets
         # created. let's launch a (mock) job flow
@@ -234,7 +234,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         # use self.mrjob_conf_path because it's easier than making a new file
         bootstrap_file = self.mrjob_conf_path
-        
+
         runner = EMRJobRunner(conf_path=False,
                               bootstrap_files=[bootstrap_file])
 
@@ -249,7 +249,7 @@ class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
 
         NUM_JOB_FLOWS = 2222
         assert_gt(NUM_JOB_FLOWS, DEFAULT_MAX_JOB_FLOWS_RETURNED)
-    
+
         for i in range(NUM_JOB_FLOWS):
             jfid = 'j-%04d' % i
             self.mock_emr_job_flows[jfid] = MockEmrObject(
@@ -325,14 +325,14 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
 
     def test_python_exception(self):
         self.add_mock_s3_data({'walrus': {
-            ATTEMPT_DIR + 'stderr': 
+            ATTEMPT_DIR + 'stderr':
                 GARBAGE + TRACEBACK_START + PY_EXCEPTION + GARBAGE,
-            ATTEMPT_DIR + 'syslog': 
+            ATTEMPT_DIR + 'syslog':
                 make_input_uri_line(BUCKET_URI + 'input.gz'),
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
                      {'lines': list(StringIO(PY_EXCEPTION)),
-                      's3_log_file_uri': 
+                      's3_log_file_uri':
                           BUCKET_URI + ATTEMPT_DIR + 'stderr',
                       'input_uri': BUCKET_URI + 'input.gz'})
 
@@ -343,14 +343,14 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
                      {'lines': list(StringIO(PY_EXCEPTION)),
-                      's3_log_file_uri': 
+                      's3_log_file_uri':
                           BUCKET_URI + ATTEMPT_DIR + 'stderr',
                       'input_uri': None})
 
     def test_java_exception(self):
         self.add_mock_s3_data({'walrus': {
             ATTEMPT_DIR + 'stderr': GARBAGE + GARBAGE,
-            ATTEMPT_DIR + 'syslog': 
+            ATTEMPT_DIR + 'syslog':
                 make_input_uri_line(BUCKET_URI + 'input.gz') +
                 GARBAGE +
                 CHILD_ERR_LINE +
@@ -359,27 +359,27 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
                      {'lines': list(StringIO(JAVA_STACK_TRACE)),
-                      's3_log_file_uri': 
+                      's3_log_file_uri':
                           BUCKET_URI + ATTEMPT_DIR + 'syslog',
                       'input_uri': BUCKET_URI + 'input.gz'})
 
     def test_java_exception_without_input_uri(self):
         self.add_mock_s3_data({'walrus': {
-            ATTEMPT_DIR + 'syslog': 
+            ATTEMPT_DIR + 'syslog':
                 CHILD_ERR_LINE +
                 JAVA_STACK_TRACE +
                 GARBAGE,
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
                      {'lines': list(StringIO(JAVA_STACK_TRACE)),
-                      's3_log_file_uri': 
+                      's3_log_file_uri':
                           BUCKET_URI + ATTEMPT_DIR + 'syslog',
                       'input_uri': None})
 
     def test_hadoop_streaming_error(self):
         # we should look only at step 2 since the errors in the other
         # steps are boring
-        # 
+        #
         # we include input.gz just to test that we DON'T check for it
         self.add_mock_s3_data({'walrus': {
             LOG_DIR + 'steps/1/syslog':
@@ -409,7 +409,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
         assert_equal(failure['s3_log_file_uri'],
-                     BUCKET_URI + TASK_ATTEMPTS_DIR + 
+                     BUCKET_URI + TASK_ATTEMPTS_DIR +
                      'attempt_201007271720_0002_m_000004_0/syslog')
 
     def test_later_step_logs_win(self):
@@ -433,7 +433,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
         assert_equal(failure['s3_log_file_uri'],
-                     BUCKET_URI + TASK_ATTEMPTS_DIR + 
+                     BUCKET_URI + TASK_ATTEMPTS_DIR +
                      'attempt_201007271720_0001_r_000126_3/syslog')
 
     def test_more_attempts_win(self):
@@ -446,7 +446,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
         assert_equal(failure['s3_log_file_uri'],
-                     BUCKET_URI + TASK_ATTEMPTS_DIR + 
+                     BUCKET_URI + TASK_ATTEMPTS_DIR +
                      'attempt_201007271720_0001_m_000004_3/syslog')
 
     def test_py_exception_beats_java_stack_trace(self):
@@ -483,7 +483,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                      BUCKET_URI + LOG_DIR + 'steps/1/syslog')
 
 
-             
+
 class TestLs(MockEMRAndS3TestCase):
 
     def test_s3_ls(self):
@@ -500,7 +500,7 @@ class TestLs(MockEMRAndS3TestCase):
         assert_equal(set(runner._s3_ls('s3://walrus/t')),
                      set(['s3://walrus/two',
                           's3://walrus/three',]))
-        
+
         assert_equal(set(runner._s3_ls('s3://walrus/t/')),
                      set([]))
 
@@ -509,4 +509,4 @@ class TestLs(MockEMRAndS3TestCase):
         # probably be owned by other people, and we'll get some sort
         # of permissions error)
         assert_raises(Exception, set, runner._s3_ls('s3://lolcat/'))
-    
+

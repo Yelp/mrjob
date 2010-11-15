@@ -77,11 +77,11 @@ def log_to_stream(name=None, stream=None, format=None, level=None, debug=False):
 
     if stream is None:
         stream = sys.stderr
-    
+
     handler = logging.StreamHandler(stream)
     handler.setLevel(level)
     handler.setFormatter(logging.Formatter(format))
-    
+
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
@@ -102,7 +102,7 @@ def read_input(path, stdin=sys.stdin):
         for line in stdin:
             yield line
         return
-    
+
     # resolve globs
     paths = glob.glob(path)
     if not paths:
@@ -131,7 +131,7 @@ def read_input(path, stdin=sys.stdin):
         f = gzip.GzipFile(path)
     else:
         f = open(path)
-        
+
     for line in f:
         yield line
 

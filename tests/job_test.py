@@ -39,7 +39,7 @@ class MRBoringJob(MRJob):
     """It's a boring job, but somebody had to do it."""
     def mapper(self, key, value):
         yield(key, value)
-        
+
     def reducer(self, key, values):
         yield(key, list(values))
 
@@ -47,7 +47,7 @@ class MRFinalBoringJob(MRBoringJob):
     def __init__(self, args=None):
         super(MRFinalBoringJob, self).__init__(args=args)
         self.num_lines = 0
-    
+
     def mapper_final(self):
         yield('num_lines', self.num_lines)
 
@@ -55,7 +55,7 @@ class MRCustomBoringJob(MRBoringJob):
 
     def configure_options(self):
         super(MRCustomBoringJob, self).configure_options()
-        
+
         self.add_passthrough_option(
             '--foo-size', '-F', type='int', dest='foo_size', default=5)
         self.add_passthrough_option(
@@ -74,7 +74,7 @@ class MRCustomBoringJob(MRBoringJob):
         self.add_passthrough_option(
             '--extra-special-arg', action='append', dest='extra_special_args',
             default=[])
-        
+
         self.add_file_option('--foo-config', dest='foo_config', default=None)
         self.add_file_option('--accordian-file', dest='accordian_files',
                              action='append', default=[])
@@ -107,7 +107,7 @@ class MRTestCase(TestCase):
 
 class NoTzsetTestCase(TestCase):
     """Test systems without time.tzset() (e.g. Windows). See Issue #46."""
-    
+
     @setup
     def remove_time_tzset(self):
         if hasattr(time, 'tzset'):
@@ -186,10 +186,10 @@ class ProtocolsTestCase(TestCase):
 
     class MRTrivialJob(MRJob):
         DEFAULT_OUTPUT_PROTOCOL = 'repr'
-        
+
         def mapper(self, key, value):
             yield key, value
-    
+
     def test_default_protocols(self):
         mr_job = MRBoringJob()
         assert_equal(mr_job.options.input_protocol, 'raw_value')
@@ -215,7 +215,7 @@ class ProtocolsTestCase(TestCase):
         assert_equal(mr_job2.options.input_protocol, 'json')
         assert_equal(mr_job2.options.protocol, 'pickle')
         assert_equal(mr_job2.options.output_protocol, 'repr')
-        
+
         mr_job3 = MRBoringJob(args=['--protocol=repr'])
         assert_equal(mr_job3.options.input_protocol, 'raw_value')
         assert_equal(mr_job3.options.protocol, 'repr')
@@ -286,7 +286,7 @@ class ProtocolsTestCase(TestCase):
         counters = mr_job.parse_counters()
         assert_equal(counters.keys(), ['Undecodable input'])
         assert_equal(sum(counters['Undecodable input'].itervalues()), 3)
-        
+
     def test_unencodable_output(self):
         UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
                                          '\xaa\n' +
@@ -351,7 +351,7 @@ class StepNumTestCase(TestCase):
         # represent input as a list so we can reuse it
         # also, leave off newline (MRJobRunner should fix it)
         mapper0_input_lines = ['foo', 'bar']
-        
+
         def test_mapper0(mr_job, input_lines):
             mr_job.sandbox(input_lines)
             mr_job.run_mapper(0)
@@ -558,7 +558,7 @@ class FileOptionsTestCase(TestCase):
 
         with open(n_file_path, 'w') as f:
             f.write('3')
-            
+
         os.environ['LOCAL_N_FILE_PATH'] = n_file_path
 
         stdin = ['0\n', '1\n', '2\n']

@@ -62,10 +62,10 @@ class Step(EmrObject):
                   'LastStateChangeReason',
                   'State',
                   'Jar'])
-    
+
     def __init__(self, connection=None):
         self.connection = connection
-        self.args = None 
+        self.args = None
 
     def startElement(self, name, attrs, connection):
         if name == 'Args':
@@ -99,7 +99,7 @@ class JobFlow(EmrObject):
                   'JobFlowId',
                   'KeepJobAliveWhenNoSteps',
                   'LogUri',
-                  'MasterPublicDnsName', 
+                  'MasterPublicDnsName',
                   'MasterInstanceId',
                   'Name',
                   'Placement',

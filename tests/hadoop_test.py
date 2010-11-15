@@ -33,7 +33,7 @@ class TestFindHadoopStreamingJar(TestCase):
     @setup
     def setup_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
-        
+
     @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
@@ -61,7 +61,7 @@ class TestFindHadoopStreamingJar(TestCase):
 
         # shouldn't find anything if we look in the wrong dir
         assert_equal(find_hadoop_streaming_jar(empty_dir), None)
-        
+
 class MockHadoopTestCase(TestCase):
 
     @setup
@@ -90,7 +90,7 @@ class MockHadoopTestCase(TestCase):
         # make fake output dir
         mock_output_dir = tempfile.mkdtemp(prefix='mock_hadoop_output.')
         os.environ['MOCK_HADOOP_OUTPUT'] = mock_output_dir
-                
+
     @teardown
     def delete_hadoop_home_and_restore_environment_vars(self):
         mock_hdfs_root = os.environ['MOCK_HDFS_ROOT']
@@ -130,7 +130,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         # doesn't matter what the intermediate output is; just has to exist.
         add_mock_hadoop_output([''])
         add_mock_hadoop_output(['1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n'])
-        
+
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
                                '--no-conf',
                                '-', local_input_path, remote_input_path])

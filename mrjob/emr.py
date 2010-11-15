@@ -198,7 +198,7 @@ class EMRJobRunner(MRJobRunner):
     See also: :py:meth:`EMRJobRunner.__init__`.
     """
     alias = 'emr'
-    
+
     def __init__(self, **kwargs):
         """:py:class:`EMRJobRunner` takes the same arguments as
         :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
@@ -315,7 +315,7 @@ class EMRJobRunner(MRJobRunner):
 
         # the ID assigned by EMR to this job (might be None)
         self._emr_job_flow_id = self._opts['emr_job_flow_id']
-        
+
         # when did our particular task start?
         self._emr_job_start = None
 
@@ -400,7 +400,7 @@ class EMRJobRunner(MRJobRunner):
                 # scratch space.
                 scratch_bucket_name = 'mrjob-%016x' % random.randint(0, 2**64-1)
                 self._s3_temp_bucket_to_create = scratch_bucket_name
-            
+
             self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
             log.info('using %s as our scratch dir on S3' %
                      self._opts['s3_scratch_uri'])
@@ -449,7 +449,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _setup_input(self):
         """Copy local input files (if any) to a special directory on S3.
-        
+
         Set self._s3_input_uris
         """
         self._create_s3_temp_bucket_if_needed()
@@ -472,7 +472,7 @@ class EMRJobRunner(MRJobRunner):
         if local_input_paths:
             s3_input_dir = self._s3_tmp_uri + 'input/'
             log.info('Uploading input to %s' % s3_input_dir)
-            
+
             s3_conn = self.make_s3_conn()
             for file_num, path in enumerate(local_input_paths):
                 if path == '-':
@@ -506,14 +506,14 @@ class EMRJobRunner(MRJobRunner):
         Pick S3 URIs for them if we haven't already."""
         self._create_s3_temp_bucket_if_needed()
         self._pick_s3_uris_for_files()
-                
+
         s3_files_dir = self._s3_tmp_uri + 'files/'
         log.info('Copying non-input files into %s' % s3_files_dir)
 
         s3_conn = self.make_s3_conn()
         for file_dict in self._files:
             path = file_dict['path']
-            
+
             # don't bother with files that are already on s3
             if S3_URI_RE.match(path):
                 continue
@@ -626,7 +626,7 @@ class EMRJobRunner(MRJobRunner):
             try:
                 self.make_emr_conn().terminate_jobflow(self._emr_job_flow_id)
             except Exception, e:
-                log.exception(e)            
+                log.exception(e)
 
     def _cleanup_scratch(self):
         super(EMRJobRunner, self)._cleanup_scratch()
@@ -659,7 +659,7 @@ class EMRJobRunner(MRJobRunner):
         log.info('Waiting %.1fs for S3 eventual consistency' %
                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
-        
+
     def _create_job_flow(self, persistent=False, steps=None):
         """Create an empty job flow on EMR, and return the ID of that
         job.
@@ -711,10 +711,10 @@ class EMRJobRunner(MRJobRunner):
             ', '.join('%r=%r' % (k, v) for k, v in args.iteritems())))
         emr_job_flow_id = emr_conn.run_jobflow(
             self._job_name, self._opts['s3_log_uri'], **args)
- 
+
          # keep track of when we started our job
         self._emr_job_start = time.time()
- 
+
         log.info('Job flow created with ID: %s' % emr_job_flow_id)
         return emr_job_flow_id
 
@@ -722,7 +722,7 @@ class EMRJobRunner(MRJobRunner):
         """Return a list of boto Step objects corresponding to the
         steps we want to run."""
         assert self._script # can't build steps if no script!
-        
+
         # figure out local names for our files
         self._name_files()
         self._pick_s3_uris_for_files()
@@ -773,7 +773,7 @@ class EMRJobRunner(MRJobRunner):
 
             # other arguments passed directly to hadoop streaming
             step_args = []
-            
+
             for key, value in sorted(self._cmdenv.iteritems()):
                 step_args.extend(['-cmdenv', '%s=%s' % (key, value)])
 
@@ -789,14 +789,14 @@ class EMRJobRunner(MRJobRunner):
                 step_args=step_args, input=input, output=output))
 
         return step_list
-                    
+
     def _launch_emr_job(self):
         """Create an empty jobflow on EMR, and set self._emr_job_flow_id to
         the ID for that job."""
         self._create_s3_temp_bucket_if_needed()
         # define out steps
         steps = self._build_steps()
-        
+
         # create a job flow if we're not already using an existing one
         if not self._emr_job_flow_id:
             self._emr_job_flow_id = self._create_job_flow(
@@ -807,7 +807,7 @@ class EMRJobRunner(MRJobRunner):
             log.debug('Calling add_jobflow_steps(%r, %r)' % (
                 self._emr_job_flow_id, steps))
             emr_conn.add_jobflow_steps(self._emr_job_flow_id, steps)
-        
+
         # keep track of when we launched our job
         self._emr_job_start = time.time()
 
@@ -818,7 +818,7 @@ class EMRJobRunner(MRJobRunner):
         Also grab log URI from the job status (since we may not know it)
         """
         success = False
-    
+
         while True:
             # don't antagonize EMR's throttling
             log.debug('Waiting %.1f seconds...' %
@@ -845,7 +845,7 @@ class EMRJobRunner(MRJobRunner):
                     continue
 
                 step_nums.append(i + 1)
-                
+
                 step.state = step.state
                 step_states.append(step.state)
                 if step.state == 'RUNNING':
@@ -900,7 +900,7 @@ class EMRJobRunner(MRJobRunner):
                 job_host = getattr(job_flow, 'masterpublicdnsname', None)
                 if job_host and self._opts['ssh_tunnel_to_job_tracker']:
                     self.setup_ssh_tunnel_to_job_tracker(job_host)
-                
+
             # other states include STARTING and SHUTTING_DOWN
             elif reason:
                 log.info('Job launched %.1fs ago, status %s: %s' %
@@ -954,7 +954,7 @@ class EMRJobRunner(MRJobRunner):
                 log.debug('skipping non-output file: %s' %
                           s3_key_to_uri(s3_key))
                 continue
-            
+
             output_dir = os.path.join(self._get_local_tmp_dir(), 'output')
             log.debug('downloading %s -> %s' % (
                 s3_key_to_uri(s3_key), output_dir))
@@ -982,12 +982,12 @@ class EMRJobRunner(MRJobRunner):
         return args
 
     def _mapper_args(self, step_num):
-        return (self._script_args() + 
+        return (self._script_args() +
                 ['--step-num=%d' % step_num, '--mapper'] +
                 self._mr_job_extra_args())
 
     def _reducer_args(self, step_num):
-        return (self._script_args() + 
+        return (self._script_args() +
                 ['--step-num=%d' % step_num, '--reducer'] +
                 self._mr_job_extra_args())
 
@@ -1108,13 +1108,13 @@ class EMRJobRunner(MRJobRunner):
                     's3_log_file_uri': s3_log_file_uri,
                     'input_uri': None
                 }
-                
+
                 # if this is a mapper, figure out which input file we
                 # were reading from.
                 if info['node_type'] == 'm':
                     result['input_uri'] = self._scan_for_input_uri(
                         s3_log_file_uri, s3_conn)
-                
+
                 return result
 
         return None
@@ -1164,7 +1164,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _download_log_file(self, s3_log_file_uri, s3_conn):
         """Download a log file to our local tmp dir so we can scan it.
-        
+
         Takes a log file URI, and returns a local path. We'll dump all
         log files to the same file, on the assumption that we'll scan them
         one at a time.
@@ -1219,7 +1219,7 @@ class EMRJobRunner(MRJobRunner):
 
         self._master_bootstrap_script = {'path': path}
         self._files.append(self._master_bootstrap_script)
-        
+
     def _master_bootstrap_script_content(self):
         """Create the contents of the master bootstrap script.
 
@@ -1227,7 +1227,7 @@ class EMRJobRunner(MRJobRunner):
         """
         self._name_files()
         self._pick_s3_uris_for_files()
-        
+
         out = StringIO()
         def writeln(line=''):
             out.write(line + '\n')
@@ -1249,7 +1249,7 @@ class EMRJobRunner(MRJobRunner):
             if file_dict.get('bootstrap'):
                 args = ['wget', '-S', '-T', '10', '-t', '5',
                         self._public_http_url(file_dict),
-                        '-O', file_dict['name']]            
+                        '-O', file_dict['name']]
                 writeln('check_call(%r)' % (args,))
         writeln()
 
@@ -1308,7 +1308,7 @@ class EMRJobRunner(MRJobRunner):
         return out.getvalue()
 
     ### EMR JOB MANAGEMENT UTILS ###
-    
+
     def make_persistent_job_flow(self):
         """Create a new EMR job flow that requires manual termination, and
         return its ID.
@@ -1319,7 +1319,7 @@ class EMRJobRunner(MRJobRunner):
             raise AssertionError('This runner is already associated with job flow ID %s' % (self._emr_job_flow_id))
 
         log.info('Creating persistent job flow to run several jobs in...')
-        
+
         self._create_master_bootstrap_script()
         self._upload_non_input_files()
 
@@ -1384,7 +1384,7 @@ class EMRJobRunner(MRJobRunner):
         """Helper for ls(); doesn't bother with globbing or directories"""
         s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
-        
+
         bucket = s3_conn.get_bucket(bucket_name)
         for key in bucket.list(key_name):
             yield s3_key_to_uri(key)
@@ -1457,14 +1457,14 @@ class EMRJobRunner(MRJobRunner):
             return ((isinstance(ex, boto.exception.BotoServerError) and
                      ('Throttling' in ex.body or
                       'RequestExpired' in ex.body)) or
-                    (isinstance(ex, socket.error) and 
+                    (isinstance(ex, socket.error) and
                      ex.args in ((104, 'Connection reset by peer'),
                                  (110, 'Connection timed out'))))
 
         return RetryWrapper(raw_conn,
                             retry_if=retry_if,
                             backoff=EMR_BACKOFF,
-                            multiplier=EMR_BACKOFF_MULTIPLIER, 
+                            multiplier=EMR_BACKOFF_MULTIPLIER,
                             max_tries=EMR_MAX_TRIES)
 
     def make_emr_conn(self):
@@ -1498,7 +1498,7 @@ class EMRJobRunner(MRJobRunner):
                     "Don't know the EMR endpoint for %s; try setting emr_endpoint explicitly" % self._aws_region)
 
         return boto.ec2.regioninfo.RegionInfo(None, self._aws_region, endpoint)
-            
+
     ### S3-specific FILESYSTEM STUFF ###
 
     # Utilities for interacting with S3 using S3 URIs.
@@ -1535,13 +1535,13 @@ class EMRJobRunner(MRJobRunner):
         return None if that key doesn't exist.
 
         uri is an S3 URI: ``s3://foo/bar``
-        
+
         You may optionally pass in an existing s3 connection through ``s3_conn``
         """
         if not s3_conn:
             s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
-        
+
         return s3_conn.get_bucket(bucket_name).get_key(key_name)
 
     def make_s3_key(self, uri, s3_conn=None):
@@ -1563,7 +1563,7 @@ class EMRJobRunner(MRJobRunner):
         the given dir on S3.
 
         uri is an S3 URI: ``s3://foo/bar``
-        
+
         You may optionally pass in an existing S3 connection through s3_conn
         """
         if not s3_conn:
@@ -1599,7 +1599,7 @@ class EMRJobRunner(MRJobRunner):
         """
         if not s3_conn:
             s3_conn = self.make_s3_conn()
-        
+
         bucket_name, key_name = parse_s3_uri(uri)
         bucket = s3_conn.get_bucket(bucket_name)
 

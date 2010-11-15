@@ -119,7 +119,7 @@ log = logging.getLogger('mrjob.emr')
 
 def find_mrjob_conf():
     """Look for :file:`mrjob.conf`, and return its path. Places we look:
-    
+
     - :file:`~/.mrjob`
     - :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH`
     - :file:`/etc/mrjob.conf`
@@ -154,7 +154,7 @@ def load_mrjob_conf(conf_path=None):
             'emr': {'OPTION': VALUE, ...}
             'hadoop: {'OPTION': VALUE, ...}
         }
-    
+
     Returns ``None`` if we can't find :file:`mrjob.conf`.
 
     :type conf_path: str
@@ -278,7 +278,7 @@ def _combine_envs_helper(envs, local):
         pathsep = os.pathsep
     else:
         pathsep = ':'
-    
+
     result = {}
     for env in envs:
         if env:
@@ -319,7 +319,7 @@ def combine_opts(combiners, *opts_list):
     :param opts_list: one or more dictionaries to combine
     """
     final_opts = {}
-    
+
     keys = set()
     for opts in opts_list:
         if opts:

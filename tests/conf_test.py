@@ -45,7 +45,7 @@ class MRJobConfTestCase(TestCase):
     @setup
     def setup_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
-        
+
     @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
@@ -130,7 +130,7 @@ class MRJobConfTestCase(TestCase):
                      {'qux': 'quux'})
         # test missing options
         assert_equal(load_opts_from_mrjob_conf('bar', conf_path=conf_path), {})
-        
+
     def test_round_trip(self):
         conf = {'runners': {'foo': {'qux': 'quux'}}}
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
@@ -155,7 +155,7 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
 
         dump_mrjob_conf(conf, open(conf_path, 'w'))
         contents = open(conf_path).read()
-		
+
         assert_equal(contents.replace(' ','').replace('\n',''),
 					 '{"runners":{"foo":{"qux":"quux"}}}')
 
@@ -214,7 +214,7 @@ class CombineDictsTestCase(TestCase):
              'PYTHONPATH': '/home/dave/python',
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
-        
+
 
 class CombineEnvsTestCase(TestCase):
 
@@ -319,7 +319,7 @@ class CombineAndExpandPathsTestCase(TestCase):
     @setup
     def setup_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
-        
+
     @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
@@ -368,4 +368,4 @@ class CombineAndExpandPathsTestCase(TestCase):
              os.path.join(self.tmp_dir, 'q*'),
              's3://walrus/foo'])
 
-            
+

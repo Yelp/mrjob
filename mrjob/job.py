@@ -61,7 +61,7 @@ using :py:class:`~mrjob.local.LocalMRJobRunner`.
 You can also run individual steps::
 
     # test 1st step mapper:
-    python your_mr_job_sub_class.py --mapper 
+    python your_mr_job_sub_class.py --mapper
     # test 2nd step reducer (--step-num=1 because step numbers are 0-indexed):
     python your_mr_job_sub_class.py --reducer --step-num=1
 
@@ -214,7 +214,7 @@ class MRJob(object):
 
     def mapper_final(self):
         """Re-define this to define an action to run after the mapper reaches
-        the end of input. 
+        the end of input.
 
         One way to use this is to store a total in an instance variable, and
         output it after reading all input data. See :py:mod:`mrjob.examples`
@@ -322,7 +322,7 @@ class MRJob(object):
         by Hadoop Streaming.
 
         Does one of:
-        
+
         * Print step information (:option:`--steps`). See :py:meth:`show_steps`
         * Run a mapper (:option:`--mapper`). See :py:meth:`run_mapper`
         * Run a reducer (:option:`--reducer`). See :py:meth:`run_reducer`
@@ -330,7 +330,7 @@ class MRJob(object):
         """
         # load options from the command line
         mr_job = cls(args=_READ_ARGS_FROM_SYS_ARGV)
-        
+
         if mr_job.options.show_steps:
             mr_job.show_steps()
 
@@ -346,7 +346,7 @@ class MRJob(object):
     def make_runner(self):
         """Make a runner based on command-line arguments, so we can
         launch this job on EMR, on Hadoop, or locally.
-        
+
         :rtype: :py:class:`mrjob.runner.MRJobRunner`
         """
         # have to import here so that we can still run the MRJob
@@ -354,7 +354,7 @@ class MRJob(object):
         from mrjob.emr import EMRJobRunner
         from mrjob.hadoop import HadoopJobRunner
         from mrjob.local import LocalMRJobRunner
-        
+
         if self.options.runner == 'emr':
             return EMRJobRunner(**self.emr_job_runner_kwargs())
 
@@ -391,10 +391,10 @@ class MRJob(object):
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
         increment a counter rather than raising an exception.
-        
+
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
-        """        
+        """
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
@@ -427,10 +427,10 @@ class MRJob(object):
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
         increment a counter rather than raising an exception.
-        
+
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
-        """        
+        """
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
@@ -458,7 +458,7 @@ class MRJob(object):
 
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
-        
+
         We currently output something like ``MR M R``, but expect this to
         change!
         """
@@ -549,7 +549,7 @@ class MRJob(object):
         steps_desc = self._steps_desc()
 
         protocol_dict = self.protocols()
-        
+
         # pick input protocol
         if step_num == 0 and step_type == steps_desc[0][0]:
             read_protocol = self.options.input_protocol
@@ -622,7 +622,7 @@ class MRJob(object):
         self.runner_opt_group = OptionGroup(
             self.option_parser, 'Running the entire job')
         self.option_parser.add_option_group(self.runner_opt_group)
-        
+
         self.runner_opt_group.add_option(
             '-r', '--runner', dest='runner', default='local',
             choices=('local', 'hadoop', 'emr'),
@@ -756,7 +756,7 @@ class MRJob(object):
         :py:meth:`add_file_option` instead.
         """
         pass_opt = self.option_parser.add_option(*args, **kwargs)
-        
+
         # We only support a subset of option parser actions
         SUPPORTED_ACTIONS = (
             'store', 'append', 'store_const', 'store_true', 'store_false',)
@@ -802,7 +802,7 @@ class MRJob(object):
         """Load command-line options into self.options.
 
         Called from :py:meth:`__init__()` after :py:meth:`configure_options`.
-        
+
         :type args: list of str
         :param args: a list of command line arguments. ``None`` will be treated the same as ``[]``.
 
@@ -847,7 +847,7 @@ class MRJob(object):
         :return: map from arg name to value
 
         Re-define this if you want finer control of runner initialization.
-        
+
         You might find :py:meth:`mrjob.conf.combine_dicts` useful if you
         want to add or change lots of keyword arguments.
         """
@@ -867,7 +867,7 @@ class MRJob(object):
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,
         }
- 
+
     def local_job_runner_kwargs(self):
         """Keyword arguments to create create runners when
         :py:meth:`make_runner` is called, when we run a job locally
@@ -878,33 +878,33 @@ class MRJob(object):
         Re-define this if you want finer control when running jobs locally.
         """
         return self.job_runner_kwargs()
- 
+
     def emr_job_runner_kwargs(self):
         """Keyword arguments to create create runners when
         :py:meth:`make_runner` is called, when we run a job on EMR
         (``-r emr``).
 
         :return: map from arg name to value
-        
+
         Re-define this if you want finer control when running jobs on EMR.
         """
         return combine_dicts(
             self.job_runner_kwargs(),
             self._get_kwargs_from_opt_group(self.emr_opt_group))
-    
+
     def hadoop_job_runner_kwargs(self):
         """Keyword arguments to create create runners when
         :py:meth:`make_runner` is called, when we run a job on EMR
         (``-r hadoop``).
-       
+
         :return: map from arg name to value
-        
+
         Re-define this if you want finer control when running jobs on hadoop.
         """
         return combine_dicts(
             self.job_runner_kwargs(),
             self._get_kwargs_from_opt_group(self.hadoop_opt_group))
-    
+
     def _get_kwargs_from_opt_group(self, opt_group):
         """Helper function that returns a dictionary of the values of options
         in the given options group (this works because the options and the
@@ -912,7 +912,7 @@ class MRJob(object):
         """
         keys = set(opt.dest for opt in opt_group.option_list)
         return dict((key, getattr(self.options, key)) for key in keys)
-    
+
     def generate_passthrough_arguments(self):
         """Returns a list of arguments to pass to subprocesses, either on
         hadoop or executed via subprocess.
@@ -921,7 +921,7 @@ class MRJob(object):
         as ``file_upload_args``.
         """
         master_option_dict = self.options.__dict__
-        
+
         output_args = []
         for pass_opt in self._passthrough_options:
             opt_prefix = pass_opt.get_opt_string()
@@ -1044,7 +1044,7 @@ class MRJob(object):
         return reader.read(line)
 
     ### Testing ###
-    
+
     def sandbox(self, stdin=None, stdout=None, stderr=None):
         """Redirect stdin, stdout, and stderr for automated testing.
 
@@ -1081,7 +1081,7 @@ class MRJob(object):
             from StringIO import StringIO
 
             mr_job = MRYourJob(args=[...])
-            
+
             fake_input = '"foo"\\t"bar"\\n"foo"\\t"baz"\\n'
             mr_job.sandbox(stdin=StringIO(fake_input))
 
@@ -1115,7 +1115,7 @@ class MRJob(object):
 
         This helps you test individual mappers and reducers by calling
         run_mapper() or run_reducer(). For example::
-        
+
             mr_job.sandbox(stdin=your_input)
             mr_job.run_mapper(step_num=0)
             output = mrjob.parse_output()

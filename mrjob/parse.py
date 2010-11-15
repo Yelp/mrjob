@@ -49,7 +49,7 @@ def find_hadoop_java_stack_trace(lines):
     In logs from EMR, we find java stack traces in ``task-attempts/*/syslog``
 
     Sample stack trace::
-    
+
         2010-07-27 18:25:48,397 WARN org.apache.hadoop.mapred.TaskTracker (main): Error running child
         java.lang.OutOfMemoryError: Java heap space
                 at org.apache.hadoop.mapred.IFile$Reader.readNextBlock(IFile.java:270)

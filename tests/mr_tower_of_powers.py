@@ -62,7 +62,7 @@ class MRTowerOfPowers(MRJob):
         # be reading from the original version of n_file
         assert_equal(self.options.n_file,
                      os.environ['LOCAL_N_FILE_PATH'])
-        
+
         super(MRTowerOfPowers, self).show_steps()
 
 if __name__ == '__main__':

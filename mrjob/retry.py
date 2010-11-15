@@ -45,7 +45,7 @@ class RetryWrapper(object):
         self.__backoff = backoff
         if self.__backoff <= 0:
             raise ValueError('backoff must be positive')
-        
+
         self.__multiplier = multiplier
         if self.__multiplier < 1:
             raise ValueError('multiplier must be at least one!')

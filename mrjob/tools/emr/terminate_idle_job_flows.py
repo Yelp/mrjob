@@ -39,7 +39,7 @@ DEFAULT_MAX_HOURS_IDLE = 1
 def main():
     option_parser = make_option_parser()
     options, args = option_parser.parse_args()
-    
+
     if args:
         option_parser.error('takes no arguments')
 
@@ -57,7 +57,7 @@ def main():
 
 def inspect_and_maybe_terminate_job_flows(
     conf_path, max_hours_idle, now, dry_run):
-    
+
     emr_conn = EMRJobRunner(conf_path=conf_path).make_emr_conn()
 
     log.info(
@@ -91,7 +91,7 @@ def inspect_and_maybe_terminate_job_flows(
 
             # don't care about fractions of a second
             time_idle = timedelta(time_idle.days, time_idle.seconds)
-            
+
             log.debug('Job flow %s (%s) idle for %s' %
                       (jf.jobflowid, jf.name, time_idle))
             if time_idle > timedelta(hours=max_hours_idle):

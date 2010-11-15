@@ -43,7 +43,7 @@ def add_mock_s3_data(mock_s3_fs, data):
     for bucket_name, key_name_to_bytes in data.iteritems():
         mock_s3_fs.setdefault(bucket_name, {})
         bucket = mock_s3_fs[bucket_name]
-        
+
         for key_name, bytes in key_name_to_bytes.iteritems():
             bucket[key_name] = bytes
 
@@ -307,7 +307,7 @@ class MockEmrConnection(object):
                 actiononfailure=step.action_on_failure,
                 args=step.args(),
             )
-            
+
             job_flow.steps.append(step_object)
 
     def terminate_jobflow(self, jobflow_id):
@@ -344,7 +344,7 @@ class MockEmrConnection(object):
         """
         if now is None:
             now = datetime.datetime.utcnow()
-        
+
         if self.simulation_steps_left <= 0:
             raise AssertionError(
                 'Simulated progress too many times; bailing out')
@@ -413,10 +413,10 @@ class MockEmrConnection(object):
                         bucket_name: {key_name + 'part-%05d' % i: bytes}})
             elif (jobflow_id, step_num) in self.mock_emr_output:
                 raise AssertionError(
-                    "can't use output for job flow ID %s, step %d " 
+                    "can't use output for job flow ID %s, step %d "
                     "(it doesn't output to S3)" %
                     (jobflow_id, step_num))
-                
+
 
             # done!
             return

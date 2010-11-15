@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Audit EMR usage over the past 2 weeks, sorted by job flow name and user.
+
+Usage::
+
+    python -m mrjob.emr.tools.audit_usage > report
 """
 from __future__ import with_statement
 

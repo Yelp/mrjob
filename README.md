@@ -19,7 +19,7 @@ Some important features:
  * SSH tunnel to hadoop job tracker on EMR
  * Minimal setup
      * To run on EMR, set `$AWS_ACCESS_KEY_ID` and `$AWS_SECRET_ACCESS_KEY`
-     * To run on your Hadoop cluster, set `$HADOOP_HOME`
+     * To run on your Hadoop cluster, install `simplejson` and make sure `$HADOOP_HOME` is set.
 
 Installation
 ============

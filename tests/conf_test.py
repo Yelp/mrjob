@@ -21,6 +21,7 @@ import tempfile
 
 from testify import TestCase, assert_equal, class_setup, class_teardown, setup, teardown
 from mrjob.conf import *
+import mrjob.conf
 
 class MRJobConfTestCase(TestCase):
 
@@ -131,11 +132,32 @@ class MRJobConfTestCase(TestCase):
         assert_equal(load_opts_from_mrjob_conf('bar', conf_path=conf_path), {})
         
     def test_round_trip(self):
-        conf = {"runners": {"foo": {"qux": "quux"}}}
+        conf = {'runners': {'foo': {'qux': 'quux'}}}
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
         dump_mrjob_conf(conf, open(conf_path, 'w'))
         assert_equal(conf, load_mrjob_conf(conf_path=conf_path))
+
+class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
+
+    @setup
+    def blank_out_yaml(self):
+        self._real_yaml = mrjob.conf.yaml
+        mrjob.conf.yaml = None
+
+    @teardown
+    def restore_yaml(self):
+        mrjob.conf.yaml = self._real_yaml
+
+    def test_using_json_and_not_yaml(self):
+        conf = {'runners': {'foo': {'qux': 'quux'}}}
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        dump_mrjob_conf(conf, open(conf_path, 'w'))
+        contents = open(conf_path).read()
+		
+        assert_equal(contents.replace(' ','').replace('\n',''),
+					 '{"runners":{"foo":{"qux":"quux"}}}')
 
 class CombineValuesTestCase(TestCase):
 

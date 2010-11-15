@@ -541,11 +541,25 @@ class FileOptionsTestCase(TestCase):
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
+    @setup
+    def blank_out_environment(self):
+        self._old_environ = os.environ.copy()
+        # don't do os.environ = {}! This won't actually set environment
+        # variables; it just monkey-patches os.environ
+        os.environ.clear()
+
+    @teardown
+    def restore_environment(self):
+        os.environ.clear()
+        os.environ.update(self._old_environ)
+
     def test_end_to_end(self):
         n_file_path = os.path.join(self.tmp_dir, 'n_file')
 
         with open(n_file_path, 'w') as f:
             f.write('3')
+            
+        os.environ['LOCAL_N_FILE_PATH'] = n_file_path
 
         stdin = ['0\n', '1\n', '2\n']
 

@@ -29,7 +29,9 @@ job to have access to so that you don't have to think about it. For example:
 
 :file:`mrjob.conf` is just a `YAML <http://www.yaml.org>`_-encoded dictionary
 containing default values to pass in to the constructors of the various runner
-classes. Here's a minimal :file:`mrjob.conf`::
+classes. Here's a minimal :file:`mrjob.conf`:
+
+.. code-block:: yaml
 
     runners:
       emr:
@@ -44,7 +46,9 @@ Options specified on the command-line take precedence over
 :file:`mrjob.conf`. Usually this means simply overriding the option in
 :file:`mrjob.conf`. However, we know that *cmdenv*, contains environment
 variables, so we do the right thing. For example, if your :file:`mrjob.conf`
-contained::
+contained:
+
+.. code-block:: yaml
 
     runners:
       emr:
@@ -66,7 +70,9 @@ What's going on here is that *cmdenv* is associated with
 combiner function that that combines options in an appropriate way.
 
 Combiners can also do useful things like expanding environment variables and
-globs in paths. For example, you could set::
+globs in paths. For example, you could set:
+
+.. code-block:: yaml
 
     runners:
       local:

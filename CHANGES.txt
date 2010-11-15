@@ -1,3 +1,25 @@
+v0.2.0, 2010-11-15 -- Many bugfixes, Windows support
+ * New Features/Changes:
+  * EMRJobRunner now prints % of mappers and reducers completed when you e
+     nable the SSH tunnel.
+   * Added mr_page_rank example
+   * Added mrjob.tools.emr.audit_usage script (Issue #21)
+   * You can specify alternate job owners with the "owner" option. Useful for 
+     auditing usage. (Issue #59)
+   * The job_name_prefix option has been renamed to label (the old name still 
+     works but is deprecated)
+   * bootstrap_cmds and bootstrap_scripts are no longer automatically run with 
+     sudo
+ * Bugs Fixed/Cleanup:
+   * bootstrap files no longer get uploaded to S3 twice (Issue #8)
+   * When using add_file_option(), show_steps() can now see the local version 
+     of the file (Issue #45)
+   * Now works on Windows (Issue #46)
+   * No longer requires external jar, tar, or zip binaries (Issue #47)
+   * mrjob-* scratch bucket is only created as needed (Issue #50)
+   * Can now specify us-east-1 region explicitly (Issue #58)
+   * mrjob.tools.emr.terminate_idle_job_flows leaves Hive jobs alone (Issue #60)
+
 v0.1.0, 2010-10-28 -- Same code, better version. It's official!
 
 v0.1.0-pre3, 2010-10-27 -- Pre-release to run Yelp code against

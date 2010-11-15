@@ -20,3 +20,4 @@ EMR utilities
 -------------
 
 .. automethod:: EMRJobRunner.make_emr_conn
+.. autofunction:: describe_all_job_flows

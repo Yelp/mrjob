@@ -115,9 +115,11 @@ def s3_key_to_uri(s3_key):
 def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
                            created_after=None, created_before=None):
     """Iteratively call ``EmrConnection.describe_job_flows()`` until we really
-    get all the job flows. This is a way of getting around the limits
-    of the EMR API, both on number of job flows returned, and how far
-    back in time we can go.
+    get all the available job flow information. Currently, 2 months of data
+    is available through the EMR API.
+
+    This is a way of getting around the limits of the API, both on number
+    of job flows returned, and how far back in time we can go.
 
     :type states: list
     :param states: A list of strings with job flow states wanted

@@ -1,5 +1,20 @@
 # This is basically the config file we use in production at Yelp, with some
 # strategic edits. ;)
+#
+# If you don't have the yaml module installed, you'll have to use JSON instead,
+# which would look something like this:
+# 
+# {"runners": {
+#    "emr": {
+#      "aws_access_key_id": "HADOOPHADOOPBOBADOOP", 
+#      "aws_region": "us-west-1", 
+#      "aws_secret_access_key": "MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP", 
+#      "base_tmp_dir": "/scratch/$USER"
+#      "bootstrap_python_packages": [
+#        "$BT/aws/python-packages/*.tar.gz"
+#      ], 
+#      ...
+#
 runners:
   emr:
     aws_access_key_id: HADOOPHADOOPBOBADOOP
@@ -61,7 +76,7 @@ runners:
     setup_cmds: *setup_cmds
     upload_files: *upload_files
   local:
-  	# We don't have gcc installed in production, so if we have to run an 
+    # We don't have gcc installed in production, so if we have to run an 
     # MRJob in local mode in production, don't run the Makefile
     # and whatnot; just fall back on the original copy of the code.
     base_tmp_dir: /scratch/$USER

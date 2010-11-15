@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-mrjob 0.1.0
+mrjob
 =================================
 
 mrjob - Run Hadoop Streaming jobs on Amazon Elastic MapReduce or your

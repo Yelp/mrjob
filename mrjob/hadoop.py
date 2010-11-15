@@ -88,11 +88,11 @@ class HadoopJobRunner(MRJobRunner):
         :type hadoop_bin: str
         :param hadoop_bin: name/path of your hadoop program. Defaults to *hadoop_home* plus ``bin/hadoop``
         :type hadoop_home: str
-        :param hadoop_home: alternative to setting :envvar:`$HADOOP_HOME` variable.
+        :param hadoop_home: alternative to setting :envvar:`HADOOP_HOME` variable.
         :type hdfs_scratch_dir: str
         :param hdfs_scratch_dir: temp directory on HDFS. Default is ``tmp/mrjob``
         :type hadoop_streaming_jar: str
-        :param hadoop_streaming_jar: path to your hadoop streaming jar. If not set, we'll search for it inside :envvar:`$HADOOP_HOME`
+        :param hadoop_streaming_jar: path to your hadoop streaming jar. If not set, we'll search for it inside :envvar:`HADOOP_HOME`
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 

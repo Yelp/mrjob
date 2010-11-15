@@ -206,8 +206,8 @@ class EMRJobRunner(MRJobRunner):
 
         *aws_access_key_id* and *aws_secret_access_key* are required if you
         haven't set them up already for boto (e.g. by setting the environment
-        variables :envvar:`$AWS_ACCESS_KEY_ID` and
-        :envvar:`$AWS_SECRET_ACCESS_KEY`)
+        variables :envvar:`AWS_ACCESS_KEY_ID` and
+        :envvar:`AWS_SECRET_ACCESS_KEY`)
 
         Additional options:
 

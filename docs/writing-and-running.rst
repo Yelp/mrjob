@@ -71,7 +71,7 @@ Running on EMR
 --------------
 
 * Set up your Amazon Account (see :doc:`amazon`)
-* Set :envvar:`$AWS_ACCESS_KEY_ID` and :envvar:`$AWS_SECRET_ACCESS_KEY`
+* Set :envvar:`AWS_ACCESS_KEY_ID` and :envvar:`AWS_SECRET_ACCESS_KEY`
 * Run your job with ``-r emr``::
 
     python your_mr_job_sub_class.py -r emr < input > output
@@ -81,7 +81,7 @@ Running on your own Hadoop cluster
 
 * Set up a hadoop cluster (see http://hadoop.apache.org/common/docs/current/)
 * If running Python 2.5 on your cluster, install the :py:mod:`simplejson` module on all nodes. (Recommended but not required for Python 2.6+)
-* Make sure :envvar:`$HADOOP_HOME` is set
+* Make sure :envvar:`HADOOP_HOME` is set
 * Run your job with ``-r hadoop``::
 
     python your_mr_job_sub_class.py -r hadoop < input > output

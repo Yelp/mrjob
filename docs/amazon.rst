@@ -9,7 +9,7 @@ Minimal Setup
 * create an Amazon Web Services account: http://aws.amazon.com/
 * sign up for Elastic MapReduce: http://aws.amazon.com/elasticmapreduce/
 * Get your access and secret keys (go to http://aws.amazon.com/account/ and click on "Security Credentials")
-* Set the environment variables :envvar:`$AWS_ACCESS_KEY_ID` and :envvar:`$AWS_SECRET_ACCESS_KEY` accordingly
+* Set the environment variables :envvar:`AWS_ACCESS_KEY_ID` and :envvar:`AWS_SECRET_ACCESS_KEY` accordingly
 
 SSH Tunneling
 -------------

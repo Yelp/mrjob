@@ -17,7 +17,7 @@ for :py:mod:`mrjob`.
 We look for :file:`mrjob.conf` in these locations:
 
 - :file:`~/.mrjob`
-- :file:`mrjob.conf` anywhere in your :envvar:`$PYTHONPATH`
+- :file:`mrjob.conf` anywhere in your :envvar:`PYTHONPATH`
 - :file:`/etc/mrjob.conf`
 
 The point of :file:`mrjob.conf` is to let you set up things you want every
@@ -37,7 +37,7 @@ classes. Here's a minimal :file:`mrjob.conf`::
           TZ: America/Los_Angeles
 
 Now whenever you run ``mr_your_script.py -r emr``,
-:py:class:`~mrjob.emr.EMRJobRunner` will automatically set :envvar:`$TZ` to
+:py:class:`~mrjob.emr.EMRJobRunner` will automatically set :envvar:`TZ` to
 ``America/Los_Angeles`` in your job's environment when it runs on EMR.
 
 Options specified on the command-line take precedence over
@@ -56,7 +56,7 @@ and you ran your job as::
 
     mr_your_script.py -r emr --cmdenv TZ=Europe/Paris --cmdenv PATH=/usr/sbin
 
-We'd automatically handle the :envvar:`$PATH`
+We'd automatically handle the :envvar:`PATH`
 variables and your job's environment would be::
 
     {'TZ': 'Europe/Paris', 'PATH': '/usr/sbin:/usr/local/bin'}
@@ -115,7 +115,7 @@ def find_mrjob_conf():
     """Look for :file:`mrjob.conf`, and return its path. Places we look:
     
     - :file:`~/.mrjob`
-    - :file:`mrjob.conf` in any directory in :envvar:`$PYTHONPATH`
+    - :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH`
     - :file:`/etc/mrjob.conf`
 
     Return ``None`` if we can't find it.

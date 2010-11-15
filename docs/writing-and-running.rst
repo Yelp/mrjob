@@ -56,7 +56,7 @@ You can also run individual steps:
 .. code-block:: sh
 
     # test 1st step mapper:
-    python your_mr_job_sub_class.py --mapper 
+    python your_mr_job_sub_class.py --mapper
     # test 2nd step reducer (--step-num=1 because step numbers are 0-indexed):
     python your_mr_job_sub_class.py --reducer --step-num=1
 

@@ -12,7 +12,7 @@ own Hadoop cluster
 .. toctree::
    :maxdepth: 3
    :numbered:
-   
+
    writing-and-running.rst
    library.rst
    amazon.rst

@@ -3,16 +3,16 @@
 #
 # If you don't have the yaml module installed, you'll have to use JSON instead,
 # which would look something like this:
-# 
+#
 # {"runners": {
 #    "emr": {
-#      "aws_access_key_id": "HADOOPHADOOPBOBADOOP", 
-#      "aws_region": "us-west-1", 
-#      "aws_secret_access_key": "MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP", 
+#      "aws_access_key_id": "HADOOPHADOOPBOBADOOP",
+#      "aws_region": "us-west-1",
+#      "aws_secret_access_key": "MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP",
 #      "base_tmp_dir": "/scratch/$USER"
 #      "bootstrap_python_packages": [
 #        "$BT/aws/python-packages/*.tar.gz"
-#      ], 
+#      ],
 #      ...
 #
 runners:
@@ -46,10 +46,10 @@ runners:
     # our bucket also lives in the us-west region
     s3_scratch_uri: s3://walrus/tmp/
     setup_cmds: &setup_cmds
-    # these files are different between dev and production, so they're 
-    # uploaded separately. copying them into place isn't safe because 
-    # src-tree.tar.gz is actually shared between several mappers/reducers. 
-    # Another safe approach would be to add a rule to Makefile.emr that 
+    # these files are different between dev and production, so they're
+    # uploaded separately. copying them into place isn't safe because
+    # src-tree.tar.gz is actually shared between several mappers/reducers.
+    # Another safe approach would be to add a rule to Makefile.emr that
     # copies these files if they haven't already been copied (setup_cmds
     # from two mappers/reducers won't run simultaneously on the same machine)
     - ln -sf $(readlink -f config.py) src-tree.tar.gz/config/config.py
@@ -57,8 +57,8 @@ runners:
     # run Makefile.emr to compile C code (EMR has a different architecture,
     # so we can't just upload the .so files)
     - cd src-tree.tar.gz; make -f Makefile.emr
-    # generally, we run jobs on a Linux server separate from our desktop 
-    # machine. So the SSH tunnel needs to be open so a browser on our 
+    # generally, we run jobs on a Linux server separate from our desktop
+    # machine. So the SSH tunnel needs to be open so a browser on our
     # desktop machine can connect to it.
     ssh_tunnel_is_open: true
     ssh_tunnel_to_job_tracker: true
@@ -76,7 +76,7 @@ runners:
     setup_cmds: *setup_cmds
     upload_files: *upload_files
   local:
-    # We don't have gcc installed in production, so if we have to run an 
+    # We don't have gcc installed in production, so if we have to run an
     # MRJob in local mode in production, don't run the Makefile
     # and whatnot; just fall back on the original copy of the code.
     base_tmp_dir: /scratch/$USER

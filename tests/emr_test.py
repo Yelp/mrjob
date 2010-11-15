@@ -482,7 +482,58 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         assert_equal(failure['s3_log_file_uri'],
                      BUCKET_URI + LOG_DIR + 'steps/1/syslog')
 
+class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
 
+    def test_no_region(self):
+        runner = EMRJobRunner(conf_path=False)
+        assert_equal(runner.make_emr_conn().endpoint,
+                     'elasticmapreduce.amazonaws.com')
+        assert_equal(runner.make_s3_conn().endpoint,
+                     's3.amazonaws.com')
+
+    def test_eu(self):
+        runner = EMRJobRunner(conf_path=False, aws_region='EU')
+        assert_equal(runner.make_emr_conn().endpoint,
+                     'eu-west-1.elasticmapreduce.amazonaws.com')
+        assert_equal(runner.make_s3_conn().endpoint,
+                     's3-eu-west-1.amazonaws.com')
+
+    def test_us_east_1(self):
+        runner = EMRJobRunner(conf_path=False, aws_region='us-east-1')
+        assert_equal(runner.make_emr_conn().endpoint,
+                     'us-east-1.elasticmapreduce.amazonaws.com')
+        assert_equal(runner.make_s3_conn().endpoint,
+                     's3.amazonaws.com')
+
+    def test_us_west_1(self):
+        runner = EMRJobRunner(conf_path=False, aws_region='us-west-1')
+        assert_equal(runner.make_emr_conn().endpoint,
+                     'us-west-1.elasticmapreduce.amazonaws.com')
+        assert_equal(runner.make_s3_conn().endpoint,
+                     's3-us-west-1.amazonaws.com')
+
+    def test_ap_southeast_1(self):
+        runner = EMRJobRunner(conf_path=False, aws_region='ap-southeast-1')
+        assert_equal(runner.make_s3_conn().endpoint,
+                     's3-ap-southeast-1.amazonaws.com')
+        assert_raises(Exception, runner.make_emr_conn)
+
+    def test_bad_region(self):
+        # should fail in the constructor because the constructor connects to S3
+        assert_raises(Exception, EMRJobRunner,
+                      conf_path=False, aws_region='the-moooooooon-1')
+
+    def test_case_sensitive(self):
+        assert_raises(Exception, EMRJobRunner,
+                      conf_path=False, aws_region='eu')
+        assert_raises(Exception, EMRJobRunner,
+                      conf_path=False, aws_region='US-WEST-1')
+
+    def test_explicit_endpoints(self):
+        runner = EMRJobRunner(conf_path=False, aws_region='EU',
+                              s3_endpoint='s3-proxy', emr_endpoint='emr-proxy')
+        assert_equal(runner.make_emr_conn().endpoint, 'emr-proxy')
+        assert_equal(runner.make_s3_conn().endpoint, 's3-proxy')
 
 class TestLs(MockEMRAndS3TestCase):
 

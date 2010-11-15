@@ -64,6 +64,7 @@ class MockS3Connection(object):
         from bucket name to key name to bytes.
         """
         self.mock_s3_fs = mock_s3_fs or {}
+        self.endpoint = host
 
     def get_bucket(self, bucket_name):
         if bucket_name in self.mock_s3_fs:
@@ -208,6 +209,10 @@ class MockEmrConnection(object):
         self.max_days_ago = max_days_ago
         self.max_job_flows_returned = max_job_flows_returned
         self.simulation_steps_left = max_simulation_steps
+        if region is not None:
+            self.endpoint = region.endpoint
+        else:
+            self.endpoint = 'elasticmapreduce.amazonaws.com'
 
     def run_jobflow(self,
                     name, log_uri, ec2_keyname=None, availability_zone=None,

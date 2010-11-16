@@ -81,7 +81,7 @@ REGION_TO_EMR_ENDPOINT = {
     'EU': 'eu-west-1.elasticmapreduce.amazonaws.com',
     'us-east-1': 'us-east-1.elasticmapreduce.amazonaws.com',
     'us-west-1': 'us-west-1.elasticmapreduce.amazonaws.com',
-    None: 'elasticmapreduce.amazonaws.com', # when no region specified
+    '': 'elasticmapreduce.amazonaws.com', # when no region specified
 }
 
 # map from AWS region to S3 endpoint
@@ -91,7 +91,7 @@ REGION_TO_S3_ENDPOINT = {
     'us-east-1': 's3.amazonaws.com', # no region-specific endpoint
     'us-west-1': 's3-us-west-1.amazonaws.com',
     'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com', # no EMR endpoint yet
-    None: 's3.amazonaws.com',
+    '': 's3.amazonaws.com',
 }
 
 def parse_s3_uri(uri):
@@ -270,7 +270,7 @@ class EMRJobRunner(MRJobRunner):
 
         # make aws_region an instance variable; we might want to set it
         # based on the scratch bucket
-        self._aws_region = self._opts['aws_region']
+        self._aws_region = self._opts['aws_region'] or ''
 
         # if we're going to create a bucket to use as temp space, we don't
         # want to actually create it until we run the job (Issue #50).
@@ -397,7 +397,7 @@ class EMRJobRunner(MRJobRunner):
                 # if we're not using an ancient version of boto, set region
                 # based on the bucket's region
                 if (hasattr(scratch_bucket, 'get_location')):
-                    self._aws_region = scratch_bucket.get_location()
+                    self._aws_region = scratch_bucket.get_location() or ''
                     if self._aws_region:
                         log.info("using scratch bucket's region (%s) to connect to AWS" %
                                  self._aws_region)

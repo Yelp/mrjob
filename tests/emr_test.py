@@ -490,6 +490,25 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
                      'elasticmapreduce.amazonaws.com')
         assert_equal(runner.make_s3_conn().endpoint,
                      's3.amazonaws.com')
+        assert_equal(runner._aws_region, '')
+
+    def test_none_region(self):
+        # blank region should be treated the same as no region
+        runner = EMRJobRunner(conf_path=False, aws_region=None)
+        assert_equal(runner.make_emr_conn().endpoint,
+                     'elasticmapreduce.amazonaws.com')
+        assert_equal(runner.make_s3_conn().endpoint,
+                     's3.amazonaws.com')
+        assert_equal(runner._aws_region, '')
+
+    def test_blank_region(self):
+        # blank region should be treated the same as no region
+        runner = EMRJobRunner(conf_path=False, aws_region='')
+        assert_equal(runner.make_emr_conn().endpoint,
+                     'elasticmapreduce.amazonaws.com')
+        assert_equal(runner.make_s3_conn().endpoint,
+                     's3.amazonaws.com')
+        assert_equal(runner._aws_region, '')
 
     def test_eu(self):
         runner = EMRJobRunner(conf_path=False, aws_region='EU')

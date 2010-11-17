@@ -835,7 +835,7 @@ class EMRJobRunner(MRJobRunner):
             job_flow = emr_conn.describe_jobflow(self._emr_job_flow_id)
 
             job_state = job_flow.state
-            reason = job_flow.laststatechangereason
+            reason = getattr(job_flow, 'laststatechangereason', '')
             log_uri = job_flow.loguri
 
             # find all steps belonging to us, and get their state

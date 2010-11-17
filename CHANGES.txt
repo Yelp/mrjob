@@ -1,4 +1,4 @@
-v0.2.1, 2010-11-15 -- laststatechangereason bugfix
+v0.2.1, 2010-11-17 -- laststatechangereason bugfix
  * Don't assume EMR sets laststatechangereason
 
 v0.2.0, 2010-11-15 -- Many bugfixes, Windows support

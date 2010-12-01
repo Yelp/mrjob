@@ -7,7 +7,7 @@ Command-line only options for all runners
 =================== ======================================================= ========================================================
 Option              Default                                                 Switches
 =================== ======================================================= ========================================================
-*conf_path*         (automatic; see :py:func:`~mrjob.conf.find_mrjob.conf`) :option:`-c`, :option:`--conf-path`, :option:`--no-conf`
+*conf_path*         (automatic; see :py:func:`~mrjob.conf.find_mrjob_conf`) :option:`-c`, :option:`--conf-path`, :option:`--no-conf`
 *extra_args*        ``[]``                                                  (see :py:meth:`~mrjob.job.MRJob.add_passthrough_option`)
 *file_upload_args*  ``[]``                                                  (see :py:meth:`~mrjob.job.MRJob.add_file_option`)
 *output_dir*        (automatic)                                             :option:`-o`, :option:`--output-dir`

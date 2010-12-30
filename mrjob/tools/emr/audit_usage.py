@@ -15,7 +15,7 @@
 
 Usage::
 
-    python -m mrjob.emr.tools.audit_usage > report
+    python -m mrjob.tools.emr.audit_usage > report
 """
 from __future__ import with_statement
 

@@ -16,9 +16,9 @@ configs from :py:mod:`mrjob.conf`, and print the job flow ID to stdout.
 
 Usage::
 
-    python -m mrjob.emr.tools.create_job_flow
+    python -m mrjob.tools.emr.create_job_flow
 
-**WARNING**: do not run this without having :py:mod:`mrjob.emr.tools.terminate.idle_job_flows` in your crontab; job flows left idle can quickly become expensive!
+**WARNING**: do not run this without having :py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job flows left idle can quickly become expensive!
 """
 from __future__ import with_statement
 
@@ -55,7 +55,7 @@ def main():
 
 def make_option_parser():
     usage = '%prog [options]'
-    description = 'Create a persistent EMR job flow to run jobs in. WARNING: do not run this without mrjob.emr.tools.terminate.idle_job_flows in your crontab; job flows left idle can quickly become expensive!'
+    description = 'Create a persistent EMR job flow to run jobs in. WARNING: do not run this without mrjob.tools.emr.terminate.idle_job_flows in your crontab; job flows left idle can quickly become expensive!'
     option_parser = OptionParser(usage=usage, description=description)
     option_parser.add_option(
         '-v', '--verbose', dest='verbose', default=False, action='store_true',

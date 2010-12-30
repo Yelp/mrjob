@@ -1091,7 +1091,17 @@ class EMRJobRunner(MRJobRunner):
 
         relevant_logs.sort(reverse=True)
 
+        tasks_seen = set()
+
         for sort_key, info, s3_log_file_uri in relevant_logs:
+            # Issue #31: Don't bother with errors from tasks that
+            # later succeeded
+            task_info = (info['step_num'], info['node_type'],
+                         info['node_num'], info['stream'])
+            if task_info in tasks_seen:
+                continue
+            tasks_seen.add(task_info)
+
             log_path = self._download_log_file(s3_log_file_uri, s3_conn)
             if not log_path:
                 continue

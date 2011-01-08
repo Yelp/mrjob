@@ -690,6 +690,9 @@ class MRJob(object):
         self.option_parser.add_option_group(self.hadoop_opt_group)
 
         self.hadoop_opt_group.add_option(
+            '--python-bin', dest='python_bin', default=None,
+            help='python binary. Defaults to python')
+        self.hadoop_opt_group.add_option(
             '--hadoop-bin', dest='hadoop_bin', default=None,
             help='hadoop binary. Defaults to $HADOOP_HOME/bin/hadoop')
         self.hadoop_opt_group.add_option(

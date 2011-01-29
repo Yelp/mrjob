@@ -979,9 +979,10 @@ class EMRJobRunner(MRJobRunner):
 
         assert self._script # shouldn't call _script_args() if no script
 
-        args = ['python', self._script['name']]
+        python_bin = self._opts['python_bin'] or 'python'
+        args = [python_bin, self._script['name']]
         if self._wrapper_script:
-            args = ['python', self._wrapper_script['name']] + args
+            args = [python_bin, self._wrapper_script['name']] + args
 
         return args
 

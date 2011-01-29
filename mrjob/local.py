@@ -74,7 +74,7 @@ class LocalMRJobRunner(MRJobRunner):
                         (self._opts['hadoop_extra_args'],))
 
         # use the same python interpreter that we're currently running in
-        python_bin = sys.executable or 'python'
+        python_bin = self._opts['python_bin'] or sys.executable or 'python'
 
         wrapper_args = [python_bin]
         if self._wrapper_script:

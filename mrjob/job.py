@@ -674,7 +674,7 @@ class MRJob(object):
             'multiple times.')
 
         self.runner_opt_group.add_option(
-        	'--cmdenv', dest='cmdenv', default={}, action='set_key',
+            '--cmdenv', dest='cmdenv', default={}, action='set_key',
             help='set an environment variable for your job inside Hadoop '
             'streaming. Must take the form KEY=VALUE. You can use --cmdenv '
             'multiple times.')
@@ -684,14 +684,15 @@ class MRJob(object):
             help='Argument of any type to pass to hadoop '
             'streaming. You can use --hadoop arg multiple times.')
 
+        self.runner_opt_group.add_option(
+            '--python-bin', dest='python_bin', default=None,
+            help='python binary. Defaults to python')
+
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(
             self.option_parser, 'Running on Hadoop (these apply when you set -r hadoop)')
         self.option_parser.add_option_group(self.hadoop_opt_group)
 
-        self.hadoop_opt_group.add_option(
-            '--python-bin', dest='python_bin', default=None,
-            help='python binary. Defaults to python')
         self.hadoop_opt_group.add_option(
             '--hadoop-bin', dest='hadoop_bin', default=None,
             help='hadoop binary. Defaults to $HADOOP_HOME/bin/hadoop')
@@ -869,6 +870,7 @@ class MRJob(object):
             'stdin': self.stdin,
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,
+            'python_bin': self.options.python_bin,
         }
 
     def local_job_runner_kwargs(self):

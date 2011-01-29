@@ -85,8 +85,6 @@ class HadoopJobRunner(MRJobRunner):
 
         Additional options:
 
-        :type python_bin: str
-        :param python_bin: name/path of your python program. Defaults to python
         :type hadoop_bin: str
         :param hadoop_bin: name/path of your hadoop program. Defaults to *hadoop_home* plus ``bin/hadoop``
         :type hadoop_home: str
@@ -102,10 +100,6 @@ class HadoopJobRunner(MRJobRunner):
         if not self._opts['hadoop_home']:
             raise Exception('you must set $HADOOP_HOME, or pass in hadoop_home explicitly')
         self._opts['hadoop_home'] = os.path.abspath(self._opts['hadoop_home'])
-
-        # fix python_bin
-        if not self._opts['python_bin']:
-            self._opts['python_bin'] = 'python'
 
         # fix hadoop_bin
         if not self._opts['hadoop_bin']:
@@ -145,7 +139,7 @@ class HadoopJobRunner(MRJobRunner):
     def _allowed_opts(cls):
         """A list of which keyword args we can pass to __init__()"""
         return super(HadoopJobRunner, cls)._allowed_opts() + [
-            'python_bin', 'hadoop_bin', 'hadoop_home', 'hdfs_scratch_dir',
+            'hadoop_bin', 'hadoop_home', 'hdfs_scratch_dir',
             'hadoop_streaming_jar']
 
     @classmethod
@@ -162,7 +156,6 @@ class HadoopJobRunner(MRJobRunner):
         values for that option. This allows us to specify that some options
         are lists, or contain environment variables, or whatever."""
         return combine_dicts(super(HadoopJobRunner, cls)._opts_combiners(), {
-            'python_bin': combine_paths,
             'hadoop_bin': combine_paths,
             'hadoop_home': combine_paths,
             'hdfs_scratch_dir': combine_paths,
@@ -347,9 +340,11 @@ class HadoopJobRunner(MRJobRunner):
     def _script_args(self):
         """How to invoke the script inside Hadoop"""
         assert self._script # shouldn't be able to run if no script
-        args = [self._opts['python_bin'], self._script['name']]
+
+        python_bin = self._opts['python_bin'] or 'python'
+        args = [python_bin, self._script['name']]
         if self._wrapper_script:
-            args = [self._opts['python_bin'], self._wrapper_script['name']] + args
+            args = [python_bin, self._wrapper_script['name']] + args
 
         return args
 

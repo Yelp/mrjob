@@ -340,9 +340,11 @@ class HadoopJobRunner(MRJobRunner):
     def _script_args(self):
         """How to invoke the script inside Hadoop"""
         assert self._script # shouldn't be able to run if no script
-        args = ['python', self._script['name']]
+
+        python_bin = self._opts['python_bin'] or 'python'
+        args = [python_bin, self._script['name']]
         if self._wrapper_script:
-            args = ['python', self._wrapper_script['name']] + args
+            args = [python_bin, self._wrapper_script['name']] + args
 
         return args
 

@@ -378,9 +378,11 @@ class MRJob(object):
 
         with self.make_runner() as runner:
             runner.run()
-            for line in runner.stream_output():
-                self.stdout.write(line)
-            self.stdout.flush()
+
+            if self.options.stream_output:
+                for line in runner.stream_output():
+                    self.stdout.write(line)
+                self.stdout.flush()
 
     def run_mapper(self, step_num=0):
         """Run the mapper and final mapper action for the given step.
@@ -634,6 +636,9 @@ class MRJob(object):
             '--no-conf', dest='conf_path', action='store_false',
             help="Don't load mrjob.conf even if it's available")
         self.runner_opt_group.add_option(
+            '--no-streaming-output', dest='stream_output', default=True, action='store_false',
+            help="Don't stream output after job completion")
+        self.runner_opt_group.add_option(
             '--cleanup', dest='cleanup',
             choices=CLEANUP_CHOICES, default=CLEANUP_DEFAULT,
             help="when to clean up tmp directories, etc. Choices: %s (default: %%default)" % ', '.join(CLEANUP_CHOICES))
@@ -674,7 +679,7 @@ class MRJob(object):
             'multiple times.')
 
         self.runner_opt_group.add_option(
-        	'--cmdenv', dest='cmdenv', default={}, action='set_key',
+            '--cmdenv', dest='cmdenv', default={}, action='set_key',
             help='set an environment variable for your job inside Hadoop '
             'streaming. Must take the form KEY=VALUE. You can use --cmdenv '
             'multiple times.')
@@ -683,6 +688,10 @@ class MRJob(object):
             '--hadoop-arg', dest='hadoop_arg', default=[], action='append',
             help='Argument of any type to pass to hadoop '
             'streaming. You can use --hadoop arg multiple times.')
+
+        self.runner_opt_group.add_option(
+            '--python-bin', dest='python_bin', default=None,
+            help='python binary. Defaults to python')
 
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(
@@ -867,6 +876,7 @@ class MRJob(object):
             'stdin': self.stdin,
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,
+            'python_bin': self.options.python_bin,
         }
 
     def local_job_runner_kwargs(self):

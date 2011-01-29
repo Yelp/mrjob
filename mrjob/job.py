@@ -378,9 +378,11 @@ class MRJob(object):
 
         with self.make_runner() as runner:
             runner.run()
-            for line in runner.stream_output():
-                self.stdout.write(line)
-            self.stdout.flush()
+
+            if self.options.stream_output:
+                for line in runner.stream_output():
+                    self.stdout.write(line)
+                self.stdout.flush()
 
     def run_mapper(self, step_num=0):
         """Run the mapper and final mapper action for the given step.
@@ -633,6 +635,9 @@ class MRJob(object):
         self.runner_opt_group.add_option(
             '--no-conf', dest='conf_path', action='store_false',
             help="Don't load mrjob.conf even if it's available")
+        self.runner_opt_group.add_option(
+            '--no-streaming-output', dest='stream_output', default=True, action='store_false',
+            help="Don't stream output after job completion")
         self.runner_opt_group.add_option(
             '--cleanup', dest='cleanup',
             choices=CLEANUP_CHOICES, default=CLEANUP_DEFAULT,

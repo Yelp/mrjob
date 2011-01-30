@@ -664,7 +664,9 @@ class MRJobRunner(object):
             if not self._script:
                 self._steps = []
             else:
-                python_bin = self._opts['python_bin'] or sys.executable or 'python'
+                # don't use self._opts['python_bin'] because that
+                # refers to the python binary to use inside Hadoop
+                python_bin = sys.executable or 'python'
                 args = ([python_bin, self._script['path'], '--steps'] +
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))

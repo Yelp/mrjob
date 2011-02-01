@@ -52,7 +52,7 @@ from mrjob.util import cmd_line
 
 log = logging.getLogger('mrjob.emr')
 
-S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-]+)/(.*)$')
+S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
 JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?

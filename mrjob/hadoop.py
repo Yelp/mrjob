@@ -270,6 +270,11 @@ class HadoopJobRunner(MRJobRunner):
 
             streaming_args = [self._opts['hadoop_bin'], 'jar', self._opts['hadoop_streaming_jar']]
 
+            # Add extra hadoop args first as hadoop args could be a hadoop
+            # specific argument (e.g. -libjar) which must come before job
+            # specific args.
+            streaming_args.extend(self._opts['hadoop_extra_args'])
+
             # add environment variables
             for key, value in sorted(self._cmdenv.iteritems()):
                 streaming_args.append('-cmdenv')
@@ -289,9 +294,6 @@ class HadoopJobRunner(MRJobRunner):
             # add jobconf args
             for key, value in sorted(self._opts['jobconf'].iteritems()):
                 streaming_args.extend(['-jobconf', '%s=%s' % (key, value)])
-
-            # add extra hadoop args
-            streaming_args.extend(self._opts['hadoop_extra_args'])
 
             # set up mapper and reducer
             streaming_args.append('-mapper')

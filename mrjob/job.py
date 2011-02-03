@@ -685,9 +685,9 @@ class MRJob(object):
             'multiple times.')
 
         self.runner_opt_group.add_option(
-            '--hadoop-arg', dest='hadoop_arg', default=[], action='append',
-            help='Argument of any type to pass to hadoop '
-            'streaming. You can use --hadoop arg multiple times.')
+            '--hadoop-arg', dest='hadoop_extra_args', default=[],
+            action='append', help='Argument of any type to pass to hadoop '
+            'streaming. You can use --hadoop-arg multiple times.')
 
         self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,

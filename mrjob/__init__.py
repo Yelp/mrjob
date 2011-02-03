@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,5 +19,6 @@ __credits__ = ['Adam Derewicki <derwiki@yelp.com>',
                'Matt Jones <mattj@yelp.com>',
                'Julian Krause <juliank@yelp.com>',
                'Jimmy Retzlaff <jretz@yelp.com>',
+               'Ned Rockson <<ned@tellapart.com>',
                'Paul Wais <pwais@yelp.com>']
 __version__ = '0.2.1'

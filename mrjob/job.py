@@ -857,6 +857,7 @@ class MRJob(object):
             'conf_path': self.options.conf_path,
             'extra_args': self.generate_passthrough_arguments(),
             'file_upload_args': self.generate_file_upload_args(),
+            'hadoop_extra_args': self.options.hadoop_extra_args,
             'input_paths': self.args,
             'jobconf': self.options.jobconf,
             'mr_job_script': self.mr_job_script(),

@@ -132,7 +132,8 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         add_mock_hadoop_output(['1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n'])
 
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf',
+                               '--no-conf', '--hadoop-arg', '-libjar',
+                               '--hadoop-arg', 'containsJars.jar',
                                '-', local_input_path, remote_input_path])
         mr_job.sandbox(stdin=stdin)
 
@@ -158,6 +159,8 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             home_dir = os.path.join(hdfs_root, 'user', getpass.getuser())
             assert_equal(os.listdir(home_dir), ['tmp'])
             assert_equal(os.listdir(os.path.join(home_dir, 'tmp')), ['mrjob'])
+            assert_equal(runner._opts['hadoop_extra_args'],
+                         ['-libjar', 'containsJars.jar'])
 
         assert_equal(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])

@@ -1,7 +1,7 @@
 mrjob.runner - base class for all runners
 =========================================
 
-.. currentmodule:: mrjob.runner
+.. py:module:: mrjob.runner
 
 .. autoclass:: MRJobRunner
 

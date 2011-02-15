@@ -1,7 +1,7 @@
 mrjob.local - run locally for testing
 ======================================
 
-.. currentmodule:: mrjob.local
+.. py:module:: mrjob.local
 
 .. autoclass:: LocalMRJobRunner
 

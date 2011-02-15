@@ -1,7 +1,7 @@
 mrjob.hadoop - run on your Hadoop cluster
 =========================================
 
-.. currentmodule:: mrjob.hadoop
+.. py:module:: mrjob.hadoop
 .. autoclass:: HadoopJobRunner
 
 Utilities

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit testing of MRob."""
+"""Unit testing of MRJob."""
 from __future__ import with_statement
 
 from optparse import OptionError

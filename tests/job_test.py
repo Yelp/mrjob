@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit testing of MRJob."""
+"""Unit testing of MRob."""
 from __future__ import with_statement
 
 from optparse import OptionError
@@ -20,8 +20,9 @@ import os
 import shutil
 from subprocess import Popen, PIPE
 from StringIO import StringIO
+import sys
 import tempfile
-from testify import TestCase, assert_equal, assert_raises, setup, teardown
+from testify import TestCase, assert_equal, assert_not_equal, assert_gt, assert_raises, setup, teardown
 import time
 
 from mrjob.conf import combine_envs
@@ -30,6 +31,7 @@ from mrjob.local import LocalMRJobRunner
 from mrjob.parse import parse_mr_job_stderr
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
+
 
 ### Test classes ###
 
@@ -43,6 +45,7 @@ class MRBoringJob(MRJob):
     def reducer(self, key, values):
         yield(key, list(values))
 
+
 class MRFinalBoringJob(MRBoringJob):
     def __init__(self, args=None):
         super(MRFinalBoringJob, self).__init__(args=args)
@@ -50,6 +53,7 @@ class MRFinalBoringJob(MRBoringJob):
 
     def mapper_final(self):
         yield('num_lines', self.num_lines)
+
 
 class MRCustomBoringJob(MRBoringJob):
 
@@ -105,6 +109,7 @@ class MRTestCase(TestCase):
         assert_equal(MRJob.mr(reducer=reducer, mapper_final=mapper_final),
                      ((_IDENTITY_MAPPER, mapper_final), reducer))
 
+
 class NoTzsetTestCase(TestCase):
     """Test systems without time.tzset() (e.g. Windows). See Issue #46."""
 
@@ -121,6 +126,7 @@ class NoTzsetTestCase(TestCase):
 
     def test_init(self):
         mr_job = MRJob()
+
 
 class CountersAndStatusTestCase(TestCase):
 
@@ -171,6 +177,7 @@ class CountersAndStatusTestCase(TestCase):
         assert_equal(mr_job.parse_counters(),
                      {'Bad items': {'a; b; c': 1},
                       'girl; interrupted': {'movie': 1}})
+
 
 class ProtocolsTestCase(TestCase):
     # not putting these in their own files because we're not going to invoke
@@ -303,6 +310,7 @@ class ProtocolsTestCase(TestCase):
         assert_equal(mr_job.parse_counters(),
                      {'Unencodable output': {'UnicodeDecodeError': 1}})
 
+
 class IsMapperOrReducerTestCase(TestCase):
 
     def test_is_mapper_or_reducer(self):
@@ -310,6 +318,7 @@ class IsMapperOrReducerTestCase(TestCase):
         assert_equal(MRJob(['--mapper']).is_mapper_or_reducer(), True)
         assert_equal(MRJob(['--reducer']).is_mapper_or_reducer(), True)
         assert_equal(MRJob(['--steps']).is_mapper_or_reducer(), False)
+
 
 class StepsTestCase(TestCase):
 
@@ -344,6 +353,7 @@ class StepsTestCase(TestCase):
         mr_two_step_job.sandbox()
         mr_two_step_job.show_steps()
         assert_equal(mr_two_step_job.stdout.getvalue(), 'MR M\n')
+
 
 class StepNumTestCase(TestCase):
 
@@ -403,18 +413,19 @@ class StepNumTestCase(TestCase):
         assert_raises(ValueError, mr_job.run_mapper, 2)
         assert_raises(ValueError, mr_job.run_reducer, -1)
 
+
 class CommandLineArgsTest(TestCase):
 
     def test_shouldnt_exit_when_invoked_as_object(self):
         assert_raises(ValueError, MRJob, args=['--quux', 'baz'])
 
     def test_should_exit_when_invoked_as_script(self):
-        args = ['python', MRJob.mr_job_script(), '--quux', 'baz']
+        args = [sys.executable, MRJob.mr_job_script(), '--quux', 'baz']
         # add . to PYTHONPATH (in case mrjob isn't actually installed)
         env = combine_envs(os.environ,
                            {'PYTHONPATH': os.path.abspath('.')})
         proc = Popen(args, stderr=PIPE, stdout=PIPE, env=env)
-        stderr, stdout = proc.communicate()
+        proc.communicate()
         assert_equal(proc.returncode, 2)
 
     def test_custom_key_value_option_parsing(self):
@@ -530,6 +541,7 @@ class CommandLineArgsTest(TestCase):
             ('--accordian-file', 'WeirdAl.mp3'),
             ('--accordian-file', '/home/dave/JohnLinnell.ogg')])
 
+
 class FileOptionsTestCase(TestCase):
     # make sure custom file options work with --steps (Issue #45)
 
@@ -580,3 +592,63 @@ class FileOptionsTestCase(TestCase):
                 output.add(value)
 
         assert_equal(set(output), set([0, 1, ((2**3)**3)**3]))
+
+
+class RunJobTestCase(TestCase):
+    # test invoking a job as a script
+
+    @setup
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def run_job(self, args=()):
+        args = [sys.executable, MRTwoStepJob.mr_job_script()] + list(args)
+        # add . to PYTHONPATH (in case mrjob isn't actually installed)
+        env = combine_envs(os.environ,
+                           {'PYTHONPATH': os.path.abspath('.')})
+        proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
+        stdout, stderr = proc.communicate(input='foo\nbar\nbar\n')
+        return stdout, stderr, proc.returncode
+
+    def test_quiet(self):
+        stdout, stderr, returncode = self.run_job(['-q'])
+        assert_equal(stdout, '2\t"bar"\n1\t"foo"\n3\tnull\n')
+        assert_equal(stderr, '')
+        assert_equal(returncode, 0)
+
+    def test_verbose(self):
+        stdout, stderr, returncode = self.run_job()
+        assert_equal(stdout, '2\t"bar"\n1\t"foo"\n3\tnull\n')
+        assert_not_equal(stderr, '')
+        assert_equal(returncode, 0)
+        normal_stderr = stderr
+
+        stdout, stderr, returncode = self.run_job(['-v'])
+        assert_equal(stdout, '2\t"bar"\n1\t"foo"\n3\tnull\n')
+        assert_not_equal(stderr, '')
+        assert_equal(returncode, 0)
+        assert_gt(len(stderr), len(normal_stderr))
+        
+    def test_no_output(self):
+        assert_equal(os.listdir(self.tmp_dir), []) # sanity check
+        
+        args = ['--no-output', '--output-dir', self.tmp_dir]        
+        stdout, stderr, returncode = self.run_job(args)
+        assert_equal(stdout, '')
+        assert_not_equal(stderr, '')
+        assert_equal(returncode, 0)
+
+        # make sure the correct output is in the temp dir
+        assert_not_equal(os.listdir(self.tmp_dir), [])
+        output_lines = []
+        for dirpath, _, filenames in os.walk(self.tmp_dir):
+            for filename in filenames:
+                with open(os.path.join(dirpath, filename)) as output_f:
+                    output_lines.extend(output_f)
+
+        assert_equal(sorted(output_lines),
+                     ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])

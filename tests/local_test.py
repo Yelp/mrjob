@@ -131,3 +131,24 @@ class LargeAmountsOfStderrTestCase(TestCase):
             assert_in('BOOM', e.message)
         else:
             raise AssertionError()
+
+
+class PythonBinTestCase(TestCase):
+
+    def test_echo_as_python_bin(self):
+        # "echo" is a pretty poor substitute for Python, but it
+        # should be available on most systems
+        mr_job = MRTwoStepJob(['--python-bin', 'echo'])
+        mr_job.sandbox()
+        
+        with mr_job.make_runner() as runner:
+            assert isinstance(runner, LocalMRJobRunner)
+            runner.run()
+            output = ''.join(runner.stream_output())
+
+        # the output should basically be the command we used to
+        # run the last step, which in this case is a mapper
+        assert_in('mr_two_step_job.py', output)
+        assert_in('--step-num=1', output)
+        assert_in('--mapper', output)
+ 

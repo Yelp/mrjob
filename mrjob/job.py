@@ -379,7 +379,7 @@ class MRJob(object):
         with self.make_runner() as runner:
             runner.run()
 
-            if self.options.stream_output:
+            if not self.options.no_output:
                 for line in runner.stream_output():
                     self.stdout.write(line)
                 self.stdout.flush()
@@ -636,7 +636,8 @@ class MRJob(object):
             '--no-conf', dest='conf_path', action='store_false',
             help="Don't load mrjob.conf even if it's available")
         self.runner_opt_group.add_option(
-            '--no-streaming-output', dest='stream_output', default=True, action='store_false',
+            '--no-output', dest='no_output',
+            default=False, action='store_true',
             help="Don't stream output after job completion")
         self.runner_opt_group.add_option(
             '--cleanup', dest='cleanup',

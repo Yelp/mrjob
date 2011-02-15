@@ -43,7 +43,10 @@ class LocalMRJobRunner(MRJobRunner):
     alias = 'local'
 
     def __init__(self, **kwargs):
-        """LocalMRJobRunner takes the same keyword args as MRJobRunner.
+        """LocalMRJobRunner takes the same keyword args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
+
+        * *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs`
+        * *python_bin* defaults to ``sys.executable`` (the current python interpreter)
         """
         super(LocalMRJobRunner, self).__init__(**kwargs)
 
@@ -51,6 +54,14 @@ class LocalMRJobRunner(MRJobRunner):
         self._prev_outfile = None
         self._final_outfile = None
         self._counters = {}
+
+    @classmethod
+    def _default_opts(cls):
+        """A dictionary giving the default value of options."""
+        return combine_dicts(super(LocalMRJobRunner, cls)._default_opts(), {
+            # prefer whatever interpreter we're currently using
+            'python_bin': sys.executable or 'python',
+        })
 
     @classmethod
     def _opts_combiners(cls):
@@ -73,13 +84,10 @@ class LocalMRJobRunner(MRJobRunner):
             log.warning('ignoring extra args to hadoop streaming: %r' %
                         (self._opts['hadoop_extra_args'],))
 
-        # use the same python interpreter that we're currently running in
-        python_bin = self._opts['python_bin'] or sys.executable or 'python'
-
-        wrapper_args = [python_bin]
+        wrapper_args = [self._opts['python_bin']]
         if self._wrapper_script:
-            wrapper_args = (
-                [python_bin, self._wrapper_script['name']] + wrapper_args)
+            wrapper_args = [self._opts['python_bin'],
+                            self._wrapper_script['name']] + wrapper_args
 
         # run mapper, sort, reducer for each step
         for i, step in enumerate(self._get_steps()):

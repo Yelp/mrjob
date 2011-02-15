@@ -11,6 +11,7 @@ Option              Default                                                 Swit
 *extra_args*        ``[]``                                                  (see :py:meth:`~mrjob.job.MRJob.add_passthrough_option`)
 *file_upload_args*  ``[]``                                                  (see :py:meth:`~mrjob.job.MRJob.add_file_option`)
 *output_dir*        (automatic)                                             :option:`-o`, :option:`--output-dir`
+*python_bin*        ``'python'``                                            :option:`--python-bin`
 =================== ======================================================= ========================================================
 
 See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
@@ -38,7 +39,11 @@ Option              Default                        Combined by                  
 
 See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
 
-:py:class:`~mrjob.local.LocalMRJobRunner` takes no additional options, but *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs` instead.
+:py:class:`~mrjob.local.LocalMRJobRunner` takes no additional options, but:
+
+* *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs`
+* *python_bin* defaults to ``sys.executable`` (the current python interpreter)
+
 
 Additional options for :py:class:`~mrjob.emr.EMRJobRunner`
 ----------------------------------------------------------

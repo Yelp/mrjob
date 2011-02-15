@@ -693,7 +693,7 @@ class MRJob(object):
 
         self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
-            help='python binary. Defaults to python')
+            help='Name/path of alternate python binary for mappers/reducers.')
 
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(

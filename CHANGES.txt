@@ -1,7 +1,8 @@
 v0.2.2, 2011-02-15 -- GET/POST EMR issue
+ * Use POST requests for most EMR queries (EMR was choking on large GETs)
  * find_probable_cause_of_failure() ignores transient errors (Issue #31)
  * --hadoop-arg now actually works (Issue #79)
-   * on Hadoop, extra args are added first, so you can set  e.g. -libjar
+   * on Hadoop, extra args are added first, so you can set e.g. -libjar
  * S3 buckets may now have . in their names
  * MRJob scripts now respect --quiet (Issue #84)
  * added --no-output option for MRJob scripts (Issue #81)

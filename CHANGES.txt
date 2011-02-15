@@ -1,6 +1,10 @@
 v0.2.2, 2011-02-15 -- GET/POST EMR issue
  * --hadoop-arg now actually works (Issue #79)
    * on Hadoop, extra args are added first, so you can set  e.g. -libjar
+ * S3 buckets may now have . in their names
+ * MRJob scripts now respect --quiet (Issue #84)
+ * added --no-output option for MRJob scripts (Issue #81)
+ * added --python-bin option (Issue #54)
 
 v0.2.1, 2010-11-17 -- laststatechangereason bugfix
  * Don't assume EMR sets laststatechangereason

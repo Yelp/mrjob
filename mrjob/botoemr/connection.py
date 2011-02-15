@@ -147,7 +147,7 @@ class EmrConnection(AWSQueryConnection):
         step_args = [self._build_step_args(step) for step in steps]
         params.update(self._build_step_list(step_args))
 
-        return self.get_object('AddJobFlowSteps', params, RunJobFlowResponse)
+        return self.get_object('AddJobFlowSteps', params, RunJobFlowResponse, verb='POST')
 
     def run_jobflow(self, name, log_uri, ec2_keyname=None, availability_zone=None,
                     master_instance_type='m1.small',
@@ -216,7 +216,7 @@ class EmrConnection(AWSQueryConnection):
             bootstrap_action_args = [self._build_bootstrap_action_args(bootstrap_action) for bootstrap_action in bootstrap_actions]
             params.update(self._build_bootstrap_action_list(bootstrap_action_args))
 
-        response = self.get_object('RunJobFlow', params, RunJobFlowResponse)
+        response = self.get_object('RunJobFlow', params, RunJobFlowResponse, verb='POST')
         return response.jobflowid
 
     def _build_bootstrap_action_args(self, bootstrap_action):

@@ -40,11 +40,10 @@ Try it out!
 
     # locally
     python mrjob/examples/mr_word_freq_count.py README.md > counts
-	# on EMR
+    # on EMR
     python mrjob/examples/mr_word_freq_count.py README.md -r emr > counts
     # on your Hadoop cluster
     python mrjob/examples/mr_word_freq_count.py README.md -r hadoop > counts
-
 
 Advanced Configuration
 ======================

@@ -23,7 +23,7 @@ series of mappers and reducers, and override :py:meth:`~mrjob.job.MRJob.steps`. 
     if __name__ == '__main__':
         MRWordCounter.run()
 
-The two lines at the bottom are mandatory; this is what allows your class
+**The two lines at the bottom are mandatory.** This is what allows your class
 to be run by Hadoop streaming.
 
 This will take in a file with lines of whitespace separated words, and

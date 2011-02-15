@@ -373,8 +373,9 @@ class MRJob(object):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
-        log_to_stream(
-            name='mrjob', stream=self.stderr, debug=self.options.verbose)
+        if not self.options.quiet:
+            log_to_stream(
+                name='mrjob', stream=self.stderr, debug=self.options.verbose)
 
         with self.make_runner() as runner:
             runner.run()

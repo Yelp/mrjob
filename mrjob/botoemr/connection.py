@@ -127,7 +127,7 @@ class EmrConnection(AWSQueryConnection):
         """
         params = {}
         self.build_list_params(params, jobflow_ids, 'JobFlowIds.member')
-        return self.get_status('TerminateJobFlows', params)
+        return self.get_status('TerminateJobFlows', params, verb='POST')
 
     def add_jobflow_steps(self, jobflow_id, steps):
         """

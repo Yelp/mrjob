@@ -19,6 +19,6 @@ __credits__ = ['Adam Derewicki <derwiki@yelp.com>',
                'Matt Jones <mattj@yelp.com>',
                'Julian Krause <juliank@yelp.com>',
                'Jimmy Retzlaff <jretz@yelp.com>',
-               'Ned Rockson <<ned@tellapart.com>',
+               'Ned Rockson <ned@tellapart.com>',
                'Paul Wais <pwais@yelp.com>']
 __version__ = '0.2.1'

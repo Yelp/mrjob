@@ -27,7 +27,7 @@ setup(
         'simplejson>=2.0.9'
     ],
     license='Apache',
-    long_description='Write multi-step MapReduce jobs and run them on Amazon Elastic MapReduce or your own Hadoop Cluster',
+    long_description=open('README.rst').read(),
     name='mrjob',
     packages=['mrjob',
               'mrjob.botoemr',

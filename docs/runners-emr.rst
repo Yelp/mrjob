@@ -1,7 +1,7 @@
 mrjob.emr - run on EMR
 ======================
 
-.. currentmodule:: mrjob.emr
+.. py:module:: mrjob.emr
 
 .. autoclass:: EMRJobRunner
 

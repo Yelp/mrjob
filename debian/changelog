@@ -1,3 +1,9 @@
+mrjob (0.2.2-1) unstable; urgency=low
+
+  * Fix debian docs installation
+
+ -- James Brown <jbrown@yelp.com>  Wed, 16 Feb 2011 13:21:01 -0800
+
 mrjob (0.2.2) unstable; urgency=low
 
   * See CHANGES.txt

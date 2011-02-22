@@ -67,6 +67,9 @@ class EmrConnection(AWSQueryConnection):
                                     self.region.endpoint, debug,
                                     https_connection_factory)
 
+    def _required_auth_capability(self):
+        return ['emr']
+
     def describe_jobflow(self, jobflow_id):
         """
         Describes a single Elastic MapReduce job flow

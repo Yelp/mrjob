@@ -1,3 +1,6 @@
+v0.2.3, 2011-02-24 -- boto compatibility
+ * Fix incompatibility with boto 2.0b4 (Issue #91)
+
 v0.2.2, 2011-02-15 -- GET/POST EMR issue
  * Use POST requests for most EMR queries (EMR was choking on large GETs)
  * find_probable_cause_of_failure() ignores transient errors (Issue #31)

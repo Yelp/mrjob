@@ -1278,13 +1278,14 @@ class EMRJobRunner(MRJobRunner):
         # bootstrap mrjob
         if self._opts['bootstrap_mrjob']:
             writeln('# bootstrap mrjob')
-            writeln("mrjob_dir = distutils.sysconfig.get_python_lib()")
-            writeln("check_call(['sudo', 'mkdir', mrjob_dir])")
-            writeln("check_call(['sudo', 'tar', 'xfz', %r, '-C', mrjob_dir])" %
-                    self._mrjob_tar_gz_file['name'])
+            writeln("site_packages = distutils.sysconfig.get_python_lib()")
+            writeln(
+                "check_call(['sudo', 'tar', 'xfz', %r, '-C', site_packages])" %
+                self._mrjob_tar_gz_file['name'])
             # re-compile pyc files now, since mappers/reducers can't
             # write to this directory. Don't fail if there is extra
             # un-compileable crud in the tarball.
+            writeln("mrjob_dir = os.path.join(site_packages, 'mrjob')")
             writeln("call(['sudo', 'python', '-m', 'compileall', '-f', mrjob_dir])")
             writeln()
 

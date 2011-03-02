@@ -168,6 +168,8 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
     :type out_path: str
     :param out_path: where to write the tarball too
     :param filter: if defined, a function that takes paths (relative to *dir* and returns ``True`` if we should keep them
+    :type prefix: str
+    :param prefix: subdirectory inside the tarball to put everything into (e.g. ``'mrjob'``)
     """
     if not os.path.isdir(dir):
         raise IOError('Not a directory: %r' % (dir,))

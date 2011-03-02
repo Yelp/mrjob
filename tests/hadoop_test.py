@@ -22,7 +22,7 @@ import shutil
 from subprocess import check_call
 import sys
 import tempfile
-from testify import TestCase, assert_equal, setup, teardown
+from testify import TestCase, assert_equal, assert_in, setup, teardown
 
 from tests.mockhadoop import create_mock_hadoop_script, add_mock_hadoop_output
 from tests.mr_two_step_job import MRTwoStepJob
@@ -162,10 +162,25 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             assert_equal(runner._opts['hadoop_extra_args'],
                          ['-libjar', 'containsJars.jar'])
 
+            # make sure mrjob.tar.gz is uploaded and in PYTHONPATH
+            assert runner._mrjob_tar_gz_path
+            mrjob_tar_gz_file_dicts = [
+                file_dict for file_dict in runner._files
+                if file_dict['path'] == runner._mrjob_tar_gz_path]
+            assert_equal(len(mrjob_tar_gz_file_dicts), 1)
+
+            mrjob_tar_gz_file_dict = mrjob_tar_gz_file_dicts[0]
+            assert mrjob_tar_gz_file_dict['name']
+
+            pythonpath = runner._get_cmdenv()['PYTHONPATH']
+            assert_in(mrjob_tar_gz_file_dict['name'],
+                      pythonpath.split(':'))
+
         assert_equal(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)
         assert not any(runner.ls(runner.get_output_dir()))
+
 

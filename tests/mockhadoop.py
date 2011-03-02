@@ -35,8 +35,8 @@ import stat
 import sys
 
 def create_mock_hadoop_script(path):
-    """Dump a wrapper script that runs mock hadoop to the given
-    file object."""
+    """Dump a wrapper script to the given file object that runs this
+    python script."""
     # make this work even if $PATH or $PYTHONPATH changes
     with open(path, 'w') as f:
         f.write('#!/bin/sh\n')

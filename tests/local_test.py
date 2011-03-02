@@ -159,8 +159,7 @@ class PythonBinTestCase(TestCase):
         assert_in('--mapper', output)
  
 
-class BootstrapMrjobTestCase(TestCase):
-    # tests Issue #89
+class LocalBootstrapMrjobTestCase(TestCase):
 
     def test_loading_boostrapped_mrjob_library(self):
         mrjob_path = os.path.realpath(mrjob.__file__)

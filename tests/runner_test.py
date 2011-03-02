@@ -18,7 +18,8 @@ from StringIO import StringIO
 import datetime
 import getpass
 import os
-from testify import TestCase, assert_equal, assert_not_equal, assert_gte, assert_lte, assert_not_in, assert_raises, setup, teardown
+import tarfile
+from testify import TestCase, assert_equal, assert_in, assert_not_equal, assert_gte, assert_lte, assert_not_in, assert_raises, setup, teardown
 import tempfile
 
 from mrjob.conf import dump_mrjob_conf
@@ -168,3 +169,17 @@ class TestJobName(TestCase):
 
         assert_equal(match.group(1), 'ads_chain')
         assert_equal(match.group(2), 'ads')
+
+
+class CreateMrjobTarGzTestCase(TestCase):
+
+    def test_create_mrjob_tar_gz(self):
+        with LocalMRJobRunner(conf_path=False) as runner:
+            mrjob_tar_gz_path = runner._create_mrjob_tar_gz()
+            mrjob_tar_gz = tarfile.open(mrjob_tar_gz_path)
+            contents = mrjob_tar_gz.getnames()
+
+            for path in contents:
+                assert_equal(path[:6], 'mrjob/')
+
+            assert_in('mrjob/job.py', contents)

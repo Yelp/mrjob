@@ -150,6 +150,24 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             assert_equal(name_match.group(1), 'mr_two_step_job')
             assert_equal(name_match.group(2), getpass.getuser())
 
+            # make sure mrjob.tar.gz is created and uploaded as
+            # a bootstrap file
+            assert runner._mrjob_tar_gz_path
+            mrjob_tar_gz_file_dicts = [
+                file_dict for file_dict in runner._files
+                if file_dict['path'] == runner._mrjob_tar_gz_path]
+
+            assert_equal(len(mrjob_tar_gz_file_dicts), 1)
+
+            mrjob_tar_gz_file_dict = mrjob_tar_gz_file_dicts[0]
+            assert mrjob_tar_gz_file_dict['name']
+            assert_equal(mrjob_tar_gz_file_dict.get('bootstrap'), 'file')
+
+            # shouldn't be in PYTHONPATH (we dump it directly in site-packages)
+            pythonpath = runner._get_cmdenv().get('PYTHONPATH') or ''
+            assert_not_in(mrjob_tar_gz_file_dict['name'],
+                          pythonpath.split(':'))
+
         assert_equal(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 

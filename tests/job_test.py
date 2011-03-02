@@ -606,7 +606,8 @@ class RunJobTestCase(TestCase):
         shutil.rmtree(self.tmp_dir)
 
     def run_job(self, args=()):
-        args = [sys.executable, MRTwoStepJob.mr_job_script()] + list(args)
+        args = ([sys.executable, MRTwoStepJob.mr_job_script()] +
+                list(args) + ['--no-conf'])
         # add . to PYTHONPATH (in case mrjob isn't actually installed)
         env = combine_envs(os.environ,
                            {'PYTHONPATH': os.path.abspath('.')})

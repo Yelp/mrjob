@@ -276,7 +276,7 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args.extend(self._opts['hadoop_extra_args'])
 
             # add environment variables
-            for key, value in sorted(self._cmdenv.iteritems()):
+            for key, value in sorted(self._get_cmdenv().iteritems()):
                 streaming_args.append('-cmdenv')
                 streaming_args.append('%s=%s' % (key, value))
 

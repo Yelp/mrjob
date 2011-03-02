@@ -208,10 +208,6 @@ class MRJobRunner(object):
                 file_dict = self._add_file_for_upload(path)
                 self._file_upload_args.append((arg, file_dict))
 
-        # set up hadoop environment (going to add on to this in a moment,
-        # so making it an instance variable)
-        self._cmdenv = self._opts['cmdenv'].copy()
-
         # set up uploading
         for path in self._opts['upload_archives']:
             self._add_archive_for_upload(path)
@@ -557,12 +553,26 @@ class MRJobRunner(object):
 
     def _add_python_archive(self, path):
         file_dict = self._add_archive_for_upload(path)
-        log.debug('adding %s to PYTHONPATH' % file_dict['name'])
+        self._python_archives.append(file_dict)
+
+    def _get_cmdenv(self):
+        """Get the environment variables to use inside Hadoop.
+
+        These should be `self._opts['cmdenv']` combined with python
+        archives added to :envvar:`PYTHONPATH`.
+
+        This function calls :py:meth:`MRJobRunner._name_files`
+        (since we need to know where each python archive ends up in the job's
+        working dir)
+        """
+        self._name_files()
         # on Windows, PYTHONPATH should be separated by ;, not :
         cmdenv_combiner = self._opts_combiners()['cmdenv']
-        self._cmdenv = cmdenv_combiner(
-            self._cmdenv, {'PYTHONPATH': file_dict['name']})
-        self._python_archives.append(file_dict)
+        envs_to_combine = ([{'PYTHONPATH': file_dict['name']}
+                            for file_dict in self._python_archives] +
+                           [self._opts['cmdenv']])
+
+        return cmdenv_combiner(*envs_to_combine)
 
     def _assign_unique_names_to_files(self, name_field, prefix='', match=None):
         """Go through self._files, and fill in name_field for all files where
@@ -860,7 +870,10 @@ class MRJobRunner(object):
                     # filter out MacFuse resource forks
                     filename.startswith('._'))
 
-            tar_and_gzip(mrjob_dir, tar_gz_path, filter=filter_path)
+            log.debug('archiving %s -> %s as %s' % (
+                mrjob_dir, tar_gz_path, os.path.join('mrjob', '')))
+            tar_and_gzip(
+                mrjob_dir, tar_gz_path, filter=filter_path, prefix='mrjob')
             self._mrjob_tar_gz_path = tar_gz_path
 
         return self._mrjob_tar_gz_path

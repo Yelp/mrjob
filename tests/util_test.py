@@ -199,18 +199,18 @@ class ArchiveTestCase(TestCase):
         assert os.path.isfile(join(self.tmp_dir, 'b', 'bar'))
         assert not os.path.islink(join(self.tmp_dir, 'b', 'bar'))
 
-    def test_tar_and_gz(self):
+    def test_tar_and_gzip(self):
         join = os.path.join
 
-        # tar it up
+        # tar it up, and put it in subdirectory (b/)
         tar_and_gzip(dir=join(self.tmp_dir, 'a'),
                      out_path=join(self.tmp_dir, 'a.tar.gz'),
-                     filter=lambda path: not path.endswith('z'))
+                     filter=lambda path: not path.endswith('z'),
+                     prefix='b')
 
-        # untar it into b
-        os.mkdir(join(self.tmp_dir, 'b'))
+        # untar it into b/
         t = tarfile.open(join(self.tmp_dir, 'a.tar.gz'), 'r:gz')
-        t.extractall(join(self.tmp_dir, 'b'))
+        t.extractall(self.tmp_dir)
         t.close()
 
         self.ensure_expected_results(excluded_files=['baz'])
@@ -224,7 +224,7 @@ class ArchiveTestCase(TestCase):
         archive_command = [arg % variables for arg in archive_template]
         check_call(archive_command, cwd=join(self.tmp_dir, 'a'))
 
-        # unarchive it into b
+        # unarchive it into b/
         unarchive(join(self.tmp_dir, archive_name), join(self.tmp_dir, 'b'))
 
         self.ensure_expected_results(added_files=added_files)

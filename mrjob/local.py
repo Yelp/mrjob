@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Run an MR Job locally by forking off a bunch of processes and piping
+"""Run an MRJob locally by forking off a bunch of processes and piping
 them together. Useful for testing."""
 import logging
 import os
@@ -135,6 +135,7 @@ class LocalMRJobRunner(MRJobRunner):
             if file_dict.get('upload') == 'file':
                 self._symlink_to_file_or_copy(path, dest)
             elif file_dict.get('upload') == 'archive':
+                log.debug('unarchiving %s -> %s' % (path, dest))
                 unarchive(path, dest)
 
     def _setup_output_dir(self):
@@ -183,7 +184,7 @@ class LocalMRJobRunner(MRJobRunner):
         env = combine_local_envs(
             {'PYTHONPATH': os.getcwd()},
             os.environ,
-            self._cmdenv,
+            self._get_cmdenv(),
             env or {})
 
         # decide where to get input

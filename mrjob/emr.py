@@ -723,7 +723,6 @@ class EMRJobRunner(MRJobRunner):
 
         log.info('Job flow created with ID: %s' % emr_job_flow_id)
         return emr_job_flow_id
-
     def _build_steps(self):
         """Return a list of boto Step objects corresponding to the
         steps we want to run."""
@@ -780,7 +779,7 @@ class EMRJobRunner(MRJobRunner):
             # other arguments passed directly to hadoop streaming
             step_args = []
 
-            for key, value in sorted(self._cmdenv.iteritems()):
+            for key, value in sorted(self._get_cmdenv().iteritems()):
                 step_args.extend(['-cmdenv', '%s=%s' % (key, value)])
 
             for key, value in sorted(self._opts['jobconf'].iteritems()):
@@ -1279,7 +1278,7 @@ class EMRJobRunner(MRJobRunner):
         # bootstrap mrjob
         if self._opts['bootstrap_mrjob']:
             writeln('# bootstrap mrjob')
-            writeln("mrjob_dir = os.path.join(distutils.sysconfig.get_python_lib(), 'mrjob')")
+            writeln("mrjob_dir = distutils.sysconfig.get_python_lib()")
             writeln("check_call(['sudo', 'mkdir', mrjob_dir])")
             writeln("check_call(['sudo', 'tar', 'xfz', %r, '-C', mrjob_dir])" %
                     self._mrjob_tar_gz_file['name'])

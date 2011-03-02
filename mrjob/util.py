@@ -158,7 +158,7 @@ def safeeval(expr, globals=None, locals=None):
     return eval(expr, safe_globals, locals)
 
 
-def tar_and_gzip(dir, out_path, filter=None):
+def tar_and_gzip(dir, out_path, filter=None, prefix=''):
     """Tar and gzip the given *dir* to a tarball at *out_path*.
 
     If we encounter symlinks, include the actual file, not the symlink.
@@ -182,11 +182,12 @@ def tar_and_gzip(dir, out_path, filter=None):
     for dirpath, dirnames, filenames in os.walk(dir):
         for filename in filenames:
             path = os.path.join(dirpath, filename)
-            # janky version of os.path.relpath (Python 2.6):
-            path_in_tar_gz = path[len(os.path.join(dir, '')):]
-            if filter(path_in_tar_gz):
+            # janky version of os.path.relpath() (Python 2.6):
+            rel_path = path[len(os.path.join(dir, '')):]
+            if filter(rel_path):
                 # copy over real files, not symlinks
                 real_path = os.path.realpath(path)
+                path_in_tar_gz = os.path.join(prefix, rel_path)
                 tar_gz.add(real_path, arcname=path_in_tar_gz, recursive=False)
 
     tar_gz.close()

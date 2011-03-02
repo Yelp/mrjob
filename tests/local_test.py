@@ -161,6 +161,14 @@ class PythonBinTestCase(TestCase):
 
 class LocalBootstrapMrjobTestCase(TestCase):
 
+    @setup
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
     def test_loading_boostrapped_mrjob_library(self):
         mrjob_path = os.path.realpath(mrjob.__file__)
 
@@ -168,7 +176,7 @@ class LocalBootstrapMrjobTestCase(TestCase):
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
-            # if we're not doing this, the test is invalid
+            # sanity check
             assert_equal(runner.get_opts()['bootstrap_mrjob'], True)
             local_tmp_dir = os.path.realpath(runner._get_local_tmp_dir())
 
@@ -177,6 +185,29 @@ class LocalBootstrapMrjobTestCase(TestCase):
             output = list(runner.stream_output())
             assert_equal(len(output), 1)
 
+            # script should load mrjob from its working dir
             _, path = mr_job.parse_output_line(output[0])
             assert_not_equal(mrjob_path, path)
             assert path.startswith(local_tmp_dir)
+
+    def test_can_turn_off_bootstrap_mrjob(self):
+        mrjob_path = os.path.realpath(mrjob.__file__)
+
+        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        dump_mrjob_conf({'runners': {'local': {'bootstrap_mrjob': False}}},
+                        open(self.mrjob_conf_path, 'w'))
+
+        mr_job = MRJobWhereAreYou(['-c', self.mrjob_conf_path])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            # sanity check
+            assert_equal(runner.get_opts()['bootstrap_mrjob'], False)
+            runner.run()
+
+            output = list(runner.stream_output())
+            assert_equal(len(output), 1)
+
+            # script should load mrjob from the same place our test does
+            _, path = mr_job.parse_output_line(output[0])
+            assert_equal(mrjob_path, path)

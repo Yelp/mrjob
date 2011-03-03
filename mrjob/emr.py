@@ -558,10 +558,6 @@ class EMRJobRunner(MRJobRunner):
 
         log.info('Opening ssh tunnel to Hadoop job tracker')
 
-        bind_ports = random.sample(
-            self._opts['ssh_bind_ports'],
-            min(MAX_SSH_RETRIES, len(self._opts['ssh_bind_ports'])))
-
         # if ssh detects that a host key has changed, it will silently not
         # open the tunnel, so make a fake empty known_hosts file and use that.
         # (you can actually use /dev/null as your known hosts file, but
@@ -575,7 +571,7 @@ class EMRJobRunner(MRJobRunner):
             fake_known_hosts_file,))
 
         bind_port = None
-        for bind_port in bind_ports:
+        for bind_port in self._pick_ssh_bind_ports():
             args = [
                 self._opts['ssh_bin'],
                 '-o', 'VerifyHostKeyDNS=no',
@@ -610,6 +606,21 @@ class EMRJobRunner(MRJobRunner):
                 bind_host, bind_port, EMR_JOB_TRACKER_PATH)
             self._show_tracker_progress = True
             log.info( 'Connect to job tracker at: %s' % (self._tracker_url))
+
+    def _pick_ssh_bind_ports(self):
+        """Pick a list of ports to try binding our SSH tunnel to.
+
+        We will try to bind the same port for any given job flow (Issue #67)
+        """
+        # don't perturb the random number generator
+        random_state = random.getstate()
+        try:
+            # seed random port selection on job flow ID
+            random.seed(self._emr_job_flow_id)
+            num_picks = min(MAX_SSH_RETRIES, len(self._opts['ssh_bind_ports']))
+            return random.sample(self._opts['ssh_bind_ports'], num_picks)
+        finally:
+            random.setstate(random_state)
 
     def cleanup(self, mode=None):
         super(EMRJobRunner, self).cleanup(mode=mode)

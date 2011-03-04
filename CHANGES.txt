@@ -1,3 +1,8 @@
+v0.2.4, 2011-03-04 -- fix bootstrapping mrjob
+ * Fix bootstrapping of mrjob in hadoop and local mode (Issue #89)
+ * SSH tunnels try to use the same port for the same job flow (Issue #67)
+ * Added mr_postfix_bounce and mr_pegasos_svm to examples.
+
 v0.2.3, 2011-02-24 -- boto compatibility
  * Fix incompatibility with boto 2.0b4 (Issue #91)
 

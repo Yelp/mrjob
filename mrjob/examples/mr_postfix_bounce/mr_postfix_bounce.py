@@ -1,9 +1,23 @@
+# Copyright 2011 Yelp
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 mr_postfix_bounce is a mrjob that parses a Postfix log file looking for
 messages that have bounced and yielding the (email address, date ordinal).
 The emitted email addresses can then be unconfirmed or handled in some other
 way.
 """
+__author__ = 'Adam Derewecki <derewecki@gmail.com>'
 
 from __future__ import with_statement
 

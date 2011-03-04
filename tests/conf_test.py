@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests configuration parsing and option combining"""
+"""Test configuration parsing and option combining"""
+
 from __future__ import with_statement
 
 import os
@@ -23,6 +24,7 @@ from testify import TestCase, assert_equal, class_setup, class_teardown, setup, 
 from mrjob.conf import *
 import mrjob.conf
 from tests.quiet import logger_disabled
+
 
 class MRJobConfTestCase(TestCase):
 
@@ -140,6 +142,7 @@ class MRJobConfTestCase(TestCase):
 
         dump_mrjob_conf(conf, open(conf_path, 'w'))
         assert_equal(conf, load_mrjob_conf(conf_path=conf_path))
+
 
 class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
 

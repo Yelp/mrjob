@@ -1,3 +1,9 @@
+# Copyright 2009-2011 Yelp
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
 # http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
@@ -5,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """A mock version of the hadoop binary that actually manipulates the
 filesystem. This imitates only things that mrjob actually uses.
 
@@ -20,6 +27,7 @@ mrjob requires a single binary (no args) to stand in for hadoop, so
 use create_mock_hadoop_script() to write out a shell script that runs
 mockhadoop.
 """
+
 from __future__ import with_statement
 
 import datetime
@@ -34,6 +42,7 @@ import shutil
 import stat
 import sys
 
+
 def create_mock_hadoop_script(path):
     """Dump a wrapper script to the given file object that runs this
     python script."""
@@ -44,6 +53,7 @@ def create_mock_hadoop_script(path):
             pipes.quote(sys.executable),
             pipes.quote(os.path.abspath(__file__))))
     os.chmod(path, stat.S_IREAD | stat.S_IEXEC)
+
 
 def add_mock_hadoop_output(parts):
     """Add mock output which will be used by the next fake streaming
@@ -67,6 +77,7 @@ def add_mock_hadoop_output(parts):
             for line in part:
                 part_file.write(line)
 
+
 def get_mock_hadoop_output():
     """Get the first directory (alphabetically) from MOCK_HADOOP_OUTPUT"""
     dirnames = sorted(os.listdir(os.environ['MOCK_HADOOP_OUTPUT']))
@@ -74,6 +85,7 @@ def get_mock_hadoop_output():
         return os.path.join(os.environ['MOCK_HADOOP_OUTPUT'], dirnames[0])
     else:
         return None
+
 
 def hdfs_path_to_real_path(hdfs_path):
     if hdfs_path.startswith('hdfs:///'):
@@ -83,6 +95,7 @@ def hdfs_path_to_real_path(hdfs_path):
         hdfs_path = '/user/%s/%s' % (os.environ['USER'], hdfs_path)
 
     return os.path.join(os.environ['MOCK_HDFS_ROOT'], hdfs_path.lstrip('/'))
+
 
 def real_path_to_hdfs_path(real_path):
     hdfs_root = os.environ['MOCK_HDFS_ROOT']
@@ -95,6 +108,7 @@ def real_path_to_hdfs_path(real_path):
         hdfs_path = '/' + hdfs_path
 
     return hdfs_path
+
 
 def invoke_cmd(prefix, cmd, cmd_args, error_msg, error_status):
     """Helper function to call command and subcommands of the hadoop binary.
@@ -111,6 +125,7 @@ def invoke_cmd(prefix, cmd, cmd_args, error_msg, error_status):
         sys.stderr.write(error_msg)
         sys.exit(-1)
 
+
 def main():
     """Implements hadoop <args>"""
     if len(sys.argv) < 2:
@@ -123,6 +138,7 @@ def main():
     invoke_cmd(
         'hadoop_', cmd, cmd_args,
         'Could not find the main class: %s.  Program will exit.\n\n' % cmd, 1)
+
 
 def hadoop_fs(*args):
     """Implements hadoop fs <args>"""
@@ -137,6 +153,7 @@ def hadoop_fs(*args):
     # bit easier to understand this way. :)
     invoke_cmd('hadoop_fs_', cmd, cmd_args,
                '%s: Unknown command\nUsage: java FsShell\n' % cmd, -1)
+
 
 def hadoop_fs_cat(*args):
     """Implements hadoop fs -cat <src>"""
@@ -159,6 +176,7 @@ def hadoop_fs_cat(*args):
 
     if failed:
         sys.exit(-1)
+
 
 def hadoop_fs_lsr(*args):
     """Implements hadoop fs -lsr."""
@@ -193,6 +211,7 @@ def hadoop_fs_lsr(*args):
     if failed:
         sys.exit(-1)
 
+
 def hadoop_fs_mkdir(*args):
     """Implements hadoop fs -mkdir"""
     if len(args) < 1:
@@ -209,6 +228,7 @@ def hadoop_fs_mkdir(*args):
 
     if failed:
         sys.exit(-1)
+
 
 def hadoop_fs_put(*args):
     """Implements hadoop fs -put"""
@@ -227,6 +247,7 @@ def hadoop_fs_put(*args):
 
     for src in srcs:
         shutil.copy(src, real_dst)
+
 
 def hadoop_fs_rmr(*args):
     """Implements hadoop fs -rmr."""
@@ -247,6 +268,7 @@ def hadoop_fs_rmr(*args):
 
     if failed:
         sys.exit(-1)
+
 
 def hadoop_jar(*args):
     if len(args) < 1:
@@ -275,6 +297,7 @@ def hadoop_jar(*args):
     shutil.move(mock_output_dir, real_output_dir)
 
     sys.stderr.write('Job succeeded!\n')
+
 
 if __name__ == '__main__':
     main()

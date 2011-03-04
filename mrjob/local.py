@@ -14,6 +14,7 @@
 
 """Run an MRJob locally by forking off a bunch of processes and piping
 them together. Useful for testing."""
+
 import logging
 import os
 import pprint
@@ -26,7 +27,9 @@ from mrjob.parse import find_python_traceback, parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
 from mrjob.util import cmd_line, unarchive
 
+
 log = logging.getLogger('mrjob.local')
+
 
 class LocalMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing

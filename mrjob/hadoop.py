@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import getpass
 import logging
 import os
@@ -28,6 +29,7 @@ from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.runner import MRJobRunner
 from mrjob.util import cmd_line
 
+
 log = logging.getLogger('mrjob.hadoop')
 
 HDFS_URI_RE = re.compile(r'^hdfs://(.*?)(/.*?)$')
@@ -44,6 +46,7 @@ HADOOP_LSR_NO_SUCH_FILE = re.compile(r'^lsr: Cannot access .*: No such file or d
 # used by rm() (see below)
 HADOOP_RMR_NO_SUCH_FILE = re.compile(r'^rmr: hdfs://.*$')
 
+
 def find_hadoop_streaming_jar(path):
     """Return the path of the hadoop streaming jar inside the given
     directory tree, or None if we can't find it."""
@@ -54,6 +57,7 @@ def find_hadoop_streaming_jar(path):
     else:
         return None
 
+
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
     if path.startswith('hdfs://'):
@@ -62,6 +66,7 @@ def fully_qualify_hdfs_path(path):
         return 'hdfs://' + path
     else:
         return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
+
 
 class HadoopJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.

@@ -11,11 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Utility functions for turning off printouts during testing."""
+
 from contextlib import contextmanager
 import logging
 
 
+# this exists as logging.NullHandler as of Python 2.7
 class NullHandler(logging.Handler):
     def emit(self, record):
         pass

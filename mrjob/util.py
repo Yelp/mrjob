@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Utility functions for MRJob that have no external dependencies."""
+
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
@@ -28,11 +29,13 @@ import sys
 import tarfile
 import zipfile
 
+
 def cmd_line(args):
     """build a command line that works in a shell.
     """
     args = [str(x) for x in args]
     return ' '.join(pipes.quote(x) for x in args)
+
 
 def expand_path(path):
     """Resolve ``~`` (home dir) and environment variables in *path*.
@@ -43,6 +46,7 @@ def expand_path(path):
         return None
     else:
         return os.path.expanduser(os.path.expandvars(path))
+
 
 def file_ext(path):
     """return the file extension, including the ``.``
@@ -55,6 +59,7 @@ def file_ext(path):
     if dot_index == -1:
         return ''
     return filename[dot_index:]
+
 
 def log_to_stream(name=None, stream=None, format=None, level=None, debug=False):
     """Set up logging.
@@ -85,6 +90,7 @@ def log_to_stream(name=None, stream=None, format=None, level=None, debug=False):
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
+
 
 def read_input(path, stdin=None):
     """Stream input the way Hadoop would.
@@ -137,6 +143,7 @@ def read_input(path, stdin=None):
 
     for line in f:
         yield line
+
 
 # Thanks to http://lybniz2.sourceforge.net/safeeval.html for
 # explaining how to do this!
@@ -193,6 +200,7 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
                 tar_gz.add(real_path, arcname=path_in_tar_gz, recursive=False)
 
     tar_gz.close()
+
 
 def unarchive(archive_path, dest):
     """Extract the contents of a tar or zip file at *archive_path* into the directory *dest*.

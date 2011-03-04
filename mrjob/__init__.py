@@ -11,9 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Write and run Hadoop Streaming jobs on Amazon Elastic MapReduce or your own Hadoop cluster.
 """
+
 __author__ = 'David Marin <dave@yelp.com>'
+
 __credits__ = ['James Brown <jbrown@yelp.com>',
                'Adam Derewicki <derwiki@yelp.com>',
                'Peter Harrington <peter.b.harrington@gmail.com>',
@@ -23,4 +26,5 @@ __credits__ = ['James Brown <jbrown@yelp.com>',
                'Jimmy Retzlaff <jretz@yelp.com>',
                'Ned Rockson <ned@tellapart.com>',
                'Paul Wais <pwais@yelp.com>']
+
 __version__ = '0.2.4'

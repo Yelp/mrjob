@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Unit testing of MRJob."""
+
 from __future__ import with_statement
 
 from optparse import OptionError

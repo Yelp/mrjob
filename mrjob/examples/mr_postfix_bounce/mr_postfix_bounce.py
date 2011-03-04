@@ -28,12 +28,14 @@ import time
 
 from mrjob.job import MRJob
 
+
 PROCESS_TYPE_PATTERN = re.compile(r'postfix-(?P<queue>[^/]+)/(?P<process>[^[]+)\[\d+\]:')
 MESSAGE_ID_PATTERN = re.compile(r'^(?P<message_id>[A-Z0-9]+): (?P<postfix_message>.*)')
 VAR_PATTERN = re.compile(r'(?P<name>\w+)=(?P<value>[^ ,]+)')
 HOST_PATTERN = re.compile(r'(?P<before>.*?)[\(]host (?P<host>\S+) (?P<action>[^:]+): (?P<message>.*)[\)]')
 KEY_VALUE_PATTERN = re.compile(r'(?:^|, )(?P<key>\w+)=(?P<value>[^, ]+)')
 DOMAIN_PATTERN = re.compile(r'(?<=@)[^.]+\.\w+')
+
 
 def process_log_line(line):
 	# log lines don't have year, so make that up
@@ -92,8 +94,10 @@ def process_log_line(line):
 				pass
 			return postfix_log_dict
 
+
 def domain_startswith(postfix_log_dict, needle):
 	return postfix_log_dict.get('domain').startswith(needle)
+
 
 def process_postfix_log_dict(decoded, bounce_rules):
 	if decoded and 'to' in decoded and decoded.get('status') == 'bounced':

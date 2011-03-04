@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Unit testing of LocalMRJobRunner"""
+
+"""Tests for LocalMRJobRunner"""
+
 from __future__ import with_statement
 
 from StringIO import StringIO
@@ -30,6 +32,7 @@ from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.quiet import no_handlers_for_logger
+
 
 class LocalMRJobRunnerEndToEndTestCase(TestCase):
 

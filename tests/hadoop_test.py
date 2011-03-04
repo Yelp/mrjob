@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Test the hadoop job runner."""
+
 from __future__ import with_statement
 
 from StringIO import StringIO
@@ -27,6 +28,7 @@ from testify import TestCase, assert_equal, assert_in, setup, teardown
 from tests.mockhadoop import create_mock_hadoop_script, add_mock_hadoop_output
 from tests.mr_two_step_job import MRTwoStepJob
 from mrjob.hadoop import *
+
 
 class TestFindHadoopStreamingJar(TestCase):
 
@@ -61,6 +63,7 @@ class TestFindHadoopStreamingJar(TestCase):
 
         # shouldn't find anything if we look in the wrong dir
         assert_equal(find_hadoop_streaming_jar(empty_dir), None)
+
 
 class MockHadoopTestCase(TestCase):
 
@@ -101,6 +104,7 @@ class MockHadoopTestCase(TestCase):
 
         shutil.rmtree(mock_hdfs_root)
         shutil.rmtree(mock_output_dir)
+
 
 class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 

@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Unit testing for EMRJobRunner"""
+
+"""Tests for EMRJobRunner"""
+
 from __future__ import with_statement
 
 import copy
@@ -36,6 +38,7 @@ try:
 except ImportError:
     boto = None
     botoemr = None
+
 
 class MockEMRAndS3TestCase(TestCase):
 
@@ -85,6 +88,7 @@ class MockEMRAndS3TestCase(TestCase):
         """Update self.mock_s3_fs with a map from bucket name
         to key name to data."""
         add_mock_s3_data(self.mock_s3_fs, data)
+
 
 class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
@@ -262,6 +266,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
                                if fd['path'] == bootstrap_file]
         assert_equal(len(matching_file_dicts), 1)
 
+
 class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
 
     def test_can_get_all_job_flows(self):
@@ -286,6 +291,7 @@ class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
         assert_equal(len(all_jfs), NUM_JOB_FLOWS)
         assert_equal(sorted(jf.jobflowid for jf in all_jfs),
                      [('j-%04d' % i) for i in range(NUM_JOB_FLOWS)])
+
 
 ### tests for error parsing ###
 
@@ -324,6 +330,7 @@ ATTEMPT_1_DIR = TASK_ATTEMPTS_DIR + 'attempt_201007271720_0001_m_000126_0/'
 
 def make_input_uri_line(input_uri):
     return "2010-07-27 17:55:29,400 INFO org.apache.hadoop.fs.s3native.NativeS3FileSystem (main): Opening '%s' for reading\n" % input_uri
+
 
 class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
     # We're mostly concerned here that the right log files are read in the
@@ -516,6 +523,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]), None)
 
+
 class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
 
     def test_no_region(self):
@@ -587,6 +595,7 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
                               s3_endpoint='s3-proxy', emr_endpoint='emr-proxy')
         assert_equal(runner.make_emr_conn().endpoint, 'emr-proxy')
         assert_equal(runner.make_s3_conn().endpoint, 's3-proxy')
+
 
 class TestLs(MockEMRAndS3TestCase):
 

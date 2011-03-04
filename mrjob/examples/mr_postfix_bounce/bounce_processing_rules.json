@@ -1,0 +1,18 @@
+[
+	[
+		["yahoo.", "ymail."],
+		{"remote_smtp_string": ["This account has been disabled or discontinued [#102]", "554 delivery error: dd This user doesn't have a yahoo.com account"]}
+	], [
+		["gmail.", "google."],
+		{"smtp_string": ["The email account that you tried to reach does not exist"]}
+	], [
+		["hotmail.", "msn."],
+		{"remote_smtp_string": ["mailbox unavailable"]}
+	], [
+		["aol."],
+		{"remote_smtp_string": ["Recipient address rejected"]}
+	], [
+		["comcast.net"],
+		{"remote_smtp_string": ["Not our Customer", "Account not available"]}
+	]
+]

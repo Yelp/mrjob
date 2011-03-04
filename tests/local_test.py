@@ -170,7 +170,10 @@ class LocalBootstrapMrjobTestCase(TestCase):
         shutil.rmtree(self.tmp_dir)
 
     def test_loading_boostrapped_mrjob_library(self):
-        mrjob_path = os.path.realpath(mrjob.__file__)
+        # track the dir we're loading mrjob from rather than the full path
+        # to deal with edge cases where we load from the .py file,
+        # and the script loads from the .pyc compiled from that .py file.
+        our_mrjob_dir = os.path.dirname(os.path.realpath(mrjob.__file__))
 
         mr_job = MRJobWhereAreYou(['--no-conf'])
         mr_job.sandbox()
@@ -186,12 +189,16 @@ class LocalBootstrapMrjobTestCase(TestCase):
             assert_equal(len(output), 1)
 
             # script should load mrjob from its working dir
-            _, path = mr_job.parse_output_line(output[0])
-            assert_not_equal(mrjob_path, path)
-            assert path.startswith(local_tmp_dir)
+            _, script_mrjob_dir = mr_job.parse_output_line(output[0])
+            
+            assert_not_equal(our_mrjob_dir, script_mrjob_dir)
+            assert script_mrjob_dir.startswith(local_tmp_dir)
 
     def test_can_turn_off_bootstrap_mrjob(self):
-        mrjob_path = os.path.realpath(mrjob.__file__)
+        # track the dir we're loading mrjob from rather than the full path
+        # to deal with edge cases where we load from the .py file,
+        # and the script loads from the .pyc compiled from that .py file.
+        our_mrjob_dir = os.path.dirname(os.path.realpath(mrjob.__file__))
 
         self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
         dump_mrjob_conf({'runners': {'local': {'bootstrap_mrjob': False}}},
@@ -209,5 +216,5 @@ class LocalBootstrapMrjobTestCase(TestCase):
             assert_equal(len(output), 1)
 
             # script should load mrjob from the same place our test does
-            _, path = mr_job.parse_output_line(output[0])
-            assert_equal(mrjob_path, path)
+            _, script_mrjob_dir = mr_job.parse_output_line(output[0])
+            assert_equal(our_mrjob_dir, script_mrjob_dir)

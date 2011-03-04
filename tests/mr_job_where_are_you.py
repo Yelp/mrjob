@@ -4,13 +4,13 @@ from mrjob.job import MRJob
 
 
 class MRJobWhereAreYou(MRJob):
-    """very simple job that outputs the location of the mrjob library."""
+    """Output what directory the mrjob library is in."""
 
     def mapper_final(self):
         yield (None, None)
 
     def reducer(self, key, values):
-        yield (None, os.path.realpath(mrjob.__file__))
+        yield (None, os.path.dirname(os.path.realpath(mrjob.__file__)))
 
 
 if __name__ == '__main__':

@@ -55,21 +55,16 @@ def no_handlers_for_logger(name=None):
         with no_handlers_for_logger('mrjob.local'):
             mr_job.run_job()
 
-        ... # look for logging meessages inside mr_job.stderr
+        ... # look for logging messages inside mr_job.stderr
+
+    Any handlers you add inside the `with` block will be removed at the end.
     """
     log = logging.getLogger(name)
-    old_handlers = list(log.handlers)
-    for handler in old_handlers:
-        log.removeHandler(handler)
+    old_handlers = log.handlers
 
     # add null handler so logging doesn't yell about there being no handlers
-    null_handler = NullHandler()
-    log.addHandler(null_handler)
+    log.handlers = [NullHandler()]
 
     yield
 
-    log.removeHandler(null_handler)
-
-    # restore old handlers
-    for handler in old_handlers:
-        log.addHandler(handler)
+    log.handlers = old_handlers

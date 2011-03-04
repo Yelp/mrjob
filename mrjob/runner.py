@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Base class for all runners.
-"""
+
+"""Base class for all runners."""
+
 import copy
 import datetime
 import getpass
@@ -34,6 +35,7 @@ except ImportError:
 from mrjob.conf import combine_dicts, combine_envs, combine_local_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
 from mrjob.util import cmd_line, file_ext, tar_and_gzip
 
+
 log = logging.getLogger('mrjob.runner')
 
 # use to detect globs and break into the part before and after the glob
@@ -49,6 +51,7 @@ CLEANUP_CHOICES = sorted(['NONE', 'IF_SUCCESSFUL', 'SCRATCH', 'ALL'])
 
 #: the default cleanup option: ``'IF_SUCCESSFUL'``
 CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
+
 
 class MRJobRunner(object):
     """Abstract base class for all runners.

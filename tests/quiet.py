@@ -11,11 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Utility functions for turning off printouts during testing."""
+
 from contextlib import contextmanager
 import logging
 
 
+# this exists as logging.NullHandler as of Python 2.7
 class NullHandler(logging.Handler):
     def emit(self, record):
         pass
@@ -47,7 +50,7 @@ def no_handlers_for_logger(name=None):
 
     Use this in a `with` block. For example::
 
-    	mr_job.sandbox()
+        mr_job.sandbox()
 
         with no_handlers_for_logger('mrjob.local'):
             mr_job.run_job()
@@ -62,7 +65,7 @@ def no_handlers_for_logger(name=None):
     # add null handler so logging doesn't yell about there being no handlers
     null_handler = NullHandler()
     log.addHandler(null_handler)
-    
+
     yield
 
     log.removeHandler(null_handler)

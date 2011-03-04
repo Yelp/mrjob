@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Unit testing for EMRJobRunner"""
+
+"""Test the idle job flow terminator"""
+
 from __future__ import with_statement
 
 from StringIO import StringIO
@@ -30,6 +32,7 @@ except ImportError:
 from mrjob.tools.emr.terminate_idle_job_flows import *
 from tests.emr_test import MockEMRAndS3TestCase
 from tests.mockboto import MockEmrObject, to_iso8601
+
 
 class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 

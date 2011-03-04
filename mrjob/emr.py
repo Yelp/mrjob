@@ -50,6 +50,7 @@ from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
 from mrjob.util import cmd_line
 
+
 log = logging.getLogger('mrjob.emr')
 
 S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
@@ -94,6 +95,7 @@ REGION_TO_S3_ENDPOINT = {
     '': 's3.amazonaws.com',
 }
 
+
 def parse_s3_uri(uri):
     """Parse an S3 URI into (bucket, key)
 
@@ -108,15 +110,19 @@ def parse_s3_uri(uri):
     else:
         raise ValueError('Invalid S3 URI: %s' % uri)
 
+
 def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
+
 def _to_timestamp(iso8601_time):
     return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
 
+
 def _to_datetime(iso8601_time):
     return datetime.datetime.strptime(iso8601_time, boto.utils.ISO8601)
+
 
 def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
                            created_after=None, created_before=None):
@@ -180,6 +186,7 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
             created_before -= datetime.timedelta(weeks=2)
 
     return all_job_flows
+
 
 class EMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.

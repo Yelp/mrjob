@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Unit testing of MRJobRunner"""
+
+"""Test the runner base class MRJobRunner"""
+
 from __future__ import with_statement
 
 from StringIO import StringIO
@@ -28,6 +30,7 @@ from mrjob.parse import JOB_NAME_RE
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled
 
+
 class WithStatementTestCase(TestCase):
 
     def test_cleanup_after_with_statement(self):
@@ -38,6 +41,7 @@ class WithStatementTestCase(TestCase):
             assert os.path.exists(local_tmp_dir)
 
         assert not os.path.exists(local_tmp_dir)
+
 
 class TestExtraKwargs(TestCase):
 
@@ -67,6 +71,7 @@ class TestExtraKwargs(TestCase):
                 assert_equal(runner._opts['base_tmp_dir'], '/var/tmp')
                 assert_not_in('bar', runner._opts)
 
+
 class TestDeprecatedKwargs(TestCase):
 
     def test_job_name_prefix_is_now_label(self):
@@ -81,6 +86,7 @@ class TestDeprecatedKwargs(TestCase):
         assert_equal(old_opts, new_opts)
         assert_equal(old_opts['label'], 'ads_chain')
         assert_not_in('job_name_prefix', old_opts)
+
 
 class TestJobName(TestCase):
 

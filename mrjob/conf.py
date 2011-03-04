@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """"mrjob.conf" is the name of both this module, and the global config file
 for :py:mod:`mrjob`.
 
@@ -115,6 +116,7 @@ except ImportError:
 
 log = logging.getLogger('mrjob.conf')
 
+
 ### READING AND WRITING mrjob.conf ###
 
 def find_mrjob_conf():
@@ -145,6 +147,7 @@ def find_mrjob_conf():
         log.info("no configs found; falling back on auto-configuration")
         return None
 
+
 def load_mrjob_conf(conf_path=None):
     """Load the entire data structure in :file:`mrjob.conf`, which should
     look something like this::
@@ -173,6 +176,7 @@ def load_mrjob_conf(conf_path=None):
         else:
             return json.load(f)
 
+
 def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
     """Load the options to initialize a runner from mrjob.conf, or return
     ``{}`` if we can't find them.
@@ -190,6 +194,7 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
         log.warning('no configs for runner type %r; returning {}' %
                     runner_alias)
         return {}
+
 
 def dump_mrjob_conf(conf, f):
     """Write out configuration options to a file.
@@ -212,6 +217,7 @@ def dump_mrjob_conf(conf, f):
         json.dump(conf, f, indent=2)
     f.flush()
 
+
 ### COMBINING OPTIONS ###
 
 # combiners generally consider earlier values to be defaults, and later
@@ -228,6 +234,7 @@ def combine_values(*values):
     else:
         return None
 
+
 def combine_lists(*seqs):
     """Concatenate the given sequences into a list. Ignore ``None`` values.
 
@@ -241,6 +248,7 @@ def combine_lists(*seqs):
             result.extend(seq)
 
     return result
+
 
 def combine_dicts(*dicts):
     """Combine zero or more dictionaries. Values from dicts later in the list
@@ -256,6 +264,7 @@ def combine_dicts(*dicts):
 
     return result
 
+
 def combine_envs(*envs):
     """Combine zero or more dictionaries containing environment variables.
 
@@ -267,11 +276,13 @@ def combine_envs(*envs):
     """
     return _combine_envs_helper(envs, local=False)
 
+
 def combine_local_envs(*envs):
     """Same as :py:func:`combine_envs`, except that paths are combined
     using the local path separator (e.g ``;`` on Windows rather than ``:``).
     """
     return _combine_envs_helper(envs, local=True)
+
 
 def _combine_envs_helper(envs, local):
     if local:
@@ -290,10 +301,12 @@ def _combine_envs_helper(envs, local):
 
     return result
 
+
 def combine_paths(*paths):
     """Returns the last value in *paths* that is not ``None``.
     Resolve ``~`` (home dir) and environment variables."""
     return expand_path(combine_values(*paths))
+
 
 def combine_path_lists(*path_seqs):
     """Concatenate the given sequences into a list. Ignore None values.
@@ -310,6 +323,7 @@ def combine_path_lists(*path_seqs):
         results.extend(paths)
 
     return results
+
 
 def combine_opts(combiners, *opts_list):
     """The master combiner, used to combine dictionaries of options with

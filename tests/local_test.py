@@ -144,7 +144,7 @@ class PythonBinTestCase(TestCase):
     def test_echo_as_python_bin(self):
         # "echo" is a pretty poor substitute for Python, but it
         # should be available on most systems
-        mr_job = MRTwoStepJob(['--python-bin', 'echo'])
+        mr_job = MRTwoStepJob(['--python-bin', 'echo', '--no-conf'])
         mr_job.sandbox()
         
         with mr_job.make_runner() as runner:

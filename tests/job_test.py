@@ -124,7 +124,7 @@ class NoTzsetTestCase(TestCase):
         if hasattr(self, '_real_time_tzset'):
             time.tzset = self._real_time_tzset
 
-    def test_init(self):
+    def test_init_does_not_require_tzset(self):
         mr_job = MRJob()
 
 
@@ -238,7 +238,7 @@ class ProtocolsTestCase(TestCase):
     def test_mapper_raw_value_to_json(self):
         RAW_INPUT = StringIO('foo\nbar\nbaz\n')
 
-        mr_job = MRBoringJob(args=['--mapper'])
+        mr_job = MRBoringJob(['--mapper'])
         mr_job.sandbox(stdin=RAW_INPUT)
         mr_job.run_mapper()
 

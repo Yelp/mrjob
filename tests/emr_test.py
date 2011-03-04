@@ -28,6 +28,7 @@ from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
 from mrjob.parse import JOB_NAME_RE
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.quiet import logger_disabled
 
 try:
     import boto
@@ -195,7 +196,8 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         with mr_job.make_runner() as runner:
             assert isinstance(runner, EMRJobRunner)
 
-            assert_raises(Exception, runner.run)
+            with logger_disabled('mrjob.emr'):
+                assert_raises(Exception, runner.run)
 
             emr_conn = botoemr.EmrConnection()
             job_flow_id = runner.get_emr_job_flow_id()

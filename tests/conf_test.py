@@ -22,6 +22,7 @@ import tempfile
 from testify import TestCase, assert_equal, class_setup, class_teardown, setup, teardown
 from mrjob.conf import *
 import mrjob.conf
+from tests.quiet import logger_disabled
 
 class MRJobConfTestCase(TestCase):
 
@@ -129,7 +130,9 @@ class MRJobConfTestCase(TestCase):
         assert_equal(load_opts_from_mrjob_conf('foo', conf_path=conf_path),
                      {'qux': 'quux'})
         # test missing options
-        assert_equal(load_opts_from_mrjob_conf('bar', conf_path=conf_path), {})
+        with logger_disabled('mrjob.conf'):
+            assert_equal(
+                load_opts_from_mrjob_conf('bar', conf_path=conf_path), {})
 
     def test_round_trip(self):
         conf = {'runners': {'foo': {'qux': 'quux'}}}

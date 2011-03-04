@@ -26,6 +26,7 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import JOB_NAME_RE
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.quiet import logger_disabled
 
 class WithStatementTestCase(TestCase):
 
@@ -54,20 +55,24 @@ class TestExtraKwargs(TestCase):
         os.unlink(self.mrjob_conf_path)
 
     def test_extra_kwargs_in_mrjob_conf_okay(self):
-        with LocalMRJobRunner(conf_path=self.mrjob_conf_path) as runner:
-            assert_equal(runner._opts['setup_cmds'], ['echo foo'])
-            assert_not_in('qux', runner._opts)
+        with logger_disabled('mrjob.runner'):
+            with LocalMRJobRunner(conf_path=self.mrjob_conf_path) as runner:
+                assert_equal(runner._opts['setup_cmds'], ['echo foo'])
+                assert_not_in('qux', runner._opts)
 
     def test_extra_kwargs_passed_in_directly_okay(self):
-        with LocalMRJobRunner(
-            conf_path=False, base_tmp_dir='/var/tmp', foo='bar') as runner:
-            assert_equal(runner._opts['base_tmp_dir'], '/var/tmp')
-            assert_not_in('bar', runner._opts)
+        with logger_disabled('mrjob.runner'):
+            with LocalMRJobRunner(
+                conf_path=False, base_tmp_dir='/var/tmp', foo='bar') as runner:
+                assert_equal(runner._opts['base_tmp_dir'], '/var/tmp')
+                assert_not_in('bar', runner._opts)
 
 class TestDeprecatedKwargs(TestCase):
 
     def test_job_name_prefix_is_now_label(self):
-        old_way = LocalMRJobRunner(conf_path=False, job_name_prefix='ads_chain')
+        with logger_disabled('mrjob.runner'):
+            old_way = LocalMRJobRunner(
+                conf_path=False, job_name_prefix='ads_chain')
         old_opts = old_way.get_opts()
 
         new_way = LocalMRJobRunner(conf_path=False, label='ads_chain')

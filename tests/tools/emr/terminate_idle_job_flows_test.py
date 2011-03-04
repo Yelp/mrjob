@@ -14,7 +14,9 @@
 """Unit testing for EMRJobRunner"""
 from __future__ import with_statement
 
+from StringIO import StringIO
 from datetime import datetime, timedelta
+import sys
 from testify import TestCase, assert_equal, assert_raises, setup, teardown
 
 try:
@@ -206,22 +208,31 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                           for jf in self.mock_emr_job_flows.itervalues()
                           if jf.state in ('SHUTTING_DOWN', 'TERMINATED'))
 
+        def inspect_and_maybe_terminate_quietly(*args, **kwargs):
+            # don't print anything out
+            real_stdout = sys.stdout
+            sys.stdout = StringIO()
+            try:
+                return inspect_and_maybe_terminate_job_flows(*args, **kwargs)
+            finally:
+                sys.stdout = real_stdout
+
         assert_equal(terminated_jfs(), [])
 
         # dry run shouldn't do anything
-        inspect_and_maybe_terminate_job_flows(
+        inspect_and_maybe_terminate_quietly(
             conf_path=False, max_hours_idle=0.01,
             now=self.now, dry_run=True)
 
         assert_equal(terminated_jfs(), [])
 
         # no job flows are 20 hours old
-        inspect_and_maybe_terminate_job_flows(
+        inspect_and_maybe_terminate_quietly(
             conf_path=False, max_hours_idle=20,
             now=self.now, dry_run=False)
 
         # terminate 5-hour-old jobs
-        inspect_and_maybe_terminate_job_flows(
+        inspect_and_maybe_terminate_quietly(
             conf_path=False, max_hours_idle=5,
             now=self.now, dry_run=False)
 
@@ -230,7 +241,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         assert_equal(terminated_jfs(), ['j-EMPTY'])
 
         # terminate 2-hour-old jobs
-        inspect_and_maybe_terminate_job_flows(
+        inspect_and_maybe_terminate_quietly(
             conf_path=False, max_hours_idle=2,
             now=self.now, dry_run=False)
 
@@ -240,7 +251,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         assert_equal(terminated_jfs(), ['j-EMPTY', 'j-IDLE_AND_FAILED'])
 
         # all the job flows we can terminate are at least 1 hour old
-        inspect_and_maybe_terminate_job_flows(
+        inspect_and_maybe_terminate_quietly(
             conf_path=False, max_hours_idle=1,
             now=self.now, dry_run=False)
 
@@ -249,7 +260,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                       'j-IDLE_AND_FAILED'])
 
         # just to prove our point
-        inspect_and_maybe_terminate_job_flows(
+        inspect_and_maybe_terminate_quietly(
             conf_path=False, max_hours_idle=0,
             now=self.now, dry_run=False)
 

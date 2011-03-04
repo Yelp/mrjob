@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ from mrjob.local import LocalMRJobRunner
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
-
+from tests.quiet import no_handlers_for_logger
 
 class LocalMRJobRunnerEndToEndTestCase(TestCase):
 
@@ -37,7 +37,8 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
     def make_tmp_dir_and_mrjob_conf(self):
         self.tmp_dir = tempfile.mkdtemp()
         self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({}, open(self.mrjob_conf_path, 'w'))
+        dump_mrjob_conf({'runners': {'local': {}}},
+                        open(self.mrjob_conf_path, 'w'))
 
     @teardown
     def rm_tmp_dir(self):
@@ -120,7 +121,8 @@ class LargeAmountsOfStderrTestCase(TestCase):
         mr_job.sandbox()
 
         try:
-            mr_job.run_job()
+            with no_handlers_for_logger():
+                mr_job.run_job()
         except TimeoutException:
             raise
         except Exception, e:

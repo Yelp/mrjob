@@ -113,7 +113,7 @@ try:
 except ImportError:
     yaml = None
 
-log = logging.getLogger('mrjob.emr')
+log = logging.getLogger('mrjob.conf')
 
 ### READING AND WRITING mrjob.conf ###
 

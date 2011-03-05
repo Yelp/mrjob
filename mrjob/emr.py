@@ -275,6 +275,10 @@ class EMRJobRunner(MRJobRunner):
         :type ssh_tunnel_is_open: bool
         :param ssh_tunnel_is_open: if True, any host can connect to the job tracker through the SSH tunnel you open. Mostly useful if your browser is running on a different machine from your job.
         """
+        if boto is None:
+            raise Exception(
+                'You must install the boto Python library to connect to EMR')
+        
         super(EMRJobRunner, self).__init__(**kwargs)
 
         # make aws_region an instance variable; we might want to set it

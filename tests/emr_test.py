@@ -26,7 +26,7 @@ import tempfile
 from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in, assert_raises, setup, teardown
 
 from mrjob.conf import dump_mrjob_conf
-from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
+from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri, DEFAULT_EC2_INSTANCE_TYPE
 from mrjob.parse import JOB_NAME_RE
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
@@ -45,13 +45,13 @@ class MockEMRAndS3TestCase(TestCase):
     @setup
     def make_mrjob_conf(self):
         _, self.mrjob_conf_path = tempfile.mkstemp(prefix='mrjob.conf.')
-        dump_mrjob_conf({'runners': {'emr': {
-            'check_emr_status_every': 0.01,
-            's3_scratch_uri': 's3://walrus/tmp',
-            's3_sync_wait_time': 0.01,
-        }}}, open(self.mrjob_conf_path, 'w'))
+        with open(self.mrjob_conf_path, 'w') as f:
+            dump_mrjob_conf({'runners': {'emr': {
+                'check_emr_status_every': 0.01,
+                's3_sync_wait_time': 0.01,
+            }}}, f)
 
-    @setup
+    @teardown
     def rm_mrjob_conf(self):
         os.unlink(self.mrjob_conf_path)
 
@@ -93,13 +93,8 @@ class MockEMRAndS3TestCase(TestCase):
 class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
     @setup
-    def make_tmp_dir_and_mrjob_conf(self):
+    def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
-        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'emr': {
-            'check_emr_status_every': 0.01,
-            's3_sync_wait_time': 0.01,
-        }}}, open(self.mrjob_conf_path, 'w'))
 
     @teardown
     def rm_tmp_dir(self):
@@ -220,6 +215,9 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         job_flow = emr_conn.describe_jobflow(job_flow_id)
         assert_equal(job_flow.state, 'TERMINATED')
 
+
+class S3ScratchURITestCase(MockEMRAndS3TestCase):
+
     def test_pick_scratch_uri(self):
         self.add_mock_s3_data({'mrjob-walrus': {}, 'zebra': {}})
         runner = EMRJobRunner(conf_path=False)
@@ -244,14 +242,17 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         # need to do something to ensure that the bucket actually gets
         # created. let's launch a (mock) job flow
-        jfid = runner.make_persistent_job_flow()
+        job_flow_id = runner.make_persistent_job_flow()
         assert_in(scratch_bucket, self.mock_s3_fs.keys())
-        runner.make_emr_conn().terminate_jobflow(jfid)
+        runner.make_emr_conn().terminate_jobflow(job_flow_id)
 
         # once our scratch bucket is created, we should re-use it
         runner2 = EMRJobRunner(conf_path=False)
         assert_equal(runner2._opts['s3_scratch_uri'], s3_scratch_uri)
         s3_scratch_uri = runner._opts['s3_scratch_uri']
+
+
+class BootstrapFilesTestCase(MockEMRAndS3TestCase):
 
     def test_bootstrap_files_only_get_uploaded_once(self):
         # just a regression test for Issue #8
@@ -276,21 +277,85 @@ class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
         assert_gt(NUM_JOB_FLOWS, DEFAULT_MAX_JOB_FLOWS_RETURNED)
 
         for i in range(NUM_JOB_FLOWS):
-            jfid = 'j-%04d' % i
-            self.mock_emr_job_flows[jfid] = MockEmrObject(
-                creationdatetime=to_iso8601(now - datetime.timedelta(minutes=i)),
-                jobflowid=jfid)
+            job_flow_id = 'j-%04d' % i
+            self.mock_emr_job_flows[job_flow_id] = MockEmrObject(
+                creationdatetime=to_iso8601(
+                    now - datetime.timedelta(minutes=i)),
+                jobflowid=job_flow_id)
 
         emr_conn = EMRJobRunner().make_emr_conn()
 
         # ordinary describe_jobflows() hits the limit on number of job flows
-        some_jfs = emr_conn.describe_jobflows()
-        assert_equal(len(some_jfs), DEFAULT_MAX_JOB_FLOWS_RETURNED)
+        some_job_flows = emr_conn.describe_jobflows()
+        assert_equal(len(some_job_flows), DEFAULT_MAX_JOB_FLOWS_RETURNED)
 
-        all_jfs = describe_all_job_flows(emr_conn)
-        assert_equal(len(all_jfs), NUM_JOB_FLOWS)
-        assert_equal(sorted(jf.jobflowid for jf in all_jfs),
+        all_job_flows = describe_all_job_flows(emr_conn)
+        assert_equal(len(all_job_flows), NUM_JOB_FLOWS)
+        assert_equal(sorted(jf.jobflowid for jf in all_job_flows),
                      [('j-%04d' % i) for i in range(NUM_JOB_FLOWS)])
+
+
+class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
+
+    def _test_instance_types(self, kwargs, expected_master, expected_slave):
+        runner = EMRJobRunner(conf_path=self.mrjob_conf_path, **kwargs)
+
+        job_flow_id = runner.make_persistent_job_flow()
+        job_flow = runner.make_emr_conn().describe_jobflow(job_flow_id)
+
+        assert_equal(
+            (expected_master, expected_slave),
+            (job_flow.masterinstancetype, job_flow.slaveinstancetype))
+
+    def test_defaults(self):
+        self._test_instance_types(
+            {}, DEFAULT_EC2_INSTANCE_TYPE, DEFAULT_EC2_INSTANCE_TYPE)
+
+        self._test_instance_types(
+            {'num_ec2_instances': 2},
+            DEFAULT_EC2_INSTANCE_TYPE, DEFAULT_EC2_INSTANCE_TYPE)
+
+    def test_single_instance(self):
+        self._test_instance_types(
+            {'ec2_instance_type': 'c1.xlarge'},
+            'c1.xlarge', 'c1.xlarge')
+
+    def test_multiple_instances(self):
+        self._test_instance_types(
+            {'ec2_instance_type': 'c1.xlarge', 'num_ec2_instances': 2},
+            DEFAULT_EC2_INSTANCE_TYPE, 'c1.xlarge')
+
+    def test_explicit_master_and_slave_instance_types(self):
+        self._test_instance_types(
+            {'ec2_master_instance_type': 'm1.large'},
+            'm1.large', DEFAULT_EC2_INSTANCE_TYPE)
+        self._test_instance_types(
+            {'ec2_slave_instance_type': 'm2.xlarge'},
+            DEFAULT_EC2_INSTANCE_TYPE, 'm2.xlarge')
+        self._test_instance_types(
+            {'ec2_master_instance_type': 'm1.large',
+             'ec2_slave_instance_type': 'm2.xlarge'},
+            'm1.large', 'm2.xlarge')
+
+    def test_ec2_instance_type_takes_precedence(self):
+        self._test_instance_types(
+            {'ec2_instance_type': 'c1.xlarge',
+             'ec2_master_instance_type': 'm1.large',
+             'ec2_slave_instance_type': 'm2.xlarge'},
+            'c1.xlarge', 'c1.xlarge')
+        # when there are multiple instances, ec2_instance_type only
+        # sets slave instance type
+        self._test_instance_types(
+            {'ec2_instance_type': 'c1.xlarge',
+             'ec2_master_instance_type': 'm1.large',
+             'num_ec2_instances': 2,
+             'ec2_slave_instance_type': 'm2.xlarge'},
+            'm1.large', 'c1.xlarge')
+        
+        
+        
+        
+                                 
 
 
 ### tests for error parsing ###

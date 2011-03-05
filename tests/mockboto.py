@@ -63,7 +63,7 @@ class MockS3Connection(object):
         by specifying mock_s3_fs. The mock filesystem is just a map
         from bucket name to key name to bytes.
         """
-        self.mock_s3_fs = mock_s3_fs or {}
+        self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.endpoint = host or 's3.amazonaws.com'
 
     def get_bucket(self, bucket_name):
@@ -240,7 +240,9 @@ class MockEmrConnection(object):
             keepjobalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
             loguri=log_uri,
+            masterinstancetype=master_instance_type,
             name=name,
+            slaveinstancetype=slave_instance_type,
             state='STARTING',
             steps=[],
         )

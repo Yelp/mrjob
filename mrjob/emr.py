@@ -1504,10 +1504,13 @@ class EMRJobRunner(MRJobRunner):
         """Wrap a given boto Connection object so that it can retry when
         throttled."""
         def retry_if(ex):
-            """Retry if we get a server error indicating throttling."""
+            """Retry if we get a server error indicating throttling. Also
+            handle spurious 505s that are thought to be part of a load
+            balancer issue inside AWS."""
             return ((isinstance(ex, boto.exception.BotoServerError) and
                      ('Throttling' in ex.body or
-                      'RequestExpired' in ex.body)) or
+                      'RequestExpired' in ex.body or
+                      ex.status == 505)) or
                     (isinstance(ex, socket.error) and
                      ex.args in ((104, 'Connection reset by peer'),
                                  (110, 'Connection timed out'))))

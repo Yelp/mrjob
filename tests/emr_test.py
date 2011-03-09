@@ -26,6 +26,7 @@ import tempfile
 from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in, assert_raises, setup, teardown
 
 from mrjob.conf import dump_mrjob_conf
+import mrjob.emr
 from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri, DEFAULT_EC2_INSTANCE_TYPE
 from mrjob.parse import JOB_NAME_RE
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
@@ -688,3 +689,29 @@ class TestLs(MockEMRAndS3TestCase):
         # of permissions error)
         assert_raises(Exception, set, runner._s3_ls('s3://lolcat/'))
 
+class TestNoBoto(TestCase):
+
+    @setup
+    def blank_out_boto(self):
+        self._real_boto = mrjob.emr.boto
+        mrjob.emr.boto = None
+        self._real_botoemr = mrjob.emr.botoemr
+        mrjob.emr.botoemr = None
+
+    @teardown
+    def restore_boto(self):
+        mrjob.emr.boto = self._real_boto
+        mrjob.emr.botoemr = self._real_botoemr
+
+    def test_init(self):
+        # merely creating an EMRJobRunner should raise an exception
+        # because it'll need to connect to S3 to set s3_scratch_uri
+        assert_raises(ImportError, EMRJobRunner, conf_path=False)
+
+    def test_make_emr_conn(self):
+        runner = EMRJobRunner(conf_path=False, s3_scratch_uri='s3://foo/tmp')
+        assert_raises(ImportError, runner.make_emr_conn)
+
+    def test_make_s3_conn(self):
+        runner = EMRJobRunner(conf_path=False, s3_scratch_uri='s3://foo/tmp')
+        assert_raises(ImportError, runner.make_s3_conn)

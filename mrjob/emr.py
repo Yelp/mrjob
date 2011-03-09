@@ -275,10 +275,6 @@ class EMRJobRunner(MRJobRunner):
         :type ssh_tunnel_is_open: bool
         :param ssh_tunnel_is_open: if True, any host can connect to the job tracker through the SSH tunnel you open. Mostly useful if your browser is running on a different machine from your job.
         """
-        if boto is None:
-            raise Exception(
-                'You must install the boto Python library to connect to EMR')
-        
         super(EMRJobRunner, self).__init__(**kwargs)
 
         # make aws_region an instance variable; we might want to set it
@@ -1526,8 +1522,13 @@ class EMRJobRunner(MRJobRunner):
 
         :return: a :py:class:`mrjob.botoemr.connection.EmrConnection`, wrapped in a :py:class:`mrjob.retry.RetryWrapper`
         """
+        # give a non-cryptic error message if boto isn't installed
+        if botoemr is None:
+            raise ImportError('You must install boto to connect to EMR')
+
         region = self._get_region_info_for_emr_conn()
         log.debug('creating EMR connection (to %s)' % region.endpoint)
+
         raw_emr_conn = botoemr.EmrConnection(
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
@@ -1565,8 +1566,13 @@ class EMRJobRunner(MRJobRunner):
 
         :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a :py:class:`mrjob.retry.RetryWrapper`
         """
+        # give a non-cryptic error message if boto isn't installed
+        if boto is None:
+            raise ImportError('You must install boto to connect to S3')
+
         s3_endpoint = self._get_s3_endpoint()
         log.debug('creating S3 connection (to %s)' % s3_endpoint)
+
         raw_s3_conn = boto.connect_s3(
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],

@@ -44,7 +44,7 @@ except ImportError:
     boto = None
     botoemr = None
 
-from mrjob.conf import combine_dicts, combine_lists, combine_paths, combine_path_lists
+from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths, combine_path_lists
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE

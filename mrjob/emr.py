@@ -264,8 +264,8 @@ class EMRJobRunner(MRJobRunner):
         :param s3_log_uri:  where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for your job flow will go into a subdirectory, e.g. ``s3://yourbucket/logs/j-JOBFLOWID/``. in this example s3://yourbucket/logs/j-YOURJOBID/). Default is to append ``logs/`` to *s3_scratch_uri*.
         :type s3_scratch_uri: str
         :param s3_scratch_uri: S3 directory (URI ending in ``/``) to use as scratch space, e.g. ``s3://yourbucket/tmp/``. Default is ``tmp/mrjob/`` in the first bucket belonging to you.
-        :type ssh_bin: str
-        :param ssh_bin: path to the ssh binary. Defaults to ``ssh``
+        :type ssh_bin: str or list
+        :param ssh_bin: path to the ssh binary; may include switches (e.g. ``'ssh -v'`` or ``['ssh', '-v']``. Defaults to :command:`ssh`
         :type ssh_bind_ports: list of int
         :param ssh_bind_ports: a list of ports that are safe to listen on. Defaults to ports ``40001`` thru ``40840``.
         :type ssh_tunnel_to_job_tracker: bool
@@ -370,7 +370,7 @@ class EMRJobRunner(MRJobRunner):
             'ec2_slave_instance_type': 'm1.small',
             'num_ec2_instances': 1,
             's3_sync_wait_time': 5.0,
-            'ssh_bin': 'ssh',
+            'ssh_bin': ['ssh'],
             'ssh_bind_ports': range(40001, 40841),
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
@@ -389,7 +389,7 @@ class EMRJobRunner(MRJobRunner):
             'ec2_key_pair_file': combine_paths,
             's3_log_uri': combine_paths,
             's3_scratch_uri': combine_paths,
-            'ssh_bin': combine_paths,
+            'ssh_bin': combine_cmds,
         })
 
     def _fix_s3_scratch_and_log_uri_opts(self):
@@ -593,8 +593,7 @@ class EMRJobRunner(MRJobRunner):
 
         bind_port = None
         for bind_port in self._pick_ssh_bind_ports():
-            args = [
-                self._opts['ssh_bin'],
+            args = self._opts['ssh_bin'] + [
                 '-o', 'VerifyHostKeyDNS=no',
                 '-o', 'StrictHostKeyChecking=no',
                 '-o', 'ExitOnForwardFailure=yes',

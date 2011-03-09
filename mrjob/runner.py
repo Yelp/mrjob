@@ -126,7 +126,7 @@ class MRJobRunner(object):
         :type python_archives: list of str
         :param python_archives: same as upload_archives, except they get added to the job's :envvar:`PYTHONPATH`
         :type python_bin: list or str
-        :param python_bin: Name/path/list of args for alternate python binary for mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to ``['python']``.
+        :param python_bin: Name/path/list of args for alternate python binary for mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to :command:`python`.
         :type setup_cmds: list
         :param setup_cmds: a list of commands to run before each mapper/reducer step (e.g. ``['cd my-src-tree; make', 'mkdir -p /tmp/foo']``). You can specify commands as strings, which will be run through the shell, or lists of args, which will be invoked directly. We'll use file locking to ensure that multiple mappers/reducers running on the same node won't run *setup_cmds* simultaneously (it's safe to run ``make``).
         :type setup_scripts: list of str

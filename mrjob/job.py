@@ -741,6 +741,9 @@ class MRJob(object):
             default=None, type='int',
             help='How often (in seconds) to check status of your EMR job')
         self.emr_opt_group.add_option(
+            '--ssh-bin', dest='ssh_bin', default=None,
+            help="Name/path of ssh binary. Arguments are allowed (e.g. --ssh-bin 'ssh -v')")
+        self.emr_opt_group.add_option(
             '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
             default=None, action='store_true',
             help='Open up an SSH tunnel to the Hadoop job tracker')

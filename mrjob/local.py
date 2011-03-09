@@ -49,7 +49,7 @@ class LocalMRJobRunner(MRJobRunner):
         """LocalMRJobRunner takes the same keyword args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 
         * *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs`
-        * *python_bin* defaults to ``sys.executable`` (the current python interpreter)
+        * *python_bin* defaults to the current python interpreter
         """
         super(LocalMRJobRunner, self).__init__(**kwargs)
 

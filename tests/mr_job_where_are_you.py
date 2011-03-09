@@ -12,10 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mrjob
 import os
-from mrjob.job import MRJob
+import sys
+import warnings
 
+# PYTHONPATH takes precedence over any sys.path hacks
+if os.environ.get('PYTHONPATH'):
+    sys.path = os.environ['PYTHONPATH'].split(os.pathsep) + sys.path
+    warnings.simplefilter('ignore')
+
+import mrjob
+from mrjob.job import MRJob
 
 class MRJobWhereAreYou(MRJob):
     """Output what directory the mrjob library is in."""

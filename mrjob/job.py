@@ -693,7 +693,7 @@ class MRJob(object):
 
         self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
-            help='Name/path of alternate python binary for mappers/reducers.')
+            help="Name/path of alternate python binary for mappers/reducers. You can include arguments (e.g. --python-bin 'python -S').")
 
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(
@@ -876,10 +876,10 @@ class MRJob(object):
             'label': self.options.label,
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
+            'python_bin': self.options.python_bin,
             'stdin': self.stdin,
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,
-            'python_bin': self.options.python_bin,
         }
 
     def local_job_runner_kwargs(self):

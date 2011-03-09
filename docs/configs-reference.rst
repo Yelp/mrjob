@@ -11,7 +11,6 @@ Option              Default                                                 Swit
 *extra_args*        ``[]``                                                  (see :py:meth:`~mrjob.job.MRJob.add_passthrough_option`)
 *file_upload_args*  ``[]``                                                  (see :py:meth:`~mrjob.job.MRJob.add_file_option`)
 *output_dir*        (automatic)                                             :option:`-o`, :option:`--output-dir`
-*python_bin*        ``'python'``                                            :option:`--python-bin`
 =================== ======================================================= ========================================================
 
 See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
@@ -31,6 +30,7 @@ Option              Default                        Combined by                  
 *label*             (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--label`
 *owner*             (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--owner`
 *python_archives*   ``[]``                         :py:func:`~mrjob.conf.combine_path_lists`
+*python_bin*        ``python``                     :py:func:`~mrjob.conf.combine_cmds`       :option:`--python-bin`
 *setup_cmds*        ``[]``                         :py:func:`~mrjob.conf.combine_lists`
 *setup_scripts*     ``[]``                         :py:func:`~mrjob.conf.combine_path_lists`
 *upload_archives*   ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--archive`

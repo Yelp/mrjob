@@ -63,7 +63,7 @@ class LocalMRJobRunner(MRJobRunner):
         """A dictionary giving the default value of options."""
         return combine_dicts(super(LocalMRJobRunner, cls)._default_opts(), {
             # prefer whatever interpreter we're currently using
-            'python_bin': sys.executable or 'python',
+            'python_bin': [sys.executable] or ['python'],
         })
 
     @classmethod
@@ -87,10 +87,11 @@ class LocalMRJobRunner(MRJobRunner):
             log.warning('ignoring extra args to hadoop streaming: %r' %
                         (self._opts['hadoop_extra_args'],))
 
-        wrapper_args = [self._opts['python_bin']]
+        wrapper_args = self._opts['python_bin']
         if self._wrapper_script:
-            wrapper_args = [self._opts['python_bin'],
-                            self._wrapper_script['name']] + wrapper_args
+            wrapper_args = (self._opts['python_bin'] +
+                            [self._wrapper_script['name']] +
+                            wrapper_args)
 
         # run mapper, sort, reducer for each step
         for i, step in enumerate(self._get_steps()):

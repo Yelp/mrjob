@@ -32,7 +32,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from mrjob.conf import combine_dicts, combine_envs, combine_local_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
+from mrjob.conf import combine_cmds, combine_cmd_lists, combine_dicts, combine_envs, combine_local_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
 from mrjob.util import cmd_line, file_ext, tar_and_gzip
 
 
@@ -125,8 +125,8 @@ class MRJobRunner(object):
         :param owner: who is running this job. Used solely to set the job name. By default, we use :py:func:`getpass.getuser`, or ``no_user`` if it fails.
         :type python_archives: list of str
         :param python_archives: same as upload_archives, except they get added to the job's :envvar:`PYTHONPATH`
-        :type python_bin: str
-        :param python_bin: Name/path of alternate python binary for mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to ``'python'``.
+        :type python_bin: list or str
+        :param python_bin: Name/path/list of args for alternate python binary for mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to ``['python']``.
         :type setup_cmds: list
         :param setup_cmds: a list of commands to run before each mapper/reducer step (e.g. ``['cd my-src-tree; make', 'mkdir -p /tmp/foo']``). You can specify commands as strings, which will be run through the shell, or lists of args, which will be invoked directly. We'll use file locking to ensure that multiple mappers/reducers running on the same node won't run *setup_cmds* simultaneously (it's safe to run ``make``).
         :type setup_scripts: list of str
@@ -264,7 +264,7 @@ class MRJobRunner(object):
             'bootstrap_mrjob': True,
             'cleanup': CLEANUP_DEFAULT,
             'owner': owner,
-            'python_bin': 'python',
+            'python_bin': ['python'],
         }
 
     @classmethod
@@ -278,7 +278,7 @@ class MRJobRunner(object):
             'hadoop_extra_args': combine_lists,
             'jobconf': combine_dicts,
             'python_archives': combine_path_lists,
-            'python_bin': combine_paths,
+            'python_bin': combine_cmds,
             'setup_cmds': combine_lists,
             'setup_scripts': combine_path_lists,
             'upload_archives': combine_path_lists,

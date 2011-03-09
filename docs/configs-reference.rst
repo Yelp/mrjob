@@ -42,7 +42,7 @@ See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
 :py:class:`~mrjob.local.LocalMRJobRunner` takes no additional options, but:
 
 * *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs`
-* *python_bin* defaults to ``sys.executable`` (the current python interpreter)
+* *python_bin* defaults to the current python interpreter
 
 
 Additional options for :py:class:`~mrjob.emr.EMRJobRunner`

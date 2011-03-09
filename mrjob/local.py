@@ -63,7 +63,7 @@ class LocalMRJobRunner(MRJobRunner):
         """A dictionary giving the default value of options."""
         return combine_dicts(super(LocalMRJobRunner, cls)._default_opts(), {
             # prefer whatever interpreter we're currently using
-            'python_bin': [sys.executable] or ['python'],
+            'python_bin': [sys.executable or 'python'],
         })
 
     @classmethod

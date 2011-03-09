@@ -3,8 +3,8 @@ v0.3.0, ??? -- ???!
    * ec2_instance_type option now only sets instance type for slave nodes when 
      there are multiple EC2 instances (Issue #66)
    * job_name_prefix option is gone (was deprecated)
- * hadoop_bin, python_bin, and ssh_bin can now all take switches
- * --ssh-bin command-line option (Issue #96)
+ * hadoop_bin, python_bin, and ssh_bin can now all take switches (Issue #96)
+ * --ssh-bin command-line option
 
 v0.2.4, 2011-03-09 -- fix bootstrapping mrjob
 * Fix bootstrapping of mrjob in hadoop and local mode (Issue #89)

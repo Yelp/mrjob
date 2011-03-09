@@ -222,6 +222,51 @@ class CombineDictsTestCase(TestCase):
              'PS1': '\w> '})
 
 
+class CombineCmdsTestCase(TestCase):
+
+    def test_empty(self):
+        assert_equal(combine_cmds(), None)
+
+    def test_picks_last_value(self):
+        assert_equal(combine_cmds(['sort'], ['grep'], ['cat']), ['cat'])
+
+    def test_all_None(self):
+        assert_equal(combine_cmds(None, None, None), None)
+
+    def test_skips_None(self):
+        assert_equal(combine_values(None, ['cat']), ['cat'])
+        assert_equal(combine_values(['cat'], None), ['cat'])
+        assert_equal(combine_values(None, None, ['cat'], None), ['cat'])
+
+    def test_parse_string(self):
+        assert_equal(combine_cmds('sort', 'grep', 'cat'), ['cat'])
+        assert_equal(combine_cmds(['python'], 'python -S'), ['python', '-S'])
+
+    def test_parse_empty_string(self):
+        assert_equal(combine_cmds(''), [])
+
+    def test_convert_to_list(self):
+        assert_equal(combine_cmds('sort', ('grep', '-E')), ['grep', '-E'])
+
+
+class CombineCmdsListsCase(TestCase):
+
+    def test_empty(self):
+        assert_equal(combine_cmd_lists(), [])
+
+    def test_concatenation(self):
+        assert_equal(
+            combine_cmd_lists(
+                [['echo', 'foo']], None, (['mkdir', 'bar'], ['rmdir', 'bar'])),
+            [['echo', 'foo'], ['mkdir', 'bar'], ['rmdir', 'bar']])
+
+    def test_conversion(self):
+        assert_equal(
+            combine_cmd_lists(
+                ['echo "Hello World!"'], None, [('mkdir', '/tmp/baz')]),
+            [['echo', 'Hello World!'], ['mkdir', '/tmp/baz']])
+
+
 class CombineEnvsTestCase(TestCase):
 
     def test_empty(self):

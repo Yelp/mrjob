@@ -100,6 +100,7 @@ from __future__ import with_statement
 import glob
 import logging
 import os
+import shlex
 
 from mrjob.util import expand_path
 
@@ -248,6 +249,34 @@ def combine_lists(*seqs):
             result.extend(seq)
 
     return result
+
+
+def combine_cmds(*cmds):
+    """Take zero or more commands to run on the command line, and return
+    the last one that is not ``None``. Each command should either be a list
+    containing the command plus switches, or a string, which will be parsed
+    with :py:func:`shlex.split`
+
+    Returns either ``None`` or a list containing the command plus arguments.
+    """
+    cmd = combine_values(*cmds)
+
+    if cmd is None:
+        return None
+    elif isinstance(cmd, basestring):
+        return shlex.split(cmd)
+    else:
+        return list(cmd)
+
+
+def combine_cmd_lists(*seqs_of_cmds):
+    """Concatenate the given commands into a list. Ignore ``None`` values,
+    and parse strings with :py:func:`shlex.split`.
+
+    Returns a list of lists (each sublist contains the command plus arguments).
+    """
+    seq_of_cmds = combine_lists(*seqs_of_cmds)
+    return [combine_cmds(cmd) for cmd in seq_of_cmds]
 
 
 def combine_dicts(*dicts):

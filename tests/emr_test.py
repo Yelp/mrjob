@@ -27,7 +27,7 @@ from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in,
 
 from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
-from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri, DEFAULT_EC2_INSTANCE_TYPE
+from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
 from mrjob.parse import JOB_NAME_RE
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
@@ -310,11 +310,11 @@ class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
 
     def test_defaults(self):
         self._test_instance_types(
-            {}, DEFAULT_EC2_INSTANCE_TYPE, DEFAULT_EC2_INSTANCE_TYPE)
+            {}, 'm1.small', 'm1.small')
 
         self._test_instance_types(
             {'num_ec2_instances': 2},
-            DEFAULT_EC2_INSTANCE_TYPE, DEFAULT_EC2_INSTANCE_TYPE)
+            'm1.small', 'm1.small')
 
     def test_single_instance(self):
         self._test_instance_types(
@@ -324,15 +324,15 @@ class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
     def test_multiple_instances(self):
         self._test_instance_types(
             {'ec2_instance_type': 'c1.xlarge', 'num_ec2_instances': 2},
-            DEFAULT_EC2_INSTANCE_TYPE, 'c1.xlarge')
+            'm1.small', 'c1.xlarge')
 
     def test_explicit_master_and_slave_instance_types(self):
         self._test_instance_types(
             {'ec2_master_instance_type': 'm1.large'},
-            'm1.large', DEFAULT_EC2_INSTANCE_TYPE)
+            'm1.large', 'm1.small')
         self._test_instance_types(
             {'ec2_slave_instance_type': 'm2.xlarge'},
-            DEFAULT_EC2_INSTANCE_TYPE, 'm2.xlarge')
+            'm1.small', 'm2.xlarge')
         self._test_instance_types(
             {'ec2_master_instance_type': 'm1.large',
              'ec2_slave_instance_type': 'm2.xlarge'},

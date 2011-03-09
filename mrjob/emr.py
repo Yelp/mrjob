@@ -95,8 +95,6 @@ REGION_TO_S3_ENDPOINT = {
     '': 's3.amazonaws.com',
 }
 
-DEFAULT_EC2_INSTANCE_TYPE = 'm1.small'
-
 
 def parse_s3_uri(uri):
     """Parse an S3 URI into (bucket, key)
@@ -245,15 +243,15 @@ class EMRJobRunner(MRJobRunner):
         :type check_emr_status_every: float
         :param check_emr_status_every: How often to check on the status of EMR jobs.Default is 30 seconds (too often and AWS will throttle you).
         :type ec2_instance_type: str
-        :param ec2_instance_type: What sort of EC2 instance(s) to use on the nodes that actually run tasks (see http://aws.amazon.com/ec2/instance-types/). When you run multiple instances (see *num_ec2_instances*), the master node is just coordinating the other nodes, so usually the default instance type (m1.small) is fine, and using larger instances is wasteful.
+        :param ec2_instance_type: What sort of EC2 instance(s) to use on the nodes that actually run tasks (see http://aws.amazon.com/ec2/instance-types/). When you run multiple instances (see *num_ec2_instances*), the master node is just coordinating the other nodes, so usually the default instance type (``m1.small``) is fine, and using larger instances is wasteful.
         :type ec2_key_pair: str
         :param ec2_key_pair: name of the SSH key you set up for EMR.
         :type ec2_key_pair_file: str
         :param ec2_key_pair_file: path to file containing the SSH key for EMR
         :type ec2_master_instance_type: str
-        :param ec2_master_instance_type: same as *ec2_instance_type*, but only for the master Hadoop node. Usually you just want to use *ec2_instance_type*.
+        :param ec2_master_instance_type: same as *ec2_instance_type*, but only for the master Hadoop node. Usually you just want to use *ec2_instance_type*. Defaults to ``'m1.small'``.
         :type ec2_slave_instance_type: str
-        :param ec2_slave_instance_type: same as *ec2_instance_type*, but only for the slave Hadoop nodes. Usually you just want to use *ec2_instance_type*.
+        :param ec2_slave_instance_type: same as *ec2_instance_type*, but only for the slave Hadoop nodes. Usually you just want to use *ec2_instance_type*. Defaults to ``'m1.small'``.
         :type emr_endpoint: str
         :param emr_endpoint: optional host to connect to when communicating with S3 (e.g. ``us-west-1.elasticmapreduce.amazonaws.com``). Default is to infer this from *aws_region*.
         :type emr_job_flow_id: str
@@ -287,6 +285,8 @@ class EMRJobRunner(MRJobRunner):
         self._s3_temp_bucket_to_create = None
 
         self._fix_s3_scratch_and_log_uri_opts()
+
+        self._fix_ec2_instance_types()
 
         # pick a tmp dir based on the job name
         self._s3_tmp_uri = self._opts['s3_scratch_uri'] + self._job_name + '/'
@@ -366,6 +366,8 @@ class EMRJobRunner(MRJobRunner):
         """A dictionary giving the default value of options."""
         return combine_dicts(super(EMRJobRunner, cls)._default_opts(), {
             'check_emr_status_every': 30,
+            'ec2_master_instance_type': 'm1.small',
+            'ec2_slave_instance_type': 'm1.small',
             'num_ec2_instances': 1,
             's3_sync_wait_time': 5.0,
             'ssh_bin': 'ssh',
@@ -428,6 +430,17 @@ class EMRJobRunner(MRJobRunner):
                 self._opts['s3_log_uri'])
         else:
             self._opts['s3_log_uri'] = self._opts['s3_scratch_uri'] + 'logs/'
+
+    def _fix_ec2_instance_types(self):
+        """If the *ec2_instance_type* option is set, override instance
+        type for the nodes that actually run tasks (see Issue #66)
+        """
+        ec2_instance_type = self._opts['ec2_instance_type']
+        if ec2_instance_type:
+            self._opts['ec2_slave_instance_type'] = ec2_instance_type
+            # master instance only does work when it's the only instance
+            if self._opts['num_ec2_instances'] == 1:
+                self._opts['ec2_master_instance_type'] = ec2_instance_type
 
     def _create_s3_temp_bucket_if_needed(self):
         if self._s3_temp_bucket_to_create:
@@ -704,30 +717,8 @@ class EMRJobRunner(MRJobRunner):
 
         args['num_instances'] = str(self._opts['num_ec2_instances'])
 
-        # set instance types
-
-        # explicitly set defaults
-        args['master_instance_type'] = DEFAULT_EC2_INSTANCE_TYPE
-        args['slave_instance_type'] = DEFAULT_EC2_INSTANCE_TYPE
-
-        # set master and slave instance type explicitly
-        if self._opts['ec2_master_instance_type']:
-            args['master_instance_type'] = (
-                self._opts['ec2_master_instance_type'])
-
-        if self._opts['ec2_slave_instance_type']:
-            args['slave_instance_type'] = (
-                self._opts['ec2_slave_instance_type'])
-
-        # if ec2_instance_type is set, we want to override instance
-        # type for the nodes that actually run tasks (see Issue #66)
-        if self._opts['ec2_instance_type']:
-            if self._opts['num_ec2_instances'] == 1:
-                args['master_instance_type'] = self._opts['ec2_instance_type']
-            # I don't think slave_instance_type does anything when there's
-            # only one instance, but doesn't hurt to set it
-            args['slave_instance_type'] = self._opts['ec2_instance_type']
-
+        args['master_instance_type'] = self._opts['ec2_master_instance_type']
+        args['slave_instance_type'] = self._opts['ec2_slave_instance_type']
 
         if self._master_bootstrap_script:
             args['bootstrap_actions'] = [botoemr.BootstrapAction(

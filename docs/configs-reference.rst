@@ -85,7 +85,7 @@ Additional options for :py:class:`~mrjob.hadoop.HadoopJobRunner`
 ====================== =========================== ===================================== ================================
 Option                 Default                     Combined by                           Switches
 ====================== =========================== ===================================== ================================
-*hadoop_bin*           (automatic)                 :py:func:`~mrjob.conf.combine_paths`  :option:`--hadoop-bin`
+*hadoop_bin*           (automatic)                 :py:func:`~mrjob.conf.combine_cmds`   :option:`--hadoop-bin`
 *hadoop_home*          :envvar:`HADOOP_HOME`       :py:func:`~mrjob.conf.combine_values`
 *hdfs_scratch_dir*     ``tmp/mrjob`` (in HDFS)     :py:func:`~mrjob.conf.combine_paths`  :option:`--hdfs-scratch-dir`
 *hadoop_streaming_jar* (automatic)                 :py:func:`~mrjob.conf.combine_paths`  :option:`--hadoop-streaming-jar`

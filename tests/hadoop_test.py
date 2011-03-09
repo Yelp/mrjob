@@ -116,7 +116,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
-    def test_end_to_end(self):
+    def _test_end_to_end(self, args=()):
         # read from STDIN, a local file, and a remote file
         stdin = StringIO('foo\nbar\n')
 
@@ -137,8 +137,8 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
                                '--no-conf', '--hadoop-arg', '-libjar',
-                               '--hadoop-arg', 'containsJars.jar',
-                               '-', local_input_path, remote_input_path])
+                               '--hadoop-arg', 'containsJars.jar'] + list(args)
+                               + ['-', local_input_path, remote_input_path])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
@@ -187,4 +187,8 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         assert not os.path.exists(local_tmp_dir)
         assert not any(runner.ls(runner.get_output_dir()))
 
+    def test_end_to_end(self):
+        self._test_end_to_end()
 
+    def test_end_to_end_with_explicit_hadoop_bin(self):
+        self._test_end_to_end(['--hadoop-bin', self.hadoop_bin])

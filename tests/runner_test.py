@@ -72,22 +72,6 @@ class TestExtraKwargs(TestCase):
                 assert_not_in('bar', runner._opts)
 
 
-class TestDeprecatedKwargs(TestCase):
-
-    def test_job_name_prefix_is_now_label(self):
-        with logger_disabled('mrjob.runner'):
-            old_way = LocalMRJobRunner(
-                conf_path=False, job_name_prefix='ads_chain')
-        old_opts = old_way.get_opts()
-
-        new_way = LocalMRJobRunner(conf_path=False, label='ads_chain')
-        new_opts = new_way.get_opts()
-
-        assert_equal(old_opts, new_opts)
-        assert_equal(old_opts['label'], 'ads_chain')
-        assert_not_in('job_name_prefix', old_opts)
-
-
 class TestJobName(TestCase):
 
     @setup

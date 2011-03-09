@@ -667,7 +667,7 @@ class MRJob(object):
             'for EMR, and an HDFS path for Hadoop, and must be empty')
 
         self.runner_opt_group.add_option(
-            '--label', '--job-name-prefix', dest='label', default=None,
+            '--label', dest='label', default=None,
             help='custom prefix for job name, to help us identify the job')
 
         self.runner_opt_group.add_option(

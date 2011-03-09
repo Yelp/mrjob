@@ -120,7 +120,7 @@ class MRJobRunner(object):
         :type jobconf: dict
         :param jobconf: ``-jobconf`` args to pass to hadoop streaming. This should be a map from property name to value. Equivalent to passing ``['-jobconf', 'KEY1=VALUE1', '-jobconf', 'KEY2=VALUE2', ...]`` to ``hadoop_extra_args``.
         :type label: str
-        :param label: description of this job to use as the part of its name. By default, we use the script's module name, or ``no_script`` if there is none. This used to be called *job_name_prefix* (which still works but is deprecated).
+        :param label: description of this job to use as the part of its name. By default, we use the script's module name, or ``no_script`` if there is none.
         :type owner: str
         :param owner: who is running this job. Used solely to set the job name. By default, we use :py:func:`getpass.getuser`, or ``no_user`` if it fails.
         :type python_archives: list of str
@@ -137,7 +137,6 @@ class MRJobRunner(object):
         :param upload_files: a list of files to copy to the local directory of the mr_job script when it runs. You can set the local name of the dir we unpack into by appending ``#localname`` to the path; otherwise we just use the name of the file
         """
         # enforce correct arguments
-        self._fix_deprecated_opts(opts)
         allowed_opts = set(self._allowed_opts())
         unrecognized_opts = set(opts) - allowed_opts
         if unrecognized_opts:
@@ -149,7 +148,6 @@ class MRJobRunner(object):
         # issue a warning for unknown opts from mrjob.conf and filter them out
         mrjob_conf_opts = load_opts_from_mrjob_conf(
             self.alias, conf_path=conf_path)
-        self._fix_deprecated_opts(mrjob_conf_opts)
         unrecognized_opts = set(mrjob_conf_opts) - set(self._allowed_opts())
         if unrecognized_opts:
             log.warn('got unexpected opts from mrjob.conf: ' +
@@ -286,15 +284,6 @@ class MRJobRunner(object):
             'upload_archives': combine_path_lists,
             'upload_files': combine_path_lists,
         }
-
-    @classmethod
-    def _fix_deprecated_opts(cls, opts):
-        """Scan opts for deprecated options, and issue warnings. Return a new
-        version of opts with the current versions of the options.
-        """
-        if 'job_name_prefix' in opts:
-            log.warn('job_name_prefix is DEPRECATED in v0.2.0; use label instead')
-            opts['label'] = opts['job_name_prefix']
 
     @classmethod
     def combine_opts(cls, *opts_list):

@@ -22,11 +22,10 @@ import mrjob
 import os
 import shutil
 import signal
-from testify import TestCase, assert_in, assert_equal, assert_not_equal, assert_not_in, assert_raises, setup, suite, teardown
+from testify import TestCase, assert_in, assert_equal, assert_not_equal, assert_not_in, setup, teardown
 import tempfile
 
 from mrjob.conf import dump_mrjob_conf
-from mrjob.job import MRJob, _IDENTITY_MAPPER
 from mrjob.local import LocalMRJobRunner
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
@@ -174,7 +173,6 @@ class LocalBootstrapMrjobTestCase(TestCase):
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
-    @suite('disabled', 'need a way to turn off site.py')
     def test_loading_boostrapped_mrjob_library(self):
         # track the dir we're loading mrjob from rather than the full path
         # to deal with edge cases where we load from the .py file,
@@ -200,7 +198,6 @@ class LocalBootstrapMrjobTestCase(TestCase):
             assert_not_equal(our_mrjob_dir, script_mrjob_dir)
             assert script_mrjob_dir.startswith(local_tmp_dir)
 
-    @suite('disabled', 'need a way to turn off site.py')
     def test_can_turn_off_bootstrap_mrjob(self):
         # track the dir we're loading mrjob from rather than the full path
         # to deal with edge cases where we load from the .py file,

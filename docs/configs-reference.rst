@@ -24,7 +24,7 @@ Option              Default                        Combined by                  
 *base_tmp_dir*      (automatic)                    :py:func:`~mrjob.conf.combine_paths`
 *bootstrap_mrjob*   ``True``                       :py:func:`~mrjob.conf.combine_values`
 *cleanup*           ``'IF_SUCCESSFUL'``            :py:func:`~mrjob.conf.combine_values`     :option:`--cleanup`
-*cmdenv*            ``{}``                         :py:func:`~mrjob.conf.combine_envs`
+*cmdenv*            ``{}``                         :py:func:`~mrjob.conf.combine_envs`       :option:`--cmdenv`
 *hadoop_extra_args* ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--hadoop-arg`
 *jobconf*           ``{}``                         :py:func:`~mrjob.conf.combine_dicts`      :option:`--jobconf`
 *label*             (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--label`
@@ -65,7 +65,7 @@ Option                      Default                        Combined by          
 *ec2_master_instance_type*  ``'m1.small'``                 :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-master-instance-type`
 *ec2_slave_instance_type*   ``'m1.small'``                 :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-slave-instance-type`
 *emr_endpoint*              (automatic)                    :py:func:`~mrjob.conf.combine_values`
-*emr_job_flow_id*           ``None``                       :py:func:`~mrjob.conf.combine_values`
+*emr_job_flow_id*           ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--emr-job-flow-id`
 *num_ec2_instances*         ``1``                          :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-instances`
 *s3_endpoint*               (automatic)                    :py:func:`~mrjob.conf.combine_paths`
 *s3_log_uri*                (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-log-uri`

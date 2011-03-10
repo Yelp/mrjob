@@ -20,6 +20,7 @@ import copy
 import datetime
 import getpass
 import os
+import py_compile
 import shutil
 from StringIO import StringIO
 import tempfile
@@ -715,3 +716,36 @@ class TestNoBoto(TestCase):
     def test_make_s3_conn(self):
         runner = EMRJobRunner(conf_path=False, s3_scratch_uri='s3://foo/tmp')
         assert_raises(ImportError, runner.make_s3_conn)
+
+
+class TestMasterBootstrapScript(TestCase):
+
+    @setup
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def test_master_bootstrap_script_is_valid_python(self):
+        # do everything
+        runner = EMRJobRunner(conf_path=False, s3_scratch_uri='s3://foo/tmp',
+                              bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
+                              bootstrap_files=['/tmp/quz'],
+                              bootstrap_mrjob=True,
+                              bootstrap_python_packages=['yelpy.tar.gz'],
+                              bootstrap_scripts=['speedups.sh', '/tmp/s.sh'])
+        script_path = os.path.join(self.tmp_dir, 'b.py')
+        runner._create_master_bootstrap_script(dest=script_path)
+
+        assert os.path.exists(script_path)
+        py_compile.compile(script_path)
+
+    def test_no_bootstrap_script_if_not_needed(self):
+        runner = EMRJobRunner(conf_path=False, s3_scratch_uri='s3://foo/tmp',
+                              bootstrap_mrjob=False)
+        script_path = os.path.join(self.tmp_dir, 'b.py')
+        runner._create_master_bootstrap_script(dest=script_path)
+
+        assert not os.path.exists(script_path)

@@ -5,6 +5,7 @@ v0.3.0, ??? -- ???!
    * job_name_prefix option is gone (was deprecated)
  * hadoop_bin, python_bin, and ssh_bin can now all take switches (Issue #96)
  * --ssh-bin command-line option
+ * EMR boostrap files are no longer made public on S3 (Issue #70)
 
 v0.2.4, 2011-03-09 -- fix bootstrapping mrjob
 * Fix bootstrapping of mrjob in hadoop and local mode (Issue #89)

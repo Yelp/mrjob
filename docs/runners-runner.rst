@@ -33,6 +33,7 @@ have directories, so the semantics get a little weird.
 .. automethod:: MRJobRunner.du
 .. automethod:: MRJobRunner.ls
 .. automethod:: MRJobRunner.mkdir
+.. automethod:: MRJobRunner.path_exists
 .. automethod:: MRJobRunner.path_join
 .. automethod:: MRJobRunner.rm
 .. automethod:: MRJobRunner.touchz

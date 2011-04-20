@@ -145,7 +145,8 @@ class HadoopJobRunner(MRJobRunner):
         """A list of which keyword args we can pass to __init__()"""
         return super(HadoopJobRunner, cls)._allowed_opts() + [
             'hadoop_bin', 'hadoop_home', 'hdfs_scratch_dir',
-            'hadoop_streaming_jar']
+            'hadoop_streaming_jar',
+            'input_format', 'output_format']
 
     @classmethod
     def _default_opts(cls):
@@ -279,6 +280,11 @@ class HadoopJobRunner(MRJobRunner):
             # specific argument (e.g. -libjar) which must come before job
             # specific args.
             streaming_args.extend(self._opts['hadoop_extra_args'])
+
+            if step_num == 0 and self._opts.get('input_format'):
+                streaming_args.extend(("-inputformat", self._opts['input_format']))
+            if step_num == len(steps)-1 and self._opts.get('output_format'):
+                streaming_args.extend(("-outputformat", self._opts['output_format']))
 
             # add environment variables
             for key, value in sorted(self._get_cmdenv().iteritems()):

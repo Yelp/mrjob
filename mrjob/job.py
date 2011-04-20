@@ -692,6 +692,21 @@ class MRJob(object):
             'streaming. You can use --hadoop-arg multiple times.')
 
         self.runner_opt_group.add_option(
+            '--outputformat', dest='output_format', default=None,
+            help='the hadoop OutputFormat class used to write the data. '
+            'Class must be defined in --hadoop-streaming-jar')
+
+        self.runner_opt_group.add_option(
+            '--inputformat', dest='input_format', default=None,
+            help='the hadoop OutputFormat class used to read the data. '
+            'Class must be defined in --hadoop-streaming-jar')
+
+        self.runner_opt_group.add_option(
+            '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
+            default=None,
+            help='Path of your hadoop streaming jar (REQUIRED with -r hadoop)')
+
+        self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
             help='Name/path of alternate python binary for mappers/reducers.')
 
@@ -703,10 +718,6 @@ class MRJob(object):
         self.hadoop_opt_group.add_option(
             '--hadoop-bin', dest='hadoop_bin', default=None,
             help='hadoop binary. Defaults to $HADOOP_HOME/bin/hadoop')
-        self.hadoop_opt_group.add_option(
-            '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
-            default=None,
-            help='Path of your hadoop streaming jar (REQUIRED)')
         self.hadoop_opt_group.add_option(
             '--hdfs-scratch-dir', dest='hdfs_scratch_dir',
             default=None,
@@ -870,6 +881,9 @@ class MRJob(object):
             'extra_args': self.generate_passthrough_arguments(),
             'file_upload_args': self.generate_file_upload_args(),
             'hadoop_extra_args': self.options.hadoop_extra_args,
+            'input_format': self.options.input_format,
+            'output_format': self.options.output_format,
+            'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
             'input_paths': self.args,
             'jobconf': self.options.jobconf,
             'mr_job_script': self.mr_job_script(),

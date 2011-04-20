@@ -97,7 +97,8 @@ class StreamingStep(Step):
     def __init__(self, name, mapper, reducer=None,
                  action_on_failure='TERMINATE_JOB_FLOW',
                  cache_files=None, cache_archives=None,
-                 step_args=None, input=None, output=None):
+                 step_args=None, input=None, output=None,
+				 jar=None):
         """
         A hadoop streaming elastic mapreduce step
 
@@ -128,17 +129,18 @@ class StreamingStep(Step):
         self.cache_archives = cache_archives
         self.input = input
         self.output = output
+        self._jar = jar or '/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar'
 
         if isinstance(step_args, basestring):
             step_args = [step_args]
 
         self.step_args = step_args
 
-    def jar(self):
-        return '/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar'
-
     def main_class(self):
         return None
+
+    def jar(self):
+        return self._jar
 
     def args(self):
         args = ['-mapper', self.mapper]

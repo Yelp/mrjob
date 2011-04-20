@@ -196,7 +196,7 @@ class EMRJobRunner(MRJobRunner):
     just for your job; it's also possible to run your job in an existing
     job flow by setting *emr_job_flow_id* (or :option:`--emr-job-flow-id`).
 
-    Input and support files can be either local or on S3; use ``s3://...``
+    Input, support, and jar files can be either local or on S3; use ``s3://...``
     URLs to refer to files on S3.
 
     This class has some useful utilities for talking directly to S3 and EMR,
@@ -312,6 +312,11 @@ class EMRJobRunner(MRJobRunner):
             file_dict = self._add_bootstrap_file(path)
             self._bootstrap_python_packages.append(file_dict)
 
+        if self._opts.get('hadoop_streaming_jar'):
+            self._jar_dict = self._add_jar_file(self._opts['hadoop_streaming_jar'])
+        else:
+            self._jar_dict = {}
+
         # if we're bootstrapping mrjob, keep track of the file_dict
         # for mrjob.tar.gz
         self._mrjob_tar_gz_file = None
@@ -357,7 +362,8 @@ class EMRJobRunner(MRJobRunner):
             'num_ec2_instances', 's3_endpoint', 's3_log_uri',
             's3_scratch_uri', 's3_sync_wait_time', 'ssh_bin',
             'ssh_bind_ports', 'ssh_tunnel_is_open',
-            'ssh_tunnel_to_job_tracker']
+            'ssh_tunnel_to_job_tracker', 'hadoop_streaming_jar',
+            'input_format', 'output_format']
 
     @classmethod
     def _default_opts(cls):
@@ -451,6 +457,12 @@ class EMRJobRunner(MRJobRunner):
         self._files.append(file_dict)
         return file_dict
 
+    def _add_jar_file(self, path):
+        name, path = self._split_path(path)
+        file_dict = {'path': path, 'name': name, 'jar': 'file'}
+        self._files.append(file_dict)
+        return file_dict
+
     def _run(self):
         self._setup_input()
         self._create_wrapper_script()
@@ -498,6 +510,12 @@ class EMRJobRunner(MRJobRunner):
                 s3_key.set_contents_from_filename(path)
 
             self._s3_input_uris.append(s3_input_dir)
+
+    def _add_bootstrap_file(self, path):
+        name, path = self._split_path(path)
+        file_dict = {'path': path, 'name': name, 'bootstrap': 'file'}
+        self._files.append(file_dict)
+        return file_dict
 
     def _setup_output(self):
         """Set self._output_dir if it's not set already."""
@@ -741,6 +759,7 @@ class EMRJobRunner(MRJobRunner):
 
         log.info('Job flow created with ID: %s' % emr_job_flow_id)
         return emr_job_flow_id
+
     def _build_steps(self):
         """Return a list of boto Step objects corresponding to the
         steps we want to run."""
@@ -805,11 +824,17 @@ class EMRJobRunner(MRJobRunner):
 
             step_args.extend(self._opts['hadoop_extra_args'])
 
+            if step_num == 0 and self._opts.get('input_format'):
+                step_args.extend(("-inputformat", self._opts['input_format']))
+            if step_num == len(steps)-1 and self._opts.get('output_format'):
+                step_args.extend(("-outputformat", self._opts['output_format']))
+
             step_list.append(botoemr.StreamingStep(
                 name=name, mapper=mapper, reducer=reducer,
                 action_on_failure=action_on_failure,
                 cache_files=cache_files, cache_archives=cache_archives,
-                step_args=step_args, input=input, output=output))
+                step_args=step_args, input=input, output=output,
+                jar=self._jar_dict.get('s3_uri')))
 
         return step_list
 

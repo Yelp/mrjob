@@ -692,19 +692,21 @@ class MRJob(object):
             'streaming. You can use --hadoop-arg multiple times.')
 
         self.runner_opt_group.add_option(
-            '--outputformat', dest='output_format', default=None,
-            help='the hadoop OutputFormat class used to write the data. '
-            'Class must be defined in --hadoop-streaming-jar')
+            '--hadoop-input-format', dest='hadoop_input_format', default=None,
+            help='the hadoop InputFormat class used to write the data. '
+            'Custom formats must be included in your hadoop streaming jar (see '
+            '--hadoop-streaming-jar)')
 
         self.runner_opt_group.add_option(
-            '--inputformat', dest='input_format', default=None,
-            help='the hadoop OutputFormat class used to read the data. '
-            'Class must be defined in --hadoop-streaming-jar')
+            '--hadoop-output-format', dest='hadoop_output_format', default=None,
+            help='the hadoop OutputFormat class used to write the data. '
+            'Custom formats must be included in your hadoop streaming jar (see '
+            '--hadoop-streaming-jar)')
 
         self.runner_opt_group.add_option(
             '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
             default=None,
-            help='Path of your hadoop streaming jar (REQUIRED with -r hadoop)')
+            help='Path of your hadoop streaming jar')
 
         self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
@@ -881,8 +883,8 @@ class MRJob(object):
             'extra_args': self.generate_passthrough_arguments(),
             'file_upload_args': self.generate_file_upload_args(),
             'hadoop_extra_args': self.options.hadoop_extra_args,
-            'input_format': self.options.input_format,
-            'output_format': self.options.output_format,
+            'hadoop_input_format': self.options.hadoop_input_format,
+            'hadoop_output_format': self.options.hadoop_output_format,
             'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
             'input_paths': self.args,
             'jobconf': self.options.jobconf,
@@ -890,10 +892,10 @@ class MRJob(object):
             'label': self.options.label,
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
+            'python_bin': self.options.python_bin,
             'stdin': self.stdin,
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,
-            'python_bin': self.options.python_bin,
         }
 
     def local_job_runner_kwargs(self):

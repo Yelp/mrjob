@@ -256,8 +256,12 @@ class EMRJobRunner(MRJobRunner):
         :param emr_endpoint: optional host to connect to when communicating with S3 (e.g. ``us-west-1.elasticmapreduce.amazonaws.com``). Default is to infer this from *aws_region*.
         :type emr_job_flow_id: str
         :param emr_job_flow_id: the ID of a persistent EMR job flow to run jobs in (normally we launch our own job). It's fine for other jobs to be using the job flow; we give our job's steps a unique ID.
+        :type hadoop_streaming_jar: str
+        :param hadoop_streaming_jar: This is actually an option in the base MRJobRunner class. Points to a custom hadoop streaming jar on the local filesystem or S3. If you want to point to a streaming jar already installed on the EMR instances (perhaps through a bootstrap action?), use *remote_hadoop_streaming_jar*.
         :type num_ec2_instances: int
         :param num_ec2_instances: number of instances to start up. Default is ``1``.
+        :type remote_hadoop_streaming_jar: str
+        :param remote_hadoop_streaming_jar: Like *hadoop_streaming_jar*, except that it points to a path on the EMR instance, rather than a local path. Rarely necessary.
         :type s3_endpoint: str
         :param s3_endpoint: Host to connect to when communicating with S3 (e.g. ``s3-us-west-1.amazonaws.com``). Default is to infer this from *aws_region*.
         :type s3_log_uri: str
@@ -312,10 +316,10 @@ class EMRJobRunner(MRJobRunner):
             file_dict = self._add_bootstrap_file(path)
             self._bootstrap_python_packages.append(file_dict)
 
+        self._streaming_jar = None
         if self._opts.get('hadoop_streaming_jar'):
-            self._jar_dict = self._add_jar_file(self._opts['hadoop_streaming_jar'])
-        else:
-            self._jar_dict = {}
+            self._streaming_jar = self._add_file_for_upload(
+                self._opts['hadoop_streaming_jar'])
 
         # if we're bootstrapping mrjob, keep track of the file_dict
         # for mrjob.tar.gz
@@ -354,16 +358,32 @@ class EMRJobRunner(MRJobRunner):
     def _allowed_opts(cls):
         """A list of which keyword args we can pass to __init__()"""
         return super(EMRJobRunner, cls)._allowed_opts() + [
-            'aws_access_key_id', 'aws_secret_access_key', 'aws_region',
-            'bootstrap_cmds', 'bootstrap_files', 'bootstrap_python_packages',
-            'bootstrap_scripts', 'check_emr_status_every', 'ec2_instance_type',
-            'ec2_key_pair', 'ec2_key_pair_file', 'ec2_master_instance_type',
-            'ec2_slave_instance_type', 'emr_endpoint', 'emr_job_flow_id',
-            'num_ec2_instances', 's3_endpoint', 's3_log_uri',
-            's3_scratch_uri', 's3_sync_wait_time', 'ssh_bin',
-            'ssh_bind_ports', 'ssh_tunnel_is_open',
-            'ssh_tunnel_to_job_tracker', 'hadoop_streaming_jar',
-            'input_format', 'output_format']
+            'aws_access_key_id',
+            'aws_secret_access_key',
+            'aws_region',
+            'bootstrap_cmds',
+            'bootstrap_files',
+            'bootstrap_python_packages',
+            'bootstrap_scripts',
+            'check_emr_status_every',
+            'ec2_instance_type',
+            'ec2_key_pair',
+            'ec2_key_pair_file',
+            'ec2_master_instance_type',
+            'ec2_slave_instance_type',
+            'emr_endpoint',
+            'emr_job_flow_id',
+            'num_ec2_instances',
+            'remote_hadoop_streaming_jar',
+            's3_endpoint',
+            's3_log_uri',
+            's3_scratch_uri',
+            's3_sync_wait_time',
+            'ssh_bin',
+            'ssh_bind_ports',
+            'ssh_tunnel_is_open',
+            'ssh_tunnel_to_job_tracker',
+        ]
 
     @classmethod
     def _default_opts(cls):
@@ -450,18 +470,6 @@ class EMRJobRunner(MRJobRunner):
             s3_uri = s3_uri + '/'
 
         return s3_uri
-
-    def _add_bootstrap_file(self, path):
-        name, path = self._split_path(path)
-        file_dict = {'path': path, 'name': name, 'bootstrap': 'file'}
-        self._files.append(file_dict)
-        return file_dict
-
-    def _add_jar_file(self, path):
-        name, path = self._split_path(path)
-        file_dict = {'path': path, 'name': name, 'jar': 'file'}
-        self._files.append(file_dict)
-        return file_dict
 
     def _run(self):
         self._setup_input()
@@ -816,6 +824,7 @@ class EMRJobRunner(MRJobRunner):
             # other arguments passed directly to hadoop streaming
             step_args = []
 
+            # TODO: unify this with similar code in hadoop
             for key, value in sorted(self._get_cmdenv().iteritems()):
                 step_args.extend(['-cmdenv', '%s=%s' % (key, value)])
 
@@ -824,19 +833,34 @@ class EMRJobRunner(MRJobRunner):
 
             step_args.extend(self._opts['hadoop_extra_args'])
 
-            if step_num == 0 and self._opts.get('input_format'):
-                step_args.extend(("-inputformat", self._opts['input_format']))
-            if step_num == len(steps)-1 and self._opts.get('output_format'):
-                step_args.extend(("-outputformat", self._opts['output_format']))
+            if (step_num == 0 and
+                self._opts.get('hadoop_input_format')):
+                step_args.extend(['-inputformat',
+                                  self._opts['hadoop_input_format']])
+
+            if (step_num == len(steps) - 1 and
+                self._opts.get('hadoop_output_format')):
+                step_args.extend(['-outputformat',
+                                  self._opts['hadoop_output_format']])
 
             step_list.append(botoemr.StreamingStep(
                 name=name, mapper=mapper, reducer=reducer,
                 action_on_failure=action_on_failure,
                 cache_files=cache_files, cache_archives=cache_archives,
                 step_args=step_args, input=input, output=output,
-                jar=self._jar_dict.get('s3_uri')))
+                jar=self._jar()))
 
         return step_list
+
+    def _jar(self):
+        self._name_files()
+        self._pick_s3_uris_for_files()
+
+        if self._streaming_jar:
+            return self._streaming_jar['s3_uri']
+        else:
+            # this might be None, but that just means to use the default
+            return self.opts['remote_hadoop_streaming_jar']
 
     def _launch_emr_job(self):
         """Create an empty jobflow on EMR, and set self._emr_job_flow_id to

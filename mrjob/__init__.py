@@ -18,7 +18,7 @@
 __author__ = 'David Marin <dave@yelp.com>'
 
 __credits__ = ['James Brown <jbrown@yelp.com>',
-               'Adam Derewicki <derwiki@yelp.com>',
+               'Adam Derewicki <derewecki@gmail.com>',
                'Peter Harrington <peter.b.harrington@gmail.com>',
                'Brett Hoerner <brett@bretthoerner.com>',
                'Matt Jones <mattj@yelp.com>',

@@ -913,7 +913,7 @@ class MRJobRunner(object):
 
         return self._mrjob_tar_gz_path
 
-    def _hadoop_config_args(self, step_num, num_steps):
+    def _hadoop_conf_args(self, step_num, num_steps):
         """Build a list of extra arguments to the hadoop binary.
 
         This handles *cmdenv*, *hadoop_extra_args*, *hadoop_input_format*,
@@ -922,6 +922,8 @@ class MRJobRunner(object):
         This doesn't handle input, output, mappers, reducers, or uploading
         files.
         """
+        assert 0 <= step_num < num_steps
+
         args = []
 
         # hadoop_extra_args

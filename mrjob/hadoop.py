@@ -281,7 +281,7 @@ class HadoopJobRunner(MRJobRunner):
             # specific argument (e.g. -libjar) which must come before job
             # specific args.
             streaming_args.extend(
-                self._hadoop_config_args(step_num, len(steps)))
+                self._hadoop_conf_args(step_num, len(steps)))
 
             # setup input
             for input_uri in self._hdfs_step_input_files(step_num):

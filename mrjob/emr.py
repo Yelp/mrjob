@@ -821,7 +821,7 @@ class EMRJobRunner(MRJobRunner):
             input = self._s3_step_input_uris(step_num)
             output = self._s3_step_output_uri(step_num)
 
-            step_args = self._hadoop_config_args(step_num, len(steps))
+            step_args = self._hadoop_conf_args(step_num, len(steps))
 
             step_list.append(botoemr.StreamingStep(
                 name=name, mapper=mapper, reducer=reducer,

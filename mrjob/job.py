@@ -706,7 +706,7 @@ class MRJob(object):
         self.runner_opt_group.add_option(
             '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
             default=None,
-            help='Path of your hadoop streaming jar')
+            help='Path of your hadoop streaming jar (locally, or on S3/HDFS)')
 
         self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
@@ -764,6 +764,11 @@ class MRJob(object):
         self.emr_opt_group.add_option(
             '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
             help='ID of an existing EMR job flow to use')
+        self.emr_opt_group.add_option(
+            '--hadoop-streaming-jar-on-emr', dest='hadoop_streaming_jar_on_emr',
+            default=None,
+            help='Local path of the hadoop streaming jar on the EMR node. Rarely necessary')
+
 
     def add_passthrough_option(self, *args, **kwargs):
         """Function to create options which both the job runner

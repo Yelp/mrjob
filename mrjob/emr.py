@@ -257,11 +257,11 @@ class EMRJobRunner(MRJobRunner):
         :type emr_job_flow_id: str
         :param emr_job_flow_id: the ID of a persistent EMR job flow to run jobs in (normally we launch our own job). It's fine for other jobs to be using the job flow; we give our job's steps a unique ID.
         :type hadoop_streaming_jar: str
-        :param hadoop_streaming_jar: This is actually an option in the base MRJobRunner class. Points to a custom hadoop streaming jar on the local filesystem or S3. If you want to point to a streaming jar already installed on the EMR instances (perhaps through a bootstrap action?), use *remote_hadoop_streaming_jar*.
+        :param hadoop_streaming_jar: This is actually an option in the base MRJobRunner class. Points to a custom hadoop streaming jar on the local filesystem or S3. If you want to point to a streaming jar already installed on the EMR instances (perhaps through a bootstrap action?), use *hadoop_streaming_jar_on_emr*.
         :type num_ec2_instances: int
         :param num_ec2_instances: number of instances to start up. Default is ``1``.
-        :type remote_hadoop_streaming_jar: str
-        :param remote_hadoop_streaming_jar: Like *hadoop_streaming_jar*, except that it points to a path on the EMR instance, rather than a local path. Rarely necessary.
+        :type hadoop_streaming_jar_on_emr: str
+        :param hadoop_streaming_jar_on_emr: Like *hadoop_streaming_jar*, except that it points to a path on the EMR instance, rather than to a local file or one on S3. Rarely necessary.
         :type s3_endpoint: str
         :param s3_endpoint: Host to connect to when communicating with S3 (e.g. ``s3-us-west-1.amazonaws.com``). Default is to infer this from *aws_region*.
         :type s3_log_uri: str
@@ -373,8 +373,8 @@ class EMRJobRunner(MRJobRunner):
             'ec2_slave_instance_type',
             'emr_endpoint',
             'emr_job_flow_id',
+            'hadoop_streaming_jar_on_emr',
             'num_ec2_instances',
-            'remote_hadoop_streaming_jar',
             's3_endpoint',
             's3_log_uri',
             's3_scratch_uri',
@@ -860,7 +860,7 @@ class EMRJobRunner(MRJobRunner):
             return self._streaming_jar['s3_uri']
         else:
             # this might be None, but that just means to use the default
-            return self.opts['remote_hadoop_streaming_jar']
+            return self._opts['hadoop_streaming_jar_on_emr']
 
     def _launch_emr_job(self):
         """Create an empty jobflow on EMR, and set self._emr_job_flow_id to

@@ -19,7 +19,7 @@ __author__ = 'David Marin <dave@yelp.com>'
 
 __credits__ = ['Jim Blomo <jblomo@yelp.com>',
                'James Brown <jbrown@yelp.com>',
-               'Adam Derewicki <derwiki@yelp.com>',
+               'Adam Derewecki <derewecki@gmail.com>',
                'Peter Harrington <peter.b.harrington@gmail.com>',
                'Brett Hoerner <brett@bretthoerner.com>',
                'Matt Jones <mattj@yelp.com>',
@@ -28,4 +28,4 @@ __credits__ = ['Jim Blomo <jblomo@yelp.com>',
                'Ned Rockson <ned@tellapart.com>',
                'Paul Wais <pwais@yelp.com>']
 
-__version__ = '0.2.4'
+__version__ = '0.2.5-dev'

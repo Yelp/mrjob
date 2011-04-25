@@ -1,3 +1,9 @@
+v0.2.5, 2011-04-XX -- input and output formats
+ * Added hadoop_input/output_format options
+ * You can now specify a custom Hadoop streaming jar (hadoop_streaming_jar)
+ * extra args to hadoop now come before -mapper/-reducer on EMR, so
+   that e.g. -libjar will work (worked in hadoop mode since v0.2.2)
+
 v0.2.4, 2011-03-09 -- fix bootstrapping mrjob
  * Fix bootstrapping of mrjob in hadoop and local mode (Issue #89)
  * SSH tunnels try to use the same port for the same job flow (Issue #67)

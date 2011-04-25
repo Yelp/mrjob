@@ -117,6 +117,12 @@ class MRJobRunner(object):
         :param cmdenv: environment variables to pass to the job inside Hadoop streaming
         :type hadoop_extra_args: list of str
         :param hadoop_extra_args: extra arguments to pass to hadoop streaming
+        :type hadoop_input_format: str
+        :param hadoop_input_format: name of an optional Hadoop ``InputFormat`` class. Passed to Hadoop along with your first step with the ``-inputformat`` option. Note that if you write your own class, you'll need to include it in your own custom streaming jar (see *hadoop_streaming_jar*).
+        :type hadoop_output_format: str
+        :param hadoop_output_format: name of an optional Hadoop output format class. Passed to Hadoop along with your first step with the ``-outputformat`` option. Note that if you write your own class, you'll need to include it in your own custom streaming jar (see *hadoop_streaming_jar*).
+        :type hadoop_streaming_jar: str
+        :param hadoop_streaming_jar: path to a custom hadoop streaming jar.
         :type jobconf: dict
         :param jobconf: ``-jobconf`` args to pass to hadoop streaming. This should be a map from property name to value. Equivalent to passing ``['-jobconf', 'KEY1=VALUE1', '-jobconf', 'KEY2=VALUE2', ...]`` to ``hadoop_extra_args``.
         :type label: str
@@ -247,10 +253,25 @@ class MRJobRunner(object):
     @classmethod
     def _allowed_opts(cls):
         """A list of which keyword args we can pass to __init__()"""
-        return ['base_tmp_dir', 'bootstrap_mrjob', 'cleanup', 'cmdenv',
-                'hadoop_extra_args', 'jobconf', 'label', 'owner',
-                'python_archives', 'python_bin', 'setup_cmds',
-                'setup_scripts', 'upload_archives', 'upload_files']
+        return [
+            'base_tmp_dir',
+            'bootstrap_mrjob',
+            'cleanup',
+            'cmdenv',
+            'hadoop_extra_args',
+            'hadoop_input_format',
+            'hadoop_output_format',
+            'hadoop_streaming_jar',
+            'jobconf',
+            'label',
+            'owner',
+            'python_archives',
+            'python_bin',
+            'setup_cmds',
+            'setup_scripts',
+            'upload_archives',
+            'upload_files',
+        ]
 
     @classmethod
     def _default_opts(cls):
@@ -524,9 +545,20 @@ class MRJobRunner(object):
 
         return name, path
 
+    def _add_file(self, path):
+        """Add a file that's uploaded, but not added to the working
+        dir for *mr_job_script*.
+
+        You probably want _add_for_upload() in most cases
+        """
+        name, path = self._split_path(path)
+        file_dict = {'path': path, 'name': name}
+        self._files.append(file_dict)
+        return file_dict
+
     def _add_for_upload(self, path, what):
         """Add a file to our list of files to copy into the working
-        dir for mr_job_script.
+        dir for *mr_job_script*.
 
         path -- path to the file on the local filesystem. Normally
             we just use the file's name as it's remote name. You can
@@ -880,3 +912,40 @@ class MRJobRunner(object):
             self._mrjob_tar_gz_path = tar_gz_path
 
         return self._mrjob_tar_gz_path
+
+    def _hadoop_conf_args(self, step_num, num_steps):
+        """Build a list of extra arguments to the hadoop binary.
+
+        This handles *cmdenv*, *hadoop_extra_args*, *hadoop_input_format*,
+        *hadoop_output_format*, and *jobconf*
+
+        This doesn't handle input, output, mappers, reducers, or uploading
+        files.
+        """
+        assert 0 <= step_num < num_steps
+
+        args = []
+
+        # hadoop_extra_args
+        args.extend(self._opts['hadoop_extra_args'])
+
+        # cmdenv
+        for key, value in sorted(self._get_cmdenv().iteritems()):
+            args.append('-cmdenv')
+            args.append('%s=%s' % (key, value))
+
+        # hadoop_input_format
+        if (step_num == 0 and
+            self._opts.get('hadoop_input_format')):
+            args.extend(['-inputformat', self._opts['hadoop_input_format']])
+
+        # hadoop_output_format
+        if (step_num == num_steps - 1 and
+            self._opts.get('hadoop_output_format')):
+            args.extend(['-outputformat', self._opts['hadoop_output_format']])
+
+        # jobconf
+        for key, value in sorted(self._opts['jobconf'].iteritems()):
+            args.extend(['-jobconf', '%s=%s' % (key, value)])
+
+        return args

@@ -122,7 +122,9 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '-c', self.mrjob_conf_path,
-                               '-', local_input_path, remote_input_path])
+                               '-', local_input_path, remote_input_path,
+                               '--hadoop-input-format', 'FooFormat',
+                               '--hadoop-output-format', 'BarFormat'])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
@@ -154,6 +156,13 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             name_match = JOB_NAME_RE.match(job_flow.name)
             assert_equal(name_match.group(1), 'mr_two_step_job')
             assert_equal(name_match.group(2), getpass.getuser())
+
+            # make sure our input and output formats are attached to
+            # the correct steps
+            assert_in('-inputformat', job_flow.steps[0].args)
+            assert_not_in('-outputformat', job_flow.steps[0].args)
+            assert_not_in('-inputformat', job_flow.steps[1].args)
+            assert_in('-outputformat', job_flow.steps[1].args)
 
             # make sure mrjob.tar.gz is created and uploaded as
             # a bootstrap file

@@ -280,22 +280,8 @@ class HadoopJobRunner(MRJobRunner):
             # Add extra hadoop args first as hadoop args could be a hadoop
             # specific argument (e.g. -libjar) which must come before job
             # specific args.
-            streaming_args.extend(self._opts['hadoop_extra_args'])
-
-            if (step_num == 0 and
-                self._opts.get('hadoop_input_format')):
-                streaming_args.extend(['-inputformat',
-                                       self._opts['hadoop_input_format']])
-
-            if (step_num == len(steps) - 1 and
-                self._opts.get('hadoop_output_format')):
-                streaming_args.extend(['-outputformat',
-                                       self._opts['hadoop_output_format']])
-
-            # add environment variables
-            for key, value in sorted(self._get_cmdenv().iteritems()):
-                streaming_args.append('-cmdenv')
-                streaming_args.append('%s=%s' % (key, value))
+            streaming_args.extend(
+                self._hadoop_config_args(step_num, len(steps)))
 
             # setup input
             for input_uri in self._hdfs_step_input_files(step_num):
@@ -307,10 +293,6 @@ class HadoopJobRunner(MRJobRunner):
 
             # set up uploading from HDFS to the working dir
             streaming_args.extend(self._upload_args())
-
-            # add jobconf args
-            for key, value in sorted(self._opts['jobconf'].iteritems()):
-                streaming_args.extend(['-jobconf', '%s=%s' % (key, value)])
 
             # set up mapper and reducer
             streaming_args.append('-mapper')

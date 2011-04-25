@@ -66,7 +66,7 @@ class JarStep(Step):
         :param step_args: A list of arguments to pass to the step
         """
         self.name = name
-        self._jar = jar
+        self.jar = jar
         self._main_class = main_class
         self.action_on_failure = action_on_failure
 
@@ -76,7 +76,7 @@ class JarStep(Step):
         self.step_args = step_args
 
     def jar(self):
-        return self._jar
+        return self.jar
 
     def args(self):
         args = []
@@ -129,7 +129,7 @@ class StreamingStep(Step):
         self.cache_archives = cache_archives
         self.input = input
         self.output = output
-        self._jar = jar or '/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar'
+        self.jar = jar or '/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar'
 
         if isinstance(step_args, basestring):
             step_args = [step_args]
@@ -140,13 +140,22 @@ class StreamingStep(Step):
         return None
 
     def jar(self):
-        return self._jar
+        return self.jar
 
     def args(self):
-        args = ['-mapper', self.mapper]
+        args = []
+
+        # put extra args BEFORE -mapper and -reducer so that e.g. -libjar 
+        # will work
+        if self.step_args:
+            args.extend(self.step_args)
+
+        args.extend(['-mapper', self.mapper])
 
         if self.reducer:
             args.extend(['-reducer', self.reducer])
+        else:
+            args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
 
         if self.input:
             if isinstance(self.input, list):
@@ -164,12 +173,6 @@ class StreamingStep(Step):
         if self.cache_archives:
            for cache_archive in self.cache_archives:
                 args.extend(('-cacheArchive', cache_archive))
-
-        if self.step_args:
-            args.extend(self.step_args)
-
-        if not self.reducer:
-            args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
 
         return args
 

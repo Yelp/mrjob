@@ -821,38 +821,18 @@ class EMRJobRunner(MRJobRunner):
             input = self._s3_step_input_uris(step_num)
             output = self._s3_step_output_uri(step_num)
 
-            # other arguments passed directly to hadoop streaming
-            step_args = []
-
-            # TODO: unify this with similar code in hadoop
-            for key, value in sorted(self._get_cmdenv().iteritems()):
-                step_args.extend(['-cmdenv', '%s=%s' % (key, value)])
-
-            for key, value in sorted(self._opts['jobconf'].iteritems()):
-                step_args.extend(['-jobconf', '%s=%s' % (key, value)])
-
-            step_args.extend(self._opts['hadoop_extra_args'])
-
-            if (step_num == 0 and
-                self._opts.get('hadoop_input_format')):
-                step_args.extend(['-inputformat',
-                                  self._opts['hadoop_input_format']])
-
-            if (step_num == len(steps) - 1 and
-                self._opts.get('hadoop_output_format')):
-                step_args.extend(['-outputformat',
-                                  self._opts['hadoop_output_format']])
+            step_args = self._hadoop_config_args(step_num, len(steps))
 
             step_list.append(botoemr.StreamingStep(
                 name=name, mapper=mapper, reducer=reducer,
                 action_on_failure=action_on_failure,
                 cache_files=cache_files, cache_archives=cache_archives,
                 step_args=step_args, input=input, output=output,
-                jar=self._jar()))
+                jar=self._get_jar()))
 
         return step_list
 
-    def _jar(self):
+    def _get_jar(self):
         self._name_files()
         self._pick_s3_uris_for_files()
 

@@ -912,3 +912,38 @@ class MRJobRunner(object):
             self._mrjob_tar_gz_path = tar_gz_path
 
         return self._mrjob_tar_gz_path
+
+    def _hadoop_config_args(self, step_num, num_steps):
+        """Build a list of extra arguments to the hadoop binary.
+
+        This handles *cmdenv*, *hadoop_extra_args*, *hadoop_input_format*,
+        *hadoop_output_format*, and *jobconf*
+
+        This doesn't handle input, output, mappers, reducers, or uploading
+        files.
+        """
+        args = []
+
+        # hadoop_extra_args
+        args.extend(self._opts['hadoop_extra_args'])
+
+        # cmdenv
+        for key, value in sorted(self._get_cmdenv().iteritems()):
+            args.append('-cmdenv')
+            args.append('%s=%s' % (key, value))
+
+        # hadoop_input_format
+        if (step_num == 0 and
+            self._opts.get('hadoop_input_format')):
+            args.extend(['-inputformat', self._opts['hadoop_input_format']])
+
+        # hadoop_output_format
+        if (step_num == num_steps - 1 and
+            self._opts.get('hadoop_output_format')):
+            args.extend(['-outputformat', self._opts['hadoop_output_format']])
+
+        # jobconf
+        for key, value in sorted(self._opts['jobconf'].iteritems()):
+            args.extend(['-jobconf', '%s=%s' % (key, value)])
+
+        return args

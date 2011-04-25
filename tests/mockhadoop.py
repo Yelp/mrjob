@@ -136,7 +136,7 @@ def main():
             cmd_log.write(' '.join(pipes.quote(arg) for arg in sys.argv[1:]))
             cmd_log.write('\n')
             cmd_log.flush()
-            
+
     if len(sys.argv) < 2:
         sys.stderr.write('Usage: hadoop [--config confdir] COMMAND\n')
         sys.exit(1)

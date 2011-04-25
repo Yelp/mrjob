@@ -63,5 +63,6 @@ Links
 
  * source: <http://github.com/Yelp/mrjob>
  * documentation: <http://packages.python.org/mrjob/>
+ * discussion group: <http://groups.google.com/group/mrjob>
  * Hadoop MapReduce: <http://hadoop.apache.org/mapreduce/>
  * Elastic MapReduce: <http://aws.amazon.com/documentation/elasticmapreduce/>

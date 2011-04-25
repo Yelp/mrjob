@@ -1,3 +1,9 @@
+mrjob (0.2.5) unstable; urgency=low
+
+  * See CHANGES.txt
+
+ -- David Marin <dave@yelp.com>  Mon, 25 Apr 2011 16:54:52 -0700
+
 mrjob (0.2.4) unstable; urgency=low
 
   * See CHANGES.txt

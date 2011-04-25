@@ -38,7 +38,7 @@ Option                 Default                        Combined by               
 *setup_scripts*        ``[]``                         :py:func:`~mrjob.conf.combine_path_lists`
 *upload_archives*      ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--archive`
 *upload_files*         ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--file`
-====================== ============================== ========================================= ==================================
+====================== ============================== ========================================= =================================
 
 See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
 

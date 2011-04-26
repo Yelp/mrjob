@@ -32,7 +32,7 @@ from mrjob.util import cmd_line
 
 log = logging.getLogger('mrjob.hadoop')
 
-HDFS_URI_RE = re.compile(r'^hdfs://(.*?)(/.*?)$')
+HDFS_URI_RE = re.compile(r'^s3n:/|hdfs://(.*?)(/.*?)$')
 
 # to filter out the log4j stuff that hadoop streaming prints out
 HADOOP_STREAMING_OUTPUT_RE = re.compile(r'^(\S+ \S+ \S+ \S+: )?(.*)$')
@@ -60,7 +60,7 @@ def find_hadoop_streaming_jar(path):
 
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
-    if path.startswith('hdfs://'):
+    if path.startswith('hdfs://') or path.startswith('s3n:/'):
         return path
     elif path.startswith('/'):
         return 'hdfs://' + path

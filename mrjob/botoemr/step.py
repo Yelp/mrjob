@@ -136,16 +136,16 @@ class StreamingStep(Step):
 
         self.step_args = step_args
 
-    def main_class(self):
-        return None
-
     def jar(self):
         return self._jar
+
+    def main_class(self):
+        return None
 
     def args(self):
         args = []
 
-        # put extra args BEFORE -mapper and -reducer so that e.g. -libjar 
+        # put extra args BEFORE -mapper and -reducer so that e.g. -libjar
         # will work
         if self.step_args:
             args.extend(self.step_args)

@@ -66,7 +66,7 @@ class JarStep(Step):
         :param step_args: A list of arguments to pass to the step
         """
         self.name = name
-        self.jar = jar
+        self._jar = jar
         self._main_class = main_class
         self.action_on_failure = action_on_failure
 
@@ -76,7 +76,7 @@ class JarStep(Step):
         self.step_args = step_args
 
     def jar(self):
-        return self.jar
+        return self._jar
 
     def args(self):
         args = []
@@ -98,7 +98,7 @@ class StreamingStep(Step):
                  action_on_failure='TERMINATE_JOB_FLOW',
                  cache_files=None, cache_archives=None,
                  step_args=None, input=None, output=None,
-				 jar=None):
+                 jar=None):
         """
         A hadoop streaming elastic mapreduce step
 

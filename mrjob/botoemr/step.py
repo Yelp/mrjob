@@ -129,7 +129,7 @@ class StreamingStep(Step):
         self.cache_archives = cache_archives
         self.input = input
         self.output = output
-        self.jar = jar or '/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar'
+        self._jar = jar or '/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar'
 
         if isinstance(step_args, basestring):
             step_args = [step_args]
@@ -140,7 +140,7 @@ class StreamingStep(Step):
         return None
 
     def jar(self):
-        return self.jar
+        return self._jar
 
     def args(self):
         args = []

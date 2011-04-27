@@ -19,7 +19,8 @@ Relies on these environment variables:
 MOCK_HDFS_ROOT -- root dir for our fake HDFS filesystem
 MOCK_HADOOP_OUTPUT -- a directory containing directories containing
 fake job output (to add output, use add_mock_output())
-
+MOCK_HADOOP_CMD_LOG -- optional: if this is set, append arguments passed
+to the fake hadoop binary to this script, one line per invocation
 
 This is designed to run as: python -m tests.mockhadoop <hadoop args>
 
@@ -128,6 +129,14 @@ def invoke_cmd(prefix, cmd, cmd_args, error_msg, error_status):
 
 def main():
     """Implements hadoop <args>"""
+
+    # log what commands we ran
+    if os.environ.get('MOCK_HADOOP_LOG'):
+        with open(os.environ['MOCK_HADOOP_LOG'], 'a') as cmd_log:
+            cmd_log.write(' '.join(pipes.quote(arg) for arg in sys.argv[1:]))
+            cmd_log.write('\n')
+            cmd_log.flush()
+
     if len(sys.argv) < 2:
         sys.stderr.write('Usage: hadoop [--config confdir] COMMAND\n')
         sys.exit(1)

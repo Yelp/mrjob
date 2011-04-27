@@ -32,7 +32,7 @@ from mrjob.util import cmd_line
 
 log = logging.getLogger('mrjob.hadoop')
 
-HDFS_URI_RE = re.compile(r'^hdfs://(.*?)(/.*?)$')
+HDFS_URI_RE = re.compile(r'^s3n:/|hdfs://(.*?)(/.*?)$')
 
 # to filter out the log4j stuff that hadoop streaming prints out
 HADOOP_STREAMING_OUTPUT_RE = re.compile(r'^(\S+ \S+ \S+ \S+: )?(.*)$')
@@ -60,7 +60,7 @@ def find_hadoop_streaming_jar(path):
 
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
-    if path.startswith('hdfs://'):
+    if path.startswith('hdfs://') or path.startswith('s3n:/'):
         return path
     elif path.startswith('/'):
         return 'hdfs://' + path
@@ -96,8 +96,8 @@ class HadoopJobRunner(MRJobRunner):
         :param hadoop_home: alternative to setting :envvar:`HADOOP_HOME` variable.
         :type hdfs_scratch_dir: str
         :param hdfs_scratch_dir: temp directory on HDFS. Default is ``tmp/mrjob``
-        :type hadoop_streaming_jar: str
-        :param hadoop_streaming_jar: path to your hadoop streaming jar. If not set, we'll search for it inside :envvar:`HADOOP_HOME`
+
+        *hadoop_streaming_jar* is optional; by default, we'll search for it inside :envvar:`HADOOP_HOME`
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 
@@ -144,8 +144,10 @@ class HadoopJobRunner(MRJobRunner):
     def _allowed_opts(cls):
         """A list of which keyword args we can pass to __init__()"""
         return super(HadoopJobRunner, cls)._allowed_opts() + [
-            'hadoop_bin', 'hadoop_home', 'hdfs_scratch_dir',
-            'hadoop_streaming_jar']
+            'hadoop_bin',
+            'hadoop_home',
+            'hdfs_scratch_dir',
+        ]
 
     @classmethod
     def _default_opts(cls):
@@ -278,12 +280,8 @@ class HadoopJobRunner(MRJobRunner):
             # Add extra hadoop args first as hadoop args could be a hadoop
             # specific argument (e.g. -libjar) which must come before job
             # specific args.
-            streaming_args.extend(self._opts['hadoop_extra_args'])
-
-            # add environment variables
-            for key, value in sorted(self._get_cmdenv().iteritems()):
-                streaming_args.append('-cmdenv')
-                streaming_args.append('%s=%s' % (key, value))
+            streaming_args.extend(
+                self._hadoop_conf_args(step_num, len(steps)))
 
             # setup input
             for input_uri in self._hdfs_step_input_files(step_num):
@@ -295,10 +293,6 @@ class HadoopJobRunner(MRJobRunner):
 
             # set up uploading from HDFS to the working dir
             streaming_args.extend(self._upload_args())
-
-            # add jobconf args
-            for key, value in sorted(self._opts['jobconf'].iteritems()):
-                streaming_args.extend(['-jobconf', '%s=%s' % (key, value)])
 
             # set up mapper and reducer
             streaming_args.append('-mapper')

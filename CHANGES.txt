@@ -1,4 +1,4 @@
-v0.2.5, 2011-04-XX -- input and output formats
+v0.2.5, 2011-04-29 -- Hadoop input and output formats
  * Added hadoop_input/output_format options
  * You can now specify a custom Hadoop streaming jar (hadoop_streaming_jar)
  * extra args to hadoop now come before -mapper/-reducer on EMR, so

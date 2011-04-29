@@ -120,7 +120,7 @@ class MRJobRunner(object):
         :type hadoop_input_format: str
         :param hadoop_input_format: name of an optional Hadoop ``InputFormat`` class. Passed to Hadoop along with your first step with the ``-inputformat`` option. Note that if you write your own class, you'll need to include it in your own custom streaming jar (see *hadoop_streaming_jar*).
         :type hadoop_output_format: str
-        :param hadoop_output_format: name of an optional Hadoop output format class. Passed to Hadoop along with your first step with the ``-outputformat`` option. Note that if you write your own class, you'll need to include it in your own custom streaming jar (see *hadoop_streaming_jar*).
+        :param hadoop_output_format: name of an optional Hadoop ``OutputFormat`` class. Passed to Hadoop along with your first step with the ``-outputformat`` option. Note that if you write your own class, you'll need to include it in your own custom streaming jar (see *hadoop_streaming_jar*).
         :type hadoop_streaming_jar: str
         :param hadoop_streaming_jar: path to a custom hadoop streaming jar.
         :type jobconf: dict

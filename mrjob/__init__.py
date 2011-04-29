@@ -17,15 +17,19 @@
 
 __author__ = 'David Marin <dave@yelp.com>'
 
-__credits__ = ['James Brown <jbrown@yelp.com>',
-               'Adam Derewicki <derwiki@yelp.com>',
-               'Benjamin Goldenberg <benjamin@yelp.com',
-               'Peter Harrington <peter.b.harrington@gmail.com>',
-               'Brett Hoerner <brett@bretthoerner.com>',
-               'Matt Jones <mattj@yelp.com>',
-               'Julian Krause <juliank@yelp.com>',
-               'Jimmy Retzlaff <jretz@yelp.com>',
-               'Ned Rockson <ned@tellapart.com>',
-               'Paul Wais <pwais@yelp.com>']
+__credits__ = [
+    'Jim Blomo <jblomo@yelp.com>',
+    'James Brown <jbrown@yelp.com>',
+    'Adam Derewecki <derewecki@gmail.com>',
+    'Benjamin Goldenberg <benjamin@yelp.com',
+    'Peter Harrington <peter.b.harrington@gmail.com>',
+    'Brett Hoerner <brett@bretthoerner.com>',
+    'Matt Jones <mattj@yelp.com>',
+    'Julian Krause <juliank@yelp.com>',
+    'Jimmy Retzlaff <jretz@yelp.com>',
+    'Ned Rockson <ned@tellapart.com>',
+    'Steve Spencer <steve@bigfrog.net>',
+    'Paul Wais <pwais@yelp.com>',
+]
 
 __version__ = '0.3.0-dev'

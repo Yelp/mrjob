@@ -27,6 +27,7 @@ import tempfile
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import JOB_NAME_RE
+from mrjob.runner import MRJobRunner
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled
 
@@ -178,3 +179,64 @@ class CreateMrjobTarGzTestCase(TestCase):
                 assert_equal(path[:6], 'mrjob/')
 
             assert_in('mrjob/job.py', contents)
+
+
+class TestHadoopConfArgs(TestCase):
+
+    def test_empty(self):
+        runner = MRJobRunner(conf_path=False)
+        assert_equal(runner._hadoop_conf_args(0, 1), [])
+
+    def test_hadoop_extra_args(self):
+        extra_args = ['-foo', 'bar']
+        runner = MRJobRunner(conf_path=False, hadoop_extra_args=extra_args)
+        assert_equal(runner._hadoop_conf_args(0, 1), extra_args)
+
+    def test_cmdenv(self):
+        cmdenv = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
+        runner = MRJobRunner(conf_path=False, cmdenv=cmdenv)
+        assert_equal(runner._hadoop_conf_args(0, 1),
+                     ['-cmdenv', 'BAX=Arnold',
+                      '-cmdenv', 'BAZ=qux',
+                      '-cmdenv', 'FOO=bar',])
+
+    def test_hadoop_input_format(self):
+        format = 'org.apache.hadoop.mapred.SequenceFileInputFormat'
+        runner = MRJobRunner(conf_path=False, hadoop_input_format=format)
+        assert_equal(runner._hadoop_conf_args(0, 1),
+                     ['-inputformat', format])
+        # test multi-step job
+        assert_equal(runner._hadoop_conf_args(0, 2),
+                     ['-inputformat', format])
+        assert_equal(runner._hadoop_conf_args(1, 2), [])
+
+    def test_hadoop_output_format(self):
+        format = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
+        runner = MRJobRunner(conf_path=False, hadoop_output_format=format)
+        assert_equal(runner._hadoop_conf_args(0, 1),
+                     ['-outputformat', format])
+        # test multi-step job
+        assert_equal(runner._hadoop_conf_args(0, 2), [])
+        assert_equal(runner._hadoop_conf_args(1, 2),
+                     ['-outputformat', format])
+
+    def test_jobconf(self):
+        jobconf = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
+        runner = MRJobRunner(conf_path=False, jobconf=jobconf)
+        assert_equal(runner._hadoop_conf_args(0, 1),
+                     ['-jobconf', 'BAX=Arnold',
+                      '-jobconf', 'BAZ=qux',
+                      '-jobconf', 'FOO=bar',])
+
+    def test_hadoop_extra_args_comes_first(self):
+        runner = MRJobRunner(
+            conf_path=False,
+            cmdenv={'FOO': 'bar'},
+            hadoop_input_format='FooInputFormat',
+            hadoop_output_format='BarOutputFormat',
+            jobconf={'baz': 'quz'},
+            hadoop_extra_args=['-libjar', 'qux.jar'])
+        # hadoop_extra_args should come first
+        conf_args = runner._hadoop_conf_args(0, 1)
+        assert_equal(conf_args[:2], ['-libjar', 'qux.jar'])
+        assert_equal(len(conf_args), 10)

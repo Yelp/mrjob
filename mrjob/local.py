@@ -49,7 +49,8 @@ class LocalMRJobRunner(MRJobRunner):
         """LocalMRJobRunner takes the same keyword args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 
         * *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs`
-        * *python_bin* defaults to the current python interpreter
+        * *python_bin* defaults to ``sys.executable`` (the current python interpreter)
+        * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*, and *hadoop_streaming_jar*, and *jobconf* are ignored because they require Java. If you need to test these, consider starting up a standalone Hadoop instance and running your job with ``-r hadoop``.
         """
         super(LocalMRJobRunner, self).__init__(**kwargs)
 
@@ -73,6 +74,15 @@ class LocalMRJobRunner(MRJobRunner):
             super(LocalMRJobRunner, cls)._opts_combiners(),
             {'cmdenv': combine_local_envs})
 
+    # options that we ignore because they require real Hadoop
+    IGNORED_OPTS = [
+        'hadoop_extra_args',
+        'hadoop_input_format',
+        'hadoop_output_format',
+        'hadoop_streaming_jar',
+        'jobconf',
+    ]
+
     def _run(self):
         if self._opts['bootstrap_mrjob']:
             self._add_python_archive(self._create_mrjob_tar_gz() + '#')
@@ -83,9 +93,10 @@ class LocalMRJobRunner(MRJobRunner):
 
         assert self._script # shouldn't be able to run if no script
 
-        if self._opts['hadoop_extra_args']:
-            log.warning('ignoring extra args to hadoop streaming: %r' %
-                        (self._opts['hadoop_extra_args'],))
+        for ignored_opt in self.IGNORED_OPTS:
+            if self._opts[ignored_opt]:
+                log.warning('ignoring %s option (requires real Hadoop): %r' %
+                            (ignored_opt, self._opts[ignored_opt]))
 
         wrapper_args = self._opts['python_bin']
         if self._wrapper_script:

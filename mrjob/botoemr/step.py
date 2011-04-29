@@ -97,7 +97,8 @@ class StreamingStep(Step):
     def __init__(self, name, mapper, reducer=None,
                  action_on_failure='TERMINATE_JOB_FLOW',
                  cache_files=None, cache_archives=None,
-                 step_args=None, input=None, output=None):
+                 step_args=None, input=None, output=None,
+                 jar=None):
         """
         A hadoop streaming elastic mapreduce step
 
@@ -119,6 +120,8 @@ class StreamingStep(Step):
         :param input: The input uri
         :type output: str
         :param output: The output uri
+        :type jar: str
+        :param jar: The hadoop streaming jar. This can be either a local path on the master node, or an s3:// URI.
         """
         self.name = name
         self.mapper = mapper
@@ -128,6 +131,7 @@ class StreamingStep(Step):
         self.cache_archives = cache_archives
         self.input = input
         self.output = output
+        self._jar = jar or '/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar'
 
         if isinstance(step_args, basestring):
             step_args = [step_args]
@@ -135,16 +139,25 @@ class StreamingStep(Step):
         self.step_args = step_args
 
     def jar(self):
-        return '/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar'
+        return self._jar
 
     def main_class(self):
         return None
 
     def args(self):
-        args = ['-mapper', self.mapper]
+        args = []
+
+        # put extra args BEFORE -mapper and -reducer so that e.g. -libjar
+        # will work
+        if self.step_args:
+            args.extend(self.step_args)
+
+        args.extend(['-mapper', self.mapper])
 
         if self.reducer:
             args.extend(['-reducer', self.reducer])
+        else:
+            args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
 
         if self.input:
             if isinstance(self.input, list):
@@ -162,12 +175,6 @@ class StreamingStep(Step):
         if self.cache_archives:
            for cache_archive in self.cache_archives:
                 args.extend(('-cacheArchive', cache_archive))
-
-        if self.step_args:
-            args.extend(self.step_args)
-
-        if not self.reducer:
-            args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
 
         return args
 

@@ -19,11 +19,12 @@ from __future__ import with_statement
 from StringIO import StringIO
 import getpass
 import os
+import shlex
 import shutil
 from subprocess import check_call
 import sys
 import tempfile
-from testify import TestCase, assert_equal, assert_in, setup, teardown
+from testify import TestCase, assert_equal, assert_in, assert_lt, assert_not_in, setup, teardown
 
 from tests.mockhadoop import create_mock_hadoop_script, add_mock_hadoop_output
 from tests.mr_two_step_job import MRTwoStepJob
@@ -94,17 +95,22 @@ class MockHadoopTestCase(TestCase):
         mock_output_dir = tempfile.mkdtemp(prefix='mock_hadoop_output.')
         os.environ['MOCK_HADOOP_OUTPUT'] = mock_output_dir
 
+        # set up cmd log
+        _, mock_log_path = tempfile.mkstemp(prefix='mockhadoop.log')
+        os.environ['MOCK_HADOOP_LOG'] = mock_log_path
+
     @teardown
     def delete_hadoop_home_and_restore_environment_vars(self):
         mock_hdfs_root = os.environ['MOCK_HDFS_ROOT']
         mock_output_dir = os.environ['MOCK_HADOOP_OUTPUT']
+        mock_log_path = os.environ['MOCK_HADOOP_LOG']
 
         os.environ.clear()
         os.environ.update(self._old_environ)
 
         shutil.rmtree(mock_hdfs_root)
         shutil.rmtree(mock_output_dir)
-
+        os.unlink(mock_log_path)
 
 class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
@@ -138,7 +144,9 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
                                '--no-conf', '--hadoop-arg', '-libjar',
                                '--hadoop-arg', 'containsJars.jar'] + list(args)
-                               + ['-', local_input_path, remote_input_path])
+                               + ['-', local_input_path, remote_input_path]
+                               + ['--hadoop-input-format', 'FooFormat']
+                               + ['--hadoop-output-format', 'BarFormat'])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
@@ -182,6 +190,27 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         assert_equal(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+
+        # make sure we called hadoop the way we expected
+        with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
+            hadoop_cmd_args = [shlex.split(line) for line in mock_log]
+
+        jar_cmd_args = [args for args in hadoop_cmd_args
+                        if args[:1] == ['jar']]
+        assert_equal(len(jar_cmd_args), 2)
+        step_0_args, step_1_args = jar_cmd_args
+
+        # check input/output format
+        assert_in('-inputformat', step_0_args)
+        assert_not_in('-outputformat', step_0_args)
+        assert_not_in('-inputformat', step_1_args)
+        assert_in('-outputformat', step_1_args)
+
+        # make sure -libjar extra arg comes before -mapper
+        for args in (step_0_args, step_1_args):
+            assert_in('-libjar', args)
+            assert_in('-mapper', args)
+            assert_lt(args.index('-libjar'), args.index('-mapper'))
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)

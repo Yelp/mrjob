@@ -692,6 +692,23 @@ class MRJob(object):
             'streaming. You can use --hadoop-arg multiple times.')
 
         self.runner_opt_group.add_option(
+            '--hadoop-input-format', dest='hadoop_input_format', default=None,
+            help='the hadoop InputFormat class used to write the data. '
+            'Custom formats must be included in your hadoop streaming jar (see '
+            '--hadoop-streaming-jar)')
+
+        self.runner_opt_group.add_option(
+            '--hadoop-output-format', dest='hadoop_output_format', default=None,
+            help='the hadoop OutputFormat class used to write the data. '
+            'Custom formats must be included in your hadoop streaming jar (see '
+            '--hadoop-streaming-jar)')
+
+        self.runner_opt_group.add_option(
+            '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
+            default=None,
+            help='Path of your hadoop streaming jar (locally, or on S3/HDFS)')
+
+        self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
             help="Name/path of alternate python binary for mappers/reducers. You can include arguments (e.g. --python-bin 'python -S').")
 
@@ -703,10 +720,6 @@ class MRJob(object):
         self.hadoop_opt_group.add_option(
             '--hadoop-bin', dest='hadoop_bin', default=None,
             help='hadoop binary. Defaults to $HADOOP_HOME/bin/hadoop')
-        self.hadoop_opt_group.add_option(
-            '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
-            default=None,
-            help='Path of your hadoop streaming jar (REQUIRED)')
         self.hadoop_opt_group.add_option(
             '--hdfs-scratch-dir', dest='hdfs_scratch_dir',
             default=None,
@@ -754,6 +767,11 @@ class MRJob(object):
         self.emr_opt_group.add_option(
             '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
             help='ID of an existing EMR job flow to use')
+        self.emr_opt_group.add_option(
+            '--hadoop-streaming-jar-on-emr', dest='hadoop_streaming_jar_on_emr',
+            default=None,
+            help='Local path of the hadoop streaming jar on the EMR node. Rarely necessary')
+
 
     def add_passthrough_option(self, *args, **kwargs):
         """Function to create options which both the job runner
@@ -873,6 +891,9 @@ class MRJob(object):
             'extra_args': self.generate_passthrough_arguments(),
             'file_upload_args': self.generate_file_upload_args(),
             'hadoop_extra_args': self.options.hadoop_extra_args,
+            'hadoop_input_format': self.options.hadoop_input_format,
+            'hadoop_output_format': self.options.hadoop_output_format,
+            'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
             'input_paths': self.args,
             'jobconf': self.options.jobconf,
             'mr_job_script': self.mr_job_script(),

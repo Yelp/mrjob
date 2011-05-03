@@ -258,10 +258,10 @@ class EMRJobRunner(MRJobRunner):
         :param emr_job_flow_id: the ID of a persistent EMR job flow to run jobs in (normally we launch our own job). It's fine for other jobs to be using the job flow; we give our job's steps a unique ID.
         :type hadoop_streaming_jar: str
         :param hadoop_streaming_jar: This is actually an option in the base MRJobRunner class. Points to a custom hadoop streaming jar on the local filesystem or S3. If you want to point to a streaming jar already installed on the EMR instances (perhaps through a bootstrap action?), use *hadoop_streaming_jar_on_emr*.
-        :type num_ec2_instances: int
-        :param num_ec2_instances: number of instances to start up. Default is ``1``.
         :type hadoop_streaming_jar_on_emr: str
         :param hadoop_streaming_jar_on_emr: Like *hadoop_streaming_jar*, except that it points to a path on the EMR instance, rather than to a local file or one on S3. Rarely necessary.
+        :type num_ec2_instances: int
+        :param num_ec2_instances: number of instances to start up. Default is ``1``.
         :type s3_endpoint: str
         :param s3_endpoint: Host to connect to when communicating with S3 (e.g. ``s3-us-west-1.amazonaws.com``). Default is to infer this from *aws_region*.
         :type s3_log_uri: str
@@ -1320,7 +1320,7 @@ class EMRJobRunner(MRJobRunner):
         writeln("secret_key = configs['fs.s3.awsSecretAccessKey']")
         writeln()
 
-        # set up s3cmd
+        # set up s3cmd. Use a temp file in case ~/.s3cfg already exists
         writeln('# set up s3cmd')
         writeln("_, s3cfg_path = mkstemp(prefix='s3cfg')")
         writeln("with open(s3cfg_path, 'w') as s3cfg:")
@@ -1333,8 +1333,9 @@ class EMRJobRunner(MRJobRunner):
         writeln('# download files using s3cmd')
         for file_dict in self._files:
             if file_dict.get('bootstrap'):
-                writeln("check_call('s3cmd', '-c', s3cfg_path, 'get', %r, %r)"
-                        % (file_dict['s3_uri'], file_dict['name']))
+                writeln(
+                    "check_call(['s3cmd', '-c', s3cfg_path, 'get', %r, %r])" %
+                    (file_dict['s3_uri'], file_dict['name']))
         writeln()
 
         # make scripts executable

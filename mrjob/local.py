@@ -50,6 +50,7 @@ class LocalMRJobRunner(MRJobRunner):
 
         * *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs`
         * *python_bin* defaults to ``sys.executable`` (the current python interpreter)
+        * *steps_python_bin* defaults to ``sys.executable`` (the current python interpreter)
         * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*, and *hadoop_streaming_jar*, and *jobconf* are ignored because they require Java. If you need to test these, consider starting up a standalone Hadoop instance and running your job with ``-r hadoop``.
         """
         super(LocalMRJobRunner, self).__init__(**kwargs)
@@ -65,6 +66,7 @@ class LocalMRJobRunner(MRJobRunner):
         return combine_dicts(super(LocalMRJobRunner, cls)._default_opts(), {
             # prefer whatever interpreter we're currently using
             'python_bin': sys.executable or 'python',
+            'steps_python_bin': sys.executable or 'python',
         })
 
     @classmethod

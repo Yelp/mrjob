@@ -712,6 +712,12 @@ class MRJob(object):
             '--python-bin', dest='python_bin', default=None,
             help="Name/path of alternate python binary for mappers/reducers. You can include arguments (e.g. --python-bin 'python -S').")
 
+        self.runner_opt_group.add_option(
+            '--steps-python-bin', dest='steps_python_bin', default=None,
+            help='Name/path of alternate python binary to use to query the '
+            'job about its steps, if different from the current Python '
+            'interpreter. Rarely needed.')
+
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(
             self.option_parser, 'Running on Hadoop (these apply when you set -r hadoop)')
@@ -902,6 +908,7 @@ class MRJob(object):
             'owner': self.options.owner,
             'python_bin': self.options.python_bin,
             'stdin': self.stdin,
+            'steps_python_bin': self.options.steps_python_bin,
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,
         }

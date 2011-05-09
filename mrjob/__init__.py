@@ -26,6 +26,7 @@ __credits__ = [
     'Brett Hoerner <brett@bretthoerner.com>',
     'Matt Jones <mattj@yelp.com>',
     'Julian Krause <juliank@yelp.com>',
+    'Robert Leftwich <rl.0x0@eml.cc>',
     'Jimmy Retzlaff <jretz@yelp.com>',
     'Ned Rockson <ned@tellapart.com>',
     'Steve Spencer <steve@bigfrog.net>',

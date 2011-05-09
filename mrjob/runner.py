@@ -131,12 +131,14 @@ class MRJobRunner(object):
         :param owner: who is running this job. Used solely to set the job name. By default, we use :py:func:`getpass.getuser`, or ``no_user`` if it fails.
         :type python_archives: list of str
         :param python_archives: same as upload_archives, except they get added to the job's :envvar:`PYTHONPATH`
-        :type python_bin: list or str
-        :param python_bin: Name/path/list of args for alternate python binary for mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to :command:`python`.
+        :type python_bin: str
+        :param python_bin: Name/path of alternate python binary for mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to ``'python'``.
         :type setup_cmds: list
         :param setup_cmds: a list of commands to run before each mapper/reducer step (e.g. ``['cd my-src-tree; make', 'mkdir -p /tmp/foo']``). You can specify commands as strings, which will be run through the shell, or lists of args, which will be invoked directly. We'll use file locking to ensure that multiple mappers/reducers running on the same node won't run *setup_cmds* simultaneously (it's safe to run ``make``).
         :type setup_scripts: list of str
         :param setup_scripts: files that will be copied into the local working directory and then run. These are run after *setup_cmds*. Like with *setup_cmds*, we use file locking to keep multiple mappers/reducers on the same node from running *setup_scripts* simultaneously.
+        :type steps_python_bin: str
+        :param steps_python_bin: Name/path of alternate python binary to use to query the job about its steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults to ``sys.executable`` (the current Python interpreter).
         :type upload_archives: list of str
         :param upload_archives: a list of archives (e.g. tarballs) to unpack in the local directory of the mr_job script when it runs. You can set the local name of the dir we unpack into by appending ``#localname`` to the path; otherwise we just use the name of the archive file (e.g. ``foo.tar.gz``)
         :type upload_files: list of str
@@ -265,6 +267,7 @@ class MRJobRunner(object):
             'owner',
             'python_archives',
             'python_bin',
+            'steps_python_bin',
             'setup_cmds',
             'setup_scripts',
             'upload_archives',
@@ -286,6 +289,7 @@ class MRJobRunner(object):
             'cleanup': CLEANUP_DEFAULT,
             'owner': owner,
             'python_bin': ['python'],
+            'steps_python_bin': [sys.executable or 'python'],
         }
 
     @classmethod
@@ -302,6 +306,7 @@ class MRJobRunner(object):
             'python_bin': combine_cmds,
             'setup_cmds': combine_lists,
             'setup_scripts': combine_path_lists,
+            'steps_python_bin': combine_cmds,
             'upload_archives': combine_path_lists,
             'upload_files': combine_path_lists,
         }
@@ -699,10 +704,8 @@ class MRJobRunner(object):
             if not self._script:
                 self._steps = []
             else:
-                # don't use self._opts['python_bin'] because that
-                # refers to the python binary to use inside Hadoop
-                python_bin = sys.executable or 'python'
-                args = ([python_bin, self._script['path'], '--steps'] +
+                args = (self._opts['steps_python_bin'] +
+                        [self._script['path'], '--steps'] +
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))
                 # add . to PYTHONPATH (in case mrjob isn't actually installed)

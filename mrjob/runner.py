@@ -133,6 +133,8 @@ class MRJobRunner(object):
         :param python_archives: same as upload_archives, except they get added to the job's :envvar:`PYTHONPATH`
         :type python_bin: str
         :param python_bin: Name/path of alternate python binary for mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to ``'python'``.
+        :type steps_python_bin: str
+        :param steps_python_bin: Name/path of alternate python binary for steps (e.g. for use with :py:mod:`virtualenv`). Defaults to ``'python'``.
         :type setup_cmds: list
         :param setup_cmds: a list of commands to run before each mapper/reducer step (e.g. ``['cd my-src-tree; make', 'mkdir -p /tmp/foo']``). You can specify commands as strings, which will be run through the shell, or lists of args, which will be invoked directly. We'll use file locking to ensure that multiple mappers/reducers running on the same node won't run *setup_cmds* simultaneously (it's safe to run ``make``).
         :type setup_scripts: list of str
@@ -267,6 +269,7 @@ class MRJobRunner(object):
             'owner',
             'python_archives',
             'python_bin',
+            'steps_python_bin',
             'setup_cmds',
             'setup_scripts',
             'upload_archives',
@@ -288,6 +291,7 @@ class MRJobRunner(object):
             'cleanup': CLEANUP_DEFAULT,
             'owner': owner,
             'python_bin': 'python',
+            'steps_python_bin': 'python',
         }
 
     @classmethod
@@ -302,6 +306,7 @@ class MRJobRunner(object):
             'jobconf': combine_dicts,
             'python_archives': combine_path_lists,
             'python_bin': combine_paths,
+            'steps_python_bin': combine_paths,
             'setup_cmds': combine_lists,
             'setup_scripts': combine_path_lists,
             'upload_archives': combine_path_lists,
@@ -710,9 +715,7 @@ class MRJobRunner(object):
             if not self._script:
                 self._steps = []
             else:
-                # don't use self._opts['python_bin'] because that
-                # refers to the python binary to use inside Hadoop
-                python_bin = sys.executable or 'python'
+                python_bin = self._opts['steps_python_bin']
                 args = ([python_bin, self._script['path'], '--steps'] +
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))

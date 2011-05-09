@@ -163,6 +163,25 @@ class PythonBinTestCase(TestCase):
         assert_in('--mapper', output)
  
 
+class StepsPythonBinTestCase(TestCase):
+
+    def test_echo_as_steps_python_bin(self):
+        mr_job = MRTwoStepJob(['--steps', '--steps-python-bin', 'echo', '--no-conf'])
+        mr_job.sandbox()
+        
+        with mr_job.make_runner() as runner:
+            assert isinstance(runner, LocalMRJobRunner)
+            try:
+                runner._get_steps()
+                assert False, 'Should throw exception'
+            except ValueError, ex:
+                output = str(ex)
+                # the output should basically be the command used to
+                # run the steps command
+                assert_in('mr_two_step_job.py', output)
+                assert_in('--steps', output)
+ 
+
 class LocalBootstrapMrjobTestCase(TestCase):
 
     @setup

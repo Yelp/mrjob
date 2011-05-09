@@ -133,12 +133,12 @@ class MRJobRunner(object):
         :param python_archives: same as upload_archives, except they get added to the job's :envvar:`PYTHONPATH`
         :type python_bin: str
         :param python_bin: Name/path of alternate python binary for mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to ``'python'``.
-        :type steps_python_bin: str
-        :param steps_python_bin: Name/path of alternate python binary to use to query the job about its steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults to ``sys.executable`` (the current python interpreter).
         :type setup_cmds: list
         :param setup_cmds: a list of commands to run before each mapper/reducer step (e.g. ``['cd my-src-tree; make', 'mkdir -p /tmp/foo']``). You can specify commands as strings, which will be run through the shell, or lists of args, which will be invoked directly. We'll use file locking to ensure that multiple mappers/reducers running on the same node won't run *setup_cmds* simultaneously (it's safe to run ``make``).
         :type setup_scripts: list of str
         :param setup_scripts: files that will be copied into the local working directory and then run. These are run after *setup_cmds*. Like with *setup_cmds*, we use file locking to keep multiple mappers/reducers on the same node from running *setup_scripts* simultaneously.
+        :type steps_python_bin: str
+        :param steps_python_bin: Name/path of alternate python binary to use to query the job about its steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults to ``sys.executable`` (the current python interpreter).
         :type upload_archives: list of str
         :param upload_archives: a list of archives (e.g. tarballs) to unpack in the local directory of the mr_job script when it runs. You can set the local name of the dir we unpack into by appending ``#localname`` to the path; otherwise we just use the name of the archive file (e.g. ``foo.tar.gz``)
         :type upload_files: list of str
@@ -269,9 +269,9 @@ class MRJobRunner(object):
             'owner',
             'python_archives',
             'python_bin',
-            'steps_python_bin',
             'setup_cmds',
             'setup_scripts',
+            'steps_python_bin',
             'upload_archives',
             'upload_files',
         ]
@@ -306,9 +306,9 @@ class MRJobRunner(object):
             'jobconf': combine_dicts,
             'python_archives': combine_path_lists,
             'python_bin': combine_paths,
-            'steps_python_bin': combine_paths,
             'setup_cmds': combine_lists,
             'setup_scripts': combine_path_lists,
+            'steps_python_bin': combine_paths,
             'upload_archives': combine_path_lists,
             'upload_files': combine_path_lists,
         }

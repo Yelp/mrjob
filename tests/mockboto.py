@@ -220,7 +220,7 @@ class MockEmrConnection(object):
                     slave_instance_type='m1.small', num_instances=1,
                     action_on_failure='TERMINATE_JOB_FLOW', keep_alive=False,
                     enable_debugging=False,
-                    hadoop_version='0.18',
+                    hadoop_version='0.20',
                     steps=[],
                     bootstrap_actions=[],
                     now=None):

@@ -131,7 +131,7 @@ class StreamingStep(Step):
         self.cache_archives = cache_archives
         self.input = input
         self.output = output
-        self._jar = jar or '/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar'
+        self._jar = jar or '/home/hadoop/contrib/streaming/hadoop-0.20-streaming.jar'
 
         if isinstance(step_args, basestring):
             step_args = [step_args]

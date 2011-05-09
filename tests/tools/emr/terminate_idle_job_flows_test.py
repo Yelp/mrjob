@@ -54,7 +54,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             startdatetime=to_iso8601(self.now - timedelta(hours=5)),
             steps=[MockEmrObject(
                 startdatetime=to_iso8601(self.now - timedelta(hours=4)),
-                jar='/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar',
+                jar='/home/hadoop/contrib/streaming/hadoop-0.20-streaming.jar',
                 state='RUNNING',
             )],
         )
@@ -68,7 +68,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             steps=[MockEmrObject(
                 startdatetime=to_iso8601(self.now - timedelta(hours=8)),
                 enddatetime=to_iso8601(self.now - timedelta(hours=6)),
-                jar='/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar',
+                jar='/home/hadoop/contrib/streaming/hadoop-0.20-streaming.jar',
                 state='COMPLETE',
             )],
         )
@@ -81,7 +81,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             steps=[MockEmrObject(
                 startdatetime=to_iso8601(self.now - timedelta(hours=4)),
                 enddatetime=to_iso8601(self.now - timedelta(hours=2)),
-                jar='/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar',
+                jar='/home/hadoop/contrib/streaming/hadoop-0.20-streaming.jar',
                 state='COMPLETE',
             )],
         )
@@ -116,7 +116,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                 MockEmrObject(
                     startdatetime=to_iso8601(self.now - timedelta(hours=4)),
                     enddatetime=to_iso8601(self.now - timedelta(hours=2)),
-                    jar='/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar',
+                    jar='/home/hadoop/contrib/streaming/hadoop-0.20-streaming.jar',
                     state='COMPLETE',
                 )
             ],
@@ -132,11 +132,11 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                 MockEmrObject(
                     startdatetime=to_iso8601(self.now - timedelta(hours=4)),
                     enddatetime=to_iso8601(self.now - timedelta(hours=3)),
-                    jar='/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar',
+                    jar='/home/hadoop/contrib/streaming/hadoop-0.20-streaming.jar',
                     state='FAILED',
                 ),
                 MockEmrObject(
-                    jar='/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar',
+                    jar='/home/hadoop/contrib/streaming/hadoop-0.20-streaming.jar',
                     state='CANCELLED',
                 )
             ],

@@ -267,9 +267,9 @@ class MRJobRunner(object):
             'owner',
             'python_archives',
             'python_bin',
-            'steps_python_bin',
             'setup_cmds',
             'setup_scripts',
+            'steps_python_bin',
             'upload_archives',
             'upload_files',
         ]

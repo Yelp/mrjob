@@ -714,7 +714,9 @@ class MRJob(object):
 
         self.runner_opt_group.add_option(
             '--steps-python-bin', dest='steps_python_bin', default=None,
-            help='Name/path of alternate python binary for steps.')
+            help='Name/path of alternate python binary to use to query the '
+            'job about its steps, if different from the current Python '
+            'interpreter. Rarely needed.')
 
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(
@@ -902,8 +904,8 @@ class MRJob(object):
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
             'python_bin': self.options.python_bin,
-            'steps_python_bin': self.options.steps_python_bin,
             'stdin': self.stdin,
+            'steps_python_bin': self.options.steps_python_bin,
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,
         }

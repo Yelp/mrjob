@@ -134,7 +134,7 @@ class MRJobRunner(object):
         :type python_bin: str
         :param python_bin: Name/path of alternate python binary for mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to ``'python'``.
         :type steps_python_bin: str
-        :param steps_python_bin: Name/path of alternate python binary for steps (e.g. for use with :py:mod:`virtualenv`). Defaults to ``'python'``.
+        :param steps_python_bin: Name/path of alternate python binary to use to query the job about its steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults to ``sys.executable`` (the current python interpreter).
         :type setup_cmds: list
         :param setup_cmds: a list of commands to run before each mapper/reducer step (e.g. ``['cd my-src-tree; make', 'mkdir -p /tmp/foo']``). You can specify commands as strings, which will be run through the shell, or lists of args, which will be invoked directly. We'll use file locking to ensure that multiple mappers/reducers running on the same node won't run *setup_cmds* simultaneously (it's safe to run ``make``).
         :type setup_scripts: list of str
@@ -291,7 +291,7 @@ class MRJobRunner(object):
             'cleanup': CLEANUP_DEFAULT,
             'owner': owner,
             'python_bin': 'python',
-            'steps_python_bin': 'python',
+            'steps_python_bin': sys.executable or 'python',
         }
 
     @classmethod

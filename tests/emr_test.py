@@ -36,10 +36,9 @@ from tests.quiet import logger_disabled
 
 try:
     import boto
-    from mrjob import botoemr
+    import boto.emr
 except ImportError:
     boto = None
-    botoemr = None
 
 
 class MockEMRAndS3TestCase(TestCase):
@@ -68,7 +67,7 @@ class MockEMRAndS3TestCase(TestCase):
             kwargs['mock_s3_fs'] = self.mock_s3_fs
             return MockS3Connection(*args, **kwargs)
 
-        def mock_botoemr_EmrConnection(*args, **kwargs):
+        def mock_boto_emr_EmrConnection(*args, **kwargs):
             kwargs['mock_s3_fs'] = self.mock_s3_fs
             kwargs['mock_emr_job_flows'] = self.mock_emr_job_flows
             kwargs['mock_emr_failures'] = self.mock_emr_failures
@@ -78,13 +77,13 @@ class MockEMRAndS3TestCase(TestCase):
         self._real_boto_connect_s3 = boto.connect_s3
         boto.connect_s3 = mock_boto_connect_s3
 
-        self._real_botoemr_EmrConnection = botoemr.EmrConnection
-        botoemr.EmrConnection = mock_botoemr_EmrConnection
+        self._real_boto_emr_EmrConnection = boto.emr.EmrConnection
+        boto.emr.EmrConnection = mock_boto_emr_EmrConnection
 
     @teardown
     def unsandbox_boto(self):
         boto.connect_s3 = self._real_boto_connect_s3
-        botoemr.EmrConnection = self._real_botoemr_EmrConnection
+        boto.emr.EmrConnection = self._real_boto_emr_EmrConnection
 
     def add_mock_s3_data(self, data):
         """Update self.mock_s3_fs with a map from bucket name
@@ -209,7 +208,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             with logger_disabled('mrjob.emr'):
                 assert_raises(Exception, runner.run)
 
-            emr_conn = botoemr.EmrConnection()
+            emr_conn = boto.emr.EmrConnection()
             job_flow_id = runner.get_emr_job_flow_id()
             for i in range(10):
                 emr_conn.simulate_progress(job_flow_id)
@@ -705,13 +704,10 @@ class TestNoBoto(TestCase):
     def blank_out_boto(self):
         self._real_boto = mrjob.emr.boto
         mrjob.emr.boto = None
-        self._real_botoemr = mrjob.emr.botoemr
-        mrjob.emr.botoemr = None
 
     @teardown
     def restore_boto(self):
         mrjob.emr.boto = self._real_boto
-        mrjob.emr.botoemr = self._real_botoemr
 
     def test_init(self):
         # merely creating an EMRJobRunner should raise an exception

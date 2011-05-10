@@ -35,14 +35,13 @@ except ImportError:
 try:
     import boto
     import boto.ec2
+    import boto.emr
     import boto.exception
     import boto.utils
-    from mrjob import botoemr
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
     # inside hadoop streaming
     boto = None
-    botoemr = None
 
 from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths, combine_path_lists
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error
@@ -746,7 +745,7 @@ class EMRJobRunner(MRJobRunner):
         args['slave_instance_type'] = self._opts['ec2_slave_instance_type']
 
         if self._master_bootstrap_script:
-            args['bootstrap_actions'] = [botoemr.BootstrapAction(
+            args['bootstrap_actions'] = [boto.emr.BootstrapAction(
                 'master', self._master_bootstrap_script['s3_uri'], [])]
 
         if self._opts['ec2_key_pair']:
@@ -826,7 +825,7 @@ class EMRJobRunner(MRJobRunner):
 
             step_args = self._hadoop_conf_args(step_num, len(steps))
 
-            step_list.append(botoemr.StreamingStep(
+            step_list.append(boto.emr.StreamingStep(
                 name=name, mapper=mapper, reducer=reducer,
                 action_on_failure=action_on_failure,
                 cache_files=cache_files, cache_archives=cache_archives,
@@ -1560,16 +1559,16 @@ class EMRJobRunner(MRJobRunner):
     def make_emr_conn(self):
         """Create a connection to EMR.
 
-        :return: a :py:class:`mrjob.botoemr.connection.EmrConnection`, wrapped in a :py:class:`mrjob.retry.RetryWrapper`
+        :return: a :py:class:`boto.emr.connection.EmrConnection`, wrapped in a :py:class:`mrjob.retry.RetryWrapper`
         """
         # give a non-cryptic error message if boto isn't installed
-        if botoemr is None:
+        if boto is None:
             raise ImportError('You must install boto to connect to EMR')
 
         region = self._get_region_info_for_emr_conn()
         log.debug('creating EMR connection (to %s)' % region.endpoint)
 
-        raw_emr_conn = botoemr.EmrConnection(
+        raw_emr_conn = boto.emr.EmrConnection(
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             region=region)

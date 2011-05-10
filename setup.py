@@ -30,7 +30,6 @@ setup(
     long_description=open('README.rst').read(),
     name='mrjob',
     packages=['mrjob',
-              'mrjob.botoemr',
               'mrjob.examples',
               'mrjob.tools',
               'mrjob.tools.emr'],

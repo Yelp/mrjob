@@ -330,18 +330,20 @@ class MRJob(object):
         """
         # load options from the command line
         mr_job = cls(args=_READ_ARGS_FROM_SYS_ARGV)
+        mr_job.execute()
 
-        if mr_job.options.show_steps:
-            mr_job.show_steps()
+    def execute(self):
+        if self.options.show_steps:
+            self.show_steps()
 
-        elif mr_job.options.run_mapper:
-            mr_job.run_mapper(mr_job.options.step_num)
+        elif self.options.run_mapper:
+            self.run_mapper(self.options.step_num)
 
-        elif mr_job.options.run_reducer:
-            mr_job.run_reducer(mr_job.options.step_num)
+        elif self.options.run_reducer:
+            self.run_reducer(self.options.step_num)
 
         else:
-            mr_job.run_job()
+            self.run_job()
 
     def make_runner(self):
         """Make a runner based on command-line arguments, so we can
@@ -354,12 +356,16 @@ class MRJob(object):
         from mrjob.emr import EMRJobRunner
         from mrjob.hadoop import HadoopJobRunner
         from mrjob.local import LocalMRJobRunner
+        from mrjob.inline import InlineJobRunner
 
         if self.options.runner == 'emr':
             return EMRJobRunner(**self.emr_job_runner_kwargs())
 
         elif self.options.runner == 'hadoop':
             return HadoopJobRunner(**self.hadoop_job_runner_kwargs())
+
+        elif self.options.runner == 'inline':
+            return InlineJobRunner(mrjob_cls=self.__class__, **self.inline_job_runner_kwargs())
 
         else:
             # run locally by default
@@ -628,7 +634,7 @@ class MRJob(object):
 
         self.runner_opt_group.add_option(
             '-r', '--runner', dest='runner', default='local',
-            choices=('local', 'hadoop', 'emr'),
+            choices=('local', 'hadoop', 'emr', 'inline'),
             help='Where to run the job: local to run locally, hadoop to run on your Hadoop cluster, emr to run on Amazon ElasticMapReduce. Default is local.')
         self.runner_opt_group.add_option(
             '-c', '--conf-path', dest='conf_path', default=None,
@@ -909,6 +915,17 @@ class MRJob(object):
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,
         }
+
+    def inline_job_runner_kwargs(self):
+        """Keyword arguments to create create runners when
+        :py:meth:`make_runner` is called, when we run a job locally
+        (``-r inline``).
+
+        :return: map from arg name to value
+
+        Re-define this if you want finer control when running jobs locally.
+        """
+        return self.job_runner_kwargs()
 
     def local_job_runner_kwargs(self):
         """Keyword arguments to create create runners when

@@ -259,7 +259,7 @@ class EMRJobRunner(MRJobRunner):
         :type hadoop_streaming_jar: str
         :param hadoop_streaming_jar: This is actually an option in the base MRJobRunner class. Points to a custom hadoop streaming jar on the local filesystem or S3. If you want to point to a streaming jar already installed on the EMR instances (perhaps through a bootstrap action?), use *hadoop_streaming_jar_on_emr*.
         :type hadoop_streaming_jar_on_emr: str
-        :param hadoop_streaming_jar_on_emr: Like *hadoop_streaming_jar*, except that it points to a path on the EMR instance, rather than to a local file or one on S3. Rarely necessary.
+        :param hadoop_streaming_jar_on_emr: Like *hadoop_streaming_jar*, except that it points to a path on the EMR instance, rather than to a local file or one on S3. Rarely necessary to set this by hand.
         :type num_ec2_instances: int
         :param num_ec2_instances: number of instances to start up. Default is ``1``.
         :type s3_endpoint: str
@@ -394,6 +394,8 @@ class EMRJobRunner(MRJobRunner):
             'check_emr_status_every': 30,
             'ec2_master_instance_type': 'm1.small',
             'ec2_slave_instance_type': 'm1.small',
+            'hadoop_streaming_jar_on_emr':
+                '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
             'num_ec2_instances': 1,
             's3_sync_wait_time': 5.0,
             'ssh_bin': ['ssh'],
@@ -840,7 +842,6 @@ class EMRJobRunner(MRJobRunner):
         if self._streaming_jar:
             return self._streaming_jar['s3_uri']
         else:
-            # this might be None, but that just means to use the default
             return self._opts['hadoop_streaming_jar_on_emr']
 
     def _launch_emr_job(self):

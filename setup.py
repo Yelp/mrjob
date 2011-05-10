@@ -22,7 +22,7 @@ setup(
     ],
     description='Python MapReduce framework',
     install_requires=[
-        'boto>=1.6',
+        'boto>=1.9',
         'PyYAML',
         'simplejson>=2.0.9'
     ],

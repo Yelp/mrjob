@@ -237,7 +237,7 @@ class MockEmrConnection(object):
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
             creationdatetime=to_iso8601(now),
-            keepjobalivewhennosteps=keep_alive,
+            keepjobflowalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
             loguri=log_uri,
             masterinstancetype=master_instance_type,
@@ -429,7 +429,7 @@ class MockEmrConnection(object):
             return
 
         # no pending steps. shut down job if appropriate
-        if job_flow.keepjobalivewhennosteps:
+        if job_flow.keepjobflowalivewhennosteps:
             job_flow.state = 'WAITING'
             job_flow.reason = 'Waiting for steps to run'
         else:

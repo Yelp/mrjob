@@ -30,3 +30,13 @@ On your Hadoop cluster
 
 .. automethod:: mrjob.hadoop.HadoopJobRunner.__init__
 
+Alternate (debugger-friendly) local testing
+-------------------------------------------
+
+.. automethod:: mrjob.inline.InlineMRJobRunner.__init__
+
+Getting configuration options out of runners
+--------------------------------------------
+
+.. automethod:: mrjob.runner.MRJobRunner.get_opts
+.. automethod:: mrjob.runner.MRJobRunner.get_default_opts

@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for InlineJobRunner"""
+"""Tests for InlineMRJobRunner"""
 
 from __future__ import with_statement
 
@@ -25,14 +25,14 @@ from testify import TestCase, assert_in, assert_equal, assert_not_equal, assert_
 import tempfile
 
 from mrjob.conf import dump_mrjob_conf
-from mrjob.inline import InlineJobRunner
+from mrjob.inline import InlineMRJobRunner
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.quiet import no_handlers_for_logger
 
 
-class InlineJobRunnerEndToEndTestCase(TestCase):
+class InlineMRJobRunnerEndToEndTestCase(TestCase):
 
     @setup
     def make_tmp_dir_and_mrjob_conf(self):
@@ -66,7 +66,7 @@ class InlineJobRunnerEndToEndTestCase(TestCase):
         results = []
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, InlineJobRunner)
+            assert isinstance(runner, InlineMRJobRunner)
             runner.run()
 
             for line in runner.stream_output():

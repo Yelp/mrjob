@@ -213,7 +213,7 @@ class EMRJobRunner(MRJobRunner):
     alias = 'emr'
 
     def __init__(self, **kwargs):
-        """:py:class:`EMRJobRunner` takes the same arguments as
+        """:py:class:`~mrjob.emr.EMRJobRunner` takes the same arguments as
         :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
         which can be defaulted in :py:mod:`mrjob.conf`.
 

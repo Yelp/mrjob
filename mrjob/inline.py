@@ -31,26 +31,26 @@ from mrjob.job import MRJob
 log = logging.getLogger('mrjob.inline')
 
 
-class InlineJobRunner(MRJobRunner):
+class InlineMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` without invoking the job as
     a subprocess, so it's easy to attach a debugger.
 
     This is NOT the default way of testing jobs; to more accurately
-    simulate your environment prior to running on Hadoop/EMR, use -r local
+    simulate your environment prior to running on Hadoop/EMR, use ``-r local``.
 
     It's rare to need to instantiate this class directly (see
-    :py:meth:`~InlineJobRunner.__init__` for details).
+    :py:meth:`~InlineMRJobRunner.__init__` for details).
     """
 
     alias = 'inline'
 
     def __init__(self, mrjob_cls=None, **kwargs):
-        """InlineJobRunner takes the same keyword args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
+        """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 
         * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*, and *hadoop_streaming_jar*, and *jobconf* are ignored because they require Java. If you need to test these, consider starting up a standalone Hadoop instance and running your job with ``-r hadoop``.
         * *cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*, *steps_python_bin*, *upload_archives*, and *upload_files* are ignored because we don't invoke the job as a subprocess or run it in its own directory.
         """
-        super(InlineJobRunner, self).__init__(**kwargs)
+        super(InlineMRJobRunner, self).__init__(**kwargs)
         assert issubclass(mrjob_cls, MRJob)
 
         self._mrjob_cls = mrjob_cls
@@ -61,7 +61,7 @@ class InlineJobRunner(MRJobRunner):
     def _opts_combiners(cls):
         # on windows, PYTHONPATH should use ;, not :
         return combine_dicts(
-            super(InlineJobRunner, cls)._opts_combiners(),
+            super(InlineMRJobRunner, cls)._opts_combiners(),
             {'cmdenv': combine_local_envs})
 
     # options that we ignore because they require real Hadoop

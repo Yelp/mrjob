@@ -356,7 +356,7 @@ class MRJob(object):
         from mrjob.emr import EMRJobRunner
         from mrjob.hadoop import HadoopJobRunner
         from mrjob.local import LocalMRJobRunner
-        from mrjob.inline import InlineJobRunner
+        from mrjob.inline import InlineMRJobRunner
 
         if self.options.runner == 'emr':
             return EMRJobRunner(**self.emr_job_runner_kwargs())
@@ -365,7 +365,7 @@ class MRJob(object):
             return HadoopJobRunner(**self.hadoop_job_runner_kwargs())
 
         elif self.options.runner == 'inline':
-            return InlineJobRunner(mrjob_cls=self.__class__, **self.inline_job_runner_kwargs())
+            return InlineMRJobRunner(mrjob_cls=self.__class__, **self.inline_job_runner_kwargs())
 
         else:
             # run locally by default

@@ -31,7 +31,7 @@ log = logging.getLogger('mrjob.inline')
 
 class InlineJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` without invoking the job as
-    a subprocess, so it's easy to use a debugger.
+    a subprocess, so it's easy to attach a debugger.
 
     This is NOT the default way of testing jobs; to more accurately
     simulate your environment prior to running on Hadoop/EMR, use -r local
@@ -46,6 +46,7 @@ class InlineJobRunner(MRJobRunner):
         """InlineJobRunner takes the same keyword args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 
         * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*, and *hadoop_streaming_jar*, and *jobconf* are ignored because they require Java. If you need to test these, consider starting up a standalone Hadoop instance and running your job with ``-r hadoop``.
+        * *cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*, *steps_python_bin*, *upload_archives*, and *upload_files* are ignored because we don't invoke the job as a subprocess or run it in its own directory.
         """
         super(InlineJobRunner, self).__init__(**kwargs)
         assert issubclass(mrjob_cls, MRJob)

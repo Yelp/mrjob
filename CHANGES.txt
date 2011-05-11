@@ -1,6 +1,8 @@
 v0.2.6, 2011-05-?? -- inline runner and more
  * New inline runner, for testing locally with a debugger
  * Added steps_python_bin option (for use with virtualenv)
+ * mrjob no longer chokes when asked to run on an EMR job flow running 
+   Hadoop 0.20 (Issue #110)
 
 v0.2.5, 2011-04-29 -- Hadoop input and output formats
  * Added hadoop_input/output_format options

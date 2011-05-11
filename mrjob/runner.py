@@ -420,6 +420,10 @@ class MRJobRunner(object):
         mrjob.conf, or as a keyword argument."""
         return copy.deepcopy(self._opts)
 
+    def get_default_opts(self):
+        blank_opts = dict((key, None) for key in self._allowed_opts)
+        return self.combine_opts(blank_opts, self._default_opts())
+
     def get_job_name(self):
         """Get the unique name for the job run by this runner.
         This has the format ``label.owner.date.time.microseconds``

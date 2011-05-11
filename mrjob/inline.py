@@ -1,4 +1,5 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2011 Matthew Tai
+# Copyright 2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,8 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Run an MRJob inline by running all mappers and reducers through the same process.  Useful for debugging."""
+__author__ = 'Matthew Tai <mtai@adku.com>'
 
 import logging
 import os
@@ -29,11 +30,11 @@ log = logging.getLogger('mrjob.inline')
 
 
 class InlineJobRunner(MRJobRunner):
-    """Runs an :py:class:`~mrjob.job.MRJob` inline, for testing
-    purposes and use with debuggers.
+    """Runs an :py:class:`~mrjob.job.MRJob` without invoking the job as
+    a subprocess, so it's easy to use a debugger.
 
-    This is NOT the default way of running jobs; to more accurately
-    simulate your environment prior to running on Hadoop/EMR, use --runner local
+    This is NOT the default way of testing jobs; to more accurately
+    simulate your environment prior to running on Hadoop/EMR, use -r local
 
     It's rare to need to instantiate this class directly (see
     :py:meth:`~InlineJobRunner.__init__` for details).
@@ -61,7 +62,7 @@ class InlineJobRunner(MRJobRunner):
             {'cmdenv': combine_local_envs})
 
     # options that we ignore because they require real Hadoop
-    IGNORED_OPTS = [
+    IGNORED_HADOOP_OPTS = [
         'hadoop_extra_args',
         'hadoop_input_format',
         'hadoop_output_format',
@@ -69,14 +70,32 @@ class InlineJobRunner(MRJobRunner):
         'jobconf',
     ]
 
+    # options that we ignore because they involve running subprocesses
+    IGNORED_LOCAL_OPTS = [
+        'cmdenv',
+        'python_bin',
+        'setup_cmds',
+        'setup_scripts',
+        'steps_python_bin',
+        'upload_archives',
+        'upload_files',
+    ]
+
     def _run(self):
         self._setup_output_dir()
 
         assert self._script # shouldn't be able to run if no script
 
-        for ignored_opt in self.IGNORED_OPTS:
-            if self._opts[ignored_opt]:
+        default_opts = self.get_default_opts()
+
+        for ignored_opt in self.IGNORED_HADOOP_OPTS:
+            if self._opts[ignored_opt] != default_opts[ignored_opt]:
                 log.warning('ignoring %s option (requires real Hadoop): %r' %
+                            (ignored_opt, self._opts[ignored_opt]))
+
+        for ignored_opt in self.IGNORED_LOCAL_OPTS:
+            if self._opts[ignored_opt] != default_opts[ignored_opt]:
+                log.warning('ignoring %s option (use -r local instead): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 
         # run mapper, sort, reducer for each step

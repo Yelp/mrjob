@@ -19,9 +19,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-# This code has been patched slightly for inclusion in mrjob, while we
-# wait for full EMR support to make it into boto.
-
 """
 This module provies an interface to the Elastic MapReduce (EMR)
 service from AWS.

@@ -261,7 +261,7 @@ class EMRJobRunner(MRJobRunner):
         :type num_ec2_instances: int
         :param num_ec2_instances: number of instances to start up. Default is ``1``.
         :type hadoop_streaming_jar_on_emr: str
-        :param hadoop_streaming_jar_on_emr: Like *hadoop_streaming_jar*, except that it points to a path on the EMR instance, rather than to a local file or one on S3. Rarely necessary.
+        :param hadoop_streaming_jar_on_emr: Like *hadoop_streaming_jar*, except that it points to a path on the EMR instance, rather than to a local file or one on S3. Rarely necessary to set this by hand.
         :type s3_endpoint: str
         :param s3_endpoint: Host to connect to when communicating with S3 (e.g. ``s3-us-west-1.amazonaws.com``). Default is to infer this from *aws_region*.
         :type s3_log_uri: str
@@ -391,6 +391,8 @@ class EMRJobRunner(MRJobRunner):
         return combine_dicts(super(EMRJobRunner, cls)._default_opts(), {
             'check_emr_status_every': 30,
             'ec2_instance_type': 'm1.small',
+            'hadoop_streaming_jar_on_emr':
+                '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
             'num_ec2_instances': 1,
             's3_sync_wait_time': 5.0,
             'ssh_bin': 'ssh',
@@ -839,7 +841,6 @@ class EMRJobRunner(MRJobRunner):
         if self._streaming_jar:
             return self._streaming_jar['s3_uri']
         else:
-            # this might be None, but that just means to use the default
             return self._opts['hadoop_streaming_jar_on_emr']
 
     def _launch_emr_job(self):

@@ -1,4 +1,5 @@
 # Copyright (c) 2010 Spotify AB
+# Copyright (c) 2010-2011 Yelp
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the
@@ -98,7 +99,7 @@ class StreamingStep(Step):
                  action_on_failure='TERMINATE_JOB_FLOW',
                  cache_files=None, cache_archives=None,
                  step_args=None, input=None, output=None,
-                 jar=None):
+                 jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar'):
         """
         A hadoop streaming elastic mapreduce step
 
@@ -131,7 +132,7 @@ class StreamingStep(Step):
         self.cache_archives = cache_archives
         self.input = input
         self.output = output
-        self._jar = jar or '/home/hadoop/contrib/streaming/hadoop-0.18-streaming.jar'
+        self._jar = jar
 
         if isinstance(step_args, basestring):
             step_args = [step_args]
@@ -179,8 +180,8 @@ class StreamingStep(Step):
         return args
 
     def __repr__(self):
-        return '%s.%s(name=%r, mapper=%r, reducer=%r, action_on_failure=%r, cache_files=%r, cache_archives=%r, step_args=%r, input=%r, output=%r)' % (
+        return '%s.%s(name=%r, mapper=%r, reducer=%r, action_on_failure=%r, cache_files=%r, cache_archives=%r, step_args=%r, input=%r, output=%r, jar=%r)' % (
             self.__class__.__module__, self.__class__.__name__,
             self.name, self.mapper, self.reducer, self.action_on_failure,
             self.cache_files, self.cache_archives, self.step_args,
-            self.input, self.output)
+            self.input, self.output, self._jar)

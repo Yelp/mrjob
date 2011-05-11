@@ -145,8 +145,9 @@ class InlineJobRunner(MRJobRunner):
         child_stdout.flush()
         child_stdout.close()
 
-        log.info('counters: %s',
-                 pprint.pformat(child_instance.parse_counters()))
+        counters = child_instance.parse_counters()
+        if counters:
+            log.info('counters: ' + pprint.pformat(counters))
 
     def _decide_input_paths(self):
         # decide where to get input

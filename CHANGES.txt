@@ -1,3 +1,7 @@
+v0.2.6, 2011-05-?? -- inline runner and more
+ * New inline runner, for testing locally with a debugger
+ * Added steps_python_bin option (for use with virtualenv)
+
 v0.2.5, 2011-04-29 -- Hadoop input and output formats
  * Added hadoop_input/output_format options
  * You can now specify a custom Hadoop streaming jar (hadoop_streaming_jar)

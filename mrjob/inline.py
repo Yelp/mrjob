@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Run an MRJob inline by running all mappers and reducers through the same process.  Useful for debugging."""
+from __future__ import with_statement
+
 __author__ = 'Matthew Tai <mtai@adku.com>'
 
 import logging
@@ -101,16 +103,22 @@ class InlineJobRunner(MRJobRunner):
 
         # run mapper, sort, reducer for each step
         for step_number, step_name in enumerate(self._get_steps()):
-            self._invoke_inline_mrjob(step_number, 'step-%d-mapper' % step_number, is_mapper=True)
+            self._invoke_inline_mrjob(step_number, 'step-%d-mapper' %
+                                      step_number, is_mapper=True)
 
             if 'R' in step_name:
                 mapper_output_path = self._prev_outfile
-                sorted_mapper_output_path = self._decide_output_path('step-%d-mapper-sorted' % step_number)
-                proc = subprocess.Popen(['sort', '-o', sorted_mapper_output_path, mapper_output_path], env={'LC_ALL': 'C'})
+                sorted_mapper_output_path = self._decide_output_path(
+                    'step-%d-mapper-sorted' % step_number)
+                with open(sorted_mapper_output_path, 'w') as sort_out:
+                    proc = subprocess.Popen(
+                        ['sort', mapper_output_path],
+                        stdout=sort_out, env={'LC_ALL': 'C'})
                 proc.wait()
 
                 # This'll read from sorted_mapper_output_path
-                self._invoke_inline_mrjob(step_number, 'step-%d-reducer' % step_number, is_reducer=True)
+                self._invoke_inline_mrjob(step_number, 'step-%d-reducer' %
+                                          step_number, is_reducer=True)
 
         # move final output to output directory
         self._final_outfile = os.path.join(self._output_dir, 'part-00000')
@@ -118,7 +126,9 @@ class InlineJobRunner(MRJobRunner):
         shutil.move(self._prev_outfile, self._final_outfile)
 
     def _invoke_inline_mrjob(self, step_number, outfile_name, is_mapper=False, is_reducer=False):
-        common_args = ['--step-num=%d' % step_number] + self._mr_job_extra_args() + self._decide_input_paths()
+        common_args = (['--step-num=%d' % step_number] +
+                       self._mr_job_extra_args(local=True) +
+                       self._decide_input_paths())
         if is_mapper:
             child_args = ['--mapper'] + common_args
         elif is_reducer:
@@ -135,7 +145,8 @@ class InlineJobRunner(MRJobRunner):
         child_stdout.flush()
         child_stdout.close()
 
-        log.info('counters: %s', pprint.pformat(child_instance.parse_counters()))
+        log.info('counters: %s',
+                 pprint.pformat(child_instance.parse_counters()))
 
     def _decide_input_paths(self):
         # decide where to get input
@@ -162,7 +173,8 @@ class InlineJobRunner(MRJobRunner):
 
     def _setup_output_dir(self):
         if not self._output_dir:
-            self._output_dir = os.path.join(self._get_local_tmp_dir(), 'output')
+            self._output_dir = os.path.join(
+                self._get_local_tmp_dir(), 'output')
 
         if not os.path.isdir(self._output_dir):
             log.debug('Creating output directory %s' % self._output_dir)

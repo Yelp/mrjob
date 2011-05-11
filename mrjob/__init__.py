@@ -30,6 +30,7 @@ __credits__ = [
     'Jimmy Retzlaff <jretz@yelp.com>',
     'Ned Rockson <ned@tellapart.com>',
     'Steve Spencer <steve@bigfrog.net>',
+    'Matthew Tai <mtai@adku.com>',
     'Paul Wais <pwais@yelp.com>',
 ]
 

@@ -8,3 +8,4 @@ Runners - launching your job
    runners-local.rst
    runners-emr.rst
    runners-hadoop.rst
+   runners-inline.rst

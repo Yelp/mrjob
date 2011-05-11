@@ -50,6 +50,9 @@ See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
 
 In addition, it ignores *hadoop_input_format*, *hadoop_output_format*, *hadoop_streaming_jar*, and *jobconf*
 
+:py:class:`~mrjob.inline.InlineMRJobRunner` works like :py:class:`~mrjob.local.LocalMRJobRunner`, only it also ignores 
+*cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*, *steps_python_bin*, *upload_archives*, and *upload_files*.
+
 
 Additional options for :py:class:`~mrjob.emr.EMRJobRunner`
 ----------------------------------------------------------

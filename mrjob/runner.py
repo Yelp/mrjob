@@ -405,9 +405,14 @@ class MRJobRunner(object):
     ### more runner information ###
 
     def get_opts(self):
-        """Get options set for this reducer (either by default, from
-        mrjob.conf, or as a keyword argument."""
+        """Get options set for this runner, as a dict."""
         return copy.deepcopy(self._opts)
+
+    @classmethod
+    def get_default_opts(self):
+        """Get default options for this runner class, as a dict."""
+        blank_opts = dict((key, None) for key in self._allowed_opts())
+        return self.combine_opts(blank_opts, self._default_opts())
 
     def get_job_name(self):
         """Get the unique name for the job run by this runner.

@@ -824,13 +824,27 @@ class EMRJobRunner(MRJobRunner):
             output = self._s3_step_output_uri(step_num)
 
             step_args = self._hadoop_conf_args(step_num, len(steps))
+            jar = self._get_jar()
 
-            step_list.append(boto.emr.StreamingStep(
-                name=name, mapper=mapper, reducer=reducer,
-                action_on_failure=action_on_failure,
-                cache_files=cache_files, cache_archives=cache_archives,
-                step_args=step_args, input=input, output=output,
-                jar=self._get_jar()))
+            try:
+                streaming_step = boto.emr.StreamingStep(
+                    name=name, mapper=mapper, reducer=reducer,
+                    action_on_failure=action_on_failure,
+                    cache_files=cache_files, cache_archives=cache_archives,
+                    step_args=step_args, input=input, output=output,
+                    jar=jar)
+            except TypeError:
+                # the jar option is new to boto (actually just a pull
+                # request from my branch right now), so we may need to
+                # monkey-patch the jar() method
+                streaming_step = boto.emr.StreamingStep(
+                    name=name, mapper=mapper, reducer=reducer,
+                    action_on_failure=action_on_failure,
+                    cache_files=cache_files, cache_archives=cache_archives,
+                    step_args=step_args, input=input, output=output)
+                streaming_step.jar = lambda: jar
+
+            step_list.append(streaming_step)
 
         return step_list
 

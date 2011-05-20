@@ -524,7 +524,7 @@ class MRJob(object):
                     yield key, value
                 except Exception, e:
                     if self.options.strict_protocols:
-                        raise Exception(e)
+                        raise
                     else:
                         self.increment_counter('Undecodable input',
                                                 e.__class__.__name__)
@@ -534,7 +534,7 @@ class MRJob(object):
                 print >> self.stdout, write(key, value)
             except Exception, e:
                 if self.options.strict_protocols:
-                    raise Exception(e)
+                    raise
                 else:
                     self.increment_counter('Unencodable output',
                                             e.__class__.__name__)

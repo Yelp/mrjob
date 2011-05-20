@@ -505,6 +505,7 @@ class CommandLineArgsTest(TestCase):
             '--planck-constant', '42',
             '--extra-special-arg', 'you',
             '--extra-special-arg', 'me',
+            '--strict-protocols',
             ])
 
         assert_equal(mr_job.options.input_protocol, 'raw_value')
@@ -517,10 +518,12 @@ class CommandLineArgsTest(TestCase):
         assert_equal(mr_job.options.pill_type, 'red')
         assert_equal(mr_job.options.planck_constant, 42)
         assert_equal(mr_job.options.extra_special_args, ['you', 'me'])
+        assert_equal(mr_job.options.strict_protocols, True)
         assert_equal(mr_job.generate_passthrough_arguments(),
                      ['--protocol', 'repr',
                       '--output-protocol', 'repr',
                       '--input-protocol', 'raw_value',
+                      '--strict-protocols',
                       '--foo-size', '9',
                       '--bar-name', 'Alembic',
                       '--enable-baz-mode',

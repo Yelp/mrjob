@@ -243,6 +243,7 @@ class MockEmrConnection(object):
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
             creationdatetime=to_iso8601(now),
+            hadoopversion=hadoop_version,
             keepjobflowalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
             masterinstancetype=master_instance_type,

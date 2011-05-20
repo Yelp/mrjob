@@ -259,6 +259,8 @@ class EMRJobRunner(MRJobRunner):
         :param hadoop_streaming_jar: This is actually an option in the base MRJobRunner class. Points to a custom hadoop streaming jar on the local filesystem or S3. If you want to point to a streaming jar already installed on the EMR instances (perhaps through a bootstrap action?), use *hadoop_streaming_jar_on_emr*.
         :type hadoop_streaming_jar_on_emr: str
         :param hadoop_streaming_jar_on_emr: Like *hadoop_streaming_jar*, except that it points to a path on the EMR instance, rather than to a local file or one on S3. Rarely necessary to set this by hand.
+        :type hadoop_version: str
+        :param hadoop_version: Set the version of Hadoop to use on EMR. Currently can be ``'0.18'`` or ``'0.20'``. Default is ``'0.18'``, but will change to ``'0.20'`` (EMR's default) in v0.3.0 of :py:mod:`mrjob`.
         :type num_ec2_instances: int
         :param num_ec2_instances: number of instances to start up. Default is ``1``.
         :type s3_endpoint: str
@@ -375,6 +377,7 @@ class EMRJobRunner(MRJobRunner):
             'emr_endpoint',
             'emr_job_flow_id',
             'hadoop_streaming_jar_on_emr',
+            'hadoop_version',
             'num_ec2_instances',
             's3_endpoint',
             's3_log_uri',
@@ -395,6 +398,7 @@ class EMRJobRunner(MRJobRunner):
             'ec2_slave_instance_type': 'm1.small',
             'hadoop_streaming_jar_on_emr':
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
+            'hadoop_version': '0.18',
             'num_ec2_instances': 1,
             's3_sync_wait_time': 5.0,
             'ssh_bin': ['ssh'],
@@ -738,6 +742,8 @@ class EMRJobRunner(MRJobRunner):
 
         log.info('Creating Elastic MapReduce job flow')
         args = {}
+
+        args['hadoop_version'] = self._opts['hadoop_version']
 
         args['num_instances'] = str(self._opts['num_ec2_instances'])
 

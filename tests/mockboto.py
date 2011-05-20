@@ -64,7 +64,7 @@ class MockS3Connection(object):
         from bucket name to key name to bytes.
         """
         # use mock_s3_fs even if it's {}
-        self.mock_s3_fs = mock_s3_fs if mock_s3_fs is not None else {}
+        self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.endpoint = host or 's3.amazonaws.com'
 
     def get_bucket(self, bucket_name):

@@ -897,7 +897,7 @@ class EMRJobRunner(MRJobRunner):
 
             job_state = job_flow.state
             reason = getattr(job_flow, 'laststatechangereason', '')
-            log_uri = job_flow.loguri
+            log_uri = getattr(job_flow, 'loguri', '')
 
             # find all steps belonging to us, and get their state
             step_states = []

@@ -63,7 +63,8 @@ class MockS3Connection(object):
         by specifying mock_s3_fs. The mock filesystem is just a map
         from bucket name to key name to bytes.
         """
-        self.mock_s3_fs = combine_values({}, mock_s3_fs)
+        # use mock_s3_fs even if it's {}
+        self.mock_s3_fs = mock_s3_fs if mock_s3_fs is not None else {}
         self.endpoint = host or 's3.amazonaws.com'
 
     def get_bucket(self, bucket_name):
@@ -224,6 +225,11 @@ class MockEmrConnection(object):
                     steps=[],
                     bootstrap_actions=[],
                     now=None):
+        """Mock of run_jobflow().
+
+        If you set log_uri to None, you can get a jobflow with no loguri
+        attribute, which is useful for testing.
+        """
         if now is None:
             now = datetime.datetime.utcnow()
 
@@ -239,13 +245,16 @@ class MockEmrConnection(object):
             creationdatetime=to_iso8601(now),
             keepjobflowalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
-            loguri=log_uri,
             masterinstancetype=master_instance_type,
             name=name,
             slaveinstancetype=slave_instance_type,
             state='STARTING',
             steps=[],
         )
+        # don't always set loguri, so we can test Issue #112
+        if log_uri is not None:
+            job_flow.loguri = log_uri
+
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
         self.add_jobflow_steps(jobflow_id, steps)

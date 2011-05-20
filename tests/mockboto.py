@@ -64,7 +64,7 @@ class MockS3Connection(object):
         from bucket name to key name to bytes.
         """
         # use mock_s3_fs even if it's {}
-        self.mock_s3_fs = mock_s3_fs if mock_s3_fs is not None else {}
+        self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.endpoint = host or 's3.amazonaws.com'
 
     def get_bucket(self, bucket_name):
@@ -243,7 +243,7 @@ class MockEmrConnection(object):
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
             creationdatetime=to_iso8601(now),
-            keepjobalivewhennosteps=keep_alive,
+            keepjobflowalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
             name=name,
             state='STARTING',
@@ -436,7 +436,7 @@ class MockEmrConnection(object):
             return
 
         # no pending steps. shut down job if appropriate
-        if job_flow.keepjobalivewhennosteps:
+        if job_flow.keepjobflowalivewhennosteps:
             job_flow.state = 'WAITING'
             job_flow.reason = 'Waiting for steps to run'
         else:

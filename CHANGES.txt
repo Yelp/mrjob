@@ -1,5 +1,5 @@
 v0.2.6, 2011-05-?? -- Hadoop 0.20 in EMR, inline runner, and more
- * Pick which version of Hadoop to run on EMR with --hadoop-version.
+ * Set Hadoop to run on EMR with --hadoop-version (Issue #71).
    * Default is still 0.18, but will change to 0.20 in mrjob v0.3.0.
  * New inline runner, for testing locally with a debugger
  * Added steps_python_bin option (for use with virtualenv)

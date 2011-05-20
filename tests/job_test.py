@@ -303,15 +303,9 @@ class ProtocolsTestCase(TestCase):
 
         mr_job = MRBoringJob(args=['--reducer', '--strict-protocols'])
         mr_job.sandbox(stdin=BAD_JSON_INPUT)
-        raised_exception = False
-        # attempt to run it
-        try:
-            mr_job.run_reducer()
-        except:
-            raised_exception = True
-
+        
         # make sure it raises an exception
-        assert_equal(raised_exception, True)
+        assert_raises(Exception, mr_job.run_reducer)
         
     def test_unencodable_output(self):
         UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
@@ -336,15 +330,9 @@ class ProtocolsTestCase(TestCase):
 
         mr_job = MRBoringJob(args=['--mapper', '--strict-protocols'])
         mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
-        raised_exception = False
-        # attempt to run it
-        try:
-            mr_job.run_mapper()
-        except:
-            raised_exception = True
-
+        
         # make sure it raises an exception
-        assert_equal(raised_exception, True)
+        assert_raises(Exception, mr_job.run_mapper)
 
 
 class IsMapperOrReducerTestCase(TestCase):

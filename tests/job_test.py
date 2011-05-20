@@ -339,7 +339,7 @@ class ProtocolsTestCase(TestCase):
         raised_exception = False
         # attempt to run it
         try:
-            mr_job.run_reducer()
+            mr_job.run_mapper()
         except:
             raised_exception = True
 

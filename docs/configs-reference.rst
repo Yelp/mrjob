@@ -77,6 +77,7 @@ Option                        Default                        Combined by        
 *emr_endpoint*                (automatic)                    :py:func:`~mrjob.conf.combine_values`
 *emr_job_flow_id*             (create our own job flow)      :py:func:`~mrjob.conf.combine_values`     :option:`--emr-job-flow-id`
 *hadoop_streaming_jar_on_emr* ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-streaming-jar-on-emr`
+*hadoop_version*              ``'0.18'``                     :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-version`
 *num_ec2_instances*           ``1``                          :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-instances`
 *s3_endpoint*                 (automatic)                    :py:func:`~mrjob.conf.combine_paths`
 *s3_log_uri*                  (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-log-uri`

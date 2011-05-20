@@ -3,6 +3,7 @@ v0.3.0, ??? -- ???!
    * ec2_instance_type option now only sets instance type for slave nodes when 
      there are multiple EC2 instances (Issue #66)
    * job_name_prefix option is gone (was deprecated)
+   * default Hadoop version on EMR is 0.20 (was 0.18)
  * hadoop_bin, python_bin, and ssh_bin can now all take switches (Issue #96)
  * --ssh-bin command-line option
  * EMR boostrap files are no longer made public on S3 (Issue #70)

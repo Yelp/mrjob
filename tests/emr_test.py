@@ -316,13 +316,13 @@ class BootstrapFilesTestCase(MockEMRAndS3TestCase):
             emr_conn = runner.make_emr_conn()
             job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
 
-            assert_equal(job_flow.hadoopversion, '0.18')
+            assert_equal(job_flow.hadoopversion, '0.20')
 
     def test_set_hadoop_version(self):
         stdin = StringIO('foo\nbar\n')
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '-c', self.mrjob_conf_path,
-                               '--hadoop-version', '0.20'])
+                               '--hadoop-version', '0.18'])
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
@@ -331,7 +331,7 @@ class BootstrapFilesTestCase(MockEMRAndS3TestCase):
             emr_conn = runner.make_emr_conn()
             job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
 
-            assert_equal(job_flow.hadoopversion, '0.20')
+            assert_equal(job_flow.hadoopversion, '0.18')
 
 
 class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):

@@ -785,7 +785,7 @@ class MRJob(object):
             help='Local path of the hadoop streaming jar on the EMR node. Rarely necessary')
         self.emr_opt_group.add_option(
             '--hadoop-version', dest='hadoop_version', default=None,
-            help='Version of Hadoop to spin up on EMR. Default is 0.18, but will change to 0.20 in v0.3.0 of mrjob.')
+            help='Version of Hadoop to spin up on EMR. Default is 0.20.')
 
 
     def add_passthrough_option(self, *args, **kwargs):

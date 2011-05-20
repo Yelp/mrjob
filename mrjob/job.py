@@ -634,6 +634,10 @@ class MRJob(object):
             '--input-protocol', dest='input_protocol',
             default=self.DEFAULT_INPUT_PROTOCOL, choices=protocol_choices,
             help='protocol to read input with (default: %default)')
+        self.add_passthrough_option(
+			'--strict-protocols', dest='strict_protocols', default=False,
+			action='store_true', help='If something violates an input/output '
+			'protocol then raise an exception')
 
         # options for running the entire job
         self.runner_opt_group = OptionGroup(
@@ -731,11 +735,6 @@ class MRJob(object):
             help='Name/path of alternate python binary to use to query the '
             'job about its steps, if different from the current Python '
             'interpreter. Rarely needed.')
-        
-        self.runner_opt_group.add_option(
-			'--strict-protocols', dest='strict_protocols', default=False,
-			action='store_true', help='If something violates an input/output '
-			'protocol then raise an exception')
 
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(

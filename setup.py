@@ -22,7 +22,9 @@ setup(
     ],
     description='Python MapReduce framework',
     install_requires=[
-        'boto>=1.9',
+        # todo: update this to whatever version of boto includes
+        # https://github.com/boto/boto/pull/190
+        'boto>=2.0b4',
         'PyYAML',
         'simplejson>=2.0.9'
     ],

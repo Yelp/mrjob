@@ -34,8 +34,10 @@ Option                 Default                        Combined by               
 *label*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--label`
 *owner*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--owner`
 *python_archives*      ``[]``                         :py:func:`~mrjob.conf.combine_path_lists`
+*python_bin*           :command:`python`              :py:func:`~mrjob.conf.combine_values`     :option:`--python-bin`
 *setup_cmds*           ``[]``                         :py:func:`~mrjob.conf.combine_lists`
 *setup_scripts*        ``[]``                         :py:func:`~mrjob.conf.combine_path_lists`
+*steps_python_bin*     (current Python interpreter)   :py:func:`~mrjob.conf.combine_values`     :option:`--steps-python-bin`
 *upload_archives*      ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--archive`
 *upload_files*         ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--file`
 ====================== ============================== ========================================= =================================
@@ -45,9 +47,12 @@ See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
 :py:class:`~mrjob.local.LocalMRJobRunner` takes no additional options, but:
 
 * *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs`
-* *python_bin* defaults to ``sys.executable`` (the current python interpreter)
+* *python_bin* defaults to ``sys.executable`` (the current Python interpreter)
 
 In addition, it ignores *hadoop_input_format*, *hadoop_output_format*, *hadoop_streaming_jar*, and *jobconf*
+
+:py:class:`~mrjob.inline.InlineMRJobRunner` works like :py:class:`~mrjob.local.LocalMRJobRunner`, only it also ignores 
+*cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*, *steps_python_bin*, *upload_archives*, and *upload_files*.
 
 
 Additional options for :py:class:`~mrjob.emr.EMRJobRunner`

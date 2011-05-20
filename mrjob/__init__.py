@@ -25,10 +25,12 @@ __credits__ = [
     'Brett Hoerner <brett@bretthoerner.com>',
     'Matt Jones <mattj@yelp.com>',
     'Julian Krause <juliank@yelp.com>',
+    'Robert Leftwich <rl.0x0@eml.cc>',
     'Jimmy Retzlaff <jretz@yelp.com>',
     'Ned Rockson <ned@tellapart.com>',
     'Steve Spencer <steve@bigfrog.net>',
+    'Matthew Tai <mtai@adku.com>',
     'Paul Wais <pwais@yelp.com>',
 ]
 
-__version__ = '0.2.5'
+__version__ = '0.2.6-dev'

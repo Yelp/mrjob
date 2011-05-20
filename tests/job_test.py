@@ -295,6 +295,24 @@ class ProtocolsTestCase(TestCase):
         assert_equal(counters.keys(), ['Undecodable input'])
         assert_equal(sum(counters['Undecodable input'].itervalues()), 3)
 
+    def test_undecodable_input_strict(self):
+        BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
+                                  '"foo"\t"bar"\n' +
+                                  '"too"\t"many"\t"tabs"\n' +
+                                  '"notabs"\n')
+
+        mr_job = MRBoringJob(args=['--reducer', '--strict-protocols'])
+        mr_job.sandbox(stdin=BAD_JSON_INPUT)
+        raised_exception = False
+        # attempt to run it
+        try:
+            mr_job.run_reducer()
+        except:
+            raised_exception = True
+
+        # make sure it raises an exception
+        assert_equal(raised_exception, True)
+        
     def test_unencodable_output(self):
         UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
                                          '\xaa\n' +
@@ -310,6 +328,23 @@ class ProtocolsTestCase(TestCase):
 
         assert_equal(mr_job.parse_counters(),
                      {'Unencodable output': {'UnicodeDecodeError': 1}})
+                     
+    def test_undecodable_output_strict(self):
+        UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
+                                         '\xaa\n' +
+                                         'bar\n')
+
+        mr_job = MRBoringJob(args=['--mapper', '--strict-protocols'])
+        mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
+        raised_exception = False
+        # attempt to run it
+        try:
+            mr_job.run_reducer()
+        except:
+            raised_exception = True
+
+        # make sure it raises an exception
+        assert_equal(raised_exception, True)
 
 
 class IsMapperOrReducerTestCase(TestCase):

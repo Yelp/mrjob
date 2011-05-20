@@ -137,6 +137,8 @@ class MRJobRunner(object):
         :param setup_cmds: a list of commands to run before each mapper/reducer step (e.g. ``['cd my-src-tree; make', 'mkdir -p /tmp/foo']``). You can specify commands as strings, which will be run through the shell, or lists of args, which will be invoked directly. We'll use file locking to ensure that multiple mappers/reducers running on the same node won't run *setup_cmds* simultaneously (it's safe to run ``make``).
         :type setup_scripts: list of str
         :param setup_scripts: files that will be copied into the local working directory and then run. These are run after *setup_cmds*. Like with *setup_cmds*, we use file locking to keep multiple mappers/reducers on the same node from running *setup_scripts* simultaneously.
+        :type steps_python_bin: str
+        :param steps_python_bin: Name/path of alternate python binary to use to query the job about its steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults to ``sys.executable`` (the current python interpreter).
         :type upload_archives: list of str
         :param upload_archives: a list of archives (e.g. tarballs) to unpack in the local directory of the mr_job script when it runs. You can set the local name of the dir we unpack into by appending ``#localname`` to the path; otherwise we just use the name of the archive file (e.g. ``foo.tar.gz``)
         :type upload_files: list of str
@@ -269,6 +271,7 @@ class MRJobRunner(object):
             'python_bin',
             'setup_cmds',
             'setup_scripts',
+            'steps_python_bin',
             'upload_archives',
             'upload_files',
         ]
@@ -288,6 +291,7 @@ class MRJobRunner(object):
             'cleanup': CLEANUP_DEFAULT,
             'owner': owner,
             'python_bin': 'python',
+            'steps_python_bin': sys.executable or 'python',
         }
 
     @classmethod
@@ -304,6 +308,7 @@ class MRJobRunner(object):
             'python_bin': combine_paths,
             'setup_cmds': combine_lists,
             'setup_scripts': combine_path_lists,
+            'steps_python_bin': combine_paths,
             'upload_archives': combine_path_lists,
             'upload_files': combine_path_lists,
         }
@@ -411,9 +416,14 @@ class MRJobRunner(object):
     ### more runner information ###
 
     def get_opts(self):
-        """Get options set for this reducer (either by default, from
-        mrjob.conf, or as a keyword argument."""
+        """Get options set for this runner, as a dict."""
         return copy.deepcopy(self._opts)
+
+    @classmethod
+    def get_default_opts(self):
+        """Get default options for this runner class, as a dict."""
+        blank_opts = dict((key, None) for key in self._allowed_opts())
+        return self.combine_opts(blank_opts, self._default_opts())
 
     def get_job_name(self):
         """Get the unique name for the job run by this runner.
@@ -710,9 +720,7 @@ class MRJobRunner(object):
             if not self._script:
                 self._steps = []
             else:
-                # don't use self._opts['python_bin'] because that
-                # refers to the python binary to use inside Hadoop
-                python_bin = sys.executable or 'python'
+                python_bin = self._opts['steps_python_bin']
                 args = ([python_bin, self._script['path'], '--steps'] +
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))

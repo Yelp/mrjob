@@ -1,4 +1,5 @@
 # Copyright (c) 2010 Spotify AB
+# Copyright (c) 2010-2011 Yelp
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the
@@ -55,17 +56,16 @@ class EmrConnection(AWSQueryConnection):
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
                  is_secure=True, port=None, proxy=None, proxy_port=None,
                  proxy_user=None, proxy_pass=None, debug=0,
-                 https_connection_factory=None, region=None):
+                 https_connection_factory=None, region=None, path='/'):
         if not region:
             region = RegionInfo(self, self.DefaultRegionName, self.DefaultRegionEndpoint)
         self.region = region
-
         AWSQueryConnection.__init__(self, aws_access_key_id,
                                     aws_secret_access_key,
                                     is_secure, port, proxy, proxy_port,
                                     proxy_user, proxy_pass,
                                     self.region.endpoint, debug,
-                                    https_connection_factory)
+                                    https_connection_factory, path)
 
     def _required_auth_capability(self):
         return ['emr']
@@ -150,7 +150,8 @@ class EmrConnection(AWSQueryConnection):
         step_args = [self._build_step_args(step) for step in steps]
         params.update(self._build_step_list(step_args))
 
-        return self.get_object('AddJobFlowSteps', params, RunJobFlowResponse, verb='POST')
+        return self.get_object(
+            'AddJobFlowSteps', params, RunJobFlowResponse, verb='POST')
 
     def run_jobflow(self, name, log_uri, ec2_keyname=None, availability_zone=None,
                     master_instance_type='m1.small',
@@ -219,7 +220,8 @@ class EmrConnection(AWSQueryConnection):
             bootstrap_action_args = [self._build_bootstrap_action_args(bootstrap_action) for bootstrap_action in bootstrap_actions]
             params.update(self._build_bootstrap_action_list(bootstrap_action_args))
 
-        response = self.get_object('RunJobFlow', params, RunJobFlowResponse, verb='POST')
+        response = self.get_object(
+            'RunJobFlow', params, RunJobFlowResponse, verb='POST')
         return response.jobflowid
 
     def _build_bootstrap_action_args(self, bootstrap_action):
@@ -260,7 +262,7 @@ class EmrConnection(AWSQueryConnection):
         params = {}
         for i, bootstrap_action in enumerate(bootstrap_actions):
             for key, value in bootstrap_action.iteritems():
-                params['BootstrapActions.memeber.%s.%s' % (i + 1, key)] = value
+                params['BootstrapActions.member.%s.%s' % (i + 1, key)] = value
         return params
 
     def _build_step_list(self, steps):
@@ -270,7 +272,7 @@ class EmrConnection(AWSQueryConnection):
         params = {}
         for i, step in enumerate(steps):
             for key, value in step.iteritems():
-                params['Steps.memeber.%s.%s' % (i+1, key)] = value
+                params['Steps.member.%s.%s' % (i+1, key)] = value
         return params
 
     def _build_instance_args(self, ec2_keyname, availability_zone, master_instance_type,

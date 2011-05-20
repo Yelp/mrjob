@@ -330,18 +330,20 @@ class MRJob(object):
         """
         # load options from the command line
         mr_job = cls(args=_READ_ARGS_FROM_SYS_ARGV)
+        mr_job.execute()
 
-        if mr_job.options.show_steps:
-            mr_job.show_steps()
+    def execute(self):
+        if self.options.show_steps:
+            self.show_steps()
 
-        elif mr_job.options.run_mapper:
-            mr_job.run_mapper(mr_job.options.step_num)
+        elif self.options.run_mapper:
+            self.run_mapper(self.options.step_num)
 
-        elif mr_job.options.run_reducer:
-            mr_job.run_reducer(mr_job.options.step_num)
+        elif self.options.run_reducer:
+            self.run_reducer(self.options.step_num)
 
         else:
-            mr_job.run_job()
+            self.run_job()
 
     def make_runner(self):
         """Make a runner based on command-line arguments, so we can
@@ -354,12 +356,16 @@ class MRJob(object):
         from mrjob.emr import EMRJobRunner
         from mrjob.hadoop import HadoopJobRunner
         from mrjob.local import LocalMRJobRunner
+        from mrjob.inline import InlineMRJobRunner
 
         if self.options.runner == 'emr':
             return EMRJobRunner(**self.emr_job_runner_kwargs())
 
         elif self.options.runner == 'hadoop':
             return HadoopJobRunner(**self.hadoop_job_runner_kwargs())
+
+        elif self.options.runner == 'inline':
+            return InlineMRJobRunner(mrjob_cls=self.__class__, **self.inline_job_runner_kwargs())
 
         else:
             # run locally by default
@@ -393,7 +399,8 @@ class MRJob(object):
 
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception.
+        increment a counter rather than raising an exception. If 
+        strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
@@ -429,7 +436,8 @@ class MRJob(object):
 
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception.
+        increment a counter rather than raising an exception. If 
+        strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
@@ -495,7 +503,7 @@ class MRJob(object):
     def _wrap_protocols(self, step_num, step_type):
         """Pick the protocol classes to use for reading and writing
         for the given step, and wrap them so that bad input and output
-        trigger a counter rather than an exception.
+        trigger a counter rather than an exception unless strict-protocols is set.
 
         Returns a tuple of read_lines, write_line
         read_lines() is a function that reads lines from input, decodes them,
@@ -515,15 +523,21 @@ class MRJob(object):
                     key, value = read(line.rstrip('\n'))
                     yield key, value
                 except Exception, e:
-                    self.increment_counter('Undecodable input',
-                                           e.__class__.__name__)
+                    if self.options.strict_protocols:
+                        raise Exception(e)
+                    else:
+                        self.increment_counter('Undecodable input',
+                                                e.__class__.__name__)
 
         def write_line(key, value):
             try:
                 print >> self.stdout, write(key, value)
             except Exception, e:
-                self.increment_counter('Unencodable output',
-                                       e.__class__.__name__)
+                if self.options.strict_protocols:
+                    raise Exception(e)
+                else:
+                    self.increment_counter('Unencodable output',
+                                            e.__class__.__name__)
 
         return read_lines, write_line
 
@@ -628,7 +642,7 @@ class MRJob(object):
 
         self.runner_opt_group.add_option(
             '-r', '--runner', dest='runner', default='local',
-            choices=('local', 'hadoop', 'emr'),
+            choices=('local', 'hadoop', 'emr', 'inline'),
             help='Where to run the job: local to run locally, hadoop to run on your Hadoop cluster, emr to run on Amazon ElasticMapReduce. Default is local.')
         self.runner_opt_group.add_option(
             '-c', '--conf-path', dest='conf_path', default=None,
@@ -711,6 +725,17 @@ class MRJob(object):
         self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
             help='Name/path of alternate python binary for mappers/reducers.')
+
+        self.runner_opt_group.add_option(
+            '--steps-python-bin', dest='steps_python_bin', default=None,
+            help='Name/path of alternate python binary to use to query the '
+            'job about its steps, if different from the current Python '
+            'interpreter. Rarely needed.')
+        
+        self.runner_opt_group.add_option(
+			'--strict-protocols', dest='strict_protocols', default=False,
+			action='store_true', help='If something violates an input/output '
+			'protocol then raise an exception')
 
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(
@@ -899,9 +924,21 @@ class MRJob(object):
             'owner': self.options.owner,
             'python_bin': self.options.python_bin,
             'stdin': self.stdin,
+            'steps_python_bin': self.options.steps_python_bin,
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,
         }
+
+    def inline_job_runner_kwargs(self):
+        """Keyword arguments to create create runners when
+        :py:meth:`make_runner` is called, when we run a job locally
+        (``-r inline``).
+
+        :return: map from arg name to value
+
+        Re-define this if you want finer control when running jobs locally.
+        """
+        return self.job_runner_kwargs()
 
     def local_job_runner_kwargs(self):
         """Keyword arguments to create create runners when

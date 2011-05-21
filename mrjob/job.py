@@ -399,7 +399,8 @@ class MRJob(object):
 
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception.
+        increment a counter rather than raising an exception. If 
+        --strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
@@ -435,7 +436,8 @@ class MRJob(object):
 
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception.
+        increment a counter rather than raising an exception. If 
+        --strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
@@ -501,7 +503,8 @@ class MRJob(object):
     def _wrap_protocols(self, step_num, step_type):
         """Pick the protocol classes to use for reading and writing
         for the given step, and wrap them so that bad input and output
-        trigger a counter rather than an exception.
+        trigger a counter rather than an exception unless --strict-protocols
+        is set.
 
         Returns a tuple of read_lines, write_line
         read_lines() is a function that reads lines from input, decodes them,
@@ -521,15 +524,21 @@ class MRJob(object):
                     key, value = read(line.rstrip('\n'))
                     yield key, value
                 except Exception, e:
-                    self.increment_counter('Undecodable input',
-                                           e.__class__.__name__)
+                    if self.options.strict_protocols:
+                        raise
+                    else:
+                        self.increment_counter('Undecodable input',
+                                                e.__class__.__name__)
 
         def write_line(key, value):
             try:
                 print >> self.stdout, write(key, value)
             except Exception, e:
-                self.increment_counter('Unencodable output',
-                                       e.__class__.__name__)
+                if self.options.strict_protocols:
+                    raise
+                else:
+                    self.increment_counter('Unencodable output',
+                                            e.__class__.__name__)
 
         return read_lines, write_line
 
@@ -626,6 +635,10 @@ class MRJob(object):
             '--input-protocol', dest='input_protocol',
             default=self.DEFAULT_INPUT_PROTOCOL, choices=protocol_choices,
             help='protocol to read input with (default: %default)')
+        self.add_passthrough_option(
+			'--strict-protocols', dest='strict_protocols', default=False,
+			action='store_true', help='If something violates an input/output '
+			'protocol then raise an exception')
 
         # options for running the entire job
         self.runner_opt_group = OptionGroup(

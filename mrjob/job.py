@@ -400,7 +400,7 @@ class MRJob(object):
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
         increment a counter rather than raising an exception. If 
-        strict-protocols is set, then an exception is raised
+        --strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
@@ -437,7 +437,7 @@ class MRJob(object):
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
         increment a counter rather than raising an exception. If 
-        strict-protocols is set, then an exception is raised
+        --strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
@@ -503,7 +503,8 @@ class MRJob(object):
     def _wrap_protocols(self, step_num, step_type):
         """Pick the protocol classes to use for reading and writing
         for the given step, and wrap them so that bad input and output
-        trigger a counter rather than an exception unless strict-protocols is set.
+        trigger a counter rather than an exception unless --strict-protocols
+        is set.
 
         Returns a tuple of read_lines, write_line
         read_lines() is a function that reads lines from input, decodes them,

@@ -295,6 +295,18 @@ class ProtocolsTestCase(TestCase):
         assert_equal(counters.keys(), ['Undecodable input'])
         assert_equal(sum(counters['Undecodable input'].itervalues()), 3)
 
+    def test_undecodable_input_strict(self):
+        BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
+                                  '"foo"\t"bar"\n' +
+                                  '"too"\t"many"\t"tabs"\n' +
+                                  '"notabs"\n')
+
+        mr_job = MRBoringJob(args=['--reducer', '--strict-protocols'])
+        mr_job.sandbox(stdin=BAD_JSON_INPUT)
+        
+        # make sure it raises an exception
+        assert_raises(Exception, mr_job.run_reducer)
+        
     def test_unencodable_output(self):
         UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
                                          '\xaa\n' +
@@ -310,6 +322,17 @@ class ProtocolsTestCase(TestCase):
 
         assert_equal(mr_job.parse_counters(),
                      {'Unencodable output': {'UnicodeDecodeError': 1}})
+                     
+    def test_undecodable_output_strict(self):
+        UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
+                                         '\xaa\n' +
+                                         'bar\n')
+
+        mr_job = MRBoringJob(args=['--mapper', '--strict-protocols'])
+        mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
+        
+        # make sure it raises an exception
+        assert_raises(Exception, mr_job.run_mapper)
 
 
 class IsMapperOrReducerTestCase(TestCase):
@@ -482,6 +505,7 @@ class CommandLineArgsTest(TestCase):
             '--planck-constant', '42',
             '--extra-special-arg', 'you',
             '--extra-special-arg', 'me',
+            '--strict-protocols',
             ])
 
         assert_equal(mr_job.options.input_protocol, 'raw_value')
@@ -494,10 +518,12 @@ class CommandLineArgsTest(TestCase):
         assert_equal(mr_job.options.pill_type, 'red')
         assert_equal(mr_job.options.planck_constant, 42)
         assert_equal(mr_job.options.extra_special_args, ['you', 'me'])
+        assert_equal(mr_job.options.strict_protocols, True)
         assert_equal(mr_job.generate_passthrough_arguments(),
                      ['--protocol', 'repr',
                       '--output-protocol', 'repr',
                       '--input-protocol', 'raw_value',
+                      '--strict-protocols',
                       '--foo-size', '9',
                       '--bar-name', 'Alembic',
                       '--enable-baz-mode',

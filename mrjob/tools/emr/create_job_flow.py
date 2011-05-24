@@ -27,6 +27,7 @@ from optparse import OptionParser
 from mrjob.emr import EMRJobRunner
 from mrjob.util import log_to_stream
 
+
 def main():
     # parser command-line args
     option_parser = make_option_parser()
@@ -45,6 +46,9 @@ def main():
         'ec2_instance_type': options.ec2_instance_type,
         'ec2_master_instance_type': options.ec2_master_instance_type,
         'ec2_slave_instance_type': options.ec2_slave_instance_type,
+        'hadoop_streaming_jar': options.hadoop_streaming_jar,
+        'hadoop_streaming_jar_on_emr': options.hadoop_streaming_jar_on_emr,
+        'hadoop_version': options.hadoop_version,
         'label': options.label,
         'num_ec2_instances': options.num_ec2_instances,
         'owner': options.owner,
@@ -52,6 +56,7 @@ def main():
     runner = EMRJobRunner(**runner_kwargs)
     emr_job_flow_id = runner.make_persistent_job_flow()
     print emr_job_flow_id
+
 
 def make_option_parser():
     usage = '%prog [options]'
@@ -83,6 +88,17 @@ def make_option_parser():
         type='int',
         help='Number of EC2 instances to launch')
     option_parser.add_option(
+        '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
+        default=None,
+        help='Path of your hadoop streaming jar (locally, or on S3/HDFS)')
+    option_parser.add_option(
+        '--hadoop-streaming-jar-on-emr', dest='hadoop_streaming_jar_on_emr',
+        default=None,
+        help='Local path of the hadoop streaming jar on the EMR node. Rarely necessary')
+    option_parser.add_option(
+        '--hadoop-version', dest='hadoop_version', default=None,
+        help='Version of Hadoop to spin up on EMR. Default is 0.18, but will change to 0.20 in v0.3.0 of mrjob.')
+    option_parser.add_option(
         '-l', '--label', dest='label',
         default='create_job_flow',
         help='Optional label for this job flow; useful for auditing. default: %default')
@@ -92,6 +108,7 @@ def make_option_parser():
         help='Optional owner for this job; useful for auditing. Default is your username.')
 
     return option_parser
+
 
 if __name__ == '__main__':
     main()

@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@ class MRVerboseJob(MRJob):
     def mapper_final(self):
         # the UNIX pipe buffer can hold 65536 bytes, so this should
         # definitely exceed that
-        for i in range(10000):
+        for i in xrange(10000):
             self.increment_counter('Foo', 'Bar')
 
-        for i in range(100):
+        for i in xrange(100):
             self.set_status(str(i))
 
         print >> sys.stderr, 'Qux'

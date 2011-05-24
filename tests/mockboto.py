@@ -63,7 +63,8 @@ class MockS3Connection(object):
         by specifying mock_s3_fs. The mock filesystem is just a map
         from bucket name to key name to bytes.
         """
-        self.mock_s3_fs = mock_s3_fs or {}
+        # use mock_s3_fs even if it's {}
+        self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.endpoint = host or 's3.amazonaws.com'
 
     def get_bucket(self, bucket_name):
@@ -224,6 +225,11 @@ class MockEmrConnection(object):
                     steps=[],
                     bootstrap_actions=[],
                     now=None):
+        """Mock of run_jobflow().
+
+        If you set log_uri to None, you can get a jobflow with no loguri
+        attribute, which is useful for testing.
+        """
         if now is None:
             now = datetime.datetime.utcnow()
 
@@ -237,13 +243,17 @@ class MockEmrConnection(object):
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
             creationdatetime=to_iso8601(now),
-            keepjobalivewhennosteps=keep_alive,
+            hadoopversion=hadoop_version,
+            keepjobflowalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
-            loguri=log_uri,
             name=name,
             state='STARTING',
             steps=[],
         )
+        # don't always set loguri, so we can test Issue #112
+        if log_uri is not None:
+            job_flow.loguri = log_uri
+
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
         self.add_jobflow_steps(jobflow_id, steps)
@@ -427,7 +437,7 @@ class MockEmrConnection(object):
             return
 
         # no pending steps. shut down job if appropriate
-        if job_flow.keepjobalivewhennosteps:
+        if job_flow.keepjobflowalivewhennosteps:
             job_flow.state = 'WAITING'
             job_flow.reason = 'Waiting for steps to run'
         else:

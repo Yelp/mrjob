@@ -277,6 +277,9 @@ class BootstrapFilesTestCase(MockEMRAndS3TestCase):
                                if fd['path'] == bootstrap_file]
         assert_equal(len(matching_file_dicts), 1)
 
+
+class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
+
     def test_attach_to_existing_job_flow(self):
         emr_conn = EMRJobRunner().make_emr_conn()
         # set log_uri to None, so that when we describe the job flow, it
@@ -303,6 +306,9 @@ class BootstrapFilesTestCase(MockEMRAndS3TestCase):
 
         assert_equal(sorted(results),
             [(1, 'bar'), (1, 'foo'), (2, None)])
+
+
+class HadoopVersionTestCase(MockEMRAndS3TestCase):
 
     def test_default_hadoop_version(self):
         stdin = StringIO('foo\nbar\n')

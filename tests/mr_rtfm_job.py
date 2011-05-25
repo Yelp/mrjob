@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""We use this to test jobs that emit a large amount of stderr."""
-import sys
+"""Job that tries to misuse the API"""
 
 from mrjob.job import MRJob
 

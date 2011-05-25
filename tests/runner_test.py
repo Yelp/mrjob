@@ -20,8 +20,6 @@ from StringIO import StringIO
 import datetime
 import getpass
 import os
-import signal
-import subprocess
 import tarfile
 from testify import TestCase, assert_equal, assert_in, assert_not_equal, assert_gte, assert_lte, assert_not_in, assert_raises, setup, teardown
 import tempfile
@@ -258,35 +256,3 @@ class TestHadoopConfArgs(TestCase):
         assert_equal(conf_args[:2], ['-libjar', 'qux.jar'])
         assert_equal(len(conf_args), 10)
 
-
-#todo: extract TimeoutException to share code with local_test
-class SubprocessRecursionNotCaughtException(Exception):
-    pass
-
-
-class TestBadMainCatch(TestCase):
-    """Ensure that the user cannot do anything but just call MRYourJob.run() from __main__"""
-    
-    @setup
-    def set_alarm(self):
-        # if the test fails, it'll stall forever and spawn infinite processes,
-        #   so set an alarm
-        def alarm_handler(*args, **kwargs):
-            self.proc.kill()
-            raise SubprocessRecursionNotCaughtException("make_runner failed to catch bad __main__ behavior. Check for leftover processes.")
-        self._old_alarm_handler = signal.signal(signal.SIGALRM, alarm_handler)
-        
-        # 15 second timer obtained by guessing and testing. May be able to bring
-        #   the bound tighter by failing earlier.
-        signal.alarm(15)
-
-    @teardown
-    def restore_old_alarm_handler(self):
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, self._old_alarm_handler)
-    
-    def test_bad_main_catch(self):
-        self.proc = subprocess.Popen(['python tests/mr_rtfm_job.py', "--no-conf"], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        txt, err = self.proc.communicate()
-        assert_in('UsageError', err)
-        

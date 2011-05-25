@@ -118,6 +118,9 @@ def _IDENTITY_MAPPER(key, value):
 # sentinel value; used when running MRJob as a script
 _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
 
+class UsageError(Exception):
+    pass
+
 class SetKeyOption(Option):
 
     ACTIONS = Option.ACTIONS + ('set_key',)
@@ -351,6 +354,11 @@ class MRJob(object):
 
         :rtype: :py:class:`mrjob.runner.MRJobRunner`
         """
+        bad_words = ('--steps', '--mapper', '--reducer', '--step-num')
+        for w in bad_words:
+            if w in sys.argv:
+                raise UsageError("make_runner() was called with %s. This probably means you tried to use it from __main__, which doesn't work." % w)
+        
         # have to import here so that we can still run the MRJob
         # without importing boto
         from mrjob.emr import EMRJobRunner

@@ -120,6 +120,26 @@ def find_interesting_hadoop_streaming_error(lines):
     else:
         return None
 
+_TIMEOUT_ERROR_RE = re.compile(r'Task.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds. Killing!"')
+
+def find_timeout_error(lines):
+    """Scan a log file or other iterable for a timeout error from Hadoop.
+    Return the number of seconds the job ran for before timing out, or None if
+    nothing found.
+
+    In logs from EMR, we find timeouterrors in ``jobs/*.jar``
+
+    Example line::
+
+        Task TASKID="task_201010202309_0001_m_000153" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1287618918658" ERROR="Task attempt_201010202309_0001_m_000153_3 failed to report status for 602 seconds. Killing!"
+    """
+    for line in lines:
+        match = _TIMEOUT_ERROR_RE.match(line)
+        if match:
+            return int(match.group(1))
+    else:
+        return None
+
 # recognize hadoop streaming output
 _COUNTER_RE = re.compile(r'reporter:counter:([^,]*),([^,]*),(-?\d+)$')
 _STATUS_RE = re.compile(r'reporter:status:(.*)$')

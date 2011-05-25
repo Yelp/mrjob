@@ -1001,7 +1001,7 @@ class MRJob(object):
         hadoop or executed via subprocess.
 
         These are passed to :py:meth:`mrjob.runner.MRJobRunner.__init__`
-        as ``file_upload_args``.
+        as ``extra_args``.
         """
         master_option_dict = self.options.__dict__
 
@@ -1034,7 +1034,7 @@ class MRJob(object):
         of tuples of ``('--argname', path)``
 
         These are passed to :py:meth:`mrjob.runner.MRJobRunner.__init__`
-        as ``extra_args``.
+        as ``file_upload_args``.
         """
         file_upload_args = []
 

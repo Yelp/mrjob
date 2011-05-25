@@ -20,6 +20,8 @@ from StringIO import StringIO
 import datetime
 import getpass
 import os
+import signal
+import subprocess
 import tarfile
 from testify import TestCase, assert_equal, assert_in, assert_not_equal, assert_gte, assert_lte, assert_not_in, assert_raises, setup, teardown
 import tempfile
@@ -30,7 +32,6 @@ from mrjob.parse import JOB_NAME_RE
 from mrjob.runner import MRJobRunner
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled
-
 
 class WithStatementTestCase(TestCase):
 
@@ -256,3 +257,31 @@ class TestHadoopConfArgs(TestCase):
         conf_args = runner._hadoop_conf_args(0, 1)
         assert_equal(conf_args[:2], ['-libjar', 'qux.jar'])
         assert_equal(len(conf_args), 10)
+
+
+#todo: extract TimeoutException to share code with local_test
+class SubprocessRecursionNotCaughtException(Exception):
+    pass
+
+
+class TestBadMainCatch(TestCase):
+    """Ensure that the user cannot do anything but just call MRYourJob.run() from __main__"""
+    
+    @setup
+    def set_alarm(self):
+        # if the test fails, it'll stall forever, so set an alarm
+        def alarm_handler(*args, **kwargs):
+            raise SubprocessRecursionNotCaughtException("make_runner failed to catch bad __main__ behavior")
+        self._old_alarm_handler = signal.signal(signal.SIGALRM, alarm_handler)
+        signal.alarm(2)
+
+    @teardown
+    def restore_old_alarm_handler(self):
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, self._old_alarm_handler)
+    
+    def test_bad_main_catch(self):
+        proc = subprocess.Popen('python tests/mr_rtfm_job.py', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        txt, err = proc.communicate()[0]
+        assert_in('MainError', err)
+        

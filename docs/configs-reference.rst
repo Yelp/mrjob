@@ -11,7 +11,6 @@ Option              Default                                                 Swit
 *extra_args*        ``[]``                                                  (see :py:meth:`~mrjob.job.MRJob.add_passthrough_option`)
 *file_upload_args*  ``[]``                                                  (see :py:meth:`~mrjob.job.MRJob.add_file_option`)
 *output_dir*        (automatic)                                             :option:`-o`, :option:`--output-dir`
-*python_bin*        ``'python'``                                            :option:`--python-bin`
 =================== ======================================================= ========================================================
 
 See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.

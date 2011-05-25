@@ -31,6 +31,7 @@ from mrjob.runner import MRJobRunner
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled
 
+
 class WithStatementTestCase(TestCase):
 
     def test_cleanup_after_with_statement(self):

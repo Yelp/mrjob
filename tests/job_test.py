@@ -19,7 +19,6 @@ from __future__ import with_statement
 from optparse import OptionError
 import os
 import shutil
-import signal
 from subprocess import Popen, PIPE
 from StringIO import StringIO
 import sys

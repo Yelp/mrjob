@@ -24,7 +24,7 @@ from subprocess import Popen, PIPE
 from StringIO import StringIO
 import sys
 import tempfile
-from testify import TestCase, assert_equal, assert_not_equal, assert_gt, assert_raises, setup, teardown, assert_in
+from testify import TestCase, assert_equal, assert_not_equal, assert_gt, assert_raises, setup, teardown
 import time
 
 from mrjob.conf import combine_envs

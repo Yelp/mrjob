@@ -19,11 +19,12 @@ from __future__ import with_statement
 from optparse import OptionError
 import os
 import shutil
+import signal
 from subprocess import Popen, PIPE
 from StringIO import StringIO
 import sys
 import tempfile
-from testify import TestCase, assert_equal, assert_not_equal, assert_gt, assert_raises, setup, teardown
+from testify import TestCase, assert_equal, assert_not_equal, assert_gt, assert_raises, setup, teardown, assert_in
 import time
 
 from mrjob.conf import combine_envs
@@ -680,3 +681,35 @@ class RunJobTestCase(TestCase):
 
         assert_equal(sorted(output_lines),
                      ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])
+
+
+class SubprocessRecursionNotCaughtException(Exception):
+    pass
+
+
+class TestBadMainCatch(TestCase):
+    """Ensure that the user cannot do anything but just call MRYourJob.run() from __main__"""
+    
+    @setup
+    def set_alarm(self):
+        # if the test fails, it'll stall forever and spawn infinite processes,
+        #   so set an alarm
+        def alarm_handler(*args, **kwargs):
+            self.proc.kill()
+            raise SubprocessRecursionNotCaughtException("make_runner failed to catch bad __main__ behavior. Check for leftover processes.")
+        self._old_alarm_handler = signal.signal(signal.SIGALRM, alarm_handler)
+        
+        # 15 second timer obtained by guessing and testing. May be able to bring
+        #   the bound tighter by failing earlier.
+        signal.alarm(15)
+
+    @teardown
+    def restore_old_alarm_handler(self):
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, self._old_alarm_handler)
+    
+    def test_bad_main_catch(self):
+        self.proc = Popen(['python tests/mr_rtfm_job.py', "--no-conf"], 
+                          shell=True, stdout=PIPE, stderr=PIPE)
+        txt, err = self.proc.communicate()
+        assert_in('UsageError', err)

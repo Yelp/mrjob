@@ -269,11 +269,16 @@ class TestBadMainCatch(TestCase):
     
     @setup
     def set_alarm(self):
-        # if the test fails, it'll stall forever, so set an alarm
+        # if the test fails, it'll stall forever and spawn infinite processes,
+        #   so set an alarm
         def alarm_handler(*args, **kwargs):
-            raise SubprocessRecursionNotCaughtException("make_runner failed to catch bad __main__ behavior")
+            self.proc.kill()
+            raise SubprocessRecursionNotCaughtException("make_runner failed to catch bad __main__ behavior. Check for leftover processes.")
         self._old_alarm_handler = signal.signal(signal.SIGALRM, alarm_handler)
-        signal.alarm(2)
+        
+        # 15 second timer obtained by guessing and testing. May be able to bring
+        #   the bound tighter by failing earlier.
+        signal.alarm(15)
 
     @teardown
     def restore_old_alarm_handler(self):
@@ -281,7 +286,7 @@ class TestBadMainCatch(TestCase):
         signal.signal(signal.SIGALRM, self._old_alarm_handler)
     
     def test_bad_main_catch(self):
-        proc = subprocess.Popen('python tests/mr_rtfm_job.py', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        txt, err = proc.communicate()[0]
-        assert_in('MainError', err)
+        self.proc = subprocess.Popen(['python tests/mr_rtfm_job.py', "--no-conf"], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        txt, err = self.proc.communicate()
+        assert_in('UsageError', err)
         

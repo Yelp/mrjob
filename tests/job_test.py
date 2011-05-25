@@ -684,7 +684,7 @@ class RunJobTestCase(TestCase):
 
 class TestBadMainCatch(TestCase):
     """Ensure that the user cannot do anything but just call MRYourJob.run() from __main__"""
-    
+
     def test_bad_main_catch(self):
         sys.argv.append('--mapper')
         assert_raises(UsageError, MRBoringJob().make_runner)

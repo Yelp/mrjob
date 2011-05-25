@@ -256,4 +256,3 @@ class TestHadoopConfArgs(TestCase):
         conf_args = runner._hadoop_conf_args(0, 1)
         assert_equal(conf_args[:2], ['-libjar', 'qux.jar'])
         assert_equal(len(conf_args), 10)
-

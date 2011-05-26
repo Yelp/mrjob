@@ -133,12 +133,12 @@ def find_timeout_error(lines):
 
         Task TASKID="task_201010202309_0001_m_000153" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1287618918658" ERROR="Task attempt_201010202309_0001_m_000153_3 failed to report status for 602 seconds. Killing!"
     """
+    result = None
     for line in lines:
         match = _TIMEOUT_ERROR_RE.match(line)
         if match:
-            return int(match.group(1))
-    else:
-        return None
+            result = match.group(1)
+    return int(result)
 
 # recognize hadoop streaming output
 _COUNTER_RE = re.compile(r'reporter:counter:([^,]*),([^,]*),(-?\d+)$')

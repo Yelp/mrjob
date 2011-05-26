@@ -45,7 +45,7 @@ except ImportError:
     botoemr = None
 
 from mrjob.conf import combine_dicts, combine_lists, combine_paths, combine_path_lists
-from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error
+from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
 from mrjob.util import cmd_line
@@ -75,6 +75,9 @@ TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/task-attempts/attempt_(?P<timestamp>
 
 # regex for matching step log URIs
 STEP_LOG_URI_RE = re.compile(r'^.*/steps/(?P<step_num>\d+)/syslog$')
+
+# regex for matching job log URIs
+JOB_LOG_URI_RE = re.compile(r'^.*?/jobs/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
 
 # map from AWS region to EMR endpoint
 # see http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?ConceptsRequestEndpoints.html
@@ -1112,9 +1115,11 @@ class EMRJobRunner(MRJobRunner):
         # give priority to task-attempts/ logs as they contain more useful
         # error messages. this may take a while.
         s3_conn = self.make_s3_conn()
+        
         return (
             self._scan_task_attempt_logs(s3_log_file_uris, step_nums, s3_conn)
-            or self._scan_step_logs(s3_log_file_uris, step_nums, s3_conn))
+            or self._scan_step_logs(s3_log_file_uris, step_nums, s3_conn)
+            or self._scan_job_logs(s3_log_file_uris, step_nums, s3_conn))
 
     def _scan_task_attempt_logs(self, s3_log_file_uris, step_nums, s3_conn):
         """Scan task-attempts/*/{syslog,stderr} for Python exceptions
@@ -1229,6 +1234,48 @@ class EMRJobRunner(MRJobRunner):
                             's3_log_file_uri': s3_log_file_uri,
                             'input_uri': None,
                         }
+
+    def _scan_job_logs(self, s3_log_file_uris, step_nums, s3_conn):
+        """Scan jobs/* for timeout errors.
+        
+        Helper for _find_probable_cause_of_failure()
+        """
+        
+        relevant_logs = [] # list of (sort key, info, URI)
+        for s3_log_file_uri in s3_log_file_uris:
+            match = JOB_LOG_URI_RE.match(s3_log_file_uri)
+            if not match:
+                continue
+
+            info = match.groupdict()
+
+            if not int(info['step_num']) in step_nums:
+                continue
+
+            # sort so we can go through the steps in reverse order
+            sort_key = (info['timestamp'], info['step_num'])
+
+            relevant_logs.append((sort_key, info, s3_log_file_uri))
+
+        relevant_logs.sort(reverse=True)
+        
+        for sort_key, info, s3_log_file_uri in relevant_logs:
+            log_path = self._download_log_file(s3_log_file_uri, s3_conn)
+            if not log_path:
+                continue
+            
+            with open(log_path) as log_file:
+                n = find_timeout_error(log_file)
+
+            if n is not None:
+                result = {
+                    'lines': ['Timeout after %d seconds' % n],
+                    's3_log_file_uri': s3_log_file_uri,
+                    'input_uri': None
+                }
+
+                return result
+        return None
 
     def _download_log_file(self, s3_log_file_uri, s3_conn):
         """Download a log file to our local tmp dir so we can scan it.

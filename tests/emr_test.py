@@ -99,6 +99,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         dump_mrjob_conf({'runners': {'emr': {
             'check_emr_status_every': 0.01,
             's3_sync_wait_time': 0.01,
+            'aws_availability_zone': 'PUPPYLAND',
         }}}, open(self.mrjob_conf_path, 'w'))
 
     @teardown
@@ -330,6 +331,31 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
 
             assert_equal(job_flow.hadoopversion, '0.20')
+
+    def test_availability_zone_config(self):
+        # Confirm that the mrjob.conf option 'aws_availability_zone' was
+        #   propagated through to the job flow
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
+                               '-c', self.mrjob_conf_path])
+        mr_job.sandbox()
+
+        results = []
+        with mr_job.make_runner() as runner:
+            assert isinstance(runner, EMRJobRunner)
+            runner.run()
+            for line in runner.stream_output():
+                pass
+
+        emr_conn = runner.make_emr_conn()
+        job_flow_id = runner.get_emr_job_flow_id()
+        for i in range(10):
+            emr_conn.simulate_progress(job_flow_id)
+
+        job_flow = emr_conn.describe_jobflow(job_flow_id)
+        print dir(job_flow)
+        assert_equal(job_flow.availabilityzone, 'PUPPYLAND')
+        assert_equal(job_flow.state, 'TERMINATED')
+
 
 
 class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):

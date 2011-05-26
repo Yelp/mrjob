@@ -233,6 +233,8 @@ class EMRJobRunner(MRJobRunner):
         :param aws_secret_access_key: your "password" on AWS
         :type aws_region: str
         :param aws_region: region to connect to S3 and EMR on (e.g. ``us-west-1``). If you want to use separate regions for S3 and EMR, set *emr_endpoint* and *s3_endpoint*.
+        :type aws_availability_zone: str
+        :param aws_availability_zone: availability zone to run the job in
         :type bootstrap_cmds: list
         :param bootstrap_cmds: a list of commands to run on the master node to set up libraries, etc. Like *setup_cmds*, these can be strings, which will be run in the shell, or lists of args, which will be run directly. Prepend ``sudo`` to commands to do things that require root privileges.
         :type bootstrap_files: list of str
@@ -366,6 +368,7 @@ class EMRJobRunner(MRJobRunner):
             'aws_access_key_id',
             'aws_secret_access_key',
             'aws_region',
+            'aws_availability_zone',
             'bootstrap_cmds',
             'bootstrap_files',
             'bootstrap_python_packages',
@@ -400,6 +403,7 @@ class EMRJobRunner(MRJobRunner):
             'hadoop_streaming_jar_on_emr':
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
             'hadoop_version': '0.18',
+            'aws_availability_zone': None,
             'num_ec2_instances': 1,
             's3_sync_wait_time': 5.0,
             'ssh_bin': 'ssh',
@@ -737,6 +741,9 @@ class EMRJobRunner(MRJobRunner):
         args = {}
 
         args['hadoop_version'] = self._opts['hadoop_version']
+        
+        if self._opts['aws_availability_zone']:
+            args['availability_zone'] = self._opts['aws_availability_zone']
 
         if self._opts['num_ec2_instances']:
             args['num_instances'] = str(self._opts['num_ec2_instances'])

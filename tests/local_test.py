@@ -110,7 +110,7 @@ class LargeAmountsOfStderrTestCase(TestCase):
     @setup
     def set_alarm(self):
         # if the test fails, it'll stall forever, so set an alarm
-        def alarm_handler():
+        def alarm_handler(*args, **kwargs):
             raise TimeoutException('Stalled on large amounts of stderr; probably pipe buffer is full.')
         self._old_alarm_handler = signal.signal(signal.SIGALRM, alarm_handler)
         signal.alarm(10)

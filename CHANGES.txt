@@ -8,6 +8,9 @@ v0.3.0, ??? -- ???!
  * --ssh-bin command-line option
  * EMR boostrap files are no longer made public on S3 (Issue #70)
 
+v0.2.7, 2011-06-?? -- ???
+ * Catch abuse of __main__ in jobs (Issue #78)
+
 v0.2.6, 2011-05-24 -- Hadoop 0.20 in EMR, inline runner, and more
 * Set Hadoop to run on EMR with --hadoop-version (Issue #71).
    * Default is still 0.18, but will change to 0.20 in mrjob v0.3.0.

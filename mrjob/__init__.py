@@ -24,7 +24,7 @@ __credits__ = [
     'Benjamin Goldenberg <benjamin@yelp.com',
     'Peter Harrington <peter.b.harrington@gmail.com>',
     'Brett Hoerner <brett@bretthoerner.com>',
-    'Steven Johnson <sjohnson@yelp.com>',
+    'Stephen Johnson <sjohnson@yelp.com>',
     'Matt Jones <mattj@yelp.com>',
     'Julian Krause <juliank@yelp.com>',
     'Robert Leftwich <rl.0x0@eml.cc>',

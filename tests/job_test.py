@@ -27,7 +27,7 @@ from testify import TestCase, assert_equal, assert_not_equal, assert_gt, assert_
 import time
 
 from mrjob.conf import combine_envs
-from mrjob.job import MRJob, _IDENTITY_MAPPER
+from mrjob.job import MRJob, _IDENTITY_MAPPER, UsageError
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import parse_mr_job_stderr
 from tests.mr_tower_of_powers import MRTowerOfPowers
@@ -680,3 +680,12 @@ class RunJobTestCase(TestCase):
 
         assert_equal(sorted(output_lines),
                      ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])
+
+
+class TestBadMainCatch(TestCase):
+    """Ensure that the user cannot do anything but just call MRYourJob.run() from __main__"""
+
+    def test_bad_main_catch(self):
+        sys.argv.append('--mapper')
+        assert_raises(UsageError, MRBoringJob().make_runner)
+        sys.argv = sys.argv[:-1]

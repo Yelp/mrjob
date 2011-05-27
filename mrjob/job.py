@@ -825,6 +825,11 @@ class MRJob(object):
             help='Commands to run on the master node to set up libraries, etc. You can use --bootstrap-cmd more than once. Use mrjob.conf to specify arguments as a list to be run directly.')
 
         self.emr_opt_group.add_option(
+            '--bootstrap-file', dest='bootstrap_files', action='append',
+            default=[],
+            help='File to upload to the master node before running bootstrap_cmds (for example, debian packages). These will be made public on S3 due to a limitation of the bootstrap feature. You can use --bootstrap-file more than once.')
+
+        self.emr_opt_group.add_option(
             '--check-emr-status-every', dest='check_emr_status_every',
             default=None, type='int',
             help='How often (in seconds) to check status of your EMR job')

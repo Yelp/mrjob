@@ -708,7 +708,7 @@ class MRJob(object):
 
         self.runner_opt_group.add_option(
             '--python-archive', dest='python_archives', default=[], action='append',
-            help='Archive to unpack and add to the :envvar:`PYTHONPATH` of the mr_job script when it runs. You can use --python-archives multiple times.')
+            help='Archive to unpack and add to the PYTHONPATH of the mr_job script when it runs. You can use --python-archives multiple times.')
 
         self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,

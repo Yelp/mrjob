@@ -975,6 +975,7 @@ class MRJob(object):
         want to add or change lots of keyword arguments.
         """
         return {
+            'bootstrap_mrjob': self.options.bootstrap_mrjob,
             'cleanup': self.options.cleanup,
             'cmdenv': self.options.cmdenv,
             'conf_path': self.options.conf_path,
@@ -992,6 +993,7 @@ class MRJob(object):
             'owner': self.options.owner,
             'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
+            'setup_cmds': self.setup_cmds,
             'stdin': self.stdin,
             'steps_python_bin': self.options.steps_python_bin,
             'upload_archives': self.options.upload_archives,

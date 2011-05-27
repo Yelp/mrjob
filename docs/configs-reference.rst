@@ -66,7 +66,7 @@ Option                        Default                        Combined by        
 *aws_region*                  (automatic)                    :py:func:`~mrjob.conf.combine_values`     --aws-region
 *bootstrap_cmds*              ``[]``                         :py:func:`~mrjob.conf.combine_lists`      --bootstrap-cmd
 *bootstrap_files*             ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` --bootstrap-file
-*bootstrap_python_packages*   ``[]``                         :py:func:`~mrjob.conf.combine_path_lists`
+*bootstrap_python_packages*   ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` --bootstrap-python-package
 *bootstrap_scripts*           ``[]``                         :py:func:`~mrjob.conf.combine_lists`
 *check_emr_status_every*      ``30``                         :py:func:`~mrjob.conf.combine_values`     :option:`--check-emr-status-every`
 *ec2_instance_type*           ``'m1.small'``                 :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-instance-type`

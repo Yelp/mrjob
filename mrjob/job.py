@@ -830,6 +830,11 @@ class MRJob(object):
             help='File to upload to the master node before running bootstrap_cmds (for example, debian packages). These will be made public on S3 due to a limitation of the bootstrap feature. You can use --bootstrap-file more than once.')
 
         self.emr_opt_group.add_option(
+            '--bootstrap-python-package', dest='bootstrap_python_packages', action='append',
+            default=[],
+            help='Path to a Python module to install on EMR. These should be standard python module tarballs. If a module is named foo.tar.gz, we expect to be able to run tar xfz foo.tar.gz; cd foo; sudo python setup.py install. You can use --bootstrap-python-packages more than once.')
+
+        self.emr_opt_group.add_option(
             '--check-emr-status-every', dest='check_emr_status_every',
             default=None, type='int',
             help='How often (in seconds) to check status of your EMR job')

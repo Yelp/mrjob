@@ -403,7 +403,6 @@ class EMRJobRunner(MRJobRunner):
             'hadoop_streaming_jar_on_emr':
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
             'hadoop_version': '0.18',
-            'aws_availability_zone': None,
             'num_ec2_instances': 1,
             's3_sync_wait_time': 5.0,
             'ssh_bin': 'ssh',

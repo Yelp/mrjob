@@ -636,10 +636,11 @@ class MRJob(object):
         self.option_parser.add_option_group(self.proto_opt_group)
 
         self.add_passthrough_option(
-            '-p', '--protocol', dest='protocol',
+            '--input-protocol', dest='input_protocol',
             opt_group=self.proto_opt_group,
-            default=self.DEFAULT_PROTOCOL, choices=protocol_choices,
-            help='output protocol for mappers/reducers. Choices: %s (default: %%default)' % ', '.join(protocol_choices))
+            default=self.DEFAULT_INPUT_PROTOCOL, choices=protocol_choices,
+            help='protocol to read input with (default: %default)')
+
         self.add_passthrough_option(
             '--output-protocol', dest='output_protocol',
             opt_group=self.proto_opt_group,
@@ -648,16 +649,19 @@ class MRJob(object):
              help='protocol for final output (default: %s)' % (
             'same as --protocol' if self.DEFAULT_OUTPUT_PROTOCOL is None
             else '%default'))
+
         self.add_passthrough_option(
-            '--input-protocol', dest='input_protocol',
+            '-p', '--protocol', dest='protocol',
             opt_group=self.proto_opt_group,
-            default=self.DEFAULT_INPUT_PROTOCOL, choices=protocol_choices,
-            help='protocol to read input with (default: %default)')
+            default=self.DEFAULT_PROTOCOL, choices=protocol_choices,
+            help='output protocol for mappers/reducers. Choices: %s (default: %%default)' % ', '.join(protocol_choices))
+
         self.add_passthrough_option(
             '--strict-protocols', dest='strict_protocols', default=False,
             opt_group=self.proto_opt_group,
             action='store_true', help='If something violates an input/output '
             'protocol then raise an exception')
+
 
         # options for running the entire job
         self.runner_opt_group = OptionGroup(
@@ -665,71 +669,68 @@ class MRJob(object):
         self.option_parser.add_option_group(self.runner_opt_group)
 
         self.runner_opt_group.add_option(
-            '-r', '--runner', dest='runner', default='local',
-            choices=('local', 'hadoop', 'emr', 'inline'),
-            help='Where to run the job: local to run locally, hadoop to run on your Hadoop cluster, emr to run on Amazon ElasticMapReduce. Default is local.')
+            '--archive', dest='upload_archives', action='append',
+            default=[],
+            help='Unpack archive in the working directory of this script. You can use --archive multiple times.')
+
         self.runner_opt_group.add_option(
             '-c', '--conf-path', dest='conf_path', default=None,
             help='Path to alternate mrjob.conf file to read from')
-        self.runner_opt_group.add_option(
-            '--no-conf', dest='conf_path', action='store_false',
-            help="Don't load mrjob.conf even if it's available")
-        self.runner_opt_group.add_option(
-            '--no-output', dest='no_output',
-            default=False, action='store_true',
-            help="Don't stream output after job completion")
+
         self.runner_opt_group.add_option(
             '--cleanup', dest='cleanup',
             choices=CLEANUP_CHOICES, default=CLEANUP_DEFAULT,
             help="when to clean up tmp directories, etc. Choices: %s (default: %%default)" % ', '.join(CLEANUP_CHOICES))
-        self.runner_opt_group.add_option(
-            '-v', '--verbose', dest='verbose', default=False,
-            action='store_true',
-            help='print more messages to stderr')
-        self.runner_opt_group.add_option(
-            '-q', '--quiet', dest='quiet', default=False,
-            action='store_true',
-            help="Don't print anything to stderr")
+
         self.runner_opt_group.add_option(
             '--file', dest='upload_files', action='append',
             default=[],
             help='Copy file to the working directory of this script. You can use --file multiple times.')
+
         self.runner_opt_group.add_option(
-            '--archive', dest='upload_archives', action='append',
-            default=[],
-            help='Unpack archive in the working directory of this script. You can use --archive multiple times.')
+            '--no-conf', dest='conf_path', action='store_false',
+            help="Don't load mrjob.conf even if it's available")
+
+        self.runner_opt_group.add_option(
+            '--no-output', dest='no_output',
+            default=False, action='store_true',
+            help="Don't stream output after job completion")
+
         self.runner_opt_group.add_option(
             '-o', '--output-dir', dest='output_dir', default=None,
             help='Where to put final job output. This must be an s3:// URL ' +
             'for EMR, an HDFS path for Hadoop, and a system path for local,' +
             'and must be empty')
+
         self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
             help='Name/path of alternate python binary for mappers/reducers.')
+
+        self.runner_opt_group.add_option(
+            '-q', '--quiet', dest='quiet', default=False,
+            action='store_true',
+            help="Don't print anything to stderr")
+
+        self.runner_opt_group.add_option(
+            '-r', '--runner', dest='runner', default='local',
+            choices=('local', 'hadoop', 'emr', 'inline'),
+            help='Where to run the job: local to run locally, hadoop to run on your Hadoop cluster, emr to run on Amazon ElasticMapReduce. Default is local.')
+
         self.runner_opt_group.add_option(
             '--steps-python-bin', dest='steps_python_bin', default=None,
             help='Name/path of alternate python binary to use to query the '
             'job about its steps, if different from the current Python '
             'interpreter. Rarely needed.')
 
+        self.runner_opt_group.add_option(
+            '-v', '--verbose', dest='verbose', default=False,
+            action='store_true',
+            help='print more messages to stderr')
+
         # options common to Hadoop and EMR
         self.hadoop_emr_opt_group = OptionGroup(
             self.option_parser, 'Running on Hadoop or EMR (these apply when you set -r hadoop or -r emr)')
         self.option_parser.add_option_group(self.hadoop_emr_opt_group)
-
-        self.hadoop_emr_opt_group.add_option(
-            '--label', '--job-name-prefix', dest='label', default=None,
-            help='custom prefix for job name, to help us identify the job')
-
-        self.hadoop_emr_opt_group.add_option(
-            '--owner', dest='owner', default=None,
-            help='custom username to use, to help us identify who ran the job')
-
-        self.hadoop_emr_opt_group.add_option(
-            '--jobconf', dest='jobconf', default={}, action='set_key',
-            help='-jobconf arg to pass through to hadoop streaming; '
-            'should take the form KEY=VALUE. You can use --jobconf '
-            'multiple times.')
 
         self.hadoop_emr_opt_group.add_option(
             '--cmdenv', dest='cmdenv', default={}, action='set_key',
@@ -759,6 +760,20 @@ class MRJob(object):
             default=None,
             help='Path of your hadoop streaming jar (locally, or on S3/HDFS)')
 
+        self.hadoop_emr_opt_group.add_option(
+            '--jobconf', dest='jobconf', default={}, action='set_key',
+            help='-jobconf arg to pass through to hadoop streaming; '
+            'should take the form KEY=VALUE. You can use --jobconf '
+            'multiple times.')
+
+        self.hadoop_emr_opt_group.add_option(
+            '--label', '--job-name-prefix', dest='label', default=None,
+            help='custom prefix for job name, to help us identify the job')
+
+        self.hadoop_emr_opt_group.add_option(
+            '--owner', dest='owner', default=None,
+            help='custom username to use, to help us identify who ran the job')
+
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(
             self.option_parser, 'Running on Hadoop (these apply when you set -r hadoop)')
@@ -767,6 +782,7 @@ class MRJob(object):
         self.hadoop_opt_group.add_option(
             '--hadoop-bin', dest='hadoop_bin', default=None,
             help='hadoop binary. Defaults to $HADOOP_HOME/bin/hadoop')
+
         self.hadoop_opt_group.add_option(
             '--hdfs-scratch-dir', dest='hdfs_scratch_dir',
             default=None,
@@ -778,46 +794,57 @@ class MRJob(object):
         self.option_parser.add_option_group(self.emr_opt_group)
 
         self.emr_opt_group.add_option(
-            '--ec2-instance-type', dest='ec2_instance_type', default=None,
-            help='Type of EC2 instance(s) to launch (e.g. m1.small, c1.xlarge, m2.xlarge). See http://aws.amazon.com/ec2/instance-types/ for the full list.')
-        self.emr_opt_group.add_option(
-            '--ec2-master-instance-type', dest='ec2_master_instance_type', default=None,
-            help='Type of EC2 instance for master node only')
-        self.emr_opt_group.add_option(
-            '--ec2-slave-instance-type', dest='ec2_slave_instance_type', default=None,
-            help='Type of EC2 instance for slave nodes only')
-        self.emr_opt_group.add_option(
-            '--num-ec2-instances', dest='num_ec2_instances', default=None,
-            type='int',
-            help='Number of EC2 instances to launch')
-        self.emr_opt_group.add_option(
-            '--s3-scratch-uri', dest='s3_scratch_uri', default=None,
-            help='URI on S3 to use as our temp directory.')
-        self.emr_opt_group.add_option(
-            '--s3-log-uri', dest='s3_log_uri', default=None,
-            help='URI on S3 to write logs into')
-        self.emr_opt_group.add_option(
             '--check-emr-status-every', dest='check_emr_status_every',
             default=None, type='int',
             help='How often (in seconds) to check status of your EMR job')
+
         self.emr_opt_group.add_option(
-            '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
-            default=None, action='store_true',
-            help='Open up an SSH tunnel to the Hadoop job tracker')
+            '--ec2-instance-type', dest='ec2_instance_type', default=None,
+            help='Type of EC2 instance(s) to launch (e.g. m1.small, c1.xlarge, m2.xlarge). See http://aws.amazon.com/ec2/instance-types/ for the full list.')
+
         self.emr_opt_group.add_option(
-            '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',
-            default=None, action='store_true',
-            help='Make ssh tunnel accessible from remote hosts (not just localhost)')
+            '--ec2-master-instance-type', dest='ec2_master_instance_type', default=None,
+            help='Type of EC2 instance for master node only')
+
+        self.emr_opt_group.add_option(
+            '--ec2-slave-instance-type', dest='ec2_slave_instance_type', default=None,
+            help='Type of EC2 instance for slave nodes only')
+
         self.emr_opt_group.add_option(
             '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
             help='ID of an existing EMR job flow to use')
+
         self.emr_opt_group.add_option(
             '--hadoop-streaming-jar-on-emr', dest='hadoop_streaming_jar_on_emr',
             default=None,
             help='Local path of the hadoop streaming jar on the EMR node. Rarely necessary')
+
         self.emr_opt_group.add_option(
             '--hadoop-version', dest='hadoop_version', default=None,
             help='Version of Hadoop to spin up on EMR. Default is 0.18, but will change to 0.20 in v0.3.0 of mrjob.')
+
+        self.emr_opt_group.add_option(
+            '--num-ec2-instances', dest='num_ec2_instances', default=None,
+            type='int',
+            help='Number of EC2 instances to launch')
+
+        self.emr_opt_group.add_option(
+            '--s3-log-uri', dest='s3_log_uri', default=None,
+            help='URI on S3 to write logs into')
+
+        self.emr_opt_group.add_option(
+            '--s3-scratch-uri', dest='s3_scratch_uri', default=None,
+            help='URI on S3 to use as our temp directory.')
+
+        self.emr_opt_group.add_option(
+            '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',
+            default=None, action='store_true',
+            help='Make ssh tunnel accessible from remote hosts (not just localhost)')
+
+        self.emr_opt_group.add_option(
+            '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
+            default=None, action='store_true',
+            help='Open up an SSH tunnel to the Hadoop job tracker')
 
 
     def add_passthrough_option(self, *args, **kwargs):

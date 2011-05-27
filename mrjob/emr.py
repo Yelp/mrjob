@@ -229,6 +229,8 @@ class EMRJobRunner(MRJobRunner):
 
         :type aws_access_key_id: str
         :param aws_access_key_id: "username" for Amazon web services.
+        :type aws_availability_zone: str
+        :param aws_availability_zone: availability zone to run the job in
         :type aws_secret_access_key: str
         :param aws_secret_access_key: your "password" on AWS
         :type aws_region: str
@@ -364,6 +366,7 @@ class EMRJobRunner(MRJobRunner):
         """A list of which keyword args we can pass to __init__()"""
         return super(EMRJobRunner, cls)._allowed_opts() + [
             'aws_access_key_id',
+            'aws_availability_zone',
             'aws_secret_access_key',
             'aws_region',
             'bootstrap_cmds',
@@ -737,6 +740,9 @@ class EMRJobRunner(MRJobRunner):
         args = {}
 
         args['hadoop_version'] = self._opts['hadoop_version']
+        
+        if self._opts['aws_availability_zone']:
+            args['availability_zone'] = self._opts['aws_availability_zone']
 
         if self._opts['num_ec2_instances']:
             args['num_instances'] = str(self._opts['num_ec2_instances'])

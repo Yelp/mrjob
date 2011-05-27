@@ -727,7 +727,7 @@ class MRJob(object):
         self.runner_opt_group.add_option(
             '--setup-cmd', dest='setup_cmds', action='append',
             default=[],
-            help='A command to run before each mapper/reducer step (e.g. "cd my-src-tree; make") specified as a string. You can use --setup-cmd more than once. See configuration docs for more information.')
+            help='A command to run before each mapper/reducer step in the shell (e.g. "cd my-src-tree; make") specified as a string. You can use --setup-cmd more than once. Use mrjob.conf to specify arguments as a list to be run directly.')
 
         self.runner_opt_group.add_option(
             '--setup-script', dest='setup_scripts', action='append',
@@ -818,6 +818,11 @@ class MRJob(object):
         self.emr_opt_group.add_option(
             '--aws_region', dest='aws_region', default=None,
             help='Region to connect to S3 and EMR on (e.g. us-west-1).')
+
+        self.emr_opt_group.add_option(
+            '--bootstrap-cmd', dest='bootstrap_cmds', action='append',
+            default=[],
+            help='Commands to run on the master node to set up libraries, etc. You can use --bootstrap-cmd more than once. Use mrjob.conf to specify arguments as a list to be run directly.')
 
         self.emr_opt_group.add_option(
             '--check-emr-status-every', dest='check_emr_status_every',

@@ -17,9 +17,12 @@
 from __future__ import with_statement
 
 from StringIO import StringIO
+import bz2
 import datetime
 import getpass
+import gzip
 import os
+import shutil
 import tarfile
 from testify import TestCase, assert_equal, assert_in, assert_not_equal, assert_gte, assert_lte, assert_not_in, assert_raises, setup, teardown
 import tempfile
@@ -240,3 +243,88 @@ class TestHadoopConfArgs(TestCase):
         conf_args = runner._hadoop_conf_args(0, 1)
         assert_equal(conf_args[:2], ['-libjar', 'qux.jar'])
         assert_equal(len(conf_args), 10)
+
+
+class TestCat(TestCase):
+
+    @setup
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def test_cat_uncompressed(self):
+        input_path = os.path.join(self.tmp_dir, 'input')
+        with open(input_path, 'w') as input_file:
+            input_file.write('bar\nfoo\n')
+
+        runner = MRJobRunner(conf_path = False)
+        output = []
+        for line in runner.cat(input_path):
+            output.append(line)
+
+        assert_equal(output, ['bar\n', 'foo\n'])
+    
+    def test_cat_uncompressed_stream(self):
+        input_path = os.path.join(self.tmp_dir, 'input')
+        with open(input_path, 'w') as input_file:
+            input_file.write('bar\nfoo\n')
+
+        runner = MRJobRunner(conf_path = False)
+        output = []
+        for line in runner.cat(input_path, fileobj = open(input_path)):
+            output.append(line)
+
+        assert_equal(output, ['bar\n', 'foo\n'])
+
+    def test_cat_compressed(self):
+        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz = gzip.GzipFile(input_gz_path, 'w')
+        input_gz.write('foo\nbar\n')
+        input_gz.close()
+
+        runner = MRJobRunner(conf_path = False)
+        output = []
+        for line in runner.cat(input_gz_path):
+            output.append(line)
+
+        assert_equal(output, ['foo\n', 'bar\n'])
+
+        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
+        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
+        input_bz2.write('bar\nbar\nfoo\n')
+        input_bz2.close()
+
+        runner = MRJobRunner(conf_path = False)
+        output = []
+        for line in runner.cat(input_bz2_path):
+            output.append(line)
+
+        assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
+    
+    def test_cat_compressed_stream(self):
+        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz = gzip.GzipFile(input_gz_path, 'w')
+        input_gz.write('foo\nbar\n')
+        input_gz.close()
+
+        runner = MRJobRunner(conf_path = False)
+        output = []
+        for line in runner.cat(input_gz_path, fileobj = open(input_gz_path)):
+            output.append(line)
+
+        assert_equal(output, ['foo\n', 'bar\n'])
+        
+        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
+        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
+        input_bz2.write('bar\nbar\nfoo\n')
+        input_bz2.close()
+
+        runner = MRJobRunner(conf_path = False)
+        output = []
+        for line in runner.cat(input_bz2_path, fileobj = open(input_bz2_path)):
+            output.append(line)
+
+        assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])

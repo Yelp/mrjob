@@ -439,18 +439,22 @@ class HadoopJobRunner(MRJobRunner):
         log.debug('> %s' % cmd_line(cat_args))
 
         cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
+        
+        def stream():  
+            for line in cat_proc.stdout:
+                yield line
 
-        for line in cat_proc.stdout:
+            # there shouldn't be any stderr
+            for line in cat_proc.stderr:
+                log.error('STDERR: ' + line)
+
+            returncode = cat_proc.wait()
+
+            if returncode != 0:
+                raise CalledProcessError(returncode, cat_args)
+        
+        for line in self.cat(output_dir, stream()):
             yield line
-
-        # there shouldn't be any stderr
-        for line in cat_proc.stderr:
-            log.error('STDERR: ' + line)
-
-        returncode = cat_proc.wait()
-
-        if returncode != 0:
-            raise CalledProcessError(returncode, cat_args)
 
     def _cleanup_scratch(self):
         super(HadoopJobRunner, self)._cleanup_scratch()

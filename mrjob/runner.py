@@ -14,10 +14,12 @@
 
 """Base class for all runners."""
 
+import bz2
 import copy
 import datetime
 import getpass
 import glob
+import gzip
 import logging
 import os
 import random
@@ -338,6 +340,35 @@ class MRJobRunner(object):
         assert self._ran_job
 
         for line in self._stream_output():
+            yield line
+            
+    def cat(self, source_path, fileobj = None):
+        """cat output from a source file. This would automatically decompress 
+        .gz and .bz2 files.
+        cats output from a stream if fileobj is not none
+        """
+
+        # decompress if .gz or .bz2 files found
+        if source_path.endswith('.gz'):
+            f = gzip.GzipFile(source_path, fileobj = fileobj)
+        elif source_path.endswith('.bz2'):
+            # things are a bit more complicated with bz2
+            if fileobj is None:
+                f = bz2.BZ2File(source_path)
+            else:
+                # bz2 cannot decompress a stream, so decompress chunks
+                # into a buffer, then stream from the buffer
+                buff = ''
+                decomp = bz2.BZ2Decompressor()
+                for part in fileobj:
+                    buff = buff.join(decomp.decompress(part))
+                f = buff.splitlines(True)
+        elif fileobj is None:
+            f = open(source_path)
+        else:
+            f = fileobj
+
+        for line in f:
             yield line
 
     def _cleanup_scratch(self):

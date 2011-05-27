@@ -1029,7 +1029,7 @@ class EMRJobRunner(MRJobRunner):
             s3_key.get_contents_to_filename(
                 output_dir, headers={'Accept-Encoding': 'gzip'})
             log.debug('reading lines from %s' % output_dir)
-            for line in open(output_dir):
+            for line in self.cat(output_dir):
                 yield line
 
     def _script_args(self):

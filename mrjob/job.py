@@ -674,6 +674,10 @@ class MRJob(object):
             help='Unpack archive in the working directory of this script. You can use --archive multiple times.')
 
         self.runner_opt_group.add_option(
+            '--bootstrap-mrjob', dest='bootstrap_mrjob', action='store_true', default=False,
+            help="Automatically tar up the mrjob library and install it when we run the mrjob. Set this to False if you’ve already installed mrjob on your Hadoop cluster.")
+
+        self.runner_opt_group.add_option(
             '-c', '--conf-path', dest='conf_path', default=None,
             help='Path to alternate mrjob.conf file to read from')
 

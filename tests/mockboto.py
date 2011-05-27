@@ -249,6 +249,11 @@ class MockEmrConnection(object):
             name=name,
             state='STARTING',
             steps=[],
+            masterinstancetype=master_instance_type,
+            slaveinstancetype=slave_instance_type,
+            instancecount=num_instances,
+            ec2keyname=ec2_keyname,
+            availabilityzone=availability_zone,
         )
         # don't always set loguri, so we can test Issue #112
         if log_uri is not None:

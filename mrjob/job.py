@@ -703,6 +703,10 @@ class MRJob(object):
             'and must be empty')
 
         self.runner_opt_group.add_option(
+            '--python-archive', dest='python_archives', default=[], action='append',
+            help='Archive to unpack and add to the :envvar:`PYTHONPATH` of the mr_job script when it runs. You can use --python-archives multiple times.')
+
+        self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
             help='Name/path of alternate python binary for mappers/reducers.')
 
@@ -977,6 +981,7 @@ class MRJob(object):
             'label': self.options.label,
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
+            'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
             'stdin': self.stdin,
             'steps_python_bin': self.options.steps_python_bin,

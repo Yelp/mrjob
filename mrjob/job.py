@@ -816,6 +816,10 @@ class MRJob(object):
             help='Availability zone to run the job flow on')
 
         self.emr_opt_group.add_option(
+            '--aws_region', dest='aws_region', default=None,
+            help='Region to connect to S3 and EMR on (e.g. us-west-1).')
+
+        self.emr_opt_group.add_option(
             '--check-emr-status-every', dest='check_emr_status_every',
             default=None, type='int',
             help='How often (in seconds) to check status of your EMR job')

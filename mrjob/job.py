@@ -613,27 +613,36 @@ class MRJob(object):
             help='show the steps of mappers and reducers')
 
         # To run mappers or reducers
-        self.option_parser.add_option(
+        self.mux_opt_group = OptionGroup(
+            self.option_parser, 'Running specific parts of the job')
+        self.option_parser.add_option_group(self.mux_opt_group)
+
+        self.mux_opt_group.add_option(
             '--mapper', dest='run_mapper', action='store_true', default=False,
             help='run a mapper')
 
-        self.option_parser.add_option(
+        self.mux_opt_group.add_option(
             '--reducer', dest='run_reducer', action='store_true', default=False,
             help='run a reducer')
 
-        self.option_parser.add_option(
+        self.mux_opt_group.add_option(
             '--step-num', dest='step_num', type='int', default=0,
             help='which step to execute (default is 0)')
 
         # protocol stuff
         protocol_choices = sorted(self.protocols())
+        self.proto_opt_group = OptionGroup(
+            self.option_parser, 'Protocols')
+        self.option_parser.add_option_group(self.proto_opt_group)
 
         self.add_passthrough_option(
             '-p', '--protocol', dest='protocol',
+            opt_group=self.proto_opt_group,
             default=self.DEFAULT_PROTOCOL, choices=protocol_choices,
             help='output protocol for mappers/reducers. Choices: %s (default: %%default)' % ', '.join(protocol_choices))
         self.add_passthrough_option(
             '--output-protocol', dest='output_protocol',
+            opt_group=self.proto_opt_group,
             default=self.DEFAULT_OUTPUT_PROTOCOL,
             choices=protocol_choices,
              help='protocol for final output (default: %s)' % (
@@ -641,12 +650,14 @@ class MRJob(object):
             else '%default'))
         self.add_passthrough_option(
             '--input-protocol', dest='input_protocol',
+            opt_group=self.proto_opt_group,
             default=self.DEFAULT_INPUT_PROTOCOL, choices=protocol_choices,
             help='protocol to read input with (default: %default)')
         self.add_passthrough_option(
-			'--strict-protocols', dest='strict_protocols', default=False,
-			action='store_true', help='If something violates an input/output '
-			'protocol then raise an exception')
+            '--strict-protocols', dest='strict_protocols', default=False,
+            opt_group=self.proto_opt_group,
+            action='store_true', help='If something violates an input/output '
+            'protocol then raise an exception')
 
         # options for running the entire job
         self.runner_opt_group = OptionGroup(
@@ -820,7 +831,10 @@ class MRJob(object):
         If you want to pass files through to the mapper/reducer, use
         :py:meth:`add_file_option` instead.
         """
-        pass_opt = self.option_parser.add_option(*args, **kwargs)
+        if not kwargs.has_key('opt_group'):
+            pass_opt = self.option_parser.add_option(*args, **kwargs)
+        else:
+            pass_opt = kwargs.pop('opt_group').add_option(*args, **kwargs)
 
         # We only support a subset of option parser actions
         SUPPORTED_ACTIONS = (

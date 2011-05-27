@@ -61,6 +61,7 @@ Additional options for :py:class:`~mrjob.emr.EMRJobRunner`
 Option                        Default                        Combined by                               Switches
 ============================= ============================== ========================================= =======================================
 *aws_access_key_id*           (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_ACCESS_KEY_ID`)
+*aws_availability_zone*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     --aws-availability-zone
 *aws_secret_access_key*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_SECRET_ACCESS_KEY`)
 *aws_region*                  (automatic)                    :py:func:`~mrjob.conf.combine_values`
 *bootstrap_cmds*              ``[]``                         :py:func:`~mrjob.conf.combine_lists`

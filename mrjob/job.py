@@ -725,6 +725,11 @@ class MRJob(object):
             help='Where to run the job: local to run locally, hadoop to run on your Hadoop cluster, emr to run on Amazon ElasticMapReduce. Default is local.')
 
         self.runner_opt_group.add_option(
+            '--setup-cmd', dest='setup_cmds', action='append',
+            default=[],
+            help='A command to run before each mapper/reducer step (e.g. "cd my-src-tree; make") specified as a string. You can use --setup-cmd more than once. See configuration docs for more information.')
+
+        self.runner_opt_group.add_option(
             '--steps-python-bin', dest='steps_python_bin', default=None,
             help='Name/path of alternate python binary to use to query the '
             'job about its steps, if different from the current Python '

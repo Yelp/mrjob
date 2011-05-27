@@ -730,6 +730,11 @@ class MRJob(object):
             help='A command to run before each mapper/reducer step (e.g. "cd my-src-tree; make") specified as a string. You can use --setup-cmd more than once. See configuration docs for more information.')
 
         self.runner_opt_group.add_option(
+            '--setup-script', dest='setup_scripts', action='append',
+            default=[],
+            help='Path to file to be copied into the local working directory and then run. You can use --setup-script more than once. These are run after setup_cmds.')
+
+ self.runner_opt_group.add_option(
             '--steps-python-bin', dest='steps_python_bin', default=None,
             help='Name/path of alternate python binary to use to query the '
             'job about its steps, if different from the current Python '
@@ -994,6 +999,7 @@ class MRJob(object):
             'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
             'setup_cmds': self.setup_cmds,
+            'setup_scripts': self.setup_scripts,
             'stdin': self.stdin,
             'steps_python_bin': self.options.steps_python_bin,
             'upload_archives': self.options.upload_archives,

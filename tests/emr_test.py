@@ -339,7 +339,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
                                '-c', self.mrjob_conf_path])
         mr_job.sandbox()
 
-        results = []
         with mr_job.make_runner() as runner:
             runner.run()
 

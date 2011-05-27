@@ -61,12 +61,12 @@ Additional options for :py:class:`~mrjob.emr.EMRJobRunner`
 Option                        Default                        Combined by                               Switches
 ============================= ============================== ========================================= =======================================
 *aws_access_key_id*           (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_ACCESS_KEY_ID`)
-*aws_availability_zone*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     --aws-availability-zone
+*aws_availability_zone*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--aws-availability-zone`
 *aws_secret_access_key*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_SECRET_ACCESS_KEY`)
-*aws_region*                  (automatic)                    :py:func:`~mrjob.conf.combine_values`     --aws-region
-*bootstrap_cmds*              ``[]``                         :py:func:`~mrjob.conf.combine_lists`      --bootstrap-cmd
-*bootstrap_files*             ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` --bootstrap-file
-*bootstrap_python_packages*   ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` --bootstrap-python-package
+*aws_region*                  (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--aws-region`
+*bootstrap_cmds*              ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--bootstrap-cmd`
+*bootstrap_files*             ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--bootstrap-file`
+*bootstrap_python_packages*   ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--bootstrap-python-package`
 *bootstrap_scripts*           ``[]``                         :py:func:`~mrjob.conf.combine_lists`
 *check_emr_status_every*      ``30``                         :py:func:`~mrjob.conf.combine_values`     :option:`--check-emr-status-every`
 *ec2_instance_type*           ``'m1.small'``                 :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-instance-type`

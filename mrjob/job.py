@@ -698,63 +698,66 @@ class MRJob(object):
             '--archive', dest='upload_archives', action='append',
             default=[],
             help='Unpack archive in the working directory of this script. You can use --archive multiple times.')
-
         self.runner_opt_group.add_option(
             '-o', '--output-dir', dest='output_dir', default=None,
             help='Where to put final job output. This must be an s3:// URL ' +
-            'for EMR, and an HDFS path for Hadoop, and must be empty')
-
-        self.runner_opt_group.add_option(
-            '--label', '--job-name-prefix', dest='label', default=None,
-            help='custom prefix for job name, to help us identify the job')
-
-        self.runner_opt_group.add_option(
-            '--owner', dest='owner', default=None,
-            help='custom username to use, to help us identify who ran the job')
-
-        self.runner_opt_group.add_option(
-            '--jobconf', dest='jobconf', default={}, action='set_key',
-            help='-jobconf arg to pass through to hadoop streaming; '
-            'should take the form KEY=VALUE. You can use --jobconf '
-            'multiple times.')
-
-        self.runner_opt_group.add_option(
-            '--cmdenv', dest='cmdenv', default={}, action='set_key',
-            help='set an environment variable for your job inside Hadoop '
-            'streaming. Must take the form KEY=VALUE. You can use --cmdenv '
-            'multiple times.')
-
-        self.runner_opt_group.add_option(
-            '--hadoop-arg', dest='hadoop_extra_args', default=[],
-            action='append', help='Argument of any type to pass to hadoop '
-            'streaming. You can use --hadoop-arg multiple times.')
-
-        self.runner_opt_group.add_option(
-            '--hadoop-input-format', dest='hadoop_input_format', default=None,
-            help='the hadoop InputFormat class used to write the data. '
-            'Custom formats must be included in your hadoop streaming jar (see '
-            '--hadoop-streaming-jar)')
-
-        self.runner_opt_group.add_option(
-            '--hadoop-output-format', dest='hadoop_output_format', default=None,
-            help='the hadoop OutputFormat class used to write the data. '
-            'Custom formats must be included in your hadoop streaming jar (see '
-            '--hadoop-streaming-jar)')
-
-        self.runner_opt_group.add_option(
-            '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
-            default=None,
-            help='Path of your hadoop streaming jar (locally, or on S3/HDFS)')
-
+            'for EMR, an HDFS path for Hadoop, and a system path for local,' +
+            'and must be empty')
         self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
             help='Name/path of alternate python binary for mappers/reducers.')
-
         self.runner_opt_group.add_option(
             '--steps-python-bin', dest='steps_python_bin', default=None,
             help='Name/path of alternate python binary to use to query the '
             'job about its steps, if different from the current Python '
             'interpreter. Rarely needed.')
+
+        # options common to Hadoop and EMR
+        self.hadoop_emr_opt_group = OptionGroup(
+            self.option_parser, 'Running on Hadoop or EMR (these apply when you set -r hadoop or -r emr)')
+        self.option_parser.add_option_group(self.hadoop_emr_opt_group)
+
+        self.hadoop_emr_opt_group.add_option(
+            '--label', '--job-name-prefix', dest='label', default=None,
+            help='custom prefix for job name, to help us identify the job')
+
+        self.hadoop_emr_opt_group.add_option(
+            '--owner', dest='owner', default=None,
+            help='custom username to use, to help us identify who ran the job')
+
+        self.hadoop_emr_opt_group.add_option(
+            '--jobconf', dest='jobconf', default={}, action='set_key',
+            help='-jobconf arg to pass through to hadoop streaming; '
+            'should take the form KEY=VALUE. You can use --jobconf '
+            'multiple times.')
+
+        self.hadoop_emr_opt_group.add_option(
+            '--cmdenv', dest='cmdenv', default={}, action='set_key',
+            help='set an environment variable for your job inside Hadoop '
+            'streaming. Must take the form KEY=VALUE. You can use --cmdenv '
+            'multiple times.')
+
+        self.hadoop_emr_opt_group.add_option(
+            '--hadoop-arg', dest='hadoop_extra_args', default=[],
+            action='append', help='Argument of any type to pass to hadoop '
+            'streaming. You can use --hadoop-arg multiple times.')
+
+        self.hadoop_emr_opt_group.add_option(
+            '--hadoop-input-format', dest='hadoop_input_format', default=None,
+            help='the hadoop InputFormat class used to write the data. '
+            'Custom formats must be included in your hadoop streaming jar (see '
+            '--hadoop-streaming-jar)')
+
+        self.hadoop_emr_opt_group.add_option(
+            '--hadoop-output-format', dest='hadoop_output_format', default=None,
+            help='the hadoop OutputFormat class used to write the data. '
+            'Custom formats must be included in your hadoop streaming jar (see '
+            '--hadoop-streaming-jar)')
+
+        self.hadoop_emr_opt_group.add_option(
+            '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
+            default=None,
+            help='Path of your hadoop streaming jar (locally, or on S3/HDFS)')
 
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(

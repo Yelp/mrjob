@@ -22,7 +22,7 @@ Options for all runners
 Option                 Default                        Combined by                               Switches
 ====================== ============================== ========================================= =================================
 *base_tmp_dir*         (automatic)                    :py:func:`~mrjob.conf.combine_paths`      (set :envvar:`TMPDIR`)
-*bootstrap_mrjob*      ``True``                       :py:func:`~mrjob.conf.combine_values`     :option:`--boostrap-mrjob`
+*bootstrap_mrjob*      ``True``                       :py:func:`~mrjob.conf.combine_values`     :option:`--no-boostrap-mrjob`
 *cleanup*              ``'IF_SUCCESSFUL'``            :py:func:`~mrjob.conf.combine_values`     :option:`--cleanup`
 *cmdenv*               ``{}``                         :py:func:`~mrjob.conf.combine_envs`       :option:`--cmdenv`
 *hadoop_extra_args*    ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--hadoop-arg`

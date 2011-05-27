@@ -229,12 +229,12 @@ class EMRJobRunner(MRJobRunner):
 
         :type aws_access_key_id: str
         :param aws_access_key_id: "username" for Amazon web services.
+        :type aws_availability_zone: str
+        :param aws_availability_zone: availability zone to run the job in
         :type aws_secret_access_key: str
         :param aws_secret_access_key: your "password" on AWS
         :type aws_region: str
         :param aws_region: region to connect to S3 and EMR on (e.g. ``us-west-1``). If you want to use separate regions for S3 and EMR, set *emr_endpoint* and *s3_endpoint*.
-        :type aws_availability_zone: str
-        :param aws_availability_zone: availability zone to run the job in
         :type bootstrap_cmds: list
         :param bootstrap_cmds: a list of commands to run on the master node to set up libraries, etc. Like *setup_cmds*, these can be strings, which will be run in the shell, or lists of args, which will be run directly. Prepend ``sudo`` to commands to do things that require root privileges.
         :type bootstrap_files: list of str
@@ -366,9 +366,9 @@ class EMRJobRunner(MRJobRunner):
         """A list of which keyword args we can pass to __init__()"""
         return super(EMRJobRunner, cls)._allowed_opts() + [
             'aws_access_key_id',
+            'aws_availability_zone',
             'aws_secret_access_key',
             'aws_region',
-            'aws_availability_zone',
             'bootstrap_cmds',
             'bootstrap_files',
             'bootstrap_python_packages',

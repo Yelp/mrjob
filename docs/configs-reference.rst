@@ -83,7 +83,7 @@ Option                        Default                        Combined by        
 *s3_log_uri*                  (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-log-uri`
 *s3_scratch_uri*              (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--s3-scratch-uri`
 *s3_sync_wait_time*           ``5.0``                        :py:func:`~mrjob.conf.combine_values`     :option:`--s3-sync-wait-time`
-*ssh_bin*                     ``'ssh'``                      :py:func:`~mrjob.conf.combine_paths`
+*ssh_bin*                     ``'ssh'``                      :py:func:`~mrjob.conf.combine_paths`      :option:`--ssh-bin`
 *ssh_bind_ports*              ``range(40001, 40841)``        :py:func:`~mrjob.conf.combine_values`
 *ssh_tunnel_to_job_tracker*   ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-to-job-tracker`
 *ssh_tunnel_is_open*          ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-is-open`

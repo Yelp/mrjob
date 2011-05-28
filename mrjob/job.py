@@ -903,6 +903,10 @@ class MRJob(object):
             help='How long to wait for S3 to reach eventual consistency. This is typically less than a second (zero in us-west) but the default is 5.0 to be safe.')
 
         self.emr_opt_group.add_option(
+            '--ssh-bin', dest='ssh-bin', default=None,
+            help='Path to the ssh binary. Defaults to ssh.')
+
+        self.emr_opt_group.add_option(
             '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',
             default=None, action='store_true',
             help='Make ssh tunnel accessible from remote hosts (not just localhost)')

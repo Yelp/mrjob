@@ -849,6 +849,14 @@ class MRJob(object):
             help='Type of EC2 instance(s) to launch (e.g. m1.small, c1.xlarge, m2.xlarge). See http://aws.amazon.com/ec2/instance-types/ for the full list.')
 
         self.emr_opt_group.add_option(
+            '--ec2-key-pair', dest='ec2_key_pair', default=None,
+            help='Name of the SSH key pair you set up for EMR')
+
+        self.emr_opt_group.add_option(
+            '--ec2-key-pair-file', dest='ec2_key_pair-file', default=None,
+            help='Path to file containing SSH key for EMR')
+
+        self.emr_opt_group.add_option(
             '--ec2-master-instance-type', dest='ec2_master_instance_type', default=None,
             help='Type of EC2 instance for master node only')
 

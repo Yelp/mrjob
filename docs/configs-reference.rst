@@ -70,8 +70,8 @@ Option                        Default                        Combined by        
 *bootstrap_scripts*           ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--bootstrap-script`
 *check_emr_status_every*      ``30``                         :py:func:`~mrjob.conf.combine_values`     :option:`--check-emr-status-every`
 *ec2_instance_type*           ``'m1.small'``                 :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-instance-type`
-*ec2_key_pair*                ``None``                       :py:func:`~mrjob.conf.combine_values`
-*ec2_key_pair_file*           ``None``                       :py:func:`~mrjob.conf.combine_paths`
+*ec2_key_pair*                ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-key-pair`
+*ec2_key_pair_file*           ``None``                       :py:func:`~mrjob.conf.combine_paths`      :option:`--ec2-key-pair-file`
 *ec2_master_instance_type*    (same as *ec2_instance_type*)  :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-master-instance-type`
 *ec2_slave_instance_type*     (same as *ec2_instance_type*)  :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-slave-instance-type`
 *emr_endpoint*                (automatic)                    :py:func:`~mrjob.conf.combine_values`

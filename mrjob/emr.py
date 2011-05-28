@@ -274,6 +274,8 @@ class EMRJobRunner(MRJobRunner):
         :param s3_log_uri:  where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for your job flow will go into a subdirectory, e.g. ``s3://yourbucket/logs/j-JOBFLOWID/``. in this example s3://yourbucket/logs/j-YOURJOBID/). Default is to append ``logs/`` to *s3_scratch_uri*.
         :type s3_scratch_uri: str
         :param s3_scratch_uri: S3 directory (URI ending in ``/``) to use as scratch space, e.g. ``s3://yourbucket/tmp/``. Default is ``tmp/mrjob/`` in the first bucket belonging to you.
+        :type s3_sync_wait_time: float
+        :param s3_sync_wait_time: How long to wait for S3 to reach eventual consistency. This is typically less than a second (zero in us-west) but the default is 5.0 to be safe.
         :type ssh_bin: str
         :param ssh_bin: path to the ssh binary. Defaults to ``ssh``
         :type ssh_bind_ports: list of int

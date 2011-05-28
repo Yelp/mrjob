@@ -899,6 +899,10 @@ class MRJob(object):
             help='URI on S3 to use as our temp directory.')
 
         self.emr_opt_group.add_option(
+            '--s3-sync-wait-time', dest='s3_sync_wait_time', default=None, type='float',
+            help='How long to wait for S3 to reach eventual consistency. This is typically less than a second (zero in us-west) but the default is 5.0 to be safe.')
+
+        self.emr_opt_group.add_option(
             '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',
             default=None, action='store_true',
             help='Make ssh tunnel accessible from remote hosts (not just localhost)')

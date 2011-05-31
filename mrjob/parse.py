@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utilities for parsing errors, counters, and status messages."""
+from optparse import OptionValueError
 import re
 
 try:
@@ -183,4 +184,30 @@ def parse_mr_job_stderr(stderr, counters=None):
         other.append(line)
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
+
+def parse_port_range_list(range_list_str):
+    all_ranges = []
+    for range_str in range_list_str.split(','):
+        if ':' in range_str:
+            a, b = [int(x) for x in range_str.split(':')]
+            all_ranges.extend(range(a, b+1))
+        else:
+            all_ranges.append(int(range_str))
+    return all_ranges
+
+def check_kv_pair(option, opt, value):
+    items = value.split('=', 1)
+    if len(items) == 2:
+        return items 
+    else:
+        raise OptionValueError(
+            "option %s: value is not of the form KEY=VALUE: %r" % (opt, value))
+
+
+def check_range_list(option, opt, value):
+    try:
+        ports = parse_port_range_list(value)
+        return ports
+    except ValueError, e:
+        raise OptionValueError('option %s: invalid port range list "%s": \n%s' % (opt, value, e.args[0]))
 

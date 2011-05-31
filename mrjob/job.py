@@ -107,7 +107,7 @@ except ImportError:
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
-from mrjob.parse import parse_mr_job_stderr, parse_port_range_list
+from mrjob.parse import parse_mr_job_stderr, parse_port_range_list, check_kv_pair, check_range_list
 from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
 from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
 from mrjob.util import log_to_stream, read_input
@@ -118,23 +118,6 @@ def _IDENTITY_MAPPER(key, value):
 
 # sentinel value; used when running MRJob as a script
 _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
-
-
-def check_kv(option, opt, value):
-    items = value.split('=', 1)
-    if len(items) == 2:
-        return items 
-    else:
-        raise OptionValueError(
-            "option %s: value is not of the form KEY=VALUE: %r" % (opt, value))
-
-
-def check_range_list(option, opt, value):
-    try:
-        ports = parse_port_range_list(value)
-        return ports
-    except ValueError as e:
-        raise OptionValueError('option %s: invalid port range list "%s": \n%s' % (opt, value, e.args[0]))
 
 
 class UsageError(Exception):
@@ -150,7 +133,7 @@ class MRJobOptions(Option):
     ALWAYS_TYPED_ACTIONS = Option.ALWAYS_TYPED_ACTIONS + ('set_key',)
 
     TYPE_CHECKER = copy(Option.TYPE_CHECKER)
-    TYPE_CHECKER["key_value_pair"] = check_kv
+    TYPE_CHECKER["key_value_pair"] = check_kv_pair
     TYPE_CHECKER["range_list"] = check_range_list
 
     def take_action(self, action, dest, opt, value, values, parser):

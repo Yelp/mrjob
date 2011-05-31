@@ -93,6 +93,7 @@ See :py:mod:`mrjob.examples` for more examples.
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
+from copy import copy
 import inspect
 import itertools
 from optparse import Option, OptionParser, OptionGroup, OptionError, OptionValueError
@@ -106,7 +107,7 @@ except ImportError:
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
-from mrjob.parse import parse_mr_job_stderr
+from mrjob.parse import parse_mr_job_stderr, parse_port_range_list
 from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
 from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
 from mrjob.util import log_to_stream, read_input
@@ -118,27 +119,52 @@ def _IDENTITY_MAPPER(key, value):
 # sentinel value; used when running MRJob as a script
 _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
 
+
+def check_kv(option, opt, value):
+    items = value.split('=', 1)
+    if len(items) == 2:
+        return items 
+    else:
+        raise OptionValueError(
+            "option %s: value is not of the form KEY=VALUE: %r" % (opt, value))
+
+
+def check_range_list(option, opt, value):
+    try:
+        ports = parse_port_range_list(value)
+        return ports
+    except ValueError as e:
+        raise OptionValueError('option %s: invalid port range list "%s": \n%s' % (opt, value, e.args[0]))
+
+
 class UsageError(Exception):
     pass
 
-class SetKeyOption(Option):
 
+class MRJobOptions(Option):
+
+    TYPES = Option.TYPES + ('key_value_pair', 'range_list')
     ACTIONS = Option.ACTIONS + ('set_key',)
     STORE_ACTIONS = Option.STORE_ACTIONS + ('set_key',)
     TYPED_ACTIONS = Option.TYPED_ACTIONS + ('set_key',)
     ALWAYS_TYPED_ACTIONS = Option.ALWAYS_TYPED_ACTIONS + ('set_key',)
 
+    TYPE_CHECKER = copy(Option.TYPE_CHECKER)
+    TYPE_CHECKER["key_value_pair"] = check_kv
+    TYPE_CHECKER["range_list"] = check_range_list
+
     def take_action(self, action, dest, opt, value, values, parser):
         if action == 'set_key':
             try:
-                key, value = value.split('=', 1)
+                store_key, store_value = value
             except ValueError:
                 raise OptionValueError(
-                    "option %s: Expected KEY=VALUE, not %r" % (opt, value))
-            values.ensure_value(dest, {})[key] = value
+                    "option %s: value is not a key_value_pair" % opt)
+            values.ensure_value(dest, {})[store_key] = store_value
         else:
             Option.take_action(
                 self, action, dest, opt, value, values, parser)
+
 
 class MRJob(object):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
@@ -169,7 +195,7 @@ class MRJob(object):
 
         usage = "usage: %prog [options] [input files]"
         self.option_parser = OptionParser(
-            usage=usage, option_class=SetKeyOption)
+            usage=usage, option_class=MRJobOptions)
         self.configure_options()
 
         # Load and validate options
@@ -751,7 +777,7 @@ class MRJob(object):
         self.option_parser.add_option_group(self.hadoop_emr_opt_group)
 
         self.hadoop_emr_opt_group.add_option(
-            '--cmdenv', dest='cmdenv', default={}, action='set_key',
+            '--cmdenv', dest='cmdenv', default={}, action='set_key', type='key_value_pair',
             help='set an environment variable for your job inside Hadoop '
             'streaming. Must take the form KEY=VALUE. You can use --cmdenv '
             'multiple times.')
@@ -779,7 +805,7 @@ class MRJob(object):
             help='Path of your hadoop streaming jar (locally, or on S3/HDFS)')
 
         self.hadoop_emr_opt_group.add_option(
-            '--jobconf', dest='jobconf', default={}, action='set_key',
+            '--jobconf', dest='jobconf', default={}, action='set_key', type='key_value_pair',
             help='-jobconf arg to pass through to hadoop streaming; '
             'should take the form KEY=VALUE. You can use --jobconf '
             'multiple times.')
@@ -908,6 +934,7 @@ class MRJob(object):
 
         self.emr_opt_group.add_option(
             '--ssh-bind-ports', dest='ssh_bind_ports', default=None,
+            type='range_list',
             help='A list of port ranges that are safe to listen on, delimited by colons and commas with the syntax 2000[:2001][,2003,2005:2008,etc]. Defaults to 40001:40840.')
 
         self.emr_opt_group.add_option(

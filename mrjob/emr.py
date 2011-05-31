@@ -662,8 +662,6 @@ class EMRJobRunner(MRJobRunner):
         try:
             # seed random port selection on job flow ID
             random.seed(self._emr_job_flow_id)
-            if isinstance(self._opts['ssh_bind_ports'], str):
-                self._opts['ssh_bind_ports'] = parse_port_range_list(self._opts['ssh_bind_ports'])
             num_picks = min(MAX_SSH_RETRIES, len(self._opts['ssh_bind_ports']))
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
         finally:

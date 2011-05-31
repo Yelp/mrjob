@@ -367,6 +367,7 @@ class EMRJobRunner(MRJobRunner):
         """A list of which keyword args we can pass to __init__()"""
         return super(EMRJobRunner, cls)._allowed_opts() + [
             'aws_access_key_id',
+            'aws_availability_zone',
             'aws_secret_access_key',
             'aws_region',
             'bootstrap_cmds',

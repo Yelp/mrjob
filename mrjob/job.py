@@ -825,11 +825,11 @@ class MRJob(object):
         self.option_parser.add_option_group(self.emr_opt_group)
 
         self.emr_opt_group.add_option(
-            '--aws_availability-zone', dest='aws_availability_zone', default=None,
+            '--aws-availability-zone', dest='aws_availability_zone', default=None,
             help='Availability zone to run the job flow on')
 
         self.emr_opt_group.add_option(
-            '--aws_region', dest='aws_region', default=None,
+            '--aws-region', dest='aws_region', default=None,
             help='Region to connect to S3 and EMR on (e.g. us-west-1).')
 
         self.emr_opt_group.add_option(
@@ -866,7 +866,7 @@ class MRJob(object):
             help='Name of the SSH key pair you set up for EMR')
 
         self.emr_opt_group.add_option(
-            '--ec2-key-pair-file', dest='ec2_key_pair-file', default=None,
+            '--ec2-key-pair-file', dest='ec2_key_pair_file', default=None,
             help='Path to file containing SSH key for EMR')
 
         self.emr_opt_group.add_option(

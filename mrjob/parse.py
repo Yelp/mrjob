@@ -186,9 +186,9 @@ def parse_mr_job_stderr(stderr, counters=None):
 
 def parse_port_range(range_str):
     if ':' in range_str:
-        return range(int(x) for x in range_str.split(':'))
+        return range(*[int(x) for x in range_str.split(':')])
     else:
-        return int(range_str)
+        return [int(range_str)]
 
 PORT_RANGE_LIST_RE = re.compile(r'\d+(:\d+)?(,\d+(:\d+)?)*')
 

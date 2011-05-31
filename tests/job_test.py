@@ -16,7 +16,7 @@
 
 from __future__ import with_statement
 
-from optparse import OptionError
+from optparse import OptionError, OptionValueError
 import os
 import shutil
 from subprocess import Popen, PIPE
@@ -547,6 +547,10 @@ class CommandLineArgsTest(TestCase):
             OptionError, mr_job.add_passthrough_option,
             '--leave-a-msg', dest='leave_a_msg', action='callback',
             default=None)
+
+    def test_incorrect_option_types(self):
+        assert_raises(ValueError, MRJob, ['--cmdenv', 'cats'])
+        assert_raises(ValueError, MRJob, ['--ssh-bind-ports', 'athens'])
 
     def test_default_file_options(self):
         mr_job = MRCustomBoringJob()

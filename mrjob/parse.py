@@ -208,7 +208,6 @@ def check_range_list(option, opt, value):
     try:
         ports = parse_port_range_list(value)
         return ports
-    except ValueError as e:
+    except ValueError, e:
         raise OptionValueError('option %s: invalid port range list "%s": \n%s' % (opt, value, e.args[0]))
-
 

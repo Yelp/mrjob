@@ -18,9 +18,9 @@ See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
 Options for all runners
 -----------------------
 
-====================== ============================== ========================================= =================================
+====================== ============================== ========================================= ==========================================================
 Option                 Default                        Combined by                               Switches
-====================== ============================== ========================================= =================================
+====================== ============================== ========================================= ==========================================================
 *base_tmp_dir*         (automatic)                    :py:func:`~mrjob.conf.combine_paths`      (set :envvar:`TMPDIR`)
 *bootstrap_mrjob*      ``True``                       :py:func:`~mrjob.conf.combine_values`     :option:`--boostrap-mrjob`, :option:`--no-bootstrap-mrjob`
 *cleanup*              ``'IF_SUCCESSFUL'``            :py:func:`~mrjob.conf.combine_values`     :option:`--cleanup`
@@ -39,7 +39,7 @@ Option                 Default                        Combined by               
 *steps_python_bin*     (current Python interpreter)   :py:func:`~mrjob.conf.combine_values`     :option:`--steps-python-bin`
 *upload_archives*      ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--archive`
 *upload_files*         ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--file`
-====================== ============================== ========================================= =================================
+====================== ============================== ========================================= ==========================================================
 
 See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
 
@@ -57,9 +57,9 @@ In addition, it ignores *hadoop_input_format*, *hadoop_output_format*, *hadoop_s
 Additional options for :py:class:`~mrjob.emr.EMRJobRunner`
 ----------------------------------------------------------
 
-============================= ============================== ========================================= =======================================
+============================= ============================== ========================================= ================================================================
 Option                        Default                        Combined by                               Switches
-============================= ============================== ========================================= =======================================
+============================= ============================== ========================================= ================================================================
 *aws_access_key_id*           (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_ACCESS_KEY_ID`)
 *aws_availability_zone*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--aws-availability-zone`
 *aws_secret_access_key*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_SECRET_ACCESS_KEY`)
@@ -87,7 +87,7 @@ Option                        Default                        Combined by        
 *ssh_bind_ports*              ``range(40001, 40841)``        :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-bind-ports`
 *ssh_tunnel_to_job_tracker*   ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-to-job-tracker`
 *ssh_tunnel_is_open*          ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-is-open`, :option:`--ssh-tunnel-is-closed`
-============================= ============================== ========================================= =======================================
+============================= ============================== ========================================= ================================================================
 
 See :py:meth:`mrjob.emr.EMRJobRunner.__init__` for details.
 

@@ -22,7 +22,7 @@ Options for all runners
 Option                 Default                        Combined by                               Switches
 ====================== ============================== ========================================= =================================
 *base_tmp_dir*         (automatic)                    :py:func:`~mrjob.conf.combine_paths`      (set :envvar:`TMPDIR`)
-*bootstrap_mrjob*      ``True``                       :py:func:`~mrjob.conf.combine_values`     :option:`--no-boostrap-mrjob`
+*bootstrap_mrjob*      ``True``                       :py:func:`~mrjob.conf.combine_values`     :option:`--[no-]boostrap-mrjob`
 *cleanup*              ``'IF_SUCCESSFUL'``            :py:func:`~mrjob.conf.combine_values`     :option:`--cleanup`
 *cmdenv*               ``{}``                         :py:func:`~mrjob.conf.combine_envs`       :option:`--cmdenv`
 *hadoop_extra_args*    ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--hadoop-arg`
@@ -86,7 +86,7 @@ Option                        Default                        Combined by        
 *ssh_bin*                     ``'ssh'``                      :py:func:`~mrjob.conf.combine_paths`      :option:`--ssh-bin`
 *ssh_bind_ports*              ``range(40001, 40841)``        :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-bind-ports`
 *ssh_tunnel_to_job_tracker*   ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-to-job-tracker`
-*ssh_tunnel_is_open*          ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-is-open`
+*ssh_tunnel_is_open*          ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-is-(open|closed)`
 ============================= ============================== ========================================= =======================================
 
 See :py:meth:`mrjob.emr.EMRJobRunner.__init__` for details.

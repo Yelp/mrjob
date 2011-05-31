@@ -683,8 +683,8 @@ class MRJob(object):
             help='Unpack archive in the working directory of this script. You can use --archive multiple times.')
 
         self.runner_opt_group.add_option(
-            '--no-bootstrap-mrjob', dest='bootstrap_mrjob', action='store_false', default=None,
-            help="Automatically tar up the mrjob library and install it when we run the mrjob. Set this to False if you've already installed mrjob on your Hadoop cluster.")
+            '--bootstrap-mrjob', dest='bootstrap_mrjob', action='store_true', default=None,
+            help="Automatically tar up the mrjob library and install it when we run the mrjob. This is the default. Use --no-bootstrap-mrjob if you've already installed mrjob on your Hadoop cluster.")
 
         self.runner_opt_group.add_option(
             '-c', '--conf-path', dest='conf_path', default=None,
@@ -699,6 +699,10 @@ class MRJob(object):
             '--file', dest='upload_files', action='append',
             default=[],
             help='Copy file to the working directory of this script. You can use --file multiple times.')
+
+        self.runner_opt_group.add_option(
+            '--no-bootstrap-mrjob', dest='bootstrap_mrjob', action='store_false', default=None,
+            help="Don't automatically tar up the mrjob library and install it when we run the mrjob. Use this if you've already installed mrjob on your Hadoop cluster.")
 
         self.runner_opt_group.add_option(
             '--no-conf', dest='conf_path', action='store_false',
@@ -919,6 +923,11 @@ class MRJob(object):
             '--ssh-bind-ports', dest='ssh_bind_ports', default=None,
             type='range_list',
             help='A list of port ranges that are safe to listen on, delimited by colons and commas with the syntax 2000[:2001][,2003,2005:2008,etc]. Defaults to 40001:40840.')
+
+        self.emr_opt_group.add_option(
+            '--ssh-tunnel-is-closed', dest='ssh_tunnel_is_open',
+            default=None, action='store_false',
+            help='Make ssh tunnel accessible from localhost only')
 
         self.emr_opt_group.add_option(
             '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',

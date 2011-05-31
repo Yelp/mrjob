@@ -27,7 +27,7 @@ except ImportError:
 from mrjob.conf import combine_cmds, combine_dicts, combine_paths
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line
+from mrjob.util import cmd_line, read_file
 
 
 log = logging.getLogger('mrjob.hadoop')
@@ -431,11 +431,8 @@ class HadoopJobRunner(MRJobRunner):
         for line in stderr:
             log.info('HADOOP: %s' % line.rstrip('\n'))
 
-    def _stream_output(self):
-        output_dir = posixpath.join(self._output_dir, 'part-*')
-        log.info('Streaming output from %s from HDFS' % output_dir)
-
-        cat_args = self._opts['hadoop_bin'] + ['fs', '-cat', output_dir]
+    def _cat_file(self, filename):
+        cat_args = self._opts['hadoop_bin'] + ['fs', '-cat', filename]
         log.debug('> %s' % cmd_line(cat_args))
 
         cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
@@ -453,8 +450,7 @@ class HadoopJobRunner(MRJobRunner):
             if returncode != 0:
                 raise CalledProcessError(returncode, cat_args)
         
-        for line in self.cat(output_dir, stream()):
-            yield line
+        return read_file(filename, stream())
 
     def _cleanup_scratch(self):
         super(HadoopJobRunner, self)._cleanup_scratch()

@@ -27,6 +27,7 @@ import sys
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.runner import MRJobRunner
 from mrjob.job import MRJob
+from mrjob.util import read_file
 
 log = logging.getLogger('mrjob.inline')
 
@@ -181,13 +182,7 @@ class InlineMRJobRunner(MRJobRunner):
             log.debug('Creating output directory %s' % self._output_dir)
             self.mkdir(self._output_dir)
 
-    def _stream_output(self):
-        """Read output from the final outfile."""
-        if self._final_outfile:
-            output_file = self._final_outfile
-        else:
-            output_file = os.path.join(self._output_dir, 'part-00000')
-        log.info('streaming final output from %s' % output_file)
-
-        for line in self.cat(output_file):
+    def _cat_file(self, filename):
+        '''cat a file, decompress if necessary.'''
+        for line in read_file(filename):
             yield line

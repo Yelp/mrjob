@@ -47,7 +47,7 @@ from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.util import cmd_line
+from mrjob.util import cmd_line, read_file
 
 
 log = logging.getLogger('mrjob.emr')
@@ -1006,7 +1006,7 @@ class EMRJobRunner(MRJobRunner):
 
             raise Exception(msg)
 
-    def _stream_output(self):
+    def _cat_file(self, filename):
         log.info('Streaming final output from %s' % self._output_dir)
 
         # make sure the job had a chance to copy all our data to S3
@@ -1029,9 +1029,34 @@ class EMRJobRunner(MRJobRunner):
             s3_key.get_contents_to_filename(
                 output_dir, headers={'Accept-Encoding': 'gzip'})
             log.debug('reading lines from %s' % output_dir)
-            for line in self.cat(output_dir):
+            for line in open(output_dir):
                 yield line
-
+                
+        # make sure the job had a chance to copy all our data to S3
+        #self._wait_for_s3_eventual_consistency()
+        
+        # boto Keys are theoretically iterable, but they don't actually
+        # give you a line at a time.
+        #s3_key = self.get_s3_key(filename)
+        #read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+        #for s3_key in self.get_s3_keys(filename):
+        #    if not posixpath.basename(s3_key.name).startswith('part-'):
+        #        log.debug('skipping non-output file: %s' %
+        #                  s3_key_to_uri(s3_key))
+        #        continue
+        
+        #    output_dir = os.path.join(self._get_local_tmp_dir(), 'output')
+        #    log.debug('downloading %s -> %s' % (
+        #        s3_key_to_uri(s3_key), output_dir))
+            # boto Keys are theoretically iterable, but they don't actually
+            # give you a line at a time, so download their contents.
+            # Compress the network traffic if we can.
+        #    s3_key.get_contents_to_filename(
+        #        output_dir, headers={'Accept-Encoding': 'gzip'})
+        #    log.debug('reading lines from %s' % output_dir)
+        #    return read_file(output_dir)
+            #return read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+        
     def _script_args(self):
         """How to invoke the script inside EMR"""
         # We can invoke the script by its S3 URL, but we don't really

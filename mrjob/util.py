@@ -134,16 +134,42 @@ def read_input(path, stdin=None):
         return
 
     # read from files
-    if path.endswith('.bz2'):
-        f = bz2.BZ2File(path)
-    elif path.endswith('.gz'):
-        f = gzip.GzipFile(path)
-    else:
-        f = open(path)
+    for line in read_file(path):
+        yield line
 
+
+def read_file(path, fileobj=None):
+    """Reads a file.
+    
+    - Decompress ``.gz`` and ``.bz2`` files.
+    - If fileobj is not None, stream lines from the fileobj
+    """
+    if path.endswith('.gz'):
+        f = gzip.GzipFile(path, fileobj = fileobj)
+    elif path.endswith('.bz2'):
+        if fileobj is None:
+            f = bz2.BZ2File(path)
+        else:
+            f = bunzip2_stream(fileobj)
+    elif fileobj is None:
+        f = open(path)
+    else:
+        f = fileobj
+    
     for line in f:
         yield line
 
+
+def bunzip2_stream(fileobj):
+    """Return an uncompressed bz2 stream from a file object
+    """
+    # decompress chunks into a buffer, then stream from the buffer
+    buff = ''
+    decomp = bz2.BZ2Decompressor()
+    for part in fileobj:
+        buff = buff.join(decomp.decompress(part))
+    f = buff.splitlines(True)
+    return f
 
 # Thanks to http://lybniz2.sourceforge.net/safeeval.html for
 # explaining how to do this!

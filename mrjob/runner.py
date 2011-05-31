@@ -338,39 +338,12 @@ class MRJobRunner(object):
         using the read() method of the appropriate HadoopStreamingProtocol
         class."""
         assert self._ran_job
-
-        for line in self._stream_output():
-            yield line
-            
-    def cat(self, source_path, fileobj = None):
-        """cat output from a source file. This would automatically decompress 
-        .gz and .bz2 files.
-        cats output from a stream if fileobj is not none
-        """
-
-        # decompress if .gz or .bz2 files found
-        if source_path.endswith('.gz'):
-            f = gzip.GzipFile(source_path, fileobj = fileobj)
-        elif source_path.endswith('.bz2'):
-            # things are a bit more complicated with bz2
-            if fileobj is None:
-                f = bz2.BZ2File(source_path)
-            else:
-                # bz2 cannot decompress a stream, so decompress chunks
-                # into a buffer, then stream from the buffer
-                buff = ''
-                decomp = bz2.BZ2Decompressor()
-                for part in fileobj:
-                    buff = buff.join(decomp.decompress(part))
-                f = buff.splitlines(True)
-        elif fileobj is None:
-            f = open(source_path)
-        else:
-            f = fileobj
-
-        for line in f:
-            yield line
-
+        
+        output_dir = self.get_output_dir()
+        log.info('Streaming final output from %s' % self._output_dir)
+        
+        return self.cat(self.path_join(output_dir, 'part-*'))
+     
     def _cleanup_scratch(self):
         """Cleanup any files/directories we create while running this job.
         Should be safe to run this at any time, or multiple times.
@@ -499,6 +472,16 @@ class MRJobRunner(object):
             else:
                 yield path
 
+    def cat(self, path):
+        """cat output from a given path. This would automatically decompress 
+        .gz and .bz2 files.
+        
+        Corresponds roughly to: ``hadoop fs -cat path``
+        """
+        for filename in self.ls(path):
+            for line in self._cat_file(filename):
+                yield line
+
     def mkdir(self, path):
         """Create the given dir and its subdirs (if they don't already
         exist).
@@ -552,8 +535,8 @@ class MRJobRunner(object):
         """Run the job."""
         raise NotImplementedError
 
-    def _stream_output(self):
-        """Stream raw lines from the job's output."""
+    def _cat_file(self, filename):
+        """cat a file, decompress if necessary."""
         raise NotImplementedError
 
     ### internal utilities for implementing MRJobRunners ###

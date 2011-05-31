@@ -1007,55 +1007,12 @@ class EMRJobRunner(MRJobRunner):
             raise Exception(msg)
 
     def _cat_file(self, filename):
-        log.info('Streaming final output from %s' % self._output_dir)
-
         # make sure the job had a chance to copy all our data to S3
         self._wait_for_s3_eventual_consistency()
-
-        # boto Keys are theoretically iterable, but they don't actually
-        # give you a line at a time.
-        for s3_key in self.get_s3_keys(self._output_dir):
-            if not posixpath.basename(s3_key.name).startswith('part-'):
-                log.debug('skipping non-output file: %s' %
-                          s3_key_to_uri(s3_key))
-                continue
-
-            output_dir = os.path.join(self._get_local_tmp_dir(), 'output')
-            log.debug('downloading %s -> %s' % (
-                s3_key_to_uri(s3_key), output_dir))
-            # boto Keys are theoretically iterable, but they don't actually
-            # give you a line at a time, so download their contents.
-            # Compress the network traffic if we can.
-            s3_key.get_contents_to_filename(
-                output_dir, headers={'Accept-Encoding': 'gzip'})
-            log.debug('reading lines from %s' % output_dir)
-            for line in open(output_dir):
-                yield line
-                
-        # make sure the job had a chance to copy all our data to S3
-        #self._wait_for_s3_eventual_consistency()
         
-        # boto Keys are theoretically iterable, but they don't actually
-        # give you a line at a time.
-        #s3_key = self.get_s3_key(filename)
-        #read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
-        #for s3_key in self.get_s3_keys(filename):
-        #    if not posixpath.basename(s3_key.name).startswith('part-'):
-        #        log.debug('skipping non-output file: %s' %
-        #                  s3_key_to_uri(s3_key))
-        #        continue
-        
-        #    output_dir = os.path.join(self._get_local_tmp_dir(), 'output')
-        #    log.debug('downloading %s -> %s' % (
-        #        s3_key_to_uri(s3_key), output_dir))
-            # boto Keys are theoretically iterable, but they don't actually
-            # give you a line at a time, so download their contents.
-            # Compress the network traffic if we can.
-        #    s3_key.get_contents_to_filename(
-        #        output_dir, headers={'Accept-Encoding': 'gzip'})
-        #    log.debug('reading lines from %s' % output_dir)
-        #    return read_file(output_dir)
-            #return read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+        # stream lines from the s3 key
+        s3_key = self.get_s3_key(filename)
+        return read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
         
     def _script_args(self):
         """How to invoke the script inside EMR"""

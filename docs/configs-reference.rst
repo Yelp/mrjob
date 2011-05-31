@@ -34,8 +34,8 @@ Option                 Default                        Combined by               
 *owner*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--owner`
 *python_archives*      ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--python-archive`
 *python_bin*           :command:`python`              :py:func:`~mrjob.conf.combine_values`     :option:`--python-bin`
-*setup_cmds*           ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--setup-cmd'
-*setup_scripts*        ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--setup-script'
+*setup_cmds*           ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--setup-cmd`
+*setup_scripts*        ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--setup-script`
 *steps_python_bin*     (current Python interpreter)   :py:func:`~mrjob.conf.combine_values`     :option:`--steps-python-bin`
 *upload_archives*      ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--archive`
 *upload_files*         ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--file`

@@ -63,7 +63,7 @@ def find_hadoop_java_stack_trace(lines):
                 at org.apache.hadoop.mapred.ReduceTask.run(ReduceTask.java:277)
                 at org.apache.hadoop.mapred.TaskTracker$Child.main(TaskTracker.java:2216)
 
-    3(We omit the "Error running child" line from the results)
+    (We omit the "Error running child" line from the results)
     """
     for line in lines:
         if line.rstrip('\n').endswith("Error running child"):

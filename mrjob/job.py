@@ -865,7 +865,7 @@ class MRJob(object):
             help='Type of EC2 instance for slave nodes only')
 
         self.emr_opt_group.add_option(
-            '--emr-end-point', dest='emr_end_point', default=None,
+            '--emr-endpoint', dest='emr_endpoint', default=None,
             help='Optional host to connect to when communicating with S3 (e.g. us-west-1.elasticmapreduce.amazonaws.com). Default is to infer this from aws_region.')
 
         self.emr_opt_group.add_option(

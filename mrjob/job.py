@@ -675,7 +675,7 @@ class MRJob(object):
 
         self.runner_opt_group.add_option(
             '--no-bootstrap-mrjob', dest='bootstrap_mrjob', action='store_false', default=None,
-            help="Automatically tar up the mrjob library and install it when we run the mrjob. Set this to False if you’ve already installed mrjob on your Hadoop cluster.")
+            help="Automatically tar up the mrjob library and install it when we run the mrjob. Set this to False if you've already installed mrjob on your Hadoop cluster.")
 
         self.runner_opt_group.add_option(
             '-c', '--conf-path', dest='conf_path', default=None,
@@ -734,7 +734,7 @@ class MRJob(object):
             default=[],
             help='Path to file to be copied into the local working directory and then run. You can use --setup-script more than once. These are run after setup_cmds.')
 
- self.runner_opt_group.add_option(
+        self.runner_opt_group.add_option(
             '--steps-python-bin', dest='steps_python_bin', default=None,
             help='Name/path of alternate python binary to use to query the '
             'job about its steps, if different from the current Python '
@@ -903,8 +903,12 @@ class MRJob(object):
             help='How long to wait for S3 to reach eventual consistency. This is typically less than a second (zero in us-west) but the default is 5.0 to be safe.')
 
         self.emr_opt_group.add_option(
-            '--ssh-bin', dest='ssh-bin', default=None,
+            '--ssh-bin', dest='ssh_bin', default=None,
             help='Path to the ssh binary. Defaults to ssh.')
+
+        self.emr_opt_group.add_option(
+            '--ssh-bind-ports', dest='ssh_bind_ports', default=None,
+            help='A list of port ranges that are safe to listen on, delimited by colons and commas with the syntax 000[:111][,222,333:444,etc]. Defaults to 40001:40840.')
 
         self.emr_opt_group.add_option(
             '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',
@@ -1050,8 +1054,8 @@ class MRJob(object):
             'owner': self.options.owner,
             'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
-            'setup_cmds': self.setup_cmds,
-            'setup_scripts': self.setup_scripts,
+            'setup_cmds': self.options.setup_cmds,
+            'setup_scripts': self.options.setup_scripts,
             'stdin': self.stdin,
             'steps_python_bin': self.options.steps_python_bin,
             'upload_archives': self.options.upload_archives,

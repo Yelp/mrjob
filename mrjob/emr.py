@@ -44,7 +44,7 @@ except ImportError:
     botoemr = None
 
 from mrjob.conf import combine_dicts, combine_lists, combine_paths, combine_path_lists
-from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error
+from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_port_range
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
 from mrjob.util import cmd_line
@@ -662,6 +662,11 @@ class EMRJobRunner(MRJobRunner):
         try:
             # seed random port selection on job flow ID
             random.seed(self._emr_job_flow_id)
+            if isinstance(self._opts['ssh_bind_ports'], str):
+                self._opts['ssh_bind_ports'] = parse_port_range_list(self._opts['ssh_bind_ports'])
+            print 'ports are', self._opts['ssh_bind_ports']
+            import sys
+            sys.exit(0)
             num_picks = min(MAX_SSH_RETRIES, len(self._opts['ssh_bind_ports']))
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
         finally:

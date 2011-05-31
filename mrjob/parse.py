@@ -63,7 +63,7 @@ def find_hadoop_java_stack_trace(lines):
                 at org.apache.hadoop.mapred.ReduceTask.run(ReduceTask.java:277)
                 at org.apache.hadoop.mapred.TaskTracker$Child.main(TaskTracker.java:2216)
 
-    (We omit the "Error running child" line from the results)
+    3(We omit the "Error running child" line from the results)
     """
     for line in lines:
         if line.rstrip('\n').endswith("Error running child"):
@@ -183,4 +183,19 @@ def parse_mr_job_stderr(stderr, counters=None):
         other.append(line)
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
+
+def parse_port_range(range_str):
+    if ':' in range_str:
+        return range(int(x) for x in range_str.split(':'))
+    else:
+        return int(range_str)
+
+PORT_RANGE_LIST_RE = re.compile(r'\d+(:\d+)?(,\d+(:\d+)?)*')
+
+def parse_port_range_list(range_list_str):
+    assert PORT_RANGE_LIST_RE.match(range_list_str)
+    all_ranges = []
+    for range_str in range_list_str.split(','):
+        all_ranges.extend(parse_port_range(range_str))
+    return all_ranges
 

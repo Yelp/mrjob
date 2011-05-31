@@ -908,7 +908,7 @@ class MRJob(object):
 
         self.emr_opt_group.add_option(
             '--ssh-bind-ports', dest='ssh_bind_ports', default=None,
-            help='A list of port ranges that are safe to listen on, delimited by colons and commas with the syntax 000[:111][,222,333:444,etc]. Defaults to 40001:40840.')
+            help='A list of port ranges that are safe to listen on, delimited by colons and commas with the syntax 2000[:2001][,2003,2005:2008,etc]. Defaults to 40001:40840.')
 
         self.emr_opt_group.add_option(
             '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',

@@ -436,62 +436,24 @@ class EMRJobRunner(MRJobRunner):
         aren't already set.
         """
         s3_conn = self.make_s3_conn()
-        buckets = s3_conn.get_all_buckets()
         # check s3_scratch_uri against aws_region if specified
-        scratch_uri = self._opts['s3_scratch_uri']
-        if scratch_uri:
-            bucket_name = parse_s3_uri(scratch_uri)[0]
+        if self._opts['s3_scratch_uri']:
+            bucket_name = parse_s3_uri(self._opts['s3_scratch_uri'])[0]
             bucket_loc = s3_conn.get_bucket(bucket_name).get_location()
+
             # make sure they can communicate if both specified
             if self._aws_region and bucket_loc and self._aws_region != bucket_loc:
                 log.warning('warning: aws_region (%s) does not match bucket region (%s). Your EC2 instances may not be able to reach your S3 buckets.' % (self._aws_region, bucket_loc))
+
             # otherwise derive aws_region from bucket_loc
             elif bucket_loc and not self._aws_region:
                 log.info("inferring aws_region from scratch bucket's region (%s)" % bucket_loc)
                 self._aws_region = bucket_loc
         # set s3_scratch_uri by checking for existing buckets
         else:
-            mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
-            chosen_bucket = None
-            # Loop over buckets until we find one that is not region-
-            #   restricted, matches aws_region, or can be used to
-            #   infer aws_region if no aws_region is specified
-            for scratch_bucket in mrjob_buckets:
-                scratch_bucket_name = scratch_bucket.name
-                scratch_bucket_location = scratch_bucket.get_location()
+            bucket_name = self._find_free_bucket(s3_conn)
 
-                if scratch_bucket_location:
-                    if scratch_bucket_location == self._aws_region:
-                        # Regions are both specified and match
-                        chosen_bucket = scratch_bucket
-                        log.info("using existing scratch bucket %s" % scratch_bucket_name)
-                        break
-                    elif not self._aws_region:
-                        # aws_region not specified, so set it based on this
-                        #   bucket's location and use this bucket
-                        self._aws_region = scratch_bucket_location 
-                        chosen_bucket = scratch_bucket
-                        log.info("inferring aws_region from scratch bucket's region (%s)" %
-                                 self._aws_region)
-                        break
-                    elif scratch_bucket_location != self._aws_region:
-                        pass    # Skip this bucket, we don't want it
-                else:
-                    # This bucket is accessible anywhere, so we can use it
-                    chosen_bucket = scratch_bucket
-                    log.info("using existing scratch bucket %s" % scratch_bucket_name)
-                    break
-
-
-            # That may have all failed. If so, pick a name.
-            if not chosen_bucket:
-                # We'll need to create a bucket if and when we need to use
-                # scratch space.
-                scratch_bucket_name = 'mrjob-%016x' % random.randint(0, 2**64-1)
-                self._s3_temp_bucket_to_create = scratch_bucket_name
-                log.info("creating new scratch bucket %s" % scratch_bucket_name)
-
-            self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
+            self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % bucket_name
             log.info('using %s as our scratch dir on S3' %
                      self._opts['s3_scratch_uri'])
 
@@ -504,6 +466,42 @@ class EMRJobRunner(MRJobRunner):
                 self._opts['s3_log_uri'])
         else:
             self._opts['s3_log_uri'] = self._opts['s3_scratch_uri'] + 'logs/'
+
+    def _find_free_bucket(self, s3_conn):
+        buckets = s3_conn.get_all_buckets()
+        mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
+
+        # Loop over buckets until we find one that is not region-
+        #   restricted, matches aws_region, or can be used to
+        #   infer aws_region if no aws_region is specified
+        for scratch_bucket in mrjob_buckets:
+            scratch_bucket_name = scratch_bucket.name
+            scratch_bucket_location = scratch_bucket.get_location()
+
+            if scratch_bucket_location:
+                if scratch_bucket_location == self._aws_region:
+                    # Regions are both specified and match
+                    log.info("using existing scratch bucket %s" % scratch_bucket_name)
+                    return scratch_bucket_name
+                elif not self._aws_region:
+                    # aws_region not specified, so set it based on this
+                    #   bucket's location and use this bucket
+                    self._aws_region = scratch_bucket_location 
+                    log.info("inferring aws_region from scratch bucket's region (%s)" %
+                             self._aws_region)
+                    return scratch_bucket_name
+                elif scratch_bucket_location != self._aws_region:
+                    pass    # Skip this bucket, we don't want it
+            else:
+                # This bucket is accessible anywhere, so we can use it
+                log.info("using existing scratch bucket %s" % scratch_bucket_name)
+                return scratch_bucket_name
+
+        # That may have all failed. If so, pick a name.
+        scratch_bucket_name = 'mrjob-%016x' % random.randint(0, 2**64-1)
+        self._s3_temp_bucket_to_create = scratch_bucket_name
+        log.info("creating new scratch bucket %s" % scratch_bucket_name)
+        return scratch_bucket_name
 
     def _create_s3_temp_bucket_if_needed(self):
         if self._s3_temp_bucket_to_create:

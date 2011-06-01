@@ -348,6 +348,66 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             job_flow = emr_conn.describe_jobflow(job_flow_id)
             assert_equal(job_flow.availabilityzone, 'PUPPYLAND')
 
+    def test_region_settings(self):
+        self.add_mock_s3_data({'mrjob-1': {}})
+        s3c = boto.connect_s3()
+        bucket = s3c.get_bucket('mrjob-1')
+
+        # First, simple tests of default behavior
+
+        # aws_region specified, no bucket specified, default bucket has no location
+        j = EMRJobRunner(aws_region='PUPPYLAND', 
+                         s3_endpoint='PUPPYLAND',
+                         conf_path=False)
+        assert_equal(j._opts['s3_scratch_uri'], 's3://mrjob-1/tmp/')
+
+        # aws_region not specified, no bucket specified, default bucket has no location
+        j = EMRJobRunner(conf_path=False)
+        assert_equal(j._opts['s3_scratch_uri'], 's3://mrjob-1/tmp/')
+
+        # aws_region not specified, bucket specified without location
+        j = EMRJobRunner(conf_path=False,
+                         s3_scratch_uri='s3://mrjob-1/tmp/')
+        assert_equal(j._opts['s3_scratch_uri'], 's3://mrjob-1/tmp/')
+
+        # aws_region not specified, bucket specified with location
+        bucket.set_location('PUPPYLAND')
+        j = EMRJobRunner(conf_path=False)
+        assert_equal(j._aws_region, 'PUPPYLAND')
+
+        # Now do some tests that require the existence of an incorrect bucket
+        self.add_mock_s3_data({'mrjob-2': {}})
+        bad_bucket = s3c.get_bucket('mrjob-2')
+        bad_bucket.set_location('KITTYLAND')
+
+        # aws_region specified, no bucket specified, bucket exists with matching region
+        bucket.set_location('PUPPYLAND')
+        j = EMRJobRunner(aws_region='PUPPYLAND', 
+                         s3_endpoint='PUPPYLAND',
+                         conf_path=False)
+        assert_equal(j._opts['s3_scratch_uri'], 's3://mrjob-1/tmp/')
+
+        # aws_region specified, bucket specified with matching location
+        j = EMRJobRunner(aws_region='PUPPYLAND', 
+                         s3_endpoint='PUPPYLAND',
+                         s3_scratch_uri='s3://mrjob-1/tmp/',
+                         conf_path=False)
+        assert_equal(j._opts['s3_scratch_uri'], 's3://mrjob-1/tmp/')
+
+        # aws_region specified, bucket specified with incorrect location
+        stderr = StringIO()
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
+                       '-c', self.mrjob_conf_path,
+                       '--s3-endpoint', 'PUPPYLAND',
+                       '--aws-region', 'PUPPYLAND',
+                       '--s3-scratch-uri', 's3://mrjob-2/tmp/',
+                       '--hadoop-version', '0.20'])
+        mr_job.sandbox(stderr=stderr)
+
+        with mr_job.make_runner() as runner:
+            # This does not work. Why not?
+            assert_in('does not match bucket region', stderr.getvalue())
+
 
 class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
 

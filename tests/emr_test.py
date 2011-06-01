@@ -19,6 +19,7 @@ from __future__ import with_statement
 import copy
 import datetime
 import getpass
+import logging
 import os
 import shutil
 from StringIO import StringIO
@@ -30,7 +31,7 @@ from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
 from mrjob.parse import JOB_NAME_RE
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.quiet import logger_disabled
+from tests.quiet import logger_disabled, no_handlers_for_logger
 
 try:
     import boto
@@ -404,9 +405,13 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
                        '--hadoop-version', '0.20'])
         mr_job.sandbox(stderr=stderr)
 
-        with mr_job.make_runner() as runner:
-            # This does not work. Why not?
-            assert_in('does not match bucket region', stderr.getvalue())
+        with no_handlers_for_logger():
+            stderr = StringIO()
+            log = logging.getLogger('mrjob.emr')
+            log.addHandler(logging.StreamHandler(stderr))
+            log.setLevel(logging.WARNING)
+            with mr_job.make_runner() as runner:
+                assert_in('does not match bucket region', stderr.getvalue())
 
 
 class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):

@@ -448,7 +448,7 @@ class EMRJobRunner(MRJobRunner):
             bucket_loc = s3_conn.get_bucket(bucket_name).get_location()
             # make sure they can communicate if both specified
             if self._aws_region and bucket_loc and self._aws_region != bucket_loc:
-                log.info('warning: aws_region (%s) does not match bucket region (%s). Your EC2 instances may not be able to reach your S3 buckets.' % (self._aws_region, bucket_loc))
+                log.warning('warning: aws_region (%s) does not match bucket region (%s). Your EC2 instances may not be able to reach your S3 buckets.' % (self._aws_region, bucket_loc))
             # otherwise derive aws_region from bucket_loc
             elif bucket_loc and not self._aws_region:
                 self._aws_region = bucket_loc

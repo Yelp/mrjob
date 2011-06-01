@@ -442,8 +442,9 @@ class EMRJobRunner(MRJobRunner):
         s3_conn = self.make_s3_conn()
         buckets = s3_conn.get_all_buckets()
         # check s3_scratch_uri against aws_region if specified
-        if self._opts['s3_scratch_uri']:
-            bucket_name = S3_URI_BUCKET_NAME_RE.match(self._opts['s3_scratch_uri']).group(1)
+        scratch_uri = self._opts['s3_scratch_uri']
+        if scratch_uri:
+            bucket_name = S3_URI_BUCKET_NAME_RE.match(scratch_uri).group(1)
             bucket_loc = s3_conn.get_bucket(bucket_name).get_location()
             # make sure they can communicate if both specified
             if self._aws_region and bucket_loc and self._aws_region != bucket_loc:
@@ -460,18 +461,30 @@ class EMRJobRunner(MRJobRunner):
             #   infer aws_region if no aws_region is specified
             for scratch_bucket in mrjob_buckets:
                 scratch_bucket_name = scratch_bucket.name
-                scratch_bucket_location = scratch_bucket.get_location() or None
-                
-                if self._aws_region and scratch_bucket_location == self._aws_region:
+                scratch_bucket_location = scratch_bucket.get_location()
+
+                if scratch_bucket_location:
+                    if scratch_bucket_location == self._aws_region:
+                        # Regions are both specified and match
+                        chosen_bucket = scratch_bucket
+                        log.info("using existing scratch bucket %s" % scratch_bucket_name)
+                        break
+                    elif not self._aws_region:
+                        # aws_region not specified, so set it based on this
+                        #   bucket's location and use this bucket
+                        self._aws_region = scratch_bucket_location 
+                        chosen_bucket = scratch_bucket
+                        log.info("inferring aws_region from scratch bucket's region (%s)" %
+                                 self._aws_region)
+                        break
+                    elif scratch_bucket_location != self._aws_region:
+                        pass    # Skip this bucket, we don't want it
+                else:
+                    # This bucket is accessible anywhere, so we can use it
                     chosen_bucket = scratch_bucket
                     log.info("using existing scratch bucket %s" % scratch_bucket_name)
                     break
-                elif not self._aws_region and scratch_bucket_location:
-                    self._aws_region = scratch_bucket_location 
-                    chosen_bucket = scratch_bucket
-                    log.info("inferring aws_region from scratch bucket's region (%s)" %
-                             self._aws_region)
-                    break
+
 
             # That may have all failed. If so, pick a name.
             if not chosen_bucket:

@@ -27,4 +27,32 @@ from connection import EmrConnection
 from step import Step, StreamingStep, JarStep
 from bootstrap_action import BootstrapAction
 
+from boto import handler
+from boto.s3.bucket import Bucket
+from boto.resultset import ResultSet
+import xml.sax
+
+def get_bucket_location(bucket):
+    """
+    Returns the LocationConstraint for the bucket.
+
+    :rtype: str
+    :return: The LocationConstraint for the bucket or the empty
+             string if no constraint was specified when bucket
+             was created.
+    """
+    response = bucket.connection.make_request('GET', bucket.name,
+                                            query_args='location')
+    body = response.read()
+    if response.status == 200:
+        rs = ResultSet(bucket)
+        h = handler.XmlHandler(rs, bucket)
+        xml.sax.parseString(body, h)
+        return rs.LocationConstraint
+    else:
+        raise bucket.connection.provider.storage_response_error(
+            response.status, response.reason, body)
+
+if not hasattr(Bucket, 'get_location'):
+    Bucket.get_location = get_bucket_location
 

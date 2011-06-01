@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from subprocess import Popen, PIPE
-from testify import TestCase, assert_equal, assert_not_equal
+from testify import TestCase, assert_equal, assert_not_equal, assert_raises
 
 from mrjob.parse import *
 
@@ -177,4 +177,18 @@ class ParseMRJobStderr(TestCase):
 
         assert_equal(parse_mr_job_stderr(BAD_LINES),
                      {'counters': {}, 'statuses': [], 'other': BAD_LINES})
+
+
+class PortRangeListTestCase(TestCase):
+    def test_port_range_list(self):
+        assert_equal(parse_port_range_list('1234'), [1234]) 
+        assert_equal(parse_port_range_list('123,456,789'), [123,456,789])
+        assert_equal(parse_port_range_list('1234,5678'), [1234, 5678])
+        assert_equal(parse_port_range_list('1234:1236'), [1234, 1235, 1236])
+        assert_equal(parse_port_range_list('123:125,456'), [123,124,125,456])
+        assert_equal(parse_port_range_list('123:125,456:458'), [123,124,125,456,457,458])
+        assert_equal(parse_port_range_list('0123'), [123])
+
+        assert_raises(ValueError, parse_port_range_list, 'Alexandria')
+        assert_raises(ValueError, parse_port_range_list, 'Athens:Alexandria')
 

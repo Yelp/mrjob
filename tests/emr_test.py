@@ -277,7 +277,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         assert_equal(len(matching_file_dicts), 1)
 
     def test_attach_to_existing_job_flow(self):
-        emr_conn = EMRJobRunner().make_emr_conn()
+        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
         # set log_uri to None, so that when we describe the job flow, it
         # won't have the loguri attribute, to test Issue #112
         emr_job_flow_id = emr_conn.run_jobflow(
@@ -349,7 +349,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             assert_equal(job_flow.availabilityzone, 'PUPPYLAND')
 
 
-
 class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
 
     def test_can_get_all_job_flows(self):
@@ -364,7 +363,7 @@ class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
                 creationdatetime=to_iso8601(now - datetime.timedelta(minutes=i)),
                 jobflowid=jfid)
 
-        emr_conn = EMRJobRunner().make_emr_conn()
+        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
 
         # ordinary describe_jobflows() hits the limit on number of job flows
         some_jfs = emr_conn.describe_jobflows()
@@ -421,6 +420,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
 
     @setup
     def make_runner(self):
+        self.add_mock_s3_data({'walrus': {}})
         self.runner = EMRJobRunner(s3_sync_wait_time=0,
                                    s3_scratch_uri='s3://walrus/tmp',
                                    conf_path=False)
@@ -683,10 +683,10 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
 class TestLs(MockEMRAndS3TestCase):
 
     def test_s3_ls(self):
+        self.add_mock_s3_data({'walrus': {'one': '', 'two': '', 'three': ''}})
+
         runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
                               conf_path=False)
-
-        self.add_mock_s3_data({'walrus': {'one': '', 'two': '', 'three': ''}})
 
         assert_equal(set(runner._s3_ls('s3://walrus/')),
                      set(['s3://walrus/one',

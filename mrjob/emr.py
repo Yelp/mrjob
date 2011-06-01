@@ -54,10 +54,6 @@ log = logging.getLogger('mrjob.emr')
 
 S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
 
-# this regexp is used to get the bucket name so we can pass it to s3connection.get_bucket().
-# there is probably a better way to do this.
-S3_URI_BUCKET_NAME_RE = re.compile(r'^s3://([^/]+)(/.*)?$')
-
 JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?
@@ -444,13 +440,14 @@ class EMRJobRunner(MRJobRunner):
         # check s3_scratch_uri against aws_region if specified
         scratch_uri = self._opts['s3_scratch_uri']
         if scratch_uri:
-            bucket_name = S3_URI_BUCKET_NAME_RE.match(scratch_uri).group(1)
+            bucket_name = parse_s3_uri(scratch_uri)[0]
             bucket_loc = s3_conn.get_bucket(bucket_name).get_location()
             # make sure they can communicate if both specified
             if self._aws_region and bucket_loc and self._aws_region != bucket_loc:
                 log.warning('warning: aws_region (%s) does not match bucket region (%s). Your EC2 instances may not be able to reach your S3 buckets.' % (self._aws_region, bucket_loc))
             # otherwise derive aws_region from bucket_loc
             elif bucket_loc and not self._aws_region:
+                log.info("inferring aws_region from scratch bucket's region (%s)" % bucket_loc)
                 self._aws_region = bucket_loc
         # set s3_scratch_uri by checking for existing buckets
         else:

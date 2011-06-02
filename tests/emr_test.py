@@ -32,6 +32,7 @@ from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
 from mrjob.parse import JOB_NAME_RE
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.mr_nomapper_multistep import MRNoMapper
 from tests.quiet import logger_disabled
 
 try:
@@ -754,3 +755,51 @@ class TestMasterBootstrapScript(TestCase):
         runner._create_master_bootstrap_script(dest=script_path)
 
         assert not os.path.exists(script_path)
+        
+        
+class EMRNoMapperTest(MockEMRAndS3TestCase):
+
+    @setup
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def test_no_mapper(self):
+        # read from STDIN, a local file, and a remote file
+        stdin = StringIO('foo\nbar\n')
+
+        local_input_path = os.path.join(self.tmp_dir, 'input')
+        with open(local_input_path, 'w') as local_input_file:
+            local_input_file.write('bar\nqux\n')
+
+        remote_input_path = 's3://walrus/data/foo'
+        self.add_mock_s3_data({'walrus': {'data/foo': 'foo\n'}})
+
+        # setup fake output
+        self.mock_emr_output = {('j-MOCKJOBFLOW0', 1): [
+            '1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n']}
+
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
+                               '-c', self.mrjob_conf_path,
+                               '-', local_input_path, remote_input_path,
+                               '--hadoop-input-format', 'FooFormat',
+                               '--hadoop-output-format', 'BarFormat'])
+        mr_job.sandbox(stdin=stdin)
+
+        local_tmp_dir = None
+        results = []
+
+        mock_s3_fs_snapshot = copy.deepcopy(self.mock_s3_fs)
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+        assert_equal(sorted(results),
+                     [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])

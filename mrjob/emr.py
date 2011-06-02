@@ -437,7 +437,7 @@ class EMRJobRunner(MRJobRunner):
         s3_conn = self.make_s3_conn()
         # check s3_scratch_uri against aws_region if specified
         if self._opts['s3_scratch_uri']:
-            bucket_name = parse_s3_uri(self._opts['s3_scratch_uri'])[0]
+            bucket_name, _ = parse_s3_uri(self._opts['s3_scratch_uri'])
             bucket_loc = s3_conn.get_bucket(bucket_name).get_location()
 
             # make sure they can communicate if both specified
@@ -450,9 +450,7 @@ class EMRJobRunner(MRJobRunner):
                 self._aws_region = bucket_loc
         # set s3_scratch_uri by checking for existing buckets
         else:
-            bucket_name = self._find_free_bucket(s3_conn)
-
-            self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % bucket_name
+            self._set_s3_scratch_uri(s3_conn)
             log.info('using %s as our scratch dir on S3' %
                      self._opts['s3_scratch_uri'])
 
@@ -466,7 +464,7 @@ class EMRJobRunner(MRJobRunner):
         else:
             self._opts['s3_log_uri'] = self._opts['s3_scratch_uri'] + 'logs/'
 
-    def _find_free_bucket(self, s3_conn):
+    def _set_s3_scratch_uri(self, s3_conn):
         buckets = s3_conn.get_all_buckets()
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
 
@@ -481,26 +479,29 @@ class EMRJobRunner(MRJobRunner):
                 if scratch_bucket_location == self._aws_region:
                     # Regions are both specified and match
                     log.info("using existing scratch bucket %s" % scratch_bucket_name)
-                    return scratch_bucket_name
+                    self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
+                    return
                 elif not self._aws_region:
                     # aws_region not specified, so set it based on this
                     #   bucket's location and use this bucket
                     self._aws_region = scratch_bucket_location 
                     log.info("inferring aws_region from scratch bucket's region (%s)" %
                              self._aws_region)
-                    return scratch_bucket_name
+                    self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
+                    return
                 elif scratch_bucket_location != self._aws_region:
-                    pass    # Skip this bucket, we don't want it
+                    continue
             else:
                 # This bucket is accessible anywhere, so we can use it
                 log.info("using existing scratch bucket %s" % scratch_bucket_name)
-                return scratch_bucket_name
+                self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
+                return
 
         # That may have all failed. If so, pick a name.
         scratch_bucket_name = 'mrjob-%016x' % random.randint(0, 2**64-1)
         self._s3_temp_bucket_to_create = scratch_bucket_name
         log.info("creating new scratch bucket %s" % scratch_bucket_name)
-        return scratch_bucket_name
+        self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
 
     def _create_s3_temp_bucket_if_needed(self):
         if self._s3_temp_bucket_to_create:

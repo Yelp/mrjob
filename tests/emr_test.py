@@ -353,24 +353,10 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 class BucketRegionTestCase(MockEMRAndS3TestCase):
 
     @setup
-    def make_tmp_dir_and_mrjob_conf(self):
-        self.tmp_dir = tempfile.mkdtemp()
-        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'emr': {
-            'check_emr_status_every': 0.01,
-            's3_sync_wait_time': 0.01,
-            'aws_availability_zone': 'PUPPYLAND',
-        }}}, open(self.mrjob_conf_path, 'w'))
-
-    @teardown
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
-    @setup
     def make_dummy_data(self):
         self.add_mock_s3_data({'mrjob-1': {}})
-        self.s3c = boto.connect_s3()
-        self.bucket1 = self.s3c.get_bucket('mrjob-1')
+        s3c = boto.connect_s3()
+        self.bucket1 = s3c.get_bucket('mrjob-1')
         self.bucket1_uri = 's3://mrjob-1/tmp/'
 
     def test_region_nobucket_nolocation(self):
@@ -409,29 +395,16 @@ class BucketRegionTestCase(MockEMRAndS3TestCase):
 class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
 
     @setup
-    def make_tmp_dir_and_mrjob_conf(self):
-        self.tmp_dir = tempfile.mkdtemp()
-        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'emr': {
-            'check_emr_status_every': 0.01,
-            's3_sync_wait_time': 0.01,
-            'aws_availability_zone': 'PUPPYLAND',
-        }}}, open(self.mrjob_conf_path, 'w'))
-
-    @teardown
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
-    @setup
     def make_dummy_data(self):
         self.add_mock_s3_data({'mrjob-1': {}})
-        self.s3c = boto.connect_s3()
-        self.bucket1 = self.s3c.get_bucket('mrjob-1')
+        s3c = boto.connect_s3()
+        self.bucket1 = s3c.get_bucket('mrjob-1')
         self.bucket1_uri = 's3://mrjob-1/tmp/'
 
         self.add_mock_s3_data({'mrjob-2': {}})
-        self.bucket2 = self.s3c.get_bucket('mrjob-2')
+        self.bucket2 = s3c.get_bucket('mrjob-2')
         self.bucket2.set_location('KITTYLAND')
+        self.bucket2_uri = 's3://mrjob-2/tmp/'
 
     def test_region_nobucket_matchexists(self):
         # aws_region specified, no bucket specified, bucket exists with matching region
@@ -450,22 +423,18 @@ class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
 
     def test_region_bucket_doesnotmatch(self):
         # aws_region specified, bucket specified with incorrect location
-        stderr = StringIO()
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                       '-c', self.mrjob_conf_path,
-                       '--s3-endpoint', 'PUPPYLAND',
-                       '--aws-region', 'PUPPYLAND',
-                       '--s3-scratch-uri', 's3://mrjob-2/tmp/',
-                       '--hadoop-version', '0.20'])
-        mr_job.sandbox(stderr=stderr)
-
         with no_handlers_for_logger():
             stderr = StringIO()
             log = logging.getLogger('mrjob.emr')
             log.addHandler(logging.StreamHandler(stderr))
             log.setLevel(logging.WARNING)
-            with mr_job.make_runner() as runner:
-                assert_in('does not match bucket region', stderr.getvalue())
+
+            j = EMRJobRunner(aws_region='PUPPYLAND',
+                             s3_endpoint='PUPPYLAND',
+                             s3_scratch_uri=self.bucket2_uri,
+                             conf_path=False)
+
+            assert_in('does not match bucket region', stderr.getvalue())
 
 
 class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):

@@ -47,7 +47,7 @@ from mrjob.conf import combine_dicts, combine_lists, combine_paths, combine_path
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_port_range_list
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.util import cmd_line
+from mrjob.util import cmd_line, extract_dir_for_tar
 
 
 log = logging.getLogger('mrjob.emr')
@@ -1440,9 +1440,8 @@ class EMRJobRunner(MRJobRunner):
                 writeln("check_call(['tar', 'xfz', %r])" %
                         file_dict['name'])
                 # figure out name of dir to CD into
-                orig_name = os.path.basename(file_dict['path'])
-                assert orig_name.endswith('.tar.gz')
-                cd_into = orig_name[:-7]
+                assert file_dict['path'].endswith('.tar.gz')
+                cd_into = extract_dir_for_tar(file_dict['path'])
                 # install the module
                 writeln("check_call(['sudo', 'python', 'setup.py', 'install'], cwd=%r)" % cd_into)
 

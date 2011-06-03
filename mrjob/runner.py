@@ -14,10 +14,12 @@
 
 """Base class for all runners."""
 
+import bz2
 import copy
 import datetime
 import getpass
 import glob
+import gzip
 import logging
 import os
 import random
@@ -33,7 +35,7 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob.conf import combine_cmds, combine_cmd_lists, combine_dicts, combine_envs, combine_local_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
-from mrjob.util import cmd_line, file_ext, tar_and_gzip
+from mrjob.util import cmd_line, file_ext, read_file, tar_and_gzip
 
 
 log = logging.getLogger('mrjob.runner')
@@ -336,10 +338,12 @@ class MRJobRunner(object):
         using the read() method of the appropriate HadoopStreamingProtocol
         class."""
         assert self._ran_job
-
-        for line in self._stream_output():
-            yield line
-
+        
+        output_dir = self.get_output_dir()
+        log.info('Streaming final output from %s' % output_dir)
+        
+        return self.cat(self.path_join(output_dir, 'part-*'))
+     
     def _cleanup_scratch(self):
         """Cleanup any files/directories we create while running this job.
         Should be safe to run this at any time, or multiple times.
@@ -468,6 +472,16 @@ class MRJobRunner(object):
             else:
                 yield path
 
+    def cat(self, path):
+        """cat output from a given path. This would automatically decompress 
+        .gz and .bz2 files.
+        
+        Corresponds roughly to: ``hadoop fs -cat path``
+        """
+        for filename in self.ls(path):
+            for line in self._cat_file(filename):
+                yield line
+
     def mkdir(self, path):
         """Create the given dir and its subdirs (if they don't already
         exist).
@@ -521,9 +535,10 @@ class MRJobRunner(object):
         """Run the job."""
         raise NotImplementedError
 
-    def _stream_output(self):
-        """Stream raw lines from the job's output."""
-        raise NotImplementedError
+    def _cat_file(self, filename):
+        """cat a file, decompress if necessary."""
+        for line in read_file(filename):
+            yield line
 
     ### internal utilities for implementing MRJobRunners ###
 

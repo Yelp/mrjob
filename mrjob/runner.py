@@ -35,7 +35,7 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob.conf import combine_cmds, combine_cmd_lists, combine_dicts, combine_envs, combine_local_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
-from mrjob.util import cmd_line, file_ext, tar_and_gzip
+from mrjob.util import cmd_line, file_ext, read_file, tar_and_gzip
 
 
 log = logging.getLogger('mrjob.runner')
@@ -340,7 +340,7 @@ class MRJobRunner(object):
         assert self._ran_job
         
         output_dir = self.get_output_dir()
-        log.info('Streaming final output from %s' % self._output_dir)
+        log.info('Streaming final output from %s' % output_dir)
         
         return self.cat(self.path_join(output_dir, 'part-*'))
      
@@ -537,7 +537,8 @@ class MRJobRunner(object):
 
     def _cat_file(self, filename):
         """cat a file, decompress if necessary."""
-        raise NotImplementedError
+        for line in read_file(filename):
+            yield line
 
     ### internal utilities for implementing MRJobRunners ###
 

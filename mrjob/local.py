@@ -173,11 +173,6 @@ class LocalMRJobRunner(MRJobRunner):
             log.debug('copying %s -> %s' % (path, dest))
             shutil.copyfile(path, dest)
 
-    def _cat_file(self, filename):
-        '''cat a file, decompress if necessary.'''
-        for line in read_file(filename):
-            yield line
-        
     def _invoke_step(self, args, outfile_name, env=None):
         """Run the given command, outputting into outfile, and reading
         from the previous outfile (or, for the first step, from our

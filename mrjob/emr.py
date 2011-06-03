@@ -494,6 +494,9 @@ class EMRJobRunner(MRJobRunner):
 
         self._launch_emr_job()
         self._wait_for_job_to_complete()
+        
+        # make sure the job had a chance to copy all our data to S3
+        self._wait_for_s3_eventual_consistency()
 
     def _setup_input(self):
         """Copy local input files (if any) to a special directory on S3.
@@ -1007,12 +1010,13 @@ class EMRJobRunner(MRJobRunner):
             raise Exception(msg)
 
     def _cat_file(self, filename):
-        # make sure the job had a chance to copy all our data to S3
-        self._wait_for_s3_eventual_consistency()
-        
-        # stream lines from the s3 key
-        s3_key = self.get_s3_key(filename)
-        return read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+        if S3_URI_RE.match(filename):
+            # stream lines from the s3 key
+            s3_key = self.get_s3_key(filename)
+            return read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+        else:
+            # read from local filesystem
+            return super(EMRJobRunner, self)._cat_file(filename)
         
     def _script_args(self):
         """How to invoke the script inside EMR"""
@@ -1437,6 +1441,7 @@ class EMRJobRunner(MRJobRunner):
         if not S3_URI_RE.match(path_glob):
             for path in super(EMRJobRunner, self).ls(path_glob):
                 yield path
+            return
 
         # support globs
         glob_match = GLOB_RE.match(path_glob)

@@ -181,8 +181,3 @@ class InlineMRJobRunner(MRJobRunner):
         if not os.path.isdir(self._output_dir):
             log.debug('Creating output directory %s' % self._output_dir)
             self.mkdir(self._output_dir)
-
-    def _cat_file(self, filename):
-        '''cat a file, decompress if necessary.'''
-        for line in read_file(filename):
-            yield line

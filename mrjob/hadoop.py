@@ -432,25 +432,30 @@ class HadoopJobRunner(MRJobRunner):
             log.info('HADOOP: %s' % line.rstrip('\n'))
 
     def _cat_file(self, filename):
-        cat_args = self._opts['hadoop_bin'] + ['fs', '-cat', filename]
-        log.debug('> %s' % cmd_line(cat_args))
+        if HDFS_URI_RE.match(filename):
+            # stream from HDFS
+            cat_args = self._opts['hadoop_bin'] + ['fs', '-cat', filename]
+            log.debug('> %s' % cmd_line(cat_args))
 
-        cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
+            cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
         
-        def stream():  
-            for line in cat_proc.stdout:
-                yield line
+            def stream():  
+                for line in cat_proc.stdout:
+                    yield line
 
-            # there shouldn't be any stderr
-            for line in cat_proc.stderr:
-                log.error('STDERR: ' + line)
+                # there shouldn't be any stderr
+                for line in cat_proc.stderr:
+                    log.error('STDERR: ' + line)
 
-            returncode = cat_proc.wait()
+                returncode = cat_proc.wait()
 
-            if returncode != 0:
-                raise CalledProcessError(returncode, cat_args)
+                if returncode != 0:
+                    raise CalledProcessError(returncode, cat_args)
         
-        return read_file(filename, stream())
+            return read_file(filename, stream())
+        else:
+            # read from local filesystem
+            return super(HadoopJobRunner, self)._cat_file(filename)
 
     def _cleanup_scratch(self):
         super(HadoopJobRunner, self)._cleanup_scratch()
@@ -487,7 +492,7 @@ class HadoopJobRunner(MRJobRunner):
                 yield path
             return
 
-        hdfs_prefix = hdfs_match.group(1)
+        hdfs_prefix = 'hdfs://' + hdfs_match.group(1)
 
         stdout = self._invoke_hadoop(
             ['fs', '-lsr', path_glob],

@@ -215,6 +215,14 @@ class ArchiveTestCase(TestCase):
 
         self.ensure_expected_results(excluded_files=['baz'])
 
+    def test_extract_dir_for_tar(self):
+        join = os.path.join
+        tar_and_gzip(dir=join(self.tmp_dir, 'a'),
+                     out_path=join(self.tmp_dir, 'not_a.tar.gz'),
+                     prefix='b')
+
+        assert_equal(extract_dir_for_tar(join(self.tmp_dir, 'not_a.tar.gz')), 'b')
+
     def archive_and_unarchive(self, extension, archive_template, added_files=[]):
         join = os.path.join
 

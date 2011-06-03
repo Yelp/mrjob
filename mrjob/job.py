@@ -484,7 +484,16 @@ class MRJob(object):
         print >> self.stdout, ' '.join(self._steps_desc())
 
     def _steps_desc(self):
-        return ['MR' if reducer else 'M' for (mapper, reducer) in self.steps()]
+        res = []
+        for (mapper, reducer) in self.steps():
+            if reducer:
+                if mapper == _IDENTITY_MAPPER:
+                    res.append('IR')
+                else:
+                    res.append('MR')
+            else:
+                res.append('M')
+        return res
 
     @classmethod
     def mr_job_script(cls):

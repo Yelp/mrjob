@@ -729,7 +729,7 @@ class MRJobRunner(object):
                 if not steps:
                     raise ValueError('step description is empty!')
                 for step in steps:
-                    if step not in ('MR', 'M'):
+                    if step not in ('MR', 'M', 'IR'):
                         raise ValueError(
                             'unexpected step type %r in steps %r' %
                                          (step, stdout))

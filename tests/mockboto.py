@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,11 +41,11 @@ def add_mock_s3_data(mock_s3_fs, data):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
     key to contents) with a map from bucket name to key name to data."""
     for bucket_name, key_name_to_bytes in data.iteritems():
-        mock_s3_fs.setdefault(bucket_name, {})
+        mock_s3_fs.setdefault(bucket_name, {'keys':{}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
 
         for key_name, bytes in key_name_to_bytes.iteritems():
-            bucket[key_name] = bytes
+            bucket['keys'][key_name] = bytes
 
 class MockS3Connection(object):
     """Mock out boto.s3.Connection
@@ -81,12 +81,12 @@ class MockS3Connection(object):
         if bucket_name in self.mock_s3_fs:
             raise boto.exception.S3CreateError(409, 'Conflict')
         else:
-            self.mock_s3_fs[bucket_name] = {}
+            self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': ''}
 
 class MockBucket:
     """Mock out boto.s3.Bucket
     """
-    def __init__(self, connection=None, name=None):
+    def __init__(self, connection=None, name=None, location=None):
         """You can optionally specify a 'data' argument, which will instantiate
         mock keys and mock data. data should be a map from key name to bytes.
         """
@@ -97,7 +97,7 @@ class MockBucket:
         """Returns a dictionary from key to data representing the
         state of this bucket."""
         if self.name in self.connection.mock_s3_fs:
-            return self.connection.mock_s3_fs[self.name]
+            return self.connection.mock_s3_fs[self.name]['keys']
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -113,7 +113,10 @@ class MockBucket:
             return None
 
     def get_location(self):
-        return 'us-west-1'
+        return self.connection.mock_s3_fs[self.name]['location']
+
+    def set_location(self, new_location):
+        self.connection.mock_s3_fs[self.name]['location'] = new_location
 
     def list(self, prefix=''):
         for key_name in sorted(self.mock_state()):
@@ -247,8 +250,11 @@ class MockEmrConnection(object):
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
+            availabilityzone=availability_zone,
             creationdatetime=to_iso8601(now),
+            ec2keyname=ec2_keyname,
             hadoopversion=hadoop_version,
+            instancecount=num_instances,
             keepjobflowalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
             masterinstancetype=master_instance_type,

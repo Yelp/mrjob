@@ -10,6 +10,8 @@ v0.3.0, ??? -- ???!
 
 v0.2.7, 2011-06-?? -- ???
  * Catch abuse of __main__ in jobs (Issue #78)
+ * EMR parses and reports job failure due to steps timing out (Issue #15)
+ * New availability_zone option on EMR (Issue #72)
 
 v0.2.6, 2011-05-24 -- Hadoop 0.20 in EMR, inline runner, and more
 * Set Hadoop to run on EMR with --hadoop-version (Issue #71).

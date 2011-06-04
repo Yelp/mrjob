@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from subprocess import Popen, PIPE
-from testify import TestCase, assert_equal, assert_not_equal
+from testify import TestCase, assert_equal, assert_not_equal, assert_raises
 
 from mrjob.parse import *
 
@@ -92,6 +92,24 @@ class FindMiscTestCase(TestCase):
         assert_equal(
             find_interesting_hadoop_streaming_error(line for line in LOG_LINES),
             'Error launching job , Output path already exists : Output directory s3://yourbucket/logs/2010/07/23/ already exists and is not empty')
+    
+    def test_find_timeout_error(self):
+        LOG_LINES = [
+            'Task TASKID="task_201010202309_0001_m_000153" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1287618918658" ERROR="Task attempt_201010202309_0001_m_000153_3 failed to report status for 602 seconds. Killing!"',
+            'Task blahblah',
+            'Bada bing!',
+        ]
+        
+        assert_equal(find_timeout_error(LOG_LINES), 602)
+        
+        LOG_LINES = [
+            'Job JOBID="job_201105252346_0001" LAUNCH_TIME="1306367213950" TOTAL_MAPS="2" TOTAL_REDUCES="1" ',
+            'Task TASKID="task_201105252346_0001_m_000000" TASK_TYPE="MAP" START_TIME="1306367217455" SPLITS="/default-rack/localhost" ',
+            'MapAttempt TASK_TYPE="MAP" TASKID="task_201105252346_0001_m_000000" TASK_ATTEMPT_ID="attempt_201105252346_0001_m_000000_0" START_TIME="1306367223172" HOSTNAME="/default-rack/ip-10-168-73-40.us-west-1.compute.internal" ',
+            'Task TASKID="task_201105252346_0001_m_000000" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1306367233379" ERROR="Task attempt_201105252346_0001_m_000000_3 failed to report status for 0 seconds. Killing!"',
+        ]
+        
+        assert_equal(find_timeout_error(LOG_LINES), 0)
 
 
 
@@ -159,4 +177,18 @@ class ParseMRJobStderr(TestCase):
 
         assert_equal(parse_mr_job_stderr(BAD_LINES),
                      {'counters': {}, 'statuses': [], 'other': BAD_LINES})
+
+
+class PortRangeListTestCase(TestCase):
+    def test_port_range_list(self):
+        assert_equal(parse_port_range_list('1234'), [1234]) 
+        assert_equal(parse_port_range_list('123,456,789'), [123,456,789])
+        assert_equal(parse_port_range_list('1234,5678'), [1234, 5678])
+        assert_equal(parse_port_range_list('1234:1236'), [1234, 1235, 1236])
+        assert_equal(parse_port_range_list('123:125,456'), [123,124,125,456])
+        assert_equal(parse_port_range_list('123:125,456:458'), [123,124,125,456,457,458])
+        assert_equal(parse_port_range_list('0123'), [123])
+
+        assert_raises(ValueError, parse_port_range_list, 'Alexandria')
+        assert_raises(ValueError, parse_port_range_list, 'Athens:Alexandria')
 

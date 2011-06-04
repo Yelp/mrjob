@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utilities for parsing errors, counters, and status messages."""
+from optparse import OptionValueError
 import re
 
 try:
@@ -120,6 +121,26 @@ def find_interesting_hadoop_streaming_error(lines):
     else:
         return None
 
+_TIMEOUT_ERROR_RE = re.compile(r'Task.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds. Killing!"')
+
+def find_timeout_error(lines):
+    """Scan a log file or other iterable for a timeout error from Hadoop.
+    Return the number of seconds the job ran for before timing out, or None if
+    nothing found.
+
+    In logs from EMR, we find timeouterrors in ``jobs/*.jar``
+
+    Example line::
+
+        Task TASKID="task_201010202309_0001_m_000153" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1287618918658" ERROR="Task attempt_201010202309_0001_m_000153_3 failed to report status for 602 seconds. Killing!"
+    """
+    result = None
+    for line in lines:
+        match = _TIMEOUT_ERROR_RE.match(line)
+        if match:
+            result = match.group(1)
+    return int(result)
+
 # recognize hadoop streaming output
 _COUNTER_RE = re.compile(r'reporter:counter:([^,]*),([^,]*),(-?\d+)$')
 _STATUS_RE = re.compile(r'reporter:status:(.*)$')
@@ -163,4 +184,30 @@ def parse_mr_job_stderr(stderr, counters=None):
         other.append(line)
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
+
+def parse_port_range_list(range_list_str):
+    all_ranges = []
+    for range_str in range_list_str.split(','):
+        if ':' in range_str:
+            a, b = [int(x) for x in range_str.split(':')]
+            all_ranges.extend(range(a, b+1))
+        else:
+            all_ranges.append(int(range_str))
+    return all_ranges
+
+def check_kv_pair(option, opt, value):
+    items = value.split('=', 1)
+    if len(items) == 2:
+        return items 
+    else:
+        raise OptionValueError(
+            "option %s: value is not of the form KEY=VALUE: %r" % (opt, value))
+
+
+def check_range_list(option, opt, value):
+    try:
+        ports = parse_port_range_list(value)
+        return ports
+    except ValueError, e:
+        raise OptionValueError('option %s: invalid port range list "%s": \n%s' % (opt, value, e.args[0]))
 

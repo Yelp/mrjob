@@ -21,20 +21,21 @@ import copy
 import datetime
 import getpass
 import gzip
+import logging
 import os
 import py_compile
 import shutil
 from StringIO import StringIO
 import tempfile
-from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in, assert_raises, setup, teardown
+from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in, assert_raises, setup, teardown, assert_not_equal
 
 from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
 from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
 from mrjob.parse import JOB_NAME_RE
-from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
+from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.quiet import logger_disabled
+from tests.quiet import logger_disabled, no_handlers_for_logger
 
 try:
     import boto
@@ -98,6 +99,12 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
     @setup
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
+        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        dump_mrjob_conf({'runners': {'emr': {
+            'check_emr_status_every': 0.01,
+            's3_sync_wait_time': 0.01,
+            'aws_availability_zone': 'PUPPYLAND',
+        }}}, open(self.mrjob_conf_path, 'w'))
 
     @teardown
     def rm_tmp_dir(self):
@@ -283,7 +290,7 @@ class BootstrapFilesTestCase(MockEMRAndS3TestCase):
 class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
     def test_attach_to_existing_job_flow(self):
-        emr_conn = EMRJobRunner().make_emr_conn()
+        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
         # set log_uri to None, so that when we describe the job flow, it
         # won't have the loguri attribute, to test Issue #112
         emr_job_flow_id = emr_conn.run_jobflow(
@@ -341,6 +348,109 @@ class HadoopVersionTestCase(MockEMRAndS3TestCase):
 
             assert_equal(job_flow.hadoopversion, '0.18')
 
+    def test_availability_zone_config(self):
+        # Confirm that the mrjob.conf option 'aws_availability_zone' was
+        #   propagated through to the job flow
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
+                               '-c', self.mrjob_conf_path])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            job_flow_id = runner.get_emr_job_flow_id()
+
+            job_flow = emr_conn.describe_jobflow(job_flow_id)
+            assert_equal(job_flow.availabilityzone, 'PUPPYLAND')
+
+
+class BucketRegionTestCase(MockEMRAndS3TestCase):
+
+    @setup
+    def make_dummy_data(self):
+        self.add_mock_s3_data({'mrjob-1': {}})
+        s3c = boto.connect_s3()
+        self.bucket1 = s3c.get_bucket('mrjob-1')
+        self.bucket1_uri = 's3://mrjob-1/tmp/'
+
+    def test_region_nobucket_nolocation(self):
+        # aws_region specified, no bucket specified, default bucket has no location
+        j = EMRJobRunner(aws_region='PUPPYLAND', 
+                         s3_endpoint='PUPPYLAND',
+                         conf_path=False)
+        assert_equal(j._opts['s3_scratch_uri'], self.bucket1_uri)
+
+    def test_region_nobucket_nomatchexists(self):
+        # aws_region specified, no bucket specified, no buckets have matching region
+        self.bucket1.set_location('PUPPYLAND')
+        j = EMRJobRunner(aws_region='KITTYLAND',
+                         s3_endpoint='KITTYLAND',
+                         conf_path=False)
+        assert_not_equal(j._opts['s3_scratch_uri'], self.bucket1_uri)
+
+    def test_noregion_nobucket_nolocation(self):
+        # aws_region not specified, no bucket specified, default bucket has no location
+        j = EMRJobRunner(conf_path=False)
+        assert_equal(j._opts['s3_scratch_uri'], self.bucket1_uri)
+
+    def test_noregion_bucket_nolocation(self):
+        # aws_region not specified, bucket specified without location
+        j = EMRJobRunner(conf_path=False,
+                         s3_scratch_uri=self.bucket1_uri)
+        assert_equal(j._opts['s3_scratch_uri'], self.bucket1_uri)
+
+    def test_noregion_bucket_location(self):
+        # aws_region not specified, bucket specified with location
+        self.bucket1.set_location('PUPPYLAND')
+        j = EMRJobRunner(conf_path=False)
+        assert_equal(j._aws_region, 'PUPPYLAND')
+
+
+class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
+
+    @setup
+    def make_dummy_data(self):
+        self.add_mock_s3_data({'mrjob-1': {}})
+        s3c = boto.connect_s3()
+        self.bucket1 = s3c.get_bucket('mrjob-1')
+        self.bucket1_uri = 's3://mrjob-1/tmp/'
+
+        self.add_mock_s3_data({'mrjob-2': {}})
+        self.bucket2 = s3c.get_bucket('mrjob-2')
+        self.bucket2.set_location('KITTYLAND')
+        self.bucket2_uri = 's3://mrjob-2/tmp/'
+
+    def test_region_nobucket_matchexists(self):
+        # aws_region specified, no bucket specified, bucket exists with matching region
+        j = EMRJobRunner(aws_region='PUPPYLAND', 
+                         s3_endpoint='PUPPYLAND',
+                         conf_path=False)
+        assert_equal(j._opts['s3_scratch_uri'], self.bucket1_uri)
+
+    def test_region_bucket_match(self):
+        # aws_region specified, bucket specified with matching location
+        j = EMRJobRunner(aws_region='PUPPYLAND', 
+                         s3_endpoint='PUPPYLAND',
+                         s3_scratch_uri=self.bucket1_uri,
+                         conf_path=False)
+        assert_equal(j._opts['s3_scratch_uri'], self.bucket1_uri)
+
+    def test_region_bucket_doesnotmatch(self):
+        # aws_region specified, bucket specified with incorrect location
+        with no_handlers_for_logger():
+            stderr = StringIO()
+            log = logging.getLogger('mrjob.emr')
+            log.addHandler(logging.StreamHandler(stderr))
+            log.setLevel(logging.WARNING)
+
+            j = EMRJobRunner(aws_region='PUPPYLAND',
+                             s3_endpoint='PUPPYLAND',
+                             s3_scratch_uri=self.bucket2_uri,
+                             conf_path=False)
+
+            assert_in('does not match bucket region', stderr.getvalue())
+
 
 class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
 
@@ -357,7 +467,7 @@ class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
                     now - datetime.timedelta(minutes=i)),
                 jobflowid=job_flow_id)
 
-        emr_conn = EMRJobRunner().make_emr_conn()
+        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
 
         # ordinary describe_jobflows() hits the limit on number of job flows
         some_job_flows = emr_conn.describe_jobflows()
@@ -477,6 +587,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
 
     @setup
     def make_runner(self):
+        self.add_mock_s3_data({'walrus': {}})
         self.runner = EMRJobRunner(s3_sync_wait_time=0,
                                    s3_scratch_uri='s3://walrus/tmp',
                                    conf_path=False)
@@ -739,10 +850,10 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
 class TestLs(MockEMRAndS3TestCase):
 
     def test_s3_ls(self):
+        self.add_mock_s3_data({'walrus': {'one': '', 'two': '', 'three': ''}})
+
         runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
                               conf_path=False)
-
-        self.add_mock_s3_data({'walrus': {'one': '', 'two': '', 'three': ''}})
 
         assert_equal(set(runner._s3_ls('s3://walrus/')),
                      set(['s3://walrus/one',
@@ -762,6 +873,7 @@ class TestLs(MockEMRAndS3TestCase):
         # of permissions error)
         assert_raises(Exception, set, runner._s3_ls('s3://lolcat/'))
 
+
 class TestNoBoto(TestCase):
 
     @setup
@@ -778,13 +890,11 @@ class TestNoBoto(TestCase):
         # because it'll need to connect to S3 to set s3_scratch_uri
         assert_raises(ImportError, EMRJobRunner, conf_path=False)
 
-    def test_make_emr_conn(self):
-        runner = EMRJobRunner(conf_path=False, s3_scratch_uri='s3://foo/tmp')
-        assert_raises(ImportError, runner.make_emr_conn)
-
-    def test_make_s3_conn(self):
-        runner = EMRJobRunner(conf_path=False, s3_scratch_uri='s3://foo/tmp')
-        assert_raises(ImportError, runner.make_s3_conn)
+    def test_init_with_s3_scratch_uri(self):
+        # this also raises an exception because we have to check
+        # the bucket location
+        assert_raises(ImportError, EMRJobRunner,
+                      conf_path=False, s3_scratch_uri='s3://foo/tmp')
 
 
 class TestMasterBootstrapScript(TestCase):

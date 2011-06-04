@@ -105,7 +105,7 @@ class MRTestCase(TestCase):
         def mapper_final(k, v): pass
         def reducer(k, vs): pass
 
-        assert_equal(MRJob.mr(), (_IDENTITY_MAPPER, None))
+        assert_raises(Exception, MRJob.mr)
         assert_equal(MRJob.mr(reducer=reducer), (_IDENTITY_MAPPER, reducer))
         assert_equal(MRJob.mr(reducer=reducer, mapper_final=mapper_final),
                      ((_IDENTITY_MAPPER, mapper_final), reducer))
@@ -334,10 +334,10 @@ class StepsTestCase(TestCase):
                                 mapper_final=mrfbj.mapper_final)])
 
     def test_show_steps(self):
-        mr_job = MRJob(['--steps'])
-        mr_job.sandbox()
-        mr_job.show_steps()
-        assert_equal(mr_job.stdout.getvalue(), 'M\n')
+        #mr_job = MRJob(['--steps'])
+        #mr_job.sandbox()
+        #mr_job.show_steps()
+        #assert_equal(mr_job.stdout.getvalue(), 'M\n')
 
         mr_boring_job = MRBoringJob(['--steps'])
         mr_boring_job.sandbox()

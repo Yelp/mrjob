@@ -297,18 +297,8 @@ class HadoopJobRunner(MRJobRunner):
 
             # set up mapper and reducer
             streaming_args.append('-mapper')
-            if 'I' in step:
-                mapper_args = cmd_line(self._mapper_args(step_num))
-                # is there a better way to get the protocols from the runner?
-                input_protocol = mapper_args[mapper_args.index('--input-protocol') + 1]
-                output_protocol = mapper_args[mapper_args.index('--output-protocol') + 1]
-                
-                # if identity mapper is used and input and ouput protocols
-                # are the same, then use hadoop IdentityMapper
-                if step_num == 0 or input_protocol != output_protocol:
-                    streaming_args.append('/bin/cat')
-                else:
-                    streaming_args.append(mapper_args)
+            if 'M' not in step:
+                streaming_args.append('/bin/cat')
             else:
                 streaming_args.append(cmd_line(self._mapper_args(step_num)))
             

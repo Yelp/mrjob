@@ -802,20 +802,8 @@ class EMRJobRunner(MRJobRunner):
                 action_on_failure = 'TERMINATE_JOB_FLOW'
 
             # Hadoop streaming stuff
-            if 'I' in step: # if we have an identity mapper
-                # check if input and output protocols are the same 
-				mapper_args = self._mapper_args(step_num)
-				
-				# is there a better way to get the protocols from the runner?
-				input_protocol = mapper_args[mapper_args.index('--input-protocol') + 1]
-				output_protocol = mapper_args[mapper_args.index('--output-protocol') + 1]
-				
-				# if identity mapper is used and input and output protocols
-				# are the same, then use hadoop IdentityMapper
-				if step_num == 0 or input_protocol != output_protocol:
-				    mapper = cmd_line(mapper_args)
-				else:
-				    mapper = '/bin/cat' #'org.apache.hadoop.mapred.lib.IdentityMapper'
+            if 'M' not in step: # if we have an identity mapper
+                mapper = '/bin/cat'
             else:
                 mapper = cmd_line(self._mapper_args(step_num))
                 

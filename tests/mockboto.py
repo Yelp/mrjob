@@ -158,6 +158,11 @@ class MockKey(object):
 
     def make_public(self):
         pass
+        
+    def __iter__(self):
+        data = self.read_mock_data()
+        for line in data.splitlines(True):
+            yield line
 
 ### EMR ###
 

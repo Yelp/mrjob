@@ -25,7 +25,7 @@ import sys
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.parse import find_python_traceback, parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line, unarchive
+from mrjob.util import cmd_line, read_file, unarchive
 
 
 log = logging.getLogger('mrjob.local')
@@ -172,17 +172,6 @@ class LocalMRJobRunner(MRJobRunner):
         else:
             log.debug('copying %s -> %s' % (path, dest))
             shutil.copyfile(path, dest)
-
-    def _stream_output(self):
-        """Read output from the final outfile."""
-        if self._final_outfile:
-            output_file = self._final_outfile
-        else:
-            output_file = os.path.join(self._output_dir, 'part-00000')
-        log.info('streaming final output from %s' % output_file)
-
-        for line in open(output_file):
-            yield line
 
     def _invoke_step(self, args, outfile_name, env=None):
         """Run the given command, outputting into outfile, and reading

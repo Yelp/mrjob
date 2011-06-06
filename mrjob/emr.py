@@ -47,7 +47,7 @@ from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.util import cmd_line
+from mrjob.util import cmd_line, read_file
 
 
 log = logging.getLogger('mrjob.emr')
@@ -494,6 +494,9 @@ class EMRJobRunner(MRJobRunner):
 
         self._launch_emr_job()
         self._wait_for_job_to_complete()
+        
+        # make sure the job had a chance to copy all our data to S3
+        self._wait_for_s3_eventual_consistency()
 
     def _setup_input(self):
         """Copy local input files (if any) to a special directory on S3.
@@ -1009,32 +1012,15 @@ class EMRJobRunner(MRJobRunner):
 
             raise Exception(msg)
 
-    def _stream_output(self):
-        log.info('Streaming final output from %s' % self._output_dir)
-
-        # make sure the job had a chance to copy all our data to S3
-        self._wait_for_s3_eventual_consistency()
-
-        # boto Keys are theoretically iterable, but they don't actually
-        # give you a line at a time.
-        for s3_key in self.get_s3_keys(self._output_dir):
-            if not posixpath.basename(s3_key.name).startswith('part-'):
-                log.debug('skipping non-output file: %s' %
-                          s3_key_to_uri(s3_key))
-                continue
-
-            output_dir = os.path.join(self._get_local_tmp_dir(), 'output')
-            log.debug('downloading %s -> %s' % (
-                s3_key_to_uri(s3_key), output_dir))
-            # boto Keys are theoretically iterable, but they don't actually
-            # give you a line at a time, so download their contents.
-            # Compress the network traffic if we can.
-            s3_key.get_contents_to_filename(
-                output_dir, headers={'Accept-Encoding': 'gzip'})
-            log.debug('reading lines from %s' % output_dir)
-            for line in open(output_dir):
-                yield line
-
+    def _cat_file(self, filename):
+        if S3_URI_RE.match(filename):
+            # stream lines from the s3 key
+            s3_key = self.get_s3_key(filename)
+            return read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+        else:
+            # read from local filesystem
+            return super(EMRJobRunner, self)._cat_file(filename)
+        
     def _script_args(self):
         """How to invoke the script inside EMR"""
         # We can invoke the script by its S3 URL, but we don't really
@@ -1458,6 +1444,7 @@ class EMRJobRunner(MRJobRunner):
         if not S3_URI_RE.match(path_glob):
             for path in super(EMRJobRunner, self).ls(path_glob):
                 yield path
+            return
 
         # support globs
         glob_match = GLOB_RE.match(path_glob)

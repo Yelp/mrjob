@@ -148,7 +148,7 @@ def find_timeout_error(lines):
 _COUNTER_RE = re.compile(r'reporter:counter:([^,]*),([^,]*),(-?\d+)$')
 _STATUS_RE = re.compile(r'reporter:status:(.*)$')
 
-def parse_mr_job_stderr(stderr, counters=None):
+def parse_mr_job_stderr(stderr, counters=None, step_num=0):
     """Parse counters and status messages out of MRJob output.
 
     :param data: a filehandle, a list of lines, or a str containing data
@@ -174,9 +174,10 @@ def parse_mr_job_stderr(stderr, counters=None):
         m = _COUNTER_RE.match(line)
         if m:
             group, counter, amount_str = m.groups()
-            counters.setdefault(group, {})
-            counters[group].setdefault(counter, 0)
-            counters[group][counter] += int(amount_str)
+            counters.setdefault(step_num, {})           # steps
+            counters[step_num].setdefault(group, {})    # groups
+            counters[step_num][group].setdefault(counter, 0)
+            counters[step_num][group][counter] += int(amount_str)
             continue
 
         m = _STATUS_RE.match(line)

@@ -134,36 +134,36 @@ class ParseMRJobStderr(TestCase):
 
         assert_equal(
             parse_mr_job_stderr(INPUT),
-            {'counters': {'Foo': {'Bar': 3, 'Baz': 1},
-                          'Quux Subsystem': {'Baz': 42}},
+            {'counters': {0: {'Foo': {'Bar': 3, 'Baz': 1},
+                          'Quux Subsystem': {'Baz': 42}}},
              'statuses': ['Baz', 'Baz'],
              'other': ['Warning: deprecated metasyntactic variable: garply\n']
             })
 
     def test_update_counters(self):
-        counters = {'Foo': {'Bar': 3, 'Baz': 1}}
+        counters = {0: {'Foo': {'Bar': 3, 'Baz': 1}}}
 
         parse_mr_job_stderr(
             StringIO('reporter:counter:Foo,Baz,1\n'), counters=counters)
 
-        assert_equal(counters, {'Foo': {'Bar': 3, 'Baz': 2}})
+        assert_equal(counters, {0: {'Foo': {'Bar': 3, 'Baz': 2}}})
 
     def test_read_single_line(self):
         # LocalMRJobRunner runs parse_mr_job_stderr on one line at a time.
         assert_equal(parse_mr_job_stderr('reporter:counter:Foo,Bar,2\n'),
-                     {'counters': {'Foo': {'Bar': 2}},
+                     {'counters': {0: {'Foo': {'Bar': 2}}},
                       'statuses': [], 'other': []})
 
     def test_read_multiple_lines_from_buffer(self):
         assert_equal(parse_mr_job_stderr('reporter:counter:Foo,Bar,2\nwoot\n'),
-                     {'counters': {'Foo': {'Bar': 2}},
+                     {'counters': {0: {'Foo': {'Bar': 2}}},
                       'statuses': [], 'other': ['woot\n']})
 
     def test_negative_counters(self):
         # kind of poor practice to use negative counters, but Hadoop
         # Streaming supports it (negative numbers are integers too!)
         assert_equal(parse_mr_job_stderr(['reporter:counter:Foo,Bar,-2\n']),
-                     {'counters': {'Foo': {'Bar': -2}},
+                     {'counters': {0:{'Foo': {'Bar': -2}}},
                       'statuses': [], 'other': []})
 
     def test_garbled_counters(self):

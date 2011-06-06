@@ -848,6 +848,8 @@ class EMRJobRunner(MRJobRunner):
 
         step_list = []
 
+        # EMR docs claim that you need this to enable certain kinds of
+        # Hadoop logging, but I have not yet tested without it.
         if emr_debugging:
             script_runner_path = "s3://us-west-1.elasticmapreduce/libs/script-runner/script-runner.jar"
             enable_debugging_path = "s3://us-west-1.elasticmapreduce/libs/state-pusher/0.1/fetch"

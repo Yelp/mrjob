@@ -818,7 +818,8 @@ class EMRJobRunner(MRJobRunner):
             self._job_name, self._opts['s3_log_uri'],
             ', '.join('%s=%r' % (k, v) for k, v in args.iteritems())))
         emr_job_flow_id = emr_conn.run_jobflow(
-            self._job_name, self._opts['s3_log_uri'], **args)
+            self._job_name, self._opts['s3_log_uri'], 
+            enable_debugging=self._opts['emr_debugging'], **args)
 
          # keep track of when we started our job
         self._emr_job_start = time.time()
@@ -846,15 +847,6 @@ class EMRJobRunner(MRJobRunner):
         steps = self._get_steps()
 
         step_list = []
-
-        # Enable storage of Hadoop logs in SimpleDB
-        if self._opts['emr_debugging']:
-            script_runner_path = "s3://us-west-1.elasticmapreduce/libs/script-runner/script-runner.jar"
-            enable_debugging_path = "s3://us-west-1.elasticmapreduce/libs/state-pusher/0.1/fetch"
-            step_list.append(botoemr.JarStep(
-                name='Enable Hadoop Debugging',
-                jar=script_runner_path,
-                step_args=[enable_debugging_path]))
 
         for step_num, step in enumerate(steps):
             # EMR-specific stuff

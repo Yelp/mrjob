@@ -803,7 +803,7 @@ class EMRJobRunner(MRJobRunner):
 
             # Hadoop streaming stuff
             if 'M' not in step: # if we have an identity mapper
-                mapper = '/bin/cat'
+                mapper = 'cat'
             else:
                 mapper = cmd_line(self._mapper_args(step_num))
                 

@@ -298,7 +298,7 @@ class HadoopJobRunner(MRJobRunner):
             # set up mapper and reducer
             streaming_args.append('-mapper')
             if 'M' not in step:
-                streaming_args.append('/bin/cat')
+                streaming_args.append('cat')
             else:
                 streaming_args.append(cmd_line(self._mapper_args(step_num)))
             

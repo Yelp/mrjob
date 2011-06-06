@@ -32,6 +32,7 @@ from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in,
 from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
 from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
+from mrjob.util import tar_and_gzip
 from mrjob.parse import JOB_NAME_RE
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
@@ -99,12 +100,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
     @setup
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
-        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'emr': {
-            'check_emr_status_every': 0.01,
-            's3_sync_wait_time': 0.01,
-            'aws_availability_zone': 'PUPPYLAND',
-        }}}, open(self.mrjob_conf_path, 'w'))
 
     @teardown
     def rm_tmp_dir(self):
@@ -347,6 +342,17 @@ class HadoopVersionTestCase(MockEMRAndS3TestCase):
             job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
 
             assert_equal(job_flow.hadoopversion, '0.18')
+
+
+class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
+
+    @setup
+    def put_availability_zone_in_mrjob_conf(self):
+        dump_mrjob_conf({'runners': {'emr': {
+            'check_emr_status_every': 0.01,
+            's3_sync_wait_time': 0.01,
+            'aws_availability_zone': 'PUPPYLAND',
+        }}}, open(self.mrjob_conf_path, 'w'))
 
     def test_availability_zone_config(self):
         # Confirm that the mrjob.conf option 'aws_availability_zone' was
@@ -897,7 +903,7 @@ class TestNoBoto(TestCase):
                       conf_path=False, s3_scratch_uri='s3://foo/tmp')
 
 
-class TestMasterBootstrapScript(TestCase):
+class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
     @setup
     def make_tmp_dir(self):
@@ -908,12 +914,17 @@ class TestMasterBootstrapScript(TestCase):
         shutil.rmtree(self.tmp_dir)
 
     def test_master_bootstrap_script_is_valid_python(self):
-        # do everything
-        runner = EMRJobRunner(conf_path=False, s3_scratch_uri='s3://foo/tmp',
+        # create a fake src tarball
+        with open(os.path.join(self.tmp_dir, 'foo.py'), 'w'): pass
+        yelpy_tar_gz_path = os.path.join(self.tmp_dir, 'yelpy.tar.gz')
+        tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
+
+        # use all the bootstrap options        
+        runner = EMRJobRunner(conf_path=False,
                               bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
                               bootstrap_files=['/tmp/quz'],
                               bootstrap_mrjob=True,
-                              bootstrap_python_packages=['yelpy.tar.gz'],
+                              bootstrap_python_packages=[yelpy_tar_gz_path],
                               bootstrap_scripts=['speedups.sh', '/tmp/s.sh'])
         script_path = os.path.join(self.tmp_dir, 'b.py')
         runner._create_master_bootstrap_script(dest=script_path)
@@ -922,8 +933,7 @@ class TestMasterBootstrapScript(TestCase):
         py_compile.compile(script_path)
 
     def test_no_bootstrap_script_if_not_needed(self):
-        runner = EMRJobRunner(conf_path=False, s3_scratch_uri='s3://foo/tmp',
-                              bootstrap_mrjob=False)
+        runner = EMRJobRunner(conf_path=False, bootstrap_mrjob=False)
         script_path = os.path.join(self.tmp_dir, 'b.py')
         runner._create_master_bootstrap_script(dest=script_path)
 
@@ -948,7 +958,7 @@ class TestCat(MockEMRAndS3TestCase):
         remote_input_path = 's3://walrus/data/foo'
         self.add_mock_s3_data({'walrus': {'data/foo': 'foo\nfoo\n'}})
 
-        with EMRJobRunner(cleanup = 'NONE') as runner:
+        with EMRJobRunner(cleanup='NONE', conf_path=False) as runner:
             local_output = []
             for line in runner.cat(local_input_path):
                 local_output.append(line)
@@ -966,7 +976,7 @@ class TestCat(MockEMRAndS3TestCase):
         input_gz.write('foo\nbar\n')
         input_gz.close()
 
-        with EMRJobRunner(cleanup = 'NONE') as runner:
+        with EMRJobRunner(cleanup='NONE', conf_path=False) as runner:
             output = []
             for line in runner.cat(input_gz_path):
                 output.append(line)
@@ -978,7 +988,7 @@ class TestCat(MockEMRAndS3TestCase):
         input_bz2.write('bar\nbar\nfoo\n')
         input_bz2.close()
 
-        with EMRJobRunner(cleanup = 'NONE') as runner:
+        with EMRJobRunner(cleanup='NONE', conf_path=False) as runner:
             output = []
             for line in runner.cat(input_bz2_path):
                 output.append(line)

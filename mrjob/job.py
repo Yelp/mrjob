@@ -701,7 +701,7 @@ class MRJob(object):
             help='output protocol for mappers/reducers. Choices: %s (default: %%default)' % ', '.join(protocol_choices))
 
         self.add_passthrough_option(
-            '--strict-protocols', dest='strict_protocols', default=False,
+            '--strict-protocols', dest='strict_protocols', default=None,
             opt_group=self.proto_opt_group,
             action='store_true', help='If something violates an input/output '
             'protocol then raise an exception')
@@ -740,12 +740,12 @@ class MRJob(object):
             help="Don't automatically tar up the mrjob library and install it when we run the mrjob. Use this if you've already installed mrjob on your Hadoop cluster.")
 
         self.runner_opt_group.add_option(
-            '--no-conf', dest='conf_path', action='store_false',
+            '--no-conf', dest='conf_path', action='store_false', default=None,
             help="Don't load mrjob.conf even if it's available")
 
         self.runner_opt_group.add_option(
             '--no-output', dest='no_output',
-            default=False, action='store_true',
+            default=None, action='store_true',
             help="Don't stream output after job completion")
 
         self.runner_opt_group.add_option(
@@ -763,7 +763,7 @@ class MRJob(object):
             help='Name/path of alternate python binary for mappers/reducers.')
 
         self.runner_opt_group.add_option(
-            '-q', '--quiet', dest='quiet', default=False,
+            '-q', '--quiet', dest='quiet', default=None,
             action='store_true',
             help="Don't print anything to stderr")
 
@@ -789,7 +789,7 @@ class MRJob(object):
             'interpreter. Rarely needed.')
 
         self.runner_opt_group.add_option(
-            '-v', '--verbose', dest='verbose', default=False,
+            '-v', '--verbose', dest='verbose', default=None,
             action='store_true',
             help='print more messages to stderr')
 
@@ -919,6 +919,15 @@ class MRJob(object):
         self.emr_opt_group.add_option(
             '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
             help='ID of an existing EMR job flow to use')
+
+        self.emr_opt_group.add_option(
+            '--enable-emr-debugging', dest='emr_debugging', default=None,
+            action='store_true',
+            help='Enable storage of Hadoop logs in SimpleDB')
+
+        self.emr_opt_group.add_option(
+            '--disable-emr-debugging', dest='emr_debugging', action='store_false',
+            help='Enable storage of Hadoop logs in SimpleDB')
 
         self.emr_opt_group.add_option(
             '--hadoop-streaming-jar-on-emr', dest='hadoop_streaming_jar_on_emr',

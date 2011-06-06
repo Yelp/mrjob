@@ -1,3 +1,5 @@
+# Copyright 2011 Contributors (Jordan Andersen)
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -23,6 +25,7 @@ chunk of the full range of the possible factorial(N-1) tours. (Where N is the
 number of nodes in the graph). The reducers then pick the winners from each 
 mapper.
 """
+__author__ = 'Jordan Andersen <jordandandersen@gmail.com>'
 
 from mrjob.job import MRJob
 from scipy.misc.common import factorial

@@ -207,7 +207,7 @@ From file named: (log_uri)/jobs/ip-10-168-73-57.us-west-1.compute.internal_13073
         counter_re = COUNTER_RE.match(counter_line)
         group, name, amount_str = counter_re.groups()
 
-        counters.setdefault(group, {})    # groups
+        counters.setdefault(group, {})
         counters[group].setdefault(name, 0)
         counters[group][name] += int(amount_str)
 

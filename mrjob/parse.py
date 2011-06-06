@@ -175,7 +175,7 @@ def parse_mr_job_stderr(stderr, counters=None):
         m = _COUNTER_RE.match(line)
         if m:
             group, counter, amount_str = m.groups()
-            counters.setdefault(group, {})    # groups
+            counters.setdefault(group, {})
             counters[group].setdefault(counter, 0)
             counters[group][counter] += int(amount_str)
             continue

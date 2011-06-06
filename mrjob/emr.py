@@ -729,8 +729,6 @@ class EMRJobRunner(MRJobRunner):
                 log.exception(e)
 
     def _cleanup_scratch(self):
-        print 'it wants me to delete', self._s3_tmp_uri
-        return
         super(EMRJobRunner, self)._cleanup_scratch()
 
         # delete all the files we created
@@ -743,8 +741,6 @@ class EMRJobRunner(MRJobRunner):
                 log.exception(e)
 
     def _cleanup_logs(self):
-        print 'it wants me to delete', self._s3_job_log_uri
-        return
         super(EMRJobRunner, self)._cleanup_logs()
 
         # delete the log files, if it's a job flow we created (the logs

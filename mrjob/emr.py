@@ -827,7 +827,7 @@ class EMRJobRunner(MRJobRunner):
         log.info('Job flow created with ID: %s' % emr_job_flow_id)
         return emr_job_flow_id
 
-    def _build_steps(self, emr_debugging=True):
+    def _build_steps(self, emr_debugging=False):
         """Return a list of boto Step objects corresponding to the
         steps we want to run."""
         assert self._script # can't build steps if no script!
@@ -1158,7 +1158,7 @@ class EMRJobRunner(MRJobRunner):
         if not self._s3_job_log_uri:
             return None
 
-        counters = {}
+        counters = []
 
         log.info('Fetching counters...')
         self._wait_for_s3_eventual_consistency()
@@ -1166,7 +1166,8 @@ class EMRJobRunner(MRJobRunner):
         s3_log_file_uris = set(self.ls(self._s3_job_log_uri))
 
         s3_conn = self.make_s3_conn()
-        relevant_logs = [] # list of (sort key, info, URI)
+        relevant_logs = [] # list of (sort key, URI)
+
         for s3_log_file_uri in s3_log_file_uris:
             match = JOB_LOG_URI_RE.match(s3_log_file_uri)
             if not match:
@@ -1174,13 +1175,18 @@ class EMRJobRunner(MRJobRunner):
 
             step_num = int(match.group('step_num'))
 
+            relevant_logs.append((step_num, s3_log_file_uri))
+
+        relevant_logs.sort()
+
+        for _, s3_log_file_uri in relevant_logs:
             log_path = self._download_log_file(s3_log_file_uri, s3_conn)
             if not log_path:
                 continue
 
             with open(log_path) as log_file:
                 for line in log_file:
-                    counters = parse_hadoop_counters_from_line(line, step_num, counters)
+                    counters.append(parse_hadoop_counters_from_line(line, counters))
 
         return counters
 

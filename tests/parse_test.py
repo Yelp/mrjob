@@ -114,8 +114,8 @@ class FindMiscTestCase(TestCase):
     def test_find_counters(self):
         counters = parse_hadoop_counters_from_line('Job JOBID="job_201106061823_0001" FINISH_TIME="1307384737542" JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1" FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="File Systems.S3N bytes read:3726,File Systems.Local bytes read:4164,File Systems.S3N bytes written:1663,File Systems.Local bytes written:8410,Job Counters .Launched reduce tasks:1,Job Counters .Rack-local map tasks:2,Job Counters .Launched map tasks:2,Map-Reduce Framework.Reduce input groups:154,Map-Reduce Framework.Combine output records:0,Map-Reduce Framework.Map input records:68,Map-Reduce Framework.Reduce output records:154,Map-Reduce Framework.Map output bytes:3446,Map-Reduce Framework.Map input bytes:2483,Map-Reduce Framework.Map output records:336,Map-Reduce Framework.Combine input records:0,Map-Reduce Framework.Reduce input records:336,profile.reducer step 0 estimated IO time: 0.00:1,profile.mapper step 0 estimated IO time: 0.00:2,profile.reducer step 0 estimated CPU time: 0.00:1,profile.mapper step 0 estimated CPU time: 0.00:2"')
 
-        assert_equal(counters[0]['profile']['reducer step 0 estimated IO time: 0.00'], 1)
-        assert_equal(counters[0]['profile']['mapper step 0 estimated CPU time: 0.00'], 2)
+        assert_equal(counters['profile']['reducer step 0 estimated IO time: 0.00'], 1)
+        assert_equal(counters['profile']['mapper step 0 estimated CPU time: 0.00'], 2)
 
 
 class ParseMRJobStderr(TestCase):
@@ -136,36 +136,36 @@ class ParseMRJobStderr(TestCase):
 
         assert_equal(
             parse_mr_job_stderr(INPUT),
-            {'counters': {0: {'Foo': {'Bar': 3, 'Baz': 1},
-                          'Quux Subsystem': {'Baz': 42}}},
+            {'counters': {'Foo': {'Bar': 3, 'Baz': 1},
+                          'Quux Subsystem': {'Baz': 42}},
              'statuses': ['Baz', 'Baz'],
              'other': ['Warning: deprecated metasyntactic variable: garply\n']
             })
 
     def test_update_counters(self):
-        counters = {0: {'Foo': {'Bar': 3, 'Baz': 1}}}
+        counters = {'Foo': {'Bar': 3, 'Baz': 1}}
 
         parse_mr_job_stderr(
             StringIO('reporter:counter:Foo,Baz,1\n'), counters=counters)
 
-        assert_equal(counters, {0: {'Foo': {'Bar': 3, 'Baz': 2}}})
+        assert_equal(counters, {'Foo': {'Bar': 3, 'Baz': 2}})
 
     def test_read_single_line(self):
         # LocalMRJobRunner runs parse_mr_job_stderr on one line at a time.
         assert_equal(parse_mr_job_stderr('reporter:counter:Foo,Bar,2\n'),
-                     {'counters': {0: {'Foo': {'Bar': 2}}},
+                     {'counters': {'Foo': {'Bar': 2}},
                       'statuses': [], 'other': []})
 
     def test_read_multiple_lines_from_buffer(self):
         assert_equal(parse_mr_job_stderr('reporter:counter:Foo,Bar,2\nwoot\n'),
-                     {'counters': {0: {'Foo': {'Bar': 2}}},
+                     {'counters': {'Foo': {'Bar': 2}},
                       'statuses': [], 'other': ['woot\n']})
 
     def test_negative_counters(self):
         # kind of poor practice to use negative counters, but Hadoop
         # Streaming supports it (negative numbers are integers too!)
         assert_equal(parse_mr_job_stderr(['reporter:counter:Foo,Bar,-2\n']),
-                     {'counters': {0:{'Foo': {'Bar': -2}}},
+                     {'counters': {'Foo': {'Bar': -2}},
                       'statuses': [], 'other': []})
 
     def test_garbled_counters(self):

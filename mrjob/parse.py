@@ -149,7 +149,7 @@ def find_timeout_error(lines):
 _COUNTER_RE = re.compile(r'reporter:counter:([^,]*),([^,]*),(-?\d+)$')
 _STATUS_RE = re.compile(r'reporter:status:(.*)$')
 
-def parse_mr_job_stderr(stderr, counters=None, step_num=0):
+def parse_mr_job_stderr(stderr, counters=None):
     """Parse counters and status messages out of MRJob output.
 
     :param data: a filehandle, a list of lines, or a str containing data
@@ -175,10 +175,9 @@ def parse_mr_job_stderr(stderr, counters=None, step_num=0):
         m = _COUNTER_RE.match(line)
         if m:
             group, counter, amount_str = m.groups()
-            counters.setdefault(step_num, {})           # steps
-            counters[step_num].setdefault(group, {})    # groups
-            counters[step_num][group].setdefault(counter, 0)
-            counters[step_num][group][counter] += int(amount_str)
+            counters.setdefault(group, {})    # groups
+            counters[group].setdefault(counter, 0)
+            counters[group][counter] += int(amount_str)
             continue
 
         m = _STATUS_RE.match(line)
@@ -190,7 +189,7 @@ def parse_mr_job_stderr(stderr, counters=None, step_num=0):
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
 
-def parse_hadoop_counters_from_line(line, step_num=0, counters=None):
+def parse_hadoop_counters_from_line(line, counters=None):
     """Parse Hadoop counter values from a log line.
 
     :param line: log line containing counter data
@@ -204,17 +203,16 @@ From file named: (log_uri)/jobs/ip-10-168-73-57.us-west-1.compute.internal_13073
     m = COUNTER_LINE_RE.match(line)
     if not m:
         return counters
-    
+
     counters = {}
     for counter_line in m.group('counters').split(','):
         counter_re = COUNTER_RE.match(counter_line)
         group, name, amount_str = counter_re.groups()
 
-        counters.setdefault(step_num, {})
-        counters[step_num].setdefault(group, {})    # groups
-        counters[step_num][group].setdefault(name, 0)
-        counters[step_num][group][name] += int(amount_str)
-    
+        counters.setdefault(group, {})    # groups
+        counters[group].setdefault(name, 0)
+        counters[group][name] += int(amount_str)
+
     return counters
 
 

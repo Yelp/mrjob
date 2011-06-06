@@ -57,7 +57,7 @@ class LocalMRJobRunner(MRJobRunner):
         self._working_dir = None
         self._prev_outfile = None
         self._final_outfile = None
-        self._counters = {}
+        self._counters = []
 
     @classmethod
     def _default_opts(cls):
@@ -105,6 +105,7 @@ class LocalMRJobRunner(MRJobRunner):
 
         # run mapper, sort, reducer for each step
         for i, step in enumerate(self._get_steps()):
+            self._counters.append({})
             # run the mapper
             mapper_args = (wrapper_args + [self._script['name'],
                             '--step-num=%d' % i, '--mapper'] +
@@ -261,7 +262,7 @@ class LocalMRJobRunner(MRJobRunner):
         for line in stderr:
             # just pass one line at a time to parse_mr_job_stderr(),
             # so we can print error and status messages in realtime
-            parsed = parse_mr_job_stderr([line], counters=self._counters, step_num=step_num)
+            parsed = parse_mr_job_stderr([line], counters=self._counters[step_num-1])
 
             # in practice there's only going to be at most one line in
             # one of these lists, but the code is cleaner this way

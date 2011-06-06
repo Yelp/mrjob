@@ -276,6 +276,8 @@ class MRJob(object):
         """
         # Hadoop streaming requires a mapper, so patch in _IDENTITY_MAPPER
         if not mapper:
+            if not mapper_final and not reducer:
+                raise Exception("Step has no mappers and no reducers")
             mapper = _IDENTITY_MAPPER
 
         if mapper_final:
@@ -493,7 +495,23 @@ class MRJob(object):
         print >> self.stdout, ' '.join(self._steps_desc())
 
     def _steps_desc(self):
-        return ['MR' if reducer else 'M' for (mapper, reducer) in self.steps()]
+        step_num = 0
+        res = []
+        for (mapper, reducer) in self.steps():
+            if reducer:
+                if mapper == _IDENTITY_MAPPER:
+                    # infer whether the mapper has the same input and 
+                    # output protocols 
+                    if step_num == 0:
+                        res.append('MR')
+                    else:
+                        res.append('R')
+                else:
+                    res.append('MR')
+            else:
+                res.append('M')
+            step_num += 1
+        return res
 
     @classmethod
     def mr_job_script(cls):
@@ -534,7 +552,7 @@ class MRJob(object):
         step_type -- 'M' for mapper, 'R' for reducer
         """
         read, write = self.pick_protocols(step_num, step_type)
-
+        
         def read_lines():
             for line in self._read_input():
                 try:
@@ -586,12 +604,13 @@ class MRJob(object):
         protocol_dict = self.protocols()
 
         # pick input protocol
+        # first mapper handles input unless there is no mapper for the step
         if step_num == 0 and step_type == steps_desc[0][0]:
             read_protocol = self.options.input_protocol
         else:
             read_protocol = self.options.protocol
         read = protocol_dict[read_protocol].read
-
+        
         if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
             write_protocol = self.options.output_protocol
         else:

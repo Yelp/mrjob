@@ -843,9 +843,8 @@ class EMRJobRunner(MRJobRunner):
         # quick, add the other steps before the job spins up and
         # then shuts itself down (in practice this takes several minutes)
         steps = self._get_steps()
-
         step_list = []
-
+        
         for step_num, step in enumerate(steps):
             # EMR-specific stuff
             name = '%s: Step %d of %d' % (
@@ -858,7 +857,11 @@ class EMRJobRunner(MRJobRunner):
                 action_on_failure = 'TERMINATE_JOB_FLOW'
 
             # Hadoop streaming stuff
-            mapper = cmd_line(self._mapper_args(step_num))
+            if 'M' not in step: # if we have an identity mapper
+                mapper = 'cat'
+            else:
+                mapper = cmd_line(self._mapper_args(step_num))
+                
             if 'R' in step: # i.e. if there is a reducer:
                 reducer = cmd_line(self._reducer_args(step_num))
             else:

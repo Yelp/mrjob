@@ -32,6 +32,7 @@ from mrjob.local import LocalMRJobRunner
 from mrjob.parse import parse_mr_job_stderr
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.mr_nomapper_triv import MRNoMapper
 
 
 ### Test classes ###
@@ -105,7 +106,7 @@ class MRTestCase(TestCase):
         def mapper_final(k, v): pass
         def reducer(k, vs): pass
 
-        assert_equal(MRJob.mr(), (_IDENTITY_MAPPER, None))
+        assert_raises(Exception, MRJob.mr)
         assert_equal(MRJob.mr(reducer=reducer), (_IDENTITY_MAPPER, reducer))
         assert_equal(MRJob.mr(reducer=reducer, mapper_final=mapper_final),
                      ((_IDENTITY_MAPPER, mapper_final), reducer))
@@ -357,11 +358,6 @@ class StepsTestCase(TestCase):
                                 mapper_final=mrfbj.mapper_final)])
 
     def test_show_steps(self):
-        mr_job = MRJob(['--steps'])
-        mr_job.sandbox()
-        mr_job.show_steps()
-        assert_equal(mr_job.stdout.getvalue(), 'M\n')
-
         mr_boring_job = MRBoringJob(['--steps'])
         mr_boring_job.sandbox()
         mr_boring_job.show_steps()
@@ -377,6 +373,11 @@ class StepsTestCase(TestCase):
         mr_two_step_job.sandbox()
         mr_two_step_job.show_steps()
         assert_equal(mr_two_step_job.stdout.getvalue(), 'MR M\n')
+        
+        mr_no_mapper = MRNoMapper(['--steps'])
+        mr_no_mapper.sandbox()
+        mr_no_mapper.show_steps()
+        assert_equal(mr_no_mapper.stdout.getvalue(), 'MR R\n')
 
 
 class StepNumTestCase(TestCase):

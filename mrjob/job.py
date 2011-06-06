@@ -476,15 +476,22 @@ class MRJob(object):
         print >> self.stdout, ' '.join(self._steps_desc())
 
     def _steps_desc(self):
+        step_num = 0
         res = []
         for (mapper, reducer) in self.steps():
             if reducer:
                 if mapper == _IDENTITY_MAPPER:
-                    res.append('R')
+                    # infer whether the mapper has the same input and 
+                    # output protocols 
+                    if step_num == 0:
+                        res.append('MR')
+                    else:
+                        res.append('R')
                 else:
                     res.append('MR')
             else:
                 res.append('M')
+            step_num += 1
         return res
 
     @classmethod
@@ -526,19 +533,10 @@ class MRJob(object):
         """
         read, write = self.pick_protocols(step_num, step_type)
         
-        read2 = None
-        if isinstance(read, tuple):
-            read2 = read[1]
-            read = read[0]
-         
         def read_lines():
             for line in self._read_input():
                 try:
                     key, value = read(line.rstrip('\n'))
-                    if read2:
-                        if key:
-                            value = str(key).join(str(value))
-                        key, value = read2(str(value))
                     yield key, value
                 except Exception, e:
                     self.increment_counter('Undecodable input',
@@ -581,15 +579,12 @@ class MRJob(object):
 
         # pick input protocol
         # first mapper handles input unless there is no mapper for the step
-        if step_num == 0 and step_type == steps_desc[0][0]:# or steps_desc[step_num] == 'R': 
+        if step_num == 0 and step_type == steps_desc[0][0]:
             read_protocol = self.options.input_protocol
         else:
             read_protocol = self.options.protocol
         read = protocol_dict[read_protocol].read
         
-        if steps_desc[step_num] == 'R' and self.options.input_protocol != self.options.protocol:
-            read = (protocol_dict[self.options.input_protocol].read, protocol_dict[self.options.protocol].read)
-
         if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
             write_protocol = self.options.output_protocol
         else:

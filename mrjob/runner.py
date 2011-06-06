@@ -267,6 +267,7 @@ class MRJobRunner(object):
             'jobconf',
             'label',
             'owner',
+			'profile',
             'python_archives',
             'python_bin',
             'setup_cmds',

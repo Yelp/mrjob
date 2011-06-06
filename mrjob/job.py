@@ -97,6 +97,7 @@ from copy import copy
 import inspect
 import itertools
 from optparse import Option, OptionParser, OptionGroup, OptionError, OptionValueError
+import resource
 import sys
 import time
 
@@ -110,7 +111,7 @@ from mrjob.conf import combine_dicts
 from mrjob.parse import parse_mr_job_stderr, parse_port_range_list, check_kv_pair, check_range_list
 from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
 from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
-from mrjob.util import log_to_stream, read_input
+from mrjob.util import log_to_stream, read_input, Profiler
 
 # used by mr() below, to fake no mapper
 def _IDENTITY_MAPPER(key, value):
@@ -436,14 +437,29 @@ class MRJob(object):
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'M')
 
+        # set up profiling if appropriate
+        # if self.options.profile:
+        profiler = Profiler()
+        # else:
+        #    profiler = None
+
         # run the mapper on each line
         for key, value in read_lines():
+            if profiler: profiler.mark_start_processing()
+
             for out_key, out_value in mapper(key, value):
                 write_line(out_key, out_value)
+
+            if profiler: profiler.mark_end_processing()
 
         if mapper_final:
             for out_key, out_value in mapper_final():
                 write_line(out_key, out_value)
+
+        # report profiling findings
+        if profiler:
+            self.increment_counter('profile', 'mapper step %d estimated IO time: %0.2f' % (step_num, profiler.accumulated_io_time))
+            self.increment_counter('profile', 'mapper step %d estimated CPU time: %0.2f' % (step_num, profiler.accumulated_cpu_time))
 
     def run_reducer(self, step_num=0):
         """Run the reducer for the given step.
@@ -469,6 +485,12 @@ class MRJob(object):
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'R')
 
+        # set up profiling if appropriate
+        if self.options.profile:
+            profiler = Profiler()
+        else:
+            profiler = None
+
         # group all values of the same key together, and pass to the reducer
         #
         # be careful to use generators for everything, to allow for
@@ -477,7 +499,16 @@ class MRJob(object):
                                                key=lambda(k, v): k):
             values = (v for k, v in kv_pairs)
             for out_key, out_value in reducer(key, values):
+                if profiler: profiler.mark_start_processing()
+
                 write_line(out_key, out_value)
+
+                if profiler: profiler.mark_end_processing()
+
+        # report profiling findings
+        if profiler:
+            self.increment_counter('profile', 'reducer step %d estimated IO time: %0.2f' % (step_num, profiler.accumulated_io_time))
+            self.increment_counter('profile', 'reducer step %d estimated CPU time: %0.2f' % (step_num, profiler.accumulated_cpu_time))
 
     def show_steps(self):
         """Print information about how many steps there are, and whether
@@ -620,6 +651,10 @@ class MRJob(object):
         self.option_parser.add_option(
             '--steps', dest='show_steps', action='store_true', default=False,
             help='show the steps of mappers and reducers')
+
+        self.add_passthrough_option(
+            '--profile', dest='profile', action='store_true', default=None,
+            help="Enable profiling of resource usage.")
 
         # To run mappers or reducers
         self.mux_opt_group = OptionGroup(
@@ -1071,6 +1106,7 @@ class MRJob(object):
             'label': self.options.label,
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
+            'profile': self.options.profile,
             'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
             'setup_cmds': self.options.setup_cmds,

@@ -728,6 +728,8 @@ class EMRJobRunner(MRJobRunner):
                 log.exception(e)
 
     def _cleanup_scratch(self):
+        print 'it wants me to delete', self._s3_tmp_uri
+        return
         super(EMRJobRunner, self)._cleanup_scratch()
 
         # delete all the files we created
@@ -740,6 +742,8 @@ class EMRJobRunner(MRJobRunner):
                 log.exception(e)
 
     def _cleanup_logs(self):
+        print 'it wants me to delete', self._s3_job_log_uri
+        return
         super(EMRJobRunner, self)._cleanup_logs()
 
         # delete the log files, if it's a job flow we created (the logs
@@ -822,7 +826,7 @@ class EMRJobRunner(MRJobRunner):
         log.info('Job flow created with ID: %s' % emr_job_flow_id)
         return emr_job_flow_id
 
-    def _build_steps(self):
+    def _build_steps(self, emr_debugging=True):
         """Return a list of boto Step objects corresponding to the
         steps we want to run."""
         assert self._script # can't build steps if no script!
@@ -842,6 +846,14 @@ class EMRJobRunner(MRJobRunner):
         steps = self._get_steps()
 
         step_list = []
+
+        if emr_debugging:
+            script_runner_path = "s3://us-west-1.elasticmapreduce/libs/script-runner/script-runner.jar"
+            enable_debugging_path = "s3://us-west-1.elasticmapreduce/libs/state-pusher/0.1/fetch"
+            step_list.append(botoemr.JarStep(
+                name='Enable Hadoop Debugging',
+                jar=script_runner_path,
+                step_args=[enable_debugging_path]))
 
         for step_num, step in enumerate(steps):
             # EMR-specific stuff
@@ -1574,6 +1586,7 @@ class EMRJobRunner(MRJobRunner):
 
     def rm(self, path_glob):
         """Remove all files matching the given glob."""
+        return
         if not S3_URI_RE.match(path_glob):
             return super(EMRJobRunner, self).rm(path_glob)
 

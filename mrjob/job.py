@@ -458,8 +458,8 @@ class MRJob(object):
 
         # report profiling findings
         if profiler:
-            self.increment_counter('profile', 'mapper estimated IO time: %0.2f' % (step_num, profiler.accumulated_io_time))
-            self.increment_counter('profile', 'mapper estimated CPU time: %0.2f' % (step_num, profiler.accumulated_cpu_time))
+            self.increment_counter('profile', 'mapper estimated IO time: %0.2f' % (profiler.accumulated_io_time))
+            self.increment_counter('profile', 'mapper estimated CPU time: %0.2f' % (profiler.accumulated_cpu_time))
 
     def run_reducer(self, step_num=0):
         """Run the reducer for the given step.

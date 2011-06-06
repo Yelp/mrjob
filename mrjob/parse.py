@@ -27,7 +27,8 @@ HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*\.jar$')
 JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
 
 # match a job output line containing counter data
-COUNTER_RE = re.compile(r'Job \w+=".*?"(\s+\w+=".*?")+\s+COUNTERS="(?P<counters>.+?)"')
+COUNTER_LINE_RE = re.compile(r'Job \w+=".*?"(\s+\w+=".*?")+\s+COUNTERS="(?P<counters>.+?)"') 
+COUNTER_RE = re.compile(r'(?P<group>.+?)[.](?P<name>.+?):(?P<value>\d+)')
 
 def find_python_traceback(lines):
     """Scan a log file or other iterable for a Python traceback,
@@ -189,21 +190,32 @@ def parse_mr_job_stderr(stderr, counters=None, step_num=0):
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
 
-def parse_hadoop_counters_from_line(line):
+def parse_hadoop_counters_from_line(line, step_num=0, counters=None):
     """Parse Hadoop counter values from a log line.
 
     :param line: log line containing counter data
     :type line: str
 
     Example line: Job JOBID="job_201106061823_0001" FINISH_TIME="1307384737542" JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1" FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="File Systems.S3N bytes read:3726,File Systems.Local bytes read:4164,File Systems.S3N bytes written:1663,File Systems.Local bytes written:8410,Job Counters .Launched reduce tasks:1,Job Counters .Rack-local map tasks:2,Job Counters .Launched map tasks:2,Map-Reduce Framework.Reduce input groups:154,Map-Reduce Framework.Combine output records:0,Map-Reduce Framework.Map input records:68,Map-Reduce Framework.Reduce output records:154,Map-Reduce Framework.Map output bytes:3446,Map-Reduce Framework.Map input bytes:2483,Map-Reduce Framework.Map output records:336,Map-Reduce Framework.Combine input records:0,Map-Reduce Framework.Reduce input records:336,profile.reducer step 0 estimated IO time: 0.00:1,profile.mapper step 0 estimated IO time: 0.00:2,profile.reducer step 0 estimated CPU time: 0.00:1,profile.mapper step 0 estimated CPU time: 0.00:2"
-
-    From file named: (log_uri)/jobs/ip-10-168-73-57.us-west-1.compute.internal_1307384628708_job_201106061823_0001_hadoop_streamjob5884999361405044030.jar
+From file named: (log_uri)/jobs/ip-10-168-73-57.us-west-1.compute.internal_1307384628708_job_201106061823_0001_hadoop_streamjob5884999361405044030.jar
     """
-    m = COUNTER_RE.match(line)
+    counters = counters or {}
+
+    m = COUNTER_LINE_RE.match(line)
     if not m:
-        return {}
+        return counters
     
-    return m.group('counters').split(',')
+    counters = {}
+    for counter_line in m.group('counters').split(','):
+        counter_re = COUNTER_RE.match(counter_line)
+        group, name, amount_str = counter_re.groups()
+
+        counters.setdefault(step_num, {})
+        counters[step_num].setdefault(group, {})    # groups
+        counters[step_num][group].setdefault(name, 0)
+        counters[step_num][group][name] += int(amount_str)
+    
+    return counters
 
 
 def parse_port_range_list(range_list_str):

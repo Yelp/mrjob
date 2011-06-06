@@ -1186,7 +1186,10 @@ class EMRJobRunner(MRJobRunner):
 
             with open(log_path) as log_file:
                 for line in log_file:
-                    counters.append(parse_hadoop_counters_from_line(line, counters))
+                    new_counters = parse_hadoop_counters_from_line(line)
+                    if new_counters:
+                        counters.append(new_counters)
+                        break
 
         return counters
 

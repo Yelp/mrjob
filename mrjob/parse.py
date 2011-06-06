@@ -189,7 +189,7 @@ def parse_mr_job_stderr(stderr, counters=None):
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
 
-def parse_hadoop_counters_from_line(line, counters=None):
+def parse_hadoop_counters_from_line(line):
     """Parse Hadoop counter values from a log line.
 
     :param line: log line containing counter data
@@ -198,11 +198,9 @@ def parse_hadoop_counters_from_line(line, counters=None):
     Example line: Job JOBID="job_201106061823_0001" FINISH_TIME="1307384737542" JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1" FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="File Systems.S3N bytes read:3726,File Systems.Local bytes read:4164,File Systems.S3N bytes written:1663,File Systems.Local bytes written:8410,Job Counters .Launched reduce tasks:1,Job Counters .Rack-local map tasks:2,Job Counters .Launched map tasks:2,Map-Reduce Framework.Reduce input groups:154,Map-Reduce Framework.Combine output records:0,Map-Reduce Framework.Map input records:68,Map-Reduce Framework.Reduce output records:154,Map-Reduce Framework.Map output bytes:3446,Map-Reduce Framework.Map input bytes:2483,Map-Reduce Framework.Map output records:336,Map-Reduce Framework.Combine input records:0,Map-Reduce Framework.Reduce input records:336,profile.reducer step 0 estimated IO time: 0.00:1,profile.mapper step 0 estimated IO time: 0.00:2,profile.reducer step 0 estimated CPU time: 0.00:1,profile.mapper step 0 estimated CPU time: 0.00:2"
 From file named: (log_uri)/jobs/ip-10-168-73-57.us-west-1.compute.internal_1307384628708_job_201106061823_0001_hadoop_streamjob5884999361405044030.jar
     """
-    counters = counters or {}
-
     m = COUNTER_LINE_RE.match(line)
     if not m:
-        return counters
+        return None
 
     counters = {}
     for counter_line in m.group('counters').split(','):

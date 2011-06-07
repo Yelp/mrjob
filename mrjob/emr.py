@@ -18,6 +18,7 @@ import fnmatch
 import logging
 import os
 import posixpath
+import pprint
 import random
 import re
 import signal
@@ -44,7 +45,7 @@ except ImportError:
     botoemr = None
 
 from mrjob.conf import combine_dicts, combine_lists, combine_paths, combine_path_lists
-from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_port_range_list
+from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_port_range_list, parse_hadoop_counters_from_line
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
 from mrjob.util import cmd_line, extract_dir_for_tar
@@ -258,6 +259,8 @@ class EMRJobRunner(MRJobRunner):
         :param ec2_master_instance_type: same as *ec2_instance_type*, but only for the master Hadoop node
         :type ec2_slave_instance_type: str
         :param ec2_slave_instance_type: same as *ec2_instance_type*, but only for the slave Hadoop nodes
+        :type enable_emr_debugging: str
+        :param enable_emr_debugging: store Hadoop logs in SimpleDB
         :type emr_endpoint: str
         :param emr_endpoint: optional host to connect to when communicating with S3 (e.g. ``us-west-1.elasticmapreduce.amazonaws.com``). Default is to infer this from *aws_region*.
         :type emr_job_flow_id: str
@@ -382,6 +385,7 @@ class EMRJobRunner(MRJobRunner):
             'ec2_key_pair_file',
             'ec2_master_instance_type',
             'ec2_slave_instance_type',
+            'enable_emr_debugging',
             'emr_endpoint',
             'emr_job_flow_id',
             'hadoop_streaming_jar_on_emr',
@@ -803,6 +807,9 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['ec2_key_pair']:
             args['ec2_keyname'] = self._opts['ec2_key_pair']
 
+        if self._opts['enable_emr_debugging']:
+            args['enable_debugging'] = True
+
         if persistent:
             args['keep_alive'] = True
 
@@ -1019,6 +1026,7 @@ class EMRJobRunner(MRJobRunner):
         if success:
             log.info('Job completed.')
             log.info('Running time was %.1fs (not counting time spent waiting for the EC2 instances)' % total_step_time)
+            log.info('counters: %s' % pprint.pformat(self._get_counters(step_nums)))
         else:
             msg = 'Job failed with status %s: %s' % (job_state, reason)
             log.error(msg)
@@ -1131,6 +1139,51 @@ class EMRJobRunner(MRJobRunner):
         work if we've uploaded the file and set it to public.)"""
         bucket_name, path = parse_s3_uri(file_dict['s3_uri'])
         return 'http://%s.s3.amazonaws.com/%s' % (bucket_name, path)
+
+    def _get_counters(self, step_nums):
+        """Read Hadoop counters from S3.
+
+        Args:
+        step_nums -- the numbers of steps belonging to us, so that we
+            can ignore errors from other jobs when sharing a job flow
+        """
+        if not self._s3_job_log_uri:
+            return None
+
+        counters = []
+
+        log.info('Fetching counters...')
+        self._wait_for_s3_eventual_consistency()
+
+        s3_log_file_uris = set(self.ls(posixpath.join(self._s3_job_log_uri, 'jobs', '*')))
+
+        s3_conn = self.make_s3_conn()
+        relevant_logs = [] # list of (sort key, URI)
+
+        for s3_log_file_uri in s3_log_file_uris:
+            match = JOB_LOG_URI_RE.match(s3_log_file_uri)
+            if not match:
+                continue
+
+            step_num = int(match.group('step_num'))
+
+            relevant_logs.append((step_num, s3_log_file_uri))
+
+        relevant_logs.sort()
+
+        for _, s3_log_file_uri in relevant_logs:
+            log_path = self._download_log_file(s3_log_file_uri, s3_conn)
+            if not log_path:
+                continue
+
+            with open(log_path) as log_file:
+                for line in log_file:
+                    new_counters = parse_hadoop_counters_from_line(line)
+                    if new_counters:
+                        counters.append(new_counters)
+                        break
+
+        return counters
 
     def _find_probable_cause_of_failure(self, step_nums):
         """Scan logs for Python exception tracebacks.

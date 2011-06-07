@@ -679,6 +679,10 @@ class MRJob(object):
             '--archive', dest='upload_archives', action='append',
             default=[],
             help='Unpack archive in the working directory of this script. You can use --archive multiple times.')
+        self.runner_opt_group.add_option(
+            '--python-archive', dest='python_archives', action='append',
+            default=[],
+            help='Same as --archive, except it gets added to the job\'s PYTHONPATH. You can use --python-archive multiple times.')
 
         self.runner_opt_group.add_option(
             '-o', '--output-dir', dest='output_dir', default=None,
@@ -925,6 +929,7 @@ class MRJob(object):
             'label': self.options.label,
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
+            'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
             'stdin': self.stdin,
             'steps_python_bin': self.options.steps_python_bin,

@@ -29,6 +29,7 @@ try:
 except ImportError:
     boto = None
 
+from mrjob.botoemr.step import JarStep
 from mrjob.conf import combine_values
 from mrjob.emr import S3_URI_RE, parse_s3_uri
 
@@ -264,6 +265,13 @@ class MockEmrConnection(object):
 
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
+        if enable_debugging:
+            debugging_step = JarStep(name='Setup Hadoop Debugging',
+                                     action_on_failure='TERMINATE_JOB_FLOW',
+                                     main_class=None,
+                                     jar='DEBUGGING.jar',
+                                     step_args='S3/PATH/TO/ARGS.jar')
+            steps.insert(0, debugging_step)
         self.add_jobflow_steps(jobflow_id, steps)
 
         return jobflow_id

@@ -782,7 +782,7 @@ class EMRJobRunner(MRJobRunner):
 
         args['hadoop_version'] = self._opts['hadoop_version']
         
-        if self._opts['aws_avau]:
+        if self._opts['aws_availability_zone']:
             args['availability_zone'] = self._opts['aws_availability_zone']
 
         if self._opts['num_ec2_instances']:
@@ -807,6 +807,9 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['ec2_key_pair']:
             args['ec2_keyname'] = self._opts['ec2_key_pair']
 
+        if self._opts['enable_emr_debugging']:
+            args['enable_debugging'] = True
+
         if persistent:
             args['keep_alive'] = True
 
@@ -818,8 +821,7 @@ class EMRJobRunner(MRJobRunner):
             self._job_name, self._opts['s3_log_uri'],
             ', '.join('%s=%r' % (k, v) for k, v in args.iteritems())))
         emr_job_flow_id = emr_conn.run_jobflow(
-            self._job_name, self._opts['s3_log_uri'], 
-            enable_debugging=self._opts['enable_emr_debugging'], **args)
+            self._job_name, self._opts['s3_log_uri'], **args)
 
          # keep track of when we started our job
         self._emr_job_start = time.time()

@@ -259,6 +259,8 @@ class EMRJobRunner(MRJobRunner):
         :param ec2_master_instance_type: same as *ec2_instance_type*, but only for the master Hadoop node
         :type ec2_slave_instance_type: str
         :param ec2_slave_instance_type: same as *ec2_instance_type*, but only for the slave Hadoop nodes
+        :type emr_debugging: str
+        :param emr_debugging: store Hadoop logs in SimpleDB
         :type emr_endpoint: str
         :param emr_endpoint: optional host to connect to when communicating with S3 (e.g. ``us-west-1.elasticmapreduce.amazonaws.com``). Default is to infer this from *aws_region*.
         :type emr_job_flow_id: str
@@ -383,6 +385,7 @@ class EMRJobRunner(MRJobRunner):
             'ec2_key_pair_file',
             'ec2_master_instance_type',
             'ec2_slave_instance_type',
+            'emr_debugging',
             'emr_endpoint',
             'emr_job_flow_id',
             'hadoop_streaming_jar_on_emr',
@@ -823,7 +826,7 @@ class EMRJobRunner(MRJobRunner):
         log.info('Job flow created with ID: %s' % emr_job_flow_id)
         return emr_job_flow_id
 
-    def _build_steps(self, emr_debugging=False):
+    def _build_steps(self):
         """Return a list of boto Step objects corresponding to the
         steps we want to run."""
         assert self._script # can't build steps if no script!
@@ -844,9 +847,8 @@ class EMRJobRunner(MRJobRunner):
 
         step_list = []
 
-        # EMR docs claim that you need this to enable certain kinds of
-        # Hadoop logging, but I have not yet tested without it.
-        if emr_debugging:
+        # Enable storage of Hadoop logs in SimpleDB
+        if self._opts['emr_debugging']:
             script_runner_path = "s3://us-west-1.elasticmapreduce/libs/script-runner/script-runner.jar"
             enable_debugging_path = "s3://us-west-1.elasticmapreduce/libs/state-pusher/0.1/fetch"
             step_list.append(botoemr.JarStep(
@@ -1631,7 +1633,6 @@ class EMRJobRunner(MRJobRunner):
 
     def rm(self, path_glob):
         """Remove all files matching the given glob."""
-        return
         if not S3_URI_RE.match(path_glob):
             return super(EMRJobRunner, self).rm(path_glob)
 

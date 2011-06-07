@@ -1153,7 +1153,7 @@ class EMRJobRunner(MRJobRunner):
         log.info('Fetching counters...')
         self._wait_for_s3_eventual_consistency()
 
-        s3_log_file_uris = set(self.ls(os.posixpath.join(self._s3_job_log_uri, 'jobs')))
+        s3_log_file_uris = set(self.ls(posixpath.join(self._s3_job_log_uri, 'jobs')))
 
         s3_conn = self.make_s3_conn()
         relevant_logs = [] # list of (sort key, URI)

@@ -268,8 +268,10 @@ class Profiler(object):
         current_measurement = resource.getrusage(resource.RUSAGE_SELF)
 
         self.accumulated_io_time += current_measurement.ru_stime - self.last_measurement.ru_stime
+        self.accumulated_io_time += current_measurement.ru_utime - self.last_measurement.ru_utime
         self.last_measurement = current_measurement
 
     def mark_end_processing(self):
         new_measurement = resource.getrusage(resource.RUSAGE_SELF)
         self.accumulated_cpu_time += new_measurement.ru_utime - self.last_measurement.ru_utime
+        self.accumulated_cpu_time += new_measurement.ru_stime - self.last_measurement.ru_stime

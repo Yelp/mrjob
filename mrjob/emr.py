@@ -259,8 +259,8 @@ class EMRJobRunner(MRJobRunner):
         :param ec2_master_instance_type: same as *ec2_instance_type*, but only for the master Hadoop node
         :type ec2_slave_instance_type: str
         :param ec2_slave_instance_type: same as *ec2_instance_type*, but only for the slave Hadoop nodes
-        :type emr_debugging: str
-        :param emr_debugging: store Hadoop logs in SimpleDB
+        :type enable_emr_debugging: str
+        :param enable_emr_debugging: store Hadoop logs in SimpleDB
         :type emr_endpoint: str
         :param emr_endpoint: optional host to connect to when communicating with S3 (e.g. ``us-west-1.elasticmapreduce.amazonaws.com``). Default is to infer this from *aws_region*.
         :type emr_job_flow_id: str
@@ -385,7 +385,7 @@ class EMRJobRunner(MRJobRunner):
             'ec2_key_pair_file',
             'ec2_master_instance_type',
             'ec2_slave_instance_type',
-            'emr_debugging',
+            'enable_emr_debugging',
             'emr_endpoint',
             'emr_job_flow_id',
             'hadoop_streaming_jar_on_emr',
@@ -782,7 +782,7 @@ class EMRJobRunner(MRJobRunner):
 
         args['hadoop_version'] = self._opts['hadoop_version']
         
-        if self._opts['aws_availability_zone']:
+        if self._opts['aws_avau]:
             args['availability_zone'] = self._opts['aws_availability_zone']
 
         if self._opts['num_ec2_instances']:
@@ -819,7 +819,7 @@ class EMRJobRunner(MRJobRunner):
             ', '.join('%s=%r' % (k, v) for k, v in args.iteritems())))
         emr_job_flow_id = emr_conn.run_jobflow(
             self._job_name, self._opts['s3_log_uri'], 
-            enable_debugging=self._opts['emr_debugging'], **args)
+            enable_debugging=self._opts['enable_emr_debugging'], **args)
 
          # keep track of when we started our job
         self._emr_job_start = time.time()

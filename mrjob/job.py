@@ -886,12 +886,12 @@ class MRJob(object):
             help='ID of an existing EMR job flow to use')
 
         self.emr_opt_group.add_option(
-            '--enable-emr-debugging', dest='emr_debugging', default=None,
+            '--enable-emr-debugging', dest='enable_emr_debugging', default=None,
             action='store_true',
             help='Enable storage of Hadoop logs in SimpleDB')
 
         self.emr_opt_group.add_option(
-            '--disable-emr-debugging', dest='emr_debugging', action='store_false',
+            '--disable-emr-debugging', dest='enable_emr_debugging', action='store_false',
             help='Enable storage of Hadoop logs in SimpleDB')
 
         self.emr_opt_group.add_option(

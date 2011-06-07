@@ -782,7 +782,7 @@ class EMRJobRunner(MRJobRunner):
 
         args['hadoop_version'] = self._opts['hadoop_version']
         
-        if self._opts['aws_avau]:
+        if self._opts['aws_availability_zone']:
             args['availability_zone'] = self._opts['aws_availability_zone']
 
         if self._opts['num_ec2_instances']:
@@ -847,15 +847,6 @@ class EMRJobRunner(MRJobRunner):
         steps = self._get_steps()
 
         step_list = []
-
-        # Enable storage of Hadoop logs in SimpleDB
-        if self._opts['emr_debugging']:
-            script_runner_path = "s3://us-west-1.elasticmapreduce/libs/script-runner/script-runner.jar"
-            enable_debugging_path = "s3://us-west-1.elasticmapreduce/libs/state-pusher/0.1/fetch"
-            step_list.append(botoemr.JarStep(
-                name='Enable Hadoop Debugging',
-                jar=script_runner_path,
-                step_args=[enable_debugging_path]))
 
         for step_num, step in enumerate(steps):
             # EMR-specific stuff

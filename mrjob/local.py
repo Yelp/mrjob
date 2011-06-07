@@ -55,9 +55,11 @@ class LocalMRJobRunner(MRJobRunner):
         super(LocalMRJobRunner, self).__init__(**kwargs)
 
         self._working_dir = None
-        self._prev_outfile = None
-        self._final_outfile = None
+        self._prev_outfiles = []
         self._counters = {}
+        
+        self._map_tasks = 2
+        self._reduce_tasks = 2
 
     @classmethod
     def _default_opts(cls):
@@ -115,18 +117,19 @@ class LocalMRJobRunner(MRJobRunner):
             if 'R' in step:
                 # sort the output
                 self._invoke_step(['sort'], 'step-%d-mapper-sorted' % i,
-                       env={'LC_ALL': 'C'}) # ignore locale
+                       env={'LC_ALL': 'C'}, num_tasks = 1) # ignore locale
 
                 # run the reducer
                 reducer_args = (wrapper_args + [self._script['name'],
                                  '--step-num=%d' % i, '--reducer'] +
                                 self._mr_job_extra_args())
-                self._invoke_step(reducer_args, 'step-%d-reducer' % i)
+                self._invoke_step(reducer_args, 'step-%d-reducer' % i, num_tasks = 1)
 
         # move final output to output directory
-        self._final_outfile = os.path.join(self._output_dir, 'part-00000')
-        log.info('Moving %s -> %s' % (self._prev_outfile, self._final_outfile))
-        shutil.move(self._prev_outfile, self._final_outfile)
+        for i, outfile in enumerate(self._prev_outfiles):
+            final_outfile = os.path.join(self._output_dir, 'part-%05d' % i)
+            log.info('Moving %s -> %s' % (outfile, final_outfile))
+            shutil.move(outfile, final_outfile)
 
     def _setup_working_dir(self):
         """Make a working directory with symlinks to our script and
@@ -173,7 +176,29 @@ class LocalMRJobRunner(MRJobRunner):
             log.debug('copying %s -> %s' % (path, dest))
             shutil.copyfile(path, dest)
 
-    def _invoke_step(self, args, outfile_name, env=None):
+    def _get_file_splits(self, input_paths, num_splits):
+        """Split the input files into *num_splits* files
+        """
+        # there must be a better way to do this?
+        tmp_directory = self._get_local_tmp_dir()
+        files = []
+        file_names = []
+        for i in xrange(num_splits):
+            outfile = tmp_directory + '/input_part%d' % i
+            file_names.append(outfile)
+            files.append(open(outfile, 'w'))
+        
+        current_file = 0
+        for path in input_paths:
+            input_file = open(path)
+            for line in input_file.readlines():
+                files[current_file].write(line)
+                current_file = (current_file + 1)%num_splits
+        
+        return file_names
+            
+
+    def _invoke_step(self, args, outfile_name, env=None, num_tasks=2):
         """Run the given command, outputting into outfile, and reading
         from the previous outfile (or, for the first step, from our
         original output files).
@@ -192,8 +217,8 @@ class LocalMRJobRunner(MRJobRunner):
             env or {})
 
         # decide where to get input
-        if self._prev_outfile is not None:
-            input_paths = [self._prev_outfile]
+        if self._prev_outfiles:
+            input_paths = self._prev_outfiles
         else:
             input_paths = []
             for path in self._input_paths:
@@ -202,41 +227,55 @@ class LocalMRJobRunner(MRJobRunner):
                 else:
                     input_paths.append(path)
 
-        # add input to the command line
-        for path in input_paths:
-            args.append(os.path.abspath(path))
+        # get file splits
+        file_splits = self._get_file_splits(input_paths, num_tasks)
+        
+        #if num_tasks == 1:
+        #    f = open(file_splits[0])
+        #    for line in f.readlines():
+        #        print line.strip()
+        #    exit()
+        
+        # run the tasks
+        procs = []
+        self._prev_outfiles = []
+        for task_num in xrange(num_tasks):
+            # args - one file_split per process
+            proc_args = args + [file_splits[task_num]]
+            log.info('> %s' % cmd_line(proc_args))
+            
+            # set up outfile
+            outfile = os.path.join(self._get_local_tmp_dir(), outfile_name + '_part%d' % task_num)
+            log.info('writing to %s' % outfile)
+            log.debug('')
 
-        log.info('> %s' % cmd_line(args))
+            self._prev_outfiles.append(outfile)
+            write_to = open(outfile, 'w')
 
-        # set up outfile
-        outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
-        log.info('writing to %s' % outfile)
-        log.debug('')
+            # run the process
+            proc = Popen(proc_args, stdout=write_to, stderr=PIPE,
+                         cwd=self._working_dir, env=env)
+            procs.append(proc)
 
-        self._prev_outfile = outfile
-        write_to = open(outfile, 'w')
+        for task_num in xrange(num_tasks):
+            proc = procs[task_num]
+            # handle counters, status msgs, and other stuff on stderr
+            stderr_lines = self._process_stderr_from_script(proc.stderr)
+            tb_lines = find_python_traceback(stderr_lines)
 
-        # run the process
-        proc = Popen(args, stdout=write_to, stderr=PIPE,
-                     cwd=self._working_dir, env=env)
+            self._print_counters()
 
-        # handle counters, status msgs, and other stuff on stderr
-        stderr_lines = self._process_stderr_from_script(proc.stderr)
-        tb_lines = find_python_traceback(stderr_lines)
-
-        self._print_counters()
-
-        returncode = proc.wait()
-        if returncode != 0:
-            # try to throw a useful exception
-            if tb_lines:
-                raise Exception(
-                    'Command %r returned non-zero exit status %d:\n%s' %
-                    (args, returncode, ''.join(tb_lines)))
-            else:
-                raise Exception(
-                    'Command %r returned non-zero exit status %d: %s' %
-                    (args, returncode))
+            returncode = proc.wait()
+            if returncode != 0:
+                # try to throw a useful exception
+                if tb_lines:
+                    raise Exception(
+                        'Command %r returned non-zero exit status %d:\n%s' %
+                        (args, returncode, ''.join(tb_lines)))
+                else:
+                    raise Exception(
+                        'Command %r returned non-zero exit status %d: %s' %
+                        (args, returncode))
 
         # flush file descriptors
         write_to.flush()

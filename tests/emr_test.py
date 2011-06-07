@@ -28,7 +28,7 @@ from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in,
 from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
 from mrjob.parse import JOB_NAME_RE
-from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
+from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, MockKey, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled
 
@@ -632,3 +632,46 @@ class TestLs(MockEMRAndS3TestCase):
         # of permissions error)
         assert_raises(Exception, set, runner._s3_ls('s3://lolcat/'))
 
+
+class EMRS3CleanupTestCase(MockEMRAndS3TestCase):
+
+    @setup
+    def make_tmp_dir_and_mrjob_conf(self):
+        self.tmp_dir = tempfile.mkdtemp()
+        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        dump_mrjob_conf({'runners': {'emr': {
+            'check_emr_status_every': 0.01,
+            's3_sync_wait_time': 0.01,
+        }}}, open(self.mrjob_conf_path, 'w'))
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def test_cleanup(self):
+        runner = EMRJobRunner(conf_path=False, s3_sync_wait_time=0.01)
+        
+        # add some mock data and change last_modified
+        remote_input_path = 's3://walrus/data/'
+        self.add_mock_s3_data({'walrus': {'data/foo': 'foo\n', 'data/bar': 'bar\n'}})
+        
+        s3_conn = runner.make_s3_conn()
+        bucket_name, key_name = parse_s3_uri(remote_input_path)
+        bucket = s3_conn.get_bucket(bucket_name)
+        
+        key_foo = bucket.get_key('data/foo')
+        key_bar = bucket.get_key('data/bar')
+        key_bar.last_modified = datetime.datetime.now() - datetime.timedelta(45)
+        
+        # make sure keys are there
+        assert isinstance(key_foo, MockKey)
+        assert isinstance(key_bar, MockKey)
+            
+        runner.S3_cleanup(remote_input_path)
+        
+        key_foo = bucket.get_key('data/foo')
+        key_bar = bucket.get_key('data/bar')
+        
+        # make sure key_bar is deleted
+        assert isinstance(key_foo, MockKey)
+        assert_equal(key_bar, None)

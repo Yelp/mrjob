@@ -39,13 +39,15 @@ DEFAULT_MAX_DAYS_AGO = 61
 
 def add_mock_s3_data(mock_s3_fs, data):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
-    key to contents) with a map from bucket name to key name to data."""
+    key to contents) with a map from bucket name to key name to data and
+    time last modified."""
+    time_modified = to_iso8601(datetime.datetime.now())
     for bucket_name, key_name_to_bytes in data.iteritems():
         mock_s3_fs.setdefault(bucket_name, {})
         bucket = mock_s3_fs[bucket_name]
 
         for key_name, bytes in key_name_to_bytes.iteritems():
-            bucket[key_name] = bytes
+            bucket[key_name] = (bytes, time_modified)
 
 class MockS3Connection(object):
     """Mock out boto.s3.Connection
@@ -87,7 +89,8 @@ class MockBucket:
     """
     def __init__(self, connection=None, name=None):
         """You can optionally specify a 'data' argument, which will instantiate
-        mock keys and mock data. data should be a map from key name to bytes.
+        mock keys and mock data. data should be a map from key name to bytes and
+        time last modified.
         """
         self.name = name
         self.connection = connection
@@ -102,7 +105,8 @@ class MockBucket:
 
     def new_key(self, key_name):
         if key_name not in self.mock_state():
-            self.mock_state()[key_name] = ''
+            self.mock_state()[key_name] = ('', 
+                    to_iso8601(datetime.datetime.now()))
         return MockKey(bucket=self, name=key_name)
 
     def get_key(self, key_name):
@@ -132,13 +136,14 @@ class MockKey(object):
     def read_mock_data(self):
         """Read the bytes for this key out of the fake boto state."""
         if self.name in self.bucket.mock_state():
-            return self.bucket.mock_state()[self.name]
+            return self.bucket.mock_state()[self.name][0]
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
     def write_mock_data(self, data):
         if self.name in self.bucket.mock_state():
-            self.bucket.mock_state()[self.name] = data
+            self.bucket.mock_state()[self.name] = (data, 
+                        to_iso8601(datetime.datetime.now()))
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -158,6 +163,23 @@ class MockKey(object):
 
     def make_public(self):
         pass
+    
+    def _get_last_modified(self):
+        if self.name in self.bucket.mock_state():
+            return self.bucket.mock_state()[self.name][1]
+        else:
+            raise boto.exception.S3ResponseError(404, 'Not Found')
+    
+    # option to change last_modified time for testing purposes
+    def _set_last_modified(self, time_modified):
+        if self.name in self.bucket.mock_state():
+            data = self.bucket.mock_state()[self.name][0]
+            self.bucket.mock_state()[self.name] = (data, 
+                        to_iso8601(time_modified))
+        else:
+            raise boto.exception.S3ResponseError(404, 'Not Found')
+    
+    last_modified = property(_get_last_modified, _set_last_modified)
 
 ### EMR ###
 

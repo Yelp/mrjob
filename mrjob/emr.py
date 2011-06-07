@@ -1675,3 +1675,25 @@ class EMRJobRunner(MRJobRunner):
             key = bucket.get_key(folder_name)
             if key:
                 yield key
+
+    def S3_cleanup(self, path, days_old=30, s3_conn=None, dry_run=False):
+        """Delete all files older than *days_old* in *path*.
+        If *dry_run* is ``True``, then just log the files that need to be 
+        deleted without actually deleting them
+        """
+        if not s3_conn:
+            s3_conn = self.make_s3_conn()
+            
+        bucket_name, key_name = parse_s3_uri(path)
+        bucket = s3_conn.get_bucket(bucket_name)
+
+        for key in bucket.list(key_name):
+            last_modified = datetime.datetime.strptime(key.last_modified, boto.utils.ISO8601)
+            last_modified = last_modified.replace(tzinfo=None)
+            time_delta = datetime.datetime.now() - last_modified
+            if time_delta.days > days_old:
+                # Delete it
+                log.info('Deleting %s; is %s old' % (key.name, str(time_delta)))
+                if not dry_run:
+                    key.delete()
+                    

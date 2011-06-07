@@ -32,7 +32,7 @@ from mrjob.local import LocalMRJobRunner
 from mrjob.parse import parse_mr_job_stderr
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.mr_nomapper_triv import MRNoMapper
+from tests.mr_nomapper_multistep import MRNoMapper
 
 
 ### Test classes ###

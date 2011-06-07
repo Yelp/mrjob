@@ -371,6 +371,17 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
             job_flow = emr_conn.describe_jobflow(job_flow_id)
             assert_equal(job_flow.availabilityzone, 'PUPPYLAND')
 
+    def test_debugging_works(self):
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
+                           '-c', self.mrjob_conf_path,
+                           '--enable-emr-debugging'])
+        mr_job.sandbox()
+        
+        with mr_job.make_runner() as runner:
+            runner.run()
+            flow = runner.make_emr_conn().describe_jobflow(runner._emr_job_flow_id)
+            assert_equal(flow.steps[0].name, 'Setup Hadoop Debugging')
+
 
 class BucketRegionTestCase(MockEMRAndS3TestCase):
 

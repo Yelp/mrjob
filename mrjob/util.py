@@ -25,6 +25,7 @@ import gzip
 import logging
 import os
 import pipes
+import resource
 import sys
 import tarfile
 import zipfile
@@ -252,3 +253,25 @@ def extract_dir_for_tar(archive_path, compression='gz'):
     tar.close()
     # Return the first path component of the item's name
     return first_member.name.split('/')[0]
+
+
+class Profiler(object):
+    """Provide facilities for profiling IO- and CPU-bound parts of jobs."""
+
+    def __init__(self):
+        super(Profiler, self).__init__()
+        self.last_measurement = resource.getrusage(resource.RUSAGE_SELF)
+        self.accumulated_io_time = 0.0
+        self.accumulated_cpu_time = 0.0
+
+    def mark_start_processing(self):
+        current_measurement = resource.getrusage(resource.RUSAGE_SELF)
+
+        self.accumulated_io_time += current_measurement.ru_stime - self.last_measurement.ru_stime
+        self.accumulated_io_time += current_measurement.ru_utime - self.last_measurement.ru_utime
+        self.last_measurement = current_measurement
+
+    def mark_end_processing(self):
+        new_measurement = resource.getrusage(resource.RUSAGE_SELF)
+        self.accumulated_cpu_time += new_measurement.ru_utime - self.last_measurement.ru_utime
+        self.accumulated_cpu_time += new_measurement.ru_stime - self.last_measurement.ru_stime

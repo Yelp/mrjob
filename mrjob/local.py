@@ -58,10 +58,11 @@ class LocalMRJobRunner(MRJobRunner):
 
         self._working_dir = None
         self._prev_outfiles = []
-        self._counters = {}
+        self._counters = []
         
         self._map_tasks = 1
         self._reduce_tasks = 1
+
 
     @classmethod
     def _default_opts(cls):
@@ -120,23 +121,26 @@ class LocalMRJobRunner(MRJobRunner):
                     
         # run mapper, sort, reducer for each step
         for i, step in enumerate(self._get_steps()):
+            self._counters.append({})
             # run the mapper
             mapper_args = (wrapper_args + [self._script['name'],
                             '--step-num=%d' % i, '--mapper'] +
                            self._mr_job_extra_args())
-            self._invoke_step(mapper_args, 'step-%d-mapper' % i, num_tasks = self._map_tasks)
+                           
+            self._invoke_step(mapper_args, 'step-%d-mapper' % i, step_num=i, num_tasks=self._map_tasks)
 
             if 'R' in step:
                 # sort the output
                 self._invoke_step(['sort'], 'step-%d-mapper-sorted' % i,
-                       env={'LC_ALL': 'C'}, num_tasks = 1) # ignore locale
+                       env={'LC_ALL': 'C'}, step_num=i, num_tasks=1) # ignore locale
 
                 # run the reducer
                 reducer_args = (wrapper_args + [self._script['name'],
                                  '--step-num=%d' % i, '--reducer'] +
                                 self._mr_job_extra_args())
-                self._invoke_step(reducer_args, 'step-%d-reducer' % i, 
-                                        num_tasks = self._reduce_tasks, step_type = 'R')
+                                
+                self._invoke_step(reducer_args, 'step-%d-reducer' % i, step_num=i,
+                                        num_tasks = self._reduce_tasks, step_type='R')
 
         # move final output to output directory
         for i, outfile in enumerate(self._prev_outfiles):
@@ -228,7 +232,7 @@ class LocalMRJobRunner(MRJobRunner):
         
         return file_names
 
-    def _invoke_step(self, args, outfile_name, env=None, num_tasks=2, step_type='M'):
+    def _invoke_step(self, args, outfile_name, env=None, step_num=0, num_tasks=2, step_type='M'):
         """Run the given command, outputting into outfile, and reading
         from the previous outfile (or, for the first step, from our
         original output files).
@@ -287,7 +291,7 @@ class LocalMRJobRunner(MRJobRunner):
         for task_num in xrange(num_tasks):
             proc = procs[task_num]
             # handle counters, status msgs, and other stuff on stderr
-            stderr_lines = self._process_stderr_from_script(proc.stderr)
+            stderr_lines = self._process_stderr_from_script(proc.stderr, step_num=step_num)
             tb_lines = find_python_traceback(stderr_lines)
 
             self._print_counters()
@@ -307,7 +311,7 @@ class LocalMRJobRunner(MRJobRunner):
         # flush file descriptors
         write_to.flush()
 
-    def _process_stderr_from_script(self, stderr):
+    def _process_stderr_from_script(self, stderr, step_num=0):
         """Handle stderr a line at time:
 
         - for counter lines, store counters
@@ -317,7 +321,7 @@ class LocalMRJobRunner(MRJobRunner):
         for line in stderr:
             # just pass one line at a time to parse_mr_job_stderr(),
             # so we can print error and status messages in realtime
-            parsed = parse_mr_job_stderr([line], counters=self._counters)
+            parsed = parse_mr_job_stderr([line], counters=self._counters[step_num-1])
 
             # in practice there's only going to be at most one line in
             # one of these lists, but the code is cleaner this way

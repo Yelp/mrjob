@@ -30,6 +30,7 @@ from testify import TestCase, assert_equal, assert_in, assert_lt, assert_not_in,
 
 from tests.mockhadoop import create_mock_hadoop_script, add_mock_hadoop_output
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.mr_nomapper_multistep import MRNoMapper
 from mrjob.hadoop import *
 
 

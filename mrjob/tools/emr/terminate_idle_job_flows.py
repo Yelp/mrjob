@@ -115,7 +115,8 @@ def is_job_flow_non_streaming(job_flow):
         return False
 
     for step in job_flow.steps:
-        if HADOOP_STREAMING_JAR_RE.match(posixpath.basename(step.jar)):
+        args = step.args()
+        if '-mapper' in args:
             return False
 
     # job has at least one step, and none are streaming steps

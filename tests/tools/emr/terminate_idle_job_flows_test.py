@@ -47,16 +47,30 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             steps=[],
         )
 
+        # Build a step object easily
+        # also make it respond to .args()
+        def step(jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
+                 args=['-mapper', 'my_job.py --mapper', 
+                       '-reducer', 'my_job.py --reducer'],
+                 state='COMPLETE', **kwargs):
+            if 'start_time_back' in kwargs:
+                hours = kwargs.pop('start_time_back')
+                kwargs['startdatetime'] = to_iso8601(
+                    self.now - timedelta(hours=hours))
+            if 'end_time_back' in kwargs:
+                hours = kwargs.pop('end_time_back')
+                kwargs['enddatetime'] = to_iso8601(
+                    self.now - timedelta(hours=hours))
+            kwargs['args'] = lambda: args
+            return MockEmrObject(
+                jar=jar, state=state, **kwargs)
+
         # currently running job
         self.mock_emr_job_flows['j-CURRENTLY_RUNNING'] = MockEmrObject(
             state='RUNNING',
             creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
             startdatetime=to_iso8601(self.now - timedelta(hours=5)),
-            steps=[MockEmrObject(
-                startdatetime=to_iso8601(self.now - timedelta(hours=4)),
-                jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
-                state='RUNNING',
-            )],
+            steps=[step(start_time_back=4, state='RUNNING')],
         )
 
         # finished job flow
@@ -65,12 +79,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             creationdatetime=to_iso8601(self.now - timedelta(hours=10)),
             startdatetime=to_iso8601(self.now - timedelta(hours=9)),
             enddatetime=to_iso8601(self.now - timedelta(hours=5)),
-            steps=[MockEmrObject(
-                startdatetime=to_iso8601(self.now - timedelta(hours=8)),
-                enddatetime=to_iso8601(self.now - timedelta(hours=6)),
-                jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
-                state='COMPLETE',
-            )],
+            steps=[step(start_time_back=8, end_time_back=6)],
         )
 
         # idle job flow
@@ -78,12 +87,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             state='WAITING',
             creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
             startdatetime=to_iso8601(self.now - timedelta(hours=5)),
-            steps=[MockEmrObject(
-                startdatetime=to_iso8601(self.now - timedelta(hours=4)),
-                enddatetime=to_iso8601(self.now - timedelta(hours=2)),
-                jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
-                state='COMPLETE',
-            )],
+            steps=[step(start_time_back=4, end_time_back=2)],
         )
 
         # hive job flow (looks completed but isn't)
@@ -91,11 +95,11 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             state='WAITING',
             creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
             startdatetime=to_iso8601(self.now - timedelta(hours=5)),
-            steps=[MockEmrObject(
-                startdatetime=to_iso8601(self.now - timedelta(hours=4)),
-                enddatetime=to_iso8601(self.now - timedelta(hours=4)),
+            steps=[step(
+                start_time_back=4,
+                end_time_back=4,
                 jar='s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar',
-                state='COMPLETE',
+                args=[],
             )],
         )
 
@@ -107,18 +111,13 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
             startdatetime=to_iso8601(self.now - timedelta(hours=5)),
             steps=[
-                MockEmrObject(
-                    startdatetime=to_iso8601(self.now - timedelta(hours=5)),
-                    enddatetime=to_iso8601(self.now - timedelta(hours=5)),
+                step(
+                    start_time_back=5,
+                    end_time_back=5,
                     jar='s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar',
-                    state='COMPLETE',
+                    args=[],
                 ),
-                MockEmrObject(
-                    startdatetime=to_iso8601(self.now - timedelta(hours=4)),
-                    enddatetime=to_iso8601(self.now - timedelta(hours=2)),
-                    jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
-                    state='COMPLETE',
-                )
+                step(start_time_back=4, end_time_back=2),
             ],
         )
 
@@ -128,15 +127,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
             startdatetime=to_iso8601(self.now - timedelta(hours=5)),
             steps=[
-
-                MockEmrObject(
-                    startdatetime=to_iso8601(self.now - timedelta(hours=4)),
-                    enddatetime=to_iso8601(self.now - timedelta(hours=3)),
-                    jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
-                    state='FAILED',
-                ),
-                MockEmrObject(
-                    jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
+                step(start_time_back=4, end_time_back=3, state='FAILED'),
+                step(
                     state='CANCELLED',
                 )
             ],

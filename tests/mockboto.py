@@ -473,22 +473,9 @@ class MockEmrObject(object):
     can set any attribute on."""
 
     def __init__(self, **kwargs):
-        self._format_string = 'MockEmrObject('
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
-            if self._format_string.endswith('('):
-                val_fmt = '%s=%%(%s)r'
-            else:
-                val_fmt = ', %s=%%(%s)r'
-            self._format_string += val_fmt % (key, key)
-        if not self._format_string.endswith('('):
-            self._format_string += ')'
-        else:
-            self._format_string = value
 
     def __setattr__(self, key, value):
         self.__dict__[key] = value
-
-    def __repr__(self):
-        return self._format_string % self.__dict__
 

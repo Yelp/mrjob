@@ -16,7 +16,7 @@
 
 from __future__ import with_statement
 
-from optparse import OptionError
+from optparse import OptionError, OptionValueError
 import os
 import shutil
 from subprocess import Popen, PIPE
@@ -27,7 +27,7 @@ from testify import TestCase, assert_equal, assert_not_equal, assert_gt, assert_
 import time
 
 from mrjob.conf import combine_envs
-from mrjob.job import MRJob, _IDENTITY_MAPPER
+from mrjob.job import MRJob, _IDENTITY_MAPPER, UsageError
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import parse_mr_job_stderr
 from tests.mr_tower_of_powers import MRTowerOfPowers
@@ -487,9 +487,9 @@ class CommandLineArgsTest(TestCase):
         # shouldn't include --limit because it's None
         # items should be in the order they were instantiated
         assert_equal(mr_job.generate_passthrough_arguments(),
-                     ['--protocol', 'json',
+                     ['--input-protocol', 'raw_value',
                       '--output-protocol', 'json',
-                      '--input-protocol', 'raw_value',
+                      '--protocol', 'json',
                       '--foo-size', '5',
                       '--pill-type', 'blue',
                       '--planck-constant', '6.626068e-34'])
@@ -520,9 +520,9 @@ class CommandLineArgsTest(TestCase):
         assert_equal(mr_job.options.extra_special_args, ['you', 'me'])
         assert_equal(mr_job.options.strict_protocols, True)
         assert_equal(mr_job.generate_passthrough_arguments(),
-                     ['--protocol', 'repr',
+                     ['--input-protocol', 'raw_value',
                       '--output-protocol', 'repr',
-                      '--input-protocol', 'raw_value',
+                      '--protocol', 'repr',
                       '--strict-protocols',
                       '--foo-size', '9',
                       '--bar-name', 'Alembic',
@@ -547,6 +547,10 @@ class CommandLineArgsTest(TestCase):
             OptionError, mr_job.add_passthrough_option,
             '--leave-a-msg', dest='leave_a_msg', action='callback',
             default=None)
+
+    def test_incorrect_option_types(self):
+        assert_raises(ValueError, MRJob, ['--cmdenv', 'cats'])
+        assert_raises(ValueError, MRJob, ['--ssh-bind-ports', 'athens'])
 
     def test_default_file_options(self):
         mr_job = MRCustomBoringJob()
@@ -680,3 +684,12 @@ class RunJobTestCase(TestCase):
 
         assert_equal(sorted(output_lines),
                      ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])
+
+
+class TestBadMainCatch(TestCase):
+    """Ensure that the user cannot do anything but just call MRYourJob.run() from __main__"""
+
+    def test_bad_main_catch(self):
+        sys.argv.append('--mapper')
+        assert_raises(UsageError, MRBoringJob().make_runner)
+        sys.argv = sys.argv[:-1]

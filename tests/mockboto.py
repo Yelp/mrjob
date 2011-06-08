@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ try:
 except ImportError:
     boto = None
 
+from mrjob.botoemr.connection import EmrConnection
+from mrjob.botoemr.step import JarStep
 from mrjob.conf import combine_values
 from mrjob.emr import S3_URI_RE, parse_s3_uri
 
@@ -43,11 +45,11 @@ def add_mock_s3_data(mock_s3_fs, data):
     time last modified."""
     time_modified = to_iso8601(datetime.datetime.now())
     for bucket_name, key_name_to_bytes in data.iteritems():
-        mock_s3_fs.setdefault(bucket_name, {})
+        mock_s3_fs.setdefault(bucket_name, {'keys':{}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
 
         for key_name, bytes in key_name_to_bytes.iteritems():
-            bucket[key_name] = (bytes, time_modified)
+            bucket['keys'][key_name] = (bytes, time_modified)
 
 class MockS3Connection(object):
     """Mock out boto.s3.Connection
@@ -65,7 +67,8 @@ class MockS3Connection(object):
         by specifying mock_s3_fs. The mock filesystem is just a map
         from bucket name to key name to bytes.
         """
-        self.mock_s3_fs = mock_s3_fs or {}
+        # use mock_s3_fs even if it's {}
+        self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.endpoint = host or 's3.amazonaws.com'
 
     def get_bucket(self, bucket_name):
@@ -82,12 +85,12 @@ class MockS3Connection(object):
         if bucket_name in self.mock_s3_fs:
             raise boto.exception.S3CreateError(409, 'Conflict')
         else:
-            self.mock_s3_fs[bucket_name] = {}
+            self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': ''}
 
 class MockBucket:
     """Mock out boto.s3.Bucket
     """
-    def __init__(self, connection=None, name=None):
+    def __init__(self, connection=None, name=None, location=None):
         """You can optionally specify a 'data' argument, which will instantiate
         mock keys and mock data. data should be a map from key name to bytes and
         time last modified.
@@ -99,7 +102,7 @@ class MockBucket:
         """Returns a dictionary from key to data representing the
         state of this bucket."""
         if self.name in self.connection.mock_s3_fs:
-            return self.connection.mock_s3_fs[self.name]
+            return self.connection.mock_s3_fs[self.name]['keys']
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -116,7 +119,10 @@ class MockBucket:
             return None
 
     def get_location(self):
-        return 'us-west-1'
+        return self.connection.mock_s3_fs[self.name]['location']
+
+    def set_location(self, new_location):
+        self.connection.mock_s3_fs[self.name]['location'] = new_location
 
     def list(self, prefix=''):
         for key_name in sorted(self.mock_state()):
@@ -243,11 +249,18 @@ class MockEmrConnection(object):
                     action_on_failure='TERMINATE_JOB_FLOW', keep_alive=False,
                     enable_debugging=False,
                     hadoop_version='0.18',
-                    steps=[],
+                    steps=None,
                     bootstrap_actions=[],
                     now=None):
+        """Mock of run_jobflow().
+
+        If you set log_uri to None, you can get a jobflow with no loguri
+        attribute, which is useful for testing.
+        """
         if now is None:
             now = datetime.datetime.utcnow()
+
+        steps = steps or []
 
         init_args = locals().copy()
         del init_args['self']
@@ -259,15 +272,32 @@ class MockEmrConnection(object):
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
             creationdatetime=to_iso8601(now),
-            keepjobalivewhennosteps=keep_alive,
+            hadoopversion=hadoop_version,
+            keepjobflowalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
-            loguri=log_uri,
             name=name,
             state='STARTING',
             steps=[],
+            masterinstancetype=master_instance_type,
+            slaveinstancetype=slave_instance_type,
+            instancecount=num_instances,
+            ec2keyname=ec2_keyname,
+            availabilityzone=availability_zone,
         )
+        # don't always set loguri, so we can test Issue #112
+        if log_uri is not None:
+            job_flow.loguri = log_uri
+
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
+        if enable_debugging:
+            debugging_step = JarStep(name='Setup Hadoop Debugging',
+                                     action_on_failure='TERMINATE_JOB_FLOW',
+                                     main_class=None,
+                                     jar=EmrConnection.DebuggingJar,
+                                     step_args=[MockEmrObject(value=EmrConnection.DebuggingArgs)])
+            debugging_step.state = 'COMPLETED'
+            steps.insert(0, debugging_step)
         self.add_jobflow_steps(jobflow_id, steps)
 
         return jobflow_id
@@ -332,7 +362,7 @@ class MockEmrConnection(object):
                 state='PENDING',
                 name=step.name,
                 actiononfailure=step.action_on_failure,
-                args=step.args(),
+                args=step.args,
             )
 
             job_flow.steps.append(step_object)
@@ -402,6 +432,9 @@ class MockEmrConnection(object):
             # skip steps that are already done
             if step.state in ('COMPLETED', 'FAILED', 'CANCELLED'):
                 continue
+            if step.name in ('Setup Hadoop Debugging', ):
+                step.state = 'COMPLETED'
+                continue
 
             # found currently running step! going to handle it, then exit
             if step.state == 'PENDING':
@@ -449,7 +482,7 @@ class MockEmrConnection(object):
             return
 
         # no pending steps. shut down job if appropriate
-        if job_flow.keepjobalivewhennosteps:
+        if job_flow.keepjobflowalivewhennosteps:
             job_flow.state = 'WAITING'
             job_flow.reason = 'Waiting for steps to run'
         else:

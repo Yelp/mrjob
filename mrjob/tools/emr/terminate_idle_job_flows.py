@@ -116,7 +116,7 @@ def is_job_flow_non_streaming(job_flow):
 
     for step in job_flow.steps:
         args = [a.value for a in step.args]
-        if u'-mapper' in args:
+        if '-mapper' in args:
             return False
 
     # job has at least one step, and none are streaming steps

@@ -52,15 +52,16 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         def step(jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
                  args=['-mapper', 'my_job.py --mapper', 
                        '-reducer', 'my_job.py --reducer'],
-                 state='COMPLETE', **kwargs):
-            if 'start_time_back' in kwargs:
-                hours = kwargs.pop('start_time_back')
+                 state='COMPLETE', 
+                 start_time_back=None,
+                 end_time_back=None,
+                 **kwargs):
+            if start_time_back:
                 kwargs['startdatetime'] = to_iso8601(
-                    self.now - timedelta(hours=hours))
-            if 'end_time_back' in kwargs:
-                hours = kwargs.pop('end_time_back')
+                    self.now - timedelta(hours=start_time_back))
+            if end_time_back:
                 kwargs['enddatetime'] = to_iso8601(
-                    self.now - timedelta(hours=hours))
+                    self.now - timedelta(hours=end_time_back))
             kwargs['args'] = [MockEmrObject(value=a) for a in args]
             return MockEmrObject(
                 jar=jar, state=state, **kwargs)

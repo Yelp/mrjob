@@ -15,7 +15,6 @@ S3 utilities
 .. automethod:: EMRJobRunner.get_s3_keys
 .. automethod:: EMRJobRunner.get_s3_folder_keys
 .. automethod:: EMRJobRunner.make_s3_key
-.. automethod:: EMRJobRunner.S3_cleanup
 
 EMR utilities
 -------------

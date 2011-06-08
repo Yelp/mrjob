@@ -37,6 +37,11 @@ try:
 except ImportError:
     import json # built in to Python 2.6 and later
 
+try:
+    import msgpack
+except ImportError:
+    msgpack = None
+
 class HadoopStreamingProtocol(object):
     """Abstract base class for all protocols. Inherit from it and define
     your own :py:meth:`read` and :py:meth:`write` functions.
@@ -87,6 +92,32 @@ class JSONValueProtocol(HadoopStreamingProtocol):
     @classmethod
     def write(cls, key, value):
         return json.dumps(value)
+
+class MsgPackProtocol(HadoopStreamingProtocol):
+    """Encode ``(key, value)`` as two MsgPacks separated by a tab.
+
+    Note that MsgPack has some limitations; dictionary keys must be strings,
+    and there's no distinction between lists and tuples."""
+    @classmethod
+    def read(cls, line):
+        key, value = line.split('\t')
+        return msgpack.unpackb(key), msgpack.unpackb(value)
+
+    @classmethod
+    def write(cls, key, value):
+        return '%s\t%s' % (msgpack.packb(key), msgpack.packb(value))
+
+class MsgPackValueProtocol(HadoopStreamingProtocol):
+    """Encode ``value`` as a MsgPack and discard ``key``
+    (``key`` is read in as ``None``).
+    """
+    @classmethod
+    def read(cls, line):
+        return (None, msgpack.unpackb(line))
+
+    @classmethod
+    def write(cls, key, value):
+        return msgpack.packb(value)
 
 class PickleProtocol(HadoopStreamingProtocol):
     """Encode ``(key, value)`` as two string-escaped pickles separated
@@ -165,24 +196,28 @@ class ReprValueProtocol(HadoopStreamingProtocol):
         return repr(value)
 
 #: The default protocol for all encoded input and output: ``'json'``
-DEFAULT_PROTOCOL = 'json'
+DEFAULT_PROTOCOL = 'msgpack'
 
 #: Default mapping from protocol name to class:
 #:
-#: ============ ===============================
-#: name         class
-#: ============ ===============================
-#: json         :py:class:`JSONProtocol`
-#: json_value   :py:class:`JSONValueProtocol`
-#: pickle       :py:class:`PickleProtocol`
-#: pickle_value :py:class:`PickleValueProtocol`
-#: raw_value    :py:class:`RawValueProtocol`
-#: repr         :py:class:`ReprProtocol`
-#: repr_value   :py:class:`ReprValueProtocol`
-#: ============ ===============================
+#: ============= ===============================
+#: name          class
+#: ============= ===============================
+#: json          :py:class:`JSONProtocol`
+#: json_value    :py:class:`JSONValueProtocol`
+#: msgpack       :py:class:`MsgPackProtocol`
+#: msgpack_value :py:class:`MsgPackValueProtocol`
+#: pickle        :py:class:`PickleProtocol`
+#: pickle_value  :py:class:`PickleValueProtocol`
+#: raw_value     :py:class:`RawValueProtocol`
+#: repr          :py:class:`ReprProtocol`
+#: repr_value    :py:class:`ReprValueProtocol`
+#: ============= ===============================
 PROTOCOL_DICT = {
     'json': JSONProtocol,
     'json_value': JSONValueProtocol,
+    'msgpack': MsgPackProtocol,
+    'msgpack_value': MsgPackValueProtocol,
     'pickle': PickleProtocol,
     'pickle_value': PickleValueProtocol,
     'raw_value': RawValueProtocol,

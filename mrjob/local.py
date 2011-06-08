@@ -15,6 +15,7 @@
 """Run an MRJob locally by forking off a bunch of processes and piping
 them together. Useful for testing."""
 
+import itertools
 import logging
 import os
 import pprint
@@ -58,8 +59,8 @@ class LocalMRJobRunner(MRJobRunner):
         self._prev_outfiles = []
         self._counters = {}
         
-        self._map_tasks = 2
-        self._reduce_tasks = 2
+        self._map_tasks = 1
+        self._reduce_tasks = 1
 
     @classmethod
     def _default_opts(cls):
@@ -82,7 +83,6 @@ class LocalMRJobRunner(MRJobRunner):
         'hadoop_input_format',
         'hadoop_output_format',
         'hadoop_streaming_jar',
-        'jobconf',
     ]
 
     def _run(self):
@@ -106,13 +106,24 @@ class LocalMRJobRunner(MRJobRunner):
                             [self._wrapper_script['name']] +
                             wrapper_args)
 
+        jobconf = self._opts['jobconf']
+        if jobconf:
+            for (conf_arg, value) in jobconf.iteritems():
+                if conf_arg == 'mapred.map.tasks':
+                    self._map_tasks = int(value)
+                elif conf_arg == 'mapred.reduce.tasks':
+                    self._reduce_tasks = int(value)
+                else:
+                    log.warning('ignoring jobconf %s option (requires real Hadoop)' %
+                                 conf_arg)
+                    
         # run mapper, sort, reducer for each step
         for i, step in enumerate(self._get_steps()):
             # run the mapper
             mapper_args = (wrapper_args + [self._script['name'],
                             '--step-num=%d' % i, '--mapper'] +
                            self._mr_job_extra_args())
-            self._invoke_step(mapper_args, 'step-%d-mapper' % i)
+            self._invoke_step(mapper_args, 'step-%d-mapper' % i, num_tasks = self._map_tasks)
 
             if 'R' in step:
                 # sort the output
@@ -123,7 +134,8 @@ class LocalMRJobRunner(MRJobRunner):
                 reducer_args = (wrapper_args + [self._script['name'],
                                  '--step-num=%d' % i, '--reducer'] +
                                 self._mr_job_extra_args())
-                self._invoke_step(reducer_args, 'step-%d-reducer' % i, num_tasks = 1)
+                self._invoke_step(reducer_args, 'step-%d-reducer' % i, 
+                                        num_tasks = self._reduce_tasks, step_type = 'R')
 
         # move final output to output directory
         for i, outfile in enumerate(self._prev_outfiles):
@@ -176,7 +188,7 @@ class LocalMRJobRunner(MRJobRunner):
             log.debug('copying %s -> %s' % (path, dest))
             shutil.copyfile(path, dest)
 
-    def _get_file_splits(self, input_paths, num_splits):
+    def _get_file_splits(self, input_paths, num_splits, keep_sorted=False):
         """Split the input files into *num_splits* files
         """
         # there must be a better way to do this?
@@ -184,21 +196,36 @@ class LocalMRJobRunner(MRJobRunner):
         files = []
         file_names = []
         for i in xrange(num_splits):
-            outfile = tmp_directory + '/input_part%d' % i
+            outfile = tmp_directory + '/input_part-%05d' % i
             file_names.append(outfile)
             files.append(open(outfile, 'w'))
-        
-        current_file = 0
-        for path in input_paths:
-            input_file = open(path)
-            for line in input_file.readlines():
-                files[current_file].write(line)
-                current_file = (current_file + 1)%num_splits
+            
+        if keep_sorted:
+            # assume that input is a collection of key <tab> value pairs
+            try:
+                lines = []
+                for path in input_paths:
+                    for line in read_file(path):
+                        lines.append(line.split('\t', 1))
+            
+                current_file = 0
+                for key, kv_pairs in itertools.groupby(sorted(lines), key=lambda(k, v): k):
+                    for key, value in kv_pairs:
+                        files[current_file].write(key + "\t" + value)
+                    current_file = (current_file + 1)%num_splits
+            except:
+                # fall back to unsorted case
+                return self._get_file_splits(input_paths, num_splits)
+        else:
+            current_file = 0
+            for path in input_paths:
+                for line in read_file(path):
+                    files[current_file].write(line)
+                    current_file = (current_file + 1)%num_splits
         
         return file_names
-            
 
-    def _invoke_step(self, args, outfile_name, env=None, num_tasks=2):
+    def _invoke_step(self, args, outfile_name, env=None, num_tasks=2, step_type='M'):
         """Run the given command, outputting into outfile, and reading
         from the previous outfile (or, for the first step, from our
         original output files).
@@ -228,13 +255,10 @@ class LocalMRJobRunner(MRJobRunner):
                     input_paths.append(path)
 
         # get file splits
-        file_splits = self._get_file_splits(input_paths, num_tasks)
-        
-        #if num_tasks == 1:
-        #    f = open(file_splits[0])
-        #    for line in f.readlines():
-        #        print line.strip()
-        #    exit()
+        if step_type == 'R':
+            file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=True)
+        else:
+            file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=False)
         
         # run the tasks
         procs = []
@@ -245,7 +269,7 @@ class LocalMRJobRunner(MRJobRunner):
             log.info('> %s' % cmd_line(proc_args))
             
             # set up outfile
-            outfile = os.path.join(self._get_local_tmp_dir(), outfile_name + '_part%d' % task_num)
+            outfile = os.path.join(self._get_local_tmp_dir(), outfile_name + '_part-%05d' % task_num)
             log.info('writing to %s' % outfile)
             log.debug('')
 

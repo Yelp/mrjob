@@ -84,6 +84,45 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
 
         assert_equal(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+                     
+    def test_end_to_end_multiple_tasks(self):
+        # read from STDIN, a regular file, and a .gz
+        stdin = StringIO('foo\nbar\n')
+
+        input_path = os.path.join(self.tmp_dir, 'input')
+        with open(input_path, 'w') as input_file:
+            input_file.write('bar\nqux\n')
+
+        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz = gzip.GzipFile(input_gz_path, 'w')
+        input_gz.write('foo\n')
+        input_gz.close()
+
+        mr_job = MRTwoStepJob(['-c', self.mrjob_conf_path,
+                               '--jobconf=mapred.map.tasks=2',
+                                '--jobconf=mapred.reduce.tasks=2',
+                               '-', input_path, input_gz_path])
+        mr_job.sandbox(stdin=stdin)
+
+        local_tmp_dir = None
+        results = []
+
+        with mr_job.make_runner() as runner:
+            assert isinstance(runner, LocalMRJobRunner)
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+            local_tmp_dir = runner._get_local_tmp_dir()
+            assert os.path.exists(local_tmp_dir)
+
+        # make sure cleanup happens
+        assert not os.path.exists(local_tmp_dir)
+
+        assert_equal(sorted(results),
+                     [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
 
 class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):

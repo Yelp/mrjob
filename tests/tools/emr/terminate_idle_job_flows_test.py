@@ -61,7 +61,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                 hours = kwargs.pop('end_time_back')
                 kwargs['enddatetime'] = to_iso8601(
                     self.now - timedelta(hours=hours))
-            kwargs['args'] = lambda: args
+            kwargs['args'] = [MockEmrObject(value=a) for a in args]
             return MockEmrObject(
                 jar=jar, state=state, **kwargs)
 
@@ -99,6 +99,19 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                 start_time_back=4,
                 end_time_back=4,
                 jar='s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar',
+                args=[],
+            )],
+        )
+
+        # custom hadoop streaming jar
+        self.mock_emr_job_flows['j-CUSTOM_DONE_AND_IDLE'] = MockEmrObject(
+            state='WAITING',
+            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
+            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
+            steps=[step(
+                start_time_back=4,
+                end_time_back=4,
+                jar='s3://my_bucket/tmp/somejob/files/oddjob-0.0.3-SNAPSHOT-standalone.jar',
                 args=[],
             )],
         )

@@ -32,6 +32,7 @@ Option                 Default                        Combined by               
 *jobconf*              ``{}``                         :py:func:`~mrjob.conf.combine_dicts`      :option:`--jobconf`
 *label*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--label`
 *owner*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--owner`
+*profile*              ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--profile`
 *python_archives*      ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--python-archive`
 *python_bin*           :command:`python`              :py:func:`~mrjob.conf.combine_values`     :option:`--python-bin`
 *setup_cmds*           ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--setup-cmd`

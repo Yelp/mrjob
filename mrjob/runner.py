@@ -129,6 +129,8 @@ class MRJobRunner(object):
         :param label: description of this job to use as the part of its name. By default, we use the script's module name, or ``no_script`` if there is none. This used to be called *job_name_prefix* (which still works but is deprecated).
         :type owner: str
         :param owner: who is running this job. Used solely to set the job name. By default, we use :py:func:`getpass.getuser`, or ``no_user`` if it fails.
+        :type profile: bool
+        :param bool: Enable profiling. A ``profile`` counter group will be added to each step. For each mapper/reducer, two counters will be incremented: one for the time spent in the mapper/reducer functions, and the other for the time spent in the framework and waiting for IO.
         :type python_archives: list of str
         :param python_archives: same as upload_archives, except they get added to the job's :envvar:`PYTHONPATH`
         :type python_bin: str

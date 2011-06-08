@@ -29,6 +29,7 @@ try:
 except ImportError:
     boto = None
 
+from mrjob.botoemr.connection import EmrConnection
 from mrjob.botoemr.step import JarStep
 from mrjob.conf import combine_values
 from mrjob.emr import S3_URI_RE, parse_s3_uri
@@ -226,7 +227,7 @@ class MockEmrConnection(object):
                     action_on_failure='TERMINATE_JOB_FLOW', keep_alive=False,
                     enable_debugging=False,
                     hadoop_version='0.18',
-                    steps=[],
+                    steps=None,
                     bootstrap_actions=[],
                     now=None):
         """Mock of run_jobflow().
@@ -236,6 +237,8 @@ class MockEmrConnection(object):
         """
         if now is None:
             now = datetime.datetime.utcnow()
+
+        steps = steps or []
 
         init_args = locals().copy()
         del init_args['self']
@@ -269,8 +272,9 @@ class MockEmrConnection(object):
             debugging_step = JarStep(name='Setup Hadoop Debugging',
                                      action_on_failure='TERMINATE_JOB_FLOW',
                                      main_class=None,
-                                     jar='DEBUGGING.jar',
-                                     step_args='S3/PATH/TO/ARGS.jar')
+                                     jar=EmrConnection.DebuggingJar,
+                                     step_args=[MockEmrObject(value=EmrConnection.DebuggingArgs)])
+            debugging_step.state = 'COMPLETED'
             steps.insert(0, debugging_step)
         self.add_jobflow_steps(jobflow_id, steps)
 
@@ -406,6 +410,9 @@ class MockEmrConnection(object):
             # skip steps that are already done
             if step.state in ('COMPLETED', 'FAILED', 'CANCELLED'):
                 continue
+            if step.name in ('Setup Hadoop Debugging', ):
+                step.state = 'COMPLETED'
+                continue
 
             # found currently running step! going to handle it, then exit
             if step.state == 'PENDING':
@@ -466,9 +473,22 @@ class MockEmrObject(object):
     can set any attribute on."""
 
     def __init__(self, **kwargs):
+        self._format_string = 'MockEmrObject('
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
+            if self._format_string.endswith('('):
+                val_fmt = '%s=%%(%s)r'
+            else:
+                val_fmt = ', %s=%%(%s)r'
+            self._format_string += val_fmt % (key, key)
+        if not self._format_string.endswith('('):
+            self._format_string += ')'
+        else:
+            self._format_string = value
 
     def __setattr__(self, key, value):
         self.__dict__[key] = value
+
+    def __repr__(self):
+        return self._format_string % self.__dict__
 

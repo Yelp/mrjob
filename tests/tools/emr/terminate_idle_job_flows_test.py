@@ -31,7 +31,7 @@ except ImportError:
 
 from mrjob.tools.emr.terminate_idle_job_flows import *
 from tests.emr_test import MockEMRAndS3TestCase
-from tests.mockboto import MockEmrObject, to_iso8601
+from tests.mockboto import MockEmrObject, to_iso8601, MockEmrConnection
 
 
 class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
@@ -117,6 +117,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             )],
         )
 
+
         # hadoop debugging + actual job
         # hadoop debugging looks the same to us as Hive (they use the same
         # jar). The difference is that there's also a streaming step.
@@ -147,6 +148,16 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                 )
             ],
         )
+
+        mock_conn = MockEmrConnection()
+        jobflow_id = mock_conn.run_jobflow(name='j-DEBUG_ONLY',
+                                           log_uri='',
+                                           enable_debugging=True)
+        jf = mock_conn.describe_jobflow(jobflow_id)
+        self.mock_emr_job_flows['j-DEBUG_ONLY'] = jf
+        jf.state = 'WAITING'
+        jf.startdatetime=to_iso8601(self.now - timedelta(hours=2))
+        jf.steps[0].enddatetime=to_iso8601(self.now - timedelta(hours=2))
 
         # add job flow IDs and fake names to the mock job flows
         for jfid, jf in self.mock_emr_job_flows.iteritems():
@@ -265,7 +276,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             now=self.now, dry_run=False)
 
         assert_equal(terminated_jfs(),
-                     ['j-DONE_AND_IDLE', 'j-EMPTY', 'j-HADOOP_DEBUGGING',
+                     ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY', 'j-HADOOP_DEBUGGING',
                       'j-IDLE_AND_FAILED'])
 
         # just to prove our point
@@ -274,7 +285,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             now=self.now, dry_run=False)
 
         assert_equal(terminated_jfs(),
-                     ['j-DONE_AND_IDLE', 'j-EMPTY', 'j-HADOOP_DEBUGGING',
+                     ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY', 'j-HADOOP_DEBUGGING',
                       'j-IDLE_AND_FAILED'])
 
 

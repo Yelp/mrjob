@@ -362,9 +362,10 @@ class MockEmrConnection(object):
         """Figure out the output dir for a step by parsing step.args
         and looking for an -output argument."""
         # parse in reverse order, in case there are multiple -output args
-        for i, arg in reversed(list(enumerate(step.args[:-1]))):
+        args = step.args()
+        for i, arg in reversed(list(enumerate(args[:-1]))):
             if arg == '-output':
-                return step.args[i+1]
+                return args[i+1]
         else:
             return None
 
@@ -479,3 +480,20 @@ class MockEmrObject(object):
     def __setattr__(self, key, value):
         self.__dict__[key] = value
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        my_items = self.__dict__.items()
+        other_items = other.__dict__.items()
+
+        if len(my_items) != len(other_items):
+            return False
+
+        for k, v in my_items:
+            if not other_items.has_key(k):
+                return False
+            else:
+                if v != other_items[k]:
+                    return False
+
+        return True

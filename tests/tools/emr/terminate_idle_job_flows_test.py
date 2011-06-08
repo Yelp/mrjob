@@ -55,6 +55,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                  state='COMPLETE', 
                  start_time_back=None,
                  end_time_back=None,
+                 name='Streaming Step',
+                 action_on_failure='TERMINATE_JOB_FLOW',
                  **kwargs):
             if start_time_back:
                 kwargs['startdatetime'] = to_iso8601(
@@ -62,9 +64,10 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             if end_time_back:
                 kwargs['enddatetime'] = to_iso8601(
                     self.now - timedelta(hours=end_time_back))
-            kwargs['args'] = [MockEmrObject(value=a) for a in args]
+            kwargs['args'] = lambda: [MockEmrObject(value=a) for a in args]
             return MockEmrObject(
-                jar=jar, state=state, **kwargs)
+                jar=jar, state=state, name=name, 
+                action_on_failure=action_on_failure, **kwargs)
 
         # currently running job
         self.mock_emr_job_flows['j-CURRENTLY_RUNNING'] = MockEmrObject(
@@ -117,24 +120,33 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             )],
         )
 
+        mock_conn = MockEmrConnection()
+
+        # hadoop debugging without any other steps
+        jobflow_id = mock_conn.run_jobflow(name='j-DEBUG_ONLY',
+                                           log_uri='',
+                                           enable_debugging=True)
+        jf = mock_conn.describe_jobflow(jobflow_id)
+        self.mock_emr_job_flows['j-DEBUG_ONLY'] = jf
+        jf.state = 'WAITING'
+        jf.startdatetime=to_iso8601(self.now - timedelta(hours=2))
+        jf.steps[0].enddatetime=to_iso8601(self.now - timedelta(hours=2))
 
         # hadoop debugging + actual job
-        # hadoop debugging looks the same to us as Hive (they use the same
-        # jar). The difference is that there's also a streaming step.
-        self.mock_emr_job_flows['j-HADOOP_DEBUGGING'] = MockEmrObject(
-            state='WAITING',
-            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
-            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
-            steps=[
-                step(
-                    start_time_back=5,
-                    end_time_back=5,
-                    jar='s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar',
-                    args=[],
-                ),
-                step(start_time_back=4, end_time_back=2),
-            ],
-        )
+        # same jar as hive but with different args
+        jobflow_id = mock_conn.run_jobflow(name='j-HADOOP_DEBUGGING',
+                                           log_uri='',
+                                           enable_debugging=True,
+                                           steps=[step()])
+        jf = mock_conn.describe_jobflow(jobflow_id)
+        self.mock_emr_job_flows['j-HADOOP_DEBUGGING'] = jf
+        jf.state = 'WAITING'
+        jf.creationdatetime = to_iso8601(self.now - timedelta(hours=6))
+        jf.startdatetime = to_iso8601(self.now - timedelta(hours=5))
+        # Need to reset times manually because mockboto resets them
+        jf.steps[0].enddatetime = to_iso8601(self.now - timedelta(hours=5))
+        jf.steps[1].startdatetime = to_iso8601(self.now - timedelta(hours=4))
+        jf.steps[1].enddatetime = to_iso8601(self.now - timedelta(hours=2))
 
         # skip cancelled steps
         self.mock_emr_job_flows['j-IDLE_AND_FAILED'] = MockEmrObject(
@@ -148,16 +160,6 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                 )
             ],
         )
-
-        mock_conn = MockEmrConnection()
-        jobflow_id = mock_conn.run_jobflow(name='j-DEBUG_ONLY',
-                                           log_uri='',
-                                           enable_debugging=True)
-        jf = mock_conn.describe_jobflow(jobflow_id)
-        self.mock_emr_job_flows['j-DEBUG_ONLY'] = jf
-        jf.state = 'WAITING'
-        jf.startdatetime=to_iso8601(self.now - timedelta(hours=2))
-        jf.steps[0].enddatetime=to_iso8601(self.now - timedelta(hours=2))
 
         # add job flow IDs and fake names to the mock job flows
         for jfid, jf in self.mock_emr_job_flows.iteritems():

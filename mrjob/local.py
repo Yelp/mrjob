@@ -19,6 +19,7 @@ import itertools
 import logging
 import os
 import pprint
+import re
 import shutil
 from subprocess import Popen, PIPE
 import sys
@@ -202,17 +203,19 @@ class LocalMRJobRunner(MRJobRunner):
             
         if keep_sorted:
             # assume that input is a collection of key <tab> value pairs
+            re_pattern = re.compile("^(.*?)\t")
             try:
                 lines = []
                 for path in input_paths:
                     for line in read_file(path):
-                        lines.append(line.split('\t', 1))
+                        key = re_pattern.search(line).group(1)
+                        lines.append((key, line))
             
                 current_file = 0
                 for key, kv_pairs in itertools.groupby(sorted(lines), key=lambda(k, v): k):
-                    for key, value in kv_pairs:
-                        files[current_file].write(key + "\t" + value)
-                    current_file = (current_file + 1)%num_splits
+                    for key, line in kv_pairs:
+                        files[current_file].write(line)
+                    current_file = (current_file + 1) % num_splits
             except:
                 # fall back to unsorted case
                 return self._get_file_splits(input_paths, num_splits)
@@ -221,7 +224,7 @@ class LocalMRJobRunner(MRJobRunner):
             for path in input_paths:
                 for line in read_file(path):
                     files[current_file].write(line)
-                    current_file = (current_file + 1)%num_splits
+                    current_file = (current_file + 1) % num_splits
         
         return file_names
 

@@ -37,7 +37,7 @@ log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
 
 DEFAULT_MAX_HOURS_IDLE = 1
 
-DEBUG_JAR_RE = re.compile(r's3://.*\.elasticmapreduce/libs/state-pusher/[^/]+/fetch')
+DEBUG_JAR_RE = re.compile(r's3n://.*\.elasticmapreduce/libs/state-pusher/[^/]+/fetch')
 
 def main():
     option_parser = make_option_parser()
@@ -124,7 +124,7 @@ def is_job_flow_non_streaming(job_flow):
             if arg == '-mapper':
                 return False
             # This is a debug jar associated with hadoop streaming
-            if arg.endswith('elasticmapreduce/libs/state-pusher/0.1/fetch'):
+            if DEBUG_JAR_RE.match(arg):
                 return False
 
     # job has at least one step, and none are streaming steps

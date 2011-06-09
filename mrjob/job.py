@@ -458,7 +458,7 @@ class MRJob(object):
         if mapper_final:
             start_processing()
             for out_key, out_value in mapper_final():
-                end_procesing()
+                end_processing()
                 write_line(out_key, out_value)
                 start_processing()
             end_processing()

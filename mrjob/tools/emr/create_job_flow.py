@@ -67,20 +67,16 @@ def make_option_parser():
     options_to_steal = {
         option_parser: ('conf_path', 'quiet', 'verbose'),
         ec2_opt_group: ('ec2_instance_type', 'ec2_master_instance_type',
-                        'ec2_slave_instance_type', 'num_ec2_instances',),
+                        'ec2_slave_instance_type', 'num_ec2_instances',
+                        'aws_availability_zone', 
+                        'ec2_key_pair', 'ec2_key_pair_file',
+                        'emr_endpoint',),
         hadoop_opt_group: ('hadoop_streaming_jar', 'hadoop_streaming_jar_on_emr',
-                           'hadoop_version',),
+                           'hadoop_version', 'cmdenv', 'label', 'owner'),
+        job_opt_group: ('upload_archives', 'bootstrap_mrjob', 'upload_files',
+                        'python_archives', 'bootstrap_cmds',
+                        'bootstrap_files', 'bootstrap_python_packages',),
     }
-
-    # These options are not created by MRJob()
-    job_opt_group.add_option(
-        '-l', '--label', dest='label',
-        default='create_job_flow',
-        help='Optional label for this job flow; useful for auditing. default: %default')
-    job_opt_group.add_option(
-        '-o', '--owner', dest='owner',
-        default=None,
-        help='Optional owner for this job; useful for auditing. Default is your username.')
 
     # Scrape options from MRJob and index them by dest
     all_options = {}

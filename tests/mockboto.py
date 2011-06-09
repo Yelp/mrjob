@@ -29,6 +29,7 @@ try:
 except ImportError:
     boto = None
 
+from mrjob.botoemr.connection import EmrConnection
 from mrjob.botoemr.step import JarStep
 from mrjob.conf import combine_values
 from mrjob.emr import S3_URI_RE, parse_s3_uri
@@ -226,7 +227,7 @@ class MockEmrConnection(object):
                     action_on_failure='TERMINATE_JOB_FLOW', keep_alive=False,
                     enable_debugging=False,
                     hadoop_version='0.18',
-                    steps=[],
+                    steps=None,
                     bootstrap_actions=[],
                     now=None):
         """Mock of run_jobflow().
@@ -236,6 +237,8 @@ class MockEmrConnection(object):
         """
         if now is None:
             now = datetime.datetime.utcnow()
+
+        steps = steps or []
 
         init_args = locals().copy()
         del init_args['self']
@@ -269,8 +272,9 @@ class MockEmrConnection(object):
             debugging_step = JarStep(name='Setup Hadoop Debugging',
                                      action_on_failure='TERMINATE_JOB_FLOW',
                                      main_class=None,
-                                     jar='DEBUGGING.jar',
-                                     step_args='S3/PATH/TO/ARGS.jar')
+                                     jar=EmrConnection.DebuggingJar,
+                                     step_args=[MockEmrObject(value=EmrConnection.DebuggingArgs)])
+            debugging_step.state = 'COMPLETED'
             steps.insert(0, debugging_step)
         self.add_jobflow_steps(jobflow_id, steps)
 
@@ -336,7 +340,7 @@ class MockEmrConnection(object):
                 state='PENDING',
                 name=step.name,
                 actiononfailure=step.action_on_failure,
-                args=step.args(),
+                args=step.args,
             )
 
             job_flow.steps.append(step_object)
@@ -358,9 +362,10 @@ class MockEmrConnection(object):
         """Figure out the output dir for a step by parsing step.args
         and looking for an -output argument."""
         # parse in reverse order, in case there are multiple -output args
-        for i, arg in reversed(list(enumerate(step.args[:-1]))):
+        args = step.args()
+        for i, arg in reversed(list(enumerate(args[:-1]))):
             if arg == '-output':
-                return step.args[i+1]
+                return args[i+1]
         else:
             return None
 
@@ -405,6 +410,9 @@ class MockEmrConnection(object):
         for step_num, step in enumerate(job_flow.steps):
             # skip steps that are already done
             if step.state in ('COMPLETED', 'FAILED', 'CANCELLED'):
+                continue
+            if step.name in ('Setup Hadoop Debugging', ):
+                step.state = 'COMPLETED'
                 continue
 
             # found currently running step! going to handle it, then exit
@@ -472,3 +480,20 @@ class MockEmrObject(object):
     def __setattr__(self, key, value):
         self.__dict__[key] = value
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        my_items = self.__dict__.items()
+        other_items = other.__dict__.items()
+
+        if len(my_items) != len(other_items):
+            return False
+
+        for k, v in my_items:
+            if not other_items.has_key(k):
+                return False
+            else:
+                if v != other_items[k]:
+                    return False
+
+        return True

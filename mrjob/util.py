@@ -256,22 +256,22 @@ def extract_dir_for_tar(archive_path, compression='gz'):
 
 
 class Profiler(object):
-    """Provide facilities for profiling IO- and CPU-bound parts of jobs."""
+    """Provide facilities for measuring time spent in user code (mappers/reducer) vs IO wait and framework."""
 
     def __init__(self):
         super(Profiler, self).__init__()
         self.last_measurement = resource.getrusage(resource.RUSAGE_SELF)
-        self.accumulated_io_time = 0.0
-        self.accumulated_cpu_time = 0.0
+        self.accumulated_other_time = 0.0
+        self.accumulated_user_time = 0.0
 
     def mark_start_processing(self):
         current_measurement = resource.getrusage(resource.RUSAGE_SELF)
 
-        self.accumulated_io_time += current_measurement.ru_stime - self.last_measurement.ru_stime
-        self.accumulated_io_time += current_measurement.ru_utime - self.last_measurement.ru_utime
+        self.accumulated_other_time += current_measurement.ru_stime - self.last_measurement.ru_stime
+        self.accumulated_other_time += current_measurement.ru_utime - self.last_measurement.ru_utime
         self.last_measurement = current_measurement
 
     def mark_end_processing(self):
         new_measurement = resource.getrusage(resource.RUSAGE_SELF)
-        self.accumulated_cpu_time += new_measurement.ru_utime - self.last_measurement.ru_utime
-        self.accumulated_cpu_time += new_measurement.ru_stime - self.last_measurement.ru_stime
+        self.accumulated_user_time += new_measurement.ru_utime - self.last_measurement.ru_utime
+        self.accumulated_user_time += new_measurement.ru_stime - self.last_measurement.ru_stime

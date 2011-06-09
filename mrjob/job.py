@@ -439,25 +439,33 @@ class MRJob(object):
         # set up profiling if appropriate
         if self.options.profile:
             profiler = Profiler()
+            start_processing = profiler.mark_start_processing
+            end_processing = profiler.mark_end_processing
         else:
             profiler = None
+            start_processing = lambda: True
+            end_processing = lambda: True
 
         # run the mapper on each line
         for key, value in read_lines():
-            if profiler: profiler.mark_start_processing()
+            start_processing()
             for out_key, out_value in mapper(key, value):
+                end_processing()
                 write_line(out_key, out_value)
-            if profiler: profiler.mark_end_processing()
+                start_processing()
+            end_processing()
 
         if mapper_final:
-            if profiler: profiler.mark_start_processing()
+            start_processing()
             for out_key, out_value in mapper_final():
+                end_processing()
                 write_line(out_key, out_value)
-            if profiler: profiler.mark_end_processing()
+                start_processing()
+            end_processing()
 
         if profiler:
-            self.increment_counter('profile', 'mapper estimated IO time: %0.2f' % (profiler.accumulated_io_time))
-            self.increment_counter('profile', 'mapper estimated CPU time: %0.2f' % (profiler.accumulated_cpu_time))
+            self.increment_counter('profile', 'mapper time (other): %0.2f' % (profiler.accumulated_other_time))
+            self.increment_counter('profile', 'mapper time (processing): %0.2f' % (profiler.accumulated_user_time))
 
     def run_reducer(self, step_num=0):
         """Run the reducer for the given step.
@@ -486,8 +494,12 @@ class MRJob(object):
         # set up profiling if appropriate
         if self.options.profile:
             profiler = Profiler()
+            start_processing = profiler.mark_start_processing
+            end_processing = profiler.mark_end_processing
         else:
             profiler = None
+            start_processing = lambda: True
+            end_processing = lambda: True
 
         # group all values of the same key together, and pass to the reducer
         #
@@ -495,15 +507,17 @@ class MRJob(object):
         # very large groupings of values
         for key, kv_pairs in itertools.groupby(read_lines(),
                                                key=lambda(k, v): k):
-            if profiler: profiler.mark_start_processing()
+            start_processing()
             values = (v for k, v in kv_pairs)
             for out_key, out_value in reducer(key, values):
+                end_processing()
                 write_line(out_key, out_value)
-            if profiler: profiler.mark_end_processing()
+                start_processing()
+            end_processing()
 
         if profiler:
-            self.increment_counter('profile', 'reducer estimated IO time: %0.2f' % (profiler.accumulated_io_time))
-            self.increment_counter('profile', 'reducer estimated CPU time: %0.2f' % (profiler.accumulated_cpu_time))
+            self.increment_counter('profile', 'reducer time (other): %0.2f' % (profiler.accumulated_other_time))
+            self.increment_counter('profile', 'reducer time (processing): %0.2f' % (profiler.accumulated_user_time))
 
     def show_steps(self):
         """Print information about how many steps there are, and whether

@@ -37,6 +37,12 @@ def cmd_line(args):
     return ' '.join(pipes.quote(x) for x in args)
 
 
+def get_jobconf_value(variable):
+    """gets a jobconf varaible from runtime environment
+    """
+    return os.environ[variable]
+
+
 def expand_path(path):
     """Resolve ``~`` (home dir) and environment variables in *path*.
 

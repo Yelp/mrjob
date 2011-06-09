@@ -23,7 +23,7 @@ from subprocess import Popen, PIPE
 from StringIO import StringIO
 import sys
 import tempfile
-from testify import TestCase, assert_equal, assert_not_equal, assert_gt, assert_raises, setup, teardown
+from testify import TestCase, assert_equal, assert_in, assert_not_equal, assert_gt, assert_raises, setup, teardown
 import time
 
 from mrjob.conf import combine_envs, dump_mrjob_conf
@@ -182,25 +182,14 @@ class CountersAndStatusTestCase(TestCase):
 
 class ProfilingTestCase(TestCase):
 
-    @setup
-    def make_tmp_dir_and_mrjob_conf(self):
-        self.tmp_dir = tempfile.mkdtemp()
-        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'inline': {}}},
-                        open(self.mrjob_conf_path, 'w'))
-
-    @teardown
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
     def test_profiling(self):
         stdin = StringIO('foo\nbar\n')
-        mr_job = MRBoringJob(['-r', 'inline', '--profile', 
-                             '-c', self.mrjob_conf_path]).sandbox(stdin=stdin)
+        mr_job = MRTwoStepJob(['-r', 'local', '--profile', 
+                              '--no-conf'])
+        mr_job.sandbox(stdin=stdin)
         with mr_job.make_runner() as runner:
             runner.run()
-            counters = mr_job.parse_counters()
-            assert_in('profile', counters)
+            assert_in('profile', runner._counters[0])
 
 
 class ProtocolsTestCase(TestCase):

@@ -93,6 +93,12 @@ class JSONValueProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return json.dumps(value)
 
+def escape_msgpack(s):
+    return s.replace('\t', r'\\\\t').replace('\n', r'\\\\n')
+
+def unescape_msgpack(s):
+    return s.replace(r'\\\\t', '\t').replace(r'\\\\n', '\n')
+
 class MsgPackProtocol(HadoopStreamingProtocol):
     """Encode ``(key, value)`` as two MsgPacks separated by a tab.
 
@@ -100,12 +106,12 @@ class MsgPackProtocol(HadoopStreamingProtocol):
     and there's no distinction between lists and tuples."""
     @classmethod
     def read(cls, line):
-        key, value = line.split('\t')
+        key, value = [unescape_msgpack(i) for i in line.split('\t')]
         return msgpack.unpackb(key), msgpack.unpackb(value)
 
     @classmethod
     def write(cls, key, value):
-        return '%s\t%s' % (msgpack.packb(key), msgpack.packb(value))
+        return '%s\t%s' % (escape_msgpack(msgpack.packb(key)), escape_msgpack(msgpack.packb(value)))
 
 class MsgPackValueProtocol(HadoopStreamingProtocol):
     """Encode ``value`` as a MsgPack and discard ``key``
@@ -113,11 +119,11 @@ class MsgPackValueProtocol(HadoopStreamingProtocol):
     """
     @classmethod
     def read(cls, line):
-        return (None, msgpack.unpackb(line))
+        return (None, unpacker.unpack(line))
 
     @classmethod
     def write(cls, key, value):
-        return msgpack.packb(value)
+        return packer.pack(value)
 
 class PickleProtocol(HadoopStreamingProtocol):
     """Encode ``(key, value)`` as two string-escaped pickles separated

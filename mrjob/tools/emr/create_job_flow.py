@@ -22,9 +22,11 @@ Usage::
 """
 from __future__ import with_statement
 
-from optparse import OptionParser
+import itertools
+from optparse import OptionParser, OptionGroup
 
 from mrjob.emr import EMRJobRunner
+from mrjob.job import MRJob
 from mrjob.util import log_to_stream
 
 
@@ -41,18 +43,8 @@ def main():
         log_to_stream(name='mrjob', debug=options.verbose)
 
     # create the persistent job
-    runner_kwargs = {
-        'conf_path': options.conf_path,
-        'ec2_instance_type': options.ec2_instance_type,
-        'ec2_master_instance_type': options.ec2_master_instance_type,
-        'ec2_slave_instance_type': options.ec2_slave_instance_type,
-        'hadoop_streaming_jar': options.hadoop_streaming_jar,
-        'hadoop_streaming_jar_on_emr': options.hadoop_streaming_jar_on_emr,
-        'hadoop_version': options.hadoop_version,
-        'label': options.label,
-        'num_ec2_instances': options.num_ec2_instances,
-        'owner': options.owner,
-    }
+    runner_kwargs = options.__dict__
+
     runner = EMRJobRunner(**runner_kwargs)
     emr_job_flow_id = runner.make_persistent_job_flow()
     print emr_job_flow_id
@@ -62,50 +54,55 @@ def make_option_parser():
     usage = '%prog [options]'
     description = 'Create a persistent EMR job flow to run jobs in. WARNING: do not run this without mrjob.tools.emr.terminate.idle_job_flows in your crontab; job flows left idle can quickly become expensive!'
     option_parser = OptionParser(usage=usage, description=description)
-    option_parser.add_option(
-        '-v', '--verbose', dest='verbose', default=False, action='store_true',
-        help='print more messages to stderr')
-    option_parser.add_option(
-        '-q', '--quiet', dest='quiet', default=False, action='store_true',
-        help='just print job flow ID to stdout')
-    option_parser.add_option(
-        '-c', '--conf-path', dest='conf_path', default=None,
-        help='Path to alternate mrjob.conf file to read from')
-    option_parser.add_option(
-        '--no-conf', dest='conf_path', action='store_false',
-        help="Don't load mrjob.conf even if it's available")
-    option_parser.add_option(
-        '--ec2-instance-type', dest='ec2_instance_type', default=None,
-        help='Type of EC2 instance(s) to launch (e.g. m1.small, c1.xlarge, m2.xlarge). See http://aws.amazon.com/ec2/instance-types/ for the full list.')
-    option_parser.add_option(
-        '--ec2-master-instance-type', dest='ec2_master_instance_type', default=None,
-        help='Type of EC2 instance for master node only')
-    option_parser.add_option(
-        '--ec2-slave-instance-type', dest='ec2_slave_instance_type', default=None,
-        help='Type of EC2 instance for slave nodes only')
-    option_parser.add_option(
-        '--num-ec2-instances', dest='num_ec2_instances', default=None,
-        type='int',
-        help='Number of EC2 instances to launch')
-    option_parser.add_option(
-        '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
-        default=None,
-        help='Path of your hadoop streaming jar (locally, or on S3/HDFS)')
-    option_parser.add_option(
-        '--hadoop-streaming-jar-on-emr', dest='hadoop_streaming_jar_on_emr',
-        default=None,
-        help='Local path of the hadoop streaming jar on the EMR node. Rarely necessary')
-    option_parser.add_option(
-        '--hadoop-version', dest='hadoop_version', default=None,
-        help='Version of Hadoop to spin up on EMR. Default is 0.18, but will change to 0.20 in v0.3.0 of mrjob.')
-    option_parser.add_option(
+
+    def make_option_group(halp):
+        g = OptionGroup(option_parser, halp)
+        option_parser.add_option_group(g)
+        return g
+
+    ec2_opt_group = make_option_group('EC2 instance configuration')
+    hadoop_opt_group = make_option_group('Hadoop configuration')
+    job_opt_group = make_option_group('Job flow configuration')
+
+    options_to_steal = {
+        option_parser: ('conf_path', 'quiet', 'verbose'),
+        ec2_opt_group: ('ec2_instance_type', 'ec2_master_instance_type',
+                        'ec2_slave_instance_type', 'num_ec2_instances',),
+        hadoop_opt_group: ('hadoop_streaming_jar', 'hadoop_streaming_jar_on_emr',
+                           'hadoop_version',),
+    }
+
+    # These options are not created by MRJob()
+    job_opt_group.add_option(
         '-l', '--label', dest='label',
         default='create_job_flow',
         help='Optional label for this job flow; useful for auditing. default: %default')
-    option_parser.add_option(
+    job_opt_group.add_option(
         '-o', '--owner', dest='owner',
         default=None,
         help='Optional owner for this job; useful for auditing. Default is your username.')
+
+    # Scrape options from MRJob and index them by dest
+    all_options = {}
+    mr_job = MRJob()
+    job_option_groups = (mr_job.option_parser, mr_job.mux_opt_group,
+                         mr_job.proto_opt_group, mr_job.runner_opt_group,
+                         mr_job.hadoop_emr_opt_group, mr_job.emr_opt_group)
+    job_option_lists = [g.option_list for g in job_option_groups]
+    for option in itertools.chain(*job_option_lists):
+        other_options = all_options.get(option.dest, [])
+        other_options.append(option)
+        all_options[option.dest] = other_options
+
+    # Insert them into our own option groups
+    for opt_group, opt_dest_list in options_to_steal.iteritems():
+        options_for_this_group = opt_group.option_list
+        for option_dest in options_to_steal[opt_group]:
+            for option in all_options[option_dest]:
+                options_for_this_group.append(option)
+        # Sort alphabetically
+        opt_group.option_list = sorted(options_for_this_group,
+                                       key=lambda item: item.get_opt_string())
 
     return option_parser
 

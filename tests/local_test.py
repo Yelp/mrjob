@@ -30,6 +30,8 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import cmd_line
 from tests.mr_job_where_are_you import MRJobWhereAreYou
+from tests.mr_test_jobconf import MRJobConfTest
+from tests.mr_wordcount import MRWordCount
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.quiet import no_handlers_for_logger
@@ -298,3 +300,77 @@ class LocalBootstrapMrjobTestCase(TestCase):
             # script should load mrjob from the same place our test does
             _, script_mrjob_dir = mr_job.parse_output_line(output[0])
             assert_equal(our_mrjob_dir, script_mrjob_dir)
+
+
+class LocalMRJobRunnerJobConfTestCase(TestCase):
+
+    @setup
+    def make_tmp_dir_and_mrjob_conf(self):
+        self.tmp_dir = tempfile.mkdtemp()
+        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        dump_mrjob_conf({'runners': {'local': {}}},
+                        open(self.mrjob_conf_path, 'w'))
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def test_input_file(self):
+        input_path = os.path.join(self.tmp_dir, 'input')
+        with open(input_path, 'w') as input_file:
+            input_file.write('bar\nqux\nfoo\n')
+
+        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz = gzip.GzipFile(input_gz_path, 'w')
+        input_gz.write('foo\n')
+        input_gz.close()
+
+        mr_job = MRWordCount(['-c', self.mrjob_conf_path,
+                               '--jobconf=mapred.map.tasks=2',
+                                '--jobconf=mapred.reduce.tasks=2',
+                               input_path, input_gz_path])
+        mr_job.sandbox()
+
+        results = []
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+        assert_equal(sorted(results),
+                     [(input_path, 3), (input_gz_path, 1)])
+                     
+    def test_others(self):
+        input_path = os.path.join(self.tmp_dir, 'input')
+        with open(input_path, 'w') as input_file:
+            input_file.write('foo\n')
+
+        mr_job = MRJobConfTest(['-c', self.mrjob_conf_path,
+                               input_path])
+        mr_job.sandbox()
+
+        results = []
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+        # test that we are are not throwing exceptions
+        assert_equal(sorted(results),
+                     [('mapreduce_job_cache_local_archives', runner._mrjob_tar_gz_path), 
+                     ('mapreduce_job_id', runner._job_name), 
+                     ('mapreduce_job_local_dir', runner._working_dir), 
+                     ('mapreduce_map_input_file', input_path), 
+                     ('mapreduce_map_input_length', '4'), 
+                     ('mapreduce_map_input_start', '0'), 
+                     ('mapreduce_task_attempt_id', 'attempt_%s_M_000000_0' % runner._job_name), 
+                     ('mapreduce_task_id', 'task_%s_M_000000' % runner._job_name), 
+                     ('mapreduce_task_ismap', 'True'), 
+                     ('mapreduce_task_output_dir', runner._output_dir), 
+                     ('mapreduce_task_partition', '0')])

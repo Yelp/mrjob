@@ -161,10 +161,10 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            assert_in('-inputformat', job_flow.steps[0].args)
-            assert_not_in('-outputformat', job_flow.steps[0].args)
-            assert_not_in('-inputformat', job_flow.steps[1].args)
-            assert_in('-outputformat', job_flow.steps[1].args)
+            assert_in('-inputformat', job_flow.steps[0].args())
+            assert_not_in('-outputformat', job_flow.steps[0].args())
+            assert_not_in('-inputformat', job_flow.steps[1].args())
+            assert_in('-outputformat', job_flow.steps[1].args())
 
             # make sure mrjob.tar.gz is created and uploaded as
             # a bootstrap file
@@ -354,7 +354,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
                            '-c', self.mrjob_conf_path,
                            '--enable-emr-debugging'])
         mr_job.sandbox()
-        
+
         with mr_job.make_runner() as runner:
             runner.run()
             flow = runner.make_emr_conn().describe_jobflow(runner._emr_job_flow_id)

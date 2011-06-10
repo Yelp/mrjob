@@ -27,6 +27,20 @@ HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*\.jar$')
 JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
 
 
+_HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.()])')
+
+def counter_unescape(escaped_string):
+    """Fix names of counters and groups emitted by Hadoop 0.20+ logs, which
+    use escape sequences for more characters than most decoders know about
+    (e.g. ``().``).
+
+    :param escaped_string: string from a counter log line
+    :type escaped_string: str
+    """
+    escaped_string = _HADOOP_0_20_ESCAPED_CHARS_RE.sub(r'\1', escaped_string)
+    return escaped_string.decode('string_escape')
+
+
 def find_python_traceback(lines):
     """Scan a log file or other iterable for a Python traceback,
     and return it as a list of lines.
@@ -43,6 +57,7 @@ def find_python_traceback(lines):
             return tb_lines
     else:
         return None
+
 
 def find_hadoop_java_stack_trace(lines):
     """Scan a log file or other iterable for a java stack trace from Hadoop,
@@ -100,6 +115,7 @@ def find_input_uri_for_mapper(lines):
     else:
         return None
 
+
 _HADOOP_STREAMING_ERROR_RE = re.compile(r'^.*ERROR org\.apache\.hadoop\.streaming\.StreamJob \(main\): (.*)$')
 
 def find_interesting_hadoop_streaming_error(lines):
@@ -122,6 +138,7 @@ def find_interesting_hadoop_streaming_error(lines):
     else:
         return None
 
+
 _TIMEOUT_ERROR_RE = re.compile(r'Task.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds. Killing!"')
 
 def find_timeout_error(lines):
@@ -141,6 +158,7 @@ def find_timeout_error(lines):
         if match:
             result = match.group(1)
     return int(result)
+
 
 # recognize hadoop streaming output
 _COUNTER_RE = re.compile(r'reporter:counter:([^,]*),([^,]*),(-?\d+)$')
@@ -204,7 +222,6 @@ _COUNTER_RE_0_20 = re.compile(r'\[\((?P<counter_id>.+?)\)\((?P<counter_name>.+?)
 # look for the {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...} syntax
 _COUNTER_FORMAT_IS_0_20 = re.compile(r'{\(.+?\)\(.+?\)(\[\(.+?\)\(.+?\)\(\d+\)\])}')
 
-
 def _parse_counters_0_18(counter_string):
     # 0.18 counters look like this:
     # GroupName.CounterName:Value,GroupName.Crackers:3,AnotherGroup.Nerf:243,... 
@@ -212,44 +229,29 @@ def _parse_counters_0_18(counter_string):
         yield group, name, int(amount_str)
 
 
-def counter_unescape(escaped_string):
-    """Fix names of counters and groups emitted by Hadoop 0.20+ logs. They are escaped with a few extra characters (e.g. ``().``) which must be handled manually.
-
-    :param escaped_string: string from a counter log line
-    :type escaped_string: str
-    """
-    escaped_string = escaped_string.decode('string_escape')
-    next_char_protected = False
-    new_chars = []
-    escapable = '().'
-    for char in escaped_string:
-        if char == '\\':
-            next_char_protected = True
-        elif next_char_protected and char not in escapable:
-            # put the backslash back in
-            new_chars.append('\\')
-            new_chars.append(char)
-            next_char_protected = False
-        else:
-            new_chars.append(char)
-            next_char_protected = False
-    if next_char_protected:
-        new_chars.append('\\')
-    return ''.join(new_chars)
-
-
 def _parse_counters_0_20(group_string):
     # 0.20 counters look like this:
     # {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...} 
     for group_id, group_name, counter_str in _GROUP_RE_0_20.findall(group_string):
         for counter_id, counter_name, counter_value in _COUNTER_RE_0_20.findall(counter_str):
-            yield counter_unescape(group_name), counter_unescape(counter_name), int(counter_value)
+            try:
+                group_name = counter_unescape(group_name)
+            except ValueError:
+                raise Exception("Could not decode group name %s" % group_name)
+
+            try:
+                counter_name = counter_unescape(counter_name)
+            except ValueError:
+                raise Exception("Could not decode counter name %s" % counter_name)
+
+            yield group_name, counter_name, int(counter_value)
 
 
 def parse_hadoop_counters_from_line(line):
     """Parse Hadoop counter values from a log line.
 
-    The counter log line format changed significantly between Hadoop 0.18 and 0.20, so this function switches between parsers for them.
+    The counter log line format changed significantly between Hadoop 0.18 and
+    0.20, so this function switches between parsers for them.
 
     :param line: log line containing counter data
     :type line: str

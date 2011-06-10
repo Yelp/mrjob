@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2010-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Delete old files in a path (by default files that are older than 30 days)
+""" Delete old files in a path
 """
 from datetime import datetime, timedelta
 import logging
@@ -27,14 +27,15 @@ from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.s3_tmpwatch')
 
-DEFAULT_TIME_OLD = '30d'
-
 def main():
     option_parser = make_option_parser()
     options, args = option_parser.parse_args()
 
+    # make sure time and uris are given
     if not args:
         option_parser.error('Please specify one or more URIs')
+    if not options.time:
+        option_parser.error('--time needs to be specified')
 
     # set up logging
     if not options.quiet:
@@ -45,11 +46,11 @@ def main():
     time_old = process_time(options.time)
    
     for path in args:
-        S3_cleanup(path, time_old,
+        s3_cleanup(path, time_old,
             conf_path=options.conf_path,
             dry_run=options.test)
 
-def S3_cleanup(glob_path, time_old, dry_run=False, conf_path=None):
+def s3_cleanup(glob_path, time_old, dry_run=False, conf_path=None):
     """Delete all files older than *time_old* in *path*.
        If *dry_run* is ``True``, then just log the files that need to be 
        deleted without actually deleting them
@@ -65,8 +66,7 @@ def S3_cleanup(glob_path, time_old, dry_run=False, conf_path=None):
 
         for key in bucket.list(key_name):
             last_modified = datetime.strptime(key.last_modified, boto.utils.ISO8601)
-            last_modified = last_modified.replace(tzinfo=None)
-            time_delta = datetime.now() - last_modified
+            time_delta = datetime.utcnow() - last_modified
             if time_delta > time_old:
                 # Delete it
                 log.info('Deleting %s; is %s old' % (key.name, str(time_delta)))
@@ -92,9 +92,9 @@ def make_option_parser():
         action='store_true',
         help='Print more messages')
     option_parser.add_option(
-           '-q', '--quiet', dest='quiet', default=False,
-           action='store_true',
-           help="Don't print anything to stderr; just print deleted files to stdout")
+        '-q', '--quiet', dest='quiet', default=False,
+        action='store_true',
+        help="Don't print anything to stderr; just print deleted files to stdout")
     option_parser.add_option(
         '-c', '--conf-path', dest='conf_path', default=None,
         help='Path to alternate mrjob.conf file to read from')
@@ -102,11 +102,10 @@ def make_option_parser():
         '--no-conf', dest='conf_path', action='store_false',
         help="Don't load mrjob.conf even if it's available")
     option_parser.add_option(
-        '-t', '--time', dest='time',
-        default=DEFAULT_TIME_OLD, type='str',
+        '--time', dest='time', type='str',
         help='The time the file needs to be old before deleting it')
     option_parser.add_option(
-        '--test', dest='test', default=False,
+        '-t', '--test', dest='test', default=False,
         action='store_true',
         help="Don't actually delete any files; just log that we would")
 

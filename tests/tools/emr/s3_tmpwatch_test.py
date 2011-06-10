@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -73,14 +73,14 @@ class S3TmpWatchTestCase(MockEMRAndS3TestCase):
         assert isinstance(key_bar, MockKey)
         assert isinstance(key_qux, MockKey)
             
-        S3_cleanup(remote_input_path, timedelta(days=30), dry_run=True)
+        s3_cleanup(remote_input_path, timedelta(days=30), dry_run=True)
         
         # dry-run shouldn't delete anything
         assert isinstance(key_foo, MockKey)
         assert isinstance(key_bar, MockKey)
         assert isinstance(key_qux, MockKey)
         
-        S3_cleanup(remote_input_path, timedelta(days=30))
+        s3_cleanup(remote_input_path, timedelta(days=30))
         
         key_foo = bucket.get_key('data/foo')
         key_bar = bucket.get_key('data/bar')
@@ -91,7 +91,7 @@ class S3TmpWatchTestCase(MockEMRAndS3TestCase):
         assert_equal(key_bar, None)
         assert isinstance(key_qux, MockKey)
         
-        S3_cleanup(remote_input_path, timedelta(hours=48))
+        s3_cleanup(remote_input_path, timedelta(hours=48))
         
         key_foo = bucket.get_key('data/foo')
         key_bar = bucket.get_key('data/bar')

@@ -43,7 +43,7 @@ def add_mock_s3_data(mock_s3_fs, data):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
     key to contents) with a map from bucket name to key name to data and
     time last modified."""
-    time_modified = to_iso8601(datetime.datetime.now())
+    time_modified = to_iso8601(datetime.datetime.utcnow())
     for bucket_name, key_name_to_bytes in data.iteritems():
         mock_s3_fs.setdefault(bucket_name, {'keys':{}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
@@ -109,7 +109,7 @@ class MockBucket:
     def new_key(self, key_name):
         if key_name not in self.mock_state():
             self.mock_state()[key_name] = ('', 
-                    to_iso8601(datetime.datetime.now()))
+                    to_iso8601(datetime.datetime.utcnow()))
         return MockKey(bucket=self, name=key_name)
 
     def get_key(self, key_name):
@@ -149,7 +149,7 @@ class MockKey(object):
     def write_mock_data(self, data):
         if self.name in self.bucket.mock_state():
             self.bucket.mock_state()[self.name] = (data, 
-                        to_iso8601(datetime.datetime.now()))
+                        to_iso8601(datetime.datetime.utcnow()))
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 

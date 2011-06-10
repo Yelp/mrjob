@@ -37,6 +37,23 @@ def cmd_line(args):
     return ' '.join(pipes.quote(x) for x in args)
 
 
+def extract_dir_for_tar(archive_path, compression='gz'):
+    """Get the name of the directory the tar at *archive_path* extracts into.
+
+    :type archive_path: str
+    :param archive_path: path to archive file
+    :type compression: str
+    :param compression: Compression type to use. This can be one of ``''``, ``bz2``, or ``gz``.
+    """
+    # Open the file for read-only streaming (no random seeks)
+    tar = tarfile.open(archive_path, mode='r|%s' % compression)
+    # Grab the first item
+    first_member = tar.next()
+    tar.close()
+    # Return the first path component of the item's name
+    return first_member.name.split('/')[0]
+
+
 def expand_path(path):
     """Resolve ``~`` (home dir) and environment variables in *path*.
 
@@ -235,20 +252,3 @@ def unarchive(archive_path, dest):
                         dest_file.write(archive.read(name))
     else:
         raise IOError('Unknown archive type: %s' % (archive_path,))
-
-
-def extract_dir_for_tar(archive_path, compression='gz'):
-    """Get the name of the directory the tar at *archive_path* extracts into.
-
-    :type archive_path: str
-    :param archive_path: path to archive file
-    :type compression: str
-    :param compression: Compression type to use. This can be one of ``''``, ``bz2``, or ``gz``.
-    """
-    # Open the file for read-only streaming (no random seeks)
-    tar = tarfile.open(archive_path, mode='r|%s' % compression)
-    # Grab the first item
-    first_member = tar.next()
-    tar.close()
-    # Return the first path component of the item's name
-    return first_member.name.split('/')[0]

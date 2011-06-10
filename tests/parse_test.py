@@ -129,6 +129,15 @@ class FindMiscTestCase(TestCase):
         assert_equal(counter_unescape(r'\\'), '\\')
         # cases covered by manual unescape:
         assert_equal(counter_unescape(r'\.'), '.')
+        assert_raises(ValueError, counter_unescape, '\\')
+
+    def test_parsing_error(self):
+        counter_string = 'Job FAILED_REDUCES="0" COUNTERS="{(testgroup)(testgroup)[(\\)(\\)(1)]}"'
+        assert_raises(LogParsingException, parse_hadoop_counters_from_line, counter_string)
+
+    def test_messy_error(self):
+        counter_string = 'Job FAILED_REDUCES="0" COUNTERS="YOU JUST GOT PUNKD"'
+        assert_raises(LogParsingException, parse_hadoop_counters_from_line, counter_string)
 
 
 class ParseMRJobStderr(TestCase):

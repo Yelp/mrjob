@@ -27,6 +27,10 @@ HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*\.jar$')
 JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
 
 
+class LogParsingException(Exception):
+    pass
+
+
 _HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.()])')
 
 def counter_unescape(escaped_string):
@@ -237,12 +241,12 @@ def _parse_counters_0_20(group_string):
             try:
                 group_name = counter_unescape(group_name)
             except ValueError:
-                raise Exception("Could not decode group name %s" % group_name)
+                raise LogParsingException("Could not decode group name %s" % group_name)
 
             try:
                 counter_name = counter_unescape(counter_name)
             except ValueError:
-                raise Exception("Could not decode counter name %s" % counter_name)
+                raise LogParsingException("Could not decode counter name %s" % counter_name)
 
             yield group_name, counter_name, int(counter_value)
 
@@ -276,7 +280,7 @@ def parse_hadoop_counters_from_line(line):
             break
 
     if correct_func is None:
-        raise Exception('Cannot parse Hadoop counter line: %s' % line)
+        raise LogParsingException('Cannot parse Hadoop counter line: %s' % line)
 
     counters = {}
     for group, counter, value in correct_func(counter_substring):

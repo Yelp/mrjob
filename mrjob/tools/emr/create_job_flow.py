@@ -63,7 +63,7 @@ def make_option_parser():
     hadoop_opt_group = make_option_group('Hadoop configuration')
     job_opt_group = make_option_group('Job flow configuration')
 
-    options_to_steal = {
+    assignments = {
         option_parser: ('conf_path', 'quiet', 'verbose'),
         ec2_opt_group: ('ec2_instance_type', 'ec2_master_instance_type',
                         'ec2_slave_instance_type', 'num_ec2_instances',
@@ -80,7 +80,7 @@ def make_option_parser():
     job_option_groups = (mr_job.option_parser, mr_job.mux_opt_group,
                          mr_job.proto_opt_group, mr_job.runner_opt_group,
                          mr_job.hadoop_emr_opt_group, mr_job.emr_opt_group)
-    scrape_options_into_new_groups(job_option_groups, options_to_steal)
+    scrape_options_into_new_groups(job_option_groups, assignments)
     return option_parser
 
 

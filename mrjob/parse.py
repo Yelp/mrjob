@@ -212,12 +212,25 @@ def _parse_counters_0_18(counter_string):
         yield group, name, int(amount_str)
 
 
+def _unescape(escaped_string):
+    escaped_string = escaped_string.decode('string_escape')
+    next_char_protected = False
+    new_chars = []
+    for char in escaped_string:
+        if next_char_protected or char != '\\':
+            new_chars.append(char)
+        else:
+            next_char_protected = True
+        next_char_protected = False
+    return ''.join(new_chars)
+
+
 def _parse_counters_0_20(group_string):
     # 0.20 counters look like this:
     # {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...} 
     for group_id, group_name, counter_str in _GROUP_RE_0_20.findall(group_string):
         for counter_id, counter_name, counter_value in _COUNTER_RE_0_20.findall(counter_str):
-            yield group_name, counter_name, int(counter_value)
+            yield _unescape(group_name), _unescape(counter_name), int(counter_value)
 
 
 def parse_hadoop_counters_from_line(line):

@@ -156,7 +156,7 @@ class LocalMRJobRunner(MRJobRunner):
                 self._reduce_tasks = int(value)
                 if self._reduce_tasks < 1:
                     raise ValueError("%s should be greater than 1" % conf_arg)
-            elif conf_arg == 'mapred.job.local.dir':
+            elif conf_arg == 'mapred.job.local.dir' or conf_arg == 'mapreduce.job.local.dir':
                 # hadoop supports multiple direcories - sticking with only one here
                 if not os.path.isdir(value):
                     raise IOError("Directory %s does not exist" % value)

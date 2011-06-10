@@ -28,11 +28,14 @@ JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
 
 # match a job output line containing counter data
 COUNTER_LINE_RE = re.compile(r'Job \w+=".*?"(\s+\w+=".*?")+\s+COUNTERS="(?P<counters>.+?)"') 
+
 # 0.18-specific
 COUNTER_RE_0_18 = re.compile(r'(?P<group>.+?)[.](?P<name>.+?):(?P<value>\d+)')
+COUNTER_FORMAT_IS_0_18 = re.compile(r'(.+?[.].+?:\d+)(,(.+?[.].+?:\d+))*')
 # 0.20-specific
 GROUP_RE_0_20 = re.compile(r'{\((.+?)\)\((.+?)\)(.+)}')
 COUNTER_RE_0_20 = re.compile(r'\[\((.+?)\)\((.+?)\)\((\d+)\)\]')
+COUNTER_FORMAT_IS_0_20 = re.compile(r'{\(.+?\)\(.+?\)(\[\(.+?\)\(.+?\)\(\d+\)\])}')
 
 def find_python_traceback(lines):
     """Scan a log file or other iterable for a Python traceback,
@@ -224,7 +227,7 @@ def _parse_counters_0_20(counter_string):
     return counters
 
 
-def parse_hadoop_counters_from_line(line, hadoop_version='0.18'):
+def parse_hadoop_counters_from_line(line):
     """Parse Hadoop counter values from a log line.
 
     :param line: log line containing counter data
@@ -234,13 +237,18 @@ def parse_hadoop_counters_from_line(line, hadoop_version='0.18'):
     """
     m = COUNTER_LINE_RE.match(line)
     if not m:
-        return None 
+        return None
 
-    styles = {
-        '0.18': _parse_counters_0_18,
-        '0.20': _parse_counters_0_20,
-    }
-    return styles[hadoop_version](m.group('counters'))
+    parser_switch = (
+        (COUNTER_FORMAT_IS_0_18, _parse_counters_0_18),
+        (COUNTER_FORMAT_IS_0_20, _parse_counters_0_20),
+    )
+
+    counter_substring = m.group('counters')
+
+    for regex, func in parser_switch:
+        if regex.match(counter_substring):
+            return func(counter_substring)
 
 
 def parse_port_range_list(range_list_str):

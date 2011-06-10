@@ -71,10 +71,8 @@ def make_option_parser():
                         'aws_availability_zone', 
                         'ec2_key_pair', 'ec2_key_pair_file',
                         'emr_endpoint',),
-        hadoop_opt_group: ('hadoop_streaming_jar', 'hadoop_streaming_jar_on_emr',
-                           'hadoop_version', 'cmdenv', 'label', 'owner'),
-        job_opt_group: ('upload_archives', 'bootstrap_mrjob', 'upload_files',
-                        'python_archives', 'bootstrap_cmds',
+        hadoop_opt_group: ('hadoop_version', 'label', 'owner'),
+        job_opt_group: ('bootstrap_mrjob', 'bootstrap_cmds',
                         'bootstrap_files', 'bootstrap_python_packages',),
     }
 

@@ -209,19 +209,18 @@ class LocalMRJobRunner(MRJobRunner):
             # assume that input is a collection of key <tab> value pairs
             re_pattern = re.compile("^(.*?)\t")
             try:
-                lines = []
-                for path in input_paths:
-                    for line in read_file(path):
-                        key = re_pattern.search(line).group(1)
-                        lines.append((key, line))
-            
+                # we should only have one file at this point
+                assert(len(input_paths) == 1)
+                input_file = input_paths[0] 
                 current_file = 0
-                for key, kv_pairs in itertools.groupby(sorted(lines), key=lambda(k, v): k):
-                    for key, line in kv_pairs:
+                for key, lines in itertools.groupby(read_file(input_file), 
+                                key=lambda(line): re_pattern.search(line).group(1)):
+                    for line in lines:
                         files[current_file].write(line)
                     current_file = (current_file + 1) % num_splits
             except:
                 # fall back to unsorted case
+                log.warning('Could not keep file sorted')
                 return self._get_file_splits(input_paths, num_splits)
         else:
             current_file = 0

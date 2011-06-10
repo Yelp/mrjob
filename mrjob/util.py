@@ -269,15 +269,17 @@ class Profiler(object):
         """Transition from 'other' code to 'processing' code"""
         current_measurement = resource.getrusage(resource.RUSAGE_SELF)
 
-        self.accumulated_other_time += current_measurement.ru_stime - self.last_measurement.ru_stime
-        self.accumulated_other_time += current_measurement.ru_utime - self.last_measurement.ru_utime
+        stime_delta = current_measurement.ru_stime - self.last_measurement.ru_stime
+        utime_delta = current_measurement.ru_utime - self.last_measurement.ru_utime
+        self.accumulated_other_time += stime_delta + utime_delta
         self.last_measurement = current_measurement
 
     def mark_end_processing(self):
         """Transition from 'processing' code back to 'other' code"""
         new_measurement = resource.getrusage(resource.RUSAGE_SELF)
-        self.accumulated_processing_time += new_measurement.ru_utime - self.last_measurement.ru_utime
-        self.accumulated_processing_time += new_measurement.ru_stime - self.last_measurement.ru_stime
+        stime_delta = new_measurement.ru_stime - self.last_measurement.ru_stime
+        utime_delta = new_measurement.ru_utime - self.last_measurement.ru_utime
+        self.accumulated_processing_time += stime_delta + utime_delta
 
     def results(self):
         """Quickly get measurements
@@ -287,6 +289,8 @@ class Profiler(object):
         return self.accumulated_processing_time, self.accumulated_other_time
 
     def _wrap_normal(self, func, mark_begin, mark_end):
+        # wrap a normal function, nothing too fancy here
+        # except to use @wraps to preserve the function signature
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             mark_begin()
@@ -296,12 +300,15 @@ class Profiler(object):
         return wrapper
 
     def _wrap_generator(self, gen, mark_begin, mark_end):
+        # Generators should be measured each time they yield.
         @functools.wraps(gen)
         def wrapper(*args, **kwargs):
             mark_begin()
             for item in gen(*args, **kwargs):
                 mark_end()
                 yield item
+                # yield only continues in the current scope when the caller
+                # is ready, so mark_begin() is safe here.
                 mark_begin()
             mark_end()
         return wrapper
@@ -314,9 +321,12 @@ class Profiler(object):
         :type generator: bool
         :param generator: set to ``True`` if ``processing_func`` is a generator so its iterations can be counted towards processing time
         """
+        # this is broken out in case we decide to also have a wrap_other() function
         if generator:
-            return self._wrap_generator(processing_func, self.mark_start_processing,
+            return self._wrap_generator(processing_func,
+                                        self.mark_start_processing,
                                         self.mark_end_processing)
         else:
-            return self._wrap_normal(processing_func, self.mark_start_processing,
+            return self._wrap_normal(processing_func,
+                                     self.mark_start_processing,
                                      self.mark_end_processing)

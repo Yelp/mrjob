@@ -123,6 +123,13 @@ class FindMiscTestCase(TestCase):
 
         assert_in('reducer time (processing): 2.51', counters['profile'])
 
+    def test_unescape(self):
+        # cases covered by string_escape:
+        assert_equal(counter_unescape(r'\n'), '\n')
+        assert_equal(counter_unescape(r'\\'), '\\')
+        # cases covered by manual unescape:
+        assert_equal(counter_unescape(r'\.'), '.')
+
 
 class ParseMRJobStderr(TestCase):
 

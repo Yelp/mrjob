@@ -212,16 +212,29 @@ def _parse_counters_0_18(counter_string):
         yield group, name, int(amount_str)
 
 
-def _unescape(escaped_string):
+def counter_unescape(escaped_string):
+    """Fix names of counters and groups emitted by Hadoop 0.20+ logs. They are escaped with a few extra characters (e.g. ``().``) which must be handled manually.
+
+    :param escaped_string: string from a counter log line
+    :type escaped_string: str
+    """
     escaped_string = escaped_string.decode('string_escape')
     next_char_protected = False
     new_chars = []
+    escapable = '().'
     for char in escaped_string:
-        if next_char_protected or char != '\\':
-            new_chars.append(char)
-        else:
+        if char == '\\':
             next_char_protected = True
-        next_char_protected = False
+        elif next_char_protected and char not in escapable:
+            # put the backslash back in
+            new_chars.append('\\')
+            new_chars.append(char)
+            next_char_protected = False
+        else:
+            new_chars.append(char)
+            next_char_protected = False
+    if next_char_protected:
+        new_chars.append('\\')
     return ''.join(new_chars)
 
 
@@ -230,7 +243,7 @@ def _parse_counters_0_20(group_string):
     # {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...} 
     for group_id, group_name, counter_str in _GROUP_RE_0_20.findall(group_string):
         for counter_id, counter_name, counter_value in _COUNTER_RE_0_20.findall(counter_str):
-            yield _unescape(group_name), _unescape(counter_name), int(counter_value)
+            yield counter_unescape(group_name), counter_unescape(counter_name), int(counter_value)
 
 
 def parse_hadoop_counters_from_line(line):

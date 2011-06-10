@@ -73,14 +73,14 @@ class S3TmpWatchTestCase(MockEMRAndS3TestCase):
         assert isinstance(key_bar, MockKey)
         assert isinstance(key_qux, MockKey)
             
-        s3_cleanup(remote_input_path, timedelta(days=30), dry_run=True)
+        s3_cleanup(remote_input_path, timedelta(days=30), dry_run=True, conf_path=False)
         
         # dry-run shouldn't delete anything
         assert isinstance(key_foo, MockKey)
         assert isinstance(key_bar, MockKey)
         assert isinstance(key_qux, MockKey)
         
-        s3_cleanup(remote_input_path, timedelta(days=30))
+        s3_cleanup(remote_input_path, timedelta(days=30), conf_path=False)
         
         key_foo = bucket.get_key('data/foo')
         key_bar = bucket.get_key('data/bar')
@@ -91,7 +91,7 @@ class S3TmpWatchTestCase(MockEMRAndS3TestCase):
         assert_equal(key_bar, None)
         assert isinstance(key_qux, MockKey)
         
-        s3_cleanup(remote_input_path, timedelta(hours=48))
+        s3_cleanup(remote_input_path, timedelta(hours=48), conf_path=False)
         
         key_foo = bucket.get_key('data/foo')
         key_bar = bucket.get_key('data/bar')

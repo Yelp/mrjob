@@ -194,7 +194,7 @@ _COUNTER_LINE_RE = re.compile(r'Job \w+=".*?"(\s+\w+=".*?")*\s+COUNTERS="(?P<cou
 
 # 0.18-specific
 # see _parse_counters_0_18 for format
-_COUNTER_RE_0_18 = re.compile(r'(?P<group>.+?)[.](?P<name>.+?):(?P<value>\d+)')
+_COUNTER_RE_0_18 = re.compile(r'(?P<group>[^,]+?)[.](?P<name>.+?):(?P<value>\d+)')
 # look for the groupname.countername:countervalue,... syntax
 _COUNTER_FORMAT_IS_0_18 = re.compile(r'(.+?[.].+?:\d+)(,(.+?[.].+?:\d+))*')
 # 0.20-specific
@@ -208,57 +208,16 @@ _COUNTER_FORMAT_IS_0_20 = re.compile(r'{\(.+?\)\(.+?\)(\[\(.+?\)\(.+?\)\(\d+\)\]
 def _parse_counters_0_18(counter_string):
     # 0.18 counters look like this:
     # GroupName.CounterName:Value,GroupName.Crackers:3,AnotherGroup.Nerf:243,... 
-    counters = {}
-
-    # split out each counter to make regexp matching easier
-    for counter_line in counter_string.split(','):
-        # Grab capture groups
-        counter_re = _COUNTER_RE_0_18.match(counter_line)
-        group, name, amount_str = counter_re.groups()
-
-        # Store counter data
-        counters.setdefault(group, {})
-        counters[group].setdefault(name, 0)
-        counters[group][name] += int(amount_str)
-    return counters
+    for group, name, amount_str in _COUNTER_RE_0_18.findall(counter_string):
+        yield group, name, int(amount_str)
 
 
 def _parse_counters_0_20(group_string):
     # 0.20 counters look like this:
     # {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...} 
-    counters = {}
-
-    # Iterate over bracketed group expressions
-    group_match_start = 0
-    while group_match_start < len(group_string):
-        # Grab capture groups
-        group_substring = group_string[group_match_start:]
-        group_re = _GROUP_RE_0_20.match(group_substring)
-        group_id, group_name, counter_str = group_re.groups()
-        group_match_start += group_re.end()
-
-        # Iterate over square bracketed counter expressions
-        counter_match_start = 0
-        while counter_match_start < len(counter_str):
-            # Grab capture groups
-            counter_substring = counter_str[counter_match_start:]
-            counter_re = _COUNTER_RE_0_20.match(counter_substring)
-            counter_id, counter_name, counter_value = counter_re.groups()
-            counter_match_start += counter_re.end()
-
-            # For now just remove escape slashes, since they don't generally
-            # affect parsing.
-            # This has the unfortunate side effect of removing all backslashes,
-            # including those you want to keep. We would need a proper 
-            # tokenizer to fix this problem.
-            counter_name = counter_name.replace('\\', '')
-
-            # Store counter data
-            counters.setdefault(group_name, {})
-            counters[group_name].setdefault(counter_name, 0)
-            counters[group_name][counter_name] += int(counter_value)
-
-    return counters
+    for group_id, group_name, counter_str in _GROUP_RE_0_20.findall(group_string):
+        for counter_id, counter_name, counter_value in _COUNTER_RE_0_20.findall(counter_str):
+            yield group_name, counter_name, int(counter_value)
 
 
 def parse_hadoop_counters_from_line(line):
@@ -282,9 +241,21 @@ def parse_hadoop_counters_from_line(line):
 
     counter_substring = m.group('counters')
 
+    correct_func = None
     for regex, func in parser_switch:
         if regex.match(counter_substring):
-            return func(counter_substring)
+            correct_func = func
+            break
+
+    if correct_func is None:
+        raise Exception('Cannot parse Hadoop counter line: %s' % line)
+
+    counters = {}
+    for group, counter, value in correct_func(counter_substring):
+        counters.setdefault(group, {})
+        counters[group].setdefault(counter, 0)
+        counters[group][counter] += int(value)
+    return counters
 
 
 def parse_port_range_list(range_list_str):
@@ -301,7 +272,7 @@ def parse_port_range_list(range_list_str):
 def check_kv_pair(option, opt, value):
     items = value.split('=', 1)
     if len(items) == 2:
-        return items 
+        return items
     else:
         raise OptionValueError(
             "option %s: value is not of the form KEY=VALUE: %r" % (opt, value))

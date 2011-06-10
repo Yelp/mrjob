@@ -28,7 +28,11 @@ JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
 
 # match a job output line containing counter data
 COUNTER_LINE_RE = re.compile(r'Job \w+=".*?"(\s+\w+=".*?")+\s+COUNTERS="(?P<counters>.+?)"') 
-COUNTER_RE = re.compile(r'(?P<group>.+?)[.](?P<name>.+?):(?P<value>\d+)')
+# 0.18-specific
+COUNTER_RE_0_18 = re.compile(r'(?P<group>.+?)[.](?P<name>.+?):(?P<value>\d+)')
+# 0.20-specific
+GROUP_RE_0_20 = re.compile(r'{\((.+?)\)\((.+?)\)(.+)}')
+COUNTER_RE_0_20 = re.compile(r'\[\((.+?)\)\((.+?)\)\((\d+)\)\]')
 
 def find_python_traceback(lines):
     """Scan a log file or other iterable for a Python traceback,
@@ -189,29 +193,54 @@ def parse_mr_job_stderr(stderr, counters=None):
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
 
-def parse_hadoop_counters_from_line(line):
-    """Parse Hadoop counter values from a log line.
 
-    :param line: log line containing counter data
-    :type line: str
-
-    Example line: Job JOBID="job_201106061823_0001" FINISH_TIME="1307384737542" JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1" FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="File Systems.S3N bytes read:3726,File Systems.Local bytes read:4164,File Systems.S3N bytes written:1663,File Systems.Local bytes written:8410,Job Counters .Launched reduce tasks:1,Job Counters .Rack-local map tasks:2,Job Counters .Launched map tasks:2,Map-Reduce Framework.Reduce input groups:154,Map-Reduce Framework.Combine output records:0,Map-Reduce Framework.Map input records:68,Map-Reduce Framework.Reduce output records:154,Map-Reduce Framework.Map output bytes:3446,Map-Reduce Framework.Map input bytes:2483,Map-Reduce Framework.Map output records:336,Map-Reduce Framework.Combine input records:0,Map-Reduce Framework.Reduce input records:336,profile.reducer step 0 estimated IO time: 0.00:1,profile.mapper step 0 estimated IO time: 0.00:2,profile.reducer step 0 estimated CPU time: 0.00:1,profile.mapper step 0 estimated CPU time: 0.00:2"
-From file named: (log_uri)/jobs/ip-10-168-73-57.us-west-1.compute.internal_1307384628708_job_201106061823_0001_hadoop_streamjob5884999361405044030.jar
-    """
-    m = COUNTER_LINE_RE.match(line)
-    if not m:
-        return None
-
+def _parse_counters_0_18(counter_string):
     counters = {}
-    for counter_line in m.group('counters').split(','):
-        counter_re = COUNTER_RE.match(counter_line)
+    for counter_line in counter_string.split(','):
+        counter_re = COUNTER_RE_0_18.match(counter_line)
         group, name, amount_str = counter_re.groups()
 
         counters.setdefault(group, {})
         counters[group].setdefault(name, 0)
         counters[group][name] += int(amount_str)
-
     return counters
+
+
+def _parse_counters_0_20(counter_string):
+    counters = {}
+    counter_string = counter_string.replace('}{', '}\n{')
+    for part in counter_string.split('\n'):
+        group_re = GROUP_RE_0_20.match(part)
+        group_id, group_name, counters_str = group_re.groups()
+        counters_str = counters_str.replace('][', ']\n[')
+        for counter_str in counters_str.split('\n'):
+            counter_re = COUNTER_RE_0_20.match(counter_str)
+            counter_id, counter_name, counter_value = counter_re.groups()
+            counter_name = counter_name.replace('\\', '')
+
+            counters.setdefault(group_name, {})
+            counters[group_name].setdefault(counter_name, 0)
+            counters[group_name][counter_name] += int(counter_value)
+    return counters
+
+
+def parse_hadoop_counters_from_line(line, hadoop_version='0.18'):
+    """Parse Hadoop counter values from a log line.
+
+    :param line: log line containing counter data
+    :type line: str
+    :param hadoop_version: Version of Hadoop that produced the log files because they are formatted differently.
+    :type hadoop_version: str
+    """
+    m = COUNTER_LINE_RE.match(line)
+    if not m:
+        return None 
+
+    styles = {
+        '0.18': _parse_counters_0_18,
+        '0.20': _parse_counters_0_20,
+    }
+    return styles[hadoop_version](m.group('counters'))
 
 
 def parse_port_range_list(range_list_str):

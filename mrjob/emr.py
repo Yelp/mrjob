@@ -1178,7 +1178,8 @@ class EMRJobRunner(MRJobRunner):
 
             with open(log_path) as log_file:
                 for line in log_file:
-                    new_counters = parse_hadoop_counters_from_line(line)
+                    new_counters = parse_hadoop_counters_from_line(line, 
+                                                self._opts['hadoop_version'])
                     if new_counters:
                         counters.append(new_counters)
                         break

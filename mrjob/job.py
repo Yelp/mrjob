@@ -440,18 +440,15 @@ class MRJob(object):
         if self.options.profile:
             profiler = Profiler()
             mapper = profiler.wrap_processing(mapper, generator=True)
-            mapper_final = profiler.wrap_processing(mapper_final, generator=True)
+            if mapper_final:
+                mapper_final = profiler.wrap_processing(mapper_final, generator=True)
         else:
             profiler = None
 
         # run the mapper on each line
         for key, value in read_lines():
-            start_processing()
             for out_key, out_value in mapper(key, value):
-                end_processing()
                 write_line(out_key, out_value)
-                start_processing()
-            end_processing()
 
         if mapper_final:
             for out_key, out_value in mapper_final():

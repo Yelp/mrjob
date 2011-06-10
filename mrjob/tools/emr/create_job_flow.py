@@ -22,12 +22,11 @@ Usage::
 """
 from __future__ import with_statement
 
-import itertools
 from optparse import OptionParser, OptionGroup
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.util import log_to_stream
+from mrjob.util import scrape_options_into_new_groups, log_to_stream
 
 
 def main():
@@ -77,27 +76,11 @@ def make_option_parser():
     }
 
     # Scrape options from MRJob and index them by dest
-    all_options = {}
     mr_job = MRJob()
     job_option_groups = (mr_job.option_parser, mr_job.mux_opt_group,
                          mr_job.proto_opt_group, mr_job.runner_opt_group,
                          mr_job.hadoop_emr_opt_group, mr_job.emr_opt_group)
-    job_option_lists = [g.option_list for g in job_option_groups]
-    for option in itertools.chain(*job_option_lists):
-        other_options = all_options.get(option.dest, [])
-        other_options.append(option)
-        all_options[option.dest] = other_options
-
-    # Insert them into our own option groups
-    for opt_group, opt_dest_list in options_to_steal.iteritems():
-        options_for_this_group = opt_group.option_list
-        for option_dest in options_to_steal[opt_group]:
-            for option in all_options[option_dest]:
-                options_for_this_group.append(option)
-        # Sort alphabetically
-        opt_group.option_list = sorted(options_for_this_group,
-                                       key=lambda item: item.get_opt_string())
-
+    scrape_options_into_new_groups(job_option_groups, options_to_steal)
     return option_parser
 
 

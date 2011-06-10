@@ -30,6 +30,61 @@ import tarfile
 import zipfile
 
 
+# keep a mapping for all the names of old/new jobconf env variables
+MAPREDUCE_JOB_ID = 0
+MAPREDUCE_JOB_LOCAL_DIR = 1
+MAPREDUCE_TASK_ID = 2
+MAPREDUCE_TASK_ATTEMPT_ID = 3
+MAPREDUCE_TASK_ISMAP = 4
+MAPREDUCE_TASK_PARTITION = 5
+MAPREDUCE_MAP_INPUT_FILE = 6
+MAPREDUCE_MAP_INPUT_START = 7
+MAPREDUCE_MAP_INPUT_LENGTH = 8
+MAPREDUCE_TASK_OUTPUT_DIR = 9
+MAPREDUCE_JOB_CACHE_LOCAL_ARCHIVES = 10
+
+# this indexes into jobconf_map
+jobconf_variable_map = {
+    "mapreduce_job_id": MAPREDUCE_JOB_ID,
+    "mapred_job_id": MAPREDUCE_JOB_ID,
+    "mapreduce_job_local_dir": MAPREDUCE_JOB_LOCAL_DIR,
+    "job_local_dir": MAPREDUCE_JOB_LOCAL_DIR,
+    "mapred_job_local_dir": MAPREDUCE_JOB_LOCAL_DIR,
+    "mapreduce_task_id": MAPREDUCE_TASK_ID,
+    "mapred_tip_id": MAPREDUCE_TASK_ID,
+    "mapreduce_task_attempt_id": MAPREDUCE_TASK_ATTEMPT_ID,
+    "mapred_task_id": MAPREDUCE_TASK_ATTEMPT_ID,
+    "mapreduce_task_ismap": MAPREDUCE_TASK_ISMAP,
+    "mapred_task_is_map": MAPREDUCE_TASK_ISMAP,
+    "mapreduce_task_partition": MAPREDUCE_TASK_PARTITION,
+    "mapred_task_partition": MAPREDUCE_TASK_PARTITION,
+    "mapreduce_map_input_file": MAPREDUCE_MAP_INPUT_FILE,
+    "map_input_file": MAPREDUCE_MAP_INPUT_FILE,
+    "mapreduce_map_input_start": MAPREDUCE_MAP_INPUT_START,
+    "map_input_start": MAPREDUCE_MAP_INPUT_START,
+    "mapreduce_map_input_length": MAPREDUCE_MAP_INPUT_LENGTH,
+    "map_input_length": MAPREDUCE_MAP_INPUT_LENGTH,
+    "mapreduce_task_output_dir": MAPREDUCE_TASK_OUTPUT_DIR,
+    "mapred_work_output_dir": MAPREDUCE_TASK_OUTPUT_DIR,
+    "mapreduce_job_cache_local_archives": MAPREDUCE_JOB_CACHE_LOCAL_ARCHIVES,
+    "mapred_cache_localArchives": MAPREDUCE_JOB_CACHE_LOCAL_ARCHIVES,
+}
+
+# lists alternative names for jobconf variables
+jobconf_map = {
+    MAPREDUCE_JOB_ID: ["mapreduce_job_id", "mapred_job_id"],
+    MAPREDUCE_JOB_LOCAL_DIR: ["mapreduce_job_local_dir", "mapreduce_job_local_dir"], 
+    MAPREDUCE_TASK_ID: ["mapreduce_task_id", "mapred_task_id"],
+    MAPREDUCE_TASK_ATTEMPT_ID: ["mapreduce_task_attempt_id", "mapreduce_task_id"],
+    MAPREDUCE_TASK_ISMAP: ["mapreduce_task_ismap", "mapred_task_ismap"],
+    MAPREDUCE_TASK_PARTITION: ["mapreduce_task_partition", "mapred_task_partition"],
+    MAPREDUCE_MAP_INPUT_FILE: ["mapreduce_map_input_file", "map_input_file"],
+    MAPREDUCE_MAP_INPUT_START: ["mapreduce_map_input_start", "map_input_start"],
+    MAPREDUCE_MAP_INPUT_LENGTH: ["mapreduce_map_input_length", "map_input_length"],
+    MAPREDUCE_TASK_OUTPUT_DIR: ["mapreduce_task_output_dir", "mapred_work_output_dir"],
+    MAPREDUCE_JOB_CACHE_LOCAL_ARCHIVES: ["mapreduce_job_cache_local_archives", "mapred_cache_localArchives"]
+}
+
 def cmd_line(args):
     """build a command line that works in a shell.
     """
@@ -40,8 +95,15 @@ def cmd_line(args):
 def get_jobconf_value(variable):
     """gets a jobconf varaible from runtime environment
     """
-    return os.environ[variable]
-
+    if variable in os.environ:
+        return os.environ[variable]
+    
+    # try alternatives
+    key = jobconf_variable_map[variable]
+    for variable in jobconf_map[key]:
+        if variable in os.environ:
+            return os.environ[variable]
+        
 
 def expand_path(path):
     """Resolve ``~`` (home dir) and environment variables in *path*.

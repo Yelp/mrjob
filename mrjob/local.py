@@ -22,6 +22,7 @@ import os
 import pprint
 import re
 import shutil
+import stat
 from subprocess import Popen, PIPE
 import sys
 
@@ -147,21 +148,21 @@ class LocalMRJobRunner(MRJobRunner):
 
     def _process_jobconf_args(self, jobconf):
         for (conf_arg, value) in jobconf.iteritems():
-            if conf_arg == 'mapred.map.tasks':
+            if conf_arg == 'mapred.map.tasks' or conf_arg == 'mapreduce.job.maps':
                 self._map_tasks = int(value)
                 if self._map_tasks < 1:
-                    raise ValueError("mapred.map.tasks should be greater than 1")
-            elif conf_arg == 'mapred.reduce.tasks':
+                    raise ValueError("%s should be greater than 1" % conf_arg)
+            elif conf_arg == 'mapred.reduce.tasks' or conf_arg == 'mapreduce.job.reduces':
                 self._reduce_tasks = int(value)
                 if self._reduce_tasks < 1:
-                    raise ValueError("mapred.reduce.tasks should be greater than 1")
+                    raise ValueError("%s should be greater than 1" % conf_arg)
             elif conf_arg == 'mapred.job.local.dir':
                 # hadoop supports multiple direcories - sticking with only one here
                 if not os.path.isdir(value):
                     raise IOError("Directory %s does not exist" % value)
                 self._working_dir = value
             else:
-                # convert . to _ and add to running env
+                # catch all - convert . to _ and add to running env
                 name = ""
                 for c in conf_arg:
                     if c == '.':
@@ -169,8 +170,8 @@ class LocalMRJobRunner(MRJobRunner):
                     name = name + c
                 self._running_env[name] = value
                 
-        self._running_env['mapred_job_id'] = self._job_name
-        self._running_env['mapred_cache_localArchives'] = self._mrjob_tar_gz_path
+        self._running_env['mapreduce_job_id'] = self._job_name
+        self._running_env['mapreduce_job_cache_local_archives'] = self._mrjob_tar_gz_path
                 
     def _setup_working_dir(self):
         """Make a working directory with symlinks to our script and
@@ -186,7 +187,7 @@ class LocalMRJobRunner(MRJobRunner):
             self._working_dir = os.path.join(self._get_local_tmp_dir(), 'working_dir')
             self.mkdir(self._working_dir)
         
-        self._running_env["mapred_job_local_dir"] = self._working_dir
+        self._running_env["mapreduce_job_local_dir"] = self._working_dir
 
         # give all our files names, and symlink or unarchive them
         self._name_files()
@@ -208,7 +209,7 @@ class LocalMRJobRunner(MRJobRunner):
             log.debug('Creating output directory %s' % self._output_dir)
             self.mkdir(self._output_dir)
         
-        self._running_env['mapred_work_output_dir'] = self._output_dir
+        self._running_env['mapreduce_task_output_dir'] = self._output_dir
 
     def _symlink_to_file_or_copy(self, path, dest):
         """Symlink from *dest* to the absolute version of *path*.
@@ -221,20 +222,37 @@ class LocalMRJobRunner(MRJobRunner):
         else:
             log.debug('copying %s -> %s' % (path, dest))
             shutil.copyfile(path, dest)
-
-     def _get_file_splits(self, input_paths, num_splits, keep_sorted=False):
-        """Split the input files into *num_splits* files
+    
+    def _get_file_splits(self, input_paths, num_splits, keep_sorted=False):
+        """ Split the input files into *num_splits* files
+            
+            We may not generate exactly *num_splits* files. Instead this is used
+            as a rough goal.
+            
+            returns a dictionary that maps split file names to a dictionary of properties??
+            ??list of tuples [(original_filename, split_filename, start, length)]
         """
-        # there must be a better way to do this?
+        total_size = sum([os.stat(path)[stat.ST_SIZE] for path in input_paths])
+        split_size = total_size / num_splits
+        
+        # we want each file split to be as close to split_size as possible
+        # we also want different input files to be in different splits 
         tmp_directory = self._get_local_tmp_dir()
-        files = []
-        file_names = []
-        for i in xrange(num_splits):
-            outfile = tmp_directory + '/input_part-%05d' % i
-            file_names.append(outfile)
-            files.append(open(outfile, 'w'))
-
+        file_names = defaultdict(str)
+        
+        def create_outfile(original_name = '', start = ''):
+            outfile_name = tmp_directory + '/input_part-%05d' % len(file_names)
+            new_file = defaultdict(str) 
+            new_file['original_name'] = original_name
+            new_file['start'] = start
+            file_names[outfile_name] = new_file 
+            return outfile_name
+        
         if keep_sorted:
+            files = []
+            for i in xrange(num_splits):
+                outfile_name = create_outfile()
+                files.append(open(outfile_name, 'w'))
             # assume that input is a collection of key <tab> value pairs
             re_pattern = re.compile("^(.*?)\t")
             try:
@@ -253,11 +271,23 @@ class LocalMRJobRunner(MRJobRunner):
                 # fall back to unsorted case
                 return self._get_file_splits(input_paths, num_splits)
         else:
-            current_file = 0
             for path in input_paths:
+                # create a new split file for each new path
+                outfile_name = create_outfile(path, 0)
+                outfile = open(outfile_name, 'w')
+                total_bytes = 0
+                bytes_written = 0
                 for line in read_file(path):
-                    files[current_file].write(line)
-                    current_file = (current_file + 1) % num_splits
+                    if bytes_written >= split_size:
+                        # new split file if we exceeded the limit
+                        file_names[outfile_name]['length'] = bytes_written
+                        total_bytes += bytes_written
+                        outfile_name = create_outfile(path, total_bytes)
+                        outfile = open(outfile_name, 'w')
+                        bytes_written = 0
+                    outfile.write(line)
+                    bytes_written += len(line)
+                file_names[outfile_name]['length'] = bytes_written
 
         return file_names
 
@@ -287,10 +317,6 @@ class LocalMRJobRunner(MRJobRunner):
             file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=True)
         else:
             file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=False)
-        
-        # generate a task id
-        mapred_tip_id = 'task_%s_%s_%05d%d' % (self._job_name, step_type, step_num, 0) # TODO: fix when merging
-        mapred_task_id = 'attempt_%s_%s_%05d%d_0' % (self._job_name, step_type, step_num, 0) # we only have one attempt
 
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
@@ -299,20 +325,37 @@ class LocalMRJobRunner(MRJobRunner):
             os.environ,
             self._get_cmdenv(),
             env or {}, 
-            {#'map_input_file': input_paths[0], # TODO: fix when merging
-             'mapred_task_is_map': str(step_type=='M'), 
-             'mapred_task_partition': str(step_num), 
-             'mapred_tip_id': mapred_tip_id, # TODO: fix when merging 
-             'mapred_task_id': mapred_task_id, # TODO: fix when merging 
-             })
+            {'mapreduce_task_ismap': str(step_type=='M'), 
+             'mapreduce_task_partition': str(step_num),
+            })
         
         # run the tasks
         procs = []
         self._prev_outfiles = []
-        for task_num in xrange(num_tasks):
+        for (task_num, file_name) in enumerate(file_splits):
             # args - one file_split per process
-            proc_args = args + [file_splits[task_num]]
+            proc_args = args + [file_name]
             log.info('> %s' % cmd_line(proc_args))
+            
+            # set the task env
+            # generate a task id
+            mapreduce_task_id = 'task_%s_%s_%05d%d' % (self._job_name, step_type, step_num, task_num) 
+            mapreduce_task_attempt_id = 'attempt_%s_%s_%05d%d_0' % (self._job_name, step_type, step_num, task_num) # we only have one attempt
+            
+            task_env = combine_local_envs(
+                env,
+                {'mapreduce_task_id': mapreduce_task_id, 
+                 'mapreduce_task_attempt_id': mapreduce_task_attempt_id,
+                 })
+                 
+            if step_type == 'M':
+                # map only jobconf environment variables
+                task_env = combine_local_envs(
+                    task_env, 
+                    {'mapreduce_map_input_file': file_splits[file_name]['original_name'], 
+                     'mapreduce_map_input_start': str(file_splits[file_name]['start']),
+                     'mapreduce_map_input_length': str(file_splits[file_name]['length'])
+                     })
             
             # set up outfile
             outfile = os.path.join(self._get_local_tmp_dir(), outfile_name + '_part-%05d' % task_num)
@@ -324,10 +367,10 @@ class LocalMRJobRunner(MRJobRunner):
 
             # run the process
             proc = Popen(proc_args, stdout=write_to, stderr=PIPE,
-                         cwd=self._working_dir, env=env)
+                         cwd=self._working_dir, env=task_env)
             procs.append(proc)
 
-        for task_num in xrange(num_tasks):
+        for task_num in xrange(len(file_splits)):
             proc = procs[task_num]
             # handle counters, status msgs, and other stuff on stderr
             stderr_lines = self._process_stderr_from_script(proc.stderr, step_num=step_num)

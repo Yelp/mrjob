@@ -20,6 +20,7 @@ from __future__ import with_statement
 
 import bz2
 import contextlib
+import functools
 import glob
 import gzip
 import logging
@@ -262,9 +263,10 @@ class Profiler(object):
         super(Profiler, self).__init__()
         self.last_measurement = resource.getrusage(resource.RUSAGE_SELF)
         self.accumulated_other_time = 0.0
-        self.accumulated_user_time = 0.0
+        self.accumulated_processing_time = 0.0
 
     def mark_start_processing(self):
+        """Transition from 'other' code to 'processing' code"""
         current_measurement = resource.getrusage(resource.RUSAGE_SELF)
 
         self.accumulated_other_time += current_measurement.ru_stime - self.last_measurement.ru_stime
@@ -272,6 +274,49 @@ class Profiler(object):
         self.last_measurement = current_measurement
 
     def mark_end_processing(self):
+        """Transition from 'processing' code back to 'other' code"""
         new_measurement = resource.getrusage(resource.RUSAGE_SELF)
-        self.accumulated_user_time += new_measurement.ru_utime - self.last_measurement.ru_utime
-        self.accumulated_user_time += new_measurement.ru_stime - self.last_measurement.ru_stime
+        self.accumulated_processing_time += new_measurement.ru_utime - self.last_measurement.ru_utime
+        self.accumulated_processing_time += new_measurement.ru_stime - self.last_measurement.ru_stime
+
+    def results(self):
+        """Quickly get measurements
+
+        :return: ``accumulated_processing_time``, ``accumulated_other_time``
+        """
+        return self.accumulated_processing_time, self.accumulated_other_time
+
+    def _wrap_normal(self, func, mark_begin, mark_end):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            mark_begin()
+            result = func(*args, **kwargs)
+            mark_end()
+            return result
+        return wrapper
+
+    def _wrap_generator(self, gen, mark_begin, mark_end):
+        @functools.wraps(gen)
+        def wrapper(*args, **kwargs):
+            mark_begin()
+            for item in gen(*args, **kwargs):
+                mark_end()
+                yield item
+                mark_begin()
+            mark_end()
+        return wrapper
+
+    def wrap_processing(self, processing_func, generator=False):
+        """Wrap a function in "processing" markers.
+
+        :type processing_func: function
+        :param processing_func: function to wrap in "processing" markers
+        :type generator: bool
+        :param generator: set to ``True`` if ``processing_func`` is a generator so its iterations can be counted towards processing time
+        """
+        if generator:
+            return self._wrap_generator(processing_func, self.mark_start_processing,
+                                        self.mark_end_processing)
+        else:
+            return self._wrap_normal(processing_func, self.mark_start_processing,
+                                     self.mark_end_processing)

@@ -196,7 +196,6 @@ class LocalMRJobRunner(MRJobRunner):
     def _get_file_splits(self, input_paths, num_splits, keep_sorted=False):
         """Split the input files into *num_splits* files
         """
-        # there must be a better way to do this?
         tmp_directory = self._get_local_tmp_dir()
         files = []
         file_names = []
@@ -208,20 +207,17 @@ class LocalMRJobRunner(MRJobRunner):
         if keep_sorted:
             # assume that input is a collection of key <tab> value pairs
             re_pattern = re.compile("^(.*?)\t")
-            try:
-                # we should only have one file at this point
-                assert(len(input_paths) == 1)
-                input_file = input_paths[0] 
-                current_file = 0
-                for key, lines in itertools.groupby(read_file(input_file), 
-                                key=lambda(line): re_pattern.search(line).group(1)):
-                    for line in lines:
-                        files[current_file].write(line)
-                    current_file = (current_file + 1) % num_splits
-            except:
-                # fall back to unsorted case
-                log.warning('Could not keep file sorted')
-                return self._get_file_splits(input_paths, num_splits)
+            
+            # we should only have one file at this point
+            assert(len(input_paths) == 1)
+            
+            input_file = input_paths[0] 
+            current_file = 0
+            for key, lines in itertools.groupby(read_file(input_file), 
+                            key=lambda(line): re_pattern.search(line).group(1)):
+                for line in lines:
+                    files[current_file].write(line)
+                current_file = (current_file + 1) % num_splits
         else:
             current_file = 0
             for path in input_paths:
@@ -261,10 +257,8 @@ class LocalMRJobRunner(MRJobRunner):
                     input_paths.append(path)
 
         # get file splits
-        if step_type == 'R':
-            file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=True)
-        else:
-            file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=False)
+        keep_sorted = (step_type == 'R')
+        file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=keep_sorted)
         
         # run the tasks
         procs = []

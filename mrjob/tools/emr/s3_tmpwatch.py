@@ -32,10 +32,8 @@ def main():
     options, args = option_parser.parse_args()
 
     # make sure time and uris are given
-    if not args:
-        option_parser.error('Please specify one or more URIs')
-    if not options.time:
-        option_parser.error('--time needs to be specified')
+    if not args or len(args) < 2:
+        option_parser.error('Please specify time and one or more URIs')
 
     # set up logging
     if not options.quiet:
@@ -43,9 +41,9 @@ def main():
     # suppress No handlers could be found for logger "boto" message
     log_to_stream(name='boto', level=logging.CRITICAL)
 
-    time_old = process_time(options.time)
+    time_old = process_time(args[0])
    
-    for path in args:
+    for path in args[1:]:
         s3_cleanup(path, time_old,
             conf_path=options.conf_path,
             dry_run=options.test)
@@ -84,7 +82,7 @@ def process_time(time):
         return timedelta(hours=int(time))
     
 def make_option_parser():
-    usage = '%prog [options] [URI(s)]'
+    usage = '%prog [options] <time-untouched> <URIs>'
     description = 'Delete all files in a given URI that are older that a specified time.\n\nThe time parameter defines the threshold for removing files. If the file has not been accessed for *time*, the  file is removed. The time argument is a number with an optional single-character suffix specifying the units: m for minutes, h for hours, d for days.  If no suffix is specified, time is in hours.'
     option_parser = OptionParser(usage=usage, description=description)
     option_parser.add_option(
@@ -101,9 +99,6 @@ def make_option_parser():
     option_parser.add_option(
         '--no-conf', dest='conf_path', action='store_false',
         help="Don't load mrjob.conf even if it's available")
-    option_parser.add_option(
-        '--time', dest='time', type='str',
-        help='The time the file needs to be old before deleting it')
     option_parser.add_option(
         '-t', '--test', dest='test', default=False,
         action='store_true',

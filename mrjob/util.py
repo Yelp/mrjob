@@ -38,7 +38,7 @@ def cmd_line(args):
 
 
 def dots_to_underscores(var):
-    return ''.join(map(lambda(a): a if a != '.' else '_', var))
+    return ''.join(a if a != '.' else '_' for a in var)
 
 
 def get_jobconf_value(variable):

@@ -210,40 +210,40 @@ def parse_mr_job_stderr(stderr, counters=None):
 
 
 _CAPTURED_EXPR = r'(?P<%s>.*?[^\\])'
+_expr = lambda name: _CAPTURED_EXPR % name
 
 # Match a job output line containing counter data.
 # The line is of the form 
 # "Job KEY="value" KEY2="value2" ... COUNTERS="<counter_string>"
 # We just want to pull out the counter string, which varies between 
 # Hadoop versions.
-_COUNTER_EXPR = _CAPTURED_EXPR % 'counters'
 _KV_EXPR = r'\s+\w+=".*?"'
-_COUNTER_LINE_RE_EXPR = r'Job(%s)*\s+COUNTERS="%s"' % (_KV_EXPR, _COUNTER_EXPR)
+_COUNTER_LINE_RE_EXPR = r'Job(%s)*\s+COUNTERS="%s"' % (_KV_EXPR,
+                                                       _expr('counters'))
 _COUNTER_LINE_RE = re.compile(_COUNTER_LINE_RE_EXPR)
 
 # 0.18-specific
 # see _parse_counters_0_18 for format
-_COUNTER_RE_0_18 = re.compile(r'(?P<group>[^,]+?)[.](?P<name>.+?):(?P<value>\d+)')
+_COUNTER_RE_0_18 = re.compile(r'(?P<group>[^,]+?)' +
+                              r'[.](?P<name>.+?)' +
+                              r':(?P<value>\d+)')
 # look for the groupname.countername:countervalue,... syntax
 _COUNTER_FORMAT_IS_0_18 = re.compile(r'(.+?[.].+?:\d+)(,(.+?[.].+?:\d+))*')
 
 # 0.20-specific
 # see _parse_counters_0_20 for format
-_GROUP_ID_EXPR = _CAPTURED_EXPR % 'group_id'
-_GROUP_NAME_EXPR = _CAPTURED_EXPR % 'group_name'
 _COUNTER_LIST_EXPR = r'(?P<counter_list_str>\[.*?[^\\]\])'
 
-_GROUP_RE_0_20 = re.compile(r'{\(%s\)\(%s\)%s}' % (_GROUP_ID_EXPR,
-                                                   _GROUP_NAME_EXPR,
+_GROUP_RE_0_20 = re.compile(r'{\(%s\)\(%s\)%s}' % (_expr('group_id'),
+                                                   _expr('group_name'),
                                                    _COUNTER_LIST_EXPR))
 
-_COUNTER_ID_EXPR = _CAPTURED_EXPR % 'counter_id'
-_COUNTER_NAME_EXPR = _CAPTURED_EXPR % 'counter_name'
 _COUNTER_VALUE_EXPR = r'(?P<counter_value>\d+)'
-_COUNTER_0_20_EXPR = r'\[\(%s\)\(%s\)\(%s\)\]' % (_COUNTER_ID_EXPR,
-                                                  _COUNTER_NAME_EXPR,
+_COUNTER_0_20_EXPR = r'\[\(%s\)\(%s\)\(%s\)\]' % (_expr('counter_id'),
+                                                  _expr('counter_name'),
                                                   _COUNTER_VALUE_EXPR)
 _COUNTER_RE_0_20 = re.compile(_COUNTER_0_20_EXPR)
+
 # look for the {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...} syntax
 _COUNTER_FORMAT_IS_0_20 = re.compile(r'{\(.+?\)\(.+?\)(\[\(.+?\)\(.+?\)\(\d+\)\])}')
 

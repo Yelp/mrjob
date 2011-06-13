@@ -31,7 +31,7 @@ class LogParsingException(Exception):
     pass
 
 
-_HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.(){}[\]"])')
+_HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.(){}[\]"\\])')
 
 def counter_unescape(escaped_string):
     """Fix names of counters and groups emitted by Hadoop 0.20+ logs, which

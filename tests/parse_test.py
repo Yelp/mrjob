@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import random
 from subprocess import Popen, PIPE
 from testify import TestCase, assert_equal, assert_in, assert_not_equal, assert_raises
 
@@ -145,9 +146,27 @@ class FindMiscTestCase(TestCase):
         assert_raises(LogParsingException, parse_hadoop_counters_from_line, counter_string)
 
     def test_freaky_counter_names(self):
-        freaky_name = '\{\}\(\)\[\]\.'
+        freaky_name = r'\\\\\{\}\(\)\[\]\.\\\\'
         counter_string = r'Job FAILED_REDUCES="0" COUNTERS="{(%s)(%s)[(a)(a)(1)]}"' % (freaky_name, freaky_name)
-        assert_in('{}()[].', parse_hadoop_counters_from_line(counter_string))
+        assert_in('\\{}()[].\\', parse_hadoop_counters_from_line(counter_string))
+
+    def test_counters_fuzz(self):
+        freakquences = [
+            (r'\\\\', '\\'), 
+            ('\{', '{'),
+            ('\}', '}'),
+            ('\(', '('),
+            ('\)', ')'),
+            ('\[', '['),
+            ('\]', ']'),
+        ]
+        # test 100 random scary counter names
+        for i in xrange(100):
+            this_seq = [random.choice(freakquences) for f in xrange(10)]
+            in_str = ''.join([a for a, b in this_seq])
+            out_str = ''.join([b for a, b in this_seq])
+            counter_string = r'Job FAILED_REDUCES="0" COUNTERS="{(%s)(%s)[(a)(a)(1)]}"' % (in_str, in_str)
+            assert_in(out_str, parse_hadoop_counters_from_line(counter_string))
 
 
 class ParseMRJobStderr(TestCase):

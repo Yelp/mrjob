@@ -20,7 +20,6 @@ from __future__ import with_statement
 
 import bz2
 import contextlib
-import functools
 import glob
 import gzip
 import logging

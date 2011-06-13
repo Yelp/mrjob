@@ -24,7 +24,7 @@ from subprocess import Popen, PIPE, CalledProcessError, check_call
 from StringIO import StringIO
 import tarfile
 import tempfile
-from testify import TestCase, assert_equal, assert_gt, assert_lt, assert_in, assert_raises, class_setup, class_teardown, setup, teardown
+from testify import TestCase, assert_equal, assert_in, assert_raises, class_setup, class_teardown, setup, teardown
 
 from mrjob.util import *
 

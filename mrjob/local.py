@@ -206,7 +206,8 @@ class LocalMRJobRunner(MRJobRunner):
             
         if keep_sorted:
             # assume that input is a collection of key <tab> value pairs
-            re_pattern = re.compile("^(.*?)\t")
+            # match all non-tab characters
+            re_pattern = re.compile("^(\S*)")
             
             # we should only have one file at this point
             assert(len(input_paths) == 1)

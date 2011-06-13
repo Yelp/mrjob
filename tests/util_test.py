@@ -267,38 +267,3 @@ class ArchiveTestCase(TestCase):
         join = os.path.join
 
         assert_raises(IOError, unarchive, join(self.tmp_dir, 'a', 'foo'), join(self.tmp_dir, 'b'))
-
-
-class ProfilingTestCase(TestCase):
-
-    @setup
-    def make_profiler(self):
-        self.profiler = Profiler()
-
-    def make_useless_function(self, n):
-        def func():
-            for i in range(n):
-                pass
-        return func
-
-    def make_useless_generator(self, n, k):
-        each_iter = self.make_useless_function(k)
-        def gen():
-            for i in range(n):
-                each_iter()
-                yield i
-        return gen
-
-    def test_timing_func_expensive(self):
-        func = self.profiler.wrap_processing(self.make_useless_function(1000000))
-        func()
-        user_time, other_time = self.profiler.results()
-        assert_gt(user_time, other_time)
-
-    def test_timing_func_cheap(self):
-        func = self.profiler.wrap_processing(self.make_useless_function(1000))
-        func()
-        self.make_useless_function(10000000)()
-        self.profiler.add_time_to_other()
-        user_time, other_time = self.profiler.results()
-        assert_lt(user_time, other_time)

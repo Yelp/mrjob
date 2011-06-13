@@ -108,9 +108,10 @@ except ImportError:
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
 from mrjob.parse import parse_mr_job_stderr, parse_port_range_list, check_kv_pair, check_range_list
+from mrjob.profile import Profiler
 from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
 from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
-from mrjob.util import log_to_stream, read_input, Profiler
+from mrjob.util import log_to_stream, read_input
 
 # used by mr() below, to fake no mapper
 def _IDENTITY_MAPPER(key, value):

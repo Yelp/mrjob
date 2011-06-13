@@ -31,6 +31,7 @@ from mrjob.local import LocalMRJobRunner
 from mrjob.util import cmd_line
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_test_jobconf import MRJobConfTest
+from tests.mr_test_jobconf_old import MRJobConfTestOld
 from tests.mr_wordcount import MRWordCount
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
@@ -404,7 +405,41 @@ class LocalMRJobRunnerJobConfTestCase(TestCase):
             input_file.write('foo\n')
 
         mr_job = MRJobConfTest(['-c', self.mrjob_conf_path,
+                                '--jobconf=user.defined=something',
                                input_path])
+        mr_job.sandbox()
+
+        results = []
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+        # test that we are are not throwing exceptions
+        assert_equal(sorted(results),
+                     [('mapreduce_job_cache_local_archives', runner._mrjob_tar_gz_path), 
+                     ('mapreduce_job_id', runner._job_name), 
+                     ('mapreduce_job_local_dir', runner._working_dir), 
+                     ('mapreduce_map_input_file', input_path), 
+                     ('mapreduce_map_input_length', '4'), 
+                     ('mapreduce_map_input_start', '0'), 
+                     ('mapreduce_task_attempt_id', 'attempt_%s_M_000000_0' % runner._job_name), 
+                     ('mapreduce_task_id', 'task_%s_M_000000' % runner._job_name), 
+                     ('mapreduce_task_ismap', 'True'), 
+                     ('mapreduce_task_output_dir', runner._output_dir), 
+                     ('mapreduce_task_partition', '0'),
+                     ('user_defined', 'something')])
+                     
+    def test_others_old(self):
+        input_path = os.path.join(self.tmp_dir, 'input')
+        with open(input_path, 'w') as input_file:
+            input_file.write('foo\n')
+
+        mr_job = MRJobConfTestOld(['-c', self.mrjob_conf_path,
+                                    input_path])
         mr_job.sandbox()
 
         results = []

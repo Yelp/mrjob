@@ -37,21 +37,25 @@ def cmd_line(args):
     return ' '.join(pipes.quote(x) for x in args)
 
 
-def _dots_to_underscores(var):
-    return ''.join(a for a in map(lambda(a): a if a != '.' else '_', var))
+def dots_to_underscores(var):
+    return ''.join(map(lambda(a): a if a != '.' else '_', var))
 
 
 def get_jobconf_value(variable):
     """gets a jobconf varaible from runtime environment
     """
-    if variable in os.environ:
-        return os.environ[variable]
+    name = dots_to_underscores(variable)
+    if name in os.environ:
+        return os.environ[name]
     
     # try alternatives
-    key = jobconf_variable_map[variable]
-    for variable in jobconf_map[key]:
-        if variable in os.environ:
-            return os.environ[variable]
+    from mrjob.compat import translate_jobconf
+    for var in translate_jobconf(variable):
+        var = dots_to_underscores(var)
+        if var in os.environ:
+            return os.environ[var]
+    
+    raise KeyError("%s jobconf variable not found" % variable)
         
 
 def expand_path(path):

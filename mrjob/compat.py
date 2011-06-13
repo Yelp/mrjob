@@ -15,6 +15,7 @@
 """Utility functions for compatibility with different version of hadoop."""
 
 # keep a mapping for all the names of old/new jobconf env variables
+# http://hadoop.apache.org/mapreduce/docs/current/mapred-default.html
 
 # lists alternative names for jobconf variables
 jobconf_map = {
@@ -22,10 +23,10 @@ jobconf_map = {
     "mapred.job.id": {'0.21': "mapreduce.job.id", '0.18': "mapred.job.id"},
     "mapreduce.job.local.dir": {'0.21': "mapreduce.job.local.dir", '0.18': "job.local.dir"}, 
     "job.local.dir": {'0.21': "mapreduce.job.local.dir", '0.18': "job.local.dir"}, 
-    "mapreduce.task.id": {'0.21': "mapreduce.task.id", '0.18': "mapred.task.id"},
-    "mapred.tip.id": {'0.21': "mapreduce.task.id", '0.18': "mapred.task.id"},
-    "mapreduce.task.attempt.id": {'0.21': "mapreduce.task.attempt.id", '0.18': "mapreduce.task.id"},
-    "mapred.task.id": {'0.21': "mapreduce.task.attempt.id", '0.18': "mapreduce.task.id"},
+    "mapreduce.task.id": {'0.21': "mapreduce.task.id", '0.18': "mapred.tip.id"},
+    "mapred.tip.id": {'0.21': "mapreduce.task.id", '0.18': "mapred.tip.id"},
+    "mapreduce.task.attempt.id": {'0.21': "mapreduce.task.attempt.id", '0.18': "mapred.task.id"},
+    "mapred.task.id": {'0.21': "mapreduce.task.attempt.id", '0.18': "mapred.task.id"},
     "mapreduce.task.ismap": {'0.21': "mapreduce.task.ismap", '0.18': "mapred.task.ismap"},
     "mapred.task.is.map": {'0.21': "mapreduce.task.ismap", '0.18': "mapred.task.ismap"},
     "mapreduce.task.partition": {'0.21': "mapreduce.task.partition", '0.18': "mapred.task.partition"},
@@ -38,15 +39,22 @@ jobconf_map = {
     "map.input.length": {'0.21': "mapreduce.map.input.length", '0.18': "map.input.length"},
     "mapreduce.task.output.dir": {'0.21': "mapreduce.task.output.dir", '0.18': "mapred.work.output.dir"},
     "mapred.work.output.dir": {'0.21': "mapreduce.task.output.dir", '0.18': "mapred.work.output.dir"},
-    "mapreduce.job.cache.local.archives": {'0.21': "mapreduce.job.cache.local.archives", '0.18': "mapred.cache.localArchives"}
-    "mapred.cache.localArchives": {'0.21': "mapreduce.job.cache.local.archives", '0.18': "mapred.cache.localArchives"}
+    "mapreduce.job.cache.local.archives": {'0.21': "mapreduce.job.cache.local.archives", '0.18': "mapred.cache.localArchives"},
+    "mapred.cache.localArchives": {'0.21': "mapreduce.job.cache.local.archives", '0.18': "mapred.cache.localArchives"},
+    "mapreduce.job.maps": {'0.21': "mapreduce.job.maps", '0.18': "mapred.map.tasks"},
+    "mapred.map.tasks": {'0.21': "mapreduce.job.maps", '0.18': "mapred.map.tasks"},
+    "mapreduce.job.reduces": {'0.21': "mapreduce.job.reduces", '0.18': "mapred.reduce.tasks"},
+    "mapred.reduce.tasks": {'0.21': "mapreduce.job.reduces", '0.18': "mapred.reduce.tasks"},
 }
 
 def translate_jobconf(variable, version=None):
-    """
+    """ Translates a jobconf variable into the equivalent name in 
+        other versions of hadoop. 
+        If *version* is given, it returns the jobconf argument for that version.
+        Otherwise, it returns the set of equivalent arguements
     """
     if version:
         return jobconf_map[variable][version]
     else:
-        return jobconf_map[variables].itervalues()
+        return jobconf_map[variable].itervalues()
         

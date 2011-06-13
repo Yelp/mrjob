@@ -30,7 +30,8 @@ class MRJobConfTest(MRJob):
         yield ("mapreduce_map_input_length", get_jobconf_value("mapreduce_map_input_length"))
         yield ("mapreduce_task_output_dir", get_jobconf_value("mapreduce_task_output_dir"))
         yield ("mapreduce_job_cache_local_archives", get_jobconf_value("mapreduce_job_cache_local_archives"))
-        
+        yield ("user_defined", get_jobconf_value("user.defined"))
+
 if __name__ == '__main__':
     MRJobConfTest.run()
 

@@ -815,6 +815,7 @@ class MRJob(object):
             help='-jobconf arg to pass through to hadoop streaming; '
             'should take the form KEY=VALUE. You can use --jobconf '
             'multiple times.')
+        #   ref: http://hadoop.apache.org/mapreduce/docs/current/mapred-default.html
 
         self.hadoop_emr_opt_group.add_option(
             '--label', dest='label', default=None,

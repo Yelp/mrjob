@@ -26,10 +26,11 @@ import stat
 from subprocess import Popen, PIPE
 import sys
 
+from mrjob.compat import translate_jobconf
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.parse import find_python_traceback, parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line, read_file, unarchive
+from mrjob.util import cmd_line, dots_to_underscores, read_file, unarchive
 
 
 log = logging.getLogger('mrjob.local')
@@ -146,26 +147,27 @@ class LocalMRJobRunner(MRJobRunner):
     def _process_jobconf_args(self, jobconf):
         if jobconf:
             for (conf_arg, value) in jobconf.iteritems():
-                if conf_arg == 'mapred.map.tasks' or conf_arg == 'mapreduce.job.maps':
+                # attempt to get the latest version equivalence
+                try:
+                    conf_arg = translate_jobconf(conf_arg, '0.21')
+                except:
+                    pass
+                if conf_arg == 'mapreduce.job.maps':
                     self._map_tasks = int(value)
                     if self._map_tasks < 1:
                         raise ValueError("%s should be greater than 1" % conf_arg)
-                elif conf_arg == 'mapred.reduce.tasks' or conf_arg == 'mapreduce.job.reduces':
+                elif conf_arg == 'mapreduce.job.reduces':
                     self._reduce_tasks = int(value)
                     if self._reduce_tasks < 1:
                         raise ValueError("%s should be greater than 1" % conf_arg)
-                elif conf_arg == 'mapred.job.local.dir' or conf_arg == 'mapreduce.job.local.dir':
+                elif conf_arg == 'mapreduce.job.local.dir':
                     # hadoop supports multiple direcories - sticking with only one here
                     if not os.path.isdir(value):
                         raise IOError("Directory %s does not exist" % value)
                     self._working_dir = value
                 else:
                     # catch all - convert . to _ and add to running env
-                    name = ""
-                    for c in conf_arg:
-                        if c == '.':
-                            c = '_'
-                        name = name + c
+                    name = dots_to_underscores(conf_arg)
                     self._running_env[name] = value
                 
         self._running_env['mapreduce_job_id'] = self._job_name

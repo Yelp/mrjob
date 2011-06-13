@@ -31,7 +31,7 @@ class LogParsingException(Exception):
     pass
 
 
-_HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.()])')
+_HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.(){}[\]"])')
 
 def counter_unescape(escaped_string):
     """Fix names of counters and groups emitted by Hadoop 0.20+ logs, which
@@ -212,7 +212,7 @@ def parse_mr_job_stderr(stderr, counters=None):
 # match a job output line containing counter data
 # The line is of the form "Job KEY="value" KEY2="value2" ... COUNTERS="<counter_string>"
 # we just want to pull out the counter string, which varies between Hadoop versions
-_COUNTER_LINE_RE = re.compile(r'Job \w+=".*?"(\s+\w+=".*?")*\s+COUNTERS="(?P<counters>.+?)"') 
+_COUNTER_LINE_RE = re.compile(r'Job \w+=".*?"(\s+\w+=".*?")*\s+COUNTERS="(?P<counters>.*?[^\\])"')
 
 # 0.18-specific
 # see _parse_counters_0_18 for format
@@ -221,8 +221,8 @@ _COUNTER_RE_0_18 = re.compile(r'(?P<group>[^,]+?)[.](?P<name>.+?):(?P<value>\d+)
 _COUNTER_FORMAT_IS_0_18 = re.compile(r'(.+?[.].+?:\d+)(,(.+?[.].+?:\d+))*')
 # 0.20-specific
 # see _parse_counters_0_20 for format
-_GROUP_RE_0_20 = re.compile(r'{\((?P<group_id>.+?)\)\((?P<group_name>.+?)\)(?P<counter_list_str>.+?)}')
-_COUNTER_RE_0_20 = re.compile(r'\[\((?P<counter_id>.+?)\)\((?P<counter_name>.+?)\)\((?P<counter_value>\d+)\)\]')
+_GROUP_RE_0_20 = re.compile(r'{\((?P<group_id>.*?[^\\])\)\((?P<group_name>.*?[^\\])\)(?P<counter_list_str>\[.*?[^\\]\])}')
+_COUNTER_RE_0_20 = re.compile(r'\[\((?P<counter_id>.*?[^\\])\)\((?P<counter_name>.*?[^\\])\)\((?P<counter_value>\d+)\)\]')
 # look for the {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...} syntax
 _COUNTER_FORMAT_IS_0_20 = re.compile(r'{\(.+?\)\(.+?\)(\[\(.+?\)\(.+?\)\(\d+\)\])}')
 

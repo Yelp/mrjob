@@ -98,14 +98,14 @@ class LocalMRJobRunner(MRJobRunner):
             if self._opts[ignored_opt]:
                 log.warning('ignoring %s option (requires real Hadoop): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
-        
-        # process jobconf arguments
-        jobconf = self._opts['jobconf']
-        self._process_jobconf_args(jobconf)
-       
+          
         self._create_wrapper_script()
         self._setup_working_dir()
         self._setup_output_dir()
+
+         # process jobconf arguments
+        jobconf = self._opts['jobconf']
+        self._process_jobconf_args(jobconf)
 
         assert self._script # shouldn't be able to run if no script
                                 
@@ -169,7 +169,7 @@ class LocalMRJobRunner(MRJobRunner):
                     self._running_env[name] = value
                 
         self._running_env['mapreduce_job_id'] = self._job_name
-        self._running_env['mapreduce_job_cache_local_archives'] = self._mrjob_tar_gz_path
+        self._running_env['mapreduce_job_cache_local_archives'] = str(self._mrjob_tar_gz_path)
                 
     def _setup_working_dir(self):
         """Make a working directory with symlinks to our script and
@@ -222,17 +222,13 @@ class LocalMRJobRunner(MRJobRunner):
             shutil.copyfile(path, dest)
     
     def _get_file_splits(self, input_paths, num_splits, keep_sorted=False):
-        """ Split the input files into *num_splits* files
+        """ Split the input files into (roughly) *num_splits* files
             
-            We may not generate exactly *num_splits* files. Instead this is used
-            as a rough goal.
-            
-            returns a dictionary that maps split file names to a dictionary of properties??
-            ??list of tuples [(original_filename, split_filename, start, length)]
+            returns a dictionary that maps split_file names to a dictionary of properties
         """
         total_size = sum([os.stat(path)[stat.ST_SIZE] for path in input_paths])
         split_size = total_size / num_splits
-        
+         
         # we want each file split to be as close to split_size as possible
         # we also want different input files to be in different splits 
         tmp_directory = self._get_local_tmp_dir()
@@ -247,6 +243,22 @@ class LocalMRJobRunner(MRJobRunner):
             return outfile_name
         
         if keep_sorted:
+            # merge all input files into one
+            if len(input_paths) == 1:
+                input_file = input_paths[0]
+            else:
+                input_file = tmp_directory + '/sorted_input'
+                args = ['sort', '-m'] + input_paths
+                
+                outfile = open(input_file, 'w')
+                proc = Popen(args, stdout=outfile, stderr=PIPE,
+                             cwd=self._working_dir, env={'LC_ALL': 'C'})
+                returncode = proc.wait()
+                if returncode != 0:
+                    raise Exception(
+                        'Command %r returned non-zero exit status %d: %s' %
+                        (args, returncode))
+                
             files = []
             for i in xrange(num_splits):
                 outfile_name = create_outfile()
@@ -255,10 +267,6 @@ class LocalMRJobRunner(MRJobRunner):
             # match all non-tab characters
             re_pattern = re.compile("^(\S*)")
             
-            # we should only have one file at this point
-            assert(len(input_paths) == 1)
-            
-            input_file = input_paths[0] 
             current_file = 0
             for key, lines in itertools.groupby(read_file(input_file), 
                             key=lambda(line): re_pattern.search(line).group(1)):
@@ -296,6 +304,17 @@ class LocalMRJobRunner(MRJobRunner):
 
         We'll intelligently handle stderr from the process.
         """
+        # keep the current environment because we need PATH to find binaries
+        # and make PYTHONPATH work
+        env = combine_local_envs(
+            {'PYTHONPATH': os.getcwd()},
+            os.environ,
+            self._get_cmdenv(),
+            env or {}, 
+            {'mapreduce_task_ismap': str(step_type=='M'), 
+             'mapreduce_task_partition': str(step_num),
+            })
+            
         # decide where to get input
         if self._prev_outfiles:
             input_paths = self._prev_outfiles
@@ -310,17 +329,6 @@ class LocalMRJobRunner(MRJobRunner):
         # get file splits
         keep_sorted = (step_type == 'R')
         file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=keep_sorted)
-        
-        # keep the current environment because we need PATH to find binaries
-        # and make PYTHONPATH work
-        env = combine_local_envs(
-            {'PYTHONPATH': os.getcwd()},
-            os.environ,
-            self._get_cmdenv(),
-            env or {}, 
-            {'mapreduce_task_ismap': str(step_type=='M'), 
-             'mapreduce_task_partition': str(step_num),
-            })
         
         # run the tasks
         procs = []

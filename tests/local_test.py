@@ -125,7 +125,62 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
 
         assert_equal(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+    
+    def test_get_file_splits_test(self):
+        # set up input paths
+        input_path = os.path.join(self.tmp_dir, 'input')
+        with open(input_path, 'w') as input_file:
+            input_file.write('bar\nqux\nfoo\nbar\nqux\nfoo\n')
 
+        input_path2 = os.path.join(self.tmp_dir, 'input2')
+        with open(input_path2, 'w') as input_file:
+            input_file.write('foo\nbar\nbar\n')
+        
+        runner = LocalMRJobRunner(conf_path=False)
+       
+        # split into 3 files
+        file_splits = runner._get_file_splits([input_path, input_path2], 3)
+        
+        # make sure we get 3 files
+        assert_equal(len(file_splits), 3)
+        
+        # make sure all the data is preserved
+        content = []
+        for file_name in file_splits:
+            f = open(file_name)
+            content.extend(f.readlines())
+            
+        assert_equal(sorted(content),
+                    ['bar\n', 'bar\n', 'bar\n', 'bar\n', 'foo\n',
+                     'foo\n', 'foo\n', 'qux\n', 'qux\n'])
+    
+    def test_get_file_splits_sorted_test(self):
+        # set up input paths
+        input_path = os.path.join(self.tmp_dir, 'input')
+        with open(input_path, 'w') as input_file:
+            input_file.write('1\tbar\n1\tbar\n2\tfoo\n2\tfoo\n3\tqux\n')
+
+        input_path2 = os.path.join(self.tmp_dir, 'input2')
+        with open(input_path2, 'w') as input_file:
+            input_file.write('1\tbar\n2\tfoo\n3\tqux\n3\tqux\n')
+
+        runner = LocalMRJobRunner(conf_path=False)
+
+        file_splits = runner._get_file_splits([input_path, input_path2], 3, keep_sorted=True)
+
+        # make sure we get 3 files
+        assert_equal(len(file_splits), 3)
+
+        # make sure all the data is preserved in sorted order
+        content = []
+        for file_name in sorted(file_splits.keys()):
+            f = open(file_name, 'r')
+            content.extend(f.readlines())
+                
+        assert_equal(content,
+                    ['1\tbar\n', '1\tbar\n', '1\tbar\n', '2\tfoo\n', '2\tfoo\n',
+                     '2\tfoo\n', '3\tqux\n', '3\tqux\n', '3\tqux\n'])
+        
 
 class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):
     """Test systems without os.symlink (e.g. Windows). See Issue #46"""

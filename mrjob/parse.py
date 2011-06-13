@@ -211,8 +211,8 @@ def parse_mr_job_stderr(stderr, counters=None):
 
 
 # shortcuts for commonly used sub-expressions
-_CAPTURED_EXPR = r'(?P<%s>.*?[^\\])'
-_NON_CAPTURED_EXPR = r'.*?[^\\]'
+_CAPTURED_EXPR = r'(?P<%s>.*?)'
+_NON_CAPTURED_EXPR = r'.*?'
 _expr = lambda name: _CAPTURED_EXPR % name
 
 # Match a job output line containing counter data.

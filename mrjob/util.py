@@ -265,7 +265,7 @@ class Profiler(object):
         self.accumulated_other_time = 0.0
         self.accumulated_processing_time = 0.0
 
-    def mark_start_processing(self):
+    def add_time_to_other(self):
         """Transition from 'other' code to 'processing' code"""
         current_measurement = resource.getrusage(resource.RUSAGE_SELF)
 
@@ -274,7 +274,7 @@ class Profiler(object):
         self.accumulated_other_time += stime_delta + utime_delta
         self.last_measurement = current_measurement
 
-    def mark_end_processing(self):
+    def add_time_to_processing(self):
         """Transition from 'processing' code back to 'other' code"""
         new_measurement = resource.getrusage(resource.RUSAGE_SELF)
         stime_delta = new_measurement.ru_stime - self.last_measurement.ru_stime
@@ -324,9 +324,9 @@ class Profiler(object):
         # this is broken out in case we decide to also have a wrap_other() function
         if generator:
             return self._wrap_generator(processing_func,
-                                        self.mark_start_processing,
-                                        self.mark_end_processing)
+                                        self.add_time_to_other,
+                                        self.add_time_to_processing)
         else:
             return self._wrap_normal(processing_func,
-                                     self.mark_start_processing,
-                                     self.mark_end_processing)
+                                     self.add_time_to_other,
+                                     self.add_time_to_processing)

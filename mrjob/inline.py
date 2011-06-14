@@ -58,8 +58,6 @@ class InlineMRJobRunner(MRJobRunner):
         self._mrjob_cls = mrjob_cls
         self._prev_outfile = None
         self._final_outfile = None
-        
-        self._running_env = defaultdict(str)
 
     @classmethod
     def _opts_combiners(cls):
@@ -74,6 +72,7 @@ class InlineMRJobRunner(MRJobRunner):
         'hadoop_input_format',
         'hadoop_output_format',
         'hadoop_streaming_jar',
+        'jobconf'
     ]
 
     # options that we ignore because they involve running subprocesses
@@ -103,9 +102,6 @@ class InlineMRJobRunner(MRJobRunner):
                 log.warning('ignoring %s option (use -r local instead): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 
-        jobconf = self._opts['jobconf']
-        self._process_jobconf_arguments(jobconf)
-
         with save_current_environment():
             # set cmdenv variables
             os.environ.update(self._get_cmdenv())
@@ -133,25 +129,6 @@ class InlineMRJobRunner(MRJobRunner):
         self._final_outfile = os.path.join(self._output_dir, 'part-00000')
         log.info('Moving %s -> %s' % (self._prev_outfile, self._final_outfile))
         shutil.move(self._prev_outfile, self._final_outfile)
-
-    def _process_jobconf_arguments(self, jobconf):
-        if jobconf:
-            # TODO: attempt to get the latest version equivalence
-            #try:
-            #     conf_arg = translate_jobconf(conf_arg, '0.21')
-            #except:
-            #    pass
-            for (conf_arg, value) in jobconf.iteritems():
-                if (conf_arg == 'mapreduce.job.maps' or conf_arg == 'mapreduce.job.reduces' or 
-                    conf_arg == 'mapreduce.jobs.local.dir'):
-                    log.warning('ignoring %s option (requires multiple processes)' % conf_arg)
-                else:
-                    pass
-                    # TODO: name = dots_to_underscores(conf_arg)
-                    # self._running_env[name] = value
-            
-            self._running_env['mapreduce_job_id'] = self._job_name
-            self._running_env['mapreduce_job_cache_local_archives'] = str(self._mrjob_tar_gz_path)
 
     def _invoke_inline_mrjob(self, step_number, outfile_name, is_mapper=False, is_reducer=False):
         common_args = (['--step-num=%d' % step_number] +
@@ -208,5 +185,3 @@ class InlineMRJobRunner(MRJobRunner):
         if not os.path.isdir(self._output_dir):
             log.debug('Creating output directory %s' % self._output_dir)
             self.mkdir(self._output_dir)
-        
-        self._running_env['mapreduce_task_output_dir'] = self._output_dir

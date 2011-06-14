@@ -27,7 +27,7 @@ import tempfile
 from mrjob.conf import dump_mrjob_conf
 from mrjob.inline import InlineMRJobRunner
 from mrjob.job import MRJob
-from tests.mr_cmdenv_test import MRcmdenvTest
+from tests.mr_cmdenv_test import MRCmdenvTest
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
@@ -107,7 +107,7 @@ class InlineMRJobRunnerCmdenvTest(TestCase):
          os.environ['SOMETHING'] = 'foofoofoo'
          old_env = os.environ.copy()
 
-         mr_job = MRcmdenvTest(['--runner', 'inline', 
+         mr_job = MRCmdenvTest(['--runner', 'inline', 
                                 '-c', self.mrjob_conf_path,
                                 '--cmdenv=FOO=bar', input_path])
          mr_job.sandbox()

@@ -123,7 +123,7 @@ class S3LogFetcher(LogFetcher):
 
         return log_path
 
-    def get_s3_key(self, s3_log_file_uri):
+    def get_s3_key(self, uri):
         """Get the boto Key object matching the given S3 uri, or
         return None if that key doesn't exist.
 

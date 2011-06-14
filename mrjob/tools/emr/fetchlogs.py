@@ -21,26 +21,40 @@ from mrjob.logfetch.ssh import SSHLogFetcher
 from mrjob.emr import EMRJobRunner
 
 
-def fetchlogs(jobflow_id):
+def fetch_ssh(jobflow_id, path):
     dummy_runner = EMRJobRunner()
     emr_conn = dummy_runner.make_emr_conn()
+    keypath_file = dummy_runner._opts['ec2_key_pair_file']
+    fetcher = SSHLogFetcher(emr_conn, jobflow_id,
+                            keyfile_path=keypath_file)
+    return fetcher.ls(path)
+
+
+def fetch_s3(jobflow_id, path):
+    dummy_runner = EMRJobRunner()
+    emr_conn = dummy_runner.make_emr_conn()
+
+    jobflow = emr_conn.describe_jobflow(jobflow_id)
+    log_uri = getattr(jobflow, 'loguri', '')
+    tweaked_log_uri = log_uri.replace('s3n://', 's3://')
+    root_path = '%s%s/' % (tweaked_log_uri, jobflow_id)
+
+    s3_conn = dummy_runner.make_s3_conn()
+    fetcher = S3LogFetcher(s3_conn, root_path)
+    return fetcher.ls(path)
+
+
+def fetchlogs(jobflow_id, path):
     try:
-        keypath_file = dummy_runner._opts['ec2_key_pair_file']
-        fetcher = SSHLogFetcher(emr_conn, jobflow_id,
-                                keyfile_path=keypath_file)
-        print '\n'.join(fetcher.ls())
+        print '\n'.join(fetch_ssh(jobflow_id, path))
     except LogFetchException:
-        s3_conn = dummy_runner.make_s3_conn()
-        jobflow = emr_conn.describe_jobflow(jobflow_id)
-        log_uri = getattr(jobflow, 'loguri', '')
-        tweaked_log_uri = log_uri.replace('s3n://', 's3://')
-        root_path = '%s%s/' % (tweaked_log_uri, jobflow_id)
-        fetcher = S3LogFetcher(s3_conn, root_path)
-        print '\n'.join(fetcher.ls())
+        print '\n'.join(fetch_s3(jobflow_id, path))
 
 
 def main():
-    fetchlogs(sys.argv[1])
+    if len(sys.argv) < 3:
+        sys.argv.append('')
+    fetchlogs(sys.argv[1], sys.argv[2])
 
 
 if __name__ == '__main__':

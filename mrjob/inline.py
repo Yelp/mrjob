@@ -74,7 +74,6 @@ class InlineMRJobRunner(MRJobRunner):
         'hadoop_input_format',
         'hadoop_output_format',
         'hadoop_streaming_jar',
-        'jobconf',
     ]
 
     # options that we ignore because they involve running subprocesses
@@ -103,6 +102,9 @@ class InlineMRJobRunner(MRJobRunner):
             if self._opts[ignored_opt] != default_opts[ignored_opt]:
                 log.warning('ignoring %s option (use -r local instead): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
+
+        jobconf = self._opts['jobconf']
+        self._process_jobconf_arguments(jobconf)
 
         with save_current_environment():
             # set cmdenv variables
@@ -134,14 +136,18 @@ class InlineMRJobRunner(MRJobRunner):
 
     def _process_jobconf_arguments(self, jobconf):
         if jobconf:
+            # TODO: attempt to get the latest version equivalence
+            #try:
+            #     conf_arg = translate_jobconf(conf_arg, '0.21')
+            #except:
+            #    pass
             for (conf_arg, value) in jobconf.iteritems():
-                if conf_arg == 'mapreduce.job.maps' or conf_arg == 'mapreduce.job.reduces':
+                if (conf_arg == 'mapreduce.job.maps' or conf_arg == 'mapreduce.job.reduces' or 
+                    conf_arg == 'mapreduce.jobs.local.dir'):
                     log.warning('ignoring %s option (requires multiple processes)' % conf_arg)
-                elif conf_arg == 'mapreduce.jobs.local.dir':
-                    pass
                 else:
                     pass
-                    # name = dots_to_underscores(conf_arg)
+                    # TODO: name = dots_to_underscores(conf_arg)
                     # self._running_env[name] = value
             
             self._running_env['mapreduce_job_id'] = self._job_name

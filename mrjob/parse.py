@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utilities for parsing errors, counters, and status messages."""
+import logging
 from optparse import OptionValueError
 import re
 
@@ -27,8 +28,7 @@ HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*\.jar$')
 JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
 
 
-class LogParsingException(Exception):
-    pass
+log = logging.getLogger('mrjob.parse')
 
 
 _HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.(){}[\]"\\])')
@@ -275,12 +275,12 @@ def _parse_counters_0_20(group_string):
             try:
                 group_name = counter_unescape(group_name)
             except ValueError:
-                raise LogParsingException("Could not decode group name %s" % group_name)
+                log.warn("Could not decode group name %s" % group_name)
 
             try:
                 counter_name = counter_unescape(counter_name)
             except ValueError:
-                raise LogParsingException("Could not decode counter name %s" % counter_name)
+                log.warn("Could not decode counter name %s" % counter_name)
 
             yield group_name, counter_name, int(counter_value)
 
@@ -314,7 +314,8 @@ def parse_hadoop_counters_from_line(line):
             break
 
     if correct_func is None:
-        raise LogParsingException('Cannot parse Hadoop counter line: %s' % line)
+        log.warn('Cannot parse Hadoop counter line: %s' % line)
+        return None
 
     counters = {}
     for group, counter, value in correct_func(counter_substring):

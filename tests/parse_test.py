@@ -143,7 +143,7 @@ class FindMiscTestCase(TestCase):
 
     def test_messy_error(self):
         counter_string = 'Job FAILED_REDUCES="0" COUNTERS="YOU JUST GOT PUNKD"'
-        assert_raises(LogParsingException, parse_hadoop_counters_from_line, counter_string)
+        assert_equal(None, parse_hadoop_counters_from_line(counter_string))
 
     def test_freaky_counter_names(self):
         freaky_name = r'\\\\\{\}\(\)\[\]\.\\\\'

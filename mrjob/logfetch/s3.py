@@ -110,10 +110,10 @@ class S3LogFetcher(LogFetcher):
             yield s3_key_to_uri(key)
 
     def get(self, path):
-        log_path = os.path.join(self.get_local_tmp_dir, 'log')
+        log_path = os.path.join(self.local_temp_dir, 'log')
 
         if self._uri_of_downloaded_log_file != path:
-            s3_log_file = self.get_s3_key(path, s3_conn)
+            s3_log_file = self.get_s3_key(path)
             if not s3_log_file:
                 raise LogFetchException('Could not fetch file %s from S3' % path)
 

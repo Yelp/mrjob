@@ -21,16 +21,15 @@ from mrjob.logfetch.ssh import SSHLogFetcher
 from mrjob.emr import EMRJobRunner
 
 
-def fetch_ssh(jobflow_id, path):
+def ssh_fetcher(jobflow_id):
     dummy_runner = EMRJobRunner()
     emr_conn = dummy_runner.make_emr_conn()
-    keypath_file = dummy_runner._opts['ec2_key_pair_file']
-    fetcher = SSHLogFetcher(emr_conn, jobflow_id,
-                            keyfile_path=keypath_file)
-    return fetcher.ls(path)
+    ec2_key_pair_file = dummy_runner._opts['ec2_key_pair_file']
+    return SSHLogFetcher(emr_conn, jobflow_id,
+                         ec2_key_pair_file=ec2_key_pair_file)
 
 
-def fetch_s3(jobflow_id, path):
+def s3_fetcher(jobflow_id):
     dummy_runner = EMRJobRunner()
     emr_conn = dummy_runner.make_emr_conn()
 
@@ -40,15 +39,24 @@ def fetch_s3(jobflow_id, path):
     root_path = '%s%s/' % (tweaked_log_uri, jobflow_id)
 
     s3_conn = dummy_runner.make_s3_conn()
-    fetcher = S3LogFetcher(s3_conn, root_path)
-    return fetcher.ls(path)
+    return S3LogFetcher(s3_conn, root_path)
+
+
+def cat_files(fetcher, paths):
+    for remote_path in paths:
+        print '=== %s ===' % remote_path
+        local_path = fetcher.get(remote_path)
+        with open(local_path, 'r') as f:
+            print f.read()
 
 
 def fetchlogs(jobflow_id, path):
     try:
-        print '\n'.join(fetch_ssh(jobflow_id, path))
+        fetcher = ssh_fetcher(jobflow_id)
+        cat_files(fetcher, fetcher.ls(path))
     except LogFetchException:
-        print '\n'.join(fetch_s3(jobflow_id, path))
+        fetcher = s3_fetcher(jobflow_id)
+        cat_files(fetcher, fetcher.ls(path))
 
 
 def main():

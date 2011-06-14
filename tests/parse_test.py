@@ -151,20 +151,19 @@ class FindMiscTestCase(TestCase):
         assert_in('\\{}()[].\\', parse_hadoop_counters_from_line(counter_string))
 
     def test_counters_fuzz(self):
+        # test some strings that should break badly formulated parsing regexps
         freakquences = [
-            (r'\\\\', '\\'), 
-            ('\{', '{'),
-            ('\}', '}'),
-            ('\(', '('),
-            ('\)', ')'),
-            ('\[', '['),
-            ('\]', ']'),
-        ]
-        # test 100 random scary counter names
-        for i in xrange(100):
-            this_seq = [random.choice(freakquences) for f in xrange(10)]
-            in_str = ''.join([a for a, b in this_seq])
-            out_str = ''.join([b for a, b in this_seq])
+            ('\\[\\]\\(\\}\\[\\{\\\\\\\\\\[\\]\\(', '[](}[{\\[]('), 
+            ('\\)\\}\\\\\\\\\\[\\[\\)\\{\\{\\}\\]', ')}\\[[){{}]'), 
+            ('\\(\\{\\(\\[\\(\\]\\\\\\\\\\(\\\\\\\\\\\\\\\\', '({([(]\\(\\\\'), 
+            ('\\)\\{\\[\\)\\)\\(\\}\\(\\\\\\\\\\\\\\\\', '){[))(}(\\\\'), 
+            ('\\}\\(\\{\\)\\]\\]\\(\\]\\[\\\\\\\\', '}({)]](][\\'), 
+            ('\\[\\{\\\\\\\\\\)\\\\\\\\\\{\\{\\]\\]\\(', '[{\\)\\{{]]('), 
+            ('\\\\\\\\\\(\\(\\)\\\\\\\\\\\\\\\\\\\\\\\\\\[\\{\\]', '\\(()\\\\\\[{]'), 
+            ('\\]\\(\\[\\)\\{\\(\\)\\)\\{\\]', ']([){()){]'), 
+            ('\\(\\[\\{\\[\\[\\(\\{\\}\\(\\{', '([{[[({}({'), 
+            ('\\(\\{\\(\\{\\[\\{\\(\\{\\}\\}', '({({[{({}}')]
+        for in_str, out_str in freakquences:
             counter_string = r'Job FAILED_REDUCES="0" COUNTERS="{(%s)(%s)[(a)(a)(1)]}"' % (in_str, in_str)
             assert_in(out_str, parse_hadoop_counters_from_line(counter_string))
 

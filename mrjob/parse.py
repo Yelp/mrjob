@@ -210,51 +210,51 @@ def parse_mr_job_stderr(stderr, counters=None):
     return {'counters': counters, 'statuses': statuses, 'other': other}
 
 
-# shortcuts for commonly used sub-expressions
-_CAPTURED_EXPR = r'(?P<%s>.*?)'
-_NON_CAPTURED_EXPR = r'.*?'
-_expr = lambda name: _CAPTURED_EXPR % name
-
 # Match a job output line containing counter data.
 # The line is of the form 
 # "Job KEY="value" KEY2="value2" ... COUNTERS="<counter_string>"
 # We just want to pull out the counter string, which varies between 
 # Hadoop versions.
-_KV_EXPR = r'\s+\w+=".*?"'
+_KV_EXPR = r'\s+\w+=".*?"'  # this matches KEY="VALUE"
 _COUNTER_LINE_EXPR = r'Job(%s)*\s+COUNTERS="%s"' % (_KV_EXPR,
-                                                    _expr('counters'))
+                                                    r'(?P<counters>.*?)')
 _COUNTER_LINE_RE = re.compile(_COUNTER_LINE_EXPR)
 
 # 0.18-specific
 # see _parse_counters_0_18 for format
+# A counter looks like this: groupname.countername:countervalue
 _COUNTER_EXPR_0_18 = r'(?P<group>[^,]+?)[.](?P<name>.+?):(?P<value>\d+)'
 _COUNTER_RE_0_18 = re.compile(_COUNTER_EXPR_0_18)
 
 # aggregate 'is this 0.18?' expression
-# look for the groupname.countername:countervalue,... syntax
+# these are comma-separated counter expressions (see _COUNTER_EXPR_0_18)
 _ONE_0_18_COUNTER = r'[^,]+?[.].+?:\d+'
 _0_18_EXPR = r'(%s)(,%s)*' % (_ONE_0_18_COUNTER, _ONE_0_18_COUNTER)
 _COUNTER_FORMAT_IS_0_18 = re.compile(_0_18_EXPR)
 
 # 0.20-specific
-# see _parse_counters_0_20 for format
 
 # capture one group including sub-counters
-_COUNTER_LIST_EXPR = r'(?P<counter_list_str>\[.*?[^\\]\])'
-_GROUP_RE_0_20 = re.compile(r'{\(%s\)\(%s\)%s}' % (_expr('group_id'),
-                                                   _expr('group_name'),
+# these look like: {(gid)(gname)[...][...][...]...}
+_COUNTER_LIST_EXPR = r'(?P<counter_list_str>\[.*?\])'
+_GROUP_RE_0_20 = re.compile(r'{\(%s\)\(%s\)%s}' % (r'(?P<group_id>.*?)',
+                                                   r'(?P<group_name>.*?)',
                                                    _COUNTER_LIST_EXPR))
 
 # capture a single counter from a group
+# this is what the ... is in _COUNTER_LIST_EXPR (incl. the brackets).
+# it looks like: [(cid)(cname)(value)]
 _COUNTER_VALUE_EXPR = r'(?P<counter_value>\d+)'
-_COUNTER_0_20_EXPR = r'\[\(%s\)\(%s\)\(%s\)\]' % (_expr('counter_id'),
-                                                  _expr('counter_name'),
+_COUNTER_0_20_EXPR = r'\[\(%s\)\(%s\)\(%s\)\]' % (r'(?P<counter_id>.*?)',
+                                                  r'(?P<counter_name>.*?)',
                                                   _COUNTER_VALUE_EXPR)
 _COUNTER_RE_0_20 = re.compile(_COUNTER_0_20_EXPR)
 
-# look for the {(gid)(gname)[(cid)(cname)(cvalue)][...]...} syntax
-_0_20_EXPR = r'{\(%s\)\(%s\)(%s)*' % (_NON_CAPTURED_EXPR,
-                                      _NON_CAPTURED_EXPR,
+# aggregate 'is this 0.20?' expression
+# combines most of the rules from the capturing expressions above
+# should match strings like: {(gid)(gname)[(cid)(cname)(cvalue)][...]...}
+_0_20_EXPR = r'{\(%s\)\(%s\)(%s)*' % (r'.*?',
+                                      r'.*?',
                                       _COUNTER_0_20_EXPR)
 _COUNTER_FORMAT_IS_0_20 = re.compile(_0_20_EXPR)
 

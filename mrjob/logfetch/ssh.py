@@ -13,12 +13,13 @@
 # limitations under the License.
 
 import logging
+import os
 import subprocess
 
 from mrjob.logfetch import LogFetcher, LogFetchException
 
 
-log = logging.getLogger('mrjob.fetch_ssh')
+log = logging.getLogger('mrjob.fetch_s3')
 
 
 class SSHLogFetcher(LogFetcher):
@@ -31,6 +32,7 @@ class SSHLogFetcher(LogFetcher):
         self.jobflow_id = jobflow_id
         self.ec2_key_pair_file = ec2_key_pair_file
         self.root_path = '/mnt/var/log/hadoop/'
+        self._uri_of_downloaded_log_file = None
         self.address = None
 
     def _address_of_master(self):
@@ -52,8 +54,7 @@ class SSHLogFetcher(LogFetcher):
             'hadoop@%s' % self._address_of_master(),
             'find', self.root_path,
         ]
-        print ' '.join(args)
-        p = subprocess.Popen(args, 
+        p = subprocess.Popen(args,
                              stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
@@ -62,12 +63,35 @@ class SSHLogFetcher(LogFetcher):
             log.error(str(err))
             raise LogFetchException('ssh error: %s' % str(err))
         else:
-            return output.split('\n')
+            for line in output.split('\n'):
+                # skip directories, we only want to return downloadable files
+                if not line.endswith('/'):
+                    yield line
 
     def get(self, path):
-        return None
+        log_path = os.path.join(self.local_temp_dir, 'log')
 
-if __name__ == '__main__':
-    emr_conn = EMRJobRunner().make_emr_conn()
-    addr = address_of_master(emr_conn, sys.argv[1])
-    print '\n'.join(ls(addr, '/*'))
+        if self._uri_of_downloaded_log_file != path:
+            log.debug('downloading %s -> %s' % (path, log_path))
+            # download path to log_path
+
+            self._uri_of_downloaded_log_file = path
+
+        args = [
+            'scp', '-q',
+            '-i', self.ec2_key_pair_file,
+            'hadoop@%s:%s' % (self._address_of_master(), path),
+            log_path,
+        ]
+        p = subprocess.Popen(args,
+                             stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        output, err = p.communicate()
+        if err:
+            if 'not a regular file' in err:
+                return None
+            log.error(str(err))
+            raise LogFetchException('scp error: %s' % str(err))
+        else:
+            return log_path

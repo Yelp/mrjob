@@ -21,6 +21,15 @@ from mrjob.logfetch.ssh import SSHLogFetcher
 from mrjob.emr import EMRJobRunner
 
 
+# Log file locations are like so:
+#    S3 location             Local location
+#    /daemons                / (root)
+#    /jobs                   /history
+#    /node                   <not present>
+#    /steps                  /steps
+#    /task-attempts          /userlogs
+
+
 def ssh_fetcher(jobflow_id):
     dummy_runner = EMRJobRunner()
     emr_conn = dummy_runner.make_emr_conn()
@@ -46,8 +55,11 @@ def cat_files(fetcher, paths):
     for remote_path in paths:
         print '=== %s ===' % remote_path
         local_path = fetcher.get(remote_path)
-        with open(local_path, 'r') as f:
-            print f.read()
+        # Sometimes get() will return None
+        if local_path:
+            with open(local_path, 'r') as f:
+                pass
+                # print f.read()
 
 
 def fetchlogs(jobflow_id, path):

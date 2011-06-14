@@ -1,0 +1,137 @@
+# Copyright 2009-2011 Yelp and Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+from __future__ import with_statement
+
+import fnmatch
+import logging
+import os
+import posixpath
+import re
+
+from mrjob.logfetch import GLOB_RE, LogFetcher, LogFetchException
+
+
+S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
+
+
+log = logging.getLogger('mrjob.fetch_s3')
+
+
+def parse_s3_uri(uri):
+    """Parse an S3 URI into (bucket, key)
+
+    >>> parse_s3_uri('s3://walrus/tmp/')
+    ('walrus', 'tmp/')
+
+    If ``uri`` is not an S3 URI, raise a ValueError
+    """
+    match = S3_URI_RE.match(uri)
+    if match:
+        return match.groups()
+    else:
+        raise ValueError('Invalid S3 URI: %s' % uri)
+
+
+def s3_key_to_uri(s3_key):
+    """Convert a boto Key object into an ``s3://`` URI"""
+    return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
+
+
+class S3LogFetcher(LogFetcher):
+
+    def __init__(self, s3_conn, root_path, local_temp_dir='/tmp'):
+        super(S3LogFetcher, self).__init__(local_temp_dir=local_temp_dir)
+        self.s3_conn = s3_conn
+        self.root_path = root_path
+        self._uri_of_downloaded_log_file = None
+
+    def ls(self, path=''):
+        """Recursively list files locally or on S3.
+
+        This doesn't list "directories" unless there's actually a
+        corresponding key ending with a '/' (which is weird and confusing;
+        don't make S3 keys ending in '/')
+
+        To list a directory, path_glob must end with a trailing
+        slash (foo and foo/ are different on S3)
+        """
+        if path:
+            # Convert the relative path to an absolute one
+            path = posixpath.join(self.root_path, path)
+        else:
+            path = self.root_path
+
+        # Fall back on local behavior if it's a local path
+        if not S3_URI_RE.match(path):
+            for path in super(S3LogFetcher, self).ls(path):
+                yield path
+
+        # support globs
+        glob_match = GLOB_RE.match(path)
+
+        # if it's a "file" (doesn't end with /), just check if it exists
+        if not glob_match and not path.endswith('/'):
+            uri = path
+            if self.get_s3_key(uri):
+                yield uri
+            return
+
+        # we're going to search for all keys starting with base_uri
+        if glob_match:
+            # cut it off at first wildcard
+            base_uri = glob_match.group(1)
+        else:
+            base_uri = path
+
+        for uri in self._s3_ls(base_uri):
+            # enforce globbing
+            if glob_match and not fnmatch.fnmatch(uri, path):
+                continue
+
+            yield uri
+
+    def _s3_ls(self, uri):
+        """Helper for ls(); doesn't bother with globbing or directories"""
+        bucket_name, key_name = parse_s3_uri(uri)
+
+        bucket = self.s3_conn.get_bucket(bucket_name)
+        for key in bucket.list(key_name):
+            yield s3_key_to_uri(key)
+
+    def get(self, path):
+        log_path = os.path.join(self.get_local_tmp_dir, 'log')
+
+        if self._uri_of_downloaded_log_file != path:
+            s3_log_file = self.get_s3_key(path, s3_conn)
+            if not s3_log_file:
+                raise LogFetchException('Could not fetch file %s from S3' % path)
+
+            log.debug('downloading %s -> %s' % (path, log_path))
+            s3_log_file.get_contents_to_filename(log_path)
+            self._uri_of_downloaded_log_file = s3_log_file
+
+        return log_path
+
+    def get_s3_key(self, s3_log_file_uri):
+        """Get the boto Key object matching the given S3 uri, or
+        return None if that key doesn't exist.
+
+        uri is an S3 URI: ``s3://foo/bar``
+
+        You may optionally pass in an existing s3 connection through ``s3_conn``
+        """
+        bucket_name, key_name = parse_s3_uri(uri)
+
+        return self.s3_conn.get_bucket(bucket_name).get_key(key_name)
+

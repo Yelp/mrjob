@@ -17,7 +17,7 @@ from __future__ import with_statement
 
 __author__ = 'Matthew Tai <mtai@adku.com>'
 
-from collections import defualtdict
+from collections import defaultdict
 import logging
 import os
 import pprint
@@ -28,7 +28,7 @@ import sys
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.runner import MRJobRunner
 from mrjob.job import MRJob
-from mrjob.util import read_file
+from mrjob.util import read_file, save_current_environment
 
 log = logging.getLogger('mrjob.inline')
 
@@ -104,31 +104,28 @@ class InlineMRJobRunner(MRJobRunner):
                 log.warning('ignoring %s option (use -r local instead): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 
-        # set cmdenv variables
-        # save os.environ and load it back again after execution
-        self._original_environ = os.environ.copy()
-        os.environ.update(self._get_cmdenv())
+        with save_current_environment():
+            # set cmdenv variables
+            os.environ.update(self._get_cmdenv())
 
-        # run mapper, sort, reducer for each step
-        for step_number, step_name in enumerate(self._get_steps()):
-            self._invoke_inline_mrjob(step_number, 'step-%d-mapper' %
-                                      step_number, is_mapper=True)
+            # run mapper, sort, reducer for each step
+            for step_number, step_name in enumerate(self._get_steps()):
+                self._invoke_inline_mrjob(step_number, 'step-%d-mapper' %
+                                          step_number, is_mapper=True)
 
-            if 'R' in step_name:
-                mapper_output_path = self._prev_outfile
-                sorted_mapper_output_path = self._decide_output_path(
-                    'step-%d-mapper-sorted' % step_number)
-                with open(sorted_mapper_output_path, 'w') as sort_out:
-                    proc = subprocess.Popen(
-                        ['sort', mapper_output_path],
-                        stdout=sort_out, env={'LC_ALL': 'C'})
-                proc.wait()
+                if 'R' in step_name:
+                    mapper_output_path = self._prev_outfile
+                    sorted_mapper_output_path = self._decide_output_path(
+                        'step-%d-mapper-sorted' % step_number)
+                    with open(sorted_mapper_output_path, 'w') as sort_out:
+                        proc = subprocess.Popen(
+                            ['sort', mapper_output_path],
+                            stdout=sort_out, env={'LC_ALL': 'C'})
+                    proc.wait()
 
-                # This'll read from sorted_mapper_output_path
-                self._invoke_inline_mrjob(step_number, 'step-%d-reducer' %
-                                          step_number, is_reducer=True)
-
-        os.environ = self._original_environ
+                    # This'll read from sorted_mapper_output_path
+                    self._invoke_inline_mrjob(step_number, 'step-%d-reducer' %
+                                              step_number, is_reducer=True)
 
         # move final output to output directory
         self._final_outfile = os.path.join(self._output_dir, 'part-00000')
@@ -206,4 +203,4 @@ class InlineMRJobRunner(MRJobRunner):
             log.debug('Creating output directory %s' % self._output_dir)
             self.mkdir(self._output_dir)
         
-        self._running_env['mapreduce_output_fileoutputformat_outputdir'] = self._output_dir
+        self._running_env['mapreduce_task_output_dir'] = self._output_dir

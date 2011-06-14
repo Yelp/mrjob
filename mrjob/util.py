@@ -92,6 +92,18 @@ def log_to_stream(name=None, stream=None, format=None, level=None, debug=False):
     logger.addHandler(handler)
 
 
+@contextlib.contextmanager
+def save_current_environment():
+    """ Context manager that saves os.environ and loads 
+        it back again after execution
+    """
+    original_environ = os.environ.copy()
+    
+    yield
+    
+    os.environ.clear()
+    os.environ.update(original_environ)
+
 def read_input(path, stdin=None):
     """Stream input the way Hadoop would.
 

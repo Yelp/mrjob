@@ -104,8 +104,7 @@ class InlineMRJobRunner(MRJobRunner):
         # set cmdenv variables
         # save os.environ and load it back again after execution
         self._original_environ = os.environ.copy()
-        for (var, value) in self._get_cmdenv().iteritems():
-            os.environ[var] = value
+        os.environ.update(self._get_cmdenv())
 
         # run mapper, sort, reducer for each step
         for step_number, step_name in enumerate(self._get_steps()):

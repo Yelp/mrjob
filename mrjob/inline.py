@@ -17,6 +17,7 @@ from __future__ import with_statement
 
 __author__ = 'Matthew Tai <mtai@adku.com>'
 
+from collections import defualtdict
 import logging
 import os
 import pprint
@@ -57,6 +58,8 @@ class InlineMRJobRunner(MRJobRunner):
         self._mrjob_cls = mrjob_cls
         self._prev_outfile = None
         self._final_outfile = None
+        
+        self._running_env = defaultdict(str)
 
     @classmethod
     def _opts_combiners(cls):
@@ -132,6 +135,21 @@ class InlineMRJobRunner(MRJobRunner):
         log.info('Moving %s -> %s' % (self._prev_outfile, self._final_outfile))
         shutil.move(self._prev_outfile, self._final_outfile)
 
+    def _process_jobconf_arguments(self, jobconf):
+        if jobconf:
+            for (conf_arg, value) in jobconf.iteritems():
+                if conf_arg == 'mapreduce.job.maps' or conf_arg == 'mapreduce.job.reduces':
+                    log.warning('ignoring %s option (requires multiple processes)' % conf_arg)
+                elif conf_arg == 'mapreduce.jobs.local.dir':
+                    pass
+                else:
+                    pass
+                    # name = dots_to_underscores(conf_arg)
+                    # self._running_env[name] = value
+            
+            self._running_env['mapreduce_job_id'] = self._job_name
+            self._running_env['mapreduce_job_cache_local_archives'] = str(self._mrjob_tar_gz_path)
+
     def _invoke_inline_mrjob(self, step_number, outfile_name, is_mapper=False, is_reducer=False):
         common_args = (['--step-num=%d' % step_number] +
                        self._mr_job_extra_args(local=True) +
@@ -187,3 +205,5 @@ class InlineMRJobRunner(MRJobRunner):
         if not os.path.isdir(self._output_dir):
             log.debug('Creating output directory %s' % self._output_dir)
             self.mkdir(self._output_dir)
+        
+        self._running_env['mapreduce_output_fileoutputformat_outputdir'] = self._output_dir

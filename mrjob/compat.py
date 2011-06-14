@@ -430,14 +430,32 @@ jobconf_map = {
     "user.name": {'0.21': "mapreduce.job.user.name", '0.18': "user.name"},
 }
 
-def translate_jobconf(variable, version=None):
+def translate_jobconf(variable):
     """ Translates a jobconf variable into the equivalent name in 
         other versions of hadoop. 
-        If *version* is given, it returns the jobconf argument for that version.
-        Otherwise, it returns the set of equivalent arguements
+        Returns an iterator over the list of equivalent arguements
     """
-    if version:
-        return jobconf_map[variable][version]
-    else:
-        return jobconf_map[variable].itervalues()
-        
+    return jobconf_map[variable].itervalues()
+
+
+def translate_jobconf_to_version(variable, version):
+    """ Translates a jobconf variable into the equivalent name in 
+        the given version of hadoop.
+    """
+    return jobconf_map[variable][version]
+    
+
+def get_jobconf_value(variable):
+    """gets a jobconf varaible from runtime environment
+    """
+    name = variable.replace('.','_')
+    if name in os.environ:
+        return os.environ[name]
+
+    # try alternatives
+    for var in translate_jobconf(variable):
+        var = dots_to_underscores(var)
+        if var in os.environ:
+            return os.environ[var]
+
+    raise KeyError("%s jobconf variable not found" % variable)

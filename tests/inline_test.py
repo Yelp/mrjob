@@ -103,6 +103,10 @@ class InlineMRJobRunnerCmdenvTest(TestCase):
          with open(input_path, 'w') as input_file:
              input_file.write('foo\n')
 
+         # make sure previous environment is preserved
+         os.environ['SOMETHING'] = 'foofoofoo'
+         old_env = os.environ.copy()
+
          mr_job = MRcmdenvTest(['--runner', 'inline', 
                                 '-c', self.mrjob_conf_path,
                                 '--cmdenv=FOO=bar', input_path])
@@ -110,9 +114,6 @@ class InlineMRJobRunnerCmdenvTest(TestCase):
 
          local_tmp_dir = None
          results = []
-
-         # make sure previous environment is preserved
-         os.environ['SOMETHING'] = 'foofoofoo'
 
          with mr_job.make_runner() as runner:
              assert isinstance(runner, InlineMRJobRunner)
@@ -124,6 +125,9 @@ class InlineMRJobRunnerCmdenvTest(TestCase):
 
          assert_equal(sorted(results),
                       [('FOO', 'bar'), ('SOMETHING', 'foofoofoo')])
+        
+         # make sure we revert back              
+         assert_equal(old_env, os.environ)
                       
                       
 class TimeoutException(Exception):

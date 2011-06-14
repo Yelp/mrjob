@@ -14,12 +14,23 @@
 
 import logging
 import os
+import re
 import subprocess
 
 from mrjob.logfetch import LogFetcher, LogFetchException
 
 
 log = logging.getLogger('mrjob.fetch_s3')
+
+
+# regex for matching task-attempts log URIs
+TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/hadoop/userlogs/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
+
+# regex for matching step log URIs
+STEP_LOG_URI_RE = re.compile(r'^.*/hadoop/steps/(?P<step_num>\d+)/syslog$')
+
+# regex for matching job log URIs
+JOB_LOG_URI_RE = re.compile(r'^.*?/hadoop/history/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
 
 
 class SSHLogFetcher(LogFetcher):
@@ -34,6 +45,15 @@ class SSHLogFetcher(LogFetcher):
         self.root_path = '/mnt/var/log/hadoop/'
         self._uri_of_downloaded_log_file = None
         self.address = None
+
+    def task_attempts_log_uri_re(self):
+        return TASK_ATTEMPTS_LOG_URI_RE
+
+    def step_log_uri_re(self):
+        return STEP_LOG_URI_RE
+
+    def job_log_uri_re(self):
+        return JOB_LOG_URI_RE
 
     def _address_of_master(self):
         # cache address of master to avoid redundant calls to describe_jobflow

@@ -25,6 +25,16 @@ from mrjob.logfetch import GLOB_RE, LogFetcher, LogFetchException
 S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
 
 
+# regex for matching task-attempts log URIs
+TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/task-attempts/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
+
+# regex for matching step log URIs
+STEP_LOG_URI_RE = re.compile(r'^.*/steps/(?P<step_num>\d+)/syslog$')
+
+# regex for matching job log URIs
+JOB_LOG_URI_RE = re.compile(r'^.*?/jobs/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
+
+
 log = logging.getLogger('mrjob.fetch_s3')
 
 
@@ -55,6 +65,15 @@ class S3LogFetcher(LogFetcher):
         self.s3_conn = s3_conn
         self.root_path = root_path
         self._uri_of_downloaded_log_file = None
+
+    def task_attempts_log_uri_re(self):
+        return TASK_ATTEMPTS_LOG_URI_RE
+
+    def step_log_uri_re(self):
+        return STEP_LOG_URI_RE
+
+    def job_log_uri_re(self):
+        return JOB_LOG_URI_RE
 
     def ls(self, path=''):
         """Recursively list files locally or on S3.

@@ -65,10 +65,27 @@ def cat_files(fetcher, paths):
 def fetchlogs(jobflow_id, path):
     try:
         fetcher = ssh_fetcher(jobflow_id)
-        cat_files(fetcher, fetcher.ls(path))
+        task_attempts, steps, jobs = fetcher.list_logs()
+        print 'Task attempts:'
+        cat_files(fetcher, task_attempts)
+        print
+        print 'Steps:'
+        cat_files(fetcher, steps)
+        print
+        print 'Jobs:'
+        cat_files(fetcher, jobs)
+
     except LogFetchException:
         fetcher = s3_fetcher(jobflow_id)
-        cat_files(fetcher, fetcher.ls(path))
+        task_attempts, step_logs, job_logs = fetcher.list_logs()
+        print 'Task attempts:'
+        cat_files(fetcher, task_attempts)
+        print
+        print 'Steps:'
+        cat_files(fetcher, steps)
+        print
+        print 'Jobs:'
+        cat_files(fetcher, jobs)
 
 
 def main():

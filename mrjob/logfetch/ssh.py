@@ -55,6 +55,15 @@ class SSHLogFetcher(LogFetcher):
     def job_log_uri_re(self):
         return JOB_LOG_URI_RE
 
+    def task_attempts_log_path(self):
+        return 'userlogs'
+
+    def step_log_path(self):
+        return 'steps'
+
+    def job_log_path(self):
+        return 'history'
+
     def _address_of_master(self):
         # cache address of master to avoid redundant calls to describe_jobflow
         if self.address:

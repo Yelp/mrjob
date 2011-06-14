@@ -17,6 +17,10 @@ import glob
 import os
 import re
 
+TASK_ATTEMPT_LOGS = 'TASK_ATTEMPT_LOGS'
+STEP_LOGS = 'STEP_LOGS'
+JOB_LOGS = 'JOB_LOGS'
+
 
 # use to detect globs and break into the part before and after the glob
 GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
@@ -35,11 +39,50 @@ class LogFetcher(object):
     def task_attempts_log_uri_re(self):
         raise NotImplementedError
 
+    def task_attempts_log_path(self):
+        raise NotImplementedError
+
     def step_log_uri_re(self):
+        raise NotImplementedError
+
+    def step_log_path(self):
         raise NotImplementedError
 
     def job_log_uri_re(self):
         raise NotImplementedError
+
+    def job_log_path(self):
+        raise NotImplementedError
+
+    def list_logs(self, log_types=None):
+        log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
+        re_map = {
+            TASK_ATTEMPT_LOGS: self.task_attempts_log_uri_re(),
+            STEP_LOGS: self.step_log_uri_re(),
+            JOB_LOGS: self.job_log_uri_re(),
+        }
+        path_map = {
+            TASK_ATTEMPT_LOGS: self.task_attempts_log_path(),
+            STEP_LOGS: self.step_log_path(),
+            JOB_LOGS: self.job_log_path(),
+        }
+        if len(log_types) > 1:
+            paths = self.ls()
+        else:
+            paths = self.ls(path_map[log_types[0]])
+
+        output = []
+        for log_type in log_types:
+            output.append([])
+
+        for item in paths:
+            for i, log_type in enumerate(log_types):
+                if re_map[log_type].match(item):
+                    output[i].append(item)
+        if len(output) > 1:
+            return output
+        else:
+            return output[0]
 
     def ls(self, path):
         """Recursively list all files in the given path.

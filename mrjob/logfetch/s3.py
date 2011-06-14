@@ -75,6 +75,15 @@ class S3LogFetcher(LogFetcher):
     def job_log_uri_re(self):
         return JOB_LOG_URI_RE
 
+    def task_attempts_log_path(self):
+        return 'task-attempts'
+
+    def step_log_path(self):
+        return 'steps'
+
+    def job_log_path(self):
+        return 'jobs'
+
     def ls(self, path=''):
         """Recursively list files locally or on S3.
 

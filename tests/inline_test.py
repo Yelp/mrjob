@@ -26,6 +26,8 @@ import tempfile
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.inline import InlineMRJobRunner
+from mrjob.job import MRJob
+from tests.mr_cmdenv_test import MRcmdenvTest
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
@@ -82,5 +84,47 @@ class InlineMRJobRunnerEndToEndTestCase(TestCase):
         assert_equal(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
+
+class InlineMRJobRunnerCmdenvTest(TestCase):
+
+     @setup
+     def make_tmp_dir_and_mrjob_conf(self):
+         self.tmp_dir = tempfile.mkdtemp()
+         self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+         dump_mrjob_conf({'runners': {'inline': {}}},
+                         open(self.mrjob_conf_path, 'w'))
+
+     @teardown
+     def rm_tmp_dir(self):
+         shutil.rmtree(self.tmp_dir)
+
+     def test_cmdenv(self):
+         input_path = os.path.join(self.tmp_dir, 'input')
+         with open(input_path, 'w') as input_file:
+             input_file.write('foo\n')
+
+         mr_job = MRcmdenvTest(['--runner', 'inline', 
+                                '-c', self.mrjob_conf_path,
+                                '--cmdenv=FOO=bar', input_path])
+         mr_job.sandbox()
+
+         local_tmp_dir = None
+         results = []
+
+         # make sure previous environment is preserved
+         os.environ['SOMETHING'] = 'foofoofoo'
+
+         with mr_job.make_runner() as runner:
+             assert isinstance(runner, InlineMRJobRunner)
+             runner.run()
+
+             for line in runner.stream_output():
+                 key, value = mr_job.parse_output_line(line)
+                 results.append((key, value))
+
+         assert_equal(sorted(results),
+                      [('FOO', 'bar'), ('SOMETHING', 'foofoofoo')])
+                      
+                      
 class TimeoutException(Exception):
     pass

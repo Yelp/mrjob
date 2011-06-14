@@ -76,7 +76,6 @@ class InlineMRJobRunner(MRJobRunner):
 
     # options that we ignore because they involve running subprocesses
     IGNORED_LOCAL_OPTS = [
-        'cmdenv',
         'python_bin',
         'setup_cmds',
         'setup_scripts',
@@ -102,6 +101,12 @@ class InlineMRJobRunner(MRJobRunner):
                 log.warning('ignoring %s option (use -r local instead): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 
+        # set cmdenv variables
+        # save os.environ and load it back again after execution
+        self._original_environ = os.environ.copy()
+        for (var, value) in self._get_cmdenv().iteritems():
+            os.environ[var] = value
+
         # run mapper, sort, reducer for each step
         for step_number, step_name in enumerate(self._get_steps()):
             self._invoke_inline_mrjob(step_number, 'step-%d-mapper' %
@@ -120,6 +125,8 @@ class InlineMRJobRunner(MRJobRunner):
                 # This'll read from sorted_mapper_output_path
                 self._invoke_inline_mrjob(step_number, 'step-%d-reducer' %
                                           step_number, is_reducer=True)
+
+        os.environ = self._original_environ
 
         # move final output to output directory
         self._final_outfile = os.path.join(self._output_dir, 'part-00000')

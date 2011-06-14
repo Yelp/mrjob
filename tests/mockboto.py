@@ -29,6 +29,7 @@ try:
 except ImportError:
     boto = None
 
+from mrjob.botoemr.connection import EmrConnection
 from mrjob.botoemr.step import JarStep
 from mrjob.conf import combine_values
 from mrjob.emr import S3_URI_RE, parse_s3_uri
@@ -40,13 +41,15 @@ DEFAULT_MAX_DAYS_AGO = 61
 
 def add_mock_s3_data(mock_s3_fs, data):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
-    key to contents) with a map from bucket name to key name to data."""
+    key to contents) with a map from bucket name to key name to data and
+    time last modified."""
+    time_modified = to_iso8601(datetime.datetime.utcnow())
     for bucket_name, key_name_to_bytes in data.iteritems():
         mock_s3_fs.setdefault(bucket_name, {'keys':{}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
 
         for key_name, bytes in key_name_to_bytes.iteritems():
-            bucket['keys'][key_name] = bytes
+            bucket['keys'][key_name] = (bytes, time_modified)
 
 class MockS3Connection(object):
     """Mock out boto.s3.Connection
@@ -89,7 +92,8 @@ class MockBucket:
     """
     def __init__(self, connection=None, name=None, location=None):
         """You can optionally specify a 'data' argument, which will instantiate
-        mock keys and mock data. data should be a map from key name to bytes.
+        mock keys and mock data. data should be a map from key name to bytes and
+        time last modified.
         """
         self.name = name
         self.connection = connection
@@ -104,7 +108,8 @@ class MockBucket:
 
     def new_key(self, key_name):
         if key_name not in self.mock_state():
-            self.mock_state()[key_name] = ''
+            self.mock_state()[key_name] = ('', 
+                    to_iso8601(datetime.datetime.utcnow()))
         return MockKey(bucket=self, name=key_name)
 
     def get_key(self, key_name):
@@ -137,13 +142,14 @@ class MockKey(object):
     def read_mock_data(self):
         """Read the bytes for this key out of the fake boto state."""
         if self.name in self.bucket.mock_state():
-            return self.bucket.mock_state()[self.name]
+            return self.bucket.mock_state()[self.name][0]
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
     def write_mock_data(self, data):
         if self.name in self.bucket.mock_state():
-            self.bucket.mock_state()[self.name] = data
+            self.bucket.mock_state()[self.name] = (data, 
+                        to_iso8601(datetime.datetime.utcnow()))
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -168,6 +174,23 @@ class MockKey(object):
         data = self.read_mock_data()
         for line in data.splitlines(True):
             yield line
+    
+    def _get_last_modified(self):
+        if self.name in self.bucket.mock_state():
+            return self.bucket.mock_state()[self.name][1]
+        else:
+            raise boto.exception.S3ResponseError(404, 'Not Found')
+    
+    # option to change last_modified time for testing purposes
+    def _set_last_modified(self, time_modified):
+        if self.name in self.bucket.mock_state():
+            data = self.bucket.mock_state()[self.name][0]
+            self.bucket.mock_state()[self.name] = (data, 
+                        to_iso8601(time_modified))
+        else:
+            raise boto.exception.S3ResponseError(404, 'Not Found')
+    
+    last_modified = property(_get_last_modified, _set_last_modified)
 
 ### EMR ###
 
@@ -231,7 +254,7 @@ class MockEmrConnection(object):
                     action_on_failure='TERMINATE_JOB_FLOW', keep_alive=False,
                     enable_debugging=False,
                     hadoop_version='0.18',
-                    steps=[],
+                    steps=None,
                     bootstrap_actions=[],
                     now=None):
         """Mock of run_jobflow().
@@ -241,6 +264,8 @@ class MockEmrConnection(object):
         """
         if now is None:
             now = datetime.datetime.utcnow()
+
+        steps = steps or []
 
         init_args = locals().copy()
         del init_args['self']
@@ -274,8 +299,9 @@ class MockEmrConnection(object):
             debugging_step = JarStep(name='Setup Hadoop Debugging',
                                      action_on_failure='TERMINATE_JOB_FLOW',
                                      main_class=None,
-                                     jar='DEBUGGING.jar',
-                                     step_args='S3/PATH/TO/ARGS.jar')
+                                     jar=EmrConnection.DebuggingJar,
+                                     step_args=[MockEmrObject(value=EmrConnection.DebuggingArgs)])
+            debugging_step.state = 'COMPLETED'
             steps.insert(0, debugging_step)
         self.add_jobflow_steps(jobflow_id, steps)
 
@@ -341,7 +367,7 @@ class MockEmrConnection(object):
                 state='PENDING',
                 name=step.name,
                 actiononfailure=step.action_on_failure,
-                args=step.args(),
+                args=step.args,
             )
 
             job_flow.steps.append(step_object)
@@ -363,9 +389,10 @@ class MockEmrConnection(object):
         """Figure out the output dir for a step by parsing step.args
         and looking for an -output argument."""
         # parse in reverse order, in case there are multiple -output args
-        for i, arg in reversed(list(enumerate(step.args[:-1]))):
+        args = step.args()
+        for i, arg in reversed(list(enumerate(args[:-1]))):
             if arg == '-output':
-                return step.args[i+1]
+                return args[i+1]
         else:
             return None
 
@@ -410,6 +437,9 @@ class MockEmrConnection(object):
         for step_num, step in enumerate(job_flow.steps):
             # skip steps that are already done
             if step.state in ('COMPLETED', 'FAILED', 'CANCELLED'):
+                continue
+            if step.name in ('Setup Hadoop Debugging', ):
+                step.state = 'COMPLETED'
                 continue
 
             # found currently running step! going to handle it, then exit
@@ -477,3 +507,20 @@ class MockEmrObject(object):
     def __setattr__(self, key, value):
         self.__dict__[key] = value
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        my_items = self.__dict__.items()
+        other_items = other.__dict__.items()
+
+        if len(my_items) != len(other_items):
+            return False
+
+        for k, v in my_items:
+            if not other_items.has_key(k):
+                return False
+            else:
+                if v != other_items[k]:
+                    return False
+
+        return True

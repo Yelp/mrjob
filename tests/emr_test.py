@@ -34,8 +34,7 @@ import mrjob.emr
 from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
 from mrjob.util import tar_and_gzip
 from mrjob.parse import JOB_NAME_RE
-from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, add_mock_s3_data, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
-from tests.mr_nomapper_multistep import MRNoMapper
+from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, MockKey, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled, no_handlers_for_logger
 
@@ -160,10 +159,10 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            assert_in('-inputformat', job_flow.steps[0].args)
-            assert_not_in('-outputformat', job_flow.steps[0].args)
-            assert_not_in('-inputformat', job_flow.steps[1].args)
-            assert_in('-outputformat', job_flow.steps[1].args)
+            assert_in('-inputformat', job_flow.steps[0].args())
+            assert_not_in('-outputformat', job_flow.steps[0].args())
+            assert_not_in('-inputformat', job_flow.steps[1].args())
+            assert_in('-outputformat', job_flow.steps[1].args())
 
             # make sure mrjob.tar.gz is created and uploaded as
             # a bootstrap file
@@ -376,7 +375,7 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
                            '-c', self.mrjob_conf_path,
                            '--enable-emr-debugging'])
         mr_job.sandbox()
-        
+
         with mr_job.make_runner() as runner:
             runner.run()
             flow = runner.make_emr_conn().describe_jobflow(runner._emr_job_flow_id)

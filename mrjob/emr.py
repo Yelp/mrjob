@@ -1618,7 +1618,7 @@ class EMRJobRunner(MRJobRunner):
 
         for uri in self._s3_ls(base_uri):
             # enforce globbing
-            if glob_match and not fnmatch.fnmatch(uri, path_glob):
+            if glob_match and not fnmatch.fnmatchcase(uri, path_glob):
                 continue
 
             yield uri

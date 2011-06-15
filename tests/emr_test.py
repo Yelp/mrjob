@@ -150,7 +150,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             local_tmp_dir = runner._get_local_tmp_dir()
             # make sure cleanup hasn't happened yet
             assert os.path.exists(local_tmp_dir)
-            assert any(runner._s3_fetcher().ls(runner.get_output_dir()))
+            assert any(runner.ls(runner.get_output_dir()))
 
             emr_conn = runner.make_emr_conn()
             job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
@@ -787,21 +787,21 @@ class TestLs(MockEMRAndS3TestCase):
         runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
                               conf_path=False)
 
-        assert_equal(set(runner._s3_fetcher()._s3_ls('s3://walrus/')),
+        assert_equal(set(runner._s3_ls('s3://walrus/')),
                      set(['s3://walrus/one',
                           's3://walrus/two',
                           's3://walrus/three',]))
 
-        assert_equal(set(runner._s3_fetcher()._s3_ls('s3://walrus/t')),
+        assert_equal(set(runner._s3_ls('s3://walrus/t')),
                      set(['s3://walrus/two',
                           's3://walrus/three',]))
 
-        assert_equal(set(runner._s3_fetcher()._s3_ls('s3://walrus/t/')),
+        assert_equal(set(runner._s3_ls('s3://walrus/t/')),
                      set([]))
 
         # if we ask for a nonexistent bucket, we should get some sort
         # of exception (in practice, buckets with random names will
         # probably be owned by other people, and we'll get some sort
         # of permissions error)
-        assert_raises(Exception, set, runner._s3_fetcher()._s3_ls('s3://lolcat/'))
+        assert_raises(Exception, set, runner._s3_ls('s3://lolcat/'))
 

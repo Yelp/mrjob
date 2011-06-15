@@ -124,7 +124,7 @@ class LocalMRJobRunner(MRJobRunner):
                             '--step-num=%d' % i, '--mapper'] +
                            self._mr_job_extra_args())
             self._invoke_step(mapper_args, 'step-%d-mapper' % i, step_num=i, 
-                        env=self._running_env, step_type='M', num_tasks=self._map_tasks)
+                        env=self._get_running_env(), step_type='M', num_tasks=self._map_tasks)
 
             if 'R' in step:
                 # sort the output
@@ -136,7 +136,7 @@ class LocalMRJobRunner(MRJobRunner):
                                  '--step-num=%d' % i, '--reducer'] +
                                 self._mr_job_extra_args())
                 self._invoke_step(reducer_args, 'step-%d-reducer' % i, step_num=i, 
-                        env=self._running_env, num_tasks = self._reduce_tasks, step_type='R')
+                        env=self._get_running_env(), num_tasks = self._reduce_tasks, step_type='R')
 
         # move final output to output directory
         for i, outfile in enumerate(self._prev_outfiles):
@@ -166,9 +166,17 @@ class LocalMRJobRunner(MRJobRunner):
                     name = conf_arg.replace('.', '_')
                     self._running_env[name] = value
                 
-        self._running_env['mapreduce_job_id'] = self._job_name
-        self._running_env['mapreduce_job_cache_local_archives'] = str(self._mrjob_tar_gz_path)
-                
+        self._running_env['mapreduce.job.id'] = self._job_name
+        self._running_env['mapreduce.job.cache.local.archives'] = str(self._mrjob_tar_gz_path)
+    
+    def _get_running_env(self):
+        """ Converts . to _ in self._running_env and returns it
+        """
+        env = {}
+        for (key, value) in self._running_env.iteritems():
+            env[key.replace('.','_')] = value
+        return env
+    
     def _setup_working_dir(self):
         """Make a working directory with symlinks to our script and
         external files. Return name of the script"""
@@ -183,7 +191,7 @@ class LocalMRJobRunner(MRJobRunner):
             self._working_dir = os.path.join(self._get_local_tmp_dir(), 'working_dir')
             self.mkdir(self._working_dir)
         
-        self._running_env['mapreduce_job_local_dir'] = self._working_dir
+        self._running_env['mapreduce.job.local.dir'] = self._working_dir
 
         # give all our files names, and symlink or unarchive them
         self._name_files()
@@ -205,7 +213,7 @@ class LocalMRJobRunner(MRJobRunner):
             log.debug('Creating output directory %s' % self._output_dir)
             self.mkdir(self._output_dir)
         
-        self._running_env['mapreduce_task_output_dir'] = self._output_dir
+        self._running_env['mapreduce.task.output.dir'] = self._output_dir
 
     def _symlink_to_file_or_copy(self, path, dest):
         """Symlink from *dest* to the absolute version of *path*.

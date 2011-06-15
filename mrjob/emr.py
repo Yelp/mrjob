@@ -1221,7 +1221,7 @@ class EMRJobRunner(MRJobRunner):
         """
         try:
             fetcher = self._ssh_fetcher()
-            return self._scan_logs_with_fetcher(fetcher.ls(), step_nums, fetcher)
+            return self._scan_logs_with_fetcher(list(fetcher.ls()), step_nums, fetcher)
         except LogFetchException, e:
             if not self._s3_job_log_uri:
                 return None
@@ -1230,7 +1230,7 @@ class EMRJobRunner(MRJobRunner):
             self._wait_for_s3_eventual_consistency()
 
             fetcher = self._s3_fetcher()
-            return self._scan_logs_with_fetcher(fetcher.ls(), step_nums, fetcher)
+            return self._scan_logs_with_fetcher(list(fetcher.ls()), step_nums, fetcher)
 
     def _scan_logs_with_fetcher(self, uris, step_nums, fetcher):
         # give priority to task-attempts/ logs as they contain more useful
@@ -1320,13 +1320,12 @@ class EMRJobRunner(MRJobRunner):
         s3_syslog_uri = posixpath.join(
             posixpath.dirname(s3_log_file_uri), 'syslog')
 
-        syslog_path = fetcher.get(s3_syslog_uri)
-
-        if syslog_path:
+        try:
+            syslog_path = fetcher.get(s3_syslog_uri)
             log.debug('scanning %s for input URI' % syslog_path)
             with open(syslog_path) as syslog_file:
                 return find_input_uri_for_mapper(syslog_file)
-        else:
+        except LogFetchException:
             return None
 
     def _scan_step_logs(self, s3_log_file_uris, step_nums, fetcher):
@@ -1554,7 +1553,10 @@ class EMRJobRunner(MRJobRunner):
         if not S3_URI_RE.match(path_glob):
             return super(EMRJobRunner, self).getsize(path_glob)
 
-        return sum(self.get_s3_key(uri).size for uri in self._s3_fetcher().ls(path_glob))
+        return sum(self.get_s3_key(uri).size for uri in self.ls(path_glob))
+
+    def ls(self, path_glob):
+        return self._s3_fetcher().ls(path_glob)
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on S3 because there are
@@ -1573,7 +1575,7 @@ class EMRJobRunner(MRJobRunner):
             return super(EMRJobRunner, self).path_exists(path_glob)
 
         # just fall back on ls(); it's smart
-        return any(self._s3_fetcher().ls(path_glob))
+        return any(self.ls(path_glob))
 
     def path_join(self, dirname, filename):
         if S3_URI_RE.match(dirname):
@@ -1587,7 +1589,7 @@ class EMRJobRunner(MRJobRunner):
             return super(EMRJobRunner, self).rm(path_glob)
 
         s3_conn = self.make_s3_conn()
-        for uri in self._s3_fetcher(s3_conn).ls(path_glob):
+        for uri in self.ls(path_glob):
             key = self.get_s3_key(uri, s3_conn)
             if key:
                 log.debug('deleting ' + uri)

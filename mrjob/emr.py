@@ -74,13 +74,13 @@ MAX_SSH_RETRIES = 20
 WAIT_FOR_SSH_TO_FAIL = 1.0
 
 # regex for matching task-attempts log URIs
-TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/task-attempts/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
+TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
 
 # regex for matching step log URIs
-STEP_LOG_URI_RE = re.compile(r'^.*/steps/(?P<step_num>\d+)/syslog$')
+STEP_LOG_URI_RE = re.compile(r'^.*/(?P<step_num>\d+)/syslog$')
 
 # regex for matching job log URIs
-JOB_LOG_URI_RE = re.compile(r'^.*?/jobs/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
+JOB_LOG_URI_RE = re.compile(r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
 
 # map from AWS region to EMR endpoint
 # see http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?ConceptsRequestEndpoints.html
@@ -1143,19 +1143,19 @@ class EMRJobRunner(MRJobRunner):
         bucket_name, path = parse_s3_uri(file_dict['s3_uri'])
         return 'http://%s.s3.amazonaws.com/%s' % (bucket_name, path)
 
-    def _ssh_fetcher(self):
-        return SSHLogFetcher(self.make_emr_conn(), 
+    def _ssh_fetcher(self, emr_conn=None):
+        return SSHLogFetcher(emr_conn or self.make_emr_conn(), 
                              self._emr_job_flow_id,
                              ec2_key_pair_file=self._opts['ec2_key_pair_file'])
 
-    def _s3_fetcher(self):
+    def _s3_fetcher(self, s3_conn=None):
         if not self._s3_job_log_uri:
             return None
 
         log.info('Scanning logs for probable cause of failure')
         self._wait_for_s3_eventual_consistency()
 
-        return S3LogFetcher(self.make_s3_conn(), 
+        return S3LogFetcher(s3_conn or self.make_s3_conn(), 
                             self._s3_job_log_uri)
 
     def _get_counters(self, step_nums):
@@ -1549,7 +1549,7 @@ class EMRJobRunner(MRJobRunner):
         if not S3_URI_RE.match(path_glob):
             return super(EMRJobRunner, self).getsize(path_glob)
 
-        return sum(self.get_s3_key(uri).size for uri in self.ls(path_glob))
+        return sum(self.get_s3_key(uri).size for uri in self._s3_fetcher().ls(path_glob))
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on S3 because there are
@@ -1568,7 +1568,7 @@ class EMRJobRunner(MRJobRunner):
             return super(EMRJobRunner, self).path_exists(path_glob)
 
         # just fall back on ls(); it's smart
-        return any(self.ls(path_glob))
+        return any(self._s3_fetcher().ls(path_glob))
 
     def path_join(self, dirname, filename):
         if S3_URI_RE.match(dirname):
@@ -1582,7 +1582,7 @@ class EMRJobRunner(MRJobRunner):
             return super(EMRJobRunner, self).rm(path_glob)
 
         s3_conn = self.make_s3_conn()
-        for uri in self.ls(path_glob):
+        for uri in self._s3_fetcher(s3_conn).ls(path_glob):
             key = self.get_s3_key(uri, s3_conn)
             if key:
                 log.debug('deleting ' + uri)

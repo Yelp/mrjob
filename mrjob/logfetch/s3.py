@@ -66,6 +66,8 @@ class S3LogFetcher(LogFetcher):
         self.root_path = root_path
         self._uri_of_downloaded_log_file = None
 
+    ### RETRIEVING/RECOGNIZING KINDS OF LOG FILES ###
+
     def task_attempts_log_uri_re(self):
         return TASK_ATTEMPTS_LOG_URI_RE
 
@@ -83,6 +85,8 @@ class S3LogFetcher(LogFetcher):
 
     def job_log_path(self):
         return 'jobs'
+
+    ### BASIC ACTIONS RELATED TO DOWNLOADING LOGS ###
 
     def ls(self, path='*'):
         """Recursively list files locally or on S3.

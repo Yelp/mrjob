@@ -36,6 +36,8 @@ class LogFetcher(object):
         super(LogFetcher, self).__init__()
         self.local_temp_dir = local_temp_dir
 
+    ### RETRIEVING/RECOGNIZING KINDS OF LOG FILES ###
+
     def task_attempts_log_uri_re(self):
         raise NotImplementedError
 
@@ -53,6 +55,8 @@ class LogFetcher(object):
 
     def job_log_path(self):
         raise NotImplementedError
+
+    ### BASIC ACTIONS RELATED TO DOWNLOADING LOGS ###
 
     def list_logs(self, log_types=None):
         log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]

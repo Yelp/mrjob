@@ -35,7 +35,7 @@ JOB_LOG_URI_RE = re.compile(r'^.*?/hadoop/history/.+?_(?P<mystery_string_1>\d+)_
 
 class SSHLogFetcher(LogFetcher):
 
-    def __init__(self, emr_conn, jobflow_id, 
+    def __init__(self, emr_conn, jobflow_id,
                  ec2_key_pair_file='/nail/etc/EMR.pem.dev',
                  local_temp_dir='/tmp'):
         super(SSHLogFetcher, self).__init__(local_temp_dir=local_temp_dir)
@@ -97,30 +97,31 @@ class SSHLogFetcher(LogFetcher):
                 if line and not line.endswith('/'):
                     yield line
 
-    def get(self, path):
-        log_path = os.path.join(self.local_temp_dir, 'log')
+    def get(self, path, dest=None):
+        save_dest = (dest is None)
+        dest = dest or os.path.join(self.local_temp_dir, 'log')
 
-        if self._uri_of_downloaded_log_file != path:
-            log.debug('downloading %s -> %s' % (path, log_path))
-            # download path to log_path
+        if not save_dest or self._uri_of_downloaded_log_file != path:
+            log.debug('downloading %s -> %s' % (path, dest))
 
-            self._uri_of_downloaded_log_file = path
 
-        args = [
-            'scp', '-q',
-            '-i', self.ec2_key_pair_file,
-            'hadoop@%s:%s' % (self._address_of_master(), path),
-            log_path,
-        ]
-        p = subprocess.Popen(args,
-                             stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-        output, err = p.communicate()
-        if err:
-            if 'not a regular file' in err:
-                return None
-            log.error(str(err))
-            raise LogFetchException('scp error: %s' % str(err))
-        else:
-            return log_path
+            args = [
+                'scp', '-q',
+                '-i', self.ec2_key_pair_file,
+                'hadoop@%s:%s' % (self._address_of_master(), path),
+                dest,
+            ]
+            p = subprocess.Popen(args,
+                                 stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            output, err = p.communicate()
+            if err:
+                if 'not a regular file' in err:
+                    return None
+                log.error(str(err))
+                raise LogFetchException('scp error: %s' % str(err))
+            elif save_dest:
+                self._uri_of_downloaded_log_file = path
+
+        return dest

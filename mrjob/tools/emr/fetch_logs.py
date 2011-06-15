@@ -15,6 +15,7 @@ from __future__ import with_statement
 
 import functools
 from optparse import OptionParser, OptionValueError
+import os
 import sys
 
 from mrjob.logfetch import LogFetchException
@@ -28,15 +29,35 @@ def main():
     description = 'Retrieve log files for EMR jobs.'
     option_parser = OptionParser(usage=usage,description=description)
 
-    option_parser.add_option('-l', '--list',
-                             action="callback", callback=list_relevant,
+    option_parser.add_option('-l', '--list', dest='list_relevant',
+                             action="store_true", default=False,
                              help='List log files MRJob finds relevant')
 
-    option_parser.add_option('-a', '--list-all',
-                             action="callback", callback=list_all,
-                             help='List log files MRJob finds relevant')
+    option_parser.add_option('-L', '--list-all', dest='list_all',
+                             action="store_true", default=False,
+                             help='List all log files')
+
+    option_parser.add_option('-d', '--download', dest='download_relevant',
+                             action="store_true", default=False,
+                             help='Download log files MRJob finds relevant')
+
+    option_parser.add_option('-D', '--download-all', dest='download_all',
+                             action="store_true", default=False,
+                             help='Download all log files to JOB_FLOW_ID/')
 
     options, args = option_parser.parse_args()
+
+    if options.list_relevant:
+        list_relevant(args[0])
+
+    if options.list_all:
+        list_all(args[0])
+
+    if options.download_relevant:
+        download_relevant(args[0])
+
+    if options.download_all:
+        download_all(args[0])
 
 
 def ssh_fetcher(jobflow_id):
@@ -62,13 +83,14 @@ def s3_fetcher(jobflow_id):
 
 def with_fetcher(func):
     @functools.wraps(func)
-    def wrap(option, opt_str, value, parser, *args, **kwargs):
+    def wrap(jobflow_id):
         try:
-            fetcher = ssh_fetcher(parser.rargs[-1])
-            func(fetcher)
-        except LogFetchException:
-            fetcher = s3_fetcher(parser.rargs[-1])
-            func(fetcher)
+            fetcher = ssh_fetcher(jobflow_id)
+            func(fetcher, jobflow_id)
+        except LogFetchException, e:
+            print e
+            fetcher = s3_fetcher(jobflow_id)
+            func(fetcher, jobflow_id)
     return wrap
 
 
@@ -79,7 +101,7 @@ def prettyprint_paths(paths):
 
 
 @with_fetcher
-def list_relevant(fetcher):
+def list_relevant(fetcher, jobflow_id):
     task_attempts, steps, jobs = fetcher.list_logs()
     print 'Task attempts:'
     prettyprint_paths(task_attempts)
@@ -90,8 +112,41 @@ def list_relevant(fetcher):
 
 
 @with_fetcher
-def list_all(fetcher):
+def list_all(fetcher, jobflow_id):
     prettyprint_paths(fetcher.ls())
+
+
+@with_fetcher
+def download_relevant(fetcher, jobflow_id):
+    if not os.path.exists(jobflow_id):
+        os.makedirs(jobflow_id)
+    task_attempts, steps, jobs = fetcher.list_logs()
+    folder_and_items = [
+        ('task_attempts', task_attempts),
+        ('steps', steps),
+        ('jobs', jobs),
+    ]
+    for base_path, items in folder_and_items:
+        base_path = os.path.join(jobflow_id, base_path)
+        if not os.path.exists(base_path):
+            os.makedirs(base_path)
+        for item in items:
+            head, tail = os.path.split(item)
+            fetcher.get(item, os.path.join(base_path, tail))
+            print os.path.join(base_path, tail)
+
+
+@with_fetcher
+def download_all(fetcher, jobflow_id):
+    if not os.path.exists(jobflow_id):
+        os.makedirs(jobflow_id)
+    for item in fetcher.ls():
+        local_path = os.path.join(jobflow_id, item[item.find('hadoop'):])
+        head, tail = os.path.split(local_path)
+        if not os.path.exists(head):
+            os.makedirs(head)
+        fetcher.get(item, local_path)
+        print local_path
 
 
 if __name__ == '__main__':

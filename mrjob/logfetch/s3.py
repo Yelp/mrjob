@@ -137,19 +137,21 @@ class S3LogFetcher(LogFetcher):
         for key in bucket.list(key_name):
             yield s3_key_to_uri(key)
 
-    def get(self, path):
-        log_path = os.path.join(self.local_temp_dir, 'log')
+    def get(self, path, dest=None):
+        save_dest = (dest is None)
+        dest = os.path.join(self.local_temp_dir, 'log')
 
-        if self._uri_of_downloaded_log_file != path:
+        if not save_dest or self._uri_of_downloaded_log_file != path:
             s3_log_file = self.get_s3_key(path)
             if not s3_log_file:
                 raise LogFetchException('Could not fetch file %s from S3' % path)
 
-            log.debug('downloading %s -> %s' % (path, log_path))
-            s3_log_file.get_contents_to_filename(log_path)
-            self._uri_of_downloaded_log_file = s3_log_file
+            log.debug('downloading %s -> %s' % (path, dest))
+            s3_log_file.get_contents_to_filename(dest)
+            if save_dest:
+                self._uri_of_downloaded_log_file = s3_log_file
 
-        return log_path
+        return dest
 
     def get_s3_key(self, uri):
         """Get the boto Key object matching the given S3 uri, or

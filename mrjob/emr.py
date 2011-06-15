@@ -240,7 +240,7 @@ class EMRJobRunner(MRJobRunner):
         :type bootstrap_cmds: list
         :param bootstrap_cmds: a list of commands to run on the master node to set up libraries, etc. Like *setup_cmds*, these can be strings, which will be run in the shell, or lists of args, which will be run directly. Prepend ``sudo`` to commands to do things that require root privileges.
         :type bootstrap_files: list of str
-        :param bootstrap_files: files to upload to the master node before running *bootstrap_cmds* (for example, debian packages). These will be made public on S3 due to a limitation of the bootstrap feature.
+        :param bootstrap_files: files to upload to the master node before running *bootstrap_cmds* (for example, debian packages).
         :type bootstrap_mrjob: boolean
         :param bootstrap_mrjob: This is actually an option in the base MRJobRunner class. If this is ``True`` (the default), we'll tar up :mod:`mrjob` from the local filesystem, and install it on the master node.
         :type bootstrap_python_packages: list of str
@@ -615,8 +615,6 @@ class EMRJobRunner(MRJobRunner):
             log.debug('uploading %s -> %s' % (path, s3_uri))
             s3_key = self.make_s3_key(s3_uri, s3_conn)
             s3_key.set_contents_from_filename(file_dict['path'])
-            if file_dict.get('bootstrap'):
-                s3_key.make_public()
 
     def setup_ssh_tunnel_to_job_tracker(self, host):
         """setup the ssh tunnel to the job tracker, if it's not currently
@@ -1134,12 +1132,6 @@ class EMRJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_name, step_num + 1)
 
-    def _public_http_url(self, file_dict):
-        """Get the public HTTP URL for a file on S3. (The URL will only
-        work if we've uploaded the file and set it to public.)"""
-        bucket_name, path = parse_s3_uri(file_dict['s3_uri'])
-        return 'http://%s.s3.amazonaws.com/%s' % (bucket_name, path)
-
     def _get_counters(self, step_nums):
         """Read Hadoop counters from S3.
 
@@ -1398,15 +1390,12 @@ class EMRJobRunner(MRJobRunner):
         temp directory.
 
         This will do nothing if there are no bootstrap scripts or commands,
-        or if _create_bootstrap_script() has already been called."""
+        or if _create_master_bootstrap_script() has already been called."""
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
 
-        # need to know what files are called
-        if not (self._opts['bootstrap_cmds'] or
-                self._bootstrap_python_packages or
-                self._bootstrap_scripts or
-                self._opts['bootstrap_mrjob']):
+        if not any(key.startswith('bootstrap_') and value
+                   for (key, value) in self._opts.iteritems()):
             return
 
         if self._master_bootstrap_script:
@@ -1416,6 +1405,10 @@ class EMRJobRunner(MRJobRunner):
             if self._mrjob_tar_gz_file is None:
                 self._mrjob_tar_gz_file = self._add_bootstrap_file(
                     self._create_mrjob_tar_gz() + '#')
+
+        # need to know what files are called
+        self._name_files()
+        self._pick_s3_uris_for_files()
 
         path = os.path.join(self._get_local_tmp_dir(), dest)
         log.info('writing master bootstrap script to %s' % path)
@@ -1434,11 +1427,11 @@ class EMRJobRunner(MRJobRunner):
     def _master_bootstrap_script_content(self):
         """Create the contents of the master bootstrap script.
 
-        This will give names and S3 URIs to files that don't already have them
-        """
-        self._name_files()
-        self._pick_s3_uris_for_files()
+        This will give names and S3 URIs to files that don't already have them.
 
+        This function does NOT pick S3 URIs for files or anything like
+        that; _create_master_bootstrap_script() is responsible for that.
+        """
         out = StringIO()
         def writeln(line=''):
             out.write(line + '\n')
@@ -1448,19 +1441,43 @@ class EMRJobRunner(MRJobRunner):
         writeln()
 
         # imports
+        writeln('from __future__ import with_statement')
+        writeln()
         writeln('import distutils.sysconfig')
         writeln('import os')
         writeln('import stat')
         writeln('from subprocess import call, check_call')
+        writeln('from xml.etree.ElementTree import ElementTree')
         writeln()
 
-        # download all our files using wget
-        writeln('# download files using wget')
+        # read credentials
+        # see http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?Bootstrap.html for details about config files
+        writeln("# read credentials")
+        writeln("if os.path.exists('/home/hadoop/conf/core-site.xml'):")
+        writeln("    xml_conf_path = '/home/hadoop/conf/core-site.xml'")
+        writeln("else:")
+        writeln("    xml_conf_path = '/home/hadoop/conf/hadoop-site.xml'")
+        writeln()
+        writeln('root = ElementTree().parse(xml_conf_path)')
+        writeln("configs = dict((e.find('name').text, e.find('value').text)")
+        writeln("               for e in root.findall('property'))")
+        writeln("access_key = configs['fs.s3.awsAccessKeyId']")
+        writeln("secret_key = configs['fs.s3.awsSecretAccessKey']")
+        writeln()
+
+        # set up s3cmd
+        writeln("# set up s3cmd")
+        writeln("with open('/home/hadoop/.s3cfg', 'w') as s3cfg:")
+        writeln(r"    s3cfg.write('[default]\n')")
+        writeln(r"    s3cfg.write('access_key = %s\n' % access_key)")
+        writeln(r"    s3cfg.write('secret_key = %s\n' % secret_key)")
+        writeln()
+
+        # download files using s3cmd
+        writeln('# download files using s3cmd')
         for file_dict in self._files:
             if file_dict.get('bootstrap'):
-                args = ['wget', '-S', '-T', '10', '-t', '5',
-                        self._public_http_url(file_dict),
-                        '-O', file_dict['name']]
+                args = ['s3cmd', 'get', file_dict['s3_uri'], file_dict['name']]
                 writeln('check_call(%r)' % (args,))
         writeln()
 

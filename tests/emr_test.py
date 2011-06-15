@@ -21,14 +21,17 @@ import datetime
 import getpass
 import logging
 import os
+import py_compile
 import shutil
 from StringIO import StringIO
 import tempfile
 from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in, assert_raises, setup, teardown, assert_not_equal
 
 from mrjob.conf import dump_mrjob_conf
+import mrjob.emr
 from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
 from mrjob.parse import JOB_NAME_RE
+from mrjob.util import tar_and_gzip
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, MockKey, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled, no_handlers_for_logger
@@ -805,3 +808,65 @@ class TestLs(MockEMRAndS3TestCase):
         # of permissions error)
         assert_raises(Exception, set, runner._s3_ls('s3://lolcat/'))
 
+class TestNoBoto(TestCase):
+
+    @setup
+    def blank_out_boto(self):
+        self._real_boto = mrjob.emr.boto
+        mrjob.emr.boto = None
+        self._real_botoemr = mrjob.emr.botoemr
+        mrjob.emr.botoemr = None
+
+    @teardown
+    def restore_boto(self):
+        mrjob.emr.boto = self._real_boto
+        mrjob.emr.botoemr = self._real_botoemr
+
+    def test_init(self):
+        # merely creating an EMRJobRunner should raise an exception
+        # because it'll need to connect to S3 to set s3_scratch_uri
+        assert_raises(ImportError, EMRJobRunner, conf_path=False)
+
+    def test_init_with_s3_scratch_uri(self):
+        # this also raises an exception because we have to check
+        # the bucket location
+        assert_raises(ImportError, EMRJobRunner,
+                      conf_path=False, s3_scratch_uri='s3://foo/tmp')
+
+
+class TestMasterBootstrapScript(MockEMRAndS3TestCase):
+
+    @setup
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def test_master_bootstrap_script_is_valid_python(self):
+        # create a fake src tarball
+        with open(os.path.join(self.tmp_dir, 'foo.py'), 'w'): pass
+        yelpy_tar_gz_path = os.path.join(self.tmp_dir, 'yelpy.tar.gz')
+        tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
+
+        # do everything
+        runner = EMRJobRunner(conf_path=False,
+                              bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
+                              bootstrap_files=['/tmp/quz'],
+                              bootstrap_mrjob=True,
+                              bootstrap_python_packages=[yelpy_tar_gz_path],
+                              bootstrap_scripts=['speedups.sh', '/tmp/s.sh'])
+        script_path = os.path.join(self.tmp_dir, 'b.py')
+        runner._create_master_bootstrap_script(dest=script_path)
+
+        assert os.path.exists(script_path)
+        py_compile.compile(script_path)
+
+    def test_no_bootstrap_script_if_not_needed(self):
+        runner = EMRJobRunner(conf_path=False,
+                              bootstrap_mrjob=False)
+        script_path = os.path.join(self.tmp_dir, 'b.py')
+        runner._create_master_bootstrap_script(dest=script_path)
+
+        assert not os.path.exists(script_path)

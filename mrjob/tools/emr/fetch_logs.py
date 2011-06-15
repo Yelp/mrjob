@@ -18,10 +18,12 @@ from optparse import OptionParser, OptionValueError
 import os
 import sys
 
+from mrjob.emr import EMRJobRunner
+from mrjob.job import MRJob
 from mrjob.logfetch import LogFetchException
 from mrjob.logfetch.s3 import S3LogFetcher
 from mrjob.logfetch.ssh import SSHLogFetcher
-from mrjob.emr import EMRJobRunner
+from mrjob.util import scrape_options_into_new_groups
 
 
 def main():
@@ -44,32 +46,43 @@ def main():
     option_parser.add_option('-D', '--download-all', dest='download_all',
                              action="store_true", default=False,
                              help='Download all log files to JOB_FLOW_ID/')
+    
+    assignments = {
+        option_parser: ('conf_path', 'quiet', 'verbose',
+                        'ec2_key_pair_file')
+    }
+
+    mr_job = MRJob()
+    job_option_groups = (mr_job.option_parser, mr_job.mux_opt_group,
+                     mr_job.proto_opt_group, mr_job.runner_opt_group,
+                     mr_job.hadoop_emr_opt_group, mr_job.emr_opt_group)
+    scrape_options_into_new_groups(job_option_groups, assignments)
 
     options, args = option_parser.parse_args()
 
     if options.list_relevant:
-        list_relevant(args[0])
+        list_relevant(args[0], **options.__dict__)
 
     if options.list_all:
-        list_all(args[0])
+        list_all(args[0], **options.__dict__)
 
     if options.download_relevant:
-        download_relevant(args[0])
+        download_relevant(args[0], **options.__dict__)
 
     if options.download_all:
-        download_all(args[0])
+        download_all(args[0], **options.__dict__)
 
 
-def ssh_fetcher(jobflow_id):
-    dummy_runner = EMRJobRunner()
+def ssh_fetcher(jobflow_id, **runner_kwargs):
+    dummy_runner = EMRJobRunner(**runner_kwargs)
     emr_conn = dummy_runner.make_emr_conn()
     ec2_key_pair_file = dummy_runner._opts['ec2_key_pair_file']
     return SSHLogFetcher(emr_conn, jobflow_id,
                          ec2_key_pair_file=ec2_key_pair_file)
 
 
-def s3_fetcher(jobflow_id):
-    dummy_runner = EMRJobRunner()
+def s3_fetcher(jobflow_id, **runner_kwargs):
+    dummy_runner = EMRJobRunner(**runner_kwargs)
     emr_conn = dummy_runner.make_emr_conn()
 
     jobflow = emr_conn.describe_jobflow(jobflow_id)
@@ -82,14 +95,13 @@ def s3_fetcher(jobflow_id):
 
 
 def with_fetcher(func):
-    @functools.wraps(func)
-    def wrap(jobflow_id):
+    def wrap(jobflow_id, **runner_kwargs):
         try:
-            fetcher = ssh_fetcher(jobflow_id)
+            fetcher = ssh_fetcher(jobflow_id, **runner_kwargs)
             func(fetcher, jobflow_id)
         except LogFetchException, e:
             print e
-            fetcher = s3_fetcher(jobflow_id)
+            fetcher = s3_fetcher(jobflow_id, **runner_kwargs)
             func(fetcher, jobflow_id)
     return wrap
 

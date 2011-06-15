@@ -37,9 +37,11 @@ JOB_LOG_URI_RE = re.compile(r'^.*?/hadoop/history/.+?_(?P<mystery_string_1>\d+)_
 class SSHLogFetcher(LogFetcher):
 
     def __init__(self, emr_conn, jobflow_id,
-                 ec2_key_pair_file='/nail/etc/EMR.pem.dev',
+                 ec2_key_pair_file=None,
                  local_temp_dir='/tmp'):
         super(SSHLogFetcher, self).__init__(local_temp_dir=local_temp_dir)
+        if ec2_key_pair_file is None:
+            raise LogFetchException('Cannot ssh to master; ec2_key_pair_file not specified')
         self.emr_conn = emr_conn
         self.jobflow_id = jobflow_id
         self.ec2_key_pair_file = ec2_key_pair_file

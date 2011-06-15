@@ -24,6 +24,8 @@ from mrjob.logfetch import GLOB_RE, LogFetcher, LogFetchException
 
 S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
 
+ABSOLUTE_RE = re.compile(r'^(/|\w+://).*')
+
 
 # regex for matching task-attempts log URIs
 TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/task-attempts/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
@@ -98,8 +100,9 @@ class S3LogFetcher(LogFetcher):
         To list a directory, path_glob must end with a trailing
         slash (foo and foo/ are different on S3)
         """
-        # Convert the relative path to an absolute one
-        path = posixpath.join(self.root_path, path)
+        if self.root_path and not ABSOLUTE_RE.match(path):
+            # Convert the relative path to an absolute one
+            path = posixpath.join(self.root_path, path)
 
         # Fall back on local behavior if it's a local path
         if not S3_URI_RE.match(path):

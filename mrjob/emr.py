@@ -1149,12 +1149,6 @@ class EMRJobRunner(MRJobRunner):
                              ec2_key_pair_file=self._opts['ec2_key_pair_file'])
 
     def _s3_fetcher(self, s3_conn=None):
-        if not self._s3_job_log_uri:
-            return None
-
-        log.info('Scanning logs for probable cause of failure')
-        self._wait_for_s3_eventual_consistency()
-
         return S3LogFetcher(s3_conn or self.make_s3_conn(), 
                             self._s3_job_log_uri)
 
@@ -1171,6 +1165,11 @@ class EMRJobRunner(MRJobRunner):
             log.info('Fetching counters from SSH...')
             return self._scan_for_counters_with_fetcher(uris, fetcher)
         except LogFetchException, e:
+            if not self._s3_job_log_uri:
+                return None
+
+            self._wait_for_s3_eventual_consistency()
+
             fetcher = self._s3_fetcher()
             log.info('Fetching counters from S3...')
             uris = fetcher.list_logs(log_types=[JOB_LOGS])
@@ -1224,6 +1223,12 @@ class EMRJobRunner(MRJobRunner):
             fetcher = self._ssh_fetcher()
             return self._scan_logs_with_fetcher(fetcher.ls(), step_nums, fetcher)
         except LogFetchException, e:
+            if not self._s3_job_log_uri:
+                return None
+
+            log.info('Scanning S3 logs for probable cause of failure')
+            self._wait_for_s3_eventual_consistency()
+
             fetcher = self._s3_fetcher()
             return self._scan_logs_with_fetcher(fetcher.ls(), step_nums, fetcher)
 
@@ -1231,9 +1236,9 @@ class EMRJobRunner(MRJobRunner):
         # give priority to task-attempts/ logs as they contain more useful
         # error messages. this may take a while.
         return (
-            self._scan_task_attempt_logs(s3_log_file_uris, step_nums, fetcher)
-            or self._scan_step_logs(s3_log_file_uris, step_nums, fetcher)
-            or self._scan_job_logs(s3_log_file_uris, step_nums, fetcher))
+            self._scan_task_attempt_logs(uris, step_nums, fetcher)
+            or self._scan_step_logs(uris, step_nums, fetcher)
+            or self._scan_job_logs(uris, step_nums, fetcher))
 
     def _scan_task_attempt_logs(self, s3_log_file_uris, step_nums, fetcher):
         """Scan task-attempts/*/{syslog,stderr} for Python exceptions

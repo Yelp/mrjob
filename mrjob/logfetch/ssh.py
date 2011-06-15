@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from boto.exception import S3ResponseError
 import logging
 import os
 import re
@@ -69,9 +70,12 @@ class SSHLogFetcher(LogFetcher):
         if self.address:
             return self.address
 
-        jobflow = self.emr_conn.describe_jobflow(self.jobflow_id)
-        if jobflow.state not in ('WAITING', 'RUNNING'):
-            raise LogFetchException('Cannot ssh to master; job flow is not waiting or running')
+        try:
+            jobflow = self.emr_conn.describe_jobflow(self.jobflow_id)
+            if jobflow.state not in ('WAITING', 'RUNNING'):
+                raise LogFetchException('Cannot ssh to master; job flow is not waiting or running')
+        except S3ResponseError:
+            raise LogFetchException('Could not get job flow information')
 
         self.address = jobflow.masterpublicdnsname
         return self.address

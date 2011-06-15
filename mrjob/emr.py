@@ -74,12 +74,15 @@ MAX_SSH_RETRIES = 20
 WAIT_FOR_SSH_TO_FAIL = 1.0
 
 # regex for matching task-attempts log URIs
+# general enough to match any base directory
 TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
 
 # regex for matching step log URIs
+# general enough to match any base directory
 STEP_LOG_URI_RE = re.compile(r'^.*/(?P<step_num>\d+)/syslog$')
 
 # regex for matching job log URIs
+# general enough to match any base directory
 JOB_LOG_URI_RE = re.compile(r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
 
 # map from AWS region to EMR endpoint
@@ -1144,11 +1147,17 @@ class EMRJobRunner(MRJobRunner):
         return 'http://%s.s3.amazonaws.com/%s' % (bucket_name, path)
 
     def _ssh_fetcher(self, emr_conn=None):
+        """Return an :py:class:`~mrjob.logfetch.ssh.SSHLogFetcher` object
+        which can read logs from this job's master node via SSH
+        """
         return SSHLogFetcher(emr_conn or self.make_emr_conn(), 
                              self._emr_job_flow_id,
                              ec2_key_pair_file=self._opts['ec2_key_pair_file'])
 
     def _s3_fetcher(self, s3_conn=None):
+        """Return an :py:class:`~mrjob.logfetch.ssh.S3LogFetcher` object
+        which can read logs from this job's S3 log bucket/directory
+        """
         return S3LogFetcher(s3_conn or self.make_s3_conn(), 
                             self._s3_job_log_uri)
 
@@ -1326,6 +1335,10 @@ class EMRJobRunner(MRJobRunner):
             with open(syslog_path) as syslog_file:
                 return find_input_uri_for_mapper(syslog_file)
         except LogFetchException:
+            # Normally a LogFetchException would mean that our fetcher isn't
+            # working anymore and we should try again with another fetcher,
+            # but here the surrounding code expects None if the file doesn't
+            # exist, so just return None.
             return None
 
     def _scan_step_logs(self, s3_log_file_uris, step_nums, fetcher):

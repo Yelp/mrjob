@@ -28,12 +28,15 @@ ABSOLUTE_RE = re.compile(r'^(/|\w+://).*')
 
 
 # regex for matching task-attempts log URIs
+# specific to S3
 TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/task-attempts/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
 
 # regex for matching step log URIs
+# specific to S3
 STEP_LOG_URI_RE = re.compile(r'^.*/steps/(?P<step_num>\d+)/syslog$')
 
 # regex for matching job log URIs
+# specific to S3
 JOB_LOG_URI_RE = re.compile(r'^.*?/jobs/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
 
 

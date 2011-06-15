@@ -119,12 +119,15 @@ def populate_option_groups_with_options(assignments, indexed_options):
     :param indexed_options: options to use when populating the parsers/groups
     """
     for opt_group, opt_dest_list in assignments.iteritems():
-        options_for_this_group = opt_group.option_list
+        new_options = []
         for option_dest in assignments[opt_group]:
             for option in indexed_options[option_dest]:
-                options_for_this_group.append(option)
-        # Sort alphabetically
-        opt_group.option_list = sorted(options_for_this_group,
+                new_options.append(option)
+        # New options must be added using add_options() or they will not be
+        # allowed by the parser on the command line
+        opt_group.add_options(new_options)
+        # Sort alphabetically for help
+        opt_group.option_list = sorted(opt_group.option_list,
                                        key=lambda item: item.get_opt_string())
 
 

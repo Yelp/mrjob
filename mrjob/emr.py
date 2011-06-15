@@ -45,6 +45,9 @@ except ImportError:
     botoemr = None
 
 from mrjob.conf import combine_dicts, combine_lists, combine_paths, combine_path_lists
+from mrjob.logfetch import LogFetchException, JOB_LOGS
+from mrjob.logfetch.s3 import S3LogFetcher
+from mrjob.logfetch.ssh import SSHLogFetcher
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_port_range_list, parse_hadoop_counters_from_line
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
@@ -1140,6 +1143,21 @@ class EMRJobRunner(MRJobRunner):
         bucket_name, path = parse_s3_uri(file_dict['s3_uri'])
         return 'http://%s.s3.amazonaws.com/%s' % (bucket_name, path)
 
+    def _ssh_fetcher(self):
+        return SSHLogFetcher(self.make_emr_conn(), 
+                             self._emr_job_flow_id,
+                             ec2_key_pair_file=self._opts['ec2_key_pair_file'])
+
+    def _s3_fetcher(self):
+        if not self._s3_job_log_uri:
+            return None
+
+        log.info('Scanning logs for probable cause of failure')
+        self._wait_for_s3_eventual_consistency()
+
+        return S3LogFetcher(self.make_s3_conn(), 
+                            self._s3_job_log_uri)
+
     def _get_counters(self, step_nums):
         """Read Hadoop counters from S3.
 
@@ -1147,17 +1165,19 @@ class EMRJobRunner(MRJobRunner):
         step_nums -- the numbers of steps belonging to us, so that we
             can ignore errors from other jobs when sharing a job flow
         """
-        if not self._s3_job_log_uri:
-            return None
+        try:
+            fetcher = self._ssh_fetcher()
+            uris = fetcher.list_logs(log_types=[JOB_LOGS])
+            log.info('Fetching counters from SSH...')
+            return self._scan_for_counters_with_fetcher(uris, fetcher)
+        except LogFetchException, e:
+            fetcher = self._s3_fetcher()
+            log.info('Fetching counters from S3...')
+            uris = fetcher.list_logs(log_types=[JOB_LOGS])
+            return self._scan_for_counters_with_fetcher(uris, fetcher)
 
+    def _scan_for_counters_with_fetcher(self, s3_log_file_uris, fetcher):
         counters = []
-
-        log.info('Fetching counters...')
-        self._wait_for_s3_eventual_consistency()
-
-        s3_log_file_uris = set(self.ls(posixpath.join(self._s3_job_log_uri, 'jobs', '*')))
-
-        s3_conn = self.make_s3_conn()
         relevant_logs = [] # list of (sort key, URI)
 
         for s3_log_file_uri in s3_log_file_uris:
@@ -1172,7 +1192,7 @@ class EMRJobRunner(MRJobRunner):
         relevant_logs.sort()
 
         for _, s3_log_file_uri in relevant_logs:
-            log_path = self._download_log_file(s3_log_file_uri, s3_conn)
+            log_path = fetcher.get(s3_log_file_uri)
             if not log_path:
                 continue
 
@@ -1200,24 +1220,22 @@ class EMRJobRunner(MRJobRunner):
             step, the URI of the input file that caused the error
             (otherwise None)
         """
-        if not self._s3_job_log_uri:
-            return None
+        try:
+            fetcher = self._ssh_fetcher()
+            return self._scan_logs_with_fetcher(fetcher.ls(), step_nums, fetcher)
+        except LogFetchException, e:
+            fetcher = self._s3_fetcher()
+            return self._scan_logs_with_fetcher(fetcher.ls(), step_nums, fetcher)
 
-        log.info('Scanning logs for probable cause of failure')
-        self._wait_for_s3_eventual_consistency()
-
-        s3_log_file_uris = set(self.ls(self._s3_job_log_uri))
-
+    def _scan_logs_with_fetcher(self, uris, step_nums, fetcher):
         # give priority to task-attempts/ logs as they contain more useful
         # error messages. this may take a while.
-        s3_conn = self.make_s3_conn()
-        
         return (
-            self._scan_task_attempt_logs(s3_log_file_uris, step_nums, s3_conn)
-            or self._scan_step_logs(s3_log_file_uris, step_nums, s3_conn)
-            or self._scan_job_logs(s3_log_file_uris, step_nums, s3_conn))
+            self._scan_task_attempt_logs(s3_log_file_uris, step_nums, fetcher)
+            or self._scan_step_logs(s3_log_file_uris, step_nums, fetcher)
+            or self._scan_job_logs(s3_log_file_uris, step_nums, fetcher))
 
-    def _scan_task_attempt_logs(self, s3_log_file_uris, step_nums, s3_conn):
+    def _scan_task_attempt_logs(self, s3_log_file_uris, step_nums, fetcher):
         """Scan task-attempts/*/{syslog,stderr} for Python exceptions
         and Java stack traces.
 
@@ -1257,7 +1275,7 @@ class EMRJobRunner(MRJobRunner):
                 continue
             tasks_seen.add(task_info)
 
-            log_path = self._download_log_file(s3_log_file_uri, s3_conn)
+            log_path = fetcher.get(s3_log_file_uri)
             if not log_path:
                 continue
 
@@ -1282,13 +1300,13 @@ class EMRJobRunner(MRJobRunner):
                 # were reading from.
                 if info['node_type'] == 'm':
                     result['input_uri'] = self._scan_for_input_uri(
-                        s3_log_file_uri, s3_conn)
+                        s3_log_file_uri, fetcher)
 
                 return result
 
         return None
 
-    def _scan_for_input_uri(self, s3_log_file_uri, s3_conn):
+    def _scan_for_input_uri(self, s3_log_file_uri, fetcher):
         """Scan the syslog file corresponding to s3_log_file_uri for
         information about the input file.
 
@@ -1297,7 +1315,7 @@ class EMRJobRunner(MRJobRunner):
         s3_syslog_uri = posixpath.join(
             posixpath.dirname(s3_log_file_uri), 'syslog')
 
-        syslog_path = self._download_log_file(s3_syslog_uri, s3_conn)
+        syslog_path = fetcher.get(s3_syslog_uri)
 
         if syslog_path:
             log.debug('scanning %s for input URI' % syslog_path)
@@ -1306,7 +1324,7 @@ class EMRJobRunner(MRJobRunner):
         else:
             return None
 
-    def _scan_step_logs(self, s3_log_file_uris, step_nums, s3_conn):
+    def _scan_step_logs(self, s3_log_file_uris, step_nums, fetcher):
         """Scan steps/*/syslog for hadoop streaming errors.
 
         Helper for _find_probable_cause_of_failure()
@@ -1320,7 +1338,7 @@ class EMRJobRunner(MRJobRunner):
             if not step_num in step_nums:
                 continue
 
-            log_path = self._download_log_file(s3_log_file_uri, s3_conn)
+            log_path = fetcher.get(s3_log_file_uri)
             if log_path:
                 with open(log_path) as log_file:
                     msg = find_interesting_hadoop_streaming_error(log_file)
@@ -1331,7 +1349,7 @@ class EMRJobRunner(MRJobRunner):
                             'input_uri': None,
                         }
 
-    def _scan_job_logs(self, s3_log_file_uris, step_nums, s3_conn):
+    def _scan_job_logs(self, s3_log_file_uris, step_nums, fetcher):
         """Scan jobs/* for timeout errors.
         
         Helper for _find_probable_cause_of_failure()
@@ -1356,7 +1374,7 @@ class EMRJobRunner(MRJobRunner):
         relevant_logs.sort(reverse=True)
         
         for sort_key, info, s3_log_file_uri in relevant_logs:
-            log_path = self._download_log_file(s3_log_file_uri, s3_conn)
+            log_path = fetcher.get(s3_log_file_uri)
             if not log_path:
                 continue
             
@@ -1372,26 +1390,6 @@ class EMRJobRunner(MRJobRunner):
 
                 return result
         return None
-
-    def _download_log_file(self, s3_log_file_uri, s3_conn):
-        """Download a log file to our local tmp dir so we can scan it.
-
-        Takes a log file URI, and returns a local path. We'll dump all
-        log files to the same file, on the assumption that we'll scan them
-        one at a time.
-        """
-        log_path = os.path.join(self._get_local_tmp_dir(), 'log')
-
-        if self._uri_of_downloaded_log_file != s3_log_file_uri:
-            s3_log_file = self.get_s3_key(s3_log_file_uri, s3_conn)
-            if not s3_log_file:
-                return None
-
-            log.debug('downloading %s -> %s' % (s3_log_file_uri, log_path))
-            s3_log_file.get_contents_to_filename(log_path)
-            self._uri_of_downloaded_log_file = s3_log_file
-
-        return log_path
 
     def _create_master_bootstrap_script(self, dest='b.py'):
         """Create the master bootstrap script and write it into our local
@@ -1552,53 +1550,6 @@ class EMRJobRunner(MRJobRunner):
             return super(EMRJobRunner, self).getsize(path_glob)
 
         return sum(self.get_s3_key(uri).size for uri in self.ls(path_glob))
-
-    def ls(self, path_glob):
-        """Recursively list files locally or on S3.
-
-        This doesn't list "directories" unless there's actually a
-        corresponding key ending with a '/' (which is weird and confusing;
-        don't make S3 keys ending in '/')
-
-        To list a directory, path_glob must end with a trailing
-        slash (foo and foo/ are different on S3)
-        """
-        if not S3_URI_RE.match(path_glob):
-            for path in super(EMRJobRunner, self).ls(path_glob):
-                yield path
-
-        # support globs
-        glob_match = GLOB_RE.match(path_glob)
-
-        # if it's a "file" (doesn't end with /), just check if it exists
-        if not glob_match and not path_glob.endswith('/'):
-            uri = path_glob
-            if self.get_s3_key(uri):
-                yield uri
-            return
-
-        # we're going to search for all keys starting with base_uri
-        if glob_match:
-            # cut it off at first wildcard
-            base_uri = glob_match.group(1)
-        else:
-            base_uri = path_glob
-
-        for uri in self._s3_ls(base_uri):
-            # enforce globbing
-            if glob_match and not fnmatch.fnmatchcase(uri, path_glob):
-                continue
-
-            yield uri
-
-    def _s3_ls(self, uri):
-        """Helper for ls(); doesn't bother with globbing or directories"""
-        s3_conn = self.make_s3_conn()
-        bucket_name, key_name = parse_s3_uri(uri)
-
-        bucket = s3_conn.get_bucket(bucket_name)
-        for key in bucket.list(key_name):
-            yield s3_key_to_uri(key)
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on S3 because there are

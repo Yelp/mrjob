@@ -84,7 +84,7 @@ class S3LogFetcher(LogFetcher):
     def job_log_path(self):
         return 'jobs'
 
-    def ls(self, path=''):
+    def ls(self, path='*'):
         """Recursively list files locally or on S3.
 
         This doesn't list "directories" unless there's actually a
@@ -94,11 +94,8 @@ class S3LogFetcher(LogFetcher):
         To list a directory, path_glob must end with a trailing
         slash (foo and foo/ are different on S3)
         """
-        if path:
-            # Convert the relative path to an absolute one
-            path = posixpath.join(self.root_path, path)
-        else:
-            path = self.root_path
+        # Convert the relative path to an absolute one
+        path = posixpath.join(self.root_path, path)
 
         # Fall back on local behavior if it's a local path
         if not S3_URI_RE.match(path):
@@ -139,7 +136,7 @@ class S3LogFetcher(LogFetcher):
 
     def get(self, path, dest=None):
         save_dest = (dest is None)
-        dest = os.path.join(self.local_temp_dir, 'log')
+        dest = dest or os.path.join(self.local_temp_dir, 'log')
 
         if not save_dest or self._uri_of_downloaded_log_file != path:
             s3_log_file = self.get_s3_key(path)

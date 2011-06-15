@@ -131,6 +131,7 @@ def download_relevant(fetcher, jobflow_id):
         if not os.path.exists(base_path):
             os.makedirs(base_path)
         for item in items:
+
             head, tail = os.path.split(item)
             fetcher.get(item, os.path.join(base_path, tail))
             print os.path.join(base_path, tail)
@@ -141,7 +142,7 @@ def download_all(fetcher, jobflow_id):
     if not os.path.exists(jobflow_id):
         os.makedirs(jobflow_id)
     for item in fetcher.ls():
-        local_path = os.path.join(jobflow_id, item[item.find('hadoop'):])
+        local_path = os.path.join(jobflow_id, item[len(fetcher.root_path):])
         head, tail = os.path.split(local_path)
         if not os.path.exists(head):
             os.makedirs(head)

@@ -82,17 +82,19 @@ class OptionScrapingTestCase(TestCase):
     def test_scrape_different(self):
         assignments = {
             self.new_parser: ('x',),
-            self.new_group_1: ('x', 'y'),
-            self.new_group_2: ('a', 'y'),
+            self.new_group_1: ('y',),
+            self.new_group_2: ('a',),
         }
         old_groups = (self.original_parser, self.original_group)
         scrape_options_into_new_groups(old_groups, assignments)
         target_1 = self.original_group.option_list[:1]
-        target_2 = self.original_group.option_list
-        target_3 = self.original_parser.option_list[1:] + [self.original_group.option_list[1]]
+        target_2 = self.original_group.option_list[1:]
+        target_3 = self.original_parser.option_list[1:]
         assert_equal(target_1, self.new_parser.option_list[1:])
         assert_equal(target_2, self.new_group_1.option_list)
         assert_equal(target_3, self.new_group_2.option_list)
+        options, args = self.new_parser.parse_args(['-x', 'happy'])
+        assert_equal(options.x, 'happy')
 
 
 class ReadInputTestCase(TestCase):

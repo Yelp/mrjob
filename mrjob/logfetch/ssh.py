@@ -66,6 +66,7 @@ class SSHLogFetcher(LogFetcher):
         return 'history'
 
     def _address_of_master(self):
+        """Get the address of the master node so we can SSH to it"""
         # cache address of master to avoid redundant calls to describe_jobflow
         if self.address:
             return self.address
@@ -75,6 +76,7 @@ class SSHLogFetcher(LogFetcher):
             if jobflow.state not in ('WAITING', 'RUNNING'):
                 raise LogFetchException('Cannot ssh to master; job flow is not waiting or running')
         except S3ResponseError:
+            # This error is raised by mockboto when the jobflow doesn't exist
             raise LogFetchException('Could not get job flow information')
 
         self.address = jobflow.masterpublicdnsname
@@ -85,7 +87,7 @@ class SSHLogFetcher(LogFetcher):
             'ssh', '-q',
             '-i', self.ec2_key_pair_file,
             'hadoop@%s' % self._address_of_master(),
-            'find', self.root_path,
+            'find', self.root_path, '-type', 'f',
         ]
         p = subprocess.Popen(args,
                              stdin=subprocess.PIPE,

@@ -17,6 +17,7 @@ import glob
 import os
 import re
 
+# Constants used to tell :py:func:`list_logs` what logs to find and return
 TASK_ATTEMPT_LOGS = 'TASK_ATTEMPT_LOGS'
 STEP_LOGS = 'STEP_LOGS'
 JOB_LOGS = 'JOB_LOGS'
@@ -31,34 +32,59 @@ class LogFetchException(Exception):
 
 
 class LogFetcher(object):
+    """Abstract base class for log fetchers.
+
+    Log fetchers are responsible for listing and downloading logs from a
+    specific storage medium such as S3, SSH, or the local file system.
+
+    Subclasses: :py:class:`~mrjob.logfetch.s3.S3LogFetcher`,
+    :py:class:`~mrjob.logfetch.ssh.SSHLogFetcher`
+    """
 
     def __init__(self, local_temp_dir='/tmp'):
         super(LogFetcher, self).__init__()
         self.local_temp_dir = local_temp_dir
+        self.root_path = '/'
 
     ### RETRIEVING/RECOGNIZING KINDS OF LOG FILES ###
 
     def task_attempts_log_uri_re(self):
+        """Returns a regular expression object that matches task attempt log
+        URIs
+        """
         raise NotImplementedError
 
     def task_attempts_log_path(self):
+        """Returns the relative path of task attempt log files"""
         raise NotImplementedError
 
     def step_log_uri_re(self):
+        """Returns a regular expression object that matches step log URIs"""
         raise NotImplementedError
 
     def step_log_path(self):
+        """Returns the relative path of step log files"""
         raise NotImplementedError
 
     def job_log_uri_re(self):
+        """Returns a regular expression object that matches job log URIs"""
         raise NotImplementedError
 
     def job_log_path(self):
+        """Returns the relative path of job log files"""
         raise NotImplementedError
 
     ### BASIC ACTIONS RELATED TO DOWNLOADING LOGS ###
 
     def list_logs(self, log_types=None):
+        """Find and return lists of log paths corresponding to the kinds
+        specified in ``log_types``.
+
+        :type log_types: list
+        :param log_types: list containing some combination of the constants ``TASK_ATTEMPT_LOGS``, ``STEP_LOGS``, and ``JOB_LOGS``. Defaults to ``[TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]``.
+
+        :return: list of matching log files in the order specified by ``log_types``
+        """
         log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
         re_map = {
             TASK_ATTEMPT_LOGS: self.task_attempts_log_uri_re(),
@@ -91,7 +117,7 @@ class LogFetcher(object):
     def ls(self, path):
         """Recursively list all files in the given path.
 
-        We don't return directories for compatibility with S3 (which
+        We try not to return directories for compatibility with S3 (which
         has no concept of them)
 
         Corresponds roughly to: ``hadoop fs -lsr path_glob``
@@ -104,7 +130,8 @@ class LogFetcher(object):
             else:
                 yield path
 
-    def get(self, path):
-        """Download the file at ``path`` and return its local path
+    def get(self, path, dest=None):
+        """Download the file at ``path`` and return its local path. Specify
+        ``dest`` to download the file to that path.
         """
         return path

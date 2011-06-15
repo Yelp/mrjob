@@ -162,8 +162,6 @@ class S3LogFetcher(LogFetcher):
         return None if that key doesn't exist.
 
         uri is an S3 URI: ``s3://foo/bar``
-
-        You may optionally pass in an existing s3 connection through ``s3_conn``
         """
         bucket_name, key_name = parse_s3_uri(uri)
 

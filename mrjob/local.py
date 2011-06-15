@@ -26,11 +26,11 @@ import stat
 from subprocess import Popen, PIPE
 import sys
 
-from mrjob.compat import translate_jobconf
+from mrjob.compat import translate_jobconf, translate_jobconf_to_version, is_equivalent_jobconf
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.parse import find_python_traceback, parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line, dots_to_underscores, read_file, unarchive
+from mrjob.util import cmd_line, read_file, unarchive
 
 
 log = logging.getLogger('mrjob.local')
@@ -148,26 +148,22 @@ class LocalMRJobRunner(MRJobRunner):
         if jobconf:
             for (conf_arg, value) in jobconf.iteritems():
                 # attempt to get the latest version equivalence
-                try:
-                    conf_arg = translate_jobconf(conf_arg, '0.21')
-                except:
-                    pass
-                if conf_arg == 'mapreduce.job.maps':
+                if is_equivalent_jobconf('mapreduce.job.maps', conf_arg):
                     self._map_tasks = int(value)
                     if self._map_tasks < 1:
                         raise ValueError("%s should be greater than 1" % conf_arg)
-                elif conf_arg == 'mapreduce.job.reduces':
+                elif is_equivalent_jobconf('mapreduce.job.reduces', conf_arg):
                     self._reduce_tasks = int(value)
                     if self._reduce_tasks < 1:
                         raise ValueError("%s should be greater than 1" % conf_arg)
-                elif conf_arg == 'mapreduce.job.local.dir':
+                elif is_equivalent_jobconf('mapreduce.job.local.dir', conf_arg):
                     # hadoop supports multiple direcories - sticking with only one here
                     if not os.path.isdir(value):
                         raise IOError("Directory %s does not exist" % value)
                     self._working_dir = value
                 else:
                     # catch all - convert . to _ and add to running env
-                    name = dots_to_underscores(conf_arg)
+                    name = conf_arg.replace('.', '_')
                     self._running_env[name] = value
                 
         self._running_env['mapreduce_job_id'] = self._job_name
@@ -187,7 +183,7 @@ class LocalMRJobRunner(MRJobRunner):
             self._working_dir = os.path.join(self._get_local_tmp_dir(), 'working_dir')
             self.mkdir(self._working_dir)
         
-        self._running_env["mapreduce_job_local_dir"] = self._working_dir
+        self._running_env['mapreduce_job_local_dir'] = self._working_dir
 
         # give all our files names, and symlink or unarchive them
         self._name_files()
@@ -226,8 +222,16 @@ class LocalMRJobRunner(MRJobRunner):
     def _get_file_splits(self, input_paths, num_splits, keep_sorted=False):
         """ Split the input files into (roughly) *num_splits* files
             
-            returns a dictionary that maps split_file names to a dictionary of properties
+            returns a dictionary that maps split_file names to a dictionary of 
+            properties: 
+                - original_name: the original name of the file whose data is in the split
+                - start: where the split starts
+                - length: the length of the split
         """
+        # sanity check, if keep_sorted=True, then we should only have one file here 
+        assert(not keep_sorted or len(input_paths) == 1)
+        
+        # determine the size of each file split
         total_size = sum([os.stat(path)[stat.ST_SIZE] for path in input_paths])
         split_size = total_size / num_splits
          
@@ -236,7 +240,9 @@ class LocalMRJobRunner(MRJobRunner):
         tmp_directory = self._get_local_tmp_dir()
         file_names = defaultdict(str)
         
+        # Helper functions:
         def create_outfile(original_name = '', start = ''):
+            # create a new ouput file and initialize its dictionary of properties
             outfile_name = tmp_directory + '/input_part-%05d' % len(file_names)
             new_file = defaultdict(str) 
             new_file['original_name'] = original_name
@@ -244,55 +250,43 @@ class LocalMRJobRunner(MRJobRunner):
             file_names[outfile_name] = new_file 
             return outfile_name
         
-        if keep_sorted:
-            # merge all input files into one
-            if len(input_paths) == 1:
-                input_file = input_paths[0]
+        def line_generator(input_path):
+            # generates lines from a given input_path, if keep_sorted is true then
+            # we concatinate all lines with the same key before and yield them together
+            if keep_sorted:
+                # assume that input is a collection of key <tab> value pairs
+                # match all non-tab characters
+                re_pattern = re.compile("^(\S*)")
+                for key, lines in itertools.groupby(read_file(input_path), 
+                                key=lambda(line): re_pattern.search(line).group(1)):
+                    yield ''.join(lines)
             else:
-                input_file = tmp_directory + '/sorted_input'
-                args = ['sort', '-m'] + input_paths
-                
-                outfile = open(input_file, 'w')
-                proc = Popen(args, stdout=outfile, stderr=PIPE,
-                             cwd=self._working_dir, env={'LC_ALL': 'C'})
-                returncode = proc.wait()
-                if returncode != 0:
-                    raise Exception(
-                        'Command %r returned non-zero exit status %d: %s' %
-                        (args, returncode))
-                
-            files = []
-            for i in xrange(num_splits):
-                outfile_name = create_outfile()
-                files.append(open(outfile_name, 'w'))
-            # assume that input is a collection of key <tab> value pairs
-            # match all non-tab characters
-            re_pattern = re.compile("^(\S*)")
+                for line in read_file(input_path):
+                    yield line
+             
+        for path in input_paths:
+            # create a new split file for each new path
             
-            current_file = 0
-            for key, lines in itertools.groupby(read_file(input_file), 
-                            key=lambda(line): re_pattern.search(line).group(1)):
-                for line in lines:
-                    files[current_file].write(line)
-                current_file = (current_file + 1) % num_splits
-        else:
-            for path in input_paths:
-                # create a new split file for each new path
-                outfile_name = create_outfile(path, 0)
-                outfile = open(outfile_name, 'w')
-                total_bytes = 0
-                bytes_written = 0
-                for line in read_file(path):
-                    if bytes_written >= split_size:
-                        # new split file if we exceeded the limit
-                        file_names[outfile_name]['length'] = bytes_written
-                        total_bytes += bytes_written
-                        outfile_name = create_outfile(path, total_bytes)
-                        outfile = open(outfile_name, 'w')
-                        bytes_written = 0
-                    outfile.write(line)
-                    bytes_written += len(line)
-                file_names[outfile_name]['length'] = bytes_written
+            # initialize file and accumulators
+            outfile_name = create_outfile(path, 0)
+            outfile = open(outfile_name, 'w')
+            bytes_written = 0
+            total_bytes = 0
+            
+            # write each line to a file as long as we are within the limit (split_size)
+            for line in line_generator(path):
+                if bytes_written >= split_size:
+                    # new split file if we exceeded the limit
+                    file_names[outfile_name]['length'] = bytes_written
+                    total_bytes += bytes_written
+                    outfile_name = create_outfile(path, total_bytes)
+                    outfile = open(outfile_name, 'w')
+                    bytes_written = 0
+                    
+                outfile.write(line)
+                bytes_written += len(line)
+                
+            file_names[outfile_name]['length'] = bytes_written
 
         return file_names
 
@@ -328,73 +322,100 @@ class LocalMRJobRunner(MRJobRunner):
                 else:
                     input_paths.append(path)
 
-        # get file splits
-        keep_sorted = (step_type == 'R')
-        file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=keep_sorted)
-        
-        # run the tasks
+        # Start the tasks associated with the step:
+        # if we need to sort, then just sort all input files into one file
+        # otherwise, split the files needed for mappers and reducers
+        # and setup the task environment for each
         procs = []
         self._prev_outfiles = []
-        for (task_num, file_name) in enumerate(file_splits):
-            # args - one file_split per process
-            proc_args = args + [file_name]
-            log.info('> %s' % cmd_line(proc_args))
-            
-            # set the task env
-            # generate a task id
-            mapreduce_task_id = 'task_%s_%s_%05d%d' % (self._job_name, step_type, step_num, task_num) 
-            mapreduce_task_attempt_id = 'attempt_%s_%s_%05d%d_0' % (self._job_name, step_type, step_num, task_num) # we only have one attempt
-            
-            task_env = combine_local_envs(
-                env,
-                {'mapreduce_task_id': mapreduce_task_id, 
-                 'mapreduce_task_attempt_id': mapreduce_task_attempt_id,
-                 })
-                 
-            if step_type == 'M':
-                # map only jobconf environment variables
-                task_env = combine_local_envs(
-                    task_env, 
-                    {'mapreduce_map_input_file': file_splits[file_name]['original_name'], 
-                     'mapreduce_map_input_start': str(file_splits[file_name]['start']),
-                     'mapreduce_map_input_length': str(file_splits[file_name]['length'])
-                     })
-            
-            # set up outfile
-            outfile = os.path.join(self._get_local_tmp_dir(), outfile_name + '_part-%05d' % task_num)
-            log.info('writing to %s' % outfile)
-            log.debug('')
-
-            self._prev_outfiles.append(outfile)
-            write_to = open(outfile, 'w')
-
-            # run the process
-            proc = Popen(proc_args, stdout=write_to, stderr=PIPE,
-                         cwd=self._working_dir, env=task_env)
+        
+        if step_type == 'S':
+            # sort all the files into one main file
+            # no need to split the input here
+            for path in input_paths:
+                args.append(os.path.abspath(path))
+            proc = self._invoke_process(args, outfile_name, env)
             procs.append(proc)
+        else:
+            # get file splits for mappers and reducers
+            keep_sorted = (step_type == 'R')
+            file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=keep_sorted)
+            
+            # run the tasks
+            for (task_num, file_name) in enumerate(file_splits):
+                # set the task env
+                # generate a task id
+                mapreduce_task_id = 'task_%s_%s_%05d%d' % (self._job_name, step_type, step_num, task_num) 
+                mapreduce_task_attempt_id = 'attempt_%s_%s_%05d%d_0' % (self._job_name, step_type, step_num, task_num) # we only have one attempt
+                
+                task_env = combine_local_envs(
+                    env,
+                    {'mapreduce_task_id': mapreduce_task_id, 
+                     'mapreduce_task_attempt_id': mapreduce_task_attempt_id,
+                     })
+             
+                if step_type == 'M':
+                    # map only jobconf environment variables
+                    task_env = combine_local_envs(
+                        task_env, 
+                        {'mapreduce_map_input_file': file_splits[file_name]['original_name'], 
+                         'mapreduce_map_input_start': str(file_splits[file_name]['start']),
+                         'mapreduce_map_input_length': str(file_splits[file_name]['length'])
+                         })
+        
+                task_outfile = outfile_name + '_part-%05d' % task_num
+        
+                proc = self._invoke_process(args + [file_name], task_outfile, env=task_env)
+                procs.append(proc)
 
-        for task_num in xrange(len(file_splits)):
-            proc = procs[task_num]
-            # handle counters, status msgs, and other stuff on stderr
-            stderr_lines = self._process_stderr_from_script(proc.stderr, step_num=step_num)
-            tb_lines = find_python_traceback(stderr_lines)
+        for proc in procs:
+            self._wait_for_process(proc, step_num)
 
+        self._print_counters()
+        
+        
+    def _invoke_process(self, args, outfile_name, env):
+        """ invokes the process described by *args* and which writes to *outfile_name*
+            returns a dictoinary representing the process:
+                - proc: Popen object
+                - args: the process args
+                - write_to: the file descriptor the process is writing to
+        """
+        log.info('> %s' % cmd_line(args))
+        
+        # set up outfile
+        outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
+        log.info('writing to %s' % outfile)
+        log.debug('')
+
+        self._prev_outfiles.append(outfile)
+        write_to = open(outfile, 'w')
+
+        # run the process
+        proc = Popen(args, stdout=write_to, stderr=PIPE,
+                     cwd=self._working_dir, env=env)
+        return {'proc': proc, 'args': args, 'write_to': write_to}
+    
+    def _wait_for_process(self, proc, step_num):
+        # handle counters, status msgs, and other stuff on stderr
+        stderr_lines = self._process_stderr_from_script(proc['proc'].stderr, step_num=step_num)
+        tb_lines = find_python_traceback(stderr_lines)
+       
+        returncode = proc['proc'].wait()
+        if returncode != 0:
             self._print_counters()
-
-            returncode = proc.wait()
-            if returncode != 0:
-                # try to throw a useful exception
-                if tb_lines:
-                    raise Exception(
-                        'Command %r returned non-zero exit status %d:\n%s' %
-                        (args, returncode, ''.join(tb_lines)))
-                else:
-                    raise Exception(
-                        'Command %r returned non-zero exit status %d: %s' %
-                        (args, returncode))
-
+            # try to throw a useful exception
+            if tb_lines:
+                raise Exception(
+                    'Command %r returned non-zero exit status %d:\n%s' %
+                    (proc['args'], returncode, ''.join(tb_lines)))
+            else:
+                raise Exception(
+                    'Command %r returned non-zero exit status %d: %s' %
+                    (proc['args'], returncode))
+        
         # flush file descriptors
-        write_to.flush()
+        proc['write_to'].flush()
 
     def _process_stderr_from_script(self, stderr, step_num=0):
         """Handle stderr a line at time:

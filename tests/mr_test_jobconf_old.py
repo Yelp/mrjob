@@ -14,23 +14,21 @@
 """Tests for JobConf Environment Variables
 """
 from mrjob.job import MRJob
-from mrjob.util import get_jobconf_value
+from mrjob.compat import get_jobconf_value
+
+JOBCONF_LIST = [
+    'mapreduce.job.id', 'mapreduce.job.local.dir', 'mapreduce.task.id',
+    'mapreduce.task.attempt.id', 'mapreduce.task.ismap', 'mapreduce.task.partition',
+    'mapreduce.map.input.file', 'mapreduce.map.input.start', 'mapreduce.map.input.length',
+    'mapreduce.task.output.dir', 'mapreduce.job.cache.local.archives'
+]
 
 class MRJobConfTestOld(MRJob):
 
     def mapper(self, _, line):
-        yield ("mapreduce_job_id", get_jobconf_value("mapred.job.id"))
-        yield ("mapreduce_job_local_dir", get_jobconf_value("job.local.dir"))
-        yield ("mapreduce_task_id", get_jobconf_value("mapred.tip.id"))
-        yield ("mapreduce_task_attempt_id", get_jobconf_value("mapred.task.id")) 
-        yield ("mapreduce_task_ismap", get_jobconf_value("mapred.task.is.map"))
-        yield ("mapreduce_task_partition", get_jobconf_value("mapred.task.partition"))
-        yield ("mapreduce_map_input_file", get_jobconf_value("map.input.file"))
-        yield ("mapreduce_map_input_start", get_jobconf_value("map.input.start"))
-        yield ("mapreduce_map_input_length", get_jobconf_value("map.input.length"))
-        yield ("mapreduce_task_output_dir", get_jobconf_value("mapred.work.output.dir"))
-        yield ("mapreduce_job_cache_local_archives", get_jobconf_value("mapred.cache.localArchives"))
-        
+        for jobconf in JOBCONF_LIST:
+            yield (jobconf, get_jobconf_value(jobconf))
+            
 if __name__ == '__main__':
     MRJobConfTestOld.run()
 

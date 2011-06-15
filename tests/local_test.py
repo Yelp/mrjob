@@ -159,15 +159,11 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
         # set up input paths
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
-            input_file.write('1\tbar\n1\tbar\n2\tfoo\n2\tfoo\n3\tqux\n')
-
-        input_path2 = os.path.join(self.tmp_dir, 'input2')
-        with open(input_path2, 'w') as input_file:
-            input_file.write('1\tbar\n2\tfoo\n3\tqux\n3\tqux\n')
+            input_file.write('1\tbar\n1\tbar\n1\tbar\n2\tfoo\n2\tfoo\n2\tfoo\n3\tqux\n3\tqux\n3\tqux\n')
 
         runner = LocalMRJobRunner(conf_path=False)
 
-        file_splits = runner._get_file_splits([input_path, input_path2], 3, keep_sorted=True)
+        file_splits = runner._get_file_splits([input_path], 3, keep_sorted=True)
 
         # make sure we get 3 files
         assert_equal(len(file_splits), 3)
@@ -420,18 +416,18 @@ class LocalMRJobRunnerJobConfTestCase(TestCase):
 
         # test that we are are not throwing exceptions
         assert_equal(sorted(results),
-                     [('mapreduce_job_cache_local_archives', runner._mrjob_tar_gz_path), 
-                     ('mapreduce_job_id', runner._job_name), 
-                     ('mapreduce_job_local_dir', runner._working_dir), 
-                     ('mapreduce_map_input_file', input_path), 
-                     ('mapreduce_map_input_length', '4'), 
-                     ('mapreduce_map_input_start', '0'), 
-                     ('mapreduce_task_attempt_id', 'attempt_%s_M_000000_0' % runner._job_name), 
-                     ('mapreduce_task_id', 'task_%s_M_000000' % runner._job_name), 
-                     ('mapreduce_task_ismap', 'True'), 
-                     ('mapreduce_task_output_dir', runner._output_dir), 
-                     ('mapreduce_task_partition', '0'),
-                     ('user_defined', 'something')])
+                     [('mapreduce.job.cache.local.archives', runner._mrjob_tar_gz_path), 
+                     ('mapreduce.job.id', runner._job_name), 
+                     ('mapreduce.job.local.dir', runner._working_dir), 
+                     ('mapreduce.map.input.file', input_path), 
+                     ('mapreduce.map.input.length', '4'), 
+                     ('mapreduce.map.input.start', '0'), 
+                     ('mapreduce.task.attempt.id', 'attempt_%s_M_000000_0' % runner._job_name), 
+                     ('mapreduce.task.id', 'task_%s_M_000000' % runner._job_name), 
+                     ('mapreduce.task.ismap', 'True'), 
+                     ('mapreduce.task.output.dir', runner._output_dir), 
+                     ('mapreduce.task.partition', '0'),
+                     ('user.defined', 'something')])
                      
     def test_others_old(self):
         input_path = os.path.join(self.tmp_dir, 'input')
@@ -453,14 +449,14 @@ class LocalMRJobRunnerJobConfTestCase(TestCase):
 
         # test that we are are not throwing exceptions
         assert_equal(sorted(results),
-                     [('mapreduce_job_cache_local_archives', runner._mrjob_tar_gz_path), 
-                     ('mapreduce_job_id', runner._job_name), 
-                     ('mapreduce_job_local_dir', runner._working_dir), 
-                     ('mapreduce_map_input_file', input_path), 
-                     ('mapreduce_map_input_length', '4'), 
-                     ('mapreduce_map_input_start', '0'), 
-                     ('mapreduce_task_attempt_id', 'attempt_%s_M_000000_0' % runner._job_name), 
-                     ('mapreduce_task_id', 'task_%s_M_000000' % runner._job_name), 
-                     ('mapreduce_task_ismap', 'True'), 
-                     ('mapreduce_task_output_dir', runner._output_dir), 
-                     ('mapreduce_task_partition', '0')])
+                     [('mapreduce.job.cache.local.archives', runner._mrjob_tar_gz_path), 
+                      ('mapreduce.job.id', runner._job_name), 
+                      ('mapreduce.job.local.dir', runner._working_dir), 
+                      ('mapreduce.map.input.file', input_path), 
+                      ('mapreduce.map.input.length', '4'), 
+                      ('mapreduce.map.input.start', '0'), 
+                      ('mapreduce.task.attempt.id', 'attempt_%s_M_000000_0' % runner._job_name), 
+                      ('mapreduce.task.id', 'task_%s_M_000000' % runner._job_name), 
+                      ('mapreduce.task.ismap', 'True'), 
+                      ('mapreduce.task.output.dir', runner._output_dir), 
+                      ('mapreduce.task.partition', '0'),])

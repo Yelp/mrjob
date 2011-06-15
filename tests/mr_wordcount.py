@@ -15,7 +15,7 @@
 """
 from mrjob.job import MRJob
 import re
-from mrjob.util import get_jobconf_value
+from mrjob.compat import get_jobconf_value
 
 WORD_RE = re.compile(r"[\w']+")
 
@@ -24,7 +24,7 @@ class MRWordCount(MRJob):
     """
     def mapper(self, _, line):
         for word in WORD_RE.findall(line):
-            yield (get_jobconf_value("mapreduce_map_input_file"), 1)
+            yield (get_jobconf_value("mapreduce.map.input.file"), 1)
             
     def reducer(self, name, counts):
         yield (name, sum(counts))

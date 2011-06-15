@@ -1556,6 +1556,16 @@ class EMRJobRunner(MRJobRunner):
         return sum(self.get_s3_key(uri).size for uri in self.ls(path_glob))
 
     def ls(self, path_glob):
+        """Recursively list files locally or on S3.
+
+        This doesn't list "directories" unless there's actually a
+        corresponding key ending with a '/' (which is weird and confusing;
+        don't make S3 keys ending in '/')
+
+        To list a directory, path_glob must end with a trailing
+        slash (foo and foo/ are different on S3)
+        """
+    
         return self._s3_fetcher().ls(path_glob)
 
     def mkdir(self, dest):

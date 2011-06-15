@@ -13,6 +13,8 @@
 # limitations under the License.
 from __future__ import with_statement
 
+import functools
+from optparse import OptionParser, OptionValueError
 import sys
 
 from mrjob.logfetch import LogFetchException
@@ -21,13 +23,20 @@ from mrjob.logfetch.ssh import SSHLogFetcher
 from mrjob.emr import EMRJobRunner
 
 
-# Log file locations are like so:
-#    S3 location             Local location
-#    /daemons                / (root)
-#    /jobs                   /history
-#    /node                   <not present>
-#    /steps                  /steps
-#    /task-attempts          /userlogs
+def main():
+    usage = 'usage: %prog [options] JOB_FLOW_ID'
+    description = 'Retrieve log files for EMR jobs.'
+    option_parser = OptionParser(usage=usage,description=description)
+
+    option_parser.add_option('-l', '--list',
+                             action="callback", callback=list_relevant,
+                             help='List log files MRJob finds relevant')
+
+    option_parser.add_option('-a', '--list-all',
+                             action="callback", callback=list_all,
+                             help='List log files MRJob finds relevant')
+
+    options, args = option_parser.parse_args()
 
 
 def ssh_fetcher(jobflow_id):
@@ -51,47 +60,38 @@ def s3_fetcher(jobflow_id):
     return S3LogFetcher(s3_conn, root_path)
 
 
-def cat_files(fetcher, paths):
-    for remote_path in paths:
-        print '=== %s ===' % remote_path
-        local_path = fetcher.get(remote_path)
-        # Sometimes get() will return None
-        if local_path:
-            with open(local_path, 'r') as f:
-                pass
-                # print f.read()
+def with_fetcher(func):
+    @functools.wraps(func)
+    def wrap(option, opt_str, value, parser, *args, **kwargs):
+        try:
+            fetcher = ssh_fetcher(parser.rargs[-1])
+            func(fetcher)
+        except LogFetchException:
+            fetcher = s3_fetcher(parser.rargs[-1])
+            func(fetcher)
+    return wrap
 
 
-def fetchlogs(jobflow_id, path):
-    try:
-        fetcher = ssh_fetcher(jobflow_id)
-        task_attempts, steps, jobs = fetcher.list_logs()
-        print 'Task attempts:'
-        cat_files(fetcher, task_attempts)
-        print
-        print 'Steps:'
-        cat_files(fetcher, steps)
-        print
-        print 'Jobs:'
-        cat_files(fetcher, jobs)
-
-    except LogFetchException:
-        fetcher = s3_fetcher(jobflow_id)
-        task_attempts, step_logs, job_logs = fetcher.list_logs()
-        print 'Task attempts:'
-        cat_files(fetcher, task_attempts)
-        print
-        print 'Steps:'
-        cat_files(fetcher, steps)
-        print
-        print 'Jobs:'
-        cat_files(fetcher, jobs)
+def prettyprint_paths(paths):
+    for path in paths:
+        print path
+    print
 
 
-def main():
-    if len(sys.argv) < 3:
-        sys.argv.append('')
-    fetchlogs(sys.argv[1], sys.argv[2])
+@with_fetcher
+def list_relevant(fetcher):
+    task_attempts, steps, jobs = fetcher.list_logs()
+    print 'Task attempts:'
+    prettyprint_paths(task_attempts)
+    print 'Steps:'
+    prettyprint_paths(steps)
+    print 'Jobs:'
+    prettyprint_paths(jobs)
+
+
+@with_fetcher
+def list_all(fetcher):
+    prettyprint_paths(fetcher.ls())
 
 
 if __name__ == '__main__':

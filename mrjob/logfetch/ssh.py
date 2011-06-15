@@ -94,7 +94,7 @@ class SSHLogFetcher(LogFetcher):
         else:
             for line in output.split('\n'):
                 # skip directories, we only want to return downloadable files
-                if not line.endswith('/'):
+                if line and not line.endswith('/'):
                     yield line
 
     def get(self, path):

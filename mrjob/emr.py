@@ -1323,11 +1323,12 @@ class EMRJobRunner(MRJobRunner):
             posixpath.dirname(s3_log_file_uri), 'syslog')
 
         syslog_string = self.cat(s3_syslog_uri)
-        if not syslog_string:
+        if syslog_string:
+            log.debug('scanning %s for input URI' % s3_syslog_uri)
+            return find_input_uri_for_mapper(syslog_string.split('\n'))
+        else:
             return None
 
-        log.debug('scanning %s for input URI' % s3_syslog_uri)
-        return find_input_uri_for_mapper(syslog_string.split('\n'))
 
     def _scan_step_logs(self, s3_log_file_uris, step_nums):
         """Scan steps/*/syslog for hadoop streaming errors.
@@ -1573,7 +1574,6 @@ class EMRJobRunner(MRJobRunner):
         if not S3_URI_RE.match(path_glob):
             for path in super(EMRJobRunner, self).ls(path_glob):
                 yield path
-            return
 
         # support globs
         glob_match = GLOB_RE.match(path_glob)
@@ -1688,7 +1688,7 @@ class EMRJobRunner(MRJobRunner):
     def cat(self, uri, s3_conn=None):
         if uri.startswith("ssh://"):
             return self._ssh_cat(uri[len('ssh:/'):])
-        elif uri.startswith("s3://") or uri.startswith("s3n://"):
+        elif S3_URI_RE.match(uri):
             return self._s3_cat(uri, s3_conn)
         else:
             with open(uri, 'r') as f:

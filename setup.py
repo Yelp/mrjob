@@ -32,7 +32,6 @@ setup(
     packages=['mrjob',
               'mrjob.botoemr',
               'mrjob.examples',
-              'mrjob.logfetch',
               'mrjob.tools',
               'mrjob.tools.emr'],
     provides=['mrjob'],

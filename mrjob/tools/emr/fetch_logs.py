@@ -20,9 +20,7 @@ import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.logfetch import LogFetchException
-from mrjob.logfetch.s3 import S3LogFetcher
-from mrjob.logfetch.ssh import SSHLogFetcher
+from mrjob.logfetch import LogFetchException, S3LogFetcher, SSHLogFetcher
 from mrjob.util import scrape_options_into_new_groups
 
 
@@ -39,14 +37,14 @@ def main():
                              action="store_true", default=False,
                              help='List all log files')
 
-    option_parser.add_option('-d', '--download', dest='download_relevant',
+    option_parser.add_option('-a', '--cat', dest='cat_relevant',
                              action="store_true", default=False,
-                             help='Download log files MRJob finds relevant')
+                             help='Cat log files MRJob finds relevant')
 
-    option_parser.add_option('-D', '--download-all', dest='download_all',
+    option_parser.add_option('-C', '--cat-all', dest='cat_all',
                              action="store_true", default=False,
-                             help='Download all log files to JOB_FLOW_ID/')
-    
+                             help='Cat all log files to JOB_FLOW_ID/')
+
     assignments = {
         option_parser: ('conf_path', 'quiet', 'verbose',
                         'ec2_key_pair_file')
@@ -66,43 +64,25 @@ def main():
     if options.list_all:
         list_all(args[0], **options.__dict__)
 
-    if options.download_relevant:
-        download_relevant(args[0], **options.__dict__)
+    if options.cat_relevant:
+        cat_relevant(args[0], **options.__dict__)
 
-    if options.download_all:
-        download_all(args[0], **options.__dict__)
-
-
-def ssh_fetcher(jobflow_id, **runner_kwargs):
-    dummy_runner = EMRJobRunner(**runner_kwargs)
-    emr_conn = dummy_runner.make_emr_conn()
-    ec2_key_pair_file = dummy_runner._opts['ec2_key_pair_file']
-    return SSHLogFetcher(emr_conn, jobflow_id,
-                         ec2_key_pair_file=ec2_key_pair_file)
-
-
-def s3_fetcher(jobflow_id, **runner_kwargs):
-    dummy_runner = EMRJobRunner(**runner_kwargs)
-    emr_conn = dummy_runner.make_emr_conn()
-
-    jobflow = emr_conn.describe_jobflow(jobflow_id)
-    log_uri = getattr(jobflow, 'loguri', '')
-    tweaked_log_uri = log_uri.replace('s3n://', 's3://')
-    root_path = '%s%s/' % (tweaked_log_uri, jobflow_id)
-
-    s3_conn = dummy_runner.make_s3_conn()
-    return S3LogFetcher(s3_conn, root_path)
+    if options.cat_all:
+        cat_all(args[0], **options.__dict__)
 
 
 def with_fetcher(func):
     def wrap(jobflow_id, **runner_kwargs):
+        runner = EMRJobRunner(emr_job_flow_id=jobflow_id,
+                              **runner_kwargs)
         try:
-            fetcher = ssh_fetcher(jobflow_id, **runner_kwargs)
-            func(fetcher, jobflow_id)
+            raise LogFetchException
+            fetcher = runner._ssh_fetcher()
+            func(runner, fetcher, runner._ssh_ls)
         except LogFetchException, e:
             print e
-            fetcher = s3_fetcher(jobflow_id, **runner_kwargs)
-            func(fetcher, jobflow_id)
+            fetcher = runner._s3_fetcher()
+            func(runner, fetcher, runner._s3_ls)
     return wrap
 
 
@@ -113,8 +93,8 @@ def prettyprint_paths(paths):
 
 
 @with_fetcher
-def list_relevant(fetcher, jobflow_id):
-    task_attempts, steps, jobs = fetcher.list_logs()
+def list_relevant(runner, fetcher, ls_func):
+    task_attempts, steps, jobs = fetcher.list_logs(ls_func)
     print 'Task attempts:'
     prettyprint_paths(task_attempts)
     print 'Steps:'
@@ -124,43 +104,21 @@ def list_relevant(fetcher, jobflow_id):
 
 
 @with_fetcher
-def list_all(fetcher, jobflow_id):
-    prettyprint_paths(fetcher.ls())
+def list_all(runner, fetcher, ls_func):
+    prettyprint_paths(ls_func(fetcher.root_path))
 
 
 @with_fetcher
-def download_relevant(fetcher, jobflow_id):
-    if not os.path.exists(jobflow_id):
-        os.makedirs(jobflow_id)
-    task_attempts, steps, jobs = fetcher.list_logs()
-    folder_and_items = [
-        ('task_attempts', task_attempts),
-        ('steps', steps),
-        ('jobs', jobs),
-    ]
-    for base_path, items in folder_and_items:
-        base_path = os.path.join(jobflow_id, base_path)
-        if not os.path.exists(base_path):
-            os.makedirs(base_path)
-        for item in items:
-
-            head, tail = os.path.split(item)
-            fetcher.get(item, os.path.join(base_path, tail))
-            print os.path.join(base_path, tail)
-
+def cat_relevant(runner, fetcher, ls_func):
+    for path in fetcher.list_logs(ls_func):
+        print path
+        runner.cat(path)
 
 @with_fetcher
-def download_all(fetcher, jobflow_id):
-    if not os.path.exists(jobflow_id):
-        os.makedirs(jobflow_id)
-    for item in fetcher.ls():
-        local_path = os.path.join(jobflow_id, item[len(fetcher.root_path):])
-        head, tail = os.path.split(local_path)
-        if not os.path.exists(head):
-            os.makedirs(head)
-        fetcher.get(item, local_path)
-        print local_path
-
+def cat_all(runner, fetcher, ls_func):
+    for path in ls_func(fetcher.root_path + '/*'):
+        print path
+        runner.cat(path)
 
 if __name__ == '__main__':
     main()

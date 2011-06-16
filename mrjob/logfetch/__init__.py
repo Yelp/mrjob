@@ -37,6 +37,9 @@ class LogFetcher(object):
     Log fetchers are responsible for listing and downloading logs from a
     specific storage medium such as S3, SSH, or the local file system.
 
+    Since it is often a toss-up which fetcher will return correct results,
+    this class may throw LogFetcherException.
+
     Subclasses: :py:class:`~mrjob.logfetch.s3.S3LogFetcher`,
     :py:class:`~mrjob.logfetch.ssh.SSHLogFetcher`
     """

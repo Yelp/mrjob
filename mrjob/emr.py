@@ -1177,7 +1177,7 @@ class EMRJobRunner(MRJobRunner):
             fetcher = self._s3_fetcher()
             log.info('Fetching counters from S3...')
             uris = fetcher.list_logs(self._s3_ls, log_types=[JOB_LOGS])
-            return self._scan_for_counters_in_file(uris)
+            return self._scan_for_counters_in_files(uris)
 
     def _scan_for_counters_in_files(self, s3_log_file_uris):
         counters = []
@@ -1195,16 +1195,15 @@ class EMRJobRunner(MRJobRunner):
         relevant_logs.sort()
 
         for _, s3_log_file_uri in relevant_logs:
-            log_path = self.get(s3_log_file_uri)
-            if not log_path:
+            log_string = self.cat(s3_log_file_uri)
+            if not log_string:
                 continue
 
-            with open(log_path) as log_file:
-                for line in log_file:
-                    new_counters = parse_hadoop_counters_from_line(line)
-                    if new_counters:
-                        counters.append(new_counters)
-                        break
+            for line in log_string.split('\n'):
+                new_counters = parse_hadoop_counters_from_line(line)
+                if new_counters:
+                    counters.append(new_counters)
+                    break
 
         return counters
 
@@ -1285,19 +1284,17 @@ class EMRJobRunner(MRJobRunner):
                 continue
             tasks_seen.add(task_info)
 
-            log_path = self.get(s3_log_file_uri)
-            if not log_path:
+            log_string = self.cat(s3_log_file_uri)
+            if not log_string:
                 continue
 
             lines = None
             if info['stream'] == 'stderr':
-                log.debug('scanning %s for Python tracebacks' % log_path)
-                with open(log_path) as log_file:
-                    lines = find_python_traceback(log_file)
+                log.debug('scanning %s for Python tracebacks' % s3_log_file_uri)
+                lines = find_python_traceback(log_string.split('\n'))
             else:
-                log.debug('scanning %s for Java stack traces' % log_path)
-                with open(log_path) as log_file:
-                    lines = find_hadoop_java_stack_trace(log_file)
+                log.debug('scanning %s for Java stack traces' % s3_log_file_uri)
+                lines = find_hadoop_java_stack_trace(log_string.split('\n'))
 
             if lines is not None:
                 result = {
@@ -1310,7 +1307,7 @@ class EMRJobRunner(MRJobRunner):
                 # were reading from.
                 if info['node_type'] == 'm':
                     result['input_uri'] = self._scan_for_input_uri(
-                        s3_log_file_uri, fetcher)
+                        s3_log_file_uri)
 
                 return result
 
@@ -1325,17 +1322,12 @@ class EMRJobRunner(MRJobRunner):
         s3_syslog_uri = posixpath.join(
             posixpath.dirname(s3_log_file_uri), 'syslog')
 
-        try:
-            syslog_path = self.get(s3_syslog_uri)
-            log.debug('scanning %s for input URI' % syslog_path)
-            with open(syslog_path) as syslog_file:
-                return find_input_uri_for_mapper(syslog_file)
-        except LogFetchException:
-            # Normally a LogFetchException would mean that our fetcher isn't
-            # working anymore and we should try again with another fetcher,
-            # but here the surrounding code expects None if the file doesn't
-            # exist, so just return None.
+        syslog_string = self.cat(s3_syslog_uri)
+        if not syslog_string:
             return None
+
+        log.debug('scanning %s for input URI' % s3_syslog_uri)
+        return find_input_uri_for_mapper(syslog_string.split('\n'))
 
     def _scan_step_logs(self, s3_log_file_uris, step_nums):
         """Scan steps/*/syslog for hadoop streaming errors.
@@ -1351,16 +1343,16 @@ class EMRJobRunner(MRJobRunner):
             if not step_num in step_nums:
                 continue
 
-            log_path = fetcher.get(s3_log_file_uri)
-            if log_path:
-                with open(log_path) as log_file:
-                    msg = find_interesting_hadoop_streaming_error(log_file)
-                    if msg:
-                        return {
-                            'lines': [msg + '\n'],
-                            's3_log_file_uri': s3_log_file_uri,
-                            'input_uri': None,
-                        }
+            log_string = self.cat(s3_log_file_uri)
+            if log_string:
+                lines = log_string.split('\n')
+                msg = find_interesting_hadoop_streaming_error(lines)
+                if msg:
+                    return {
+                        'lines': [msg + '\n'],
+                        's3_log_file_uri': s3_log_file_uri,
+                        'input_uri': None,
+                    }
 
     def _scan_job_logs(self, s3_log_file_uris, step_nums):
         """Scan jobs/* for timeout errors.
@@ -1385,14 +1377,13 @@ class EMRJobRunner(MRJobRunner):
             relevant_logs.append((sort_key, info, s3_log_file_uri))
 
         relevant_logs.sort(reverse=True)
-        
+
         for sort_key, info, s3_log_file_uri in relevant_logs:
-            log_path = self.get(s3_log_file_uri)
-            if not log_path:
+            log_string = self.cat(s3_log_file_uri)
+            if not log_string:
                 continue
-            
-            with open(log_path) as log_file:
-                n = find_timeout_error(log_file)
+
+            n = find_timeout_error(log_string.split('\n'))
 
             if n is not None:
                 result = {
@@ -1721,7 +1712,10 @@ class EMRJobRunner(MRJobRunner):
 
     def _s3_cat(self, uri, s3_conn=None):
         s3_log_file = self.get_s3_key(uri, s3_conn or self.make_s3_conn())
-        return s3_log_file.get_contents_as_string()
+        if s3_log_file:
+            return s3_log_file.get_contents_as_string()
+        else:
+            return None
 
     ### EMR-specific STUFF ###
 

@@ -18,9 +18,8 @@ from optparse import OptionParser, OptionValueError
 import os
 import sys
 
-from mrjob.emr import EMRJobRunner
+from mrjob.emr import EMRJobRunner, LogFetchException
 from mrjob.job import MRJob
-from mrjob.logfetch import LogFetchException, S3LogFetcher, SSHLogFetcher
 from mrjob.util import scrape_options_into_new_groups
 
 
@@ -41,7 +40,7 @@ def main():
                              action="store_true", default=False,
                              help='Cat log files MRJob finds relevant')
 
-    option_parser.add_option('-C', '--cat-all', dest='cat_all',
+    option_parser.add_option('-A', '--cat-all', dest='cat_all',
                              action="store_true", default=False,
                              help='Cat all log files to JOB_FLOW_ID/')
 
@@ -71,18 +70,11 @@ def main():
         cat_all(args[0], **options.__dict__)
 
 
-def with_fetcher(func):
+def with_runner(func):
     def wrap(jobflow_id, **runner_kwargs):
         runner = EMRJobRunner(emr_job_flow_id=jobflow_id,
                               **runner_kwargs)
-        try:
-            raise LogFetchException
-            fetcher = runner._ssh_fetcher()
-            func(runner, fetcher, runner._ssh_ls)
-        except LogFetchException, e:
-            print e
-            fetcher = runner._s3_fetcher()
-            func(runner, fetcher, runner._s3_ls)
+        func(runner)
     return wrap
 
 
@@ -92,9 +84,7 @@ def prettyprint_paths(paths):
     print
 
 
-@with_fetcher
-def list_relevant(runner, fetcher, ls_func):
-    task_attempts, steps, jobs = fetcher.list_logs(ls_func)
+def _prettyprint_relevant(task_attempts, steps, jobs):
     print 'Task attempts:'
     prettyprint_paths(task_attempts)
     print 'Steps:'
@@ -103,22 +93,55 @@ def list_relevant(runner, fetcher, ls_func):
     prettyprint_paths(jobs)
 
 
-@with_fetcher
-def list_all(runner, fetcher, ls_func):
-    prettyprint_paths(ls_func(fetcher.root_path))
+@with_runner
+def list_relevant(runner):
+    try:
+        _prettyprint_relevant(*runner.ssh_list_logs())
+    except LogFetchException, e:
+        print e
+        _prettyprint_relevant(*runner.s3_list_logs())
 
 
-@with_fetcher
-def cat_relevant(runner, fetcher, ls_func):
-    for path in fetcher.list_logs(ls_func):
-        print path
-        runner.cat(path)
+@with_runner
+def list_all(runner):
+    try:
+        prettyprint_paths(runner.ssh_list_all())
+    except LogFetchException, e:
+        print e
+        prettyprint_paths(runner.s3_list_all())
 
-@with_fetcher
-def cat_all(runner, fetcher, ls_func):
-    for path in ls_func(fetcher.root_path + '/*'):
-        print path
-        runner.cat(path)
+
+def cat_from_list(runner, path_list):
+    for path in path_list:
+        print '===', path, '==='
+        print runner.cat(path)
+
+
+def cat_from_relevant(runner, task_attempts, steps, jobs):
+    print 'Task attempts:'
+    cat_from_list(runner, task_attempts)
+    print 'Steps:'
+    cat_from_list(runner, steps)
+    print 'Jobs:'
+    cat_from_list(runner, jobs)
+
+
+@with_runner
+def cat_relevant(runner):
+    try:
+        cat_from_relevant(runner, *runner.ssh_list_logs())
+    except LogFetchException, e:
+        print e
+        cat_from_relevant(runner, *runner.s3_list_logs())
+
+
+@with_runner
+def cat_all(runner):
+    try:
+        cat_from_list(runner, runner.ssh_list_all())
+    except LogFetchException, e:
+        print e
+        cat_from_list(runner, runner.s3_list_all())
 
 if __name__ == '__main__':
     main()

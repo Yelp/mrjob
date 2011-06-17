@@ -26,6 +26,7 @@ import itertools
 import logging
 import os
 import pipes
+from subprocess import Popen, PIPE
 import sys
 import tarfile
 import zipfile
@@ -186,15 +187,55 @@ def read_input(path, stdin=None):
 
 
 def run_command_on_ssh(ssh_bin, address, ec2_key_pair_file, *cmd_args):
+    """Shortcut to call ssh by ``subprocess``.
+
+    :param ssh_bin: Path to ``ssh`` binary
+    :param address: Address of your job's master node (obtained via EmrConnection.describe_jobflow())
+    :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
+    :param cmd_args: The command you want to run
+
+    :return: (stdout, stderr)
+    """
     args = [
         ssh_bin,
-        '-q',
         '-i', ec2_key_pair_file,
-        'hadoop@%s' % address,
-        *cmd_args
-    ]
+        'hadoop@%s' % (address,),
+    ] + list(cmd_args)
     p = Popen(args, stdout=PIPE, stderr=PIPE)
-    return p.communicate()
+    out, err = p.communicate()
+    return out, err
+
+
+mock_ssh_cat_value = None
+def ssh_cat(ssh_bin, address, ec2_key_pair_file, path):
+    """Return the file at ``path`` as a string"""
+    global mock_ssh_cat_value
+    # Allow mocking of output
+    # Mocking kept separate from ssh_ls() to make testing more intuitive
+    if mock_ssh_cat_output is not None:
+        out, err = mock_ssh_cat_output
+        mock_ssh_cat_output = None
+        return out, err
+    else:
+        out, err = run_command_on_ssh(ssh_bin, address, ec2_key_pair_file,
+                                      'cat', uri)
+        return out, err
+
+
+mock_ssh_ls_value = None
+def ssh_ls(ssh_bin, address, ec2_key_pair_file, path):
+    """Recursively list files under ``path`` on the specified SSH host"""
+    global mock_ssh_ls_value
+    # Allow mocking of output
+    # Mocking kept separate from ssh_cat() to make testing more intuitive
+    if mock_ssh_ls_value is not None:
+        out, err = mock_ssh_ls_value
+        mock_ssh_ls_value = None
+        return out, err
+    else:
+        out, err = run_command_on_ssh(ssh_bin, address, ec2_key_pair_file,
+                                      'find', path, '-type', 'f')
+        return out, err
 
 
 def scrape_options_and_index_by_dest(*parsers_and_groups):

@@ -48,7 +48,7 @@ from mrjob.conf import combine_dicts, combine_lists, combine_paths, combine_path
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_port_range_list, parse_hadoop_counters_from_line
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.util import cmd_line, extract_dir_for_tar
+from mrjob.util import cmd_line, extract_dir_for_tar, ssh_cat, ssh_ls
 
 
 log = logging.getLogger('mrjob.emr')
@@ -1676,17 +1676,16 @@ class EMRJobRunner(MRJobRunner):
             yield uri
 
     def _ssh_ls(self, uri):
-        uri = SSH_URI_RE.match(uri).groups('filesystem_path')[0]
-        args = [
+        """Helper for ls(); obeys globbing"""
+        output, err = ssh_ls(
             self._opts['ssh_bin'],
-            '-q',
-            '-i', self._opts['ec2_key_pair_file'],
             'hadoop@%s' % self._address_of_master(),
-            'find', uri, '-type', 'f',
-        ]
-        p = Popen(args, stdout=PIPE, stderr=PIPE)
-        output, err = p.communicate()
-        if err:
+            self._opts['ec2_key_pair_file'],
+            SSH_URI_RE.match(uri).groups('filesystem_path')[0],
+        )
+        # It may be better to catch the publickey error in
+        # run_command_on_ssh.
+        if err or 'Permission denied (publickey)' in output:
             log.error(str(err))
             raise LogFetchException('ssh error: %s' % str(err))
         else:
@@ -1772,17 +1771,15 @@ class EMRJobRunner(MRJobRunner):
                 return f.read()
 
     def _ssh_cat(self, uri):
-        uri = SSH_URI_RE.match(uri).groups('filesystem_path')[0]
-        args = [
+        output, err = ssh_cat(
             self._opts['ssh_bin'],
-            '-q',
-            '-i', self._opts['ec2_key_pair_file'],
             'hadoop@%s' % self._address_of_master(),
-            'cat', uri
-        ]
-        p = Popen(args, stdout=PIPE, stderr=PIPE)
-        output, err = p.communicate()
-        if err:
+            self._opts['ec2_key_pair_file'],
+            SSH_URI_RE.match(uri).groups('filesystem_path')[0],
+        )
+        # It may be better to catch the publickey error in
+        # run_command_on_ssh.
+        if err or 'Permission denied (publickey)' in output:
             log.error(str(err))
             raise LogFetchException('ssh error: %s' % str(err))
         else:

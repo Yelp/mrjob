@@ -27,8 +27,9 @@ import tempfile
 from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in, assert_raises, setup, teardown, assert_not_equal
 
 from mrjob.conf import dump_mrjob_conf
-from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
+from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri, SSH_LOG_ROOT, SSH_PREFIX
 from mrjob.parse import JOB_NAME_RE
+from mrjob.util import mock_ssh_cat, mock_ssh_ls
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, MockKey, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled, no_handlers_for_logger
@@ -705,6 +706,22 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         assert_equal(self.runner._find_probable_cause_of_failure([1]), None)
 
 
+class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
+    # Make sure that SSH and S3 are accessed when we expect them to be
+
+    @setup
+    def make_runner(self):
+        self.add_mock_s3_data({'walrus': {}})
+        self.runner = EMRJobRunner(s3_sync_wait_time=0,
+                                   s3_scratch_uri='s3://walrus/tmp',
+                                   conf_path=False)
+        self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
+
+    @teardown
+    def cleanup_runner(self):
+        self.runner.cleanup()
+
+
 class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
 
     def test_no_region(self):
@@ -804,3 +821,31 @@ class TestLs(MockEMRAndS3TestCase):
         # of permissions error)
         assert_raises(Exception, set, runner._s3_ls('s3://lolcat/'))
 
+    def test_ssh_ls(self):
+        runner = EMRJobRunner(conf_path=False)
+        runner._address = 'not_a_real_ssh_host'
+        mock_ssh_ls({'/': (['/one', '/two'], '')})
+        assert_equal(list(runner.ls('ssh://')), ['ssh://one', 'ssh://two'])
+        # Define a quick inline function because runner.ls is a generator
+        # and won't fire unless we list() it
+        def die():
+            list(runner.ls('ssh://does_not_exist'))
+        assert_raises(IOError, die)
+
+
+def TestCat(MockEMRAndS3TestCase):
+
+    def test_s3_cat(self):
+        self.add_mock_s3_data({'walrus': {'one': 'one_text', 'two': 'two_text', 'three': 'three_text'}})
+
+        runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
+                              conf_path=False)
+        
+        assert_equal(runner.cat('s3://walrus/one'), 'one_text')
+
+    def test_ssh_cat(self):
+        runner = EMRJobRunner(conf_path=False)
+        runner._address = 'not_a_real_ssh_host'
+        mock_ssh_cat({'/etc/init.d': ('meow', '')})
+        assert_equal(runner.cat('/etc/init.d'), 'meow')
+        assert_raises(IOError, runner.cat, 'ssh://does_not_exist')

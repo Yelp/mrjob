@@ -1699,7 +1699,7 @@ class EMRJobRunner(MRJobRunner):
                 self._opts['ec2_key_pair_file'],
                 SSH_URI_RE.match(uri).groups('filesystem_path')[0],
             )
-            for line in output.split('\n'):
+            for line in output:
                 # skip directories, we only want to return downloadable files
                 if line and not line.endswith('/'):
                     yield SSH_PREFIX + line
@@ -1863,6 +1863,8 @@ class EMRJobRunner(MRJobRunner):
     def _address_of_master(self, emr_conn=None):
         """Get the address of the master node so we can SSH to it"""
         # cache address of master to avoid redundant calls to describe_jobflow
+        # also convenient for testing (pretend we can SSH when we really can't
+        # by setting this to something not False)
         if self._address:
             return self._address
 

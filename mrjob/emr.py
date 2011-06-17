@@ -1166,8 +1166,8 @@ class EMRJobRunner(MRJobRunner):
                 continue
 
             step_num = int(match.group('step_num'))
-
-            relevant_logs.append((step_num, s3_log_file_uri))
+            if step_num in step_nums:
+                relevant_logs.append((step_num, s3_log_file_uri))
 
         relevant_logs.sort()
 

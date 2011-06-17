@@ -45,7 +45,6 @@ except ImportError:
     botoemr = None
 
 from mrjob.conf import combine_dicts, combine_lists, combine_paths, combine_path_lists
-from mrjob.logfetch import LogFetchException, JOB_LOGS, S3LogFetcher, SSHLogFetcher, TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, JOB_LOG_URI_RE
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_port_range_list, parse_hadoop_counters_from_line
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
@@ -70,6 +69,23 @@ MAX_SSH_RETRIES = 20
 
 # ssh should fail right away if it can't bind a port
 WAIT_FOR_SSH_TO_FAIL = 1.0
+
+# Constants used to tell :py:func:`~mrjob.emr.EMRJobRunner._list_logs` what logs to find and return
+TASK_ATTEMPT_LOGS = 'TASK_ATTEMPT_LOGS'
+STEP_LOGS = 'STEP_LOGS'
+JOB_LOGS = 'JOB_LOGS'
+
+# regex for matching task-attempts log URIs
+# general enough to match any base directory
+TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
+
+# regex for matching step log URIs
+# general enough to match any base directory
+STEP_LOG_URI_RE = re.compile(r'^.*/(?P<step_num>\d+)/syslog$')
+
+# regex for matching job log URIs
+# general enough to match any base directory
+JOB_LOG_URI_RE = re.compile(r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
 
 # map from AWS region to EMR endpoint
 # see http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?ConceptsRequestEndpoints.html
@@ -181,6 +197,10 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
             created_before -= datetime.timedelta(weeks=2)
 
     return all_job_flows
+
+
+class LogFetchException(Exception):
+    pass
 
 
 class EMRJobRunner(MRJobRunner):
@@ -929,8 +949,7 @@ class EMRJobRunner(MRJobRunner):
                       self._opts['check_emr_status_every'])
             time.sleep(self._opts['check_emr_status_every'])
 
-            emr_conn = self.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(self._emr_job_flow_id)
+            job_flow = self._describe_jobflow()
 
             job_state = job_flow.state
             reason = getattr(job_flow, 'laststatechangereason', '')
@@ -1132,29 +1151,65 @@ class EMRJobRunner(MRJobRunner):
         bucket_name, path = parse_s3_uri(file_dict['s3_uri'])
         return 'http://%s.s3.amazonaws.com/%s' % (bucket_name, path)
 
-    def _ssh_fetcher(self, emr_conn=None):
-        """Return an :py:class:`~mrjob.logfetch.ssh.SSHLogFetcher` object
-        which can read logs from this job's master node via SSH
-        """
-        return SSHLogFetcher()
+    def _list_logs(self, root_path, path_map, log_types=None):
+        """Find and return lists of log paths corresponding to the kinds
+        specified in ``log_types``.
 
-    def _s3_fetcher(self, emr_conn=None):
-        """Return an :py:class:`~mrjob.logfetch.ssh.S3LogFetcher` object
-        which can read logs from this job's S3 log bucket/directory
+        :param root_path: URL common to all logs that should be returned
+        :param path_map: dictionary mapping ``log_type`` constants to compiled regular expression objects that check the file name (given the full path)
+        :type log_types: list
+        :param log_types: list containing some combination of the constants ``TASK_ATTEMPT_LOGS``, ``STEP_LOGS``, and ``JOB_LOGS``. Defaults to ``[TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]``.
+
+        :return: list of matching log files in the order specified by ``log_types``
         """
+        log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
+
+        re_map = {
+            TASK_ATTEMPT_LOGS: TASK_ATTEMPTS_LOG_URI_RE,
+            STEP_LOGS: STEP_LOG_URI_RE,
+            JOB_LOGS: JOB_LOG_URI_RE,
+        }
+
+        if len(log_types) > 1:
+            paths = self.ls(root_path)
+        else:
+            path = posixpath.join(root_path, path_map[log_types[0]])
+            paths = self.ls(path)
+
+        output = []
+        for log_type in log_types:
+            output.append([])
+
+        for item in paths:
+            for i, log_type in enumerate(log_types):
+                if re_map[log_type].match(item):
+                    output[i].append(item)
+        if len(output) > 1:
+            return output
+        else:
+            return output[0]
+
+    def ssh_list_logs(self, log_types=None):
+        path_map = {
+            TASK_ATTEMPT_LOGS: 'userlogs',
+            STEP_LOGS: 'steps',
+            JOB_LOGS: 'history',
+        }
+        return self._list_logs('ssh://mnt/var/log/hadoop',
+                               path_map, log_types)
+    
+    def s3_list_logs(self, log_types=None):
         if not self._s3_job_log_uri:
-            job_flow = self._describe_jobflow()
-            emr_conn = emr_conn or self.make_emr_conn()
-            log_uri = getattr(job_flow, 'loguri', '')
+            return None
 
-            if not log_uri:
-                # can't look at S3
-                raise LogFetchException
+        path_map = {
+            TASK_ATTEMPT_LOGS: 'task-attempts',
+            STEP_LOGS: 'steps',
+            JOB_LOGS: 'jobs',
+        }
+        return self._list_logs(self._s3_job_log_uri,
+                               path_map, log_types)
 
-            self._s3_job_log_uri = '%s%s/' % (
-                log_uri.replace('s3n://', 's3://'), self._emr_job_flow_id)
-
-        return S3LogFetcher(self._s3_job_log_uri)
 
     def _get_counters(self, step_nums):
         """Read Hadoop counters from S3.
@@ -1164,8 +1219,7 @@ class EMRJobRunner(MRJobRunner):
             can ignore errors from other jobs when sharing a job flow
         """
         try:
-            fetcher = self._ssh_fetcher()
-            uris = fetcher.list_logs(self._ssh_ls, log_types=[JOB_LOGS])
+            uris = self.ssh_list_logs(log_types=[JOB_LOGS])
             log.info('Fetching counters from SSH...')
             return self._scan_for_counters_in_files(uris)
         except LogFetchException, e:
@@ -1174,9 +1228,8 @@ class EMRJobRunner(MRJobRunner):
 
             self._wait_for_s3_eventual_consistency()
 
-            fetcher = self._s3_fetcher()
             log.info('Fetching counters from S3...')
-            uris = fetcher.list_logs(self._s3_ls, log_types=[JOB_LOGS])
+            uris = self.s3_list_logs(log_types=[JOB_LOGS])
             return self._scan_for_counters_in_files(uris)
 
     def _scan_for_counters_in_files(self, s3_log_file_uris):
@@ -1225,8 +1278,7 @@ class EMRJobRunner(MRJobRunner):
         # give priority to task-attempts/ logs as they contain more useful
         # error messages. this may take a while.
         try:
-            fetcher = self._ssh_fetcher()
-            task_uris, step_uris, job_uris = fetcher.list_logs(self._ssh_ls)
+            task_uris, step_uris, job_uris = self.ssh_list_logs()
             return (
                 self._scan_task_attempt_logs(task_uris, step_nums)
                 or self._scan_step_logs(step_uris, step_nums)
@@ -1238,8 +1290,7 @@ class EMRJobRunner(MRJobRunner):
             log.info('Scanning S3 logs for probable cause of failure')
             self._wait_for_s3_eventual_consistency()
 
-            fetcher = self._s3_fetcher()
-            task_uris, step_uris, job_uris = fetcher.list_logs(self._s3_ls)
+            task_uris, step_uris, job_uris = self.s3_list_logs()
             return (
                 self._scan_task_attempt_logs(task_uris, step_nums)
                 or self._scan_step_logs(step_uris, step_nums)

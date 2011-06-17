@@ -519,6 +519,15 @@ class EMRJobRunner(MRJobRunner):
         log.info("creating new scratch bucket %s" % scratch_bucket_name)
         self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
 
+    def _set_s3_job_log_uri(self, job_flow):
+        """Given a job flow description, set self._s3_job_log_uri. This allows
+        us to call self.ls(), etc. without running the job.
+        """
+        log_uri = getattr(job_flow, 'loguri', '')
+        if log_uri:
+            self._s3_job_log_uri = '%s%s/' % (
+                log_uri.replace('s3n://', 's3://'), self._emr_job_flow_id)
+
     def _create_s3_temp_bucket_if_needed(self):
         if self._s3_temp_bucket_to_create:
             s3_conn = self.make_s3_conn()
@@ -951,9 +960,11 @@ class EMRJobRunner(MRJobRunner):
 
             job_flow = self._describe_jobflow()
 
+            self._set_s3_job_log_uri(job_flow)
+
             job_state = job_flow.state
             reason = getattr(job_flow, 'laststatechangereason', '')
-            log_uri = getattr(job_flow, 'loguri', '')
+
 
             # find all steps belonging to us, and get their state
             step_states = []
@@ -1029,10 +1040,6 @@ class EMRJobRunner(MRJobRunner):
             else:
                 log.info('Job launched %.1fs ago, status %s' %
                          (running_time, job_state,))
-
-        if log_uri:
-            self._s3_job_log_uri = '%s%s/' % (
-                log_uri.replace('s3n://', 's3://'), self._emr_job_flow_id)
 
         if success:
             log.info('Job completed.')
@@ -1189,6 +1196,7 @@ class EMRJobRunner(MRJobRunner):
             return output[0]
 
     def ssh_list_logs(self, log_types=None):
+        """Get specific kinds of logs from SSH (see _list_logs)"""
         path_map = {
             TASK_ATTEMPT_LOGS: 'userlogs/',
             STEP_LOGS: 'steps/',
@@ -1198,6 +1206,9 @@ class EMRJobRunner(MRJobRunner):
                                path_map, log_types)
     
     def s3_list_logs(self, log_types=None):
+        """Get specific kinds of logs from S3 (see _list_logs)"""
+        if not self._s3_job_log_uri:
+            self._set_s3_job_log_uri(self._describe_jobflow())
         if not self._s3_job_log_uri:
             return None
 
@@ -1210,9 +1221,15 @@ class EMRJobRunner(MRJobRunner):
                                path_map, log_types)
 
     def ssh_list_all(self):
+        """List all log files in the log root directory"""
         return self.ls('ssh://mnt/var/log/hadoop')
 
     def s3_list_all(self):
+        """List all log files in the S3 log root directory"""
+        if not self._s3_job_log_uri:
+            self._set_s3_job_log_uri(self._describe_jobflow())
+        if not self._s3_job_log_uri:
+            return None
         return self.ls(self._s3_job_log_uri)
 
 

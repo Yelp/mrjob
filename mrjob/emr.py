@@ -53,7 +53,11 @@ from mrjob.util import cmd_line, extract_dir_for_tar
 
 log = logging.getLogger('mrjob.emr')
 
+SSH_PREFIX = 'ssh:/'
+SSH_LOG_ROOT = '/mnt/var/log/hadoop'
+
 S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
+SSH_URI_RE = re.compile(r'^%s(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
 JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?
@@ -965,7 +969,6 @@ class EMRJobRunner(MRJobRunner):
             job_state = job_flow.state
             reason = getattr(job_flow, 'laststatechangereason', '')
 
-
             # find all steps belonging to us, and get their state
             step_states = []
             running_step_name = ''
@@ -1202,7 +1205,7 @@ class EMRJobRunner(MRJobRunner):
             STEP_LOGS: 'steps/',
             JOB_LOGS: 'history/',
         }
-        return self._list_logs('ssh://mnt/var/log/hadoop',
+        return self._list_logs(SSH_PREFIX + SSH_LOG_ROOT,
                                path_map, log_types)
     
     def s3_list_logs(self, log_types=None):
@@ -1222,7 +1225,7 @@ class EMRJobRunner(MRJobRunner):
 
     def ssh_list_all(self):
         """List all log files in the log root directory"""
-        return self.ls('ssh://mnt/var/log/hadoop')
+        return self.ls(SSH_PREFIX + SSH_LOG_ROOT)
 
     def s3_list_all(self):
         """List all log files in the S3 log root directory"""
@@ -1639,8 +1642,8 @@ class EMRJobRunner(MRJobRunner):
         To list a directory, path_glob must end with a trailing
         slash (foo and foo/ are different on S3)
         """
-        if path_glob.startswith('ssh://'):
-            for item in self._ssh_ls(path_glob[len('ssh:/'):]):
+        if SSH_URI_RE.match(path_glob):
+            for item in self._ssh_ls(path_glob):
                 yield item
             return
 
@@ -1673,6 +1676,7 @@ class EMRJobRunner(MRJobRunner):
             yield uri
 
     def _ssh_ls(self, uri):
+        uri = SSH_URI_RE.match(uri).groups('filesystem_path')[0]
         args = [
             self._opts['ssh_bin'],
             '-q',
@@ -1689,7 +1693,7 @@ class EMRJobRunner(MRJobRunner):
             for line in output.split('\n'):
                 # skip directories, we only want to return downloadable files
                 if line and not line.endswith('/'):
-                    yield 'ssh:/' + line
+                    yield SSH_PREFIX + line
 
     def _s3_ls(self, uri):
         """Helper for ls(); doesn't bother with globbing or directories"""
@@ -1759,8 +1763,8 @@ class EMRJobRunner(MRJobRunner):
         self.make_s3_key(dest).set_contents_from_string('')
 
     def cat(self, uri, s3_conn=None):
-        if uri.startswith("ssh://"):
-            return self._ssh_cat(uri[len('ssh:/'):])
+        if SSH_URI_RE.match(uri):
+            return self._ssh_cat(uri)
         elif S3_URI_RE.match(uri):
             return self._s3_cat(uri, s3_conn)
         else:
@@ -1768,6 +1772,7 @@ class EMRJobRunner(MRJobRunner):
                 return f.read()
 
     def _ssh_cat(self, uri):
+        uri = SSH_URI_RE.match(uri).groups('filesystem_path')[0]
         args = [
             self._opts['ssh_bin'],
             '-q',

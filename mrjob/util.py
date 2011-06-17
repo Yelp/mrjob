@@ -185,6 +185,18 @@ def read_input(path, stdin=None):
         yield line
 
 
+def run_command_on_ssh(ssh_bin, address, ec2_key_pair_file, *cmd_args):
+    args = [
+        ssh_bin,
+        '-q',
+        '-i', ec2_key_pair_file,
+        'hadoop@%s' % address,
+        *cmd_args
+    ]
+    p = Popen(args, stdout=PIPE, stderr=PIPE)
+    return p.communicate()
+
+
 def scrape_options_and_index_by_dest(*parsers_and_groups):
     """Scrapes ``optparse`` options from :py:class:`OptionParser` and :py:class:`OptionGroup` objects and builds a dictionary of ``dest_var: [option1, option2, ...]``. This function primarily exists to serve :py:func:`scrape_options_into_new_groups`.
 

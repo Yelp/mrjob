@@ -114,7 +114,7 @@ class S3LogFetcher(LogFetcher):
 class SSHLogFetcher(LogFetcher):
 
     def __init__(self):
-        super(SSHLogFetcher, self).__init__('/mnt/var/log/hadoop')
+        super(SSHLogFetcher, self).__init__('ssh://mnt/var/log/hadoop')
 
     def path_map(self):
         return {

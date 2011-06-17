@@ -788,6 +788,15 @@ class EMRJobRunner(MRJobRunner):
                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
+    def _wait_for_job_flow_termination(self):
+        jobflow = self._describe_jobflow()
+        while jobflow.state != 'TERMINATED':
+            msg = 'Waiting for job flow to terminate (currently %s)' % \
+                                                         jobflow.state
+            log.info(msg)
+            time.sleep(self._opts['check_emr_status_every'])
+            jobflow = self._describe_jobflow()
+
     def _create_job_flow(self, persistent=False, steps=None):
         """Create an empty job flow on EMR, and return the ID of that
         job.
@@ -1252,6 +1261,7 @@ class EMRJobRunner(MRJobRunner):
                 return None
 
             self._wait_for_s3_eventual_consistency()
+            self._wait_for_job_flow_termination()
 
             log.info('Fetching counters from S3...')
             uris = self.s3_list_logs(log_types=[JOB_LOGS])
@@ -1308,6 +1318,7 @@ class EMRJobRunner(MRJobRunner):
 
             log.info('Scanning S3 logs for probable cause of failure')
             self._wait_for_s3_eventual_consistency()
+            self._wait_for_job_flow_termination()
 
             return self._scan_logs_in_order(step_nums, *self.s3_list_logs())
 

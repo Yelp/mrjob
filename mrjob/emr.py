@@ -48,7 +48,7 @@ from mrjob.conf import combine_dicts, combine_lists, combine_paths, combine_path
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_port_range_list, parse_hadoop_counters_from_line
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.util import cmd_line, extract_dir_for_tar, ssh_cat, ssh_ls
+from mrjob.util import cmd_line, extract_dir_for_tar, ssh_cat, ssh_ls, SSHException
 
 
 log = logging.getLogger('mrjob.emr')
@@ -1677,22 +1677,19 @@ class EMRJobRunner(MRJobRunner):
 
     def _ssh_ls(self, uri):
         """Helper for ls(); obeys globbing"""
-        output, err = ssh_ls(
-            self._opts['ssh_bin'],
-            'hadoop@%s' % self._address_of_master(),
-            self._opts['ec2_key_pair_file'],
-            SSH_URI_RE.match(uri).groups('filesystem_path')[0],
-        )
-        # It may be better to catch the publickey error in
-        # run_command_on_ssh.
-        if err or 'Permission denied (publickey)' in output:
-            log.error(str(err))
-            raise LogFetchException('ssh error: %s' % str(err))
-        else:
+        try:
+            output, err = ssh_ls(
+                self._opts['ssh_bin'],
+                'hadoop@%s' % self._address_of_master(),
+                self._opts['ec2_key_pair_file'],
+                SSH_URI_RE.match(uri).groups('filesystem_path')[0],
+            )
             for line in output.split('\n'):
                 # skip directories, we only want to return downloadable files
                 if line and not line.endswith('/'):
                     yield SSH_PREFIX + line
+        except SSHException, e:
+            raise LogFetchException(e)
 
     def _s3_ls(self, uri):
         """Helper for ls(); doesn't bother with globbing or directories"""
@@ -1771,19 +1768,16 @@ class EMRJobRunner(MRJobRunner):
                 return f.read()
 
     def _ssh_cat(self, uri):
-        output, err = ssh_cat(
-            self._opts['ssh_bin'],
-            'hadoop@%s' % self._address_of_master(),
-            self._opts['ec2_key_pair_file'],
-            SSH_URI_RE.match(uri).groups('filesystem_path')[0],
-        )
-        # It may be better to catch the publickey error in
-        # run_command_on_ssh.
-        if err or 'Permission denied (publickey)' in output:
-            log.error(str(err))
-            raise LogFetchException('ssh error: %s' % str(err))
-        else:
+        try:
+            output, err = ssh_cat(
+                self._opts['ssh_bin'],
+                'hadoop@%s' % self._address_of_master(),
+                self._opts['ec2_key_pair_file'],
+                SSH_URI_RE.match(uri).groups('filesystem_path')[0],
+            )
             return output
+        except SSHException, e:
+            raise LogFetchException(e)
 
     def _s3_cat(self, uri, s3_conn=None):
         s3_log_file = self.get_s3_key(uri, s3_conn or self.make_s3_conn())

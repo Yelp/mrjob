@@ -32,6 +32,10 @@ import tarfile
 import zipfile
 
 
+class SSHException(Exception):
+    pass
+
+
 def cmd_line(args):
     """build a command line that works in a shell.
     """
@@ -203,6 +207,13 @@ def run_command_on_ssh(ssh_bin, address, ec2_key_pair_file, *cmd_args):
     ] + list(cmd_args)
     p = Popen(args, stdout=PIPE, stderr=PIPE)
     out, err = p.communicate()
+
+    if err:
+        raise SSHException(err)
+
+    if 'Permission denied (publickey)' in out:
+        raise SSHException(out)
+
     return out, err
 
 

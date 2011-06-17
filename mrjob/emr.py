@@ -789,8 +789,12 @@ class EMRJobRunner(MRJobRunner):
         time.sleep(self._opts['s3_sync_wait_time'])
 
     def _wait_for_job_flow_termination(self):
-        jobflow = self._describe_jobflow()
-        while jobflow.state != 'TERMINATED':
+        try:
+            jobflow = self._describe_jobflow()
+        except boto.exception.S3ResponseError:
+            # mockboto throws this for some reason
+            return
+        while jobflow.state not in ('TERMINATED', 'COMPLETED', 'FAILED'):
             msg = 'Waiting for job flow to terminate (currently %s)' % \
                                                          jobflow.state
             log.info(msg)
@@ -1068,7 +1072,7 @@ class EMRJobRunner(MRJobRunner):
                 # log cause, and put it in exception
                 cause_msg = [] # lines to log and put in exception
                 cause_msg.append('Probable cause of failure (from %s):' %
-                           cause['s3_log_file_uri'])
+                           cause['log_file_uri'])
                 cause_msg.extend(line.strip('\n') for line in cause['lines'])
                 if cause['input_uri']:
                     cause_msg.append('(while reading from %s)' %
@@ -1267,23 +1271,23 @@ class EMRJobRunner(MRJobRunner):
             uris = self.s3_list_logs(log_types=[JOB_LOGS])
             return self._scan_for_counters_in_files(uris)
 
-    def _scan_for_counters_in_files(self, s3_log_file_uris):
+    def _scan_for_counters_in_files(self, log_file_uris):
         counters = []
         relevant_logs = [] # list of (sort key, URI)
 
-        for s3_log_file_uri in s3_log_file_uris:
-            match = JOB_LOG_URI_RE.match(s3_log_file_uri)
+        for log_file_uri in log_file_uris:
+            match = JOB_LOG_URI_RE.match(log_file_uri)
             if not match:
                 continue
 
             step_num = int(match.group('step_num'))
 
-            relevant_logs.append((step_num, s3_log_file_uri))
+            relevant_logs.append((step_num, log_file_uri))
 
         relevant_logs.sort()
 
-        for _, s3_log_file_uri in relevant_logs:
-            log_string = self.cat(s3_log_file_uri)
+        for _, log_file_uri in relevant_logs:
+            log_string = self.cat(log_file_uri)
             if not log_string:
                 continue
 
@@ -1305,7 +1309,7 @@ class EMRJobRunner(MRJobRunner):
         Returns:
         None (nothing found) or a dictionary containing:
         lines -- lines in the log file containing the error message
-        s3_log_file_uri -- the log file containing the error message
+        log_file_uri -- the log file containing the error message
         input_uri -- if the error happened in a mapper in the first
             step, the URI of the input file that caused the error
             (otherwise None)
@@ -1330,15 +1334,15 @@ class EMRJobRunner(MRJobRunner):
             or self._scan_step_logs(step_uris, step_nums)
             or self._scan_job_logs(job_uris, step_nums))
 
-    def _scan_task_attempt_logs(self, s3_log_file_uris, step_nums):
+    def _scan_task_attempt_logs(self, log_file_uris, step_nums):
         """Scan task-attempts/*/{syslog,stderr} for Python exceptions
         and Java stack traces.
 
         Helper for _find_probable_cause_of_failure()
         """
         relevant_logs = [] # list of (sort key, info, URI)
-        for s3_log_file_uri in s3_log_file_uris:
-            match = TASK_ATTEMPTS_LOG_URI_RE.match(s3_log_file_uri)
+        for log_file_uri in log_file_uris:
+            match = TASK_ATTEMPTS_LOG_URI_RE.match(log_file_uri)
             if not match:
                 continue
 
@@ -1355,13 +1359,13 @@ class EMRJobRunner(MRJobRunner):
                         info['stream'] == 'stderr',
                         info['node_num'])
 
-            relevant_logs.append((sort_key, info, s3_log_file_uri))
+            relevant_logs.append((sort_key, info, log_file_uri))
 
         relevant_logs.sort(reverse=True)
 
         tasks_seen = set()
 
-        for sort_key, info, s3_log_file_uri in relevant_logs:
+        for sort_key, info, log_file_uri in relevant_logs:
             # Issue #31: Don't bother with errors from tasks that
             # later succeeded
             task_info = (info['step_num'], info['node_type'],
@@ -1370,23 +1374,23 @@ class EMRJobRunner(MRJobRunner):
                 continue
             tasks_seen.add(task_info)
 
-            log_string = self.cat(s3_log_file_uri)
+            log_string = self.cat(log_file_uri)
             if not log_string:
                 continue
 
             log_lines = list(StringIO(log_string))
             lines = None
             if info['stream'] == 'stderr':
-                log.debug('scanning %s for Python tracebacks' % s3_log_file_uri)
+                log.debug('scanning %s for Python tracebacks' % log_file_uri)
                 lines = find_python_traceback(log_lines)
             else:
-                log.debug('scanning %s for Java stack traces' % s3_log_file_uri)
+                log.debug('scanning %s for Java stack traces' % log_file_uri)
                 lines = find_hadoop_java_stack_trace(log_lines)
 
             if lines is not None:
                 result = {
                     'lines': lines,
-                    's3_log_file_uri': s3_log_file_uri,
+                    'log_file_uri': log_file_uri,
                     'input_uri': None
                 }
 
@@ -1394,36 +1398,36 @@ class EMRJobRunner(MRJobRunner):
                 # were reading from.
                 if info['node_type'] == 'm':
                     result['input_uri'] = self._scan_for_input_uri(
-                        s3_log_file_uri)
+                        log_file_uri)
 
                 return result
 
         return None
 
-    def _scan_for_input_uri(self, s3_log_file_uri):
-        """Scan the syslog file corresponding to s3_log_file_uri for
+    def _scan_for_input_uri(self, log_file_uri):
+        """Scan the syslog file corresponding to log_file_uri for
         information about the input file.
 
         Helper function for _scan_task_attempt_logs()
         """
-        s3_syslog_uri = posixpath.join(
-            posixpath.dirname(s3_log_file_uri), 'syslog')
+        syslog_uri = posixpath.join(
+            posixpath.dirname(log_file_uri), 'syslog')
 
-        syslog_string = self.cat(s3_syslog_uri)
+        syslog_string = self.cat(syslog_uri)
         if syslog_string:
-            log.debug('scanning %s for input URI' % s3_syslog_uri)
+            log.debug('scanning %s for input URI' % syslog_uri)
             return find_input_uri_for_mapper(syslog_string.split('\n'))
         else:
             return None
 
 
-    def _scan_step_logs(self, s3_log_file_uris, step_nums):
+    def _scan_step_logs(self, log_file_uris, step_nums):
         """Scan steps/*/syslog for hadoop streaming errors.
 
         Helper for _find_probable_cause_of_failure()
         """
-        for s3_log_file_uri in sorted(s3_log_file_uris, reverse=True):
-            match = STEP_LOG_URI_RE.match(s3_log_file_uri)
+        for log_file_uri in sorted(log_file_uris, reverse=True):
+            match = STEP_LOG_URI_RE.match(log_file_uri)
             if not match:
                 continue
 
@@ -1431,26 +1435,26 @@ class EMRJobRunner(MRJobRunner):
             if not step_num in step_nums:
                 continue
 
-            log_string = self.cat(s3_log_file_uri)
+            log_string = self.cat(log_file_uri)
             if log_string:
                 lines = log_string.split('\n')
                 msg = find_interesting_hadoop_streaming_error(lines)
                 if msg:
                     return {
                         'lines': [msg + '\n'],
-                        's3_log_file_uri': s3_log_file_uri,
+                        'log_file_uri': log_file_uri,
                         'input_uri': None,
                     }
 
-    def _scan_job_logs(self, s3_log_file_uris, step_nums):
+    def _scan_job_logs(self, log_file_uris, step_nums):
         """Scan jobs/* for timeout errors.
         
         Helper for _find_probable_cause_of_failure()
         """
         
         relevant_logs = [] # list of (sort key, info, URI)
-        for s3_log_file_uri in s3_log_file_uris:
-            match = JOB_LOG_URI_RE.match(s3_log_file_uri)
+        for log_file_uri in log_file_uris:
+            match = JOB_LOG_URI_RE.match(log_file_uri)
             if not match:
                 continue
 
@@ -1462,12 +1466,12 @@ class EMRJobRunner(MRJobRunner):
             # sort so we can go through the steps in reverse order
             sort_key = (info['timestamp'], info['step_num'])
 
-            relevant_logs.append((sort_key, info, s3_log_file_uri))
+            relevant_logs.append((sort_key, info, log_file_uri))
 
         relevant_logs.sort(reverse=True)
 
-        for sort_key, info, s3_log_file_uri in relevant_logs:
-            log_string = self.cat(s3_log_file_uri)
+        for sort_key, info, log_file_uri in relevant_logs:
+            log_string = self.cat(log_file_uri)
             if not log_string:
                 continue
 
@@ -1476,7 +1480,7 @@ class EMRJobRunner(MRJobRunner):
             if n is not None:
                 result = {
                     'lines': ['Timeout after %d seconds' % n],
-                    's3_log_file_uri': s3_log_file_uri,
+                    'log_file_uri': log_file_uri,
                     'input_uri': None
                 }
 

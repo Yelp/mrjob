@@ -345,7 +345,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             emr_conn = runner.make_emr_conn()
             job_flow_id = runner.get_emr_job_flow_id()
-
             job_flow = emr_conn.describe_jobflow(job_flow_id)
             assert_equal(job_flow.availabilityzone, 'PUPPYLAND')
 
@@ -542,7 +541,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
                      {'lines': list(StringIO(PY_EXCEPTION)),
-                      's3_log_file_uri':
+                      'log_file_uri':
                           BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
                       'input_uri': BUCKET_URI + 'input.gz'})
 
@@ -553,7 +552,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
                      {'lines': list(StringIO(PY_EXCEPTION)),
-                      's3_log_file_uri':
+                      'log_file_uri':
                           BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
                       'input_uri': None})
 
@@ -569,7 +568,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
                      {'lines': list(StringIO(JAVA_STACK_TRACE)),
-                      's3_log_file_uri':
+                      'log_file_uri':
                           BUCKET_URI + ATTEMPT_0_DIR + 'syslog',
                       'input_uri': BUCKET_URI + 'input.gz'})
 
@@ -582,7 +581,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
                      {'lines': list(StringIO(JAVA_STACK_TRACE)),
-                      's3_log_file_uri':
+                      'log_file_uri':
                           BUCKET_URI + ATTEMPT_0_DIR + 'syslog',
                       'input_uri': None})
 
@@ -605,7 +604,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
 
         assert_equal(self.runner._find_probable_cause_of_failure([1, 2, 3]),
                      {'lines': [USEFUL_HADOOP_ERROR + '\n'],
-                      's3_log_file_uri':
+                      'log_file_uri':
                           BUCKET_URI + LOG_DIR + 'steps/2/syslog',
                       'input_uri': None})
 
@@ -618,7 +617,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 CHILD_ERR_LINE + JAVA_STACK_TRACE,
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + TASK_ATTEMPTS_DIR +
                      'attempt_201007271720_0002_m_000004_0/syslog')
 
@@ -630,7 +629,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n',
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + LOG_DIR + 'steps/2/syslog')
 
     def test_reducer_beats_mapper(self):
@@ -642,7 +641,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 CHILD_ERR_LINE + JAVA_STACK_TRACE,
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + TASK_ATTEMPTS_DIR +
                      'attempt_201007271720_0001_r_000126_3/syslog')
 
@@ -655,7 +654,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 CHILD_ERR_LINE + JAVA_STACK_TRACE,
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + TASK_ATTEMPTS_DIR +
                      'attempt_201007271720_0001_m_000004_3/syslog')
 
@@ -665,7 +664,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
             ATTEMPT_0_DIR + 'syslog': CHILD_ERR_LINE + JAVA_STACK_TRACE,
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + ATTEMPT_0_DIR + 'stderr')
 
     def test_exception_beats_hadoop_error(self):
@@ -676,7 +675,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n',
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + TASK_ATTEMPTS_DIR +
                      'attempt_201007271720_0002_m_000126_0/stderr')
 
@@ -689,7 +688,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n',
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + LOG_DIR + 'steps/1/syslog')
 
     def test_ignore_errors_from_steps_that_later_succeeded(self):

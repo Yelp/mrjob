@@ -1222,10 +1222,15 @@ class EMRJobRunner(MRJobRunner):
             step, the URI of the input file that caused the error
             (otherwise None)
         """
+        # give priority to task-attempts/ logs as they contain more useful
+        # error messages. this may take a while.
         try:
             fetcher = self._ssh_fetcher()
-            uris = fetcher.list_logs(self._ssh_ls, log_types=[JOB_LOGS])
-            return self._scan_logs_with_uris(set(self.ls('ssh://*')), step_nums)
+            task_uris, step_uris, job_uris = fetcher.list_logs(self._ssh_ls)
+            return (
+                self._scan_task_attempt_logs(task_uris, step_nums)
+                or self._scan_step_logs(step_uris, step_nums)
+                or self._scan_job_logs(job_uris, step_nums))
         except LogFetchException, e:
             if not self._s3_job_log_uri:
                 return None
@@ -1234,15 +1239,11 @@ class EMRJobRunner(MRJobRunner):
             self._wait_for_s3_eventual_consistency()
 
             fetcher = self._s3_fetcher()
-            return self._scan_logs_with_uris(set(self.ls(self._s3_job_log_uri)), step_nums)
-
-    def _scan_logs_with_uris(self, uris, step_nums):
-        # give priority to task-attempts/ logs as they contain more useful
-        # error messages. this may take a while.
-        return (
-            self._scan_task_attempt_logs(uris, step_nums)
-            or self._scan_step_logs(uris, step_nums)
-            or self._scan_job_logs(uris, step_nums))
+            task_uris, step_uris, job_uris = fetcher.list_logs(self._s3_ls)
+            return (
+                self._scan_task_attempt_logs(task_uris, step_nums)
+                or self._scan_step_logs(step_uris, step_nums)
+                or self._scan_job_logs(job_uris, step_nums))
 
     def _scan_task_attempt_logs(self, s3_log_file_uris, step_nums):
         """Scan task-attempts/*/{syslog,stderr} for Python exceptions

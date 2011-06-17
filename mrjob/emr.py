@@ -1170,11 +1170,10 @@ class EMRJobRunner(MRJobRunner):
             JOB_LOGS: JOB_LOG_URI_RE,
         }
 
-        if len(log_types) > 1:
-            paths = self.ls(root_path)
-        else:
-            path = posixpath.join(root_path, path_map[log_types[0]])
-            paths = self.ls(path)
+        paths = []
+        for log_type in log_types:
+            path = posixpath.join(root_path, path_map[log_type])
+            paths.extend(list(self.ls(path)))
 
         output = []
         for log_type in log_types:
@@ -1191,9 +1190,9 @@ class EMRJobRunner(MRJobRunner):
 
     def ssh_list_logs(self, log_types=None):
         path_map = {
-            TASK_ATTEMPT_LOGS: 'userlogs',
-            STEP_LOGS: 'steps',
-            JOB_LOGS: 'history',
+            TASK_ATTEMPT_LOGS: 'userlogs/',
+            STEP_LOGS: 'steps/',
+            JOB_LOGS: 'history/',
         }
         return self._list_logs('ssh://mnt/var/log/hadoop',
                                path_map, log_types)
@@ -1203,12 +1202,18 @@ class EMRJobRunner(MRJobRunner):
             return None
 
         path_map = {
-            TASK_ATTEMPT_LOGS: 'task-attempts',
-            STEP_LOGS: 'steps',
-            JOB_LOGS: 'jobs',
+            TASK_ATTEMPT_LOGS: 'task-attempts/',
+            STEP_LOGS: 'steps/',
+            JOB_LOGS: 'jobs/',
         }
         return self._list_logs(self._s3_job_log_uri,
                                path_map, log_types)
+
+    def ssh_list_all(self):
+        return self.ls('ssh://mnt/var/log/hadoop')
+
+    def s3_list_all(self):
+        return self.ls(self._s3_job_log_uri)
 
 
     def _get_counters(self, step_nums):
@@ -1669,7 +1674,7 @@ class EMRJobRunner(MRJobRunner):
             for line in output.split('\n'):
                 # skip directories, we only want to return downloadable files
                 if line and not line.endswith('/'):
-                    yield line
+                    yield 'ssh:/' + line
 
     def _s3_ls(self, uri):
         """Helper for ls(); doesn't bother with globbing or directories"""
@@ -1751,7 +1756,7 @@ class EMRJobRunner(MRJobRunner):
         args = [
             self._opts['ssh_bin'],
             '-q',
-            '-i', self._opt['ec2_key_pair_file'],
+            '-i', self._opts['ec2_key_pair_file'],
             'hadoop@%s' % self._address_of_master(),
             'cat', uri
         ]

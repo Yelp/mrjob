@@ -1288,13 +1288,14 @@ class EMRJobRunner(MRJobRunner):
             if not log_string:
                 continue
 
+            log_lines = list(StringIO(log_string))
             lines = None
             if info['stream'] == 'stderr':
                 log.debug('scanning %s for Python tracebacks' % s3_log_file_uri)
-                lines = find_python_traceback(log_string.split('\n'))
+                lines = find_python_traceback(log_lines)
             else:
                 log.debug('scanning %s for Java stack traces' % s3_log_file_uri)
-                lines = find_hadoop_java_stack_trace(log_string.split('\n'))
+                lines = find_hadoop_java_stack_trace(log_lines)
 
             if lines is not None:
                 result = {

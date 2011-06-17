@@ -1280,14 +1280,8 @@ class EMRJobRunner(MRJobRunner):
             step, the URI of the input file that caused the error
             (otherwise None)
         """
-        # give priority to task-attempts/ logs as they contain more useful
-        # error messages. this may take a while.
         try:
-            task_uris, step_uris, job_uris = self.ssh_list_logs()
-            return (
-                self._scan_task_attempt_logs(task_uris, step_nums)
-                or self._scan_step_logs(step_uris, step_nums)
-                or self._scan_job_logs(job_uris, step_nums))
+            self._scan_logs_in_order(step_nums, *self.ssh_list_logs())
         except LogFetchException, e:
             if not self._s3_job_log_uri:
                 return None
@@ -1295,11 +1289,15 @@ class EMRJobRunner(MRJobRunner):
             log.info('Scanning S3 logs for probable cause of failure')
             self._wait_for_s3_eventual_consistency()
 
-            task_uris, step_uris, job_uris = self.s3_list_logs()
-            return (
-                self._scan_task_attempt_logs(task_uris, step_nums)
-                or self._scan_step_logs(step_uris, step_nums)
-                or self._scan_job_logs(job_uris, step_nums))
+            return self._scan_logs_in_order(step_nums, *self.s3_list_logs())
+
+    def _scan_logs_in_order(self, step_nums, task_uris, step_uris, job_uris):
+        # give priority to task-attempts/ logs as they contain more useful
+        # error messages. this may take a while.
+        return (
+            self._scan_task_attempt_logs(task_uris, step_nums)
+            or self._scan_step_logs(step_uris, step_nums)
+            or self._scan_job_logs(job_uris, step_nums))
 
     def _scan_task_attempt_logs(self, s3_log_file_uris, step_nums):
         """Scan task-attempts/*/{syslog,stderr} for Python exceptions

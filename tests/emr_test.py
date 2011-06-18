@@ -721,6 +721,62 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
     def cleanup_runner(self):
         self.runner.cleanup()
 
+    def test_ssh_comes_first(self):
+        # Put a log file and error into SSH
+        join = os.path.join
+        lone_log_path = join(SSH_LOG_ROOT, 'steps/1/syslog')   
+        mock_ssh_ls({
+            join(SSH_LOG_ROOT, 'steps/'): [lone_log_path],
+            join(SSH_LOG_ROOT, 'userlogs/'): [],
+            join(SSH_LOG_ROOT, 'history/'): [],
+        })
+        contents = HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n'
+        mock_ssh_cat({lone_log_path: contents})
+        self.runner._address = 'YO I EXIST'
+
+        # Put a 'more interesting' error in S3 to make sure that the
+        # 'less interesting' one from SSH is read and S3 is never
+        # looked at. This would never happen in reality because the
+        # logs should be identical, but it makes for an easy test
+        # of SSH overriding S3.
+        self.add_mock_s3_data({'walrus': {
+            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000126_0/stderr':
+                TRACEBACK_START + PY_EXCEPTION,
+        }})
+        failure = self.runner._find_probable_cause_of_failure([1, 2])
+        assert_equal(failure['log_file_uri'], SSH_PREFIX + lone_log_path)
+                     #BUCKET_URI + TASK_ATTEMPTS_DIR +
+                     #'attempt_201007271720_0002_m_000126_0/stderr')
+
+    def test_ssh_fails_to_s3(self):
+        # Put a log file and error into SSH
+        join = os.path.join
+        lone_log_path = join(SSH_LOG_ROOT, 'steps/1/syslog')   
+        mock_ssh_ls({
+            join(SSH_LOG_ROOT, 'steps/'): [lone_log_path],
+            join(SSH_LOG_ROOT, 'userlogs/'): [],
+            join(SSH_LOG_ROOT, 'history/'): [],
+        })
+        contents = HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n'
+        mock_ssh_cat({lone_log_path: contents})
+
+        # cause SSH to fail
+        self.runner._address = None
+
+        # Put a 'more interesting' error in S3 to make sure that the
+        # 'less interesting' one from SSH is read and S3 is never
+        # looked at. This would never happen in reality because the
+        # logs should be identical, but it makes for an easy test
+        # of SSH overriding S3.
+        self.add_mock_s3_data({'walrus': {
+            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000126_0/stderr':
+                TRACEBACK_START + PY_EXCEPTION,
+        }})
+        failure = self.runner._find_probable_cause_of_failure([1, 2])
+        assert_equal(failure['log_file_uri'],
+                     BUCKET_URI + TASK_ATTEMPTS_DIR +
+                     'attempt_201007271720_0002_m_000126_0/stderr')
+
 
 class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
 
@@ -824,7 +880,7 @@ class TestLs(MockEMRAndS3TestCase):
     def test_ssh_ls(self):
         runner = EMRJobRunner(conf_path=False)
         runner._address = 'not_a_real_ssh_host'
-        mock_ssh_ls({'/': (['/one', '/two'], '')})
+        mock_ssh_ls({'/': ['/one', '/two']})
         assert_equal(list(runner.ls('ssh://')), ['ssh://one', 'ssh://two'])
         # Define a quick inline function because runner.ls is a generator
         # and won't fire unless we list() it
@@ -846,6 +902,6 @@ def TestCat(MockEMRAndS3TestCase):
     def test_ssh_cat(self):
         runner = EMRJobRunner(conf_path=False)
         runner._address = 'not_a_real_ssh_host'
-        mock_ssh_cat({'/etc/init.d': ('meow', '')})
+        mock_ssh_cat({'/etc/init.d': 'meow'})
         assert_equal(runner.cat('/etc/init.d'), 'meow')
         assert_raises(IOError, runner.cat, 'ssh://does_not_exist')

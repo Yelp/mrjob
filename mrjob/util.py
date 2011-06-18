@@ -214,7 +214,13 @@ def run_command_on_ssh(ssh_bin, address, ec2_key_pair_file, *cmd_args):
     if 'Permission denied (publickey)' in out:
         raise SSHException(out)
 
-    return out, err
+    return out
+
+
+def _handle_cat_out(out):
+    if 'No such file or directory' in out:
+        raise IOError("File not found: %s" % path)
+    return out
 
 
 _mock_ssh_cat_values = None
@@ -224,21 +230,25 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path):
     # Mocking kept separate from ssh_ls() to make testing more intuitive
     if _mock_ssh_cat_values is not None:
         if _mock_ssh_cat_values.has_key(path):
-            return _mock_ssh_cat_values[path]
+            return _handle_cat_out(_mock_ssh_cat_values[path])
         else:
             raise IOError('File not found: %s' % path)
     else:
-        out, err = run_command_on_ssh(ssh_bin, address, ec2_key_pair_file,
-                                      'cat', uri)
-        if 'No such file or directory' in out:
-            raise IOError("File not found: %s" % path)
-        return out.split('\n'), err
+        out = run_command_on_ssh(ssh_bin, address, ec2_key_pair_file,
+                                 'cat', uri)
+        return _handle_cat_out(out)
 
 
 def mock_ssh_cat(new_values):
-    """Pass in a dictionary mapping path to a tuple (stdout, stderr)"""
+    """Pass in a dictionary mapping path to a string"""
     global _mock_ssh_cat_values
     _mock_ssh_cat_values = new_values
+
+
+def _handle_ls_out(out):
+    if 'No such file or directory' in out:
+        raise IOError("No such file or directory: %s" % path)
+    return out.split('\n')
 
 
 _mock_ssh_ls_values = None
@@ -248,19 +258,17 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path):
     # Mocking kept separate from ssh_cat() to make testing more intuitive
     if _mock_ssh_ls_values is not None:
         if _mock_ssh_ls_values.has_key(path):
-            return _mock_ssh_ls_values[path]
+            return _handle_ls_out('\n'.join(_mock_ssh_ls_values[path]))
         else:
             raise IOError("No such file or directory: %s" % path)
     else:
-        out, err = run_command_on_ssh(ssh_bin, address, ec2_key_pair_file,
-                                      'find', path, '-type', 'f')
-        if 'No such file or directory' in out:
-            raise IOError("No such file or directory: %s" % path)
-        return out, err
+        out = run_command_on_ssh(ssh_bin, address, ec2_key_pair_file,
+                                 'find', path, '-type', 'f')
+        return _handle_ls_out(out)
 
 
 def mock_ssh_ls(new_values):
-    """Pass in a dictionary mapping path to a tuple ([paths], stderr)"""
+    """Pass in a dictionary mapping path to a list of strings"""
     global _mock_ssh_ls_values
     _mock_ssh_ls_values = new_values
 

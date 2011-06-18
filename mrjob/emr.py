@@ -1315,7 +1315,7 @@ class EMRJobRunner(MRJobRunner):
             (otherwise None)
         """
         try:
-            self._scan_logs_in_order(step_nums, *self.ssh_list_logs())
+            return self._scan_logs_in_order(step_nums, *self.ssh_list_logs())
         except LogFetchException, e:
             if not self._s3_job_log_uri:
                 return None
@@ -1693,7 +1693,7 @@ class EMRJobRunner(MRJobRunner):
     def _ssh_ls(self, uri):
         """Helper for ls(); obeys globbing"""
         try:
-            output, err = ssh_ls(
+            output = ssh_ls(
                 self._opts['ssh_bin'],
                 'hadoop@%s' % self._address_of_master(),
                 self._opts['ec2_key_pair_file'],
@@ -1784,7 +1784,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _ssh_cat(self, uri):
         try:
-            output, err = ssh_cat(
+            output = ssh_cat(
                 self._opts['ssh_bin'],
                 'hadoop@%s' % self._address_of_master(),
                 self._opts['ec2_key_pair_file'],

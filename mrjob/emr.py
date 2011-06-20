@@ -1262,9 +1262,9 @@ class EMRJobRunner(MRJobRunner):
             can ignore errors from other jobs when sharing a job flow
         """
         try:
-            uris = self.ssh_list_logs(log_types=[JOB_LOGS])
+            uris = list(self.ssh_list_logs(log_types=[JOB_LOGS]))
             log.info('Fetching counters from SSH...')
-            return self._scan_for_counters_in_files(uris)
+            return self._scan_for_counters_in_files(uris, step_nums)
         except LogFetchException, e:
             if not self._s3_job_log_uri:
                 return None
@@ -1274,9 +1274,9 @@ class EMRJobRunner(MRJobRunner):
 
             log.info('Fetching counters from S3...')
             uris = self.s3_list_logs(log_types=[JOB_LOGS])
-            return self._scan_for_counters_in_files(uris)
+            return self._scan_for_counters_in_files(uris, step_nums)
 
-    def _scan_for_counters_in_files(self, log_file_uris):
+    def _scan_for_counters_in_files(self, log_file_uris, step_nums):
         counters = []
         relevant_logs = [] # list of (sort key, URI)
 
@@ -1286,8 +1286,8 @@ class EMRJobRunner(MRJobRunner):
                 continue
 
             step_num = int(match.group('step_num'))
-
-            relevant_logs.append((step_num, log_file_uri))
+            if step_num in step_nums:
+                relevant_logs.append((step_num, log_file_uri))
 
         relevant_logs.sort()
 

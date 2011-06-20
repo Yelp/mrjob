@@ -14,10 +14,12 @@
 
 """Base class for all runners."""
 
+import bz2
 import copy
 import datetime
 import getpass
 import glob
+import gzip
 import logging
 import os
 import random
@@ -32,8 +34,8 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from mrjob.conf import combine_dicts, combine_envs, combine_local_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
-from mrjob.util import cmd_line, file_ext, tar_and_gzip
+from mrjob.conf import combine_cmds, combine_cmd_lists, combine_dicts, combine_envs, combine_local_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
+from mrjob.util import cmd_line, file_ext, read_file, tar_and_gzip
 
 
 log = logging.getLogger('mrjob.runner')
@@ -126,7 +128,7 @@ class MRJobRunner(object):
         :type jobconf: dict
         :param jobconf: ``-jobconf`` args to pass to hadoop streaming. This should be a map from property name to value. Equivalent to passing ``['-jobconf', 'KEY1=VALUE1', '-jobconf', 'KEY2=VALUE2', ...]`` to ``hadoop_extra_args``.
         :type label: str
-        :param label: description of this job to use as the part of its name. By default, we use the script's module name, or ``no_script`` if there is none. This used to be called *job_name_prefix* (which still works but is deprecated).
+        :param label: description of this job to use as the part of its name. By default, we use the script's module name, or ``no_script`` if there is none.
         :type owner: str
         :param owner: who is running this job. Used solely to set the job name. By default, we use :py:func:`getpass.getuser`, or ``no_user`` if it fails.
         :type python_archives: list of str
@@ -138,14 +140,13 @@ class MRJobRunner(object):
         :type setup_scripts: list of str
         :param setup_scripts: files that will be copied into the local working directory and then run. These are run after *setup_cmds*. Like with *setup_cmds*, we use file locking to keep multiple mappers/reducers on the same node from running *setup_scripts* simultaneously.
         :type steps_python_bin: str
-        :param steps_python_bin: Name/path of alternate python binary to use to query the job about its steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults to ``sys.executable`` (the current python interpreter).
+        :param steps_python_bin: Name/path of alternate python binary to use to query the job about its steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults to ``sys.executable`` (the current Python interpreter).
         :type upload_archives: list of str
         :param upload_archives: a list of archives (e.g. tarballs) to unpack in the local directory of the mr_job script when it runs. You can set the local name of the dir we unpack into by appending ``#localname`` to the path; otherwise we just use the name of the archive file (e.g. ``foo.tar.gz``)
         :type upload_files: list of str
         :param upload_files: a list of files to copy to the local directory of the mr_job script when it runs. You can set the local name of the dir we unpack into by appending ``#localname`` to the path; otherwise we just use the name of the file
         """
         # enforce correct arguments
-        self._fix_deprecated_opts(opts)
         allowed_opts = set(self._allowed_opts())
         unrecognized_opts = set(opts) - allowed_opts
         if unrecognized_opts:
@@ -157,7 +158,6 @@ class MRJobRunner(object):
         # issue a warning for unknown opts from mrjob.conf and filter them out
         mrjob_conf_opts = load_opts_from_mrjob_conf(
             self.alias, conf_path=conf_path)
-        self._fix_deprecated_opts(mrjob_conf_opts)
         unrecognized_opts = set(mrjob_conf_opts) - set(self._allowed_opts())
         if unrecognized_opts:
             log.warn('got unexpected opts from mrjob.conf: ' +
@@ -290,8 +290,8 @@ class MRJobRunner(object):
             'bootstrap_mrjob': True,
             'cleanup': CLEANUP_DEFAULT,
             'owner': owner,
-            'python_bin': 'python',
-            'steps_python_bin': sys.executable or 'python',
+            'python_bin': ['python'],
+            'steps_python_bin': [sys.executable or 'python'],
         }
 
     @classmethod
@@ -305,22 +305,13 @@ class MRJobRunner(object):
             'hadoop_extra_args': combine_lists,
             'jobconf': combine_dicts,
             'python_archives': combine_path_lists,
-            'python_bin': combine_paths,
+            'python_bin': combine_cmds,
             'setup_cmds': combine_lists,
             'setup_scripts': combine_path_lists,
-            'steps_python_bin': combine_paths,
+            'steps_python_bin': combine_cmds,
             'upload_archives': combine_path_lists,
             'upload_files': combine_path_lists,
         }
-
-    @classmethod
-    def _fix_deprecated_opts(cls, opts):
-        """Scan opts for deprecated options, and issue warnings. Return a new
-        version of opts with the current versions of the options.
-        """
-        if 'job_name_prefix' in opts:
-            log.warn('job_name_prefix is DEPRECATED in v0.2.0; use label instead')
-            opts['label'] = opts['job_name_prefix']
 
     @classmethod
     def combine_opts(cls, *opts_list):
@@ -347,10 +338,12 @@ class MRJobRunner(object):
         using the read() method of the appropriate HadoopStreamingProtocol
         class."""
         assert self._ran_job
-
-        for line in self._stream_output():
-            yield line
-
+        
+        output_dir = self.get_output_dir()
+        log.info('Streaming final output from %s' % output_dir)
+        
+        return self.cat(self.path_join(output_dir, 'part-*'))
+     
     def _cleanup_scratch(self):
         """Cleanup any files/directories we create while running this job.
         Should be safe to run this at any time, or multiple times.
@@ -479,6 +472,16 @@ class MRJobRunner(object):
             else:
                 yield path
 
+    def cat(self, path):
+        """cat output from a given path. This would automatically decompress 
+        .gz and .bz2 files.
+        
+        Corresponds roughly to: ``hadoop fs -cat path``
+        """
+        for filename in self.ls(path):
+            for line in self._cat_file(filename):
+                yield line
+
     def mkdir(self, path):
         """Create the given dir and its subdirs (if they don't already
         exist).
@@ -532,9 +535,10 @@ class MRJobRunner(object):
         """Run the job."""
         raise NotImplementedError
 
-    def _stream_output(self):
-        """Stream raw lines from the job's output."""
-        raise NotImplementedError
+    def _cat_file(self, filename):
+        """cat a file, decompress if necessary."""
+        for line in read_file(filename):
+            yield line
 
     ### internal utilities for implementing MRJobRunners ###
 
@@ -720,8 +724,8 @@ class MRJobRunner(object):
             if not self._script:
                 self._steps = []
             else:
-                python_bin = self._opts['steps_python_bin']
-                args = ([python_bin, self._script['path'], '--steps'] +
+                args = (self._opts['steps_python_bin'] +
+                        [self._script['path'], '--steps'] +
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))
                 # add . to PYTHONPATH (in case mrjob isn't actually installed)
@@ -740,7 +744,7 @@ class MRJobRunner(object):
                 if not steps:
                     raise ValueError('step description is empty!')
                 for step in steps:
-                    if step not in ('MR', 'M'):
+                    if step not in ('MR', 'M', 'R'):
                         raise ValueError(
                             'unexpected step type %r in steps %r' %
                                          (step, stdout))

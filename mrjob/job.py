@@ -107,7 +107,7 @@ except ImportError:
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
-from mrjob.parse import parse_mr_job_stderr, parse_port_range_list, check_kv_pair, check_range_list
+from mrjob.parse import check_kv_pair, check_range_list, parse_mr_job_stderr
 from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
 from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
 from mrjob.util import log_to_stream, read_input
@@ -276,6 +276,8 @@ class MRJob(object):
         """
         # Hadoop streaming requires a mapper, so patch in _IDENTITY_MAPPER
         if not mapper:
+            if not mapper_final and not reducer:
+                raise Exception("Step has no mappers and no reducers")
             mapper = _IDENTITY_MAPPER
 
         if mapper_final:
@@ -493,7 +495,23 @@ class MRJob(object):
         print >> self.stdout, ' '.join(self._steps_desc())
 
     def _steps_desc(self):
-        return ['MR' if reducer else 'M' for (mapper, reducer) in self.steps()]
+        step_num = 0
+        res = []
+        for (mapper, reducer) in self.steps():
+            if reducer:
+                if mapper == _IDENTITY_MAPPER:
+                    # infer whether the mapper has the same input and 
+                    # output protocols 
+                    if step_num == 0:
+                        res.append('MR')
+                    else:
+                        res.append('R')
+                else:
+                    res.append('MR')
+            else:
+                res.append('M')
+            step_num += 1
+        return res
 
     @classmethod
     def mr_job_script(cls):
@@ -534,7 +552,7 @@ class MRJob(object):
         step_type -- 'M' for mapper, 'R' for reducer
         """
         read, write = self.pick_protocols(step_num, step_type)
-
+        
         def read_lines():
             for line in self._read_input():
                 try:
@@ -586,12 +604,13 @@ class MRJob(object):
         protocol_dict = self.protocols()
 
         # pick input protocol
+        # first mapper handles input unless there is no mapper for the step
         if step_num == 0 and step_type == steps_desc[0][0]:
             read_protocol = self.options.input_protocol
         else:
             read_protocol = self.options.protocol
         read = protocol_dict[read_protocol].read
-
+        
         if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
             write_protocol = self.options.output_protocol
         else:
@@ -725,7 +744,7 @@ class MRJob(object):
 
         self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
-            help='Name/path of alternate python binary for mappers/reducers.')
+            help="Name/path of alternate python binary for mappers/reducers. You can include arguments (e.g. --python-bin 'python -v').")
 
         self.runner_opt_group.add_option(
             '-q', '--quiet', dest='quiet', default=None,
@@ -798,7 +817,7 @@ class MRJob(object):
             'multiple times.')
 
         self.hadoop_emr_opt_group.add_option(
-            '--label', '--job-name-prefix', dest='label', default=None,
+            '--label', dest='label', default=None,
             help='custom prefix for job name, to help us identify the job')
 
         self.hadoop_emr_opt_group.add_option(
@@ -901,7 +920,7 @@ class MRJob(object):
 
         self.emr_opt_group.add_option(
             '--hadoop-version', dest='hadoop_version', default=None,
-            help='Version of Hadoop to spin up on EMR. Default is 0.18, but will change to 0.20 in v0.3.0 of mrjob.')
+            help='Version of Hadoop to spin up on EMR. Default is 0.20.')
 
         self.emr_opt_group.add_option(
             '--num-ec2-instances', dest='num_ec2_instances', default=None,
@@ -926,7 +945,7 @@ class MRJob(object):
 
         self.emr_opt_group.add_option(
             '--ssh-bin', dest='ssh_bin', default=None,
-            help='Path to the ssh binary. Defaults to ssh.')
+            help="Name/path of ssh binary. Arguments are allowed (e.g. --ssh-bin 'ssh -v')")
 
         self.emr_opt_group.add_option(
             '--ssh-bind-ports', dest='ssh_bind_ports', default=None,

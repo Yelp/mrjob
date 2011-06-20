@@ -24,10 +24,10 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from mrjob.conf import combine_dicts, combine_paths
+from mrjob.conf import combine_cmds, combine_dicts, combine_paths
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line
+from mrjob.util import cmd_line, read_file
 
 
 log = logging.getLogger('mrjob.hadoop')
@@ -90,8 +90,8 @@ class HadoopJobRunner(MRJobRunner):
 
         Additional options:
 
-        :type hadoop_bin: str
-        :param hadoop_bin: name/path of your hadoop program. Defaults to *hadoop_home* plus ``bin/hadoop``
+        :type hadoop_bin: str or list
+        :param hadoop_bin: name/path of your hadoop program (may include arguments). Defaults to *hadoop_home* plus ``bin/hadoop``
         :type hadoop_home: str
         :param hadoop_home: alternative to setting :envvar:`HADOOP_HOME` variable.
         :type hdfs_scratch_dir: str
@@ -108,8 +108,8 @@ class HadoopJobRunner(MRJobRunner):
 
         # fix hadoop_bin
         if not self._opts['hadoop_bin']:
-            self._opts['hadoop_bin'] = os.path.join(
-                self._opts['hadoop_home'], 'bin/hadoop')
+            self._opts['hadoop_bin'] = [
+                os.path.join(self._opts['hadoop_home'], 'bin/hadoop')]
 
         # fix hadoop_streaming_jar
         if not self._opts['hadoop_streaming_jar']:
@@ -163,7 +163,7 @@ class HadoopJobRunner(MRJobRunner):
         values for that option. This allows us to specify that some options
         are lists, or contain environment variables, or whatever."""
         return combine_dicts(super(HadoopJobRunner, cls)._opts_combiners(), {
-            'hadoop_bin': combine_paths,
+            'hadoop_bin': combine_cmds,
             'hadoop_home': combine_paths,
             'hdfs_scratch_dir': combine_paths,
         })
@@ -275,7 +275,8 @@ class HadoopJobRunner(MRJobRunner):
         for step_num, step in enumerate(steps):
             log.debug('running step %d of %d' % (step_num+1, len(steps)))
 
-            streaming_args = [self._opts['hadoop_bin'], 'jar', self._opts['hadoop_streaming_jar']]
+            streaming_args = (self._opts['hadoop_bin'] +
+                              ['jar', self._opts['hadoop_streaming_jar']])
 
             # Add extra hadoop args first as hadoop args could be a hadoop
             # specific argument (e.g. -libjar) which must come before job
@@ -296,7 +297,11 @@ class HadoopJobRunner(MRJobRunner):
 
             # set up mapper and reducer
             streaming_args.append('-mapper')
-            streaming_args.append(cmd_line(self._mapper_args(step_num)))
+            if 'M' not in step:
+                streaming_args.append('cat')
+            else:
+                streaming_args.append(cmd_line(self._mapper_args(step_num)))
+            
             if 'R' in step:
                 streaming_args.append('-reducer')
                 streaming_args.append(cmd_line(self._reducer_args(step_num)))
@@ -342,10 +347,11 @@ class HadoopJobRunner(MRJobRunner):
         """How to invoke the script inside Hadoop"""
         assert self._script # shouldn't be able to run if no script
 
-        args = [self._opts['python_bin'], self._script['name']]
+        args = self._opts['python_bin'] + [self._script['name']]
         if self._wrapper_script:
-            args = [self._opts['python_bin'],
-                    self._wrapper_script['name']] + args
+            args = (self._opts['python_bin'] +
+                    [self._wrapper_script['name']]
+                    + args)
 
         return args
 
@@ -391,7 +397,7 @@ class HadoopJobRunner(MRJobRunner):
             than logging it. If this is False, we return the returncode
             instead.
         """
-        args = [self._opts['hadoop_bin']] + args
+        args = self._opts['hadoop_bin'] + args
 
         log.debug('> %s' % cmd_line(args))
 
@@ -429,26 +435,31 @@ class HadoopJobRunner(MRJobRunner):
         for line in stderr:
             log.info('HADOOP: %s' % line.rstrip('\n'))
 
-    def _stream_output(self):
-        output_dir = posixpath.join(self._output_dir, 'part-*')
-        log.info('Streaming output from %s from HDFS' % output_dir)
+    def _cat_file(self, filename):
+        if HDFS_URI_RE.match(filename):
+            # stream from HDFS
+            cat_args = self._opts['hadoop_bin'] + ['fs', '-cat', filename]
+            log.debug('> %s' % cmd_line(cat_args))
 
-        cat_args = [self._opts['hadoop_bin'], 'fs', '-cat', output_dir]
-        log.debug('> %s' % cmd_line(cat_args))
+            cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
+        
+            def stream():  
+                for line in cat_proc.stdout:
+                    yield line
 
-        cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
+                # there shouldn't be any stderr
+                for line in cat_proc.stderr:
+                    log.error('STDERR: ' + line)
 
-        for line in cat_proc.stdout:
-            yield line
+                returncode = cat_proc.wait()
 
-        # there shouldn't be any stderr
-        for line in cat_proc.stderr:
-            log.error('STDERR: ' + line)
-
-        returncode = cat_proc.wait()
-
-        if returncode != 0:
-            raise CalledProcessError(returncode, cat_args)
+                if returncode != 0:
+                    raise CalledProcessError(returncode, cat_args)
+        
+            return read_file(filename, stream())
+        else:
+            # read from local filesystem
+            return super(HadoopJobRunner, self)._cat_file(filename)
 
     def _cleanup_scratch(self):
         super(HadoopJobRunner, self)._cleanup_scratch()
@@ -485,7 +496,7 @@ class HadoopJobRunner(MRJobRunner):
                 yield path
             return
 
-        hdfs_prefix = hdfs_match.group(1)
+        hdfs_prefix = 'hdfs://' + hdfs_match.group(1)
 
         stdout = self._invoke_hadoop(
             ['fs', '-lsr', path_glob],

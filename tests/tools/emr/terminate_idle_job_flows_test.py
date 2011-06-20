@@ -21,14 +21,6 @@ from datetime import datetime, timedelta
 import sys
 from testify import TestCase, assert_equal, assert_raises, setup, teardown
 
-try:
-    import boto
-    import boto.utils
-    from mrjob import botoemr
-except ImportError:
-    boto = None
-    botoemr = None
-
 from mrjob.tools.emr.terminate_idle_job_flows import *
 from tests.emr_test import MockEMRAndS3TestCase
 from tests.mockboto import MockEmrObject, to_iso8601, MockEmrConnection

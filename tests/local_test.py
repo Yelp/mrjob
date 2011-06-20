@@ -22,11 +22,13 @@ import mrjob
 import os
 import shutil
 import signal
+import sys
 from testify import TestCase, assert_in, assert_equal, assert_not_equal, assert_not_in, setup, teardown
 import tempfile
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
+from mrjob.util import cmd_line
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
@@ -162,6 +164,21 @@ class PythonBinTestCase(TestCase):
         assert_in('--step-num=1', output)
         assert_in('--mapper', output)
  
+    def test_python_dash_v_as_python_bin(self):
+        python_cmd = cmd_line([sys.executable or 'python', '-v'])
+        mr_job = MRTwoStepJob(['--python-bin', python_cmd, '--no-conf'])
+        mr_job.sandbox(stdin=['bar\n'])
+
+        with no_handlers_for_logger():
+            mr_job.run_job()
+
+        # expect debugging messages in stderr
+        assert_in('import mrjob', mr_job.stderr.getvalue())
+        assert_in('#', mr_job.stderr.getvalue())
+
+        # should still get expected results
+        assert_equal(sorted(mr_job.parse_output()), [(1, None), (1, 'bar')])
+
 
 class StepsPythonBinTestCase(TestCase):
 
@@ -236,6 +253,7 @@ class LocalBootstrapMrjobTestCase(TestCase):
             runner.run()
 
             output = list(runner.stream_output())
+
             assert_equal(len(output), 1)
 
             # script should load mrjob from the same place our test does

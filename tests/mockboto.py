@@ -172,6 +172,11 @@ class MockKey(object):
 
     def make_public(self):
         pass
+        
+    def __iter__(self):
+        data = self.read_mock_data()
+        for line in data.splitlines(True):
+            yield line
     
     def _get_last_modified(self):
         if self.name in self.bucket.mock_state():
@@ -274,18 +279,18 @@ class MockEmrConnection(object):
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
+            availabilityzone=availability_zone,
             creationdatetime=to_iso8601(now),
+            ec2keyname=ec2_keyname,
             hadoopversion=hadoop_version,
+            instancecount=num_instances,
             keepjobflowalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
+            masterinstancetype=master_instance_type,
             name=name,
+            slaveinstancetype=slave_instance_type,
             state='STARTING',
             steps=[],
-            masterinstancetype=master_instance_type,
-            slaveinstancetype=slave_instance_type,
-            instancecount=num_instances,
-            ec2keyname=ec2_keyname,
-            availabilityzone=availability_zone,
         )
         # don't always set loguri, so we can test Issue #112
         if log_uri is not None:

@@ -18,6 +18,8 @@ Combiner functions take a list of values to combine, with later options taking p
 .. autofunction:: combine_values
 .. autofunction:: combine_lists
 .. autofunction:: combine_dicts
+.. autofunction:: combine_cmds
+.. autofunction:: combine_cmd_lists
 .. autofunction:: combine_envs
 .. autofunction:: combine_local_envs
 .. autofunction:: combine_paths

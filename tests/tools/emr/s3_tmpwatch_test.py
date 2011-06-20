@@ -39,11 +39,6 @@ class S3TmpWatchTestCase(MockEMRAndS3TestCase):
     @setup
     def make_tmp_dir_and_mrjob_conf(self):
         self.tmp_dir = tempfile.mkdtemp()
-        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'emr': {
-            'check_emr_status_every': 0.01,
-            's3_sync_wait_time': 0.01,
-        }}}, open(self.mrjob_conf_path, 'w'))
 
     @teardown
     def rm_tmp_dir(self):

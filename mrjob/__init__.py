@@ -22,6 +22,7 @@ __credits__ = [
     'Jim Blomo <jblomo@yelp.com>',
     'James Brown <jbrown@yelp.com>',
     'Adam Derewecki <derewecki@gmail.com>',
+    'Benjamin Goldenberg <benjamin@yelp.com',
     'Peter Harrington <peter.b.harrington@gmail.com>',
     'Brett Hoerner <brett@bretthoerner.com>',
     'Stephen Johnson <sjohnson@yelp.com>',
@@ -36,4 +37,4 @@ __credits__ = [
     'Paul Wais <pwais@yelp.com>',
 ]
 
-__version__ = '0.2.7-dev'
+__version__ = '0.3.0-dev'

@@ -64,7 +64,7 @@ class LocalMRJobRunner(MRJobRunner):
         """A dictionary giving the default value of options."""
         return combine_dicts(super(LocalMRJobRunner, cls)._default_opts(), {
             # prefer whatever interpreter we're currently using
-            'python_bin': sys.executable or 'python',
+            'python_bin': [sys.executable or 'python'],
         })
 
     @classmethod
@@ -98,10 +98,11 @@ class LocalMRJobRunner(MRJobRunner):
                 log.warning('ignoring %s option (requires real Hadoop): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 
-        wrapper_args = [self._opts['python_bin']]
+        wrapper_args = self._opts['python_bin']
         if self._wrapper_script:
-            wrapper_args = [self._opts['python_bin'],
-                            self._wrapper_script['name']] + wrapper_args
+            wrapper_args = (self._opts['python_bin'] +
+                            [self._wrapper_script['name']] +
+                            wrapper_args)
 
         # run mapper, sort, reducer for each step
         for i, step in enumerate(self._get_steps()):
@@ -172,17 +173,6 @@ class LocalMRJobRunner(MRJobRunner):
         else:
             log.debug('copying %s -> %s' % (path, dest))
             shutil.copyfile(path, dest)
-
-    def _stream_output(self):
-        """Read output from the final outfile."""
-        if self._final_outfile:
-            output_file = self._final_outfile
-        else:
-            output_file = os.path.join(self._output_dir, 'part-00000')
-        log.info('streaming final output from %s' % output_file)
-
-        for line in open(output_file):
-            yield line
 
     def _invoke_step(self, args, outfile_name, env=None, step_num=0):
         """Run the given command, outputting into outfile, and reading

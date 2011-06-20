@@ -114,7 +114,9 @@ def list_all(runner):
 def cat_from_list(runner, path_list):
     for path in path_list:
         print '===', path, '==='
-        print runner.cat(path)
+        for line in runner.cat(path):
+            print line
+        print
 
 
 def cat_from_relevant(runner, task_attempts, steps, jobs):

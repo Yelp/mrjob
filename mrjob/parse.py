@@ -55,8 +55,6 @@ def find_python_traceback(lines):
     # This method used to expect an iterator. These days we are passing it
     # a list because boto gives us full-on strings from S3 keys.
     # The hasattr() check is in case we want to go back to file objects.
-    if hasattr(lines, '__iter__'):
-        lines = lines.__iter__()
     for line in lines:
         if line.startswith('Traceback (most recent call last):'):
             tb_lines = []
@@ -95,8 +93,6 @@ def find_hadoop_java_stack_trace(lines):
     # This method used to expect an iterator. These days we are passing it
     # a list because boto gives us full-on strings from S3 keys.
     # The hasattr() check is in case we want to go back to file objects.
-    if hasattr(lines, '__iter__'):
-        lines = lines.__iter__()
     for line in lines:
         if line.rstrip('\n').endswith("Error running child"):
             st_lines = []

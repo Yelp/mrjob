@@ -1180,12 +1180,6 @@ class EMRJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_name, step_num + 1)
 
-    def _public_http_url(self, file_dict):
-        """Get the public HTTP URL for a file on S3. (The URL will only
-        work if we've uploaded the file and set it to public.)"""
-        bucket_name, path = parse_s3_uri(file_dict['s3_uri'])
-        return 'http://%s.s3.amazonaws.com/%s' % (bucket_name, path)
-
     def _list_logs(self, root_path, path_map, log_types=None):
         """Find and return lists of log paths corresponding to the kinds
         specified in ``log_types``.

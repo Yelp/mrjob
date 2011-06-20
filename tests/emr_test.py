@@ -813,6 +813,7 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
             join(SSH_LOG_ROOT, 'steps/'): [lone_log_path],
             join(SSH_LOG_ROOT, 'userlogs/'): [],
             join(SSH_LOG_ROOT, 'history/'): [],
+            join(SSH_LOG_ROOT, lone_log_path): [lone_log_path]
         })
         contents = HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n'
         mock_ssh_cat({lone_log_path: contents})

@@ -32,6 +32,9 @@ import tarfile
 import zipfile
 
 
+SSH_PREFIX = 'ssh:/'
+SSH_LOG_ROOT = '/mnt/var/log/hadoop'
+
 class SSHException(Exception):
     pass
 

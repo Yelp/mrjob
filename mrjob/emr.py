@@ -46,13 +46,10 @@ from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_hadoop_counters_from_line
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.util import cmd_line, extract_dir_for_tar, read_file, ssh_cat, ssh_ls, SSHException
+from mrjob.util import cmd_line, extract_dir_for_tar, read_file, ssh_cat, ssh_ls, SSHException, SSH_PREFIX, SSH_LOG_ROOT
 
 
 log = logging.getLogger('mrjob.emr')
-
-SSH_PREFIX = 'ssh:/'
-SSH_LOG_ROOT = '/mnt/var/log/hadoop'
 
 S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
 SSH_URI_RE = re.compile(r'^%s(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
@@ -1106,10 +1103,22 @@ class EMRJobRunner(MRJobRunner):
             raise Exception(msg)
 
     def _cat_file(self, filename):
+        ssh_match = SSH_URI_RE.match(filename)
         if S3_URI_RE.match(filename):
             # stream lines from the s3 key
             s3_key = self.get_s3_key(filename)
             return read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+        elif ssh_match:
+            try:
+                output = ssh_cat(
+                    self._opts['ssh_bin'],
+                    'hadoop@%s' % self._address_of_master(),
+                    self._opts['ec2_key_pair_file'],
+                    ssh_match.groups('filesystem_path')[0],
+                )
+                return read_file(filename, fileobj=StringIO(output))
+            except SSHException, e:
+                raise LogFetchException(e)
         else:
             # read from local filesystem
             return super(EMRJobRunner, self)._cat_file(filename)
@@ -1376,11 +1385,10 @@ class EMRJobRunner(MRJobRunner):
                 continue
             tasks_seen.add(task_info)
 
-            log_string = self.cat(log_file_uri)
-            if not log_string:
+            log_lines = self.cat(log_file_uri)
+            if not log_lines:
                 continue
 
-            log_lines = list(StringIO(log_string))
             lines = None
             if info['stream'] == 'stderr':
                 log.debug('scanning %s for Python tracebacks' % log_file_uri)
@@ -1415,10 +1423,10 @@ class EMRJobRunner(MRJobRunner):
         syslog_uri = posixpath.join(
             posixpath.dirname(log_file_uri), 'syslog')
 
-        syslog_string = self.cat(syslog_uri)
-        if syslog_string:
+        syslog_lines = self.cat(syslog_uri)
+        if syslog_lines:
             log.debug('scanning %s for input URI' % syslog_uri)
-            return find_input_uri_for_mapper(syslog_string.split('\n'))
+            return find_input_uri_for_mapper(syslog_lines)
         else:
             return None
 
@@ -1437,9 +1445,8 @@ class EMRJobRunner(MRJobRunner):
             if not step_num in step_nums:
                 continue
 
-            log_string = self.cat(log_file_uri)
-            if log_string:
-                lines = log_string.split('\n')
+            lines = self.cat(log_file_uri)
+            if lines:
                 msg = find_interesting_hadoop_streaming_error(lines)
                 if msg:
                     return {
@@ -1803,34 +1810,6 @@ class EMRJobRunner(MRJobRunner):
             raise OSError('Non-empty file %r already exists!' % (dest,))
 
         self.make_s3_key(dest).set_contents_from_string('')
-
-    def cat(self, uri, s3_conn=None):
-        if SSH_URI_RE.match(uri):
-            return self._ssh_cat(uri)
-        elif S3_URI_RE.match(uri):
-            return self._s3_cat(uri, s3_conn)
-        else:
-            with open(uri, 'r') as f:
-                return f.read()
-
-    def _ssh_cat(self, uri):
-        try:
-            output = ssh_cat(
-                self._opts['ssh_bin'],
-                'hadoop@%s' % self._address_of_master(),
-                self._opts['ec2_key_pair_file'],
-                SSH_URI_RE.match(uri).groups('filesystem_path')[0],
-            )
-            return output
-        except SSHException, e:
-            raise LogFetchException(e)
-
-    def _s3_cat(self, uri, s3_conn=None):
-        s3_log_file = self.get_s3_key(uri, s3_conn or self.make_s3_conn())
-        if s3_log_file:
-            return s3_log_file.get_contents_as_string()
-        else:
-            return None
 
     ### EMR-specific STUFF ###
 

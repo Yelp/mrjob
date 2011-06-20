@@ -829,8 +829,6 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
         assert_equal(failure['log_file_uri'], SSH_PREFIX + lone_log_path)
-                     #BUCKET_URI + TASK_ATTEMPTS_DIR +
-                     #'attempt_201007271720_0002_m_000126_0/stderr')
 
     def test_ssh_fails_to_s3(self):
         # Put a log file and error into SSH
@@ -964,7 +962,10 @@ class TestLs(MockEMRAndS3TestCase):
     def test_ssh_ls(self):
         runner = EMRJobRunner(conf_path=False)
         runner._address = 'not_a_real_ssh_host'
-        mock_ssh_ls({'/': ['/one', '/two']})
+        mock_ssh_ls({
+            '/': ['/one', '/two'],
+            '/mnt/var/log/hadoop/steps/1/syslog': [],
+        })
         assert_equal(list(runner.ls('ssh://')), ['ssh://one', 'ssh://two'])
         # Define a quick inline function because runner.ls is a generator
         # and won't fire unless we list() it

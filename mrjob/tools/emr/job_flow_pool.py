@@ -17,40 +17,41 @@ import bisect
 import boto.utils
 import functools
 import math
+from optparse import OptionParser, OptionGroup
 import time
 
 from mrjob import botoemr
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.audit_usage import to_timestamp
-from mrjob.tools.emr.terminate_idle_job_flows import is_job_flow_done, is_job_flow_running
+from mrjob.util import scrape_options_into_new_groups
 
 
-ANY_INSTANCE_TYPE = '*.*'
+def job_flows_matching_runner(runner):
+    """Get job flows with specific properties
 
+    :return: list of (job_minutes_float, :py:class:`botoemr.emrobject.JobFlow`)
+    """
 
-def job_flows_matching_instance_types(
-    master_instance_type=ANY_INSTANCE_TYPE,
-    slave_instance_type=ANY_INSTANCE_TYPE):
-
-    emr_conn = EMRJobRunner().make_emr_conn()
+    emr_conn = runner.make_emr_conn()
     all_job_flows = emr_conn.describe_jobflows()
+    jf_args = runner.job_flow_args(persistent=True)
 
     def matches(job_flow):
-        if is_job_flow_done(job_flow):
-            return False
-        if is_job_flow_running(job_flow):
-            return False
-        if job_flow.state == 'SHUTTING_DOWN':
+        if job_flow.state != 'WAITING':
             return False
 
-        if job_flow.masterinstancetype != master_instance_type \
-           and master_instance_type != ANY_INSTANCE_TYPE:
-            return False
+        args_to_check = [
+            ('ec2_master_instance_type', job_flow.masterinstancetype),
+            ('ec2_slave_instance_type', job_flow.slaveinstancetype),
+            ('num_ec2_instances', job_flow.instancecount),
+            ('hadoop_version', job_flow.hadoopversion),
+            ('keep_alive', job_flow.keepjobflowalivewhennosteps),
+        ]
 
-        jf_slave_instance_type = getattr(job_flow, 'slaveinstancetype', None)
-        if jf_slave_instance_type != slave_instance_type \
-           and slave_instance_type != ANY_INSTANCE_TYPE:
-            return False
+        for arg_name, required_value in args_to_check:
+            if jf_args.has_key(arg_name) \
+               and jf_args[arg_name] != required_value:
+                return False
 
         return True
 
@@ -60,8 +61,12 @@ def job_flows_matching_instance_types(
 
 
 def est_time_to_hour(job_flow):
+    """If available, get the difference between hours billed and hours used.
+    This metric is used to determine which job flow to use if more than one
+    is available.
+    """
+
     if not hasattr(job_flow, 'startdatetime'):
-        print 'no start'
         return 0.0
     else:
         now = time.time()
@@ -84,6 +89,16 @@ def to_timestamp(iso8601_time):
 
 
 def find_optimal(min_time, job_flows_with_times):
+    """Given a list of job flows tagged with the amount of time they would
+    waste if killed now, find the one that would waste the least time if
+    it ran a job lasting ``min_time`` minutes.
+
+    :param min_time: Upper bound on the number of minutes the prospective job will take
+    :type min_time: int
+    :param job_flows_with_times: Jobs matching criteria for running the prospective job
+    :type job_flows_with_times: list of (job_minutes_float, :py:class:`botoemr.emrobject.JobFlow`)
+    :return: (job_minutes_float, :py:class:`botoemr.emrobject.JobFlow`)
+    """
     # from http://docs.python.org/library/bisect.html
     # derived from find_gt() to find leftmost value greater than x
     # but returns job_flows_With_times[0] if none found
@@ -94,6 +109,10 @@ def find_optimal(min_time, job_flows_with_times):
 
 
 def pprint_job_flow(jf):
+    """Print a job flow to stdout in this form:
+    job.flow.name
+    j-JOB_FLOW_ID: 2 instances (master=m1.small, slaves=m1.small, 20 minutes to the hour)
+    """
     instance_count = int(jf.instancecount)
 
     nosep_segments = [
@@ -122,8 +141,50 @@ def pprint_job_flow(jf):
     print
 
 
+def find_or_create_job_flow(runner, estimate=15):
+    """Find or create a job flow matching the given runner"""
+
+    sorted_tagged_job_flows = job_flows_matching_runner(runner)
+    if sorted_tagged_job_flows:
+        time_to_hour, jf = find_optimal(estimate, sorted_tagged_job_flows)
+        return jf
+    else:
+        return None
+
+
 if __name__ == '__main__':
-    sorted_tagged_job_flows = job_flows_matching_instance_types()
+    usage = '%prog [options]'
+    description = 'Identify an exising job flow to run jobs in or create a new one if none are available. WARNING: do not run this without mrjob.tools.emr.terminate.idle_job_flows in your crontab; job flows left idle can quickly become expensive!'
+    option_parser = OptionParser(usage=usage, description=description)
+
+    def make_option_group(halp):
+        g = OptionGroup(option_parser, halp)
+        option_parser.add_option_group(g)
+        return g
+
+    ec2_opt_group = make_option_group('EC2 instance configuration')
+    hadoop_opt_group = make_option_group('Hadoop configuration')
+    job_opt_group = make_option_group('Job flow configuration')
+
+    assignments = {
+        option_parser: ('conf_path', 'quiet', 'verbose'),
+        ec2_opt_group: ('ec2_instance_type', 'ec2_master_instance_type',
+                        'ec2_slave_instance_type', 'num_ec2_instances',
+                        'aws_availability_zone', 
+                        'ec2_key_pair', 'ec2_key_pair_file',
+                        'emr_endpoint',),
+        hadoop_opt_group: ('hadoop_version', 'label', 'owner'),
+        job_opt_group: ('bootstrap_mrjob', 'bootstrap_cmds',
+                        'bootstrap_files', 'bootstrap_python_packages',),
+    }
+
+    # Scrape options from MRJob and index them by dest
+    mr_job = MRJob()
+    scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
+    options, args = option_parser.parse_args()
+
+    runner = EMRJobRunner(**options.__dict__)
+    sorted_tagged_job_flows = job_flows_matching_runner(runner)
     for time_to_hour, jf in sorted_tagged_job_flows:
         pprint_job_flow(jf)
 

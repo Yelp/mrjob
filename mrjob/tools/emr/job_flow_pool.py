@@ -22,6 +22,7 @@ import time
 
 from mrjob import botoemr
 from mrjob.emr import EMRJobRunner
+from mrjob.job import MRJob
 from mrjob.tools.emr.audit_usage import to_timestamp
 from mrjob.util import scrape_options_into_new_groups
 
@@ -51,6 +52,7 @@ def job_flows_matching_runner(runner):
         for arg_name, required_value in args_to_check:
             if jf_args.has_key(arg_name) \
                and jf_args[arg_name] != required_value:
+                print job_flow.name, 'fails', arg_name, '(%r != %r)' % (required_value, jf_args[arg_name])
                 return False
 
         return True

@@ -41,13 +41,21 @@ def job_flows_matching_runner(runner):
         if job_flow.state != 'WAITING':
             return False
 
+        # boto gives us a ustring for this. why???
+        job_flow.instancecount = int(job_flow.instancecount)
+        keep_alive = job_flow.keepjobflowalivewhennosteps  
+        job_flow.keepjobflowalivewhennosteps = bool(keep_alive == 'true')
+
         args_to_check = [
             ('ec2_master_instance_type', job_flow.masterinstancetype),
-            ('ec2_slave_instance_type', job_flow.slaveinstancetype),
             ('num_ec2_instances', job_flow.instancecount),
             ('hadoop_version', job_flow.hadoopversion),
             ('keep_alive', job_flow.keepjobflowalivewhennosteps),
         ]
+
+        if job_flow.instancecount > 1:
+            args_to_check.append(
+                ('ec2_slave_instance_type', job_flow.slaveinstancetype))
 
         for arg_name, required_value in args_to_check:
             if jf_args.has_key(arg_name) \

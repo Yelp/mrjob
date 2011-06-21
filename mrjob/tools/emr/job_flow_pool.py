@@ -40,6 +40,8 @@ def job_flows_matching_instance_types(
             return False
         if is_job_flow_running(job_flow):
             return False
+        if job_flow.state == 'SHUTTING_DOWN':
+            return False
 
         if job_flow.masterinstancetype != master_instance_type \
            and master_instance_type != ANY_INSTANCE_TYPE:
@@ -125,7 +127,10 @@ if __name__ == '__main__':
     for time_to_hour, jf in sorted_tagged_job_flows:
         pprint_job_flow(jf)
 
-    estimate = 15
-    time_to_hour, jf = find_optimal(estimate, sorted_tagged_job_flows)
-    print 'You should use this one (%d minutes of padding):' % (time_to_hour-estimate)
-    pprint_job_flow(jf)
+    if sorted_tagged_job_flows:
+        estimate = 15
+        time_to_hour, jf = find_optimal(estimate, sorted_tagged_job_flows)
+        print 'You should use this one (%d minutes of padding):' % (time_to_hour-estimate)
+        pprint_job_flow(jf)
+    else:
+        print 'No idle job flows match criteria'

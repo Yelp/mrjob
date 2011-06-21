@@ -438,6 +438,8 @@ class EMRJobRunner(MRJobRunner):
     def _fix_ec2_instance_types(self):
         """If the *ec2_instance_type* option is set, override instance
         type for the nodes that actually run tasks (see Issue #66)
+
+        Helper for __init__.
         """
         ec2_instance_type = self._opts['ec2_instance_type']
         if ec2_instance_type:
@@ -449,6 +451,8 @@ class EMRJobRunner(MRJobRunner):
     def _fix_s3_scratch_and_log_uri_opts(self):
         """Fill in s3_scratch_uri and s3_log_uri (in self._opts) if they
         aren't already set.
+
+        Helper for __init__.
         """
         s3_conn = self.make_s3_conn()
         # check s3_scratch_uri against aws_region if specified
@@ -481,6 +485,7 @@ class EMRJobRunner(MRJobRunner):
             self._opts['s3_log_uri'] = self._opts['s3_scratch_uri'] + 'logs/'
 
     def _set_s3_scratch_uri(self, s3_conn):
+        """Helper for _fix_s3_scratch_and_log_uri_opts"""
         buckets = s3_conn.get_all_buckets()
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
 
@@ -520,6 +525,7 @@ class EMRJobRunner(MRJobRunner):
         self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
 
     def _create_s3_temp_bucket_if_needed(self):
+        """Make sure temp bucket exists"""
         if self._s3_temp_bucket_to_create:
             s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as scratch space' %
@@ -529,6 +535,7 @@ class EMRJobRunner(MRJobRunner):
             self._s3_temp_bucket_to_create = None
 
     def _check_and_fix_s3_dir(self, s3_uri):
+        """Helper for __init__"""
         if not S3_URI_RE.match(s3_uri):
             raise ValueError('Invalid S3 URI: %r' % s3_uri)
         if not s3_uri.endswith('/'):
@@ -552,6 +559,7 @@ class EMRJobRunner(MRJobRunner):
         """Copy local input files (if any) to a special directory on S3.
 
         Set self._s3_input_uris
+        Helper for _run
         """
         self._create_s3_temp_bucket_if_needed()
         # winnow out s3 files from local ones
@@ -592,12 +600,6 @@ class EMRJobRunner(MRJobRunner):
         file_dict = {'path': path, 'name': name, 'bootstrap': 'file'}
         self._files.append(file_dict)
         return file_dict
-
-    def _setup_output(self):
-        """Set self._output_dir if it's not set already."""
-        if not self._output_dir:
-            self._output_dir = self._s3_tmp_uri + 'output/'
-        log.info('Job will output -> %s' % self._output_dir)
 
     def _pick_s3_uris_for_files(self):
         """Decide where each file will be uploaded on S3.
@@ -775,25 +777,12 @@ class EMRJobRunner(MRJobRunner):
                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
-    def _create_job_flow(self, persistent=False, steps=None):
-        """Create an empty job flow on EMR, and return the ID of that
-        job.
-
-        persistent -- if this is true, create the job flow with the --alive
-            option, indicating the job will have to be manually terminated.
-        """
-        # make sure we can see the files we copied to S3
-        self._wait_for_s3_eventual_consistency()
-
-        # figure out local names and S3 URIs for our bootstrap files, if any
-        self._name_files()
-        self._pick_s3_uris_for_files()
-
-        log.info('Creating Elastic MapReduce job flow')
+    def _job_flow_args(self, persistent=False, steps=None):
+        """Build kwargs for emr_conn.run_jobflow()"""
         args = {}
 
         args['hadoop_version'] = self._opts['hadoop_version']
-        
+
         if self._opts['aws_availability_zone']:
             args['availability_zone'] = self._opts['aws_availability_zone']
 
@@ -817,6 +806,25 @@ class EMRJobRunner(MRJobRunner):
 
         if steps:
             args['steps'] = steps
+
+        return args
+
+    def _create_job_flow(self, persistent=False, steps=None):
+        """Create an empty job flow on EMR, and return the ID of that
+        job.
+
+        persistent -- if this is true, create the job flow with the --alive
+            option, indicating the job will have to be manually terminated.
+        """
+        # make sure we can see the files we copied to S3
+        self._wait_for_s3_eventual_consistency()
+
+        # figure out local names and S3 URIs for our bootstrap files, if any
+        self._name_files()
+        self._pick_s3_uris_for_files()
+
+        log.info('Creating Elastic MapReduce job flow')
+        args = self._job_flow_args(persistent, steps)
 
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (

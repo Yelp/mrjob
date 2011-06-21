@@ -1112,7 +1112,7 @@ class EMRJobRunner(MRJobRunner):
             try:
                 output = ssh_cat(
                     self._opts['ssh_bin'],
-                    'hadoop@%s' % self._address_of_master(),
+                    self._address_of_master(),
                     self._opts['ec2_key_pair_file'],
                     ssh_match.groups('filesystem_path')[0],
                 )
@@ -1266,13 +1266,15 @@ class EMRJobRunner(MRJobRunner):
             log.info('Fetching counters from SSH...')
             return self._scan_for_counters_in_files(uris, step_nums)
         except LogFetchException, e:
+            log.info(str(e))
             if not self._s3_job_log_uri:
                 return None
+
+            log.info('Fetching counters from S3...')
 
             self._wait_for_s3_eventual_consistency()
             self._wait_for_job_flow_termination()
 
-            log.info('Fetching counters from S3...')
             uris = self.s3_list_logs(log_types=[JOB_LOGS])
             return self._scan_for_counters_in_files(uris, step_nums)
 
@@ -1292,11 +1294,11 @@ class EMRJobRunner(MRJobRunner):
         relevant_logs.sort()
 
         for _, log_file_uri in relevant_logs:
-            log_string = self.cat(log_file_uri)
-            if not log_string:
+            log_lines = self.cat(log_file_uri)
+            if not log_lines:
                 continue
 
-            for line in log_string.split('\n'):
+            for line in log_lines:
                 new_counters = parse_hadoop_counters_from_line(line)
                 if new_counters:
                     counters.append(new_counters)
@@ -1727,7 +1729,7 @@ class EMRJobRunner(MRJobRunner):
         try:
             output = ssh_ls(
                 self._opts['ssh_bin'],
-                'hadoop@%s' % self._address_of_master(),
+                self._address_of_master(),
                 self._opts['ec2_key_pair_file'],
                 SSH_URI_RE.match(uri).groups('filesystem_path')[0],
             )

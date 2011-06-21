@@ -252,7 +252,7 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path):
             raise IOError('File not found: %s' % path)
     else:
         out = run_command_on_ssh(ssh_bin, address, ec2_key_pair_file,
-                                 'cat', uri)
+                                 'cat', path)
         return _handle_cat_out(out)
 
 

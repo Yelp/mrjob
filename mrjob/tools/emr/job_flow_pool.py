@@ -93,11 +93,6 @@ def est_time_to_hour(job_flow):
         return math.ceil(hours)*60 - minutes
 
 
-def to_timestamp(iso8601_time):
-    if iso8601_time is None: return None
-    return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
-
-
 def find_optimal(min_time, job_flows_with_times):
     """Given a list of job flows tagged with the amount of time they would
     waste if killed now, find the one that would waste the least time if

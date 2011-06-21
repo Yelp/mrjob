@@ -43,6 +43,8 @@ def main():
 
     # create the persistent job
     runner_kwargs = options.__dict__
+    del runner_kwargs['quiet']
+    del runner_kwargs['verbose']
 
     runner = EMRJobRunner(**runner_kwargs)
     emr_job_flow_id = runner.make_persistent_job_flow()
@@ -77,10 +79,7 @@ def make_option_parser():
 
     # Scrape options from MRJob and index them by dest
     mr_job = MRJob()
-    job_option_groups = (mr_job.option_parser, mr_job.mux_opt_group,
-                         mr_job.proto_opt_group, mr_job.runner_opt_group,
-                         mr_job.hadoop_emr_opt_group, mr_job.emr_opt_group)
-    scrape_options_into_new_groups(job_option_groups, assignments)
+    scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
     return option_parser
 
 

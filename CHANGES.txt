@@ -15,6 +15,7 @@ v0.2.7, 2011-06-22 -- Hooray for interns!
  * bootstrap_python_packages works regardless of tarball name (Issue #49)
  * mrjob always creates temp buckets in the correct AWS region (Issue #64)
  * Catch abuse of __main__ in jobs (Issue #78)
+ * Added mr_travelling_salesman example
 
 v0.2.6, 2011-05-24 -- Hadoop 0.20 in EMR, inline runner, and more
  * Set Hadoop to run on EMR with --hadoop-version (Issue #71).

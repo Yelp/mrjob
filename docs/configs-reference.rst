@@ -64,6 +64,7 @@ Option                        Default                        Combined by        
 *aws_availability_zone*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--aws-availability-zone`
 *aws_secret_access_key*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_SECRET_ACCESS_KEY`)
 *aws_region*                  (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--aws-region`
+*bootstrap_actions*           ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--bootstrap-action`
 *bootstrap_cmds*              ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--bootstrap-cmd`
 *bootstrap_files*             ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--bootstrap-file`
 *bootstrap_python_packages*   ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--bootstrap-python-package`

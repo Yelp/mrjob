@@ -833,6 +833,11 @@ class MRJob(object):
             help='Region to connect to S3 and EMR on (e.g. us-west-1).')
 
         self.emr_opt_group.add_option(
+            '--bootstrap-action', dest='bootstrap_actions', action='append',
+            default=[],
+            help='Raw bootstrap action scripts to run before any of the other bootstrap steps. You can use --bootstrap-action more than once. Local scripts will be automatically uploaded to S3. To specify arguments, just use quotes: "foo.sh arg1 arg2"')
+
+        self.emr_opt_group.add_option(
             '--bootstrap-cmd', dest='bootstrap_cmds', action='append',
             default=[],
             help='Commands to run on the master node to set up libraries, etc. You can use --bootstrap-cmd more than once. Use mrjob.conf to specify arguments as a list to be run directly.')

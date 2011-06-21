@@ -834,7 +834,7 @@ class TestNoBoto(TestCase):
                       conf_path=False, s3_scratch_uri='s3://foo/tmp')
 
 
-class TestMasterBootstrapScript(MockEMRAndS3TestCase):
+class TestBootstrapScripts(MockEMRAndS3TestCase):
 
     @setup
     def make_tmp_dir(self):
@@ -864,9 +864,90 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         py_compile.compile(script_path)
 
     def test_no_bootstrap_script_if_not_needed(self):
+        script_path = os.path.join(self.tmp_dir, 'b.py')
+
         runner = EMRJobRunner(conf_path=False,
                               bootstrap_mrjob=False)
-        script_path = os.path.join(self.tmp_dir, 'b.py')
         runner._create_master_bootstrap_script(dest=script_path)
-
         assert not os.path.exists(script_path)
+
+        # bootstrap actions don't figure into the master bootstrap script
+        runner = EMRJobRunner(conf_path=False,
+                              bootstrap_mrjob=False,
+                              bootstrap_actions=['foo', 'bar baz'])
+        runner._create_master_bootstrap_script(dest=script_path)
+        assert not os.path.exists(script_path)
+
+    def test_bootstrap_actions_get_added(self):
+        bootstrap_actions = [
+            's3://elasticmapreduce/bootstrap-actions/configure-hadoop -m,mapred.tasktracker.map.tasks.maximum=1',
+            's3://foo/bar#xyzzy', # use alternate name for script
+        ]
+        
+        runner = EMRJobRunner(conf_path=False,
+                              bootstrap_actions=bootstrap_actions,
+                              s3_sync_wait_time=0.01)
+        
+        job_flow_id = runner._create_job_flow()
+        
+        emr_conn = runner.make_emr_conn()
+        job_flow = emr_conn.describe_jobflow(job_flow_id)
+        actions = job_flow.bootstrapactions
+
+        assert_equal(len(actions), 3)
+
+        assert_equal(
+            actions[0].path,
+            's3://elasticmapreduce/bootstrap-actions/configure-hadoop')
+        assert_equal(
+            actions[0].args,
+            ['-m,mapred.tasktracker.map.tasks.maximum=1'])
+        assert_equal(actions[0].name, 'configure-hadoop')
+
+        assert_equal(actions[1].path, 's3://foo/bar')
+        assert_equal(actions[1].args, [])
+        assert_equal(actions[1].name, 'xyzzy')
+
+        # check for master boostrap script
+        assert actions[2].path.endswith('b.py')
+        assert_equal(actions[2].args, [])
+        assert_equal(actions[2].name, 'master')
+        
+    def test_local_bootstrap_action(self):
+        # make sure that local bootstrap action scripts get uploaded to S3
+        action_path = os.path.join(self.tmp_dir, 'apt-install.sh')
+        with open(action_path, 'w') as f:
+            f.write('for $pkg in $@; do sudo apt-get install $pkg; done\n')
+
+        bootstrap_actions = [
+            action_path + ' python-scipy mysql-server']
+
+        runner = EMRJobRunner(conf_path=False,
+                              bootstrap_actions=bootstrap_actions,
+                              s3_sync_wait_time=0.01)
+        
+        runner._upload_non_input_files()
+        job_flow_id = runner._create_job_flow()
+        
+        emr_conn = runner.make_emr_conn()
+        job_flow = emr_conn.describe_jobflow(job_flow_id)
+        actions = job_flow.bootstrapactions
+
+        assert_equal(len(actions), 2)
+
+        assert actions[0].path.startswith('s3://mrjob-')
+        assert actions[0].path.endswith('/apt-install.sh')
+        assert_equal(actions[0].name, 'apt-install.sh')
+        assert_equal(actions[0].args, ['python-scipy', 'mysql-server'])
+
+        # check for master boostrap script
+        assert actions[1].path.endswith('b.py')
+        assert_equal(actions[1].args, [])
+        assert_equal(actions[1].name, 'master')
+
+
+        
+    
+        
+
+        

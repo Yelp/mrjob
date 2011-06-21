@@ -271,22 +271,29 @@ class MockEmrConnection(object):
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
+            availabilityzone=availability_zone,
             creationdatetime=to_iso8601(now),
+            ec2keyname=ec2_keyname,
             hadoopversion=hadoop_version,
+            instancecount=num_instances,
             keepjobflowalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
+            masterinstancetype=master_instance_type,
             name=name,
+            slaveinstancetype=slave_instance_type,
             state='STARTING',
             steps=[],
-            masterinstancetype=master_instance_type,
-            slaveinstancetype=slave_instance_type,
-            instancecount=num_instances,
-            ec2keyname=ec2_keyname,
-            availabilityzone=availability_zone,
         )
         # don't always set loguri, so we can test Issue #112
         if log_uri is not None:
             job_flow.loguri = log_uri
+
+        # setup bootstrap actions
+        if bootstrap_actions:
+            job_flow.bootstrapactions = [
+                MockEmrObject(
+                    name=action.name, path=action.path, args=action.args())
+                for action in bootstrap_actions]
 
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
@@ -519,3 +526,12 @@ class MockEmrObject(object):
                     return False
 
         return True
+
+    # useful for hand-debugging tests
+    def __repr__(self):
+        return('%s.%s(%s)' % (
+            self.__class__.__module__,
+            self.__class__.__name__,
+            ', '.join('%s=%r' % (k, v)
+                      for k, v in sorted(self.__dict__.iteritems()))))
+                                        

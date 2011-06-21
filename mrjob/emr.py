@@ -21,6 +21,7 @@ import posixpath
 import pprint
 import random
 import re
+import shlex
 import signal
 import socket
 from subprocess import Popen, PIPE
@@ -237,6 +238,8 @@ class EMRJobRunner(MRJobRunner):
         :param aws_availability_zone: availability zone to run the job flow on
         :type aws_region: str
         :param aws_region: region to connect to S3 and EMR on (e.g. ``us-west-1``). If you want to use separate regions for S3 and EMR, set *emr_endpoint* and *s3_endpoint*.
+        :type bootstrap_actions: list of str
+        :param bootstrap_actions: a list of raw bootstrap actions (essentially scripts) to run prior to any of the other bootstrap steps. Any arguments should be separated from the command by spaces (we use :py:func:`shlex.split`). If the action is on the local filesystem, we'll automatically upload it to S3. 
         :type bootstrap_cmds: list
         :param bootstrap_cmds: a list of commands to run on the master node to set up libraries, etc. Like *setup_cmds*, these can be strings, which will be run in the shell, or lists of args, which will be run directly. Prepend ``sudo`` to commands to do things that require root privileges.
         :type bootstrap_files: list of str
@@ -313,6 +316,17 @@ class EMRJobRunner(MRJobRunner):
             self._output_dir = self._s3_tmp_uri + 'output/'
 
         # add the bootstrap files to a list of files to upload
+        self._bootstrap_actions = []
+        for action in self._opts['bootstrap_actions']:
+            args = shlex.split(action)
+            if not args:
+                raise ValueError('bad bootstrap action: %r' % (action,))
+            # don't use _add_bootstrap_file() because this is a raw bootstrap
+            # action, not part of mrjob's bootstrap utilities
+            file_dict = self._add_file(args[0])
+            file_dict['args'] = args[1:]
+            self._bootstrap_actions.append(file_dict)
+
         for path in self._opts['bootstrap_files']:
             self._add_bootstrap_file(path)
 
@@ -375,6 +389,7 @@ class EMRJobRunner(MRJobRunner):
             'aws_availability_zone',
             'aws_secret_access_key',
             'aws_region',
+            'bootstrap_actions',
             'bootstrap_cmds',
             'bootstrap_files',
             'bootstrap_python_packages',
@@ -424,6 +439,7 @@ class EMRJobRunner(MRJobRunner):
         values for that option. This allows us to specify that some options
         are lists, or contain environment variables, or whatever."""
         return combine_dicts(super(EMRJobRunner, cls)._opts_combiners(), {
+            'bootstrap_actions': combine_lists,
             'bootstrap_cmds': combine_lists,
             'bootstrap_files': combine_path_lists,
             'bootstrap_python_packages': combine_path_lists,
@@ -527,7 +543,6 @@ class EMRJobRunner(MRJobRunner):
     def _run(self):
         self._setup_input()
         self._create_wrapper_script()
-        self._create_master_bootstrap_script()
         self._upload_non_input_files()
 
         self._launch_emr_job()
@@ -771,7 +786,10 @@ class EMRJobRunner(MRJobRunner):
         # make sure we can see the files we copied to S3
         self._wait_for_s3_eventual_consistency()
 
-        # figure out local names and S3 URIs for our bootstrap files, if any
+        # make the master bootstrap script if we haven't already
+        self._create_master_bootstrap_script()
+
+        # figure out local names and S3 URIs for our bootstrap actions, if any
         self._name_files()
         self._pick_s3_uris_for_files()
 
@@ -798,9 +816,23 @@ class EMRJobRunner(MRJobRunner):
             args['slave_instance_type'] = (
                 self._opts['ec2_slave_instance_type'])
 
+
+        # bootstrap actions
+        bootstrap_action_args = []
+        
+        for file_dict in self._bootstrap_actions:
+            bootstrap_action_args.append(
+                botoemr.BootstrapAction(
+                file_dict['name'], file_dict['s3_uri'], file_dict['args']))
+
         if self._master_bootstrap_script:
-            args['bootstrap_actions'] = [botoemr.BootstrapAction(
-                'master', self._master_bootstrap_script['s3_uri'], [])]
+            bootstrap_action_args.append(
+                botoemr.BootstrapAction(
+                'master', self._master_bootstrap_script['s3_uri'], []))
+
+        if bootstrap_action_args:
+            args['bootstrap_actions'] = bootstrap_action_args
+            
 
         if self._opts['ec2_key_pair']:
             args['ec2_keyname'] = self._opts['ec2_key_pair']
@@ -1394,11 +1426,13 @@ class EMRJobRunner(MRJobRunner):
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
 
-        if not any(key.startswith('bootstrap_') and value
-                   for (key, value) in self._opts.iteritems()):
+        if self._master_bootstrap_script:
             return
 
-        if self._master_bootstrap_script:
+        if not any(key.startswith('bootstrap_')
+                   and key != 'bootstrap_actions' # these are separate scripts
+                   and value
+                   for (key, value) in self._opts.iteritems()):
             return
 
         if self._opts['bootstrap_mrjob']:
@@ -1550,7 +1584,6 @@ class EMRJobRunner(MRJobRunner):
 
         log.info('Creating persistent job flow to run several jobs in...')
 
-        self._create_master_bootstrap_script()
         self._upload_non_input_files()
 
         # don't allow user to call run()

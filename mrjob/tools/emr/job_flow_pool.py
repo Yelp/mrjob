@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import with_statement
 
+import bisect
 import boto.utils
 import functools
 import math
@@ -52,7 +53,8 @@ def job_flows_matching_instance_types(
         return True
 
     available_job_flows = [jf for jf in all_job_flows if matches(jf)]
-    return available_job_flows
+    job_flows_with_times = [(est_time_to_hour(jf), jf) for jf in available_job_flows]
+    return sorted(job_flows_with_times, key=lambda (t, jf): t)
 
 
 def est_time_to_hour(job_flow):
@@ -77,6 +79,16 @@ def est_time_to_hour(job_flow):
 def to_timestamp(iso8601_time):
     if iso8601_time is None: return None
     return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
+
+
+def find_optimal(min_time, job_flows_with_times):
+    # from http://docs.python.org/library/bisect.html
+    # derived from find_gt() to find leftmost value greater than x
+    # but returns job_flows_With_times[0] if none found
+    i = bisect.bisect_right(job_flows_with_times, (min_time, None))
+    if i != len(job_flows_with_times):
+        return job_flows_with_times[i]
+    return job_flows_with_times[0]
 
 
 def pprint_job_flow(jf):
@@ -109,5 +121,11 @@ def pprint_job_flow(jf):
 
 
 if __name__ == '__main__':
-    for jf in job_flows_matching_instance_types():
+    sorted_tagged_job_flows = job_flows_matching_instance_types()
+    for time_to_hour, jf in sorted_tagged_job_flows:
         pprint_job_flow(jf)
+
+    estimate = 15
+    time_to_hour, jf = find_optimal(estimate, sorted_tagged_job_flows)
+    print 'You should use this one (%d minutes of padding):' % (time_to_hour-estimate)
+    pprint_job_flow(jf)

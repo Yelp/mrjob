@@ -777,24 +777,7 @@ class EMRJobRunner(MRJobRunner):
                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
-    def _create_job_flow(self, persistent=False, steps=None):
-        """Create an empty job flow on EMR, and return the ID of that
-        job.
-
-        persistent -- if this is true, create the job flow with the --alive
-            option, indicating the job will have to be manually terminated.
-        """
-        # make sure we can see the files we copied to S3
-        self._wait_for_s3_eventual_consistency()
-
-        # make the master bootstrap script if we haven't already
-        self._create_master_bootstrap_script()
-
-        # figure out local names and S3 URIs for our bootstrap actions, if any
-        self._name_files()
-        self._pick_s3_uris_for_files()
-
-        log.info('Creating Elastic MapReduce job flow')
+    def job_flow_args(self, persistent=False, steps=None):
         args = {}
 
         args['hadoop_version'] = self._opts['hadoop_version']
@@ -846,6 +829,28 @@ class EMRJobRunner(MRJobRunner):
 
         if steps:
             args['steps'] = steps
+
+        return args
+
+    def _create_job_flow(self, persistent=False, steps=None):
+        """Create an empty job flow on EMR, and return the ID of that
+        job.
+
+        persistent -- if this is true, create the job flow with the --alive
+            option, indicating the job will have to be manually terminated.
+        """
+        # make sure we can see the files we copied to S3
+        self._wait_for_s3_eventual_consistency()
+
+        # make the master bootstrap script if we haven't already
+        self._create_master_bootstrap_script()
+
+        # figure out local names and S3 URIs for our bootstrap actions, if any
+        self._name_files()
+        self._pick_s3_uris_for_files()
+
+        log.info('Creating Elastic MapReduce job flow')
+        args = self.job_flow_args(persistent, steps)
 
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (

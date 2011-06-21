@@ -953,6 +953,10 @@ class MRJob(object):
             default=None, action='store_true',
             help='Open up an SSH tunnel to the Hadoop job tracker')
 
+    def all_option_groups(self):
+        return (self.option_parser, self.mux_opt_group,
+                self.proto_opt_group, self.runner_opt_group,
+                self.hadoop_emr_opt_group, self.emr_opt_group)
 
     def add_passthrough_option(self, *args, **kwargs):
         """Function to create options which both the job runner

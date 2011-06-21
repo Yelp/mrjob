@@ -218,8 +218,7 @@ def run_command_on_ssh(ssh_bin, address, ec2_key_pair_file, *cmd_args):
 
     :return: (stdout, stderr)
     """
-    args = [
-        ssh_bin,
+    args = ssh_bin + [
         '-i', ec2_key_pair_file,
         'hadoop@%s' % (address,),
     ] + list(cmd_args)

@@ -43,6 +43,8 @@ def main():
 
     # create the persistent job
     runner_kwargs = options.__dict__
+    del runner_kwargs['quiet']
+    del runner_kwargs['verbose']
 
     runner = EMRJobRunner(**runner_kwargs)
     emr_job_flow_id = runner.make_persistent_job_flow()

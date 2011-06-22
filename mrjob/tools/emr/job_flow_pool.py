@@ -49,7 +49,6 @@ def pprint_job_flow(jf):
 
     print jf.name
     print ''.join(nosep_segments)
-    print jf.bootstrapactions[0].path
     print
 
 
@@ -59,7 +58,6 @@ if __name__ == '__main__':
     option_parser = OptionParser(usage=usage, description=description)
 
     import boto.emr.connection
-    print boto.emr.connection.JobFlow.Fields
     boto.emr.connection.JobFlow.Fields.add('HadoopVersion')
 
     def make_option_group(halp):

@@ -1056,6 +1056,9 @@ class TestCat(MockEMRAndS3TestCase):
 class PoolingTestCase(MockEMRAndS3TestCase):
 
     def test_make_new_pooled_job_flow(self):
+        # This test should pass, but it fails. The behavior seems to be
+        # correct, but the second job does not give any output despite using
+        # the correct job flow.
         mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool',
                                '-c', self.mrjob_conf_path])
         mr_job.sandbox()
@@ -1066,7 +1069,6 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             job_flow_id = runner.get_emr_job_flow_id()
 
             for line in runner.stream_output():
-                print line
                 key, value = mr_job.parse_output_line(line)
                 results.append((key, value))
 
@@ -1081,11 +1083,10 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         results = []
         with mr_job.make_runner() as runner:
             runner.run()
+            # This job flow ID is correct, but the output is not.
             jf_id = runner.get_emr_job_flow_id()
-            print self.mock_emr_output[(jf_id, 1)]
 
             for line in runner.stream_output():
-                print line
                 key, value = mr_job.parse_output_line(line)
                 results.append((key, value))
 

@@ -988,6 +988,13 @@ class EMRJobRunner(MRJobRunner):
         # define out steps
         steps = self._build_steps()
 
+        # try to find a job flow from the pool. basically auto-fill
+        # 'emr_job_flow_id' if possible and then follow normal behavior.
+        if self._opts['pool_job_flows']:
+            job_flow = self.find_job_flow()
+            if job_flow:
+                self._emr_job_flow_id = job_flow.jobflowid
+
         # create a job flow if we're not already using an existing one
         if not self._emr_job_flow_id:
             self._emr_job_flow_id = self._create_job_flow(
@@ -1650,32 +1657,19 @@ class EMRJobRunner(MRJobRunner):
         jf_args = self._job_flow_args(persistent=True)
 
         def matches(job_flow):
+            # boto gives us a ustring for this. why???
+            job_flow.instancecount = int(job_flow.instancecount)
+            keep_alive = job_flow.keepjobflowalivewhennosteps 
+            job_flow.keepjobflowalivewhennosteps = bool(keep_alive == 'true')
+
             if job_flow.state != 'WAITING':
                 return False
             if 'pool' not in job_flow.bootstrapactions[0].args:
                 return False
-
-            # boto gives us a ustring for this. why???
-            job_flow.instancecount = int(job_flow.instancecount)
-            keep_alive = job_flow.keepjobflowalivewhennosteps  
-            job_flow.keepjobflowalivewhennosteps = bool(keep_alive == 'true')
-
-            args_to_check = [
-                # ('ec2_master_instance_type', job_flow.masterinstancetype),
-                # ('num_ec2_instances', job_flow.instancecount),
-                ('hadoop_version', job_flow.hadoopversion),
-                ('keep_alive', job_flow.keepjobflowalivewhennosteps),
-            ]
-
-            # if job_flow.instancecount > 1:
-            #     args_to_check.append(
-            #         ('ec2_slave_instance_type', job_flow.slaveinstancetype))
-
-            for arg_name, required_value in args_to_check:
-                if jf_args.has_key(arg_name) \
-                   and jf_args[arg_name] != required_value:
-                    print job_flow.name, 'fails', arg_name, '(%r != %r)' % (required_value, jf_args[arg_name])
-                    return False
+            if not job_flow.keepjobflowalivewhennosteps:
+                return False
+            if not job_flow.hadoopversion == self._opts['hadoop_version']:
+                return False
 
             return True
 
@@ -1699,7 +1693,7 @@ class EMRJobRunner(MRJobRunner):
         """
         sorted_tagged_job_flows = self.usable_job_flows()
         if sorted_tagged_job_flows:
-            return sorted_tagged_job_flows[-1][0]
+            return sorted_tagged_job_flows[-1][1]
         else:
             return None
 

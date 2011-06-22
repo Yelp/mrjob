@@ -273,14 +273,26 @@ class MockEmrConnection(object):
         jobflow_id = 'j-MOCKJOBFLOW%d' % len(self.mock_emr_job_flows)
         assert jobflow_id not in self.mock_emr_job_flows
 
+        def make_fake_action(real_action):
+            return MockEmrObject(name=real_action.name,
+                                 path=real_action.path,
+                                 args=real_action.bootstrap_action_args)
+
+        if keep_alive:
+            keep_alive = u'true'
+        else:
+            keep_alive = u'false'
+
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
             availabilityzone=availability_zone,
+            bootstrapactions=[make_fake_action(a) for a in bootstrap_actions],
             creationdatetime=to_iso8601(now),
             ec2keyname=ec2_keyname,
             hadoopversion=hadoop_version,
-            instancecount=num_instances,
+            instancecount=str(num_instances),
+            jobflowid=jobflow_id,
             keepjobflowalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
             masterinstancetype=master_instance_type,

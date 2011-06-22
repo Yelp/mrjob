@@ -1051,3 +1051,33 @@ class TestCat(MockEMRAndS3TestCase):
                 output.append(line)
 
         assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
+
+
+class PoolingTestCase(MockEMRAndS3TestCase):
+
+    def test_make_new_pooled_job_flow(self):
+        pass
+
+    def test_join_pooled_job_flow(self):
+        runner = EMRJobRunner(conf_path=False, pool_job_flows=True)
+        job_flow_id = runner.make_persistent_job_flow()
+        runner.make_emr_conn().describe_jobflow(job_flow_id).state = 'WAITING'
+
+        stdin = StringIO('foo\nbar\n')
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool',
+                               '-c', self.mrjob_conf_path])
+        mr_job.sandbox(stdin=stdin)
+
+        results = []
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+        assert_equal(sorted(results),
+            [(1, 'bar'), (1, 'foo'), (2, None)])

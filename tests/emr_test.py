@@ -883,13 +883,13 @@ class TestBootstrapScripts(MockEMRAndS3TestCase):
             's3://elasticmapreduce/bootstrap-actions/configure-hadoop -m,mapred.tasktracker.map.tasks.maximum=1',
             's3://foo/bar#xyzzy', # use alternate name for script
         ]
-        
+
         runner = EMRJobRunner(conf_path=False,
                               bootstrap_actions=bootstrap_actions,
                               s3_sync_wait_time=0.01)
-        
-        job_flow_id = runner._create_job_flow()
-        
+
+        job_flow_id = runner.make_persistent_job_flow()
+
         emr_conn = runner.make_emr_conn()
         job_flow = emr_conn.describe_jobflow(job_flow_id)
         actions = job_flow.bootstrapactions
@@ -908,11 +908,15 @@ class TestBootstrapScripts(MockEMRAndS3TestCase):
         assert_equal(actions[1].args, [])
         assert_equal(actions[1].name, 'xyzzy')
 
-        # check for master boostrap script
+        # check for master bootstrap script
+        assert actions[2].path.startswith('s3://mrjob-')
         assert actions[2].path.endswith('b.py')
         assert_equal(actions[2].args, [])
         assert_equal(actions[2].name, 'master')
-        
+
+        # make sure master bootstrap script is on S3
+        assert runner.path_exists(actions[2].path)
+
     def test_local_bootstrap_action(self):
         # make sure that local bootstrap action scripts get uploaded to S3
         action_path = os.path.join(self.tmp_dir, 'apt-install.sh')
@@ -925,10 +929,9 @@ class TestBootstrapScripts(MockEMRAndS3TestCase):
         runner = EMRJobRunner(conf_path=False,
                               bootstrap_actions=bootstrap_actions,
                               s3_sync_wait_time=0.01)
-        
-        runner._upload_non_input_files()
-        job_flow_id = runner._create_job_flow()
-        
+
+        job_flow_id = runner.make_persistent_job_flow()
+
         emr_conn = runner.make_emr_conn()
         job_flow = emr_conn.describe_jobflow(job_flow_id)
         actions = job_flow.bootstrapactions
@@ -941,13 +944,10 @@ class TestBootstrapScripts(MockEMRAndS3TestCase):
         assert_equal(actions[0].args, ['python-scipy', 'mysql-server'])
 
         # check for master boostrap script
+        assert actions[1].path.startswith('s3://mrjob-')
         assert actions[1].path.endswith('b.py')
         assert_equal(actions[1].args, [])
         assert_equal(actions[1].name, 'master')
 
-
-        
-    
-        
-
-        
+        # make sure master bootstrap script is on S3
+        assert runner.path_exists(actions[1].path)

@@ -544,6 +544,7 @@ class EMRJobRunner(MRJobRunner):
     def _run(self):
         self._setup_input()
         self._create_wrapper_script()
+        self._create_master_bootstrap_script()
         self._upload_non_input_files()
 
         self._launch_emr_job()
@@ -786,9 +787,6 @@ class EMRJobRunner(MRJobRunner):
         """
         # make sure we can see the files we copied to S3
         self._wait_for_s3_eventual_consistency()
-
-        # make the master bootstrap script if we haven't already
-        self._create_master_bootstrap_script()
 
         # figure out local names and S3 URIs for our bootstrap actions, if any
         self._name_files()
@@ -1585,6 +1583,7 @@ class EMRJobRunner(MRJobRunner):
 
         log.info('Creating persistent job flow to run several jobs in...')
 
+        self._create_master_bootstrap_script()
         self._upload_non_input_files()
 
         # don't allow user to call run()

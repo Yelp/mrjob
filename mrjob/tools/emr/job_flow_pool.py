@@ -49,6 +49,7 @@ def pprint_job_flow(jf):
 
     print jf.name
     print ''.join(nosep_segments)
+    print jf.bootstrapactions[0].path
     print
 
 
@@ -56,6 +57,10 @@ if __name__ == '__main__':
     usage = '%prog [options]'
     description = 'Identify an exising job flow to run jobs in or create a new one if none are available. WARNING: do not run this without mrjob.tools.emr.terminate.idle_job_flows in your crontab; job flows left idle can quickly become expensive!'
     option_parser = OptionParser(usage=usage, description=description)
+
+    import boto.emr.connection
+    print boto.emr.connection.JobFlow.Fields
+    boto.emr.connection.JobFlow.Fields.add('HadoopVersion')
 
     def make_option_group(halp):
         g = OptionGroup(option_parser, halp)
@@ -94,7 +99,7 @@ if __name__ == '__main__':
 
     if sorted_tagged_job_flows:
         time_to_hour, jf = sorted_tagged_job_flows[-1]
-        print 'You should use this one (%d minutes of padding):' % (time_to_hour-estimate)
+        print 'You should use this one:'
         pprint_job_flow(jf)
     else:
         print 'No idle job flows match criteria'

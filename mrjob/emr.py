@@ -432,6 +432,7 @@ class EMRJobRunner(MRJobRunner):
             'hadoop_streaming_jar_on_emr',
             'hadoop_version',
             'num_ec2_instances',
+            'pool_job_flows',
             's3_endpoint',
             's3_log_uri',
             's3_scratch_uri',
@@ -781,7 +782,10 @@ class EMRJobRunner(MRJobRunner):
 
         # stop the job flow if it belongs to us (it may have stopped on its
         # own already, but that's fine)
-        if self._emr_job_flow_id and not self._opts['emr_job_flow_id']:
+        # don't stop it if it was created due to --pool because the user
+        # probably wants to use it again
+        if self._emr_job_flow_id and not self._opts['emr_job_flow_id'] \
+           and not self._opts['pool_job_flows']:
             log.info('Terminating job flow: %s' % self._emr_job_flow_id)
             try:
                 self.make_emr_conn().terminate_jobflow(self._emr_job_flow_id)
@@ -805,7 +809,8 @@ class EMRJobRunner(MRJobRunner):
 
         # delete the log files, if it's a job flow we created (the logs
         # belong to the job flow)
-        if self._s3_job_log_uri and not self._opts['emr_job_flow_id']:
+        if self._s3_job_log_uri and not self._opts['emr_job_flow_id'] \
+           and not self._opts['pool_job_flows']:
             try:
                 log.info('Removing all files in %s' % self._s3_job_log_uri)
                 self.rm(self._s3_job_log_uri)
@@ -1666,10 +1671,11 @@ class EMRJobRunner(MRJobRunner):
         available_job_flows = [jf for jf in all_job_flows if matches(jf)]
         job_flows_with_times = [(est_time_to_hour(jf), jf) for jf in available_job_flows]
 
-        def sort_key(time_to_hour, job_flow):
+        def sort_key(tup):
+            time_to_hour, job_flow = tup
             instance_type = job_flow.masterinstancetype
             if job_flow.instancecount > 1:
-                instance_type = job.slaveinstancetype
+                instance_type = job_flow.slaveinstancetype
             total_units = compute_units[instance_type]*job_flow.instancecount
             return (total_units, time_to_hour)
 

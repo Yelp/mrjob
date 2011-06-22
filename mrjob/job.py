@@ -928,6 +928,10 @@ class MRJob(object):
             help='Number of EC2 instances to launch')
 
         self.emr_opt_group.add_option(
+            '--pool', dest='pool_job_flows', action='store_true',
+            help='Add to an existing job flow or create a new one that does not terminate when the job completes. Overrides other job flow-related options including EC2 instance configuration.')
+
+        self.emr_opt_group.add_option(
             '--s3-endpoint', dest='s3_endpoint', default=None,
             help='Host to connect to when communicating with S3 (e.g. s3-us-west-1.amazonaws.com). Default is to infer this from aws_region.')
 

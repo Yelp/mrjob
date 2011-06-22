@@ -825,7 +825,8 @@ class EMRJobRunner(MRJobRunner):
                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
-    def _create_job_flow(self, persistent=False, steps=None):
+    def _create_job_flow(self, persistent=False, steps=None,
+                         bootstrap_args=None):
         """Create an empty job flow on EMR, and return the ID of that
         job.
 
@@ -840,7 +841,7 @@ class EMRJobRunner(MRJobRunner):
         self._pick_s3_uris_for_files()
 
         log.info('Creating Elastic MapReduce job flow')
-        args = self._job_flow_args(persistent, steps)
+        args = self._job_flow_args(persistent, steps, bootstrap_args)
 
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (
@@ -855,7 +856,8 @@ class EMRJobRunner(MRJobRunner):
         log.info('Job flow created with ID: %s' % emr_job_flow_id)
         return emr_job_flow_id
 
-    def _job_flow_args(self, persistent=False, steps=None):
+    def _job_flow_args(self, persistent=False, steps=None,
+                       bootstrap_args=None):
         """Build kwargs for emr_conn.run_jobflow()"""
         args = {}
 
@@ -870,8 +872,10 @@ class EMRJobRunner(MRJobRunner):
         args['slave_instance_type'] = self._opts['ec2_slave_instance_type']
 
         if self._master_bootstrap_script:
+            bootstrap_args = bootstrap_args or []
             args['bootstrap_actions'] = [boto.emr.BootstrapAction(
-                'master', self._master_bootstrap_script['s3_uri'], [])]
+                'master', self._master_bootstrap_script['s3_uri'],
+                bootstrap_args)]
 
         if self._opts['ec2_key_pair']:
             args['ec2_keyname'] = self._opts['ec2_key_pair']
@@ -1622,7 +1626,12 @@ class EMRJobRunner(MRJobRunner):
         # don't allow user to call run()
         self._ran_job = True
 
-        self._emr_job_flow_id = self._create_job_flow(persistent=True)
+        if self._opts['pool_job_flows']:
+            args = ['pool']
+        else:
+            args = []
+        self._emr_job_flow_id = self._create_job_flow(persistent=True,
+                                                      bootstrap_args=args)
 
         return self._emr_job_flow_id
 
@@ -1642,6 +1651,8 @@ class EMRJobRunner(MRJobRunner):
 
         def matches(job_flow):
             if job_flow.state != 'WAITING':
+                return False
+            if 'pool' not in job_flow.bootstrapactions[0].args:
                 return False
 
             # boto gives us a ustring for this. why???

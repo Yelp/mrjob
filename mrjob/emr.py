@@ -15,6 +15,7 @@ from __future__ import with_statement
 import datetime
 import fnmatch
 import logging
+import math
 import os
 import posixpath
 import pprint
@@ -95,6 +96,46 @@ REGION_TO_S3_ENDPOINT = {
     'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com', # no EMR endpoint yet
     '': 's3.amazonaws.com',
 }
+
+
+# map from instance type to number of compute units
+# from http://aws.amazon.com/ec2/instance-types/
+compute_units = {
+    't1.micro': 2,
+    'm1.small': 1,
+    'm1.large': 4,
+    'm1.xlarge': 8,
+    'm2.xlarge': 6.5,
+    'm2.2xlarge': 13,
+    'm2.4xlarge': 26,
+    'c1.medium': 5,
+    'c1.xlarge': 20,
+    'cc1.4xlarge': 33.5,
+    'cg1.4xlarge': 33.5,
+}
+
+
+def est_time_to_hour(job_flow):
+    """If available, get the difference between hours billed and hours used.
+    This metric is used to determine which job flow to use if more than one
+    is available.
+    """
+
+    if not hasattr(job_flow, 'startdatetime'):
+        return 0.0
+    else:
+        now = time.time()
+
+        # find out how long the job flow has been running
+        jf_start = _to_timestamp(job_flow.startdatetime)
+        if hasattr(job_flow, 'enddatetime'):
+            jf_end = _to_timestamp(job_flow.enddatetime)
+        else:
+            jf_end = now
+
+        minutes = (jf_end - jf_start) / 60.0
+        hours = minutes / 60.0
+        return math.ceil(hours)*60 - minutes
 
 
 def parse_s3_uri(uri):
@@ -722,6 +763,8 @@ class EMRJobRunner(MRJobRunner):
         finally:
             random.setstate(random_state)
 
+    ### Running the job ###
+
     def cleanup(self, mode=None):
         super(EMRJobRunner, self).cleanup(mode=mode)
 
@@ -777,6 +820,36 @@ class EMRJobRunner(MRJobRunner):
                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
+    def _create_job_flow(self, persistent=False, steps=None):
+        """Create an empty job flow on EMR, and return the ID of that
+        job.
+
+        persistent -- if this is true, create the job flow with the --alive
+            option, indicating the job will have to be manually terminated.
+        """
+        # make sure we can see the files we copied to S3
+        self._wait_for_s3_eventual_consistency()
+
+        # figure out local names and S3 URIs for our bootstrap files, if any
+        self._name_files()
+        self._pick_s3_uris_for_files()
+
+        log.info('Creating Elastic MapReduce job flow')
+        args = self._job_flow_args(persistent, steps)
+
+        emr_conn = self.make_emr_conn()
+        log.debug('Calling run_jobflow(%r, %r, %s)' % (
+            self._job_name, self._opts['s3_log_uri'],
+            ', '.join('%s=%r' % (k, v) for k, v in args.iteritems())))
+        emr_job_flow_id = emr_conn.run_jobflow(
+            self._job_name, self._opts['s3_log_uri'], **args)
+
+         # keep track of when we started our job
+        self._emr_job_start = time.time()
+
+        log.info('Job flow created with ID: %s' % emr_job_flow_id)
+        return emr_job_flow_id
+
     def _job_flow_args(self, persistent=False, steps=None):
         """Build kwargs for emr_conn.run_jobflow()"""
         args = {}
@@ -808,36 +881,6 @@ class EMRJobRunner(MRJobRunner):
             args['steps'] = steps
 
         return args
-
-    def _create_job_flow(self, persistent=False, steps=None):
-        """Create an empty job flow on EMR, and return the ID of that
-        job.
-
-        persistent -- if this is true, create the job flow with the --alive
-            option, indicating the job will have to be manually terminated.
-        """
-        # make sure we can see the files we copied to S3
-        self._wait_for_s3_eventual_consistency()
-
-        # figure out local names and S3 URIs for our bootstrap files, if any
-        self._name_files()
-        self._pick_s3_uris_for_files()
-
-        log.info('Creating Elastic MapReduce job flow')
-        args = self._job_flow_args(persistent, steps)
-
-        emr_conn = self.make_emr_conn()
-        log.debug('Calling run_jobflow(%r, %r, %s)' % (
-            self._job_name, self._opts['s3_log_uri'],
-            ', '.join('%s=%r' % (k, v) for k, v in args.iteritems())))
-        emr_job_flow_id = emr_conn.run_jobflow(
-            self._job_name, self._opts['s3_log_uri'], **args)
-
-         # keep track of when we started our job
-        self._emr_job_start = time.time()
-
-        log.info('Job flow created with ID: %s' % emr_job_flow_id)
-        return emr_job_flow_id
 
     def _build_steps(self):
         """Return a list of boto Step objects corresponding to the
@@ -1145,6 +1188,8 @@ class EMRJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_name, step_num + 1)
 
+    ### Post-run processing (failures, counters, etc.) ###
+
     def _get_counters(self, step_nums):
         """Read Hadoop counters from S3.
 
@@ -1398,6 +1443,8 @@ class EMRJobRunner(MRJobRunner):
 
         return log_path
 
+    ### Bootstrapping ###
+
     def _create_master_bootstrap_script(self, dest='b.py'):
         """Create the master bootstrap script and write it into our local
         temp directory.
@@ -1576,6 +1623,68 @@ class EMRJobRunner(MRJobRunner):
 
     def get_emr_job_flow_id(self):
         return self._emr_job_flow_id
+
+    def usable_job_flows(self, emr_conn=None):
+        """Get job flows that this runner can use. Sort by instance compute
+        units and time left to an even instance hour.
+
+        :return: list of (job_minutes_float, :py:class:`botoemr.emrobject.JobFlow`)
+        """
+
+        emr_conn = emr_conn or self.make_emr_conn()
+        all_job_flows = emr_conn.describe_jobflows()
+        jf_args = self._job_flow_args(persistent=True)
+
+        def matches(job_flow):
+            if job_flow.state != 'WAITING':
+                return False
+
+            # boto gives us a ustring for this. why???
+            job_flow.instancecount = int(job_flow.instancecount)
+            keep_alive = job_flow.keepjobflowalivewhennosteps  
+            job_flow.keepjobflowalivewhennosteps = bool(keep_alive == 'true')
+
+            args_to_check = [
+                # ('ec2_master_instance_type', job_flow.masterinstancetype),
+                # ('num_ec2_instances', job_flow.instancecount),
+                ('hadoop_version', job_flow.hadoopversion),
+                ('keep_alive', job_flow.keepjobflowalivewhennosteps),
+            ]
+
+            # if job_flow.instancecount > 1:
+            #     args_to_check.append(
+            #         ('ec2_slave_instance_type', job_flow.slaveinstancetype))
+
+            for arg_name, required_value in args_to_check:
+                if jf_args.has_key(arg_name) \
+                   and jf_args[arg_name] != required_value:
+                    print job_flow.name, 'fails', arg_name, '(%r != %r)' % (required_value, jf_args[arg_name])
+                    return False
+
+            return True
+
+        available_job_flows = [jf for jf in all_job_flows if matches(jf)]
+        job_flows_with_times = [(est_time_to_hour(jf), jf) for jf in available_job_flows]
+
+        def sort_key(time_to_hour, job_flow):
+            instance_type = job_flow.masterinstancetype
+            if job_flow.instancecount > 1:
+                instance_type = job.slaveinstancetype
+            total_units = compute_units[instance_type]*job_flow.instancecount
+            return (total_units, time_to_hour)
+
+        return sorted(job_flows_with_times, key=sort_key)
+
+    def find_job_flow(self):
+        """Find a job flow that can host this runner. Prefer flows with more
+        compute units. Break ties by choosing flow with longest idle time.
+        Return ``None`` if no suitable flows exist.
+        """
+        sorted_tagged_job_flows = self.usable_job_flows()
+        if sorted_tagged_job_flows:
+            return sorted_tagged_job_flows[-1][0]
+        else:
+            return None
 
     ### GENERAL FILESYSTEM STUFF ###
 

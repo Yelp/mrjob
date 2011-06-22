@@ -42,7 +42,9 @@ def main():
         log_to_stream(name='mrjob', debug=options.verbose)
 
     # create the persistent job
-    runner_kwargs = options.__dict__
+    runner_kwargs = options.__dict__.copy()
+    del runner_kwargs['quiet']
+    del runner_kwargs['verbose']
 
     runner = EMRJobRunner(**runner_kwargs)
     emr_job_flow_id = runner.make_persistent_job_flow()

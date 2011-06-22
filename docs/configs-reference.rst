@@ -80,6 +80,7 @@ Option                        Default                        Combined by        
 *hadoop_streaming_jar_on_emr* ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-streaming-jar-on-emr`
 *hadoop_version*              ``'0.20'``                     :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-version`
 *num_ec2_instances*           ``1``                          :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-instances`
+*pool_job_flows*              ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--pool`
 *s3_endpoint*                 (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-endpoint`
 *s3_log_uri*                  (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-log-uri`
 *s3_scratch_uri*              (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--s3-scratch-uri`

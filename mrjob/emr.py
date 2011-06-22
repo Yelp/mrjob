@@ -301,7 +301,7 @@ class EMRJobRunner(MRJobRunner):
         :type emr_endpoint: str
         :param emr_endpoint: optional host to connect to when communicating with S3 (e.g. ``us-west-1.elasticmapreduce.amazonaws.com``). Default is to infer this from *aws_region*.
         :type emr_job_flow_id: str
-        :param emr_job_flow_id: the ID of a persistent EMR job flow to run jobs in (normally we launch our own job). It's fine for other jobs to be using the job flow; we give our job's steps a unique ID.
+        :param emr_job_flow_id: the ID of a persistent EMR job flow to run jobs in (normally we launch our own job flow). It's fine for other jobs to be using the job flow; we give our job's steps a unique ID.
         :type enable_emr_debugging: str
         :param enable_emr_debugging: store Hadoop logs in SimpleDB
         :type hadoop_streaming_jar: str
@@ -311,6 +311,8 @@ class EMRJobRunner(MRJobRunner):
         :type hadoop_version: str
         :param hadoop_version: Set the version of Hadoop to use on EMR. EMR currently accepts ``'0.18'`` or ``'0.20'``; default is ``'0.20'``.
         :type num_ec2_instances: int
+        :type pool_job_flows: bool
+        :param pool_job_flows: Try to run the job on a ``WAITING`` pooled job flow. Prefer the one with the most compute units. Use S3 to "lock" the job flow and ensure that the job is not scheduled behind another job. If no suitable job flow is `WAITING`, create a new pooled job flow.
         :param num_ec2_instances: number of instances to start up. Default is ``1``.
         :type s3_endpoint: str
         :param s3_endpoint: Host to connect to when communicating with S3 (e.g. ``s3-us-west-1.amazonaws.com``). Default is to infer this from *aws_region*.
@@ -825,8 +827,7 @@ class EMRJobRunner(MRJobRunner):
                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
-    def _create_job_flow(self, persistent=False, steps=None,
-                         bootstrap_args=None):
+    def _create_job_flow(self, persistent=False, steps=None):
         """Create an empty job flow on EMR, and return the ID of that
         job.
 
@@ -841,7 +842,7 @@ class EMRJobRunner(MRJobRunner):
         self._pick_s3_uris_for_files()
 
         log.info('Creating Elastic MapReduce job flow')
-        args = self._job_flow_args(persistent, steps, bootstrap_args)
+        args = self._job_flow_args(persistent, steps)
 
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (
@@ -856,8 +857,7 @@ class EMRJobRunner(MRJobRunner):
         log.info('Job flow created with ID: %s' % emr_job_flow_id)
         return emr_job_flow_id
 
-    def _job_flow_args(self, persistent=False, steps=None,
-                       bootstrap_args=None):
+    def _job_flow_args(self, persistent=False, steps=None):
         """Build kwargs for emr_conn.run_jobflow()"""
         args = {}
 
@@ -872,7 +872,10 @@ class EMRJobRunner(MRJobRunner):
         args['slave_instance_type'] = self._opts['ec2_slave_instance_type']
 
         if self._master_bootstrap_script:
-            bootstrap_args = bootstrap_args or []
+            if self._opts['pool_job_flows']:
+                bootstrap_args = ['pool']
+            else:
+                bootstrap_args = []
             args['bootstrap_actions'] = [boto.emr.BootstrapAction(
                 'master', self._master_bootstrap_script['s3_uri'],
                 bootstrap_args)]
@@ -883,7 +886,7 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['enable_emr_debugging']:
             args['enable_debugging'] = True
 
-        if persistent:
+        if persistent or self._opts['pool_job_flows']:
             args['keep_alive'] = True
 
         if steps:
@@ -1633,12 +1636,7 @@ class EMRJobRunner(MRJobRunner):
         # don't allow user to call run()
         self._ran_job = True
 
-        if self._opts['pool_job_flows']:
-            args = ['pool']
-        else:
-            args = []
-        self._emr_job_flow_id = self._create_job_flow(persistent=True,
-                                                      bootstrap_args=args)
+        self._emr_job_flow_id = self._create_job_flow(persistent=True)
 
         return self._emr_job_flow_id
 

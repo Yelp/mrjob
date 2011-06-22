@@ -1056,7 +1056,41 @@ class TestCat(MockEMRAndS3TestCase):
 class PoolingTestCase(MockEMRAndS3TestCase):
 
     def test_make_new_pooled_job_flow(self):
-        pass
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool',
+                               '-c', self.mrjob_conf_path])
+        mr_job.sandbox()
+
+        results = []
+        with mr_job.make_runner() as runner:
+            runner.run()
+            job_flow_id = runner.get_emr_job_flow_id()
+
+            for line in runner.stream_output():
+                print line
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+        stdin = StringIO('foo\nbar\n')
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool',
+                               '-c', self.mrjob_conf_path])
+        mr_job.sandbox(stdin=stdin)
+
+        results = []
+        with mr_job.make_runner() as runner:
+            runner.run()
+            jf_id = runner.get_emr_job_flow_id()
+            print self.mock_emr_output[(jf_id, 1)]
+
+            for line in runner.stream_output():
+                print line
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+        assert_equal(sorted(results),
+            [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_join_pooled_job_flow(self):
         runner = EMRJobRunner(conf_path=False, pool_job_flows=True)

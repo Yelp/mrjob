@@ -22,7 +22,6 @@ Usage::
 """
 from __future__ import with_statement
 
-import copy
 from optparse import OptionParser, OptionGroup
 
 from mrjob.emr import EMRJobRunner
@@ -43,7 +42,7 @@ def main():
         log_to_stream(name='mrjob', debug=options.verbose)
 
     # create the persistent job
-    runner_kwargs = copy.copy(options.__dict__)
+    runner_kwargs = options.__dict__.copy()
     del runner_kwargs['quiet']
     del runner_kwargs['verbose']
 

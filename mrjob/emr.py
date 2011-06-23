@@ -1707,7 +1707,8 @@ class EMRJobRunner(MRJobRunner):
                                          job_flow.jobflowid,
                                         len(job_flow.steps)+1)
                 status = attempt_to_acquire(s3_conn, lock_uri,
-                                            self._opts['s3_sync_wait_time'])
+                                            self._opts['s3_sync_wait_time'],
+                                            self._job_name)
                 if status:
                     return sorted_tagged_job_flows[-1][1]
                 else:

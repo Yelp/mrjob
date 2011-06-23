@@ -28,6 +28,8 @@ def make_uid():
     things like host, username, and time. Could be replaced by a better GUID
     scheme.
     """
+    # This function is almost certainly unnecessary since we have
+    # runner._job_name. To be removed.
     return str(os.uname()) + os.getlogin()
 
 

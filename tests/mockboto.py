@@ -24,13 +24,12 @@ from __future__ import with_statement
 import datetime
 
 try:
+    import boto.emr
     import boto.exception
     import boto.utils
 except ImportError:
     boto = None
 
-from mrjob.botoemr.connection import EmrConnection
-from mrjob.botoemr.step import JarStep
 from mrjob.conf import combine_values
 from mrjob.emr import S3_URI_RE, parse_s3_uri
 
@@ -282,7 +281,8 @@ class MockEmrConnection(object):
         def make_fake_action(real_action):
             return MockEmrObject(name=real_action.name,
                                  path=real_action.path,
-                                 args=real_action.bootstrap_action_args)
+                                 args=[MockEmrObject(value=v) for v \
+                                       in real_action.bootstrap_action_args])
 
         if keep_alive:
             keep_alive = u'true'
@@ -314,11 +314,14 @@ class MockEmrConnection(object):
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
         if enable_debugging:
+            debug_jar = boto.emr.connection.EmrConnection.DebuggingJar
+            debug_args = [MockEmrObject(value=boto.emr.connection.EmrConnection.DebuggingArgs)]
+            JarStep = boto.emr.step.JarStep
             debugging_step = JarStep(name='Setup Hadoop Debugging',
                                      action_on_failure='TERMINATE_JOB_FLOW',
                                      main_class=None,
-                                     jar=EmrConnection.DebuggingJar,
-                                     step_args=[MockEmrObject(value=EmrConnection.DebuggingArgs)])
+                                     jar=debug_jar,
+                                     step_args=debug_args)
             debugging_step.state = 'COMPLETED'
             steps.insert(0, debugging_step)
         self.add_jobflow_steps(jobflow_id, steps)

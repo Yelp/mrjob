@@ -27,8 +27,28 @@ HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*\.jar$')
 # match an mrjob job name (these are used to name EMR job flows)
 JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
 
+# match an S3 url and extract the bucket and key names
+S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
+
 
 log = logging.getLogger('mrjob.parse')
+
+
+def check_kv_pair(option, opt, value):
+    items = value.split('=', 1)
+    if len(items) == 2:
+        return items
+    else:
+        raise OptionValueError(
+            "option %s: value is not of the form KEY=VALUE: %r" % (opt, value))
+
+
+def check_range_list(option, opt, value):
+    try:
+        ports = parse_port_range_list(value)
+        return ports
+    except ValueError, e:
+        raise OptionValueError('option %s: invalid port range list "%s": \n%s' % (opt, value, e.args[0]))
 
 
 _HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.(){}[\]"\\])')
@@ -336,19 +356,16 @@ def parse_port_range_list(range_list_str):
     return all_ranges
 
 
-def check_kv_pair(option, opt, value):
-    items = value.split('=', 1)
-    if len(items) == 2:
-        return items
+def parse_s3_uri(uri):
+    """Parse an S3 URI into (bucket, key)
+
+    >>> parse_s3_uri('s3://walrus/tmp/')
+    ('walrus', 'tmp/')
+
+    If ``uri`` is not an S3 URI, raise a ValueError
+    """
+    match = S3_URI_RE.match(uri)
+    if match:
+        return match.groups()
     else:
-        raise OptionValueError(
-            "option %s: value is not of the form KEY=VALUE: %r" % (opt, value))
-
-
-def check_range_list(option, opt, value):
-    try:
-        ports = parse_port_range_list(value)
-        return ports
-    except ValueError, e:
-        raise OptionValueError('option %s: invalid port range list "%s": \n%s' % (opt, value, e.args[0]))
-
+        raise ValueError('Invalid S3 URI: %s' % uri)

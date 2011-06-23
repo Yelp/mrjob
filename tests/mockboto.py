@@ -161,6 +161,12 @@ class MockKey(object):
         with open(path) as f:
             self.write_mock_data(f.read())
 
+    def get_contents_as_string(self):
+        return self.read_mock_data()
+
+    def set_contents_from_string(self, string):
+        self.write_mock_data(string)
+
     def delete(self):
         if self.name in self.bucket.mock_state():
             del self.bucket.mock_state()[self.name]
@@ -500,7 +506,7 @@ class MockEmrConnection(object):
             return
 
         # no pending steps. shut down job if appropriate
-        if job_flow.keepjobflowalivewhennosteps:
+        if job_flow.keepjobflowalivewhennosteps in ('true', True):
             job_flow.state = 'WAITING'
             job_flow.reason = 'Waiting for steps to run'
         else:

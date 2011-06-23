@@ -44,15 +44,15 @@ except ImportError:
     boto = None
 
 from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths, combine_path_lists
-from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_hadoop_counters_from_line
+from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_hadoop_counters_from_line, parse_s3_uri, S3_URI_RE
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
+from mrjob.s3lock import make_lock_uri, attempt_to_acquire
 from mrjob.util import cmd_line, extract_dir_for_tar, read_file
 
 
 log = logging.getLogger('mrjob.emr')
 
-S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
 JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?
@@ -136,21 +136,6 @@ def est_time_to_hour(job_flow):
         minutes = (jf_end - jf_start) / 60.0
         hours = minutes / 60.0
         return math.ceil(hours)*60 - minutes
-
-
-def parse_s3_uri(uri):
-    """Parse an S3 URI into (bucket, key)
-
-    >>> parse_s3_uri('s3://walrus/tmp/')
-    ('walrus', 'tmp/')
-
-    If ``uri`` is not an S3 URI, raise a ValueError
-    """
-    match = S3_URI_RE.match(uri)
-    if match:
-        return match.groups()
-    else:
-        raise ValueError('Invalid S3 URI: %s' % uri)
 
 
 def s3_key_to_uri(s3_key):
@@ -1643,7 +1628,7 @@ class EMRJobRunner(MRJobRunner):
     def get_emr_job_flow_id(self):
         return self._emr_job_flow_id
 
-    def usable_job_flows(self, emr_conn=None):
+    def usable_job_flows(self, emr_conn=None, exclude=None):
         """Get job flows that this runner can use. Sort by instance compute
         units and time left to an even instance hour.
 
@@ -1651,14 +1636,19 @@ class EMRJobRunner(MRJobRunner):
         """
 
         emr_conn = emr_conn or self.make_emr_conn()
+        exclude = exclude or []
+
         all_job_flows = emr_conn.describe_jobflows()
         jf_args = self._job_flow_args(persistent=True)
 
         def matches(job_flow):
-            # boto gives us a ustring for this. why???
+            if job_flow.jobflowid in exclude:
+                return False
+
+            # boto gives us ustrings for these. why???
             job_flow.instancecount = int(job_flow.instancecount)
             keep_alive = job_flow.keepjobflowalivewhennosteps 
-            job_flow.keepjobflowalivewhennosteps = bool(keep_alive == 'true')
+            job_flow.keepjobflowalivewhennosteps = (keep_alive in ('true', True))
 
             if job_flow.state != 'WAITING':
                 return False
@@ -1689,11 +1679,26 @@ class EMRJobRunner(MRJobRunner):
         compute units. Break ties by choosing flow with longest idle time.
         Return ``None`` if no suitable flows exist.
         """
-        sorted_tagged_job_flows = self.usable_job_flows()
-        if sorted_tagged_job_flows:
-            return sorted_tagged_job_flows[-1][1]
-        else:
-            return None
+        chosen_job_flow = None
+        exclude = []
+        emr_conn = self.make_emr_conn()
+        s3_conn = self.make_s3_conn()
+        while chosen_job_flow is None:
+            sorted_tagged_job_flows = self.usable_job_flows(emr_conn=emr_conn,
+                                                            exclude=exclude)
+            if sorted_tagged_job_flows:
+                job_flow = sorted_tagged_job_flows[-1][1]
+                lock_uri = make_lock_uri(self._s3_tmp_uri,
+                                         job_flow.jobflowid,
+                                        len(job_flow.steps)+1)
+                status = attempt_to_acquire(s3_conn, lock_uri,
+                                            self._opts['s3_sync_wait_time'])
+                if status:
+                    return sorted_tagged_job_flows[-1][1]
+                else:
+                    exclude.append(job_flow.jobflowid)
+            else:
+                return None
 
     ### GENERAL FILESYSTEM STUFF ###
 

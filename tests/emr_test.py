@@ -32,7 +32,8 @@ from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in,
 from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
 from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
-from mrjob.parse import JOB_NAME_RE
+from mrjob.parse import JOB_NAME_RE, parse_s3_uri
+from mrjob.s3lock import attempt_to_acquire, _acquire_step_1, _acquire_step_2, make_lock_uri
 from mrjob.util import tar_and_gzip
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, MockKey, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
@@ -1116,3 +1117,51 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         assert_equal(sorted(results),
             [(1, 'bar'), (1, 'foo'), (2, None)])
+
+
+class S3LockTestCase(MockEMRAndS3TestCase):
+
+    @setup
+    def make_buckets(self):
+        self.add_mock_s3_data({'locks': {}})
+        self.lock_uri = 's3://locks/some_lock'
+
+    def test_lock(self):
+        # Most basic test case
+        runner = EMRJobRunner(conf_path=False)
+        s3_conn = runner.make_s3_conn()
+        assert attempt_to_acquire(s3_conn, self.lock_uri, 0), 'Basic lock should succeed for first'
+        assert not attempt_to_acquire(s3_conn, self.lock_uri, 0), 'Basic lock should fail for second'
+
+    def test_key_race_condition(self):
+        # Test case where one attempt puts the key in existence 
+        runner = EMRJobRunner(conf_path=False)
+        s3_conn = runner.make_s3_conn()
+
+        uid = 'a_uid'
+        key = _acquire_step_1(s3_conn, self.lock_uri, uid)
+        assert_not_equal(key, None)
+
+        uid2 = 'another_uid'
+        key2 = _acquire_step_1(s3_conn, self.lock_uri, uid2)
+        assert_equal(key2, None)
+
+    def test_read_race_condition(self):
+        # test case where both try to create the key
+        runner = EMRJobRunner(conf_path=False)
+        s3_conn = runner.make_s3_conn()
+
+        uid = 'some_uid'
+        key = _acquire_step_1(s3_conn, self.lock_uri, uid)
+        assert_not_equal(key, None)
+
+        # acquire the key by subversive means to simulate contention
+        bucket_name, key_prefix = parse_s3_uri(self.lock_uri)
+        bucket = s3_conn.get_bucket(bucket_name)
+        key2 = bucket.get_key(key_prefix)
+        uid2 = 'another_uid'
+
+        # and take the lock!
+        key2.set_contents_from_string(uid2)
+
+        assert not _acquire_step_2(key, uid), 'Lock should fail'

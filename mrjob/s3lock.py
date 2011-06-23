@@ -34,11 +34,7 @@ def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
     """Generate the URI to lock the job flow ``emr_job_flow_id``"""
     return s3_tmp_uri + 'locks/' + emr_job_flow_id + '/' + str(step_num)
 
-def attempt_to_acquire(s3_conn, lock_uri, sync_wait_time=5.0, uid=None):
-    """Returns True if this session successfully took ownership of the lock
-    specified by ``lock_uri``.
-    """
-    uid = uid or make_uid()
+def _acquire_step_1(s3_conn, lock_uri, uid):
     bucket_name, key_prefix = parse_s3_uri(lock_uri)
     bucket = s3_conn.get_bucket(bucket_name)
     key = bucket.get_key(lock_uri)
@@ -46,9 +42,24 @@ def attempt_to_acquire(s3_conn, lock_uri, sync_wait_time=5.0, uid=None):
     if key is None:
         key = bucket.new_key(lock_uri)
         key.set_contents_from_string(uid)
+        return key
+    else:
+        return None
+
+def _acquire_step_2(key, uid):
+    key_value = key.get_contents_as_string()
+    return (key_value == uid)
+
+def attempt_to_acquire(s3_conn, lock_uri, sync_wait_time=5.0, uid=None):
+    """Returns True if this session successfully took ownership of the lock
+    specified by ``lock_uri``.
+    """
+    uid = uid or make_uid()
+    key = _acquire_step_1(s3_conn, lock_uri, uid)
+    if key is not None:
         time.sleep(sync_wait_time)
-        key_value = key.get_contents_as_string()
-        if key_value == uid:
+        success = _acquire_step_2(key, uid)
+        if success:
             return True
 
     print 'could not acquire lock for', lock_uri

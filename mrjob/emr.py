@@ -1703,7 +1703,7 @@ class EMRJobRunner(MRJobRunner):
                                                             exclude=exclude)
             if sorted_tagged_job_flows:
                 job_flow = sorted_tagged_job_flows[-1][1]
-                lock_uri = make_lock_uri(self._s3_tmp_uri,
+                lock_uri = make_lock_uri(self._opts['s3_scratch_uri'],
                                          job_flow.jobflowid,
                                         len(job_flow.steps)+1)
                 status = attempt_to_acquire(s3_conn, lock_uri,

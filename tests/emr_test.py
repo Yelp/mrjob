@@ -1067,32 +1067,15 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         results = []
         with mr_job.make_runner() as runner:
             runner.run()
+
+            # Make sure that the runner made a pooling-enabled job flow
+            emr_conn = runner.make_emr_conn()
             job_flow_id = runner.get_emr_job_flow_id()
-
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
-
-        stdin = StringIO('foo\nbar\n')
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool',
-                               '-c', self.mrjob_conf_path])
-        mr_job.sandbox(stdin=stdin)
-
-        results = []
-        with mr_job.make_runner() as runner:
-            runner.run()
-            # This job flow ID is correct, but the output is not.
-            jf_id = runner.get_emr_job_flow_id()
-
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
-
-        assert_equal(sorted(results),
-            [(1, 'bar'), (1, 'foo'), (2, None)])
+            job_flow = emr_conn.describe_jobflow(job_flow_id)
+            bootstrap_action = job_flow.bootstrapactions[0]
+            runner_jobflow_args = [a.value for a in bootstrap_action.args]
+            assert runner._pool_arg() in runner_jobflow_args
+            assert_equal(job_flow.state, 'WAITING')
 
     def test_join_pooled_job_flow(self):
         runner = EMRJobRunner(conf_path=self.mrjob_conf_path,

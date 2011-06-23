@@ -1114,20 +1114,18 @@ class S3LockTestCase(MockEMRAndS3TestCase):
         # Most basic test case
         runner = EMRJobRunner(conf_path=False)
         s3_conn = runner.make_s3_conn()
-        assert attempt_to_acquire(s3_conn, self.lock_uri, 0), 'Basic lock should succeed for first'
-        assert not attempt_to_acquire(s3_conn, self.lock_uri, 0), 'Basic lock should fail for second'
+        assert attempt_to_acquire(s3_conn, self.lock_uri, 0, 'jf1'), 'Basic lock should succeed for first'
+        assert not attempt_to_acquire(s3_conn, self.lock_uri, 0, 'jf2'), 'Basic lock should fail for second'
 
     def test_key_race_condition(self):
         # Test case where one attempt puts the key in existence 
         runner = EMRJobRunner(conf_path=False)
         s3_conn = runner.make_s3_conn()
 
-        uid = 'a_uid'
-        key = _acquire_step_1(s3_conn, self.lock_uri, uid)
+        key = _acquire_step_1(s3_conn, self.lock_uri, 'jf1')
         assert_not_equal(key, None)
 
-        uid2 = 'another_uid'
-        key2 = _acquire_step_1(s3_conn, self.lock_uri, uid2)
+        key2 = _acquire_step_1(s3_conn, self.lock_uri, 'jf2')
         assert_equal(key2, None)
 
     def test_read_race_condition(self):
@@ -1135,17 +1133,15 @@ class S3LockTestCase(MockEMRAndS3TestCase):
         runner = EMRJobRunner(conf_path=False)
         s3_conn = runner.make_s3_conn()
 
-        uid = 'some_uid'
-        key = _acquire_step_1(s3_conn, self.lock_uri, uid)
+        key = _acquire_step_1(s3_conn, self.lock_uri, 'jf1')
         assert_not_equal(key, None)
 
         # acquire the key by subversive means to simulate contention
         bucket_name, key_prefix = parse_s3_uri(self.lock_uri)
         bucket = s3_conn.get_bucket(bucket_name)
         key2 = bucket.get_key(key_prefix)
-        uid2 = 'another_uid'
 
         # and take the lock!
-        key2.set_contents_from_string(uid2)
+        key2.set_contents_from_string('jf2')
 
-        assert not _acquire_step_2(key, uid), 'Lock should fail'
+        assert not _acquire_step_2(key, 'jf1'), 'Lock should fail'

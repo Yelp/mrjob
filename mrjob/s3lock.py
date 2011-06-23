@@ -23,47 +23,36 @@ import time
 from mrjob.parse import parse_s3_uri
 
 
-def make_uid():
-    """Generate a string that is local to the current 'lock attempt'. Uses
-    things like host, username, and time. Could be replaced by a better GUID
-    scheme.
-    """
-    # This function is almost certainly unnecessary since we have
-    # runner._job_name. To be removed.
-    return str(os.uname()) + os.getlogin()
-
-
 def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
     """Generate the URI to lock the job flow ``emr_job_flow_id``"""
     return s3_tmp_uri + 'locks/' + emr_job_flow_id + '/' + str(step_num)
 
 
-def _acquire_step_1(s3_conn, lock_uri, uid):
+def _acquire_step_1(s3_conn, lock_uri, job_name):
     bucket_name, key_prefix = parse_s3_uri(lock_uri)
     bucket = s3_conn.get_bucket(bucket_name)
     key = bucket.get_key(key_prefix)
     if key is None:
         key = bucket.new_key(key_prefix)
-        key.set_contents_from_string(uid)
+        key.set_contents_from_string(job_name)
         return key
     else:
         return None
 
 
-def _acquire_step_2(key, uid):
+def _acquire_step_2(key, job_name):
     key_value = key.get_contents_as_string()
-    return (key_value == uid)
+    return (key_value == job_name)
 
 
-def attempt_to_acquire(s3_conn, lock_uri, sync_wait_time=5.0, uid=None):
+def attempt_to_acquire(s3_conn, lock_uri, sync_wait_time, job_name):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
-    uid = uid or make_uid()
-    key = _acquire_step_1(s3_conn, lock_uri, uid)
+    key = _acquire_step_1(s3_conn, lock_uri, job_name)
     if key is not None:
         time.sleep(sync_wait_time)
-        success = _acquire_step_2(key, uid)
+        success = _acquire_step_2(key, job_name)
         if success:
             return True
 

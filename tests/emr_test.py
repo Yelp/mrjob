@@ -1095,7 +1095,8 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_join_pooled_job_flow(self):
-        runner = EMRJobRunner(conf_path=False, pool_job_flows=True)
+        runner = EMRJobRunner(conf_path=self.mrjob_conf_path,
+                              pool_job_flows=True)
         job_flow_id = runner.make_persistent_job_flow()
         runner.make_emr_conn().describe_jobflow(job_flow_id).state = 'WAITING'
 

@@ -48,7 +48,7 @@ from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, fin
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
 from mrjob.s3lock import make_lock_uri, attempt_to_acquire
-from mrjob.util import cmd_line, extract_dir_for_tar, read_file
+from mrjob.util import cmd_line, extract_dir_for_tar, hash_file, hash_object, read_file
 
 
 def monkeypatch_boto():
@@ -870,7 +870,7 @@ class EMRJobRunner(MRJobRunner):
 
         if self._master_bootstrap_script:
             if self._opts['pool_job_flows']:
-                bootstrap_args = ['pool']
+                bootstrap_args = [self._pool_arg()]
             else:
                 bootstrap_args = []
             args['bootstrap_actions'] = [boto.emr.BootstrapAction(
@@ -1653,6 +1653,8 @@ class EMRJobRunner(MRJobRunner):
         all_job_flows = emr_conn.describe_jobflows()
         jf_args = self._job_flow_args(persistent=True)
 
+        pool_arg = self._pool_arg()
+
         def matches(job_flow):
             if job_flow.jobflowid in exclude:
                 return False
@@ -1665,7 +1667,7 @@ class EMRJobRunner(MRJobRunner):
             if job_flow.state != 'WAITING':
                 return False
             args = [arg.value for arg in job_flow.bootstrapactions[0].args]
-            if 'pool' not in args:
+            if pool_arg not in args:
                 return False
             if not job_flow.keepjobflowalivewhennosteps:
                 return False
@@ -1712,6 +1714,24 @@ class EMRJobRunner(MRJobRunner):
                     exclude.append(job_flow.jobflowid)
             else:
                 return None
+
+    def _pool_arg(self):
+        things_to_hash = [
+            [fd['path'] for fd in self._bootstrap_scripts],
+            self._opts['bootstrap_mrjob'],
+            [fd['path'] for fd in self._bootstrap_python_packages],
+            self._opts['bootstrap_cmds'],
+        ]
+        # log.info('\n'.join([str(s) for s in things_to_hash]))
+        things_to_hash = [
+            [hash_file(fd['path']) for fd in self._bootstrap_scripts],
+            self._opts['bootstrap_mrjob'],
+            [hash_file(fd['path']) for fd in self._bootstrap_python_packages],
+            self._opts['bootstrap_cmds'],
+        ]
+        # log.info(things_to_hash)
+        arg = 'pool-%s' % hash_object(things_to_hash)
+        return arg
 
     ### GENERAL FILESYSTEM STUFF ###
 

@@ -22,6 +22,7 @@ import bz2
 import contextlib
 import glob
 import gzip
+import hashlib
 import itertools
 import logging
 import os
@@ -77,6 +78,25 @@ def file_ext(path):
     if dot_index == -1:
         return ''
     return filename[dot_index:]
+
+
+def hash_file(path, block_size=8**6):
+    """Generate a hash (currently md5) of the file at ``path``"""
+    md5 = hashlib.md5()
+    with open(path, 'rb') as f:
+        while True:
+            data = f.read(block_size)
+            if not data:
+                break
+            md5.update(data)
+    return md5.hexdigest()
+
+
+def hash_object(obj):
+    """Generate a hash (currently md5) of the ``repr`` of the object"""
+    m = hashlib.md5()
+    m.update(repr(obj))
+    return m.hexdigest()
 
 
 def log_to_stream(name=None, stream=None, format=None, level=None, debug=False):

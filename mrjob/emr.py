@@ -51,6 +51,18 @@ from mrjob.s3lock import make_lock_uri, attempt_to_acquire
 from mrjob.util import cmd_line, extract_dir_for_tar, read_file
 
 
+def monkeypatch_boto():
+    boto.emr.emrobject.JobFlow.Fields.add('HadoopVersion')
+    from boto.resultset import ResultSet
+    def new_bootstrap_sax_handler(self, name, attrs, connection):
+        if name == 'Args':
+            self.args = ResultSet([('member', boto.emr.emrobject.Arg)])
+            return self.args
+    boto.emr.emrobject.BootstrapAction.startElement = new_bootstrap_sax_handler
+
+monkeypatch_boto()
+
+
 log = logging.getLogger('mrjob.emr')
 
 JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
@@ -1652,7 +1664,8 @@ class EMRJobRunner(MRJobRunner):
 
             if job_flow.state != 'WAITING':
                 return False
-            if 'pool' not in job_flow.bootstrapactions[0].args:
+            args = [arg.value for arg in job_flow.bootstrapactions[0].args]
+            if 'pool' not in args:
                 return False
             if not job_flow.keepjobflowalivewhennosteps:
                 return False

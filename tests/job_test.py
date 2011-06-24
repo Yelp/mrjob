@@ -35,6 +35,13 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_nomapper_multistep import MRNoMapper
 
 
+def stepdict(mapper, reducer=None, mapper_final=None, **kwargs):
+    d = dict(mapper=mapper,
+             mapper_final=mapper_final,
+             reducer=reducer)
+    d.update(kwargs)
+    return d
+
 ### Test classes ###
 
 # These can't be invoked as a separate script, but they don't need to be
@@ -97,19 +104,26 @@ class MRTestCase(TestCase):
         def reducer(k, vs): pass
 
         # make sure it returns the format we currently expect
-        assert_equal(MRJob.mr(mapper, reducer), (mapper, reducer))
+        assert_equal(MRJob.mr(mapper, reducer),
+                     stepdict(mapper, reducer))
         assert_equal(MRJob.mr(mapper, reducer, mapper_final=mapper_final),
-                     ((mapper, mapper_final), reducer))
-        assert_equal(MRJob.mr(mapper), (mapper, None))
+                     stepdict(mapper, mapper_final=mapper_final,
+                              reducer=reducer))
+        assert_equal(MRJob.mr(mapper),
+                     stepdict(mapper))
 
     def test_no_mapper(self):
         def mapper_final(k, v): pass
         def reducer(k, vs): pass
 
         assert_raises(Exception, MRJob.mr)
-        assert_equal(MRJob.mr(reducer=reducer), (_IDENTITY_MAPPER, reducer))
+        assert_equal(MRJob.mr(reducer=reducer),
+                     stepdict(mapper=_IDENTITY_MAPPER,
+                              reducer=reducer))
         assert_equal(MRJob.mr(reducer=reducer, mapper_final=mapper_final),
-                     ((_IDENTITY_MAPPER, mapper_final), reducer))
+                     stepdict(mapper=_IDENTITY_MAPPER,
+                              mapper_final=mapper_final,
+                              reducer=reducer))
 
 
 class NoTzsetTestCase(TestCase):
@@ -350,12 +364,15 @@ class StepsTestCase(TestCase):
     def test_auto_build_steps(self):
         mrbj = MRBoringJob()
         assert_equal(mrbj.steps(),
-                     [mrbj.mr(mrbj.mapper, mrbj.reducer)])
+                     [dict(mapper=mrbj.mapper,
+                           mapper_final=None,
+                           reducer=mrbj.reducer)])
 
         mrfbj = MRFinalBoringJob()
         assert_equal(mrfbj.steps(),
-                     [mrfbj.mr(mrfbj.mapper, mrfbj.reducer,
-                                mapper_final=mrfbj.mapper_final)])
+                     [dict(mapper=mrfbj.mapper,
+                           mapper_final=mrfbj.mapper_final,
+                           reducer=mrfbj.reducer)])
 
     def test_show_steps(self):
         mr_boring_job = MRBoringJob(['--steps'])

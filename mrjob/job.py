@@ -276,7 +276,7 @@ class MRJob(object):
         """
         step = dict(mapper=mapper, reducer=reducer, mapper_final=mapper_final)
 
-        if not reduce(lambda a, b: a or b, step.itervalues(), False):
+        if not any(step.itervalues()):
             raise Exception("Step has no mappers and no reducers")
 
         # Hadoop streaming requires a mapper, so patch in _IDENTITY_MAPPER
@@ -493,7 +493,8 @@ class MRJob(object):
         res = []
         for step in self.steps():
             if step['reducer']:
-                if step['mapper'] == _IDENTITY_MAPPER:
+                if step['mapper'] == _IDENTITY_MAPPER \
+                   and not step['mapper_final']:
                     # infer whether the mapper has the same input and 
                     # output protocols 
                     if step_num == 0:

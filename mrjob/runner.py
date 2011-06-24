@@ -741,7 +741,7 @@ class MRJobRunner(object):
                 steps = stdout.strip().split(' ')
 
                 # verify that this is a proper step description
-                if not steps:
+                if not steps or not stdout:
                     raise ValueError('step description is empty!')
                 for step in steps:
                     if step not in ('MR', 'M', 'R'):

@@ -35,7 +35,7 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_nomapper_multistep import MRNoMapper
 
 
-def stepdict(mapper, reducer=None,
+def stepdict(mapper=_IDENTITY_MAPPER, reducer=None,
              mapper_init=None, mapper_final=None, 
              reducer_init=None, reducer_final=None,
              **kwargs):
@@ -68,6 +68,26 @@ class MRFinalBoringJob(MRBoringJob):
 
     def mapper_final(self):
         yield('num_lines', self.num_lines)
+
+
+class MRInitJob(MRJob):
+
+    def __init__(self, *args, **kwargs):
+        super(MRInitJob, self).__init__(*args, **kwargs)
+        self.sum_amount = 0
+        self.multiplier = 0
+
+    def mapper_init(self):
+        self.sum_amount += 10
+
+    def mapper(self, key, value):
+        yield(None, self.sum_amount)
+
+    def reducer_init(self):
+        self.multiplier += 10
+
+    def reducer(self, key, values):
+        yield(None, sum(values)*self.multiplier)
 
 
 class MRCustomBoringJob(MRBoringJob):
@@ -106,30 +126,70 @@ class MRTestCase(TestCase):
     def test_mr(self):
 
         def mapper(k, v): pass
-        def mapper_final(k, v): pass
+        def mapper_init(): pass
+        def mapper_final(): pass
         def reducer(k, vs): pass
+        def reducer_init(): pass
+        def reducer_final(): pass
 
         # make sure it returns the format we currently expect
         assert_equal(MRJob.mr(mapper, reducer),
                      stepdict(mapper, reducer))
-        assert_equal(MRJob.mr(mapper, reducer, mapper_final=mapper_final),
-                     stepdict(mapper, mapper_final=mapper_final,
-                              reducer=reducer))
+        assert_equal(MRJob.mr(mapper, reducer,
+                              mapper_init=mapper_init,
+                              mapper_final=mapper_final,
+                              reducer_init=reducer_init,
+                              reducer_final=reducer_final),
+                     stepdict(mapper, reducer,
+                              mapper_init=mapper_init,
+                              mapper_final=mapper_final,
+                              reducer_init=reducer_init,
+                              reducer_final=reducer_final))
         assert_equal(MRJob.mr(mapper),
                      stepdict(mapper))
 
     def test_no_mapper(self):
-        def mapper_final(k, v): pass
+        def mapper_init(): pass
+        def mapper_final(): pass
         def reducer(k, vs): pass
 
         assert_raises(Exception, MRJob.mr)
         assert_equal(MRJob.mr(reducer=reducer),
-                     stepdict(mapper=_IDENTITY_MAPPER,
-                              reducer=reducer))
-        assert_equal(MRJob.mr(reducer=reducer, mapper_final=mapper_final),
-                     stepdict(mapper=_IDENTITY_MAPPER,
-                              mapper_final=mapper_final,
-                              reducer=reducer))
+                     stepdict(reducer=reducer))
+        assert_equal(MRJob.mr(reducer=reducer,
+                              mapper_final=mapper_final),
+                     stepdict(reducer=reducer,
+                              mapper_final=mapper_final))
+        assert_equal(MRJob.mr(reducer=reducer,
+                              mapper_init=mapper_init),
+                     stepdict(reducer=reducer,
+                              mapper_init=mapper_init))
+
+    def test_no_reducer(self):
+        def reducer_init(): pass
+        def reducer_final(): pass
+
+        assert_equal(MRJob.mr(reducer_init=reducer_init),
+                     stepdict(reducer_init=reducer_init))
+        assert_equal(MRJob.mr(reducer_final=reducer_final),
+                     stepdict(reducer_final=reducer_final))
+
+
+class MRInitTestCase(TestCase):
+
+    def test_init_funcs(self):
+        num_inputs = 2
+        stdin = StringIO("x\n" * num_inputs)
+        mr_job = MRInitJob(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
+        results = []
+        with mr_job.make_runner() as runner:
+            runner.run()
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append(value)
+        # these numbers should match if mapper_init and reducer_Init were
+        # called as expected
+        assert_equal(results[0], num_inputs*10*10)
 
 
 class NoTzsetTestCase(TestCase):
@@ -395,7 +455,7 @@ class StepsTestCase(TestCase):
         mr_two_step_job.sandbox()
         mr_two_step_job.show_steps()
         assert_equal(mr_two_step_job.stdout.getvalue(), 'MR M\n')
-        
+
         mr_no_mapper = MRNoMapper(['--steps'])
         mr_no_mapper.sandbox()
         mr_no_mapper.show_steps()

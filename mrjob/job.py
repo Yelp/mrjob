@@ -309,13 +309,17 @@ class MRJob(object):
     def mr(cls, mapper=None, reducer=None,
            mapper_init=None, mapper_final=None,
            reducer_init=None, reducer_final=None):
-        """Define a step (mapper, final mapper action, and/or reducer) for your job.
+        """Define a step (mapper, reducer, and/or any combination of 
+        mapper_init, reducer_final, etc.) for your job.
 
         Used by :py:meth:`steps`. (Don't re-define this, just call it!)
 
         :param mapper: function with same function signature as :py:meth:`mapper`, or ``None`` for an identity mapper.
         :param reducer: function with same function signature as :py:meth:`reducer`, or ``None`` for no reducer.
+        :param mapper_init: function with same function signature as :py:meth:`mapper_init`, or ``None`` for no initial mapper action. Please invoke this as a keyword argument.
         :param mapper_final: function with same function signature as :py:meth:`mapper_final`, or ``None`` for no final mapper action. Please invoke this as a keyword argument.
+        :param reducer_init: function with same function signature as :py:meth:`reducer_init`, or ``None`` for no initial reducer action. Please invoke this as a keyword argument.
+        :param reducer_final: function with same function signature as :py:meth:`reducer_final`, or ``None`` for no final reducer action. Please invoke this as a keyword argument.
 
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.

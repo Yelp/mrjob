@@ -1719,21 +1719,12 @@ class EMRJobRunner(MRJobRunner):
 
     def _pool_arg(self):
         things_to_hash = [
-            [fd['path'] for fd in self._bootstrap_scripts],
-            self._opts['bootstrap_mrjob'],
-            [fd['path'] for fd in self._bootstrap_python_packages],
-            self._opts['bootstrap_cmds'],
-        ]
-        # log.info('\n'.join([str(s) for s in things_to_hash]))
-        things_to_hash = [
             [hash_file(fd['path']) for fd in self._bootstrap_scripts],
             self._opts['bootstrap_mrjob'],
             [hash_file(fd['path']) for fd in self._bootstrap_python_packages],
             self._opts['bootstrap_cmds'],
         ]
-        # log.info(things_to_hash)
-        arg = 'pool-%s' % hash_object(things_to_hash)
-        return arg
+        return 'pool-%s' % hash_object(things_to_hash)
 
     ### GENERAL FILESYSTEM STUFF ###
 

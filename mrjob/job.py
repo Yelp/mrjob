@@ -274,16 +274,15 @@ class MRJob(object):
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.
         """
-        # Hadoop streaming requires a mapper, so patch in _IDENTITY_MAPPER
-        if not mapper:
-            if not mapper_final and not reducer:
-                raise Exception("Step has no mappers and no reducers")
-            mapper = _IDENTITY_MAPPER
+        step = dict(mapper=mapper, reducer=reducer, mapper_final=mapper_final)
 
-        if mapper_final:
-            return ((mapper, mapper_final), reducer)
-        else:
-            return (mapper, reducer)
+        if not reduce(lambda a, b: a or b, step.itervalues(), False):
+            raise Exception("Step has no mappers and no reducers")
+
+        # Hadoop streaming requires a mapper, so patch in _IDENTITY_MAPPER
+        step['mapper'] = step['mapper'] or _IDENTITY_MAPPER
+
+        return step
 
     def increment_counter(self, group, counter, amount=1):
         """Increment a hadoop counter in hadoop streaming by printing to stderr.
@@ -369,7 +368,7 @@ class MRJob(object):
         for w in bad_words:
             if w in sys.argv:
                 raise UsageError("make_runner() was called with %s. This probably means you tried to use it from __main__, which doesn't work." % w)
-        
+
         # have to import here so that we can still run the MRJob
         # without importing boto
         from mrjob.emr import EMRJobRunner
@@ -427,13 +426,8 @@ class MRJob(object):
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
-        mapper = steps[step_num][0]
-
-        # special case: mapper is actually a tuple of mapper and final mapper
-        if isinstance(mapper, tuple):
-            mapper, mapper_final = mapper
-        else:
-            mapper_final = None
+        mapper = steps[step_num]['mapper']
+        mapper_final = steps[step_num]['mapper_final']
 
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'M')
@@ -464,7 +458,7 @@ class MRJob(object):
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
-        reducer = steps[step_num][1]
+        reducer = steps[step_num]['reducer']
         if reducer is None:
             raise ValueError('No reducer in step %d' % step_num)
 
@@ -497,9 +491,9 @@ class MRJob(object):
     def _steps_desc(self):
         step_num = 0
         res = []
-        for (mapper, reducer) in self.steps():
-            if reducer:
-                if mapper == _IDENTITY_MAPPER:
+        for step in self.steps():
+            if step['reducer']:
+                if step['mapper'] == _IDENTITY_MAPPER:
                     # infer whether the mapper has the same input and 
                     # output protocols 
                     if step_num == 0:

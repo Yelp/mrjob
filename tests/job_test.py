@@ -90,6 +90,30 @@ class MRInitJob(MRJob):
         yield(None, sum(values)*self.multiplier)
 
 
+class MRInvisibleMapperJob(MRJob):
+
+    def mapper_init(self):
+        self.things = 0
+
+    def mapper(self, key, value):
+        self.things += 1
+
+    def mapper_final(self):
+        yield None, self.things
+
+
+class MRInvisibleReducerJob(MRJob):
+
+    def reducer_init(self):
+        self.things = 0
+
+    def reducer(self, key, values):
+        self.things += len(list(values))
+
+    def reducer_final(self):
+        yield None, self.things
+
+
 class MRCustomBoringJob(MRBoringJob):
 
     def configure_options(self):
@@ -190,6 +214,33 @@ class MRInitTestCase(TestCase):
         # these numbers should match if mapper_init and reducer_Init were
         # called as expected
         assert_equal(results[0], num_inputs*10*10)
+
+
+class MRNoOutputTestCase(TestCase):
+
+    def test_no_map(self):
+        num_inputs = 2
+        stdin = StringIO("x\n" * num_inputs)
+        mr_job = MRInvisibleMapperJob(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
+        results = []
+        with mr_job.make_runner() as runner:
+            runner.run()
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append(value)
+        assert_equal(results[0], num_inputs)
+
+    def test_no_reduce(self):
+        num_inputs = 2
+        stdin = StringIO("x\n" * num_inputs)
+        mr_job = MRInvisibleReducerJob(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
+        results = []
+        with mr_job.make_runner() as runner:
+            runner.run()
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append(value)
+        assert_equal(results[0], num_inputs)
 
 
 class NoTzsetTestCase(TestCase):

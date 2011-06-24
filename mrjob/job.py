@@ -488,7 +488,7 @@ class MRJob(object):
 
         # run the mapper on each line
         for key, value in read_lines():
-            for out_key, out_value in mapper(key, value):
+            for out_key, out_value in mapper(key, value) or ():
                 write_line(out_key, out_value)
 
         if mapper_final:
@@ -533,7 +533,7 @@ class MRJob(object):
         for key, kv_pairs in itertools.groupby(read_lines(),
                                                key=lambda(k, v): k):
             values = (v for k, v in kv_pairs)
-            for out_key, out_value in reducer(key, values):
+            for out_key, out_value in reducer(key, values) or ():
                 write_line(out_key, out_value)
 
         if reducer_final:

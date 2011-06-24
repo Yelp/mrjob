@@ -24,7 +24,8 @@ from __future__ import with_statement
 import datetime
 
 try:
-    import boto.emr
+    from boto.emr.connection import EmrConnection
+    from boto.emr.step import JarStep
     import boto.exception
     import boto.utils
 except ImportError:
@@ -314,8 +315,8 @@ class MockEmrConnection(object):
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
         if enable_debugging:
-            debug_jar = boto.emr.connection.EmrConnection.DebuggingJar
-            debug_args = [MockEmrObject(value=boto.emr.connection.EmrConnection.DebuggingArgs)]
+            debug_jar = EmrConnection.DebuggingJar
+            debug_args = [MockEmrObject(value=EmrConnection.DebuggingArgs)]
             JarStep = boto.emr.step.JarStep
             debugging_step = JarStep(name='Setup Hadoop Debugging',
                                      action_on_failure='TERMINATE_JOB_FLOW',

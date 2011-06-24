@@ -232,8 +232,9 @@ class EMRJobRunner(MRJobRunner):
 
     :py:class:`EMRJobRunner` runs your job in an EMR job flow, which is
     basically a temporary Hadoop cluster. Normally, it creates a job flow
-    just for your job; it's also possible to run your job in an existing
-    job flow by setting *emr_job_flow_id* (or :option:`--emr-job-flow-id`).
+    just for your job; it's also possible to run your job in a specific
+    job flow by setting *emr_job_flow_id* or to automatically choose a
+    waiting job flow, creating one if none exists, by setting *pool_job_flows*.
 
     Input, support, and jar files can be either local or on S3; use ``s3://...``
     URLs to refer to files on S3.

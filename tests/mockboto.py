@@ -24,13 +24,13 @@ from __future__ import with_statement
 import datetime
 
 try:
+    from boto.emr.connection import EmrConnection
+    from boto.emr.step import JarStep
     import boto.exception
     import boto.utils
 except ImportError:
     boto = None
 
-from mrjob.botoemr.connection import EmrConnection
-from mrjob.botoemr.step import JarStep
 from mrjob.conf import combine_values
 from mrjob.emr import S3_URI_RE, parse_s3_uri
 

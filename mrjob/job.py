@@ -262,7 +262,9 @@ class MRJob(object):
         return [self.mr(**kwargs)]
 
     @classmethod
-    def mr(cls, mapper=None, reducer=None, mapper_final=None):
+    def mr(cls, mapper=None, reducer=None,
+           mapper_init=None, mapper_final=None,
+           reducer_init=None, reducer_final=None):
         """Define a step (mapper, final mapper action, and/or reducer) for your job.
 
         Used by :py:meth:`steps`. (Don't re-define this, just call it!)
@@ -274,7 +276,9 @@ class MRJob(object):
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.
         """
-        step = dict(mapper=mapper, reducer=reducer, mapper_final=mapper_final)
+        step = dict(mapper=mapper, reducer=reducer,
+                    mapper_init=mapper_init, mapper_final=mapper_final,
+                    reducer_init=reducer_init, reducer_final=reducer_final)
 
         if not any(step.itervalues()):
             raise Exception("Step has no mappers and no reducers")
@@ -426,11 +430,17 @@ class MRJob(object):
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
-        mapper = steps[step_num]['mapper']
-        mapper_final = steps[step_num]['mapper_final']
+        step = steps[step_num]
+        mapper = step['mapper']
+        mapper_init = step['mapper_init']
+        mapper_final = step['mapper_final']
 
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'M')
+
+        if mapper_init:
+            for out_key, out_value in mapper_init():
+                write_line(out_key, out_value)
 
         # run the mapper on each line
         for key, value in read_lines():
@@ -458,12 +468,19 @@ class MRJob(object):
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
-        reducer = steps[step_num]['reducer']
+        step = steps[step_num]
+        reducer = step['reducer']
+        reducer_init = step['reducer_init']
+        reducer_final = step['reducer_final']
         if reducer is None:
             raise ValueError('No reducer in step %d' % step_num)
 
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'R')
+
+        if reducer_init:
+            for out_key, out_value in reducer_init():
+                write_line(out_key, out_value)
 
         # group all values of the same key together, and pass to the reducer
         #
@@ -473,6 +490,10 @@ class MRJob(object):
                                                key=lambda(k, v): k):
             values = (v for k, v in kv_pairs)
             for out_key, out_value in reducer(key, values):
+                write_line(out_key, out_value)
+
+        if reducer_final:
+            for out_key, out_value in reducer_final():
                 write_line(out_key, out_value)
 
     def show_steps(self):

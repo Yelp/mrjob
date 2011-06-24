@@ -35,10 +35,16 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_nomapper_multistep import MRNoMapper
 
 
-def stepdict(mapper, reducer=None, mapper_final=None, **kwargs):
+def stepdict(mapper, reducer=None,
+             mapper_init=None, mapper_final=None, 
+             reducer_init=None, reducer_final=None,
+             **kwargs):
     d = dict(mapper=mapper,
+             mapper_init=mapper_init,
              mapper_final=mapper_final,
-             reducer=reducer)
+             reducer=reducer,
+             reducer_init=reducer_init,
+             reducer_final=reducer_final)
     d.update(kwargs)
     return d
 
@@ -364,15 +370,14 @@ class StepsTestCase(TestCase):
     def test_auto_build_steps(self):
         mrbj = MRBoringJob()
         assert_equal(mrbj.steps(),
-                     [dict(mapper=mrbj.mapper,
-                           mapper_final=None,
-                           reducer=mrbj.reducer)])
+                     [stepdict(mapper=mrbj.mapper,
+                               reducer=mrbj.reducer)])
 
         mrfbj = MRFinalBoringJob()
         assert_equal(mrfbj.steps(),
-                     [dict(mapper=mrfbj.mapper,
-                           mapper_final=mrfbj.mapper_final,
-                           reducer=mrfbj.reducer)])
+                     [stepdict(mapper=mrfbj.mapper,
+                               mapper_final=mrfbj.mapper_final,
+                               reducer=mrfbj.reducer)])
 
     def test_show_steps(self):
         mr_boring_job = MRBoringJob(['--steps'])

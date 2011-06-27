@@ -224,6 +224,20 @@ class MRJob(object):
         """
         raise NotImplementedError
 
+    def mapper_init(self):
+        """Re-define this to define an action to run before the mapper
+        processes any input.
+
+        One use for this function is to initialize mapper-specific helper
+        structures.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
     def mapper_final(self):
         """Re-define this to define an action to run after the mapper reaches
         the end of input.
@@ -231,6 +245,31 @@ class MRJob(object):
         One way to use this is to store a total in an instance variable, and
         output it after reading all input data. See :py:mod:`mrjob.examples`
         for an example.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
+    def reducer_init(self):
+        """Re-define this to define an action to run before the reducer
+        processes any input.
+
+        One use for this function is to initialize reducer-specific helper
+        structures.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
+    def reducer_final(self):
+        """Re-define this to define an action to run after the reducer reaches
+        the end of input.
 
         Yields one or more tuples of ``(out_key, out_value)``.
 
@@ -255,26 +294,39 @@ class MRJob(object):
         # Use mapper(), mapper_final(), and reducer() only if they've been
         # re-defined
         kwargs = dict((func_name, getattr(self, func_name))
-                      for func_name in ('mapper', 'mapper_final', 'reducer')
+                      for func_name in ('mapper',
+                                        'mapper_init',
+                                        'mapper_final',
+                                        'reducer',
+                                        'reducer_init',
+                                        'reducer_final')
                       if (getattr(self, func_name).im_func is not
                           getattr(MRJob, func_name).im_func))
 
         return [self.mr(**kwargs)]
 
     @classmethod
-    def mr(cls, mapper=None, reducer=None, mapper_final=None):
-        """Define a step (mapper, final mapper action, and/or reducer) for your job.
+    def mr(cls, mapper=None, reducer=None,
+           mapper_init=None, mapper_final=None,
+           reducer_init=None, reducer_final=None):
+        """Define a step (mapper, reducer, and/or any combination of 
+        mapper_init, reducer_final, etc.) for your job.
 
         Used by :py:meth:`steps`. (Don't re-define this, just call it!)
 
         :param mapper: function with same function signature as :py:meth:`mapper`, or ``None`` for an identity mapper.
         :param reducer: function with same function signature as :py:meth:`reducer`, or ``None`` for no reducer.
+        :param mapper_init: function with same function signature as :py:meth:`mapper_init`, or ``None`` for no initial mapper action. Please invoke this as a keyword argument.
         :param mapper_final: function with same function signature as :py:meth:`mapper_final`, or ``None`` for no final mapper action. Please invoke this as a keyword argument.
+        :param reducer_init: function with same function signature as :py:meth:`reducer_init`, or ``None`` for no initial reducer action. Please invoke this as a keyword argument.
+        :param reducer_final: function with same function signature as :py:meth:`reducer_final`, or ``None`` for no final reducer action. Please invoke this as a keyword argument.
 
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.
         """
-        step = dict(mapper=mapper, reducer=reducer, mapper_final=mapper_final)
+        step = dict(mapper=mapper, reducer=reducer,
+                    mapper_init=mapper_init, mapper_final=mapper_final,
+                    reducer_init=reducer_init, reducer_final=reducer_final)
 
         if not any(step.itervalues()):
             raise Exception("Step has no mappers and no reducers")
@@ -426,19 +478,25 @@ class MRJob(object):
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
-        mapper = steps[step_num]['mapper']
-        mapper_final = steps[step_num]['mapper_final']
+        step = steps[step_num]
+        mapper = step['mapper']
+        mapper_init = step['mapper_init']
+        mapper_final = step['mapper_final']
 
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'M')
 
+        if mapper_init:
+            for out_key, out_value in mapper_init() or ():
+                write_line(out_key, out_value)
+
         # run the mapper on each line
         for key, value in read_lines():
-            for out_key, out_value in mapper(key, value):
+            for out_key, out_value in mapper(key, value) or ():
                 write_line(out_key, out_value)
 
         if mapper_final:
-            for out_key, out_value in mapper_final():
+            for out_key, out_value in mapper_final() or ():
                 write_line(out_key, out_value)
 
     def run_reducer(self, step_num=0):
@@ -458,12 +516,19 @@ class MRJob(object):
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
-        reducer = steps[step_num]['reducer']
+        step = steps[step_num]
+        reducer = step['reducer']
+        reducer_init = step['reducer_init']
+        reducer_final = step['reducer_final']
         if reducer is None:
             raise ValueError('No reducer in step %d' % step_num)
 
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'R')
+
+        if reducer_init:
+            for out_key, out_value in reducer_init() or ():
+                write_line(out_key, out_value)
 
         # group all values of the same key together, and pass to the reducer
         #
@@ -472,7 +537,11 @@ class MRJob(object):
         for key, kv_pairs in itertools.groupby(read_lines(),
                                                key=lambda(k, v): k):
             values = (v for k, v in kv_pairs)
-            for out_key, out_value in reducer(key, values):
+            for out_key, out_value in reducer(key, values) or ():
+                write_line(out_key, out_value)
+
+        if reducer_final:
+            for out_key, out_value in reducer_final() or ():
                 write_line(out_key, out_value)
 
     def show_steps(self):
@@ -492,17 +561,19 @@ class MRJob(object):
         step_num = 0
         res = []
         for step in self.steps():
-            if step['reducer']:
-                if step['mapper'] == _IDENTITY_MAPPER \
-                   and not step['mapper_final']:
+            mapper_funcs = ('mapper_init', 'mapper_final')
+            reducer_funcs = ('reducer', 'reducer_init', 'reducer_final')
+            if any(step[k] for k in reducer_funcs):
+                if step['mapper'] != _IDENTITY_MAPPER \
+                   or any(step[k] for k in mapper_funcs):
+                    res.append('MR')
+                else:
                     # infer whether the mapper has the same input and 
                     # output protocols 
                     if step_num == 0:
                         res.append('MR')
                     else:
                         res.append('R')
-                else:
-                    res.append('MR')
             else:
                 res.append('M')
             step_num += 1

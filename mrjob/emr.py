@@ -75,16 +75,16 @@ STEP_LOGS = 'STEP_LOGS'
 JOB_LOGS = 'JOB_LOGS'
 
 # regex for matching task-attempts log URIs
-# general enough to match any base directory
 TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
 
 # regex for matching step log URIs
-# general enough to match any base directory
 STEP_LOG_URI_RE = re.compile(r'^.*/(?P<step_num>\d+)/syslog$')
 
 # regex for matching job log URIs
-# general enough to match any base directory
 JOB_LOG_URI_RE = re.compile(r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
+
+# regex for matching slave log URIs
+NODE_LOG_URI_RE = re.compile(r'^.*?/hadoop-hadoop-(jobtracker|namenode).*.out$')
 
 # map from AWS region to EMR endpoint
 # see http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?ConceptsRequestEndpoints.html
@@ -1180,12 +1180,19 @@ class EMRJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_name, step_num + 1)
 
-    def _list_logs(self, root_path, path_map, log_types=None):
-        """Find and return lists of log paths corresponding to the kinds
-        specified in ``log_types``.
+    def _list_logs(self, root_path, regexp):
+        """List log paths at ``root_path`` that match ``regexp``."""
+        paths = list(self.ls(root_path))
+        output = []
 
-        :param root_path: URL common to all logs that should be returned
-        :param path_map: dictionary mapping ``log_type`` constants to compiled regular expression objects that check the file name (given the full path)
+        for path in paths:
+            if regexp.match(path):
+                output.append(path)
+        return output
+
+    def ssh_list_logs(self, log_types=None):
+        """Get specific kinds of logs from SSH
+
         :type log_types: list
         :param log_types: list containing some combination of the constants ``TASK_ATTEMPT_LOGS``, ``STEP_LOGS``, and ``JOB_LOGS``. Defaults to ``[TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]``.
 
@@ -1193,54 +1200,55 @@ class EMRJobRunner(MRJobRunner):
         """
         log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
 
-        re_map = {
-            TASK_ATTEMPT_LOGS: TASK_ATTEMPTS_LOG_URI_RE,
-            STEP_LOGS: STEP_LOG_URI_RE,
-            JOB_LOGS: JOB_LOG_URI_RE,
-        }
+        def ssh_logs(relative_path, regexp):
+            return self._list_logs(SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path,
+                                   regexp)
 
-        paths = []
+        results = []
         for log_type in log_types:
-            path = posixpath.join(root_path, path_map[log_type])
-            paths.extend(list(self.ls(path)))
+            if log_type == TASK_ATTEMPT_LOGS:
+                results.append(ssh_logs('userlogs/', TASK_ATTEMPTS_LOG_URI_RE))
+            elif log_type == STEP_LOGS:
+                results.append(ssh_logs('steps/', STEP_LOG_URI_RE))
+            elif log_type == JOB_LOGS:
+                results.append(ssh_logs('history/', JOB_LOG_URI_RE))
+            elif log_type == NODE_LOGS:
+                pass    # results.append(self._list_slave_logs)
+        return results
 
-        output = []
-        for log_type in log_types:
-            output.append([])
-
-        for item in paths:
-            for i, log_type in enumerate(log_types):
-                if re_map[log_type].match(item):
-                    output[i].append(item)
-        if len(output) > 1:
-            return output
-        else:
-            return output[0]
-
-    def ssh_list_logs(self, log_types=None):
-        """Get specific kinds of logs from SSH (see _list_logs)"""
-        path_map = {
-            TASK_ATTEMPT_LOGS: 'userlogs/',
-            STEP_LOGS: 'steps/',
-            JOB_LOGS: 'history/',
-        }
-        return self._list_logs(SSH_PREFIX + SSH_LOG_ROOT,
-                               path_map, log_types)
-    
     def s3_list_logs(self, log_types=None):
-        """Get specific kinds of logs from S3 (see _list_logs)"""
+        """Get specific kinds of logs from S3
+
+        :type log_types: list
+        :param log_types: list containing some combination of the constants ``TASK_ATTEMPT_LOGS``, ``STEP_LOGS``, and ``JOB_LOGS``. Defaults to ``[TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]``.
+
+        :return: list of matching log files in the order specified by ``log_types``
+        """
         if not self._s3_job_log_uri:
             self._set_s3_job_log_uri(self._describe_jobflow())
         if not self._s3_job_log_uri:
             return None
 
-        path_map = {
-            TASK_ATTEMPT_LOGS: 'task-attempts/',
-            STEP_LOGS: 'steps/',
-            JOB_LOGS: 'jobs/',
-        }
-        return self._list_logs(self._s3_job_log_uri,
-                               path_map, log_types)
+        log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
+
+        def s3_logs(relative_path, regexp):
+            return self._list_logs(self._s3_job_log_uri + relative_path,
+                                   regexp)
+
+        results = []
+        for log_type in log_types:
+            if log_type == TASK_ATTEMPT_LOGS:
+                results.append(s3_logs('task-attempts/', TASK_ATTEMPTS_LOG_URI_RE))
+            elif log_type == STEP_LOGS:
+                results.append(s3_logs('steps/', STEP_LOG_URI_RE))
+            elif log_type == JOB_LOGS:
+                results.append(s3_logs('jobs/', JOB_LOG_URI_RE))
+            elif log_type == NODE_LOGS:
+                results.append(s3_logs('node/', NODE_LOG_URI_RE))
+        if len(results) == 1:
+            return results[0]
+        else:
+            return results
 
     def ssh_list_all(self):
         """List all log files in the log root directory"""

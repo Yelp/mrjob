@@ -1512,8 +1512,9 @@ class EMRJobRunner(MRJobRunner):
         writeln('# download files using s3cmd')
         for file_dict in self._files:
             if file_dict.get('bootstrap'):
-                writeln("check_call('s3cmd', '-c', s3cfg_path, 'get', %r, %r)"
-                        % (file_dict['s3_uri'], file_dict['name']))
+                writeln(
+                    "check_call(['s3cmd', '-c', s3cfg_path, 'get', %r, %r])" %
+                    (file_dict['s3_uri'], file_dict['name']))
         writeln()
 
         # make scripts executable

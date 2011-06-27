@@ -47,7 +47,6 @@ from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_hadoop_counters_from_line, parse_s3_uri, S3_URI_RE
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.s3lock import make_lock_uri, attempt_to_acquire
 from mrjob.util import cmd_line, extract_dir_for_tar, hash_file, hash_object, read_file
 
 
@@ -225,6 +224,42 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
             created_before -= datetime.timedelta(weeks=2)
 
     return all_job_flows
+
+
+def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
+    """Generate the URI to lock the job flow ``emr_job_flow_id``"""
+    return s3_tmp_uri + 'locks/' + emr_job_flow_id + '/' + str(step_num)
+
+
+def _lock_acquire_step_1(s3_conn, lock_uri, job_name):
+    bucket_name, key_prefix = parse_s3_uri(lock_uri)
+    bucket = s3_conn.get_bucket(bucket_name)
+    key = bucket.get_key(key_prefix)
+    if key is None:
+        key = bucket.new_key(key_prefix)
+        key.set_contents_from_string(job_name)
+        return key
+    else:
+        return None
+
+
+def _lock_acquire_step_2(key, job_name):
+    key_value = key.get_contents_as_string()
+    return (key_value == job_name)
+
+
+def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name):
+    """Returns True if this session successfully took ownership of the lock
+    specified by ``lock_uri``.
+    """
+    key = _lock_acquire_step_1(s3_conn, lock_uri, job_name)
+    if key is not None:
+        time.sleep(sync_wait_time)
+        success = _lock_acquire_step_2(key, job_name)
+        if success:
+            return True
+
+    return False
 
 
 class EMRJobRunner(MRJobRunner):
@@ -1707,9 +1742,9 @@ class EMRJobRunner(MRJobRunner):
                 lock_uri = make_lock_uri(self._opts['s3_scratch_uri'],
                                          job_flow.jobflowid,
                                         len(job_flow.steps)+1)
-                status = attempt_to_acquire(s3_conn, lock_uri,
-                                            self._opts['s3_sync_wait_time'],
-                                            self._job_name)
+                status = attempt_to_acquire_lock(s3_conn, lock_uri,
+                                                 self._opts['s3_sync_wait_time'],
+                                                 self._job_name)
                 if status:
                     return sorted_tagged_job_flows[-1][1]
                 else:

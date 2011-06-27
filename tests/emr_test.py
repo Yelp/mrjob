@@ -31,9 +31,8 @@ from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in,
 
 from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
-from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
+from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri, attempt_to_acquire_lock, _lock_acquire_step_1, _lock_acquire_step_2, make_lock_uri
 from mrjob.parse import JOB_NAME_RE, parse_s3_uri
-from mrjob.s3lock import attempt_to_acquire, _acquire_step_1, _acquire_step_2, make_lock_uri
 from mrjob.util import tar_and_gzip
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, MockKey, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mr_two_step_job import MRTwoStepJob
@@ -1114,18 +1113,18 @@ class S3LockTestCase(MockEMRAndS3TestCase):
         # Most basic test case
         runner = EMRJobRunner(conf_path=False)
         s3_conn = runner.make_s3_conn()
-        assert attempt_to_acquire(s3_conn, self.lock_uri, 0, 'jf1'), 'Basic lock should succeed for first'
-        assert not attempt_to_acquire(s3_conn, self.lock_uri, 0, 'jf2'), 'Basic lock should fail for second'
+        assert attempt_to_acquire_lock(s3_conn, self.lock_uri, 0, 'jf1'), 'Basic lock should succeed for first'
+        assert not attempt_to_acquire_lock(s3_conn, self.lock_uri, 0, 'jf2'), 'Basic lock should fail for second'
 
     def test_key_race_condition(self):
         # Test case where one attempt puts the key in existence 
         runner = EMRJobRunner(conf_path=False)
         s3_conn = runner.make_s3_conn()
 
-        key = _acquire_step_1(s3_conn, self.lock_uri, 'jf1')
+        key = _lock_acquire_step_1(s3_conn, self.lock_uri, 'jf1')
         assert_not_equal(key, None)
 
-        key2 = _acquire_step_1(s3_conn, self.lock_uri, 'jf2')
+        key2 = _lock_acquire_step_1(s3_conn, self.lock_uri, 'jf2')
         assert_equal(key2, None)
 
     def test_read_race_condition(self):
@@ -1133,7 +1132,7 @@ class S3LockTestCase(MockEMRAndS3TestCase):
         runner = EMRJobRunner(conf_path=False)
         s3_conn = runner.make_s3_conn()
 
-        key = _acquire_step_1(s3_conn, self.lock_uri, 'jf1')
+        key = _lock_acquire_step_1(s3_conn, self.lock_uri, 'jf1')
         assert_not_equal(key, None)
 
         # acquire the key by subversive means to simulate contention
@@ -1144,4 +1143,4 @@ class S3LockTestCase(MockEMRAndS3TestCase):
         # and take the lock!
         key2.set_contents_from_string('jf2')
 
-        assert not _acquire_step_2(key, 'jf1'), 'Lock should fail'
+        assert not _lock_acquire_step_2(key, 'jf1'), 'Lock should fail'

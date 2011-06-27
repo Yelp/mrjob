@@ -46,7 +46,7 @@ from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_hadoop_counters_from_line
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.util import cmd_line, extract_dir_for_tar, read_file, ssh_cat, ssh_ls, SSHException, SSH_PREFIX, SSH_LOG_ROOT
+from mrjob.util import cmd_line, extract_dir_for_tar, read_file, ssh_cat, ssh_ls, ssh_slave_bootstrap, SSHException, SSH_PREFIX, SSH_LOG_ROOT
 
 
 log = logging.getLogger('mrjob.emr')
@@ -73,6 +73,7 @@ WAIT_FOR_SSH_TO_FAIL = 1.0
 TASK_ATTEMPT_LOGS = 'TASK_ATTEMPT_LOGS'
 STEP_LOGS = 'STEP_LOGS'
 JOB_LOGS = 'JOB_LOGS'
+NODE_LOGS = 'NODE_LOGS'
 
 # regex for matching task-attempts log URIs
 TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
@@ -370,6 +371,7 @@ class EMRJobRunner(MRJobRunner):
         # ssh state
         self._ssh_proc = None
         self._gave_cant_ssh_warning = False
+        self._uploaded_ssh_key = False
 
         # cache for SSH address
         self._address = None
@@ -1198,7 +1200,7 @@ class EMRJobRunner(MRJobRunner):
 
         :return: list of matching log files in the order specified by ``log_types``
         """
-        log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
+        log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS]
 
         def ssh_logs(relative_path, regexp):
             return self._list_logs(SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path,
@@ -1207,12 +1209,20 @@ class EMRJobRunner(MRJobRunner):
         results = []
         for log_type in log_types:
             if log_type == TASK_ATTEMPT_LOGS:
-                results.append(ssh_logs('userlogs/', TASK_ATTEMPTS_LOG_URI_RE))
+                try:
+                    results.append(ssh_logs('userlogs/', TASK_ATTEMPTS_LOG_URI_RE))
+                except IOError:
+                    results.append([])
             elif log_type == STEP_LOGS:
                 results.append(ssh_logs('steps/', STEP_LOG_URI_RE))
             elif log_type == JOB_LOGS:
                 results.append(ssh_logs('history/', JOB_LOG_URI_RE))
             elif log_type == NODE_LOGS:
+                if not self._uploaded_ssh_key:
+                    ssh_slave_bootstrap(
+                        self._opts['ssh_bin'],
+                        self._address_of_master(),
+                        self._opts['ec2_key_pair_file'])
                 pass    # results.append(self._list_slave_logs)
         return results
 
@@ -1245,6 +1255,7 @@ class EMRJobRunner(MRJobRunner):
                 results.append(s3_logs('jobs/', JOB_LOG_URI_RE))
             elif log_type == NODE_LOGS:
                 results.append(s3_logs('node/', NODE_LOG_URI_RE))
+
         if len(results) == 1:
             return results[0]
         else:

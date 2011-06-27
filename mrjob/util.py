@@ -207,7 +207,16 @@ def read_file(path, fileobj=None):
         yield line
 
 
-def run_command_on_ssh(ssh_bin, address, ec2_key_pair_file, *cmd_args):
+
+def ssh_args(ssh_bin, address, ec2_key_pair_file, *cmd_args):
+    return ssh_bin + [
+        '-i', ec2_key_pair_file,
+        'hadoop@%s' % (address,),
+    ] + list(cmd_args)
+    # ] + [pipes.quote(arg) for arg in cmd_args]
+
+
+def ssh_run(ssh_bin, address, ec2_key_pair_file, *cmd_args, **kwargs):
     """Shortcut to call ssh by ``subprocess``.
 
     :param ssh_bin: Path to ``ssh`` binary
@@ -217,20 +226,29 @@ def run_command_on_ssh(ssh_bin, address, ec2_key_pair_file, *cmd_args):
 
     :return: (stdout, stderr)
     """
-    args = ssh_bin + [
-        '-i', ec2_key_pair_file,
-        'hadoop@%s' % (address,),
-    ] + list(cmd_args)
-    p = Popen(args, stdout=PIPE, stderr=PIPE)
-    out, err = p.communicate()
+    stdin = kwargs.get('stdin', '')
+    shell = kwargs.get('shell', False)
+    args = ssh_args(ssh_bin, address, ec2_key_pair_file, *cmd_args)
+    p = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE)
+    out, err = p.communicate(stdin)
 
     if err:
-        raise SSHException(err)
+        if 'No such file or directory' in err:
+            raise IOError(err)
+        else:
+            raise SSHException(err)
 
-    if 'Permission denied (publickey)' in out:
+    if 'Permission denied' in out:
         raise SSHException(out)
 
     return out
+
+
+def ssh_slave_bootstrap(ssh_bin, master_address, ec2_key_pair_file):
+    """Prepare master to SSH to slaves."""
+    with open(ec2_key_pair_file, 'rb') as f:
+        ssh_run(ssh_bin, master_address, ec2_key_pair_file,
+                'bash -c "cat > key.pem"', stdin=f.read(), shell=True)
 
 
 def _handle_cat_out(out):
@@ -250,7 +268,7 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path):
         else:
             raise IOError('File not found: %s' % path)
     else:
-        out = run_command_on_ssh(ssh_bin, address, ec2_key_pair_file,
+        out = ssh_run(ssh_bin, address, ec2_key_pair_file,
                                  'cat', path)
         return _handle_cat_out(out)
 
@@ -278,8 +296,8 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path):
         else:
             raise IOError("No such file or directory: %s" % path)
     else:
-        out = run_command_on_ssh(ssh_bin, address, ec2_key_pair_file,
-                                 'find', path, '-type', 'f')
+        out = ssh_run(ssh_bin, address, ec2_key_pair_file,
+                      'find', path, '-type', 'f')
         return _handle_ls_out(out)
 
 

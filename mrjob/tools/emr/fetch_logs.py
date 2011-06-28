@@ -119,13 +119,15 @@ def cat_from_list(runner, path_list):
         print
 
 
-def cat_from_relevant(runner, task_attempts, steps, jobs):
+def cat_from_relevant(runner, task_attempts, steps, jobs, nodes):
     print 'Task attempts:'
     cat_from_list(runner, task_attempts)
     print 'Steps:'
     cat_from_list(runner, steps)
     print 'Jobs:'
     cat_from_list(runner, jobs)
+    print 'Slaves:'
+    cat_from_list(runner, nodes)
 
 
 @with_runner
@@ -133,7 +135,7 @@ def cat_relevant(runner):
     try:
         cat_from_relevant(runner, *runner.ssh_list_logs())
     except LogFetchException, e:
-        print e
+        print 'SSH error:', e
         cat_from_relevant(runner, *runner.s3_list_logs())
 
 
@@ -142,7 +144,7 @@ def cat_all(runner):
     try:
         cat_from_list(runner, runner.ssh_list_all())
     except LogFetchException, e:
-        print e
+        print 'SSH error:', e
         cat_from_list(runner, runner.s3_list_all())
 
 if __name__ == '__main__':

@@ -46,13 +46,13 @@ from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_hadoop_counters_from_line
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.util import cmd_line, extract_dir_for_tar, read_file, ssh_cat, ssh_ls, ssh_slave_bootstrap, SSHException, SSH_PREFIX, SSH_LOG_ROOT
+from mrjob.util import cmd_line, extract_dir_for_tar, read_file, ssh_cat, ssh_ls, ssh_slave_bootstrap, ssh_slave_addresses, SSHException, SSH_PREFIX, SSH_LOG_ROOT
 
 
 log = logging.getLogger('mrjob.emr')
 
 S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
-SSH_URI_RE = re.compile(r'^%s(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
+SSH_URI_RE = re.compile(r'^%s(?P<hostname>[^/]+)?(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
 JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?
@@ -375,6 +375,7 @@ class EMRJobRunner(MRJobRunner):
 
         # cache for SSH address
         self._address = None
+        self._ssh_slave_addrs = None
 
         # store the tracker URL for completion status
         self._tracker_url = None
@@ -1184,10 +1185,9 @@ class EMRJobRunner(MRJobRunner):
 
     def _list_logs(self, root_path, regexp):
         """List log paths at ``root_path`` that match ``regexp``."""
-        paths = list(self.ls(root_path))
         output = []
 
-        for path in paths:
+        for path in self.ls(root_path):
             if regexp.match(path):
                 output.append(path)
         return output
@@ -1223,7 +1223,14 @@ class EMRJobRunner(MRJobRunner):
                         self._opts['ssh_bin'],
                         self._address_of_master(),
                         self._opts['ec2_key_pair_file'])
-                pass    # results.append(self._list_slave_logs)
+                all_paths = []
+                for addr in self._addresses_of_slaves():
+                    root = '%s%s!%s%s' % (SSH_PREFIX,
+                                          self._address_of_master(),
+                                          addr,
+                                          SSH_LOG_ROOT)
+                    all_paths.extend(self._list_logs(root, NODE_LOG_URI_RE))
+                results.append([])
         return results
 
     def s3_list_logs(self, log_types=None):
@@ -1745,17 +1752,19 @@ class EMRJobRunner(MRJobRunner):
 
     def _ssh_ls(self, uri):
         """Helper for ls(); obeys globbing"""
+        m = SSH_URI_RE.match(uri)
         try:
+            addr = m.group('hostname') or self._address_of_master()
             output = ssh_ls(
                 self._opts['ssh_bin'],
-                self._address_of_master(),
+                addr,
                 self._opts['ec2_key_pair_file'],
-                SSH_URI_RE.match(uri).groups('filesystem_path')[0],
+                m.group('filesystem_path'),
             )
             for line in output:
                 # skip directories, we only want to return downloadable files
                 if line and not line.endswith('/'):
-                    yield SSH_PREFIX + line
+                    yield SSH_PREFIX + addr + line
         except SSHException, e:
             raise LogFetchException(e)
 
@@ -1908,6 +1917,14 @@ class EMRJobRunner(MRJobRunner):
 
         self._address = jobflow.masterpublicdnsname
         return self._address
+
+    def _addresses_of_slaves(self):
+        if not self._ssh_slave_addrs:
+            self._ssh_slave_addrs = ssh_slave_addresses(
+                self._opts['ssh_bin'],
+                self._address_of_master(),
+                self._opts['ec2_key_pair_file'])
+        return self._ssh_slave_addrs
 
 
     ### S3-specific FILESYSTEM STUFF ###

@@ -32,7 +32,7 @@ import tarfile
 import zipfile
 
 
-SSH_PREFIX = 'ssh:/'
+SSH_PREFIX = 'ssh://'
 SSH_LOG_ROOT = '/mnt/var/log/hadoop'
 
 class SSHException(Exception):
@@ -211,9 +211,10 @@ def read_file(path, fileobj=None):
 def ssh_args(ssh_bin, address, ec2_key_pair_file, *cmd_args):
     return ssh_bin + [
         '-i', ec2_key_pair_file,
+        '-o', 'StrictHostKeyChecking=no',
+        '-o', 'UserKnownHostsFile=/dev/null',
         'hadoop@%s' % (address,),
     ] + list(cmd_args)
-    # ] + [pipes.quote(arg) for arg in cmd_args]
 
 
 def ssh_run(ssh_bin, address, ec2_key_pair_file, *cmd_args, **kwargs):
@@ -227,8 +228,8 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, *cmd_args, **kwargs):
     :return: (stdout, stderr)
     """
     stdin = kwargs.get('stdin', '')
-    shell = kwargs.get('shell', False)
     args = ssh_args(ssh_bin, address, ec2_key_pair_file, *cmd_args)
+    print ' '.join(args)
     p = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE)
     out, err = p.communicate(stdin)
 
@@ -248,7 +249,15 @@ def ssh_slave_bootstrap(ssh_bin, master_address, ec2_key_pair_file):
     """Prepare master to SSH to slaves."""
     with open(ec2_key_pair_file, 'rb') as f:
         ssh_run(ssh_bin, master_address, ec2_key_pair_file,
-                'bash -c "cat > key.pem"', stdin=f.read(), shell=True)
+                'bash -c "cat > key.pem" && chmod 600 key.pem', stdin=f.read())
+
+
+def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
+    """Get the IP addresses of the slave nodes."""
+    cmd = "hadoop dfsadmin -report | grep ^Name | cut -f2 -d: | cut -f2 -d' '"
+    ips = ssh_run(ssh_bin, master_address, ec2_key_pair_file,
+                  'bash -c "%s"' % cmd).split('\n')
+    return [ip for ip in ips if ip]
 
 
 def _handle_cat_out(out):
@@ -296,8 +305,15 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path):
         else:
             raise IOError("No such file or directory: %s" % path)
     else:
-        out = ssh_run(ssh_bin, address, ec2_key_pair_file,
-                      'find', path, '-type', 'f')
+        if '!' in address:
+            master_address, slave_address = address.split('!')
+            out = ssh_run(ssh_bin, master_address, ec2_key_pair_file,
+                          'ssh', '-i', 'key.pem',
+                          'hadoop@%s' % slave_address,
+                          'find', path, '-type', 'f')
+        else:
+            out = ssh_run(ssh_bin, address, ec2_key_pair_file,
+                          'find', path, '-type', 'f')
         return _handle_ls_out(out)
 
 

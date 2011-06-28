@@ -35,6 +35,7 @@ import zipfile
 SSH_PREFIX = 'ssh://'
 SSH_LOG_ROOT = '/mnt/var/log/hadoop'
 
+
 class SSHException(Exception):
     pass
 
@@ -247,6 +248,9 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, *cmd_args, **kwargs):
 
 def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file):
     """Prepare master to SSH to slaves."""
+    if not ec2_key_pair_file or not os.path.exists(ec2_key_pair_file):
+        return  # this is a testing environment
+
     with open(ec2_key_pair_file, 'rb') as f:
         ssh_run(ssh_bin, master_address, ec2_key_pair_file,
                 'bash -c "cat > key.pem" && chmod 600 key.pem', stdin=f.read())
@@ -254,6 +258,9 @@ def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file):
 
 def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
     """Get the IP addresses of the slave nodes."""
+    if not ec2_key_pair_file or not os.path.exists(ec2_key_pair_file):
+        return []   # this is a testing environment
+
     cmd = "hadoop dfsadmin -report | grep ^Name | cut -f2 -d: | cut -f2 -d' '"
     ips = ssh_run(ssh_bin, master_address, ec2_key_pair_file,
                   'bash -c "%s"' % cmd).split('\n')

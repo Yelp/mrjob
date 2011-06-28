@@ -46,7 +46,7 @@ from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_hadoop_counters_from_line
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.util import cmd_line, extract_dir_for_tar, read_file, ssh_cat, ssh_ls, ssh_slave_bootstrap, ssh_slave_addresses, SSHException, SSH_PREFIX, SSH_LOG_ROOT
+from mrjob.util import cmd_line, extract_dir_for_tar, read_file, ssh_cat, ssh_ls, ssh_copy_key, ssh_slave_addresses, SSHException, SSH_PREFIX, SSH_LOG_ROOT
 
 
 log = logging.getLogger('mrjob.emr')
@@ -1206,23 +1206,33 @@ class EMRJobRunner(MRJobRunner):
             return self._list_logs(SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path,
                                    regexp)
 
+        if not self._uploaded_ssh_key:
+            ssh_copy_key(
+                self._opts['ssh_bin'],
+                self._address_of_master(),
+                self._opts['ec2_key_pair_file'])
+
         results = []
         for log_type in log_types:
             if log_type == TASK_ATTEMPT_LOGS:
+                all_paths = []
+                for addr in self._addresses_of_slaves():
+                    root = '%s%s!%s%s' % (SSH_PREFIX,
+                                          self._address_of_master(),
+                                          addr,
+                                          SSH_LOG_ROOT + '/userlogs/')
+                    all_paths.extend(self._list_logs(root, TASK_ATTEMPTS_LOG_URI_RE))
                 try:
-                    results.append(ssh_logs('userlogs/', TASK_ATTEMPTS_LOG_URI_RE))
+                    all_paths.extend(ssh_logs('userlogs/', TASK_ATTEMPTS_LOG_URI_RE))
                 except IOError:
-                    results.append([])
+                    # sometimes the master doesn't have these
+                    pass
+                results.append(all_paths)
             elif log_type == STEP_LOGS:
                 results.append(ssh_logs('steps/', STEP_LOG_URI_RE))
             elif log_type == JOB_LOGS:
                 results.append(ssh_logs('history/', JOB_LOG_URI_RE))
             elif log_type == NODE_LOGS:
-                if not self._uploaded_ssh_key:
-                    ssh_slave_bootstrap(
-                        self._opts['ssh_bin'],
-                        self._address_of_master(),
-                        self._opts['ec2_key_pair_file'])
                 all_paths = []
                 for addr in self._addresses_of_slaves():
                     root = '%s%s!%s%s' % (SSH_PREFIX,
@@ -1230,7 +1240,7 @@ class EMRJobRunner(MRJobRunner):
                                           addr,
                                           SSH_LOG_ROOT)
                     all_paths.extend(self._list_logs(root, NODE_LOG_URI_RE))
-                results.append([])
+                results.append(all_paths)
         return results
 
     def s3_list_logs(self, log_types=None):

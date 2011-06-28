@@ -84,13 +84,15 @@ def prettyprint_paths(paths):
     print
 
 
-def _prettyprint_relevant(task_attempts, steps, jobs):
+def _prettyprint_relevant(task_attempts, steps, jobs, nodes):
     print 'Task attempts:'
     prettyprint_paths(task_attempts)
     print 'Steps:'
     prettyprint_paths(steps)
     print 'Jobs:'
     prettyprint_paths(jobs)
+    print 'Nodes:'
+    prettyprint_paths(nodes)
 
 
 @with_runner

@@ -229,14 +229,14 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, *cmd_args, **kwargs):
     """
     stdin = kwargs.get('stdin', '')
     args = ssh_args(ssh_bin, address, ec2_key_pair_file, *cmd_args)
-    print ' '.join(args)
+    # print ' '.join(args)
     p = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE)
     out, err = p.communicate(stdin)
 
     if err:
         if 'No such file or directory' in err:
             raise IOError(err)
-        else:
+        elif 'Permanently added' not in err:
             raise SSHException(err)
 
     if 'Permission denied' in out:
@@ -245,7 +245,7 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, *cmd_args, **kwargs):
     return out
 
 
-def ssh_slave_bootstrap(ssh_bin, master_address, ec2_key_pair_file):
+def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file):
     """Prepare master to SSH to slaves."""
     with open(ec2_key_pair_file, 'rb') as f:
         ssh_run(ssh_bin, master_address, ec2_key_pair_file,

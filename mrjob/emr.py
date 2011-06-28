@@ -1052,6 +1052,9 @@ class EMRJobRunner(MRJobRunner):
             self._s3_job_log_uri = '%s%s/' % (
                 log_uri.replace('s3n://', 's3://'), self._emr_job_flow_id)
 
+        # make sure the job had a chance to copy all our data to S3
+        self._wait_for_s3_eventual_consistency()
+
         if success:
             log.info('Job completed.')
             log.info('Running time was %.1fs (not counting time spent waiting for the EC2 instances)' % total_step_time)
@@ -1083,9 +1086,6 @@ class EMRJobRunner(MRJobRunner):
 
     def _stream_output(self):
         log.info('Streaming final output from %s' % self._output_dir)
-
-        # make sure the job had a chance to copy all our data to S3
-        self._wait_for_s3_eventual_consistency()
 
         # boto Keys are theoretically iterable, but they don't actually
         # give you a line at a time.
@@ -1176,7 +1176,6 @@ class EMRJobRunner(MRJobRunner):
         counters = []
 
         log.info('Fetching counters...')
-        self._wait_for_s3_eventual_consistency()
 
         s3_log_file_uris = set(self.ls(posixpath.join(self._s3_job_log_uri, 'jobs', '*')))
 
@@ -1227,7 +1226,6 @@ class EMRJobRunner(MRJobRunner):
             return None
 
         log.info('Scanning logs for probable cause of failure')
-        self._wait_for_s3_eventual_consistency()
 
         s3_log_file_uris = set(self.ls(self._s3_job_log_uri))
 

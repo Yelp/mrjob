@@ -1229,14 +1229,18 @@ class EMRJobRunner(MRJobRunner):
             if log_type == TASK_ATTEMPT_LOGS:
                 all_paths = []
                 try:
+                    print 'getting task attempts from master'
                     all_paths.extend(ssh_logs('userlogs/', TASK_ATTEMPTS_LOG_URI_RE))
                 except IOError:
                     # sometimes the master doesn't have these
                     pass
+                    print 'it failed'
                 if not all_paths:
+                    print 'getting task attempts from slaves'
                     # get them from the slaves instead (takes a little longer)
                     self._enable_slave_ssh_access()
                     for addr in self._addresses_of_slaves():
+                        print addr
                         logs = slave_ssh_logs(addr, 'userlogs/',
                                               TASK_ATTEMPTS_LOG_URI_RE)
                         all_paths.extend(logs)
@@ -1270,7 +1274,7 @@ class EMRJobRunner(MRJobRunner):
         if not self._s3_job_log_uri:
             return None
 
-        log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
+        log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS]
 
         def s3_logs(relative_path, regexp):
             return self._list_logs(self._s3_job_log_uri + relative_path,

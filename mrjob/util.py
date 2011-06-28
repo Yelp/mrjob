@@ -237,7 +237,7 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, *cmd_args, **kwargs):
     if err:
         if 'No such file or directory' in err:
             raise IOError(err)
-        elif 'Permanently added' not in err:
+        elif 'Warning: Permanently added' not in err:
             raise SSHException(err)
 
     if 'Permission denied' in out:
@@ -294,6 +294,8 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
             master_address, slave_address = address.split('!')
             out = ssh_run(ssh_bin, master_address, ec2_key_pair_file,
                           'ssh', '-i', keyfile,
+                          '-o', 'StrictHostKeyChecking=no',
+                          '-o', 'UserKnownHostsFile=/dev/null',
                           'hadoop@%s' % slave_address,
                           'cat', path)
         else:
@@ -329,6 +331,8 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
             master_address, slave_address = address.split('!')
             out = ssh_run(ssh_bin, master_address, ec2_key_pair_file,
                           'ssh', '-i', keyfile,
+                          '-o', 'StrictHostKeyChecking=no',
+                          '-o', 'UserKnownHostsFile=/dev/null',
                           'hadoop@%s' % slave_address,
                           'find', path, '-type', 'f')
         else:

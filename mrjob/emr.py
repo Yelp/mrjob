@@ -1237,7 +1237,6 @@ class EMRJobRunner(MRJobRunner):
                     # get them from the slaves instead (takes a little longer)
                     self._enable_slave_ssh_access()
                     for addr in self._addresses_of_slaves():
-                        print addr
                         logs = slave_ssh_logs(addr, 'userlogs/',
                                               TASK_ATTEMPTS_LOG_URI_RE)
                         all_paths.extend(logs)

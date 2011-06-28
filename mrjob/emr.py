@@ -512,8 +512,8 @@ class EMRJobRunner(MRJobRunner):
                     return
                 elif scratch_bucket_location != self._aws_region:
                     continue
-            else:
-                # This bucket is accessible anywhere, so we can use it
+            elif not self._aws_region:
+                # Only use regionless buckets if the job flow is also regionless
                 log.info("using existing scratch bucket %s" % scratch_bucket_name)
                 self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
                 return

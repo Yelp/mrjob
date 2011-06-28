@@ -371,7 +371,7 @@ class EMRJobRunner(MRJobRunner):
         # ssh state
         self._ssh_proc = None
         self._gave_cant_ssh_warning = False
-        self._uploaded_ssh_key = False
+        self._ssh_key_name = None
 
         # cache for SSH address
         self._address = None
@@ -744,6 +744,15 @@ class EMRJobRunner(MRJobRunner):
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
         finally:
             random.setstate(random_state)
+
+    def _enable_slave_ssh_access(self):
+        if not self._ssh_key_name:
+            self._ssh_key_name = self._job_name + '.pem'
+            ssh_copy_key(
+                self._opts['ssh_bin'],
+                self._address_of_master(),
+                self._opts['ec2_key_pair_file'],
+                self._ssh_key_name)
 
     def cleanup(self, mode=None):
         super(EMRJobRunner, self).cleanup(mode=mode)
@@ -1119,6 +1128,7 @@ class EMRJobRunner(MRJobRunner):
                     addr,
                     self._opts['ec2_key_pair_file'],
                     ssh_match.group('filesystem_path'),
+                    self._ssh_key_name,
                 )
                 return read_file(filename, fileobj=StringIO(output))
             except SSHException, e:
@@ -1207,12 +1217,12 @@ class EMRJobRunner(MRJobRunner):
             return self._list_logs(SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path,
                                    regexp)
 
-        if not self._uploaded_ssh_key and TASK_ATTEMPT_LOGS in log_types \
-           or NODE_LOGS in log_types:
-            ssh_copy_key(
-                self._opts['ssh_bin'],
-                self._address_of_master(),
-                self._opts['ec2_key_pair_file'])
+        def slave_ssh_logs(addr, relative_path, regexp):
+            root = '%s%s!%s%s' % (SSH_PREFIX,
+                                  self._address_of_master(),
+                                  addr,
+                                  SSH_LOG_ROOT + '/' + relative_path)
+            return self._list_logs(root, regexp)
 
         results = []
         for log_type in log_types:
@@ -1224,12 +1234,12 @@ class EMRJobRunner(MRJobRunner):
                     # sometimes the master doesn't have these
                     pass
                 if not all_paths:
+                    # get them from the slaves instead (takes a little longer)
+                    self._enable_slave_ssh_access()
                     for addr in self._addresses_of_slaves():
-                        root = '%s%s!%s%s' % (SSH_PREFIX,
-                                              self._address_of_master(),
-                                              addr,
-                                              SSH_LOG_ROOT + '/userlogs/')
-                        all_paths.extend(self._list_logs(root, TASK_ATTEMPTS_LOG_URI_RE))
+                        logs = slave_ssh_logs(addr, 'userlogs/',
+                                              TASK_ATTEMPTS_LOG_URI_RE)
+                        all_paths.extend(logs)
                 results.append(all_paths)
             elif log_type == STEP_LOGS:
                 results.append(ssh_logs('steps/', STEP_LOG_URI_RE))
@@ -1237,12 +1247,10 @@ class EMRJobRunner(MRJobRunner):
                 results.append(ssh_logs('history/', JOB_LOG_URI_RE))
             elif log_type == NODE_LOGS:
                 all_paths = []
+                self._enable_slave_ssh_access()
                 for addr in self._addresses_of_slaves():
-                    root = '%s%s!%s%s' % (SSH_PREFIX,
-                                          self._address_of_master(),
-                                          addr,
-                                          SSH_LOG_ROOT)
-                    all_paths.extend(self._list_logs(root, NODE_LOG_URI_RE))
+                    logs = slave_ssh_logs(addr, '', TASK_ATTEMPTS_LOG_URI_RE)
+                    all_paths.extend(logs)
                 results.append(all_paths)
         if len(results) == 1:
             return results[0]
@@ -1780,6 +1788,7 @@ class EMRJobRunner(MRJobRunner):
                 addr,
                 self._opts['ec2_key_pair_file'],
                 m.group('filesystem_path'),
+                self._ssh_key_name,
             )
             for line in output:
                 # skip directories, we only want to return downloadable files

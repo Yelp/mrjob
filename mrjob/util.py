@@ -246,14 +246,20 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, *cmd_args, **kwargs):
     return out
 
 
-def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file):
+def _poor_mans_scp(ssh_bin, addr, ec2_key_pair_file, src, dest):
+    with open(src, 'rb') as f:
+        ssh_run(ssh_bin, addr, ec2_key_pair_file,
+                'bash -c "cat > %s" && chmod 600 %s' % (dest, dest),
+                stdin=f.read())
+
+
+def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
     """Prepare master to SSH to slaves."""
     if not ec2_key_pair_file or not os.path.exists(ec2_key_pair_file):
         return  # this is a testing environment
 
-    with open(ec2_key_pair_file, 'rb') as f:
-        ssh_run(ssh_bin, master_address, ec2_key_pair_file,
-                'bash -c "cat > key.pem" && chmod 600 key.pem', stdin=f.read())
+    _poor_mans_scp(ssh_bin, master_address, ec2_key_pair_file,
+                   ec2_key_pair_file, keyfile)
 
 
 def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
@@ -274,7 +280,7 @@ def _handle_cat_out(out):
 
 
 _mock_ssh_cat_values = None
-def ssh_cat(ssh_bin, address, ec2_key_pair_file, path):
+def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     """Return the file at ``path`` as a string"""
     # Allow mocking of output
     # Mocking kept separate from ssh_ls() to make testing more intuitive
@@ -284,8 +290,15 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path):
         else:
             raise IOError('File not found: %s' % path)
     else:
-        out = ssh_run(ssh_bin, address, ec2_key_pair_file,
-                                 'cat', path)
+        if '!' in address:
+            master_address, slave_address = address.split('!')
+            out = ssh_run(ssh_bin, master_address, ec2_key_pair_file,
+                          'ssh', '-i', keyfile,
+                          'hadoop@%s' % slave_address,
+                          'cat', path)
+        else:
+            out = ssh_run(ssh_bin, address, ec2_key_pair_file,
+                                     'cat', path)
         return _handle_cat_out(out)
 
 
@@ -302,7 +315,7 @@ def _handle_ls_out(out):
 
 
 _mock_ssh_ls_values = None
-def ssh_ls(ssh_bin, address, ec2_key_pair_file, path):
+def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     """Recursively list files under ``path`` on the specified SSH host"""
     # Allow mocking of output
     # Mocking kept separate from ssh_cat() to make testing more intuitive
@@ -315,7 +328,7 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path):
         if '!' in address:
             master_address, slave_address = address.split('!')
             out = ssh_run(ssh_bin, master_address, ec2_key_pair_file,
-                          'ssh', '-i', 'key.pem',
+                          'ssh', '-i', keyfile,
                           'hadoop@%s' % slave_address,
                           'find', path, '-type', 'f')
         else:

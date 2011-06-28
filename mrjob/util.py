@@ -367,7 +367,7 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param ssh_bin: Path to ``ssh`` binary
     :param address: Address of your job's master node (obtained via EmrConnection.describe_jobflow())
     :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
-    :param path: Path on the remote host to get
+    :param path: Path on the remote host to list
     :param keyfile: Name of the EMR private key file on the master node in case ``path`` exists on one of the slave nodes
     """
     # Allow mocking of output

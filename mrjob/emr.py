@@ -1401,7 +1401,7 @@ class EMRJobRunner(MRJobRunner):
             log_types = [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
             logs = self.ssh_list_logs(log_types, step_nums)
             log.info('Scanning SSH logs for probable cause of failure')
-            return self._scan_logs_in_order(step_nums, *logs)
+            return self._scan_logs_in_order(*logs)
         except LogFetchException, e:
             if not self._s3_job_log_uri:
                 return None
@@ -1412,17 +1412,17 @@ class EMRJobRunner(MRJobRunner):
 
             log_types = [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
             logs = self.s3_list_logs(log_types, step_nums)
-            return self._scan_logs_in_order(step_nums, *logs)
+            return self._scan_logs_in_order(*logs)
 
-    def _scan_logs_in_order(self, step_nums, task_uris, step_uris, job_uris):
+    def _scan_logs_in_order(self, task_uris, step_uris, job_uris):
         # give priority to task-attempts/ logs as they contain more useful
         # error messages. this may take a while.
         return (
-            self._scan_task_attempt_logs(task_uris, step_nums)
-            or self._scan_step_logs(step_uris, step_nums)
-            or self._scan_job_logs(job_uris, step_nums))
+            self._scan_task_attempt_logs(task_uris)
+            or self._scan_step_logs(step_uris)
+            or self._scan_job_logs(job_uris))
 
-    def _scan_task_attempt_logs(self, log_file_uris, step_nums):
+    def _scan_task_attempt_logs(self, log_file_uris):
         """Scan task-attempts/*/{syslog,stderr} for Python exceptions
         and Java stack traces.
 
@@ -1435,9 +1435,6 @@ class EMRJobRunner(MRJobRunner):
                 continue
 
             info = match.groupdict()
-
-            if not int(info['step_num']) in step_nums:
-                continue
 
             # sort so we can go through the steps in reverse order
             # prefer stderr to syslog (Python exceptions are more
@@ -1508,7 +1505,7 @@ class EMRJobRunner(MRJobRunner):
             return None
 
 
-    def _scan_step_logs(self, log_file_uris, step_nums):
+    def _scan_step_logs(self, log_file_uris):
         """Scan steps/*/syslog for hadoop streaming errors.
 
         Helper for _find_probable_cause_of_failure()
@@ -1516,10 +1513,6 @@ class EMRJobRunner(MRJobRunner):
         for log_file_uri in sorted(log_file_uris, reverse=True):
             match = STEP_LOG_URI_RE.match(log_file_uri)
             if not match:
-                continue
-
-            step_num = int(match.group(1))
-            if not step_num in step_nums:
                 continue
 
             lines = self.cat(log_file_uri)
@@ -1532,7 +1525,7 @@ class EMRJobRunner(MRJobRunner):
                         'input_uri': None,
                     }
 
-    def _scan_job_logs(self, log_file_uris, step_nums):
+    def _scan_job_logs(self, log_file_uris):
         """Scan jobs/* for timeout errors.
         
         Helper for _find_probable_cause_of_failure()
@@ -1545,9 +1538,6 @@ class EMRJobRunner(MRJobRunner):
                 continue
 
             info = match.groupdict()
-
-            if not int(info['step_num']) in step_nums:
-                continue
 
             # sort so we can go through the steps in reverse order
             sort_key = (info['timestamp'], info['step_num'])

@@ -30,6 +30,19 @@ class SSHException(Exception):
     pass
 
 
+def _ssh_args(ssh_bin, address, ec2_key_pair_file):
+    """Helper method for :py:func:`ssh_run` to build an argument list for
+    ``subprocess``. Specifies an identity, disables strict host key checking,
+    and adds the ``hadoop`` username.
+    """
+    return ssh_bin + [
+        '-i', ec2_key_pair_file,
+        '-o', 'StrictHostKeyChecking=no',
+        '-o', 'UserKnownHostsFile=/dev/null',
+        'hadoop@%s' % (address,),
+    ]
+
+
 def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     """Shortcut to call ssh on a Hadoop node via ``subprocess``.
 

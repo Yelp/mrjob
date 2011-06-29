@@ -1059,7 +1059,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         # This test should pass, but it fails. The behavior seems to be
         # correct, but the second job does not give any output despite using
         # the correct job flow.
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool',
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool-emr-job-flows',
                                '-c', self.mrjob_conf_path])
         mr_job.sandbox()
 
@@ -1078,7 +1078,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
     def test_join_pooled_job_flow(self):
         runner = EMRJobRunner(conf_path=self.mrjob_conf_path,
-                              pool_job_flows=True)
+                              pool_emr_job_flows=True)
         job_flow_id = runner.make_persistent_job_flow()
         runner.make_emr_conn().describe_jobflow(job_flow_id).state = 'WAITING'
 
@@ -1086,7 +1086,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.mock_emr_output = {(job_flow_id, 1): [
             '1\t"bar"\n1\t"foo"\n2\tnull\n']}
 
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool',
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool-emr-job-flows',
                                '-c', self.mrjob_conf_path])
         mr_job.sandbox(stdin=stdin)
 

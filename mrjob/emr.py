@@ -269,7 +269,8 @@ class EMRJobRunner(MRJobRunner):
     basically a temporary Hadoop cluster. Normally, it creates a job flow
     just for your job; it's also possible to run your job in a specific
     job flow by setting *emr_job_flow_id* or to automatically choose a
-    waiting job flow, creating one if none exists, by setting *pool_job_flows*.
+    waiting job flow, creating one if none exists, by setting
+    *pool_emr_job_flows*.
 
     Input, support, and jar files can be either local or on S3; use ``s3://...``
     URLs to refer to files on S3.
@@ -344,8 +345,8 @@ class EMRJobRunner(MRJobRunner):
         :type hadoop_version: str
         :param hadoop_version: Set the version of Hadoop to use on EMR. EMR currently accepts ``'0.18'`` or ``'0.20'``; default is ``'0.20'``.
         :type num_ec2_instances: int
-        :type pool_job_flows: bool
-        :param pool_job_flows: Try to run the job on a ``WAITING`` pooled job flow with the same bootstrap configuration. Prefer the one with the most compute units. Use S3 to "lock" the job flow and ensure that the job is not scheduled behind another job. If no suitable job flow is `WAITING`, create a new pooled job flow.
+        :type pool_emr_job_flows: bool
+        :param pool_emr_job_flows: Try to run the job on a ``WAITING`` pooled job flow with the same bootstrap configuration. Prefer the one with the most compute units. Use S3 to "lock" the job flow and ensure that the job is not scheduled behind another job. If no suitable job flow is `WAITING`, create a new pooled job flow.
         :param num_ec2_instances: number of instances to start up. Default is ``1``.
         :type s3_endpoint: str
         :param s3_endpoint: Host to connect to when communicating with S3 (e.g. ``s3-us-west-1.amazonaws.com``). Default is to infer this from *aws_region*.
@@ -467,7 +468,7 @@ class EMRJobRunner(MRJobRunner):
             'hadoop_streaming_jar_on_emr',
             'hadoop_version',
             'num_ec2_instances',
-            'pool_job_flows',
+            'pool_emr_job_flows',
             's3_endpoint',
             's3_log_uri',
             's3_scratch_uri',
@@ -820,7 +821,7 @@ class EMRJobRunner(MRJobRunner):
         # don't stop it if it was created due to --pool because the user
         # probably wants to use it again
         if self._emr_job_flow_id and not self._opts['emr_job_flow_id'] \
-           and not self._opts['pool_job_flows']:
+           and not self._opts['pool_emr_job_flows']:
             log.info('Terminating job flow: %s' % self._emr_job_flow_id)
             try:
                 self.make_emr_conn().terminate_jobflow(self._emr_job_flow_id)
@@ -845,7 +846,7 @@ class EMRJobRunner(MRJobRunner):
         # delete the log files, if it's a job flow we created (the logs
         # belong to the job flow)
         if self._s3_job_log_uri and not self._opts['emr_job_flow_id'] \
-           and not self._opts['pool_job_flows']:
+           and not self._opts['pool_emr_job_flows']:
             try:
                 log.info('Removing all files in %s' % self._s3_job_log_uri)
                 self.rm(self._s3_job_log_uri)
@@ -905,7 +906,7 @@ class EMRJobRunner(MRJobRunner):
         args['slave_instance_type'] = self._opts['ec2_slave_instance_type']
 
         if self._master_bootstrap_script:
-            if self._opts['pool_job_flows']:
+            if self._opts['pool_emr_job_flows']:
                 bootstrap_args = [self._pool_arg()]
             else:
                 bootstrap_args = []
@@ -919,7 +920,7 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['enable_emr_debugging']:
             args['enable_debugging'] = True
 
-        if persistent or self._opts['pool_job_flows']:
+        if persistent or self._opts['pool_emr_job_flows']:
             args['keep_alive'] = True
 
         if steps:
@@ -1026,7 +1027,7 @@ class EMRJobRunner(MRJobRunner):
 
         # try to find a job flow from the pool. basically auto-fill
         # 'emr_job_flow_id' if possible and then follow normal behavior.
-        if self._opts['pool_job_flows']:
+        if self._opts['pool_emr_job_flows']:
             job_flow = self.find_job_flow()
             if job_flow:
                 self._emr_job_flow_id = job_flow.jobflowid

@@ -1194,15 +1194,6 @@ class EMRJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_name, step_num + 1)
 
-    def _list_logs(self, root_path, regexp):
-        """List log paths at ``root_path`` that match ``regexp``."""
-        output = []
-
-        for path in self.ls(root_path):
-            if regexp.match(path):
-                output.append(path)
-        return output
-
     def ssh_list_logs(self, log_types=None):
         """Get specific kinds of logs from SSH
 
@@ -1214,15 +1205,15 @@ class EMRJobRunner(MRJobRunner):
         log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS]
 
         def ssh_logs(relative_path, regexp):
-            return self._list_logs(SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path,
-                                   regexp)
+            root_path = SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path
+            return [path for path in self.ls(root_path) if regexp.match(path)]
 
         def slave_ssh_logs(addr, relative_path, regexp):
-            root = '%s%s!%s%s' % (SSH_PREFIX,
-                                  self._address_of_master(),
-                                  addr,
-                                  SSH_LOG_ROOT + '/' + relative_path)
-            return self._list_logs(root, regexp)
+            root_path = '%s%s!%s%s' % (SSH_PREFIX,
+                                       self._address_of_master(),
+                                       addr,
+                                       SSH_LOG_ROOT + '/' + relative_path)
+            return [path for path in self.ls(root_path) if regexp.match(path)]
 
         results = []
         for log_type in log_types:
@@ -1273,8 +1264,8 @@ class EMRJobRunner(MRJobRunner):
         log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS]
 
         def s3_logs(relative_path, regexp):
-            return self._list_logs(self._s3_job_log_uri + relative_path,
-                                   regexp)
+            root_path = self._s3_job_log_uri + relative_path
+            return [path for path in self.ls(root_path) if regexp.match(path)]
 
         results = []
         for log_type in log_types:

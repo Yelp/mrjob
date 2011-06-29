@@ -92,7 +92,7 @@ def list_relevant(runner):
     try:
         _prettyprint_relevant(*runner.ssh_list_logs())
     except LogFetchException, e:
-        print e
+        print 'SSH error:', e
         _prettyprint_relevant(*runner.s3_list_logs())
 
 
@@ -100,7 +100,7 @@ def list_all(runner):
     try:
         prettyprint_paths(runner.ssh_list_all())
     except LogFetchException, e:
-        print e
+        print 'SSH error:', e
         prettyprint_paths(runner.s3_list_all())
 
 

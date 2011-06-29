@@ -820,6 +820,8 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
 
         # Inject a master node hostname so it doesn't try to 'emr --describe' it
         self.runner._address = 'some_ip'
+        # Also pretend to have an SSH key pair file
+        self.runner._opts['ec2_key_pair_file'] = 'key.pem'
 
         # Put a 'more interesting' error in S3 to make sure that the
         # 'less interesting' one from SSH is read and S3 is never
@@ -834,17 +836,6 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
         assert_equal(failure['log_file_uri'], SSH_PREFIX + self.runner._address + lone_log_path)
 
     def test_ssh_fails_to_s3(self):
-        # Put a log file and error into SSH
-        join = os.path.join
-        lone_log_path = join(SSH_LOG_ROOT, 'steps/1/syslog')
-        mock_ssh_ls({
-            join(SSH_LOG_ROOT, 'steps/'): [lone_log_path],
-            join(SSH_LOG_ROOT, 'userlogs/'): [],
-            join(SSH_LOG_ROOT, 'history/'): [],
-        })
-        contents = HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n'
-        mock_ssh_cat({lone_log_path: contents})
-
         # the runner will try to use SSH and find itself unable to do so,
         # throwing a LogFetchException and triggering S3 fetching
         self.runner._address = None

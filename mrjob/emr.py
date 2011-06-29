@@ -1303,6 +1303,8 @@ class EMRJobRunner(MRJobRunner):
             can ignore errors from other jobs when sharing a job flow
         """
         try:
+            if not self._opts['ec2_key_pair_file']:
+                raise LogFetchException('ec2_key_pair_file not specified')
             uris = list(self.ssh_list_logs(log_types=[JOB_LOGS]))
             log.info('Fetching counters from SSH...')
             return self._scan_for_counters_in_files(uris, step_nums)
@@ -1363,6 +1365,8 @@ class EMRJobRunner(MRJobRunner):
             (otherwise None)
         """
         try:
+            if not self._opts['ec2_key_pair_file']:
+                raise LogFetchException('ec2_key_pair_file not specified')
             log_types = [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
             logs = self.ssh_list_logs(log_types)
             log.info('Scanning SSH logs for probable cause of failure')

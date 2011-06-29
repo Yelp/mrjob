@@ -26,7 +26,6 @@ import itertools
 import logging
 import os
 import pipes
-from subprocess import Popen, PIPE
 import sys
 import tarfile
 import zipfile

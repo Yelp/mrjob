@@ -808,7 +808,7 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
     def test_ssh_comes_first(self):
         # Put a log file and error into SSH
         join = os.path.join
-        lone_log_path = join(SSH_LOG_ROOT, 'steps/1/syslog')   
+        lone_log_path = join(SSH_LOG_ROOT, 'steps/1/syslog')
         mock_ssh_ls({
             join(SSH_LOG_ROOT, 'steps/'): [lone_log_path],
             join(SSH_LOG_ROOT, 'userlogs/'): [],
@@ -817,7 +817,9 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
         })
         contents = HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n'
         mock_ssh_cat({lone_log_path: contents})
-        self.runner._address = 'YO I EXIST'
+
+        # Inject a master node hostname so it doesn't try to 'emr --describe' it
+        self.runner._address = 'some_ip'
 
         # Put a 'more interesting' error in S3 to make sure that the
         # 'less interesting' one from SSH is read and S3 is never
@@ -843,14 +845,11 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
         contents = HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n'
         mock_ssh_cat({lone_log_path: contents})
 
-        # cause SSH to fail
+        # the runner will try to use SSH and find itself unable to do so,
+        # throwing a LogFetchException and triggering S3 fetching
         self.runner._address = None
 
-        # Put a 'more interesting' error in S3 to make sure that the
-        # 'less interesting' one from SSH is read and S3 is never
-        # looked at. This would never happen in reality because the
-        # logs should be identical, but it makes for an easy test
-        # of SSH overriding S3.
+        # Put a different error into S3
         self.add_mock_s3_data({'walrus': {
             TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000126_0/stderr':
                 TRACEBACK_START + PY_EXCEPTION,

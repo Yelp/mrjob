@@ -46,7 +46,8 @@ from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_hadoop_counters_from_line
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.util import cmd_line, extract_dir_for_tar, read_file, ssh_cat, ssh_ls, ssh_copy_key, ssh_slave_addresses, SSHException, SSH_PREFIX, SSH_LOG_ROOT
+from mrjob.ssh import ssh_cat, ssh_ls, ssh_copy_key, ssh_slave_addresses, SSHException, SSH_PREFIX, SSH_LOG_ROOT
+from mrjob.util import cmd_line, extract_dir_for_tar, read_file
 
 
 log = logging.getLogger('mrjob.emr')

@@ -375,10 +375,10 @@ class BucketRegionTestCase(MockEMRAndS3TestCase):
 
     def test_region_nobucket_nolocation(self):
         # aws_region specified, no bucket specified, default bucket has no location
-        j = EMRJobRunner(aws_region='PUPPYLAND', 
+        j = EMRJobRunner(aws_region='PUPPYLAND',
                          s3_endpoint='PUPPYLAND',
                          conf_path=False)
-        assert_equal(j._opts['s3_scratch_uri'], self.bucket1_uri)
+        assert_not_equal(j._opts['s3_scratch_uri'], self.bucket1_uri)
 
     def test_region_nobucket_nomatchexists(self):
         # aws_region specified, no bucket specified, no buckets have matching region
@@ -422,14 +422,14 @@ class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
 
     def test_region_nobucket_matchexists(self):
         # aws_region specified, no bucket specified, bucket exists with matching region
-        j = EMRJobRunner(aws_region='PUPPYLAND', 
-                         s3_endpoint='PUPPYLAND',
+        j = EMRJobRunner(aws_region='KITTYLAND',
+                         s3_endpoint='KITTYLAND',
                          conf_path=False)
-        assert_equal(j._opts['s3_scratch_uri'], self.bucket1_uri)
+        assert_equal(j._opts['s3_scratch_uri'], self.bucket2_uri)
 
     def test_region_bucket_match(self):
         # aws_region specified, bucket specified with matching location
-        j = EMRJobRunner(aws_region='PUPPYLAND', 
+        j = EMRJobRunner(aws_region='PUPPYLAND',
                          s3_endpoint='PUPPYLAND',
                          s3_scratch_uri=self.bucket1_uri,
                          conf_path=False)

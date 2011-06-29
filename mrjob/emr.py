@@ -1195,33 +1195,43 @@ class EMRJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_name, step_num + 1)
 
-    def ssh_list_logs(self, log_types=None):
+    def _enforce_path_regexp(self, paths, regexp, step_nums=None):
+        """Helper for ssh_list_logs and s3_list_logs to filter out unwanted
+        logs. Only pass ``step_nums`` if ``regexp`` has a ``step_nums`` group.
+        """
+        for path in paths:
+            m = regexp.match(path)
+            if m:
+                if step_nums is None or int(m.group('step_num')) in step_nums:
+                    yield path
+
+    def ssh_list_logs(self, log_types=None, step_nums=None):
         """Get specific kinds of logs from SSH
 
         :type log_types: list
         :param log_types: list containing some combination of the constants ``TASK_ATTEMPT_LOGS``, ``STEP_LOGS``, and ``JOB_LOGS``. Defaults to ``[TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]``.
+        :type log_types: list of int
 
         :return: list of matching log files in the order specified by ``log_types``
         """
         log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS]
 
-        def ssh_logs(relative_path, regexp):
-            root_path = SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path
-            return (path for path in self.ls(root_path) if regexp.match(path))
+        def ssh_logs(relative_path):
+            return self.ls(SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path)
 
-        def slave_ssh_logs(addr, relative_path, regexp):
+        def slave_ssh_logs(addr, relative_path):
             root_path = '%s%s!%s%s' % (SSH_PREFIX,
                                        self._address_of_master(),
                                        addr,
                                        SSH_LOG_ROOT + '/' + relative_path)
-            return (path for path in self.ls(root_path) if regexp.match(path))
+            return self.ls(root_path)
 
         results = []
         for log_type in log_types:
             if log_type == TASK_ATTEMPT_LOGS:
                 all_paths = []
                 try:
-                    all_paths.extend(ssh_logs('userlogs/', TASK_ATTEMPTS_LOG_URI_RE))
+                    all_paths.extend(ssh_logs('userlogs/'))
                 except IOError:
                     # sometimes the master doesn't have these
                     pass
@@ -1229,31 +1239,42 @@ class EMRJobRunner(MRJobRunner):
                     # get them from the slaves instead (takes a little longer)
                     self._enable_slave_ssh_access()
                     for addr in self._addresses_of_slaves():
-                        logs = slave_ssh_logs(addr, 'userlogs/',
-                                              TASK_ATTEMPTS_LOG_URI_RE)
+                        logs = slave_ssh_logs(addr, 'userlogs/')
                         all_paths.extend(logs)
+                all_paths = self._enforce_path_regexp(all_paths,
+                                                      TASK_ATTEMPTS_LOG_URI_RE,
+                                                      step_nums)
                 results.append(all_paths)
             elif log_type == STEP_LOGS:
-                results.append(ssh_logs('steps/', STEP_LOG_URI_RE))
+                paths = self._enforce_path_regexp(ssh_logs('steps/'),
+                                                  STEP_LOG_URI_RE,
+                                                  step_nums)
+                results.append(paths)
             elif log_type == JOB_LOGS:
-                results.append(ssh_logs('history/', JOB_LOG_URI_RE))
+                paths = self._enforce_path_regexp(ssh_logs('history/'),
+                                                  JOB_LOG_URI_RE)
+                results.append(paths)
             elif log_type == NODE_LOGS:
                 all_paths = []
                 self._enable_slave_ssh_access()
                 for addr in self._addresses_of_slaves():
-                    logs = slave_ssh_logs(addr, '', TASK_ATTEMPTS_LOG_URI_RE)
+                    logs = slave_ssh_logs(addr, '')
                     all_paths.extend(logs)
+                all_paths = self._enforce_path_regexp(all_paths,
+                                                      NODE_LOG_URI_RE)
                 results.append(all_paths)
+
         if len(results) == 1:
             return results[0]
         else:
             return results
 
-    def s3_list_logs(self, log_types=None):
+    def s3_list_logs(self, log_types=None, step_nums=None):
         """Get specific kinds of logs from S3
 
         :type log_types: list
         :param log_types: list containing some combination of the constants ``TASK_ATTEMPT_LOGS``, ``STEP_LOGS``, and ``JOB_LOGS``. Defaults to ``[TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]``.
+        :type step_nums: list of int
 
         :return: list of matching log files in the order specified by ``log_types``
         """
@@ -1264,20 +1285,29 @@ class EMRJobRunner(MRJobRunner):
 
         log_types = log_types or [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS]
 
-        def s3_logs(relative_path, regexp):
-            root_path = self._s3_job_log_uri + relative_path
-            return (path for path in self.ls(root_path) if regexp.match(path))
+        def s3_logs(relative_path):
+            return self.ls(self._s3_job_log_uri + relative_path)
 
         results = []
         for log_type in log_types:
             if log_type == TASK_ATTEMPT_LOGS:
-                results.append(s3_logs('task-attempts/', TASK_ATTEMPTS_LOG_URI_RE))
+                paths = self._enforce_path_regexp(s3_logs('task-attempts/'),
+                                                  TASK_ATTEMPTS_LOG_URI_RE,
+                                                  step_nums)
+                results.append(paths)
             elif log_type == STEP_LOGS:
-                results.append(s3_logs('steps/', STEP_LOG_URI_RE))
+                paths = self._enforce_path_regexp(s3_logs('steps/'),
+                                                  STEP_LOG_URI_RE,
+                                                  step_nums)
+                results.append(paths)
             elif log_type == JOB_LOGS:
-                results.append(s3_logs('jobs/', JOB_LOG_URI_RE))
+                paths = self._enforce_path_regexp(s3_logs('jobs/'),
+                                                  JOB_LOG_URI_RE)
+                results.append(paths)
             elif log_type == NODE_LOGS:
-                results.append(s3_logs('node/', NODE_LOG_URI_RE))
+                paths = self._enforce_path_regexp(s3_logs('node/'),
+                                                  NODE_LOG_URI_RE)
+                results.append(paths)
 
         if len(results) == 1:
             return results[0]
@@ -1306,7 +1336,7 @@ class EMRJobRunner(MRJobRunner):
         try:
             if not self._opts['ec2_key_pair_file']:
                 raise LogFetchException('ec2_key_pair_file not specified')
-            uris = list(self.ssh_list_logs(log_types=[JOB_LOGS]))
+            uris = list(self.ssh_list_logs([JOB_LOGS], step_nums))
             log.info('Fetching counters from SSH...')
             return self._scan_for_counters_in_files(uris, step_nums)
         except LogFetchException, e:
@@ -1319,7 +1349,7 @@ class EMRJobRunner(MRJobRunner):
             self._wait_for_s3_eventual_consistency()
             self._wait_for_job_flow_termination()
 
-            uris = self.s3_list_logs(log_types=[JOB_LOGS])
+            uris = self.s3_list_logs([JOB_LOGS], step_nums)
             return self._scan_for_counters_in_files(uris, step_nums)
 
     def _scan_for_counters_in_files(self, log_file_uris, step_nums):
@@ -1369,7 +1399,7 @@ class EMRJobRunner(MRJobRunner):
             if not self._opts['ec2_key_pair_file']:
                 raise LogFetchException('ec2_key_pair_file not specified')
             log_types = [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
-            logs = self.ssh_list_logs(log_types)
+            logs = self.ssh_list_logs(log_types, step_nums)
             log.info('Scanning SSH logs for probable cause of failure')
             return self._scan_logs_in_order(step_nums, *logs)
         except LogFetchException, e:
@@ -1381,7 +1411,7 @@ class EMRJobRunner(MRJobRunner):
             self._wait_for_job_flow_termination()
 
             log_types = [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
-            logs = self.s3_list_logs(log_types)
+            logs = self.s3_list_logs(log_types, step_nums)
             return self._scan_logs_in_order(step_nums, *logs)
 
     def _scan_logs_in_order(self, step_nums, task_uris, step_uris, job_uris):

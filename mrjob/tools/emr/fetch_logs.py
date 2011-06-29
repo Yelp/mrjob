@@ -44,6 +44,10 @@ def main():
                              action="store_true", default=False,
                              help='Cat all log files to JOB_FLOW_ID/')
 
+    option_parser.add_option('-s', '--step-num', dest='step_num',
+                             action='store', type='int', default=None,
+                             help='Limit results to a single step. To be used with --list and --cat.')
+
     assignments = {
         option_parser: ('conf_path', 'quiet', 'verbose',
                         'ec2_key_pair_file')
@@ -56,16 +60,20 @@ def main():
     scrape_options_into_new_groups(job_option_groups, assignments)
 
     options, args = option_parser.parse_args()
+    if options.step_num:
+        step_nums = [options.step_num]
+    else:
+        step_nums = None
 
-    with EMRJobRunner(args[0], **options.__dict__) as runner:
+    with EMRJobRunner(emr_job_flow_id=args[0], **options.__dict__) as runner:
         if options.list_relevant:
-            list_relevant(runner)
+            list_relevant(runner, step_nums)
 
         if options.list_all:
             list_all(runner)
 
         if options.cat_relevant:
-            cat_relevant(runner)
+            cat_relevant(runner, step_nums)
 
         if options.cat_all:
             cat_all(runner)
@@ -88,15 +96,15 @@ def _prettyprint_relevant(task_attempts, steps, jobs, nodes):
     prettyprint_paths(nodes)
 
 
-def list_relevant(runner):
+def list_relevant(runner, step_nums):
     try:
-        _prettyprint_relevant(*runner.ssh_list_logs())
+        _prettyprint_relevant(*runner.ssh_list_logs(step_nums=step_nums))
     except LogFetchException, e:
         print 'SSH error:', e
-        _prettyprint_relevant(*runner.s3_list_logs())
+        _prettyprint_relevant(*runner.s3_list_logs(step_nums=step_nums))
 
 
-def list_all(runner):
+def list_all(runner, step_num):
     try:
         prettyprint_paths(runner.ssh_list_all())
     except LogFetchException, e:
@@ -123,12 +131,12 @@ def _cat_from_relevant(runner, task_attempts, steps, jobs, nodes):
     cat_from_list(runner, nodes)
 
 
-def cat_relevant(runner):
+def cat_relevant(runner, step_nums):
     try:
-        _cat_from_relevant(runner, *runner.ssh_list_logs())
+        _cat_from_relevant(runner, *runner.ssh_list_logs(step_nums=step_nums))
     except LogFetchException, e:
         print 'SSH error:', e
-        _cat_from_relevant(runner, *runner.s3_list_logs())
+        _cat_from_relevant(runner, *runner.s3_list_logs(step_nums=step_nums))
 
 
 def cat_all(runner):

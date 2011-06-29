@@ -427,6 +427,7 @@ class EMRJobRunner(MRJobRunner):
 
         # the ID assigned by EMR to this job (might be None)
         self._emr_job_flow_id = self._opts['emr_job_flow_id']
+        self._pool_name = self._opts['emr_job_flow_pool_name'] or 'default'
 
         # when did our particular task start?
         self._emr_job_start = None
@@ -462,9 +463,10 @@ class EMRJobRunner(MRJobRunner):
             'ec2_key_pair_file',
             'ec2_master_instance_type',
             'ec2_slave_instance_type',
-            'enable_emr_debugging',
+            'emr_job_flow_pool_name',
             'emr_endpoint',
             'emr_job_flow_id',
+            'enable_emr_debugging',
             'hadoop_streaming_jar_on_emr',
             'hadoop_version',
             'num_ec2_instances',
@@ -906,13 +908,17 @@ class EMRJobRunner(MRJobRunner):
         args['slave_instance_type'] = self._opts['ec2_slave_instance_type']
 
         if self._master_bootstrap_script:
+            bootstrap_args = []
             if self._opts['pool_emr_job_flows']:
-                bootstrap_args = [self._pool_arg()]
-            else:
-                bootstrap_args = []
-            args['bootstrap_actions'] = [boto.emr.BootstrapAction(
-                'master', self._master_bootstrap_script['s3_uri'],
-                bootstrap_args)]
+                bootstrap_args = [
+                    self._pool_arg(),
+                    self._pool_name,
+                ]
+            args['bootstrap_actions'] = [
+                boto.emr.BootstrapAction(
+                    'master', self._master_bootstrap_script['s3_uri'],
+                    bootstrap_args)
+            ]
 
         if self._opts['ec2_key_pair']:
             args['ec2_keyname'] = self._opts['ec2_key_pair']
@@ -1704,7 +1710,7 @@ class EMRJobRunner(MRJobRunner):
             if job_flow.state != 'WAITING':
                 return False
             args = [arg.value for arg in job_flow.bootstrapactions[0].args]
-            if pool_arg not in args:
+            if not args == [pool_arg, self._pool_name]:
                 return False
             if not job_flow.keepjobflowalivewhennosteps:
                 return False
@@ -1754,6 +1760,10 @@ class EMRJobRunner(MRJobRunner):
                 return None
 
     def _pool_arg(self):
+        """Generate a hash of the bootstrap configuration so it can be used to
+        match jobs and job flows. This value will be passed as an argument
+        to the bootstrap script.
+        """
         things_to_hash = [
             [hash_file(fd['path']) for fd in self._bootstrap_scripts],
             self._opts['bootstrap_mrjob'],

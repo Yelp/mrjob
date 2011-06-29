@@ -995,10 +995,10 @@ class MRJob(object):
 
         self.emr_opt_group.add_option(
             '--pool-emr-job-flows', dest='pool_emr_job_flows', action='store_true',
-            help='Add to an existing job flow or create a new one that does not terminate when the job completes. Overrides other job flow-related options including EC2 instance configuration. Joins pool "default" if pool_name is not specified.')
+            help='Add to an existing job flow or create a new one that does not terminate when the job completes. Overrides other job flow-related options including EC2 instance configuration. Joins pool "default" if emr_job_flow_pool_name is not specified.')
 
         self.emr_opt_group.add_option(
-            '--pool-name', dest='pool_name', action='store', default=None,
+            '--pool-name', dest='emr_job_flow_pool_name', action='store', default=None,
             help='Specify a pool name to join. Set to "default" if not specified.')
 
         self.emr_opt_group.add_option(

@@ -57,25 +57,18 @@ def main():
 
     options, args = option_parser.parse_args()
 
-    if options.list_relevant:
-        list_relevant(args[0], **options.__dict__)
+    with EMRJobRunner(args[0], **options.__dict__) as runner:
+        if options.list_relevant:
+            list_relevant(runner)
 
-    if options.list_all:
-        list_all(args[0], **options.__dict__)
+        if options.list_all:
+            list_all(runner)
 
-    if options.cat_relevant:
-        cat_relevant(args[0], **options.__dict__)
+        if options.cat_relevant:
+            cat_relevant(runner)
 
-    if options.cat_all:
-        cat_all(args[0], **options.__dict__)
-
-
-def with_runner(func):
-    def wrap(jobflow_id, **runner_kwargs):
-        runner = EMRJobRunner(emr_job_flow_id=jobflow_id,
-                              **runner_kwargs)
-        func(runner)
-    return wrap
+        if options.cat_all:
+            cat_all(runner)
 
 
 def prettyprint_paths(paths):
@@ -95,7 +88,6 @@ def _prettyprint_relevant(task_attempts, steps, jobs, nodes):
     prettyprint_paths(nodes)
 
 
-@with_runner
 def list_relevant(runner):
     try:
         _prettyprint_relevant(*runner.ssh_list_logs())
@@ -104,7 +96,6 @@ def list_relevant(runner):
         _prettyprint_relevant(*runner.s3_list_logs())
 
 
-@with_runner
 def list_all(runner):
     try:
         prettyprint_paths(runner.ssh_list_all())
@@ -121,7 +112,7 @@ def cat_from_list(runner, path_list):
         print
 
 
-def cat_from_relevant(runner, task_attempts, steps, jobs, nodes):
+def _cat_from_relevant(runner, task_attempts, steps, jobs, nodes):
     print 'Task attempts:'
     cat_from_list(runner, task_attempts)
     print 'Steps:'
@@ -132,16 +123,14 @@ def cat_from_relevant(runner, task_attempts, steps, jobs, nodes):
     cat_from_list(runner, nodes)
 
 
-@with_runner
 def cat_relevant(runner):
     try:
-        cat_from_relevant(runner, *runner.ssh_list_logs())
+        _cat_from_relevant(runner, *runner.ssh_list_logs())
     except LogFetchException, e:
         print 'SSH error:', e
-        cat_from_relevant(runner, *runner.s3_list_logs())
+        _cat_from_relevant(runner, *runner.s3_list_logs())
 
 
-@with_runner
 def cat_all(runner):
     try:
         cat_from_list(runner, runner.ssh_list_all())

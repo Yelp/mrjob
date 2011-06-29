@@ -1206,14 +1206,14 @@ class EMRJobRunner(MRJobRunner):
 
         def ssh_logs(relative_path, regexp):
             root_path = SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path
-            return [path for path in self.ls(root_path) if regexp.match(path)]
+            return (path for path in self.ls(root_path) if regexp.match(path))
 
         def slave_ssh_logs(addr, relative_path, regexp):
             root_path = '%s%s!%s%s' % (SSH_PREFIX,
                                        self._address_of_master(),
                                        addr,
                                        SSH_LOG_ROOT + '/' + relative_path)
-            return [path for path in self.ls(root_path) if regexp.match(path)]
+            return (path for path in self.ls(root_path) if regexp.match(path))
 
         results = []
         for log_type in log_types:
@@ -1265,7 +1265,7 @@ class EMRJobRunner(MRJobRunner):
 
         def s3_logs(relative_path, regexp):
             root_path = self._s3_job_log_uri + relative_path
-            return [path for path in self.ls(root_path) if regexp.match(path)]
+            return (path for path in self.ls(root_path) if regexp.match(path))
 
         results = []
         for log_type in log_types:
@@ -1365,6 +1365,7 @@ class EMRJobRunner(MRJobRunner):
         try:
             log_types = [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
             logs = self.ssh_list_logs(log_types)
+            log.info('Scanning SSH logs for probable cause of failure')
             return self._scan_logs_in_order(step_nums, *logs)
         except LogFetchException, e:
             if not self._s3_job_log_uri:

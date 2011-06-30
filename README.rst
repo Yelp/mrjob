@@ -30,7 +30,7 @@ Setting up EMR on Amazon
 
 * create an `Amazon Web Services account <http://aws.amazon.com/>`_
 * sign up for `Elastic MapReduce <http://aws.amazon.com/elasticmapreduce/>`_
-* Get your access and secret keys (`go here <http://aws.amazon.com/account/>`_ and click on "Security Credentials")
+* Get your access and secret keys (click "Security Credentials" on `your account page <http://aws.amazon.com/account/>`_)
 * Set the environment variables ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY`` accordingly
 
 Try it out!

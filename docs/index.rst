@@ -9,11 +9,16 @@ Table of Contents
 =================
 
 .. toctree::
-   :maxdepth: 3
-   :numbered:
+    :maxdepth: 3
+    :numbered:
 
-   writing-and-running.rst
-   library.rst
+    writing-and-running.rst
+    job.rst
+    protocols.rst
+    runners.rst
+    configs.rst
+    utils.rst
+    tools.rst
 
 Indices and tables
 ==================

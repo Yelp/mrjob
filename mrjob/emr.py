@@ -346,7 +346,7 @@ class EMRJobRunner(MRJobRunner):
         :param hadoop_version: Set the version of Hadoop to use on EMR. EMR currently accepts ``'0.18'`` or ``'0.20'``; default is ``'0.20'``.
         :type num_ec2_instances: int
         :type pool_emr_job_flows: bool
-        :param pool_emr_job_flows: Try to run the job on a ``WAITING`` pooled job flow with the same bootstrap configuration. Prefer the one with the most compute units. Use S3 to "lock" the job flow and ensure that the job is not scheduled behind another job. If no suitable job flow is `WAITING`, create a new pooled job flow.
+        :param pool_emr_job_flows: Try to run the job on a ``WAITING`` pooled job flow with the same bootstrap configuration. Prefer the one with the most compute units. Use S3 to "lock" the job flow and ensure that the job is not scheduled behind another job. If no suitable job flow is `WAITING`, create a new pooled job flow. **WARNING**: do not run this without having :py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job flows left idle can quickly become expensive!
         :param num_ec2_instances: number of instances to start up. Default is ``1``.
         :type s3_endpoint: str
         :param s3_endpoint: Host to connect to when communicating with S3 (e.g. ``s3-us-west-1.amazonaws.com``). Default is to infer this from *aws_region*.

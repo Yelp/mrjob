@@ -1767,8 +1767,8 @@ class EMRJobRunner(MRJobRunner):
         to the bootstrap script.
         """
         def should_include_file(info):
-            # Bootstrap will always have a different checksum
-            if info['path'].endswith('b.py'):
+            # Bootstrap scripts will always have a different checksum
+            if info['name'] in ('b.py', 'wrapper.py'):
                 return False
 
             # Also do not include script used to spin up job

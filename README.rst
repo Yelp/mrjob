@@ -23,17 +23,10 @@ Some important features:
 
 Installation
 ------------
+
 ``python setup.py install``
 
-.. _amazon-setup:
-
-Setting up EMR on Amazon
-------------------------
-
-* create an `Amazon Web Services account <http://aws.amazon.com/>`_
-* sign up for `Elastic MapReduce <http://aws.amazon.com/elasticmapreduce/>`_
-* Get your access and secret keys (click "Security Credentials" on `your account page <http://aws.amazon.com/account/>`_)
-* Set the environment variables ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY`` accordingly
+You can also get the source `on Github <http://www.github.com/yelp/mrjob>`_.
 
 Try it out!
 -----------
@@ -46,6 +39,16 @@ Try it out!
     python mrjob/examples/mr_word_freq_count.py README.rst -r emr > counts
     # on your Hadoop cluster
     python mrjob/examples/mr_word_freq_count.py README.rst -r hadoop > counts
+
+.. _amazon-setup:
+
+Setting up EMR on Amazon
+------------------------
+
+* create an `Amazon Web Services account <http://aws.amazon.com/>`_
+* sign up for `Elastic MapReduce <http://aws.amazon.com/elasticmapreduce/>`_
+* Get your access and secret keys (click "Security Credentials" on `your account page <http://aws.amazon.com/account/>`_)
+* Set the environment variables ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY`` accordingly
 
 Advanced Configuration
 ----------------------

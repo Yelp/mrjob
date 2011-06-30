@@ -13,6 +13,7 @@ own Hadoop cluster
    :maxdepth: 3
    :numbered:
 
+   README.rst
    writing-and-running.rst
    library.rst
    amazon.rst

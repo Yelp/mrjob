@@ -1827,7 +1827,6 @@ class EMRJobRunner(MRJobRunner):
 
         bucket = s3_conn.get_bucket(bucket_name)
         for key in bucket.list(key_name):
-            log.info(self.md5sum(s3_key_to_uri(key), s3_conn=s3_conn))
             yield s3_key_to_uri(key)
 
     def md5sum(self, path, s3_conn=None):

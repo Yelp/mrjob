@@ -64,10 +64,11 @@ def make_option_parser():
     job_opt_group = make_option_group('Job flow configuration')
 
     assignments = {
-        option_parser: ('conf_path', 'pool_emr_job_flows', 'quiet', 'verbose'),
+        option_parser: ('conf_path', 'pool_emr_job_flows',
+                        'emr_job_flow_pool_name', 'quiet', 'verbose'),
         ec2_opt_group: ('ec2_instance_type', 'ec2_master_instance_type',
                         'ec2_slave_instance_type', 'num_ec2_instances',
-                        'aws_availability_zone', 
+                        'aws_availability_zone',
                         'ec2_key_pair', 'ec2_key_pair_file',
                         'emr_endpoint',),
         hadoop_opt_group: ('hadoop_version', 'label', 'owner'),

@@ -86,7 +86,7 @@ How jobs are run
 
 
 Hooks for testing
-=================
+-----------------
 
 .. currentmodule:: mrjob.job
 

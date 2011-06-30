@@ -209,7 +209,7 @@ class EMRJobRunner(MRJobRunner):
         job_flows = emr_conn.describe_jobflows()
         ...
 
-    See also: :py:meth:`EMRJobRunner.__init__`.
+    See also: :py:meth:`~EMRJobRunner.__init__`.
     """
     alias = 'emr'
 

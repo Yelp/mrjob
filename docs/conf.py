@@ -97,7 +97,29 @@ html_theme = 'default'
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-#html_theme_options = {}
+_yelp_red = "#C41200"
+_yelp_gray = "#555"
+_yelp_yellow = "#FFFED7"
+_yelp_yellow_2 = "#FFF0D1"
+_yelp_link = "#66C"
+_header_border = "#CCC"
+html_theme_options = {
+    "relbarbgcolor": _yelp_red,
+    "footerbgcolor": "white",
+    "footertextcolor": _yelp_gray,
+    "sidebarbgcolor": "white",
+    "sidebarlinkcolor": _yelp_link,
+    "sidebartextcolor": _yelp_gray,
+    "headbgcolor": _yelp_yellow_2,
+    "headlinkcolor": _yelp_link,
+    "headtextcolor": _yelp_gray,
+    "headfont": "arial,'Lucida Grande','Bitstream Vera Sans',verdana,sans-serif",
+    "bodyfont": "arial,'Lucida Grande','Bitstream Vera Sans',verdana,sans-serif",
+    "linkcolor": _yelp_link,
+    "visitedlinkcolor": _yelp_link,
+    "textcolor": _yelp_gray,
+    "codebgcolor": _yelp_yellow,
+}
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = []

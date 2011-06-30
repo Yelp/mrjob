@@ -26,8 +26,6 @@ Installation
 
 ``python setup.py install``
 
-You can also get the source `on Github <http://www.github.com/yelp/mrjob>`_.
-
 Try it out!
 -----------
 

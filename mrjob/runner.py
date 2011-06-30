@@ -532,7 +532,7 @@ class MRJobRunner(object):
     def _md5sum_file(self, fileobj, block_size=8**6):
         md5 = hashlib.md5()
         while True:
-            data = f.read(block_size)
+            data = fileobj.read(block_size)
             if not data:
                 break
             md5.update(data)
@@ -541,7 +541,7 @@ class MRJobRunner(object):
     def md5sum(self, path):
         """Generate the md5 sum of the file at ``path``"""
         with open(path, 'rb') as f:
-            return self._md5sum_file(self, f)
+            return self._md5sum_file(f)
 
     ### other methods you need to implement in your subclass ###
 

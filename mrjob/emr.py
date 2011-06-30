@@ -1764,10 +1764,27 @@ class EMRJobRunner(MRJobRunner):
         match jobs and job flows. This value will be passed as an argument
         to the bootstrap script.
         """
+        def should_include_file(info):
+            # Bootstrap will always have a different checksum
+            if info['path'].endswith('b.py'):
+                return False
+
+            # Also do not include script used to spin up job
+            if self._script and info['path'] == self._script['path']:
+               return False
+
+            # mrjob.tar.gz is covered by bootstrap_mrjob variable.
+            # also, it seems to be different every time, causing an
+            # causing an undesirable hash mismatch.
+            if self._opts['bootstrap_mrjob'] \
+               and info['name'] == 'mrjob.tar.gz':
+                return False
+
+            return True
+
         things_to_hash = [
-            [self.md5sum(fd['path']) for fd in self._bootstrap_scripts],
+            [self.md5sum(fd['path']) for fd in self._files if should_include_file(fd)],
             self._opts['bootstrap_mrjob'],
-            [self.md5sum(fd['path']) for fd in self._bootstrap_python_packages],
             self._opts['bootstrap_cmds'],
         ]
         return 'pool-%s' % hash_object(things_to_hash)

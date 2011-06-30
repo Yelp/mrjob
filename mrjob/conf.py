@@ -45,7 +45,7 @@ Now whenever you run ``mr_your_script.py -r emr``,
 
 Options specified on the command-line take precedence over
 :file:`mrjob.conf`. Usually this means simply overriding the option in
-:file:`mrjob.conf`. However, we know that *cmdenv*, contains environment
+:file:`mrjob.conf`. However, we know that *cmdenv* contains environment
 variables, so we do the right thing. For example, if your :file:`mrjob.conf`
 contained:
 

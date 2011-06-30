@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import with_statement
 
 """Base class for all runners."""
 
@@ -20,6 +21,7 @@ import datetime
 import getpass
 import glob
 import gzip
+import hashlib
 import logging
 import os
 import random
@@ -527,9 +529,23 @@ class MRJobRunner(object):
         # zero out the file
         open(path, 'w').close()
 
+    def _md5sum_file(self, fileobj, block_size=8**6):
+        md5 = hashlib.md5()
+        while True:
+            data = f.read(block_size)
+            if not data:
+                break
+            md5.update(data)
+        return md5.hexdigest()
+
+    def md5sum(self, path):
+        """Generate the md5 sum of the file at ``path``"""
+        with open(path, 'rb') as f:
+            return self._md5sum_file(self, f)
+
     ### other methods you need to implement in your subclass ###
 
-    # you'll probably wan't to add your own __init__() and cleanup() as well
+    # you'll probably want to add your own __init__() and cleanup() as well
 
     def _run(self):
         """Run the job."""

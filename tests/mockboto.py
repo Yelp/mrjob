@@ -22,6 +22,7 @@ ad-hoc mock objects.
 """
 from __future__ import with_statement
 import datetime
+import hashlib
 
 try:
     from boto.emr.connection import EmrConnection
@@ -197,6 +198,13 @@ class MockKey(object):
             raise boto.exception.S3ResponseError(404, 'Not Found')
     
     last_modified = property(_get_last_modified, _set_last_modified)
+
+    def _get_etag(self):
+        m = hashlib.md5()
+        m.update(self.get_contents_as_string())
+        return m.hexdigest()
+
+    etag = property(_get_etag)
 
 ### EMR ###
 

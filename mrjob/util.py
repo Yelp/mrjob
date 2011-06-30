@@ -80,18 +80,6 @@ def file_ext(path):
     return filename[dot_index:]
 
 
-def hash_file(path, block_size=8**6):
-    """Generate a hash (currently md5) of the file at ``path``"""
-    md5 = hashlib.md5()
-    with open(path, 'rb') as f:
-        while True:
-            data = f.read(block_size)
-            if not data:
-                break
-            md5.update(data)
-    return md5.hexdigest()
-
-
 def hash_object(obj):
     """Generate a hash (currently md5) of the ``repr`` of the object"""
     m = hashlib.md5()

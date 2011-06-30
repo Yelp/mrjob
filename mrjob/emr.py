@@ -47,7 +47,7 @@ from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths
 from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_hadoop_counters_from_line, parse_s3_uri, S3_URI_RE
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.util import cmd_line, extract_dir_for_tar, hash_file, hash_object, read_file
+from mrjob.util import cmd_line, extract_dir_for_tar, hash_object, read_file
 
 
 def monkeypatch_boto():
@@ -1765,9 +1765,9 @@ class EMRJobRunner(MRJobRunner):
         to the bootstrap script.
         """
         things_to_hash = [
-            [hash_file(fd['path']) for fd in self._bootstrap_scripts],
+            [self.md5sum(fd['path']) for fd in self._bootstrap_scripts],
             self._opts['bootstrap_mrjob'],
-            [hash_file(fd['path']) for fd in self._bootstrap_python_packages],
+            [self.md5sum(fd['path']) for fd in self._bootstrap_python_packages],
             self._opts['bootstrap_cmds'],
         ]
         return 'pool-%s' % hash_object(things_to_hash)
@@ -1827,7 +1827,15 @@ class EMRJobRunner(MRJobRunner):
 
         bucket = s3_conn.get_bucket(bucket_name)
         for key in bucket.list(key_name):
+            log.info(self.md5sum(s3_key_to_uri(key), s3_conn=s3_conn))
             yield s3_key_to_uri(key)
+
+    def md5sum(self, path, s3_conn=None):
+        if S3_URI_RE.match(path):
+            k = self.get_s3_key(path, s3_conn=s3_conn)
+            return k.etag.strip('"')
+        else:
+            return super(EMRJobRunner, self).md5sum(path)
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on S3 because there are

@@ -688,7 +688,7 @@ class MRJob(object):
     ### Command-line arguments ###
 
     def configure_options(self):
-        """Define arguments for this script. Called from ``__init__()``.
+        """Define arguments for this script. Called from :py:meth:`MRJob.__init__()`.
 
         Run ``python -m mrjob.job.MRJob --help`` to see all options.
 

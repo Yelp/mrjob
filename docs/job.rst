@@ -45,6 +45,9 @@ Advanced
 
 Protocols
 ^^^^^^^^^
+
+See :doc:`protocols` for a complete description of protocols.
+
 .. autoattribute:: MRJob.DEFAULT_INPUT_PROTOCOL
 .. autoattribute:: MRJob.DEFAULT_PROTOCOL
 .. autoattribute:: MRJob.DEFAULT_OUTPUT_PROTOCOL
@@ -53,6 +56,9 @@ Protocols
 
 Custom command-line options
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+See :doc:`configs-reference` for a complete list of all configuration options.
+
 .. automethod:: MRJob.configure_options
 .. automethod:: MRJob.add_passthrough_option
 .. automethod:: MRJob.add_file_option

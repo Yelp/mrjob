@@ -14,7 +14,6 @@ Table of Contents
 
    writing-and-running.rst
    library.rst
-   amazon.rst
 
 Indices and tables
 ==================

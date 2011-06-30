@@ -25,6 +25,8 @@ Installation
 ------------
 ``python setup.py install``
 
+.. _amazon-setup:
+
 Setting up EMR on Amazon
 ------------------------
 

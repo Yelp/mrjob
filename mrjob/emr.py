@@ -1782,6 +1782,10 @@ class EMRJobRunner(MRJobRunner):
                and info['name'] == 'mrjob.tar.gz':
                 return False
 
+            # Ignore job-specific files
+            if info['path'] in self._input_paths:
+                return False
+
             return True
 
         things_to_hash = [

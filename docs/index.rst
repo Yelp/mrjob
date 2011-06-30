@@ -3,17 +3,15 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-mrjob
-=================================
+.. include:: README.rst
 
-mrjob - Run Hadoop Streaming jobs on Amazon Elastic MapReduce or your
-own Hadoop cluster
+Table of Contents
+=================
 
 .. toctree::
    :maxdepth: 3
    :numbered:
 
-   README.rst
    writing-and-running.rst
    library.rst
    amazon.rst

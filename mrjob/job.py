@@ -995,7 +995,7 @@ class MRJob(object):
 
         self.emr_opt_group.add_option(
             '--pool-emr-job-flows', dest='pool_emr_job_flows', action='store_true',
-            help='Add to an existing job flow or create a new one that does not terminate when the job completes. Overrides other job flow-related options including EC2 instance configuration. Joins pool "default" if emr_job_flow_pool_name is not specified.')
+            help='Add to an existing job flow or create a new one that does not terminate when the job completes. Overrides other job flow-related options including EC2 instance configuration. Joins pool "default" if emr_job_flow_pool_name is not specified. WARNING: do not run this without mrjob.tools.emr.terminate.idle_job_flows in your crontab; job flows left idle can quickly become expensive!')
 
         self.emr_opt_group.add_option(
             '--pool-name', dest='emr_job_flow_pool_name', action='store', default=None,

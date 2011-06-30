@@ -1700,23 +1700,48 @@ class EMRJobRunner(MRJobRunner):
 
         pool_arg = self._pool_arg()
 
+        def calculate_compute_units(job_flow):
+            instance_type = job_flow.masterinstancetype
+            if job_flow.instancecount > 1:
+                instance_type = job_flow.slaveinstancetype
+            return compute_units[instance_type]*job_flow.instancecount
+
+        my_instance_type = self._opts['ec2_master_instance_type']
+        if self._opts['num_ec2_instances'] > 1:
+            my_instance_type = self._opts['ec2_slave_instance_type']
+        units_per_instance = compute_units.get(my_instance_type, 0)
+        my_compute_units = units_per_instance*self._opts['num_ec2_instances']
+
         def matches(job_flow):
+            # this may be a retry due to locked job flows
             if job_flow.jobflowid in exclude:
                 return False
 
-            # boto gives us ustrings for these. why???
+            # convert from braindead string types to usable types
             job_flow.instancecount = int(job_flow.instancecount)
-            keep_alive = job_flow.keepjobflowalivewhennosteps 
+            keep_alive = job_flow.keepjobflowalivewhennosteps
             job_flow.keepjobflowalivewhennosteps = (keep_alive in ('true', True))
 
+            # only take idle job flows
             if job_flow.state != 'WAITING':
                 return False
+
+            # match bootstrap configuration and pool name
             args = [arg.value for arg in job_flow.bootstrapactions[0].args]
             if not args == [pool_arg, self._pool_name]:
                 return False
+
+            # sanity check for proper type of job flow
             if not job_flow.keepjobflowalivewhennosteps:
                 return False
+
+            # match hadoop version
             if not job_flow.hadoopversion == self._opts['hadoop_version']:
+                return False
+
+            # don't accept a job flow with worse performance characteristics
+            # than those specified by the config
+            if calculate_compute_units(job_flow) < my_compute_units:
                 return False
 
             return True
@@ -1726,11 +1751,7 @@ class EMRJobRunner(MRJobRunner):
 
         def sort_key(tup):
             time_to_hour, job_flow = tup
-            instance_type = job_flow.masterinstancetype
-            if job_flow.instancecount > 1:
-                instance_type = job_flow.slaveinstancetype
-            total_units = compute_units[instance_type]*job_flow.instancecount
-            return (total_units, time_to_hour)
+            return (calculate_compute_units(job_flow), time_to_hour)
 
         return sorted(job_flows_with_times, key=sort_key)
 

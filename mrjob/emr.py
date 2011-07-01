@@ -1700,17 +1700,20 @@ class EMRJobRunner(MRJobRunner):
 
         pool_arg = self._pool_arg()
 
-        def calculate_compute_units(job_flow):
-            instance_type = job_flow.masterinstancetype
+        def worker_instance_type(job_flow):
             if job_flow.instancecount > 1:
-                instance_type = job_flow.slaveinstancetype
+                return job_flow.slaveinstancetype
+            else:
+                return job_flow.masterinstancetype
+
+        def calculate_compute_units(job_flow):
+            instance_type = worker_instance_type(job_flow)
             return compute_units[instance_type]*job_flow.instancecount
 
         my_instance_type = self._opts['ec2_master_instance_type']
         if self._opts['num_ec2_instances'] > 1:
             my_instance_type = self._opts['ec2_slave_instance_type']
-        units_per_instance = compute_units.get(my_instance_type, 0)
-        my_compute_units = units_per_instance*self._opts['num_ec2_instances']
+        my_compute_units = compute_units[my_instance_type]
 
         def matches(job_flow):
             # this may be a retry due to locked job flows
@@ -1741,7 +1744,9 @@ class EMRJobRunner(MRJobRunner):
 
             # don't accept a job flow with worse performance characteristics
             # than those specified by the config
-            if calculate_compute_units(job_flow) < my_compute_units:
+            if compute_units[worker_instance_type(job_flow)] < my_compute_units:
+                return False
+            if job_flow.instancecount < self._opts['num_ec2_instances']:
                 return False
 
             return True
@@ -1798,7 +1803,7 @@ class EMRJobRunner(MRJobRunner):
 
             # mrjob.tar.gz is covered by bootstrap_mrjob variable.
             # also, it seems to be different every time, causing an
-            # causing an undesirable hash mismatch.
+            # undesirable hash mismatch.
             if self._opts['bootstrap_mrjob'] \
                and info['name'] == 'mrjob.tar.gz':
                 return False

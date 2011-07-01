@@ -47,7 +47,9 @@ The criteria for finding an appropriate job flow for a job are as follows:
 
 Most of the time you shouldn't need to worry about these things. Just use pool names to separate job flows into pools representing their type.
 
-**If you use job flow pools, keep** ``terminate_idle_job_flows.py`` **in your crontab!** Otherwise you will forget to terminate your job flows and waste a lot of money.
+EMR provides no way to remove steps from a job flow once they are added. This introduces a race condition where two users identify the same job flow and join it simultaneously, causing one user's job to be delayed until the first user's is finished. mrjob avoids this situation using an S3-based locking mechanism.
+
+**If you use job flow pools, keep** :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows` **in your crontab!** Otherwise you will forget to terminate your job flows and waste a lot of money.
 
 S3 utilities
 ------------

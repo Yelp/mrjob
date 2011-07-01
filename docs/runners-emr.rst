@@ -27,7 +27,7 @@ You can then add jobs to the job flow with the :option:`--emr-job-flow-id` switc
     Adding our job to job flow j-SUNG7EGS3ECP
     ...
 
-Debugging will be difficult unless you complete SSH setup (CROSS REFERENCE PLZ) since the logs will not be copied from the master node to S3 before either five minutes pass or the job flow terminates.
+Debugging will be difficult unless you complete SSH setup (see :ref:`ssh-tunneling`) since the logs will not be copied from the master node to S3 before either five minutes pass or the job flow terminates.
 
 
 Pooling Job Flows

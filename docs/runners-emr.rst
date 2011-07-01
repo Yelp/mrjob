@@ -24,7 +24,7 @@ You can then add jobs to the job flow with the :option:`--emr-job-flow-id` switc
 
     > python mr_my_job.py -r emr --emr-job-flow-id=j-JOBFLOWID input_file.txt > out
     ...
-    Adding our job to job flow j-SUNG7EGS3ECP
+    Adding our job to job flow j-JOBFLOWID
     ...
 
 Debugging will be difficult unless you complete SSH setup (see :ref:`ssh-tunneling`) since the logs will not be copied from the master node to S3 before either five minutes pass or the job flow terminates.

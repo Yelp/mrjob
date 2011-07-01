@@ -45,9 +45,9 @@ The criteria for finding an appropriate job flow for a job are as follows:
 * The job flow must have at least as many instances, and  the instance type must have at least as many compute units, as the job configuration specifies. See `Amazon EC2 Instance Types <http://aws.amazon.com/ec2/instance-types/>`_ for a complete listing of instance types and their respective compute units.
 * Ties are broken first by total compute units in the job flow as calculated by ``number of instances * instance type compute units``, then by the number of minutes until an even instance hour. This strategy minimizes wasted instance hours.
 
-Most of the time you shouldn't need to worry about these things. Just separate job flows into pools representing their type.
+Most of the time you shouldn't need to worry about these things. Just use pool names to separate job flows into pools representing their type.
 
-**If you use job flow pools, keep :cmd:`terminate_idle_job_flows.py` in your crontab!** Otherwise you will forget to terminate your job flows and waste a lot of money.
+**If you use job flow pools, keep** ``terminate_idle_job_flows.py`` **in your crontab!** Otherwise you will forget to terminate your job flows and waste a lot of money.
 
 S3 utilities
 ------------

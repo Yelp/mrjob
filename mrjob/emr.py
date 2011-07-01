@@ -1706,14 +1706,13 @@ class EMRJobRunner(MRJobRunner):
             else:
                 return job_flow.masterinstancetype
 
-        def calculate_compute_units(job_flow):
-            instance_type = worker_instance_type(job_flow)
-            return compute_units[instance_type]*job_flow.instancecount
+        def cu(job_flow):
+            return compute_units.get(worker_instance_type(job_flow), 0)
 
         my_instance_type = self._opts['ec2_master_instance_type']
         if self._opts['num_ec2_instances'] > 1:
             my_instance_type = self._opts['ec2_slave_instance_type']
-        my_compute_units = compute_units[my_instance_type]
+        my_compute_units = compute_units.get(my_instance_type, 0)
 
         def matches(job_flow):
             # this may be a retry due to locked job flows
@@ -1744,7 +1743,7 @@ class EMRJobRunner(MRJobRunner):
 
             # don't accept a job flow with worse performance characteristics
             # than those specified by the config
-            if compute_units[worker_instance_type(job_flow)] < my_compute_units:
+            if cu(job_flow) < my_compute_units:
                 return False
             if job_flow.instancecount < self._opts['num_ec2_instances']:
                 return False
@@ -1756,7 +1755,7 @@ class EMRJobRunner(MRJobRunner):
 
         def sort_key(tup):
             time_to_hour, job_flow = tup
-            return (calculate_compute_units(job_flow), time_to_hour)
+            return (cu(job_flow)*job_flow.instancecount, time_to_hour)
 
         return sorted(job_flows_with_times, key=sort_key)
 

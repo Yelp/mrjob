@@ -104,7 +104,7 @@ _yelp_yellow_2 = "#FFF0D1"
 _yelp_link = "#66C"
 _header_border = "#CCC"
 html_theme_options = {
-    "rightsidebar": True,
+    "rightsidebar": False,
     "relbarbgcolor": _yelp_red,
     "footerbgcolor": "white",
     "footertextcolor": _yelp_gray,

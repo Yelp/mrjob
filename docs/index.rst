@@ -3,7 +3,12 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. include:: ../README.rst
+mrjob
+=====
+
+mrjob is a Python package that helps you write and run Hadoop Streaming jobs.
+
+mrjob fully supports Amazon's Elastic MapReduce (EMR) service, which allows you to buy time on a Hadoop cluster on an hourly basis. It also works with your own Hadoop cluster.
 
 Table of Contents
 =================

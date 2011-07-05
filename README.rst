@@ -38,8 +38,6 @@ Try it out!
     # on your Hadoop cluster
     python mrjob/examples/mr_word_freq_count.py README.rst -r hadoop > counts
 
-.. _amazon-setup:
-
 Setting up EMR on Amazon
 ------------------------
 

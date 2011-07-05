@@ -34,7 +34,7 @@ def pprint_job_flow(jf):
     instance_count = int(jf.instancecount)
 
     nosep_segments = [
-        '%s: %d instance' % (jf.jobflowid, instance_count),
+        '%d instance' % instance_count,
     ]
     if instance_count > 1:
         nosep_segments.append('s')
@@ -54,9 +54,30 @@ def pprint_job_flow(jf):
         ')',
     ]
 
-    print jf.name
+    print '%s: %s' % (jf.jobflowid, jf.name)
     print ''.join(nosep_segments)
+    print jf.state
     print
+
+
+def pprint_pools(runner):
+    emr_conn = runner.make_emr_conn()
+
+    pools = {}
+    for job_flow in emr_conn.describe_jobflows():
+        if job_flow.state in ('TERMINATED', 'FAILED', 'COMPLETED'):
+            continue
+        args = [arg.value for arg in job_flow.bootstrapactions[0].args]
+        if len(args) != 2:
+            continue
+        pools.setdefault(args[1], list()).append(job_flow)
+
+    for pool_name, job_flows in pools.iteritems():
+        print '-'*len(pool_name)
+        print pool_name
+        print '-'*len(pool_name)
+        for job_flow in job_flows:
+            pprint_job_flow(job_flow)
 
 
 def main():
@@ -107,7 +128,7 @@ def main():
     runner = EMRJobRunner(**runner_kwargs)
 
     if options.list_all:
-        pass # this will prettyprint all the pooled job flows by pool name
+        pprint_pools(runner)
     else:
         sorted_tagged_job_flows = runner.usable_job_flows()
 

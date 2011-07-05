@@ -26,6 +26,21 @@ from mrjob.emr import EMRJobRunner, est_time_to_hour
 from mrjob.job import MRJob
 from mrjob.util import scrape_options_into_new_groups, log_to_stream
 
+
+def get_pools(emr_conn):
+    pools = {}
+    for job_flow in emr_conn.describe_jobflows():
+        if job_flow.state in ('TERMINATED', 'FAILED', 'COMPLETED',
+                              'SHUTTING_DOWN'):
+            continue
+        args = [arg.value for arg in job_flow.bootstrapactions[0].args]
+        if len(args) != 2:
+            continue
+        pools.setdefault(args[1], list()).append(job_flow)
+
+    return pools
+
+
 def pprint_job_flow(jf):
     """Print a job flow to stdout in this form:
     job.flow.name
@@ -61,17 +76,7 @@ def pprint_job_flow(jf):
 
 
 def pprint_pools(runner):
-    emr_conn = runner.make_emr_conn()
-
-    pools = {}
-    for job_flow in emr_conn.describe_jobflows():
-        if job_flow.state in ('TERMINATED', 'FAILED', 'COMPLETED'):
-            continue
-        args = [arg.value for arg in job_flow.bootstrapactions[0].args]
-        if len(args) != 2:
-            continue
-        pools.setdefault(args[1], list()).append(job_flow)
-
+    pools = get_pools(runner.make_emr_conn())
     for pool_name, job_flows in pools.iteritems():
         print '-'*len(pool_name)
         print pool_name
@@ -79,6 +84,16 @@ def pprint_pools(runner):
         for job_flow in job_flows:
             pprint_job_flow(job_flow)
 
+
+def terminate(runner, pool_name):
+    emr_conn = runner.make_emr_conn()
+    pools = get_pools(emr_conn)
+    try:
+        for job_flow in pools[pool_name]:
+            emr_conn.terminate_jobflow(job_flow.jobflowid)
+            print 'terminated %s' % job_flow.jobflowid
+    except KeyError:
+        print 'No job flows match pool name "%s"' % pool_name
 
 def main():
     usage = '%prog [options]'
@@ -112,6 +127,12 @@ def main():
     option_parser.add_option('-a', '--all', action='store_true',
                              default=False, dest='list_all',
                              help='List all available job flows without filtering by configuration')
+    option_parser.add_option('-f', '--find', action='store_true',
+                             default=False, dest='find',
+                             help='Find a job flow matching the pool name, bootstrap configuration, and instance number/type as specified on the command line and in the configuration files')
+    option_parser.add_option('-t', '--terminate', action='store',
+                             default=None, dest='terminate',
+                             help='Terminate all job flows in the given pool (defaults to pool "default")')
 
     # Scrape options from MRJob and index them by dest
     mr_job = MRJob()
@@ -121,15 +142,16 @@ def main():
     log_to_stream(name='mrjob', debug=options.verbose)
 
     runner_kwargs = options.__dict__.copy()
-    del runner_kwargs['quiet']
-    del runner_kwargs['verbose']
-    del runner_kwargs['list_all']
+    for non_runner_kwarg in ('quiet', 'verbose', 'list_all', 'find',
+                             'terminate'):
+        del runner_kwargs[non_runner_kwarg]
 
     runner = EMRJobRunner(**runner_kwargs)
 
     if options.list_all:
         pprint_pools(runner)
-    else:
+
+    if options.find:
         sorted_tagged_job_flows = runner.usable_job_flows()
 
         if sorted_tagged_job_flows:
@@ -138,6 +160,9 @@ def main():
             pprint_job_flow(jf)
         else:
             print 'No idle job flows match criteria'
+
+    if options.terminate:
+        terminate(runner, options.terminate)
 
 
 if __name__ == '__main__':

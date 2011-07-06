@@ -138,9 +138,9 @@ def find_mrjob_conf():
 
         # $HOME isn't necessarily set on Windows, but ~ works
         yield (expand_path('~/.mrjob.conf'), False)
-        yield (expand_path('~/.mrjob'), True)
 
         # DEPRECATED:
+        yield (expand_path('~/.mrjob'), True)
         if os.environ.get('PYTHONPATH'):
             for dirname in os.environ['PYTHONPATH'].split(os.pathsep):
                 yield (os.path.join(dirname, 'mrjob.conf'), True)

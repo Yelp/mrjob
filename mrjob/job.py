@@ -1240,10 +1240,19 @@ class MRJob(object):
         """
         master_option_dict = self.options.__dict__
 
+        # Some options' defaults don't quite match to their optparse
+        # definitions, so slip in the correct values
+        master_default_dict = dict((opt.dest, opt.default) for opt in self._passthrough_options)
+        if not master_default_dict['output_protocol']:
+            master_default_dict['output_protocol'] = master_option_dict['protocol']
+
         output_args = []
         for pass_opt in self._passthrough_options:
             opt_prefix = pass_opt.get_opt_string()
             opt_value = master_option_dict[pass_opt.dest]
+
+            if opt_value == master_default_dict[pass_opt.dest]:
+                continue
 
             # Pass through the arguments for these actions
             if pass_opt.action == 'store' and opt_value is not None:

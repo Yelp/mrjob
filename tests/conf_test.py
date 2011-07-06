@@ -65,6 +65,9 @@ class MRJobConfTestCase(TestCase):
         os.environ.clear()
         os.environ.update(self._old_environ)
 
+
+class MRJobBasicConfTest(MRJobConfTestCase):
+
     def test_no_mrjob_conf(self):
         self._existing_paths = []
         assert_equal(find_mrjob_conf(), None)

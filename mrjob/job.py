@@ -1222,7 +1222,7 @@ class MRJob(object):
 
             @classmethod
             def protocols(cls):
-                protocol_dict = super(MRYourJob, self).protocols()
+                protocol_dict = super(MRYourJob, cls).protocols()
                 protocol_dict['rot13'] = Rot13Protocol
                 return protocol_dict
 

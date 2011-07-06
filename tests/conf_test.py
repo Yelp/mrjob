@@ -90,6 +90,7 @@ class MRJobConfTestCase(TestCase):
         os.environ['PYTHONPATH'] = self.tmp_dir
         mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
         open(mrjob_conf_path, 'w').close()
+        self._existing_paths = [mrjob_conf_path]
         assert_equal(find_mrjob_conf(), mrjob_conf_path)
 
     def test_precedence(self):

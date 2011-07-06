@@ -78,7 +78,7 @@ class MRJobBasicConfTest(MRJobConfTestCase):
 
     def test_mrjob_in_home_dir(self):
         os.environ['HOME'] = self.tmp_dir
-        dot_mrjob_path = os.path.join(self.tmp_dir, '.mrjob')
+        dot_mrjob_path = os.path.join(self.tmp_dir, '.mrjob.conf')
         open(dot_mrjob_path, 'w').close()
         assert_equal(find_mrjob_conf(), dot_mrjob_path)
 
@@ -112,13 +112,13 @@ class MRJobBasicConfTest(MRJobConfTestCase):
         self._existing_paths.add('/py1/mrjob.conf')
         assert_equal(find_mrjob_conf(), '/py1/mrjob.conf')
 
-        self._existing_paths.add('/home/foo/.mrjob')
-        assert_equal(find_mrjob_conf(), '/home/foo/.mrjob')
+        self._existing_paths.add('/home/foo/.mrjob.conf')
+        assert_equal(find_mrjob_conf(), '/home/foo/.mrjob.conf')
 
     def test_load_and_load_opts_use_find_mrjob_conf(self):
         os.environ['HOME'] = self.tmp_dir
 
-        dot_mrjob_path = os.path.join(self.tmp_dir, '.mrjob')
+        dot_mrjob_path = os.path.join(self.tmp_dir, '.mrjob.conf')
         with open(dot_mrjob_path, 'w') as f:
             f.write('{"runners": {"foo": {"bar": "baz"}}}')
 

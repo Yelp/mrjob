@@ -51,8 +51,10 @@ To run in other AWS regions, upload your source tree, run ``make``, and use
 other advanced mrjob features, you'll need to set up ``mrjob.conf``. mrjob looks 
 for its conf file in:
 
-* ``~/.mrjob``
-* ``mrjob.conf`` anywhere in your ``$PYTHONPATH``
+* The contents of ``$MRJOB_CONF``
+* ``~/.mrjob.conf``
+* ``~/.mrjob`` (deprecated)
+* ``mrjob.conf`` anywhere in your ``$PYTHONPATH`` (deprecated)
 * ``/etc/mrjob.conf``
 
 See ``mrjob.conf.example`` for more information.

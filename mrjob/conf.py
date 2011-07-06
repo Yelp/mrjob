@@ -17,8 +17,10 @@ for :py:mod:`mrjob`.
 
 We look for :file:`mrjob.conf` in these locations:
 
-- :file:`~/.mrjob`
-- :file:`mrjob.conf` anywhere in your :envvar:`PYTHONPATH`
+- The location specified by :envvar:`MRJOB_CONF`
+- :file:`~/.mrjob.conf`
+- :file:`~/.mrjob` (deprecated)
+- :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH` (deprecated)
 - :file:`/etc/mrjob.conf`
 
 The point of :file:`mrjob.conf` is to let you set up things you want every
@@ -125,8 +127,8 @@ def find_mrjob_conf():
 
     - The location specified by :envvar:`MRJOB_CONF`
     - :file:`~/.mrjob.conf`
-    - :file:`~/.mrjob`
-    - :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH`
+    - :file:`~/.mrjob` (deprecated)
+    - :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH` (deprecated)
     - :file:`/etc/mrjob.conf`
 
     Return ``None`` if we can't find it.

@@ -1251,7 +1251,8 @@ class MRJob(object):
             opt_prefix = pass_opt.get_opt_string()
             opt_value = master_option_dict[pass_opt.dest]
 
-            if opt_value == master_default_dict[pass_opt.dest]:
+            if pass_opt.action != 'append' \
+               and opt_value == master_default_dict[pass_opt.dest]:
                 continue
 
             # Pass through the arguments for these actions

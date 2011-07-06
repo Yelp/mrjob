@@ -16,11 +16,13 @@
 
 from __future__ import with_statement
 
+import logging
 import os
 import shutil
+from StringIO import StringIO
 import tempfile
 
-from testify import TestCase, assert_equal, class_setup, class_teardown, setup, teardown
+from testify import TestCase, assert_equal, assert_in, assert_not_in, class_setup, class_teardown, setup, teardown
 from mrjob.conf import *
 import mrjob.conf
 from tests.quiet import logger_disabled
@@ -54,6 +56,22 @@ class MRJobConfTestCase(TestCase):
         shutil.rmtree(self.tmp_dir)
 
     @setup
+    def setup_log_capture(self):
+        self.log_file = StringIO()
+        self._log_handler = logging.StreamHandler(self.log_file)
+        self._log_handler.setLevel(logging.INFO)
+        self._log_handler.setFormatter(logging.Formatter('%(message)s'))
+        logger = logging.getLogger('mrjob.conf')
+        self._old_handlers = logger.handlers
+        logger.setLevel(logging.INFO)
+        logger.handlers = [self._log_handler]
+
+    @teardown
+    def rm_log_capture(self):
+        logger = logging.getLogger('mrjob.conf')
+        logger.handlers = self._old_handlers
+
+    @setup
     def blank_out_environment(self):
         self._old_environ = os.environ.copy()
         # don't do os.environ = {}! This won't actually set environment
@@ -66,7 +84,7 @@ class MRJobConfTestCase(TestCase):
         os.environ.update(self._old_environ)
 
 
-class MRJobBasicConfTest(MRJobConfTestCase):
+class MRJobBasicConfTestCase(MRJobConfTestCase):
 
     def test_no_mrjob_conf(self):
         self._existing_paths = []
@@ -89,13 +107,6 @@ class MRJobBasicConfTest(MRJobConfTestCase):
         self._existing_paths = [mrjob_conf_path]
         assert_equal(find_mrjob_conf(), None)
 
-    def test_mrjob_conf_in_python_path(self):
-        os.environ['PYTHONPATH'] = self.tmp_dir
-        mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        open(mrjob_conf_path, 'w').close()
-        self._existing_paths = [mrjob_conf_path]
-        assert_equal(find_mrjob_conf(), mrjob_conf_path)
-
     def test_precedence(self):
         os.environ['HOME'] = '/home/foo'
         os.environ['PYTHONPATH'] = '/py1:/py2'
@@ -106,14 +117,17 @@ class MRJobBasicConfTest(MRJobConfTestCase):
         self._existing_paths.add('/etc/mrjob.conf')
         assert_equal(find_mrjob_conf(), '/etc/mrjob.conf')
 
-        self._existing_paths.add('/py2/mrjob.conf')
-        assert_equal(find_mrjob_conf(), '/py2/mrjob.conf')
-
-        self._existing_paths.add('/py1/mrjob.conf')
-        assert_equal(find_mrjob_conf(), '/py1/mrjob.conf')
-
         self._existing_paths.add('/home/foo/.mrjob.conf')
         assert_equal(find_mrjob_conf(), '/home/foo/.mrjob.conf')
+
+        mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        open(mrjob_conf_path, 'w').close()
+        os.environ['MRJOB_CONF'] = mrjob_conf_path
+        self._existing_paths.add(mrjob_conf_path)
+        assert_equal(find_mrjob_conf(), mrjob_conf_path)
+
+        assert_not_in('This config path is deprecated',
+                      self.log_file.getvalue())
 
     def test_load_and_load_opts_use_find_mrjob_conf(self):
         os.environ['HOME'] = self.tmp_dir
@@ -146,6 +160,46 @@ class MRJobBasicConfTest(MRJobConfTestCase):
 
         dump_mrjob_conf(conf, open(conf_path, 'w'))
         assert_equal(conf, load_mrjob_conf(conf_path=conf_path))
+
+
+class MRJobConfDeprecatedLocationTestCase(MRJobConfTestCase):
+
+    def test_mrjob_conf_in_python_path(self):
+        os.environ['PYTHONPATH'] = self.tmp_dir
+        mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        open(mrjob_conf_path, 'w').close()
+        self._existing_paths = [mrjob_conf_path]
+        assert_equal(find_mrjob_conf(), mrjob_conf_path)
+        assert_in('This config path is deprecated',
+                      self.log_file.getvalue())
+
+    def test_precedence_deprecated(self):
+        os.environ['HOME'] = '/home/foo'
+        os.environ['PYTHONPATH'] = '/py1:/py2'
+        self._existing_paths = set()
+
+        assert_equal(find_mrjob_conf(), None)
+
+        self._existing_paths.add('/etc/mrjob.conf')
+        assert_equal(find_mrjob_conf(), '/etc/mrjob.conf')
+
+        self._existing_paths.add('/py2/mrjob.conf')
+        assert_equal(find_mrjob_conf(), '/py2/mrjob.conf')
+
+        self._existing_paths.add('/py1/mrjob.conf')
+        assert_equal(find_mrjob_conf(), '/py1/mrjob.conf')
+
+        self._existing_paths.add('/home/foo/.mrjob')
+        assert_equal(find_mrjob_conf(), '/home/foo/.mrjob')
+
+        mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        open(mrjob_conf_path, 'w').close()
+        os.environ['MRJOB_CONF'] = mrjob_conf_path
+        self._existing_paths.add(mrjob_conf_path)
+        assert_equal(find_mrjob_conf(), mrjob_conf_path)
+
+        assert_in('This config path is deprecated',
+                      self.log_file.getvalue())
 
 
 class MRJobConfNoYAMLTestCase(MRJobConfTestCase):

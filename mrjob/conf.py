@@ -123,6 +123,8 @@ log = logging.getLogger('mrjob.conf')
 def find_mrjob_conf():
     """Look for :file:`mrjob.conf`, and return its path. Places we look:
 
+    - The location specified by :envvar:`MRJOB_CONF`
+    - :file:`~/.mrjob.conf`
     - :file:`~/.mrjob`
     - :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH`
     - :file:`/etc/mrjob.conf`
@@ -130,19 +132,28 @@ def find_mrjob_conf():
     Return ``None`` if we can't find it.
     """
     def candidates():
-        # $HOME isn't necessarily set on Windows, but ~ works
-        yield expand_path('~/.mrjob')
+        """Return (path, is_deprecated)"""
+        if os.environ.has_key('MRJOB_CONF'):
+            yield (expand_path(os.environ['MRJOB_CONF']), False)
 
+        # $HOME isn't necessarily set on Windows, but ~ works
+        yield (expand_path('~/.mrjob.conf'), False)
+        yield (expand_path('~/.mrjob'), True)
+
+        # DEPRECATED:
         if os.environ.get('PYTHONPATH'):
             for dirname in os.environ['PYTHONPATH'].split(os.pathsep):
-                yield os.path.join(dirname, 'mrjob.conf')
+                yield (os.path.join(dirname, 'mrjob.conf'), True)
 
-        yield '/etc/mrjob.conf'
+        yield ('/etc/mrjob.conf', False)
 
-    for path in candidates():
+    for path, is_deprecated in candidates():
         log.debug('looking for configs in %s' % path)
         if os.path.exists(path):
             log.info('using configs in %s' % path)
+            if is_deprecated:
+                log.warning('This config path is deprecated and will stop'
+                            ' working in a future version of mrjob!')
             return path
     else:
         log.info("no configs found; falling back on auto-configuration")

@@ -135,20 +135,12 @@ class MRCustomBoringJob(MRBoringJob):
         self.add_passthrough_option(
             '--planck-constant', type='float', default=6.626068e-34)
         self.add_passthrough_option(
-            '--extra-special-arg', action='append', dest='extra_special_args')
+            '--extra-special-arg', action='append', dest='extra_special_args',
+            default=[])
 
         self.add_file_option('--foo-config', dest='foo_config', default=None)
         self.add_file_option('--accordian-file', dest='accordian_files',
-                             action='append')
-
-
-class MRBadBoringJob(MRBoringJob):
-
-    def configure_options(self):
-        super(MRBadBoringJob, self).configure_options()
-        self.add_passthrough_option(
-            '--extra-special-arg', action='append', dest='extra_special_args',
-            default=[])
+                             action='append', default=[])
 
 
 ### Test cases ###
@@ -672,7 +664,6 @@ class CommandLineArgsTest(TestCase):
     def test_bad_custom_options(self):
         assert_raises(ValueError, MRCustomBoringJob, ['--planck-constant', 'c'])
         assert_raises(ValueError, MRCustomBoringJob, ['--pill-type=green'])
-        assert_raises(ValueError, MRBadBoringJob)
 
     def test_bad_option_types(self):
         mr_job = MRJob()

@@ -1100,7 +1100,6 @@ class MRJob(object):
         command line arguments it consumes. It handles all actions/types
         including callbacks that consume arbitrary numbers of arguments.
         """
-        # print opt_str, value
         self._passthrough_cl_args.append(opt_str)
         if value is not None:
             self._passthrough_cl_args.append(str(value))
@@ -1130,7 +1129,6 @@ class MRJob(object):
         # No matter how many arguments were consumed, figure out what they were
         length_difference = len(rargs_before_option) - len(parser.rargs)
         self._passthrough_cl_args.extend(rargs_before_option[:length_difference])
-        # print rargs_before_option[:length_difference]
 
     def add_file_option(self, *args, **kwargs):
         """Add a command-line option that sends an external file

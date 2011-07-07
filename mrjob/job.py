@@ -1047,16 +1047,13 @@ class MRJob(object):
                                                 self.hadoop_opt_group,
                                                 self.emr_opt_group)]
 
-        def opt_ok(opt):
+        for opt in itertools.chain(*option_lists):
             if opt.action == 'append' \
-             and opt.default is not NO_DEFAULT:
-                raise ValueError('append-type options cannot have defaults. A list'
-                                 ' will be created automatically by the parser. (%s)'
+               and opt.default is not NO_DEFAULT:
+                raise ValueError('append-type options cannot have'
+                                 ' defaults. A list will be created'
+                                 ' automatically by the parser. (%s)'
                                  % opt)
-            return True
-
-        for opt in list(opt for opt in itertools.chain(*option_lists)
-                        if opt_ok(opt)):
             try:
                 self.passthrough_option_parser.add_option(opt)
             except OptionConflictError:
@@ -1190,14 +1187,9 @@ class MRJob(object):
                                                 self.emr_opt_group)]
 
         for opt in itertools.chain(*option_lists):
-            if opt.action == 'append':
-                if opt.default is not NO_DEFAULT:
-                    raise ValueError('append-type options cannot have'
-                                     ' defaults. A list will be created'
-                                     ' automatically by the parser. (%s)'
-                                     % opt)
-                if getattr(self.options, opt.dest) == None:
-                    setattr(self.options, opt.dest, [])
+            if opt.action == 'append' \
+               and getattr(self.options, opt.dest) == None:
+                setattr(self.options, opt.dest, [])
 
     def is_mapper_or_reducer(self):
         """True if this is a mapper/reducer.

@@ -1098,8 +1098,7 @@ class MRJob(object):
         including callbacks that consume arbitrary numbers of arguments.
         """
         self._passthrough_cl_args.append(opt_str)
-        if value is not None:
-            self._passthrough_cl_args.append(str(value))
+
         # Remember which args we started with
         rargs_before_option = [x for x in parser.rargs]
 
@@ -1120,6 +1119,8 @@ class MRJob(object):
             else:
                 value = tuple(parser.rargs[0:nargs])
                 del parser.rargs[0:nargs]
+        elif value is not None:
+            self._passthrough_cl_args.append(str(value))
 
         option.original.process(opt_str, value, parser.values, parser)
 

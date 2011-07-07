@@ -135,12 +135,20 @@ class MRCustomBoringJob(MRBoringJob):
         self.add_passthrough_option(
             '--planck-constant', type='float', default=6.626068e-34)
         self.add_passthrough_option(
-            '--extra-special-arg', action='append', dest='extra_special_args',
-            default=[])
+            '--extra-special-arg', action='append', dest='extra_special_args')
 
         self.add_file_option('--foo-config', dest='foo_config', default=None)
         self.add_file_option('--accordian-file', dest='accordian_files',
-                             action='append', default=[])
+                             action='append')
+
+
+class MRBadBoringJob(MRBoringJob):
+
+    def configure_options(self):
+        super(MRBadBoringJob, self).configure_options()
+        self.add_passthrough_option(
+            '--extra-special-arg', action='append', dest='extra_special_args',
+            default=[])
 
 
 ### Test cases ###
@@ -620,13 +628,7 @@ class CommandLineArgsTest(TestCase):
         # should use long option names (--protocol, not -p)
         # shouldn't include --limit because it's None
         # items should be in the order they were instantiated
-        assert_equal(mr_job.generate_passthrough_arguments(),
-                     ['--input-protocol', 'raw_value',
-                      '--output-protocol', 'json',
-                      '--protocol', 'json',
-                      '--foo-size', '5',
-                      '--pill-type', 'blue',
-                      '--planck-constant', '6.626068e-34'])
+        assert_equal(mr_job.generate_passthrough_arguments(), [])
 
     def test_explicit_passthrough_options(self):
         mr_job = MRCustomBoringJob(args=[
@@ -654,23 +656,23 @@ class CommandLineArgsTest(TestCase):
         assert_equal(mr_job.options.extra_special_args, ['you', 'me'])
         assert_equal(mr_job.options.strict_protocols, True)
         assert_equal(mr_job.generate_passthrough_arguments(),
-                     ['--input-protocol', 'raw_value',
-                      '--output-protocol', 'repr',
-                      '--protocol', 'repr',
-                      '--strict-protocols',
+                     ['-p', 'repr',
                       '--foo-size', '9',
                       '--bar-name', 'Alembic',
                       '--enable-baz-mode',
                       '--disable-quuxing',
                       '--pill-type', 'red',
-                      '--planck-constant', '42.0',
+                      '--planck-constant', '1',
+                      '--planck-constant', '42',
                       '--extra-special-arg', 'you',
                       '--extra-special-arg', 'me',
+                      '--strict-protocols',
                       ])
 
     def test_bad_custom_options(self):
         assert_raises(ValueError, MRCustomBoringJob, ['--planck-constant', 'c'])
         assert_raises(ValueError, MRCustomBoringJob, ['--pill-type=green'])
+        assert_raises(ValueError, MRBadBoringJob)
 
     def test_bad_option_types(self):
         mr_job = MRJob()

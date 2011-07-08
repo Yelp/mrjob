@@ -98,11 +98,16 @@ class FindMiscTestCase(TestCase):
     def test_find_timeout_error(self):
         LOG_LINES = [
             'Task TASKID="task_201010202309_0001_m_000153" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1287618918658" ERROR="Task attempt_201010202309_0001_m_000153_3 failed to report status for 602 seconds. Killing!"',
+            'Task TASKID="task_201010202309_0001_m_000153" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1287618918658" ERROR="Task attempt_201010202309_0001_m_000153_3 failed to report status for 602 seconds. Killing!"',
             'Task blahblah',
             'Bada bing!',
         ]
+        LOG_LINES_2 = [
+            'Not a match',
+        ]
         
         assert_equal(find_timeout_error(LOG_LINES), 602)
+        assert_equal(find_timeout_error(LOG_LINES_2), None)
         
         LOG_LINES = [
             'Job JOBID="job_201105252346_0001" LAUNCH_TIME="1306367213950" TOTAL_MAPS="2" TOTAL_REDUCES="1" ',

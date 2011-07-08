@@ -162,7 +162,10 @@ def find_timeout_error(lines):
         match = _TIMEOUT_ERROR_RE.match(line)
         if match:
             result = match.group(1)
-    return int(result)
+    if result is None:
+        return None
+    else:
+        return int(result)
 
 
 # recognize hadoop streaming output

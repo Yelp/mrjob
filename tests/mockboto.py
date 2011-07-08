@@ -298,12 +298,12 @@ class MockEmrConnection(object):
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
         if enable_debugging:
-            debugging_step = JarStep(name='Setup Hadoop Debugging',
-                                     action_on_failure='TERMINATE_JOB_FLOW',
-                                     main_class=None,
-                                     jar=EmrConnection.DebuggingJar,
-                                     step_args=[MockEmrObject(value=EmrConnection.DebuggingArgs)])
-            debugging_step.state = 'COMPLETED'
+            debugging_step = MockEmrObject(
+                name='Setup Hadoop Debugging',
+                action_on_failure='TERMINATE_JOB_FLOW',
+                jar=EmrConnection.DebuggingJar,
+                args=[MockEmrObject(value=EmrConnection.DebuggingArgs)],
+                state='COMPLETED')
             steps.insert(0, debugging_step)
         self.add_jobflow_steps(jobflow_id, steps)
 

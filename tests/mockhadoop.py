@@ -37,9 +37,6 @@ import logging
 import os
 import pipes
 import shutil
-import os
-import pipes
-import shutil
 import stat
 import sys
 

@@ -18,6 +18,7 @@
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
+from collections import defaultdict
 import os
 from subprocess import Popen, PIPE
 
@@ -209,3 +210,12 @@ def mock_ssh_ls(new_values):
     """
     global _mock_ssh_ls_values
     _mock_ssh_ls_values = new_values
+
+
+def mock_ssh_ls_empty():
+    """For when you don't want to bother with logs of any sort. Necessary
+    because EMRJobRunner.wait_for_job_flow_termination() never succeeds in
+    tests if the job flow isn't already shut down.
+    """
+    global _mock_ssh_ls_values
+    _mock_ssh_ls_values = defaultdict(list)

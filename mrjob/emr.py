@@ -1547,11 +1547,11 @@ class EMRJobRunner(MRJobRunner):
         relevant_logs.sort(reverse=True)
 
         for sort_key, info, log_file_uri in relevant_logs:
-            log_string = self.cat(log_file_uri)
-            if not log_string:
+            lines = self.cat(log_file_uri)
+            if not lines:
                 continue
 
-            n = find_timeout_error(log_string.split('\n'))
+            n = find_timeout_error(lines)
 
             if n is not None:
                 result = {

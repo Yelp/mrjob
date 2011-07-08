@@ -777,7 +777,8 @@ class MRJob(object):
         self.option_parser.add_option_group(self.runner_opt_group)
 
         self.runner_opt_group.add_option(
-            '--archive', dest='upload_archives', default=[], action='append',
+            '--archive', dest='upload_archives', action='append',
+            default=[],
             help='Unpack archive in the working directory of this script. You can use --archive multiple times.')
 
         self.runner_opt_group.add_option(
@@ -795,6 +796,7 @@ class MRJob(object):
 
         self.runner_opt_group.add_option(
             '--file', dest='upload_files', action='append',
+            default=[],
             help='Copy file to the working directory of this script. You can use --file multiple times.')
 
         self.runner_opt_group.add_option(
@@ -817,7 +819,7 @@ class MRJob(object):
             'and must be empty')
 
         self.runner_opt_group.add_option(
-            '--python-archive', dest='python_archives', action='append',
+            '--python-archive', dest='python_archives', default=[], action='append',
             help='Archive to unpack and add to the PYTHONPATH of the mr_job script when it runs. You can use --python-archives multiple times.')
 
         self.runner_opt_group.add_option(

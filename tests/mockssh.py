@@ -36,6 +36,7 @@ import os
 import pipes
 import posixpath
 import shutil
+import stat
 import sys
 
 from mrjob import ssh
@@ -72,12 +73,18 @@ def make_empty_files(host, paths):
             pass
 
 
+def mock_ssh_dir(host, path):
+    root = path_for_host(host)
+    real_path = os.path.join(*path.split('/'))
+    os.makedirs(os.path.join(root, real_path))
+
+
 def slave_addresses():
     """Get the addresses for slaves based on :envvar:`MOCK_SSH_ROOTS`"""
     for kv_pair in os.environ['MOCK_SSH_ROOTS'].split(':'):
         this_host, this_path = kv_pair.split('=')
         if '!' in this_host:
-            yield this_host
+            print this_host
 
 
 def receive_poor_mans_scp(host, args):
@@ -91,23 +98,36 @@ def receive_poor_mans_scp(host, args):
 
 
 def ls(host, args):
-    full_path = os.path.join(path_for_host(host), args[1])
+    dest = args[1]
+    deslashed_dest = dest
+    if dest.startswith('/'):
+        deslashed_dest = dest[1:]
+    new_dest = os.path.join(*deslashed_dest.split('/'))
+    full_path = os.path.join(path_for_host(host), new_dest)
+    prefix_length = len(path_for_host(host))
     if not os.path.exists(full_path):
         print >> sys.stderr, 'No such file or directory:', full_path
         sys.exit(1)
+    if not os.path.isdir(full_path):
+        print dest
     for root, dirs, files in os.walk(full_path):
-        components = root.split('/')
-        new_root = posixpath.join(components)
+        components = root.split(os.sep)
+        new_root = posixpath.join(*components)
         for filename in files:
-            print posixpath.join(new_root, filename)
+            print '/' + posixpath.join(new_root, filename)[prefix_length:]
 
 
 def cat(host, args):
-    full_path = os.path.join(path_for_host(host), args[1])
+    dest = args[1]
+    if dest.startswith('/'):
+        dest = dest[1:]
+    new_dest = os.path.join(*dest.split('/'))
+    full_path = os.path.join(path_for_host(host), new_dest)
     if not os.path.exists(full_path):
         print >> sys.stderr, 'No such file or directory:', full_path
         sys.exit(1)
     with open(full_path, 'r') as f:
+        print full_path
         print f.read()
 
 
@@ -115,7 +135,7 @@ def run(host, remote_args, slave_key_file=None):
     remote_arg_pos = 0
 
     if remote_args[0] == 'hadoop':
-        print '\n'.join(slave_addresses())
+        slave_addresses()
     elif remote_args[0] == 'bash':
         receive_poor_mans_scp(host, remote_args)
     elif remote_args[0] == 'find':

@@ -83,12 +83,18 @@ def slave_addresses():
 def receive_poor_mans_scp(host, args):
     cat_cmd = args[2]
     dest = cat_cmd.split(' > ')[1]
-    with open(os.path.join(path_for_host(host), dest), 'r') as f:
-        f.writelines(sys.stdin)
+    try:
+        with open(os.path.join(path_for_host(host), dest), 'r') as f:
+            f.writelines(sys.stdin)
+    except IOError:
+        print >> sys.stderr, 'No such file or directory:' , dest
 
 
 def ls(host, args):
     full_path = os.path.join(path_for_host(host), args[1])
+    if not os.path.exists(full_path):
+        print >> sys.stderr, 'No such file or directory:', full_path
+        sys.exit(1)
     for root, dirs, files in os.walk(full_path):
         components = root.split('/')
         new_root = posixpath.join(components)
@@ -98,6 +104,9 @@ def ls(host, args):
 
 def cat(host, args):
     full_path = os.path.join(path_for_host(host), args[1])
+    if not os.path.exists(full_path):
+        print >> sys.stderr, 'No such file or directory:', full_path
+        sys.exit(1)
     with open(full_path, 'r') as f:
         print f.read()
 
@@ -127,7 +136,7 @@ def run(host, remote_args, slave_key_file=None):
         # don't let slave SSH work unleses the key file is properly copied
         if not os.path.exists(os.path.join(path_for_host(slave_host), slave_key_file)):
             print >> sys.stderr, 'Warning: Identity file',
-                slave_key_file, 'not accessible: No such file or directory.'
+            slave_key_file, 'not accessible: No such file or directory.'
             print >> sys.stderr, 'Permission denied (publickey).'
             sys.exit(1)
 
@@ -153,7 +162,7 @@ def main():
     if os.environ.get('MOCK_SSH_VERIFY_KEY_FILE', 'false') == 'true' \
        and not os.path.exists(args[arg_pos]):
         print >> sys.stderr, 'Warning: Identity file',
-            args[arg_pos], 'not accessible: No such file or directory.'
+        args[arg_pos], 'not accessible: No such file or directory.'
         sys.exit(1)
 
     # skip to host address

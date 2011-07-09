@@ -97,6 +97,39 @@ class MockEMRAndS3TestCase(TestCase):
         to key name to data."""
         add_mock_s3_data(self.mock_s3_fs, data)
 
+    def prepare_runner_for_ssh(self, runner, num_slaves=0):
+        self._old_environ = os.environ.copy()
+        os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
+
+        self.master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
+        roots = 'testmaster=' + self.master_ssh_root
+
+        for slave_num in range(num_slaves):
+            roots += ':testslave%n' % slave_num
+
+        os.environ['MOCK_SSH_ROOTS'] = roots
+
+        os.mkdir(os.path.join(self.master_ssh_root, 'bin'))
+        self.ssh_bin = os.path.join(self.master_ssh_root, 'bin', 'ssh')
+        create_mock_ssh_script(self.ssh_bin)
+
+        self.keyfile_path = os.path.join(self.master_ssh_root, 'key.pem')
+        with open(self.keyfile_path, 'w') as f:
+            f.write('I AM DEFINITELY AN SSH KEY FILE')
+
+        self.runner._opts['ssh_bin'] = [self.ssh_bin]
+        # Inject a master node hostname so it doesn't try to 'emr --describe' it
+        self.runner._address = 'testmaster'
+        # Also pretend to have an SSH key pair file
+        self.runner._opts['ec2_key_pair_file'] = self.keyfile_path
+
+    def teardown_ssh(self):
+        self.runner.cleanup()
+        os.environ.clear()
+        os.environ.update(self._old_environ)
+        shutil.rmtree(self.master_ssh_root)
+
+
 
 class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
@@ -800,34 +833,15 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
     def make_runner(self):
         self.add_mock_s3_data({'walrus': {}})
 
-        self._old_environ = os.environ.copy()
-        self.master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
-        os.environ['MOCK_SSH_ROOTS'] = 'testmaster=' + self.master_ssh_root
-
-        os.mkdir(os.path.join(self.master_ssh_root, 'bin'))
-        self.ssh_bin = os.path.join(self.master_ssh_root, 'bin', 'ssh')
-        create_mock_ssh_script(self.ssh_bin)
-
-        self.keyfile_path = os.path.join(self.master_ssh_root, 'key.pem')
-        with open(self.keyfile_path, 'w') as f:
-            f.write('I AM DEFINITELY AN SSH KEY FILE')
-
         self.runner = EMRJobRunner(s3_sync_wait_time=0,
                                    s3_scratch_uri='s3://walrus/tmp',
                                    conf_path=False)
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
-        self.runner._opts['ssh_bin'] = [self.ssh_bin]
-        # Inject a master node hostname so it doesn't try to 'emr --describe' it
-        self.runner._address = 'testmaster'
-        # Also pretend to have an SSH key pair file
-        self.runner._opts['ec2_key_pair_file'] = self.keyfile_path
+        self.prepare_runner_for_ssh(self.runner)
 
     @teardown
     def cleanup_runner(self):
-        self.runner.cleanup()
-        os.environ.clear()
-        os.environ.update(self._old_environ)
-        shutil.rmtree(self.master_ssh_root)
+        self.teardown_ssh()
 
     def test_ssh_comes_first(self):
         join = os.path.join
@@ -971,18 +985,19 @@ class TestLs(MockEMRAndS3TestCase):
         assert_raises(Exception, set, runner._s3_ls('s3://lolcat/'))
 
     def test_ssh_ls(self):
-        runner = EMRJobRunner(conf_path=False)
-        runner._address = 'host'
-        mock_ssh_ls({
-            '/': ['/one', '/two'],
-            '/mnt/var/log/hadoop/steps/1/syslog': [],
-        })
-        assert_equal(list(runner.ls('ssh://host/')),
-                     ['ssh://host/one', 'ssh://host/two'])
+        self.runner = EMRJobRunner(conf_path=False)
+
+        self.prepare_runner_for_ssh(self.runner, 0)
+
+        make_empty_files('testmaster',
+            [os.path.join('test', 'one'), os.path.join('test', 'two')])
+
+        assert_equal(list(self.runner.ls('ssh://testmaster/test')),
+                     ['ssh://testmaster/test/one', 'ssh://testmaster/test/two'])
         # Define a quick inline function because runner.ls is a generator
         # and won't fire unless we list() it
         def die():
-            list(runner.ls('ssh://does_not_exist/a'))
+            list(self.runner.ls('ssh://testmaster/does_not_exist'))
         assert_raises(IOError, die)
 
 

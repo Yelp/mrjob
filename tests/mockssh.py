@@ -68,15 +68,22 @@ def make_empty_files(host, paths):
     root = path_for_host(host)
     for path in paths:
         directory, filename = os.path.split(path)
-        os.makedirs(directory)
-        with open(path, 'w') as f:
+        if directory and not os.path.exists(os.path.join(root, directory)):
+            os.makedirs(os.path.join(root, directory))
+        print root, directory, filename
+        with open(os.path.join(root, directory, filename), 'w') as f:
             pass
 
 
 def mock_ssh_dir(host, path):
+    """Create a directory at ``path`` relative to the temp directory for
+    ``host``, where ``path`` uses the *current system's separators.*
+    """
     root = path_for_host(host)
     real_path = os.path.join(*path.split('/'))
-    os.makedirs(os.path.join(root, real_path))
+    full_path = os.path.join(root, real_path)
+    if not os.path.exists(full_path):
+        os.makedirs(os.path.join(root, real_path))
 
 
 def slave_addresses():
@@ -88,6 +95,7 @@ def slave_addresses():
 
 
 def receive_poor_mans_scp(host, args):
+    """Mock SSH behavior for :py:func:`~mrjob.ssh.poor_mans_scp()`"""
     cat_cmd = args[2]
     dest = cat_cmd.split(' > ')[1]
     try:
@@ -98,6 +106,7 @@ def receive_poor_mans_scp(host, args):
 
 
 def ls(host, args):
+    """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_ls()`"""
     dest = args[1]
     deslashed_dest = dest
     if dest.startswith('/'):
@@ -118,6 +127,7 @@ def ls(host, args):
 
 
 def cat(host, args):
+    """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_cat()`"""
     dest = args[1]
     if dest.startswith('/'):
         dest = dest[1:]
@@ -132,33 +142,48 @@ def cat(host, args):
 
 
 def run(host, remote_args, slave_key_file=None):
+    """Execute a command as a "host." Recursively call for slave if necessary.
+    """
     remote_arg_pos = 0
 
+    # Get slave addresses (this is 'hadoop dfsadmn ...')
     if remote_args[0] == 'hadoop':
         slave_addresses()
-    elif remote_args[0] == 'bash':
+
+    # Accept stdin for a file transfer (this is 'bash -c "cat ...')
+    if remote_args[0] == 'bash':
+
         receive_poor_mans_scp(host, remote_args)
-    elif remote_args[0] == 'find':
+
+    # Accept ls (this is 'find -type f ...')
+    if remote_args[0] == 'find':
         ls(host, remote_args)
-    elif remote_args[0] == 'cat':
+
+    # Accept cat (this is 'cat ...')
+    if remote_args[0] == 'cat':
         cat(host, remote_args)
-    elif remote_args[0] == 'ssh':
+
+    # Recursively call for slaves
+    if remote_args[0] == 'ssh':
+
+        # Actually check the existence of the key file on the master node
         while not remote_args[remote_arg_pos] == '-i':
             remote_arg_pos += 1
 
         slave_key_file = remote_args[remote_arg_pos+1]
 
+        if not os.path.exists(os.path.join(path_for_host(host), slave_key_file)):
+            # This is word-for-word what SSH says.
+            print >> sys.stderr, 'Warning: Identity file',
+            slave_key_file, 'not accessible: No such file or directory.'
+
+            print >> sys.stderr, 'Permission denied (publickey).'
+            sys.exit(1)
+
         while not remote_args[remote_arg_pos].startswith('hadoop@'):
             remote_arg_pos += 1
 
-        slave_host = host + '!%s' % remote_args[remote_arg_pos]
-
-        # don't let slave SSH work unleses the key file is properly copied
-        if not os.path.exists(os.path.join(path_for_host(slave_host), slave_key_file)):
-            print >> sys.stderr, 'Warning: Identity file',
-            slave_key_file, 'not accessible: No such file or directory.'
-            print >> sys.stderr, 'Permission denied (publickey).'
-            sys.exit(1)
+        slave_host = host + '!%s' % remote_args[remote_arg_pos].split('@')[1]
 
         # build bang path
         run(slave_host,

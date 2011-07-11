@@ -18,6 +18,7 @@
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
+from collections import defaultdict
 import os
 from subprocess import Popen, PIPE
 
@@ -55,7 +56,6 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     :return: (stdout, stderr)
     """
     args = _ssh_args(ssh_bin, address, ec2_key_pair_file) + list(cmd_args)
-    # print ' '.join(args)
     p = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE)
     out, err = p.communicate(stdin)
 
@@ -114,9 +114,6 @@ def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
     """Prepare master to SSH to slaves by copying the EMR private key to the
     master node.
     """
-    if not ec2_key_pair_file or not os.path.exists(ec2_key_pair_file):
-        return  # this is a testing environment
-
     _poor_mans_scp(ssh_bin, master_address, ec2_key_pair_file,
                    ec2_key_pair_file, keyfile)
 
@@ -135,14 +132,6 @@ def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
     return [ip for ip in ips.split('\n') if ip]
 
 
-def _handle_cat_out(out):
-    """Detect errors in ``cat`` output"""
-    if 'No such file or directory' in out:
-        raise IOError("File not found: %s" % path)
-    return out
-
-
-_mock_ssh_cat_values = None
 def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     """Return the file at ``path`` as a string. Raises ``IOError`` if the
     file doesn't exist or ``SSHException if SSH access fails.
@@ -153,33 +142,13 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param path: Path on the remote host to get
     :param keyfile: Name of the EMR private key file on the master node in case ``path`` exists on one of the slave nodes
     """
-    # Allow mocking of output
-    # Mocking kept separate from ssh_ls() to make testing more intuitive
-    if _mock_ssh_cat_values is not None:
-        if _mock_ssh_cat_values.has_key(path):
-            return _handle_cat_out(_mock_ssh_cat_values[path])
-        else:
-            raise IOError('File not found: %s' % path)
-    else:
-        out = _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
-                                      keyfile, ['cat', path])
-        return _handle_cat_out(out)
-
-
-def mock_ssh_cat(new_values):
-    """Pass in a dictionary mapping path (not including host) to a string"""
-    global _mock_ssh_cat_values
-    _mock_ssh_cat_values = new_values
-
-
-def _handle_ls_out(out):
-    """Detect errors in ``ls`` output"""
+    out = _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
+                                  keyfile, ['cat', path])
     if 'No such file or directory' in out:
-        raise IOError("No such file or directory: %s" % path)
-    return out.split('\n')
+        raise IOError("File not found: %s" % path)
+    return out
 
 
-_mock_ssh_ls_values = None
 def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     """Recursively list files under ``path`` on the specified SSH host.
     Return the file at ``path`` as a string. Raises ``IOError`` if the
@@ -191,21 +160,8 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param path: Path on the remote host to list
     :param keyfile: Name of the EMR private key file on the master node in case ``path`` exists on one of the slave nodes
     """
-    # Allow mocking of output
-    if _mock_ssh_ls_values is not None:
-        if _mock_ssh_ls_values.has_key(path):
-            return _handle_ls_out('\n'.join(_mock_ssh_ls_values[path]))
-        else:
-            raise IOError("No such file or directory: %s" % path)
-    else:
-        out = _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
-                                      keyfile, ['find', path, '-type', 'f'])
-        return _handle_ls_out(out)
-
-
-def mock_ssh_ls(new_values):
-    """Pass in a dictionary mapping path (not including host) to a list of 
-    strings
-    """
-    global _mock_ssh_ls_values
-    _mock_ssh_ls_values = new_values
+    out = _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
+                                  keyfile, ['find', path, '-type', 'f'])
+    if 'No such file or directory' in out:
+        raise IOError("No such file or directory: %s" % path)
+    return out.split('\n')

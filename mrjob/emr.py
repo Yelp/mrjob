@@ -70,7 +70,7 @@ MAX_SSH_RETRIES = 20
 # ssh should fail right away if it can't bind a port
 WAIT_FOR_SSH_TO_FAIL = 1.0
 
-# Constants used to tell :py:func:`~mrjob.emr.EMRJobRunner._list_logs` what logs to find and return
+# Constants used to tell :py:func:`~mrjob.emr.EMRJobRunner.ssh_list_logs` and :py:func:`~mrjob.emr.EMRJobRunner.s3_list_logs`  what logs to find and return
 TASK_ATTEMPT_LOGS = 'TASK_ATTEMPT_LOGS'
 STEP_LOGS = 'STEP_LOGS'
 JOB_LOGS = 'JOB_LOGS'
@@ -1124,6 +1124,8 @@ class EMRJobRunner(MRJobRunner):
         elif ssh_match:
             try:
                 addr = ssh_match.group('hostname') or self._address_of_master()
+                if '!' in addr:
+                    self._enable_slave_ssh_access()
                 output = ssh_cat(
                     self._opts['ssh_bin'],
                     addr,
@@ -1237,7 +1239,6 @@ class EMRJobRunner(MRJobRunner):
                     pass
                 if not all_paths:
                     # get them from the slaves instead (takes a little longer)
-                    self._enable_slave_ssh_access()
                     for addr in self._addresses_of_slaves():
                         logs = slave_ssh_logs(addr, 'userlogs/')
                         all_paths.extend(logs)
@@ -1256,7 +1257,6 @@ class EMRJobRunner(MRJobRunner):
                 results.append(paths)
             elif log_type == NODE_LOGS:
                 all_paths = []
-                self._enable_slave_ssh_access()
                 for addr in self._addresses_of_slaves():
                     logs = slave_ssh_logs(addr, '')
                     all_paths.extend(logs)
@@ -1800,6 +1800,8 @@ class EMRJobRunner(MRJobRunner):
         m = SSH_URI_RE.match(uri)
         try:
             addr = m.group('hostname') or self._address_of_master()
+            if '!' in addr:
+                self._enable_slave_ssh_access()
             output = ssh_ls(
                 self._opts['ssh_bin'],
                 addr,

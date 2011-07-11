@@ -35,6 +35,7 @@ import logging
 import os
 import pipes
 import posixpath
+import re
 import shutil
 import stat
 import sys
@@ -60,19 +61,7 @@ def path_for_host(host):
         this_host, this_path = kv_pair.split('=')
         if this_host == host:
             return os.path.abspath(this_path)
-    raise KeyError('Host %s is not specified in $MOCK_SSH_ROOTS' % host)
-
-
-def make_empty_files(host, paths):
-    """Touch files quickly"""
-    root = path_for_host(host)
-    for path in paths:
-        directory, filename = os.path.split(path)
-        if directory and not os.path.exists(os.path.join(root, directory)):
-            os.makedirs(os.path.join(root, directory))
-        print root, directory, filename
-        with open(os.path.join(root, directory, filename), 'w') as f:
-            pass
+    raise KeyError('Host %s is not specified in $MOCK_SSH_ROOTS (%s)' % (host, os.environ['MOCK_SSH_ROOTS']))
 
 
 def mock_ssh_dir(host, path):
@@ -86,20 +75,29 @@ def mock_ssh_dir(host, path):
         os.makedirs(os.path.join(root, real_path))
 
 
+def mock_ssh_file(host, path, contents):
+    root = path_for_host(host)
+    real_path = os.path.join(*path.split('/'))
+    full_path = os.path.join(root, real_path)
+    with open(full_path, 'w') as f:
+        f.write(contents)
+
+
+_SLAVE_ADDR_RE = re.compile(r'^(?P<master>.*?)!(?P<slave>.*?)=(?P<dir>.*)$')
 def slave_addresses():
     """Get the addresses for slaves based on :envvar:`MOCK_SSH_ROOTS`"""
     for kv_pair in os.environ['MOCK_SSH_ROOTS'].split(':'):
-        this_host, this_path = kv_pair.split('=')
-        if '!' in this_host:
-            print this_host
+        m = _SLAVE_ADDR_RE.match(kv_pair)
+        if m:
+            print m.group('slave')
 
 
+_SCP_RE = re.compile(r'^.*"cat > (?P<filename>.*?)".*$')
 def receive_poor_mans_scp(host, args):
     """Mock SSH behavior for :py:func:`~mrjob.ssh.poor_mans_scp()`"""
-    cat_cmd = args[2]
-    dest = cat_cmd.split(' > ')[1]
+    dest = _SCP_RE.match(args[0]).group('filename')
     try:
-        with open(os.path.join(path_for_host(host), dest), 'r') as f:
+        with open(os.path.join(path_for_host(host), dest), 'w') as f:
             f.writelines(sys.stdin)
     except IOError:
         print >> sys.stderr, 'No such file or directory:' , dest
@@ -147,25 +145,27 @@ def run(host, remote_args, slave_key_file=None):
     remote_arg_pos = 0
 
     # Get slave addresses (this is 'hadoop dfsadmn ...')
-    if remote_args[0] == 'hadoop':
+    if remote_args[0].startswith('bash -c "hadoop'):
         slave_addresses()
+        return
 
     # Accept stdin for a file transfer (this is 'bash -c "cat ...')
-    if remote_args[0] == 'bash':
-
+    if remote_args[0].startswith('bash -c "cat'):
         receive_poor_mans_scp(host, remote_args)
+        return
 
     # Accept ls (this is 'find -type f ...')
     if remote_args[0] == 'find':
         ls(host, remote_args)
+        return
 
     # Accept cat (this is 'cat ...')
     if remote_args[0] == 'cat':
         cat(host, remote_args)
+        return
 
     # Recursively call for slaves
     if remote_args[0] == 'ssh':
-
         # Actually check the existence of the key file on the master node
         while not remote_args[remote_arg_pos] == '-i':
             remote_arg_pos += 1
@@ -189,6 +189,10 @@ def run(host, remote_args, slave_key_file=None):
         run(slave_host,
             remote_args[remote_arg_pos+1:],
             slave_key_file)
+        return
+
+    print >> sys.stderr, "Command line not recognized: %s" % ' '.join(remote_args)
+    sys.exit(1)
 
 
 def main():

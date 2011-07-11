@@ -1049,12 +1049,6 @@ class MRJob(object):
 
     def _populate_passthrough_option_parser(self):
         for opt in self.option_parser._get_all_options():
-            # if opt.action == 'append' \
-            #    and opt.default is not NO_DEFAULT:
-            #     raise ValueError('append-type options cannot have'
-            #                      ' defaults. A list will be created'
-            #                      ' automatically by the parser. (%s)'
-            #                      % opt)
             try:
                 self.passthrough_option_parser.add_option(opt)
             except OptionConflictError:

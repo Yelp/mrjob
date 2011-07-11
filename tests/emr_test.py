@@ -104,15 +104,9 @@ class MockEMRAndS3TestCase(TestCase):
 
         # Create temporary directories and add them to MOCK_SSH_ROOTS
         self.master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
-        roots = 'testmaster=' + self.master_ssh_root
+        os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % self.master_ssh_root
 
         self.slave_ssh_roots = []
-        for slave_num in range(num_slaves):
-            new_dir = tempfile.mkdtemp(prefix='slave_%d_ssh_root.' % slave_num)
-            self.slave_ssh_roots.append(new_dir)
-            roots += ':testmaster!testslave%d=%s' % (slave_num, new_dir)
-
-        os.environ['MOCK_SSH_ROOTS'] = roots
 
         # Make the fake binary
         os.mkdir(os.path.join(self.master_ssh_root, 'bin'))
@@ -132,8 +126,15 @@ class MockEMRAndS3TestCase(TestCase):
         # Also pretend to have an SSH key pair file
         self.runner._opts['ec2_key_pair_file'] = self.keyfile_path
 
+    def add_slave(self):
+        """Add a mocked slave to the cluster"""
+        slave_num = len(self.slave_ssh_roots)
+        new_dir = tempfile.mkdtemp(prefix='slave_%d_ssh_root.' % slave_num)
+        self.slave_ssh_roots.append(new_dir)
+        os.environ['MOCK_SSH_ROOTS'] += (':testmaster!testslave%d=%s'
+                                         % (slave_num, new_dir))
+
     def teardown_ssh(self):
-        self.runner.cleanup()
         os.environ.clear()
         os.environ.update(self._old_environ)
         shutil.rmtree(self.master_ssh_root)
@@ -848,17 +849,18 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
                                    s3_scratch_uri='s3://walrus/tmp',
                                    conf_path=False)
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
+        self.prepare_runner_for_ssh(self.runner)
 
     @teardown
     def cleanup_runner(self):
-        try:
-            self.teardown_ssh()
-        except OSError:
-            pass    # didn't set up SSH
+        """This method assumes ``prepare_runner_for_ssh()`` was called. That
+        method isn't a "proper" setup method because it requires different
+        arguments for different tests.
+        """
+        self.runner.cleanup()
+        self.teardown_ssh()
 
     def test_ssh_comes_first(self):
-        self.prepare_runner_for_ssh(self.runner)
-
         join = os.path.join
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
@@ -883,7 +885,7 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
                      SSH_PREFIX + self.runner._address + ssh_lone_log_path)
 
     def test_ssh_works_with_slaves(self):
-        self.prepare_runner_for_ssh(self.runner, num_slaves=1)
+        self.add_slave()
 
         join = os.path.join
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
@@ -994,16 +996,7 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
         assert_equal(runner.make_s3_conn().endpoint, 's3-proxy')
 
 
-class TestLs(MockEMRAndS3TestCase):
-
-    @teardown
-    def cleanup_runner(self):
-        try:
-            self.teardown_ssh()
-        except OSError:
-            pass    # didn't set up SSH
-        except AttributeError:
-            pass    # didn't set a runner or env vars
+class TestS3Ls(MockEMRAndS3TestCase):
 
     def test_s3_ls(self):
         self.add_mock_s3_data({'walrus': {'one': '', 'two': '', 'three': ''}})
@@ -1029,10 +1022,20 @@ class TestLs(MockEMRAndS3TestCase):
         # of permissions error)
         assert_raises(Exception, set, runner._s3_ls('s3://lolcat/'))
 
-    def test_ssh_ls(self):
-        self.runner = EMRJobRunner(conf_path=False)
 
-        self.prepare_runner_for_ssh(self.runner, 1)
+class TestSSHLs(MockEMRAndS3TestCase):
+
+    @setup
+    def make_runner(self):
+        self.runner = EMRJobRunner(conf_path=False)
+        self.prepare_runner_for_ssh(self.runner)
+
+    @teardown
+    def cleanup_runner(self):
+        self.teardown_ssh()
+
+    def test_ssh_ls(self):
+        self.add_slave()
 
         mock_ssh_dir('testmaster', 'test')
         mock_ssh_file('testmaster', posixpath.join('test', 'one'), '')

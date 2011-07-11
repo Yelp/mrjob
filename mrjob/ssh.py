@@ -56,7 +56,6 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     :return: (stdout, stderr)
     """
     args = _ssh_args(ssh_bin, address, ec2_key_pair_file) + list(cmd_args)
-    # print ' '.join(args)
     p = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE)
     out, err = p.communicate(stdin)
 
@@ -115,9 +114,6 @@ def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
     """Prepare master to SSH to slaves by copying the EMR private key to the
     master node.
     """
-    if not ec2_key_pair_file or not os.path.exists(ec2_key_pair_file):
-        return  # this is a testing environment
-
     _poor_mans_scp(ssh_bin, master_address, ec2_key_pair_file,
                    ec2_key_pair_file, keyfile)
 

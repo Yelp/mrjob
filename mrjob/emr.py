@@ -1852,7 +1852,6 @@ class EMRJobRunner(MRJobRunner):
 
     def rm(self, path_glob):
         """Remove all files matching the given glob."""
-        print path_glob
         if not S3_URI_RE.match(path_glob):
             return super(EMRJobRunner, self).rm(path_glob)
 

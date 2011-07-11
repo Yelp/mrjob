@@ -64,22 +64,34 @@ def path_for_host(host):
     raise KeyError('Host %s is not specified in $MOCK_SSH_ROOTS (%s)' % (host, os.environ['MOCK_SSH_ROOTS']))
 
 
+def rel_posix_to_rel_local(path):
+    """Convert a POSIX path to the current system's format"""
+    return os.path.join(*path.split('/'))
+
+def rel_posix_to_abs_local(host, path):
+    """Convert a POSIX path to the current system's format and prepend the
+    tmp directory the host's files are in
+    """
+    if path.startswith('/'):
+        path = path[1:]
+    root = path_for_host(host)
+    return os.path.join(root, *path.split('/'))
+
+
 def mock_ssh_dir(host, path):
     """Create a directory at ``path`` relative to the temp directory for
-    ``host``, where ``path`` uses the *current system's separators.*
+    ``host``, where ``path`` is a POSIX path
     """
-    root = path_for_host(host)
-    real_path = os.path.join(*path.split('/'))
-    full_path = os.path.join(root, real_path)
-    if not os.path.exists(full_path):
-        os.makedirs(os.path.join(root, real_path))
+    dest = rel_posix_to_abs_local(host, path)
+    if not os.path.exists(dest):
+        os.makedirs(dest)
 
 
 def mock_ssh_file(host, path, contents):
-    root = path_for_host(host)
-    real_path = os.path.join(*path.split('/'))
-    full_path = os.path.join(root, real_path)
-    with open(full_path, 'w') as f:
+    """Create a directory at ``path`` relative to the temp directory for
+    ``host``, where ``path`` is a POSIX path
+    """
+    with open(rel_posix_to_abs_local(host, path), 'w') as f:
         f.write(contents)
 
 
@@ -106,18 +118,16 @@ def receive_poor_mans_scp(host, args):
 def ls(host, args):
     """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_ls()`"""
     dest = args[1]
-    deslashed_dest = dest
-    if dest.startswith('/'):
-        deslashed_dest = dest[1:]
-    new_dest = os.path.join(*deslashed_dest.split('/'))
-    full_path = os.path.join(path_for_host(host), new_dest)
+    root = path_for_host(host)
+    local_dest = rel_posix_to_abs_local(host, dest)
+
     prefix_length = len(path_for_host(host))
-    if not os.path.exists(full_path):
-        print >> sys.stderr, 'No such file or directory:', full_path
+    if not os.path.exists(local_dest):
+        print >> sys.stderr, 'No such file or directory:', local_dest
         sys.exit(1)
-    if not os.path.isdir(full_path):
+    if not os.path.isdir(local_dest):
         print dest
-    for root, dirs, files in os.walk(full_path):
+    for root, dirs, files in os.walk(local_dest):
         components = root.split(os.sep)
         new_root = posixpath.join(*components)
         for filename in files:
@@ -126,16 +136,12 @@ def ls(host, args):
 
 def cat(host, args):
     """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_cat()`"""
-    dest = args[1]
-    if dest.startswith('/'):
-        dest = dest[1:]
-    new_dest = os.path.join(*dest.split('/'))
-    full_path = os.path.join(path_for_host(host), new_dest)
-    if not os.path.exists(full_path):
-        print >> sys.stderr, 'No such file or directory:', full_path
+    local_dest = rel_posix_to_abs_local(host, args[1])
+    if not os.path.exists(local_dest):
+        print >> sys.stderr, 'No such file or directory:', local_dest
         sys.exit(1)
-    with open(full_path, 'r') as f:
-        print full_path
+    with open(local_dest, 'r') as f:
+        print local_dest
         print f.read()
 
 
@@ -144,22 +150,22 @@ def run(host, remote_args, slave_key_file=None):
     """
     remote_arg_pos = 0
 
-    # Get slave addresses (this is 'hadoop dfsadmn ...')
+    # Get slave addresses (this is 'bash -c "hadoop dfsadmn ...')
     if remote_args[0].startswith('bash -c "hadoop'):
         slave_addresses()
         return
 
-    # Accept stdin for a file transfer (this is 'bash -c "cat ...')
+    # Accept stdin for a file transfer (this is 'bash -c "cat > ...')
     if remote_args[0].startswith('bash -c "cat'):
         receive_poor_mans_scp(host, remote_args)
         return
 
-    # Accept ls (this is 'find -type f ...')
+    # ls (this is 'find -type f ...')
     if remote_args[0] == 'find':
         ls(host, remote_args)
         return
 
-    # Accept cat (this is 'cat ...')
+    # cat (this is 'cat ...')
     if remote_args[0] == 'cat':
         cat(host, remote_args)
         return

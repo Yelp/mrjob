@@ -850,7 +850,7 @@ class MRJob(object):
         self.emr_opt_group.add_option(
             '--bootstrap-python-package', dest='bootstrap_python_packages', action='append',
             default=[],
-            help='Path to a Python module to install on EMR. These should be standard python module tarballs. If a module is named foo.tar.gz, we expect to be able to run tar xfz foo.tar.gz; cd foo; sudo python setup.py install. You can use --bootstrap-python-packages more than once.')
+            help='Path to a Python module to install on EMR. These should be standard python module tarballs where you can cd into a subdirectory and run ``sudo python setup.py install``. You can use --bootstrap-python-package more than once.')
 
         self.emr_opt_group.add_option(
             '--bootstrap-script', dest='bootstrap_scripts', action='append',

@@ -1426,6 +1426,10 @@ class EMRJobRunner(MRJobRunner):
         if self._master_bootstrap_script:
             return
 
+        # don't bother if we're not starting a job flow
+        if self._opts['emr_job_flow_id']:
+            return
+
         if not any(key.startswith('bootstrap_')
                    and key != 'bootstrap_actions' # these are separate scripts
                    and value

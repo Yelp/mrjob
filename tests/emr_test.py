@@ -300,6 +300,10 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         with mr_job.make_runner() as runner:
             runner.run()
 
+            # Issue 182: don't create the bootstrap script when
+            # attaching to another job flow
+            assert_equal(runner._master_bootstrap_script, None)
+
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
                 results.append((key, value))

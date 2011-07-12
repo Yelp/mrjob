@@ -81,6 +81,10 @@ STEP_LOG_URI_RE = re.compile(r'^.*/steps/(?P<step_num>\d+)/syslog$')
 # regex for matching job log URIs
 JOB_LOG_URI_RE = re.compile(r'^.*?/jobs/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
 
+# sometimes AWS gives us seconds as a decimal, which we can't parse
+# with boto.utils.ISO8601
+SUBSECOND_RE = re.compile('\.[0-9]+')
+
 # map from AWS region to EMR endpoint
 # see http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?ConceptsRequestEndpoints.html
 REGION_TO_EMR_ENDPOINT = {
@@ -121,11 +125,13 @@ def s3_key_to_uri(s3_key):
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
 
-def _to_timestamp(iso8601_time):
+def iso8601_to_timestamp(iso8601_time):
+    iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
     return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
 
 
-def _to_datetime(iso8601_time):
+def iso8601_to_datetime(iso8601_time):
+    iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
     return datetime.datetime.strptime(iso8601_time, boto.utils.ISO8601)
 
 
@@ -179,7 +185,7 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
             # set created_before to be just after the start time of
             # the first job returned, to deal with job flows started
             # in the same second
-            min_create_time = min(_to_datetime(jf.creationdatetime)
+            min_create_time = min(iso8601_to_datetime(jf.creationdatetime)
                                   for jf in job_flows)
             created_before = min_create_time + datetime.timedelta(seconds=1)
             # if someone managed to start 501 job flows in the same second,
@@ -992,8 +998,8 @@ class EMRJobRunner(MRJobRunner):
 
                 if (hasattr(step, 'startdatetime') and
                     hasattr(step, 'enddatetime')):
-                    start_time = _to_timestamp(step.startdatetime)
-                    end_time = _to_timestamp(step.enddatetime)
+                    start_time = iso8601_to_timestamp(step.startdatetime)
+                    end_time = iso8601_to_timestamp(step.enddatetime)
                     total_step_time += end_time - start_time
 
             if not step_states:

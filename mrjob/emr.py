@@ -235,8 +235,6 @@ class EMRJobRunner(MRJobRunner):
         :param aws_availability_zone: availability zone to run the job in
         :type aws_secret_access_key: str
         :param aws_secret_access_key: your "password" on AWS
-        :type aws_availability_zone: str
-        :param aws_availability_zone: availability zone to run the job flow on
         :type aws_region: str
         :param aws_region: region to connect to S3 and EMR on (e.g. ``us-west-1``). If you want to use separate regions for S3 and EMR, set *emr_endpoint* and *s3_endpoint*.
         :type bootstrap_actions: list of str

@@ -27,6 +27,7 @@ import tempfile
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
+from tests.mr_counting_job import MRCountingJob
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
@@ -82,6 +83,26 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
 
         assert_equal(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+
+    def test_multi_step_counters(self):
+        # read from STDIN, a regular file, and a .gz
+        stdin = StringIO('foo\nbar\n')
+
+        mr_job = MRCountingJob(['-c', self.mrjob_conf_path, '-'])
+        mr_job.sandbox(stdin=stdin)
+
+        results = []
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+            assert_equal(runner._counters, [{'group': {'counter_name': 2}},
+                                            {'group': {'counter_name': 2}},
+                                            {'group': {'counter_name': 2}}])
 
 
 class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):

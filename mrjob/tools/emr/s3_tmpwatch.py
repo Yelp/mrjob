@@ -16,6 +16,7 @@
 from datetime import datetime, timedelta
 import logging
 from optparse import OptionParser
+import re
 
 try:
     import boto.utils
@@ -24,6 +25,8 @@ except ImportError:
 
 from mrjob.emr import EMRJobRunner, parse_s3_uri
 from mrjob.util import log_to_stream
+
+DATE_RE = re.compile('\.[0-9]+')
 
 log = logging.getLogger('mrjob.tools.emr.s3_tmpwatch')
 
@@ -63,7 +66,7 @@ def s3_cleanup(glob_path, time_old, dry_run=False, conf_path=None):
         bucket = s3_conn.get_bucket(bucket_name)
 
         for key in bucket.list(key_name):
-            last_modified = datetime.strptime(key.last_modified, boto.utils.ISO8601)
+            last_modified = datetime.strptime(DATE_RE.sub('', key.last_modified), boto.utils.ISO8601)
             time_delta = datetime.utcnow() - last_modified
             if time_delta > time_old:
                 # Delete it

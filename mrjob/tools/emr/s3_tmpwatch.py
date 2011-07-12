@@ -26,9 +26,13 @@ except ImportError:
 from mrjob.emr import EMRJobRunner, parse_s3_uri
 from mrjob.util import log_to_stream
 
-DATE_RE = re.compile('\.[0-9]+')
+
+# sometimes S3 gives us seconds as a decimal, which we can't parse
+# with boto.utils.ISO8601
+SUBSECOND_RE = re.compile('\.[0-9]+')
 
 log = logging.getLogger('mrjob.tools.emr.s3_tmpwatch')
+
 
 def main():
     option_parser = make_option_parser()
@@ -51,6 +55,7 @@ def main():
             conf_path=options.conf_path,
             dry_run=options.test)
 
+
 def s3_cleanup(glob_path, time_old, dry_run=False, conf_path=None):
     """Delete all files older than *time_old* in *path*.
        If *dry_run* is ``True``, then just log the files that need to be 
@@ -59,20 +64,21 @@ def s3_cleanup(glob_path, time_old, dry_run=False, conf_path=None):
     runner = EMRJobRunner(conf_path=conf_path)
     s3_conn = runner.make_s3_conn()
 
-    log.info('Deleting all files in %s that are older than %r days old' % (glob_path, time_old))
+    log.info('Deleting all files in %s that are older than %s' % (glob_path, time_old))
     
     for path in runner.ls(glob_path):
         bucket_name, key_name = parse_s3_uri(path)
         bucket = s3_conn.get_bucket(bucket_name)
 
         for key in bucket.list(key_name):
-            last_modified = datetime.strptime(DATE_RE.sub('', key.last_modified), boto.utils.ISO8601)
-            time_delta = datetime.utcnow() - last_modified
-            if time_delta > time_old:
+            last_modified = datetime.strptime(SUBSECOND_RE.sub('', key.last_modified), boto.utils.ISO8601)
+            age = datetime.utcnow() - last_modified
+            if age > time_old:
                 # Delete it
-                log.info('Deleting %s; is %s old' % (key.name, str(time_delta)))
+                log.info('Deleting %s; is %s old' % (key.name, age))
                 if not dry_run:
                     key.delete()
+
 
 def process_time(time):
     if time[-1] == 'm':
@@ -83,7 +89,8 @@ def process_time(time):
         return timedelta(days=int(time[:-1]))
     else:
         return timedelta(hours=int(time))
-    
+
+
 def make_option_parser():
     usage = '%prog [options] <time-untouched> <URIs>'
     description = 'Delete all files in a given URI that are older that a specified time.\n\nThe time parameter defines the threshold for removing files. If the file has not been accessed for *time*, the  file is removed. The time argument is a number with an optional single-character suffix specifying the units: m for minutes, h for hours, d for days.  If no suffix is specified, time is in hours.'
@@ -108,6 +115,7 @@ def make_option_parser():
         help="Don't actually delete any files; just log that we would")
 
     return option_parser
+
 
 if __name__ == '__main__':
     main()

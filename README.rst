@@ -22,19 +22,12 @@ Some important features:
     * To run on your Hadoop cluster, install ``simplejson`` and make sure ``$HADOOP_HOME`` is set.
 
 Installation
-============
+------------
+
 ``python setup.py install``
 
-Setting up EMR on Amazon
-========================
-
-* create an Amazon Web Services account: <http://aws.amazon.com/>
-* sign up for Elastic MapReduce: <http://aws.amazon.com/elasticmapreduce/>
-* Get your access and secret keys (go to <http://aws.amazon.com/account/> and click on "Security Credentials")
-* Set the environment variables ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY`` accordingly
-
 Try it out!
-===========
+-----------
 
 ::
 
@@ -45,8 +38,16 @@ Try it out!
     # on your Hadoop cluster
     python mrjob/examples/mr_word_freq_count.py README.rst -r hadoop > counts
 
+Setting up EMR on Amazon
+------------------------
+
+* create an `Amazon Web Services account <http://aws.amazon.com/>`_
+* sign up for `Elastic MapReduce <http://aws.amazon.com/elasticmapreduce/>`_
+* Get your access and secret keys (click "Security Credentials" on `your account page <http://aws.amazon.com/account/>`_)
+* Set the environment variables ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY`` accordingly
+
 Advanced Configuration
-======================
+----------------------
 To run in other AWS regions, upload your source tree, run ``make``, and use 
 other advanced mrjob features, you'll need to set up ``mrjob.conf``. mrjob looks 
 for its conf file in:
@@ -61,7 +62,7 @@ See ``mrjob.conf.example`` for more information.
 
 
 Links
-=====
+-----
 
 * source: <http://github.com/Yelp/mrjob>
 * documentation: <http://packages.python.org/mrjob/>

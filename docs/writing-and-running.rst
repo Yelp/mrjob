@@ -70,7 +70,7 @@ See :py:mod:`mrjob.examples` for more examples.
 Running on EMR
 --------------
 
-* Set up your Amazon Account (see :doc:`amazon`)
+* Set up your Amazon Account (see :ref:`amazon-setup`)
 * Set :envvar:`AWS_ACCESS_KEY_ID` and :envvar:`AWS_SECRET_ACCESS_KEY`
 * Run your job with ``-r emr``::
 

@@ -61,20 +61,41 @@ def make_option_parser():
         option_parser.add_option_group(g)
         return g
 
-    ec2_opt_group = make_option_group('EC2 instance configuration')
-    hadoop_opt_group = make_option_group('Hadoop configuration')
-    job_opt_group = make_option_group('Job flow configuration')
+    runner_group = make_option_group('Running the entire job')
+    hadoop_emr_opt_group = make_option_group('Running on Hadoop or EMR (these apply when you set -r hadoop or -r emr)')
+    emr_opt_group = make_option_group('Running on Amazon Elastic MapReduce (these apply when you set -r emr)')
 
     assignments = {
-        option_parser: ('conf_path', 'quiet', 'verbose'),
-        ec2_opt_group: ('ec2_instance_type', 'ec2_master_instance_type',
-                        'ec2_slave_instance_type', 'num_ec2_instances',
-                        'aws_availability_zone', 
-                        'ec2_key_pair', 'ec2_key_pair_file',
-                        'emr_endpoint',),
-        hadoop_opt_group: ('hadoop_version', 'label', 'owner'),
-        job_opt_group: ('bootstrap_mrjob', 'bootstrap_cmds',
-                        'bootstrap_files', 'bootstrap_python_packages',),
+        runner_group: (
+            'bootstrap_mrjob',
+            'conf_path',
+            'quiet',
+            'verbose'
+        ),
+        hadoop_emr_opt_group: (
+            'label',
+            'owner',
+        ),
+        emr_opt_group: (
+            'aws_availability_zone',
+            'aws_region',
+            'bootstrap_actions',
+            'bootstrap_cmds',
+            'bootstrap_files',
+            'bootstrap_python_packages',
+            'ec2_instance_type',
+            'ec2_key_pair',
+            'ec2_master_instance_type',
+            'ec2_slave_instance_type',
+            'emr_endpoint',
+            'enable_emr_debugging',
+            'hadoop_version',
+            'num_ec2_instances',
+            's3_endpoint',
+            's3_log_uri',
+            's3_scratch_uri',
+            's3_sync_wait_time',
+        ),
     }
 
     # Scrape options from MRJob and index them by dest

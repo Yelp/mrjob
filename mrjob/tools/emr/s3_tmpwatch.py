@@ -11,7 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Delete old files in a path
+"""Delete old files on S3.
+
+Suggested usage: run this as a cron job with the -q option::
+
+    0 0 * * * python -m mrjob.tools.emr.s3_tmpwatch -q 30d s3://your-bucket/tmp/
 """
 from datetime import datetime, timedelta
 import logging
@@ -98,7 +102,7 @@ def make_option_parser():
     option_parser.add_option(
         '-q', '--quiet', dest='quiet', default=False,
         action='store_true',
-        help="Don't print anything to stderr; just print deleted files to stdout")
+        help='Report only fatal errors.')
     option_parser.add_option(
         '-c', '--conf-path', dest='conf_path', default=None,
         help='Path to alternate mrjob.conf file to read from')

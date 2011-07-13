@@ -1413,7 +1413,7 @@ class MRJob(object):
 
         return self
 
-    def parse_counters(self):
+    def parse_counters(self, counters=None):
         """Convenience method for reading counters. This only works
         in sandbox mode. This does not clear ``self.stderr``.
 
@@ -1425,7 +1425,8 @@ class MRJob(object):
         if self.stderr == sys.stderr:
             raise AssertionError('You must call sandbox() first; parse_counters() is for testing only.')
 
-        return parse_mr_job_stderr(self.stderr.getvalue())['counters']
+        stderr_results = parse_mr_job_stderr(self.stderr.getvalue(), counters)
+        return stderr_results['counters']
 
     def parse_output(self, protocol=DEFAULT_PROTOCOL):
         """Convenience method for parsing output from any mapper or reducer,

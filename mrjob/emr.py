@@ -1044,7 +1044,7 @@ class EMRJobRunner(MRJobRunner):
             log.info('Job completed.')
             log.info('Running time was %.1fs (not counting time spent waiting for the EC2 instances)' % total_step_time)
             self._fetch_counters(step_nums)
-            self.print_counters(first_step_num=min(*step_nums))
+            self.print_counters(first_step_num=min(step_nums))
         else:
             msg = 'Job failed with status %s: %s' % (job_state, reason)
             log.error(msg)

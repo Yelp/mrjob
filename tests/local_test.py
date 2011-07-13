@@ -140,7 +140,7 @@ class LargeAmountsOfStderrTestCase(TestCase):
             assert_not_in('status: 100\n', stderr)
             assert_in('STDERR: Qux\n', stderr)
             # exception should appear in exception message
-            assert_in('BOOM', e.message)
+            assert_in('BOOM', repr(e))
         else:
             raise AssertionError()
 

@@ -12,11 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 import random
 from subprocess import Popen, PIPE
 from testify import TestCase, assert_equal, assert_in, assert_not_equal, assert_raises
 
 from mrjob.parse import *
+from mrjob.util import log_to_stream
+from tests.quiet import no_handlers_for_logger
 
 class FindPythonTracebackTestCase(TestCase):
 
@@ -147,8 +150,12 @@ class FindMiscTestCase(TestCase):
         assert_raises(ValueError, counter_unescape, '\\')
 
     def test_messy_error(self):
-        counter_string = 'Job FAILED_REDUCES="0" COUNTERS="YOU JUST GOT PUNKD"'
-        assert_equal(None, parse_hadoop_counters_from_line(counter_string))
+        counter_string = 'Job FAILED_REDUCES="0" COUNTERS="THIS IS NOT ACTUALLY A COUNTER"'
+        with no_handlers_for_logger(''):
+            stderr = StringIO()
+            log_to_stream('mrjob.parse', stderr, level=logging.WARN)
+            assert_equal(None, parse_hadoop_counters_from_line(counter_string))
+            assert_in('Cannot parse Hadoop counter line', stderr.getvalue())
 
     def test_freaky_counter_names(self):
         freaky_name = r'\\\\\{\}\(\)\[\]\.\\\\'

@@ -1727,7 +1727,7 @@ class EMRJobRunner(MRJobRunner):
                 return False
 
             # match bootstrap configuration and pool name
-            args = [arg.value for arg in job_flow.bootstrapactions[0].args]
+            args = [arg.value for arg in job_flow.bootstrapactions[-1].args]
             if not args == [pool_arg, self._pool_name]:
                 return False
 

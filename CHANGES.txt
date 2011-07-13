@@ -1,4 +1,4 @@
-v0.2.7, 2011-06-22 -- Hooray for interns!
+v0.2.7, 2011-07-12 -- Hooray for interns!
  * All runner options can be set from the command line (Issue #121)
    * Including for mrjob.tools.emr.create_job_flow (Issue #142)
  * New EMR options:

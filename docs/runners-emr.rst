@@ -5,6 +5,16 @@ mrjob.emr - run on EMR
 
 .. autoclass:: EMRJobRunner
 
+.. _amazon-setup:
+
+Setting up EMR on Amazon
+------------------------
+
+* create an `Amazon Web Services account <http://aws.amazon.com/>`_
+* sign up for `Elastic MapReduce <http://aws.amazon.com/elasticmapreduce/>`_
+* Get your access and secret keys (click "Security Credentials" on `your account page <http://aws.amazon.com/account/>`_)
+* Set the environment variables :envvar:`AWS_ACCESS_KEY_ID` and :envvar:`AWS_SECRET_ACCESS_KEY` accordingly
+
 Advanced EMR Usage
 ------------------
 
@@ -67,3 +77,25 @@ EMR utilities
 
 .. automethod:: EMRJobRunner.make_emr_conn
 .. autofunction:: describe_all_job_flows
+
+.. _ssh-tunneling:
+
+SSH Tunneling
+-------------
+
+To enable SSH tunneling, so that you can view the Hadoop Job Tracker in your browser:
+
+* Go to https://console.aws.amazon.com/ec2/home
+* Make sure the **Region** dropdown (upper left) matches the region you want to run jobs in (usually "US East").
+* Click on **Key Pairs** (lower left)
+* Click on **Create Key Pair** (center).
+* Name your key pair ``EMR`` (any name will work but that's what we're using in this example)
+* Save :file:`EMR.pem` wherever you like (``~/.ssh`` is a good place)
+* Run ``chmod og-rwx /path/to/EMR.pem`` so that ``ssh`` will be happy
+* Add the following entries to your :py:mod:`mrjob.conf`::
+
+    runners:
+      emr:
+        ec2_key_pair: EMR
+        ec2_key_pair_file: /path/to/EMR.pem # ~/ and $ENV_VARS allowed here!
+        ssh_tunnel_to_job_tracker: true

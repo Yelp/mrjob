@@ -77,9 +77,10 @@ class MRJobRunner(object):
     Each runner runs a single job once; if you want to run a job multiple
     times, make multiple runners.
 
-    Subclasses: :py:class:`~mrjob.local.LocalMRJobRunner`,
-    :py:class:`~mrjob.emr.EMRJobRunner`,
-    :py:class:`~mrjob.hadoop.HadoopJobRunner`
+    Subclasses: :py:class:`~mrjob.emr.EMRJobRunner`,
+    :py:class:`~mrjob.hadoop.HadoopJobRunner`,
+    :py:class:`~mrjob.inline.InlineJobRunner`,
+    :py:class:`~mrjob.local.LocalMRJobRunner`
     """
 
     #: alias for this runner; used for picking section of

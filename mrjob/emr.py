@@ -284,7 +284,7 @@ class EMRJobRunner(MRJobRunner):
         job_flows = emr_conn.describe_jobflows()
         ...
 
-    See also: :py:meth:`EMRJobRunner.__init__`.
+    See also: :py:meth:`~EMRJobRunner.__init__`.
     """
     alias = 'emr'
 
@@ -306,8 +306,6 @@ class EMRJobRunner(MRJobRunner):
         :param aws_availability_zone: availability zone to run the job in
         :type aws_secret_access_key: str
         :param aws_secret_access_key: your "password" on AWS
-        :type aws_availability_zone: str
-        :param aws_availability_zone: availability zone to run the job flow on
         :type aws_region: str
         :param aws_region: region to connect to S3 and EMR on (e.g. ``us-west-1``). If you want to use separate regions for S3 and EMR, set *emr_endpoint* and *s3_endpoint*.
         :type bootstrap_cmds: list
@@ -363,7 +361,7 @@ class EMRJobRunner(MRJobRunner):
         :type ssh_bind_ports: list of int
         :param ssh_bind_ports: a list of ports that are safe to listen on. Defaults to ports ``40001`` thru ``40840``.
         :type ssh_tunnel_to_job_tracker: bool
-        :param ssh_tunnel_to_job_tracker: If True, create an ssh tunnel to the job tracker and listen on a randomly chosen port. This requires you to set *ec2_key_pair* and *ec2_key_pair_file*.
+        :param ssh_tunnel_to_job_tracker: If True, create an ssh tunnel to the job tracker and listen on a randomly chosen port. This requires you to set *ec2_key_pair* and *ec2_key_pair_file*. See :ref:`ssh-tunneling` for detailed instructions.
         :type ssh_tunnel_is_open: bool
         :param ssh_tunnel_is_open: if True, any host can connect to the job tracker through the SSH tunnel you open. Mostly useful if your browser is running on a different machine from your job.
         """

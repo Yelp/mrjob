@@ -57,7 +57,7 @@ class LocalMRJobRunner(MRJobRunner):
         self._working_dir = None
         self._prev_outfile = None
         self._final_outfile = None
-        self._counters = {}
+        self._counters = []
 
     @classmethod
     def _default_opts(cls):
@@ -105,22 +105,23 @@ class LocalMRJobRunner(MRJobRunner):
 
         # run mapper, sort, reducer for each step
         for i, step in enumerate(self._get_steps()):
+            self._counters.append({})
             # run the mapper
             mapper_args = (wrapper_args + [self._script['name'],
                             '--step-num=%d' % i, '--mapper'] +
                            self._mr_job_extra_args())
-            self._invoke_step(mapper_args, 'step-%d-mapper' % i)
+            self._invoke_step(mapper_args, 'step-%d-mapper' % i, step_num=i)
 
             if 'R' in step:
                 # sort the output
                 self._invoke_step(['sort'], 'step-%d-mapper-sorted' % i,
-                       env={'LC_ALL': 'C'}) # ignore locale
+                       env={'LC_ALL': 'C'}, step_num=i) # ignore locale
 
                 # run the reducer
                 reducer_args = (wrapper_args + [self._script['name'],
                                  '--step-num=%d' % i, '--reducer'] +
                                 self._mr_job_extra_args())
-                self._invoke_step(reducer_args, 'step-%d-reducer' % i)
+                self._invoke_step(reducer_args, 'step-%d-reducer' % i, step_num=i)
 
         # move final output to output directory
         self._final_outfile = os.path.join(self._output_dir, 'part-00000')
@@ -183,7 +184,7 @@ class LocalMRJobRunner(MRJobRunner):
         for line in open(output_file):
             yield line
 
-    def _invoke_step(self, args, outfile_name, env=None):
+    def _invoke_step(self, args, outfile_name, env=None, step_num=0):
         """Run the given command, outputting into outfile, and reading
         from the previous outfile (or, for the first step, from our
         original output files).
@@ -231,7 +232,7 @@ class LocalMRJobRunner(MRJobRunner):
                      cwd=self._working_dir, env=env)
 
         # handle counters, status msgs, and other stuff on stderr
-        stderr_lines = self._process_stderr_from_script(proc.stderr)
+        stderr_lines = self._process_stderr_from_script(proc.stderr, step_num=step_num)
         tb_lines = find_python_traceback(stderr_lines)
 
         self._print_counters()
@@ -251,7 +252,7 @@ class LocalMRJobRunner(MRJobRunner):
         # flush file descriptors
         write_to.flush()
 
-    def _process_stderr_from_script(self, stderr):
+    def _process_stderr_from_script(self, stderr, step_num=0):
         """Handle stderr a line at time:
 
         - for counter lines, store counters
@@ -261,7 +262,7 @@ class LocalMRJobRunner(MRJobRunner):
         for line in stderr:
             # just pass one line at a time to parse_mr_job_stderr(),
             # so we can print error and status messages in realtime
-            parsed = parse_mr_job_stderr([line], counters=self._counters)
+            parsed = parse_mr_job_stderr([line], counters=self._counters[step_num])
 
             # in practice there's only going to be at most one line in
             # one of these lists, but the code is cleaner this way

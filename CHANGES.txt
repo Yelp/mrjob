@@ -1,3 +1,22 @@
+v0.2.7, 2011-07-12 -- Hooray for interns!
+ * All runner options can be set from the command line (Issue #121)
+   * Including for mrjob.tools.emr.create_job_flow (Issue #142)
+ * New EMR options:
+   * availability_zone (Issue #72)
+   * bootstrap_actions (Issue #69)
+   * enable_emr_debugging (Issue #133)
+ * Read counters from EMR log files (Issue #134)
+ * Clean old files out of S3 with mrjob.tools.emr.s3_tmpwatch (Issue #9)
+ * EMR parses and reports job failure due to steps timing out (Issue #15)
+ * EMR boostrap files are no longer made public on S3 (Issue #70)
+ * mrjob.tools.emr.terminate_idle_job_flows handles custom hadoop streaming
+   jars correctly (Issue #116)
+ * LocalMRJobRunner separates out counters by step (Issue #28)
+ * bootstrap_python_packages works regardless of tarball name (Issue #49)
+ * mrjob always creates temp buckets in the correct AWS region (Issue #64)
+ * Catch abuse of __main__ in jobs (Issue #78)
+ * Added mr_travelling_salesman example
+
 v0.2.6, 2011-05-24 -- Hadoop 0.20 in EMR, inline runner, and more
  * Set Hadoop to run on EMR with --hadoop-version (Issue #71).
    * Default is still 0.18, but will change to 0.20 in mrjob v0.3.0.

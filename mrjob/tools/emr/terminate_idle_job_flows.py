@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 import logging
 from optparse import OptionParser
 import posixpath
+import re
 
 try:
     import boto.utils
@@ -35,6 +36,8 @@ from mrjob.util import log_to_stream
 log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
 
 DEFAULT_MAX_HOURS_IDLE = 1
+
+DEBUG_JAR_RE = re.compile(r's3n://.*\.elasticmapreduce/libs/state-pusher/[^/]+/fetch')
 
 def main():
     option_parser = make_option_parser()
@@ -115,8 +118,14 @@ def is_job_flow_non_streaming(job_flow):
         return False
 
     for step in job_flow.steps:
-        if HADOOP_STREAMING_JAR_RE.match(posixpath.basename(step.jar)):
-            return False
+        args = [a.value for a in step.args]
+        for arg in args:
+            # This is hadoop streaming
+            if arg == '-mapper':
+                return False
+            # This is a debug jar associated with hadoop streaming
+            if DEBUG_JAR_RE.match(arg):
+                return False
 
     # job has at least one step, and none are streaming steps
     return True

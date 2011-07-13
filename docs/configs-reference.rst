@@ -57,9 +57,9 @@ In addition, it ignores *hadoop_input_format*, *hadoop_output_format*, *hadoop_s
 Additional options for :py:class:`~mrjob.emr.EMRJobRunner`
 ----------------------------------------------------------
 
-============================= ============================== ========================================= ==================================================================
+============================= ============================== ========================================= ===================================================================
 Option                        Default                        Combined by                               Switches
-============================= ============================== ========================================= ==================================================================
+============================= ============================== ========================================= ===================================================================
 *aws_access_key_id*           (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_ACCESS_KEY_ID`)
 *aws_availability_zone*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--aws-availability-zone`
 *aws_secret_access_key*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_SECRET_ACCESS_KEY`)
@@ -76,7 +76,7 @@ Option                        Default                        Combined by        
 *ec2_slave_instance_type*     ``'m1.small'``                 :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-slave-instance-type`
 *emr_endpoint*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--emr-endpoint`
 *emr_job_flow_id*             (create our own job flow)      :py:func:`~mrjob.conf.combine_values`     :option:`--emr-job-flow-id`
-*enable_emr_debugging*        ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--enable-emr-debugging`, :option:`--disable-emr-debugging
+*enable_emr_debugging*        ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--enable-emr-debugging`, :option:`--disable-emr-debugging`
 *hadoop_streaming_jar_on_emr* ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-streaming-jar-on-emr`
 *hadoop_version*              ``'0.20'``                     :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-version`
 *num_ec2_instances*           ``1``                          :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-instances`
@@ -88,7 +88,7 @@ Option                        Default                        Combined by        
 *ssh_bind_ports*              ``range(40001, 40841)``        :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-bind-ports`
 *ssh_tunnel_to_job_tracker*   ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-to-job-tracker`
 *ssh_tunnel_is_open*          ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-is-open`, :option:`--ssh-tunnel-is-closed`
-============================= ============================== ========================================= ==================================================================
+============================= ============================== ========================================= ===================================================================
 
 See :py:meth:`mrjob.emr.EMRJobRunner.__init__` for details.
 
@@ -98,7 +98,7 @@ Additional options for :py:class:`~mrjob.hadoop.HadoopJobRunner`
 ====================== =========================== ===================================== ================================
 Option                 Default                     Combined by                           Switches
 ====================== =========================== ===================================== ================================
-*hadoop_bin*           (automatic)                 :py:func:`~mrjob.conf.combine_cmds`  :option:`--hadoop-bin`
+*hadoop_bin*           (automatic)                 :py:func:`~mrjob.conf.combine_cmds`   :option:`--hadoop-bin`
 *hadoop_home*          :envvar:`HADOOP_HOME`       :py:func:`~mrjob.conf.combine_values` (set :envvar:`HADOOP_HOME`)
 *hdfs_scratch_dir*     ``tmp/mrjob`` (in HDFS)     :py:func:`~mrjob.conf.combine_paths`  :option:`--hdfs-scratch-dir`
 ====================== =========================== ===================================== ================================

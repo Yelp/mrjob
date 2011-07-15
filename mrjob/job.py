@@ -181,8 +181,19 @@ class MRJob(object):
             usage=usage, option_class=MRJobOptions)
         self.configure_options()
 
-        # Load and validate options
-        self.load_options(args=args)
+        # don't pass None to parse_args unless we're actually running
+        # the MRJob script
+        if args is _READ_ARGS_FROM_SYS_ARGV:
+            self._cl_args = sys.argv[1:]
+        else:
+            # don't pass sys.argv to self.option_parser, and have it
+            # raise an exception on error rather than printing to stderr
+            # and exiting.
+            self._cl_args = args or []
+            def error(msg):
+                raise ValueError(msg)
+            self.option_parser.error = error
+        self.load_options(self._cl_args)
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
         # See sandbox(), below.
@@ -1053,17 +1064,6 @@ class MRJob(object):
         else:
             pass_opt = kwargs.pop('opt_group').add_option(*args, **kwargs)
 
-        # We only support a subset of option parser actions
-        SUPPORTED_ACTIONS = (
-            'store', 'append', 'store_const', 'store_true', 'store_false',)
-        if not pass_opt.action in SUPPORTED_ACTIONS:
-            raise OptionError('Expecting only actions %s, got %r' % (SUPPORTED_ACTIONS, pass_opt.action))
-
-        # We only support a subset of option parser choices
-        SUPPORTED_TYPES = ('int', 'long', 'float', 'string', 'choice', None)
-        if not pass_opt.type in SUPPORTED_TYPES:
-            raise OptionError('Expecting only types %s, got %r' % (SUPPORTED_TYPES, pass_opt.type))
-
         self._passthrough_options.append(pass_opt)
 
     def add_file_option(self, *args, **kwargs):
@@ -1111,19 +1111,7 @@ class MRJob(object):
                 self.stop_words = self.option.stop_words.split(',')
                 ...
         """
-        # don't pass None to parse_args unless we're actually running
-        # the MRJob script
-        if args is _READ_ARGS_FROM_SYS_ARGV:
-            self.options, self.args = self.option_parser.parse_args()
-        else:
-            # don't pass sys.argv to self.option_parser, and have it
-            # raise an exception on error rather than printing to stderr
-            # and exiting.
-            args = args or []
-            def error(msg):
-                raise ValueError(msg)
-            self.option_parser.error = error
-            self.options, self.args = self.option_parser.parse_args(args)
+        self.options, self.args = self.option_parser.parse_args(args)
 
         # output_protocol defaults to protocol
         if not self.options.output_protocol:
@@ -1238,29 +1226,97 @@ class MRJob(object):
         These are passed to :py:meth:`mrjob.runner.MRJobRunner.__init__`
         as ``extra_args``.
         """
-        master_option_dict = self.options.__dict__
-
         output_args = []
-        for pass_opt in self._passthrough_options:
-            opt_prefix = pass_opt.get_opt_string()
-            opt_value = master_option_dict[pass_opt.dest]
 
-            # Pass through the arguments for these actions
-            if pass_opt.action == 'store' and opt_value is not None:
-                output_args.append(opt_prefix)
-                output_args.append(str(opt_value))
-            elif pass_opt.action == 'append':
-                for value in opt_value:
-                    output_args.append(opt_prefix)
-                    output_args.append(str(value))
-            if pass_opt.action == 'store_true' and opt_value == True:
-                output_args.append(opt_prefix)
-            elif pass_opt.action == 'store_false' and opt_value == False:
-                output_args.append(opt_prefix)
-            elif pass_opt.action == 'store_const' and opt_value is not None:
-                output_args.append(opt_prefix)
+        values = self.option_parser.get_default_values()
+        rargs = [x for x in self._cl_args]
+        self.option_parser.rargs = rargs
+        while rargs:
+            arg = rargs[0]
+            if arg == '--':
+                del rargs[0]
+                return
+            elif arg[0:2] == '--':
+                self._process_long_opt(rargs, values, output_args)
+            elif arg[:1] == '-' and len(arg) > 1:
+                self._process_short_opts(rargs, values, output_args)
+            else:
+                del rargs[0]
 
         return output_args
+
+    def _process_long_opt(self, rargs, values, output_args):
+        arg = rargs.pop(0)
+
+        # Value explicitly attached to arg?  Pretend it's the next
+        # argument.
+        if "=" in arg:
+            (opt, next_arg) = arg.split("=", 1)
+            rargs.insert(0, next_arg)
+        else:
+            opt = arg
+
+        opt = self.option_parser._match_long_opt(opt)
+        option = self.option_parser._long_opt[opt]
+
+        if option in self._passthrough_options:
+            output_args.append(opt)
+            rargs_before_processing = [x for x in rargs]
+
+        if option.takes_value():
+            nargs = option.nargs
+            if nargs == 1:
+                value = rargs.pop(0)
+            else:
+                value = tuple(rargs[0:nargs])
+                del rargs[0:nargs]
+        else:
+            value = None
+
+        option.process(opt, value, values, self.option_parser)
+
+        if option in self._passthrough_options:
+            length_difference = len(rargs_before_processing) - len(rargs)
+            output_args.extend(rargs_before_processing[:length_difference])
+
+    def _process_short_opts(self, rargs, values, output_args):
+        arg = rargs.pop(0)
+        stop = False
+        i = 1
+        for ch in arg[1:]:
+            opt = "-" + ch
+            option = self.option_parser._short_opt.get(opt)
+            i += 1                      # we have consumed a character
+
+            if option in self._passthrough_options:
+                output_args.append(opt)
+                rargs_before_processing = [x for x in rargs]
+
+            if option.takes_value():
+                # Any characters left in arg?  Pretend they're the
+                # next arg, and stop consuming characters of arg.
+                if i < len(arg):
+                    rargs.insert(0, arg[i:])
+                    stop = True
+
+                nargs = option.nargs
+                if nargs == 1:
+                    value = rargs.pop(0)
+                else:
+                    value = tuple(rargs[0:nargs])
+                    del rargs[0:nargs]
+
+            else:                       # option doesn't take a value
+                value = None
+
+            option.process(opt, value, values, self.option_parser)
+
+            if option in self._passthrough_options:
+                length_difference = len(rargs_before_processing) - len(rargs)
+                output_args.extend(rargs_before_processing[:length_difference])
+
+            if stop:
+                break
 
     def generate_file_upload_args(self):
         """Figure out file upload args to pass through to the job runner.

@@ -625,7 +625,7 @@ class CommandLineArgsTest(TestCase):
 
     def test_explicit_passthrough_options(self):
         mr_job = MRCustomBoringJob(args=[
-            '-p', 'repr', # short name for --protocol
+            '-vp', 'repr', # short name for --protocol
             '--foo-size=9',
             '--bar-name', 'Alembic',
             '--enable-baz-mode', '--disable-quuxing',

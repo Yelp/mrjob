@@ -93,7 +93,7 @@ See :py:mod:`mrjob.examples` for more examples.
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
-from copy import copy
+from copy import copy, deepcopy
 import inspect
 import itertools
 from optparse import Option, OptionParser, OptionGroup, OptionError, OptionValueError
@@ -1228,7 +1228,11 @@ class MRJob(object):
         """
         output_args = []
 
-        values = self.option_parser.get_default_values()
+        # Duplicate behavior of OptionParser, but capture the strings required
+        # to reproduce the same values.
+        # ref. optparse.py lines 1414-1548 (python 2.6.5)
+
+        values = deepcopy(self.option_parser.get_default_values())
         rargs = [x for x in self._cl_args]
         self.option_parser.rargs = rargs
         while rargs:

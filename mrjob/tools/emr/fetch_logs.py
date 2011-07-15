@@ -104,7 +104,7 @@ def list_relevant(runner, step_nums):
         _prettyprint_relevant(*runner.s3_list_logs(step_nums=step_nums))
 
 
-def list_all(runner, step_num):
+def list_all(runner):
     try:
         prettyprint_paths(runner.ssh_list_all())
     except LogFetchException, e:

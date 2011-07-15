@@ -96,7 +96,7 @@ from __future__ import with_statement
 from copy import copy
 import inspect
 import itertools
-from optparse import Option, OptionParser, OptionGroup, OptionConflictError, OptionError, OptionValueError, NO_DEFAULT
+from optparse import Option, OptionParser, OptionGroup, OptionError, OptionValueError
 import sys
 import time
 
@@ -179,24 +179,10 @@ class MRJob(object):
         usage = "usage: %prog [options] [input files]"
         self.option_parser = OptionParser(
             usage=usage, option_class=MRJobOptions)
-        self.passthrough_option_parser = OptionParser(option_class=MRJobOptions)
         self.configure_options()
-        self._populate_passthrough_option_parser()
 
         # Load and validate options
-        # don't pass None to parse_args unless we're actually running
-        # the MRJob script
-        if args is _READ_ARGS_FROM_SYS_ARGV:
-            self._cl_args = sys.argv[1:]
-        else:
-            # don't pass sys.argv to self.option_parser, and have it
-            # raise an exception on error rather than printing to stderr
-            # and exiting.
-            self._cl_args = args or []
-            def error(msg):
-                raise ValueError(msg)
-            self.option_parser.error = error
-        self.load_options(self._cl_args)
+        self.load_options(args=args)
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
         # See sandbox(), below.
@@ -702,7 +688,7 @@ class MRJob(object):
     ### Command-line arguments ###
 
     def configure_options(self):
-        """Define arguments for this script. Called from :py:meth:`__init__()`.
+        """Define arguments for this script. Called from ``__init__()``.
 
         Run ``python -m mrjob.job.MRJob --help`` to see all options.
 
@@ -1047,13 +1033,6 @@ class MRJob(object):
             default=None, action='store_true',
             help='Open up an SSH tunnel to the Hadoop job tracker')
 
-    def _populate_passthrough_option_parser(self):
-        for opt in self.option_parser._get_all_options():
-            try:
-                self.passthrough_option_parser.add_option(opt)
-            except OptionConflictError:
-                pass
-
 
     def add_passthrough_option(self, *args, **kwargs):
         """Function to create options which both the job runner
@@ -1074,54 +1053,18 @@ class MRJob(object):
         else:
             pass_opt = kwargs.pop('opt_group').add_option(*args, **kwargs)
 
-        kwargs.update(dict(action='callback',
-                           callback=self._passthrough_option_callback),
-                           choices=None)
-        if kwargs.get('type', None):
-            kwargs['type'] = 'string'
-        if kwargs.get('default', None):
-            del kwargs['default']
+        # We only support a subset of option parser actions
+        SUPPORTED_ACTIONS = (
+            'store', 'append', 'store_const', 'store_true', 'store_false',)
+        if not pass_opt.action in SUPPORTED_ACTIONS:
+            raise OptionError('Expecting only actions %s, got %r' % (SUPPORTED_ACTIONS, pass_opt.action))
 
-        wrapped_pass_opt = self.passthrough_option_parser.add_option(*args, **kwargs)
-        wrapped_pass_opt.original = pass_opt
-        self._passthrough_options.append(wrapped_pass_opt)
+        # We only support a subset of option parser choices
+        SUPPORTED_TYPES = ('int', 'long', 'float', 'string', 'choice', None)
+        if not pass_opt.type in SUPPORTED_TYPES:
+            raise OptionError('Expecting only types %s, got %r' % (SUPPORTED_TYPES, pass_opt.type))
 
-    def _passthrough_option_callback(self, option, opt_str, value, parser,
-                                     *args, **kwargs):
-        """Wrap an option's functionality for the purpse of determining which
-        command line arguments it consumes. It handles all actions/types
-        including callbacks that consume arbitrary numbers of arguments.
-        """
-        self._passthrough_cl_args.append(opt_str)
-
-        # Remember which args we started with
-        rargs_before_option = [x for x in parser.rargs]
-
-        # Obey nargs. Have to mirror some functionality from optparse.
-        # This logic is copied from optparse.py lines 1489-1501 in Python 2.6.
-        original = option.original
-        if value is None and original.takes_value():
-            nargs = original.nargs
-            if len(parser.rargs) < nargs:
-                if nargs == 1:
-                    raise OptionValueError('%s option requires an argument'
-                                           % original)
-                else:
-                    raise OptionValueError('%s option requires %d arguments'
-                                           % (original, nargs))
-            elif nargs == 1:
-                value = parser.rargs.pop(0)
-            else:
-                value = tuple(parser.rargs[0:nargs])
-                del parser.rargs[0:nargs]
-        elif value is not None:
-            self._passthrough_cl_args.append(str(value))
-
-        option.original.process(opt_str, value, parser.values, parser)
-
-        # No matter how many arguments were consumed, figure out what they were
-        length_difference = len(rargs_before_option) - len(parser.rargs)
-        self._passthrough_cl_args.extend(rargs_before_option[:length_difference])
+        self._passthrough_options.append(pass_opt)
 
     def add_file_option(self, *args, **kwargs):
         """Add a command-line option that sends an external file
@@ -1168,7 +1111,19 @@ class MRJob(object):
                 self.stop_words = self.option.stop_words.split(',')
                 ...
         """
-        self.options, self.args = self.option_parser.parse_args(args)
+        # don't pass None to parse_args unless we're actually running
+        # the MRJob script
+        if args is _READ_ARGS_FROM_SYS_ARGV:
+            self.options, self.args = self.option_parser.parse_args()
+        else:
+            # don't pass sys.argv to self.option_parser, and have it
+            # raise an exception on error rather than printing to stderr
+            # and exiting.
+            args = args or []
+            def error(msg):
+                raise ValueError(msg)
+            self.option_parser.error = error
+            self.options, self.args = self.option_parser.parse_args(args)
 
         # output_protocol defaults to protocol
         if not self.options.output_protocol:
@@ -1277,17 +1232,35 @@ class MRJob(object):
         return dict((key, getattr(self.options, key)) for key in keys)
 
     def generate_passthrough_arguments(self):
-        # Reset lists of append-type options so that the second round of
-        # parsing doesn't modify the "real" versions
-        defaults = self.passthrough_option_parser.defaults
-        for opt in self.option_parser._get_all_options():
-            if opt.action == 'append' \
-               and isinstance(defaults[opt.dest], list):
-                defaults[opt.dest] = []
+        """Returns a list of arguments to pass to subprocesses, either on
+        hadoop or executed via subprocess.
 
-        self._passthrough_cl_args = []
-        self.passthrough_option_parser.parse_args(self._cl_args)
-        return self._passthrough_cl_args
+        These are passed to :py:meth:`mrjob.runner.MRJobRunner.__init__`
+        as ``extra_args``.
+        """
+        master_option_dict = self.options.__dict__
+
+        output_args = []
+        for pass_opt in self._passthrough_options:
+            opt_prefix = pass_opt.get_opt_string()
+            opt_value = master_option_dict[pass_opt.dest]
+
+            # Pass through the arguments for these actions
+            if pass_opt.action == 'store' and opt_value is not None:
+                output_args.append(opt_prefix)
+                output_args.append(str(opt_value))
+            elif pass_opt.action == 'append':
+                for value in opt_value:
+                    output_args.append(opt_prefix)
+                    output_args.append(str(value))
+            if pass_opt.action == 'store_true' and opt_value == True:
+                output_args.append(opt_prefix)
+            elif pass_opt.action == 'store_false' and opt_value == False:
+                output_args.append(opt_prefix)
+            elif pass_opt.action == 'store_const' and opt_value is not None:
+                output_args.append(opt_prefix)
+
+        return output_args
 
     def generate_file_upload_args(self):
         """Figure out file upload args to pass through to the job runner.

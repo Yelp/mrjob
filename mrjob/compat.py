@@ -256,11 +256,14 @@ def translate_jobconf_to_version(variable, version):
         the given version of hadoop.
     """
     req_version = LooseVersion(version)
-    version_0_21 = LooseVersion('0.21')
-    if req_version < version_0_21:
-        return jobconf_map[variable]['0.21']
-    else:
-        return jobconf_map[variable]['0.18']
+    possible_versions = sorted(jobconf_map[variable].keys(), reverse=True, key=lambda(v):LooseVersion(v))
+    
+    for possible_version in possible_versions:
+        if req_version >= LooseVersion(possible_version):
+            return jobconf_map[variable][possible_version]
+    
+    # return oldest version if we don't find required version
+    return jobconf_map[variable][possible_versions[-1]]
     
 
 def is_equivalent_jobconf(arg1, arg2):
@@ -282,7 +285,7 @@ def get_jobconf_value(variable):
 
     # try alternatives
     for var in translate_jobconf(variable):
-        var = dots_to_underscores(var)
+        var = var.replace('.','_')
         if var in os.environ:
             return os.environ[var]
 

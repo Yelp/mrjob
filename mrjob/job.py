@@ -1249,6 +1249,22 @@ class MRJob(object):
 
         return output_args
 
+    def _capture_args(self, option, opt, output_args, rargs, func):
+        """Extend `output_args` with the difference in `rargs` before and
+        after calling `func()`. option is the Option object and `opt` is the
+        option string to append to `output_args` before the `rargs`
+        difference.
+        """
+        if option in self._passthrough_options:
+            output_args.append(opt)
+            rargs_before_processing = [x for x in rargs]
+
+        func()
+
+        if option in self._passthrough_options:
+            length_difference = len(rargs_before_processing) - len(rargs)
+            output_args.extend(rargs_before_processing[:length_difference])
+
     def _process_long_opt(self, rargs, values, output_args):
         arg = rargs.pop(0)
 
@@ -1263,25 +1279,20 @@ class MRJob(object):
         opt = self.option_parser._match_long_opt(opt)
         option = self.option_parser._long_opt[opt]
 
-        if option in self._passthrough_options:
-            output_args.append(opt)
-            rargs_before_processing = [x for x in rargs]
-
-        if option.takes_value():
-            nargs = option.nargs
-            if nargs == 1:
-                value = rargs.pop(0)
+        def gobbler():
+            if option.takes_value():
+                nargs = option.nargs
+                if nargs == 1:
+                    value = rargs.pop(0)
+                else:
+                    value = tuple(rargs[0:nargs])
+                    del rargs[0:nargs]
             else:
-                value = tuple(rargs[0:nargs])
-                del rargs[0:nargs]
-        else:
-            value = None
+                value = None
 
-        option.process(opt, value, values, self.option_parser)
+            option.process(opt, value, values, self.option_parser)
 
-        if option in self._passthrough_options:
-            length_difference = len(rargs_before_processing) - len(rargs)
-            output_args.extend(rargs_before_processing[:length_difference])
+        self._capture_args(option, opt, output_args, rargs, gobbler)
 
     def _process_short_opts(self, rargs, values, output_args):
         arg = rargs.pop(0)
@@ -1292,32 +1303,27 @@ class MRJob(object):
             option = self.option_parser._short_opt.get(opt)
             i += 1                      # we have consumed a character
 
-            if option in self._passthrough_options:
-                output_args.append(opt)
-                rargs_before_processing = [x for x in rargs]
+            def gobbler():
+                if option.takes_value():
+                    # Any characters left in arg?  Pretend they're the
+                    # next arg, and stop consuming characters of arg.
+                    if i < len(arg):
+                        rargs.insert(0, arg[i:])
+                        stop = True
 
-            if option.takes_value():
-                # Any characters left in arg?  Pretend they're the
-                # next arg, and stop consuming characters of arg.
-                if i < len(arg):
-                    rargs.insert(0, arg[i:])
-                    stop = True
+                    nargs = option.nargs
+                    if nargs == 1:
+                        value = rargs.pop(0)
+                    else:
+                        value = tuple(rargs[0:nargs])
+                        del rargs[0:nargs]
 
-                nargs = option.nargs
-                if nargs == 1:
-                    value = rargs.pop(0)
-                else:
-                    value = tuple(rargs[0:nargs])
-                    del rargs[0:nargs]
+                else:                       # option doesn't take a value
+                    value = None
 
-            else:                       # option doesn't take a value
-                value = None
+                option.process(opt, value, values, self.option_parser)
 
-            option.process(opt, value, values, self.option_parser)
-
-            if option in self._passthrough_options:
-                length_difference = len(rargs_before_processing) - len(rargs)
-                output_args.extend(rargs_before_processing[:length_difference])
+            self._capture_args(option, opt, output_args, rargs, gobbler)
 
             if stop:
                 break

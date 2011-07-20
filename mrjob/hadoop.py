@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import codecs
 import getpass
 import logging
 import os
@@ -438,11 +439,11 @@ class HadoopJobRunner(MRJobRunner):
 
         cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
 
-        for line in cat_proc.stdout:
+        for line in codecs.getreader('UTF-8')(cat_proc.stdout):
             yield line
 
         # there shouldn't be any stderr
-        for line in cat_proc.stderr:
+        for line in codecs.getreader('UTF-8')(cat_proc.stderr):
             log.error('STDERR: ' + line)
 
         returncode = cat_proc.wait()

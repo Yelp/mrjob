@@ -15,6 +15,7 @@
 """Run an MRJob locally by forking off a bunch of processes and piping
 them together. Useful for testing."""
 
+import codecs
 import logging
 import os
 import pprint
@@ -181,7 +182,7 @@ class LocalMRJobRunner(MRJobRunner):
             output_file = os.path.join(self._output_dir, 'part-00000')
         log.info('streaming final output from %s' % output_file)
 
-        for line in open(output_file):
+        for line in codecs.open(output_file, encoding='UTF-8'):
             yield line
 
     def _invoke_step(self, args, outfile_name, env=None, step_num=0):

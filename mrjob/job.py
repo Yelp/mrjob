@@ -93,6 +93,7 @@ See :py:mod:`mrjob.examples` for more examples.
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
+import codecs
 from copy import copy
 import inspect
 import itertools
@@ -186,9 +187,9 @@ class MRJob(object):
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
         # See sandbox(), below.
-        self.stdin = sys.stdin
-        self.stdout = sys.stdout
-        self.stderr = sys.stderr
+        self.stdin = codecs.getwriter('UTF-8')(sys.stdin)
+        self.stdout = codecs.getwriter('UTF-8')(sys.stdout)
+        self.stderr = codecs.getwriter('UTF-8')(sys.stderr)
 
     ### Defining one-step jobs ###
 

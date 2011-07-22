@@ -17,6 +17,7 @@ from __future__ import with_statement
 
 __author__ = 'Matthew Tai <mtai@adku.com>'
 
+import codecs
 import logging
 import os
 import pprint
@@ -192,5 +193,5 @@ class InlineMRJobRunner(MRJobRunner):
             output_file = os.path.join(self._output_dir, 'part-00000')
         log.info('streaming final output from %s' % output_file)
 
-        for line in open(output_file):
+        for line in codecs.open(output_file, encoding='UTF-8'):
             yield line

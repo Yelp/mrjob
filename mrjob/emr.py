@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import with_statement
 
+import codecs
 from cStringIO import StringIO
 import datetime
 import fnmatch
@@ -1108,7 +1109,7 @@ class EMRJobRunner(MRJobRunner):
             s3_key.get_contents_to_filename(
                 output_dir, headers={'Accept-Encoding': 'gzip'})
             log.debug('reading lines from %s' % output_dir)
-            for line in open(output_dir):
+            for line in codecs.open(output_dir, encoding='UTF-8'):
                 yield line
 
     def _script_args(self):

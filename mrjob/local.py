@@ -379,7 +379,7 @@ class LocalMRJobRunner(MRJobRunner):
         for proc in procs:
             self._wait_for_process(proc, step_num)
 
-        self._print_counters()
+        self.print_counters(first_step_num=1, limit_to_steps=[step_num])
         
         
     def _invoke_process(self, args, outfile_name, env):
@@ -408,10 +408,11 @@ class LocalMRJobRunner(MRJobRunner):
         # handle counters, status msgs, and other stuff on stderr
         stderr_lines = self._process_stderr_from_script(proc['proc'].stderr, step_num=step_num)
         tb_lines = find_python_traceback(stderr_lines)
-       
+        
         returncode = proc['proc'].wait()
+
         if returncode != 0:
-            self._print_counters()
+            self.print_counters(first_step_num=1, limit_to_steps=[step_num])
             # try to throw a useful exception
             if tb_lines:
                 raise Exception(
@@ -435,7 +436,7 @@ class LocalMRJobRunner(MRJobRunner):
         for line in stderr:
             # just pass one line at a time to parse_mr_job_stderr(),
             # so we can print error and status messages in realtime
-            parsed = parse_mr_job_stderr([line], counters=self._counters[step_num-1])
+            parsed = parse_mr_job_stderr([line], counters=self._counters[step_num])
 
             # in practice there's only going to be at most one line in
             # one of these lists, but the code is cleaner this way
@@ -446,9 +447,5 @@ class LocalMRJobRunner(MRJobRunner):
                 log.error('STDERR: %s' % line.rstrip('\n'))
                 yield line
 
-    def _print_counters(self):
-        """Log the current value of counters (if any)"""
-        if not self._counters:
-            return
-
-        log.info('counters: %s' % pprint.pformat(self._counters))
+    def counters(self):
+        return self._counters

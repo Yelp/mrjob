@@ -57,6 +57,7 @@ class InlineMRJobRunner(MRJobRunner):
         self._mrjob_cls = mrjob_cls
         self._prev_outfile = None
         self._final_outfile = None
+        self._counters = []
 
     @classmethod
     def _opts_combiners(cls):
@@ -126,6 +127,9 @@ class InlineMRJobRunner(MRJobRunner):
         log.info('Moving %s -> %s' % (self._prev_outfile, self._final_outfile))
         shutil.move(self._prev_outfile, self._final_outfile)
 
+    def _get_steps(self):
+        return self._mrjob_cls()._steps_desc()
+
     def _invoke_inline_mrjob(self, step_number, outfile_name, is_mapper=False, is_reducer=False):
         common_args = (['--step-num=%d' % step_number] +
                        self._mr_job_extra_args(local=True) +
@@ -146,9 +150,13 @@ class InlineMRJobRunner(MRJobRunner):
         child_stdout.flush()
         child_stdout.close()
 
-        counters = child_instance.parse_counters()
-        if counters:
-            log.info('counters: ' + pprint.pformat(counters))
+        while len(self._counters) <= step_number:
+            self._counters.append({})
+        child_instance.parse_counters(self._counters[step_number-1])
+        self.print_counters(first_step_num=1, limit_to_steps=[step_number])
+
+    def counters(self):
+        return self._counters
 
     def _decide_input_paths(self):
         # decide where to get input

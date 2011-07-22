@@ -224,6 +224,20 @@ class MRJob(object):
         """
         raise NotImplementedError
 
+    def mapper_init(self):
+        """Re-define this to define an action to run before the mapper
+        processes any input.
+
+        One use for this function is to initialize mapper-specific helper
+        structures.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
     def mapper_final(self):
         """Re-define this to define an action to run after the mapper reaches
         the end of input.
@@ -231,6 +245,31 @@ class MRJob(object):
         One way to use this is to store a total in an instance variable, and
         output it after reading all input data. See :py:mod:`mrjob.examples`
         for an example.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
+    def reducer_init(self):
+        """Re-define this to define an action to run before the reducer
+        processes any input.
+
+        One use for this function is to initialize reducer-specific helper
+        structures.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
+    def reducer_final(self):
+        """Re-define this to define an action to run after the reducer reaches
+        the end of input.
 
         Yields one or more tuples of ``(out_key, out_value)``.
 
@@ -255,35 +294,47 @@ class MRJob(object):
         # Use mapper(), mapper_final(), and reducer() only if they've been
         # re-defined
         kwargs = dict((func_name, getattr(self, func_name))
-                      for func_name in ('mapper', 'mapper_final', 'reducer')
+                      for func_name in ('mapper',
+                                        'mapper_init',
+                                        'mapper_final',
+                                        'reducer',
+                                        'reducer_init',
+                                        'reducer_final')
                       if (getattr(self, func_name).im_func is not
                           getattr(MRJob, func_name).im_func))
 
         return [self.mr(**kwargs)]
 
     @classmethod
-    def mr(cls, mapper=None, reducer=None, mapper_final=None):
-        """Define a step (mapper, final mapper action, and/or reducer) for your job.
+    def mr(cls, mapper=None, reducer=None,
+           mapper_init=None, mapper_final=None,
+           reducer_init=None, reducer_final=None):
+        """Define a step (mapper, reducer, and/or any combination of 
+        mapper_init, reducer_final, etc.) for your job.
 
         Used by :py:meth:`steps`. (Don't re-define this, just call it!)
 
         :param mapper: function with same function signature as :py:meth:`mapper`, or ``None`` for an identity mapper.
         :param reducer: function with same function signature as :py:meth:`reducer`, or ``None`` for no reducer.
+        :param mapper_init: function with same function signature as :py:meth:`mapper_init`, or ``None`` for no initial mapper action. Please invoke this as a keyword argument.
         :param mapper_final: function with same function signature as :py:meth:`mapper_final`, or ``None`` for no final mapper action. Please invoke this as a keyword argument.
+        :param reducer_init: function with same function signature as :py:meth:`reducer_init`, or ``None`` for no initial reducer action. Please invoke this as a keyword argument.
+        :param reducer_final: function with same function signature as :py:meth:`reducer_final`, or ``None`` for no final reducer action. Please invoke this as a keyword argument.
 
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.
         """
-        # Hadoop streaming requires a mapper, so patch in _IDENTITY_MAPPER
-        if not mapper:
-            if not mapper_final and not reducer:
-                raise Exception("Step has no mappers and no reducers")
-            mapper = _IDENTITY_MAPPER
+        step = dict(mapper=mapper, reducer=reducer,
+                    mapper_init=mapper_init, mapper_final=mapper_final,
+                    reducer_init=reducer_init, reducer_final=reducer_final)
 
-        if mapper_final:
-            return ((mapper, mapper_final), reducer)
-        else:
-            return (mapper, reducer)
+        if not any(step.itervalues()):
+            raise Exception("Step has no mappers and no reducers")
+
+        # Hadoop streaming requires a mapper, so patch in _IDENTITY_MAPPER
+        step['mapper'] = step['mapper'] or _IDENTITY_MAPPER
+
+        return step
 
     def increment_counter(self, group, counter, amount=1):
         """Increment a hadoop counter in hadoop streaming by printing to stderr.
@@ -369,7 +420,7 @@ class MRJob(object):
         for w in bad_words:
             if w in sys.argv:
                 raise UsageError("make_runner() was called with %s. This probably means you tried to use it from __main__, which doesn't work." % w)
-        
+
         # have to import here so that we can still run the MRJob
         # without importing boto
         from mrjob.emr import EMRJobRunner
@@ -427,24 +478,25 @@ class MRJob(object):
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
-        mapper = steps[step_num][0]
-
-        # special case: mapper is actually a tuple of mapper and final mapper
-        if isinstance(mapper, tuple):
-            mapper, mapper_final = mapper
-        else:
-            mapper_final = None
+        step = steps[step_num]
+        mapper = step['mapper']
+        mapper_init = step['mapper_init']
+        mapper_final = step['mapper_final']
 
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'M')
 
+        if mapper_init:
+            for out_key, out_value in mapper_init() or ():
+                write_line(out_key, out_value)
+
         # run the mapper on each line
         for key, value in read_lines():
-            for out_key, out_value in mapper(key, value):
+            for out_key, out_value in mapper(key, value) or ():
                 write_line(out_key, out_value)
 
         if mapper_final:
-            for out_key, out_value in mapper_final():
+            for out_key, out_value in mapper_final() or ():
                 write_line(out_key, out_value)
 
     def run_reducer(self, step_num=0):
@@ -464,12 +516,19 @@ class MRJob(object):
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
-        reducer = steps[step_num][1]
+        step = steps[step_num]
+        reducer = step['reducer']
+        reducer_init = step['reducer_init']
+        reducer_final = step['reducer_final']
         if reducer is None:
             raise ValueError('No reducer in step %d' % step_num)
 
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'R')
+
+        if reducer_init:
+            for out_key, out_value in reducer_init() or ():
+                write_line(out_key, out_value)
 
         # group all values of the same key together, and pass to the reducer
         #
@@ -478,7 +537,11 @@ class MRJob(object):
         for key, kv_pairs in itertools.groupby(read_lines(),
                                                key=lambda(k, v): k):
             values = (v for k, v in kv_pairs)
-            for out_key, out_value in reducer(key, values):
+            for out_key, out_value in reducer(key, values) or ():
+                write_line(out_key, out_value)
+
+        if reducer_final:
+            for out_key, out_value in reducer_final() or ():
                 write_line(out_key, out_value)
 
     def show_steps(self):
@@ -497,17 +560,20 @@ class MRJob(object):
     def _steps_desc(self):
         step_num = 0
         res = []
-        for (mapper, reducer) in self.steps():
-            if reducer:
-                if mapper == _IDENTITY_MAPPER:
+        for step in self.steps():
+            mapper_funcs = ('mapper_init', 'mapper_final')
+            reducer_funcs = ('reducer', 'reducer_init', 'reducer_final')
+            if any(step[k] for k in reducer_funcs):
+                if step['mapper'] != _IDENTITY_MAPPER \
+                   or any(step[k] for k in mapper_funcs):
+                    res.append('MR')
+                else:
                     # infer whether the mapper has the same input and 
                     # output protocols 
                     if step_num == 0:
                         res.append('MR')
                     else:
                         res.append('R')
-                else:
-                    res.append('MR')
             else:
                 res.append('M')
             step_num += 1
@@ -622,7 +688,7 @@ class MRJob(object):
     ### Command-line arguments ###
 
     def configure_options(self):
-        """Define arguments for this script. Called from ``__init__()``.
+        """Define arguments for this script. Called from :py:meth:`__init__()`.
 
         Run ``python -m mrjob.job.MRJob --help`` to see all options.
 
@@ -853,6 +919,11 @@ class MRJob(object):
             help='Region to connect to S3 and EMR on (e.g. us-west-1).')
 
         self.emr_opt_group.add_option(
+            '--bootstrap-action', dest='bootstrap_actions', action='append',
+            default=[],
+            help='Raw bootstrap action scripts to run before any of the other bootstrap steps. You can use --bootstrap-action more than once. Local scripts will be automatically uploaded to S3. To specify arguments, just use quotes: "foo.sh arg1 arg2"')
+
+        self.emr_opt_group.add_option(
             '--bootstrap-cmd', dest='bootstrap_cmds', action='append',
             default=[],
             help='Commands to run on the master node to set up libraries, etc. You can use --bootstrap-cmd more than once. Use mrjob.conf to specify arguments as a list to be run directly.')
@@ -865,7 +936,7 @@ class MRJob(object):
         self.emr_opt_group.add_option(
             '--bootstrap-python-package', dest='bootstrap_python_packages', action='append',
             default=[],
-            help='Path to a Python module to install on EMR. These should be standard python module tarballs. If a module is named foo.tar.gz, we expect to be able to run tar xfz foo.tar.gz; cd foo; sudo python setup.py install. You can use --bootstrap-python-packages more than once.')
+            help='Path to a Python module to install on EMR. These should be standard python module tarballs where you can cd into a subdirectory and run ``sudo python setup.py install``. You can use --bootstrap-python-package more than once.')
 
         self.emr_opt_group.add_option(
             '--bootstrap-script', dest='bootstrap_scripts', action='append',
@@ -1237,7 +1308,7 @@ class MRJob(object):
 
             @classmethod
             def protocols(cls):
-                protocol_dict = super(MRYourJob, self).protocols()
+                protocol_dict = super(MRYourJob, cls).protocols()
                 protocol_dict['rot13'] = Rot13Protocol
                 return protocol_dict
 
@@ -1348,7 +1419,7 @@ class MRJob(object):
 
         return self
 
-    def parse_counters(self):
+    def parse_counters(self, counters=None):
         """Convenience method for reading counters. This only works
         in sandbox mode. This does not clear ``self.stderr``.
 
@@ -1360,7 +1431,8 @@ class MRJob(object):
         if self.stderr == sys.stderr:
             raise AssertionError('You must call sandbox() first; parse_counters() is for testing only.')
 
-        return parse_mr_job_stderr(self.stderr.getvalue())['counters']
+        stderr_results = parse_mr_job_stderr(self.stderr.getvalue(), counters)
+        return stderr_results['counters']
 
     def parse_output(self, protocol=DEFAULT_PROTOCOL):
         """Convenience method for parsing output from any mapper or reducer,

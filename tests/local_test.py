@@ -29,6 +29,7 @@ import tempfile
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import cmd_line
+from tests.mr_counting_job import MRCountingJob
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_test_jobconf import MRJobConfTest
 from tests.mr_test_jobconf_old import MRJobConfTestOld
@@ -178,6 +179,25 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
                     ['1\tbar\n', '1\tbar\n', '1\tbar\n', '2\tfoo\n', '2\tfoo\n',
                      '2\tfoo\n', '3\tqux\n', '3\tqux\n', '3\tqux\n'])
         
+    def test_multi_step_counters(self):
+        # read from STDIN, a regular file, and a .gz
+        stdin = StringIO('foo\nbar\n')
+
+        mr_job = MRCountingJob(['-c', self.mrjob_conf_path, '-'])
+        mr_job.sandbox(stdin=stdin)
+
+        results = []
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+            assert_equal(runner._counters, [{'group': {'counter_name': 2}},
+                                            {'group': {'counter_name': 2}},
+                                            {'group': {'counter_name': 2}}])
 
 class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):
     """Test systems without os.symlink (e.g. Windows). See Issue #46"""
@@ -227,13 +247,13 @@ class LargeAmountsOfStderrTestCase(TestCase):
 
             # look for expected output from MRVerboseJob
             stderr = mr_job.stderr.getvalue()
-            assert_in("counters: [{'Foo': {'Bar': 10000}}]\n", stderr)
+            assert_in("Counters from step 1:\n  Foo:\n    Bar: 10000", stderr)
             assert_in('status: 0\n', stderr)
             assert_in('status: 99\n', stderr)
             assert_not_in('status: 100\n', stderr)
             assert_in('STDERR: Qux\n', stderr)
             # exception should appear in exception message
-            assert_in('BOOM', e.message)
+            assert_in('BOOM', repr(e))
         else:
             raise AssertionError()
 

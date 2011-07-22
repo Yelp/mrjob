@@ -98,7 +98,7 @@ class FindMiscTestCase(TestCase):
             find_interesting_hadoop_streaming_error(line for line in LOG_LINES),
             'Error launching job , Output path already exists : Output directory s3://yourbucket/logs/2010/07/23/ already exists and is not empty')
     
-    def test_find_timeout_error(self):
+    def test_find_timeout_error_1(self):
         LOG_LINES = [
             'Task TASKID="task_201010202309_0001_m_000153" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1287618918658" ERROR="Task attempt_201010202309_0001_m_000153_3 failed to report status for 602 seconds. Killing!"',
             'Task blahblah',
@@ -106,7 +106,8 @@ class FindMiscTestCase(TestCase):
         ]
         
         assert_equal(find_timeout_error(LOG_LINES), 602)
-        
+
+    def test_find_timeout_error_2(self):
         LOG_LINES = [
             'Job JOBID="job_201105252346_0001" LAUNCH_TIME="1306367213950" TOTAL_MAPS="2" TOTAL_REDUCES="1" ',
             'Task TASKID="task_201105252346_0001_m_000000" TASK_TYPE="MAP" START_TIME="1306367217455" SPLITS="/default-rack/localhost" ',
@@ -115,6 +116,13 @@ class FindMiscTestCase(TestCase):
         ]
         
         assert_equal(find_timeout_error(LOG_LINES), 0)
+
+    def test_find_timeout_error_3(self):
+       LOG_LINES = [
+           'MapAttempt TASK_TYPE="MAP" TASKID="task_201107201804_0001_m_000160" TASK_ATTEMPT_ID="attempt_201107201804_0001_m_000160_0" TASK_STATUS="FAILED" FINISH_TIME="1311188233290" HOSTNAME="/default-rack/ip-10-160-243-66.us-west-1.compute.internal" ERROR="Task attempt_201107201804_0001_m_000160_0 failed to report status for 1201 seconds. Killing!"  '
+       ]
+
+       assert_equal(find_timeout_error(LOG_LINES), 1201)
 
     def test_find_counters_0_18(self):
         counters = parse_hadoop_counters_from_line('Job JOBID="job_201106061823_0001" FINISH_TIME="1307384737542" JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1" FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="File Systems.S3N bytes read:3726,File Systems.Local bytes read:4164,File Systems.S3N bytes written:1663,File Systems.Local bytes written:8410,Job Counters .Launched reduce tasks:1,Job Counters .Rack-local map tasks:2,Job Counters .Launched map tasks:2,Map-Reduce Framework.Reduce input groups:154,Map-Reduce Framework.Combine output records:0,Map-Reduce Framework.Map input records:68,Map-Reduce Framework.Reduce output records:154,Map-Reduce Framework.Map output bytes:3446,Map-Reduce Framework.Map input bytes:2483,Map-Reduce Framework.Map output records:336,Map-Reduce Framework.Combine input records:0,Map-Reduce Framework.Reduce input records:336,profile.reducer step 0 estimated IO time: 0.00:1,profile.mapper step 0 estimated IO time: 0.00:2,profile.reducer step 0 estimated CPU time: 0.00:1,profile.mapper step ☃ estimated CPU time: 0.00:2"')
@@ -253,4 +261,5 @@ class PortRangeListTestCase(TestCase):
 
         assert_raises(ValueError, parse_port_range_list, 'Alexandria')
         assert_raises(ValueError, parse_port_range_list, 'Athens:Alexandria')
+
 

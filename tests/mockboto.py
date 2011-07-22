@@ -293,15 +293,22 @@ class MockEmrConnection(object):
         if log_uri is not None:
             job_flow.loguri = log_uri
 
+        # setup bootstrap actions
+        if bootstrap_actions:
+            job_flow.bootstrapactions = [
+                MockEmrObject(
+                    name=action.name, path=action.path, args=action.args())
+                for action in bootstrap_actions]
+
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
         if enable_debugging:
-            debugging_step = JarStep(name='Setup Hadoop Debugging',
-                                     action_on_failure='TERMINATE_JOB_FLOW',
-                                     main_class=None,
-                                     jar=EmrConnection.DebuggingJar,
-                                     step_args=[MockEmrObject(value=EmrConnection.DebuggingArgs)])
-            debugging_step.state = 'COMPLETED'
+            debugging_step = MockEmrObject(
+                name='Setup Hadoop Debugging',
+                action_on_failure='TERMINATE_JOB_FLOW',
+                jar=EmrConnection.DebuggingJar,
+                args=[MockEmrObject(value=EmrConnection.DebuggingArgs)],
+                state='COMPLETED')
             steps.insert(0, debugging_step)
         self.add_jobflow_steps(jobflow_id, steps)
 
@@ -524,3 +531,12 @@ class MockEmrObject(object):
                     return False
 
         return True
+
+    # useful for hand-debugging tests
+    def __repr__(self):
+        return('%s.%s(%s)' % (
+            self.__class__.__module__,
+            self.__class__.__name__,
+            ', '.join('%s=%r' % (k, v)
+                      for k, v in sorted(self.__dict__.iteritems()))))
+                                        

@@ -118,7 +118,7 @@ def is_job_flow_non_streaming(job_flow):
         return False
 
     for step in job_flow.steps:
-        args = [a.value for a in step.args()]
+        args = [a.value for a in step.args]
         for arg in args:
             # This is hadoop streaming
             if arg == '-mapper':

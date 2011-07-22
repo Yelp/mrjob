@@ -20,7 +20,7 @@ import sys
 
 from mrjob.emr import EMRJobRunner, LogFetchException
 from mrjob.job import MRJob
-from mrjob.util import scrape_options_into_new_groups
+from mrjob.util import scrape_options_into_new_groups, log_to_stream
 
 
 def main():
@@ -47,6 +47,9 @@ def main():
     option_parser.add_option('-s', '--step-num', dest='step_num',
                              action='store', type='int', default=None,
                              help='Limit results to a single step. To be used with --list and --cat.')
+    option_parser.add_option('--counters', dest='get_counters',
+                             action='store_true', default=False,
+                             help='Show counters from the job flow')
 
     assignments = {
         option_parser: ('conf_path', 'quiet', 'verbose',
@@ -60,12 +63,21 @@ def main():
     scrape_options_into_new_groups(job_option_groups, assignments)
 
     options, args = option_parser.parse_args()
+
+    if not options.quiet:
+        log_to_stream(name='mrjob', debug=options.verbose)
+
     if options.step_num:
         step_nums = [options.step_num]
     else:
         step_nums = None
 
-    with EMRJobRunner(emr_job_flow_id=args[0], **options.__dict__) as runner:
+    runner_kwargs = options.__dict__.copy()
+    for unused_arg in ('quiet', 'verbose', 'list_relevant', 'list_all',
+                       'cat_relevant', 'cat_all', 'get_counters'):
+        del runner_kwargs[unused_arg]
+
+    with EMRJobRunner(emr_job_flow_id=args[0], **runner_kwargs) as runner:
         if options.list_relevant:
             list_relevant(runner, step_nums)
 
@@ -77,6 +89,11 @@ def main():
 
         if options.cat_all:
             cat_all(runner)
+
+        if options.get_counters:
+            runner._set_s3_job_log_uri(runner._describe_jobflow())
+            runner._fetch_counters(range(100))
+            runner.print_counters()
 
 
 def prettyprint_paths(paths):

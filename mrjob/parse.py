@@ -144,7 +144,7 @@ def find_interesting_hadoop_streaming_error(lines):
         return None
 
 
-_TIMEOUT_ERROR_RE = re.compile(r'Task.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds. Killing!"')
+_TIMEOUT_ERROR_RE = re.compile(r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds. Killing!"')
 
 def find_timeout_error(lines):
     """Scan a log file or other iterable for a timeout error from Hadoop.
@@ -162,7 +162,10 @@ def find_timeout_error(lines):
         match = _TIMEOUT_ERROR_RE.match(line)
         if match:
             result = match.group(1)
-    return int(result)
+    if result is not None:
+        return int(result)
+    else:
+        return None
 
 
 # recognize hadoop streaming output

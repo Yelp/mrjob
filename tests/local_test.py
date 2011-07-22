@@ -155,7 +155,7 @@ class LargeAmountsOfStderrTestCase(TestCase):
 
             # look for expected output from MRVerboseJob
             stderr = mr_job.stderr.getvalue()
-            assert_in("counters: [{'Foo': {'Bar': 10000}}]\n", stderr)
+            assert_in("Counters from step 1:\n  Foo:\n    Bar: 10000", stderr)
             assert_in('status: 0\n', stderr)
             assert_in('status: 99\n', stderr)
             assert_not_in('status: 100\n', stderr)

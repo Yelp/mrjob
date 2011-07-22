@@ -225,7 +225,7 @@ class LocalMRJobRunner(MRJobRunner):
         stderr_lines = self._process_stderr_from_script(proc.stderr, step_num=step_num)
         tb_lines = find_python_traceback(stderr_lines)
 
-        self._print_counters()
+        self.print_counters(first_step_num=1, limit_to_steps=[step_num])
 
         returncode = proc.wait()
         if returncode != 0:
@@ -263,9 +263,5 @@ class LocalMRJobRunner(MRJobRunner):
                 log.error('STDERR: %s' % line.rstrip('\n'))
                 yield line
 
-    def _print_counters(self):
-        """Log the current value of counters (if any)"""
-        if not self._counters:
-            return
-
-        log.info('counters: %s' % pprint.pformat(self._counters))
+    def counters(self):
+        return self._counters

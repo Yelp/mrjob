@@ -1082,7 +1082,8 @@ class EMRJobRunner(MRJobRunner):
         if success:
             log.info('Job completed.')
             log.info('Running time was %.1fs (not counting time spent waiting for the EC2 instances)' % total_step_time)
-            log.info('counters: %s' % pprint.pformat(self._get_counters(step_nums)))
+            self._fetch_counters(step_nums)
+            self.print_counters(first_step_num=min(step_nums))
         else:
             msg = 'Job failed with status %s: %s' % (job_state, reason)
             log.error(msg)
@@ -1174,17 +1175,17 @@ class EMRJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_name, step_num + 1)
 
-    def _get_counters(self, step_nums):
+    def _fetch_counters(self, step_nums):
         """Read Hadoop counters from S3.
 
         Args:
         step_nums -- the numbers of steps belonging to us, so that we
             can ignore errors from other jobs when sharing a job flow
         """
+        self._counters = []
+
         if not self._s3_job_log_uri:
             return None
-
-        counters = []
 
         log.info('Fetching counters...')
 
@@ -1213,10 +1214,11 @@ class EMRJobRunner(MRJobRunner):
                 for line in log_file:
                     new_counters = parse_hadoop_counters_from_line(line)
                     if new_counters:
-                        counters.append(new_counters)
+                        self._counters.append(new_counters)
                         break
 
-        return counters
+    def counters(self):
+        return self._counters
 
     def _find_probable_cause_of_failure(self, step_nums):
         """Scan logs for Python exception tracebacks.

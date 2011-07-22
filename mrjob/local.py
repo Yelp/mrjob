@@ -252,7 +252,7 @@ class LocalMRJobRunner(MRJobRunner):
         for line in stderr:
             # just pass one line at a time to parse_mr_job_stderr(),
             # so we can print error and status messages in realtime
-            parsed = parse_mr_job_stderr([line], counters=self._counters[step_num-1])
+            parsed = parse_mr_job_stderr([line], counters=self._counters[step_num])
 
             # in practice there's only going to be at most one line in
             # one of these lists, but the code is cleaner this way

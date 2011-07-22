@@ -918,6 +918,11 @@ class MRJob(object):
             help='Region to connect to S3 and EMR on (e.g. us-west-1).')
 
         self.emr_opt_group.add_option(
+            '--bootstrap-action', dest='bootstrap_actions', action='append',
+            default=[],
+            help='Raw bootstrap action scripts to run before any of the other bootstrap steps. You can use --bootstrap-action more than once. Local scripts will be automatically uploaded to S3. To specify arguments, just use quotes: "foo.sh arg1 arg2"')
+
+        self.emr_opt_group.add_option(
             '--bootstrap-cmd', dest='bootstrap_cmds', action='append',
             default=[],
             help='Commands to run on the master node to set up libraries, etc. You can use --bootstrap-cmd more than once. Use mrjob.conf to specify arguments as a list to be run directly.')
@@ -930,7 +935,7 @@ class MRJob(object):
         self.emr_opt_group.add_option(
             '--bootstrap-python-package', dest='bootstrap_python_packages', action='append',
             default=[],
-            help='Path to a Python module to install on EMR. These should be standard python module tarballs. If a module is named foo.tar.gz, we expect to be able to run tar xfz foo.tar.gz; cd foo; sudo python setup.py install. You can use --bootstrap-python-packages more than once.')
+            help='Path to a Python module to install on EMR. These should be standard python module tarballs where you can cd into a subdirectory and run ``sudo python setup.py install``. You can use --bootstrap-python-package more than once.')
 
         self.emr_opt_group.add_option(
             '--bootstrap-script', dest='bootstrap_scripts', action='append',
@@ -1302,7 +1307,7 @@ class MRJob(object):
 
             @classmethod
             def protocols(cls):
-                protocol_dict = super(MRYourJob, self).protocols()
+                protocol_dict = super(MRYourJob, cls).protocols()
                 protocol_dict['rot13'] = Rot13Protocol
                 return protocol_dict
 
@@ -1413,7 +1418,7 @@ class MRJob(object):
 
         return self
 
-    def parse_counters(self):
+    def parse_counters(self, counters=None):
         """Convenience method for reading counters. This only works
         in sandbox mode. This does not clear ``self.stderr``.
 
@@ -1425,7 +1430,8 @@ class MRJob(object):
         if self.stderr == sys.stderr:
             raise AssertionError('You must call sandbox() first; parse_counters() is for testing only.')
 
-        return parse_mr_job_stderr(self.stderr.getvalue())['counters']
+        stderr_results = parse_mr_job_stderr(self.stderr.getvalue(), counters)
+        return stderr_results['counters']
 
     def parse_output(self, protocol=DEFAULT_PROTOCOL):
         """Convenience method for parsing output from any mapper or reducer,

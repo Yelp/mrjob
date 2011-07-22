@@ -352,6 +352,10 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
         with mr_job.make_runner() as runner:
             runner.run()
 
+            # Issue 182: don't create the bootstrap script when
+            # attaching to another job flow
+            assert_equal(runner._master_bootstrap_script, None)
+
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
                 results.append((key, value))
@@ -440,10 +444,10 @@ class BucketRegionTestCase(MockEMRAndS3TestCase):
 
     def test_region_nobucket_nolocation(self):
         # aws_region specified, no bucket specified, default bucket has no location
-        j = EMRJobRunner(aws_region='PUPPYLAND', 
+        j = EMRJobRunner(aws_region='PUPPYLAND',
                          s3_endpoint='PUPPYLAND',
                          conf_path=False)
-        assert_equal(j._opts['s3_scratch_uri'], self.bucket1_uri)
+        assert_not_equal(j._opts['s3_scratch_uri'], self.bucket1_uri)
 
     def test_region_nobucket_nomatchexists(self):
         # aws_region specified, no bucket specified, no buckets have matching region
@@ -487,14 +491,14 @@ class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
 
     def test_region_nobucket_matchexists(self):
         # aws_region specified, no bucket specified, bucket exists with matching region
-        j = EMRJobRunner(aws_region='PUPPYLAND', 
-                         s3_endpoint='PUPPYLAND',
+        j = EMRJobRunner(aws_region='KITTYLAND',
+                         s3_endpoint='KITTYLAND',
                          conf_path=False)
-        assert_equal(j._opts['s3_scratch_uri'], self.bucket1_uri)
+        assert_equal(j._opts['s3_scratch_uri'], self.bucket2_uri)
 
     def test_region_bucket_match(self):
         # aws_region specified, bucket specified with matching location
-        j = EMRJobRunner(aws_region='PUPPYLAND', 
+        j = EMRJobRunner(aws_region='PUPPYLAND',
                          s3_endpoint='PUPPYLAND',
                          s3_scratch_uri=self.bucket1_uri,
                          conf_path=False)
@@ -1077,7 +1081,7 @@ class TestNoBoto(TestCase):
                       conf_path=False, s3_scratch_uri='s3://foo/tmp')
 
 
-class TestMasterBootstrapScript(MockEMRAndS3TestCase):
+class TestBootstrapScripts(MockEMRAndS3TestCase):
 
     @setup
     def make_tmp_dir(self):
@@ -1109,11 +1113,93 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_path=False, bootstrap_mrjob=False)
         script_path = os.path.join(self.tmp_dir, 'b.py')
-        runner._create_master_bootstrap_script(dest=script_path)
 
+        runner._create_master_bootstrap_script(dest=script_path)
         assert not os.path.exists(script_path)
 
-     
+        # bootstrap actions don't figure into the master bootstrap script
+        runner = EMRJobRunner(conf_path=False,
+                              bootstrap_mrjob=False,
+                              bootstrap_actions=['foo', 'bar baz'])
+        runner._create_master_bootstrap_script(dest=script_path)
+        assert not os.path.exists(script_path)
+
+
+    def test_bootstrap_actions_get_added(self):
+        bootstrap_actions = [
+            's3://elasticmapreduce/bootstrap-actions/configure-hadoop -m,mapred.tasktracker.map.tasks.maximum=1',
+            's3://foo/bar#xyzzy', # use alternate name for script
+        ]
+
+        runner = EMRJobRunner(conf_path=False,
+                              bootstrap_actions=bootstrap_actions,
+                              s3_sync_wait_time=0.01)
+
+        job_flow_id = runner.make_persistent_job_flow()
+
+        emr_conn = runner.make_emr_conn()
+        job_flow = emr_conn.describe_jobflow(job_flow_id)
+        actions = job_flow.bootstrapactions
+
+        assert_equal(len(actions), 3)
+
+        assert_equal(
+            actions[0].path,
+            's3://elasticmapreduce/bootstrap-actions/configure-hadoop')
+        assert_equal(
+            actions[0].args,
+            ['-m,mapred.tasktracker.map.tasks.maximum=1'])
+        assert_equal(actions[0].name, 'configure-hadoop')
+
+        assert_equal(actions[1].path, 's3://foo/bar')
+        assert_equal(actions[1].args, [])
+        assert_equal(actions[1].name, 'xyzzy')
+
+        # check for master bootstrap script
+        assert actions[2].path.startswith('s3://mrjob-')
+        assert actions[2].path.endswith('b.py')
+        assert_equal(actions[2].args, [])
+        assert_equal(actions[2].name, 'master')
+
+        # make sure master bootstrap script is on S3
+        assert runner.path_exists(actions[2].path)
+
+    def test_local_bootstrap_action(self):
+        # make sure that local bootstrap action scripts get uploaded to S3
+        action_path = os.path.join(self.tmp_dir, 'apt-install.sh')
+        with open(action_path, 'w') as f:
+            f.write('for $pkg in $@; do sudo apt-get install $pkg; done\n')
+
+        bootstrap_actions = [
+            action_path + ' python-scipy mysql-server']
+
+        runner = EMRJobRunner(conf_path=False,
+                              bootstrap_actions=bootstrap_actions,
+                              s3_sync_wait_time=0.01)
+
+        job_flow_id = runner.make_persistent_job_flow()
+
+        emr_conn = runner.make_emr_conn()
+        job_flow = emr_conn.describe_jobflow(job_flow_id)
+        actions = job_flow.bootstrapactions
+
+        assert_equal(len(actions), 2)
+
+        assert actions[0].path.startswith('s3://mrjob-')
+        assert actions[0].path.endswith('/apt-install.sh')
+        assert_equal(actions[0].name, 'apt-install.sh')
+        assert_equal(actions[0].args, ['python-scipy', 'mysql-server'])
+
+        # check for master boostrap script
+        assert actions[1].path.startswith('s3://mrjob-')
+        assert actions[1].path.endswith('b.py')
+        assert_equal(actions[1].args, [])
+        assert_equal(actions[1].name, 'master')
+
+        # make sure master bootstrap script is on S3
+        assert runner.path_exists(actions[1].path)
+
+
 class EMRNoMapperTest(MockEMRAndS3TestCase):
     @setup
     def make_tmp_dir(self):

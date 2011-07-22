@@ -33,7 +33,21 @@ from mrjob.parse import parse_mr_job_stderr
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_nomapper_multistep import MRNoMapper
+from tests.quiet import logger_disabled
 
+
+def stepdict(mapper=_IDENTITY_MAPPER, reducer=None,
+             mapper_init=None, mapper_final=None, 
+             reducer_init=None, reducer_final=None,
+             **kwargs):
+    d = dict(mapper=mapper,
+             mapper_init=mapper_init,
+             mapper_final=mapper_final,
+             reducer=reducer,
+             reducer_init=reducer_init,
+             reducer_final=reducer_final)
+    d.update(kwargs)
+    return d
 
 ### Test classes ###
 
@@ -55,6 +69,50 @@ class MRFinalBoringJob(MRBoringJob):
 
     def mapper_final(self):
         yield('num_lines', self.num_lines)
+
+
+class MRInitJob(MRJob):
+
+    def __init__(self, *args, **kwargs):
+        super(MRInitJob, self).__init__(*args, **kwargs)
+        self.sum_amount = 0
+        self.multiplier = 0
+
+    def mapper_init(self):
+        self.sum_amount += 10
+
+    def mapper(self, key, value):
+        yield(None, self.sum_amount)
+
+    def reducer_init(self):
+        self.multiplier += 10
+
+    def reducer(self, key, values):
+        yield(None, sum(values)*self.multiplier)
+
+
+class MRInvisibleMapperJob(MRJob):
+
+    def mapper_init(self):
+        self.things = 0
+
+    def mapper(self, key, value):
+        self.things += 1
+
+    def mapper_final(self):
+        yield None, self.things
+
+
+class MRInvisibleReducerJob(MRJob):
+
+    def reducer_init(self):
+        self.things = 0
+
+    def reducer(self, key, values):
+        self.things += len(list(values))
+
+    def reducer_final(self):
+        yield None, self.things
 
 
 class MRCustomBoringJob(MRBoringJob):
@@ -93,23 +151,97 @@ class MRTestCase(TestCase):
     def test_mr(self):
 
         def mapper(k, v): pass
-        def mapper_final(k, v): pass
+        def mapper_init(): pass
+        def mapper_final(): pass
         def reducer(k, vs): pass
+        def reducer_init(): pass
+        def reducer_final(): pass
 
         # make sure it returns the format we currently expect
-        assert_equal(MRJob.mr(mapper, reducer), (mapper, reducer))
-        assert_equal(MRJob.mr(mapper, reducer, mapper_final=mapper_final),
-                     ((mapper, mapper_final), reducer))
-        assert_equal(MRJob.mr(mapper), (mapper, None))
+        assert_equal(MRJob.mr(mapper, reducer),
+                     stepdict(mapper, reducer))
+        assert_equal(MRJob.mr(mapper, reducer,
+                              mapper_init=mapper_init,
+                              mapper_final=mapper_final,
+                              reducer_init=reducer_init,
+                              reducer_final=reducer_final),
+                     stepdict(mapper, reducer,
+                              mapper_init=mapper_init,
+                              mapper_final=mapper_final,
+                              reducer_init=reducer_init,
+                              reducer_final=reducer_final))
+        assert_equal(MRJob.mr(mapper),
+                     stepdict(mapper))
 
     def test_no_mapper(self):
-        def mapper_final(k, v): pass
+        def mapper_init(): pass
+        def mapper_final(): pass
         def reducer(k, vs): pass
 
         assert_raises(Exception, MRJob.mr)
-        assert_equal(MRJob.mr(reducer=reducer), (_IDENTITY_MAPPER, reducer))
-        assert_equal(MRJob.mr(reducer=reducer, mapper_final=mapper_final),
-                     ((_IDENTITY_MAPPER, mapper_final), reducer))
+        assert_equal(MRJob.mr(reducer=reducer),
+                     stepdict(reducer=reducer))
+        assert_equal(MRJob.mr(reducer=reducer,
+                              mapper_final=mapper_final),
+                     stepdict(reducer=reducer,
+                              mapper_final=mapper_final))
+        assert_equal(MRJob.mr(reducer=reducer,
+                              mapper_init=mapper_init),
+                     stepdict(reducer=reducer,
+                              mapper_init=mapper_init))
+
+    def test_no_reducer(self):
+        def reducer_init(): pass
+        def reducer_final(): pass
+
+        assert_equal(MRJob.mr(reducer_init=reducer_init),
+                     stepdict(reducer_init=reducer_init))
+        assert_equal(MRJob.mr(reducer_final=reducer_final),
+                     stepdict(reducer_final=reducer_final))
+
+
+class MRInitTestCase(TestCase):
+
+    def test_init_funcs(self):
+        num_inputs = 2
+        stdin = StringIO("x\n" * num_inputs)
+        mr_job = MRInitJob(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
+        results = []
+        with mr_job.make_runner() as runner:
+            runner.run()
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append(value)
+        # these numbers should match if mapper_init and reducer_Init were
+        # called as expected
+        assert_equal(results[0], num_inputs*10*10)
+
+
+class MRNoOutputTestCase(TestCase):
+
+    def test_no_map(self):
+        num_inputs = 2
+        stdin = StringIO("x\n" * num_inputs)
+        mr_job = MRInvisibleMapperJob(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
+        results = []
+        with mr_job.make_runner() as runner:
+            runner.run()
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append(value)
+        assert_equal(results[0], num_inputs)
+
+    def test_no_reduce(self):
+        num_inputs = 2
+        stdin = StringIO("x\n" * num_inputs)
+        mr_job = MRInvisibleReducerJob(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
+        results = []
+        with mr_job.make_runner() as runner:
+            runner.run()
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append(value)
+        assert_equal(results[0], num_inputs)
 
 
 class NoTzsetTestCase(TestCase):
@@ -350,12 +482,14 @@ class StepsTestCase(TestCase):
     def test_auto_build_steps(self):
         mrbj = MRBoringJob()
         assert_equal(mrbj.steps(),
-                     [mrbj.mr(mrbj.mapper, mrbj.reducer)])
+                     [stepdict(mapper=mrbj.mapper,
+                               reducer=mrbj.reducer)])
 
         mrfbj = MRFinalBoringJob()
         assert_equal(mrfbj.steps(),
-                     [mrfbj.mr(mrfbj.mapper, mrfbj.reducer,
-                                mapper_final=mrfbj.mapper_final)])
+                     [stepdict(mapper=mrfbj.mapper,
+                               mapper_final=mrfbj.mapper_final,
+                               reducer=mrfbj.reducer)])
 
     def test_show_steps(self):
         mr_boring_job = MRBoringJob(['--steps'])
@@ -373,7 +507,7 @@ class StepsTestCase(TestCase):
         mr_two_step_job.sandbox()
         mr_two_step_job.show_steps()
         assert_equal(mr_two_step_job.stdout.getvalue(), 'MR M\n')
-        
+
         mr_no_mapper = MRNoMapper(['--steps'])
         mr_no_mapper.sandbox()
         mr_no_mapper.show_steps()
@@ -612,16 +746,17 @@ class FileOptionsTestCase(TestCase):
 
         mr_job.sandbox(stdin=stdin)
 
-        with mr_job.make_runner() as runner:
-            assert isinstance(runner, LocalMRJobRunner)
-            # make sure our file gets "uploaded"
-            assert [fd for fd in runner._files if fd['path'] == n_file_path]
+        with logger_disabled('mrjob.local'):
+            with mr_job.make_runner() as runner:
+                assert isinstance(runner, LocalMRJobRunner)
+                # make sure our file gets "uploaded"
+                assert [fd for fd in runner._files if fd['path'] == n_file_path]
 
-            runner.run()
-            output = set()
-            for line in runner.stream_output():
-                _, value = mr_job.parse_output_line(line)
-                output.add(value)
+                runner.run()
+                output = set()
+                for line in runner.stream_output():
+                    _, value = mr_job.parse_output_line(line)
+                    output.add(value)
 
         assert_equal(set(output), set([0, 1, ((2**3)**3)**3]))
 

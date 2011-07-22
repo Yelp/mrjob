@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ from __future__ import with_statement
 
 import bz2
 import gzip
+import optparse
 import os
 import shutil
 import stat
@@ -48,6 +49,52 @@ class FileExtTestCase(TestCase):
         assert_equal(file_ext('README'), '')
         assert_equal(file_ext('README,v'), '')
         assert_equal(file_ext('README.txt,v'), '.txt,v')
+
+class OptionScrapingTestCase(TestCase):
+
+    @setup
+    def setup_options(self):
+        self.original_parser = optparse.OptionParser(usage="don't", description='go away')
+        self.original_group = optparse.OptionGroup(self.original_parser, '?')
+        self.original_parser.add_option_group(self.original_group)
+
+        self.original_parser.add_option('-b', '--no-a', dest='a', action='store_false')
+        self.original_parser.add_option('-a', '--yes-a', dest='a', action='store_true', default=False)
+        self.original_group.add_option('-x', '--xx', dest='x', action='store')
+        self.original_group.add_option('-y', '--yy', dest='y', action='store')
+
+        self.new_parser = optparse.OptionParser()
+        self.new_group_1 = optparse.OptionGroup(self.new_parser, '?')
+        self.new_group_2 = optparse.OptionGroup(self.new_parser, '?')
+        self.new_parser.add_option_group(self.new_group_1)
+        self.new_parser.add_option_group(self.new_group_2)
+
+    def test_scrape_all(self):
+        assignments = {
+            self.new_parser: ('a',),
+            self.new_group_1: ('x', 'y'),
+        }
+        old_groups = (self.original_parser, self.original_group)
+        scrape_options_into_new_groups(old_groups, assignments)
+        assert_equal(self.original_parser.option_list[1:], self.new_parser.option_list[1:])
+        assert_equal(self.original_group.option_list, self.new_group_1.option_list)
+
+    def test_scrape_different(self):
+        assignments = {
+            self.new_parser: ('x',),
+            self.new_group_1: ('y',),
+            self.new_group_2: ('a',),
+        }
+        old_groups = (self.original_parser, self.original_group)
+        scrape_options_into_new_groups(old_groups, assignments)
+        target_1 = self.original_group.option_list[:1]
+        target_2 = self.original_group.option_list[1:]
+        target_3 = self.original_parser.option_list[1:]
+        assert_equal(target_1, self.new_parser.option_list[1:])
+        assert_equal(target_2, self.new_group_1.option_list)
+        assert_equal(target_3, self.new_group_2.option_list)
+        options, args = self.new_parser.parse_args(['-x', 'happy'])
+        assert_equal(options.x, 'happy')
 
 
 class ReadInputTestCase(TestCase):

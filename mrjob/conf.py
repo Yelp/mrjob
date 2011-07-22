@@ -17,9 +17,20 @@ for :py:mod:`mrjob`.
 
 We look for :file:`mrjob.conf` in these locations:
 
-- :file:`~/.mrjob`
-- :file:`mrjob.conf` anywhere in your :envvar:`PYTHONPATH`
+- The location specified by :envvar:`MRJOB_CONF`
+- :file:`~/.mrjob.conf`
+- :file:`~/.mrjob` (deprecated)
+- :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH` (deprecated)
 - :file:`/etc/mrjob.conf`
+
+If your :file:`mrjob.conf` path is deprecated, use this table to fix it:
+
+================================= ===============================
+Old Location                      New Location
+================================= ===============================
+:file:`~/.mrjob`                  :file:`~/.mrjob.conf`
+somewhere in :envvar:`PYTHONPATH` Specify in :envvar:`MRJOB_CONF`
+================================= ===============================
 
 The point of :file:`mrjob.conf` is to let you set up things you want every
 job to have access to so that you don't have to think about it. For example:
@@ -45,7 +56,7 @@ Now whenever you run ``mr_your_script.py -r emr``,
 
 Options specified on the command-line take precedence over
 :file:`mrjob.conf`. Usually this means simply overriding the option in
-:file:`mrjob.conf`. However, we know that *cmdenv*, contains environment
+:file:`mrjob.conf`. However, we know that *cmdenv* contains environment
 variables, so we do the right thing. For example, if your :file:`mrjob.conf`
 contained:
 
@@ -123,26 +134,40 @@ log = logging.getLogger('mrjob.conf')
 def find_mrjob_conf():
     """Look for :file:`mrjob.conf`, and return its path. Places we look:
 
-    - :file:`~/.mrjob`
-    - :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH`
+    - The location specified by :envvar:`MRJOB_CONF`
+    - :file:`~/.mrjob.conf`
+    - :file:`~/.mrjob` (deprecated)
+    - :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH` (deprecated)
     - :file:`/etc/mrjob.conf`
 
-    Return ``None`` if we can't find it.
+    Return ``None`` if we can't find it. Print a warning if its location is
+    deprecated.
     """
     def candidates():
-        # $HOME isn't necessarily set on Windows, but ~ works
-        yield expand_path('~/.mrjob')
+        """Return (path, deprecation_warning)"""
+        if os.environ.has_key('MRJOB_CONF'):
+            yield (expand_path(os.environ['MRJOB_CONF']), None)
 
+        # $HOME isn't necessarily set on Windows, but ~ works
+        yield (expand_path('~/.mrjob.conf'), None)
+
+        # DEPRECATED:
+        yield (expand_path('~/.mrjob'), 'use ~/.mrjob.conf instead.')
         if os.environ.get('PYTHONPATH'):
             for dirname in os.environ['PYTHONPATH'].split(os.pathsep):
-                yield os.path.join(dirname, 'mrjob.conf')
+                yield (os.path.join(dirname, 'mrjob.conf'),
+                      'Use $MRJOB_CONF to explicitly specify the path'
+                       ' instead.')
 
-        yield '/etc/mrjob.conf'
+        yield ('/etc/mrjob.conf', None)
 
-    for path in candidates():
+    for path, deprecation_message in candidates():
         log.debug('looking for configs in %s' % path)
         if os.path.exists(path):
             log.info('using configs in %s' % path)
+            if deprecation_message:
+                log.warning('This config path is deprecated and will stop'
+                            ' working in mrjob 0.4. %s' % deprecation_message)
             return path
     else:
         log.info("no configs found; falling back on auto-configuration")

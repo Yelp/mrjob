@@ -75,9 +75,10 @@ class MRJobRunner(object):
     Each runner runs a single job once; if you want to run a job multiple
     times, make multiple runners.
 
-    Subclasses: :py:class:`~mrjob.local.LocalMRJobRunner`,
-    :py:class:`~mrjob.emr.EMRJobRunner`,
-    :py:class:`~mrjob.hadoop.HadoopJobRunner`
+    Subclasses: :py:class:`~mrjob.emr.EMRJobRunner`,
+    :py:class:`~mrjob.hadoop.HadoopJobRunner`,
+    :py:class:`~mrjob.inline.InlineJobRunner`,
+    :py:class:`~mrjob.local.LocalMRJobRunner`
     """
 
     #: alias for this runner; used for picking section of
@@ -395,6 +396,43 @@ class MRJobRunner(object):
         if (mode == 'ALL' or
             (mode == 'IF_SUCCESSFUL' and self._ran_job)):
             self._cleanup_logs()
+
+    def counters(self):
+        """Get counters associated with this run in this form:
+
+            [{'group name': {'counter1': 1, 'counter2': 2}},
+             {'group name': ...]
+
+        The first step of *this run* will be the first item. This means that
+        if your job has 3 steps and was attached to a job flow with 3
+        already-completed steps, this list will still only contain 3
+        dictionaries.
+        """
+        return []
+
+    def print_counters(self, first_step_num=0, limit_to_steps=None):
+        """Display this run's counters in a user-friendly way.
+
+        :type first_step_num: int
+        :param first_step_num: Display step number of the counters from the first step
+        :type limit_to_steps: list of int
+        :param limit_to_steps: List of step numbers *relative to this job* to print, indexed from 0
+        """
+        if limit_to_steps:
+            counters = self.counters()
+            counter_iter = [(step_num, counters[step_num]) \
+                            for step_num in limit_to_steps]
+        else:
+            counter_iter = enumerate(self.counters())
+
+        for step_num, step_counters in counter_iter:
+            log.info('Counters from step %d:' % (step_num + first_step_num))
+            for group_name in sorted(step_counters.keys()):
+                log.info('  %s:' % group_name)
+                group_counters = step_counters[group_name]
+                for counter_name in sorted(group_counters.keys()):
+                    log.info('    %s: %d' % (counter_name,
+                                             group_counters[counter_name]))
 
     ### hooks for the with statement ###
 
@@ -741,7 +779,7 @@ class MRJobRunner(object):
                 steps = stdout.strip().split(' ')
 
                 # verify that this is a proper step description
-                if not steps:
+                if not steps or not stdout:
                     raise ValueError('step description is empty!')
                 for step in steps:
                     if step not in ('MR', 'M', 'R'):

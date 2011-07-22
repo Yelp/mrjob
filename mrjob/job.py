@@ -1229,7 +1229,7 @@ class MRJob(object):
         hadoop or executed via subprocess.
 
         These are passed to :py:meth:`mrjob.runner.MRJobRunner.__init__`
-        as ``extra_args``.
+        as *extra_args*.
         """
         output_args = []
 
@@ -1255,9 +1255,9 @@ class MRJob(object):
         return output_args
 
     def _capture_args(self, option, opt, output_args, rargs, func):
-        """Extend `output_args` with the difference in `rargs` before and
-        after calling `func()`. option is the Option object and `opt` is the
-        option string to append to `output_args` before the `rargs`
+        """Extend *output_args* with the difference in *rargs* before and
+        after calling *func()*. option is the Option object and *opt* is the
+        option string to append to *output_args* before the *rargs*
         difference.
         """
         if option in self._passthrough_options:

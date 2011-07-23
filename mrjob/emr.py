@@ -591,9 +591,6 @@ class EMRJobRunner(MRJobRunner):
 
         self._launch_emr_job()
         self._wait_for_job_to_complete()
-        
-        # make sure the job had a chance to copy all our data to S3
-        self._wait_for_s3_eventual_consistency()
 
     def _setup_input(self):
         """Copy local input files (if any) to a special directory on S3.

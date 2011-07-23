@@ -834,7 +834,8 @@ class EMRJobRunner(MRJobRunner):
         except boto.exception.S3ResponseError:
             # mockboto throws this for some reason
             return
-        while jobflow.state not in ('TERMINATED', 'COMPLETED', 'FAILED'):
+        while jobflow.state not in ('TERMINATED', 'COMPLETED', 'FAILED',
+                                    'SHUTTING_DOWN'):
             msg = 'Waiting for job flow to terminate (currently %s)' % \
                                                          jobflow.state
             log.info(msg)

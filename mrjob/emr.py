@@ -1361,7 +1361,7 @@ class EMRJobRunner(MRJobRunner):
             return None
         return self.ls(self._s3_job_log_uri)
 
-    def _fetch_counters(self, step_nums):
+    def _fetch_counters(self, step_nums, skip_s3_wait=False):
         """Read Hadoop counters from S3.
 
         Args:
@@ -1382,7 +1382,8 @@ class EMRJobRunner(MRJobRunner):
 
             log.info('Fetching counters from S3...')
 
-            self._wait_for_s3_eventual_consistency()
+            if not skip_s3_wait:
+                self._wait_for_s3_eventual_consistency()
             self._wait_for_job_flow_termination()
 
             uris = self.s3_list_logs([JOB_LOGS], step_nums)
@@ -1408,11 +1409,12 @@ class EMRJobRunner(MRJobRunner):
             if not log_lines:
                 continue
 
-            for line in log_lines:
-                new_counters = parse_hadoop_counters_from_line(line)
-                if new_counters:
-                    self._counters.append(new_counters)
-                    break
+            for maybe_double_line in log_lines:
+                for line in maybe_double_line.split('\n'):
+                    new_counters = parse_hadoop_counters_from_line(line)
+                    if new_counters:
+                        self._counters.append(new_counters)
+                        break
 
     def counters(self):
         return self._counters

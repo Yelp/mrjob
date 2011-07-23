@@ -219,8 +219,7 @@ def parse_mr_job_stderr(stderr, counters=None):
 # We just want to pull out the counter string, which varies between 
 # Hadoop versions.
 _KV_EXPR = r'\s+\w+=".*?"'  # this matches KEY="VALUE"
-_COUNTER_LINE_EXPR = r'Job(%s)*\s+COUNTERS="%s"' % (_KV_EXPR,
-                                                    r'(?P<counters>.*?)')
+_COUNTER_LINE_EXPR = r'^.*?COUNTERS="%s".*?$' % r'(?P<counters>.*?)'
 _COUNTER_LINE_RE = re.compile(_COUNTER_LINE_EXPR)
 
 # 0.18-specific

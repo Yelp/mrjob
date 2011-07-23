@@ -649,16 +649,17 @@ class CommandLineArgsTest(TestCase):
         assert_equal(mr_job.options.extra_special_args, ['you', 'me'])
         assert_equal(mr_job.options.strict_protocols, True)
         assert_equal(mr_job.generate_passthrough_arguments(),
-                     ['-p', 'repr',
-                      '--foo-size', '9',
+                     [
                       '--bar-name', 'Alembic',
                       '--enable-baz-mode',
-                      '--disable-quuxing',
+                      '--extra-special-arg', 'you',
+                      '--extra-special-arg', 'me',
+                      '--foo-size', '9',
                       '--pill-type', 'red',
                       '--planck-constant', '1',
                       '--planck-constant', '42',
-                      '--extra-special-arg', 'you',
-                      '--extra-special-arg', 'me',
+                      '-p', 'repr',
+                      '--disable-quuxing',
                       '--strict-protocols',
                       ])
 

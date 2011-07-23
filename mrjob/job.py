@@ -93,7 +93,7 @@ See :py:mod:`mrjob.examples` for more examples.
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
-from copy import copy, deepcopy
+from copy import copy
 import inspect
 import itertools
 from optparse import Option, OptionParser, OptionGroup, OptionError, OptionValueError
@@ -110,7 +110,7 @@ from mrjob.conf import combine_dicts
 from mrjob.parse import check_kv_pair, check_range_list, parse_mr_job_stderr
 from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
 from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
-from mrjob.util import log_to_stream, read_input
+from mrjob.util import log_to_stream, parse_and_save_options, read_input
 
 # used by mr() below, to fake no mapper
 def _IDENTITY_MAPPER(key, value):
@@ -1231,107 +1231,15 @@ class MRJob(object):
         These are passed to :py:meth:`mrjob.runner.MRJobRunner.__init__`
         as *extra_args*.
         """
+        arg_map = parse_and_save_options(self.option_parser, self._cl_args)
         output_args = []
 
-        # Duplicate behavior of OptionParser, but capture the strings required
-        # to reproduce the same values.
-        # ref. optparse.py lines 1414-1548 (python 2.6.5)
-
-        values = deepcopy(self.option_parser.get_default_values())
-        rargs = [x for x in self._cl_args]
-        self.option_parser.rargs = rargs
-        while rargs:
-            arg = rargs[0]
-            if arg == '--':
-                del rargs[0]
-                return
-            elif arg[0:2] == '--':
-                self._process_long_opt(rargs, values, output_args)
-            elif arg[:1] == '-' and len(arg) > 1:
-                self._process_short_opts(rargs, values, output_args)
-            else:
-                del rargs[0]
+        passthrough_dests = sorted(option.dest for option \
+                                   in self._passthrough_options)
+        for option_dest in passthrough_dests:
+            output_args.extend(arg_map.get(option_dest, []))
 
         return output_args
-
-    def _capture_args(self, option, opt, output_args, rargs, func):
-        """Extend *output_args* with the difference in *rargs* before and
-        after calling *func()*. option is the Option object and *opt* is the
-        option string to append to *output_args* before the *rargs*
-        difference.
-        """
-        if option in self._passthrough_options:
-            output_args.append(opt)
-            rargs_before_processing = [x for x in rargs]
-
-        func()
-
-        if option in self._passthrough_options:
-            length_difference = len(rargs_before_processing) - len(rargs)
-            output_args.extend(rargs_before_processing[:length_difference])
-
-    def _process_long_opt(self, rargs, values, output_args):
-        arg = rargs.pop(0)
-
-        # Value explicitly attached to arg?  Pretend it's the next
-        # argument.
-        if "=" in arg:
-            (opt, next_arg) = arg.split("=", 1)
-            rargs.insert(0, next_arg)
-        else:
-            opt = arg
-
-        opt = self.option_parser._match_long_opt(opt)
-        option = self.option_parser._long_opt[opt]
-
-        def gobbler():
-            if option.takes_value():
-                nargs = option.nargs
-                if nargs == 1:
-                    value = rargs.pop(0)
-                else:
-                    value = tuple(rargs[0:nargs])
-                    del rargs[0:nargs]
-            else:
-                value = None
-
-            option.process(opt, value, values, self.option_parser)
-
-        self._capture_args(option, opt, output_args, rargs, gobbler)
-
-    def _process_short_opts(self, rargs, values, output_args):
-        arg = rargs.pop(0)
-        stop = False
-        i = 1
-        for ch in arg[1:]:
-            opt = "-" + ch
-            option = self.option_parser._short_opt.get(opt)
-            i += 1                      # we have consumed a character
-
-            def gobbler():
-                if option.takes_value():
-                    # Any characters left in arg?  Pretend they're the
-                    # next arg, and stop consuming characters of arg.
-                    if i < len(arg):
-                        rargs.insert(0, arg[i:])
-                        stop = True
-
-                    nargs = option.nargs
-                    if nargs == 1:
-                        value = rargs.pop(0)
-                    else:
-                        value = tuple(rargs[0:nargs])
-                        del rargs[0:nargs]
-
-                else:                       # option doesn't take a value
-                    value = None
-
-                option.process(opt, value, values, self.option_parser)
-
-            self._capture_args(option, opt, output_args, rargs, gobbler)
-
-            if stop:
-                break
 
     def generate_file_upload_args(self):
         """Figure out file upload args to pass through to the job runner.

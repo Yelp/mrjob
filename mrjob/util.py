@@ -20,6 +20,7 @@ from __future__ import with_statement
 
 import bz2
 import contextlib
+from copy import deepcopy
 import glob
 import gzip
 import itertools
@@ -108,6 +109,113 @@ def log_to_stream(name=None, stream=None, format=None, level=None, debug=False):
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
+
+
+def _capture_args(arg_map, option, opt, rargs, func):
+    """Return the difference in *rargs* before and after calling *func()*.
+    *option* is the Option object and *opt* is the option string to append
+    to *output_args* before the *rargs* difference. *arg_map* is a dictionary
+    mapping destinations to command line arguments.
+    """
+    if not option.dest in arg_map:
+        arg_map[option.dest] = []
+    arg_map[option.dest].append(opt)
+    rargs_before_processing = [x for x in rargs]
+
+    func()
+
+    length_difference = len(rargs_before_processing) - len(rargs)
+    arg_map[option.dest].extend(rargs_before_processing[:length_difference])
+
+
+def _process_long_opt(option_parser, arg_map, rargs, values):
+    """Mimic function of the same name in ``OptionParser``"""
+    arg = rargs.pop(0)
+
+    # Value explicitly attached to arg?  Pretend it's the next
+    # argument.
+    if "=" in arg:
+        (opt, next_arg) = arg.split("=", 1)
+        rargs.insert(0, next_arg)
+    else:
+        opt = arg
+
+    opt = option_parser._match_long_opt(opt)
+    option = option_parser._long_opt[opt]
+
+    def gobbler():
+        if option.takes_value():
+            nargs = option.nargs
+            if nargs == 1:
+                value = rargs.pop(0)
+            else:
+                value = tuple(rargs[0:nargs])
+                del rargs[0:nargs]
+        else:
+            value = None
+
+        option.process(opt, value, values, option_parser)
+
+    _capture_args(arg_map, option, opt, rargs, gobbler)
+
+
+def _process_short_opts(option_parser, arg_map, rargs, values):
+    """Mimic function of the same name in ``OptionParser``"""
+    arg = rargs.pop(0)
+    stop = False
+    i = 1
+    for ch in arg[1:]:
+        opt = "-" + ch
+        option = option_parser._short_opt.get(opt)
+        i += 1                      # we have consumed a character
+
+        def gobbler():
+            if option.takes_value():
+                # Any characters left in arg?  Pretend they're the
+                # next arg, and stop consuming characters of arg.
+                if i < len(arg):
+                    rargs.insert(0, arg[i:])
+                    stop = True
+
+                nargs = option.nargs
+                if nargs == 1:
+                    value = rargs.pop(0)
+                else:
+                    value = tuple(rargs[0:nargs])
+                    del rargs[0:nargs]
+
+            else:                       # option doesn't take a value
+                value = None
+
+            option.process(opt, value, values, option_parser)
+
+        _capture_args(arg_map, option, opt, rargs, gobbler)
+
+        if stop:
+            break
+
+
+def parse_and_save_options(option_parser, args):
+    """Duplicate behavior of OptionParser, but capture the strings required
+    to reproduce the same values. Ref. optparse.py lines 1414-1548 (python
+    2.6.5)
+    """
+    arg_map = {}
+    values = deepcopy(option_parser.get_default_values())
+    rargs = [x for x in args]
+    option_parser.rargs = rargs
+    while rargs:
+        arg = rargs[0]
+        if arg == '--':
+            del rargs[0]
+            return
+        elif arg[0:2] == '--':
+            _process_long_opt(option_parser, arg_map, rargs, values)
+        elif arg[:1] == '-' and len(arg) > 1:
+            _process_short_opts(option_parser, arg_map, rargs, values)
+        else:
+            del rargs[0]
+    return arg_map
 
 
 def populate_option_groups_with_options(assignments, indexed_options):

@@ -142,6 +142,10 @@ def _process_long_opt(option_parser, arg_map, rargs, values):
     option = option_parser._long_opt[opt]
 
     def gobbler():
+        """Consume *rargs*. The "before" and "after" values of *rargs* are
+        measured by :py:func:`_capture_args` and the difference is stored in
+        *arg_map*.
+        """
         if option.takes_value():
             nargs = option.nargs
             if nargs == 1:
@@ -170,6 +174,10 @@ def _process_short_opts(option_parser, arg_map, rargs, values):
         i += 1                      # we have consumed a character
 
         def gobbler():
+            """Consume *rargs*. The "before" and "after" values of *rargs* are
+            measured by :py:func:`_capture_args` and the difference is stored in
+            *arg_map*.
+            """
             if option.takes_value():
                 # Any characters left in arg?  Pretend they're the
                 # next arg, and stop consuming characters of arg.

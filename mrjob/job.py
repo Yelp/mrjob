@@ -297,8 +297,14 @@ class MRJob(object):
         """Re-define this to make a multi-step job.
 
         If you don't re-define this, we'll automatically create a one-step
-        job using any of :py:meth:`mapper`, :py:meth:`mapper_final`, and
-        :py:meth:`reducer` that you've re-defined.
+        job using any of :py:meth:`mapper`, :py:meth:`mapper_init`,
+        :py:meth:`mapper_final`, :py:meth:`reducer_init`,
+        :py:meth:`reducer_final`, and :py:meth:`reducer` that you've
+        re-defined. For example::
+
+            def steps(self):
+                return [self.mr(mapper=self.transform_input, reducer=self.consolidate_1),
+                        self.mr(reducer_init=self.log_mapper_init, reducer=self.consolidate_2)]
 
         :return: a list of steps constructed with :py:meth:`mr`
         """
@@ -1060,6 +1066,10 @@ class MRJob(object):
                 super(MRYourJob, self).configure_options()
                 self.add_passthrough_option(
                     '--max-ngram-size', type='int', default=4, help='...')
+
+        Specify an *opt_group* keyword argument to add the option to that
+        :py:class:`OptionGroup` rather than the top-level
+        :py:class:`OptionParser`.
 
         If you want to pass files through to the mapper/reducer, use
         :py:meth:`add_file_option` instead.

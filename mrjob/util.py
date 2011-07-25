@@ -19,6 +19,7 @@
 from __future__ import with_statement
 
 import bz2
+from collections import defaultdict
 import contextlib
 from copy import deepcopy
 import glob
@@ -111,25 +112,22 @@ def log_to_stream(name=None, stream=None, format=None, level=None, debug=False):
     logger.addHandler(handler)
 
 
-def _capture_args(arg_map, option, opt, rargs, func):
-    """Return the difference in *rargs* before and after calling *func()*.
-    *option* is the Option object and *opt* is the option string to append
-    to *output_args* before the *rargs* difference. *arg_map* is a dictionary
-    mapping destinations to command line arguments.
+def _capture_args(opt, rargs, func):
+    """Return a list containing *opt* plus the items of *rargs* consumed
+    by *func*
     """
-    if not option.dest in arg_map:
-        arg_map[option.dest] = []
-    arg_map[option.dest].append(opt)
     rargs_before_processing = [x for x in rargs]
 
     func()
 
     length_difference = len(rargs_before_processing) - len(rargs)
-    arg_map[option.dest].extend(rargs_before_processing[:length_difference])
+    return [opt] + rargs_before_processing[:length_difference]
 
 
 def _process_long_opt(option_parser, arg_map, rargs, values):
-    """Mimic function of the same name in ``OptionParser``"""
+    """Mimic function of the same name in ``OptionParser``, capturing the
+    arguments consumed in *arg_map*
+    """
     arg = rargs.pop(0)
 
     # Value explicitly attached to arg?  Pretend it's the next
@@ -156,11 +154,13 @@ def _process_long_opt(option_parser, arg_map, rargs, values):
 
         option.process(opt, value, values, option_parser)
 
-    _capture_args(arg_map, option, opt, rargs, gobbler)
+    arg_map[option.dest].extend(_capture_args(opt, rargs, gobbler))
 
 
 def _process_short_opts(option_parser, arg_map, rargs, values):
-    """Mimic function of the same name in ``OptionParser``"""
+    """Mimic function of the same name in ``OptionParser``, capturing the
+    arguments consumed in *arg_map*
+    """
     arg = rargs.pop(0)
     stop = False
     i = 1
@@ -189,7 +189,7 @@ def _process_short_opts(option_parser, arg_map, rargs, values):
 
             option.process(opt, value, values, option_parser)
 
-        _capture_args(arg_map, option, opt, rargs, gobbler)
+        arg_map[option.dest].extend(_capture_args(opt, rargs, gobbler))
 
         if stop:
             break
@@ -200,7 +200,7 @@ def parse_and_save_options(option_parser, args):
     to reproduce the same values. Ref. optparse.py lines 1414-1548 (python
     2.6.5)
     """
-    arg_map = {}
+    arg_map = defaultdict(list)
     values = deepcopy(option_parser.get_default_values())
     rargs = [x for x in args]
     option_parser.rargs = rargs

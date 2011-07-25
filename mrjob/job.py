@@ -124,7 +124,7 @@ class UsageError(Exception):
     pass
 
 
-class MRJobOptions(Option):
+class MRJobOption(Option):
 
     TYPES = Option.TYPES + ('key_value_pair', 'range_list')
     ACTIONS = Option.ACTIONS + ('set_key',)
@@ -178,7 +178,7 @@ class MRJob(object):
 
         usage = "usage: %prog [options] [input files]"
         self.option_parser = OptionParser(
-            usage=usage, option_class=MRJobOptions)
+            usage=usage, option_class=MRJobOption)
         self.configure_options()
 
         # don't pass None to parse_args unless we're actually running

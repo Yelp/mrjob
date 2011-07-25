@@ -78,24 +78,24 @@ complicated.
 
 Adding custom actions and types to your own jobs is essentially the same as it
 is normally (see the `optparse docs <http://docs.python.org/library/optparse.html#extending-optparse>`_),
-except that you should subclass from :py:class:`mrjob.job.MRJobOptions` instead
+except that you should subclass from :py:class:`mrjob.job.MRJobOption` instead
 of :py:class:`optparse.Option`. For example, to add a new action
 ``double_store``::
 
-    from mrjob.job import MRJobOptions
+    from mrjob.job import MRJobOption
 
     class MyJobOptions():
 
-        ACTIONS = MRJobOptions.ACTIONS + ('double_store',)
-        STORE_ACTIONS = MRJobOptions.STORE_ACTIONS + ('double_store',)
-        TYPED_ACTIONS = MRJobOptions.TYPED_ACTIONS + ('double_store',)
-        ALWAYS_TYPED_ACTIONS = MRJobOptions.ALWAYS_TYPED_ACTIONS + ('double_store',)
+        ACTIONS = MRJobOption.ACTIONS + ('double_store',)
+        STORE_ACTIONS = MRJobOption.STORE_ACTIONS + ('double_store',)
+        TYPED_ACTIONS = MRJobOption.TYPED_ACTIONS + ('double_store',)
+        ALWAYS_TYPED_ACTIONS = MRJobOption.ALWAYS_TYPED_ACTIONS + ('double_store',)
 
         def take_action(self, action, dest, opt, value, values, parser):
             if action == 'double_store':
                 values.ensure_value(dest, value*2)
             else:
-                MRJobOptions.take_action(
+                MRJobOption.take_action(
                     self, action, dest, opt, value, values, parser)
 
 Special care should be taken when defining custom behavior for passthrough

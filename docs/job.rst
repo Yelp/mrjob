@@ -84,7 +84,7 @@ of :py:class:`optparse.Option`. For example, to add a new action
 
     from mrjob.job import MRJobOption
 
-    class MyJobOptions():
+    class MyJobOption():
 
         ACTIONS = MRJobOption.ACTIONS + ('double_store',)
         STORE_ACTIONS = MRJobOption.STORE_ACTIONS + ('double_store',)

@@ -164,7 +164,7 @@ def find_interesting_hadoop_streaming_error(lines):
         return None
 
 
-_TIMEOUT_ERROR_RE = re.compile(r'Task.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds. Killing!"')
+_TIMEOUT_ERROR_RE = re.compile(r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds. Killing!"')
 
 def find_timeout_error(lines):
     """Scan a log file or other iterable for a timeout error from Hadoop.
@@ -182,7 +182,10 @@ def find_timeout_error(lines):
         match = _TIMEOUT_ERROR_RE.match(line)
         if match:
             result = match.group(1)
-    return int(result)
+    if result is None:
+        return None
+    else:
+        return int(result)
 
 
 # recognize hadoop streaming output
@@ -236,8 +239,7 @@ def parse_mr_job_stderr(stderr, counters=None):
 # We just want to pull out the counter string, which varies between 
 # Hadoop versions.
 _KV_EXPR = r'\s+\w+=".*?"'  # this matches KEY="VALUE"
-_COUNTER_LINE_EXPR = r'Job(%s)*\s+COUNTERS="%s"' % (_KV_EXPR,
-                                                    r'(?P<counters>.*?)')
+_COUNTER_LINE_EXPR = r'^.*?COUNTERS="%s".*?$' % r'(?P<counters>.*?)'
 _COUNTER_LINE_RE = re.compile(_COUNTER_LINE_EXPR)
 
 # 0.18-specific

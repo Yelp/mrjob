@@ -24,15 +24,14 @@ import shutil
 try:
     import boto
     import boto.utils
-    from mrjob import botoemr
 except ImportError:
     boto = None
-    botoemr = None
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.tools.emr.s3_tmpwatch import *
 from tests.emr_test import MockEMRAndS3TestCase
 from tests.mockboto import MockKey
+
 
 class S3TmpWatchTestCase(MockEMRAndS3TestCase):
 

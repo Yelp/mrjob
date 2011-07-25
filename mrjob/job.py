@@ -1234,8 +1234,8 @@ class MRJob(object):
         arg_map = parse_and_save_options(self.option_parser, self._cl_args)
         output_args = []
 
-        passthrough_dests = sorted(option.dest for option \
-                                   in self._passthrough_options)
+        passthrough_dests = sorted(set(option.dest for option \
+                                       in self._passthrough_options))
         for option_dest in passthrough_dests:
             output_args.extend(arg_map.get(option_dest, []))
 

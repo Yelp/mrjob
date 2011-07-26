@@ -1709,26 +1709,6 @@ class EMRJobRunner(MRJobRunner):
                 return result
         return None
 
-    def _download_log_file(self, s3_log_file_uri, s3_conn):
-        """Download a log file to our local tmp dir so we can scan it.
-
-        Takes a log file URI, and returns a local path. We'll dump all
-        log files to the same file, on the assumption that we'll scan them
-        one at a time.
-        """
-        log_path = os.path.join(self._get_local_tmp_dir(), 'log')
-
-        if self._uri_of_downloaded_log_file != s3_log_file_uri:
-            s3_log_file = self.get_s3_key(s3_log_file_uri, s3_conn)
-            if not s3_log_file:
-                return None
-
-            log.debug('downloading %s -> %s' % (s3_log_file_uri, log_path))
-            s3_log_file.get_contents_to_filename(log_path)
-            self._uri_of_downloaded_log_file = s3_log_file
-
-        return log_path
-
     ### Bootstrapping ###
 
     def _create_master_bootstrap_script(self, dest='b.py'):

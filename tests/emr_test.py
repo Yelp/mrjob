@@ -1148,8 +1148,8 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
             actions[0].path,
             's3://elasticmapreduce/bootstrap-actions/configure-hadoop')
         assert_equal(
-            actions[0].args,
-            ['-m,mapred.tasktracker.map.tasks.maximum=1'])
+            actions[0].args[0].value,
+            '-m,mapred.tasktracker.map.tasks.maximum=1')
         assert_equal(actions[0].name, 'configure-hadoop')
 
         assert_equal(actions[1].path, 's3://foo/bar')
@@ -1189,7 +1189,8 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         assert actions[0].path.startswith('s3://mrjob-')
         assert actions[0].path.endswith('/apt-install.sh')
         assert_equal(actions[0].name, 'apt-install.sh')
-        assert_equal(actions[0].args, ['python-scipy', 'mysql-server'])
+        assert_equal(actions[0].args[0].value, 'python-scipy')
+        assert_equal(actions[0].args[1].value, 'mysql-server')
 
         # check for master boostrap script
         assert actions[1].path.startswith('s3://mrjob-')

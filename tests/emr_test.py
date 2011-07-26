@@ -1116,6 +1116,13 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         script_path = os.path.join(self.tmp_dir, 'b.py')
 
         runner._create_master_bootstrap_script(dest=script_path)
+        assert not os.path.exists(script_path)
+
+        # bootstrap actions don't figure into the master bootstrap script
+        runner = EMRJobRunner(conf_path=False,
+                              bootstrap_mrjob=False,
+                              bootstrap_actions=['foo', 'bar baz'])
+        runner._create_master_bootstrap_script(dest=script_path)
 
         assert not os.path.exists(script_path)
 

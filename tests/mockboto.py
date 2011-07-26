@@ -320,6 +320,13 @@ class MockEmrConnection(object):
         if log_uri is not None:
             job_flow.loguri = log_uri
 
+        # setup bootstrap actions
+        if bootstrap_actions:
+            job_flow.bootstrapactions = [
+                MockEmrObject(
+                    name=action.name, path=action.path, args=action.args())
+                for action in bootstrap_actions]
+
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
         if enable_debugging:
@@ -551,3 +558,11 @@ class MockEmrObject(object):
                     return False
 
         return True
+
+    # useful for hand-debugging tests
+    def __repr__(self):
+        return('%s.%s(%s)' % (
+            self.__class__.__module__,
+            self.__class__.__name__,
+            ', '.join('%s=%r' % (k, v)
+                      for k, v in sorted(self.__dict__.iteritems()))))

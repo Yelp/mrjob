@@ -1,3 +1,4 @@
+# Copyright 2009-2011 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +22,7 @@ import posixpath
 import pprint
 import random
 import re
+import shlex
 import signal
 import socket
 from subprocess import Popen, PIPE
@@ -48,7 +50,7 @@ from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, fin
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
 from mrjob.ssh import ssh_cat, ssh_ls, ssh_copy_key, ssh_slave_addresses, SSHException, SSH_PREFIX, SSH_LOG_ROOT, SSH_URI_RE
-from mrjob.util import cmd_line, extract_dir_for_tar, read_file
+from mrjob.util import cmd_line, extract_dir_for_tar, hash_object, read_file
 
 
 def monkeypatch_boto():
@@ -326,6 +328,8 @@ class EMRJobRunner(MRJobRunner):
         :param aws_secret_access_key: your "password" on AWS
         :type aws_region: str
         :param aws_region: region to connect to S3 and EMR on (e.g. ``us-west-1``). If you want to use separate regions for S3 and EMR, set *emr_endpoint* and *s3_endpoint*.
+        :type bootstrap_actions: list of str
+        :param bootstrap_actions: a list of raw bootstrap actions (essentially scripts) to run prior to any of the other bootstrap steps. Any arguments should be separated from the command by spaces (we use :py:func:`shlex.split`). If the action is on the local filesystem, we'll automatically upload it to S3.
         :type bootstrap_cmds: list
         :param bootstrap_cmds: a list of commands to run on the master node to set up libraries, etc. Like *setup_cmds*, these can be strings, which will be run in the shell, or lists of args, which will be run directly. Prepend ``sudo`` to commands to do things that require root privileges.
         :type bootstrap_files: list of str
@@ -408,6 +412,18 @@ class EMRJobRunner(MRJobRunner):
             self._output_dir = self._s3_tmp_uri + 'output/'
 
         # add the bootstrap files to a list of files to upload
+        self._bootstrap_actions = []
+        for action in self._opts['bootstrap_actions']:
+            args = shlex.split(action)
+            if not args:
+                raise ValueError('bad bootstrap action: %r' % (action,))
+            # don't use _add_bootstrap_file() because this is a raw bootstrap
+            # action, not part of mrjob's bootstrap utilities
+            file_dict = self._add_file(args[0])
+            file_dict['args'] = args[1:]
+            self._bootstrap_actions.append(file_dict)
+
+
         for path in self._opts['bootstrap_files']:
             self._add_bootstrap_file(path)
 
@@ -473,6 +489,7 @@ class EMRJobRunner(MRJobRunner):
             'aws_availability_zone',
             'aws_secret_access_key',
             'aws_region',
+            'bootstrap_actions',
             'bootstrap_cmds',
             'bootstrap_files',
             'bootstrap_python_packages',
@@ -525,6 +542,7 @@ class EMRJobRunner(MRJobRunner):
         values for that option. This allows us to specify that some options
         are lists, or contain environment variables, or whatever."""
         return combine_dicts(super(EMRJobRunner, cls)._opts_combiners(), {
+            'bootstrap_actions': combine_lists,
             'bootstrap_cmds': combine_lists,
             'bootstrap_files': combine_path_lists,
             'bootstrap_python_packages': combine_path_lists,

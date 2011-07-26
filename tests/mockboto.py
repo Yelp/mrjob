@@ -320,13 +320,6 @@ class MockEmrConnection(object):
         if log_uri is not None:
             job_flow.loguri = log_uri
 
-        # setup bootstrap actions
-        if bootstrap_actions:
-            job_flow.bootstrapactions = [
-                MockEmrObject(
-                    name=action.name, path=action.path, args=action.args())
-                for action in bootstrap_actions]
-
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
         if enable_debugging:

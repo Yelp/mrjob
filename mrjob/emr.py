@@ -153,9 +153,9 @@ def est_time_to_hour(job_flow):
         now = time.time()
 
         # find out how long the job flow has been running
-        jf_start = _to_timestamp(job_flow.startdatetime)
+        jf_start = iso8601_to_timestamp(job_flow.startdatetime)
         if hasattr(job_flow, 'enddatetime'):
-            jf_end = _to_timestamp(job_flow.enddatetime)
+            jf_end = iso8601_to_timestamp(job_flow.enddatetime)
         else:
             jf_end = now
 
@@ -422,7 +422,6 @@ class EMRJobRunner(MRJobRunner):
             file_dict = self._add_file(args[0])
             file_dict['args'] = args[1:]
             self._bootstrap_actions.append(file_dict)
-
 
         for path in self._opts['bootstrap_files']:
             self._add_bootstrap_file(path)
@@ -924,6 +923,7 @@ class EMRJobRunner(MRJobRunner):
             return
         while jobflow.state not in ('TERMINATED', 'COMPLETED', 'FAILED',
                                     'SHUTTING_DOWN'):
+            raise IndexError
             msg = 'Waiting for job flow to terminate (currently %s)' % \
                                                          jobflow.state
             log.info(msg)

@@ -121,11 +121,11 @@ class MockEMRAndS3TestCase(TestCase):
             f.write('I AM DEFINITELY AN SSH KEY FILE')
 
         # Tell the runner to use the fake binary
-        self.runner._opts['ssh_bin'] = [self.ssh_bin]
+        runner._opts['ssh_bin'] = [self.ssh_bin]
         # Inject a master node hostname so it doesn't try to 'emr --describe' it
-        self.runner._address = 'testmaster'
+        runner._address = 'testmaster'
         # Also pretend to have an SSH key pair file
-        self.runner._opts['ec2_key_pair_file'] = self.keyfile_path
+        runner._opts['ec2_key_pair_file'] = self.keyfile_path
 
     def add_slave(self):
         """Add a mocked slave to the cluster"""
@@ -1312,6 +1312,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
     @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
+        self.teardown_ssh()
 
     def sorted_results_for_runner_with_args(self, runner_args):
         mr_job = MRTwoStepJob(runner_args)
@@ -1319,6 +1320,8 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         results = []
         with mr_job.make_runner() as runner:
+            self.prepare_runner_for_ssh(runner)
+            mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
             runner.run()
 
             for line in runner.stream_output():
@@ -1337,6 +1340,8 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         results = []
         with mr_job.make_runner() as runner:
+            self.prepare_runner_for_ssh(runner)
+            mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
             runner.run()
 
             # Make sure that the runner made a pooling-enabled job flow
@@ -1423,6 +1428,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         runner = EMRJobRunner(conf_path=self.mrjob_conf_path,
                               pool_emr_job_flows=True)
+        runner._address = 'not_a_real_ssh_host'
         job_flow_id = runner.make_persistent_job_flow()
         runner.make_emr_conn().describe_jobflow(job_flow_id).state = 'WAITING'
         self.mock_emr_output = {(job_flow_id, 1): [

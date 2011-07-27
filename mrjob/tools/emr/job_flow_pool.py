@@ -33,7 +33,9 @@ def get_pools(emr_conn):
         if job_flow.state in ('TERMINATED', 'FAILED', 'COMPLETED',
                               'SHUTTING_DOWN'):
             continue
-        args = [arg.value for arg in job_flow.bootstrapactions[0].args]
+        if not job_flow.bootstrapactions:
+            continue
+        args = [arg.value for arg in job_flow.bootstrapactions[-1].args]
         if len(args) != 2:
             continue
         pools.setdefault(args[1], list()).append(job_flow)

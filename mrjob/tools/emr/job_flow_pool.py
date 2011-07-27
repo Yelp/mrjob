@@ -134,6 +134,7 @@ def main():
                              help='Find a job flow matching the pool name, bootstrap configuration, and instance number/type as specified on the command line and in the configuration files')
     option_parser.add_option('-t', '--terminate', action='store',
                              default=None, dest='terminate',
+                             metavar='JOB_FLOW_ID',
                              help='Terminate all job flows in the given pool (defaults to pool "default")')
 
     # Scrape options from MRJob and index them by dest

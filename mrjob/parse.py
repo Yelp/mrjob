@@ -340,7 +340,13 @@ def parse_port_range_list(range_list_str):
 
 def parse_key_value_list(kv_string_list, error_fmt, error_func):
     """Parse a list of strings like ``KEY=VALUE`` into a dictionary.
-    *error_fmt* should accept a single string which is a malformed string.
+
+    :param kv_string_list: Parse a list of strings like ``KEY=VALUE`` into a dictionary.
+    :type kv_string_list: [str]
+    :param error_fmt: Format string accepting one ``%s`` argument which is the malformed (i.e. not ``KEY=VALUE``) string
+    :type error_fmt: str
+    :param error_func: Function to call when a malformed string is encountered.
+    :type error_func: function(str)
     """
     ret = {}
     for value in kv_string_list:

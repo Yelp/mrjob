@@ -71,13 +71,13 @@ See :doc:`configs-reference` for a complete list of all configuration options.
 Custom command-line types and actions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoattribute:: MRJob.OptionClass
+.. autoattribute:: MRJob.OPTION_CLASS
 
 The :py:mod:`optparse` module allows the addition of new actions and types.
 See the `optparse docs <http://docs.python.org/library/optparse.html#extending-optparse>`_
 for instructions on defining custom options. The only difference is that
 instead of passing *option_class* to the :py:class:`OptionParser` instance
-yourself, you must set the :py:attr:`MRJob.OptionClass` attribute.
+yourself, you must set the :py:attr:`MRJob.OPTION_CLASS` attribute.
 
 Passthrough arguments have the additional caveat that mrjob uses some lesser
 magic to reproduce the argument values for the command lines of subprocesses.

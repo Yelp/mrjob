@@ -130,7 +130,7 @@ class MRJob(object):
 
     #: :py:class:`optparse.Option` subclass to use with the
     #: :py:class:`optparse.OptionParser` instance.
-    OptionClass=Option
+    OPTION_CLASS=Option
 
     def __init__(self, args=None):
         """Entry point for running your job from other Python code.
@@ -158,7 +158,7 @@ class MRJob(object):
 
         usage = "usage: %prog [options] [input files]"
         self.option_parser = OptionParser(usage=usage,
-                                          option_class=self.OptionClass)
+                                          option_class=self.OPTION_CLASS)
         self.configure_options()
 
         # don't pass None to parse_args unless we're actually running

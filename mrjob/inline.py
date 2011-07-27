@@ -17,6 +17,7 @@ from __future__ import with_statement
 
 __author__ = 'Matthew Tai <mtai@adku.com>'
 
+from collections import defaultdict
 import logging
 import os
 import pprint
@@ -27,7 +28,7 @@ import sys
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.runner import MRJobRunner
 from mrjob.job import MRJob
-from mrjob.util import read_file
+from mrjob.util import read_file, save_current_environment
 
 log = logging.getLogger('mrjob.inline')
 
@@ -57,6 +58,7 @@ class InlineMRJobRunner(MRJobRunner):
         self._mrjob_cls = mrjob_cls
         self._prev_outfile = None
         self._final_outfile = None
+        self._counters = []
 
     @classmethod
     def _opts_combiners(cls):
@@ -71,12 +73,11 @@ class InlineMRJobRunner(MRJobRunner):
         'hadoop_input_format',
         'hadoop_output_format',
         'hadoop_streaming_jar',
-        'jobconf',
+        'jobconf'
     ]
 
     # options that we ignore because they involve running subprocesses
     IGNORED_LOCAL_OPTS = [
-        'cmdenv',
         'python_bin',
         'setup_cmds',
         'setup_scripts',
@@ -102,24 +103,28 @@ class InlineMRJobRunner(MRJobRunner):
                 log.warning('ignoring %s option (use -r local instead): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 
-        # run mapper, sort, reducer for each step
-        for step_number, step_name in enumerate(self._get_steps()):
-            self._invoke_inline_mrjob(step_number, 'step-%d-mapper' %
-                                      step_number, is_mapper=True)
+        with save_current_environment():
+            # set cmdenv variables
+            os.environ.update(self._get_cmdenv())
 
-            if 'R' in step_name:
-                mapper_output_path = self._prev_outfile
-                sorted_mapper_output_path = self._decide_output_path(
-                    'step-%d-mapper-sorted' % step_number)
-                with open(sorted_mapper_output_path, 'w') as sort_out:
-                    proc = subprocess.Popen(
-                        ['sort', mapper_output_path],
-                        stdout=sort_out, env={'LC_ALL': 'C'})
-                proc.wait()
+            # run mapper, sort, reducer for each step
+            for step_number, step_name in enumerate(self._get_steps()):
+                self._invoke_inline_mrjob(step_number, 'step-%d-mapper' %
+                                          step_number, is_mapper=True)
 
-                # This'll read from sorted_mapper_output_path
-                self._invoke_inline_mrjob(step_number, 'step-%d-reducer' %
-                                          step_number, is_reducer=True)
+                if 'R' in step_name:
+                    mapper_output_path = self._prev_outfile
+                    sorted_mapper_output_path = self._decide_output_path(
+                        'step-%d-mapper-sorted' % step_number)
+                    with open(sorted_mapper_output_path, 'w') as sort_out:
+                        proc = subprocess.Popen(
+                            ['sort', mapper_output_path],
+                            stdout=sort_out, env={'LC_ALL': 'C'})
+                    proc.wait()
+
+                    # This'll read from sorted_mapper_output_path
+                    self._invoke_inline_mrjob(step_number, 'step-%d-reducer' %
+                                              step_number, is_reducer=True)
 
         # move final output to output directory
         self._final_outfile = os.path.join(self._output_dir, 'part-00000')
@@ -149,9 +154,13 @@ class InlineMRJobRunner(MRJobRunner):
         child_stdout.flush()
         child_stdout.close()
 
-        counters = child_instance.parse_counters()
-        if counters:
-            log.info('counters: ' + pprint.pformat(counters))
+        while len(self._counters) <= step_number:
+            self._counters.append({})
+        child_instance.parse_counters(self._counters[step_number-1])
+        self.print_counters(first_step_num=1, limit_to_steps=[step_number])
+
+    def counters(self):
+        return self._counters
 
     def _decide_input_paths(self):
         # decide where to get input

@@ -1,3 +1,4 @@
+# Copyright 2009-2011 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +21,7 @@ import posixpath
 import pprint
 import random
 import re
+import shlex
 import signal
 import socket
 from subprocess import Popen, PIPE
@@ -88,6 +90,10 @@ JOB_LOG_URI_RE = re.compile(r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timesta
 # regex for matching slave log URIs
 NODE_LOG_URI_RE = re.compile(r'^.*?/hadoop-hadoop-(jobtracker|namenode).*.out$')
 
+# sometimes AWS gives us seconds as a decimal, which we can't parse
+# with boto.utils.ISO8601
+SUBSECOND_RE = re.compile('\.[0-9]+')
+
 # map from AWS region to EMR endpoint
 # see http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?ConceptsRequestEndpoints.html
 REGION_TO_EMR_ENDPOINT = {
@@ -128,11 +134,13 @@ def s3_key_to_uri(s3_key):
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
 
-def _to_timestamp(iso8601_time):
+def iso8601_to_timestamp(iso8601_time):
+    iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
     return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
 
 
-def _to_datetime(iso8601_time):
+def iso8601_to_datetime(iso8601_time):
+    iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
     return datetime.datetime.strptime(iso8601_time, boto.utils.ISO8601)
 
 
@@ -186,7 +194,7 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
             # set created_before to be just after the start time of
             # the first job returned, to deal with job flows started
             # in the same second
-            min_create_time = min(_to_datetime(jf.creationdatetime)
+            min_create_time = min(iso8601_to_datetime(jf.creationdatetime)
                                   for jf in job_flows)
             created_before = min_create_time + datetime.timedelta(seconds=1)
             # if someone managed to start 501 job flows in the same second,
@@ -224,7 +232,7 @@ class EMRJobRunner(MRJobRunner):
         job_flows = emr_conn.describe_jobflows()
         ...
 
-    See also: :py:meth:`EMRJobRunner.__init__`.
+    See also: :py:meth:`~EMRJobRunner.__init__`.
     """
     alias = 'emr'
 
@@ -246,10 +254,10 @@ class EMRJobRunner(MRJobRunner):
         :param aws_availability_zone: availability zone to run the job in
         :type aws_secret_access_key: str
         :param aws_secret_access_key: your "password" on AWS
-        :type aws_availability_zone: str
-        :param aws_availability_zone: availability zone to run the job flow on
         :type aws_region: str
         :param aws_region: region to connect to S3 and EMR on (e.g. ``us-west-1``). If you want to use separate regions for S3 and EMR, set *emr_endpoint* and *s3_endpoint*.
+        :type bootstrap_actions: list of str
+        :param bootstrap_actions: a list of raw bootstrap actions (essentially scripts) to run prior to any of the other bootstrap steps. Any arguments should be separated from the command by spaces (we use :py:func:`shlex.split`). If the action is on the local filesystem, we'll automatically upload it to S3. 
         :type bootstrap_cmds: list
         :param bootstrap_cmds: a list of commands to run on the master node to set up libraries, etc. Like *setup_cmds*, these can be strings, which will be run in the shell, or lists of args, which will be run directly. Prepend ``sudo`` to commands to do things that require root privileges.
         :type bootstrap_files: list of str
@@ -299,7 +307,7 @@ class EMRJobRunner(MRJobRunner):
         :type ssh_bind_ports: list of int
         :param ssh_bind_ports: a list of ports that are safe to listen on. Defaults to ports ``40001`` thru ``40840``.
         :type ssh_tunnel_to_job_tracker: bool
-        :param ssh_tunnel_to_job_tracker: If True, create an ssh tunnel to the job tracker and listen on a randomly chosen port. This requires you to set *ec2_key_pair* and *ec2_key_pair_file*.
+        :param ssh_tunnel_to_job_tracker: If True, create an ssh tunnel to the job tracker and listen on a randomly chosen port. This requires you to set *ec2_key_pair* and *ec2_key_pair_file*. See :ref:`ssh-tunneling` for detailed instructions.
         :type ssh_tunnel_is_open: bool
         :param ssh_tunnel_is_open: if True, any host can connect to the job tracker through the SSH tunnel you open. Mostly useful if your browser is running on a different machine from your job.
         """
@@ -328,6 +336,17 @@ class EMRJobRunner(MRJobRunner):
             self._output_dir = self._s3_tmp_uri + 'output/'
 
         # add the bootstrap files to a list of files to upload
+        self._bootstrap_actions = []
+        for action in self._opts['bootstrap_actions']:
+            args = shlex.split(action)
+            if not args:
+                raise ValueError('bad bootstrap action: %r' % (action,))
+            # don't use _add_bootstrap_file() because this is a raw bootstrap
+            # action, not part of mrjob's bootstrap utilities
+            file_dict = self._add_file(args[0])
+            file_dict['args'] = args[1:]
+            self._bootstrap_actions.append(file_dict)
+
         for path in self._opts['bootstrap_files']:
             self._add_bootstrap_file(path)
 
@@ -392,6 +411,7 @@ class EMRJobRunner(MRJobRunner):
             'aws_availability_zone',
             'aws_secret_access_key',
             'aws_region',
+            'bootstrap_actions',
             'bootstrap_cmds',
             'bootstrap_files',
             'bootstrap_python_packages',
@@ -442,6 +462,7 @@ class EMRJobRunner(MRJobRunner):
         values for that option. This allows us to specify that some options
         are lists, or contain environment variables, or whatever."""
         return combine_dicts(super(EMRJobRunner, cls)._opts_combiners(), {
+            'bootstrap_actions': combine_lists,
             'bootstrap_cmds': combine_lists,
             'bootstrap_files': combine_path_lists,
             'bootstrap_python_packages': combine_path_lists,
@@ -524,8 +545,8 @@ class EMRJobRunner(MRJobRunner):
                     return
                 elif scratch_bucket_location != self._aws_region:
                     continue
-            else:
-                # This bucket is accessible anywhere, so we can use it
+            elif not self._aws_region:
+                # Only use regionless buckets if the job flow is also regionless
                 log.info("using existing scratch bucket %s" % scratch_bucket_name)
                 self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
                 return
@@ -570,9 +591,6 @@ class EMRJobRunner(MRJobRunner):
 
         self._launch_emr_job()
         self._wait_for_job_to_complete()
-        
-        # make sure the job had a chance to copy all our data to S3
-        self._wait_for_s3_eventual_consistency()
 
     def _setup_input(self):
         """Copy local input files (if any) to a special directory on S3.
@@ -816,7 +834,8 @@ class EMRJobRunner(MRJobRunner):
         except boto.exception.S3ResponseError:
             # mockboto throws this for some reason
             return
-        while jobflow.state not in ('TERMINATED', 'COMPLETED', 'FAILED'):
+        while jobflow.state not in ('TERMINATED', 'COMPLETED', 'FAILED',
+                                    'SHUTTING_DOWN'):
             msg = 'Waiting for job flow to terminate (currently %s)' % \
                                                          jobflow.state
             log.info(msg)
@@ -833,7 +852,7 @@ class EMRJobRunner(MRJobRunner):
         # make sure we can see the files we copied to S3
         self._wait_for_s3_eventual_consistency()
 
-        # figure out local names and S3 URIs for our bootstrap files, if any
+        # figure out local names and S3 URIs for our bootstrap actions, if any
         self._name_files()
         self._pick_s3_uris_for_files()
 
@@ -850,9 +869,22 @@ class EMRJobRunner(MRJobRunner):
         args['master_instance_type'] = self._opts['ec2_master_instance_type']
         args['slave_instance_type'] = self._opts['ec2_slave_instance_type']
 
+
+        # bootstrap actions
+        bootstrap_action_args = []
+        
+        for file_dict in self._bootstrap_actions:
+            bootstrap_action_args.append(
+                boto.emr.BootstrapAction(
+                file_dict['name'], file_dict['s3_uri'], file_dict['args']))
+
         if self._master_bootstrap_script:
-            args['bootstrap_actions'] = [boto.emr.BootstrapAction(
-                'master', self._master_bootstrap_script['s3_uri'], [])]
+            bootstrap_action_args.append(
+                boto.emr.BootstrapAction(
+                'master', self._master_bootstrap_script['s3_uri'], []))
+
+        if bootstrap_action_args:
+            args['bootstrap_actions'] = bootstrap_action_args
 
         if self._opts['ec2_key_pair']:
             args['ec2_keyname'] = self._opts['ec2_key_pair']
@@ -1032,8 +1064,8 @@ class EMRJobRunner(MRJobRunner):
 
                 if (hasattr(step, 'startdatetime') and
                     hasattr(step, 'enddatetime')):
-                    start_time = _to_timestamp(step.startdatetime)
-                    end_time = _to_timestamp(step.enddatetime)
+                    start_time = iso8601_to_timestamp(step.startdatetime)
+                    end_time = iso8601_to_timestamp(step.enddatetime)
                     total_step_time += end_time - start_time
 
             if not step_states:
@@ -1089,7 +1121,8 @@ class EMRJobRunner(MRJobRunner):
         if success:
             log.info('Job completed.')
             log.info('Running time was %.1fs (not counting time spent waiting for the EC2 instances)' % total_step_time)
-            log.info('counters: %s' % pprint.pformat(self._get_counters(step_nums)))
+            self._fetch_counters(step_nums)
+            self.print_counters(first_step_num=min(step_nums))
         else:
             msg = 'Job failed with status %s: %s' % (job_state, reason)
             log.error(msg)
@@ -1139,7 +1172,7 @@ class EMRJobRunner(MRJobRunner):
         else:
             # read from local filesystem
             return super(EMRJobRunner, self)._cat_file(filename)
-        
+
     def _script_args(self):
         """How to invoke the script inside EMR"""
         # We can invoke the script by its S3 URL, but we don't really
@@ -1326,19 +1359,20 @@ class EMRJobRunner(MRJobRunner):
             return None
         return self.ls(self._s3_job_log_uri)
 
-    def _get_counters(self, step_nums):
+    def _fetch_counters(self, step_nums, skip_s3_wait=False):
         """Read Hadoop counters from S3.
 
         Args:
         step_nums -- the numbers of steps belonging to us, so that we
             can ignore errors from other jobs when sharing a job flow
         """
+        self._counters = []
         try:
             if not self._opts['ec2_key_pair_file']:
                 raise LogFetchException('ec2_key_pair_file not specified')
             uris = list(self.ssh_list_logs([JOB_LOGS], step_nums))
             log.info('Fetching counters from SSH...')
-            return self._scan_for_counters_in_files(uris, step_nums)
+            self._scan_for_counters_in_files(uris, step_nums)
         except LogFetchException, e:
             log.info(str(e))
             if not self._s3_job_log_uri:
@@ -1346,11 +1380,12 @@ class EMRJobRunner(MRJobRunner):
 
             log.info('Fetching counters from S3...')
 
-            self._wait_for_s3_eventual_consistency()
+            if not skip_s3_wait:
+                self._wait_for_s3_eventual_consistency()
             self._wait_for_job_flow_termination()
 
             uris = self.s3_list_logs([JOB_LOGS], step_nums)
-            return self._scan_for_counters_in_files(uris, step_nums)
+            self._scan_for_counters_in_files(uris, step_nums)
 
     def _scan_for_counters_in_files(self, log_file_uris, step_nums):
         counters = []
@@ -1372,13 +1407,15 @@ class EMRJobRunner(MRJobRunner):
             if not log_lines:
                 continue
 
-            for line in log_lines:
-                new_counters = parse_hadoop_counters_from_line(line)
-                if new_counters:
-                    counters.append(new_counters)
-                    break
+            for maybe_double_line in log_lines:
+                for line in maybe_double_line.split('\n'):
+                    new_counters = parse_hadoop_counters_from_line(line)
+                    if new_counters:
+                        self._counters.append(new_counters)
+                        break
 
-        return counters
+    def counters(self):
+        return self._counters
 
     def _find_probable_cause_of_failure(self, step_nums):
         """Scan logs for Python exception tracebacks.
@@ -1572,11 +1609,17 @@ class EMRJobRunner(MRJobRunner):
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
 
-        if not any(key.startswith('bootstrap_') and value
-                   for (key, value) in self._opts.iteritems()):
+        if self._master_bootstrap_script:
             return
 
-        if self._master_bootstrap_script:
+        # don't bother if we're not starting a job flow
+        if self._opts['emr_job_flow_id']:
+            return
+
+        if not any(key.startswith('bootstrap_')
+                   and key != 'bootstrap_actions' # these are separate scripts
+                   and value
+                   for (key, value) in self._opts.iteritems()):
             return
 
         if self._opts['bootstrap_mrjob']:

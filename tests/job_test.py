@@ -33,6 +33,7 @@ from mrjob.parse import parse_mr_job_stderr
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_nomapper_multistep import MRNoMapper
+from tests.quiet import logger_disabled
 
 
 def stepdict(mapper=_IDENTITY_MAPPER, reducer=None,
@@ -745,16 +746,17 @@ class FileOptionsTestCase(TestCase):
 
         mr_job.sandbox(stdin=stdin)
 
-        with mr_job.make_runner() as runner:
-            assert isinstance(runner, LocalMRJobRunner)
-            # make sure our file gets "uploaded"
-            assert [fd for fd in runner._files if fd['path'] == n_file_path]
+        with logger_disabled('mrjob.local'):
+            with mr_job.make_runner() as runner:
+                assert isinstance(runner, LocalMRJobRunner)
+                # make sure our file gets "uploaded"
+                assert [fd for fd in runner._files if fd['path'] == n_file_path]
 
-            runner.run()
-            output = set()
-            for line in runner.stream_output():
-                _, value = mr_job.parse_output_line(line)
-                output.add(value)
+                runner.run()
+                output = set()
+                for line in runner.stream_output():
+                    _, value = mr_job.parse_output_line(line)
+                    output.add(value)
 
         assert_equal(set(output), set([0, 1, ((2**3)**3)**3]))
 

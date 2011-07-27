@@ -42,9 +42,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         # Build a step object easily
         # also make it respond to .args()
         def step(jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
-                 args=['-mapper', 'my_job.py --mapper', 
+                 args=['-mapper', 'my_job.py --mapper',
                        '-reducer', 'my_job.py --reducer'],
-                 state='COMPLETE', 
+                 state='COMPLETE',
                  start_time_back=None,
                  end_time_back=None,
                  name='Streaming Step',
@@ -56,9 +56,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             if end_time_back:
                 kwargs['enddatetime'] = to_iso8601(
                     self.now - timedelta(hours=end_time_back))
-            kwargs['args'] = lambda: [MockEmrObject(value=a) for a in args]
+            kwargs['args'] = [MockEmrObject(value=a) for a in args]
             return MockEmrObject(
-                jar=jar, state=state, name=name, 
+                jar=jar, state=state, name=name,
                 action_on_failure=action_on_failure, **kwargs)
 
         # currently running job

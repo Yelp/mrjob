@@ -164,6 +164,53 @@ def find_interesting_hadoop_streaming_error(lines):
         return None
 
 
+_MULTILINE_JOB_LOG_ERROR_RE = re.compile(r'^\w+Attempt.*?TASK_STATUS="FAILED".*?ERROR="(?P<first_line>[^"]*)$')
+
+def find_job_log_multiline_error(lines):
+    """Scan a log file for an arbitrary multi-line error. Return it as a list
+    of lines, or None of nothing was found.
+
+    Here is an example error. The first line returned will only include the
+    text after ``ERROR="``.
+
+    MapAttempt TASK_TYPE="MAP" TASKID="task_201106280040_0001_m_000218" TASK_ATTEMPT_ID="attempt_201106280040_0001_m_000218_5" TASK_STATUS="FAILED" FINISH_TIME="1309246900665" HOSTNAME="/default-rack/ip-10-166-239-133.us-west-1.compute.internal" ERROR="Error initializing attempt_201106280040_0001_m_000218_5:
+    java.io.IOException: Cannot run program "bash": java.io.IOException: error=12, Cannot allocate memory
+        at java.lang.ProcessBuilder.start(ProcessBuilder.java:460)
+        at org.apache.hadoop.util.Shell.runCommand(Shell.java:149)
+        at org.apache.hadoop.util.Shell.run(Shell.java:134)
+        at org.apache.hadoop.fs.DF.getAvailable(DF.java:73)
+        at org.apache.hadoop.fs.LocalDirAllocator$AllocatorPerContext.getLocalPathForWrite(LocalDirAllocator.java:296)
+        at org.apache.hadoop.fs.LocalDirAllocator.getLocalPathForWrite(LocalDirAllocator.java:124)
+        at org.apache.hadoop.mapred.TaskTracker.localizeJob(TaskTracker.java:648)
+        at org.apache.hadoop.mapred.TaskTracker.startNewTask(TaskTracker.java:1320)
+        at org.apache.hadoop.mapred.TaskTracker.offerService(TaskTracker.java:956)
+        at org.apache.hadoop.mapred.TaskTracker.run(TaskTracker.java:1357)
+        at org.apache.hadoop.mapred.TaskTracker.main(TaskTracker.java:2361)
+    Caused by: java.io.IOException: java.io.IOException: error=12, Cannot allocate memory
+        at java.lang.UNIXProcess.<init>(UNIXProcess.java:148)
+        at java.lang.ProcessImpl.start(ProcessImpl.java:65)
+        at java.lang.ProcessBuilder.start(ProcessBuilder.java:453)
+        ... 10 more
+    "
+
+    These errors are parse from jobs/*.jar.
+    """
+    for line in lines:
+        m = _MULTILINE_JOB_LOG_ERROR_RE.match(line)
+        if m:
+            st_lines = []
+            if m.group('first_line'):
+                st_lines.append(m.group('first_line'))
+            for line in lines:
+                st_lines.append(line)
+                for line in lines:
+                    if line.strip() == '"':
+                        break
+                    st_lines.append(line)
+                return st_lines
+    return None
+
+
 _TIMEOUT_ERROR_RE = re.compile(r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds. Killing!"')
 
 def find_timeout_error(lines):
@@ -348,6 +395,7 @@ def parse_hadoop_counters_from_line(line):
 
 
 def parse_port_range_list(range_list_str):
+    """Parse a port range list of the form (start[:end])(,(start[:end]))*"""
     all_ranges = []
     for range_str in range_list_str.split(','):
         if ':' in range_str:
@@ -357,6 +405,24 @@ def parse_port_range_list(range_list_str):
             all_ranges.append(int(range_str))
     return all_ranges
 
+def parse_key_value_list(kv_string_list, error_fmt, error_func):
+    """Parse a list of strings like ``KEY=VALUE`` into a dictionary.
+
+    :param kv_string_list: Parse a list of strings like ``KEY=VALUE`` into a dictionary.
+    :type kv_string_list: [str]
+    :param error_fmt: Format string accepting one ``%s`` argument which is the malformed (i.e. not ``KEY=VALUE``) string
+    :type error_fmt: str
+    :param error_func: Function to call when a malformed string is encountered.
+    :type error_func: function(str)
+    """
+    ret = {}
+    for value in kv_string_list:
+        try:
+            k, v = value.split('=', 1)
+            ret[k] = v
+        except ValueError, e:
+            error_func(error_fmt % value)
+    return ret
 
 def parse_s3_uri(uri):
     """Parse an S3 URI into (bucket, key)

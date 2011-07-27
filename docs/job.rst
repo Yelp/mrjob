@@ -15,7 +15,10 @@ One-step jobs
 ^^^^^^^^^^^^^^^^
 .. automethod:: MRJob.mapper
 .. automethod:: MRJob.reducer
+.. automethod:: MRJob.mapper_init
 .. automethod:: MRJob.mapper_final
+.. automethod:: MRJob.reducer_init
+.. automethod:: MRJob.reducer_final
 
 Running the job
 ^^^^^^^^^^^^^^^
@@ -64,6 +67,24 @@ See :doc:`configs-reference` for a complete list of all configuration options.
 .. automethod:: MRJob.add_file_option
 .. automethod:: MRJob.load_options
 .. automethod:: MRJob.is_mapper_or_reducer
+
+Custom command-line types and actions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoattribute:: MRJob.OPTION_CLASS
+
+The :py:mod:`optparse` module allows the addition of new actions and types.
+See the `optparse docs <http://docs.python.org/library/optparse.html#extending-optparse>`_
+for instructions on defining custom options. The only difference is that
+instead of passing *option_class* to the :py:class:`OptionParser` instance
+yourself, you must set the :py:attr:`MRJob.OPTION_CLASS` attribute.
+
+Passthrough arguments have the additional caveat that mrjob uses some lesser
+magic to reproduce the argument values for the command lines of subprocesses.
+In practice you shouldn't encounter any problems here even with relatively
+exotic option behavior, but be aware that your options will be processed
+twice, with the second round using a copy of your default values produced by
+:py:func:`copy.deepcopy`.
 
 .. _job-configuration:
 

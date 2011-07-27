@@ -621,17 +621,11 @@ class CommandLineArgsTest(TestCase):
         # should use long option names (--protocol, not -p)
         # shouldn't include --limit because it's None
         # items should be in the order they were instantiated
-        assert_equal(mr_job.generate_passthrough_arguments(),
-                     ['--input-protocol', 'raw_value',
-                      '--output-protocol', 'json',
-                      '--protocol', 'json',
-                      '--foo-size', '5',
-                      '--pill-type', 'blue',
-                      '--planck-constant', '6.626068e-34'])
+        assert_equal(mr_job.generate_passthrough_arguments(), [])
 
     def test_explicit_passthrough_options(self):
         mr_job = MRCustomBoringJob(args=[
-            '-p', 'repr', # short name for --protocol
+            '-vp', 'repr', # short name for --protocol
             '--foo-size=9',
             '--bar-name', 'Alembic',
             '--enable-baz-mode', '--disable-quuxing',
@@ -655,18 +649,18 @@ class CommandLineArgsTest(TestCase):
         assert_equal(mr_job.options.extra_special_args, ['you', 'me'])
         assert_equal(mr_job.options.strict_protocols, True)
         assert_equal(mr_job.generate_passthrough_arguments(),
-                     ['--input-protocol', 'raw_value',
-                      '--output-protocol', 'repr',
-                      '--protocol', 'repr',
-                      '--strict-protocols',
-                      '--foo-size', '9',
+                     [
                       '--bar-name', 'Alembic',
                       '--enable-baz-mode',
-                      '--disable-quuxing',
-                      '--pill-type', 'red',
-                      '--planck-constant', '42.0',
                       '--extra-special-arg', 'you',
                       '--extra-special-arg', 'me',
+                      '--foo-size', '9',
+                      '--pill-type', 'red',
+                      '--planck-constant', '1',
+                      '--planck-constant', '42',
+                      '-p', 'repr',
+                      '--disable-quuxing',
+                      '--strict-protocols',
                       ])
 
     def test_bad_custom_options(self):

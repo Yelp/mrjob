@@ -71,37 +71,18 @@ See :doc:`configs-reference` for a complete list of all configuration options.
 Custom command-line types and actions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. autoattribute:: MRJob.OptionClass
+
 The :py:mod:`optparse` module allows the addition of new actions and types.
-mrjob's own custom actions and types, and especially the passthrough arguments
-feature, make defining your own custom actions and types slightly more
-complicated.
+See the `optparse docs <http://docs.python.org/library/optparse.html#extending-optparse>`_
+for instructions on defining custom options. The only difference is that
+instead of passing *option_class* to the :py:class:`OptionParser` instance
+yourself, you must set the :py:attr:`MRJob.OptionClass` attribute.
 
-Adding custom actions and types to your own jobs is essentially the same as it
-is normally (see the `optparse docs <http://docs.python.org/library/optparse.html#extending-optparse>`_),
-except that you should subclass from :py:class:`mrjob.job.MRJobOption` instead
-of :py:class:`optparse.Option`. For example, to add a new action
-``double_store``::
-
-    from mrjob.job import MRJobOption
-
-    class MyJobOption():
-
-        ACTIONS = MRJobOption.ACTIONS + ('double_store',)
-        STORE_ACTIONS = MRJobOption.STORE_ACTIONS + ('double_store',)
-        TYPED_ACTIONS = MRJobOption.TYPED_ACTIONS + ('double_store',)
-        ALWAYS_TYPED_ACTIONS = MRJobOption.ALWAYS_TYPED_ACTIONS + ('double_store',)
-
-        def take_action(self, action, dest, opt, value, values, parser):
-            if action == 'double_store':
-                values.ensure_value(dest, value*2)
-            else:
-                MRJobOption.take_action(
-                    self, action, dest, opt, value, values, parser)
-
-Special care should be taken when defining custom behavior for passthrough
-arguments because mrjob must reconstruct the original command line arguments
-in order to pass them to your mappers and reducers. In practice you shouldn't
-encounter any problems here, but be aware that your options will be processed
+Passthrough arguments have the additional caveat that mrjob uses some lesser
+magic to reproduce the argument values for the command lines of subprocesses.
+In practice you shouldn't encounter any problems here even with relatively
+exotic option behavior, but be aware that your options will be processed
 twice, with the second round using a copy of your default values produced by
 :py:func:`copy.deepcopy`.
 

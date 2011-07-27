@@ -107,7 +107,7 @@ except ImportError:
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
-from mrjob.parse import check_kv_pair, check_range_list, parse_mr_job_stderr
+from mrjob.parse import parse_port_range_list, parse_mr_job_stderr, parse_key_value_list
 from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
 from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
 from mrjob.util import log_to_stream, parse_and_save_options, read_input
@@ -124,34 +124,14 @@ class UsageError(Exception):
     pass
 
 
-class MRJobOption(Option):
-
-    TYPES = Option.TYPES + ('key_value_pair', 'range_list')
-    ACTIONS = Option.ACTIONS + ('set_key',)
-    STORE_ACTIONS = Option.STORE_ACTIONS + ('set_key',)
-    TYPED_ACTIONS = Option.TYPED_ACTIONS + ('set_key',)
-    ALWAYS_TYPED_ACTIONS = Option.ALWAYS_TYPED_ACTIONS + ('set_key',)
-
-    TYPE_CHECKER = copy(Option.TYPE_CHECKER)
-    TYPE_CHECKER["key_value_pair"] = check_kv_pair
-    TYPE_CHECKER["range_list"] = check_range_list
-
-    def take_action(self, action, dest, opt, value, values, parser):
-        if action == 'set_key':
-            try:
-                store_key, store_value = value
-            except ValueError:
-                raise OptionValueError(
-                    "option %s: value is not a key_value_pair" % opt)
-            values.ensure_value(dest, {})[store_key] = store_value
-        else:
-            Option.take_action(
-                self, action, dest, opt, value, values, parser)
-
-
 class MRJob(object):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
     for details."""
+
+    #: :py:class:`optparse.Option` subclass to use with the
+    #: :py:class:`optparse.OptionParser` instance.
+    OptionClass=Option
+
     def __init__(self, args=None):
         """Entry point for running your job from other Python code.
 
@@ -177,8 +157,8 @@ class MRJob(object):
         self._file_options = []
 
         usage = "usage: %prog [options] [input files]"
-        self.option_parser = OptionParser(
-            usage=usage, option_class=MRJobOption)
+        self.option_parser = OptionParser(usage=usage,
+                                          option_class=self.OptionClass)
         self.configure_options()
 
         # don't pass None to parse_args unless we're actually running
@@ -866,7 +846,7 @@ class MRJob(object):
         self.option_parser.add_option_group(self.hadoop_emr_opt_group)
 
         self.hadoop_emr_opt_group.add_option(
-            '--cmdenv', dest='cmdenv', default={}, action='set_key', type='key_value_pair',
+            '--cmdenv', dest='cmdenv', default=[], action='append',
             help='set an environment variable for your job inside Hadoop '
             'streaming. Must take the form KEY=VALUE. You can use --cmdenv '
             'multiple times.')
@@ -894,7 +874,7 @@ class MRJob(object):
             help='Path of your hadoop streaming jar (locally, or on S3/HDFS)')
 
         self.hadoop_emr_opt_group.add_option(
-            '--jobconf', dest='jobconf', default={}, action='set_key', type='key_value_pair',
+            '--jobconf', dest='jobconf', default=[], action='append',
             help='-jobconf arg to pass through to hadoop streaming; '
             'should take the form KEY=VALUE. You can use --jobconf '
             'multiple times.')
@@ -1037,7 +1017,6 @@ class MRJob(object):
 
         self.emr_opt_group.add_option(
             '--ssh-bind-ports', dest='ssh_bind_ports', default=None,
-            type='range_list',
             help='A list of port ranges that are safe to listen on, delimited by colons and commas with the syntax 2000[:2001][,2003,2005:2008,etc]. Defaults to 40001:40840.')
 
         self.emr_opt_group.add_option(
@@ -1127,6 +1106,28 @@ class MRJob(object):
                 ...
         """
         self.options, self.args = self.option_parser.parse_args(args)
+
+        # parse custom options here to avoid setting a custom Option subclass
+        # and confusing users
+
+        if self.options.ssh_bind_ports:
+            try:
+                ports = parse_port_range_list(self.options.ssh_bind_ports)
+            except ValueError, e:
+                self.option_parser.error('invalid port range list "%s": \n%s' %
+                                         (self.options.ssh_bind_ports,
+                                          e.args[0]))
+            self.options.ssh_bind_ports = ports
+
+        cmdenv_err = 'cmdenv argument "%s" is not of the form KEY=VALUE'
+        self.options.cmdenv = parse_key_value_list(self.options.cmdenv,
+                                                   cmdenv_err,
+                                                   self.option_parser.error)
+
+        jobconf_err = 'jobconf argument "%s" is not of the form KEY=VALUE'
+        self.options.jobconf = parse_key_value_list(self.options.jobconf,
+                                                    jobconf_err,
+                                                    self.option_parser.error)
 
         # output_protocol defaults to protocol
         if not self.options.output_protocol:

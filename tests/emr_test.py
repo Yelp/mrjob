@@ -23,6 +23,7 @@ import getpass
 import gzip
 import logging
 import os
+import posixpath
 import py_compile
 import shutil
 from StringIO import StringIO
@@ -33,8 +34,10 @@ from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
 from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
 from mrjob.parse import JOB_NAME_RE
+from mrjob.ssh import SSH_LOG_ROOT, SSH_PREFIX
 from mrjob.util import tar_and_gzip
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, MockKey, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
+from tests.mockssh import create_mock_ssh_script, mock_ssh_dir, mock_ssh_file
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled, no_handlers_for_logger
 
@@ -93,6 +96,51 @@ class MockEMRAndS3TestCase(TestCase):
         """Update self.mock_s3_fs with a map from bucket name
         to key name to data."""
         add_mock_s3_data(self.mock_s3_fs, data)
+
+    def prepare_runner_for_ssh(self, runner, num_slaves=0):
+        # Set up environment variables
+        self._old_environ = os.environ.copy()
+        os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
+
+        # Create temporary directories and add them to MOCK_SSH_ROOTS
+        self.master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
+        os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % self.master_ssh_root
+
+        self.slave_ssh_roots = []
+
+        # Make the fake binary
+        os.mkdir(os.path.join(self.master_ssh_root, 'bin'))
+        self.ssh_bin = os.path.join(self.master_ssh_root, 'bin', 'ssh')
+        create_mock_ssh_script(self.ssh_bin)
+
+        # Make a fake keyfile so that the 'file exists' requirements are
+        # satsified
+        self.keyfile_path = os.path.join(self.master_ssh_root, 'key.pem')
+        with open(self.keyfile_path, 'w') as f:
+            f.write('I AM DEFINITELY AN SSH KEY FILE')
+
+        # Tell the runner to use the fake binary
+        self.runner._opts['ssh_bin'] = [self.ssh_bin]
+        # Inject a master node hostname so it doesn't try to 'emr --describe' it
+        self.runner._address = 'testmaster'
+        # Also pretend to have an SSH key pair file
+        self.runner._opts['ec2_key_pair_file'] = self.keyfile_path
+
+    def add_slave(self):
+        """Add a mocked slave to the cluster"""
+        slave_num = len(self.slave_ssh_roots)
+        new_dir = tempfile.mkdtemp(prefix='slave_%d_ssh_root.' % slave_num)
+        self.slave_ssh_roots.append(new_dir)
+        os.environ['MOCK_SSH_ROOTS'] += (':testmaster!testslave%d=%s'
+                                         % (slave_num, new_dir))
+
+    def teardown_ssh(self):
+        os.environ.clear()
+        os.environ.update(self._old_environ)
+        shutil.rmtree(self.master_ssh_root)
+        for path in self.slave_ssh_roots:
+            shutil.rmtree(path)
+
 
 
 class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
@@ -370,7 +418,6 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
 
             emr_conn = runner.make_emr_conn()
             job_flow_id = runner.get_emr_job_flow_id()
-
             job_flow = emr_conn.describe_jobflow(job_flow_id)
             assert_equal(job_flow.availabilityzone, 'PUPPYLAND')
 
@@ -631,7 +678,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
                      {'lines': list(StringIO(PY_EXCEPTION)),
-                      's3_log_file_uri':
+                      'log_file_uri':
                           BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
                       'input_uri': BUCKET_URI + 'input.gz'})
 
@@ -642,7 +689,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
                      {'lines': list(StringIO(PY_EXCEPTION)),
-                      's3_log_file_uri':
+                      'log_file_uri':
                           BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
                       'input_uri': None})
 
@@ -658,7 +705,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
                      {'lines': list(StringIO(JAVA_STACK_TRACE)),
-                      's3_log_file_uri':
+                      'log_file_uri':
                           BUCKET_URI + ATTEMPT_0_DIR + 'syslog',
                       'input_uri': BUCKET_URI + 'input.gz'})
 
@@ -671,7 +718,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
                      {'lines': list(StringIO(JAVA_STACK_TRACE)),
-                      's3_log_file_uri':
+                      'log_file_uri':
                           BUCKET_URI + ATTEMPT_0_DIR + 'syslog',
                       'input_uri': None})
 
@@ -694,7 +741,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
 
         assert_equal(self.runner._find_probable_cause_of_failure([1, 2, 3]),
                      {'lines': [USEFUL_HADOOP_ERROR + '\n'],
-                      's3_log_file_uri':
+                      'log_file_uri':
                           BUCKET_URI + LOG_DIR + 'steps/2/syslog',
                       'input_uri': None})
 
@@ -707,7 +754,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 CHILD_ERR_LINE + JAVA_STACK_TRACE,
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + TASK_ATTEMPTS_DIR +
                      'attempt_201007271720_0002_m_000004_0/syslog')
 
@@ -719,7 +766,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n',
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + LOG_DIR + 'steps/2/syslog')
 
     def test_reducer_beats_mapper(self):
@@ -731,7 +778,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 CHILD_ERR_LINE + JAVA_STACK_TRACE,
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + TASK_ATTEMPTS_DIR +
                      'attempt_201007271720_0001_r_000126_3/syslog')
 
@@ -744,7 +791,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 CHILD_ERR_LINE + JAVA_STACK_TRACE,
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + TASK_ATTEMPTS_DIR +
                      'attempt_201007271720_0001_m_000004_3/syslog')
 
@@ -754,7 +801,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
             ATTEMPT_0_DIR + 'syslog': CHILD_ERR_LINE + JAVA_STACK_TRACE,
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + ATTEMPT_0_DIR + 'stderr')
 
     def test_exception_beats_hadoop_error(self):
@@ -765,7 +812,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n',
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + TASK_ATTEMPTS_DIR +
                      'attempt_201007271720_0002_m_000126_0/stderr')
 
@@ -778,7 +825,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n',
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
-        assert_equal(failure['s3_log_file_uri'],
+        assert_equal(failure['log_file_uri'],
                      BUCKET_URI + LOG_DIR + 'steps/1/syslog')
 
     def test_ignore_errors_from_steps_that_later_succeeded(self):
@@ -793,6 +840,91 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 make_input_uri_line(BUCKET_URI + 'input.gz'),
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]), None)
+
+
+class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
+    # Make sure that SSH and S3 are accessed when we expect them to be
+
+    @setup
+    def make_runner(self):
+        self.add_mock_s3_data({'walrus': {}})
+
+        self.runner = EMRJobRunner(s3_sync_wait_time=0,
+                                   s3_scratch_uri='s3://walrus/tmp',
+                                   conf_path=False)
+        self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
+        self.prepare_runner_for_ssh(self.runner)
+
+    @teardown
+    def cleanup_runner(self):
+        """This method assumes ``prepare_runner_for_ssh()`` was called. That
+        method isn't a "proper" setup method because it requires different
+        arguments for different tests.
+        """
+        self.runner.cleanup()
+        self.teardown_ssh()
+
+    def test_ssh_comes_first(self):
+        join = os.path.join
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/userlogs')
+
+        # Put a log file and error into SSH
+        ssh_lone_log_path = posixpath.join(SSH_LOG_ROOT, 'steps', '1', 'syslog')
+        mock_ssh_file('testmaster', ssh_lone_log_path,
+                      HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n')
+
+        # Put a 'more interesting' error in S3 to make sure that the
+        # 'less interesting' one from SSH is read and S3 is never
+        # looked at. This would never happen in reality because the
+        # logs should be identical, but it makes for an easy test
+        # of SSH overriding S3.
+        self.add_mock_s3_data({'walrus': {
+            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000126_0/stderr':
+                TRACEBACK_START + PY_EXCEPTION,
+        }})
+        failure = self.runner._find_probable_cause_of_failure([1, 2])
+        assert_equal(failure['log_file_uri'],
+                     SSH_PREFIX + self.runner._address + ssh_lone_log_path)
+
+    def test_ssh_works_with_slaves(self):
+        self.add_slave()
+
+        join = os.path.join
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
+        mock_ssh_dir('testmaster!testslave0', SSH_LOG_ROOT + '/userlogs/attempt_201007271720_0002_m_000126_0')
+
+        # Put a log file and error into SSH
+        ssh_log_path = posixpath.join(SSH_LOG_ROOT, 'userlogs',
+                                      'attempt_201007271720_0002_m_000126_0',
+                                      'stderr')
+        ssh_log_path_2 = posixpath.join(SSH_LOG_ROOT, 'userlogs',
+                                        'attempt_201007271720_0002_m_000126_0',
+                                        'syslog')
+        mock_ssh_file('testmaster!testslave0', ssh_log_path,
+                      TRACEBACK_START + PY_EXCEPTION)
+        mock_ssh_file('testmaster!testslave0', ssh_log_path_2,
+                      '')
+        failure = self.runner._find_probable_cause_of_failure([1, 2])
+        assert_equal(failure['log_file_uri'],
+                     SSH_PREFIX + 'testmaster!testslave0' + ssh_log_path)
+
+    def test_ssh_fails_to_s3(self):
+        # the runner will try to use SSH and find itself unable to do so,
+        # throwing a LogFetchException and triggering S3 fetching.
+        self.runner._address = None
+
+        # Put a different error into S3
+        self.add_mock_s3_data({'walrus': {
+            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000126_0/stderr':
+                TRACEBACK_START + PY_EXCEPTION,
+        }})
+        failure = self.runner._find_probable_cause_of_failure([1, 2])
+        assert_equal(failure['log_file_uri'],
+                     BUCKET_URI + TASK_ATTEMPTS_DIR +
+                     'attempt_201007271720_0002_m_000126_0/stderr')
 
 
 class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
@@ -868,7 +1000,7 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
         assert_equal(runner.make_s3_conn().endpoint, 's3-proxy')
 
 
-class TestLs(MockEMRAndS3TestCase):
+class TestS3Ls(MockEMRAndS3TestCase):
 
     def test_s3_ls(self):
         self.add_mock_s3_data({'walrus': {'one': '', 'two': '', 'three': ''}})
@@ -893,6 +1025,37 @@ class TestLs(MockEMRAndS3TestCase):
         # probably be owned by other people, and we'll get some sort
         # of permissions error)
         assert_raises(Exception, set, runner._s3_ls('s3://lolcat/'))
+
+
+class TestSSHLs(MockEMRAndS3TestCase):
+
+    @setup
+    def make_runner(self):
+        self.runner = EMRJobRunner(conf_path=False)
+        self.prepare_runner_for_ssh(self.runner)
+
+    @teardown
+    def cleanup_runner(self):
+        self.teardown_ssh()
+
+    def test_ssh_ls(self):
+        self.add_slave()
+
+        mock_ssh_dir('testmaster', 'test')
+        mock_ssh_file('testmaster', posixpath.join('test', 'one'), '')
+        mock_ssh_file('testmaster', posixpath.join('test', 'two'), '')
+        mock_ssh_dir('testmaster!testslave0', 'test')
+        mock_ssh_file('testmaster!testslave0', posixpath.join('test', 'three'), '')
+
+        assert_equal(list(self.runner.ls('ssh://testmaster/test')),
+                     ['ssh://testmaster/test/one', 'ssh://testmaster/test/two'])
+        assert_equal(list(self.runner.ls('ssh://testmaster!testslave0/test')),
+                     ['ssh://testmaster!testslave0/test/three'])
+        # Define a quick inline function because runner.ls is a generator
+        # and won't fire unless we list() it
+        def die():
+            list(self.runner.ls('ssh://testmaster/does_not_exist'))
+        assert_raises(IOError, die)
 
 
 class TestNoBoto(TestCase):
@@ -1137,3 +1300,21 @@ class TestCat(MockEMRAndS3TestCase):
                 output.append(line)
 
         assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
+
+
+def TestCatFallback(MockEMRAndS3TestCase):
+
+    def test_s3_cat(self):
+        self.add_mock_s3_data({'walrus': {'one': 'one_text', 'two': 'two_text', 'three': 'three_text'}})
+
+        runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
+                              conf_path=False)
+
+        assert_equal(runner.cat('s3://walrus/one'), 'one_text')
+
+    def test_ssh_cat(self):
+        runner = EMRJobRunner(conf_path=False)
+        runner._address = 'not_a_real_ssh_host'
+        mock_ssh_cat({'/etc/init.d': 'meow'})
+        assert_equal(runner.cat('/etc/init.d'), 'meow')
+        assert_raises(IOError, runner.cat, 'ssh://does_not_exist')

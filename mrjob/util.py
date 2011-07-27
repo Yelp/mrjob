@@ -327,6 +327,19 @@ def bunzip2_stream(fileobj):
     return f
 
 
+@contextlib.contextmanager
+def save_current_environment():
+    """ Context manager that saves os.environ and loads 
+        it back again after execution
+    """
+    original_environ = os.environ.copy()
+    
+    yield
+    
+    os.environ.clear()
+    os.environ.update(original_environ)
+
+
 def scrape_options_and_index_by_dest(*parsers_and_groups):
     """Scrapes ``optparse`` options from :py:class:`OptionParser` and :py:class:`OptionGroup` objects and builds a dictionary of ``dest_var: [option1, option2, ...]``. This function primarily exists to serve :py:func:`scrape_options_into_new_groups`.
 

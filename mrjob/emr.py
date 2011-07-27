@@ -1516,12 +1516,14 @@ class EMRJobRunner(MRJobRunner):
             if not log_lines:
                 continue
 
+            new_counters = None
+
             for maybe_double_line in log_lines:
                 for line in maybe_double_line.split('\n'):
-                    new_counters = parse_hadoop_counters_from_line(line)
-                    if new_counters:
-                        self._counters.append(new_counters)
-                        break
+                    new_counters = parse_hadoop_counters_from_line(line) or new_counters
+            if new_counters:
+                self._counters.append(new_counters)
+                break
 
     def counters(self):
         return self._counters
@@ -1941,6 +1943,9 @@ class EMRJobRunner(MRJobRunner):
                 return False
 
             # match bootstrap configuration and pool name
+            if not job_flow.bootstrapactions:
+                return False
+
             args = [arg.value for arg in job_flow.bootstrapactions[-1].args]
             if not args == [pool_arg, self._pool_name]:
                 return False

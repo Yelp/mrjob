@@ -188,8 +188,7 @@ def find_job_log_multiline_error(lines):
                         break
                     st_lines.append(line)
                 return st_lines
-    else:
-        return None
+    return None
 
 
 _TIMEOUT_ERROR_RE = re.compile(r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds. Killing!"')

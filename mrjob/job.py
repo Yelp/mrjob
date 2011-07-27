@@ -120,6 +120,11 @@ def _IDENTITY_MAPPER(key, value):
 _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
 
 
+# The former custom option class has been removed and this stub will disappear
+# permanently in mrjob 0.4.
+MRJobOptions = Option
+
+
 class UsageError(Exception):
     pass
 

@@ -144,6 +144,53 @@ def find_interesting_hadoop_streaming_error(lines):
         return None
 
 
+_MULTILINE_JOB_LOG_ERROR_RE = re.compile(r'^\w+Attempt.*?TASK_STATUS="FAILED".*?ERROR="(?P<first_line>[^"]*)$')
+
+def find_job_log_multiline_error(lines):
+    """Scan a log file for an arbitrary multi-line error. Return it as a list
+    of lines, or None of nothing was found.
+
+    Here is an example error. The first line returned will only include the
+    text after ``ERROR="``.
+
+    MapAttempt TASK_TYPE="MAP" TASKID="task_201106280040_0001_m_000218" TASK_ATTEMPT_ID="attempt_201106280040_0001_m_000218_5" TASK_STATUS="FAILED" FINISH_TIME="1309246900665" HOSTNAME="/default-rack/ip-10-166-239-133.us-west-1.compute.internal" ERROR="Error initializing attempt_201106280040_0001_m_000218_5:
+    java.io.IOException: Cannot run program "bash": java.io.IOException: error=12, Cannot allocate memory
+        at java.lang.ProcessBuilder.start(ProcessBuilder.java:460)
+        at org.apache.hadoop.util.Shell.runCommand(Shell.java:149)
+        at org.apache.hadoop.util.Shell.run(Shell.java:134)
+        at org.apache.hadoop.fs.DF.getAvailable(DF.java:73)
+        at org.apache.hadoop.fs.LocalDirAllocator$AllocatorPerContext.getLocalPathForWrite(LocalDirAllocator.java:296)
+        at org.apache.hadoop.fs.LocalDirAllocator.getLocalPathForWrite(LocalDirAllocator.java:124)
+        at org.apache.hadoop.mapred.TaskTracker.localizeJob(TaskTracker.java:648)
+        at org.apache.hadoop.mapred.TaskTracker.startNewTask(TaskTracker.java:1320)
+        at org.apache.hadoop.mapred.TaskTracker.offerService(TaskTracker.java:956)
+        at org.apache.hadoop.mapred.TaskTracker.run(TaskTracker.java:1357)
+        at org.apache.hadoop.mapred.TaskTracker.main(TaskTracker.java:2361)
+    Caused by: java.io.IOException: java.io.IOException: error=12, Cannot allocate memory
+        at java.lang.UNIXProcess.<init>(UNIXProcess.java:148)
+        at java.lang.ProcessImpl.start(ProcessImpl.java:65)
+        at java.lang.ProcessBuilder.start(ProcessBuilder.java:453)
+        ... 10 more
+    "
+
+    These errors are parse from jobs/*.jar.
+    """
+    for line in lines:
+        m = _MULTILINE_JOB_LOG_ERROR_RE.match(line)
+        if m:
+            st_lines = []
+            if m.group('first_line'):
+                st_lines.append(m.group('first_line'))
+            for line in lines:
+                st_lines.append(line)
+                for line in lines:
+                    if line.strip() == '"':
+                        break
+                    st_lines.append(line)
+                return st_lines
+    return None
+
+
 _TIMEOUT_ERROR_RE = re.compile(r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds. Killing!"')
 
 def find_timeout_error(lines):

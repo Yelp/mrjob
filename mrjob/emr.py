@@ -45,7 +45,7 @@ except ImportError:
     boto = None
 
 from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths, combine_path_lists
-from mrjob.logparsers import TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS, processing_order
+from mrjob.logparsers import TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS, processing_order, TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, JOB_LOG_URI_RE, NODE_LOG_URI_RE
 from mrjob.parse import find_input_uri_for_mapper, parse_hadoop_counters_from_line
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
@@ -72,18 +72,6 @@ MAX_SSH_RETRIES = 20
 
 # ssh should fail right away if it can't bind a port
 WAIT_FOR_SSH_TO_FAIL = 1.0
-
-# regex for matching task-attempts log URIs
-TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
-
-# regex for matching step log URIs
-STEP_LOG_URI_RE = re.compile(r'^.*/(?P<step_num>\d+)/syslog$')
-
-# regex for matching job log URIs
-JOB_LOG_URI_RE = re.compile(r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
-
-# regex for matching slave log URIs
-NODE_LOG_URI_RE = re.compile(r'^.*?/hadoop-hadoop-(jobtracker|namenode).*.out$')
 
 # sometimes AWS gives us seconds as a decimal, which we can't parse
 # with boto.utils.ISO8601
@@ -1459,15 +1447,12 @@ class EMRJobRunner(MRJobRunner):
         documentation.
         """
         log_type_map = {
-            TASK_ATTEMPT_LOGS: (task_uris, TASK_ATTEMPTS_LOG_URI_RE),
-            STEP_LOGS: (step_uris, STEP_LOG_URI_RE),
-            JOB_LOGS: (job_uris, JOB_LOG_URI_RE),
+            TASK_ATTEMPT_LOGS: task_uris,
+            STEP_LOGS: step_uris,
+            JOB_LOGS: job_uris,
         }
-        for log_type, sort_key_func, parsers in processing_order():
-            log_file_uris, regexp = log_type_map[log_type]
-            relevant_logs = self._sort_log_file_uris(log_file_uris,
-                                                     regexp,
-                                                     sort_key_func)
+        for log_type, sort_func, parsers in processing_order():
+            relevant_logs = sort_func(log_type_map[log_type])
 
             # unfortunately need to special case task attempts since later
             # attempts may have succeeded and we don't want those (issue #31)
@@ -1488,26 +1473,6 @@ class EMRJobRunner(MRJobRunner):
                     return val
 
         return None
-
-    def _sort_log_file_uris(self, log_file_uris, regexp, sort_key_func):
-        """Sort *log_file_uris* matching *regexp* according to *sort_key_func*
-
-        :return: [(sort_key, info, log_file_uri)]
-        """
-        relevant_logs = [] # list of (sort key, info, URI)
-        for log_file_uri in log_file_uris:
-            match = regexp.match(log_file_uri)
-            if not match:
-                continue
-
-            info = match.groupdict()
-
-            sort_key = sort_key_func(info)
-
-            relevant_logs.append((sort_key, info, log_file_uri))
-
-        relevant_logs.sort(reverse=True)
-        return relevant_logs
 
     def _apply_parsers_to_log(self, parsers, log_file_uri):
         """Have each :py:class:`LogParser` in *parsers* try to find an error

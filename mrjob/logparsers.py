@@ -26,6 +26,43 @@ STEP_LOGS = 'STEP_LOGS'
 JOB_LOGS = 'JOB_LOGS'
 NODE_LOGS = 'NODE_LOGS'
 
+# regex for matching task-attempts log URIs
+TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
+
+# regex for matching step log URIs
+STEP_LOG_URI_RE = re.compile(r'^.*/(?P<step_num>\d+)/syslog$')
+
+# regex for matching job log URIs
+JOB_LOG_URI_RE = re.compile(r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
+
+# regex for matching slave log URIs
+NODE_LOG_URI_RE = re.compile(r'^.*?/hadoop-hadoop-(jobtracker|namenode).*.out$')
+
+
+def _make_sorting_func(regexp, sort_key_func):
+
+    def sorting_func(log_file_uris):
+        """Sort *log_file_uris* matching *regexp* according to *sort_key_func*
+
+        :return: [(sort_key, info, log_file_uri)]
+        """
+        relevant_logs = [] # list of (sort key, info, URI)
+        for log_file_uri in log_file_uris:
+            match = regexp.match(log_file_uri)
+            if not match:
+                continue
+
+            info = match.groupdict()
+
+            sort_key = sort_key_func(info)
+
+            relevant_logs.append((sort_key, info, log_file_uri))
+
+        relevant_logs.sort(reverse=True)
+        return relevant_logs
+
+    return sorting_func
+
 
 def processing_order():
     """Define a mapping and order for the log parsers.
@@ -36,19 +73,25 @@ def processing_order():
 
     :return: [(LOG_TYPE, sort_function, [LogParser])]
     """
+    task_attempt_sort = _make_sorting_func(TASK_ATTEMPTS_LOG_URI_RE,
+                                           make_task_attempt_log_sort_key)
+    step_sort = _make_sorting_func(STEP_LOG_URI_RE,
+                                   make_step_log_sort_key)
+    job_sort = _make_sorting_func(JOB_LOG_URI_RE,
+                                  make_job_log_sort_key)
     return [
         # give priority to task-attempts/ logs as they contain more useful
         # error messages. this may take a while.
-        (TASK_ATTEMPT_LOGS, make_task_attempt_log_sort_key,
+        (TASK_ATTEMPT_LOGS, task_attempt_sort,
          [
              PythonTracebackLogParser(),
              HadoopJavaStackTraceLogParser()
          ]),
-        (STEP_LOGS, make_step_log_sort_key,
+        (STEP_LOGS, step_sort,
          [
              HadoopStreamingErrorLogParser()
          ]),
-        (JOB_LOGS, make_job_log_sort_key,
+        (JOB_LOGS, job_sort,
          [
              TimeoutErrorLogParser()
          ]),

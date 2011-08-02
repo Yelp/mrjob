@@ -1469,8 +1469,8 @@ class EMRJobRunner(MRJobRunner):
                                                      regexp,
                                                      sort_key_func)
 
-            # unfortunately need to special case task attempts since there can
-            # be duplicates with different timestamps and we only want one
+            # unfortunately need to special case task attempts since later
+            # attempts may have succeeded and we don't want those (issue #31)
             tasks_seen = set()
             for sort_key, info, log_file_uri in relevant_logs:
 

@@ -45,7 +45,8 @@ except ImportError:
     boto = None
 
 from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths, combine_path_lists
-from mrjob.parse import find_python_traceback, find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_timeout_error, parse_hadoop_counters_from_line
+from mrjob.logparsers import TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS, processing_order
+from mrjob.parse import find_input_uri_for_mapper, parse_hadoop_counters_from_line
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
 from mrjob.ssh import ssh_cat, ssh_ls, ssh_copy_key, ssh_slave_addresses, SSHException, SSH_PREFIX, SSH_LOG_ROOT
@@ -71,12 +72,6 @@ MAX_SSH_RETRIES = 20
 
 # ssh should fail right away if it can't bind a port
 WAIT_FOR_SSH_TO_FAIL = 1.0
-
-# Constants used to tell :py:func:`~mrjob.emr.EMRJobRunner.ssh_list_logs` and :py:func:`~mrjob.emr.EMRJobRunner.s3_list_logs`  what logs to find and return
-TASK_ATTEMPT_LOGS = 'TASK_ATTEMPT_LOGS'
-STEP_LOGS = 'STEP_LOGS'
-JOB_LOGS = 'JOB_LOGS'
-NODE_LOGS = 'NODE_LOGS'
 
 # regex for matching task-attempts log URIs
 TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
@@ -1432,97 +1427,105 @@ class EMRJobRunner(MRJobRunner):
             step, the URI of the input file that caused the error
             (otherwise None)
         """
-        try:
-            if not self._opts['ec2_key_pair_file']:
-                raise LogFetchException('ec2_key_pair_file not specified')
-            log_types = [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
-            logs = self.ssh_list_logs(log_types, step_nums)
-            log.info('Scanning SSH logs for probable cause of failure')
-            return self._scan_logs_in_order(*logs)
-        except LogFetchException, e:
-            if not self._s3_job_log_uri:
-                return None
+        if self._opts['ec2_key_pair_file']:
+            try:
+                return self._find_probable_cause_of_failure_ssh(step_nums)
+            except LogFetchException, e:
+                return self._find_probable_cause_of_failure_s3(step_nums)
+        else:
+            return self._find_probable_cause_of_failure_s3(step_nums)
 
-            log.info('Scanning S3 logs for probable cause of failure')
-            self._wait_for_s3_eventual_consistency()
-            self._wait_for_job_flow_termination()
+    def _find_probable_cause_of_failure_ssh(self, step_nums):
+        log_types = [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
+        logs = self.ssh_list_logs(log_types, step_nums)
+        log.info('Scanning SSH logs for probable cause of failure')
+        return self._scan_logs_in_order(*logs)
 
-            log_types = [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
-            logs = self.s3_list_logs(log_types, step_nums)
-            return self._scan_logs_in_order(*logs)
+    def _find_probable_cause_of_failure_s3(self, step_nums):
+        if not self._s3_job_log_uri:
+            return None
+
+        log.info('Scanning S3 logs for probable cause of failure')
+        self._wait_for_s3_eventual_consistency()
+        self._wait_for_job_flow_termination()
+
+        log_types = [TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS]
+        logs = self.s3_list_logs(log_types, step_nums)
+        return self._scan_logs_in_order(*logs)
 
     def _scan_logs_in_order(self, task_uris, step_uris, job_uris):
-        # give priority to task-attempts/ logs as they contain more useful
-        # error messages. this may take a while.
-        return (
-            self._scan_task_attempt_logs(task_uris)
-            or self._scan_step_logs(step_uris)
-            or self._scan_job_logs(job_uris))
+        """Use mapping and order from :py:mod:`logparsers` to find errors in
+        logs. See :py:meth:`_find_probable_cause_of_failure` for return value
+        documentation.
+        """
+        log_type_map = {
+            TASK_ATTEMPT_LOGS: (task_uris, TASK_ATTEMPTS_LOG_URI_RE),
+            STEP_LOGS: (step_uris, STEP_LOG_URI_RE),
+            JOB_LOGS: (job_uris, JOB_LOG_URI_RE),
+        }
+        for log_type, sort_key_func, parsers in processing_order():
+            log_file_uris, regexp = log_type_map[log_type]
+            relevant_logs = self._sort_log_file_uris(log_file_uris,
+                                                     regexp,
+                                                     sort_key_func)
 
-    def _scan_task_attempt_logs(self, log_file_uris):
-        """Scan task-attempts/*/{syslog,stderr} for Python exceptions
-        and Java stack traces.
+            # unfortunately need to special case task attempts since there can
+            # be duplicates with different timestamps and we only want one
+            tasks_seen = set()
+            for sort_key, info, log_file_uri in relevant_logs:
 
-        Helper for _find_probable_cause_of_failure()
+                if log_type == TASK_ATTEMPT_LOGS:
+                    task_info = (info['step_num'], info['node_type'],
+                                 info['node_num'], info['stream'])
+                    if task_info in tasks_seen:
+                        continue
+                    tasks_seen.add(task_info)
+
+                val = self._apply_parsers_to_log(parsers, log_file_uri)
+                if val:
+                    if info.get('node_type', None) == 'm':
+                        val['input_uri'] = self._scan_for_input_uri(log_file_uri)
+                    return val
+
+        return None
+
+    def _sort_log_file_uris(self, log_file_uris, regexp, sort_key_func):
+        """Sort *log_file_uris* matching *regexp* according to *sort_key_func*
+
+        :return: [(sort_key, info, log_file_uri)]
         """
         relevant_logs = [] # list of (sort key, info, URI)
         for log_file_uri in log_file_uris:
-            match = TASK_ATTEMPTS_LOG_URI_RE.match(log_file_uri)
+            match = regexp.match(log_file_uri)
             if not match:
                 continue
 
             info = match.groupdict()
 
-            # sort so we can go through the steps in reverse order
-            # prefer stderr to syslog (Python exceptions are more
-            # helpful than Java ones)
-            sort_key = (info['step_num'], info['node_type'],
-                        info['attempt_num'],
-                        info['stream'] == 'stderr',
-                        info['node_num'])
+            sort_key = sort_key_func(info)
 
             relevant_logs.append((sort_key, info, log_file_uri))
 
         relevant_logs.sort(reverse=True)
+        return relevant_logs
 
-        tasks_seen = set()
+    def _apply_parsers_to_log(self, parsers, log_file_uri):
+        """Have each :py:class:`LogParser` in *parsers* try to find an error
+        in the contents of *log_file_uri*
+        """
+        for parser in parsers:
+            if parser.LOG_NAME_RE.match(log_file_uri):
+                log_lines = self.cat(log_file_uri)
+                if not log_lines:
+                    continue
 
-        for sort_key, info, log_file_uri in relevant_logs:
-            # Issue #31: Don't bother with errors from tasks that
-            # later succeeded
-            task_info = (info['step_num'], info['node_type'],
-                         info['node_num'], info['stream'])
-            if task_info in tasks_seen:
-                continue
-            tasks_seen.add(task_info)
-
-            log_lines = self.cat(log_file_uri)
-            if not log_lines:
-                continue
-
-            lines = None
-            if info['stream'] == 'stderr':
-                log.debug('scanning %s for Python tracebacks' % log_file_uri)
-                lines = find_python_traceback(log_lines)
-            else:
-                log.debug('scanning %s for Java stack traces' % log_file_uri)
-                lines = find_hadoop_java_stack_trace(log_lines)
-
-            if lines is not None:
-                result = {
-                    'lines': lines,
-                    'log_file_uri': log_file_uri,
-                    'input_uri': None
-                }
-
-                # if this is a mapper, figure out which input file we
-                # were reading from.
-                if info['node_type'] == 'm':
-                    result['input_uri'] = self._scan_for_input_uri(
-                        log_file_uri)
-
-                return result
-
+                lines = parser.parse(log_lines)
+                if lines is not None:
+                    return {
+                        'lines': lines,
+                        'log_file_uri': log_file_uri,
+                        'input_uri': None,
+                    }
         return None
 
     def _scan_for_input_uri(self, log_file_uri):
@@ -1540,65 +1543,6 @@ class EMRJobRunner(MRJobRunner):
             return find_input_uri_for_mapper(syslog_lines)
         else:
             return None
-
-
-    def _scan_step_logs(self, log_file_uris):
-        """Scan steps/*/syslog for hadoop streaming errors.
-
-        Helper for _find_probable_cause_of_failure()
-        """
-        for log_file_uri in sorted(log_file_uris, reverse=True):
-            match = STEP_LOG_URI_RE.match(log_file_uri)
-            if not match:
-                continue
-
-            lines = self.cat(log_file_uri)
-            if lines:
-                msg = find_interesting_hadoop_streaming_error(lines)
-                if msg:
-                    return {
-                        'lines': [msg + '\n'],
-                        'log_file_uri': log_file_uri,
-                        'input_uri': None,
-                    }
-
-    def _scan_job_logs(self, log_file_uris):
-        """Scan jobs/* for timeout errors.
-        
-        Helper for _find_probable_cause_of_failure()
-        """
-        
-        relevant_logs = [] # list of (sort key, info, URI)
-        for log_file_uri in log_file_uris:
-            match = JOB_LOG_URI_RE.match(log_file_uri)
-            if not match:
-                continue
-
-            info = match.groupdict()
-
-            # sort so we can go through the steps in reverse order
-            sort_key = (info['timestamp'], info['step_num'])
-
-            relevant_logs.append((sort_key, info, log_file_uri))
-
-        relevant_logs.sort(reverse=True)
-
-        for sort_key, info, log_file_uri in relevant_logs:
-            lines = self.cat(log_file_uri)
-            if not lines:
-                continue
-
-            n = find_timeout_error(lines)
-
-            if n is not None:
-                result = {
-                    'lines': ['Timeout after %d seconds' % n],
-                    'log_file_uri': log_file_uri,
-                    'input_uri': None
-                }
-
-                return result
-        return None
 
     def _create_master_bootstrap_script(self, dest='b.py'):
         """Create the master bootstrap script and write it into our local

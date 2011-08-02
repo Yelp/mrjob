@@ -15,7 +15,6 @@
 """Parsing classes to find errors in Hadoop logs"""
 from __future__ import with_statement
 
-import posixpath
 import re
 
 from mrjob.parse import find_hadoop_java_stack_trace, find_interesting_hadoop_streaming_error, find_python_traceback, find_timeout_error
@@ -26,6 +25,37 @@ TASK_ATTEMPT_LOGS = 'TASK_ATTEMPT_LOGS'
 STEP_LOGS = 'STEP_LOGS'
 JOB_LOGS = 'JOB_LOGS'
 NODE_LOGS = 'NODE_LOGS'
+
+
+def processing_order():
+    """Define a mapping and order for the log parsers.
+
+    Returns tuples of ``(LOG_TYPE, sort_function, [parser])``, where
+    *sort_function* takes a list of log URIs and returns a list of tuples
+    ``(sort_key, info, log_file_uri)``.
+
+    :return: [(LOG_TYPE, sort_function, [LogParser])]
+    """
+    return [
+        # give priority to task-attempts/ logs as they contain more useful
+        # error messages. this may take a while.
+        (TASK_ATTEMPT_LOGS, make_task_attempt_log_sort_key,
+         [
+             PythonTracebackLogParser(),
+             HadoopJavaStackTraceLogParser()
+         ]),
+        (STEP_LOGS, make_step_log_sort_key,
+         [
+             HadoopStreamingErrorLogParser()
+         ]),
+        (JOB_LOGS, make_job_log_sort_key,
+         [
+             TimeoutErrorLogParser()
+         ]),
+    ]
+
+
+### SORT KEY FUNCTIONS ###
 
 
 # prefer stderr to syslog (Python exceptions are more
@@ -43,6 +73,9 @@ def make_step_log_sort_key(info):
 
 def make_job_log_sort_key(info):
     return (info['timestamp'], info['step_num'])
+
+
+### LOG PARSERS ###
 
 
 class LogParser(object):
@@ -94,31 +127,3 @@ class TimeoutErrorLogParser(LogParser):
             return ['Timeout after %d seconds\n' % n]
         else:
             return None
-
-
-def processing_order():
-    """Define a mapping and order for the log parsers.
-
-    Returns tuples of ``(LOG_TYPE, sort_function, [parser])``, where
-    *sort_function* takes a list of log URIs and returns a list of tuples
-    ``(sort_key, info, log_file_uri)``.
-
-    :return: [(LOG_TYPE, sort_function, [LogParser])]
-    """
-    return [
-        # give priority to task-attempts/ logs as they contain more useful
-        # error messages. this may take a while.
-        (TASK_ATTEMPT_LOGS, make_task_attempt_log_sort_key,
-         [
-             PythonTracebackLogParser(),
-             HadoopJavaStackTraceLogParser()
-         ]),
-        (STEP_LOGS, make_step_log_sort_key,
-         [
-             HadoopStreamingErrorLogParser()
-         ]),
-        (JOB_LOGS, make_job_log_sort_key,
-         [
-             TimeoutErrorLogParser()
-         ]),
-    ]

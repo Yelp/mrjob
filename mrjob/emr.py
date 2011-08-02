@@ -1350,25 +1350,32 @@ class EMRJobRunner(MRJobRunner):
             can ignore errors from other jobs when sharing a job flow
         """
         self._counters = []
-        try:
-            if not self._opts['ec2_key_pair_file']:
-                raise LogFetchException('ec2_key_pair_file not specified')
-            uris = list(self.ssh_list_logs([JOB_LOGS], step_nums))
-            log.info('Fetching counters from SSH...')
-            self._scan_for_counters_in_files(uris, step_nums)
-        except LogFetchException, e:
-            log.info(str(e))
-            if not self._s3_job_log_uri:
-                return None
+        if self._opts['ec2_key_pair_file']:
+            try:
+                self._fetch_counters_ssh(step_nums)
+            except LogFetchException, e:
+                self._fetch_counters_s3(step_nums, skip_s3_wait)
+        else:
+            log.info('ec2_key_pair_file not specified, going to S3')
+            self._fetch_counters_s3(step_nums, skip_s3_wait)
 
-            log.info('Fetching counters from S3...')
+    def _fetch_counters_ssh(self, step_nums):
+        uris = list(self.ssh_list_logs([JOB_LOGS], step_nums))
+        log.info('Fetching counters from SSH...')
+        self._scan_for_counters_in_files(uris, step_nums)
 
-            if not skip_s3_wait:
-                self._wait_for_s3_eventual_consistency()
-            self._wait_for_job_flow_termination()
+    def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
+        if not self._s3_job_log_uri:
+            return None
 
-            uris = self.s3_list_logs([JOB_LOGS], step_nums)
-            self._scan_for_counters_in_files(uris, step_nums)
+        log.info('Fetching counters from S3...')
+
+        if not skip_s3_wait:
+            self._wait_for_s3_eventual_consistency()
+        self._wait_for_job_flow_termination()
+
+        uris = self.s3_list_logs([JOB_LOGS], step_nums)
+        self._scan_for_counters_in_files(uris, step_nums)
 
     def _scan_for_counters_in_files(self, log_file_uris, step_nums):
         counters = []
@@ -1421,6 +1428,7 @@ class EMRJobRunner(MRJobRunner):
             except LogFetchException, e:
                 return self._find_probable_cause_of_failure_s3(step_nums)
         else:
+            log.info('ec2_key_pair_file not specified, going to S3')
             return self._find_probable_cause_of_failure_s3(step_nums)
 
     def _find_probable_cause_of_failure_ssh(self, step_nums):

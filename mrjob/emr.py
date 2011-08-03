@@ -1271,9 +1271,10 @@ class EMRJobRunner(MRJobRunner):
                                          STEP_LOG_URI_RE,
                                          step_nums)
 
-    def ls_job_logs_ssh(self):
+    def ls_job_logs_ssh(self, step_nums):
         return self._enforce_path_regexp(self._ls_ssh_logs('history/'),
-                                         JOB_LOG_URI_RE)
+                                         JOB_LOG_URI_RE,
+                                         step_nums)
 
     def ls_node_logs_ssh(self):
         all_paths = []
@@ -1308,8 +1309,10 @@ class EMRJobRunner(MRJobRunner):
                                          STEP_LOG_URI_RE,
                                          step_nums)
 
-    def ls_job_logs_s3(self):
-        return  self._enforce_path_regexp(self._ls_s3_logs('jobs/'), JOB_LOG_URI_RE)
+    def ls_job_logs_s3(self, step_nums):
+        return  self._enforce_path_regexp(self._ls_s3_logs('jobs/'),
+                                          JOB_LOG_URI_RE,
+                                          step_nums)
 
     def ls_node_logs_s3(self):
         return self._enforce_path_regexp(self._ls_s3_logs('node/'), NODE_LOG_URI_RE)
@@ -1338,7 +1341,7 @@ class EMRJobRunner(MRJobRunner):
             self._fetch_counters_s3(step_nums, skip_s3_wait)
 
     def _fetch_counters_ssh(self, step_nums):
-        uris = list(self.ls_job_logs_ssh())
+        uris = list(self.ls_job_logs_ssh(step_nums))
         log.info('Fetching counters from SSH...')
         self._scan_for_counters_in_files(uris, step_nums)
 
@@ -1352,7 +1355,7 @@ class EMRJobRunner(MRJobRunner):
             self._wait_for_s3_eventual_consistency()
         self._wait_for_job_flow_termination()
 
-        uris = self.ls_job_logs_s3()
+        uris = self.ls_job_logs_s3(step_nums)
         self._scan_for_counters_in_files(uris, step_nums)
 
     def _scan_for_counters_in_files(self, log_file_uris, step_nums):
@@ -1364,9 +1367,7 @@ class EMRJobRunner(MRJobRunner):
             if not match:
                 continue
 
-            step_num = int(match.group('step_num'))
-            if step_num in step_nums:
-                relevant_logs.append((step_num, log_file_uri))
+            relevant_logs.append((match.group('step_num'), log_file_uri))
 
         relevant_logs.sort()
 
@@ -1412,7 +1413,7 @@ class EMRJobRunner(MRJobRunner):
         logs = {
             TASK_ATTEMPT_LOGS: self.ls_task_attempt_logs_ssh(step_nums),
             STEP_LOGS: self.ls_step_logs_ssh(step_nums),
-            JOB_LOGS: self.ls_job_logs_ssh(),
+            JOB_LOGS: self.ls_job_logs_ssh(step_nums),
         }
         log.info('Scanning SSH logs for probable cause of failure')
         return self._scan_logs_in_order(logs)
@@ -1428,7 +1429,7 @@ class EMRJobRunner(MRJobRunner):
         logs = {
             TASK_ATTEMPT_LOGS: self.ls_task_attempt_logs_s3(step_nums),
             STEP_LOGS: self.ls_step_logs_s3(step_nums),
-            JOB_LOGS: self.ls_job_logs_s3(),
+            JOB_LOGS: self.ls_job_logs_s3(step_nums),
         }
         return self._scan_logs_in_order(logs)
 

@@ -52,14 +52,19 @@ def find_python_traceback(lines):
 
     In logs from EMR, we find python tracebacks in ``task-attempts/*/stderr``
     """
+    all_tb_lines = []
+    in_traceback = False
     for line in lines:
-        if line.startswith('Traceback (most recent call last):'):
-            tb_lines = []
-            for line in lines:
-                tb_lines.append(line)
-                if not line.startswith(' '):
-                    break
-            return tb_lines
+        if in_traceback:
+            all_tb_lines.append(line)
+            if line.lstrip() == line:
+                in_traceback = False
+        else:
+            if line.startswith('Traceback (most recent call last):'):
+                all_tb_lines.append(line)
+                in_traceback = True
+    if all_tb_lines:
+        return all_tb_lines
     else:
         return None
 

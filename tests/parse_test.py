@@ -23,6 +23,36 @@ from tests.quiet import no_handlers_for_logger
 
 class FindPythonTracebackTestCase(TestCase):
 
+    EXAMPLE_TRACEBACK = """Traceback (most recent call last):
+  File "mr_collect_per_search_info_remote.py", line 8, in <module>
+    from batch.stat_loader_remote.protocols import MySQLLoadProtocol
+  File "/mnt/var/lib/hadoop/mapred/taskTracker/jobcache/job_201108022217_0001/attempt_201108022217_0001_m_000001_0/work/yelp-src-tree. tar.gz/batch/stat_loader_remote/protocols.py", line 4, in <module>
+ImportError: No module named mr3po.mysqldump
+Traceback (most recent call last):
+  File "wrapper.py", line 16, in <module>
+    check_call(sys.argv[1:])
+  File "/usr/lib/python2.5/subprocess.py", line 462, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '['python', 'mr_collect_per_search_info_remote.py', '--step-num=0', '--mapper']' returned non-  zero exit status 1
+"""
+
+    EXAMPLE_TRACEBACK_PART_2 = """java.lang.RuntimeException: PipeMapRed.waitOutputThreads(): subprocess failed with code 1
+    at org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads(PipeMapRed.java:317)
+    at org.apache.hadoop.streaming.PipeMapRed.mapRedFinished(PipeMapRed.java:536)
+    at org.apache.hadoop.streaming.PipeMapper.map(PipeMapper.java:97)
+    at org.apache.hadoop.mapred.MapRunner.run(MapRunner.java:47)
+    at org.apache.hadoop.streaming.PipeMapRunner.run(PipeMapRunner.java:36)
+    at org.apache.hadoop.mapred.MapTask.run(MapTask.java:231)
+    at org.apache.hadoop.mapred.TaskTracker$Child.main(TaskTracker.java:2216)
+java.lang.RuntimeException: PipeMapRed.waitOutputThreads(): subprocess failed with code 1
+    at org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads(PipeMapRed.java:317)
+    at org.apache.hadoop.streaming.PipeMapRed.mapRedFinished(PipeMapRed.java:536)
+    at org.apache.hadoop.streaming.PipeMapper.close(PipeMapper.java:108)
+    at org.apache.hadoop.mapred.MapRunner.run(MapRunner.java:50)
+    at org.apache.hadoop.streaming.PipeMapRunner.run(PipeMapRunner.java:36)
+    at org.apache.hadoop.mapred.MapTask.run(MapTask.java:231)
+    at org.apache.hadoop.mapred.TaskTracker$Child.main(TaskTracker.java:2216)"""
+
     def test_find_python_traceback(self):
         def run(*args):
             return Popen(args, stdout=PIPE, stderr=PIPE).communicate()
@@ -45,7 +75,7 @@ class FindPythonTracebackTestCase(TestCase):
         tb = find_python_traceback(StringIO(stderr))
         assert_not_equal(tb, None)
         assert isinstance(tb, list)
-        assert_equal(len(tb), 2) # The first line ("Traceback...") is skipped
+        assert_equal(len(tb), 3) # The first line ("Traceback...") is not skipped
 
         # make sure we can find the same traceback in noise
         verbose_stdout, verbose_stderr = run(
@@ -54,6 +84,11 @@ class FindPythonTracebackTestCase(TestCase):
         assert_not_equal(verbose_stderr, stderr)
         verbose_tb = find_python_traceback(StringIO(verbose_stderr))
         assert_equal(verbose_tb, tb)
+
+    def test_find_python_traceback_from_emr(self):
+        total_traceback = self.EXAMPLE_TRACEBACK + self.EXAMPLE_TRACEBACK_PART_2
+        tb = find_python_traceback(StringIO(total_traceback))
+        assert_equal(''.join(tb), self.EXAMPLE_TRACEBACK)
 
 class FindMiscTestCase(TestCase):
 

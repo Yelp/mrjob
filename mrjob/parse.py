@@ -54,6 +54,9 @@ def find_python_traceback(lines):
     """
     all_tb_lines = []
     in_traceback = False
+
+    # Certain kinds of tracebacks trigger inclusion of all previous lines
+    non_tb_lines = []
     for line in lines:
         if in_traceback:
             all_tb_lines.append(line)

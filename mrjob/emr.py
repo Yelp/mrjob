@@ -1131,12 +1131,22 @@ class EMRJobRunner(MRJobRunner):
 
             raise Exception(msg)
 
+    def _double_line_wrapper(self, lines):
+        """boto seems to sometimes include two lines in one step of the file
+        object iterator, like ``['line1\n', 'line2\nline3\n']``. This is a
+        workaround.
+        """
+        for line in lines:
+            for subline in line[:-1].split('\n'):
+                yield subline + '\n'
+
     def _cat_file(self, filename):
         ssh_match = SSH_URI_RE.match(filename)
         if S3_URI_RE.match(filename):
             # stream lines from the s3 key
             s3_key = self.get_s3_key(filename)
-            return read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+            lines = read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+            return self._double_line_wrapper(lines)
         elif ssh_match:
             try:
                 addr = ssh_match.group('hostname') or self._address_of_master()
@@ -1397,12 +1407,11 @@ class EMRJobRunner(MRJobRunner):
             if not log_lines:
                 continue
 
-            for maybe_double_line in log_lines:
-                for line in maybe_double_line.split('\n'):
-                    new_counters = parse_hadoop_counters_from_line(line)
-                    if new_counters:
-                        self._counters.append(new_counters)
-                        break
+            for line in log_lines:
+                new_counters = parse_hadoop_counters_from_line(line)
+                if new_counters:
+                    self._counters.append(new_counters)
+                    break
 
     def counters(self):
         return self._counters

@@ -36,22 +36,28 @@ Traceback (most recent call last):
 subprocess.CalledProcessError: Command '['python', 'mr_collect_per_search_info_remote.py', '--step-num=0', '--mapper']' returned non-  zero exit status 1
 """
 
-    EXAMPLE_TRACEBACK_PART_2 = """java.lang.RuntimeException: PipeMapRed.waitOutputThreads(): subprocess failed with code 1
-    at org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads(PipeMapRed.java:317)
-    at org.apache.hadoop.streaming.PipeMapRed.mapRedFinished(PipeMapRed.java:536)
-    at org.apache.hadoop.streaming.PipeMapper.map(PipeMapper.java:97)
-    at org.apache.hadoop.mapred.MapRunner.run(MapRunner.java:47)
-    at org.apache.hadoop.streaming.PipeMapRunner.run(PipeMapRunner.java:36)
-    at org.apache.hadoop.mapred.MapTask.run(MapTask.java:231)
-    at org.apache.hadoop.mapred.TaskTracker$Child.main(TaskTracker.java:2216)
-java.lang.RuntimeException: PipeMapRed.waitOutputThreads(): subprocess failed with code 1
-    at org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads(PipeMapRed.java:317)
-    at org.apache.hadoop.streaming.PipeMapRed.mapRedFinished(PipeMapRed.java:536)
-    at org.apache.hadoop.streaming.PipeMapper.close(PipeMapper.java:108)
-    at org.apache.hadoop.mapred.MapRunner.run(MapRunner.java:50)
-    at org.apache.hadoop.streaming.PipeMapRunner.run(PipeMapRunner.java:36)
-    at org.apache.hadoop.mapred.MapTask.run(MapTask.java:231)
-    at org.apache.hadoop.mapred.TaskTracker$Child.main(TaskTracker.java:2216)"""
+    EXAMPLE_STDERR_TRACEBACK_1 = """mr_profile_test.py:27: Warning: 'with' will become a reserved keyword in Python 2.6
+  File "mr_profile_test.py", line 27
+    with open('/mnt/var/log/hadoop/profile/bloop', 'w') as f:
+            ^
+SyntaxError: invalid syntax
+Traceback (most recent call last):
+  File "wrapper.py", line 16, in <module>
+    check_call(sys.argv[1:])
+  File "/usr/lib/python2.5/subprocess.py", line 462, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '['python', 'mr_profile_test.py', '--step-num=0', '--reducer', '--input-protocol', 'raw_value', '--output-protocol', 'json', '--protocol', 'json']' returned non-zero exit status 1
+"""
+
+    EXAMPLE_STDERR_TRACEBACK_2 = """tools/csv-to-myisam.c:18:19: error: mysql.h: No such file or directory
+make: *** [tools/csv-to-myisam] Error 1
+Traceback (most recent call last):
+  File "wrapper.py", line 11, in <module>
+    check_call('cd yelp-src-tree.tar.gz; ln -sf $(readlink -f config/emr/level.py) config/level.py; make -f Makefile.emr', shell=True, stdout=open('/dev/null', 'w'))
+  File "/usr/lib/python2.5/subprocess.py", line 462, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readlink -f config/emr/level.py) config/level.py; make -f    Makefile.emr' returned non-zero exit status 2
+"""
 
     def test_find_python_traceback(self):
         def run(*args):
@@ -85,10 +91,20 @@ java.lang.RuntimeException: PipeMapRed.waitOutputThreads(): subprocess failed wi
         verbose_tb = find_python_traceback(StringIO(verbose_stderr))
         assert_equal(verbose_tb, tb)
 
-    def test_find_python_traceback_from_emr(self):
-        total_traceback = self.EXAMPLE_TRACEBACK + self.EXAMPLE_TRACEBACK_PART_2
+    def test_find_multiple_python_tracebacks(self):
+        total_traceback = self.EXAMPLE_TRACEBACK + 'junk\n'
         tb = find_python_traceback(StringIO(total_traceback))
         assert_equal(''.join(tb), self.EXAMPLE_TRACEBACK)
+
+    def test_find_python_traceback_with_more_stderr(self):
+        total_traceback = self.EXAMPLE_STDERR_TRACEBACK_1 + 'junk\n'
+        tb = find_python_traceback(StringIO(total_traceback))
+        assert_equal(''.join(tb), self.EXAMPLE_STDERR_TRACEBACK_1)
+
+    def test_find_python_traceback_with_more_stderr_2(self):
+        total_traceback = self.EXAMPLE_STDERR_TRACEBACK_2 + 'junk\n'
+        tb = find_python_traceback(StringIO(total_traceback))
+        assert_equal(''.join(tb), self.EXAMPLE_STDERR_TRACEBACK_2)
 
 class FindMiscTestCase(TestCase):
 

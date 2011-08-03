@@ -52,20 +52,44 @@ def find_python_traceback(lines):
 
     In logs from EMR, we find python tracebacks in ``task-attempts/*/stderr``
     """
+    # Lines to pass back representing entire error found
     all_tb_lines = []
+
+    # This is used to store a working list of lines in a single traceback
+    tb_lines = []
+
+    # This is used to store a working list of non-traceback lines between the
+    # current traceback and the previous one
+    non_tb_lines = []
+
+    # Track whether or not we are in a traceback rather than consuming the
+    # iterator
     in_traceback = False
 
-    # Certain kinds of tracebacks trigger inclusion of all previous lines
-    non_tb_lines = []
     for line in lines:
         if in_traceback:
-            all_tb_lines.append(line)
+            tb_lines.append(line)
+
+            # If no indentation, this is the last line of the traceback
             if line.lstrip() == line:
                 in_traceback = False
+
+                if line.startswith('subprocess.CalledProcessError'):
+                    # CalledProcessError may mean that the subprocess printed
+                    # errors to stderr which we can show the user
+                    all_tb_lines += non_tb_lines
+
+                all_tb_lines += tb_lines
+
+                # Reset all working lists
+                tb_lines = []
+                non_tb_lines = []
         else:
             if line.startswith('Traceback (most recent call last):'):
-                all_tb_lines.append(line)
+                tb_lines.append(line)
                 in_traceback = True
+            else:
+                non_tb_lines.append(line)
     if all_tb_lines:
         return all_tb_lines
     else:

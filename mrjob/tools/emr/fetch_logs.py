@@ -20,6 +20,7 @@ import sys
 
 from mrjob.emr import EMRJobRunner, LogFetchException
 from mrjob.job import MRJob
+from mrjob.logparsers import TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS
 from mrjob.util import scrape_options_into_new_groups, log_to_stream
 
 
@@ -102,23 +103,35 @@ def prettyprint_paths(paths):
     print
 
 
-def _prettyprint_relevant(task_attempts, steps, jobs, nodes):
+def _prettyprint_relevant(log_type_to_uri_list):
     print 'Task attempts:'
-    prettyprint_paths(task_attempts)
+    prettyprint_paths(log_type_to_uri_list[TASK_ATTEMPT_LOGS])
     print 'Steps:'
-    prettyprint_paths(steps)
+    prettyprint_paths(log_type_to_uri_list[STEP_LOGS])
     print 'Jobs:'
-    prettyprint_paths(jobs)
+    prettyprint_paths(log_type_to_uri_list[JOB_LOGS])
     print 'Nodes:'
-    prettyprint_paths(nodes)
+    prettyprint_paths(log_type_to_uri_list[NODE_LOGS])
 
 
 def list_relevant(runner, step_nums):
     try:
-        _prettyprint_relevant(*runner.ssh_list_logs(step_nums=step_nums))
+        logs = {
+            TASK_ATTEMPT_LOGS: runner._ls_task_attempt_logs_ssh(step_nums),
+            STEP_LOGS: runner._ls_step_logs_ssh(step_nums),
+            JOB_LOGS: runner._ls_job_logs_ssh(),
+            NODE_LOGS: runner._ls_node_logs_ssh(),
+        }
+        _prettyprint_relevant(logs)
     except LogFetchException, e:
         print 'SSH error:', e
-        _prettyprint_relevant(*runner.s3_list_logs(step_nums=step_nums))
+        logs = {
+            TASK_ATTEMPT_LOGS: runner._ls_task_attempt_logs_s3(step_nums),
+            STEP_LOGS: runner._ls_step_logs_s3(step_nums),
+            JOB_LOGS: runner._ls_job_logs_s3(),
+            NODE_LOGS: runner._ls_node_logs_s3(),
+        }
+        _prettyprint_relevant(logs)
 
 
 def list_all(runner):
@@ -133,27 +146,39 @@ def cat_from_list(runner, path_list):
     for path in path_list:
         print '===', path, '==='
         for line in runner.cat(path):
-            print line
+            print line.rstrip()
         print
 
 
-def _cat_from_relevant(runner, task_attempts, steps, jobs, nodes):
+def _cat_from_relevant(runner, log_type_to_uri_list):
     print 'Task attempts:'
-    cat_from_list(runner, task_attempts)
+    cat_from_list(runner, log_type_to_uri_list[TASK_ATTEMPT_LOGS])
     print 'Steps:'
-    cat_from_list(runner, steps)
+    cat_from_list(runner, log_type_to_uri_list[STEP_LOGS])
     print 'Jobs:'
-    cat_from_list(runner, jobs)
+    cat_from_list(runner, log_type_to_uri_list[JOB_LOGS])
     print 'Slaves:'
-    cat_from_list(runner, nodes)
+    cat_from_list(runner, log_type_to_uri_list[NODE_LOGS])
 
 
 def cat_relevant(runner, step_nums):
     try:
-        _cat_from_relevant(runner, *runner.ssh_list_logs(step_nums=step_nums))
+        logs = {
+            TASK_ATTEMPT_LOGS: runner._ls_task_attempt_logs_ssh(step_nums),
+            STEP_LOGS: runner._ls_step_logs_ssh(step_nums),
+            JOB_LOGS: runner._ls_job_logs_ssh(),
+            NODE_LOGS: runner._ls_node_logs_ssh(),
+        }
+        _cat_from_relevant(runner, logs)
     except LogFetchException, e:
         print 'SSH error:', e
-        _cat_from_relevant(runner, *runner.s3_list_logs(step_nums=step_nums))
+        logs = {
+            TASK_ATTEMPT_LOGS: runner._ls_task_attempt_logs_s3(step_nums),
+            STEP_LOGS: runner._ls_step_logs_s3(step_nums),
+            JOB_LOGS: runner._ls_job_logs_s3(),
+            NODE_LOGS: runner._ls_node_logs_s3(),
+        }
+        _cat_from_relevant(runner, logs)
 
 
 def cat_all(runner):

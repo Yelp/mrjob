@@ -20,7 +20,7 @@ import re
 from mrjob.parse import find_hadoop_java_stack_trace, find_interesting_hadoop_streaming_error, find_python_traceback, find_timeout_error
 
 
-# Constants used to tell :py:func:`~mrjob.emr.EMRJobRunner.ssh_list_logs` and :py:func:`~mrjob.emr.EMRJobRunner.s3_list_logs`  what logs to find and return
+# Constants used to distinguish between different kinds of logs
 TASK_ATTEMPT_LOGS = 'TASK_ATTEMPT_LOGS'
 STEP_LOGS = 'STEP_LOGS'
 JOB_LOGS = 'JOB_LOGS'

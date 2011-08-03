@@ -29,6 +29,9 @@ def main():
     description = 'Retrieve log files for EMR jobs.'
     option_parser = OptionParser(usage=usage,description=description)
 
+    option_parser.add_option('-f', '--find-failure', dest='find_failure',
+                             action='store_true', default=False,
+                             help='Search the logs for information about why the job failed')
     option_parser.add_option('-l', '--list', dest='list_relevant',
                              action="store_true", default=False,
                              help='List log files MRJob finds relevant')
@@ -75,7 +78,8 @@ def main():
 
     runner_kwargs = options.__dict__.copy()
     for unused_arg in ('quiet', 'verbose', 'list_relevant', 'list_all',
-                       'cat_relevant', 'cat_all', 'get_counters', 'step_num'):
+                       'cat_relevant', 'cat_all', 'get_counters', 'step_num',
+                      'find_failure'):
         del runner_kwargs[unused_arg]
 
     with EMRJobRunner(emr_job_flow_id=args[0], **runner_kwargs) as runner:
@@ -95,6 +99,9 @@ def main():
             runner._set_s3_job_log_uri(runner._describe_jobflow())
             runner._fetch_counters(range(100), skip_s3_wait=True)
             runner.print_counters()
+
+        if options.find_failure:
+            find_failure(runner, options.step_num)
 
 
 def prettyprint_paths(paths):
@@ -187,6 +194,29 @@ def cat_all(runner):
     except LogFetchException, e:
         print 'SSH error:', e
         cat_from_list(runner, runner.ls_all_logs_s3())
+
+
+def find_failure(runner, step_num):
+    if step_num:
+        step_nums = [step_num]
+    else:
+        job_flow = runner._describe_jobflow()
+        step_nums = range(1, len(job_flow.steps)+1)
+
+    cause = runner._find_probable_cause_of_failure(step_nums)
+    if cause:
+        # log cause, and put it in exception
+        cause_msg = [] # lines to log and put in exception
+        cause_msg.append('Probable cause of failure (from %s):' %
+                   cause['log_file_uri'])
+        cause_msg.extend(line.strip('\n') for line in cause['lines'])
+        if cause['input_uri']:
+            cause_msg.append('(while reading from %s)' %
+                             cause['input_uri'])
+
+        print '\n'.join(cause_msg)
+    else:
+        print 'No probable cause of failure found.'
 
 if __name__ == '__main__':
     main()

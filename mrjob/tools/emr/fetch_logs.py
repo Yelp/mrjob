@@ -117,29 +117,29 @@ def _prettyprint_relevant(log_type_to_uri_list):
 def list_relevant(runner, step_nums):
     try:
         logs = {
-            TASK_ATTEMPT_LOGS: runner._ls_task_attempt_logs_ssh(step_nums),
-            STEP_LOGS: runner._ls_step_logs_ssh(step_nums),
-            JOB_LOGS: runner._ls_job_logs_ssh(),
-            NODE_LOGS: runner._ls_node_logs_ssh(),
+            TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_ssh(step_nums),
+            STEP_LOGS: runner.ls_step_logs_ssh(step_nums),
+            JOB_LOGS: runner.ls_job_logs_ssh(),
+            NODE_LOGS: runner.ls_node_logs_ssh(),
         }
         _prettyprint_relevant(logs)
     except LogFetchException, e:
         print 'SSH error:', e
         logs = {
-            TASK_ATTEMPT_LOGS: runner._ls_task_attempt_logs_s3(step_nums),
-            STEP_LOGS: runner._ls_step_logs_s3(step_nums),
-            JOB_LOGS: runner._ls_job_logs_s3(),
-            NODE_LOGS: runner._ls_node_logs_s3(),
+            TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_s3(step_nums),
+            STEP_LOGS: runner.ls_step_logs_s3(step_nums),
+            JOB_LOGS: runner.ls_job_logs_s3(),
+            NODE_LOGS: runner.ls_node_logs_s3(),
         }
         _prettyprint_relevant(logs)
 
 
 def list_all(runner):
     try:
-        prettyprint_paths(runner.ssh_list_all())
+        prettyprint_paths(runner.ls_all_logs_ssh())
     except LogFetchException, e:
         print 'SSH error:', e
-        prettyprint_paths(runner.s3_list_all())
+        prettyprint_paths(runner.ls_all_logs_s3())
 
 
 def cat_from_list(runner, path_list):
@@ -164,29 +164,29 @@ def _cat_from_relevant(runner, log_type_to_uri_list):
 def cat_relevant(runner, step_nums):
     try:
         logs = {
-            TASK_ATTEMPT_LOGS: runner._ls_task_attempt_logs_ssh(step_nums),
-            STEP_LOGS: runner._ls_step_logs_ssh(step_nums),
-            JOB_LOGS: runner._ls_job_logs_ssh(),
-            NODE_LOGS: runner._ls_node_logs_ssh(),
+            TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_ssh(step_nums),
+            STEP_LOGS: runner.ls_step_logs_ssh(step_nums),
+            JOB_LOGS: runner.ls_job_logs_ssh(),
+            NODE_LOGS: runner.ls_node_logs_ssh(),
         }
         _cat_from_relevant(runner, logs)
     except LogFetchException, e:
         print 'SSH error:', e
         logs = {
-            TASK_ATTEMPT_LOGS: runner._ls_task_attempt_logs_s3(step_nums),
-            STEP_LOGS: runner._ls_step_logs_s3(step_nums),
-            JOB_LOGS: runner._ls_job_logs_s3(),
-            NODE_LOGS: runner._ls_node_logs_s3(),
+            TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_s3(step_nums),
+            STEP_LOGS: runner.ls_step_logs_s3(step_nums),
+            JOB_LOGS: runner.ls_job_logs_s3(),
+            NODE_LOGS: runner.ls_node_logs_s3(),
         }
         _cat_from_relevant(runner, logs)
 
 
 def cat_all(runner):
     try:
-        cat_from_list(runner, runner.ssh_list_all())
+        cat_from_list(runner, runner.ls_all_logs_ssh())
     except LogFetchException, e:
         print 'SSH error:', e
-        cat_from_list(runner, runner.s3_list_all())
+        cat_from_list(runner, runner.ls_all_logs_s3())
 
 if __name__ == '__main__':
     main()

@@ -1250,7 +1250,7 @@ class EMRJobRunner(MRJobRunner):
                                    SSH_LOG_ROOT + '/' + relative_path)
         return self.ls(root_path)
 
-    def _ls_task_attempt_logs_ssh(self, step_nums):
+    def ls_task_attempt_logs_ssh(self, step_nums):
         all_paths = []
         try:
             all_paths.extend(self._ls_ssh_logs('userlogs/'))
@@ -1266,23 +1266,23 @@ class EMRJobRunner(MRJobRunner):
                                          TASK_ATTEMPTS_LOG_URI_RE,
                                          step_nums)
 
-    def _ls_step_logs_ssh(self, step_nums):
+    def ls_step_logs_ssh(self, step_nums):
         return self._enforce_path_regexp(self._ls_ssh_logs('steps/'),
                                          STEP_LOG_URI_RE,
                                          step_nums)
 
-    def _ls_job_logs_ssh(self):
+    def ls_job_logs_ssh(self):
         return self._enforce_path_regexp(self._ls_ssh_logs('history/'),
                                          JOB_LOG_URI_RE)
 
-    def _ls_node_logs_ssh(self):
+    def ls_node_logs_ssh(self):
         all_paths = []
         for addr in self._addresses_of_slaves():
             logs = self._ls_slave_ssh_logs(addr, '')
             all_paths.extend(logs)
         return self._enforce_path_regexp(all_paths, NODE_LOG_URI_RE)
 
-    def ssh_list_all(self):
+    def ls_all_logs_ssh(self):
         """List all log files in the log root directory"""
         return self.ls(SSH_PREFIX + SSH_LOG_ROOT)
 
@@ -1298,23 +1298,23 @@ class EMRJobRunner(MRJobRunner):
 
         return self.ls(self._s3_job_log_uri + relative_path)
 
-    def _ls_task_attempt_logs_s3(self, step_nums):
+    def ls_task_attempt_logs_s3(self, step_nums):
         return self._enforce_path_regexp(self._ls_s3_logs('task-attempts/'),
                                          TASK_ATTEMPTS_LOG_URI_RE,
                                          step_nums)
 
-    def _ls_step_logs_s3(self, step_nums):
+    def ls_step_logs_s3(self, step_nums):
         return self._enforce_path_regexp(self._ls_s3_logs('steps/'),
                                          STEP_LOG_URI_RE,
                                          step_nums)
 
-    def _ls_job_logs_s3(self):
+    def ls_job_logs_s3(self):
         return  self._enforce_path_regexp(self._ls_s3_logs('jobs/'), JOB_LOG_URI_RE)
 
-    def _ls_node_logs_s3(self):
+    def ls_node_logs_s3(self):
         return self._enforce_path_regexp(self._ls_s3_logs('node/'), NODE_LOG_URI_RE)
 
-    def s3_list_all(self):
+    def ls_all_logs_s3(self):
         """List all log files in the S3 log root directory"""
         return self.ls(self._s3_job_log_uri)
 
@@ -1338,7 +1338,7 @@ class EMRJobRunner(MRJobRunner):
             self._fetch_counters_s3(step_nums, skip_s3_wait)
 
     def _fetch_counters_ssh(self, step_nums):
-        uris = list(self._ls_job_logs_ssh())
+        uris = list(self.ls_job_logs_ssh())
         log.info('Fetching counters from SSH...')
         self._scan_for_counters_in_files(uris, step_nums)
 
@@ -1352,7 +1352,7 @@ class EMRJobRunner(MRJobRunner):
             self._wait_for_s3_eventual_consistency()
         self._wait_for_job_flow_termination()
 
-        uris = self._ls_job_logs_s3()
+        uris = self.ls_job_logs_s3()
         self._scan_for_counters_in_files(uris, step_nums)
 
     def _scan_for_counters_in_files(self, log_file_uris, step_nums):
@@ -1410,9 +1410,9 @@ class EMRJobRunner(MRJobRunner):
 
     def _find_probable_cause_of_failure_ssh(self, step_nums):
         logs = {
-            TASK_ATTEMPT_LOGS: self._ls_task_attempt_logs_ssh(step_nums),
-            STEP_LOGS: self._ls_step_logs_ssh(step_nums),
-            JOB_LOGS: self._ls_job_logs_ssh(),
+            TASK_ATTEMPT_LOGS: self.ls_task_attempt_logs_ssh(step_nums),
+            STEP_LOGS: self.ls_step_logs_ssh(step_nums),
+            JOB_LOGS: self.ls_job_logs_ssh(),
         }
         log.info('Scanning SSH logs for probable cause of failure')
         return self._scan_logs_in_order(logs)
@@ -1426,9 +1426,9 @@ class EMRJobRunner(MRJobRunner):
         self._wait_for_job_flow_termination()
 
         logs = {
-            TASK_ATTEMPT_LOGS: self._ls_task_attempt_logs_s3(step_nums),
-            STEP_LOGS: self._ls_step_logs_s3(step_nums),
-            JOB_LOGS: self._ls_job_logs_s3(),
+            TASK_ATTEMPT_LOGS: self.ls_task_attempt_logs_s3(step_nums),
+            STEP_LOGS: self.ls_step_logs_s3(step_nums),
+            JOB_LOGS: self.ls_job_logs_s3(),
         }
         return self._scan_logs_in_order(logs)
 

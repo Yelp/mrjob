@@ -121,6 +121,9 @@ class MRInvisibleReducerJob(MRJob):
 
 class MRInvisibleCombinerJob(MRJob):
 
+    def mapper(self, key, value):
+        yield key, 1
+
     def combiner_init(self):
         self.things = 0
 
@@ -238,7 +241,7 @@ class MRNoOutputTestCase(TestCase):
     def _test_no_main_with_class(self, cls):
         num_inputs = 2
         stdin = StringIO("x\n" * num_inputs)
-        mr_job = cls(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
+        mr_job = cls(['-r', 'inline', '--no-conf', '--strict-protocols', '-']).sandbox(stdin=stdin)
         results = []
         with mr_job.make_runner() as runner:
             runner.run()

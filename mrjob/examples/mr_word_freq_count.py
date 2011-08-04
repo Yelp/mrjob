@@ -24,6 +24,9 @@ class MRWordFreqCount(MRJob):
         for word in WORD_RE.findall(line):
             yield (word.lower(), 1)
 
+    def combiner(self, key, counts):
+        yield (word, sum(counts))
+
     def reducer(self, word, counts):
         yield (word, sum(counts))
 

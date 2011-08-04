@@ -11,6 +11,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""List, display, and parse Hadoop logs associated with EMR job flows. Useful
+for debugging failed jobs for which mrjob did not display a useful error
+message or for inspecting jobs whose output has been lost.
+
+Usage::
+
+    python -m mrjob.tools.emr.fetch_logs -[l|L|a|A|--counters] [-s] JOB_FLOW_ID
+
+Options::
+
+  -a, --cat             Cat log files MRJob finds relevant
+  -A, --cat-all         Cat all log files to JOB_FLOW_ID/
+  -c CONF_PATH, --conf-path=CONF_PATH
+                        Path to alternate mrjob.conf file to read from
+  --counters            Show counters from the job flow
+  --ec2-key-pair-file=EC2_KEY_PAIR_FILE
+                        Path to file containing SSH key for EMR
+  -h, --help            show this help message and exit
+  -l, --list            List log files MRJob finds relevant
+  -L, --list-all        List all log files
+  --no-conf             Don't load mrjob.conf even if it's available
+  -q, --quiet           Don't print anything to stderr
+  -s STEP_NUM, --step-num=STEP_NUM
+                        Limit results to a single step. To be used with --list
+                        and --cat.
+  -v, --verbose         print more messages to stderr
+"""
 from __future__ import with_statement
 
 import functools
@@ -25,7 +52,7 @@ from mrjob.util import scrape_options_into_new_groups, log_to_stream
 
 def main():
     usage = 'usage: %prog [options] JOB_FLOW_ID'
-    description = 'Retrieve log files for EMR jobs.'
+    description = 'List, display, and parse Hadoop logs associated with EMR job flows. Useful for debugging failed jobs for which mrjob did not display a useful error message or for inspecting jobs whose output has been lost.'
     option_parser = OptionParser(usage=usage,description=description)
 
     option_parser.add_option('-l', '--list', dest='list_relevant',

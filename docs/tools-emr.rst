@@ -13,6 +13,12 @@ create_job_flow
 .. automodule:: mrjob.tools.emr.create_job_flow
 
 
+fetch_logs
+----------
+
+.. automodule:: mrjob.tools.emr.fetch_logs
+
+
 s3_tmpwatch
 -----------
 

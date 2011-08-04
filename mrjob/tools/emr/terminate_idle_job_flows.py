@@ -17,6 +17,22 @@ hour) and terminate them.
 Suggested usage: run this as a cron job with the -q option::
 
     */30 * * * * python -m mrjob.tools.emr.terminate_idle_emr_job_flows -q
+
+Options::
+
+  -h, --help            show this help message and exit
+  -v, --verbose         Print more messages
+  -q, --quiet           Don't print anything to stderr; just print IDs of
+                        terminated job flows and idle time information to
+                        stdout
+  -c CONF_PATH, --conf-path=CONF_PATH
+                        Path to alternate mrjob.conf file to read from
+  --no-conf             Don't load mrjob.conf even if it's available
+  --max-hours-idle=MAX_HOURS_IDLE
+                        Max number of hours a job can run before being
+                        terminated
+  --dry-run             Don't actually kill idle jobs; just log that we would
+    
 """
 from datetime import datetime, timedelta
 import logging

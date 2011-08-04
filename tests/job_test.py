@@ -81,6 +81,7 @@ class MRInitJob(MRJob):
         super(MRInitJob, self).__init__(*args, **kwargs)
         self.sum_amount = 0
         self.multiplier = 0
+        self.combiner_multipler = 1
 
     def mapper_init(self):
         self.sum_amount += 10
@@ -93,6 +94,12 @@ class MRInitJob(MRJob):
 
     def reducer(self, key, values):
         yield(None, sum(values)*self.multiplier)
+
+    def combiner_init(self):
+        self.combiner_multiplier = 2
+
+    def combiner(self, key, values):
+        yield(None, sum(values)*self.combiner_multiplier)
 
 
 class MRInvisibleMapperJob(MRJob):
@@ -231,9 +238,9 @@ class MRInitTestCase(TestCase):
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
                 results.append(value)
-        # these numbers should match if mapper_init and reducer_Init were
-        # called as expected
-        assert_equal(results[0], num_inputs*10*10)
+        # these numbers should match if mapper_init, reducer_init, and
+        # combiner_init were called as expected
+        assert_equal(results[0], num_inputs*10*10*2)
 
 
 class MRNoOutputTestCase(TestCase):

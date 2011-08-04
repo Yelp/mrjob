@@ -24,8 +24,10 @@ class MRWordFreqCount(MRJob):
         for word in WORD_RE.findall(line):
             yield (word.lower(), 1)
 
-    def combiner(self, key, counts):
-        yield (word, sum(counts))
+    def combiner(self, word, counts):
+        counts_list = list(counts)
+        self.increment_counter('combiner', 'lines_saved', len(counts_list)-1)
+        yield (word, sum(counts_list))
 
     def reducer(self, word, counts):
         yield (word, sum(counts))

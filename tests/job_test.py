@@ -530,7 +530,7 @@ class StepsTestCase(TestCase):
         mr_two_step_job = MRTwoStepJob(['--steps'])
         mr_two_step_job.sandbox()
         mr_two_step_job.show_steps()
-        assert_equal(mr_two_step_job.stdout.getvalue(), 'MR M\n')
+        assert_equal(mr_two_step_job.stdout.getvalue(), 'MCR M\n')
 
         mr_no_mapper = MRNoMapper(['--steps'])
         mr_no_mapper.sandbox()

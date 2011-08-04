@@ -55,6 +55,9 @@ CLEANUP_CHOICES = sorted(['NONE', 'IF_SUCCESSFUL', 'SCRATCH', 'ALL'])
 CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
 
 
+_STEP_RE = re.compile(r'^M?C?R?$')
+
+
 class MRJobRunner(object):
     """Abstract base class for all runners.
 
@@ -782,7 +785,7 @@ class MRJobRunner(object):
                 if not steps or not stdout:
                     raise ValueError('step description is empty!')
                 for step in steps:
-                    if step not in ('MR', 'M', 'R'):
+                    if len(step) < 1 or not _STEP_RE.match(step):
                         raise ValueError(
                             'unexpected step type %r in steps %r' %
                                          (step, stdout))

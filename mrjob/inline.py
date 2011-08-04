@@ -134,7 +134,8 @@ class InlineMRJobRunner(MRJobRunner):
     def _get_steps(self):
         return self._mrjob_cls()._steps_desc()
 
-    def _invoke_inline_mrjob(self, step_number, outfile_name, is_mapper=False, is_reducer=False):
+    def _invoke_inline_mrjob(self, step_number, outfile_name, is_mapper=False,
+                             is_reducer=False, is_combiner=False):
         common_args = (['--step-num=%d' % step_number] +
                        self._mr_job_extra_args(local=True) +
                        self._decide_input_paths())
@@ -142,6 +143,8 @@ class InlineMRJobRunner(MRJobRunner):
             child_args = ['--mapper'] + common_args
         elif is_reducer:
             child_args = ['--reducer'] + common_args
+        elif is_combiner:
+            child_args = ['--combiner'] + common_args
 
         outfile = self._decide_output_path(outfile_name)
 

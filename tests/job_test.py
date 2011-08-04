@@ -119,6 +119,18 @@ class MRInvisibleReducerJob(MRJob):
         yield None, self.things
 
 
+class MRInvisibleCombinerJob(MRJob):
+
+    def combiner_init(self):
+        self.things = 0
+
+    def combiner(self, key, values):
+        self.things += len(list(values))
+
+    def combiner_final(self):
+        yield None, self.things
+
+
 class MRCustomBoringJob(MRBoringJob):
 
     def configure_options(self):
@@ -223,10 +235,10 @@ class MRInitTestCase(TestCase):
 
 class MRNoOutputTestCase(TestCase):
 
-    def test_no_map(self):
+    def _test_no_main_with_class(self, cls):
         num_inputs = 2
         stdin = StringIO("x\n" * num_inputs)
-        mr_job = MRInvisibleMapperJob(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
+        mr_job = cls(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
         results = []
         with mr_job.make_runner() as runner:
             runner.run()
@@ -235,17 +247,14 @@ class MRNoOutputTestCase(TestCase):
                 results.append(value)
         assert_equal(results[0], num_inputs)
 
+    def test_no_map(self):
+        self._test_no_main_with_class(MRInvisibleMapperJob)
+
     def test_no_reduce(self):
-        num_inputs = 2
-        stdin = StringIO("x\n" * num_inputs)
-        mr_job = MRInvisibleReducerJob(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
-        results = []
-        with mr_job.make_runner() as runner:
-            runner.run()
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append(value)
-        assert_equal(results[0], num_inputs)
+        self._test_no_main_with_class(MRInvisibleReducerJob)
+
+    def test_no_combine(self):
+        self._test_no_main_with_class(MRInvisibleCombinerJob)
 
 
 class NoTzsetTestCase(TestCase):

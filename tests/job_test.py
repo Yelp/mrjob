@@ -36,16 +36,20 @@ from tests.mr_nomapper_multistep import MRNoMapper
 from tests.quiet import logger_disabled
 
 
-def stepdict(mapper=_IDENTITY_MAPPER, reducer=None,
-             mapper_init=None, mapper_final=None, 
+def stepdict(mapper=_IDENTITY_MAPPER, reducer=None, combiner=None,
+             mapper_init=None, mapper_final=None,
              reducer_init=None, reducer_final=None,
+             combiner_init=None, combiner_final=None,
              **kwargs):
     d = dict(mapper=mapper,
              mapper_init=mapper_init,
              mapper_final=mapper_final,
              reducer=reducer,
              reducer_init=reducer_init,
-             reducer_final=reducer_final)
+             reducer_final=reducer_final,
+             combiner=combiner,
+             combiner_init=combiner_init,
+             combiner_final=combiner_final)
     d.update(kwargs)
     return d
 
@@ -474,6 +478,7 @@ class IsMapperOrReducerTestCase(TestCase):
         assert_equal(MRJob().is_mapper_or_reducer(), False)
         assert_equal(MRJob(['--mapper']).is_mapper_or_reducer(), True)
         assert_equal(MRJob(['--reducer']).is_mapper_or_reducer(), True)
+        assert_equal(MRJob(['--combiner']).is_mapper_or_reducer(), True)
         assert_equal(MRJob(['--steps']).is_mapper_or_reducer(), False)
 
 

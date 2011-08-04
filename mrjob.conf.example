@@ -29,21 +29,23 @@ runners:
     bootstrap_python_packages:
     - $BT/aws/python-packages/*.tar.gz
     # specifying an ssh key pair allows us to ssh tunnel to the job tracker
+    # and fetch logs via ssh
     ec2_key_pair: EMR
     ec2_key_pair_file: $BT/config/EMR.pem
     # use beefier instances in production
     ec2_instance_type: c1.xlarge
+    # but only use one unless overridden
+    num_ec2_instances: 1
     # use our local time zone (this is important for deciding when
     # days start and end, for instance)
     cmdenv:
       TZ: America/Los_Angeles
-    num_ec2_instances: 1
     # we create the src-tree.tar.gz tarball with a Makefile. It only contains
     # a subset of our code
     python_archives: &python_archives
     - $BT/aws/src-tree.tar.gz
-    s3_log_uri: s3://walrus/tmp/logs/
     # our bucket also lives in the us-west region
+    s3_log_uri: s3://walrus/tmp/logs/
     s3_scratch_uri: s3://walrus/tmp/
     setup_cmds: &setup_cmds
     # these files are different between dev and production, so they're

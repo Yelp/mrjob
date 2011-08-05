@@ -299,7 +299,8 @@ def parse_mr_job_stderr(stderr, counters=None):
 # We just want to pull out the counter string, which varies between 
 # Hadoop versions.
 _KV_EXPR = r'\s+\w+=".*?"'  # this matches KEY="VALUE"
-_COUNTER_LINE_EXPR = r'^.*?COUNTERS="%s".*?$' % r'(?P<counters>.*?)'
+_COUNTER_LINE_EXPR = r'^.*?JOBID=".*?_%s".*?COUNTERS="%s".*?$' % \
+    ('(?P<step_num>\d+)', r'(?P<counters>.*?)')
 _COUNTER_LINE_RE = re.compile(_COUNTER_LINE_EXPR)
 
 # 0.18-specific
@@ -375,12 +376,12 @@ def parse_hadoop_counters_from_line(line):
 
     :param line: log line containing counter data
     :type line: str
-    :param hadoop_version: Version of Hadoop that produced the log files because they are formatted differently.
-    :type hadoop_version: str
+
+    :return: (counter_dict, step_num) or (None, None)
     """
     m = _COUNTER_LINE_RE.match(line)
     if not m:
-        return None
+        return None, None
 
     parser_switch = (
         (_COUNTER_FORMAT_IS_0_18, _parse_counters_0_18),
@@ -397,14 +398,14 @@ def parse_hadoop_counters_from_line(line):
 
     if correct_func is None:
         log.warn('Cannot parse Hadoop counter line: %s' % line)
-        return None
+        return None, None
 
     counters = {}
     for group, counter, value in correct_func(counter_substring):
         counters.setdefault(group, {})
         counters[group].setdefault(counter, 0)
         counters[group][counter] += int(value)
-    return counters
+    return counters, int(m.group('step_num'))
 
 
 def parse_port_range_list(range_list_str):

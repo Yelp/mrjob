@@ -427,12 +427,15 @@ class MRJobRunner(object):
 
         for step_num, step_counters in counter_iter:
             log.info('Counters from step %d:' % (step_num + first_step_num))
-            for group_name in sorted(step_counters.keys()):
-                log.info('  %s:' % group_name)
-                group_counters = step_counters[group_name]
-                for counter_name in sorted(group_counters.keys()):
-                    log.info('    %s: %d' % (counter_name,
-                                             group_counters[counter_name]))
+            if step_counters.keys():
+                for group_name in sorted(step_counters.keys()):
+                    log.info('  %s:' % group_name)
+                    group_counters = step_counters[group_name]
+                    for counter_name in sorted(group_counters.keys()):
+                        log.info('    %s: %d' % (counter_name,
+                                                 group_counters[counter_name]))
+            else:
+                log.info('  (no counters found)')
 
     ### hooks for the with statement ###
 

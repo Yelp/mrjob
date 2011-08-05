@@ -1381,10 +1381,11 @@ class EMRJobRunner(MRJobRunner):
                 continue
 
             for line in log_lines:
-                new_counters = parse_hadoop_counters_from_line(line)
+                new_counters, step_num = parse_hadoop_counters_from_line(line)
                 if new_counters:
-                    self._counters.append(new_counters)
-                    break
+                    while len(self._counters) < step_num:
+                        self._counters.append({})
+                    self._counters[step_num-1] = new_counters
 
     def counters(self):
         return self._counters

@@ -160,6 +160,16 @@ timeout to one hour::
                 # Hadoop 0.21
                 mapreduce.task.timeout: 3600000
 
+Setting parameters in mapred-site.xml
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Some Hadoop options, such as the maximum number of running map tasks per node,
+must be set at bootstrap time and will not work with `--jobconf`. You must use
+Amazon's `configure-hadoop` script for this. For example, this limits the
+number of mappers and reducers to one per node::
+
+    --bootstrap-action="s3://elasticmapreduce/bootstrap-actions/configure-hadoop -m mapred.tasktracker.map.tasks.maximum=1 -m mapred.tasktracker.reduce.tasks.maximum=1"
+
 Example configuration file
 --------------------------
 

@@ -722,7 +722,7 @@ class MRJob(object):
 
         Args:
         step_num -- which step to run (e.g. 0)
-        step_type -- 'M' for mapper, 'R' for reducer, 'C' for combiner
+        step_type -- 'M' for mapper, 'C' for combiner, 'R' for reducer
         """
         read, write = self.pick_protocols(step_num, step_type)
         

@@ -26,7 +26,6 @@ class MRWordFreqCount(MRJob):
 
     def combiner(self, word, counts):
         counts_list = list(counts)
-        self.increment_counter('combiner', 'lines_saved', len(counts_list)-1)
         yield (word, sum(counts_list))
 
     def reducer(self, word, counts):

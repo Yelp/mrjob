@@ -212,6 +212,95 @@ class LogFetchException(Exception):
     pass
 
 
+class MRJobStreamingStep(boto.emr.Step):
+    """
+    Hadoop streaming step that supports combiners and is Hadoop version-aware
+    """
+    def __init__(self, name, mapper, reducer=None, combiner=None,
+                 action_on_failure='TERMINATE_JOB_FLOW',
+                 cache_files=None, cache_archives=None,
+                 step_args=None, input=None, output=None,
+                 jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
+                 hadoop_version='0.18'):
+        """
+        A hadoop streaming elastic mapreduce step that is identical to boto's
+        but includes support for combiners while boto catches up.
+        """
+        self.name = name
+        self.mapper = mapper
+        self.reducer = reducer
+        self.combiner = combiner
+        self.action_on_failure = action_on_failure
+        self.cache_files = cache_files
+        self.cache_archives = cache_archives
+        self.input = input
+        self.output = output
+        self._hadoop_version = hadoop_version
+        self._jar = jar
+
+        if isinstance(step_args, basestring):
+            step_args = [step_args]
+
+        self.step_args = step_args
+
+    def jar(self):
+        return self._jar
+
+    def main_class(self):
+        return None
+
+    def args(self):
+        args = []
+
+        # put extra args BEFORE -mapper and -reducer so that e.g. -libjar
+        # will work
+        if self.step_args:
+            args.extend(self.step_args)
+
+        if self.combiner:
+            if float(self._hadoop_version) >= 0.2:
+                args.extend(['-mapper', self.mapper])
+                args.extend(['-combiner', self.combiner])
+            else:
+                args.extend(['-mapper', '%s | sort | %s' % (self.mapper,
+                                                            self.combiner)])
+        else:
+            args.extend(['-mapper', self.mapper])
+
+        if self.reducer:
+            args.extend(['-reducer', self.reducer])
+        else:
+            args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
+
+        if self.input:
+            if isinstance(self.input, list):
+                for input in self.input:
+                    args.extend(('-input', input))
+            else:
+                args.extend(('-input', self.input))
+        if self.output:
+            args.extend(('-output', self.output))
+
+        if self.cache_files:
+            cache_file_arg = '-cacheFile'
+            for cache_file in self.cache_files:
+                args.extend((cache_file_arg, cache_file))
+
+        if self.cache_archives:
+            cache_archive_arg = '-cacheArchive'
+            for cache_archive in self.cache_archives:
+                args.extend(('-cacheArchive', cache_archive))
+
+        return args
+
+    def __repr__(self):
+        return '%s.%s(name=%r, mapper=%r, reducer=%r, action_on_failure=%r, cache_files=%r, cache_archives=%r, step_args=%r, input=%r, output=%r, jar=%r)' % (
+            self.__class__.__module__, self.__class__.__name__,
+            self.name, self.mapper, self.reducer, self.action_on_failure,
+            self.cache_files, self.cache_archives, self.step_args,
+            self.input, self.output, self._jar)
+
+
 class EMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
 
@@ -947,6 +1036,11 @@ class EMRJobRunner(MRJobRunner):
                 mapper = 'cat'
             else:
                 mapper = cmd_line(self._mapper_args(step_num))
+
+            if 'C' in step:
+                combiner = cmd_line(self._combiner_args(step_num))
+            else:
+                combiner = None
                 
             if 'R' in step: # i.e. if there is a reducer:
                 reducer = cmd_line(self._reducer_args(step_num))
@@ -970,23 +1064,12 @@ class EMRJobRunner(MRJobRunner):
             step_args = self._hadoop_conf_args(step_num, len(steps))
             jar = self._get_jar()
 
-            try:
-                streaming_step = boto.emr.StreamingStep(
-                    name=name, mapper=mapper, reducer=reducer,
-                    action_on_failure=action_on_failure,
-                    cache_files=cache_files, cache_archives=cache_archives,
-                    step_args=step_args, input=input, output=output,
-                    jar=jar)
-            except TypeError:
-                # the jar option is new to boto (actually just a pull
-                # request from my branch right now), so we may need to
-                # monkey-patch the jar() method
-                streaming_step = boto.emr.StreamingStep(
-                    name=name, mapper=mapper, reducer=reducer,
-                    action_on_failure=action_on_failure,
-                    cache_files=cache_files, cache_archives=cache_archives,
-                    step_args=step_args, input=input, output=output)
-                streaming_step.jar = lambda: jar
+            streaming_step = MRJobStreamingStep(
+                name=name, mapper=mapper, reducer=reducer, combiner=combiner,
+                action_on_failure=action_on_failure, cache_files=cache_files,
+                cache_archives=cache_archives, step_args=step_args,
+                input=input, output=output, jar=jar,
+                hadoop_version=self._opts['hadoop_version'])
 
             step_list.append(streaming_step)
 
@@ -1197,6 +1280,11 @@ class EMRJobRunner(MRJobRunner):
     def _reducer_args(self, step_num):
         return (self._script_args() +
                 ['--step-num=%d' % step_num, '--reducer'] +
+                self._mr_job_extra_args())
+
+    def _combiner_args(self, step_num):
+        return (self._script_args() +
+                ['--step-num=%d' % step_num, '--combiner'] +
                 self._mr_job_extra_args())
 
     def _upload_args(self):

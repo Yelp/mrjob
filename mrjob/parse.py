@@ -154,6 +154,7 @@ def find_input_uri_for_mapper(lines):
 
 
 _HADOOP_STREAMING_ERROR_RE = re.compile(r'^.*ERROR org\.apache\.hadoop\.streaming\.StreamJob \(main\): (.*)$')
+_HADOOP_STREAMING_ERROR_RE_2 = re.compile(r'^(.*does not exist.*)$')
 
 def find_interesting_hadoop_streaming_error(lines):
     """Scan a log file or other iterable for a hadoop streaming error
@@ -167,13 +168,13 @@ def find_interesting_hadoop_streaming_error(lines):
         2010-07-27 19:53:35,451 ERROR org.apache.hadoop.streaming.StreamJob (main): Error launching job , Output path already exists : Output directory s3://yourbucket/logs/2010/07/23/ already exists and is not empty
     """
     for line in lines:
-        match = _HADOOP_STREAMING_ERROR_RE.match(line)
+        match = _HADOOP_STREAMING_ERROR_RE.match(line) \
+                or _HADOOP_STREAMING_ERROR_RE_2.match(line)
         if match:
             msg = match.group(1)
             if msg != 'Job not Successful!':
                 return msg
-    else:
-        return None
+    return None
 
 
 _MULTILINE_JOB_LOG_ERROR_RE = re.compile(r'^\w+Attempt.*?TASK_STATUS="FAILED".*?ERROR="(?P<first_line>[^"]*)$')

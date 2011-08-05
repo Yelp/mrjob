@@ -30,7 +30,7 @@ NODE_LOGS = 'NODE_LOGS'
 TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
 
 # regex for matching step log URIs
-STEP_LOG_URI_RE = re.compile(r'^.*/(?P<step_num>\d+)/syslog$')
+STEP_LOG_URI_RE = re.compile(r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)$')
 
 # regex for matching job log URIs
 JOB_LOG_URI_RE = re.compile(r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
@@ -111,7 +111,7 @@ def make_task_attempt_log_sort_key(info):
 
 
 def make_step_log_sort_key(info):
-    return info['step_num']
+    return (info['step_num'], info['stream'] == 'stderr')
 
 
 def make_job_log_sort_key(info):

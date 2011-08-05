@@ -1259,9 +1259,13 @@ class EMRJobRunner(MRJobRunner):
             pass
         if not all_paths:
             # get them from the slaves instead (takes a little longer)
-            for addr in self._addresses_of_slaves():
-                logs = self._ls_slave_ssh_logs(addr, 'userlogs/')
-                all_paths.extend(logs)
+            try:
+                for addr in self._addresses_of_slaves():
+                    logs = self._ls_slave_ssh_logs(addr, 'userlogs/')
+                    all_paths.extend(logs)
+            except IOError:
+                # sometimes the slaves don't have them either
+                pass
         return self._enforce_path_regexp(all_paths,
                                          TASK_ATTEMPTS_LOG_URI_RE,
                                          step_nums)

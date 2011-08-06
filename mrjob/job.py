@@ -439,6 +439,7 @@ class MRJob(object):
 
         * Print step information (:option:`--steps`). See :py:meth:`show_steps`
         * Run a mapper (:option:`--mapper`). See :py:meth:`run_mapper`
+        * Run a combiner (:option:`--combiner`). See :py:meth:`run_combiner`
         * Run a reducer (:option:`--reducer`). See :py:meth:`run_reducer`
         * Run the entire job. See :py:meth:`run_job`
         """
@@ -453,11 +454,11 @@ class MRJob(object):
         elif self.options.run_mapper:
             self.run_mapper(self.options.step_num)
 
-        elif self.options.run_reducer:
-            self.run_reducer(self.options.step_num)
-
         elif self.options.run_combiner:
             self.run_combiner(self.options.step_num)
+
+        elif self.options.run_reducer:
+            self.run_reducer(self.options.step_num)
 
         else:
             self.run_job()
@@ -823,12 +824,12 @@ class MRJob(object):
             help='run a mapper')
 
         self.mux_opt_group.add_option(
-            '--reducer', dest='run_reducer', action='store_true', default=False,
-            help='run a reducer')
-
-        self.mux_opt_group.add_option(
             '--combiner', dest='run_combiner', action='store_true', default=False,
             help='run a combiner')
+
+        self.mux_opt_group.add_option(
+            '--reducer', dest='run_reducer', action='store_true', default=False,
+            help='run a reducer')
 
         self.mux_opt_group.add_option(
             '--step-num', dest='step_num', type='int', default=0,
@@ -1255,8 +1256,8 @@ class MRJob(object):
         loading options when we aren't running inside Hadoop Streaming.
         """
         return self.options.run_mapper \
-                or self.options.run_reducer \
-                or self.options.run_combiner
+                or self.options.run_combiner \
+                or self.options.run_reducer
 
     def job_runner_kwargs(self):
         """Keyword arguments used to create runners when

@@ -73,7 +73,7 @@ class MRJobRunner(object):
 
       - Run your job with :option:`--steps` to find out how many mappers/reducers to run
       - Copy your job and supporting files to Hadoop
-      - Instruct Hadoop to run your job with the appropriate :option:`--mapper`, :option:`--reducer`, and :option:`--step-num` arguments
+      - Instruct Hadoop to run your job with the appropriate :option:`--mapper`, :option:`--combiner`, :option:`--reducer`, and :option:`--step-num` arguments
 
     Each runner runs a single job once; if you want to run a job multiple
     times, make multiple runners.

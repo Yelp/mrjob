@@ -53,6 +53,16 @@ from mrjob.ssh import ssh_cat, ssh_ls, ssh_copy_key, ssh_slave_addresses, SSHExc
 from mrjob.util import cmd_line, extract_dir_for_tar, read_file
 
 
+def monkeypatch_boto():
+    # 2.0b4 doesn't have HadoopVersion in JobFlow.
+    # 2.0 final does.
+    from boto.emr.emrobject import JobFlow
+    if not 'HadoopVersion' in JobFlow.Fields:
+        JobFlow.Fields.add('HadoopVersion')
+
+monkeypatch_boto()
+
+
 log = logging.getLogger('mrjob.emr')
 
 S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
@@ -977,8 +987,10 @@ class EMRJobRunner(MRJobRunner):
             jar = self._get_jar()
 
             # boto 2.0 doesn't support combiners in StreamingStep, so insert
-            # them into step_args manually
-            version = self._opts['hadoop_version']
+            # them into step_args manually.
+            # Also, self._opts['hadoop_version'] may not match the job's
+            # actual Hadoop version.
+            version = self._describe_jobflow().hadoopversion
             if LooseVersion(version) >= LooseVersion('0.20'):
                 step_args.extend(['-combiner', combiner])
             else:

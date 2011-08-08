@@ -301,6 +301,11 @@ class HadoopJobRunner(MRJobRunner):
                 streaming_args.append('cat')
             else:
                 streaming_args.append(cmd_line(self._mapper_args(step_num)))
+
+            if 'C' in step:
+                # TODO: support Hadoop < 0.20 using '<mapper> | sort | <combiner>'
+                streaming_args.append('-combiner')
+                streaming_args.append(cmd_line(self._combiner_args(step_num)))
             
             if 'R' in step:
                 streaming_args.append('-reducer')
@@ -358,6 +363,11 @@ class HadoopJobRunner(MRJobRunner):
     def _mapper_args(self, step_num):
         return (self._script_args() +
                 ['--step-num=%d' % step_num, '--mapper'] +
+                self._mr_job_extra_args())
+
+    def _combiner_args(self, step_num):
+        return (self._script_args() +
+                ['--step-num=%d' % step_num, '--combiner'] +
                 self._mr_job_extra_args())
 
     def _reducer_args(self, step_num):

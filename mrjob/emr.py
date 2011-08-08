@@ -994,7 +994,7 @@ class EMRJobRunner(MRJobRunner):
             if LooseVersion(version) >= LooseVersion('0.20'):
                 step_args.extend(['-combiner', combiner])
             else:
-                mapper = '%s | sort | %s' % (mapper, combiner)
+                mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
 
             try:
                 streaming_step = boto.emr.StreamingStep(

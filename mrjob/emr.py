@@ -60,7 +60,8 @@ def monkeypatch_boto():
     if not 'HadoopVersion' in JobFlow.Fields:
         JobFlow.Fields.add('HadoopVersion')
 
-monkeypatch_boto()
+if boto is not None:
+    monkeypatch_boto()
 
 
 log = logging.getLogger('mrjob.emr')

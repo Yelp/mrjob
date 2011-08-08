@@ -1105,7 +1105,7 @@ class EMRJobRunner(MRJobRunner):
             log.info('Job completed.')
             log.info('Running time was %.1fs (not counting time spent waiting for the EC2 instances)' % total_step_time)
             self._fetch_counters(step_nums)
-            self.print_counters(first_step_num=min(step_nums))
+            self.print_counters(step_nums)
         else:
             msg = 'Job failed with status %s: %s' % (job_state, reason)
             log.error(msg)
@@ -1383,9 +1383,10 @@ class EMRJobRunner(MRJobRunner):
             for line in log_lines:
                 new_counters, step_num = parse_hadoop_counters_from_line(line)
                 if new_counters:
-                    while len(self._counters) < step_num:
-                        self._counters.append({})
-                    self._counters[step_num-1] = new_counters
+                    while len(counters) < step_num:
+                        counters.append({})
+                    counters[step_num-1] = new_counters
+        self._counters = counters
 
     def counters(self):
         return self._counters

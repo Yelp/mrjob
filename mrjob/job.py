@@ -758,7 +758,7 @@ class MRJob(object):
         :type step_num: int
         :param step_num: which step to run (e.g. ``0`` for the first step)
         :type step_type: str
-        :param step_type: ``'M'`` for mapper, ``'R'`` for reducer, ``'C'`` for combiner
+        :param step_type: ``'M'`` for mapper, ``'C'`` for combiner, ``'R'`` for reducer
 
         By default, we use one protocol for reading input, one
         internal protocol for communication between steps, and one

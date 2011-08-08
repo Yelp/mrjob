@@ -22,12 +22,13 @@ import logging
 import os
 import pprint
 import shutil
+import subprocess
+import sys
+
 try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
-import subprocess
-import sys
 
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.runner import MRJobRunner

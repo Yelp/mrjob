@@ -144,7 +144,8 @@ class HadoopJobRunner(MRJobRunner):
         # temp dir for input
         self._hdfs_input_dir = None
 
-        self._get_hadoop_version()
+        # init hadoop version cache
+        self._hadoop_version = None
 
     @classmethod
     def _allowed_opts(cls):
@@ -174,18 +175,20 @@ class HadoopJobRunner(MRJobRunner):
             'hdfs_scratch_dir': combine_paths,
         })
 
-    def _get_hadoop_version(self):
-        stdout = self._invoke_hadoop(['version'], return_stdout=True)
-        if stdout:
-            first_line = stdout.split('\n')[0]
-            log.info("'hadoop version' output: %s" % first_line)
-            m = HADOOP_VERSION_RE.match(first_line)
-            if m:
-                self.hadoop_version = m.group('version')
-                log.info("Using Hadoop version %s" % self.hadoop_version)
-                return
-        self.hadoop_version = '0.20.203'
-        log.info("Unable to determine Hadoop version. Assuming 0.20.203.")
+    def get_hadoop_version(self):
+        if not self._hadoop_version:
+            stdout = self._invoke_hadoop(['version'], return_stdout=True)
+            if stdout:
+                first_line = stdout.split('\n')[0]
+                log.info("'hadoop version' output: %s" % first_line)
+                m = HADOOP_VERSION_RE.match(first_line)
+                if m:
+                    self._hadoop_version = m.group('version')
+                    log.info("Using Hadoop version %s" % self.hadoop_version)
+                    return
+            self._hadoop_version = '0.20.203'
+            log.info("Unable to determine Hadoop version. Assuming 0.20.203.")
+        return self._hadoop_version
 
     def _run(self):
         if self._opts['bootstrap_mrjob']:
@@ -322,7 +325,7 @@ class HadoopJobRunner(MRJobRunner):
 
             if 'C' in step:
                 combiner_cmd = cmd_line(self._combiner_args(step_num))
-                if LooseVersion(self.hadoop_version) < LooseVersion('0.20.203'):
+                if LooseVersion(self.get_hadoop_version()) < LooseVersion('0.20.203'):
                     mapper = "bash -c '%s | sort | %s'" % (mapper, combiner_cmd)
                     combiner = None
                 else:

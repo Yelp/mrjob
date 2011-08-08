@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from distutils.version import LooseVersion
 import getpass
 import logging
 import os
@@ -45,6 +46,9 @@ HADOOP_LSR_NO_SUCH_FILE = re.compile(r'^lsr: Cannot access .*: No such file or d
 
 # used by rm() (see below)
 HADOOP_RMR_NO_SUCH_FILE = re.compile(r'^rmr: hdfs://.*$')
+
+# find version string in "Hadoop 0.20.203" etc.
+HADOOP_VERSION_RE = re.compile(r'^.*?(?P<version>(\d|\.)+).*?$')
 
 
 def find_hadoop_streaming_jar(path):
@@ -140,6 +144,8 @@ class HadoopJobRunner(MRJobRunner):
         # temp dir for input
         self._hdfs_input_dir = None
 
+        self._get_hadoop_version()
+
     @classmethod
     def _allowed_opts(cls):
         """A list of which keyword args we can pass to __init__()"""
@@ -167,6 +173,19 @@ class HadoopJobRunner(MRJobRunner):
             'hadoop_home': combine_paths,
             'hdfs_scratch_dir': combine_paths,
         })
+
+    def _get_hadoop_version(self):
+        stdout = self._invoke_hadoop(['version'], return_stdout=True)
+        if stdout:
+            first_line = stdout.split('\n')[0]
+            log.info("'hadoop version' output: %s" % first_line)
+            m = HADOOP_VERSION_RE.match(first_line)
+            if m:
+                self.hadoop_version = m.group('version')
+                log.info("Using Hadoop version %s" % self.hadoop_version)
+                return
+        self.hadoop_version = '0.20.203'
+        log.info("Unable to determine Hadoop version. Assuming 0.20.203.")
 
     def _run(self):
         if self._opts['bootstrap_mrjob']:
@@ -296,16 +315,25 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args.extend(self._upload_args())
 
             # set up mapper and reducer
-            streaming_args.append('-mapper')
             if 'M' not in step:
-                streaming_args.append('cat')
+                mapper = 'cat'
             else:
-                streaming_args.append(cmd_line(self._mapper_args(step_num)))
+                mapper = cmd_line(self._mapper_args(step_num))
 
             if 'C' in step:
-                # TODO: support Hadoop < 0.20 using '<mapper> | sort | <combiner>'
+                combiner_cmd = cmd_line(self._combiner_args(step_num))
+                if LooseVersion(self.hadoop_version) < LooseVersion('0.20.203'):
+                    mapper = "bash -c '%s | sort | %s'" % (mapper, combiner_cmd)
+                    combiner = None
+                else:
+                    combiner = combiner_cmd
+
+            streaming_args.append('-mapper')
+            streaming_args.append(mapper)
+
+            if combiner:
                 streaming_args.append('-combiner')
-                streaming_args.append(cmd_line(self._combiner_args(step_num)))
+                streaming_args.append(combiner)
             
             if 'R' in step:
                 streaming_args.append('-reducer')

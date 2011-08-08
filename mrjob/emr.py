@@ -415,6 +415,9 @@ class EMRJobRunner(MRJobRunner):
         # turn off tracker progress until tunnel is up
         self._show_tracker_progress = False
 
+        # init hadoop version cache
+        self._hadoop_version = None
+
     @classmethod
     def _allowed_opts(cls):
         """A list of which keyword args we can pass to __init__()"""
@@ -989,10 +992,7 @@ class EMRJobRunner(MRJobRunner):
 
             # boto 2.0 doesn't support combiners in StreamingStep, so insert
             # them into step_args manually.
-            # Also, self._opts['hadoop_version'] may not match the job's
-            # actual Hadoop version.
-            version = self._describe_jobflow().hadoopversion
-            if LooseVersion(version) >= LooseVersion('0.20'):
+            if LooseVersion(self.hadoop_version) >= LooseVersion('0.20'):
                 step_args.extend(['-combiner', combiner])
             else:
                 mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
@@ -2019,6 +2019,18 @@ class EMRJobRunner(MRJobRunner):
     def _describe_jobflow(self, emr_conn=None):
         emr_conn = emr_conn or self.make_emr_conn()
         return emr_conn.describe_jobflow(self._emr_job_flow_id)
+
+    def _get_hadoop_version(self):
+        if not self._hadoop_version:
+            if self._emr_job_flow_id:
+                # if joining a job flow, infer the version
+                self._hadoop_version = self._describe_jobflow().hadoopversion
+            else:
+                # otherwise, read it from the config
+                self._hadoop_version = self._opts['hadoop_version']
+        return self._hadoop_version
+
+    hadoop_version = property(_get_hadoop_version)
 
     def _address_of_master(self, emr_conn=None):
         """Get the address of the master node so we can SSH to it"""

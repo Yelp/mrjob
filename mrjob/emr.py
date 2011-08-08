@@ -992,7 +992,7 @@ class EMRJobRunner(MRJobRunner):
 
             # boto 2.0 doesn't support combiners in StreamingStep, so insert
             # them into step_args manually.
-            if LooseVersion(self.hadoop_version) >= LooseVersion('0.20'):
+            if LooseVersion(self.get_hadoop_version()) >= LooseVersion('0.20'):
                 step_args.extend(['-combiner', combiner])
             else:
                 mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
@@ -2020,7 +2020,7 @@ class EMRJobRunner(MRJobRunner):
         emr_conn = emr_conn or self.make_emr_conn()
         return emr_conn.describe_jobflow(self._emr_job_flow_id)
 
-    def _get_hadoop_version(self):
+    def get_hadoop_version(self):
         if not self._hadoop_version:
             if self._emr_job_flow_id:
                 # if joining a job flow, infer the version
@@ -2029,8 +2029,6 @@ class EMRJobRunner(MRJobRunner):
                 # otherwise, read it from the config
                 self._hadoop_version = self._opts['hadoop_version']
         return self._hadoop_version
-
-    hadoop_version = property(_get_hadoop_version)
 
     def _address_of_master(self, emr_conn=None):
         """Get the address of the master node so we can SSH to it"""

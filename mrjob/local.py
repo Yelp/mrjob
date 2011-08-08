@@ -417,8 +417,8 @@ class LocalMRJobRunner(MRJobRunner):
 
         # run the process
         if combiner_args:
-            all_args = args + ['|', 'sort', '|'] + combiner_args
-            proc = Popen(['-c', ' '.join(all_args)],
+            command = '%s | sort | %s' % (cmd_line(args), cmd_line(combiner_args))
+            proc = Popen(['-c', command],
                          stdout=write_to, stderr=PIPE,
                          cwd=self._working_dir, env=env,
                          shell=True)

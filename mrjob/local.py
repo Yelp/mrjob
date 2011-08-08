@@ -379,7 +379,7 @@ class LocalMRJobRunner(MRJobRunner):
         for proc in procs:
             self._wait_for_process(proc, step_num)
 
-        self.print_counters([step_num])
+        self.print_counters([step_num+1])
         
         
     def _invoke_process(self, args, outfile_name, env):
@@ -412,7 +412,7 @@ class LocalMRJobRunner(MRJobRunner):
         returncode = proc['proc'].wait()
 
         if returncode != 0:
-            self.print_counters([step_num])
+            self.print_counters([step_num+1])
             # try to throw a useful exception
             if tb_lines:
                 raise Exception(

@@ -302,6 +302,7 @@ def hadoop_jar(*args):
 
     shutil.move(mock_output_dir, real_output_dir)
 
+    sys.stderr.write('Running job: job_201108091423_0002\n')
     sys.stderr.write('Job succeeded!\n')
 
 

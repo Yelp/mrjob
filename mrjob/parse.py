@@ -224,7 +224,7 @@ def find_job_log_multiline_error(lines):
     return None
 
 
-_TIMEOUT_ERROR_RE = re.compile(r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds. Killing!"')
+_TIMEOUT_ERROR_RE = re.compile(r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds.*?"')
 
 def find_timeout_error(lines):
     """Scan a log file or other iterable for a timeout error from Hadoop.

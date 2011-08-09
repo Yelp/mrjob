@@ -74,9 +74,18 @@ def scan_for_counters_in_files(log_file_uris, runner):
 
 
 def scan_logs_in_order(task_attempt_logs, step_logs, job_logs, runner):
-    """Use mapping and order from :py:mod:`logparsers` to find errors in
+    """Use mapping and order from :py:func:`processing_order` to find errors in
     logs. See :py:meth:`_find_probable_cause_of_failure` for return value
     documentation.
+
+    Returns::
+
+        None (nothing found) or a dictionary containing:
+        lines -- lines in the log file containing the error message
+        log_file_uri -- the log file containing the error message
+        input_uri -- if the error happened in a mapper in the first
+            step, the URI of the input file that caused the error
+            (otherwise None)
     """
     log_type_to_uri_list = {
         TASK_ATTEMPT_LOGS: task_attempt_logs,
@@ -98,15 +107,16 @@ def scan_logs_in_order(task_attempt_logs, step_logs, job_logs, runner):
                     continue
                 tasks_seen.add(task_info)
 
-            val = apply_parsers_to_log(parsers, log_file_uri, runner)
+            val = _apply_parsers_to_log(parsers, log_file_uri, runner)
             if val:
                 if info.get('node_type', None) == 'm':
-                    val['input_uri'] = scan_for_input_uri(log_file_uri, runner)
+                    val['input_uri'] = _scan_for_input_uri(log_file_uri, runner)
                 return val
 
     return None
 
-def apply_parsers_to_log(parsers, log_file_uri, runner):
+
+def _apply_parsers_to_log(parsers, log_file_uri, runner):
     """Have each :py:class:`LogParser` in *parsers* try to find an error
     in the contents of *log_file_uri*
     """
@@ -125,11 +135,12 @@ def apply_parsers_to_log(parsers, log_file_uri, runner):
                 }
     return None
 
-def scan_for_input_uri(log_file_uri, runner):
+
+def _scan_for_input_uri(log_file_uri, runner):
     """Scan the syslog file corresponding to log_file_uri for
     information about the input file.
 
-    Helper function for _scan_task_attempt_logs()
+    Helper function for :py:func:`scan_task_attempt_logs()`
     """
     syslog_uri = posixpath.join(
         posixpath.dirname(log_file_uri), 'syslog')

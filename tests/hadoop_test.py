@@ -127,7 +127,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
     def _test_end_to_end(self, args=()):
         # read from STDIN, a local file, and a remote file
-        stdin = StringIO('foo\nbar\n')
+        stdin = StringIO('Running job: job_201108091423_0001\n')
 
         local_input_path = os.path.join(self.tmp_dir, 'input')
         with open(local_input_path, 'w') as local_input_file:

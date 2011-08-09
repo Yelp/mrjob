@@ -1130,41 +1130,6 @@ class EMRJobRunner(MRJobRunner):
 
             raise Exception(msg)
 
-    def _double_line_wrapper(self, lines):
-        """boto seems to sometimes include two lines in one step of the file
-        object iterator, like ``['line1\n', 'line2\nline3\n']``. This is a
-        workaround.
-        """
-        for line in lines:
-            for subline in line[:-1].split('\n'):
-                yield subline + '\n'
-
-    def _cat_file(self, filename):
-        ssh_match = SSH_URI_RE.match(filename)
-        if S3_URI_RE.match(filename):
-            # stream lines from the s3 key
-            s3_key = self.get_s3_key(filename)
-            lines = read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
-            return self._double_line_wrapper(lines)
-        elif ssh_match:
-            try:
-                addr = ssh_match.group('hostname') or self._address_of_master()
-                if '!' in addr:
-                    self._enable_slave_ssh_access()
-                output = ssh_cat(
-                    self._opts['ssh_bin'],
-                    addr,
-                    self._opts['ec2_key_pair_file'],
-                    ssh_match.group('filesystem_path'),
-                    self._ssh_key_name,
-                )
-                return read_file(filename, fileobj=StringIO(output))
-            except SSHException, e:
-                raise LogFetchException(e)
-        else:
-            # read from local filesystem
-            return super(EMRJobRunner, self)._cat_file(filename)
-
     def _script_args(self):
         """How to invoke the script inside EMR"""
         # We can invoke the script by its S3 URL, but we don't really
@@ -1681,6 +1646,41 @@ class EMRJobRunner(MRJobRunner):
         bucket = s3_conn.get_bucket(bucket_name)
         for key in bucket.list(key_name):
             yield s3_key_to_uri(key)
+
+    def _double_line_wrapper(self, lines):
+        """boto seems to sometimes include two lines in one step of the file
+        object iterator, like ``['line1\n', 'line2\nline3\n']``. This is a
+        workaround.
+        """
+        for line in lines:
+            for subline in line[:-1].split('\n'):
+                yield subline + '\n'
+
+    def _cat_file(self, filename):
+        ssh_match = SSH_URI_RE.match(filename)
+        if S3_URI_RE.match(filename):
+            # stream lines from the s3 key
+            s3_key = self.get_s3_key(filename)
+            lines = read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+            return self._double_line_wrapper(lines)
+        elif ssh_match:
+            try:
+                addr = ssh_match.group('hostname') or self._address_of_master()
+                if '!' in addr:
+                    self._enable_slave_ssh_access()
+                output = ssh_cat(
+                    self._opts['ssh_bin'],
+                    addr,
+                    self._opts['ec2_key_pair_file'],
+                    ssh_match.group('filesystem_path'),
+                    self._ssh_key_name,
+                )
+                return read_file(filename, fileobj=StringIO(output))
+            except SSHException, e:
+                raise LogFetchException(e)
+        else:
+            # read from local filesystem
+            return super(EMRJobRunner, self)._cat_file(filename)
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on S3 because there are

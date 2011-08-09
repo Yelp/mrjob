@@ -45,8 +45,7 @@ except ImportError:
     boto = None
 
 from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths, combine_path_lists
-from mrjob.logparsers import TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS, processing_order, TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, JOB_LOG_URI_RE, NODE_LOG_URI_RE
-from mrjob.parse import find_input_uri_for_mapper, parse_hadoop_counters_from_line
+from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
 from mrjob.ssh import ssh_cat, ssh_ls, ssh_copy_key, ssh_slave_addresses, SSHException, SSH_PREFIX, SSH_LOG_ROOT
@@ -1347,7 +1346,7 @@ class EMRJobRunner(MRJobRunner):
     def _fetch_counters_ssh(self, step_nums):
         uris = list(self.ls_job_logs_ssh(step_nums))
         log.info('Fetching counters from SSH...')
-        self._scan_for_counters_in_files(uris, step_nums)
+        self._counters = scan_for_counters_in_files(uris, self)
 
     def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
         if not self._s3_job_log_uri:
@@ -1360,33 +1359,7 @@ class EMRJobRunner(MRJobRunner):
         self._wait_for_job_flow_termination()
 
         uris = self.ls_job_logs_s3(step_nums)
-        self._scan_for_counters_in_files(uris, step_nums)
-
-    def _scan_for_counters_in_files(self, log_file_uris, step_nums):
-        counters = []
-        relevant_logs = [] # list of (sort key, URI)
-
-        for log_file_uri in log_file_uris:
-            match = JOB_LOG_URI_RE.match(log_file_uri)
-            if not match:
-                continue
-
-            relevant_logs.append((match.group('step_num'), log_file_uri))
-
-        relevant_logs.sort()
-
-        for _, log_file_uri in relevant_logs:
-            log_lines = self.cat(log_file_uri)
-            if not log_lines:
-                continue
-
-            for line in log_lines:
-                new_counters, step_num = parse_hadoop_counters_from_line(line)
-                if new_counters:
-                    while len(counters) < step_num:
-                        counters.append({})
-                    counters[step_num-1] = new_counters
-        self._counters = counters
+        self._counters = scan_for_counters_in_files(uris, self)
 
     def counters(self):
         return self._counters
@@ -1416,13 +1389,14 @@ class EMRJobRunner(MRJobRunner):
             return self._find_probable_cause_of_failure_s3(step_nums)
 
     def _find_probable_cause_of_failure_ssh(self, step_nums):
-        logs = {
-            TASK_ATTEMPT_LOGS: self.ls_task_attempt_logs_ssh(step_nums),
-            STEP_LOGS: self.ls_step_logs_ssh(step_nums),
-            JOB_LOGS: self.ls_job_logs_ssh(step_nums),
-        }
+        task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
+        step_logs = self.ls_step_logs_ssh(step_nums)
+        job_logs = self.ls_job_logs_ssh(step_nums)
         log.info('Scanning SSH logs for probable cause of failure')
-        return self._scan_logs_in_order(logs)
+        return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
+                                  step_logs=step_logs,
+                                  job_logs=job_logs,
+                                  runner=self)
 
     def _find_probable_cause_of_failure_s3(self, step_nums):
         if not self._s3_job_log_uri:
@@ -1432,75 +1406,13 @@ class EMRJobRunner(MRJobRunner):
         self._wait_for_s3_eventual_consistency()
         self._wait_for_job_flow_termination()
 
-        logs = {
-            TASK_ATTEMPT_LOGS: self.ls_task_attempt_logs_s3(step_nums),
-            STEP_LOGS: self.ls_step_logs_s3(step_nums),
-            JOB_LOGS: self.ls_job_logs_s3(step_nums),
-        }
-        return self._scan_logs_in_order(logs)
-
-    def _scan_logs_in_order(self, log_type_to_uri_list):
-        """Use mapping and order from :py:mod:`logparsers` to find errors in
-        logs. See :py:meth:`_find_probable_cause_of_failure` for return value
-        documentation.
-        """
-        for log_type, sort_func, parsers in processing_order():
-            relevant_logs = sort_func(log_type_to_uri_list[log_type])
-
-            # unfortunately need to special case task attempts since later
-            # attempts may have succeeded and we don't want those (issue #31)
-            tasks_seen = set()
-            for sort_key, info, log_file_uri in relevant_logs:
-
-                if log_type == TASK_ATTEMPT_LOGS:
-                    task_info = (info['step_num'], info['node_type'],
-                                 info['node_num'], info['stream'])
-                    if task_info in tasks_seen:
-                        continue
-                    tasks_seen.add(task_info)
-
-                val = self._apply_parsers_to_log(parsers, log_file_uri)
-                if val:
-                    if info.get('node_type', None) == 'm':
-                        val['input_uri'] = self._scan_for_input_uri(log_file_uri)
-                    return val
-
-        return None
-
-    def _apply_parsers_to_log(self, parsers, log_file_uri):
-        """Have each :py:class:`LogParser` in *parsers* try to find an error
-        in the contents of *log_file_uri*
-        """
-        for parser in parsers:
-            if parser.LOG_NAME_RE.match(log_file_uri):
-                log_lines = self.cat(log_file_uri)
-                if not log_lines:
-                    continue
-
-                lines = parser.parse(log_lines)
-                if lines is not None:
-                    return {
-                        'lines': lines,
-                        'log_file_uri': log_file_uri,
-                        'input_uri': None,
-                    }
-        return None
-
-    def _scan_for_input_uri(self, log_file_uri):
-        """Scan the syslog file corresponding to log_file_uri for
-        information about the input file.
-
-        Helper function for _scan_task_attempt_logs()
-        """
-        syslog_uri = posixpath.join(
-            posixpath.dirname(log_file_uri), 'syslog')
-
-        syslog_lines = self.cat(syslog_uri)
-        if syslog_lines:
-            log.debug('scanning %s for input URI' % syslog_uri)
-            return find_input_uri_for_mapper(syslog_lines)
-        else:
-            return None
+        task_attempt_logs = self.ls_task_attempt_logs_s3(step_nums)
+        step_logs = self.ls_step_logs_s3(step_nums)
+        job_logs = self.ls_job_logs_s3(step_nums)
+        return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
+                                  step_logs=step_logs,
+                                  job_logs=job_logs,
+                                  runner=self)
 
     def _create_master_bootstrap_script(self, dest='b.py'):
         """Create the master bootstrap script and write it into our local

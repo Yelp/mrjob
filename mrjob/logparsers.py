@@ -15,9 +15,14 @@
 """Parsing classes to find errors in Hadoop logs"""
 from __future__ import with_statement
 
+import logging
+import posixpath
 import re
 
-from mrjob.parse import find_hadoop_java_stack_trace, find_interesting_hadoop_streaming_error, find_python_traceback, find_timeout_error
+from mrjob.parse import find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_python_traceback, find_timeout_error, parse_hadoop_counters_from_line
+
+
+log = logging.getLogger('mrjob.logparser')
 
 
 # Constants used to distinguish between different kinds of logs
@@ -37,6 +42,104 @@ JOB_LOG_URI_RE = re.compile(r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timesta
 
 # regex for matching slave log URIs
 NODE_LOG_URI_RE = re.compile(r'^.*?/hadoop-hadoop-(jobtracker|namenode).*.out$')
+
+
+def scan_for_counters_in_files(log_file_uris, runner):
+    """Scan *log_file_uris* for counters, using *runner* for file system access
+    """
+    counters = []
+    relevant_logs = [] # list of (sort key, URI)
+
+    for log_file_uri in log_file_uris:
+        match = JOB_LOG_URI_RE.match(log_file_uri)
+        if not match:
+            continue
+
+        relevant_logs.append((match.group('step_num'), log_file_uri))
+
+    relevant_logs.sort()
+
+    for _, log_file_uri in relevant_logs:
+        log_lines = runner.cat(log_file_uri)
+        if not log_lines:
+            continue
+
+        for line in log_lines:
+            new_counters, step_num = parse_hadoop_counters_from_line(line)
+            if new_counters:
+                while len(counters) < step_num:
+                    counters.append({})
+                counters[step_num-1] = new_counters
+    return counters
+
+
+def scan_logs_in_order(task_attempt_logs, step_logs, job_logs, runner):
+    """Use mapping and order from :py:mod:`logparsers` to find errors in
+    logs. See :py:meth:`_find_probable_cause_of_failure` for return value
+    documentation.
+    """
+    log_type_to_uri_list = {
+        TASK_ATTEMPT_LOGS: task_attempt_logs,
+        STEP_LOGS: step_logs,
+        JOB_LOGS: job_logs,
+    }
+    for log_type, sort_func, parsers in processing_order():
+        relevant_logs = sort_func(log_type_to_uri_list[log_type])
+
+        # unfortunately need to special case task attempts since later
+        # attempts may have succeeded and we don't want those (issue #31)
+        tasks_seen = set()
+        for sort_key, info, log_file_uri in relevant_logs:
+
+            if log_type == TASK_ATTEMPT_LOGS:
+                task_info = (info['step_num'], info['node_type'],
+                             info['node_num'], info['stream'])
+                if task_info in tasks_seen:
+                    continue
+                tasks_seen.add(task_info)
+
+            val = apply_parsers_to_log(parsers, log_file_uri, runner)
+            if val:
+                if info.get('node_type', None) == 'm':
+                    val['input_uri'] = scan_for_input_uri(log_file_uri, runner)
+                return val
+
+    return None
+
+def apply_parsers_to_log(parsers, log_file_uri, runner):
+    """Have each :py:class:`LogParser` in *parsers* try to find an error
+    in the contents of *log_file_uri*
+    """
+    for parser in parsers:
+        if parser.LOG_NAME_RE.match(log_file_uri):
+            log_lines = runner.cat(log_file_uri)
+            if not log_lines:
+                continue
+
+            lines = parser.parse(log_lines)
+            if lines is not None:
+                return {
+                    'lines': lines,
+                    'log_file_uri': log_file_uri,
+                    'input_uri': None,
+                }
+    return None
+
+def scan_for_input_uri(log_file_uri, runner):
+    """Scan the syslog file corresponding to log_file_uri for
+    information about the input file.
+
+    Helper function for _scan_task_attempt_logs()
+    """
+    syslog_uri = posixpath.join(
+        posixpath.dirname(log_file_uri), 'syslog')
+
+    syslog_lines = runner.cat(syslog_uri)
+    if syslog_lines:
+        log.debug('scanning %s for input URI' % syslog_uri)
+        return find_input_uri_for_mapper(syslog_lines)
+    else:
+        return None
 
 
 def _make_sorting_func(regexp, sort_key_func):

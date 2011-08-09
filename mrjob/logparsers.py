@@ -212,7 +212,7 @@ def processing_order():
          [
              HadoopStreamingErrorLogParser()
          ]),
-        (JOB_LOGS, job_sort,
+        (JOB_LOGS, emr_job_sort,
          [
              TimeoutErrorLogParser()
          ]),

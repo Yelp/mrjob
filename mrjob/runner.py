@@ -403,12 +403,12 @@ class MRJobRunner(object):
             [{'group name': {'counter1': 1, 'counter2': 2}},
              {'group name': ...]
 
-        The first step of *this run* will be the first item. This means that
-        if your job has 3 steps and was attached to a job flow with 3
-        already-completed steps, this list will still only contain 3
-        dictionaries.
+        The list contains an entry for *every step of the job/job flow.* So
+        even if your conceptual job is only one step, if Hadoop thinks it's
+        step 11, this function should return a list of 11 items, even if the
+        first 10 are just empty dicts.
         """
-        return []
+        raise NotImplementedError
 
     def print_counters(self, limit_to_steps=None):
         """Display this run's counters in a user-friendly way.

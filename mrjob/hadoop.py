@@ -25,7 +25,7 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob.conf import combine_cmds, combine_dicts, combine_paths
-from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
+from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, HADOOP_JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.runner import MRJobRunner
 from mrjob.util import cmd_line, read_file
@@ -342,7 +342,10 @@ class HadoopJobRunner(MRJobRunner):
                 log.error('STDOUT: ' + line.strip('\n'))
 
             returncode = step_proc.wait()
-            if returncode != 0:
+            if returncode == 0:
+                self._fetch_counters([step_num+self._start_step_num])
+                self.print_counters([step_num+self._start_step_num])
+            else:
                 msg = 'Job failed with return code %d: %s' % (step_proc.returncode, streaming_args)
                 log.error(msg)
                 # look for a Python traceback
@@ -522,10 +525,13 @@ class HadoopJobRunner(MRJobRunner):
             can ignore errors from other jobs when sharing a job flow
         """
         job_logs = self._enforce_path_regexp(self._ls_logs('history/'),
-                                             JOB_LOG_URI_RE,
+                                             HADOOP_JOB_LOG_URI_RE,
                                              step_nums)
         uris = list(job_logs)
         self._counters = scan_for_counters_in_files(uris, self)
+
+    def counters(self):
+        return self._counters
 
     def _find_probable_cause_of_failure(self, step_nums):
         all_task_attempt_logs = []
@@ -542,7 +548,7 @@ class HadoopJobRunner(MRJobRunner):
                                               STEP_LOG_URI_RE,
                                               step_nums)
         job_logs = self._enforce_path_regexp(self._ls_logs('history/'),
-                                             JOB_LOG_URI_RE,
+                                             HADOOP_JOB_LOG_URI_RE,
                                              step_nums)
         log.info('Scanning logs for probable cause of failure')
         return scan_logs_in_order(task_attempt_logs=task_attempt_logs,

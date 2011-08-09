@@ -45,7 +45,7 @@ except ImportError:
     boto = None
 
 from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths, combine_path_lists
-from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
+from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, EMR_JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
 from mrjob.ssh import ssh_cat, ssh_ls, ssh_copy_key, ssh_slave_addresses, SSHException, SSH_PREFIX, SSH_LOG_ROOT
@@ -1241,7 +1241,7 @@ class EMRJobRunner(MRJobRunner):
 
     def ls_job_logs_ssh(self, step_nums):
         return self._enforce_path_regexp(self._ls_ssh_logs('history/'),
-                                         JOB_LOG_URI_RE,
+                                         EMR_JOB_LOG_URI_RE,
                                          step_nums)
 
     def ls_node_logs_ssh(self):
@@ -1279,7 +1279,7 @@ class EMRJobRunner(MRJobRunner):
 
     def ls_job_logs_s3(self, step_nums):
         return  self._enforce_path_regexp(self._ls_s3_logs('jobs/'),
-                                          JOB_LOG_URI_RE,
+                                          EMR_JOB_LOG_URI_RE,
                                           step_nums)
 
     def ls_node_logs_s3(self):

@@ -38,7 +38,8 @@ TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/attempt_(?P<timestamp>\d+)_(?P<step_
 STEP_LOG_URI_RE = re.compile(r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)$')
 
 # regex for matching job log URIs
-JOB_LOG_URI_RE = re.compile(r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
+EMR_JOB_LOG_URI_RE = re.compile(r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
+HADOOP_JOB_LOG_URI_RE = re.compile(r'^.*?/job_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<mystery_string_1>\d+)_(?P<user>.*?)_streamjob(?P<mystery_string_2>\d+).jar$')
 
 # regex for matching slave log URIs
 NODE_LOG_URI_RE = re.compile(r'^.*?/hadoop-hadoop-(jobtracker|namenode).*.out$')
@@ -51,7 +52,11 @@ def scan_for_counters_in_files(log_file_uris, runner):
     relevant_logs = [] # list of (sort key, URI)
 
     for log_file_uri in log_file_uris:
-        match = JOB_LOG_URI_RE.match(log_file_uri)
+        log.info('counter checks %s' % log_file_uri)
+        match = EMR_JOB_LOG_URI_RE.match(log_file_uri)
+        if match is None:
+            match = HADOOP_JOB_LOG_URI_RE.match(log_file_uri)
+
         if not match:
             continue
 
@@ -191,7 +196,9 @@ def processing_order():
                                            make_task_attempt_log_sort_key)
     step_sort = _make_sorting_func(STEP_LOG_URI_RE,
                                    make_step_log_sort_key)
-    job_sort = _make_sorting_func(JOB_LOG_URI_RE,
+    emr_job_sort = _make_sorting_func(EMR_JOB_LOG_URI_RE,
+                                  make_job_log_sort_key)
+    hadoop_job_sort = _make_sorting_func(HADOOP_JOB_LOG_URI_RE,
                                   make_job_log_sort_key)
     return [
         # give priority to task-attempts/ logs as they contain more useful
@@ -206,6 +213,10 @@ def processing_order():
              HadoopStreamingErrorLogParser()
          ]),
         (JOB_LOGS, job_sort,
+         [
+             TimeoutErrorLogParser()
+         ]),
+        (JOB_LOGS, hadoop_job_sort,
          [
              TimeoutErrorLogParser()
          ]),

@@ -47,6 +47,9 @@ HADOOP_LSR_NO_SUCH_FILE = re.compile(r'^lsr: Cannot access .*: No such file or d
 # used by rm() (see below)
 HADOOP_RMR_NO_SUCH_FILE = re.compile(r'^rmr: hdfs://.*$')
 
+# used to extract the job timestamp from stderr
+HADOOP_JOB_TIMESTAMP_RE = re.compile('Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
+
 
 def find_hadoop_streaming_jar(path):
     """Return the path of the hadoop streaming jar inside the given
@@ -152,6 +155,12 @@ class HadoopJobRunner(MRJobRunner):
         self._hdfs_input_dir = None
 
         self._hadoop_log_dir = hadoop_log_dir()
+
+        # Running jobs via hadoop assigns a new timestamp to each job.
+        # Running jobs via mrjob only adds steps.
+        # Store both of these values to enable log parsing.
+        self._job_timestamp = None
+        self._start_step_num = None
 
     @classmethod
     def _allowed_opts(cls):
@@ -334,12 +343,38 @@ class HadoopJobRunner(MRJobRunner):
 
             returncode = step_proc.wait()
             if returncode != 0:
+                msg = 'Job failed with return code %d: %s' % (step_proc.returncode, streaming_args)
+                log.error(msg)
+                # look for a Python traceback
+                cause = self._find_probable_cause_of_failure([step_num+self._start_step_num])
+                if cause:
+                    # log cause, and put it in exception
+                    cause_msg = [] # lines to log and put in exception
+                    cause_msg.append('Probable cause of failure (from %s):' %
+                               cause['log_file_uri'])
+                    cause_msg.extend(line.strip('\n') for line in cause['lines'])
+                    if cause['input_uri']:
+                        cause_msg.append('(while reading from %s)' %
+                                         cause['input_uri'])
+
+                    for line in cause_msg:
+                        log.error(line)
+
+                    # add cause_msg to exception message
+                    msg += '\n' + '\n'.join(cause_msg) + '\n'
+
+                raise Exception(msg)
                 raise CalledProcessError(step_proc.returncode, streaming_args)
 
     def _process_stderr_from_streaming(self, stderr):
         for line in stderr:
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
             log.info('HADOOP: ' + line)
+            m = HADOOP_JOB_TIMESTAMP_RE.match(line)
+            if m:
+                self._job_timestamp = m.group('timestamp')
+                if self._start_step_num is None:
+                    self._start_step_num = int(m.group('step_num'))
 
     def _hdfs_step_input_files(self, step_num):
         """Get the hdfs:// URI for input for the given step."""
@@ -461,17 +496,17 @@ class HadoopJobRunner(MRJobRunner):
 
     ### LOG FETCHING/PARSING ###
 
-    def _enforce_path_regexp(self, paths, regexp, **kwargs):
+    def _enforce_path_regexp(self, paths, regexp, step_nums):
         """Helper for log fetching functions to filter out unwanted
         logs. Keyword arguments are checked against their corresponding
         regex groups.
         """
         for path in paths:
             m = regexp.match(path)
-            if m:
-                if all(m.group(k) == v for k, v in kwargs.items()) \
-                   or not kwargs:
-                    yield path
+            if m \
+             and (step_nums is None or int(m.group('step_num')) in step_nums) \
+             and (self._job_timestamp is None or m.group('timestamp') == self._job_timestamp):
+                yield path
 
     def _ls_logs(self, relative_path):
         """List logs on the local filesystem by path relative to log root
@@ -495,12 +530,12 @@ class HadoopJobRunner(MRJobRunner):
     def _find_probable_cause_of_failure(self, step_nums):
         all_task_attempt_logs = []
         try:
-            all_paths.extend(self._ls_logs('userlogs/'))
+            all_task_attempt_logs.extend(self._ls_logs('userlogs/'))
         except IOError:
             # sometimes the master doesn't have these
             pass
         # TODO: get these logs from slaves if possible
-        task_attempt_logs = self._enforce_path_regexp(all_paths,
+        task_attempt_logs = self._enforce_path_regexp(all_task_attempt_logs,
                                                       TASK_ATTEMPTS_LOG_URI_RE,
                                                       step_nums)
         step_logs = self._enforce_path_regexp(self._ls_logs('steps/'),
@@ -509,7 +544,7 @@ class HadoopJobRunner(MRJobRunner):
         job_logs = self._enforce_path_regexp(self._ls_logs('history/'),
                                              JOB_LOG_URI_RE,
                                              step_nums)
-        log.info('Scanning SSH logs for probable cause of failure')
+        log.info('Scanning logs for probable cause of failure')
         return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
                                   step_logs=step_logs,
                                   job_logs=job_logs,

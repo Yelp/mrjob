@@ -409,11 +409,14 @@ class HadoopJobRunner(MRJobRunner):
         for line in stderr:
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
             log.info('HADOOP: ' + line)
+
+            # The job identifier is printed to stderr. We only want to parse it
+            # once because we know how many steps we have and just want to know
+            # what Hadoop thinks the first step's number is.
             m = HADOOP_JOB_TIMESTAMP_RE.match(line)
-            if m:
+            if m and self._job_timestamp is None:
                 self._job_timestamp = m.group('timestamp')
-                if self._start_step_num is None:
-                    self._start_step_num = int(m.group('step_num'))
+                self._start_step_num = int(m.group('step_num'))
 
     def _hdfs_step_input_files(self, step_num):
         """Get the hdfs:// URI for input for the given step."""
@@ -547,9 +550,9 @@ class HadoopJobRunner(MRJobRunner):
         """
         for path in paths:
             m = regexp.match(path)
-            if m \
-             and (step_nums is None or int(m.group('step_num')) in step_nums) \
-             and (self._job_timestamp is None or m.group('timestamp') == self._job_timestamp):
+            if (m
+                and (step_nums is None or int(m.group('step_num')) in step_nums)
+                and (self._job_timestamp is None or m.group('timestamp') == self._job_timestamp)):
                 yield path
 
     def _ls_logs(self, relative_path):

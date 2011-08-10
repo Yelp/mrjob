@@ -302,7 +302,8 @@ def hadoop_jar(*args):
 
     shutil.move(mock_output_dir, real_output_dir)
 
-    sys.stderr.write('Running job: job_201108091423_0002\n')
+    now = datetime.datetime.now()
+    sys.stderr.write(now.strftime('Running job: job_%Y%m%d%H%M_0001\n'))
     sys.stderr.write('Job succeeded!\n')
 
 

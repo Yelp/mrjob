@@ -314,6 +314,7 @@ class HadoopJobRunner(MRJobRunner):
         if self._wrapper_script:
             self._wrapper_script['upload'] = 'file'
 
+        self._counters = []
         steps = self._get_steps()
 
         for step_num, step in enumerate(steps):
@@ -379,8 +380,10 @@ class HadoopJobRunner(MRJobRunner):
 
             returncode = step_proc.wait()
             if returncode == 0:
+                # parsing needs the job flow-relative step number
                 self._fetch_counters([step_num+self._start_step_num])
-                self.print_counters([step_num+self._start_step_num])
+                # printing needs the job-relative step number
+                self.print_counters([step_num])
             else:
                 msg = 'Job failed with return code %d: %s' % (step_proc.returncode, streaming_args)
                 log.error(msg)
@@ -572,7 +575,12 @@ class HadoopJobRunner(MRJobRunner):
                                              HADOOP_JOB_LOG_URI_RE,
                                              step_nums)
         uris = list(job_logs)
-        self._counters = scan_for_counters_in_files(uris, self)
+        new_counters = scan_for_counters_in_files(uris, self)
+
+        # step_nums is relative to the start of the job flow
+        # we only want them relative to the job
+        for step_num in step_nums:
+            self._counters.append(new_counters.get(step_num, {}))
 
     def counters(self):
         return self._counters

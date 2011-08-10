@@ -21,6 +21,7 @@ WORD_RE = re.compile(r"[\w']+")
 class MRWordFreqCount(MRJob):
 
     def mapper(self, _, line):
+        self.increment_counter('a', 'b', 1)
         for word in WORD_RE.findall(line):
             yield (word.lower(), 1)
 

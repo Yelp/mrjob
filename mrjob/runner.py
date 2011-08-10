@@ -406,10 +406,8 @@ class MRJobRunner(object):
             [{'group name': {'counter1': 1, 'counter2': 2}},
              {'group name': ...]
 
-        The list contains an entry for *every step of the job/job flow.* So
-        even if your conceptual job is only one step, if Hadoop thinks it's
-        step 11, this function should return a list of 11 items, even if the
-        first 10 are just empty dicts.
+        The list contains an entry for every step of the current job, ignoring
+        earlier steps in the same job flow.
         """
         raise NotImplementedError
 
@@ -421,6 +419,8 @@ class MRJobRunner(object):
         :type limit_to_steps: list of int
         :param limit_to_steps: List of step numbers *relative to this job* to print, indexed from 0
         """
+        print limit_to_steps
+        print self.counters()
         for step_num, step_counters in enumerate(self.counters()):
             step_num = step_num + 1
             if limit_to_steps is None or step_num in limit_to_steps:

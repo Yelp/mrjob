@@ -1131,7 +1131,7 @@ class EMRJobRunner(MRJobRunner):
             log.info('Job completed.')
             log.info('Running time was %.1fs (not counting time spent waiting for the EC2 instances)' % total_step_time)
             self._fetch_counters(step_nums)
-            self.print_counters(step_nums)
+            self.print_counters(range(1, len(step_nums)+1))
         else:
             msg = 'Job failed with status %s: %s' % (job_state, reason)
             log.error(msg)
@@ -1327,23 +1327,29 @@ class EMRJobRunner(MRJobRunner):
         """Read Hadoop counters from S3.
 
         Args:
-        step_nums -- the numbers of steps belonging to us, so that we
-            can ignore errors from other jobs when sharing a job flow
+        step_nums -- the steps belonging to us, so that we can ignore counters
+                     from other jobs when sharing a job flow
         """
         self._counters = []
+        new_counters = {}
         if self._opts['ec2_key_pair_file']:
             try:
-                self._fetch_counters_ssh(step_nums)
+                new_counters = self._fetch_counters_ssh(step_nums)
             except LogFetchException, e:
-                self._fetch_counters_s3(step_nums, skip_s3_wait)
+                new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
         else:
             log.info('ec2_key_pair_file not specified, going to S3')
-            self._fetch_counters_s3(step_nums, skip_s3_wait)
+            new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
+
+        # step_nums is relative to the start of the job flow
+        # we only want them relative to the job
+        for step_num in step_nums:
+            self._counters.append(new_counters.get(step_num, {}))
 
     def _fetch_counters_ssh(self, step_nums):
         uris = list(self.ls_job_logs_ssh(step_nums))
         log.info('Fetching counters from SSH...')
-        self._counters = scan_for_counters_in_files(uris, self)
+        return scan_for_counters_in_files(uris, self)
 
     def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
         if not self._s3_job_log_uri:
@@ -1356,7 +1362,7 @@ class EMRJobRunner(MRJobRunner):
         self._wait_for_job_flow_termination()
 
         uris = self.ls_job_logs_s3(step_nums)
-        self._counters = scan_for_counters_in_files(uris, self)
+        return scan_for_counters_in_files(uris, self)
 
     def counters(self):
         return self._counters

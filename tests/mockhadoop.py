@@ -306,5 +306,12 @@ def hadoop_jar(*args):
     sys.stderr.write('Job succeeded!\n')
 
 
+def hadoop_version(*args):
+    sys.stderr.write("""Hadoop 0.20.2
+Subversion https://svn.apache.org/repos/asf/hadoop/common/branches/branch-0.20 -r 911707
+Compiled by chrisdo on Fri Feb 19 08:07:34 UTC 2010
+""")
+
+
 if __name__ == '__main__':
     main()

@@ -25,6 +25,11 @@ import shutil
 import subprocess
 import sys
 
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
+
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.runner import MRJobRunner
 from mrjob.job import MRJob
@@ -110,7 +115,8 @@ class InlineMRJobRunner(MRJobRunner):
             # run mapper, sort, reducer for each step
             for step_number, step_name in enumerate(self._get_steps()):
                 self._invoke_inline_mrjob(step_number, 'step-%d-mapper' %
-                                          step_number, is_mapper=True)
+                                          step_number, is_mapper=True,
+                                          has_combiner=('C' in step_name))
 
                 if 'R' in step_name:
                     mapper_output_path = self._prev_outfile
@@ -134,30 +140,49 @@ class InlineMRJobRunner(MRJobRunner):
     def _get_steps(self):
         return self._mrjob_cls()._steps_desc()
 
-    def _invoke_inline_mrjob(self, step_number, outfile_name, is_mapper=False, is_reducer=False):
+    def _invoke_inline_mrjob(self, step_number, outfile_name, is_mapper=False,
+                             is_reducer=False, is_combiner=False,
+                             has_combiner=False, child_stdin=None):
+        child_stdin = child_stdin or sys.stdin
         common_args = (['--step-num=%d' % step_number] +
-                       self._mr_job_extra_args(local=True) +
-                       self._decide_input_paths())
+                       self._mr_job_extra_args(local=True))
         if is_mapper:
-            child_args = ['--mapper'] + common_args
+            child_args = ['--mapper'] + self._decide_input_paths() + common_args
         elif is_reducer:
-            child_args = ['--reducer'] + common_args
-
-        outfile = self._decide_output_path(outfile_name)
+            child_args = ['--reducer'] + self._decide_input_paths() + common_args
+        elif is_combiner:
+            child_args = ['--combiner'] + common_args + ['-']
 
         child_instance = self._mrjob_cls(args=child_args)
 
-        # Tweak IO
-        child_stdout = open(outfile, 'w')
-        child_instance.sandbox(stdin=sys.stdin, stdout=child_stdout)
+        # Use custom stdin
+        if has_combiner:
+            child_stdout = StringIO()
+        else:
+            outfile = self._decide_output_path(outfile_name)
+            child_stdout = open(outfile, 'w')
+
+        child_instance.sandbox(stdin=child_stdin, stdout=child_stdout)
         child_instance.execute()
-        child_stdout.flush()
+
+        if has_combiner:
+            sorted_lines = sorted(child_stdout.getvalue().splitlines())
+            combiner_stdin = StringIO('\n'.join(sorted_lines))
+        else:
+            child_stdout.flush()
+
         child_stdout.close()
 
         while len(self._counters) <= step_number:
             self._counters.append({})
         child_instance.parse_counters(self._counters[step_number-1])
         self.print_counters([step_number+1])
+
+        if has_combiner:
+            self._invoke_inline_mrjob(step_number, outfile_name,
+                                      is_combiner=True,
+                                      child_stdin=combiner_stdin)
+            combiner_stdin.close()
 
     def counters(self):
         return self._counters

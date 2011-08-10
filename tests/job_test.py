@@ -36,16 +36,20 @@ from tests.mr_nomapper_multistep import MRNoMapper
 from tests.quiet import logger_disabled
 
 
-def stepdict(mapper=_IDENTITY_MAPPER, reducer=None,
-             mapper_init=None, mapper_final=None, 
+def stepdict(mapper=_IDENTITY_MAPPER, reducer=None, combiner=None,
+             mapper_init=None, mapper_final=None,
              reducer_init=None, reducer_final=None,
+             combiner_init=None, combiner_final=None,
              **kwargs):
     d = dict(mapper=mapper,
              mapper_init=mapper_init,
              mapper_final=mapper_final,
              reducer=reducer,
              reducer_init=reducer_init,
-             reducer_final=reducer_final)
+             reducer_final=reducer_final,
+             combiner=combiner,
+             combiner_init=combiner_init,
+             combiner_final=combiner_final)
     d.update(kwargs)
     return d
 
@@ -77,6 +81,7 @@ class MRInitJob(MRJob):
         super(MRInitJob, self).__init__(*args, **kwargs)
         self.sum_amount = 0
         self.multiplier = 0
+        self.combiner_multipler = 1
 
     def mapper_init(self):
         self.sum_amount += 10
@@ -89,6 +94,12 @@ class MRInitJob(MRJob):
 
     def reducer(self, key, values):
         yield(None, sum(values)*self.multiplier)
+
+    def combiner_init(self):
+        self.combiner_multiplier = 2
+
+    def combiner(self, key, values):
+        yield(None, sum(values)*self.combiner_multiplier)
 
 
 class MRInvisibleMapperJob(MRJob):
@@ -112,6 +123,21 @@ class MRInvisibleReducerJob(MRJob):
         self.things += len(list(values))
 
     def reducer_final(self):
+        yield None, self.things
+
+
+class MRInvisibleCombinerJob(MRJob):
+
+    def mapper(self, key, value):
+        yield key, 1
+
+    def combiner_init(self):
+        self.things = 0
+
+    def combiner(self, key, values):
+        self.things += len(list(values))
+
+    def combiner_final(self):
         yield None, self.things
 
 
@@ -212,17 +238,17 @@ class MRInitTestCase(TestCase):
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
                 results.append(value)
-        # these numbers should match if mapper_init and reducer_Init were
-        # called as expected
-        assert_equal(results[0], num_inputs*10*10)
+        # these numbers should match if mapper_init, reducer_init, and
+        # combiner_init were called as expected
+        assert_equal(results[0], num_inputs*10*10*2)
 
 
 class MRNoOutputTestCase(TestCase):
 
-    def test_no_map(self):
+    def _test_no_main_with_class(self, cls):
         num_inputs = 2
         stdin = StringIO("x\n" * num_inputs)
-        mr_job = MRInvisibleMapperJob(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
+        mr_job = cls(['-r', 'inline', '--no-conf', '--strict-protocols', '-']).sandbox(stdin=stdin)
         results = []
         with mr_job.make_runner() as runner:
             runner.run()
@@ -231,17 +257,14 @@ class MRNoOutputTestCase(TestCase):
                 results.append(value)
         assert_equal(results[0], num_inputs)
 
+    def test_no_map(self):
+        self._test_no_main_with_class(MRInvisibleMapperJob)
+
     def test_no_reduce(self):
-        num_inputs = 2
-        stdin = StringIO("x\n" * num_inputs)
-        mr_job = MRInvisibleReducerJob(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
-        results = []
-        with mr_job.make_runner() as runner:
-            runner.run()
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append(value)
-        assert_equal(results[0], num_inputs)
+        self._test_no_main_with_class(MRInvisibleReducerJob)
+
+    def test_no_combine(self):
+        self._test_no_main_with_class(MRInvisibleCombinerJob)
 
 
 class NoTzsetTestCase(TestCase):
@@ -474,6 +497,7 @@ class IsMapperOrReducerTestCase(TestCase):
         assert_equal(MRJob().is_mapper_or_reducer(), False)
         assert_equal(MRJob(['--mapper']).is_mapper_or_reducer(), True)
         assert_equal(MRJob(['--reducer']).is_mapper_or_reducer(), True)
+        assert_equal(MRJob(['--combiner']).is_mapper_or_reducer(), True)
         assert_equal(MRJob(['--steps']).is_mapper_or_reducer(), False)
 
 
@@ -506,7 +530,7 @@ class StepsTestCase(TestCase):
         mr_two_step_job = MRTwoStepJob(['--steps'])
         mr_two_step_job.sandbox()
         mr_two_step_job.show_steps()
-        assert_equal(mr_two_step_job.stdout.getvalue(), 'MR M\n')
+        assert_equal(mr_two_step_job.stdout.getvalue(), 'MCR M\n')
 
         mr_no_mapper = MRNoMapper(['--steps'])
         mr_no_mapper.sandbox()

@@ -337,7 +337,8 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
         # set log_uri to None, so that when we describe the job flow, it
         # won't have the loguri attribute, to test Issue #112
         emr_job_flow_id = emr_conn.run_jobflow(
-            name='Development Job Flow', log_uri=None)
+            name='Development Job Flow', log_uri=None,
+            keep_alive=True)
 
         stdin = StringIO('foo\nbar\n')
         self.mock_emr_output = {(emr_job_flow_id, 1): [

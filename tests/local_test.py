@@ -82,6 +82,7 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
 
             local_tmp_dir = runner._get_local_tmp_dir()
             assert os.path.exists(local_tmp_dir)
+            assert_equal(runner.counters()[0]['count']['combiners'], 8)
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)
@@ -411,6 +412,8 @@ class LocalMRJobRunnerJobConfTestCase(TestCase):
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
                 results.append((key, value))
+
+            assert_equal(runner.counters()[0]['count']['combiners'], 2)
 
         assert_equal(sorted(results),
                      [(input_path, 3), (input_gz_path, 1)])

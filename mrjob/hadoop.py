@@ -380,9 +380,9 @@ class HadoopJobRunner(MRJobRunner):
 
             returncode = step_proc.wait()
             if returncode == 0:
-                # parsing needs the job flow-relative step number
+                # parsing needs step number for whole job
                 self._fetch_counters([step_num+self._start_step_num])
-                # printing needs the job-relative step number
+                # printing needs step number relevant to this run of mrjob
                 self.print_counters([step_num+1])
             else:
                 msg = 'Job failed with return code %d: %s' % (step_proc.returncode, streaming_args)
@@ -568,8 +568,8 @@ class HadoopJobRunner(MRJobRunner):
         """Read Hadoop counters from local logs.
 
         Args:
-        step_nums -- the numbers of steps belonging to us, so that we
-            can ignore errors from other jobs when sharing a job flow
+        step_nums -- the steps belonging to us, so that we can ignore errors
+                     from other jobs run with the same timestamp
         """
         job_logs = self._enforce_path_regexp(self._ls_logs('history/'),
                                              HADOOP_JOB_LOG_URI_RE,
@@ -577,8 +577,7 @@ class HadoopJobRunner(MRJobRunner):
         uris = list(job_logs)
         new_counters = scan_for_counters_in_files(uris, self)
 
-        # step_nums is relative to the start of the job flow
-        # we only want them relative to the job
+        # only include steps relevant to the current job
         for step_num in step_nums:
             self._counters.append(new_counters.get(step_num, {}))
 

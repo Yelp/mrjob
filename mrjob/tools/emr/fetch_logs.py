@@ -96,8 +96,9 @@ def main():
             cat_all(runner)
 
         if options.get_counters:
-            runner._set_s3_job_log_uri(runner._describe_jobflow())
-            runner._fetch_counters(range(100), skip_s3_wait=True)
+            desc = runner._describe_jobflow()
+            runner._set_s3_job_log_uri(desc)
+            runner._fetch_counters(range(1, len(desc.steps)+1), skip_s3_wait=True)
             runner.print_counters()
 
         if options.find_failure:

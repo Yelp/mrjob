@@ -202,12 +202,11 @@ class HadoopJobRunner(MRJobRunner):
             stdout = self._invoke_hadoop(['version'], return_stdout=True)
             if stdout:
                 first_line = stdout.split('\n')[0]
-                log.info("'hadoop version' output: %s" % first_line)
                 m = HADOOP_VERSION_RE.match(first_line)
                 if m:
                     self._hadoop_version = m.group('version')
-                    log.info("Using Hadoop version %s" % self.hadoop_version)
-                    return
+                    log.info("Using Hadoop version %s" % self._hadoop_version)
+                    return self._hadoop_version
             self._hadoop_version = '0.20.203'
             log.info("Unable to determine Hadoop version. Assuming 0.20.203.")
         return self._hadoop_version
@@ -348,7 +347,8 @@ class HadoopJobRunner(MRJobRunner):
 
             if 'C' in step:
                 combiner_cmd = cmd_line(self._combiner_args(step_num))
-                if LooseVersion(self.get_hadoop_version()) < LooseVersion('0.20.203'):
+                this_version = LooseVersion(self.get_hadoop_version())
+                if this_version < LooseVersion('0.20.203'):
                     mapper = "bash -c '%s | sort | %s'" % (mapper, combiner_cmd)
                     combiner = None
                 else:
@@ -383,7 +383,7 @@ class HadoopJobRunner(MRJobRunner):
                 # parsing needs the job flow-relative step number
                 self._fetch_counters([step_num+self._start_step_num])
                 # printing needs the job-relative step number
-                self.print_counters([step_num])
+                self.print_counters([step_num+1])
             else:
                 msg = 'Job failed with return code %d: %s' % (step_proc.returncode, streaming_args)
                 log.error(msg)

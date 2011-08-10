@@ -417,10 +417,8 @@ class MRJobRunner(object):
         :type first_step_num: int
         :param first_step_num: Display step number of the counters from the first step
         :type limit_to_steps: list of int
-        :param limit_to_steps: List of step numbers *relative to this job* to print, indexed from 0
+        :param limit_to_steps: List of step numbers *relative to this job* to print, indexed from 1
         """
-        print limit_to_steps
-        print self.counters()
         for step_num, step_counters in enumerate(self.counters()):
             step_num = step_num + 1
             if limit_to_steps is None or step_num in limit_to_steps:

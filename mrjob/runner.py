@@ -413,7 +413,7 @@ class MRJobRunner(object):
         """
         return []
 
-    def print_counters(self, first_step_num=0, limit_to_steps=None):
+    def print_counters(self, limit_to_steps=None):
         """Display this run's counters in a user-friendly way.
 
         :type first_step_num: int
@@ -421,21 +421,19 @@ class MRJobRunner(object):
         :type limit_to_steps: list of int
         :param limit_to_steps: List of step numbers *relative to this job* to print, indexed from 0
         """
-        if limit_to_steps:
-            counters = self.counters()
-            counter_iter = [(step_num, counters[step_num]) \
-                            for step_num in limit_to_steps]
-        else:
-            counter_iter = enumerate(self.counters())
-
-        for step_num, step_counters in counter_iter:
-            log.info('Counters from step %d:' % (step_num + first_step_num))
-            for group_name in sorted(step_counters.keys()):
-                log.info('  %s:' % group_name)
-                group_counters = step_counters[group_name]
-                for counter_name in sorted(group_counters.keys()):
-                    log.info('    %s: %d' % (counter_name,
-                                             group_counters[counter_name]))
+        for step_num, step_counters in enumerate(self.counters()):
+            step_num = step_num + 1
+            if limit_to_steps is None or step_num in limit_to_steps:
+                log.info('Counters from step %d:' % step_num)
+                if step_counters.keys():
+                    for group_name in sorted(step_counters.keys()):
+                        log.info('  %s:' % group_name)
+                        group_counters = step_counters[group_name]
+                        for counter_name in sorted(group_counters.keys()):
+                            log.info('    %s: %d' % (counter_name,
+                                                     group_counters[counter_name]))
+                else:
+                    log.info('  (no counters found)')
 
     ### hooks for the with statement ###
 

@@ -176,7 +176,7 @@ class InlineMRJobRunner(MRJobRunner):
         while len(self._counters) <= step_number:
             self._counters.append({})
         child_instance.parse_counters(self._counters[step_number-1])
-        self.print_counters(first_step_num=1, limit_to_steps=[step_number])
+        self.print_counters([step_number+1])
 
         if has_combiner:
             self._invoke_inline_mrjob(step_number, outfile_name,

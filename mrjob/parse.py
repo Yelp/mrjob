@@ -52,14 +52,46 @@ def find_python_traceback(lines):
 
     In logs from EMR, we find python tracebacks in ``task-attempts/*/stderr``
     """
+    # Lines to pass back representing entire error found
+    all_tb_lines = []
+
+    # This is used to store a working list of lines in a single traceback
+    tb_lines = []
+
+    # This is used to store a working list of non-traceback lines between the
+    # current traceback and the previous one
+    non_tb_lines = []
+
+    # Track whether or not we are in a traceback rather than consuming the
+    # iterator
+    in_traceback = False
+
     for line in lines:
-        if line.startswith('Traceback (most recent call last):'):
-            tb_lines = []
-            for line in lines:
+        if in_traceback:
+            tb_lines.append(line)
+
+            # If no indentation, this is the last line of the traceback
+            if line.lstrip() == line:
+                in_traceback = False
+
+                if line.startswith('subprocess.CalledProcessError'):
+                    # CalledProcessError may mean that the subprocess printed
+                    # errors to stderr which we can show the user
+                    all_tb_lines += non_tb_lines
+
+                all_tb_lines += tb_lines
+
+                # Reset all working lists
+                tb_lines = []
+                non_tb_lines = []
+        else:
+            if line.startswith('Traceback (most recent call last):'):
                 tb_lines.append(line)
-                if not line.startswith(' '):
-                    break
-            return tb_lines
+                in_traceback = True
+            else:
+                non_tb_lines.append(line)
+    if all_tb_lines:
+        return all_tb_lines
     else:
         return None
 
@@ -122,6 +154,7 @@ def find_input_uri_for_mapper(lines):
 
 
 _HADOOP_STREAMING_ERROR_RE = re.compile(r'^.*ERROR org\.apache\.hadoop\.streaming\.StreamJob \(main\): (.*)$')
+_HADOOP_STREAMING_ERROR_RE_2 = re.compile(r'^(.*does not exist.*)$')
 
 def find_interesting_hadoop_streaming_error(lines):
     """Scan a log file or other iterable for a hadoop streaming error
@@ -135,13 +168,13 @@ def find_interesting_hadoop_streaming_error(lines):
         2010-07-27 19:53:35,451 ERROR org.apache.hadoop.streaming.StreamJob (main): Error launching job , Output path already exists : Output directory s3://yourbucket/logs/2010/07/23/ already exists and is not empty
     """
     for line in lines:
-        match = _HADOOP_STREAMING_ERROR_RE.match(line)
+        match = _HADOOP_STREAMING_ERROR_RE.match(line) \
+                or _HADOOP_STREAMING_ERROR_RE_2.match(line)
         if match:
             msg = match.group(1)
             if msg != 'Job not Successful!':
                 return msg
-    else:
-        return None
+    return None
 
 
 _MULTILINE_JOB_LOG_ERROR_RE = re.compile(r'^\w+Attempt.*?TASK_STATUS="FAILED".*?ERROR="(?P<first_line>[^"]*)$')
@@ -266,7 +299,8 @@ def parse_mr_job_stderr(stderr, counters=None):
 # We just want to pull out the counter string, which varies between 
 # Hadoop versions.
 _KV_EXPR = r'\s+\w+=".*?"'  # this matches KEY="VALUE"
-_COUNTER_LINE_EXPR = r'^.*?COUNTERS="%s".*?$' % r'(?P<counters>.*?)'
+_COUNTER_LINE_EXPR = r'^.*?JOBID=".*?_%s".*?COUNTERS="%s".*?$' % \
+    ('(?P<step_num>\d+)', r'(?P<counters>.*?)')
 _COUNTER_LINE_RE = re.compile(_COUNTER_LINE_EXPR)
 
 # 0.18-specific
@@ -342,12 +376,12 @@ def parse_hadoop_counters_from_line(line):
 
     :param line: log line containing counter data
     :type line: str
-    :param hadoop_version: Version of Hadoop that produced the log files because they are formatted differently.
-    :type hadoop_version: str
+
+    :return: (counter_dict, step_num) or (None, None)
     """
     m = _COUNTER_LINE_RE.match(line)
     if not m:
-        return None
+        return None, None
 
     parser_switch = (
         (_COUNTER_FORMAT_IS_0_18, _parse_counters_0_18),
@@ -364,14 +398,14 @@ def parse_hadoop_counters_from_line(line):
 
     if correct_func is None:
         log.warn('Cannot parse Hadoop counter line: %s' % line)
-        return None
+        return None, None
 
     counters = {}
     for group, counter, value in correct_func(counter_substring):
         counters.setdefault(group, {})
         counters[group].setdefault(counter, 0)
         counters[group][counter] += int(value)
-    return counters
+    return counters, int(m.group('step_num'))
 
 
 def parse_port_range_list(range_list_str):

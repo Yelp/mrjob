@@ -678,7 +678,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 make_input_uri_line(BUCKET_URI + 'input.gz'),
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
-                     {'lines': list(StringIO(PY_EXCEPTION)),
+                     {'lines': list(StringIO(TRACEBACK_START + PY_EXCEPTION)),
                       'log_file_uri':
                           BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
                       'input_uri': BUCKET_URI + 'input.gz'})
@@ -689,7 +689,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 GARBAGE + TRACEBACK_START + PY_EXCEPTION + GARBAGE),
         }})
         assert_equal(self.runner._find_probable_cause_of_failure([1]),
-                     {'lines': list(StringIO(PY_EXCEPTION)),
+                     {'lines': list(StringIO(TRACEBACK_START + PY_EXCEPTION)),
                       'log_file_uri':
                           BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
                       'input_uri': None})

@@ -406,12 +406,10 @@ class MRJobRunner(object):
             [{'group name': {'counter1': 1, 'counter2': 2}},
              {'group name': ...]
 
-        The first step of *this run* will be the first item. This means that
-        if your job has 3 steps and was attached to a job flow with 3
-        already-completed steps, this list will still only contain 3
-        dictionaries.
+        The list contains an entry for every step of the current job, ignoring
+        earlier steps in the same job flow.
         """
-        return []
+        raise NotImplementedError
 
     def print_counters(self, limit_to_steps=None):
         """Display this run's counters in a user-friendly way.
@@ -419,7 +417,7 @@ class MRJobRunner(object):
         :type first_step_num: int
         :param first_step_num: Display step number of the counters from the first step
         :type limit_to_steps: list of int
-        :param limit_to_steps: List of step numbers *relative to this job* to print, indexed from 0
+        :param limit_to_steps: List of step numbers *relative to this job* to print, indexed from 1
         """
         for step_num, step_counters in enumerate(self.counters()):
             step_num = step_num + 1

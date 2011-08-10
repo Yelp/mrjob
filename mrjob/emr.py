@@ -972,12 +972,14 @@ class EMRJobRunner(MRJobRunner):
             step_args = self._hadoop_conf_args(step_num, len(steps))
             jar = self._get_jar()
 
-            # boto 2.0 doesn't support combiners in StreamingStep, so insert
-            # them into step_args manually.
-            if LooseVersion(self.get_hadoop_version()) >= LooseVersion('0.20'):
-                step_args.extend(['-combiner', combiner])
-            else:
-                mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
+            if combiner is not None:
+                # boto 2.0 doesn't support combiners in StreamingStep, so insert
+                # them into step_args manually.
+                current_version = LooseVersion(self.get_hadoop_version())
+                if current_version >= LooseVersion('0.20'):
+                    step_args.extend(['-combiner', combiner])
+                else:
+                    mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
 
             try:
                 streaming_step = boto.emr.StreamingStep(

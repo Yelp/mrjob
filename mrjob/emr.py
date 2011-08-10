@@ -1353,7 +1353,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
         if not self._s3_job_log_uri:
-            return None
+            return {}
 
         log.info('Fetching counters from S3...')
 

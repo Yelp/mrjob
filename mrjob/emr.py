@@ -14,6 +14,7 @@
 from __future__ import with_statement
 
 import datetime
+from distutils.version import LooseVersion
 import fnmatch
 import logging
 import os
@@ -50,6 +51,17 @@ from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
 from mrjob.ssh import ssh_cat, ssh_ls, ssh_copy_key, ssh_slave_addresses, SSHException, SSH_PREFIX, SSH_LOG_ROOT
 from mrjob.util import cmd_line, extract_dir_for_tar, read_file
+
+
+def monkeypatch_boto():
+    # 2.0b4 doesn't have HadoopVersion in JobFlow.
+    # 2.0 final does.
+    from boto.emr.emrobject import JobFlow
+    if not 'HadoopVersion' in JobFlow.Fields:
+        JobFlow.Fields.add('HadoopVersion')
+
+if boto is not None:
+    monkeypatch_boto()
 
 
 log = logging.getLogger('mrjob.emr')
@@ -402,6 +414,9 @@ class EMRJobRunner(MRJobRunner):
 
         # turn off tracker progress until tunnel is up
         self._show_tracker_progress = False
+
+        # init hadoop version cache
+        self._hadoop_version = None
 
     @classmethod
     def _allowed_opts(cls):
@@ -947,6 +962,11 @@ class EMRJobRunner(MRJobRunner):
                 mapper = 'cat'
             else:
                 mapper = cmd_line(self._mapper_args(step_num))
+
+            if 'C' in step:
+                combiner = cmd_line(self._combiner_args(step_num))
+            else:
+                combiner = None
                 
             if 'R' in step: # i.e. if there is a reducer:
                 reducer = cmd_line(self._reducer_args(step_num))
@@ -970,6 +990,13 @@ class EMRJobRunner(MRJobRunner):
             step_args = self._hadoop_conf_args(step_num, len(steps))
             jar = self._get_jar()
 
+            # boto 2.0 doesn't support combiners in StreamingStep, so insert
+            # them into step_args manually.
+            if LooseVersion(self.get_hadoop_version()) >= LooseVersion('0.20'):
+                step_args.extend(['-combiner', combiner])
+            else:
+                mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
+
             try:
                 streaming_step = boto.emr.StreamingStep(
                     name=name, mapper=mapper, reducer=reducer,
@@ -978,9 +1005,7 @@ class EMRJobRunner(MRJobRunner):
                     step_args=step_args, input=input, output=output,
                     jar=jar)
             except TypeError:
-                # the jar option is new to boto (actually just a pull
-                # request from my branch right now), so we may need to
-                # monkey-patch the jar() method
+                # The jar option is supported in boto 2.0 but not 2.0b4.
                 streaming_step = boto.emr.StreamingStep(
                     name=name, mapper=mapper, reducer=reducer,
                     action_on_failure=action_on_failure,
@@ -1197,6 +1222,11 @@ class EMRJobRunner(MRJobRunner):
     def _reducer_args(self, step_num):
         return (self._script_args() +
                 ['--step-num=%d' % step_num, '--reducer'] +
+                self._mr_job_extra_args())
+
+    def _combiner_args(self, step_num):
+        return (self._script_args() +
+                ['--step-num=%d' % step_num, '--combiner'] +
                 self._mr_job_extra_args())
 
     def _upload_args(self):
@@ -1989,6 +2019,16 @@ class EMRJobRunner(MRJobRunner):
     def _describe_jobflow(self, emr_conn=None):
         emr_conn = emr_conn or self.make_emr_conn()
         return emr_conn.describe_jobflow(self._emr_job_flow_id)
+
+    def get_hadoop_version(self):
+        if not self._hadoop_version:
+            if self._emr_job_flow_id:
+                # if joining a job flow, infer the version
+                self._hadoop_version = self._describe_jobflow().hadoopversion
+            else:
+                # otherwise, read it from the config
+                self._hadoop_version = self._opts['hadoop_version']
+        return self._hadoop_version
 
     def _address_of_master(self, emr_conn=None):
         """Get the address of the master node so we can SSH to it"""

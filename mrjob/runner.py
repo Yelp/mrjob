@@ -55,6 +55,9 @@ CLEANUP_CHOICES = sorted(['NONE', 'IF_SUCCESSFUL', 'SCRATCH', 'ALL'])
 CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
 
 
+_STEP_RE = re.compile(r'^M?C?R?$')
+
+
 class MRJobRunner(object):
     """Abstract base class for all runners.
 
@@ -70,7 +73,7 @@ class MRJobRunner(object):
 
       - Run your job with :option:`--steps` to find out how many mappers/reducers to run
       - Copy your job and supporting files to Hadoop
-      - Instruct Hadoop to run your job with the appropriate :option:`--mapper`, :option:`--reducer`, and :option:`--step-num` arguments
+      - Instruct Hadoop to run your job with the appropriate :option:`--mapper`, :option:`--combiner`, :option:`--reducer`, and :option:`--step-num` arguments
 
     Each runner runs a single job once; if you want to run a job multiple
     times, make multiple runners.
@@ -782,7 +785,7 @@ class MRJobRunner(object):
                 if not steps or not stdout:
                     raise ValueError('step description is empty!')
                 for step in steps:
-                    if step not in ('MR', 'M', 'R'):
+                    if len(step) < 1 or not _STEP_RE.match(step):
                         raise ValueError(
                             'unexpected step type %r in steps %r' %
                                          (step, stdout))

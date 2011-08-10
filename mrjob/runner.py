@@ -348,14 +348,15 @@ class MRJobRunner(object):
         
         return self.cat(self.path_join(output_dir, 'part-*'))
      
-    def _cleanup_scratch(self):
-        """Cleanup any files/directories we create while running this job.
-        Should be safe to run this at any time, or multiple times.
+    def _cleanup_local_scratch(self):
+        """Cleanup any files/directories on the local machine we created while
+        running this job. Should be safe to run this at any time, or multiple
+        times.
 
         This particular function removes any local tmp directories
         added to the list self._local_tmp_dirs
 
-        This won't remove output_dir if it's outside of our scratch dir
+        This won't remove output_dir if it's outside of our scratch dir.
         """
         if self._local_tmp_dir:
             log.info('removing tmp directory %s' % self._local_tmp_dir)
@@ -366,6 +367,13 @@ class MRJobRunner(object):
 
         self._local_tmp_dir = None
 
+    def _cleanup_remote_scratch(self):
+        """Cleanup any files/directories on the remote machine (S3) we created
+        while running this job. Should be safe to run this at any time, or
+        multiple times.
+        """
+        pass # this only happens on EMR
+
     def _cleanup_logs(self):
         """Cleanup any log files that are created as a side-effect of the job.
         """
@@ -373,7 +381,7 @@ class MRJobRunner(object):
 
     def _cleanup_jobs(self):
         """Stop any jobs that we created that are still running."""
-        pass
+        pass # this only happens on EMR
 
     def cleanup(self, mode=None):
         """Clean up running jobs, scratch dirs, and logs, subject to the *cleanup* option passed to the constructor.
@@ -394,7 +402,8 @@ class MRJobRunner(object):
 
         if (mode in ('ALL', 'SCRATCH') or
             (mode == 'IF_SUCCESSFUL' and self._ran_job)):
-            self._cleanup_scratch()
+            self._cleanup_local_scratch()
+            self._cleanup_remote_scratch()
 
         if (mode == 'ALL' or
             (mode == 'IF_SUCCESSFUL' and self._ran_job)):

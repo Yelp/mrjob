@@ -116,15 +116,23 @@ class LocalMRJobRunner(MRJobRunner):
                             [self._wrapper_script['name']] +
                             wrapper_args)
 
-        # run mapper, sort, reducer for each step
+        # run mapper, combiner, sort, reducer for each step
         for i, step in enumerate(self._get_steps()):
             self._counters.append({})
             # run the mapper
             mapper_args = (wrapper_args + [self._script['name'],
                             '--step-num=%d' % i, '--mapper'] +
                            self._mr_job_extra_args())
-            self._invoke_step(mapper_args, 'step-%d-mapper' % i, step_num=i, 
-                        env=self._get_running_env(), step_type='M', num_tasks=self._map_tasks)
+            combiner_args = []
+            if 'C' in step:
+                combiner_args = (wrapper_args + [self._script['name'],
+                                 '--step-num=%d' % i, '--combiner'] +
+                                 self._mr_job_extra_args())
+
+            self._invoke_step(mapper_args, 'step-%d-mapper' % i, step_num=i,
+                              env=self._get_running_env(), step_type='M',
+                              num_tasks=self._map_tasks,
+                              combiner_args=combiner_args)
 
             if 'R' in step:
                 # sort the output
@@ -298,7 +306,8 @@ class LocalMRJobRunner(MRJobRunner):
 
         return file_names
 
-    def _invoke_step(self, args, outfile_name, env=None, step_num=0, num_tasks=1, step_type='M'):
+    def _invoke_step(self, args, outfile_name, env=None, step_num=0,
+                     num_tasks=1, step_type='M', combiner_args=None):
         """Run the given command, outputting into outfile, and reading
         from the previous outfile (or, for the first step, from our
         original output files).
@@ -307,6 +316,8 @@ class LocalMRJobRunner(MRJobRunner):
         inside self._working_dir
 
         We'll intelligently handle stderr from the process.
+
+        :param combiner_args: If this mapper has a combiner, we need to do some extra shell wrangling, so pass the combiner arguments in separately.
         """
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
@@ -373,23 +384,28 @@ class LocalMRJobRunner(MRJobRunner):
         
                 task_outfile = outfile_name + '_part-%05d' % task_num
         
-                proc = self._invoke_process(args + [file_name], task_outfile, env=task_env)
+                proc = self._invoke_process(args + [file_name], task_outfile,
+                                            env=task_env,
+                                            combiner_args=combiner_args)
                 procs.append(proc)
 
         for proc in procs:
             self._wait_for_process(proc, step_num)
 
-        self.print_counters(first_step_num=1, limit_to_steps=[step_num])
+        self.print_counters([step_num+1])
         
         
-    def _invoke_process(self, args, outfile_name, env):
-        """ invokes the process described by *args* and which writes to *outfile_name*
-            returns a dictoinary representing the process:
-                - proc: Popen object
-                - args: the process args
-                - write_to: the file descriptor the process is writing to
+    def _invoke_process(self, args, outfile_name, env, combiner_args=None):
+        """invokes the process described by *args* and which writes to *outfile_name*
+
+        :param combiner_args: If this mapper has a combiner, we need to do some extra shell wrangling, so pass the combiner arguments in separately.
+
+        :return: dict(proc=Popen, args=[process args], write_to=file)
         """
-        log.info('> %s' % cmd_line(args))
+        if combiner_args:
+            log.info('> %s | sort | %s' % (cmd_line(args), cmd_line(combiner_args)))
+        else:
+            log.info('> %s' % cmd_line(args))
         
         # set up outfile
         outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
@@ -400,8 +416,15 @@ class LocalMRJobRunner(MRJobRunner):
         write_to = open(outfile, 'w')
 
         # run the process
-        proc = Popen(args, stdout=write_to, stderr=PIPE,
-                     cwd=self._working_dir, env=env)
+        if combiner_args:
+            command = '%s | sort | %s' % (cmd_line(args), cmd_line(combiner_args))
+            proc = Popen(['-c', command],
+                         stdout=write_to, stderr=PIPE,
+                         cwd=self._working_dir, env=env,
+                         shell=True)
+        else:
+            proc = Popen(args, stdout=write_to, stderr=PIPE,
+                         cwd=self._working_dir, env=env)
         return {'proc': proc, 'args': args, 'write_to': write_to}
     
     def _wait_for_process(self, proc, step_num):
@@ -412,7 +435,7 @@ class LocalMRJobRunner(MRJobRunner):
         returncode = proc['proc'].wait()
 
         if returncode != 0:
-            self.print_counters(first_step_num=1, limit_to_steps=[step_num])
+            self.print_counters([step_num+1])
             # try to throw a useful exception
             if tb_lines:
                 raise Exception(

@@ -29,6 +29,10 @@ class MRWordCount(MRJob):
     def reducer(self, name, counts):
         yield (name, sum(counts))
 
+    def combiner(self, name, counts):
+        self.increment_counter('count', 'combiners', 1)
+        yield name, sum(counts)
+
         
 if __name__ == '__main__':
     MRWordCount.run()

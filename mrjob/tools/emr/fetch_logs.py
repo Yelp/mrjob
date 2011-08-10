@@ -47,6 +47,7 @@ import sys
 
 from mrjob.emr import EMRJobRunner, LogFetchException
 from mrjob.job import MRJob
+from mrjob.logparsers import TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS
 from mrjob.util import scrape_options_into_new_groups, log_to_stream
 
 
@@ -55,6 +56,9 @@ def main():
     description = 'List, display, and parse Hadoop logs associated with EMR job flows. Useful for debugging failed jobs for which mrjob did not display a useful error message or for inspecting jobs whose output has been lost.'
     option_parser = OptionParser(usage=usage,description=description)
 
+    option_parser.add_option('-f', '--find-failure', dest='find_failure',
+                             action='store_true', default=False,
+                             help='Search the logs for information about why the job failed')
     option_parser.add_option('-l', '--list', dest='list_relevant',
                              action="store_true", default=False,
                              help='List log files MRJob finds relevant')
@@ -101,7 +105,8 @@ def main():
 
     runner_kwargs = options.__dict__.copy()
     for unused_arg in ('quiet', 'verbose', 'list_relevant', 'list_all',
-                       'cat_relevant', 'cat_all', 'get_counters', 'step_num'):
+                       'cat_relevant', 'cat_all', 'get_counters', 'step_num',
+                      'find_failure'):
         del runner_kwargs[unused_arg]
 
     with EMRJobRunner(emr_job_flow_id=args[0], **runner_kwargs) as runner:
@@ -118,9 +123,13 @@ def main():
             cat_all(runner)
 
         if options.get_counters:
-            runner._set_s3_job_log_uri(runner._describe_jobflow())
-            runner._fetch_counters(range(100), skip_s3_wait=True)
+            desc = runner._describe_jobflow()
+            runner._set_s3_job_log_uri(desc)
+            runner._fetch_counters(range(1, len(desc.steps)+1), skip_s3_wait=True)
             runner.print_counters()
+
+        if options.find_failure:
+            find_failure(runner, options.step_num)
 
 
 def prettyprint_paths(paths):
@@ -129,66 +138,113 @@ def prettyprint_paths(paths):
     print
 
 
-def _prettyprint_relevant(task_attempts, steps, jobs, nodes):
+def _prettyprint_relevant(log_type_to_uri_list):
     print 'Task attempts:'
-    prettyprint_paths(task_attempts)
+    prettyprint_paths(log_type_to_uri_list[TASK_ATTEMPT_LOGS])
     print 'Steps:'
-    prettyprint_paths(steps)
+    prettyprint_paths(log_type_to_uri_list[STEP_LOGS])
     print 'Jobs:'
-    prettyprint_paths(jobs)
+    prettyprint_paths(log_type_to_uri_list[JOB_LOGS])
     print 'Nodes:'
-    prettyprint_paths(nodes)
+    prettyprint_paths(log_type_to_uri_list[NODE_LOGS])
 
 
 def list_relevant(runner, step_nums):
     try:
-        _prettyprint_relevant(*runner.ssh_list_logs(step_nums=step_nums))
+        logs = {
+            TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_ssh(step_nums),
+            STEP_LOGS: runner.ls_step_logs_ssh(step_nums),
+            JOB_LOGS: runner.ls_job_logs_ssh(),
+            NODE_LOGS: runner.ls_node_logs_ssh(),
+        }
+        _prettyprint_relevant(logs)
     except LogFetchException, e:
         print 'SSH error:', e
-        _prettyprint_relevant(*runner.s3_list_logs(step_nums=step_nums))
+        logs = {
+            TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_s3(step_nums),
+            STEP_LOGS: runner.ls_step_logs_s3(step_nums),
+            JOB_LOGS: runner.ls_job_logs_s3(),
+            NODE_LOGS: runner.ls_node_logs_s3(),
+        }
+        _prettyprint_relevant(logs)
 
 
 def list_all(runner):
     try:
-        prettyprint_paths(runner.ssh_list_all())
+        prettyprint_paths(runner.ls_all_logs_ssh())
     except LogFetchException, e:
         print 'SSH error:', e
-        prettyprint_paths(runner.s3_list_all())
+        prettyprint_paths(runner.ls_all_logs_s3())
 
 
 def cat_from_list(runner, path_list):
     for path in path_list:
         print '===', path, '==='
         for line in runner.cat(path):
-            print line
+            print line.rstrip()
         print
 
 
-def _cat_from_relevant(runner, task_attempts, steps, jobs, nodes):
+def _cat_from_relevant(runner, log_type_to_uri_list):
     print 'Task attempts:'
-    cat_from_list(runner, task_attempts)
+    cat_from_list(runner, log_type_to_uri_list[TASK_ATTEMPT_LOGS])
     print 'Steps:'
-    cat_from_list(runner, steps)
+    cat_from_list(runner, log_type_to_uri_list[STEP_LOGS])
     print 'Jobs:'
-    cat_from_list(runner, jobs)
+    cat_from_list(runner, log_type_to_uri_list[JOB_LOGS])
     print 'Slaves:'
-    cat_from_list(runner, nodes)
+    cat_from_list(runner, log_type_to_uri_list[NODE_LOGS])
 
 
 def cat_relevant(runner, step_nums):
     try:
-        _cat_from_relevant(runner, *runner.ssh_list_logs(step_nums=step_nums))
+        logs = {
+            TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_ssh(step_nums),
+            STEP_LOGS: runner.ls_step_logs_ssh(step_nums),
+            JOB_LOGS: runner.ls_job_logs_ssh(),
+            NODE_LOGS: runner.ls_node_logs_ssh(),
+        }
+        _cat_from_relevant(runner, logs)
     except LogFetchException, e:
         print 'SSH error:', e
-        _cat_from_relevant(runner, *runner.s3_list_logs(step_nums=step_nums))
+        logs = {
+            TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_s3(step_nums),
+            STEP_LOGS: runner.ls_step_logs_s3(step_nums),
+            JOB_LOGS: runner.ls_job_logs_s3(),
+            NODE_LOGS: runner.ls_node_logs_s3(),
+        }
+        _cat_from_relevant(runner, logs)
 
 
 def cat_all(runner):
     try:
-        cat_from_list(runner, runner.ssh_list_all())
+        cat_from_list(runner, runner.ls_all_logs_ssh())
     except LogFetchException, e:
         print 'SSH error:', e
-        cat_from_list(runner, runner.s3_list_all())
+        cat_from_list(runner, runner.ls_all_logs_s3())
+
+
+def find_failure(runner, step_num):
+    if step_num:
+        step_nums = [step_num]
+    else:
+        job_flow = runner._describe_jobflow()
+        step_nums = range(1, len(job_flow.steps)+1)
+
+    cause = runner._find_probable_cause_of_failure(step_nums)
+    if cause:
+        # log cause, and put it in exception
+        cause_msg = [] # lines to log and put in exception
+        cause_msg.append('Probable cause of failure (from %s):' %
+                   cause['log_file_uri'])
+        cause_msg.extend(line.strip('\n') for line in cause['lines'])
+        if cause['input_uri']:
+            cause_msg.append('(while reading from %s)' %
+                             cause['input_uri'])
+
+        print '\n'.join(cause_msg)
+    else:
+        print 'No probable cause of failure found.'
 
 if __name__ == '__main__':
     main()

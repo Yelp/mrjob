@@ -52,7 +52,6 @@ def scan_for_counters_in_files(log_file_uris, runner):
     relevant_logs = [] # list of (sort key, URI)
 
     for log_file_uri in log_file_uris:
-        log.info('counter checks %s' % log_file_uri)
         match = EMR_JOB_LOG_URI_RE.match(log_file_uri)
         if match is None:
             match = HADOOP_JOB_LOG_URI_RE.match(log_file_uri)
@@ -95,7 +94,8 @@ def scan_logs_in_order(task_attempt_logs, step_logs, job_logs, runner):
     log_type_to_uri_list = {
         TASK_ATTEMPT_LOGS: task_attempt_logs,
         STEP_LOGS: step_logs,
-        JOB_LOGS: job_logs,
+        # job logs may be scanned twice, so save the ls generator output
+        JOB_LOGS: list(job_logs),
     }
     for log_type, sort_func, parsers in processing_order():
         relevant_logs = sort_func(log_type_to_uri_list[log_type])

@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,27 +11,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""The classic MapReduce job: count the frequency of words.
+"""Tests for JobConf Environment Variables
 """
 from mrjob.job import MRJob
-import re
+from mrjob.compat import get_jobconf_value
 
-WORD_RE = re.compile(r"[\w']+")
+JOBCONF_LIST = [
+    'mapreduce.job.id', 'mapreduce.job.local.dir', 'mapreduce.task.id',
+    'mapreduce.task.attempt.id', 'mapreduce.task.ismap', 'mapreduce.task.partition',
+    'mapreduce.map.input.file', 'mapreduce.map.input.start', 'mapreduce.map.input.length',
+    'mapreduce.task.output.dir', 'mapreduce.job.cache.local.archives', 'user.defined'
+]
 
-class MRWordFreqCount(MRJob):
+class MRJobConfTest(MRJob):
 
     def mapper(self, _, line):
-        for word in WORD_RE.findall(line):
-            yield (word.lower(), 1)
-
-    def combiner(self, word, counts):
-        counts_list = list(counts)
-        yield (word, sum(counts_list))
-
-    def reducer(self, word, counts):
-        yield (word, sum(counts))
+        for jobconf in JOBCONF_LIST:
+            yield (jobconf, get_jobconf_value(jobconf))
 
 if __name__ == '__main__':
-    MRWordFreqCount.run()
+    MRJobConfTest.run()
 
 

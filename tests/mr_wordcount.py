@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,27 +11,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""The classic MapReduce job: count the frequency of words.
+"""Tests for JobConf Environment Variables
 """
 from mrjob.job import MRJob
 import re
+from mrjob.compat import get_jobconf_value
 
 WORD_RE = re.compile(r"[\w']+")
 
-class MRWordFreqCount(MRJob):
-
+class MRWordCount(MRJob):
+    """ Trivial Job that returns the number of words in each input file
+    """
     def mapper(self, _, line):
         for word in WORD_RE.findall(line):
-            yield (word.lower(), 1)
+            yield (get_jobconf_value("mapreduce.map.input.file"), 1)
+            
+    def reducer(self, name, counts):
+        yield (name, sum(counts))
 
-    def combiner(self, word, counts):
-        counts_list = list(counts)
-        yield (word, sum(counts_list))
+    def combiner(self, name, counts):
+        self.increment_counter('count', 'combiners', 1)
+        yield name, sum(counts)
 
-    def reducer(self, word, counts):
-        yield (word, sum(counts))
-
+        
 if __name__ == '__main__':
-    MRWordFreqCount.run()
+    MRWordCount.run()
 
 

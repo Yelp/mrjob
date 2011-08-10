@@ -57,6 +57,9 @@ CLEANUP_CHOICES = sorted(['NONE', 'IF_SUCCESSFUL', 'SCRATCH', 'ALL'])
 CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
 
 
+_STEP_RE = re.compile(r'^M?C?R?$')
+
+
 class MRJobRunner(object):
     """Abstract base class for all runners.
 
@@ -72,7 +75,7 @@ class MRJobRunner(object):
 
       - Run your job with :option:`--steps` to find out how many mappers/reducers to run
       - Copy your job and supporting files to Hadoop
-      - Instruct Hadoop to run your job with the appropriate :option:`--mapper`, :option:`--reducer`, and :option:`--step-num` arguments
+      - Instruct Hadoop to run your job with the appropriate :option:`--mapper`, :option:`--combiner`, :option:`--reducer`, and :option:`--step-num` arguments
 
     Each runner runs a single job once; if you want to run a job multiple
     times, make multiple runners.
@@ -405,36 +408,32 @@ class MRJobRunner(object):
             [{'group name': {'counter1': 1, 'counter2': 2}},
              {'group name': ...]
 
-        The first step of *this run* will be the first item. This means that
-        if your job has 3 steps and was attached to a job flow with 3
-        already-completed steps, this list will still only contain 3
-        dictionaries.
+        The list contains an entry for every step of the current job, ignoring
+        earlier steps in the same job flow.
         """
-        return []
+        raise NotImplementedError
 
-    def print_counters(self, first_step_num=0, limit_to_steps=None):
+    def print_counters(self, limit_to_steps=None):
         """Display this run's counters in a user-friendly way.
 
         :type first_step_num: int
         :param first_step_num: Display step number of the counters from the first step
         :type limit_to_steps: list of int
-        :param limit_to_steps: List of step numbers *relative to this job* to print, indexed from 0
+        :param limit_to_steps: List of step numbers *relative to this job* to print, indexed from 1
         """
-        if limit_to_steps:
-            counters = self.counters()
-            counter_iter = [(step_num, counters[step_num]) \
-                            for step_num in limit_to_steps]
-        else:
-            counter_iter = enumerate(self.counters())
-
-        for step_num, step_counters in counter_iter:
-            log.info('Counters from step %d:' % (step_num + first_step_num))
-            for group_name in sorted(step_counters.keys()):
-                log.info('  %s:' % group_name)
-                group_counters = step_counters[group_name]
-                for counter_name in sorted(group_counters.keys()):
-                    log.info('    %s: %d' % (counter_name,
-                                             group_counters[counter_name]))
+        for step_num, step_counters in enumerate(self.counters()):
+            step_num = step_num + 1
+            if limit_to_steps is None or step_num in limit_to_steps:
+                log.info('Counters from step %d:' % step_num)
+                if step_counters.keys():
+                    for group_name in sorted(step_counters.keys()):
+                        log.info('  %s:' % group_name)
+                        group_counters = step_counters[group_name]
+                        for counter_name in sorted(group_counters.keys()):
+                            log.info('    %s: %d' % (counter_name,
+                                                     group_counters[counter_name]))
+                else:
+                    log.info('  (no counters found)')
 
     ### hooks for the with statement ###
 
@@ -798,7 +797,7 @@ class MRJobRunner(object):
                 if not steps or not stdout:
                     raise ValueError('step description is empty!')
                 for step in steps:
-                    if step not in ('MR', 'M', 'R'):
+                    if len(step) < 1 or not _STEP_RE.match(step):
                         raise ValueError(
                             'unexpected step type %r in steps %r' %
                                          (step, stdout))

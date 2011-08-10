@@ -39,7 +39,7 @@ def cmd_line(args):
     """
     args = [str(x) for x in args]
     return ' '.join(pipes.quote(x) for x in args)
-
+    
 
 def extract_dir_for_tar(archive_path, compression='gz'):
     """Get the name of the directory the tar at *archive_path* extracts into.

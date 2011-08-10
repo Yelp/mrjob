@@ -302,7 +302,16 @@ def hadoop_jar(*args):
 
     shutil.move(mock_output_dir, real_output_dir)
 
+    now = datetime.datetime.now()
+    sys.stderr.write(now.strftime('Running job: job_%Y%m%d%H%M_0001\n'))
     sys.stderr.write('Job succeeded!\n')
+
+
+def hadoop_version(*args):
+    sys.stderr.write("""Hadoop 0.20.2
+Subversion https://svn.apache.org/repos/asf/hadoop/common/branches/branch-0.20 -r 911707
+Compiled by chrisdo on Fri Feb 19 08:07:34 UTC 2010
+""")
 
 
 if __name__ == '__main__':

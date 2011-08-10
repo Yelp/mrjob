@@ -220,6 +220,20 @@ class MRJob(object):
         """
         raise NotImplementedError
 
+    def combiner(self, key, values):
+        """Re-define this to define the combiner for a one-step job.
+
+        Yields one or more tuples of ``(out_key, out_value)``
+
+        :param key: A key which was yielded by the mapper
+        :param value: A generator which yields all values yielded by one mapper task which correspond to ``key``.
+
+        By default (if you don't mess with :ref:`job-protocols`):
+         - ``out_key`` and ``out_value`` must be JSON-encodable.
+         - ``key`` and ``value`` will have been decoded from JSON (so tuples will become lists).
+        """
+        raise NotImplementedError
+
     def mapper_init(self):
         """Re-define this to define an action to run before the mapper
         processes any input.
@@ -274,6 +288,31 @@ class MRJob(object):
         """
         raise NotImplementedError
 
+    def combiner_init(self):
+        """Re-define this to define an action to run before the combiner
+        processes any input.
+
+        One use for this function is to initialize combiner-specific helper
+        structures.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
+    def combiner_final(self):
+        """Re-define this to define an action to run after the combiner reaches
+        the end of input.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
     ### Defining multi-step jobs ###
 
     # Don't redefine this; use it inside steps()
@@ -301,16 +340,20 @@ class MRJob(object):
                                         'mapper_final',
                                         'reducer',
                                         'reducer_init',
-                                        'reducer_final')
+                                        'reducer_final',
+                                        'combiner',
+                                        'combiner_init',
+                                        'combiner_final')
                       if (getattr(self, func_name).im_func is not
                           getattr(MRJob, func_name).im_func))
 
         return [self.mr(**kwargs)]
 
     @classmethod
-    def mr(cls, mapper=None, reducer=None,
+    def mr(cls, mapper=None, reducer=None, combiner=None,
            mapper_init=None, mapper_final=None,
-           reducer_init=None, reducer_final=None):
+           reducer_init=None, reducer_final=None,
+           combiner_init=None, combiner_final=None):
         """Define a step (mapper, reducer, and/or any combination of 
         mapper_init, reducer_final, etc.) for your job.
 
@@ -318,17 +361,21 @@ class MRJob(object):
 
         :param mapper: function with same function signature as :py:meth:`mapper`, or ``None`` for an identity mapper.
         :param reducer: function with same function signature as :py:meth:`reducer`, or ``None`` for no reducer.
+        :param combiner: function with same function signature as :py:meth:`combiner`, or ``None`` for no combiner.
         :param mapper_init: function with same function signature as :py:meth:`mapper_init`, or ``None`` for no initial mapper action. Please invoke this as a keyword argument.
         :param mapper_final: function with same function signature as :py:meth:`mapper_final`, or ``None`` for no final mapper action. Please invoke this as a keyword argument.
         :param reducer_init: function with same function signature as :py:meth:`reducer_init`, or ``None`` for no initial reducer action. Please invoke this as a keyword argument.
         :param reducer_final: function with same function signature as :py:meth:`reducer_final`, or ``None`` for no final reducer action. Please invoke this as a keyword argument.
+        :param combiner_init: function with same function signature as :py:meth:`combiner_init`, or ``None`` for no initial combiner action. Please invoke this as a keyword argument.
+        :param combiner_final: function with same function signature as :py:meth:`combiner_final`, or ``None`` for no final combiner action. Please invoke this as a keyword argument.
 
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.
         """
-        step = dict(mapper=mapper, reducer=reducer,
+        step = dict(mapper=mapper, reducer=reducer, combiner=combiner,
                     mapper_init=mapper_init, mapper_final=mapper_final,
-                    reducer_init=reducer_init, reducer_final=reducer_final)
+                    reducer_init=reducer_init, reducer_final=reducer_final,
+                    combiner_init=combiner_init, combiner_final=combiner_final)
 
         if not any(step.itervalues()):
             raise Exception("Step has no mappers and no reducers")
@@ -392,6 +439,7 @@ class MRJob(object):
 
         * Print step information (:option:`--steps`). See :py:meth:`show_steps`
         * Run a mapper (:option:`--mapper`). See :py:meth:`run_mapper`
+        * Run a combiner (:option:`--combiner`). See :py:meth:`run_combiner`
         * Run a reducer (:option:`--reducer`). See :py:meth:`run_reducer`
         * Run the entire job. See :py:meth:`run_job`
         """
@@ -406,6 +454,9 @@ class MRJob(object):
         elif self.options.run_mapper:
             self.run_mapper(self.options.step_num)
 
+        elif self.options.run_combiner:
+            self.run_combiner(self.options.step_num)
+
         elif self.options.run_reducer:
             self.run_reducer(self.options.step_num)
 
@@ -418,7 +469,7 @@ class MRJob(object):
 
         :rtype: :py:class:`mrjob.runner.MRJobRunner`
         """
-        bad_words = ('--steps', '--mapper', '--reducer', '--step-num')
+        bad_words = ('--steps', '--mapper', '--reducer', '--combiner', '--step-num')
         for w in bad_words:
             if w in sys.argv:
                 raise UsageError("make_runner() was called with %s. This probably means you tried to use it from __main__, which doesn't work." % w)
@@ -546,6 +597,51 @@ class MRJob(object):
             for out_key, out_value in reducer_final() or ():
                 write_line(out_key, out_value)
 
+    def run_combiner(self, step_num=0):
+        """Run the combiner for the given step.
+
+        :type step_num: int
+        :param step_num: which step to run (0-indexed)
+
+        If we encounter a line that can't be decoded by our input protocol,
+        or a tuple that can't be encoded by our output protocol, we'll
+        increment a counter rather than raising an exception. If 
+        --strict-protocols is set, then an exception is raised
+
+        Called from :py:meth:`run`. You'd probably only want to call this
+        directly from automated tests.
+        """
+        steps = self.steps()
+        if not 0 <= step_num < len(steps):
+            raise ValueError('Out-of-range step: %d' % step_num)
+        step = steps[step_num]
+        combiner = step['combiner']
+        combiner_init = step['combiner_init']
+        combiner_final = step['combiner_final']
+        if combiner is None:
+            raise ValueError('No combiner in step %d' % step_num)
+
+        # pick input and output protocol
+        read_lines, write_line = self._wrap_protocols(step_num, 'C')
+
+        if combiner_init:
+            for out_key, out_value in combiner_init() or ():
+                write_line(out_key, out_value)
+
+        # group all values of the same key together, and pass to the combiner
+        #
+        # be careful to use generators for everything, to allow for
+        # very large groupings of values
+        for key, kv_pairs in itertools.groupby(read_lines(),
+                                               key=lambda(k, v): k):
+            values = (v for k, v in kv_pairs)
+            for out_key, out_value in combiner(key, values) or ():
+                write_line(out_key, out_value)
+
+        if combiner_final:
+            for out_key, out_value in combiner_final() or ():
+                write_line(out_key, out_value)
+
     def show_steps(self):
         """Print information about how many steps there are, and whether
         they contain a mapper or reducer. Job runners (see :doc:`runners`)
@@ -560,25 +656,35 @@ class MRJob(object):
         print >> self.stdout, ' '.join(self._steps_desc())
 
     def _steps_desc(self):
-        step_num = 0
         res = []
-        for step in self.steps():
+        for step_num, step in enumerate(self.steps()):
             mapper_funcs = ('mapper_init', 'mapper_final')
             reducer_funcs = ('reducer', 'reducer_init', 'reducer_final')
-            if any(step[k] for k in reducer_funcs):
-                if step['mapper'] != _IDENTITY_MAPPER \
-                   or any(step[k] for k in mapper_funcs):
-                    res.append('MR')
-                else:
-                    # infer whether the mapper has the same input and 
-                    # output protocols 
-                    if step_num == 0:
-                        res.append('MR')
-                    else:
-                        res.append('R')
-            else:
-                res.append('M')
-            step_num += 1
+            combiner_funcs = ('combiner', 'combiner_init', 'combiner_final')
+
+            has_explicit_mapper = step['mapper'] != _IDENTITY_MAPPER or any(step[k] for k in mapper_funcs)
+            has_explicit_reducer = any(step[k] for k in reducer_funcs)
+            has_explicit_combiner = any(step[k] for k in combiner_funcs)
+
+            func_strs = []
+
+            # Print a mapper if:
+            # - The user specifies one
+            # - Different input and output protocols are used (infer from
+            #   step number)
+            # - We don't have anything else to print (excluding combiners)
+            if has_explicit_mapper \
+               or step_num == 0 \
+               or not has_explicit_reducer:
+                func_strs.append('M')
+
+            if has_explicit_combiner:
+                func_strs.append('C')
+
+            if has_explicit_reducer:
+                func_strs.append('R')
+
+            res.append(''.join(func_strs))
         return res
 
     @classmethod
@@ -617,7 +723,7 @@ class MRJob(object):
 
         Args:
         step_num -- which step to run (e.g. 0)
-        step_type -- 'M' for mapper, 'R' for reducer
+        step_type -- 'M' for mapper, 'C' for combiner, 'R' for reducer
         """
         read, write = self.pick_protocols(step_num, step_type)
         
@@ -652,7 +758,7 @@ class MRJob(object):
         :type step_num: int
         :param step_num: which step to run (e.g. ``0`` for the first step)
         :type step_type: str
-        :param step_type: ``'M'`` for mapper, ``'R'`` for reducer
+        :param step_type: ``'M'`` for mapper, ``'C'`` for combiner, ``'R'`` for reducer
 
         By default, we use one protocol for reading input, one
         internal protocol for communication between steps, and one
@@ -716,6 +822,10 @@ class MRJob(object):
         self.mux_opt_group.add_option(
             '--mapper', dest='run_mapper', action='store_true', default=False,
             help='run a mapper')
+
+        self.mux_opt_group.add_option(
+            '--combiner', dest='run_combiner', action='store_true', default=False,
+            help='run a combiner')
 
         self.mux_opt_group.add_option(
             '--reducer', dest='run_reducer', action='store_true', default=False,
@@ -883,6 +993,7 @@ class MRJob(object):
             help='-jobconf arg to pass through to hadoop streaming; '
             'should take the form KEY=VALUE. You can use --jobconf '
             'multiple times.')
+        #   ref: http://hadoop.apache.org/mapreduce/docs/current/mapred-default.html
 
         self.hadoop_emr_opt_group.add_option(
             '--label', dest='label', default=None,
@@ -1156,7 +1267,9 @@ class MRJob(object):
         This is mostly useful inside :py:meth:`load_options`, to disable
         loading options when we aren't running inside Hadoop Streaming.
         """
-        return self.options.run_mapper or self.options.run_reducer
+        return self.options.run_mapper \
+                or self.options.run_combiner \
+                or self.options.run_reducer
 
     def job_runner_kwargs(self):
         """Keyword arguments used to create runners when

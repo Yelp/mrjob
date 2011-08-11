@@ -293,6 +293,34 @@ def read_input(path, stdin=None):
         yield line
 
 
+def expand_input_path(path):
+    """If path is a glob or a directory, yield all contents. Otherwise yield
+    the path.
+    """
+    # resolve globs
+    paths = glob.glob(path)
+    if not paths:
+        raise IOError(2, 'No such file or directory: %r' % path)
+    elif len(paths) > 1:
+        for path in paths:
+            if not os.path.isdir(path):
+                yield path
+        return
+    else:
+        path = paths[0]
+
+    # recurse through directories
+    if os.path.isdir(path):
+        for dirname, _, filenames in os.walk(path):
+            for filename in filenames:
+                yield os.path.join(dirname, filename)
+        return
+
+    # read from files
+    if not os.path.isdir(path):
+        yield path
+
+
 def read_file(path, fileobj=None):
     """Reads a file.
     

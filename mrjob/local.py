@@ -30,7 +30,7 @@ from mrjob.compat import translate_jobconf, translate_jobconf_to_version, is_equ
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.parse import find_python_traceback, parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line, read_file, unarchive
+from mrjob.util import cmd_line, expand_input_path, read_input, unarchive
 
 
 log = logging.getLogger('mrjob.local')
@@ -248,7 +248,10 @@ class LocalMRJobRunner(MRJobRunner):
         assert(not keep_sorted or len(input_paths) == 1)
         
         # determine the size of each file split
-        total_size = sum([os.stat(path)[stat.ST_SIZE] for path in input_paths])
+        total_size = 0
+        for input_path in input_paths:
+            for path in expand_input_path(input_path):
+                total_size += os.stat(path)[stat.ST_SIZE]
         split_size = total_size / num_splits
          
         # we want each file split to be as close to split_size as possible
@@ -273,11 +276,11 @@ class LocalMRJobRunner(MRJobRunner):
                 # assume that input is a collection of key <tab> value pairs
                 # match all non-tab characters
                 re_pattern = re.compile("^(\S*)")
-                for key, lines in itertools.groupby(read_file(input_path), 
+                for key, lines in itertools.groupby(read_input(input_path),
                                 key=lambda(line): re_pattern.search(line).group(1)):
                     yield ''.join(lines)
             else:
-                for line in read_file(input_path):
+                for line in read_input(input_path):
                     yield line
              
         for path in input_paths:

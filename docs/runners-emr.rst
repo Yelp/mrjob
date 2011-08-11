@@ -79,7 +79,7 @@ Using persistent job flows
 
 When troubleshooting a job, it can be convenient to use a persistent job flow
 to avoid having to wait for bootstrapping every run. First, use the
-:py:mod:`create_job_flow` tool to create a persistent job flow::
+:py:mod:`mrjob.tools.emr.create_job_flow` tool to create a persistent job flow::
 
     > python -m mrjob.tools.emr.create_job_flow
     using configs in /etc/mrjob.conf
@@ -147,7 +147,7 @@ Finding failures after the fact
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 If you are trying to look at a failure after the original process has exited,
-you can use the :py:mod:`fetch_logs` tool to scan the logs::
+you can use the :py:mod:`mrjob.tools.emr.fetch_logs` tool to scan the logs::
 
     > python -m mrjob.tools.emr.fetch_logs --find-failure j-1NXMMBNEQHAFT                                 (docs_recipes_14⚡)
     using configs in /etc/mrjob.conf

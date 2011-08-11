@@ -889,13 +889,15 @@ class MRJob(object):
 
         self.runner_opt_group.add_option(
             '--cleanup', dest='cleanup', default=None,
-            help=('Comma-separated list of which directories to delete when a job succeeds, e.g. SCRATCH,LOGS. Choices:'
+            help=('Comma-separated list of which directories to delete when'
+                  ' a job succeeds, e.g. SCRATCH,LOGS. Choices:'
                   ' %s (default: %s)' % (', '.join(CLEANUP_CHOICES),
                                          CLEANUP_DEFAULT)))
 
         self.runner_opt_group.add_option(
             '--cleanup-on-failure', dest='cleanup_on_failure', default=None,
-            help=('Comma-separated list of which directories to delete when a job fails, e.g. SCRATCH,LOGS. Choices:'
+            help=('Comma-separated list of which directories to delete when'
+                  ' a job fails, e.g. SCRATCH,LOGS. Choices:'
                   ' %s (default: %s)' % (', '.join(CLEANUP_CHOICES),
                                          CLEANUP_FAILURE_DEFAULT)))
 

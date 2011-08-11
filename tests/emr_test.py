@@ -277,6 +277,56 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         job_flow = emr_conn.describe_jobflow(job_flow_id)
         assert_equal(job_flow.state, 'TERMINATED')
 
+    def _test_remote_scratch_cleanup(self, mode, scratch_len, log_len):
+        self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
+        # read from STDIN, a local file, and a remote file
+        stdin = StringIO('foo\nbar\n')
+
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
+                               '-c', self.mrjob_conf_path,
+                               '--s3-log-uri', 's3://walrus/logs',
+                               '-', '--cleanup', mode])
+        mr_job.sandbox(stdin=stdin)
+
+        local_tmp_dir = None
+        results = []
+
+        with mr_job.make_runner() as runner:
+            s3_scratch_uri = runner._opts['s3_scratch_uri']
+            scratch_bucket, _ = parse_s3_uri(s3_scratch_uri)
+
+            runner.run()
+
+            # this is set and unset before we can get at it unless we do this
+            log_bucket, _ = parse_s3_uri(runner._s3_job_log_uri)
+
+            list(runner.stream_output())
+
+        conn = runner.make_s3_conn()
+        bucket = conn.get_bucket(scratch_bucket)
+        assert_equal(len(list(bucket.list())), scratch_len)
+
+        bucket = conn.get_bucket(log_bucket)
+        assert_equal(len(list(bucket.list())), log_len)
+
+    def test_remote_scratch_all(self):
+        self._test_remote_scratch_cleanup('ALL', 0, 0)
+
+    def test_remote_scratch_scratch(self):
+        self._test_remote_scratch_cleanup('SCRATCH', 0, 1)
+
+    def test_remote_scratch_remote(self):
+        self._test_remote_scratch_cleanup('REMOTE_SCRATCH', 0, 1)
+
+    def test_remote_scratch_local(self):
+        self._test_remote_scratch_cleanup('LOCAL_SCRATCH', 5, 1)
+
+    def test_remote_scratch_logs(self):
+        self._test_remote_scratch_cleanup('LOGS', 5, 0)
+
+    def test_remote_scratch_none(self):
+        self._test_remote_scratch_cleanup('NONE', 5, 1)
+
 
 class S3ScratchURITestCase(MockEMRAndS3TestCase):
 
@@ -310,8 +360,8 @@ class S3ScratchURITestCase(MockEMRAndS3TestCase):
 
         # once our scratch bucket is created, we should re-use it
         runner2 = EMRJobRunner(conf_path=False)
-        assert_equal(runner2._opts['s3_scratch_uri'], s3_scratch_uri)
         s3_scratch_uri = runner._opts['s3_scratch_uri']
+        assert_equal(runner2._opts['s3_scratch_uri'], s3_scratch_uri)
 
 
 class BootstrapFilesTestCase(MockEMRAndS3TestCase):

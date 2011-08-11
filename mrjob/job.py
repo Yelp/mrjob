@@ -109,7 +109,7 @@ except ImportError:
 from mrjob.conf import combine_dicts
 from mrjob.parse import parse_port_range_list, parse_mr_job_stderr, parse_key_value_list
 from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
-from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
+from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT, CLEANUP_FAILURE_DEFAULT
 from mrjob.util import log_to_stream, parse_and_save_options, read_input
 
 # used by mr() below, to fake no mapper
@@ -890,7 +890,12 @@ class MRJob(object):
         self.runner_opt_group.add_option(
             '--cleanup', dest='cleanup',
             choices=CLEANUP_CHOICES, default=CLEANUP_DEFAULT,
-            help="when to clean up tmp directories, etc. Choices: %s (default: %%default)" % ', '.join(CLEANUP_CHOICES))
+            help="Which directories to delete when a job succeeds. Choices: %s (default: %%default)" % ', '.join(CLEANUP_CHOICES))
+
+        self.runner_opt_group.add_option(
+            '--cleanup-on-failure', dest='cleanup_on_failure',
+            choices=CLEANUP_CHOICES, default=CLEANUP_FAILURE_DEFAULT,
+            help="Which directories to clean up when a job fails. Choices: %s (default: %%default)" % ', '.join(CLEANUP_CHOICES))
 
         self.runner_opt_group.add_option(
             '--file', dest='upload_files', action='append',
@@ -1273,6 +1278,7 @@ class MRJob(object):
         return {
             'bootstrap_mrjob': self.options.bootstrap_mrjob,
             'cleanup': self.options.cleanup,
+            'cleanup_on_failure': self.options.cleanup_on_failure,
             'cmdenv': self.options.cmdenv,
             'conf_path': self.options.conf_path,
             'extra_args': self.generate_passthrough_arguments(),

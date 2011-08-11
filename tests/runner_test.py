@@ -37,14 +37,39 @@ from tests.quiet import logger_disabled
 
 class WithStatementTestCase(TestCase):
 
-    def test_cleanup_after_with_statement(self):
-        local_tmp_dir = None
+    @setup
+    def setup_ivars(self):
+        self.local_tmp_dir = None
 
-        with LocalMRJobRunner() as runner:
-            local_tmp_dir = runner._get_local_tmp_dir()
-            assert os.path.exists(local_tmp_dir)
+    @teardown
+    def delete_tmpdir(self):
+        if self.local_tmp_dir:
+            shutil.rmtree(self.local_tmp_dir)
+            self.local_tmp_dir = None
 
-        assert not os.path.exists(local_tmp_dir)
+    def _test_cleanup_after_with_statement(self, mode, should_exist):
+        with LocalMRJobRunner(cleanup=mode) as runner:
+            self.local_tmp_dir = runner._get_local_tmp_dir()
+            assert os.path.exists(self.local_tmp_dir)
+
+        assert_equal(os.path.exists(self.local_tmp_dir), should_exist)
+        if not should_exist:
+            self.local_tmp_dir = None
+
+    def _test_cleanup_all(self):
+        self._test_cleanup_after_with_statement('ALL', False)
+
+    def _test_cleanup_scratch(self):
+        self._test_cleanup_after_with_statement('SCRATCH', False)
+
+    def _test_cleanup_local_scratch(self):
+        self._test_cleanup_after_with_statement('LOCAL_SCRATCH', False)
+
+    def _test_cleanup_remote_scratch(self):
+        self._test_cleanup_after_with_statement('REMOTE_SCRATCH', True)
+
+    def _test_cleanup_none(self):
+        self._test_cleanup_after_with_statement('NONE', True)
 
 
 class TestExtraKwargs(TestCase):

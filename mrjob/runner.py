@@ -45,14 +45,19 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 #: cleanup options:
 #:
-#: - ``'NONE'``: disable cleanup
-#: - ``'IF_SUCCESSFUL'``: clean up only if job succeeded
-#: - ``'SCRATCH'``: clean up scratch space but not logs
-#: - ``'ALL'``: always clean up, even on failure
-CLEANUP_CHOICES = sorted(['NONE', 'IF_SUCCESSFUL', 'SCRATCH', 'ALL'])
+#: - ``'ALL'``: delete local scratch, remote scratch, and logs
+#: - ``'LOCAL_SCRATCH'``: delete local scratch only
+#: - ``'LOGS'``: delete logs only
+#: - ``'NONE'``: delete nothing
+#: - ``'REMOTE_SCRATCH'``: delete remote scratch only
+#: - ``'SCRATCH'``: delete local and remote scratch, but not logs
+CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH', 'SCRATCH']
 
-#: the default cleanup option: ``'IF_SUCCESSFUL'``
-CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
+#: the default cleanup-on-success option: ``'ALL'``
+CLEANUP_DEFAULT = 'ALL'
+
+#: the default cleanup-on-failure option: ``'NONE'``
+CLEANUP_FAILURE_DEFAULT = 'NONE'
 
 
 _STEP_RE = re.compile(r'^M?C?R?$')
@@ -118,7 +123,9 @@ class MRJobRunner(object):
         :type bootstrap_mrjob: bool
         :param bootstrap_mrjob: should we automatically tar up the mrjob library and install it when we run the mrjob? Set this to ``False`` if you've already installed ``mrjob`` on your Hadoop cluster.
         :type cleanup: str
-        :param cleanup: is :py:meth:`cleanup` allowed to clean up logs and scratch files? See :py:data:`CLEANUP_CHOICES`.
+        :param cleanup: Which directories to delete when a job succeeds. See :py:data:`CLEANUP_CHOICES`.
+        :type cleanup_on_failure: str
+        :param cleanup_on_failure: Which directories to clean up when a job fails. See :py:data:`CLEANUP_CHOICES`.
         :type cmdenv: dict
         :param cmdenv: environment variables to pass to the job inside Hadoop streaming
         :type hadoop_extra_args: list of str
@@ -193,6 +200,10 @@ class MRJobRunner(object):
             raise ValueError(
                 'cleanup must be one of %s, not %r' %
                 (', '.join(CLEANUP_CHOICES), self._opts['cleanup']))
+        if not self._opts['cleanup_on_failure'] in CLEANUP_CHOICES:
+            raise ValueError(
+                'cleanup_on_failure must be one of %s, not %r' %
+                (', '.join(CLEANUP_CHOICES), self._opts['cleanup']))
 
         # add the script to our list of files (don't actually commit to
         # uploading it)
@@ -263,6 +274,7 @@ class MRJobRunner(object):
             'base_tmp_dir',
             'bootstrap_mrjob',
             'cleanup',
+            'cleanup_on_failure',
             'cmdenv',
             'hadoop_extra_args',
             'hadoop_input_format',
@@ -293,6 +305,7 @@ class MRJobRunner(object):
             'base_tmp_dir': tempfile.gettempdir(),
             'bootstrap_mrjob': True,
             'cleanup': CLEANUP_DEFAULT,
+            'cleanup_on_failure': CLEANUP_FAILURE_DEFAULT,
             'owner': owner,
             'python_bin': ['python'],
             'steps_python_bin': [sys.executable or 'python'],
@@ -395,18 +408,21 @@ class MRJobRunner(object):
 
         :param mode: override *cleanup* passed into the constructor. Should be one of :py:data:`CLEANUP_CHOICES`
         """
-        mode = mode or self._opts['cleanup']
+        if self._ran_job:
+            mode = mode or self._opts['cleanup']
+        else:
+            mode = mode or self._opts['cleanup_on_failure']
 
         # always terminate running jobs
         self._cleanup_jobs()
 
-        if (mode in ('ALL', 'SCRATCH') or
-            (mode == 'IF_SUCCESSFUL' and self._ran_job)):
+        if mode in ('ALL', 'SCRATCH', 'LOCAL_SCRATCH'):
             self._cleanup_local_scratch()
+
+        if mode in ('ALL', 'SCRATCH', 'REMOTE_SCRATCH'):
             self._cleanup_remote_scratch()
 
-        if (mode == 'ALL' or
-            (mode == 'IF_SUCCESSFUL' and self._ran_job)):
+        if mode in ('ALL', 'LOGS'):
             self._cleanup_logs()
 
     def counters(self):

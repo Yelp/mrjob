@@ -248,7 +248,7 @@ class TestCat(MockHadoopTestCase):
         check_call([self.hadoop_bin,
                     'fs', '-put', input_to_upload, remote_input_path])
 
-        with HadoopJobRunner(cleanup = 'NONE') as runner:
+        with HadoopJobRunner(cleanup=['NONE']) as runner:
             local_output = []
             for line in runner.cat(local_input_path):
                 local_output.append(line)
@@ -266,7 +266,7 @@ class TestCat(MockHadoopTestCase):
         input_gz.write('foo\nbar\n')
         input_gz.close()
 
-        with HadoopJobRunner(cleanup = 'NONE') as runner:
+        with HadoopJobRunner(cleanup=['NONE']) as runner:
             output = []
             for line in runner.cat(input_gz_path):
                 output.append(line)
@@ -278,7 +278,7 @@ class TestCat(MockHadoopTestCase):
         input_bz2.write('bar\nbar\nfoo\n')
         input_bz2.close()
 
-        with HadoopJobRunner(cleanup = 'NONE') as runner:
+        with HadoopJobRunner(cleanup=['NONE']) as runner:
             output = []
             for line in runner.cat(input_bz2_path):
                 output.append(line)

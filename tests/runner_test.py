@@ -57,19 +57,25 @@ class WithStatementTestCase(TestCase):
             self.local_tmp_dir = None
 
     def _test_cleanup_all(self):
-        self._test_cleanup_after_with_statement('ALL', False)
+        self._test_cleanup_after_with_statement(['ALL'], False)
 
     def _test_cleanup_scratch(self):
-        self._test_cleanup_after_with_statement('SCRATCH', False)
+        self._test_cleanup_after_with_statement(['SCRATCH'], False)
 
     def _test_cleanup_local_scratch(self):
-        self._test_cleanup_after_with_statement('LOCAL_SCRATCH', False)
+        self._test_cleanup_after_with_statement(['LOCAL_SCRATCH'], False)
 
     def _test_cleanup_remote_scratch(self):
-        self._test_cleanup_after_with_statement('REMOTE_SCRATCH', True)
+        self._test_cleanup_after_with_statement(['REMOTE_SCRATCH'], True)
 
     def _test_cleanup_none(self):
-        self._test_cleanup_after_with_statement('NONE', True)
+        self._test_cleanup_after_with_statement(['NONE'], True)
+
+    def _test_cleanup_error(self):
+        assert_raises(ValueError, self._test_cleanup_after_with_statement,
+                      ['NONE,ALL'], True)
+        assert_raises(ValueError, self._test_cleanup_after_with_statement,
+                      ['GARBAGE'], True)
 
 
 class TestExtraKwargs(TestCase):

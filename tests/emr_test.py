@@ -309,23 +309,32 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         bucket = conn.get_bucket(log_bucket)
         assert_equal(len(list(bucket.list())), log_len)
 
-    def test_remote_scratch_all(self):
+    def test_cleanup_all(self):
         self._test_remote_scratch_cleanup('ALL', 0, 0)
 
-    def test_remote_scratch_scratch(self):
+    def test_cleanup_scratch(self):
         self._test_remote_scratch_cleanup('SCRATCH', 0, 1)
 
-    def test_remote_scratch_remote(self):
+    def test_cleanup_remote(self):
         self._test_remote_scratch_cleanup('REMOTE_SCRATCH', 0, 1)
 
-    def test_remote_scratch_local(self):
+    def test_cleanup_local(self):
         self._test_remote_scratch_cleanup('LOCAL_SCRATCH', 5, 1)
 
-    def test_remote_scratch_logs(self):
+    def test_cleanup_logs(self):
         self._test_remote_scratch_cleanup('LOGS', 5, 0)
 
-    def test_remote_scratch_none(self):
+    def test_cleanup_none(self):
         self._test_remote_scratch_cleanup('NONE', 5, 1)
+
+    def test_cleanup_combine(self):
+        self._test_remote_scratch_cleanup('LOGS,REMOTE_SCRATCH', 0, 0)
+
+    def test_cleanup_error(self):
+        assert_raises(ValueError, self._test_remote_scratch_cleanup,
+                      'NONE,LOGS,REMOTE_SCRATCH', 0, 0)
+        assert_raises(ValueError, self._test_remote_scratch_cleanup,
+                      'GARBAGE', 0, 0)
 
 
 class S3ScratchURITestCase(MockEMRAndS3TestCase):
@@ -1333,7 +1342,7 @@ class TestCat(MockEMRAndS3TestCase):
         input_gz.write('foo\nbar\n')
         input_gz.close()
 
-        with EMRJobRunner(cleanup='NONE', conf_path=False) as runner:
+        with EMRJobRunner(cleanup=['NONE'], conf_path=False) as runner:
             output = []
             for line in runner.cat(input_gz_path):
                 output.append(line)
@@ -1345,7 +1354,7 @@ class TestCat(MockEMRAndS3TestCase):
         input_bz2.write('bar\nbar\nfoo\n')
         input_bz2.close()
 
-        with EMRJobRunner(cleanup='NONE', conf_path=False) as runner:
+        with EMRJobRunner(cleanup=['NONE'], conf_path=False) as runner:
             output = []
             for line in runner.cat(input_bz2_path):
                 output.append(line)

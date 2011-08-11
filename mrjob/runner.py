@@ -122,10 +122,10 @@ class MRJobRunner(object):
         :param base_tmp_dir: path to put local temp dirs inside. By default we just call :py:func:`tempfile.gettempdir`
         :type bootstrap_mrjob: bool
         :param bootstrap_mrjob: should we automatically tar up the mrjob library and install it when we run the mrjob? Set this to ``False`` if you've already installed ``mrjob`` on your Hadoop cluster.
-        :type cleanup: str
-        :param cleanup: Which directories to delete when a job succeeds. See :py:data:`CLEANUP_CHOICES`.
-        :type cleanup_on_failure: str
-        :param cleanup_on_failure: Which directories to clean up when a job fails. See :py:data:`CLEANUP_CHOICES`.
+        :type cleanup: list
+        :param cleanup: List of which kinds of directories to delete when a job succeeds. See :py:data:`CLEANUP_CHOICES`.
+        :type cleanup_on_failure: list
+        :param cleanup_on_failure: Which kinds of directories to clean up when a job fails. See :py:data:`CLEANUP_CHOICES`.
         :type cmdenv: dict
         :param cmdenv: environment variables to pass to the job inside Hadoop streaming
         :type hadoop_extra_args: list of str
@@ -195,15 +195,27 @@ class MRJobRunner(object):
         # on the Hadoop nodes. If 'archive', uncompress the file
         self._files = []
 
-        # validate cleanup
-        if not self._opts['cleanup'] in CLEANUP_CHOICES:
-            raise ValueError(
-                'cleanup must be one of %s, not %r' %
-                (', '.join(CLEANUP_CHOICES), self._opts['cleanup']))
-        if not self._opts['cleanup_on_failure'] in CLEANUP_CHOICES:
-            raise ValueError(
-                'cleanup_on_failure must be one of %s, not %r' %
-                (', '.join(CLEANUP_CHOICES), self._opts['cleanup']))
+        # old API accepts strings for cleanup
+        # new API wants lists
+        for opt_key in ('cleanup', 'cleanup_on_failure'):
+            if isinstance(self._opts[opt_key], basestring):
+                self._opts[opt_key] = [self._opts[opt_key]]
+
+        def validate_cleanup(error_str, opt_list):
+            for choice in opt_list:
+                if choice not in CLEANUP_CHOICES:
+                    raise ValueError(error_str % choice)
+            if 'NONE' in opt_list and len(opt_list) > 1:
+                self.option_parser.error('Cannot clean up both nothing and something!')
+
+        cleanup_error = ('cleanup must be one of %s, not %%s' %
+                         ', '.join(CLEANUP_CHOICES))
+        validate_cleanup(cleanup_error, self._opts['cleanup'])
+
+        cleanup_failure_error = ('cleanup_on_failure must be one of %s, not %%s' %
+                                 ', '.join(CLEANUP_CHOICES))
+        validate_cleanup(cleanup_failure_error,
+                         self._opts['cleanup_on_failure'])
 
         # add the script to our list of files (don't actually commit to
         # uploading it)
@@ -304,8 +316,8 @@ class MRJobRunner(object):
         return {
             'base_tmp_dir': tempfile.gettempdir(),
             'bootstrap_mrjob': True,
-            'cleanup': CLEANUP_DEFAULT,
-            'cleanup_on_failure': CLEANUP_FAILURE_DEFAULT,
+            'cleanup': [CLEANUP_DEFAULT],
+            'cleanup_on_failure': [CLEANUP_FAILURE_DEFAULT],
             'owner': owner,
             'python_bin': ['python'],
             'steps_python_bin': [sys.executable or 'python'],
@@ -406,7 +418,7 @@ class MRJobRunner(object):
 
             # cleanup() called automatically here
 
-        :param mode: override *cleanup* passed into the constructor. Should be one of :py:data:`CLEANUP_CHOICES`
+        :param mode: override *cleanup* passed into the constructor. Should be a list of strings from :py:data:`CLEANUP_CHOICES`
         """
         if self._ran_job:
             mode = mode or self._opts['cleanup']
@@ -416,13 +428,16 @@ class MRJobRunner(object):
         # always terminate running jobs
         self._cleanup_jobs()
 
-        if mode in ('ALL', 'SCRATCH', 'LOCAL_SCRATCH'):
+        def mode_has(*args):
+            return any((choice in mode) for choice in args)
+
+        if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH'):
             self._cleanup_local_scratch()
 
-        if mode in ('ALL', 'SCRATCH', 'REMOTE_SCRATCH'):
+        if mode_has('ALL', 'SCRATCH', 'REMOTE_SCRATCH'):
             self._cleanup_remote_scratch()
 
-        if mode in ('ALL', 'LOGS'):
+        if mode_has('ALL', 'LOGS'):
             self._cleanup_logs()
 
     def counters(self):

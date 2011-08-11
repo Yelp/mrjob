@@ -888,14 +888,16 @@ class MRJob(object):
             help='Path to alternate mrjob.conf file to read from')
 
         self.runner_opt_group.add_option(
-            '--cleanup', dest='cleanup',
-            choices=CLEANUP_CHOICES, default=CLEANUP_DEFAULT,
-            help="Which directories to delete when a job succeeds. Choices: %s (default: %%default)" % ', '.join(CLEANUP_CHOICES))
+            '--cleanup', dest='cleanup', default=None,
+            help=('Which directories to delete when a job succeeds. Choices:'
+                  ' %s (default: %s)' % (', '.join(CLEANUP_CHOICES),
+                                         CLEANUP_DEFAULT)))
 
         self.runner_opt_group.add_option(
-            '--cleanup-on-failure', dest='cleanup_on_failure',
-            choices=CLEANUP_CHOICES, default=CLEANUP_FAILURE_DEFAULT,
-            help="Which directories to clean up when a job fails. Choices: %s (default: %%default)" % ', '.join(CLEANUP_CHOICES))
+            '--cleanup-on-failure', dest='cleanup_on_failure', default=None,
+            help=('Which directories to delete when a job fails. Choices:'
+                  ' %s (default: %s)' % (', '.join(CLEANUP_CHOICES),
+                                         CLEANUP_FAILURE_DEFAULT)))
 
         self.runner_opt_group.add_option(
             '--file', dest='upload_files', action='append',
@@ -1249,6 +1251,24 @@ class MRJob(object):
         self.options.jobconf = parse_key_value_list(self.options.jobconf,
                                                     jobconf_err,
                                                     self.option_parser.error)
+
+        def parse_commas(cleanup_str):
+            cleanup_error = ('cleanup option %s is not one of '
+                             + ', '.join(CLEANUP_CHOICES))
+            new_cleanup_options = []
+            for choice in cleanup_str.split(','):
+                if choice in CLEANUP_CHOICES:
+                    new_cleanup_options.append(choice)
+                else:
+                    self.option_parser.error(cleanup_error % choice)
+            if 'NONE' in new_cleanup_options and len(new_cleanup_options) > 1:
+                self.option_parser.error('Cannot clean up both nothing and something!')
+            return new_cleanup_options
+
+        if self.options.cleanup is not None:
+            self.options.cleanup = parse_commas(self.options.cleanup)
+        if self.options.cleanup_on_failure is not None:
+            self.options.cleanup_on_failure = parse_commas(self.options.cleanup_on_failure)
 
         # output_protocol defaults to protocol
         if not self.options.output_protocol:

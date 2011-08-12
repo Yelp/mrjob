@@ -26,7 +26,7 @@ import stat
 from subprocess import Popen, PIPE
 import sys
 
-from mrjob.compat import HadoopCompatibilityManager, is_equivalent_jobconf
+from mrjob.compat import HadoopCompatibilityManager
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.parse import find_python_traceback, parse_mr_job_stderr
 from mrjob.runner import MRJobRunner

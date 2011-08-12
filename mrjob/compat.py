@@ -230,17 +230,27 @@ JOBCONF_DICT_LIST = [
     {'0.18': 'user.name', '0.21': 'mapreduce.job.user.name'},
 ]
 
-# create the jobconf_map 
-# jobconf_map = {
-#   ...
-#   a: {'0.18': a, '0.21': b}
-#   b: {'0.18': a, '0.21': b}
-#   ..
-# }
-jobconf_map = {}
-for jobconf_dict in JOBCONF_DICT_LIST:
-    for value in jobconf_dict.itervalues():
-        jobconf_map[value] = jobconf_dict
+CL_SWITCH_DICT_LIST = [
+    {'0.18': '-jobconf', '0.20': '-D'},
+    {'0.18': '-cacheFile', '0.20': '-files'},
+    {'0.18': '-cacheArchive', '0.20': '-archives'},
+]
+
+def _dict_list_to_compat_map(dict_list):
+    # compat_map = {
+    #   ...
+    #   a: {'0.18': a, '0.21': b}
+    #   b: {'0.18': a, '0.21': b}
+    #   ..
+    # }
+    compat_map = {}
+    for version_dict in dict_list:
+        for value in version_dict.itervalues():
+            compat_map[value] = version_dict
+    return compat_map
+
+jobconf_map = _dict_list_to_compat_map(JOBCONF_DICT_LIST)
+cl_switch_map = _dict_list_to_compat_map(CL_SWITCH_DICT_LIST)
 
 
 def translate_jobconf(variable):
@@ -249,31 +259,6 @@ def translate_jobconf(variable):
         Returns an iterator over the list of equivalent arguements
     """
     return jobconf_map[variable].itervalues()
-
-
-def translate_jobconf_to_version(variable, version):
-    """ Translates a jobconf variable into the equivalent name in 
-        the given version of hadoop.
-    """
-    req_version = LooseVersion(version)
-    possible_versions = sorted(jobconf_map[variable].keys(), reverse=True, key=lambda(v):LooseVersion(v))
-
-    for possible_version in possible_versions:
-        if req_version >= LooseVersion(possible_version):
-            return jobconf_map[variable][possible_version]
-
-    # return oldest version if we don't find required version
-    return jobconf_map[variable][possible_versions[-1]]
-
-
-def is_equivalent_jobconf(arg1, arg2):
-    """ Returns ``true`` if the two jobconf arguements are equivalent
-    """
-    jobconf = jobconf_map.get(arg1)
-    if jobconf:
-        return (arg2 in jobconf.values())
-
-    return False
 
 
 def get_jobconf_value(variable):
@@ -292,16 +277,18 @@ def get_jobconf_value(variable):
     raise KeyError("%s jobconf variable not found" % variable)
 
 
-def version_gte(version_str, cmp_version_str):
-    """Return True if *version_str* >= *cmp_version_str*."""
+def translate_jobconf_to_version(variable, version):
+    req_version = LooseVersion(version)
+    possible_versions = sorted(jobconf_map[variable].keys(),
+                               reverse=True,
+                               key=lambda(v):LooseVersion(v))
 
-    if not isinstance(version_str, basestring):
-        raise ValueError('%s is not a string' % version_str)
+    for possible_version in possible_versions:
+        if req_version >= LooseVersion(possible_version):
+            return jobconf_map[variable][possible_version]
 
-    if not isinstance(cmp_version_str, basestring):
-        raise ValueError('%s is not a string' % cmp_version_str)
-
-    return LooseVersion(version_str) >= LooseVersion(cmp_version_str)
+    # return oldest version if we don't find required version
+    return jobconf_map[variable][possible_versions[-1]]
 
 
 class HadoopCompatibilityManager(object):
@@ -327,10 +314,19 @@ class HadoopCompatibilityManager(object):
         """Return True if this version of Hadoop Streaming supports combiners
         (i.e. >= 0.20.203), otherwise False.
         """
-        return version_gte(self.version, '0.20.203')
+        return self.version_gte('0.20.203')
 
     def get_jobconf_value(self, variable):
         """Get the value of *variable* no matter what version it is actually
         specified in
         """
         return get_jobconf_value(variable)
+
+
+    def version_gte(self, cmp_version_str):
+        """Return True if this object's version >= *cmp_version_str*."""
+
+        if not isinstance(cmp_version_str, basestring):
+            raise ValueError('%s is not a string' % cmp_version_str)
+
+        return LooseVersion(self.version) >= LooseVersion(cmp_version_str)

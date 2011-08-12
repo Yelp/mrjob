@@ -893,6 +893,12 @@ class MRJob(object):
             help="when to clean up tmp directories, etc. Choices: %s (default: %%default)" % ', '.join(CLEANUP_CHOICES))
 
         self.runner_opt_group.add_option(
+            '--cmdenv', dest='cmdenv', default=[], action='append',
+            help='set an environment variable for your job inside Hadoop '
+            'streaming. Must take the form KEY=VALUE. You can use --cmdenv '
+            'multiple times.')
+
+        self.runner_opt_group.add_option(
             '--file', dest='upload_files', action='append',
             default=[],
             help='Copy file to the working directory of this script. You can use --file multiple times.')
@@ -955,16 +961,25 @@ class MRJob(object):
             action='store_true',
             help='print more messages to stderr')
 
+        self.hadoop_opts_opt_group = OptionGroup(
+            self.option_parser, 'Configuring or emulating Hadoop (these apply when you set -r hadoop, -r emr, or -r local)')
+        self.option_parser.add_option_group(self.hadoop_opts_opt_group)
+
+        self.hadoop_opts_opt_group.add_option(
+            '--hadoop-version', dest='hadoop_version', default=None,
+            help='Version of Hadoop to specify to EMR or to emulate for -r local. Default is 0.20.')
+
+        self.hadoop_opts_opt_group.add_option(
+            '--jobconf', dest='jobconf', default=[], action='append',
+            help='-jobconf arg to pass through to hadoop streaming; '
+            'should take the form KEY=VALUE. You can use --jobconf '
+            'multiple times.')
+        #   ref: http://hadoop.apache.org/mapreduce/docs/current/mapred-default.html
+
         # options common to Hadoop and EMR
         self.hadoop_emr_opt_group = OptionGroup(
             self.option_parser, 'Running on Hadoop or EMR (these apply when you set -r hadoop or -r emr)')
         self.option_parser.add_option_group(self.hadoop_emr_opt_group)
-
-        self.hadoop_emr_opt_group.add_option(
-            '--cmdenv', dest='cmdenv', default=[], action='append',
-            help='set an environment variable for your job inside Hadoop '
-            'streaming. Must take the form KEY=VALUE. You can use --cmdenv '
-            'multiple times.')
 
         self.hadoop_emr_opt_group.add_option(
             '--hadoop-arg', dest='hadoop_extra_args', default=[],
@@ -987,13 +1002,6 @@ class MRJob(object):
             '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
             default=None,
             help='Path of your hadoop streaming jar (locally, or on S3/HDFS)')
-
-        self.hadoop_emr_opt_group.add_option(
-            '--jobconf', dest='jobconf', default=[], action='append',
-            help='-jobconf arg to pass through to hadoop streaming; '
-            'should take the form KEY=VALUE. You can use --jobconf '
-            'multiple times.')
-        #   ref: http://hadoop.apache.org/mapreduce/docs/current/mapred-default.html
 
         self.hadoop_emr_opt_group.add_option(
             '--label', dest='label', default=None,
@@ -1101,10 +1109,6 @@ class MRJob(object):
             '--hadoop-streaming-jar-on-emr', dest='hadoop_streaming_jar_on_emr',
             default=None,
             help='Local path of the hadoop streaming jar on the EMR node. Rarely necessary')
-
-        self.emr_opt_group.add_option(
-            '--hadoop-version', dest='hadoop_version', default=None,
-            help='Version of Hadoop to spin up on EMR. Default is 0.20.')
 
         self.emr_opt_group.add_option(
             '--num-ec2-instances', dest='num_ec2_instances', default=None,
@@ -1281,6 +1285,7 @@ class MRJob(object):
             'hadoop_input_format': self.options.hadoop_input_format,
             'hadoop_output_format': self.options.hadoop_output_format,
             'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
+            'hadoop_version': self.options.hadoop_version,
             'input_paths': self.args,
             'jobconf': self.options.jobconf,
             'mr_job_script': self.mr_job_script(),

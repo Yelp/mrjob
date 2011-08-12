@@ -241,7 +241,7 @@ jobconf_map = {}
 for jobconf_dict in JOBCONF_DICT_LIST:
     for value in jobconf_dict.itervalues():
         jobconf_map[value] = jobconf_dict
-        
+
 
 def translate_jobconf(variable):
     """ Translates a jobconf variable into the equivalent name in 
@@ -257,14 +257,14 @@ def translate_jobconf_to_version(variable, version):
     """
     req_version = LooseVersion(version)
     possible_versions = sorted(jobconf_map[variable].keys(), reverse=True, key=lambda(v):LooseVersion(v))
-    
+
     for possible_version in possible_versions:
         if req_version >= LooseVersion(possible_version):
             return jobconf_map[variable][possible_version]
-    
+
     # return oldest version if we don't find required version
     return jobconf_map[variable][possible_versions[-1]]
-    
+
 
 def is_equivalent_jobconf(arg1, arg2):
     """ Returns ``true`` if the two jobconf arguements are equivalent
@@ -272,12 +272,12 @@ def is_equivalent_jobconf(arg1, arg2):
     jobconf = jobconf_map.get(arg1)
     if jobconf:
         return (arg2 in jobconf.values())
-    
+
     return False
-        
+
 
 def get_jobconf_value(variable):
-    """gets a jobconf varaible from runtime environment
+    """gets a jobconf variable from runtime environment
     """
     name = variable.replace('.','_')
     if name in os.environ:
@@ -290,3 +290,47 @@ def get_jobconf_value(variable):
             return os.environ[var]
 
     raise KeyError("%s jobconf variable not found" % variable)
+
+
+def version_gte(version_str, cmp_version_str):
+    """Return True if *version_str* >= *cmp_version_str*."""
+
+    if not isinstance(version_str, basestring):
+        raise ValueError('%s is not a string' % version_str)
+
+    if not isinstance(cmp_version_str, basestring):
+        raise ValueError('%s is not a string' % cmp_version_str)
+
+    return LooseVersion(version_str) >= LooseVersion(cmp_version_str)
+
+
+class HadoopCompatibilityManager(object):
+
+    def __init__(self, version):
+        self.version = version
+
+    def canonicalize_jobconf(self, variable):
+        """Return *variable*'s equivalent in the internally-specified
+        "canonical" Hadoop version. If *variable* is unknown, return it
+        unchanged.
+        """
+        try:
+            return translate_jobconf_to_version(variable, '0.21')
+        except KeyError:
+            return variable
+
+    def translate_jobconf(self, variable):
+        """Translate *variable* into this object's version"""
+        return translate_jobconf_to_version(variable, self.version)
+
+    def supports_combiners_in_hadoop_streaming(self):
+        """Return True if this version of Hadoop Streaming supports combiners
+        (i.e. >= 0.20.203), otherwise False.
+        """
+        return version_gte(self.version, '0.20.203')
+
+    def get_jobconf_value(self, variable):
+        """Get the value of *variable* no matter what version it is actually
+        specified in
+        """
+        return get_jobconf_value(variable)

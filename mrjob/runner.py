@@ -268,6 +268,7 @@ class MRJobRunner(object):
             'hadoop_input_format',
             'hadoop_output_format',
             'hadoop_streaming_jar',
+            'hadoop_version',
             'jobconf',
             'label',
             'owner',
@@ -293,6 +294,7 @@ class MRJobRunner(object):
             'base_tmp_dir': tempfile.gettempdir(),
             'bootstrap_mrjob': True,
             'cleanup': CLEANUP_DEFAULT,
+            'hadoop_version': '0.20',
             'owner': owner,
             'python_bin': ['python'],
             'steps_python_bin': [sys.executable or 'python'],
@@ -567,6 +569,20 @@ class MRJobRunner(object):
         open(path, 'w').close()
 
     ### other methods you need to implement in your subclass ###
+
+    def get_hadoop_version(self):
+        """Return the version number of the Hadoop environment as a string if
+        Hadoop is being used or simulated. Return None if not applicable.
+
+        :py:class:`~mrjob.emr.EMRJobRunner` infers this from the job flow.
+        :py:class:`~mrjob.hadoop.HadoopJobRunner` gets this from
+        ``hadoop version``. :py:class:`~mrjob.local.LocalMRJobRunner` has an
+        additional `hadoop_version` option to specify which version it
+        simulates, with a default of 0.20.
+        :py:class:`~mrjob.inline.InlineMRJobRunner` does not simulate Hadoop at
+        all.
+        """
+        return None
 
     # you'll probably wan't to add your own __init__() and cleanup() as well
 

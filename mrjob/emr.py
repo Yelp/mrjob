@@ -399,7 +399,7 @@ class EMRJobRunner(MRJobRunner):
         self._show_tracker_progress = False
 
         # init hadoop version cache
-        self._hadoop_version = None
+        self._inferred_hadoop_version = None
 
     @classmethod
     def _allowed_opts(cls):
@@ -445,7 +445,6 @@ class EMRJobRunner(MRJobRunner):
             'ec2_slave_instance_type': 'm1.small',
             'hadoop_streaming_jar_on_emr':
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
-            'hadoop_version': '0.20',
             'num_ec2_instances': 1,
             's3_sync_wait_time': 5.0,
             'ssh_bin': ['ssh'],
@@ -1923,14 +1922,14 @@ class EMRJobRunner(MRJobRunner):
         return emr_conn.describe_jobflow(self._emr_job_flow_id)
 
     def get_hadoop_version(self):
-        if not self._hadoop_version:
+        if not self._inferred_hadoop_version:
             if self._emr_job_flow_id:
                 # if joining a job flow, infer the version
-                self._hadoop_version = self._describe_jobflow().hadoopversion
+                self._inferred_hadoop_version = self._describe_jobflow().hadoopversion
             else:
                 # otherwise, read it from the config
-                self._hadoop_version = self._opts['hadoop_version']
-        return self._hadoop_version
+                self._inferred_hadoop_version = self._opts['hadoop_version']
+        return self._inferred_hadoop_version
 
     def _address_of_master(self, emr_conn=None):
         """Get the address of the master node so we can SSH to it"""

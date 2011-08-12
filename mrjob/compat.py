@@ -253,14 +253,6 @@ jobconf_map = _dict_list_to_compat_map(JOBCONF_DICT_LIST)
 cl_switch_map = _dict_list_to_compat_map(CL_SWITCH_DICT_LIST)
 
 
-def translate_jobconf(variable):
-    """ Translates a jobconf variable into the equivalent name in 
-        other versions of hadoop. 
-        Returns an iterator over the list of equivalent arguements
-    """
-    return jobconf_map[variable].itervalues()
-
-
 def get_jobconf_value(variable):
     """gets a jobconf variable from runtime environment
     """
@@ -269,7 +261,7 @@ def get_jobconf_value(variable):
         return os.environ[name]
 
     # try alternatives
-    for var in translate_jobconf(variable):
+    for var in jobconf_map[variable].itervalues():
         var = var.replace('.','_')
         if var in os.environ:
             return os.environ[var]
@@ -277,18 +269,26 @@ def get_jobconf_value(variable):
     raise KeyError("%s jobconf variable not found" % variable)
 
 
-def translate_jobconf_to_version(variable, version):
+def _translate_variable_to_version(variable, version, compat_map):
     req_version = LooseVersion(version)
-    possible_versions = sorted(jobconf_map[variable].keys(),
+    possible_versions = sorted(compat_map[variable].keys(),
                                reverse=True,
                                key=lambda(v):LooseVersion(v))
 
     for possible_version in possible_versions:
         if req_version >= LooseVersion(possible_version):
-            return jobconf_map[variable][possible_version]
+            return compat_map[variable][possible_version]
 
     # return oldest version if we don't find required version
-    return jobconf_map[variable][possible_versions[-1]]
+    return compat_map[variable][possible_versions[-1]]
+
+
+def translate_jobconf_to_version(variable, version):
+    return _translate_variable_to_version(variable, version, jobconf_map)
+
+
+def translate_cl_switch_to_version(variable, version):
+    return _translate_variable_to_version(variable, version, cl_switch_map)
 
 
 class HadoopCompatibilityManager(object):
@@ -306,9 +306,15 @@ class HadoopCompatibilityManager(object):
         except KeyError:
             return variable
 
-    def translate_jobconf(self, variable):
-        """Translate *variable* into this object's version"""
-        return translate_jobconf_to_version(variable, self.version)
+    def canonicalize_jobconf(self, variable):
+        """Return *variable*'s equivalent in the internally-specified
+        "canonical" Hadoop version. If *variable* is unknown, return it
+        unchanged.
+        """
+        try:
+            return translate_cl_switch_to_version(variable, '0.21')
+        except KeyError:
+            return variable
 
     def supports_combiners_in_hadoop_streaming(self):
         """Return True if this version of Hadoop Streaming supports combiners
@@ -316,12 +322,13 @@ class HadoopCompatibilityManager(object):
         """
         return self.version_gte('0.20.203')
 
-    def get_jobconf_value(self, variable):
-        """Get the value of *variable* no matter what version it is actually
-        specified in
-        """
-        return get_jobconf_value(variable)
+    def translate_jobconf(self, variable):
+        """Translate *variable* into this object's version"""
+        return translate_jobconf_to_version(variable, self.version)
 
+    def translate_cl_switch(self, variable):
+        """Translate *variable* into this object's version"""
+        return translate_cl_switch_to_version(variable, self.version)
 
     def version_gte(self, cmp_version_str):
         """Return True if this object's version >= *cmp_version_str*."""

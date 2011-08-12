@@ -51,13 +51,11 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #: - ``'NONE'``: delete nothing
 #: - ``'REMOTE_SCRATCH'``: delete remote scratch only
 #: - ``'SCRATCH'``: delete local and remote scratch, but not logs
-CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH', 'SCRATCH']
+#: - ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL`` (not supported for ``cleanup_on_failure``)
+CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH', 'SCRATCH', 'IF_SUCCESSFUL']
 
-#: the default cleanup-on-success option: ``'ALL'``
-CLEANUP_DEFAULT = 'ALL'
-
-#: the default cleanup-on-failure option: ``'NONE'``
-CLEANUP_FAILURE_DEFAULT = 'NONE'
+#: DEPRECATED: the default cleanup-on-success option: ``'IF_SUCCESSFUL'``
+CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
 
 
 _STEP_RE = re.compile(r'^M?C?R?$')
@@ -211,11 +209,15 @@ class MRJobRunner(object):
         cleanup_error = ('cleanup must be one of %s, not %%s' %
                          ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_error, self._opts['cleanup'])
+        if 'IF_SUCCESSFUL' in self._opts['cleanup']:
+            log.warning('IF_SUCCESSFUL is deprecated and will be removed in mrjob 0.4.')
 
         cleanup_failure_error = ('cleanup_on_failure must be one of %s, not %%s' %
                                  ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_failure_error,
                          self._opts['cleanup_on_failure'])
+        if 'IF_SUCCESSFUL' in self._opts['cleanup_on_failure']:
+            raise ValueError('IF_SUCCESSFUL is not supported for cleanup_on_failure.')
 
         # add the script to our list of files (don't actually commit to
         # uploading it)
@@ -316,8 +318,8 @@ class MRJobRunner(object):
         return {
             'base_tmp_dir': tempfile.gettempdir(),
             'bootstrap_mrjob': True,
-            'cleanup': [CLEANUP_DEFAULT],
-            'cleanup_on_failure': [CLEANUP_FAILURE_DEFAULT],
+            'cleanup': ['ALL'],
+            'cleanup_on_failure': ['NONE'],
             'owner': owner,
             'python_bin': ['python'],
             'steps_python_bin': [sys.executable or 'python'],
@@ -431,13 +433,13 @@ class MRJobRunner(object):
         def mode_has(*args):
             return any((choice in mode) for choice in args)
 
-        if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH'):
+        if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH', 'IF_SUCCESSFUL'):
             self._cleanup_local_scratch()
 
-        if mode_has('ALL', 'SCRATCH', 'REMOTE_SCRATCH'):
+        if mode_has('ALL', 'SCRATCH', 'REMOTE_SCRATCH', 'IF_SUCCESSFUL'):
             self._cleanup_remote_scratch()
 
-        if mode_has('ALL', 'LOGS'):
+        if mode_has('ALL', 'LOGS', 'IF_SUCCESSFUL'):
             self._cleanup_logs()
 
     def counters(self):

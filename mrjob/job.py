@@ -109,7 +109,7 @@ except ImportError:
 from mrjob.conf import combine_dicts
 from mrjob.parse import parse_port_range_list, parse_mr_job_stderr, parse_key_value_list
 from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
-from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT, CLEANUP_FAILURE_DEFAULT
+from mrjob.runner import CLEANUP_CHOICES
 from mrjob.util import log_to_stream, parse_and_save_options, read_input
 
 # used by mr() below, to fake no mapper
@@ -891,15 +891,13 @@ class MRJob(object):
             '--cleanup', dest='cleanup', default=None,
             help=('Comma-separated list of which directories to delete when'
                   ' a job succeeds, e.g. SCRATCH,LOGS. Choices:'
-                  ' %s (default: %s)' % (', '.join(CLEANUP_CHOICES),
-                                         CLEANUP_DEFAULT)))
+                  ' %s (default: ALL)' % ', '.join(CLEANUP_CHOICES)))
 
         self.runner_opt_group.add_option(
             '--cleanup-on-failure', dest='cleanup_on_failure', default=None,
             help=('Comma-separated list of which directories to delete when'
                   ' a job fails, e.g. SCRATCH,LOGS. Choices:'
-                  ' %s (default: %s)' % (', '.join(CLEANUP_CHOICES),
-                                         CLEANUP_FAILURE_DEFAULT)))
+                  ' %s (default: NONE)' % ', '.join(CLEANUP_CHOICES)))
 
         self.runner_opt_group.add_option(
             '--file', dest='upload_files', action='append',

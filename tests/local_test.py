@@ -483,3 +483,10 @@ class LocalMRJobRunnerJobConfTestCase(TestCase):
                       ('mapreduce.task.ismap', 'True'), 
                       ('mapreduce.task.output.dir', runner._output_dir), 
                       ('mapreduce.task.partition', '0'),])
+
+
+class CompatTestCase(TestCase):
+
+    def test_environment_variables(self):
+        runner = LocalMRJobRunner(hadoop_version='0.18')
+        assert_in('mapred_task_is_map', runner._subprocess_env('M', 0).keys())

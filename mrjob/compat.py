@@ -253,6 +253,14 @@ jobconf_map = _dict_list_to_compat_map(JOBCONF_DICT_LIST)
 cl_switch_map = _dict_list_to_compat_map(CL_SWITCH_DICT_LIST)
 
 
+def _jobconf_to_env_var(variable):
+    return variable.replace('.', '_')
+
+
+def _env_var_to_jobconf(variable):
+    return variable.replace('_', '.')
+
+
 def get_jobconf_value(variable):
     """gets a jobconf variable from runtime environment
     """
@@ -262,7 +270,7 @@ def get_jobconf_value(variable):
 
     # try alternatives
     for var in jobconf_map[variable].itervalues():
-        var = var.replace('.','_')
+        var = _jobconf_to_env_var(var)
         if var in os.environ:
             return os.environ[var]
 
@@ -326,9 +334,17 @@ class HadoopCompatibilityManager(object):
         """Translate *variable* into this object's version"""
         return translate_jobconf_to_version(variable, self.version)
 
-    def translate_cl_switch(self, variable):
-        """Translate *variable* into this object's version"""
+    def translate_cl_switch(self, cl_switch):
+        """Translate *cl_switch* into this object's version"""
         return translate_cl_switch_to_version(variable, self.version)
+
+    def translate_env(self, env_var):
+        """Translate *env_var* into this object's version (same as
+        :py:meth:`translate_jobconf` but with underscores)
+        """
+        jobconf_var = _env_var_to_jobconf(env_var)
+        translated_jobconf_var = self.translate_jobconf(jobconf_var)
+        return _jobconf_to_env_var(translated_jobconf_var)
 
     def version_gte(self, cmp_version_str):
         """Return True if this object's version >= *cmp_version_str*."""

@@ -315,6 +315,23 @@ class LocalMRJobRunner(MRJobRunner):
 
         return file_names
 
+    def _subprocess_env(self, step_type, step_num, env=None):
+        """Set up environment variables for a subprocess (mapper, etc.)"""
+        # keep the current environment because we need PATH to find binaries
+        # and make PYTHONPATH work
+        ismap_var = self._compat.translate_env('mapreduce_task_ismap')
+        partition_var = self._compat.translate_env('mapreduce_task_partition')
+        hadoop_env = {
+            ismap_var: str(step_type=='M'),
+            partition_var: str(step_num),
+        }
+        return combine_local_envs({'PYTHONPATH': os.getcwd()},
+                                  os.environ,
+                                  self._get_cmdenv(),
+                                  env or {},
+                                  hadoop_env)
+
+
     def _invoke_step(self, args, outfile_name, env=None, step_num=0,
                      num_tasks=1, step_type='M', combiner_args=None):
         """Run the given command, outputting into outfile, and reading
@@ -328,17 +345,8 @@ class LocalMRJobRunner(MRJobRunner):
 
         :param combiner_args: If this mapper has a combiner, we need to do some extra shell wrangling, so pass the combiner arguments in separately.
         """
-        # keep the current environment because we need PATH to find binaries
-        # and make PYTHONPATH work
-        env = combine_local_envs(
-            {'PYTHONPATH': os.getcwd()},
-            os.environ,
-            self._get_cmdenv(),
-            env or {}, 
-            {'mapreduce_task_ismap': str(step_type=='M'), 
-             'mapreduce_task_partition': str(step_num),
-            })
-            
+        env = self._subprocess_env(step_type, step_num, env)
+
         # decide where to get input
         if self._prev_outfiles:
             input_paths = self._prev_outfiles
@@ -368,31 +376,39 @@ class LocalMRJobRunner(MRJobRunner):
             # get file splits for mappers and reducers
             keep_sorted = (step_type == 'R')
             file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=keep_sorted)
-            
+
+            task_id_var = self._compat.translate_env('mapreduce_task_id')
+            task_attempt_id_var = self._compat.translate_env('mapreduce_task_attempt_id')
+
+            input_file_var = self._compat.translate_env('mapreduce_map_input_file')
+            input_start_var = self._compat.translate_env('mapreduce_map_input_start')
+            input_length_var = self._compat.translate_env('mapreduce_map_input_length')
+
             # run the tasks
             for (task_num, file_name) in enumerate(file_splits):
                 # set the task env
                 # generate a task id
                 mapreduce_task_id = 'task_%s_%s_%05d%d' % (self._job_name, step_type, step_num, task_num) 
                 mapreduce_task_attempt_id = 'attempt_%s_%s_%05d%d_0' % (self._job_name, step_type, step_num, task_num) # we only have one attempt
-                
-                task_env = combine_local_envs(
-                    env,
-                    {'mapreduce_task_id': mapreduce_task_id, 
-                     'mapreduce_task_attempt_id': mapreduce_task_attempt_id,
-                     })
-             
+
+                task_vars = {
+                    task_id_var: mapreduce_task_id, 
+                    task_attempt_id_var: mapreduce_task_attempt_id,
+                }
                 if step_type == 'M':
                     # map only jobconf environment variables
-                    task_env = combine_local_envs(
-                        task_env, 
-                        {'mapreduce_map_input_file': file_splits[file_name]['original_name'], 
-                         'mapreduce_map_input_start': str(file_splits[file_name]['start']),
-                         'mapreduce_map_input_length': str(file_splits[file_name]['length'])
-                         })
-        
+                    input_vars = {
+                        input_file_var: file_splits[file_name]['original_name'],
+                        input_start_var: str(file_splits[file_name]['start']),
+                        input_length_var: str(file_splits[file_name]['length'])
+                    }
+                else:
+                    input_vars = {}
+
+                task_env = combine_local_envs(env, task_vars, input_vars)
+
                 task_outfile = outfile_name + '_part-%05d' % task_num
-        
+
                 proc = self._invoke_process(args + [file_name], task_outfile,
                                             env=task_env,
                                             combiner_args=combiner_args)

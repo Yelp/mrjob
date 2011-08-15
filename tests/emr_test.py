@@ -604,11 +604,6 @@ class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
              'num_ec2_instances': 2,
              'ec2_slave_instance_type': 'm2.xlarge'},
             'm1.large', 'c1.xlarge')
-        
-        
-        
-        
-                                 
 
 
 ### tests for error parsing ###

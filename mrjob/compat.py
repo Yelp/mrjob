@@ -336,7 +336,7 @@ class HadoopCompatibilityManager(object):
 
     def translate_cl_switch(self, cl_switch):
         """Translate *cl_switch* into this object's version"""
-        return translate_cl_switch_to_version(variable, self.version)
+        return translate_cl_switch_to_version(cl_switch, self.version)
 
     def translate_env(self, env_var):
         """Translate *env_var* into this object's version (same as

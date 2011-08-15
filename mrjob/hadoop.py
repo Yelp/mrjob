@@ -183,7 +183,7 @@ class HadoopJobRunner(MRJobRunner):
                 m = HADOOP_VERSION_RE.match(first_line)
                 if m:
                     self._hadoop_version = m.group('version')
-                    log.info("Using Hadoop version %s" % self.hadoop_version)
+                    log.info("Using Hadoop version %s" % self._hadoop_version)
                     return
             self._hadoop_version = '0.20.203'
             log.info("Unable to determine Hadoop version. Assuming 0.20.203.")

@@ -179,7 +179,6 @@ class HadoopJobRunner(MRJobRunner):
             stdout = self._invoke_hadoop(['version'], return_stdout=True)
             if stdout:
                 first_line = stdout.split('\n')[0]
-                log.info("'hadoop version' output: %s" % first_line)
                 m = HADOOP_VERSION_RE.match(first_line)
                 if m:
                     self._hadoop_version = m.group('version')

@@ -210,14 +210,14 @@ class MRJobRunner(object):
                          ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_error, self._opts['cleanup'])
         if 'IF_SUCCESSFUL' in self._opts['cleanup']:
-            log.warning('IF_SUCCESSFUL is deprecated and will be removed in mrjob 0.4.')
+            log.warning('IF_SUCCESSFUL is deprecated and will be removed in mrjob 0.4. Use ALL instead.')
 
         cleanup_failure_error = ('cleanup_on_failure must be one of %s, not %%s' %
                                  ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_failure_error,
                          self._opts['cleanup_on_failure'])
         if 'IF_SUCCESSFUL' in self._opts['cleanup_on_failure']:
-            raise ValueError('IF_SUCCESSFUL is not supported for cleanup_on_failure.')
+            raise ValueError('IF_SUCCESSFUL is not supported for cleanup_on_failure. Use NONE instead.')
 
         # add the script to our list of files (don't actually commit to
         # uploading it)

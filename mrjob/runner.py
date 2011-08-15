@@ -1026,9 +1026,7 @@ class MRJobRunner(object):
             args.extend(['-outputformat', self._opts['hadoop_output_format']])
 
         # jobconf
-        compat = self.get_compatibility_manager()
-        jobconf_switch = compat.translate_cl_switch('-jobconf')
         for key, value in sorted(self._opts['jobconf'].iteritems()):
-            args.extend([jobconf_switch, '%s=%s' % (key, value)])
+            args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         return args

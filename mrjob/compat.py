@@ -231,9 +231,9 @@ JOBCONF_DICT_LIST = [
 ]
 
 CL_SWITCH_DICT_LIST = [
-    {'0.18': '-jobconf', '0.20': '-D'},
-    {'0.18': '-cacheFile', '0.20': '-files'},
-    {'0.18': '-cacheArchive', '0.20': '-archives'},
+    # {'0.18': '-jobconf', '0.20': '-D'},               # this may not be accurate
+    # {'0.18': '-cacheFile', '0.20': '-files'},         # this needs more logic
+    # {'0.18': '-cacheArchive', '0.20': '-archives'},   # this needs more logic
 ]
 
 def _dict_list_to_compat_map(dict_list):
@@ -311,16 +311,6 @@ class HadoopCompatibilityManager(object):
         """
         try:
             return translate_jobconf_to_version(variable, '0.21')
-        except KeyError:
-            return variable
-
-    def canonicalize_jobconf(self, variable):
-        """Return *variable*'s equivalent in the internally-specified
-        "canonical" Hadoop version. If *variable* is unknown, return it
-        unchanged.
-        """
-        try:
-            return translate_cl_switch_to_version(variable, '0.21')
         except KeyError:
             return variable
 

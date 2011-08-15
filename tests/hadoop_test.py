@@ -216,8 +216,8 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             assert_in('-mapper', args)
             assert_lt(args.index('-libjar'), args.index('-mapper'))
 
-        # make sure -jobconf translation happened
-        assert_in('-D', step_0_args)
+        # make sure -jobconf made it through (may later become -D)
+        assert_in('-jobconf', step_0_args)
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)

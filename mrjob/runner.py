@@ -45,13 +45,16 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 #: cleanup options:
 #:
-#: - ``'NONE'``: disable cleanup
-#: - ``'IF_SUCCESSFUL'``: clean up only if job succeeded
-#: - ``'SCRATCH'``: clean up scratch space but not logs
-#: - ``'ALL'``: always clean up, even on failure
-CLEANUP_CHOICES = sorted(['NONE', 'IF_SUCCESSFUL', 'SCRATCH', 'ALL'])
+#: - ``'ALL'``: delete local scratch, remote scratch, and logs
+#: - ``'LOCAL_SCRATCH'``: delete local scratch only
+#: - ``'LOGS'``: delete logs only
+#: - ``'NONE'``: delete nothing
+#: - ``'REMOTE_SCRATCH'``: delete remote scratch only
+#: - ``'SCRATCH'``: delete local and remote scratch, but not logs
+#: - ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL`` (not supported for ``cleanup_on_failure``)
+CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH', 'SCRATCH', 'IF_SUCCESSFUL']
 
-#: the default cleanup option: ``'IF_SUCCESSFUL'``
+#: DEPRECATED: the default cleanup-on-success option: ``'IF_SUCCESSFUL'``
 CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
 
 
@@ -117,8 +120,10 @@ class MRJobRunner(object):
         :param base_tmp_dir: path to put local temp dirs inside. By default we just call :py:func:`tempfile.gettempdir`
         :type bootstrap_mrjob: bool
         :param bootstrap_mrjob: should we automatically tar up the mrjob library and install it when we run the mrjob? Set this to ``False`` if you've already installed ``mrjob`` on your Hadoop cluster.
-        :type cleanup: str
-        :param cleanup: is :py:meth:`cleanup` allowed to clean up logs and scratch files? See :py:data:`CLEANUP_CHOICES`.
+        :type cleanup: list
+        :param cleanup: List of which kinds of directories to delete when a job succeeds. See :py:data:`CLEANUP_CHOICES`.
+        :type cleanup_on_failure: list
+        :param cleanup_on_failure: Which kinds of directories to clean up when a job fails. See :py:data:`CLEANUP_CHOICES`.
         :type cmdenv: dict
         :param cmdenv: environment variables to pass to the job inside Hadoop streaming
         :type hadoop_extra_args: list of str
@@ -188,11 +193,31 @@ class MRJobRunner(object):
         # on the Hadoop nodes. If 'archive', uncompress the file
         self._files = []
 
-        # validate cleanup
-        if not self._opts['cleanup'] in CLEANUP_CHOICES:
-            raise ValueError(
-                'cleanup must be one of %s, not %r' %
-                (', '.join(CLEANUP_CHOICES), self._opts['cleanup']))
+        # old API accepts strings for cleanup
+        # new API wants lists
+        for opt_key in ('cleanup', 'cleanup_on_failure'):
+            if isinstance(self._opts[opt_key], basestring):
+                self._opts[opt_key] = [self._opts[opt_key]]
+
+        def validate_cleanup(error_str, opt_list):
+            for choice in opt_list:
+                if choice not in CLEANUP_CHOICES:
+                    raise ValueError(error_str % choice)
+            if 'NONE' in opt_list and len(opt_list) > 1:
+                self.option_parser.error('Cannot clean up both nothing and something!')
+
+        cleanup_error = ('cleanup must be one of %s, not %%s' %
+                         ', '.join(CLEANUP_CHOICES))
+        validate_cleanup(cleanup_error, self._opts['cleanup'])
+        if 'IF_SUCCESSFUL' in self._opts['cleanup']:
+            log.warning('IF_SUCCESSFUL is deprecated and will be removed in mrjob 0.4. Use ALL instead.')
+
+        cleanup_failure_error = ('cleanup_on_failure must be one of %s, not %%s' %
+                                 ', '.join(CLEANUP_CHOICES))
+        validate_cleanup(cleanup_failure_error,
+                         self._opts['cleanup_on_failure'])
+        if 'IF_SUCCESSFUL' in self._opts['cleanup_on_failure']:
+            raise ValueError('IF_SUCCESSFUL is not supported for cleanup_on_failure. Use NONE instead.')
 
         # add the script to our list of files (don't actually commit to
         # uploading it)
@@ -263,6 +288,7 @@ class MRJobRunner(object):
             'base_tmp_dir',
             'bootstrap_mrjob',
             'cleanup',
+            'cleanup_on_failure',
             'cmdenv',
             'hadoop_extra_args',
             'hadoop_input_format',
@@ -292,7 +318,8 @@ class MRJobRunner(object):
         return {
             'base_tmp_dir': tempfile.gettempdir(),
             'bootstrap_mrjob': True,
-            'cleanup': CLEANUP_DEFAULT,
+            'cleanup': ['ALL'],
+            'cleanup_on_failure': ['NONE'],
             'owner': owner,
             'python_bin': ['python'],
             'steps_python_bin': [sys.executable or 'python'],
@@ -348,14 +375,15 @@ class MRJobRunner(object):
         
         return self.cat(self.path_join(output_dir, 'part-*'))
      
-    def _cleanup_scratch(self):
-        """Cleanup any files/directories we create while running this job.
-        Should be safe to run this at any time, or multiple times.
+    def _cleanup_local_scratch(self):
+        """Cleanup any files/directories on the local machine we created while
+        running this job. Should be safe to run this at any time, or multiple
+        times.
 
         This particular function removes any local tmp directories
         added to the list self._local_tmp_dirs
 
-        This won't remove output_dir if it's outside of our scratch dir
+        This won't remove output_dir if it's outside of our scratch dir.
         """
         if self._local_tmp_dir:
             log.info('removing tmp directory %s' % self._local_tmp_dir)
@@ -366,6 +394,13 @@ class MRJobRunner(object):
 
         self._local_tmp_dir = None
 
+    def _cleanup_remote_scratch(self):
+        """Cleanup any files/directories on the remote machine (S3) we created
+        while running this job. Should be safe to run this at any time, or
+        multiple times.
+        """
+        pass # this only happens on EMR
+
     def _cleanup_logs(self):
         """Cleanup any log files that are created as a side-effect of the job.
         """
@@ -373,7 +408,7 @@ class MRJobRunner(object):
 
     def _cleanup_jobs(self):
         """Stop any jobs that we created that are still running."""
-        pass
+        pass # this only happens on EMR
 
     def cleanup(self, mode=None):
         """Clean up running jobs, scratch dirs, and logs, subject to the *cleanup* option passed to the constructor.
@@ -385,19 +420,26 @@ class MRJobRunner(object):
 
             # cleanup() called automatically here
 
-        :param mode: override *cleanup* passed into the constructor. Should be one of :py:data:`CLEANUP_CHOICES`
+        :param mode: override *cleanup* passed into the constructor. Should be a list of strings from :py:data:`CLEANUP_CHOICES`
         """
-        mode = mode or self._opts['cleanup']
+        if self._ran_job:
+            mode = mode or self._opts['cleanup']
+        else:
+            mode = mode or self._opts['cleanup_on_failure']
 
         # always terminate running jobs
         self._cleanup_jobs()
 
-        if (mode in ('ALL', 'SCRATCH') or
-            (mode == 'IF_SUCCESSFUL' and self._ran_job)):
-            self._cleanup_scratch()
+        def mode_has(*args):
+            return any((choice in mode) for choice in args)
 
-        if (mode == 'ALL' or
-            (mode == 'IF_SUCCESSFUL' and self._ran_job)):
+        if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH', 'IF_SUCCESSFUL'):
+            self._cleanup_local_scratch()
+
+        if mode_has('ALL', 'SCRATCH', 'REMOTE_SCRATCH', 'IF_SUCCESSFUL'):
+            self._cleanup_remote_scratch()
+
+        if mode_has('ALL', 'LOGS', 'IF_SUCCESSFUL'):
             self._cleanup_logs()
 
     def counters(self):

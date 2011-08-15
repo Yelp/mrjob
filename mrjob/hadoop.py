@@ -533,8 +533,8 @@ class HadoopJobRunner(MRJobRunner):
         for line in stderr:
             log.info('HADOOP: %s' % line.rstrip('\n'))
 
-    def _cleanup_scratch(self):
-        super(HadoopJobRunner, self)._cleanup_scratch()
+    def _cleanup_local_scratch(self):
+        super(HadoopJobRunner, self)._cleanup_local_scratch()
 
         if self._hdfs_tmp_dir:
             log.info('deleting %s from HDFS' % self._hdfs_tmp_dir)

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from distutils.version import LooseVersion
 import getpass
 import logging
 import os
@@ -325,11 +324,12 @@ class HadoopJobRunner(MRJobRunner):
 
             if 'C' in step:
                 combiner_cmd = cmd_line(self._combiner_args(step_num))
-                if LooseVersion(self.get_hadoop_version()) < LooseVersion('0.20.203'):
+                compat = self.get_compatibility_manager()
+                if compat.supports_combiners_in_hadoop_streaming():
+                    combiner = combiner_cmd
+                else:
                     mapper = "bash -c '%s | sort | %s'" % (mapper, combiner_cmd)
                     combiner = None
-                else:
-                    combiner = combiner_cmd
 
             streaming_args.append('-mapper')
             streaming_args.append(mapper)

@@ -14,7 +14,6 @@
 from __future__ import with_statement
 
 import datetime
-from distutils.version import LooseVersion
 import fnmatch
 import logging
 import os
@@ -974,10 +973,12 @@ class EMRJobRunner(MRJobRunner):
 
             # boto 2.0 doesn't support combiners in StreamingStep, so insert
             # them into step_args manually.
-            if LooseVersion(self.get_hadoop_version()) >= LooseVersion('0.20'):
-                step_args.extend(['-combiner', combiner])
-            else:
+
+            compat = self.get_compatibility_manager()
+            if compat.supports_combiners_in_hadoop_streaming():
                 mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
+            else:
+                step_args.extend(['-combiner', combiner])
 
             try:
                 streaming_step = boto.emr.StreamingStep(

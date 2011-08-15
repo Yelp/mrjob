@@ -34,6 +34,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+from mrjob.compat import HadoopCompatibilityManager
 from mrjob.conf import combine_cmds, combine_cmd_lists, combine_dicts, combine_envs, combine_local_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
 from mrjob.util import cmd_line, file_ext, read_file, tar_and_gzip
 
@@ -255,6 +256,9 @@ class MRJobRunner(object):
 
         # info about our steps. this is basically a cache for self._get_steps()
         self._steps = None
+
+        # Object to translate options and functionality between Hadoop versions
+        self._compatibility_manager = None
 
     @classmethod
     def _allowed_opts(cls):
@@ -583,6 +587,16 @@ class MRJobRunner(object):
         all.
         """
         return None
+
+    def get_compatibility_manager(self):
+        """Return a :py:class:`HadoopCompatibilityManager` for the version of
+        Hadoop used or simulated by this runner.
+
+        :return: :py:class:`HadoopCompatibilityManager`
+        """
+        if not self._compatibility_manager:
+            self._compatibility_manager = HadoopCompatibilityManager(self.get_hadoop_version())
+        return self._compatibility_manager
 
     # you'll probably wan't to add your own __init__() and cleanup() as well
 

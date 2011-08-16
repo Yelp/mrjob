@@ -109,7 +109,7 @@ except ImportError:
 from mrjob.conf import combine_dicts
 from mrjob.parse import parse_port_range_list, parse_mr_job_stderr, parse_key_value_list
 from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
-from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
+from mrjob.runner import CLEANUP_CHOICES
 from mrjob.util import log_to_stream, parse_and_save_options, read_input
 
 # used by mr() below, to fake no mapper
@@ -888,9 +888,16 @@ class MRJob(object):
             help='Path to alternate mrjob.conf file to read from')
 
         self.runner_opt_group.add_option(
-            '--cleanup', dest='cleanup',
-            choices=CLEANUP_CHOICES, default=CLEANUP_DEFAULT,
-            help="when to clean up tmp directories, etc. Choices: %s (default: %%default)" % ', '.join(CLEANUP_CHOICES))
+            '--cleanup', dest='cleanup', default=None,
+            help=('Comma-separated list of which directories to delete when'
+                  ' a job succeeds, e.g. SCRATCH,LOGS. Choices:'
+                  ' %s (default: ALL)' % ', '.join(CLEANUP_CHOICES)))
+
+        self.runner_opt_group.add_option(
+            '--cleanup-on-failure', dest='cleanup_on_failure', default=None,
+            help=('Comma-separated list of which directories to delete when'
+                  ' a job fails, e.g. SCRATCH,LOGS. Choices:'
+                  ' %s (default: NONE)' % ', '.join(CLEANUP_CHOICES)))
 
         self.runner_opt_group.add_option(
             '--cmdenv', dest='cmdenv', default=[], action='append',
@@ -1249,6 +1256,24 @@ class MRJob(object):
                                                     jobconf_err,
                                                     self.option_parser.error)
 
+        def parse_commas(cleanup_str):
+            cleanup_error = ('cleanup option %s is not one of '
+                             + ', '.join(CLEANUP_CHOICES))
+            new_cleanup_options = []
+            for choice in cleanup_str.split(','):
+                if choice in CLEANUP_CHOICES:
+                    new_cleanup_options.append(choice)
+                else:
+                    self.option_parser.error(cleanup_error % choice)
+            if 'NONE' in new_cleanup_options and len(new_cleanup_options) > 1:
+                self.option_parser.error('Cannot clean up both nothing and something!')
+            return new_cleanup_options
+
+        if self.options.cleanup is not None:
+            self.options.cleanup = parse_commas(self.options.cleanup)
+        if self.options.cleanup_on_failure is not None:
+            self.options.cleanup_on_failure = parse_commas(self.options.cleanup_on_failure)
+
         # output_protocol defaults to protocol
         if not self.options.output_protocol:
             self.options.output_protocol = self.options.protocol
@@ -1277,6 +1302,7 @@ class MRJob(object):
         return {
             'bootstrap_mrjob': self.options.bootstrap_mrjob,
             'cleanup': self.options.cleanup,
+            'cleanup_on_failure': self.options.cleanup_on_failure,
             'cmdenv': self.options.cmdenv,
             'conf_path': self.options.conf_path,
             'extra_args': self.generate_passthrough_arguments(),

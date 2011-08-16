@@ -25,6 +25,7 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob.conf import combine_cmds, combine_dicts, combine_paths
+from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, HADOOP_JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.runner import MRJobRunner
 from mrjob.util import cmd_line, read_file
@@ -45,6 +46,9 @@ HADOOP_LSR_NO_SUCH_FILE = re.compile(r'^lsr: Cannot access .*: No such file or d
 
 # used by rm() (see below)
 HADOOP_RMR_NO_SUCH_FILE = re.compile(r'^rmr: hdfs://.*$')
+
+# used to extract the job timestamp from stderr
+HADOOP_JOB_TIMESTAMP_RE = re.compile('Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
 
 # find version string in "Hadoop 0.20.203" etc.
 HADOOP_VERSION_RE = re.compile(r'^.*?(?P<version>(\d|\.)+).*?$')
@@ -69,6 +73,16 @@ def fully_qualify_hdfs_path(path):
         return 'hdfs://' + path
     else:
         return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
+
+
+def hadoop_log_dir():
+    """Return the path where Hadoop stores logs"""
+    try:
+        return os.environ['HADOOP_LOG_DIR']
+    except KeyError:
+        # Defaults to $HADOOP_HOME/logs
+        # http://wiki.apache.org/hadoop/HowToConfigure
+        return os.path.join(os.environ['HADOOP_HOME'], 'logs')
 
 
 class HadoopJobRunner(MRJobRunner):
@@ -143,6 +157,14 @@ class HadoopJobRunner(MRJobRunner):
         # temp dir for input
         self._hdfs_input_dir = None
 
+        self._hadoop_log_dir = hadoop_log_dir()
+
+        # Running jobs via hadoop assigns a new timestamp to each job.
+        # Running jobs via mrjob only adds steps.
+        # Store both of these values to enable log parsing.
+        self._job_timestamp = None
+        self._start_step_num = None
+
         # init hadoop version cache
         self._hadoop_version = None
 
@@ -183,7 +205,7 @@ class HadoopJobRunner(MRJobRunner):
                 if m:
                     self._hadoop_version = m.group('version')
                     log.info("Using Hadoop version %s" % self._hadoop_version)
-                    return
+                    return self._hadoop_version
             self._hadoop_version = '0.20.203'
             log.info("Unable to determine Hadoop version. Assuming 0.20.203.")
         return self._hadoop_version
@@ -290,6 +312,7 @@ class HadoopJobRunner(MRJobRunner):
         if self._wrapper_script:
             self._wrapper_script['upload'] = 'file'
 
+        self._counters = []
         steps = self._get_steps()
 
         for step_num, step in enumerate(steps):
@@ -355,13 +378,47 @@ class HadoopJobRunner(MRJobRunner):
                 log.error('STDOUT: ' + line.strip('\n'))
 
             returncode = step_proc.wait()
-            if returncode != 0:
+            if returncode == 0:
+                # parsing needs step number for whole job
+                self._fetch_counters([step_num+self._start_step_num])
+                # printing needs step number relevant to this run of mrjob
+                self.print_counters([step_num+1])
+            else:
+                msg = 'Job failed with return code %d: %s' % (step_proc.returncode, streaming_args)
+                log.error(msg)
+                # look for a Python traceback
+                cause = self._find_probable_cause_of_failure([step_num+self._start_step_num])
+                if cause:
+                    # log cause, and put it in exception
+                    cause_msg = [] # lines to log and put in exception
+                    cause_msg.append('Probable cause of failure (from %s):' %
+                               cause['log_file_uri'])
+                    cause_msg.extend(line.strip('\n') for line in cause['lines'])
+                    if cause['input_uri']:
+                        cause_msg.append('(while reading from %s)' %
+                                         cause['input_uri'])
+
+                    for line in cause_msg:
+                        log.error(line)
+
+                    # add cause_msg to exception message
+                    msg += '\n' + '\n'.join(cause_msg) + '\n'
+
+                raise Exception(msg)
                 raise CalledProcessError(step_proc.returncode, streaming_args)
 
     def _process_stderr_from_streaming(self, stderr):
         for line in stderr:
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
             log.info('HADOOP: ' + line)
+
+            # The job identifier is printed to stderr. We only want to parse it
+            # once because we know how many steps we have and just want to know
+            # what Hadoop thinks the first step's number is.
+            m = HADOOP_JOB_TIMESTAMP_RE.match(line)
+            if m and self._job_timestamp is None:
+                self._job_timestamp = m.group('timestamp')
+                self._start_step_num = int(m.group('step_num'))
 
     def _hdfs_step_input_files(self, step_num):
         """Get the hdfs:// URI for input for the given step."""
@@ -475,34 +532,8 @@ class HadoopJobRunner(MRJobRunner):
         for line in stderr:
             log.info('HADOOP: %s' % line.rstrip('\n'))
 
-    def _cat_file(self, filename):
-        if HDFS_URI_RE.match(filename):
-            # stream from HDFS
-            cat_args = self._opts['hadoop_bin'] + ['fs', '-cat', filename]
-            log.debug('> %s' % cmd_line(cat_args))
-
-            cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
-        
-            def stream():  
-                for line in cat_proc.stdout:
-                    yield line
-
-                # there shouldn't be any stderr
-                for line in cat_proc.stderr:
-                    log.error('STDERR: ' + line)
-
-                returncode = cat_proc.wait()
-
-                if returncode != 0:
-                    raise CalledProcessError(returncode, cat_args)
-        
-            return read_file(filename, stream())
-        else:
-            # read from local filesystem
-            return super(HadoopJobRunner, self)._cat_file(filename)
-
-    def _cleanup_scratch(self):
-        super(HadoopJobRunner, self)._cleanup_scratch()
+    def _cleanup_local_scratch(self):
+        super(HadoopJobRunner, self)._cleanup_local_scratch()
 
         if self._hdfs_tmp_dir:
             log.info('deleting %s from HDFS' % self._hdfs_tmp_dir)
@@ -511,6 +542,69 @@ class HadoopJobRunner(MRJobRunner):
                 self._invoke_hadoop(['fs', '-rmr', self._hdfs_tmp_dir])
             except Exception, e:
                 log.exception(e)
+
+    ### LOG FETCHING/PARSING ###
+
+    def _enforce_path_regexp(self, paths, regexp, step_nums):
+        """Helper for log fetching functions to filter out unwanted
+        logs. Keyword arguments are checked against their corresponding
+        regex groups.
+        """
+        for path in paths:
+            m = regexp.match(path)
+            if (m
+                and (step_nums is None or int(m.group('step_num')) in step_nums)
+                and (self._job_timestamp is None or m.group('timestamp') == self._job_timestamp)):
+                yield path
+
+    def _ls_logs(self, relative_path):
+        """List logs on the local filesystem by path relative to log root
+        directory
+        """
+        return self.ls(os.path.join(self._hadoop_log_dir, relative_path))
+
+    def _fetch_counters(self, step_nums, skip_s3_wait=False):
+        """Read Hadoop counters from local logs.
+
+        Args:
+        step_nums -- the steps belonging to us, so that we can ignore errors
+                     from other jobs run with the same timestamp
+        """
+        job_logs = self._enforce_path_regexp(self._ls_logs('history/'),
+                                             HADOOP_JOB_LOG_URI_RE,
+                                             step_nums)
+        uris = list(job_logs)
+        new_counters = scan_for_counters_in_files(uris, self)
+
+        # only include steps relevant to the current job
+        for step_num in step_nums:
+            self._counters.append(new_counters.get(step_num, {}))
+
+    def counters(self):
+        return self._counters
+
+    def _find_probable_cause_of_failure(self, step_nums):
+        all_task_attempt_logs = []
+        try:
+            all_task_attempt_logs.extend(self._ls_logs('userlogs/'))
+        except IOError:
+            # sometimes the master doesn't have these
+            pass
+        # TODO: get these logs from slaves if possible
+        task_attempt_logs = self._enforce_path_regexp(all_task_attempt_logs,
+                                                      TASK_ATTEMPTS_LOG_URI_RE,
+                                                      step_nums)
+        step_logs = self._enforce_path_regexp(self._ls_logs('steps/'),
+                                              STEP_LOG_URI_RE,
+                                              step_nums)
+        job_logs = self._enforce_path_regexp(self._ls_logs('history/'),
+                                             HADOOP_JOB_LOG_URI_RE,
+                                             step_nums)
+        log.info('Scanning logs for probable cause of failure')
+        return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
+                                  step_logs=step_logs,
+                                  job_logs=job_logs,
+                                  runner=self)
 
     ### FILESYSTEM STUFF ###
 
@@ -555,6 +649,32 @@ class HadoopJobRunner(MRJobRunner):
             # not sure if you can have spaces in filenames; just to be safe
             path = ' '.join(fields[7:])
             yield hdfs_prefix + path
+
+    def _cat_file(self, filename):
+        if HDFS_URI_RE.match(filename):
+            # stream from HDFS
+            cat_args = self._opts['hadoop_bin'] + ['fs', '-cat', filename]
+            log.debug('> %s' % cmd_line(cat_args))
+
+            cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
+        
+            def stream():  
+                for line in cat_proc.stdout:
+                    yield line
+
+                # there shouldn't be any stderr
+                for line in cat_proc.stderr:
+                    log.error('STDERR: ' + line)
+
+                returncode = cat_proc.wait()
+
+                if returncode != 0:
+                    raise CalledProcessError(returncode, cat_args)
+        
+            return read_file(filename, stream())
+        else:
+            # read from local filesystem
+            return super(HadoopJobRunner, self)._cat_file(filename)
 
     def mkdir(self, path):
         self._invoke_hadoop(

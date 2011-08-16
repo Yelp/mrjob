@@ -71,3 +71,5 @@ Links
 * discussion group: <http://groups.google.com/group/mrjob>
 * Hadoop MapReduce: <http://hadoop.apache.org/mapreduce/>
 * Elastic MapReduce: <http://aws.amazon.com/documentation/elasticmapreduce/>
+
+Thanks to `Greg Killion <mailto:greg@blind-works.net>`_ (`blind-works.net <http://www.blind-works.net/>`_) for the logo.

@@ -318,7 +318,7 @@ class HadoopCompatibilityManager(object):
         """Return True if this version of Hadoop Streaming supports combiners
         (i.e. >= 0.20.203), otherwise False.
         """
-        return self.version_gte('0.20.203')
+        return self.version_gte('0.20')
 
     def translate_jobconf(self, variable):
         """Translate *variable* into this object's version"""

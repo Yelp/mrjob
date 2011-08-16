@@ -336,6 +336,34 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         assert_raises(ValueError, self._test_remote_scratch_cleanup,
                       'GARBAGE', 0, 0)
 
+    def test_combiner_version_018(self):
+        self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
+        # read from STDIN, a local file, and a remote file
+        stdin = StringIO('foo\nbar\n')
+
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
+                               '--hadoop-version=0.18',
+                               '-c', self.mrjob_conf_path])
+        mr_job.sandbox(stdin=stdin)
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            assert_not_in('-combiner', runner._describe_jobflow().steps[0].args())
+
+    def test_combiner_version_020(self):
+        self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
+        # read from STDIN, a local file, and a remote file
+        stdin = StringIO('foo\nbar\n')
+
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
+                               '--hadoop-version=0.20',
+                               '-c', self.mrjob_conf_path])
+        mr_job.sandbox(stdin=stdin)
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            assert_in('-combiner', runner._describe_jobflow().steps[0].args())
+
 
 class S3ScratchURITestCase(MockEMRAndS3TestCase):
 

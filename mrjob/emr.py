@@ -973,9 +973,9 @@ class EMRJobRunner(MRJobRunner):
                 # them into step_args manually.
                 compat = self.get_compatibility_manager()
                 if compat.supports_combiners_in_hadoop_streaming():
-                    mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
-                else:
                     step_args.extend(['-combiner', combiner])
+                else:
+                    mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
 
             try:
                 streaming_step = boto.emr.StreamingStep(

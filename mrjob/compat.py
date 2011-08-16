@@ -231,7 +231,6 @@ JOBCONF_DICT_LIST = [
 ]
 
 CL_SWITCH_DICT_LIST = [
-    # {'0.18': '-jobconf', '0.20': '-D'},               # this may not be accurate
     # {'0.18': '-cacheFile', '0.20': '-files'},         # this needs more logic
     # {'0.18': '-cacheArchive', '0.20': '-archives'},   # this needs more logic
 ]

@@ -1,7 +1,7 @@
 mrjob
 =====
 
-.. image:: http://github.com/irskep/mrjob/raw/logos/docs/logos/logo_medium.png
+.. image:: http://github.com/yelp/mrjob/raw/master/docs/logos/logo_medium.png
 
 mrjob is a Python package that helps you write and run Hadoop Streaming jobs.
 

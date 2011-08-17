@@ -321,9 +321,6 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args = (self._opts['hadoop_bin'] +
                               ['jar', self._opts['hadoop_streaming_jar']])
 
-            # set up uploading from HDFS to the working dir
-            streaming_args.extend(self._upload_args())
-
             # Add extra hadoop args first as hadoop args could be a hadoop
             # specific argument (e.g. -libjar) which must come before job
             # specific args.
@@ -337,6 +334,9 @@ class HadoopJobRunner(MRJobRunner):
             # setup output
             streaming_args.append('-output')
             streaming_args.append(self._hdfs_step_output_dir(step_num))
+
+            # set up uploading from HDFS to the working dir
+            streaming_args.extend(self._upload_args())
 
             # set up mapper and reducer
             if 'M' not in step:
@@ -468,7 +468,7 @@ class HadoopJobRunner(MRJobRunner):
 
         compat = self.get_compatibility_manager()
 
-        if compat.supports_new_distributed_cache_options():
+        if compat.supports_new_distributed_cache_options() and False:
 
             # return list of strings ready for comma-joining for passing to the
             # hadoop binary

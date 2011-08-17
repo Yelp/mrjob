@@ -231,6 +231,7 @@ JOBCONF_DICT_LIST = [
 ]
 
 CL_SWITCH_DICT_LIST = [
+    {'0.18': '-jobconf', '0.20': '-D'},
     # {'0.18': '-cacheFile', '0.20': '-files'},         # this needs more logic
     # {'0.18': '-cacheArchive', '0.20': '-archives'},   # this needs more logic
 ]
@@ -317,7 +318,13 @@ class HadoopCompatibilityManager(object):
         """Return True if this version of Hadoop Streaming supports combiners
         (i.e. >= 0.20.203), otherwise False.
         """
-        return self.version_gte('0.20')
+        return self.version_gte('0.20.2')
+
+    def supports_new_distributed_cache_options(self):
+        """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
+        ``-cacheArchive``
+        """
+        return self.version_gte('0.20.2')
 
     def translate_jobconf(self, variable):
         """Translate *variable* into this object's version"""
@@ -334,6 +341,10 @@ class HadoopCompatibilityManager(object):
         jobconf_var = _env_var_to_jobconf(env_var)
         translated_jobconf_var = self.translate_jobconf(jobconf_var)
         return _jobconf_to_env_var(translated_jobconf_var)
+
+    def uses_generic_jobconf(self):
+        """Use ``-D`` instead of ``-jobconf``"""
+        return self.version_gte('0.20')
 
     def version_gte(self, cmp_version_str):
         """Return True if this object's version >= *cmp_version_str*."""

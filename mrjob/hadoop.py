@@ -321,6 +321,9 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args = (self._opts['hadoop_bin'] +
                               ['jar', self._opts['hadoop_streaming_jar']])
 
+            # set up uploading from HDFS to the working dir
+            streaming_args.extend(self._upload_args())
+
             # Add extra hadoop args first as hadoop args could be a hadoop
             # specific argument (e.g. -libjar) which must come before job
             # specific args.
@@ -334,9 +337,6 @@ class HadoopJobRunner(MRJobRunner):
             # setup output
             streaming_args.append('-output')
             streaming_args.append(self._hdfs_step_output_dir(step_num))
-
-            # set up uploading from HDFS to the working dir
-            streaming_args.extend(self._upload_args())
 
             # set up mapper and reducer
             if 'M' not in step:
@@ -465,16 +465,46 @@ class HadoopJobRunner(MRJobRunner):
     def _upload_args(self):
         """Args to upload files from HDFS to the hadoop nodes."""
         args = []
-        for file_dict in self._files:
-            if file_dict.get('upload') == 'file':
-                args.append('-cacheFile')
-                args.append(
-                    '%s#%s' % (file_dict['hdfs_uri'], file_dict['name']))
 
-            elif file_dict.get('upload') == 'archive':
-                args.append('-cacheArchive')
-                args.append(
-                    '%s#%s' % (file_dict['hdfs_uri'], file_dict['name']))
+        compat = self.get_compatibility_manager()
+
+        if compat.supports_new_distributed_cache_options():
+
+            # return list of strings ready for comma-joining for passing to the
+            # hadoop binary
+            def escaped_paths(file_dicts):
+                return ["'%s'" % fd['path'] for fd in file_dicts]
+
+            # index by type
+            all_files = {}
+            for fd in self._files:
+                all_files.setdefault(fd.get('upload'), []).append(fd)
+
+            if 'file' in all_files:
+                args.append('-files')
+                args.append(','.join(escaped_paths(all_files['file'])))
+
+            if 'archive' in all_files:
+                args.append('-archives')
+                args.append(','.join(escaped_paths(all_files['archive'])))
+
+            log.info('YES')
+            log.info(all_files)
+            log.info(args)
+            if not args:
+                raise ValueError
+
+        else:
+            for file_dict in self._files:
+                if file_dict.get('upload') == 'file':
+                    args.append('-cacheFile')
+                    args.append(
+                        '%s#%s' % (file_dict['hdfs_uri'], file_dict['name']))
+
+                elif file_dict.get('upload') == 'archive':
+                    args.append('-cacheArchive')
+                    args.append(
+                        '%s#%s' % (file_dict['hdfs_uri'], file_dict['name']))
 
         return args
 

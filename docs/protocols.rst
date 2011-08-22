@@ -8,7 +8,6 @@ mrjob.protocol - input and output
 
 .. autoclass:: HadoopStreamingProtocol
     :members:
-.. autoclass:: HadoopStreamingProtocol
 .. autoclass:: JSONProtocol
 .. autoclass:: JSONValueProtocol
 .. autoclass:: PickleProtocol

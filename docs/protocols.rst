@@ -4,10 +4,11 @@ mrjob.protocol - input and output
 .. automodule:: mrjob.protocol
 
 .. autodata:: DEFAULT_PROTOCOL
-.. autodata:: PROTOCOL_DICT
+.. autoclass:: ProtocolRegistar
 
 .. autoclass:: HadoopStreamingProtocol
     :members:
+.. autoclass:: HadoopStreamingProtocol
 .. autoclass:: JSONProtocol
 .. autoclass:: JSONValueProtocol
 .. autoclass:: PickleProtocol

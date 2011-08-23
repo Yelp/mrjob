@@ -110,7 +110,7 @@ import mrjob.protocol
 from mrjob.conf import combine_dicts
 from mrjob.parse import parse_mr_job_stderr, check_kv_pair, check_range_list
 from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
-from mrjob.util import log_to_stream, read_input, classproperty
+from mrjob.util import log_to_stream, read_input
 
 # used by mr() below, to fake no mapper
 def _IDENTITY_MAPPER(key, value):
@@ -589,7 +589,7 @@ class MRJob(object):
         else:
             read_protocol = self.options.protocol
 
-        read_protocol_cls = self.protocols[read_protocol]
+        read_protocol_cls = self.protocols()[read_protocol]
         read = read_protocol_cls(step_type).read
 
         if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
@@ -597,7 +597,7 @@ class MRJob(object):
         else:
             write_protocol = self.options.protocol
 
-        write_protocol_cls = self.protocols[write_protocol]
+        write_protocol_cls = self.protocols()[write_protocol]
         write = write_protocol_cls(step_type).write
 
         return read, write
@@ -641,7 +641,7 @@ class MRJob(object):
             help='which step to execute (default is 0)')
 
         # protocol stuff
-        protocol_choices = tuple(sorted(self.protocols))
+        protocol_choices = tuple(sorted(self.protocols()))
         self.proto_opt_group = OptionGroup(
             self.option_parser, 'Protocols')
         self.option_parser.add_option_group(self.proto_opt_group)
@@ -1210,19 +1210,19 @@ class MRJob(object):
 
     ### protocols ###
 
-    @classproperty
+    @classmethod
     def protocols(cls):
         """Mapping from protocol name to the protocol class to use
         for parsing job input and writing job output. We give protocols names
         so that we can easily choose them from the command line.
 
-        This returns :py:data:`mrjob.protocol.ProtocolRegistrar.mapping` by default.
+        Returns :py:data:`mrjob.protocol.ProtocolRegistrar.mapping()` by default.
 
         To add a custom protocol, define a subclass of
-        :py:class:`mrjob.protocol.HadoopStreamingProtocol`, and
-        then ProtocolRegistrar will pick up your new mapping
+        :py:class:`mrjob.protocol.HadoopStreamingProtocol` and make sure it gets imported.
+        ProtocolRegistrar will automatically pick up your new protocol
         """
-        return mrjob.protocol.ProtocolRegistrar.mapping # copy to stop monkey-patching
+        return mrjob.protocol.ProtocolRegistrar.mapping() # copy to stop monkey-patching
 
     #: Default protocol for reading input to the first mapper in your job.
     #: Default: ``'raw_value'``.
@@ -1272,7 +1272,7 @@ class MRJob(object):
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
         """
-        reader = self.protocols[self.options.output_protocol]()
+        reader = self.protocols()[self.options.output_protocol]()
         return reader.read(line)
 
     ### Testing ###
@@ -1360,7 +1360,7 @@ class MRJob(object):
         if self.stdout == sys.stdout:
             raise AssertionError('You must call sandbox() first; parse_output() is for testing only.')
 
-        reader_cls = self.protocols[protocol]
+        reader_cls = self.protocols()[protocol]
         reader = reader_cls()
         lines = StringIO(self.stdout.getvalue())
         return [reader.read(line) for line in lines]

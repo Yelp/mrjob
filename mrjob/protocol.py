@@ -30,7 +30,6 @@ For more information on using alternate protocols in your job, see
 # since MRJobs need to run in Amazon's generic EMR environment
 import cPickle
 
-from mrjob.util import classproperty
 from mrjob.util import safeeval
 
 try:
@@ -38,23 +37,13 @@ try:
 except ImportError:
     import json # built in to Python 2.6 and later
 
-#: Default mapping from protocol name to class:
-#:
-#: ============ ===============================
-#: name         class
-#: ============ ===============================
-#: json         :py:class:`JSONProtocol`
-#: json_value   :py:class:`JSONValueProtocol`
-#: pickle       :py:class:`PickleProtocol`
-#: pickle_value :py:class:`PickleValueProtocol`
-#: raw_value    :py:class:`RawValueProtocol`
-#: repr         :py:class:`ReprProtocol`
-#: repr_value   :py:class:`ReprValueProtocol`
-#: ============ ===============================
+
 class ProtocolRegistrar(type):
+    """Central registry for all declared HadoopStreamingProtocols"""
     _name_to_class_map = {}
 
     def __new__(mcs, name, bases, attrs):
+        """For every new Protocol declaration, register the class here"""
         new_cls = super(ProtocolRegistrar, mcs).__new__(mcs, name, bases, attrs)
 
         mapping_name = new_cls.name
@@ -66,7 +55,7 @@ class ProtocolRegistrar(type):
         mcs._name_to_class_map[mapping_name] = new_cls
         return new_cls
 
-    @classproperty
+    @classmethod
     def mapping(mcs):
         return mcs._name_to_class_map
 
@@ -78,6 +67,11 @@ class HadoopStreamingProtocol(object):
     name = None
 
     def __init__(self, step_type=None):
+        """Initialize a new protocol.
+
+        :type step_type: str
+        :param step_type: 'M' / 'R' / None - Mapper / Reducer / Unknown
+        """
         self._step_type = step_type
         assert self.name is not None, "Protocol name missing"
 
@@ -101,6 +95,9 @@ class HadoopStreamingProtocol(object):
         raise NotImplementedError
 
 class TabSplitProtocol(HadoopStreamingProtocol):
+    """Abstract base class for all protocol that splits keys and values with '\t' characters.
+    Inherit from it and define your own :py:meth:`load_from_string` and :py:meth:`dump_to_string` functions.
+    """
     name = '__tab_split__'
 
     def __init__(self, step_type=None):
@@ -134,12 +131,27 @@ class TabSplitProtocol(HadoopStreamingProtocol):
         return '%s\t%s' % (raw_key, raw_value)
 
     def load_from_string(self, string_to_read):
+        """Deserialize an object from a string.
+
+        :type string_to_read: str
+        :param string_to_read: A string to deserialize into a Python object.
+
+        :return: A python object of `decoded_item`."""
         raise NotImplementedError
 
     def dump_to_string(self, object_to_dump):
+        """Serialize an object to a string.
+
+        :type object_to_dump: object
+        :param object_to_dump: An object to serialize to a string.
+
+        :return: A string representing the serialized form of object_to_dump."""
         raise NotImplementedError
 
 class ValueOnlyProtocol(HadoopStreamingProtocol):
+    """Abstract base class for all protocol that reads/writes lines only as values.
+    Inherit from it and define your own :py:meth:`load_from_string` and :py:meth:`dump_to_string` functions.
+    """
     name = '__value_only__'
 
     def read(self, line):
@@ -149,9 +161,21 @@ class ValueOnlyProtocol(HadoopStreamingProtocol):
         return self.dump_to_string(object_value)
 
     def load_from_string(self, string_to_read):
+        """Deserialize an object from a string.
+
+        :type string_to_read: str
+        :param string_to_read: A string to deserialize into a Python object.
+
+        :return: A python object of `decoded_item`."""
         raise NotImplementedError
 
     def dump_to_string(self, object_item):
+        """Serialize an object to a string.
+
+        :type object_to_dump: object
+        :param object_to_dump: An object to serialize to a string.
+
+        :return: A string representing the serialized form of object_to_dump."""
         raise NotImplementedError
 
 class JSONMixin(object):

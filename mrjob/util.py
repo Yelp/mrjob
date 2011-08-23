@@ -307,11 +307,3 @@ def unarchive(archive_path, dest):
                         dest_file.write(archive.read(name))
     else:
         raise IOError('Unknown archive type: %s' % (archive_path,))
-
-# http://groups.google.com/group/comp.lang.python/browse_thread/thread/4dce045a99f29825/328ca175947199da
-class classproperty(object):
-    def __init__(self, getter):
-        self._getter = getter
-
-    def __get__(self, instance, owner):
-        return self._getter(owner)

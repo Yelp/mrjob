@@ -49,6 +49,8 @@ class ProtocolRegistrar(type):
         mapping_name = new_cls.name
         if new_cls.__name__ == 'HadoopStreamingProtocol':
             return new_cls
+        elif mapping_name is None:
+            raise NotImplementedError('Protocol requires a name - %r' % new_cls)
         elif mapping_name in mcs._name_to_class_map:
             raise ValueError('Protocol already registered - %s' % mapping_name)
 

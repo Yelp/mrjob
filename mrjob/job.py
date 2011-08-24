@@ -106,9 +106,9 @@ except ImportError:
     from StringIO import StringIO
 
 # don't use relative imports, to allow this script to be invoked as __main__
+import mrjob.protocol
 from mrjob.conf import combine_dicts
-from mrjob.parse import parse_mr_job_stderr, parse_port_range_list, check_kv_pair, check_range_list
-from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
+from mrjob.parse import parse_mr_job_stderr, check_kv_pair, check_range_list
 from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
 from mrjob.util import log_to_stream, read_input
 
@@ -367,7 +367,7 @@ class MRJob(object):
         for w in bad_words:
             if w in sys.argv:
                 raise UsageError("make_runner() was called with %s. This probably means you tried to use it from __main__, which doesn't work." % w)
-        
+
         # have to import here so that we can still run the MRJob
         # without importing boto
         from mrjob.emr import EMRJobRunner
@@ -416,7 +416,7 @@ class MRJob(object):
 
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception. If 
+        increment a counter rather than raising an exception. If
         --strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
@@ -453,7 +453,7 @@ class MRJob(object):
 
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception. If 
+        increment a counter rather than raising an exception. If
         --strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
@@ -583,20 +583,22 @@ class MRJob(object):
         """
         steps_desc = self._steps_desc()
 
-        protocol_dict = self.protocols()
-
         # pick input protocol
         if step_num == 0 and step_type == steps_desc[0][0]:
             read_protocol = self.options.input_protocol
         else:
             read_protocol = self.options.protocol
-        read = protocol_dict[read_protocol].read
+
+        read_protocol_cls = self.protocols()[read_protocol]
+        read = read_protocol_cls(step_type).read
 
         if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
             write_protocol = self.options.output_protocol
         else:
             write_protocol = self.options.protocol
-        write = protocol_dict[write_protocol].write
+
+        write_protocol_cls = self.protocols()[write_protocol]
+        write = write_protocol_cls(step_type).write
 
         return read, write
 
@@ -639,7 +641,7 @@ class MRJob(object):
             help='which step to execute (default is 0)')
 
         # protocol stuff
-        protocol_choices = sorted(self.protocols())
+        protocol_choices = tuple(sorted(self.protocols()))
         self.proto_opt_group = OptionGroup(
             self.option_parser, 'Protocols')
         self.option_parser.add_option_group(self.proto_opt_group)
@@ -1214,21 +1216,13 @@ class MRJob(object):
         for parsing job input and writing job output. We give protocols names
         so that we can easily choose them from the command line.
 
-        This returns :py:data:`mrjob.protocol.PROTOCOL_DICT` by default.
+        Returns :py:data:`mrjob.protocol.ProtocolRegistrar.mapping()` by default.
 
         To add a custom protocol, define a subclass of
-        :py:class:`mrjob.protocol.HadoopStreamingProtocol`, and
-        re-define this method::
-
-            @classmethod
-            def protocols(cls):
-                protocol_dict = super(MRYourJob, cls).protocols()
-                protocol_dict['rot13'] = Rot13Protocol
-                return protocol_dict
-
-            DEFAULT_PROTOCOL = 'rot13'
+        :py:class:`mrjob.protocol.HadoopStreamingProtocol` and make sure it gets imported.
+        ProtocolRegistrar will automatically pick up your new protocol
         """
-        return PROTOCOL_DICT.copy() # copy to stop monkey-patching
+        return mrjob.protocol.ProtocolRegistrar.mapping() # copy to stop monkey-patching
 
     #: Default protocol for reading input to the first mapper in your job.
     #: Default: ``'raw_value'``.
@@ -1240,7 +1234,7 @@ class MRJob(object):
     #: in your class, and your initial mapper would receive decoded JSONs
     #: rather than strings.
     #:
-    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
+    #: See :py:data:`mrjob.protocol.ProtocolRegistar` for the full list of
     #: protocols. Can be overridden by :option:`--input-protocol`.
     DEFAULT_INPUT_PROTOCOL = 'raw_value'
 
@@ -1253,9 +1247,9 @@ class MRJob(object):
     #:
     #: and step output would be encoded as string-escaped pickles.
     #:
-    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
+    #: See :py:data:`mrjob.protocol.ProtocolRegistar` for the full list of
     #: protocols. Can be overridden by :option:`--protocol`.
-    DEFAULT_PROTOCOL = DEFAULT_PROTOCOL # i.e. the one from mrjob.protocols
+    DEFAULT_PROTOCOL = mrjob.protocol.DEFAULT_PROTOCOL # i.e. the one from mrjob.protocols
 
     #: Default protocol to use for writing output. By default, this is set to
     #: ``None``, which means to fall back on ``DEFAULT_PROTOCOL``.
@@ -1266,7 +1260,7 @@ class MRJob(object):
     #:     DEFAULT_PROTOCOL = 'pickle'
     #:     DEFAULT_OUTPUT_PROTOCOL = 'json'
     #:
-    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
+    #: See :py:data:`mrjob.protocol.ProtocolRegistar` for the full list of
     #: protocols. Can be overridden by the :option:`--output-protocol`.
     DEFAULT_OUTPUT_PROTOCOL = None
 
@@ -1278,7 +1272,7 @@ class MRJob(object):
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
         """
-        reader = self.protocols()[self.options.output_protocol]
+        reader = self.protocols()[self.options.output_protocol]()
         return reader.read(line)
 
     ### Testing ###
@@ -1366,7 +1360,8 @@ class MRJob(object):
         if self.stdout == sys.stdout:
             raise AssertionError('You must call sandbox() first; parse_output() is for testing only.')
 
-        reader = self.protocols()[protocol]
+        reader_cls = self.protocols()[protocol]
+        reader = reader_cls()
         lines = StringIO(self.stdout.getvalue())
         return [reader.read(line) for line in lines]
 

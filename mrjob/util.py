@@ -144,7 +144,7 @@ def read_input(path, stdin=None):
     """
     if stdin is None:
         stdin = sys.stdin
-    
+
     # handle '-' (special case)
     if path == '-':
         for line in stdin:

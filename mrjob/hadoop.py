@@ -482,7 +482,7 @@ class HadoopJobRunner(MRJobRunner):
             # return list of strings ready for comma-joining for passing to the
             # hadoop binary
             def escaped_paths(file_dicts):
-                return ["'%s'" % os.path.abspath(fd['path']) for fd in file_dicts]
+                return ["%s" % fd['hdfs_uri'] for fd in file_dicts]
 
             # index by type
             all_files = {}
@@ -497,9 +497,6 @@ class HadoopJobRunner(MRJobRunner):
                 args.append('-archives')
                 args.append(','.join(escaped_paths(all_files['archive'])))
 
-            log.info('YES')
-            log.info(all_files)
-            log.info(args)
             if not args:
                 raise ValueError
 

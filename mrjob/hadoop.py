@@ -482,7 +482,7 @@ class HadoopJobRunner(MRJobRunner):
             # return list of strings ready for comma-joining for passing to the
             # hadoop binary
             def escaped_paths(file_dicts):
-                return ["%s" % fd['hdfs_uri'] for fd in file_dicts]
+                return ["%s#%s" % (fd['hdfs_uri'], fd['name']) for fd in file_dicts]
 
             # index by type
             all_files = {}

@@ -230,12 +230,6 @@ JOBCONF_DICT_LIST = [
     {'0.18': 'user.name', '0.21': 'mapreduce.job.user.name'},
 ]
 
-CL_SWITCH_DICT_LIST = [
-    {'0.18': '-jobconf', '0.20': '-D'},
-    # {'0.18': '-cacheFile', '0.20': '-files'},         # this needs more logic
-    # {'0.18': '-cacheArchive', '0.20': '-archives'},   # this needs more logic
-]
-
 def _dict_list_to_compat_map(dict_list):
     # compat_map = {
     #   ...
@@ -250,7 +244,6 @@ def _dict_list_to_compat_map(dict_list):
     return compat_map
 
 jobconf_map = _dict_list_to_compat_map(JOBCONF_DICT_LIST)
-cl_switch_map = _dict_list_to_compat_map(CL_SWITCH_DICT_LIST)
 
 
 def _jobconf_to_env_var(variable):
@@ -295,10 +288,6 @@ def translate_jobconf_to_version(variable, version):
     return _translate_variable_to_version(variable, version, jobconf_map)
 
 
-def translate_cl_switch_to_version(variable, version):
-    return _translate_variable_to_version(variable, version, cl_switch_map)
-
-
 class HadoopCompatibilityManager(object):
 
     def __init__(self, version):
@@ -332,10 +321,6 @@ class HadoopCompatibilityManager(object):
     def translate_jobconf(self, variable):
         """Translate *variable* into this object's version"""
         return translate_jobconf_to_version(variable, self.version)
-
-    def translate_cl_switch(self, cl_switch):
-        """Translate *cl_switch* into this object's version"""
-        return translate_cl_switch_to_version(cl_switch, self.version)
 
     def translate_env(self, env_var):
         """Translate *env_var* into this object's version (same as

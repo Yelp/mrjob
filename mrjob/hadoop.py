@@ -323,6 +323,7 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args = (self._opts['hadoop_bin'] +
                               ['jar', self._opts['hadoop_streaming_jar']])
 
+            # -files/-archives (generic options, new-style)
             if compat.supports_new_distributed_cache_options():
                 # set up uploading from HDFS to the working dir
                 streaming_args.extend(self._upload_args())
@@ -341,6 +342,7 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args.append('-output')
             streaming_args.append(self._hdfs_step_output_dir(step_num))
 
+            # -cacheFile/-cacheArchive (streaming options, old-style)
             if not compat.supports_new_distributed_cache_options():
                 # set up uploading from HDFS to the working dir
                 streaming_args.extend(self._upload_args())

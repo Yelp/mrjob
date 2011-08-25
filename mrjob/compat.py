@@ -304,6 +304,9 @@ class HadoopCompatibilityManager(object):
     def __init__(self, version):
         self.version = version
 
+    def __str__(self):
+        return 'HadoopCompatibilityManager(%s)' % self.version
+
     def canonicalize_jobconf(self, variable):
         """Return *variable*'s equivalent in the internally-specified
         "canonical" Hadoop version. If *variable* is unknown, return it
@@ -316,15 +319,15 @@ class HadoopCompatibilityManager(object):
 
     def supports_combiners_in_hadoop_streaming(self):
         """Return True if this version of Hadoop Streaming supports combiners
-        (i.e. >= 0.20.203), otherwise False.
+        (i.e. >= 0.20), otherwise False.
         """
-        return self.version_gte('0.20.2')
+        return self.version_gte('0.20')
 
     def supports_new_distributed_cache_options(self):
         """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
         ``-cacheArchive``
         """
-        return self.version_gte('0.20.2')
+        return self.version_gte('0.20')
 
     def translate_jobconf(self, variable):
         """Translate *variable* into this object's version"""

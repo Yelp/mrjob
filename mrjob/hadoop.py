@@ -352,6 +352,8 @@ class HadoopJobRunner(MRJobRunner):
                 else:
                     mapper = "bash -c '%s | sort | %s'" % (mapper, combiner_cmd)
                     combiner = None
+            else:
+                combiner = None
 
             streaming_args.append('-mapper')
             streaming_args.append(mapper)

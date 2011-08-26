@@ -1805,13 +1805,17 @@ class EMRJobRunner(MRJobRunner):
 
             # Also do not include script used to spin up job
             if self._script and info['path'] == self._script['path']:
-               return False
+                return False
 
-            # mrjob.tar.gz is covered by bootstrap_mrjob variable.
+            # Only include bootstrap files
+            if 'bootstrap' not in info:
+                return False
+
+            # mrjob.tar.gz is covered by the bootstrap_mrjob variable.
             # also, it seems to be different every time, causing an
             # undesirable hash mismatch.
-            if self._opts['bootstrap_mrjob'] \
-               and info['name'] == 'mrjob.tar.gz':
+            if (self._opts['bootstrap_mrjob']
+                and info is self._mrjob_tar_gz_file):
                 return False
 
             # Ignore job-specific files

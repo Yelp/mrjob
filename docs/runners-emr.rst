@@ -47,6 +47,8 @@ Manually creating job flows to reuse and specifying the job flow ID for every ru
 
 To mitigate these problems, mrjob provides **job flow pools.** Rather than having to remember to start a job flow and copying its ID, simply pass :option:`--pool-emr-job-flows` on the command line. The first time you do this, a new job flow will be created that does not terminate when the job completes. When you use :option:`--pool-emr-job-flows` the next time, it will identify the job flow and add the job to it rather than creating a new one.
 
+**If you use job flow pools, keep** :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows` **in your crontab!** Otherwise you will forget to terminate your job flows and waste a lot of money.
+
 The criteria for finding an appropriate job flow for a job are as follows:
 
 * The job flow must be in the ``WAITING`` state.
@@ -58,8 +60,6 @@ The criteria for finding an appropriate job flow for a job are as follows:
 Most of the time you shouldn't need to worry about these things. Just use pool names to separate job flows into pools representing their type.
 
 EMR provides no way to remove steps from a job flow once they are added. This introduces a race condition where two users identify the same job flow and join it simultaneously, causing one user's job to be delayed until the first user's is finished. mrjob avoids this situation using an S3-based locking mechanism.
-
-**If you use job flow pools, keep** :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows` **in your crontab!** Otherwise you will forget to terminate your job flows and waste a lot of money.
 
 S3 utilities
 ------------

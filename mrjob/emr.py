@@ -55,24 +55,6 @@ from mrjob.ssh import ssh_cat, ssh_ls, ssh_copy_key, ssh_slave_addresses, SSHExc
 from mrjob.util import cmd_line, extract_dir_for_tar, hash_object, read_file
 
 
-def monkeypatch_boto():
-    boto.emr.emrobject.JobFlow.Fields.add('HadoopVersion')
-    from boto.resultset import ResultSet
-    def new_bootstrap_sax_handler(self, name, attrs, connection):
-        if name == 'Args':
-            self.args = ResultSet([('member', boto.emr.emrobject.Arg)])
-            return self.args
-    boto.emr.emrobject.BootstrapAction.startElement = new_bootstrap_sax_handler
-
-    # 2.0b4 doesn't have HadoopVersion in JobFlow.
-    # 2.0 final does.
-    from boto.emr.emrobject import JobFlow
-    if not 'HadoopVersion' in JobFlow.Fields:
-        JobFlow.Fields.add('HadoopVersion')
-
-if boto is not None:
-    monkeypatch_boto()
-
 log = logging.getLogger('mrjob.emr')
 
 JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')

@@ -77,8 +77,7 @@ def scan_for_counters_in_files(log_file_uris, runner):
 
 def scan_logs_in_order(task_attempt_logs, step_logs, job_logs, runner):
     """Use mapping and order from :py:func:`processing_order` to find errors in
-    logs. See :py:meth:`_find_probable_cause_of_failure` for return value
-    documentation.
+    logs.
 
     Returns::
 

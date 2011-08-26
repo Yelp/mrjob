@@ -23,7 +23,8 @@ Option                 Default                        Combined by               
 ====================== ============================== ========================================= ==========================================================
 *base_tmp_dir*         (automatic)                    :py:func:`~mrjob.conf.combine_paths`      (set :envvar:`TMPDIR`)
 *bootstrap_mrjob*      ``True``                       :py:func:`~mrjob.conf.combine_values`     :option:`--boostrap-mrjob`, :option:`--no-bootstrap-mrjob`
-*cleanup*              ``'IF_SUCCESSFUL'``            :py:func:`~mrjob.conf.combine_values`     :option:`--cleanup`
+*cleanup*              ``'ALL'``                      :py:func:`~mrjob.conf.combine_values`     :option:`--cleanup`
+*cleanup_on_failure*   ``'NONE'``                     :py:func:`~mrjob.conf.combine_values`     :option:`--cleanup-on-failure`
 *cmdenv*               ``{}``                         :py:func:`~mrjob.conf.combine_envs`       :option:`--cmdenv`
 *hadoop_extra_args*    ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--hadoop-arg`
 *hadoop_input_format*  (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-input-format`

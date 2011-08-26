@@ -30,21 +30,68 @@ import tempfile
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import JOB_NAME_RE
-from mrjob.runner import MRJobRunner
+from mrjob.runner import MRJobRunner, CLEANUP_DEFAULT
+from mrjob.util import log_to_stream
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.quiet import logger_disabled
+from tests.quiet import logger_disabled, no_handlers_for_logger
 
 
 class WithStatementTestCase(TestCase):
 
-    def test_cleanup_after_with_statement(self):
-        local_tmp_dir = None
+    @setup
+    def setup_ivars(self):
+        self.local_tmp_dir = None
 
-        with LocalMRJobRunner() as runner:
-            local_tmp_dir = runner._get_local_tmp_dir()
-            assert os.path.exists(local_tmp_dir)
+    @teardown
+    def delete_tmpdir(self):
+        if self.local_tmp_dir:
+            shutil.rmtree(self.local_tmp_dir)
+            self.local_tmp_dir = None
 
-        assert not os.path.exists(local_tmp_dir)
+    def _test_cleanup_after_with_statement(self, mode, should_exist):
+        with LocalMRJobRunner(cleanup=mode) as runner:
+            self.local_tmp_dir = runner._get_local_tmp_dir()
+            assert os.path.exists(self.local_tmp_dir)
+
+        assert_equal(os.path.exists(self.local_tmp_dir), should_exist)
+        if not should_exist:
+            self.local_tmp_dir = None
+
+    def test_cleanup_all(self):
+        self._test_cleanup_after_with_statement(['ALL'], False)
+
+    def test_cleanup_scratch(self):
+        self._test_cleanup_after_with_statement(['SCRATCH'], False)
+
+    def test_cleanup_local_scratch(self):
+        self._test_cleanup_after_with_statement(['LOCAL_SCRATCH'], False)
+
+    def test_cleanup_remote_scratch(self):
+        self._test_cleanup_after_with_statement(['REMOTE_SCRATCH'], True)
+
+    def test_cleanup_none(self):
+        self._test_cleanup_after_with_statement(['NONE'], True)
+
+    def test_cleanup_error(self):
+        assert_raises(ValueError, self._test_cleanup_after_with_statement,
+                      ['NONE,ALL'], True)
+        assert_raises(ValueError, self._test_cleanup_after_with_statement,
+                      ['GARBAGE'], True)
+
+    def test_cleanup_deprecated(self):
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob', stderr)
+            with LocalMRJobRunner(cleanup=CLEANUP_DEFAULT) as runner:
+                self.local_tmp_dir = runner._get_local_tmp_dir()
+                assert os.path.exists(self.local_tmp_dir)
+
+            assert_equal(os.path.exists(self.local_tmp_dir), False)
+            self.local_tmp_dir = None
+            assert_in('deprecated', stderr.getvalue())
+
+    def test_cleanup_not_supported(self):
+        assert_raises(ValueError, LocalMRJobRunner, cleanup_on_failure=CLEANUP_DEFAULT)
 
 
 class TestExtraKwargs(TestCase):

@@ -15,6 +15,8 @@ All runners
 
 .. automethod:: mrjob.runner.MRJobRunner.__init__
 
+Additionally, you can specify :option:`--profile` on the command line to add a ``profile`` counter group to each step. For each mapper/reducer, two counters in the group will be incremented: one for the time spent in the mapper/reducer functions, and the other for the time spent in the framework and waiting for IO.
+
 Locally
 -------
 

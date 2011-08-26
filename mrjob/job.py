@@ -108,6 +108,7 @@ except ImportError:
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
 from mrjob.parse import parse_mr_job_stderr, parse_port_range_list, check_kv_pair, check_range_list
+from mrjob.profile import Profiler
 from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
 from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
 from mrjob.util import log_to_stream, read_input
@@ -436,6 +437,15 @@ class MRJob(object):
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'M')
 
+        # set up profiling if appropriate
+        if self.options.profile:
+            profiler = Profiler()
+            mapper = profiler.wrap_processing(mapper, generator=True)
+            if mapper_final:
+                mapper_final = profiler.wrap_processing(mapper_final, generator=True)
+        else:
+            profiler = None
+
         # run the mapper on each line
         for key, value in read_lines():
             for out_key, out_value in mapper(key, value):
@@ -444,6 +454,11 @@ class MRJob(object):
         if mapper_final:
             for out_key, out_value in mapper_final():
                 write_line(out_key, out_value)
+
+        if profiler:
+            processing, other = profiler.results()
+            self.increment_counter('profile', 'mapper time (other): %0.2f' % other)
+            self.increment_counter('profile', 'mapper time (processing): %0.2f' % processing)
 
     def run_reducer(self, step_num=0):
         """Run the reducer for the given step.
@@ -469,6 +484,13 @@ class MRJob(object):
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'R')
 
+        # set up profiling if appropriate
+        if self.options.profile:
+            profiler = Profiler()
+            reducer = profiler.wrap_processing(reducer, generator=True)
+        else:
+            profiler = None
+
         # group all values of the same key together, and pass to the reducer
         #
         # be careful to use generators for everything, to allow for
@@ -478,6 +500,11 @@ class MRJob(object):
             values = (v for k, v in kv_pairs)
             for out_key, out_value in reducer(key, values):
                 write_line(out_key, out_value)
+
+        if profiler:
+            processing, other = profiler.results()
+            self.increment_counter('profile', 'reducer time (other): %0.2f' % other)
+            self.increment_counter('profile', 'reducer time (processing): %0.2f' % processing)
 
     def show_steps(self):
         """Print information about how many steps there are, and whether
@@ -718,6 +745,10 @@ class MRJob(object):
             help='Where to put final job output. This must be an s3:// URL ' +
             'for EMR, an HDFS path for Hadoop, and a system path for local,' +
             'and must be empty')
+
+        self.add_passthrough_option(
+            '--profile', dest='profile', action='store_true', default=None,
+            help="Enable profiling of resource usage.")
 
         self.runner_opt_group.add_option(
             '--python-archive', dest='python_archives', default=[], action='append',
@@ -1085,6 +1116,7 @@ class MRJob(object):
             'label': self.options.label,
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
+            'profile': self.options.profile,
             'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
             'setup_cmds': self.options.setup_cmds,

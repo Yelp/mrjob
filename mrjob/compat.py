@@ -288,7 +288,6 @@ def translate_jobconf_to_version(variable, version):
     return _translate_variable_to_version(variable, version, jobconf_map)
 
 
-<<<<<<< HEAD
 def canonicalize_jobconf(variable):
     """Return *variable*'s equivalent in the internally-specified
     "canonical" Hadoop version. If *variable* is unknown, return it
@@ -304,46 +303,16 @@ def supports_combiners_in_hadoop_streaming(version):
     (i.e. >= 0.20.203), otherwise False.
     """
     return version_gte(version, '0.20')
-=======
-class HadoopCompatibilityManager(object):
 
-    def __init__(self, version):
-        self.version = version
-
-    def __str__(self):
-        return 'HadoopCompatibilityManager(%s)' % self.version
-
-    def canonicalize_jobconf(self, variable):
-        """Return *variable*'s equivalent in the internally-specified
-        "canonical" Hadoop version. If *variable* is unknown, return it
-        unchanged.
-        """
-        try:
-            return translate_jobconf_to_version(variable, '0.21')
-        except KeyError:
-            return variable
-
-    def supports_combiners_in_hadoop_streaming(self):
-        """Return True if this version of Hadoop Streaming supports combiners
-        (i.e. >= 0.20), otherwise False.
-        """
-        return self.version_gte('0.20')
-
-    def supports_new_distributed_cache_options(self):
-        """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
-        ``-cacheArchive``
-        """
-        return self.version_gte('0.20')
->>>>>>> abd1757753242954a9b9c26e5d43bf4bf31e1196
+def supports_new_distributed_cache_options(version):
+    """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
+    ``-cacheArchive``
+    """
+    return version_gte(version, '0.20')
 
 def translate_jobconf(version, variable):
     """Translate *variable* into *version*"""
     return translate_jobconf_to_version(variable, version)
-
-<<<<<<< HEAD
-def translate_cl_switch(version, cl_switch):
-    """Translate *cl_switch* into *version*"""
-    return translate_cl_switch_to_version(cl_switch, version)
 
 def translate_env(version, env_var):
     """Translate *env_var* into version (same as
@@ -353,24 +322,12 @@ def translate_env(version, env_var):
     translated_jobconf_var = translate_jobconf(version, jobconf_var)
     return _jobconf_to_env_var(translated_jobconf_var)
 
+def uses_generic_jobconf(version):
+    """Use ``-D`` instead of ``-jobconf``"""
+    return version_gte(version, '0.20')
+
 def version_gte(version, cmp_version_str):
     """Return True if version >= *cmp_version_str*."""
-=======
-    def translate_env(self, env_var):
-        """Translate *env_var* into this object's version (same as
-        :py:meth:`translate_jobconf` but with underscores)
-        """
-        jobconf_var = _env_var_to_jobconf(env_var)
-        translated_jobconf_var = self.translate_jobconf(jobconf_var)
-        return _jobconf_to_env_var(translated_jobconf_var)
-
-    def uses_generic_jobconf(self):
-        """Use ``-D`` instead of ``-jobconf``"""
-        return self.version_gte('0.20')
-
-    def version_gte(self, cmp_version_str):
-        """Return True if this object's version >= *cmp_version_str*."""
->>>>>>> abd1757753242954a9b9c26e5d43bf4bf31e1196
 
     if not isinstance(cmp_version_str, basestring):
         raise ValueError('%s is not a string' % cmp_version_str)

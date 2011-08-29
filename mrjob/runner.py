@@ -34,6 +34,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+from mrjob import compat
 from mrjob.conf import combine_cmds, combine_cmd_lists, combine_dicts, combine_envs, combine_local_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
 from mrjob.util import cmd_line, file_ext, read_file, tar_and_gzip
 
@@ -1037,8 +1038,8 @@ class MRJobRunner(object):
         args.extend(self._opts['hadoop_extra_args'])
 
         # new-style jobconf
-        compat = self.get_compatibility_manager()
-        if compat.uses_generic_jobconf():
+        version = self.get_hadoop_version()
+        if compat.uses_generic_jobconf(version):
             for key, value in sorted(self._opts['jobconf'].iteritems()):
                 args.extend(['-D', '%s=%s' % (key, value)])
 
@@ -1058,7 +1059,7 @@ class MRJobRunner(object):
             args.extend(['-outputformat', self._opts['hadoop_output_format']])
 
         # old-style jobconf
-        if not compat.uses_generic_jobconf():
+        if not compat.uses_generic_jobconf(version):
             for key, value in sorted(self._opts['jobconf'].iteritems()):
                 args.extend(['-jobconf', '%s=%s' % (key, value)])
 

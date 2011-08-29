@@ -30,7 +30,7 @@ from mrjob.compat import translate_jobconf, translate_jobconf_to_version, is_equ
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.parse import find_python_traceback, parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line, expand_input_path, read_input, unarchive
+from mrjob.util import cmd_line, read_input, unarchive
 
 
 log = logging.getLogger('mrjob.local')
@@ -250,7 +250,7 @@ class LocalMRJobRunner(MRJobRunner):
         # determine the size of each file split
         total_size = 0
         for input_path in input_paths:
-            for path in expand_input_path(input_path):
+            for path in self.ls(input_path):
                 total_size += os.stat(path)[stat.ST_SIZE]
         split_size = total_size / num_splits
          

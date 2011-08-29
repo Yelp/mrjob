@@ -61,12 +61,13 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
             input_file.write('bar\nqux\n')
 
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz_glob = os.path.join(self.tmp_dir, '*.gz')
         input_gz = gzip.GzipFile(input_gz_path, 'w')
         input_gz.write('foo\n')
         input_gz.close()
 
         mr_job = MRTwoStepJob(['-c', self.mrjob_conf_path,
-                               '-', input_path, input_gz_path])
+                               '-', input_path, input_gz_glob])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None

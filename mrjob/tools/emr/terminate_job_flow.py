@@ -15,7 +15,19 @@
 
 Usage::
 
-    python -m mrjob.tools.emr.terminate_job_flow j-JOBFLOWID
+    python -m mrjob.tools.emr.terminate_job_flow.py [options] j-JOBFLOWID
+
+Terminate an existing EMR job flow.
+
+Options::
+
+  -h, --help            show this help message and exit
+  -v, --verbose         print more messages to stderr
+  -q, --quiet           don't print anything
+  -c CONF_PATH, --conf-path=CONF_PATH
+                        Path to alternate mrjob.conf file to read from
+  --no-conf             Don't load mrjob.conf even if it's available
+
 """
 from __future__ import with_statement
 

@@ -78,8 +78,13 @@ Using persistent job flows
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When troubleshooting a job, it can be convenient to use a persistent job flow
-to avoid having to wait for bootstrapping every run. First, use the
-:py:mod:`mrjob.tools.emr.create_job_flow` tool to create a persistent job flow::
+to avoid having to wait for bootstrapping every run. **If you decide to use
+persistent job flows, add** :py:mod:`mrjob.tools.emr.terminate_idle_job_flows`
+**to your crontab or you will be billed for unused CPU time if you forget to
+explicitly terminate job flows.**
+
+First, use the :py:mod:`mrjob.tools.emr.create_job_flow` tool to create a
+persistent job flow::
 
     > python -m mrjob.tools.emr.create_job_flow
     using configs in /etc/mrjob.conf

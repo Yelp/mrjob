@@ -16,6 +16,19 @@
 Usage::
 
     python -m mrjob.tools.emr.audit_usage > report
+
+Options::
+
+  -h, --help            show this help message and exit
+  -v, --verbose         print more messages to stderr
+  -q, --quiet           just print job flow ID to stdout
+  -c CONF_PATH, --conf-path=CONF_PATH
+                        Path to alternate mrjob.conf file to read from
+  --no-conf             Don't load mrjob.conf even if it's available
+  --max-days-ago=MAX_DAYS_AGO
+                        Max number of days ago to look at jobs. By default, we
+                        go back as far as EMR supports (currently about 2
+                        months)
 """
 from __future__ import with_statement
 

@@ -11,14 +11,19 @@ Basic
 
 .. autoclass:: MRJob
 
-One-step jobs
-^^^^^^^^^^^^^^^^
+Writing one-step jobs
+^^^^^^^^^^^^^^^^^^^^^
 .. automethod:: MRJob.mapper
 .. automethod:: MRJob.reducer
 .. automethod:: MRJob.mapper_init
 .. automethod:: MRJob.mapper_final
 .. automethod:: MRJob.reducer_init
 .. automethod:: MRJob.reducer_final
+
+Writing multi-step jobs
+^^^^^^^^^^^^^^^^^^^^^^^
+.. automethod:: MRJob.steps
+.. automethod:: MRJob.mr
 
 Running the job
 ^^^^^^^^^^^^^^^
@@ -29,11 +34,6 @@ Running the job
 Parsing the output
 ^^^^^^^^^^^^^^^^^^
 .. automethod:: MRJob.parse_output_line
-
-Multi-step jobs
-^^^^^^^^^^^^^^^
-.. automethod:: MRJob.steps
-.. automethod:: MRJob.mr
 
 Counters and status messages
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -98,8 +98,8 @@ Job runner configuration
 .. automethod:: MRJob.generate_file_upload_args
 .. automethod:: MRJob.mr_job_script
 
-How jobs are run
-^^^^^^^^^^^^^^^^
+Running specific parts of jobs
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. automethod:: MRJob.run_job
 .. automethod:: MRJob.run_mapper
 .. automethod:: MRJob.run_reducer

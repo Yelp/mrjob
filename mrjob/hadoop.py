@@ -316,11 +316,18 @@ class HadoopJobRunner(MRJobRunner):
         self._counters = []
         steps = self._get_steps()
 
+        version = self.get_hadoop_version()
+
         for step_num, step in enumerate(steps):
             log.debug('running step %d of %d' % (step_num+1, len(steps)))
 
             streaming_args = (self._opts['hadoop_bin'] +
                               ['jar', self._opts['hadoop_streaming_jar']])
+
+            # -files/-archives (generic options, new-style)
+            if compat.supports_new_distributed_cache_options(version):
+                # set up uploading from HDFS to the working dir
+                streaming_args.extend(self._upload_args())
 
             # Add extra hadoop args first as hadoop args could be a hadoop
             # specific argument (e.g. -libjar) which must come before job
@@ -336,8 +343,10 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args.append('-output')
             streaming_args.append(self._hdfs_step_output_dir(step_num))
 
-            # set up uploading from HDFS to the working dir
-            streaming_args.extend(self._upload_args())
+            # -cacheFile/-cacheArchive (streaming options, old-style)
+            if not compat.supports_new_distributed_cache_options(version):
+                # set up uploading from HDFS to the working dir
+                streaming_args.extend(self._upload_args())
 
             # set up mapper and reducer
             if 'M' not in step:
@@ -353,6 +362,8 @@ class HadoopJobRunner(MRJobRunner):
                 else:
                     mapper = "bash -c '%s | sort | %s'" % (mapper, combiner_cmd)
                     combiner = None
+            else:
+                combiner = None
 
             streaming_args.append('-mapper')
             streaming_args.append(mapper)
@@ -466,16 +477,43 @@ class HadoopJobRunner(MRJobRunner):
     def _upload_args(self):
         """Args to upload files from HDFS to the hadoop nodes."""
         args = []
-        for file_dict in self._files:
-            if file_dict.get('upload') == 'file':
-                args.append('-cacheFile')
-                args.append(
-                    '%s#%s' % (file_dict['hdfs_uri'], file_dict['name']))
 
-            elif file_dict.get('upload') == 'archive':
-                args.append('-cacheArchive')
-                args.append(
-                    '%s#%s' % (file_dict['hdfs_uri'], file_dict['name']))
+        version = self.get_hadoop_version()
+
+        if compat.supports_new_distributed_cache_options(version):
+
+            # return list of strings ready for comma-joining for passing to the
+            # hadoop binary
+            def escaped_paths(file_dicts):
+                return ["%s#%s" % (fd['hdfs_uri'], fd['name']) for fd in file_dicts]
+
+            # index by type
+            all_files = {}
+            for fd in self._files:
+                all_files.setdefault(fd.get('upload'), []).append(fd)
+
+            if 'file' in all_files:
+                args.append('-files')
+                args.append(','.join(escaped_paths(all_files['file'])))
+
+            if 'archive' in all_files:
+                args.append('-archives')
+                args.append(','.join(escaped_paths(all_files['archive'])))
+
+            if not args:
+                raise ValueError
+
+        else:
+            for file_dict in self._files:
+                if file_dict.get('upload') == 'file':
+                    args.append('-cacheFile')
+                    args.append(
+                        '%s#%s' % (file_dict['hdfs_uri'], file_dict['name']))
+
+                elif file_dict.get('upload') == 'archive':
+                    args.append('-cacheArchive')
+                    args.append(
+                        '%s#%s' % (file_dict['hdfs_uri'], file_dict['name']))
 
         return args
 

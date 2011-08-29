@@ -1036,6 +1036,12 @@ class MRJobRunner(object):
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])
 
+        # new-style jobconf
+        compat = self.get_compatibility_manager()
+        if compat.uses_generic_jobconf():
+            for key, value in sorted(self._opts['jobconf'].iteritems()):
+                args.extend(['-D', '%s=%s' % (key, value)])
+
         # cmdenv
         for key, value in sorted(self._get_cmdenv().iteritems()):
             args.append('-cmdenv')
@@ -1051,8 +1057,9 @@ class MRJobRunner(object):
             self._opts.get('hadoop_output_format')):
             args.extend(['-outputformat', self._opts['hadoop_output_format']])
 
-        # jobconf
-        for key, value in sorted(self._opts['jobconf'].iteritems()):
-            args.extend(['-jobconf', '%s=%s' % (key, value)])
+        # old-style jobconf
+        if not compat.uses_generic_jobconf():
+            for key, value in sorted(self._opts['jobconf'].iteritems()):
+                args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         return args

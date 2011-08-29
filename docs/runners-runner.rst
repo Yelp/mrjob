@@ -15,7 +15,6 @@ Running your job
 .. automethod:: MRJobRunner.stream_output
 .. automethod:: MRJobRunner.cleanup
 .. automethod:: MRJobRunner.get_hadoop_version
-.. automethod:: MRJobRunner.get_compatibility_manager
 .. autodata:: mrjob.runner.CLEANUP_CHOICES
 .. autodata:: mrjob.runner.CLEANUP_DEFAULT
 

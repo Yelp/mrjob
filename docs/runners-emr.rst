@@ -146,6 +146,10 @@ Now you can use the job flow ID to start the troublesome job::
     Killing our SSH tunnel (pid 988)
     ...
 
+
+The same job flow ID can be used to start new jobs without waiting for a new
+job flow to bootstrap.
+
 Note that SSH must be set up for logs to be scanned from persistent jobs.
 
 Finding failures after the fact
@@ -154,7 +158,7 @@ Finding failures after the fact
 If you are trying to look at a failure after the original process has exited,
 you can use the :py:mod:`mrjob.tools.emr.fetch_logs` tool to scan the logs::
 
-    > python -m mrjob.tools.emr.fetch_logs --find-failure j-1NXMMBNEQHAFT                                 (docs_recipes_14⚡)
+    > python -m mrjob.tools.emr.fetch_logs --find-failure j-1NXMMBNEQHAFT
     using configs in /etc/mrjob.conf
     Scanning SSH logs for probable cause of failure
     Probable cause of failure (from ssh://ec2-50-18-136-229.us-west-1.compute.amazonaws.com/mnt/var/log/hadoop/userlogs/attempt_201108111855_0001_m_000001_3/stderr):

@@ -270,21 +270,18 @@ def get_jobconf_value(variable):
     raise KeyError("%s jobconf variable not found" % variable)
 
 
-def _translate_variable_to_version(variable, version, compat_map):
+def translate_jobconf(version, variable):
     req_version = LooseVersion(version)
-    possible_versions = sorted(compat_map[variable].keys(),
+    possible_versions = sorted(jobconf_map[variable].keys(),
                                reverse=True,
                                key=lambda(v):LooseVersion(v))
 
     for possible_version in possible_versions:
         if req_version >= LooseVersion(possible_version):
-            return compat_map[variable][possible_version]
+            return jobconf_map[variable][possible_version]
 
     # return oldest version if we don't find required version
-    return compat_map[variable][possible_versions[-1]]
-
-
-def translate_jobconf_to_version(variable, version):
+    return jobconf_map[variable][possible_versions[-1]]
     return _translate_variable_to_version(variable, version, jobconf_map)
 
 
@@ -294,7 +291,7 @@ def canonicalize_jobconf(variable):
     unchanged.
     """
     try:
-        return translate_jobconf_to_version(variable, '0.21')
+        return translate_jobconf('0.21', variable)
     except KeyError:
         return variable
 
@@ -309,10 +306,6 @@ def supports_new_distributed_cache_options(version):
     ``-cacheArchive``
     """
     return version_gte(version, '0.20')
-
-def translate_jobconf(version, variable):
-    """Translate *variable* into *version*"""
-    return translate_jobconf_to_version(variable, version)
 
 def translate_env(version, env_var):
     """Translate *env_var* into version (same as

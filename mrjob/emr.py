@@ -44,6 +44,7 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
+from mrjob import compat
 from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths, combine_path_lists
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, EMR_JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
 from mrjob.retry import RetryWrapper
@@ -971,8 +972,8 @@ class EMRJobRunner(MRJobRunner):
             if combiner is not None:
                 # boto 2.0 doesn't support combiners in StreamingStep, so insert
                 # them into step_args manually.
-                compat = self.get_compatibility_manager()
-                if compat.supports_combiners_in_hadoop_streaming():
+                version = self.get_hadoop_version()
+                if compat.supports_combiners_in_hadoop_streaming(version):
                     step_args.extend(['-combiner', combiner])
                 else:
                     mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)

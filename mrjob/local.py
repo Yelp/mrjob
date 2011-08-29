@@ -26,6 +26,7 @@ import stat
 from subprocess import Popen, PIPE
 import sys
 
+from mrjob import compat
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.parse import find_python_traceback, parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
@@ -152,7 +153,7 @@ class LocalMRJobRunner(MRJobRunner):
             shutil.move(outfile, final_outfile)
 
     def _process_jobconf_args(self, jobconf):
-        compat = self.get_compatibility_manager()
+        version = self.get_hadoop_version()
         if jobconf:
             for (conf_arg, value) in jobconf.iteritems():
                 # Internally, use one canonical Hadoop version
@@ -176,10 +177,10 @@ class LocalMRJobRunner(MRJobRunner):
                     name = conf_arg.replace('.', '_')
                     self._running_env[name] = value
 
-        job_id_var = compat.translate_jobconf('mapreduce.job.id')
+        job_id_var = compat.translate_jobconf(version, 'mapreduce.job.id')
         self._running_env[job_id_var] = self._job_name
 
-        archives_var = compat.translate_jobconf('mapreduce.job.cache.local.archives')
+        archives_var = compat.translate_jobconf(version, 'mapreduce.job.cache.local.archives')
         self._running_env[archives_var] = str(self._mrjob_tar_gz_path)
     
     def _get_running_env(self):
@@ -204,8 +205,8 @@ class LocalMRJobRunner(MRJobRunner):
             self._working_dir = os.path.join(self._get_local_tmp_dir(), 'working_dir')
             self.mkdir(self._working_dir)
 
-        compat = self.get_compatibility_manager()
-        local_dir_var = compat.translate_jobconf('mapreduce.job.local.dir')
+        version = self.get_hadoop_version()
+        local_dir_var = compat.translate_jobconf(version, 'mapreduce.job.local.dir')
         self._running_env[local_dir_var] = self._working_dir
 
         # give all our files names, and symlink or unarchive them
@@ -228,8 +229,8 @@ class LocalMRJobRunner(MRJobRunner):
             log.debug('Creating output directory %s' % self._output_dir)
             self.mkdir(self._output_dir)
 
-        compat = self.get_compatibility_manager()
-        output_dir_var = compat.translate_jobconf('mapreduce.task.output.dir')
+        version = self.get_hadoop_version()
+        output_dir_var = compat.translate_jobconf(version, 'mapreduce.task.output.dir')
         self._running_env[output_dir_var] = self._output_dir
 
     def _symlink_to_file_or_copy(self, path, dest):
@@ -317,11 +318,11 @@ class LocalMRJobRunner(MRJobRunner):
 
     def _subprocess_env(self, step_type, step_num, env=None):
         """Set up environment variables for a subprocess (mapper, etc.)"""
-        compat = self.get_compatibility_manager()
+        version = self.get_hadoop_version()
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
-        ismap_var = compat.translate_env('mapreduce_task_ismap')
-        partition_var = compat.translate_env('mapreduce_task_partition')
+        ismap_var = compat.translate_env(version, 'mapreduce_task_ismap')
+        partition_var = compat.translate_env(version, 'mapreduce_task_partition')
         hadoop_env = {
             ismap_var: str(step_type=='M'),
             partition_var: str(step_num),
@@ -378,13 +379,13 @@ class LocalMRJobRunner(MRJobRunner):
             keep_sorted = (step_type == 'R')
             file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=keep_sorted)
 
-            compat = self.get_compatibility_manager()
-            task_id_var = compat.translate_env('mapreduce_task_id')
-            task_attempt_id_var = compat.translate_env('mapreduce_task_attempt_id')
+            version = self.get_hadoop_version()
+            task_id_var = compat.translate_env(version, 'mapreduce_task_id')
+            task_attempt_id_var = compat.translate_env(version, 'mapreduce_task_attempt_id')
 
-            input_file_var = compat.translate_env('mapreduce_map_input_file')
-            input_start_var = compat.translate_env('mapreduce_map_input_start')
-            input_length_var = compat.translate_env('mapreduce_map_input_length')
+            input_file_var = compat.translate_env(version, 'mapreduce_map_input_file')
+            input_start_var = compat.translate_env(version, 'mapreduce_map_input_start')
+            input_length_var = compat.translate_env(version, 'mapreduce_map_input_length')
 
             # run the tasks
             for (task_num, file_name) in enumerate(file_splits):

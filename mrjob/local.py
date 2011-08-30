@@ -157,7 +157,11 @@ class LocalMRJobRunner(MRJobRunner):
         if jobconf:
             for (conf_arg, value) in jobconf.iteritems():
                 # Internally, use one canonical Hadoop version
-                canon_arg = compat.canonicalize_jobconf(conf_arg)
+                try:
+                    canon_arg = compat.translate_jobconf('0.21', conf_arg)
+                except KeyError:
+                    # probably user-defined
+                    canon_arg = conf_arg
 
                 if canon_arg == 'mapreduce.job.maps':
                     self._map_tasks = int(value)

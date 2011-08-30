@@ -271,6 +271,9 @@ def get_jobconf_value(variable):
 
 
 def translate_jobconf(version, variable):
+    """Translate *variable* to Hadoop version *version*, throwing a
+    :py:mod:`KeyError` if it cannot be found in the internal mapping
+    """
     req_version = LooseVersion(version)
     possible_versions = sorted(jobconf_map[variable].keys(),
                                reverse=True,
@@ -282,18 +285,6 @@ def translate_jobconf(version, variable):
 
     # return oldest version if we don't find required version
     return jobconf_map[variable][possible_versions[-1]]
-    return _translate_variable_to_version(variable, version, jobconf_map)
-
-
-def canonicalize_jobconf(variable):
-    """Return *variable*'s equivalent in the internally-specified
-    "canonical" Hadoop version. If *variable* is unknown, return it
-    unchanged.
-    """
-    try:
-        return translate_jobconf('0.21', variable)
-    except KeyError:
-        return variable
 
 def supports_combiners_in_hadoop_streaming(version):
     """Return True if this version of Hadoop Streaming supports combiners

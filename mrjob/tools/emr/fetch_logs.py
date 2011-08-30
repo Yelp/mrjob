@@ -89,8 +89,9 @@ def main():
 
     mr_job = MRJob()
     job_option_groups = (mr_job.option_parser, mr_job.mux_opt_group,
-                     mr_job.proto_opt_group, mr_job.runner_opt_group,
-                     mr_job.hadoop_emr_opt_group, mr_job.emr_opt_group)
+                         mr_job.proto_opt_group, mr_job.runner_opt_group,
+                         mr_job.hadoop_emr_opt_group, mr_job.emr_opt_group,
+                         mr_job.hadoop_opts_opt_group)
     scrape_options_into_new_groups(job_option_groups, assignments)
 
     options, args = option_parser.parse_args()

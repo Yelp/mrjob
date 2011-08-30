@@ -230,63 +230,90 @@ JOBCONF_DICT_LIST = [
     {'0.18': 'user.name', '0.21': 'mapreduce.job.user.name'},
 ]
 
-# create the jobconf_map 
-# jobconf_map = {
-#   ...
-#   a: {'0.18': a, '0.21': b}
-#   b: {'0.18': a, '0.21': b}
-#   ..
-# }
-jobconf_map = {}
-for jobconf_dict in JOBCONF_DICT_LIST:
-    for value in jobconf_dict.itervalues():
-        jobconf_map[value] = jobconf_dict
-        
+def _dict_list_to_compat_map(dict_list):
+    # compat_map = {
+    #   ...
+    #   a: {'0.18': a, '0.21': b}
+    #   b: {'0.18': a, '0.21': b}
+    #   ..
+    # }
+    compat_map = {}
+    for version_dict in dict_list:
+        for value in version_dict.itervalues():
+            compat_map[value] = version_dict
+    return compat_map
 
-def translate_jobconf(variable):
-    """ Translates a jobconf variable into the equivalent name in 
-        other versions of hadoop. 
-        Returns an iterator over the list of equivalent arguements
-    """
-    return jobconf_map[variable].itervalues()
+jobconf_map = _dict_list_to_compat_map(JOBCONF_DICT_LIST)
 
 
-def translate_jobconf_to_version(variable, version):
-    """ Translates a jobconf variable into the equivalent name in 
-        the given version of hadoop.
-    """
-    req_version = LooseVersion(version)
-    possible_versions = sorted(jobconf_map[variable].keys(), reverse=True, key=lambda(v):LooseVersion(v))
-    
-    for possible_version in possible_versions:
-        if req_version >= LooseVersion(possible_version):
-            return jobconf_map[variable][possible_version]
-    
-    # return oldest version if we don't find required version
-    return jobconf_map[variable][possible_versions[-1]]
-    
+def _jobconf_to_env_var(variable):
+    return variable.replace('.', '_')
 
-def is_equivalent_jobconf(arg1, arg2):
-    """ Returns ``true`` if the two jobconf arguements are equivalent
-    """
-    jobconf = jobconf_map.get(arg1)
-    if jobconf:
-        return (arg2 in jobconf.values())
-    
-    return False
-        
+
+def _env_var_to_jobconf(variable):
+    return variable.replace('_', '.')
+
 
 def get_jobconf_value(variable):
-    """gets a jobconf varaible from runtime environment
+    """gets a jobconf variable from runtime environment
     """
     name = variable.replace('.','_')
     if name in os.environ:
         return os.environ[name]
 
     # try alternatives
-    for var in translate_jobconf(variable):
-        var = var.replace('.','_')
+    for var in jobconf_map[variable].itervalues():
+        var = _jobconf_to_env_var(var)
         if var in os.environ:
             return os.environ[var]
 
     raise KeyError("%s jobconf variable not found" % variable)
+
+
+def translate_jobconf(version, variable):
+    """Translate *variable* to Hadoop version *version*, throwing a
+    :py:mod:`KeyError` if it cannot be found in the internal mapping
+    """
+    req_version = LooseVersion(version)
+    possible_versions = sorted(jobconf_map[variable].keys(),
+                               reverse=True,
+                               key=lambda(v):LooseVersion(v))
+
+    for possible_version in possible_versions:
+        if req_version >= LooseVersion(possible_version):
+            return jobconf_map[variable][possible_version]
+
+    # return oldest version if we don't find required version
+    return jobconf_map[variable][possible_versions[-1]]
+
+def supports_combiners_in_hadoop_streaming(version):
+    """Return True if this version of Hadoop Streaming supports combiners
+    (i.e. >= 0.20.203), otherwise False.
+    """
+    return version_gte(version, '0.20')
+
+def supports_new_distributed_cache_options(version):
+    """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
+    ``-cacheArchive``
+    """
+    return version_gte(version, '0.20')
+
+def translate_env(version, env_var):
+    """Translate *env_var* into version (same as
+    :py:meth:`translate_jobconf` but with underscores)
+    """
+    jobconf_var = _env_var_to_jobconf(env_var)
+    translated_jobconf_var = translate_jobconf(version, jobconf_var)
+    return _jobconf_to_env_var(translated_jobconf_var)
+
+def uses_generic_jobconf(version):
+    """Use ``-D`` instead of ``-jobconf``"""
+    return version_gte(version, '0.20')
+
+def version_gte(version, cmp_version_str):
+    """Return True if version >= *cmp_version_str*."""
+
+    if not isinstance(cmp_version_str, basestring):
+        raise ValueError('%s is not a string' % cmp_version_str)
+
+    return LooseVersion(version) >= LooseVersion(cmp_version_str)

@@ -26,7 +26,7 @@ import stat
 from subprocess import Popen, PIPE
 import sys
 
-from mrjob.compat import translate_jobconf, translate_jobconf_to_version, is_equivalent_jobconf
+from mrjob import compat
 from mrjob.conf import combine_dicts, combine_local_envs
 from mrjob.parse import find_python_traceback, parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
@@ -62,10 +62,10 @@ class LocalMRJobRunner(MRJobRunner):
         self._working_dir = None
         self._prev_outfiles = []
         self._counters = []
-        
+
         self._map_tasks = 1
         self._reduce_tasks = 1
-      
+
         self._running_env = defaultdict(str)
 
     @classmethod
@@ -99,7 +99,7 @@ class LocalMRJobRunner(MRJobRunner):
             if self._opts[ignored_opt]:
                 log.warning('ignoring %s option (requires real Hadoop): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
-          
+
         self._create_wrapper_script()
         self._setup_working_dir()
         self._setup_output_dir()
@@ -109,7 +109,7 @@ class LocalMRJobRunner(MRJobRunner):
         self._process_jobconf_args(jobconf)
 
         assert self._script # shouldn't be able to run if no script
-                                
+
         wrapper_args = self._opts['python_bin']
         if self._wrapper_script:
             wrapper_args = (self._opts['python_bin'] +
@@ -153,18 +153,25 @@ class LocalMRJobRunner(MRJobRunner):
             shutil.move(outfile, final_outfile)
 
     def _process_jobconf_args(self, jobconf):
+        version = self.get_hadoop_version()
         if jobconf:
             for (conf_arg, value) in jobconf.iteritems():
-                # attempt to get the latest version equivalence
-                if is_equivalent_jobconf('mapreduce.job.maps', conf_arg):
+                # Internally, use one canonical Hadoop version
+                try:
+                    canon_arg = compat.translate_jobconf('0.21', conf_arg)
+                except KeyError:
+                    # probably user-defined
+                    canon_arg = conf_arg
+
+                if canon_arg == 'mapreduce.job.maps':
                     self._map_tasks = int(value)
                     if self._map_tasks < 1:
                         raise ValueError("%s should be greater than 1" % conf_arg)
-                elif is_equivalent_jobconf('mapreduce.job.reduces', conf_arg):
+                elif canon_arg == 'mapreduce.job.reduces':
                     self._reduce_tasks = int(value)
                     if self._reduce_tasks < 1:
                         raise ValueError("%s should be greater than 1" % conf_arg)
-                elif is_equivalent_jobconf('mapreduce.job.local.dir', conf_arg):
+                elif canon_arg == 'mapreduce.job.local.dir':
                     # hadoop supports multiple direcories - sticking with only one here
                     if not os.path.isdir(value):
                         raise IOError("Directory %s does not exist" % value)
@@ -173,9 +180,12 @@ class LocalMRJobRunner(MRJobRunner):
                     # catch all - convert . to _ and add to running env
                     name = conf_arg.replace('.', '_')
                     self._running_env[name] = value
-                
-        self._running_env['mapreduce.job.id'] = self._job_name
-        self._running_env['mapreduce.job.cache.local.archives'] = str(self._mrjob_tar_gz_path)
+
+        job_id_var = compat.translate_jobconf(version, 'mapreduce.job.id')
+        self._running_env[job_id_var] = self._job_name
+
+        archives_var = compat.translate_jobconf(version, 'mapreduce.job.cache.local.archives')
+        self._running_env[archives_var] = str(self._mrjob_tar_gz_path)
     
     def _get_running_env(self):
         """ Converts . to _ in self._running_env and returns it
@@ -198,8 +208,10 @@ class LocalMRJobRunner(MRJobRunner):
         if not self._working_dir:
             self._working_dir = os.path.join(self._get_local_tmp_dir(), 'working_dir')
             self.mkdir(self._working_dir)
-        
-        self._running_env['mapreduce.job.local.dir'] = self._working_dir
+
+        version = self.get_hadoop_version()
+        local_dir_var = compat.translate_jobconf(version, 'mapreduce.job.local.dir')
+        self._running_env[local_dir_var] = self._working_dir
 
         # give all our files names, and symlink or unarchive them
         self._name_files()
@@ -220,8 +232,10 @@ class LocalMRJobRunner(MRJobRunner):
         if not os.path.isdir(self._output_dir):
             log.debug('Creating output directory %s' % self._output_dir)
             self.mkdir(self._output_dir)
-        
-        self._running_env['mapreduce.task.output.dir'] = self._output_dir
+
+        version = self.get_hadoop_version()
+        output_dir_var = compat.translate_jobconf(version, 'mapreduce.task.output.dir')
+        self._running_env[output_dir_var] = self._output_dir
 
     def _symlink_to_file_or_copy(self, path, dest):
         """Symlink from *dest* to the absolute version of *path*.
@@ -309,6 +323,24 @@ class LocalMRJobRunner(MRJobRunner):
 
         return file_names
 
+    def _subprocess_env(self, step_type, step_num, env=None):
+        """Set up environment variables for a subprocess (mapper, etc.)"""
+        version = self.get_hadoop_version()
+        # keep the current environment because we need PATH to find binaries
+        # and make PYTHONPATH work
+        ismap_var = compat.translate_env(version, 'mapreduce_task_ismap')
+        partition_var = compat.translate_env(version, 'mapreduce_task_partition')
+        hadoop_env = {
+            ismap_var: str(step_type=='M'),
+            partition_var: str(step_num),
+        }
+        return combine_local_envs({'PYTHONPATH': os.getcwd()},
+                                  os.environ,
+                                  self._get_cmdenv(),
+                                  env or {},
+                                  hadoop_env)
+
+
     def _invoke_step(self, args, outfile_name, env=None, step_num=0,
                      num_tasks=1, step_type='M', combiner_args=None):
         """Run the given command, outputting into outfile, and reading
@@ -322,17 +354,8 @@ class LocalMRJobRunner(MRJobRunner):
 
         :param combiner_args: If this mapper has a combiner, we need to do some extra shell wrangling, so pass the combiner arguments in separately.
         """
-        # keep the current environment because we need PATH to find binaries
-        # and make PYTHONPATH work
-        env = combine_local_envs(
-            {'PYTHONPATH': os.getcwd()},
-            os.environ,
-            self._get_cmdenv(),
-            env or {}, 
-            {'mapreduce_task_ismap': str(step_type=='M'), 
-             'mapreduce_task_partition': str(step_num),
-            })
-            
+        env = self._subprocess_env(step_type, step_num, env)
+
         # decide where to get input
         if self._prev_outfiles:
             input_paths = self._prev_outfiles
@@ -362,31 +385,40 @@ class LocalMRJobRunner(MRJobRunner):
             # get file splits for mappers and reducers
             keep_sorted = (step_type == 'R')
             file_splits = self._get_file_splits(input_paths, num_tasks, keep_sorted=keep_sorted)
-            
+
+            version = self.get_hadoop_version()
+            task_id_var = compat.translate_env(version, 'mapreduce_task_id')
+            task_attempt_id_var = compat.translate_env(version, 'mapreduce_task_attempt_id')
+
+            input_file_var = compat.translate_env(version, 'mapreduce_map_input_file')
+            input_start_var = compat.translate_env(version, 'mapreduce_map_input_start')
+            input_length_var = compat.translate_env(version, 'mapreduce_map_input_length')
+
             # run the tasks
             for (task_num, file_name) in enumerate(file_splits):
                 # set the task env
                 # generate a task id
                 mapreduce_task_id = 'task_%s_%s_%05d%d' % (self._job_name, step_type, step_num, task_num) 
                 mapreduce_task_attempt_id = 'attempt_%s_%s_%05d%d_0' % (self._job_name, step_type, step_num, task_num) # we only have one attempt
-                
-                task_env = combine_local_envs(
-                    env,
-                    {'mapreduce_task_id': mapreduce_task_id, 
-                     'mapreduce_task_attempt_id': mapreduce_task_attempt_id,
-                     })
-             
+
+                task_vars = {
+                    task_id_var: mapreduce_task_id, 
+                    task_attempt_id_var: mapreduce_task_attempt_id,
+                }
                 if step_type == 'M':
                     # map only jobconf environment variables
-                    task_env = combine_local_envs(
-                        task_env, 
-                        {'mapreduce_map_input_file': file_splits[file_name]['original_name'], 
-                         'mapreduce_map_input_start': str(file_splits[file_name]['start']),
-                         'mapreduce_map_input_length': str(file_splits[file_name]['length'])
-                         })
-        
+                    input_vars = {
+                        input_file_var: file_splits[file_name]['original_name'],
+                        input_start_var: str(file_splits[file_name]['start']),
+                        input_length_var: str(file_splits[file_name]['length'])
+                    }
+                else:
+                    input_vars = {}
+
+                task_env = combine_local_envs(env, task_vars, input_vars)
+
                 task_outfile = outfile_name + '_part-%05d' % task_num
-        
+
                 proc = self._invoke_process(args + [file_name], task_outfile,
                                             env=task_env,
                                             combiner_args=combiner_args)
@@ -475,3 +507,6 @@ class LocalMRJobRunner(MRJobRunner):
 
     def counters(self):
         return self._counters
+
+    def get_hadoop_version(self):
+        return self._opts['hadoop_version']

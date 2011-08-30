@@ -293,11 +293,6 @@ class MockEmrConnection(object):
                                  args=[MockEmrObject(value=v) for v \
                                        in real_action.bootstrap_action_args])
 
-        if keep_alive:
-            keep_alive = u'true'
-        else:
-            keep_alive = u'false'
-
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
@@ -515,7 +510,7 @@ class MockEmrConnection(object):
             return
 
         # no pending steps. shut down job if appropriate
-        if job_flow.keepjobflowalivewhennosteps in ('true', True):
+        if job_flow.keepjobflowalivewhennosteps:
             job_flow.state = 'WAITING'
             job_flow.reason = 'Waiting for steps to run'
         else:

@@ -149,7 +149,8 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
                                '--hadoop-arg', 'containsJars.jar'] + list(args)
                                + ['-', local_input_path, remote_input_path]
                                + ['--hadoop-input-format', 'FooFormat']
-                               + ['--hadoop-output-format', 'BarFormat'])
+                               + ['--hadoop-output-format', 'BarFormat']
+                               + ['--jobconf', 'x=y'])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
@@ -214,6 +215,9 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             assert_in('-libjar', args)
             assert_in('-mapper', args)
             assert_lt(args.index('-libjar'), args.index('-mapper'))
+
+        # make sure -jobconf made it through
+        assert_in('-D', step_0_args)
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)

@@ -14,7 +14,6 @@
 from __future__ import with_statement
 
 import datetime
-from distutils.version import LooseVersion
 import fnmatch
 import logging
 import os
@@ -45,6 +44,7 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
+from mrjob import compat
 from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths, combine_path_lists
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, EMR_JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
 from mrjob.retry import RetryWrapper
@@ -398,7 +398,7 @@ class EMRJobRunner(MRJobRunner):
         self._show_tracker_progress = False
 
         # init hadoop version cache
-        self._hadoop_version = None
+        self._inferred_hadoop_version = None
 
     @classmethod
     def _allowed_opts(cls):
@@ -444,7 +444,6 @@ class EMRJobRunner(MRJobRunner):
             'ec2_slave_instance_type': 'm1.small',
             'hadoop_streaming_jar_on_emr':
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
-            'hadoop_version': '0.20',
             'num_ec2_instances': 1,
             's3_sync_wait_time': 5.0,
             'ssh_bin': ['ssh'],
@@ -973,8 +972,8 @@ class EMRJobRunner(MRJobRunner):
             if combiner is not None:
                 # boto 2.0 doesn't support combiners in StreamingStep, so insert
                 # them into step_args manually.
-                current_version = LooseVersion(self.get_hadoop_version())
-                if current_version >= LooseVersion('0.20'):
+                version = self.get_hadoop_version()
+                if compat.supports_combiners_in_hadoop_streaming(version):
                     step_args.extend(['-combiner', combiner])
                 else:
                     mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
@@ -1841,14 +1840,14 @@ class EMRJobRunner(MRJobRunner):
         return emr_conn.describe_jobflow(self._emr_job_flow_id)
 
     def get_hadoop_version(self):
-        if not self._hadoop_version:
+        if not self._inferred_hadoop_version:
             if self._emr_job_flow_id:
                 # if joining a job flow, infer the version
-                self._hadoop_version = self._describe_jobflow().hadoopversion
+                self._inferred_hadoop_version = self._describe_jobflow().hadoopversion
             else:
                 # otherwise, read it from the config
-                self._hadoop_version = self._opts['hadoop_version']
-        return self._hadoop_version
+                self._inferred_hadoop_version = self._opts['hadoop_version']
+        return self._inferred_hadoop_version
 
     def _address_of_master(self, emr_conn=None):
         """Get the address of the master node so we can SSH to it"""

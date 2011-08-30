@@ -54,7 +54,7 @@ The criteria for finding an appropriate job flow for a job are as follows:
 * The job flow must be in the ``WAITING`` state.
 * The bootstrap configuration (packages, commands, etc.) must be identical. This is checked using an md5 sum.
 * The **pool name** must be the same. You can specify a pool name with :option:`--pool-name`.
-* The job flow must have at least as many instances, and  the instance type must have at least as many compute units, as the job configuration specifies. See `Amazon EC2 Instance Types <http://aws.amazon.com/ec2/instance-types/>`_ for a complete listing of instance types and their respective compute units.
+* The job flow must have at least as many instances, and  the instance type must have at least as many compute units and GB of memory, as the job configuration specifies. See `Amazon EC2 Instance Types <http://aws.amazon.com/ec2/instance-types/>`_ for a complete listing of instance types and their respective compute units.
 * Ties are broken first by total compute units in the job flow as calculated by ``number of instances * instance type compute units``, then by the number of minutes until an even instance hour. This strategy minimizes wasted instance hours.
 
 Most of the time you shouldn't need to worry about these things. Just use pool names to separate job flows into pools representing their type.

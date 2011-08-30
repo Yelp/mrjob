@@ -662,13 +662,16 @@ class EMRJobRunner(MRJobRunner):
         return s3_uri
 
     def _run(self):
+        self._prepare_for_launch()
+
+        self._launch_emr_job()
+        self._wait_for_job_to_complete()
+
+    def _prepare_for_launch(self):
         self._setup_input()
         self._create_wrapper_script()
         self._create_master_bootstrap_script()
         self._upload_non_input_files()
-
-        self._launch_emr_job()
-        self._wait_for_job_to_complete()
 
     def _setup_input(self):
         """Copy local input files (if any) to a special directory on S3.
@@ -1437,6 +1440,10 @@ class EMRJobRunner(MRJobRunner):
                 new_counters = self._fetch_counters_ssh(step_nums)
             except LogFetchException, e:
                 new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
+            except IOError:
+                # Can get 'file not found' if test suite was lazy or Hadoop logs
+                # moved. We shouldn't crash in either case.
+                new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
         else:
             log.info('ec2_key_pair_file not specified, going to S3')
             new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
@@ -1562,7 +1569,8 @@ class EMRJobRunner(MRJobRunner):
         f.write(contents)
         f.close()
 
-        self._master_bootstrap_script = {'path': path}
+        name, _ = self._split_path(path)
+        self._master_bootstrap_script = {'path': path, 'name': name}
         self._files.append(self._master_bootstrap_script)
 
     def _master_bootstrap_script_content(self):

@@ -36,6 +36,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+from mrjob import compat
 from mrjob.conf import combine_cmds, combine_cmd_lists, combine_dicts, combine_envs, combine_local_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
 from mrjob.util import cmd_line, file_ext, read_file, tar_and_gzip
 
@@ -296,6 +297,7 @@ class MRJobRunner(object):
             'hadoop_input_format',
             'hadoop_output_format',
             'hadoop_streaming_jar',
+            'hadoop_version',
             'jobconf',
             'label',
             'owner',
@@ -322,6 +324,7 @@ class MRJobRunner(object):
             'bootstrap_mrjob': True,
             'cleanup': ['ALL'],
             'cleanup_on_failure': ['NONE'],
+            'hadoop_version': '0.20',
             'owner': owner,
             'python_bin': ['python'],
             'steps_python_bin': [sys.executable or 'python'],
@@ -624,7 +627,21 @@ class MRJobRunner(object):
 
     ### other methods you need to implement in your subclass ###
 
-    # you'll probably want to add your own __init__() and cleanup() as well
+    def get_hadoop_version(self):
+        """Return the version number of the Hadoop environment as a string if
+        Hadoop is being used or simulated. Return None if not applicable.
+
+        :py:class:`~mrjob.emr.EMRJobRunner` infers this from the job flow.
+        :py:class:`~mrjob.hadoop.HadoopJobRunner` gets this from
+        ``hadoop version``. :py:class:`~mrjob.local.LocalMRJobRunner` has an
+        additional `hadoop_version` option to specify which version it
+        simulates, with a default of 0.20.
+        :py:class:`~mrjob.inline.InlineMRJobRunner` does not simulate Hadoop at
+        all.
+        """
+        return None
+
+    # you'll probably wan't to add your own __init__() and cleanup() as well
 
     def _run(self):
         """Run the job."""
@@ -1036,6 +1053,12 @@ class MRJobRunner(object):
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])
 
+        # new-style jobconf
+        version = self.get_hadoop_version()
+        if compat.uses_generic_jobconf(version):
+            for key, value in sorted(self._opts['jobconf'].iteritems()):
+                args.extend(['-D', '%s=%s' % (key, value)])
+
         # cmdenv
         for key, value in sorted(self._get_cmdenv().iteritems()):
             args.append('-cmdenv')
@@ -1051,8 +1074,9 @@ class MRJobRunner(object):
             self._opts.get('hadoop_output_format')):
             args.extend(['-outputformat', self._opts['hadoop_output_format']])
 
-        # jobconf
-        for key, value in sorted(self._opts['jobconf'].iteritems()):
-            args.extend(['-jobconf', '%s=%s' % (key, value)])
+        # old-style jobconf
+        if not compat.uses_generic_jobconf(version):
+            for key, value in sorted(self._opts['jobconf'].iteritems()):
+                args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         return args

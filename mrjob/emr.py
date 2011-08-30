@@ -114,6 +114,23 @@ EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS = {
 }
 
 
+# map from instance type to GB of memory
+# from http://aws.amazon.com/ec2/instance-types/
+EC2_INSTANCE_TYPE_TO_MEMORY = {
+    't1.micro': 0.6,
+    'm1.small': 1.7,
+    'm1.large': 7.5,
+    'm1.xlarge': 15,
+    'm2.xlarge': 17.5,
+    'm2.2xlarge': 34.2,
+    'm2.4xlarge': 68.4,
+    'c1.medium': 1.7,
+    'c1.xlarge': 7,
+    'cc1.4xlarge': 23,
+    'cg1.4xlarge': 22,
+}
+
+
 def est_time_to_hour(job_flow):
     """If available, get the difference between hours billed and hours used.
     This metric is used to determine which job flow to use if more than one
@@ -1696,7 +1713,7 @@ class EMRJobRunner(MRJobRunner):
         """
 
         emr_conn = emr_conn or self.make_emr_conn()
-        exclude = exclude or []
+        exclude = exclude or set()
 
         all_job_flows = emr_conn.describe_jobflows()
         jf_args = self._job_flow_args(persistent=True)
@@ -1712,10 +1729,15 @@ class EMRJobRunner(MRJobRunner):
         def cu(job_flow):
             return EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(worker_instance_type(job_flow), 0)
 
+        def mem(job_flow):
+            return EC2_INSTANCE_TYPE_TO_MEMORY.get(worker_instance_type(job_flow), 0)
+
         my_instance_type = self._opts['ec2_master_instance_type']
         if self._opts['num_ec2_instances'] > 1:
             my_instance_type = self._opts['ec2_slave_instance_type']
+
         my_compute_units = EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(my_instance_type, 0)
+        my_memory = EC2_INSTANCE_TYPE_TO_MEMORY.get(my_instance_type, 0)
 
         def matches(job_flow):
             # this may be a retry due to locked job flows
@@ -1751,6 +1773,8 @@ class EMRJobRunner(MRJobRunner):
             # than those specified by the config
             if cu(job_flow) < my_compute_units:
                 return False
+            if mem(job_flow) < my_memory:
+                return False
             if job_flow.instancecount < self._opts['num_ec2_instances']:
                 return False
 
@@ -1771,7 +1795,7 @@ class EMRJobRunner(MRJobRunner):
         Return ``None`` if no suitable flows exist.
         """
         chosen_job_flow = None
-        exclude = []
+        exclude = set()
         emr_conn = self.make_emr_conn()
         s3_conn = self.make_s3_conn()
         while chosen_job_flow is None:
@@ -1788,7 +1812,7 @@ class EMRJobRunner(MRJobRunner):
                 if status:
                     return sorted_tagged_job_flows[-1][1]
                 else:
-                    exclude.append(job_flow.jobflowid)
+                    exclude.add(job_flow.jobflowid)
             else:
                 return None
 

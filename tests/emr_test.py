@@ -88,6 +88,9 @@ class MockEMRAndS3TestCase(TestCase):
         self._real_boto_emr_EmrConnection = boto.emr.EmrConnection
         boto.emr.EmrConnection = mock_boto_emr_EmrConnection
 
+        # copy the old environment just to be polite
+        self._old_environ = os.environ.copy()
+
     @teardown
     def unsandbox_boto(self):
         boto.connect_s3 = self._real_boto_connect_s3
@@ -106,6 +109,7 @@ class MockEMRAndS3TestCase(TestCase):
         # Create temporary directories and add them to MOCK_SSH_ROOTS
         self.master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
         os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % self.master_ssh_root
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
 
         self.slave_ssh_roots = []
 
@@ -1408,7 +1412,6 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         results = []
         with mr_job.make_runner() as runner:
             self.prepare_runner_for_ssh(runner)
-            mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
             runner.run()
 
             for line in runner.stream_output():
@@ -1417,15 +1420,31 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         return sorted(results)
 
-    def make_pooled_job_flow(self, name=None, **kwargs):
-        """Returns (runner, job_flow_id)"""
+    def make_pooled_job_flow(self, name=None, back_in_time=0, **kwargs):
+        """Returns (runner, job_flow_id). Set back_in_time to set
+        jobflow.startdatetime to seconds before datetime.datetime.now()."""
         runner = EMRJobRunner(conf_path=self.mrjob_conf_path,
                               pool_emr_job_flows=True,
                               emr_job_flow_pool_name=name,
                               **kwargs)
         job_flow_id = runner.make_persistent_job_flow()
-        runner.make_emr_conn().describe_jobflow(job_flow_id).state = 'WAITING'
+        jf = runner.make_emr_conn().describe_jobflow(job_flow_id)
+        jf.state = 'WAITING'
+        start = (datetime.datetime.now() - datetime.timedelta(minutes=40))
+        jf.startdatetime = start.strftime(boto.utils.ISO8601)
         return runner, job_flow_id
+
+    def make_simple_runner(self, pool_name):
+        """Make an EMRJobRunner that is ready to try to find a pool to join"""
+        mr_job = MRTwoStepJob([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', pool_name,
+            '-c', self.mrjob_conf_path])
+        mr_job.sandbox()
+        runner = mr_job.make_runner()
+        self.prepare_runner_for_ssh(runner)
+        runner._prepare_for_launch()
+        return runner
 
     def test_make_new_pooled_job_flow(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool-emr-job-flows',
@@ -1435,7 +1454,6 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         results = []
         with mr_job.make_runner() as runner:
             self.prepare_runner_for_ssh(runner)
-            mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
             runner.run()
 
             # Make sure that the runner made a pooling-enabled job flow
@@ -1544,6 +1562,38 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         assert_equal(jf1.jobflowid, job_flow_id)
         assert_equal(jf2, None)
         jf1.status = 'COMPLETED'
+
+    def test_sorting_by_time(self):
+        _, job_flow_id_1 = self.make_pooled_job_flow('pool1', back_in_time=20)
+        _, job_flow_id_2 = self.make_pooled_job_flow('pool1', back_in_time=40)
+
+        runner1 = self.make_simple_runner('pool1')
+        runner2 = self.make_simple_runner('pool1')
+
+        jf1 = runner1.find_job_flow()
+        jf2 = runner2.find_job_flow()
+        assert_equal(jf1.jobflowid, job_flow_id_1)
+        assert_equal(jf2.jobflowid, job_flow_id_2)
+        jf1.status = 'COMPLETED'
+        jf2.status = 'COMPLETED'
+
+    def test_sorting_by_cpu_hours(self):
+        _, job_flow_id_1 = self.make_pooled_job_flow('pool1',
+                                                     back_in_time=40,
+                                                     num_ec2_instances=2)
+        _, job_flow_id_2 = self.make_pooled_job_flow('pool1',
+                                                     back_in_time=20,
+                                                     num_ec2_instances=1)
+
+        runner1 = self.make_simple_runner('pool1')
+        runner2 = self.make_simple_runner('pool1')
+
+        jf1 = runner1.find_job_flow()
+        jf2 = runner2.find_job_flow()
+        assert_equal(jf1.jobflowid, job_flow_id_1)
+        assert_equal(jf2.jobflowid, job_flow_id_2)
+        jf1.status = 'COMPLETED'
+        jf2.status = 'COMPLETED'
 
 
 class S3LockTestCase(MockEMRAndS3TestCase):

@@ -1789,13 +1789,12 @@ class EMRJobRunner(MRJobRunner):
             return True
 
         available_job_flows = [jf for jf in all_job_flows if matches(jf)]
-        job_flows_with_times = [(est_time_to_hour(jf), jf) for jf in available_job_flows]
 
-        def sort_key(tup):
-            time_to_hour, job_flow = tup
-            return (cu(job_flow)*job_flow.instancecount, time_to_hour)
+        def sort_key(job_flow):
+            return (cu(job_flow)*job_flow.instancecount,
+                    est_time_to_hour(job_flow))
 
-        return sorted(job_flows_with_times, key=sort_key)
+        return sorted(available_job_flows, key=sort_key)
 
     def find_job_flow(self):
         """Find a job flow that can host this runner. Prefer flows with more
@@ -1810,7 +1809,7 @@ class EMRJobRunner(MRJobRunner):
             sorted_tagged_job_flows = self.usable_job_flows(emr_conn=emr_conn,
                                                             exclude=exclude)
             if sorted_tagged_job_flows:
-                job_flow = sorted_tagged_job_flows[-1][1]
+                job_flow = sorted_tagged_job_flows[-1]
                 lock_uri = make_lock_uri(self._opts['s3_scratch_uri'],
                                          job_flow.jobflowid,
                                         len(job_flow.steps)+1)
@@ -1818,7 +1817,7 @@ class EMRJobRunner(MRJobRunner):
                                                  self._opts['s3_sync_wait_time'],
                                                  self._job_name)
                 if status:
-                    return sorted_tagged_job_flows[-1][1]
+                    return sorted_tagged_job_flows[-1]
                 else:
                     exclude.add(job_flow.jobflowid)
             else:

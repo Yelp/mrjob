@@ -1490,6 +1490,35 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         assert_equal(results,
             [(1, 'bar'), (1, 'foo'), (2, None)])
 
+    def test_dont_join_full_job_flow(self):
+        dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
+
+        # insert first item
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', 'pool1',
+            '-c', self.mrjob_conf_path])
+        assert_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+        # copy it
+        jf = dummy_runner.make_emr_conn().describe_jobflow(job_flow_id)
+        jf.steps = jf.steps * 128
+
+        # make sure next attempt at joining uses new job flow
+        self.mock_emr_output = {(job_flow_id, 257): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', 'pool1',
+            '-c', self.mrjob_conf_path])
+        assert_not_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
     def test_dont_join_wrong_named_pool(self):
         _, job_flow_id = self.make_pooled_job_flow('pool1')
 

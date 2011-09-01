@@ -45,6 +45,7 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
+import mrjob
 from mrjob import compat
 from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths, combine_path_lists
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, EMR_JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
@@ -1778,13 +1779,24 @@ class EMRJobRunner(MRJobRunner):
             if job_flow.state != 'WAITING':
                 return False
 
-            # match bootstrap configuration and pool name
+            # match bootstrap configuration and pool name and hash
             if not job_flow.bootstrapactions:
                 return False
 
             args = [arg.value for arg in job_flow.bootstrapactions[-1].args]
             if not args == [pool_arg, self._pool_name]:
                 return False
+
+            # match other bootstrap actions
+            actions_minus_last = job_flow.bootstrapactions[:-1]
+            if len(self._bootstrap_actions) != len(actions_minus_last):
+                return False
+            for my_action, jf_action in zip(self._bootstrap_actions,
+                                            actions_minus_last):
+                if my_action['path'] != jf_action.path:
+                    return False
+                if my_action['args'] != [arg.value for arg in jf_action.args]:
+                    return False
 
             # sanity check for proper type of job flow
             if not job_flow.keepjobflowalivewhennosteps:
@@ -1876,6 +1888,8 @@ class EMRJobRunner(MRJobRunner):
             self._opts['bootstrap_mrjob'],
             self._opts['bootstrap_cmds'],
         ]
+        if self._opts['bootstrap_mrjob']:
+            things_to_hash.append(mrjob.__version__)
         return 'pool-%s' % hash_object(things_to_hash)
 
     ### GENERAL FILESYSTEM STUFF ###

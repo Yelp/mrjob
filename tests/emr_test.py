@@ -30,6 +30,7 @@ from StringIO import StringIO
 import tempfile
 from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in, assert_raises, setup, teardown, assert_not_equal
 
+import mrjob
 from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
 from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri, attempt_to_acquire_lock, _lock_acquire_step_1, _lock_acquire_step_2, make_lock_uri
@@ -1533,6 +1534,24 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         assert_not_equal(results,
             [(1, 'bar'), (1, 'foo'), (2, None)])
 
+    def test_dont_join_wrong_mrjob_version(self):
+        _, job_flow_id = self.make_pooled_job_flow('pool1')
+        old_version = mrjob.__version__
+        mrjob.__version__ = 'OVER NINE THOUSAAAAAND'
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', 'not_pool1',
+            '-c', self.mrjob_conf_path])
+
+        mrjob.__version__ = old_version
+
+        assert_not_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
     def test_join_similarly_bootstrapped_pool(self):
         local_input_path = os.path.join(self.tmp_dir, 'input')
         with open(local_input_path, 'w') as input_file:
@@ -1557,7 +1576,6 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             input_file.write('bar\nfoo\n')
 
         _, job_flow_id = self.make_pooled_job_flow()
-        # runner._address = 'not_a_real_ssh_host'
 
         self.mock_emr_output = {(job_flow_id, 1): [
             '1\t"bar"\n1\t"foo"\n2\tnull\n']}
@@ -1565,6 +1583,28 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         results = self.sorted_results_for_runner_with_args([
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--bootstrap-file', local_input_path,
+            '-c', self.mrjob_conf_path])
+
+        assert_not_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_dont_join_differently_bootstrapped_pool_2(self):
+        local_input_path = os.path.join(self.tmp_dir, 'input')
+        with open(local_input_path, 'w') as input_file:
+            input_file.write('bar\nfoo\n')
+
+        bootstrap_path = os.path.join(self.tmp_dir, 'go.sh')
+        with open(bootstrap_path, 'w') as f:
+            f.write('#!/usr/bin/sh\necho "hi mom"\n')
+
+        _, job_flow_id = self.make_pooled_job_flow()
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--bootstrap-action', bootstrap_path + ' a b c',
             '-c', self.mrjob_conf_path])
 
         assert_not_equal(results,

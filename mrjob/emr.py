@@ -1729,17 +1729,27 @@ class EMRJobRunner(MRJobRunner):
         pool_arg = self._pool_arg()
 
         def worker_instance_type(job_flow):
+            """We only care about the processing power of the task nodes, which
+            are determined by different values depending on the number of total
+            nodes.
+            """
             if job_flow.instancecount > 1:
                 return job_flow.slaveinstancetype
             else:
                 return job_flow.masterinstancetype
 
         def cu(job_flow):
+            """Shortcut to calculate the compute units per task node of a job
+            flow
+            """
             return EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(worker_instance_type(job_flow), 0)
 
         def mem(job_flow):
+            """Shortcut to calculate the memory per task node of a job flow """
             return EC2_INSTANCE_TYPE_TO_MEMORY.get(worker_instance_type(job_flow), 0)
 
+        # get this run's information, unfortunately duplicating some logic from
+        # the inner functions above
         my_instance_type = self._opts['ec2_master_instance_type']
         if self._opts['num_ec2_instances'] > 1:
             my_instance_type = self._opts['ec2_slave_instance_type']
@@ -1748,8 +1758,15 @@ class EMRJobRunner(MRJobRunner):
         my_memory = EC2_INSTANCE_TYPE_TO_MEMORY.get(my_instance_type, 0)
 
         def matches(job_flow):
+            """Return True if the given job flow supports the configuration of
+            this run, otherwise False.
+            """
             # this may be a retry due to locked job flows
             if job_flow.jobflowid in exclude:
+                return False
+
+            # there is a hard limit of 256 steps per job flow
+            if len(job_flow.steps) > 255:
                 return False
 
             # convert from braindead string types to usable types

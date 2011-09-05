@@ -37,6 +37,7 @@ try:
     import boto
     import boto.ec2
     import boto.emr
+    import boto.emr.instance_group
     import boto.exception
     import boto.utils
 except ImportError:
@@ -274,6 +275,16 @@ class EMRJobRunner(MRJobRunner):
         :param ec2_master_instance_type: same as *ec2_instance_type*, but only for the master Hadoop node. Usually you just want to use *ec2_instance_type*. Defaults to ``'m1.small'``.
         :type ec2_slave_instance_type: str
         :param ec2_slave_instance_type: same as *ec2_instance_type*, but only for the slave Hadoop nodes. Usually you just want to use *ec2_instance_type*. Defaults to ``'m1.small'``.
+        :type ec2_core_instance_type: str
+        :param ec2_core_instance_type: alias for *ec2_slave_instance_type*.
+        :type ec2_task_instance_type: str
+        :param ec2_task_instance_type: same as *ec2_instance_type*, but only for the task Hadoop nodes. Used when creating a jobflow with both slave (aka "core") and task nodes.
+        :type ec2_master_instance_bid_price: str
+        :param ec2_master_instance_bid_price: when specified and not "0", this creates the master Hadoop node as a spot instance at this bid price.
+        :type ec2_core_instance_bid_price: str
+        :param ec2_core_instance_bid_price: when specified and not "0", this creates the core Hadoop nodes as spot instances at this bid price.
+        :type ec2_task_instance_bid_price: str
+        :param ec2_task_instance_bid_price: when specified and not "0", this creates the task Hadoop nodes as spot instances at this bid price.
         :type emr_endpoint: str
         :param emr_endpoint: optional host to connect to when communicating with S3 (e.g. ``us-west-1.elasticmapreduce.amazonaws.com``). Default is to infer this from *aws_region*.
         :type emr_job_flow_id: str
@@ -287,7 +298,11 @@ class EMRJobRunner(MRJobRunner):
         :type hadoop_version: str
         :param hadoop_version: Set the version of Hadoop to use on EMR. EMR currently accepts ``'0.18'`` or ``'0.20'``; default is ``'0.20'``.
         :type num_ec2_instances: int
-        :param num_ec2_instances: number of instances to start up. Default is ``1``.
+        :param num_ec2_instances: total number of instances to start up. Default is ``1``.
+        :type num_ec2_core_instances: int
+        :param num_ec2_core_instances: number of core (or "slave") instances to start up. If provided, this will supersede *num_ec2_instances*.
+        :type num_ec2_task_instances: int
+        :param num_ec2_task_instances: number of task instances to start up. Depends on num_ec2_core_instances. If provided, this will supersede *num_ec2_instances*.
         :type s3_endpoint: str
         :param s3_endpoint: Host to connect to when communicating with S3 (e.g. ``s3-us-west-1.amazonaws.com``). Default is to infer this from *aws_region*.
         :type s3_log_uri: str
@@ -319,6 +334,13 @@ class EMRJobRunner(MRJobRunner):
         self._fix_s3_scratch_and_log_uri_opts()
 
         self._fix_ec2_instance_types()
+
+        if self._opts['num_ec2_task_instances']:
+            if not self._opts['num_ec2_core_instances']:
+                raise ValueError(
+                    'num_ec2_task_instances may only be specified '
+                    'when num_ec2_core_instances is defined as well'
+                    )
 
         # pick a tmp dir based on the job name
         self._s3_tmp_uri = self._opts['s3_scratch_uri'] + self._job_name + '/'
@@ -419,12 +441,19 @@ class EMRJobRunner(MRJobRunner):
             'ec2_key_pair_file',
             'ec2_master_instance_type',
             'ec2_slave_instance_type',
+            'ec2_core_instance_type',
+            'ec2_task_instance_type',
+            'ec2_master_instance_bid_price',
+            'ec2_core_instance_bid_price',
+            'ec2_task_instance_bid_price',
             'enable_emr_debugging',
             'emr_endpoint',
             'emr_job_flow_id',
             'hadoop_streaming_jar_on_emr',
             'hadoop_version',
             'num_ec2_instances',
+            'num_ec2_core_instances',
+            'num_ec2_task_instances',
             's3_endpoint',
             's3_log_uri',
             's3_scratch_uri',
@@ -470,8 +499,16 @@ class EMRJobRunner(MRJobRunner):
         })
 
     def _fix_ec2_instance_types(self):
-        """If the *ec2_instance_type* option is set, override instance
-        type for the nodes that actually run tasks (see Issue #66)
+        """
+        Fixes two issues regarding ec2_instance_type and self._opts:
+
+            1. If the *ec2_instance_type* option is set, override
+               instance type for the nodes that actually run tasks
+               (see Issue #66)
+
+            2. Otherwise, if ec2_core_instance_type is specified,
+               (most likely via a mrjob.conf file), it is copied
+               over to ec2_slave_instance_type.
         """
         ec2_instance_type = self._opts['ec2_instance_type']
         if ec2_instance_type:
@@ -479,6 +516,9 @@ class EMRJobRunner(MRJobRunner):
             # master instance only does work when it's the only instance
             if self._opts['num_ec2_instances'] == 1:
                 self._opts['ec2_master_instance_type'] = ec2_instance_type
+
+        elif self._opts['ec2_core_instance_type']:
+            self._opts['ec2_slave_instance_type'] = self._opts['ec2_core_instance_type']
 
     def _fix_s3_scratch_and_log_uri_opts(self):
         """Fill in s3_scratch_uri and s3_log_uri (in self._opts) if they
@@ -836,8 +876,45 @@ class EMRJobRunner(MRJobRunner):
             time.sleep(self._opts['check_emr_status_every'])
             jobflow = self._describe_jobflow()
 
+    def _create_instance_group(self, role, instance_type, count, bid_price):
+        """
+        Helper method for creating instance groups. For use when
+        creating a jobflow using a list of InstanceGroups, instead
+        of the typical triumverate of
+        num_instances/master_instance_type/slave_instance_type.
+
+            - Role is either 'master', 'core', or 'task'.
+            - instance_type is an EC2 instance type
+            - count is an int
+            - bid_price is a number, a string, or None. If None,
+              this instance group will be use the ON-DEMAND market
+              instead of the SPOT market.
+        """
+
+        if not instance_type:
+            if self._opts['ec2_instance_type']:
+                instance_type = self._opts['ec2_instance_type']
+            else:
+                raise ValueError('Missing instance type for %s node(s)'
+                    % role)
+
+        if bid_price and float(bid_price):
+            market = 'SPOT'
+            bid_price = str(bid_price) # must be a string
+        else:
+            market = 'ON_DEMAND'
+            bid_price = None
+
+        # Hard-code the instance group name to something sensible.
+        name = 'mrjob-launch-%s' % role.lower()
+
+        return boto.emr.instance_group.InstanceGroup(
+            count, role, instance_type, market, name, bidprice=bid_price
+            )
+
     def _create_job_flow(self, persistent=False, steps=None):
-        """Create an empty job flow on EMR, and return the ID of that
+        """
+        Create an empty job flow on EMR, and return the ID of that
         job.
 
         persistent -- if this is true, create the job flow with the --alive
@@ -858,10 +935,40 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['aws_availability_zone']:
             args['availability_zone'] = self._opts['aws_availability_zone']
 
-        args['num_instances'] = str(self._opts['num_ec2_instances'])
+        if self._opts['num_ec2_core_instances']:
+            # The less common case: create a list of InstanceGroups
+            args['instance_groups'] = [
+                self._create_instance_group(
+                    'MASTER',
+                    self._opts['ec2_master_instance_type'],
+                    1,
+                    self._opts['ec2_master_instance_bid_price']
+                    ),
+                self._create_instance_group(
+                    'CORE',
+                    # (ec2_core_instance_type is an alias for slave...)
+                    self._opts['ec2_slave_instance_type'],
+                    self._opts['num_ec2_core_instances'],
+                    self._opts['ec2_core_instance_bid_price']
+                    )
+                ]
 
-        args['master_instance_type'] = self._opts['ec2_master_instance_type']
-        args['slave_instance_type'] = self._opts['ec2_slave_instance_type']
+            # MASTER and CORE instance groups are required;
+            # the initial TASK instance group is optional.
+            if self._opts['num_ec2_task_instances']:
+                args['instance_groups'].append(
+                    self._create_instance_group(
+                        'TASK',
+                        self._opts['ec2_task_instance_type'],
+                        self._opts['num_ec2_task_instances'],
+                        self._opts['ec2_task_instance_bid_price']
+                        )
+                    )
+        else:
+            # The common case: num_instances/master_instance_type/...
+            args['num_instances'] = str(self._opts['num_ec2_instances'])
+            args['master_instance_type'] = self._opts['ec2_master_instance_type']
+            args['slave_instance_type'] = self._opts['ec2_slave_instance_type']
 
 
         # bootstrap actions

@@ -252,7 +252,7 @@ class EMRJobRunner(MRJobRunner):
         Additional options:
 
         :type additional_emr_info: JSON str, None, or JSON-encodable object
-        :param additional_emr_info: Special parameters to select additional features. Pass a JSON string on the command line or use regular data structures in the config file.
+        :param additional_emr_info: Special parameters to select additional features, mostly to support beta EMR features. Pass a JSON string on the command line or use regular data structures in the config file.
         :type aws_access_key_id: str
         :param aws_access_key_id: "username" for Amazon web services.
         :type aws_availability_zone: str

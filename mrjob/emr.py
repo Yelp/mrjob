@@ -100,13 +100,24 @@ REGION_TO_EMR_ENDPOINT = {
 }
 
 # map from AWS region to S3 endpoint
-# see http://docs.amazonwebservices.com/AmazonS3/latest/dev/index.html?RequestEndpoints.html
+# see http://docs.amazonwebservices.com/AmazonS3/latest/dev/MakingRequests.html#RequestEndpoints
 REGION_TO_S3_ENDPOINT = {
     'EU': 's3-eu-west-1.amazonaws.com',
     'us-east-1': 's3.amazonaws.com', # no region-specific endpoint
     'us-west-1': 's3-us-west-1.amazonaws.com',
     'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com', # no EMR endpoint yet
     '': 's3.amazonaws.com',
+}
+
+# map from AWS region to S3 LocationConstraint parameter
+# see http://docs.amazonwebservices.com/AmazonS3/latest/API/index.html?RESTBucketPUT.html
+REGION_TO_S3_LOCATION_CONSTRAINT = {
+    'EU': 'EU',
+    'us-west-1': 'us-west-1',
+    'us-east-1': '',
+    'ap-southeast-1': 'ap-southeast-1',
+    'ap-northeast-1': 'ap-northeast-1',
+    '': '',
 }
 
 
@@ -545,8 +556,12 @@ class EMRJobRunner(MRJobRunner):
             s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as scratch space' %
                      self._s3_temp_bucket_to_create)
+            if isinstance(self._aws_region, basestring):
+                location = REGION_TO_S3_LOCATION_CONSTRAINT[self._aws_region]
+            else:
+                location = ''
             s3_conn.create_bucket(self._s3_temp_bucket_to_create,
-                                  location='')
+                                  location=location)
             self._s3_temp_bucket_to_create = None
 
     def _check_and_fix_s3_dir(self, s3_uri):

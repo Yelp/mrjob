@@ -109,15 +109,11 @@ REGION_TO_S3_ENDPOINT = {
     '': 's3.amazonaws.com',
 }
 
-# map from AWS region to S3 LocationConstraint parameter
+# map from AWS region to S3 LocationConstraint parameter for regions whose
+# location constraints differ from their AWS regions
 # see http://docs.amazonwebservices.com/AmazonS3/latest/API/index.html?RESTBucketPUT.html
 REGION_TO_S3_LOCATION_CONSTRAINT = {
-    'EU': 'EU',
-    'us-west-1': 'us-west-1',
     'us-east-1': '',
-    'ap-southeast-1': 'ap-southeast-1',
-    'ap-northeast-1': 'ap-northeast-1',
-    '': '',
 }
 
 
@@ -556,12 +552,9 @@ class EMRJobRunner(MRJobRunner):
             s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as scratch space' %
                      self._s3_temp_bucket_to_create)
-            if isinstance(self._aws_region, basestring):
-                location = REGION_TO_S3_LOCATION_CONSTRAINT[self._aws_region]
-            else:
-                location = ''
+            location = REGION_TO_S3_LOCATION_CONSTRAINT.get(self._aws_region, self._aws_region)
             s3_conn.create_bucket(self._s3_temp_bucket_to_create,
-                                  location=location)
+                                  location=(location or ''))
             self._s3_temp_bucket_to_create = None
 
     def _check_and_fix_s3_dir(self, s3_uri):

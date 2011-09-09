@@ -31,7 +31,11 @@ from mrjob.job import MRJob
 from scipy.misc.common import factorial
 import sys
 import numpy
-import json
+
+try:
+    import simplejson as json
+except ImportError:
+    import json
 
 def map_int_to_tour(num_nodes, i, start_node):
     """Gets a unique tour through a graph given an integer and starting node.

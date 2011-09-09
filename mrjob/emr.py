@@ -35,6 +35,11 @@ except ImportError:
     from StringIO import StringIO
 
 try:
+    import simplejson as json # preferred because of C speedups
+except ImportError:
+    import json # built in to Python 2.6 and later
+
+try:
     import boto
     import boto.ec2
     import boto.exception
@@ -95,13 +100,20 @@ REGION_TO_EMR_ENDPOINT = {
 }
 
 # map from AWS region to S3 endpoint
-# see http://docs.amazonwebservices.com/AmazonS3/latest/dev/index.html?RequestEndpoints.html
+# see http://docs.amazonwebservices.com/AmazonS3/latest/dev/MakingRequests.html#RequestEndpoints
 REGION_TO_S3_ENDPOINT = {
     'EU': 's3-eu-west-1.amazonaws.com',
     'us-east-1': 's3.amazonaws.com', # no region-specific endpoint
     'us-west-1': 's3-us-west-1.amazonaws.com',
     'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com', # no EMR endpoint yet
     '': 's3.amazonaws.com',
+}
+
+# map from AWS region to S3 LocationConstraint parameter for regions whose
+# location constraints differ from their AWS regions
+# see http://docs.amazonwebservices.com/AmazonS3/latest/API/index.html?RESTBucketPUT.html
+REGION_TO_S3_LOCATION_CONSTRAINT = {
+    'us-east-1': '',
 }
 
 
@@ -235,6 +247,8 @@ class EMRJobRunner(MRJobRunner):
 
         Additional options:
 
+        :type additional_emr_info: JSON str, None, or JSON-encodable object
+        :param additional_emr_info: Special parameters to select additional features, mostly to support beta EMR features. Pass a JSON string on the command line or use regular data structures in the config file.
         :type aws_access_key_id: str
         :param aws_access_key_id: "username" for Amazon web services.
         :type aws_availability_zone: str
@@ -353,6 +367,10 @@ class EMRJobRunner(MRJobRunner):
             self._streaming_jar = self._add_file_for_upload(
                 self._opts['hadoop_streaming_jar'])
 
+        if not (isinstance(self._opts['additional_emr_info'], basestring)
+                or self._opts['additional_emr_info'] is None):
+            self._opts['additional_emr_info'] = json.dumps(self._opts['additional_emr_info'])
+
         # if we're bootstrapping mrjob, keep track of the file_dict
         # for mrjob.tar.gz
         self._mrjob_tar_gz_file = None
@@ -390,6 +408,7 @@ class EMRJobRunner(MRJobRunner):
     def _allowed_opts(cls):
         """A list of which keyword args we can pass to __init__()"""
         return super(EMRJobRunner, cls)._allowed_opts() + [
+            'additional_emr_info',
             'aws_access_key_id',
             'aws_availability_zone',
             'aws_secret_access_key',
@@ -533,8 +552,9 @@ class EMRJobRunner(MRJobRunner):
             s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as scratch space' %
                      self._s3_temp_bucket_to_create)
+            location = REGION_TO_S3_LOCATION_CONSTRAINT.get(self._aws_region, self._aws_region)
             s3_conn.create_bucket(self._s3_temp_bucket_to_create,
-                                  location=(self._aws_region or ''))
+                                  location=(location or ''))
             self._s3_temp_bucket_to_create = None
 
     def _check_and_fix_s3_dir(self, s3_uri):
@@ -848,6 +868,9 @@ class EMRJobRunner(MRJobRunner):
 
         if steps:
             args['steps'] = steps
+
+        if self._opts['additional_emr_info']:
+            args['additional_info'] = self._opts['additional_emr_info']
 
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (

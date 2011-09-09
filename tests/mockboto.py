@@ -251,6 +251,7 @@ class MockEmrConnection(object):
                     hadoop_version='0.18',
                     steps=None,
                     bootstrap_actions=[],
+                    additional_info=None,
                     now=None):
         """Mock of run_jobflow().
 
@@ -269,7 +270,7 @@ class MockEmrConnection(object):
         assert jobflow_id not in self.mock_emr_job_flows
 
         # create a MockEmrObject corresponding to the job flow. We only
-        # need to fill in the fields that EMRJobRunnerUses
+        # need to fill in the fields that EMRJobRunner uses
         job_flow = MockEmrObject(
             availabilityzone=availability_zone,
             creationdatetime=to_iso8601(now),

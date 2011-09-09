@@ -825,6 +825,10 @@ class MRJob(object):
         self.option_parser.add_option_group(self.emr_opt_group)
 
         self.emr_opt_group.add_option(
+            '--additional-emr-info', dest='additional_emr_info', default=None,
+            help='A JSON string for selecting additional features on EMR')
+
+        self.emr_opt_group.add_option(
             '--aws-availability-zone', dest='aws_availability_zone', default=None,
             help='Availability zone to run the job flow on')
 

@@ -122,7 +122,7 @@ def main():
                         'ec2_key_pair', 'ec2_key_pair_file',
                         'emr_endpoint',),
         hadoop_opt_group: ('hadoop_version', 'label', 'owner'),
-        job_opt_group: ('bootstrap_mrjob', 'bootstrap_cmds',
+        job_opt_group: ('bootstrap_actions', 'bootstrap_mrjob', 'bootstrap_cmds',
                         'bootstrap_files', 'bootstrap_python_packages',),
     }
 
@@ -155,10 +155,10 @@ def main():
         pprint_pools(runner)
 
     if options.find:
-        sorted_tagged_job_flows = runner.usable_job_flows()
+        sorted_job_flows = runner.usable_job_flows()
 
-        if sorted_tagged_job_flows:
-            time_to_hour, jf = sorted_tagged_job_flows[-1]
+        if sorted_job_flows:
+            jf = sorted_job_flows[-1]
             print 'You should use this one:'
             pprint_job_flow(jf)
         else:

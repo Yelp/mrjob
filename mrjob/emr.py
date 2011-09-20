@@ -1463,6 +1463,13 @@ class EMRJobRunner(MRJobRunner):
         if not self._s3_job_log_uri:
             return {}
 
+        job_flow = self._describe_jobflow()
+        if job_flow.keepjobflowalivewhennosteps:
+            log.info("Can't fetch counters from S3 for five more minutes. Try"
+                     " 'python -m mrjob.tools.emr.fetch_logs --counters %s'"
+                     " in five minutes." % job_flow.jobflowid)
+            return {}
+
         log.info('Fetching counters from S3...')
 
         if not skip_s3_wait:

@@ -500,9 +500,6 @@ class HadoopJobRunner(MRJobRunner):
                 args.append('-archives')
                 args.append(','.join(escaped_paths(all_files['archive'])))
 
-            if not args:
-                raise ValueError
-
         else:
             for file_dict in self._files:
                 if file_dict.get('upload') == 'file':

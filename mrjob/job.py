@@ -1173,7 +1173,7 @@ class MRJob(object):
         return (self.option_parser, self.mux_opt_group,
                 self.proto_opt_group, self.runner_opt_group,
                 self.hadoop_emr_opt_group, self.emr_opt_group,
-                mr_job.hadoop_opts_opt_group)
+                self.hadoop_opts_opt_group)
 
     def add_passthrough_option(self, *args, **kwargs):
         """Function to create options which both the job runner

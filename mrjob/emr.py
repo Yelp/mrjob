@@ -1797,17 +1797,6 @@ class EMRJobRunner(MRJobRunner):
             if not args == [pool_arg, self._pool_name]:
                 return False
 
-            # match other bootstrap actions
-            actions_minus_last = job_flow.bootstrapactions[:-1]
-            if len(self._bootstrap_actions) != len(actions_minus_last):
-                return False
-            for my_action, jf_action in zip(self._bootstrap_actions,
-                                            actions_minus_last):
-                if my_action['path'] != jf_action.path:
-                    return False
-                if my_action['args'] != [arg.value for arg in jf_action.args]:
-                    return False
-
             # sanity check for proper type of job flow
             if not job_flow.keepjobflowalivewhennosteps:
                 return False
@@ -1893,10 +1882,15 @@ class EMRJobRunner(MRJobRunner):
 
             return True
 
+        # strip unique s3 URI if there is one
+        cleaned_bootstrap_actions = [dict(path=fd['path'], args=fd['args'])
+                                     for fd in self._bootstrap_actions]
+
         things_to_hash = [
             [self.md5sum(fd['path']) for fd in self._files if should_include_file(fd)],
             self._opts['bootstrap_mrjob'],
             self._opts['bootstrap_cmds'],
+            cleaned_bootstrap_actions,
         ]
         if self._opts['bootstrap_mrjob']:
             things_to_hash.append(mrjob.__version__)

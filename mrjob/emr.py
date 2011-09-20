@@ -972,9 +972,12 @@ class EMRJobRunner(MRJobRunner):
         bootstrap_action_args = []
         
         for file_dict in self._bootstrap_actions:
+            # file_dict is not populated the same way by tools and real job
+            # runs, so use s3_uri or path as appropriate
+            s3_uri = file_dict.get('s3_uri', None) or file_dict['path']
             bootstrap_action_args.append(
                 boto.emr.BootstrapAction(
-                file_dict['name'], file_dict['s3_uri'], file_dict['args']))
+                file_dict['name'], s3_uri, file_dict['args']))
 
         if self._master_bootstrap_script:
             master_bootstrap_script_args = []

@@ -986,9 +986,11 @@ class EMRJobRunner(MRJobRunner):
         For < 0.20, populate cache_files and cache_archives.
         For >= 20, populate step_args.
 
-        step_args should be inserted before anything else.
+        step_args should be inserted into the step arguments before anything
+            else.
+
         cache_files and cache_archives should be passed as arguments to
-        StreamingStep.
+            StreamingStep.
         """
         version = self.get_hadoop_version()
 

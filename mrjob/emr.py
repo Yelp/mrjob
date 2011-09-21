@@ -957,39 +957,7 @@ class EMRJobRunner(MRJobRunner):
             input = self._s3_step_input_uris(step_num)
             output = self._s3_step_output_uri(step_num)
 
-            step_args = []
-            cache_files = []
-            cache_archives = []
-
-            if compat.supports_new_distributed_cache_options(version):
-                # boto doesn't support non-deprecated 0.20 options, so insert
-                # them ourselves
-
-                def escaped_paths(file_dicts):
-                    # return list of strings ready for comma-joining for passing to the
-                    # hadoop binary
-                    return ["%s#%s" % (fd['s3_uri'], fd['name']) for fd in file_dicts]
-
-                # index by type
-                all_files = {}
-                for fd in self._files:
-                    all_files.setdefault(fd.get('upload'), []).append(fd)
-
-                if 'file' in all_files:
-                    step_args.append('-files')
-                    step_args.append(','.join(escaped_paths(all_files['file'])))
-
-                if 'archive' in all_files:
-                    step_args.append('-archives')
-                    step_args.append(','.join(escaped_paths(all_files['archive'])))
-            else:
-                for file_dict in self._files:
-                    if file_dict.get('upload') == 'file':
-                        cache_files.append(
-                            '%s#%s' % (file_dict['s3_uri'], file_dict['name']))
-                    elif file_dict.get('upload') == 'archive':
-                        cache_archives.append(
-                            '%s#%s' % (file_dict['s3_uri'], file_dict['name']))
+            step_args, cache_files, cache_archives = self._cache_args()
 
             step_args.extend(self._hadoop_conf_args(step_num, len(steps)))
             jar = self._get_jar()
@@ -1010,6 +978,55 @@ class EMRJobRunner(MRJobRunner):
             step_list.append(streaming_step)
 
         return step_list
+
+    def _cache_args(self):
+        """Returns ``(step_args, cache_files, cache_archives)``, populating
+        each according to the correct behavior for the current Hadoop version.
+
+        For < 0.20, populate cache_files and cache_archives.
+        For >= 20, populate step_args.
+
+        step_args should be inserted before anything else.
+        cache_files and cache_archives should be passed as arguments to
+        StreamingStep.
+        """
+        version = self.get_hadoop_version()
+
+        step_args = []
+        cache_files = []
+        cache_archives = []
+
+        if compat.supports_new_distributed_cache_options(version):
+            # boto doesn't support non-deprecated 0.20 options, so insert
+            # them ourselves
+
+            def escaped_paths(file_dicts):
+                # return list of strings ready for comma-joining for passing to the
+                # hadoop binary
+                return ["%s#%s" % (fd['s3_uri'], fd['name']) for fd in file_dicts]
+
+            # index by type
+            all_files = {}
+            for fd in self._files:
+                all_files.setdefault(fd.get('upload'), []).append(fd)
+
+            if 'file' in all_files:
+                step_args.append('-files')
+                step_args.append(','.join(escaped_paths(all_files['file'])))
+
+            if 'archive' in all_files:
+                step_args.append('-archives')
+                step_args.append(','.join(escaped_paths(all_files['archive'])))
+        else:
+            for file_dict in self._files:
+                if file_dict.get('upload') == 'file':
+                    cache_files.append(
+                        '%s#%s' % (file_dict['s3_uri'], file_dict['name']))
+                elif file_dict.get('upload') == 'archive':
+                    cache_archives.append(
+                        '%s#%s' % (file_dict['s3_uri'], file_dict['name']))
+
+        return step_args, cache_files, cache_archives
 
     def _get_jar(self):
         self._name_files()

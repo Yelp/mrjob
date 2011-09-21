@@ -499,8 +499,7 @@ class EMRJobRunner(MRJobRunner):
         })
 
     def _fix_ec2_instance_types(self):
-        """
-        Fixes two issues regarding ec2_instance_type and self._opts:
+        """Fixes two issues regarding ec2_instance_type and self._opts:
 
             1. If the *ec2_instance_type* option is set, override
                instance type for the nodes that actually run tasks
@@ -518,7 +517,11 @@ class EMRJobRunner(MRJobRunner):
                 self._opts['ec2_master_instance_type'] = ec2_instance_type
 
         elif self._opts['ec2_core_instance_type']:
+            # ec2_core_instance_type is a command line & mrjob.conf alias
+            # for ec2_slave_instance_type.
+            # Within EMRJobRunner we only ever use ec2_slave_instance_type.
             self._opts['ec2_slave_instance_type'] = self._opts['ec2_core_instance_type']
+            self._opts['ec2_core_instance_type'] = None
 
     def _fix_s3_scratch_and_log_uri_opts(self):
         """Fill in s3_scratch_uri and s3_log_uri (in self._opts) if they
@@ -877,8 +880,7 @@ class EMRJobRunner(MRJobRunner):
             jobflow = self._describe_jobflow()
 
     def _create_instance_group(self, role, instance_type, count, bid_price):
-        """
-        Helper method for creating instance groups. For use when
+        """Helper method for creating instance groups. For use when
         creating a jobflow using a list of InstanceGroups, instead
         of the typical triumverate of
         num_instances/master_instance_type/slave_instance_type.
@@ -913,8 +915,7 @@ class EMRJobRunner(MRJobRunner):
             )
 
     def _create_job_flow(self, persistent=False, steps=None):
-        """
-        Create an empty job flow on EMR, and return the ID of that
+        """Create an empty job flow on EMR, and return the ID of that
         job.
 
         persistent -- if this is true, create the job flow with the --alive

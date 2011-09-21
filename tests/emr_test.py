@@ -348,9 +348,9 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            assert_not_in('-files', runner._describe_jobflow().steps[-1].args())
-            assert_in('-cacheFile', runner._describe_jobflow().steps[-1].args())
-            assert_not_in('-combiner', runner._describe_jobflow().steps[-1].args())
+            assert_not_in('-files', runner._describe_jobflow().steps[0].args())
+            assert_in('-cacheFile', runner._describe_jobflow().steps[0].args())
+            assert_not_in('-combiner', runner._describe_jobflow().steps[0].args())
 
     def test_args_version_020(self):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
@@ -364,9 +364,9 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            assert_in('-files', runner._describe_jobflow().steps[-1].args())
-            assert_not_in('-cacheFile', runner._describe_jobflow().steps[-1].args())
-            assert_in('-combiner', runner._describe_jobflow().steps[-1].args())
+            assert_in('-files', runner._describe_jobflow().steps[0].args())
+            assert_not_in('-cacheFile', runner._describe_jobflow().steps[0].args())
+            assert_in('-combiner', runner._describe_jobflow().steps[0].args())
 
 
 class S3ScratchURITestCase(MockEMRAndS3TestCase):

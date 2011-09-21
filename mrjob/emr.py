@@ -995,8 +995,6 @@ class EMRJobRunner(MRJobRunner):
             jar = self._get_jar()
 
             if combiner is not None:
-                # boto 2.0 doesn't support combiners in StreamingStep, so insert
-                # them into step_args manually.
                 if compat.supports_combiners_in_hadoop_streaming(version):
                     step_args.extend(['-combiner', combiner])
                 else:
@@ -1368,7 +1366,6 @@ class EMRJobRunner(MRJobRunner):
             return {}
 
         job_flow = self._describe_jobflow()
-        log.info(job_flow.keepjobflowalivewhennosteps)
         if job_flow.keepjobflowalivewhennosteps in (True, 'true'):
             log.info("Can't fetch counters from S3 for five more minutes. Try"
                      " 'python -m mrjob.tools.emr.fetch_logs --counters %s'"

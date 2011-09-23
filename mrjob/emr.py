@@ -1493,36 +1493,12 @@ class EMRJobRunner(MRJobRunner):
         writeln('from xml.etree.ElementTree import ElementTree')
         writeln()
 
-        # read credentials
-        # see http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?Bootstrap.html for details about config files
-        writeln('# read credentials')
-        writeln("if os.path.exists('/home/hadoop/conf/core-site.xml'):")
-        writeln("    xml_conf_path = '/home/hadoop/conf/core-site.xml'")
-        writeln("else:")
-        writeln("    xml_conf_path = '/home/hadoop/conf/hadoop-site.xml'")
-        writeln()
-        writeln('root = ElementTree().parse(xml_conf_path)')
-        writeln("configs = dict((e.find('name').text, e.find('value').text)")
-        writeln("               for e in root.findall('property'))")
-        writeln("access_key = configs['fs.s3.awsAccessKeyId']")
-        writeln("secret_key = configs['fs.s3.awsSecretAccessKey']")
-        writeln()
-
-        # set up s3cmd. Use a temp file in case ~/.s3cfg already exists
-        writeln('# set up s3cmd')
-        writeln("_, s3cfg_path = mkstemp(prefix='s3cfg')")
-        writeln("with open(s3cfg_path, 'w') as s3cfg:")
-        writeln(r"    s3cfg.write('[default]\n')")
-        writeln(r"    s3cfg.write('access_key = %s\n' % access_key)")
-        writeln(r"    s3cfg.write('secret_key = %s\n' % secret_key)")
-        writeln()
-
-        # download files using s3cmd
-        writeln('# download files using s3cmd')
+        # download files using hadoop fs
+        writeln('# download files using hadoop fs -copyToLocal')
         for file_dict in self._files:
             if file_dict.get('bootstrap'):
                 writeln(
-                    "check_call(['s3cmd', '-c', s3cfg_path, 'get', %r, %r])" %
+                    "check_call(['hadoop', 'fs', '-copyToLocal', %r, %r])" %
                     (file_dict['s3_uri'], file_dict['name']))
         writeln()
 

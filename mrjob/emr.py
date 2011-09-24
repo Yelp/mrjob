@@ -1027,6 +1027,8 @@ class EMRJobRunner(MRJobRunner):
         # then shuts itself down (in practice this takes several minutes)
         steps = self._get_steps()
         step_list = []
+
+        version = self.get_hadoop_version()
         
         for step_num, step in enumerate(steps):
             # EMR-specific stuff
@@ -1055,9 +1057,72 @@ class EMRJobRunner(MRJobRunner):
             else:
                 reducer = None
 
-            cache_files = []
-            cache_archives = []
+            input = self._s3_step_input_uris(step_num)
+            output = self._s3_step_output_uri(step_num)
 
+            step_args, cache_files, cache_archives = self._cache_args()
+
+            step_args.extend(self._hadoop_conf_args(step_num, len(steps)))
+            jar = self._get_jar()
+
+            if combiner is not None:
+                if compat.supports_combiners_in_hadoop_streaming(version):
+                    step_args.extend(['-combiner', combiner])
+                else:
+                    mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
+
+            streaming_step = boto.emr.StreamingStep(
+                name=name, mapper=mapper, reducer=reducer,
+                action_on_failure=action_on_failure,
+                cache_files=cache_files, cache_archives=cache_archives,
+                step_args=step_args, input=input, output=output,
+                jar=jar)
+
+            step_list.append(streaming_step)
+
+        return step_list
+
+    def _cache_args(self):
+        """Returns ``(step_args, cache_files, cache_archives)``, populating
+        each according to the correct behavior for the current Hadoop version.
+
+        For < 0.20, populate cache_files and cache_archives.
+        For >= 20, populate step_args.
+
+        step_args should be inserted into the step arguments before anything
+            else.
+
+        cache_files and cache_archives should be passed as arguments to
+            StreamingStep.
+        """
+        version = self.get_hadoop_version()
+
+        step_args = []
+        cache_files = []
+        cache_archives = []
+
+        if compat.supports_new_distributed_cache_options(version):
+            # boto doesn't support non-deprecated 0.20 options, so insert
+            # them ourselves
+
+            def escaped_paths(file_dicts):
+                # return list of strings ready for comma-joining for passing to the
+                # hadoop binary
+                return ["%s#%s" % (fd['s3_uri'], fd['name']) for fd in file_dicts]
+
+            # index by type
+            all_files = {}
+            for fd in self._files:
+                all_files.setdefault(fd.get('upload'), []).append(fd)
+
+            if 'file' in all_files:
+                step_args.append('-files')
+                step_args.append(','.join(escaped_paths(all_files['file'])))
+
+            if 'archive' in all_files:
+                step_args.append('-archives')
+                step_args.append(','.join(escaped_paths(all_files['archive'])))
+        else:
             for file_dict in self._files:
                 if file_dict.get('upload') == 'file':
                     cache_files.append(
@@ -1066,40 +1131,7 @@ class EMRJobRunner(MRJobRunner):
                     cache_archives.append(
                         '%s#%s' % (file_dict['s3_uri'], file_dict['name']))
 
-            input = self._s3_step_input_uris(step_num)
-            output = self._s3_step_output_uri(step_num)
-
-            step_args = self._hadoop_conf_args(step_num, len(steps))
-            jar = self._get_jar()
-
-            if combiner is not None:
-                # boto 2.0 doesn't support combiners in StreamingStep, so insert
-                # them into step_args manually.
-                version = self.get_hadoop_version()
-                if compat.supports_combiners_in_hadoop_streaming(version):
-                    step_args.extend(['-combiner', combiner])
-                else:
-                    mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
-
-            try:
-                streaming_step = boto.emr.StreamingStep(
-                    name=name, mapper=mapper, reducer=reducer,
-                    action_on_failure=action_on_failure,
-                    cache_files=cache_files, cache_archives=cache_archives,
-                    step_args=step_args, input=input, output=output,
-                    jar=jar)
-            except TypeError:
-                # The jar option is supported in boto 2.0 but not 2.0b4.
-                streaming_step = boto.emr.StreamingStep(
-                    name=name, mapper=mapper, reducer=reducer,
-                    action_on_failure=action_on_failure,
-                    cache_files=cache_files, cache_archives=cache_archives,
-                    step_args=step_args, input=input, output=output)
-                streaming_step.jar = lambda: jar
-
-            step_list.append(streaming_step)
-
-        return step_list
+        return step_args, cache_files, cache_archives
 
     def _get_jar(self):
         self._name_files()
@@ -1467,7 +1499,7 @@ class EMRJobRunner(MRJobRunner):
             return {}
 
         job_flow = self._describe_jobflow()
-        if job_flow.keepjobflowalivewhennosteps:
+        if job_flow.keepjobflowalivewhennosteps in (True, 'true'):
             log.info("Can't fetch counters from S3 for five more minutes. Try"
                      " 'python -m mrjob.tools.emr.fetch_logs --counters %s'"
                      " in five minutes." % job_flow.jobflowid)
@@ -1611,36 +1643,12 @@ class EMRJobRunner(MRJobRunner):
         writeln('from xml.etree.ElementTree import ElementTree')
         writeln()
 
-        # read credentials
-        # see http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?Bootstrap.html for details about config files
-        writeln('# read credentials')
-        writeln("if os.path.exists('/home/hadoop/conf/core-site.xml'):")
-        writeln("    xml_conf_path = '/home/hadoop/conf/core-site.xml'")
-        writeln("else:")
-        writeln("    xml_conf_path = '/home/hadoop/conf/hadoop-site.xml'")
-        writeln()
-        writeln('root = ElementTree().parse(xml_conf_path)')
-        writeln("configs = dict((e.find('name').text, e.find('value').text)")
-        writeln("               for e in root.findall('property'))")
-        writeln("access_key = configs['fs.s3.awsAccessKeyId']")
-        writeln("secret_key = configs['fs.s3.awsSecretAccessKey']")
-        writeln()
-
-        # set up s3cmd. Use a temp file in case ~/.s3cfg already exists
-        writeln('# set up s3cmd')
-        writeln("_, s3cfg_path = mkstemp(prefix='s3cfg')")
-        writeln("with open(s3cfg_path, 'w') as s3cfg:")
-        writeln(r"    s3cfg.write('[default]\n')")
-        writeln(r"    s3cfg.write('access_key = %s\n' % access_key)")
-        writeln(r"    s3cfg.write('secret_key = %s\n' % secret_key)")
-        writeln()
-
-        # download files using s3cmd
-        writeln('# download files using s3cmd')
+        # download files using hadoop fs
+        writeln('# download files using hadoop fs -copyToLocal')
         for file_dict in self._files:
             if file_dict.get('bootstrap'):
                 writeln(
-                    "check_call(['s3cmd', '-c', s3cfg_path, 'get', %r, %r])" %
+                    "check_call(['hadoop', 'fs', '-copyToLocal', %r, %r])" %
                     (file_dict['s3_uri'], file_dict['name']))
         writeln()
 

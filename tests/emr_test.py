@@ -30,12 +30,14 @@ from StringIO import StringIO
 import tempfile
 from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in, assert_raises, setup, teardown, assert_not_equal
 
+import mrjob
 from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
-from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri
-from mrjob.parse import JOB_NAME_RE
+from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri, attempt_to_acquire_lock, _lock_acquire_step_1, _lock_acquire_step_2, make_lock_uri
+from mrjob.parse import JOB_NAME_RE, parse_s3_uri
 from mrjob.ssh import SSH_LOG_ROOT, SSH_PREFIX
 from mrjob.util import tar_and_gzip
+
 from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, MockKey, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
 from tests.mockssh import create_mock_ssh_script, mock_ssh_dir, mock_ssh_file
 from tests.mr_two_step_job import MRTwoStepJob
@@ -87,6 +89,9 @@ class MockEMRAndS3TestCase(TestCase):
         self._real_boto_emr_EmrConnection = boto.emr.EmrConnection
         boto.emr.EmrConnection = mock_boto_emr_EmrConnection
 
+        # copy the old environment just to be polite
+        self._old_environ = os.environ.copy()
+
     @teardown
     def unsandbox_boto(self):
         boto.connect_s3 = self._real_boto_connect_s3
@@ -105,6 +110,7 @@ class MockEMRAndS3TestCase(TestCase):
         # Create temporary directories and add them to MOCK_SSH_ROOTS
         self.master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
         os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % self.master_ssh_root
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
 
         self.slave_ssh_roots = []
 
@@ -120,11 +126,11 @@ class MockEMRAndS3TestCase(TestCase):
             f.write('I AM DEFINITELY AN SSH KEY FILE')
 
         # Tell the runner to use the fake binary
-        self.runner._opts['ssh_bin'] = [self.ssh_bin]
+        runner._opts['ssh_bin'] = [self.ssh_bin]
         # Inject a master node hostname so it doesn't try to 'emr --describe' it
-        self.runner._address = 'testmaster'
+        runner._address = 'testmaster'
         # Also pretend to have an SSH key pair file
-        self.runner._opts['ec2_key_pair_file'] = self.keyfile_path
+        runner._opts['ec2_key_pair_file'] = self.keyfile_path
 
     def add_slave(self):
         """Add a mocked slave to the cluster"""
@@ -1168,7 +1174,7 @@ class TestNoBoto(TestCase):
                       conf_path=False, s3_scratch_uri='s3://foo/tmp')
 
 
-class TestBootstrapScripts(MockEMRAndS3TestCase):
+class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
     @setup
     def make_tmp_dir(self):
@@ -1209,8 +1215,8 @@ class TestBootstrapScripts(MockEMRAndS3TestCase):
                               bootstrap_mrjob=False,
                               bootstrap_actions=['foo', 'bar baz'])
         runner._create_master_bootstrap_script(dest=script_path)
-        assert not os.path.exists(script_path)
 
+        assert not os.path.exists(script_path)
 
     def test_bootstrap_actions_get_added(self):
         bootstrap_actions = [
@@ -1234,8 +1240,8 @@ class TestBootstrapScripts(MockEMRAndS3TestCase):
             actions[0].path,
             's3://elasticmapreduce/bootstrap-actions/configure-hadoop')
         assert_equal(
-            actions[0].args,
-            ['-m,mapred.tasktracker.map.tasks.maximum=1'])
+            actions[0].args[0].value,
+            '-m,mapred.tasktracker.map.tasks.maximum=1')
         assert_equal(actions[0].name, 'configure-hadoop')
 
         assert_equal(actions[1].path, 's3://foo/bar')
@@ -1275,7 +1281,8 @@ class TestBootstrapScripts(MockEMRAndS3TestCase):
         assert actions[0].path.startswith('s3://mrjob-')
         assert actions[0].path.endswith('/apt-install.sh')
         assert_equal(actions[0].name, 'apt-install.sh')
-        assert_equal(actions[0].args, ['python-scipy', 'mysql-server'])
+        assert_equal(actions[0].args[0].value, 'python-scipy')
+        assert_equal(actions[0].args[1].value, 'mysql-server')
 
         # check for master boostrap script
         assert actions[1].path.startswith('s3://mrjob-')
@@ -1388,6 +1395,322 @@ class TestCat(MockEMRAndS3TestCase):
 
         assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
 
+
+class PoolingTestCase(MockEMRAndS3TestCase):
+
+    @setup
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    @teardown
+    def rm_tmp_dir(self):
+        try:
+            shutil.rmtree(self.tmp_dir)
+            self.teardown_ssh()
+        except OSError:
+            pass # didn't set up SSH
+
+    def sorted_results_for_runner_with_args(self, job_args):
+        mr_job = MRTwoStepJob(job_args)
+        mr_job.sandbox()
+
+        results = []
+        with mr_job.make_runner() as runner:
+            self.prepare_runner_for_ssh(runner)
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+        return sorted(results)
+
+    def make_pooled_job_flow(self, name=None, back_in_time=0, **kwargs):
+        """Returns (runner, job_flow_id). Set back_in_time to set
+        jobflow.startdatetime to seconds before datetime.datetime.now()."""
+        runner = EMRJobRunner(conf_path=self.mrjob_conf_path,
+                              pool_emr_job_flows=True,
+                              emr_job_flow_pool_name=name,
+                              **kwargs)
+        job_flow_id = runner.make_persistent_job_flow()
+        jf = runner.make_emr_conn().describe_jobflow(job_flow_id)
+        jf.state = 'WAITING'
+        start = (datetime.datetime.now() - datetime.timedelta(minutes=40))
+        jf.startdatetime = start.strftime(boto.utils.ISO8601)
+        return runner, job_flow_id
+
+    def make_simple_runner(self, pool_name):
+        """Make an EMRJobRunner that is ready to try to find a pool to join"""
+        mr_job = MRTwoStepJob([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', pool_name,
+            '-c', self.mrjob_conf_path])
+        mr_job.sandbox()
+        runner = mr_job.make_runner()
+        self.prepare_runner_for_ssh(runner)
+        runner._prepare_for_launch()
+        return runner
+
+    def test_make_new_pooled_job_flow(self):
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool-emr-job-flows',
+                               '-c', self.mrjob_conf_path])
+        mr_job.sandbox()
+
+        results = []
+        with mr_job.make_runner() as runner:
+            self.prepare_runner_for_ssh(runner)
+            runner.run()
+
+            # Make sure that the runner made a pooling-enabled job flow
+            emr_conn = runner.make_emr_conn()
+            job_flow_id = runner.get_emr_job_flow_id()
+            job_flow = emr_conn.describe_jobflow(job_flow_id)
+            bootstrap_action = job_flow.bootstrapactions[0]
+            runner_jobflow_args = [a.value for a in bootstrap_action.args]
+            assert runner._pool_arg() in runner_jobflow_args
+            assert_equal(job_flow.state, 'WAITING')
+
+    def test_join_pooled_job_flow(self):
+        _, job_flow_id = self.make_pooled_job_flow()
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-c', self.mrjob_conf_path])
+        assert_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_join_named_pool(self):
+        _, job_flow_id = self.make_pooled_job_flow('pool1')
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', 'pool1',
+            '-c', self.mrjob_conf_path])
+        assert_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_dont_join_full_job_flow(self):
+        dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
+
+        # insert first item
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', 'pool1',
+            '-c', self.mrjob_conf_path])
+        assert_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+        # copy it
+        jf = dummy_runner.make_emr_conn().describe_jobflow(job_flow_id)
+        jf.steps = jf.steps * 128
+
+        # make sure next attempt at joining uses new job flow
+        self.mock_emr_output = {(job_flow_id, 257): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', 'pool1',
+            '-c', self.mrjob_conf_path])
+        assert_not_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_dont_join_wrong_named_pool(self):
+        _, job_flow_id = self.make_pooled_job_flow('pool1')
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', 'not_pool1',
+            '-c', self.mrjob_conf_path])
+
+        assert_not_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_dont_join_wrong_mrjob_version(self):
+        _, job_flow_id = self.make_pooled_job_flow('pool1')
+        old_version = mrjob.__version__
+        mrjob.__version__ = 'OVER NINE THOUSAAAAAND'
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', 'not_pool1',
+            '-c', self.mrjob_conf_path])
+
+        mrjob.__version__ = old_version
+
+        assert_not_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_join_similarly_bootstrapped_pool(self):
+        local_input_path = os.path.join(self.tmp_dir, 'input')
+        with open(local_input_path, 'w') as input_file:
+            input_file.write('bar\nfoo\n')
+
+        _, job_flow_id = self.make_pooled_job_flow(bootstrap_files=[local_input_path])
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--bootstrap-file', local_input_path,
+            '-c', self.mrjob_conf_path])
+
+        assert_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_dont_join_differently_bootstrapped_pool(self):
+        local_input_path = os.path.join(self.tmp_dir, 'input')
+        with open(local_input_path, 'w') as input_file:
+            input_file.write('bar\nfoo\n')
+
+        _, job_flow_id = self.make_pooled_job_flow()
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--bootstrap-file', local_input_path,
+            '-c', self.mrjob_conf_path])
+
+        assert_not_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_dont_join_differently_bootstrapped_pool_2(self):
+        local_input_path = os.path.join(self.tmp_dir, 'input')
+        with open(local_input_path, 'w') as input_file:
+            input_file.write('bar\nfoo\n')
+
+        bootstrap_path = os.path.join(self.tmp_dir, 'go.sh')
+        with open(bootstrap_path, 'w') as f:
+            f.write('#!/usr/bin/sh\necho "hi mom"\n')
+
+        _, job_flow_id = self.make_pooled_job_flow()
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--bootstrap-action', bootstrap_path + ' a b c',
+            '-c', self.mrjob_conf_path])
+
+        assert_not_equal(results,
+            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_pool_competition(self):
+        _, job_flow_id = self.make_pooled_job_flow('robert_downey_jr')
+
+        def runner_plz():
+            mr_job = MRTwoStepJob([
+                '-r', 'emr', '-v', '--pool-emr-job-flows',
+                '--pool-name', 'robert_downey_jr',
+                '-c', self.mrjob_conf_path])
+            mr_job.sandbox()
+            runner = mr_job.make_runner()
+            runner._prepare_for_launch()
+            return runner
+
+        runner1 = runner_plz()
+        runner2 = runner_plz()
+
+        jf1 = runner1.find_job_flow()
+        jf2 = runner2.find_job_flow()
+        assert_equal(jf1.jobflowid, job_flow_id)
+        assert_equal(jf2, None)
+        jf1.status = 'COMPLETED'
+
+    def test_sorting_by_time(self):
+        _, job_flow_id_1 = self.make_pooled_job_flow('pool1', back_in_time=20)
+        _, job_flow_id_2 = self.make_pooled_job_flow('pool1', back_in_time=40)
+
+        runner1 = self.make_simple_runner('pool1')
+        runner2 = self.make_simple_runner('pool1')
+
+        jf1 = runner1.find_job_flow()
+        jf2 = runner2.find_job_flow()
+        assert_equal(jf1.jobflowid, job_flow_id_1)
+        assert_equal(jf2.jobflowid, job_flow_id_2)
+        jf1.status = 'COMPLETED'
+        jf2.status = 'COMPLETED'
+
+    def test_sorting_by_cpu_hours(self):
+        _, job_flow_id_1 = self.make_pooled_job_flow('pool1',
+                                                     back_in_time=40,
+                                                     num_ec2_instances=2)
+        _, job_flow_id_2 = self.make_pooled_job_flow('pool1',
+                                                     back_in_time=20,
+                                                     num_ec2_instances=1)
+
+        runner1 = self.make_simple_runner('pool1')
+        runner2 = self.make_simple_runner('pool1')
+
+        jf1 = runner1.find_job_flow()
+        jf2 = runner2.find_job_flow()
+        assert_equal(jf1.jobflowid, job_flow_id_1)
+        assert_equal(jf2.jobflowid, job_flow_id_2)
+        jf1.status = 'COMPLETED'
+        jf2.status = 'COMPLETED'
+
+
+class S3LockTestCase(MockEMRAndS3TestCase):
+
+    @setup
+    def make_buckets(self):
+        self.add_mock_s3_data({'locks': {}})
+        self.lock_uri = 's3://locks/some_lock'
+
+    def test_lock(self):
+        # Most basic test case
+        runner = EMRJobRunner(conf_path=False)
+        s3_conn = runner.make_s3_conn()
+        assert attempt_to_acquire_lock(s3_conn, self.lock_uri, 0, 'jf1'), 'Basic lock should succeed for first'
+        assert not attempt_to_acquire_lock(s3_conn, self.lock_uri, 0, 'jf2'), 'Basic lock should fail for second'
+
+    def test_key_race_condition(self):
+        # Test case where one attempt puts the key in existence 
+        runner = EMRJobRunner(conf_path=False)
+        s3_conn = runner.make_s3_conn()
+
+        key = _lock_acquire_step_1(s3_conn, self.lock_uri, 'jf1')
+        assert_not_equal(key, None)
+
+        key2 = _lock_acquire_step_1(s3_conn, self.lock_uri, 'jf2')
+        assert_equal(key2, None)
+
+    def test_read_race_condition(self):
+        # test case where both try to create the key
+        runner = EMRJobRunner(conf_path=False)
+        s3_conn = runner.make_s3_conn()
+
+        key = _lock_acquire_step_1(s3_conn, self.lock_uri, 'jf1')
+        assert_not_equal(key, None)
+
+        # acquire the key by subversive means to simulate contention
+        bucket_name, key_prefix = parse_s3_uri(self.lock_uri)
+        bucket = s3_conn.get_bucket(bucket_name)
+        key2 = bucket.get_key(key_prefix)
+
+        # and take the lock!
+        key2.set_contents_from_string('jf2')
+
+        assert not _lock_acquire_step_2(key, 'jf1'), 'Lock should fail'
 
 def TestCatFallback(MockEMRAndS3TestCase):
 

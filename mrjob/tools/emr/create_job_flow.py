@@ -88,9 +88,11 @@ def make_option_parser():
             'ec2_master_instance_type',
             'ec2_slave_instance_type',
             'emr_endpoint',
+            'emr_job_flow_pool_name',
             'enable_emr_debugging',
             'hadoop_version',
             'num_ec2_instances',
+            'pool_emr_job_flows',
             's3_endpoint',
             's3_log_uri',
             's3_scratch_uri',
@@ -100,10 +102,7 @@ def make_option_parser():
 
     # Scrape options from MRJob and index them by dest
     mr_job = MRJob()
-    job_option_groups = (mr_job.option_parser, mr_job.mux_opt_group,
-                         mr_job.proto_opt_group, mr_job.runner_opt_group,
-                         mr_job.hadoop_emr_opt_group, mr_job.emr_opt_group,
-                         mr_job.hadoop_opts_opt_group)
+    job_option_groups = mr_job.all_option_groups()
     scrape_options_into_new_groups(job_option_groups, assignments)
     return option_parser
 

@@ -78,10 +78,12 @@ Option                        Default                        Combined by        
 *ec2_slave_instance_type*     ``'m1.small'``                 :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-slave-instance-type`
 *emr_endpoint*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--emr-endpoint`
 *emr_job_flow_id*             (create our own job flow)      :py:func:`~mrjob.conf.combine_values`     :option:`--emr-job-flow-id`
+*emr_job_flow_pool_name*      ``'default'``                  :py:func:`~mrjob.conf.combine_values`     :option:`--pool-name`
 *enable_emr_debugging*        ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--enable-emr-debugging`, :option:`--disable-emr-debugging`
 *hadoop_streaming_jar_on_emr* ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-streaming-jar-on-emr`
 *hadoop_version*              ``'0.20'``                     :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-version`
 *num_ec2_instances*           ``1``                          :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-instances`
+*pool_emr_job_flows*          ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--pool-emr-job-flows`
 *s3_endpoint*                 (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-endpoint`
 *s3_log_uri*                  (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-log-uri`
 *s3_scratch_uri*              (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--s3-scratch-uri`

@@ -22,6 +22,7 @@ ad-hoc mock objects.
 """
 from __future__ import with_statement
 import datetime
+import hashlib
 
 try:
     from boto.emr.connection import EmrConnection
@@ -161,6 +162,12 @@ class MockKey(object):
         with open(path) as f:
             self.write_mock_data(f.read())
 
+    def get_contents_as_string(self):
+        return self.read_mock_data()
+
+    def set_contents_from_string(self, string):
+        self.write_mock_data(string)
+
     def delete(self):
         if self.name in self.bucket.mock_state():
             del self.bucket.mock_state()[self.name]
@@ -191,6 +198,13 @@ class MockKey(object):
             raise boto.exception.S3ResponseError(404, 'Not Found')
     
     last_modified = property(_get_last_modified, _set_last_modified)
+
+    def _get_etag(self):
+        m = hashlib.md5()
+        m.update(self.get_contents_as_string())
+        return m.hexdigest()
+
+    etag = property(_get_etag)
 
 ### EMR ###
 
@@ -273,14 +287,22 @@ class MockEmrConnection(object):
         jobflow_id = 'j-MOCKJOBFLOW%d' % len(self.mock_emr_job_flows)
         assert jobflow_id not in self.mock_emr_job_flows
 
+        def make_fake_action(real_action):
+            return MockEmrObject(name=real_action.name,
+                                 path=real_action.path,
+                                 args=[MockEmrObject(value=v) for v \
+                                       in real_action.bootstrap_action_args])
+
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunnerUses
         job_flow = MockEmrObject(
             availabilityzone=availability_zone,
+            bootstrapactions=[make_fake_action(a) for a in bootstrap_actions],
             creationdatetime=to_iso8601(now),
             ec2keyname=ec2_keyname,
             hadoopversion=hadoop_version,
-            instancecount=num_instances,
+            instancecount=str(num_instances),
+            jobflowid=jobflow_id,
             keepjobflowalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
             masterinstancetype=master_instance_type,
@@ -292,13 +314,6 @@ class MockEmrConnection(object):
         # don't always set loguri, so we can test Issue #112
         if log_uri is not None:
             job_flow.loguri = log_uri
-
-        # setup bootstrap actions
-        if bootstrap_actions:
-            job_flow.bootstrapactions = [
-                MockEmrObject(
-                    name=action.name, path=action.path, args=action.args())
-                for action in bootstrap_actions]
 
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
@@ -539,4 +554,3 @@ class MockEmrObject(object):
             self.__class__.__name__,
             ', '.join('%s=%r' % (k, v)
                       for k, v in sorted(self.__dict__.iteritems()))))
-                                        

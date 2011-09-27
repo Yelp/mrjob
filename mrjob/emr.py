@@ -66,7 +66,7 @@ if boto is not None:
 
 log = logging.getLogger('mrjob.emr')
 
-S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
+S3_URI_RE = re.compile(r'^(?P<scheme>s3|s3n)://(?P<bucket_name>[^/]+)/(?P<path>.*)$')
 SSH_URI_RE = re.compile(r'^%s(?P<hostname>[^/]+)?(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
 JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
 
@@ -118,7 +118,7 @@ def parse_s3_uri(uri):
     """
     match = S3_URI_RE.match(uri)
     if match:
-        return match.groups()
+        return (match.group('bucket_name'), match.group('path'))
     else:
         raise ValueError('Invalid S3 URI: %s' % uri)
 
@@ -255,7 +255,7 @@ class EMRJobRunner(MRJobRunner):
         :type bootstrap_cmds: list
         :param bootstrap_cmds: a list of commands to run on the master node to set up libraries, etc. Like *setup_cmds*, these can be strings, which will be run in the shell, or lists of args, which will be run directly. Prepend ``sudo`` to commands to do things that require root privileges.
         :type bootstrap_files: list of str
-        :param bootstrap_files: files to upload to the master node before running *bootstrap_cmds* (for example, debian packages).
+        :param bootstrap_files: files to download to the bootstrap working directory on the master node before running *bootstrap_cmds* (for example, debian packages). May be local files for mrjob to upload to S3, or any URI that ``hadoop fs`` can handle.
         :type bootstrap_mrjob: boolean
         :param bootstrap_mrjob: This is actually an option in the base MRJobRunner class. If this is ``True`` (the default), we'll tar up :mod:`mrjob` from the local filesystem, and install it on the master node.
         :type bootstrap_python_packages: list of str

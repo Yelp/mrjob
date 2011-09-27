@@ -58,7 +58,6 @@ from mrjob.util import cmd_line, extract_dir_for_tar, hash_object, read_file
 
 log = logging.getLogger('mrjob.emr')
 
-SSH_URI_RE = re.compile(r'^%s(?P<hostname>[^/]+)?(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
 JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?

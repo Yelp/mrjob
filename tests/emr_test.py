@@ -33,7 +33,7 @@ from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in,
 import mrjob
 from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
-from mrjob.emr import EMRJobRunner, describe_all_job_flows, parse_s3_uri, attempt_to_acquire_lock, _lock_acquire_step_1, _lock_acquire_step_2, make_lock_uri
+from mrjob.emr import EMRJobRunner, describe_all_job_flows, attempt_to_acquire_lock, _lock_acquire_step_1, _lock_acquire_step_2, make_lock_uri
 from mrjob.parse import JOB_NAME_RE, parse_s3_uri
 from mrjob.ssh import SSH_LOG_ROOT, SSH_PREFIX
 from mrjob.util import tar_and_gzip

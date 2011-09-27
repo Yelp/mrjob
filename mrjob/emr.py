@@ -49,7 +49,7 @@ import mrjob
 from mrjob import compat
 from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths, combine_path_lists
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, EMR_JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
-from mrjob.parse import parse_s3_uri, S3_URI_RE
+from mrjob import parse
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner, GLOB_RE
 from mrjob.ssh import ssh_cat, ssh_ls, ssh_copy_key, ssh_slave_addresses, SSHException, SSH_PREFIX, SSH_LOG_ROOT, SSH_URI_RE
@@ -241,7 +241,7 @@ def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
 
 
 def _lock_acquire_step_1(s3_conn, lock_uri, job_name):
-    bucket_name, key_prefix = parse_s3_uri(lock_uri)
+    bucket_name, key_prefix = parse.parse_s3_uri(lock_uri)
     bucket = s3_conn.get_bucket(bucket_name)
     key = bucket.get_key(key_prefix)
     if key is None:
@@ -568,7 +568,7 @@ class EMRJobRunner(MRJobRunner):
         s3_conn = self.make_s3_conn()
         # check s3_scratch_uri against aws_region if specified
         if self._opts['s3_scratch_uri']:
-            bucket_name, _ = parse_s3_uri(self._opts['s3_scratch_uri'])
+            bucket_name, _ = parse.parse_s3_uri(self._opts['s3_scratch_uri'])
             bucket_loc = s3_conn.get_bucket(bucket_name).get_location()
 
             # make sure they can communicate if both specified
@@ -656,7 +656,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _check_and_fix_s3_dir(self, s3_uri):
         """Helper for __init__"""
-        if not S3_URI_RE.match(s3_uri):
+        if not parse.is_s3_uri(s3_uri):
             raise ValueError('Invalid S3 URI: %r' % s3_uri)
         if not s3_uri.endswith('/'):
             s3_uri = s3_uri + '/'
@@ -686,7 +686,7 @@ class EMRJobRunner(MRJobRunner):
         self._s3_input_uris = []
         local_input_paths = []
         for path in self._input_paths:
-            if S3_URI_RE.match(path):
+            if parse.is_s3_uri(path):
                 # Don't even bother running the job if the input isn't there,
                 # since it's costly to spin up instances.
                 if not self.path_exists(path):
@@ -727,7 +727,8 @@ class EMRJobRunner(MRJobRunner):
         Okay to call this multiple times.
         """
         self._assign_unique_names_to_files(
-            's3_uri', prefix=self._s3_tmp_uri + 'files/', match=S3_URI_RE.match)
+            's3_uri', prefix=self._s3_tmp_uri + 'files/',
+            match=parse.is_s3_uri)
 
     def _upload_non_input_files(self):
         """Copy files to S3
@@ -744,7 +745,7 @@ class EMRJobRunner(MRJobRunner):
             path = file_dict['path']
 
             # don't bother with files that are already on s3
-            if S3_URI_RE.match(path):
+            if parse.is_s3_uri(path):
                 continue
 
             s3_uri = file_dict['s3_uri']
@@ -1909,7 +1910,7 @@ class EMRJobRunner(MRJobRunner):
 
     def du(self, path_glob):
         """Get the size of all files matching path_glob."""
-        if not S3_URI_RE.match(path_glob):
+        if not parse.is_s3_uri(path_glob):
             return super(EMRJobRunner, self).getsize(path_glob)
 
         return sum(self.get_s3_key(uri).size for uri in self.ls(path_glob))
@@ -1929,7 +1930,7 @@ class EMRJobRunner(MRJobRunner):
                 yield item
             return
 
-        if not S3_URI_RE.match(path_glob):
+        if not parse.is_s3_uri(path_glob):
             for path in super(EMRJobRunner, self).ls(path_glob):
                 yield path
             return
@@ -1982,7 +1983,7 @@ class EMRJobRunner(MRJobRunner):
     def _s3_ls(self, uri):
         """Helper for ls(); doesn't bother with globbing or directories"""
         s3_conn = self.make_s3_conn()
-        bucket_name, key_name = parse_s3_uri(uri)
+        bucket_name, key_name = parse.parse_s3_uri(uri)
 
         bucket = s3_conn.get_bucket(bucket_name)
         for key in bucket.list(key_name):
@@ -1990,7 +1991,7 @@ class EMRJobRunner(MRJobRunner):
 
 
     def md5sum(self, path, s3_conn=None):
-        if S3_URI_RE.match(path):
+        if parse.is_s3_uri(path):
             k = self.get_s3_key(path, s3_conn=s3_conn)
             return k.etag.strip('"')
         else:
@@ -2007,7 +2008,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _cat_file(self, filename):
         ssh_match = SSH_URI_RE.match(filename)
-        if S3_URI_RE.match(filename):
+        if parse.is_s3_uri(filename):
             # stream lines from the s3 key
             s3_key = self.get_s3_key(filename)
             lines = read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
@@ -2035,7 +2036,7 @@ class EMRJobRunner(MRJobRunner):
         """Make a directory. This does nothing on S3 because there are
         no directories.
         """
-        if not S3_URI_RE.match(dest):
+        if not parse.is_s3_uri(dest):
             super(EMRJobRunner, self).mkdir(dest)
 
     def path_exists(self, path_glob):
@@ -2044,21 +2045,21 @@ class EMRJobRunner(MRJobRunner):
         If dest is a directory (ends with a "/"), we check if there are
         any files starting with that path.
         """
-        if not S3_URI_RE.match(path_glob):
+        if not parse.is_s3_uri(path_glob):
             return super(EMRJobRunner, self).path_exists(path_glob)
 
         # just fall back on ls(); it's smart
         return any(self.ls(path_glob))
 
     def path_join(self, dirname, filename):
-        if S3_URI_RE.match(dirname):
+        if parse.is_s3_uri(dirname):
             return posixpath.join(dirname, filename)
         else:
             return os.path.join(dirname, filename)
 
     def rm(self, path_glob):
         """Remove all files matching the given glob."""
-        if not S3_URI_RE.match(path_glob):
+        if not parse.is_s3_uri(path_glob):
             return super(EMRJobRunner, self).rm(path_glob)
 
         s3_conn = self.make_s3_conn()
@@ -2080,7 +2081,7 @@ class EMRJobRunner(MRJobRunner):
     def touchz(self, dest):
         """Make an empty file in the given location. Raises an error if
         a non-empty file already exists in that location."""
-        if not S3_URI_RE.match(dest):
+        if not parse.is_s3_uri(dest):
             super(EMRJobRunner, self).touchz(dest)
 
         key = self.get_s3_key(dest)
@@ -2237,7 +2238,7 @@ class EMRJobRunner(MRJobRunner):
         """
         if not s3_conn:
             s3_conn = self.make_s3_conn()
-        bucket_name, key_name = parse_s3_uri(uri)
+        bucket_name, key_name = parse.parse_s3_uri(uri)
 
         return s3_conn.get_bucket(bucket_name).get_key(key_name)
 
@@ -2251,7 +2252,7 @@ class EMRJobRunner(MRJobRunner):
         """
         if not s3_conn:
             s3_conn = self.make_s3_conn()
-        bucket_name, key_name = parse_s3_uri(uri)
+        bucket_name, key_name = parse.parse_s3_uri(uri)
 
         return s3_conn.get_bucket(bucket_name).new_key(key_name)
 
@@ -2266,7 +2267,7 @@ class EMRJobRunner(MRJobRunner):
         if not s3_conn:
             s3_conn = self.make_s3_conn()
 
-        bucket_name, key_prefix = parse_s3_uri(uri)
+        bucket_name, key_prefix = parse.parse_s3_uri(uri)
         bucket = s3_conn.get_bucket(bucket_name)
         for key in bucket.list(key_prefix):
             yield key
@@ -2297,7 +2298,7 @@ class EMRJobRunner(MRJobRunner):
         if not s3_conn:
             s3_conn = self.make_s3_conn()
 
-        bucket_name, key_name = parse_s3_uri(uri)
+        bucket_name, key_name = parse.parse_s3_uri(uri)
         bucket = s3_conn.get_bucket(bucket_name)
 
         dirs = key_name.split('/')

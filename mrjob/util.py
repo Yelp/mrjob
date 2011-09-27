@@ -24,6 +24,7 @@ import contextlib
 from copy import deepcopy
 import glob
 import gzip
+import hashlib
 import itertools
 import logging
 import os
@@ -79,6 +80,13 @@ def file_ext(path):
     if dot_index == -1:
         return ''
     return filename[dot_index:]
+
+
+def hash_object(obj):
+    """Generate a hash (currently md5) of the ``repr`` of the object"""
+    m = hashlib.md5()
+    m.update(repr(obj))
+    return m.hexdigest()
 
 
 def log_to_stream(name=None, stream=None, format=None, level=None, debug=False):

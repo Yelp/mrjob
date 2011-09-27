@@ -20,11 +20,13 @@ from __future__ import with_statement
 
 from collections import defaultdict
 import os
+import re
 from subprocess import Popen, PIPE
 
 
 SSH_PREFIX = 'ssh://'
 SSH_LOG_ROOT = '/mnt/var/log/hadoop'
+SSH_URI_RE = re.compile(r'^%s(?P<hostname>[^/]+)?(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
 
 
 class SSHException(Exception):

@@ -38,6 +38,11 @@ def is_uri(uri):
     return bool(urlparse(uri).scheme)
 
 
+def is_hdfs_uri(uri):
+    components = urlparse(uri)
+    return (components.scheme in ('s3', 's3n' 'hdfs'))
+
+
 def is_s3_uri(uri):
     """Return True if *uri* can be parsed into an S3 URI, False otherwise."""
     try:

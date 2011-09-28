@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utilities for parsing errors, counters, and status messages."""
+from functools import wraps
 import logging
 from optparse import OptionValueError
 import re
-from urlparse import urlparse
+from urlparse import ParseResult, urlparse as urlparse_buggy
 
 try:
     from cStringIO import StringIO
@@ -32,6 +33,10 @@ log = logging.getLogger('mrjob.parse')
 
 
 ### URI PARSING ###
+
+
+# Used to parse the real netloc out of a malformed path from Python 2.5 urlparse
+NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)')
 
 
 def is_uri(uri):
@@ -66,6 +71,17 @@ def parse_s3_uri(uri):
         raise ValueError('Invalid S3 URI: %s' % uri)
 
     return components.netloc, components.path[1:]
+
+
+@wraps(urlparse_buggy)
+def urlparse(*args, **kwargs):
+    components = urlparse_buggy(*args, **kwargs)
+    if components.netloc == '' and components.path.startswith('//'):
+        m = NETLOC_RE.match(components.path)
+        print ParseResult(components.scheme, m.groups(1), m.groups(2), components.params, components.query, components.fragment)
+        return ParseResult(components.scheme, m.groups(1), m.groups(2), components.params, components.query, components.fragment)
+    else:
+        return components
 
 
 ### OPTION PARSING ###

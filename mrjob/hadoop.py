@@ -18,7 +18,6 @@ import os
 import posixpath
 import re
 from subprocess import Popen, PIPE, CalledProcessError
-from urlparse import urlparse
 
 try:
     from cStringIO import StringIO
@@ -28,7 +27,7 @@ except ImportError:
 from mrjob import compat
 from mrjob.conf import combine_cmds, combine_dicts, combine_paths
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, HADOOP_JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
-from mrjob.parse import HADOOP_STREAMING_JAR_RE, is_uri
+from mrjob.parse import HADOOP_STREAMING_JAR_RE, is_uri, urlparse
 from mrjob.runner import MRJobRunner
 from mrjob.util import cmd_line, read_file
 

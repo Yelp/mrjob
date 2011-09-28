@@ -288,3 +288,20 @@ class TestCat(MockHadoopTestCase):
                 output.append(line)
 
         assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
+
+
+class TestURIs(MockHadoopTestCase):
+
+    def test_uris(self):
+        runner = HadoopJobRunner()
+        list(runner.ls('hdfs://tmp/waffles'))
+        list(runner.ls('leggo://my/ego'))
+        list(runner.ls('/tmp'))
+
+        with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
+            hadoop_cmd_args = [shlex.split(line) for line in mock_log]
+
+        assert_equal(hadoop_cmd_args, [
+            ['fs', '-lsr', 'hdfs://tmp/waffles'],
+            ['fs', '-lsr', 'leggo://my/ego'],
+        ])

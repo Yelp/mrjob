@@ -338,3 +338,11 @@ class PortRangeListTestCase(TestCase):
         assert_raises(ValueError, parse_port_range_list, 'Athens:Alexandria')
 
 
+class URITestCase(TestCase):
+    def test_uri_parsing(self):
+        assert_equal(is_uri('notauri!'), False)
+        assert_equal(is_uri('they://did/the/monster/mash'), True)
+        assert_equal(is_s3_uri('s3://a/uri'), True)
+        assert_equal(is_s3_uri('s3n://a/uri'), True)
+        assert_equal(is_s3_uri('hdfs://a/uri'), False)
+        assert_equal(parse_s3_uri('s3://bucket/loc'), ('bucket', 'loc'))

@@ -78,7 +78,9 @@ def urlparse(*args, **kwargs):
     components = urlparse_buggy(*args, **kwargs)
     if components.netloc == '' and components.path.startswith('//'):
         m = NETLOC_RE.match(components.path)
-        return ParseResult(components.scheme, m.group(1), m.group(2), components.params, components.query, components.fragment)
+        return ParseResult(components.scheme, m.group(1), m.group(2),
+                           components.params, components.query,
+                           components.fragment)
     else:
         return components
 

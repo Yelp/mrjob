@@ -350,7 +350,15 @@ class URITestCase(TestCase):
         assert_equal(parse_s3_uri('s3://bucket/loc'), ('bucket', 'loc'))
 
     def test_urlparse(self):
-        assert_equal(urlparse('http://www.yelp.com/lil_brudder'), ('http', 'www.yelp.com', '/lil_brudder', '', '', ''))
-        assert_equal(urlparse('cant://touch/this'), ('cant', 'touch', '/this', '', '', ''))
-        assert_equal(urlparse('s3://bucket/path'), ('s3', 'bucket', '/path', '', '', ''))
-        assert_equal(urlparse('s3://bucket/path#customname'), ('s3', 'bucket', '/path#customname', '', '', ''))
+        assert_equal(urlparse('http://www.yelp.com/lil_brudder'),
+                     ('http', 'www.yelp.com', '/lil_brudder', '', '', ''))
+        assert_equal(urlparse('cant://touch/this'),
+                     ('cant', 'touch', '/this', '', '', ''))
+        assert_equal(urlparse('s3://bucket/path'),
+                     ('s3', 'bucket', '/path', '', '', ''))
+        assert_equal(urlparse('s3://bucket/path#customname'),
+                     ('s3', 'bucket', '/path#customname', '', '', ''))
+        assert_equal(urlparse('s3://bucket'),
+                     ('s3', 'bucket', '', '', '', ''))
+        assert_equal(urlparse('s3://bucket/'),
+                     ('s3', 'bucket', '/', '', '', ''))

@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import with_statement
+
 import logging
 import random
 from subprocess import Popen, PIPE
@@ -338,3 +340,25 @@ class PortRangeListTestCase(TestCase):
         assert_raises(ValueError, parse_port_range_list, 'Athens:Alexandria')
 
 
+class URITestCase(TestCase):
+    def test_uri_parsing(self):
+        assert_equal(is_uri('notauri!'), False)
+        assert_equal(is_uri('they://did/the/monster/mash'), True)
+        assert_equal(is_s3_uri('s3://a/uri'), True)
+        assert_equal(is_s3_uri('s3n://a/uri'), True)
+        assert_equal(is_s3_uri('hdfs://a/uri'), False)
+        assert_equal(parse_s3_uri('s3://bucket/loc'), ('bucket', 'loc'))
+
+    def test_urlparse(self):
+        assert_equal(urlparse('http://www.yelp.com/lil_brudder'),
+                     ('http', 'www.yelp.com', '/lil_brudder', '', '', ''))
+        assert_equal(urlparse('cant://touch/this'),
+                     ('cant', 'touch', '/this', '', '', ''))
+        assert_equal(urlparse('s3://bucket/path'),
+                     ('s3', 'bucket', '/path', '', '', ''))
+        assert_equal(urlparse('s3://bucket/path#customname'),
+                     ('s3', 'bucket', '/path#customname', '', '', ''))
+        assert_equal(urlparse('s3://bucket'),
+                     ('s3', 'bucket', '', '', '', ''))
+        assert_equal(urlparse('s3://bucket/'),
+                     ('s3', 'bucket', '/', '', '', ''))

@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utilities for parsing errors, counters, and status messages."""
+from functools import wraps
 import logging
 from optparse import OptionValueError
 import re
+from urlparse import ParseResult, urlparse as urlparse_buggy
 
 try:
     from cStringIO import StringIO
@@ -27,11 +29,63 @@ HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*\.jar$')
 # match an mrjob job name (these are used to name EMR job flows)
 JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
 
-# match an S3 url and extract the bucket and key names
-S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
-
-
 log = logging.getLogger('mrjob.parse')
+
+
+### URI PARSING ###
+
+
+# Used to parse the real netloc out of a malformed path from Python 2.5 urlparse
+NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
+
+
+def is_uri(uri):
+    return bool(urlparse(uri).scheme)
+
+
+def is_hdfs_uri(uri):
+    components = urlparse(uri)
+    return (components.scheme in ('s3', 's3n' 'hdfs'))
+
+
+def is_s3_uri(uri):
+    """Return True if *uri* can be parsed into an S3 URI, False otherwise."""
+    try:
+        parse_s3_uri(uri)
+        return True
+    except ValueError:
+        return False
+
+
+def parse_s3_uri(uri):
+    """Parse an S3 URI into (bucket, key)
+
+    >>> parse_s3_uri('s3://walrus/tmp/')
+    ('walrus', 'tmp/')
+
+    If ``uri`` is not an S3 URI, raise a ValueError
+    """
+    components = urlparse(uri)
+    if (components.scheme not in ('s3', 's3n')
+        or '/' not in components.path):
+        raise ValueError('Invalid S3 URI: %s' % uri)
+
+    return components.netloc, components.path[1:]
+
+
+@wraps(urlparse_buggy)
+def urlparse(*args, **kwargs):
+    components = urlparse_buggy(*args, **kwargs)
+    if components.netloc == '' and components.path.startswith('//'):
+        m = NETLOC_RE.match(components.path)
+        return ParseResult(components.scheme, m.group(1), m.group(2),
+                           components.params, components.query,
+                           components.fragment)
+    else:
+        return components
+
+
+### OPTION PARSING ###
 
 
 def check_kv_pair(option, opt, value):
@@ -49,6 +103,40 @@ def check_range_list(option, opt, value):
         return ports
     except ValueError, e:
         raise OptionValueError('option %s: invalid port range list "%s": \n%s' % (opt, value, e.args[0]))
+
+
+def parse_port_range_list(range_list_str):
+    """Parse a port range list of the form (start[:end])(,(start[:end]))*"""
+    all_ranges = []
+    for range_str in range_list_str.split(','):
+        if ':' in range_str:
+            a, b = [int(x) for x in range_str.split(':')]
+            all_ranges.extend(range(a, b+1))
+        else:
+            all_ranges.append(int(range_str))
+    return all_ranges
+
+def parse_key_value_list(kv_string_list, error_fmt, error_func):
+    """Parse a list of strings like ``KEY=VALUE`` into a dictionary.
+
+    :param kv_string_list: Parse a list of strings like ``KEY=VALUE`` into a dictionary.
+    :type kv_string_list: [str]
+    :param error_fmt: Format string accepting one ``%s`` argument which is the malformed (i.e. not ``KEY=VALUE``) string
+    :type error_fmt: str
+    :param error_func: Function to call when a malformed string is encountered.
+    :type error_func: function(str)
+    """
+    ret = {}
+    for value in kv_string_list:
+        try:
+            k, v = value.split('=', 1)
+            ret[k] = v
+        except ValueError, e:
+            error_func(error_fmt % value)
+    return ret
+
+
+### LOG PARSING ###
 
 
 _HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.(){}[\]"\\])')
@@ -427,48 +515,3 @@ def parse_hadoop_counters_from_line(line):
         counters[group].setdefault(counter, 0)
         counters[group][counter] += int(value)
     return counters, int(m.group('step_num'))
-
-
-def parse_port_range_list(range_list_str):
-    """Parse a port range list of the form (start[:end])(,(start[:end]))*"""
-    all_ranges = []
-    for range_str in range_list_str.split(','):
-        if ':' in range_str:
-            a, b = [int(x) for x in range_str.split(':')]
-            all_ranges.extend(range(a, b+1))
-        else:
-            all_ranges.append(int(range_str))
-    return all_ranges
-
-def parse_key_value_list(kv_string_list, error_fmt, error_func):
-    """Parse a list of strings like ``KEY=VALUE`` into a dictionary.
-
-    :param kv_string_list: Parse a list of strings like ``KEY=VALUE`` into a dictionary.
-    :type kv_string_list: [str]
-    :param error_fmt: Format string accepting one ``%s`` argument which is the malformed (i.e. not ``KEY=VALUE``) string
-    :type error_fmt: str
-    :param error_func: Function to call when a malformed string is encountered.
-    :type error_func: function(str)
-    """
-    ret = {}
-    for value in kv_string_list:
-        try:
-            k, v = value.split('=', 1)
-            ret[k] = v
-        except ValueError, e:
-            error_func(error_fmt % value)
-    return ret
-
-def parse_s3_uri(uri):
-    """Parse an S3 URI into (bucket, key)
-
-    >>> parse_s3_uri('s3://walrus/tmp/')
-    ('walrus', 'tmp/')
-
-    If ``uri`` is not an S3 URI, raise a ValueError
-    """
-    match = S3_URI_RE.match(uri)
-    if match:
-        return match.groups()
-    else:
-        raise ValueError('Invalid S3 URI: %s' % uri)

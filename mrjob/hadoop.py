@@ -27,14 +27,12 @@ except ImportError:
 from mrjob import compat
 from mrjob.conf import combine_cmds, combine_dicts, combine_paths
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, HADOOP_JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
-from mrjob.parse import HADOOP_STREAMING_JAR_RE
+from mrjob.parse import HADOOP_STREAMING_JAR_RE, is_uri, urlparse
 from mrjob.runner import MRJobRunner
 from mrjob.util import cmd_line, read_file
 
 
 log = logging.getLogger('mrjob.hadoop')
-
-HDFS_URI_RE = re.compile(r'^s3n:/|hdfs://(.*?)(/.*?)$')
 
 # to filter out the log4j stuff that hadoop streaming prints out
 HADOOP_STREAMING_OUTPUT_RE = re.compile(r'^(\S+ \S+ \S+ \S+: )?(.*)$')
@@ -229,7 +227,7 @@ class HadoopJobRunner(MRJobRunner):
         local_input_files = []
 
         for path in self._input_paths:
-            if HDFS_URI_RE.match(path):
+            if is_uri:
                 # Don't even bother running the job if the input isn't there.
                 if not self.ls(path):
                     raise AssertionError(
@@ -262,7 +260,7 @@ class HadoopJobRunner(MRJobRunner):
         """
         hdfs_files_dir = posixpath.join(self._hdfs_tmp_dir, 'files', '')
         self._assign_unique_names_to_files(
-            'hdfs_uri', prefix=hdfs_files_dir, match=HDFS_URI_RE.match)
+            'hdfs_uri', prefix=hdfs_files_dir, match=is_uri)
 
     def _upload_non_input_files(self):
         """Copy files to HDFS, and set the 'hdfs_uri' field for each file.
@@ -277,7 +275,7 @@ class HadoopJobRunner(MRJobRunner):
             path = file_dict['path']
 
             # don't bother with files already in HDFS
-            if HDFS_URI_RE.match(path):
+            if is_uri(path):
                 continue
 
             self._upload_to_hdfs(path, file_dict['hdfs_uri'])
@@ -647,7 +645,7 @@ class HadoopJobRunner(MRJobRunner):
     def du(self, path_glob):
         """Get the size of a file, or None if it's not a file or doesn't
         exist."""
-        if not HDFS_URI_RE.match(path_glob):
+        if not is_uri(path_glob):
             return super(HadoopJobRunner, self).dus(path_glob)
 
         stdout = self._invoke_hadoop(['fs', '-du', path_glob],
@@ -659,14 +657,13 @@ class HadoopJobRunner(MRJobRunner):
             raise Exception('Unexpected output from hadoop fs -du: %r' % stdout)
 
     def ls(self, path_glob):
-        hdfs_match = HDFS_URI_RE.match(path_glob)
-
-        if not hdfs_match:
+        if not is_uri(path_glob):
             for path in super(HadoopJobRunner, self).ls(path_glob):
                 yield path
             return
 
-        hdfs_prefix = 'hdfs://' + hdfs_match.group(1)
+        components = urlparse(path_glob)
+        hdfs_prefix = '%s://%s' % (components.scheme, components.netloc)
 
         stdout = self._invoke_hadoop(
             ['fs', '-lsr', path_glob],
@@ -687,7 +684,7 @@ class HadoopJobRunner(MRJobRunner):
             yield hdfs_prefix + path
 
     def _cat_file(self, filename):
-        if HDFS_URI_RE.match(filename):
+        if is_uri(filename):
             # stream from HDFS
             cat_args = self._opts['hadoop_bin'] + ['fs', '-cat', filename]
             log.debug('> %s' % cmd_line(cat_args))
@@ -722,20 +719,20 @@ class HadoopJobRunner(MRJobRunner):
         If dest is a directory (ends with a "/"), we check if there are
         any files starting with that path.
         """
-        if not HDFS_URI_RE.match(path_glob):
+        if not is_uri(path_glob):
             return super(HadoopJobRunner, self).path_exists(path_glob)
 
         return bool(self._invoke_hadoop(['fs', '-test', '-e', path_glob],
                                         ok_returncodes=(0,1)))
 
     def path_join(self, dirname, filename):
-        if HDFS_URI_RE.match(dirname):
+        if is_uri(dirname):
             return posixpath.join(dirname, filename)
         else:
             return os.path.join(dirname, filename)
 
     def rm(self, path_glob):
-        if not HDFS_URI_RE.match(path_glob):
+        if not is_uri(path_glob):
             super(HadoopJobRunner, self).rm(path_glob)
 
         if self.path_exists(path_glob):
@@ -752,7 +749,7 @@ class HadoopJobRunner(MRJobRunner):
                 return_stdout=True, ok_stderr=[HADOOP_RMR_NO_SUCH_FILE])
 
     def touchz(self, dest):
-        if not HDFS_URI_RE.match(dest):
+        if not is_uri(dest):
             super(HadoopJobRunner, self).touchz(dest)
 
         self._invoke_hadoop(['fs', '-touchz', dest])

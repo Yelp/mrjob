@@ -295,7 +295,7 @@ class TestURIs(MockHadoopTestCase):
     def test_uris(self):
         runner = HadoopJobRunner()
         list(runner.ls('hdfs://tmp/waffles'))
-        list(runner.ls('leggo://my/ego'))
+        list(runner.ls('lego://my/ego'))
         list(runner.ls('/tmp'))
 
         with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
@@ -303,5 +303,5 @@ class TestURIs(MockHadoopTestCase):
 
         assert_equal(hadoop_cmd_args, [
             ['fs', '-lsr', 'hdfs://tmp/waffles'],
-            ['fs', '-lsr', 'leggo://my/ego'],
+            ['fs', '-lsr', 'lego://my/ego'],
         ])

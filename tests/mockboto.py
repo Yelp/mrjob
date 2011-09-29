@@ -33,10 +33,12 @@ except ImportError:
     boto = None
 
 from mrjob.conf import combine_values
-from mrjob.emr import S3_URI_RE, parse_s3_uri
+from mrjob.parse import is_s3_uri, parse_s3_uri
+
 
 DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
 DEFAULT_MAX_DAYS_AGO = 61
+
 
 ### S3 ###
 
@@ -489,7 +491,7 @@ class MockEmrConnection(object):
 
             # create fake output if we're supposed to write to S3
             output_uri = self._get_step_output_uri(step)
-            if output_uri and S3_URI_RE.match(output_uri):
+            if output_uri and is_s3_uri(output_uri):
                 mock_output = self.mock_emr_output.get(
                     (jobflow_id, step_num)) or ['']
 

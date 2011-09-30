@@ -23,17 +23,19 @@ from subprocess import Popen, PIPE
 from StringIO import StringIO
 import sys
 import tempfile
-from testify import TestCase, assert_equal, assert_not_equal, assert_gt, assert_raises, setup, teardown
+from testify import TestCase, assert_equal, assert_in, assert_not_equal, assert_not_in, assert_gt, assert_raises, setup, teardown
 import time
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob, _IDENTITY_MAPPER, UsageError
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import parse_mr_job_stderr
+from mrjob.protocol import *
+from mrjob.util import log_to_stream
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_nomapper_multistep import MRNoMapper
-from tests.quiet import logger_disabled
+from tests.quiet import logger_disabled, no_handlers_for_logger
 
 
 def stepdict(mapper=_IDENTITY_MAPPER, reducer=None, combiner=None,
@@ -336,7 +338,7 @@ class CountersAndStatusTestCase(TestCase):
                       'girl; interrupted': {'movie': 1}})
 
 
-class ProtocolsTestCase(TestCase):
+class DeprecatedProtocolsTestCase(TestCase):
     # not putting these in their own files because we're not going to invoke
     # it as a script anyway.
 
@@ -355,47 +357,72 @@ class ProtocolsTestCase(TestCase):
             yield key, value
 
     def test_default_protocols(self):
-        mr_job = MRBoringJob()
-        assert_equal(mr_job.options.input_protocol, 'raw_value')
-        assert_equal(mr_job.options.protocol, 'json')
-        assert_equal(mr_job.options.output_protocol, 'json')
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.job', stderr)
+            mr_job = MRBoringJob()
+            assert_equal(mr_job.options.input_protocol, None)
+            assert_equal(mr_job.options.protocol, None)
+            assert_equal(mr_job.options.output_protocol, None)
+            assert_not_in('deprecated', stderr.getvalue())
 
     def test_explicit_default_protocols(self):
-        mr_job2 = self.MRBoringJob2()
-        assert_equal(mr_job2.options.input_protocol, 'json')
-        assert_equal(mr_job2.options.protocol, 'pickle')
-        assert_equal(mr_job2.options.output_protocol, 'repr')
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.job', stderr)
+            mr_job2 = self.MRBoringJob2().sandbox(stderr=stderr)
+            assert_equal(mr_job2.options.input_protocol, 'json')
+            assert_equal(mr_job2.options.protocol, 'pickle')
+            assert_equal(mr_job2.options.output_protocol, 'repr')
+            assert_in('deprecated', stderr.getvalue())
 
-        mr_job3 = self.MRBoringJob3()
-        assert_equal(mr_job3.options.input_protocol, 'raw_value')
-        assert_equal(mr_job3.options.protocol, 'repr')
-        # output protocol should default to protocol
-        assert_equal(mr_job3.options.output_protocol, 'repr')
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.job', stderr)
+            mr_job3 = self.MRBoringJob3()
+            assert_equal(mr_job3.options.input_protocol, None)
+            assert_equal(mr_job3.options.protocol, 'repr')
+            # output protocol should default to protocol
+            assert_equal(mr_job3.options.output_protocol, 'repr')
+            assert_in('deprecated', stderr.getvalue())
 
     def test_setting_protocol(self):
-        mr_job2 = MRBoringJob(args=[
-            '--input-protocol=json', '--protocol=pickle',
-            '--output-protocol=repr'])
-        assert_equal(mr_job2.options.input_protocol, 'json')
-        assert_equal(mr_job2.options.protocol, 'pickle')
-        assert_equal(mr_job2.options.output_protocol, 'repr')
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.job', stderr)
+            mr_job2 = MRBoringJob(args=[
+                '--input-protocol=json', '--protocol=pickle',
+                '--output-protocol=repr'])
+            assert_equal(mr_job2.options.input_protocol, 'json')
+            assert_equal(mr_job2.options.protocol, 'pickle')
+            assert_equal(mr_job2.options.output_protocol, 'repr')
+            assert_in('deprecated', stderr.getvalue())
 
-        mr_job3 = MRBoringJob(args=['--protocol=repr'])
-        assert_equal(mr_job3.options.input_protocol, 'raw_value')
-        assert_equal(mr_job3.options.protocol, 'repr')
-        # output protocol should default to protocol
-        assert_equal(mr_job3.options.output_protocol, 'repr')
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.job', stderr)
+            mr_job3 = MRBoringJob(args=['--protocol=repr'])
+            assert_equal(mr_job3.options.input_protocol, None)
+            assert_equal(mr_job3.options.protocol, 'repr')
+            # output protocol should default to protocol
+            assert_equal(mr_job3.options.output_protocol, 'repr')
+            assert_in('deprecated', stderr.getvalue())
 
     def test_overriding_explicit_default_protocols(self):
-        mr_job = self.MRBoringJob2(args=['--protocol=json'])
-        assert_equal(mr_job.options.input_protocol, 'json')
-        assert_equal(mr_job.options.protocol, 'json')
-        assert_equal(mr_job.options.output_protocol, 'repr')
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.job', stderr)
+            mr_job = self.MRBoringJob2(args=['--protocol=json'])
+            assert_equal(mr_job.options.input_protocol, 'json')
+            assert_equal(mr_job.options.protocol, 'json')
+            assert_equal(mr_job.options.output_protocol, 'repr')
+            assert_in('deprecated', stderr.getvalue())
 
     def test_mapper_raw_value_to_json(self):
         RAW_INPUT = StringIO('foo\nbar\nbaz\n')
 
-        mr_job = MRBoringJob(['--mapper'])
+        with no_handlers_for_logger():
+            mr_job = MRBoringJob(['--mapper'])
         mr_job.sandbox(stdin=RAW_INPUT)
         mr_job.run_mapper()
 
@@ -409,7 +436,8 @@ class ProtocolsTestCase(TestCase):
                               '"foo"\t"baz"\n' +
                               '"bar"\t"qux"\n')
 
-        mr_job = MRBoringJob(args=['--reducer'])
+        with no_handlers_for_logger():
+            mr_job = MRBoringJob(args=['--reducer'])
         mr_job.sandbox(stdin=JSON_INPUT)
         mr_job.run_reducer()
 
@@ -422,7 +450,8 @@ class ProtocolsTestCase(TestCase):
         # output protocol (in this case, repr)
         RAW_INPUT = StringIO('foo\nbar\nbaz\n')
 
-        mr_job = self.MRTrivialJob(['--mapper'])
+        with no_handlers_for_logger():
+            mr_job = self.MRTrivialJob(['--mapper'])
         mr_job.sandbox(stdin=RAW_INPUT)
         mr_job.run_mapper()
 
@@ -438,7 +467,8 @@ class ProtocolsTestCase(TestCase):
                                   '"too"\t"many"\t"tabs"\n' +
                                   '"notabs"\n')
 
-        mr_job = MRBoringJob(args=['--reducer'])
+        with no_handlers_for_logger():
+            mr_job = MRBoringJob(args=['--reducer'])
         mr_job.sandbox(stdin=BAD_JSON_INPUT)
         mr_job.run_reducer()
 
@@ -457,7 +487,8 @@ class ProtocolsTestCase(TestCase):
                                   '"too"\t"many"\t"tabs"\n' +
                                   '"notabs"\n')
 
-        mr_job = MRBoringJob(args=['--reducer', '--strict-protocols'])
+        with no_handlers_for_logger():
+            mr_job = MRBoringJob(args=['--reducer', '--strict-protocols'])
         mr_job.sandbox(stdin=BAD_JSON_INPUT)
         
         # make sure it raises an exception
@@ -468,7 +499,8 @@ class ProtocolsTestCase(TestCase):
                                          '\xaa\n' +
                                          'bar\n')
 
-        mr_job = MRBoringJob(args=['--mapper'])
+        with no_handlers_for_logger():
+            mr_job = MRBoringJob(args=['--mapper'])
         mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
         mr_job.run_mapper()
 
@@ -484,7 +516,8 @@ class ProtocolsTestCase(TestCase):
                                          '\xaa\n' +
                                          'bar\n')
 
-        mr_job = MRBoringJob(args=['--mapper', '--strict-protocols'])
+        with no_handlers_for_logger():
+            mr_job = MRBoringJob(args=['--mapper', '--strict-protocols'])
         mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
         
         # make sure it raises an exception
@@ -630,9 +663,7 @@ class CommandLineArgsTest(TestCase):
     def test_passthrough_options_defaults(self):
         mr_job = MRCustomBoringJob()
 
-        assert_equal(mr_job.options.input_protocol, 'raw_value')
-        assert_equal(mr_job.options.protocol, 'json')
-        assert_equal(mr_job.options.output_protocol, 'json')
+        assert_equal(mr_job.options.input_protocol, None)
         assert_equal(mr_job.options.foo_size, 5)
         assert_equal(mr_job.options.bar_name, None)
         assert_equal(mr_job.options.baz_mode, False)
@@ -649,7 +680,7 @@ class CommandLineArgsTest(TestCase):
 
     def test_explicit_passthrough_options(self):
         mr_job = MRCustomBoringJob(args=[
-            '-vp', 'repr', # short name for --protocol
+            '-v',
             '--foo-size=9',
             '--bar-name', 'Alembic',
             '--enable-baz-mode', '--disable-quuxing',
@@ -661,9 +692,9 @@ class CommandLineArgsTest(TestCase):
             '--strict-protocols',
             ])
 
-        assert_equal(mr_job.options.input_protocol, 'raw_value')
-        assert_equal(mr_job.options.protocol, 'repr')
-        assert_equal(mr_job.options.output_protocol, 'repr')
+        assert_equal(mr_job.options.input_protocol, None)
+        assert_equal(mr_job.options.protocol, None)
+        assert_equal(mr_job.options.output_protocol, None)
         assert_equal(mr_job.options.foo_size, 9)
         assert_equal(mr_job.options.bar_name, 'Alembic')
         assert_equal(mr_job.options.baz_mode, True)
@@ -682,7 +713,6 @@ class CommandLineArgsTest(TestCase):
                       '--pill-type', 'red',
                       '--planck-constant', '1',
                       '--planck-constant', '42',
-                      '-p', 'repr',
                       '--disable-quuxing',
                       '--strict-protocols',
                       ])

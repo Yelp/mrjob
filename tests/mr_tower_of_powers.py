@@ -21,11 +21,12 @@ import os
 from testify import assert_equal, assert_not_equal
 
 from mrjob.job import MRJob
+from mrjob.protocol import JSONValueProtocol
 
 class MRTowerOfPowers(MRJob):
 
-    DEFAULT_INPUT_PROTOCOL = 'json_value'
-    DEFAULT_OUTPUT_PROTOCOL = 'json_value'
+    INPUT_PROTOCOL = JSONValueProtocol
+    OUTPUT_PROTOCOL = JSONValueProtocol
 
     def configure_options(self):
         super(MRTowerOfPowers, self).configure_options()

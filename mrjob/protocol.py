@@ -164,9 +164,13 @@ class ReprValueProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return repr(value)
 
-#: The default protocol for all encoded input and output: ``'json'``
-DEFAULT_PROTOCOL = 'json'
+#: DEPRECATED
+#:
+#: Formerly the default protocol for all encoded input and output: ``'json'``
+DEFAULT_PROTOCOL = None
 
+#: DEPRECATED
+#:
 #: Default mapping from protocol name to class:
 #:
 #: ============ ===============================

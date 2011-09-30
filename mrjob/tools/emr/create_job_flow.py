@@ -90,6 +90,7 @@ def make_option_parser():
             'ec2_slave_instance_type',
             'emr_endpoint',
             'enable_emr_debugging',
+            'hadoop_extra_args',
             'hadoop_version',
             'num_ec2_instances',
             's3_endpoint',

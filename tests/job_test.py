@@ -380,8 +380,7 @@ class ProtocolsTestCase(TestCase):
     def test_mapper_raw_value_to_json(self):
         RAW_INPUT = StringIO('foo\nbar\nbaz\n')
 
-        with no_handlers_for_logger():
-            mr_job = MRBoringJob(['--mapper'])
+        mr_job = MRBoringJob(['--mapper'])
         mr_job.sandbox(stdin=RAW_INPUT)
         mr_job.run_mapper()
 
@@ -395,8 +394,7 @@ class ProtocolsTestCase(TestCase):
                               '"foo"\t"baz"\n' +
                               '"bar"\t"qux"\n')
 
-        with no_handlers_for_logger():
-            mr_job = MRBoringJob(args=['--reducer'])
+        mr_job = MRBoringJob(args=['--reducer'])
         mr_job.sandbox(stdin=JSON_INPUT)
         mr_job.run_reducer()
 
@@ -409,8 +407,7 @@ class ProtocolsTestCase(TestCase):
         # output protocol (in this case, repr)
         RAW_INPUT = StringIO('foo\nbar\nbaz\n')
 
-        with no_handlers_for_logger():
-            mr_job = self.MRTrivialJob(['--mapper'])
+        mr_job = self.MRTrivialJob(['--mapper'])
         mr_job.sandbox(stdin=RAW_INPUT)
         mr_job.run_mapper()
 
@@ -425,8 +422,7 @@ class ProtocolsTestCase(TestCase):
                                   '"too"\t"many"\t"tabs"\n' +
                                   '"notabs"\n')
 
-        with no_handlers_for_logger():
-            mr_job = MRBoringJob(args=['--reducer'])
+        mr_job = MRBoringJob(args=['--reducer'])
         mr_job.sandbox(stdin=BAD_JSON_INPUT)
         mr_job.run_reducer()
 
@@ -445,8 +441,7 @@ class ProtocolsTestCase(TestCase):
                                   '"too"\t"many"\t"tabs"\n' +
                                   '"notabs"\n')
 
-        with no_handlers_for_logger():
-            mr_job = MRBoringJob(args=['--reducer', '--strict-protocols'])
+        mr_job = MRBoringJob(args=['--reducer', '--strict-protocols'])
         mr_job.sandbox(stdin=BAD_JSON_INPUT)
         
         # make sure it raises an exception
@@ -457,8 +452,7 @@ class ProtocolsTestCase(TestCase):
                                          '\xaa\n' +
                                          'bar\n')
 
-        with no_handlers_for_logger():
-            mr_job = MRBoringJob(args=['--mapper'])
+        mr_job = MRBoringJob(args=['--mapper'])
         mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
         mr_job.run_mapper()
 
@@ -474,8 +468,7 @@ class ProtocolsTestCase(TestCase):
                                          '\xaa\n' +
                                          'bar\n')
 
-        with no_handlers_for_logger():
-            mr_job = MRBoringJob(args=['--mapper', '--strict-protocols'])
+        mr_job = MRBoringJob(args=['--mapper', '--strict-protocols'])
         mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
         
         # make sure it raises an exception

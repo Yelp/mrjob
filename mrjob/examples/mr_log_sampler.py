@@ -27,11 +27,11 @@ from mrjob.protocol import RawValueProtocol, ReprProtocol
 SAMPLING_FUDGE_FACTOR = 1.2
 
 class MRLogSampler(MRJob):
-	# We use RawValueProtocol for output to be format agnostic
+	# We use RawValueProtocol for input to be format agnostic
 	# and avoid any type of parsing errors
 	INPUT_PROTOCOL = RawValueProtocol
 
-	# We use the 'raw_value' output protocol, so we can output raw lines
+	# We use RawValueProtocol for output so we can output raw lines
 	# instead of (k, v) pairs
 	OUTPUT_PROTOCOL = RawValueProtocol
 

@@ -21,7 +21,8 @@ languages. If you need more power, you can represent values as reprs
 or pickles.
 
 Also, if know that your input will always be in JSON format, consider
-the ``json_value`` protocol as an alternative to ``raw_value``.
+:py:class:`JSONValueProtocol` as an alternative to
+:py:class:`RawValueProtocol`.
 
 For more information on using alternate protocols in your job, see
 :ref:`job-protocols`.
@@ -164,9 +165,13 @@ class ReprValueProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return repr(value)
 
-#: The default protocol for all encoded input and output: ``'json'``
-DEFAULT_PROTOCOL = 'json'
+#: DEPRECATED
+#:
+#: Formerly the default protocol for all encoded input and output: ``'json'``
+DEFAULT_PROTOCOL = None
 
+#: DEPRECATED
+#:
 #: Default mapping from protocol name to class:
 #:
 #: ============ ===============================

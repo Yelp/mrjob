@@ -96,6 +96,7 @@ from __future__ import with_statement
 from copy import copy
 import inspect
 import itertools
+import logging
 from optparse import Option, OptionParser, OptionGroup, OptionError, OptionValueError
 import sys
 import time
@@ -108,9 +109,12 @@ except ImportError:
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
 from mrjob.parse import parse_port_range_list, parse_mr_job_stderr, parse_key_value_list
-from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
+from mrjob.protocol import DEFAULT_PROTOCOL, JSONProtocol, PROTOCOL_DICT, RawValueProtocol
 from mrjob.runner import CLEANUP_CHOICES
 from mrjob.util import log_to_stream, parse_and_save_options, read_input
+
+
+log = logging.getLogger('mrjob.job')
 
 # used by mr() below, to fake no mapper
 def _IDENTITY_MAPPER(key, value):
@@ -244,7 +248,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -259,7 +263,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -273,7 +277,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -284,7 +288,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -298,7 +302,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -309,7 +313,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -759,16 +763,14 @@ class MRJob(object):
         :param step_num: which step to run (e.g. ``0`` for the first step)
         :type step_type: str
         :param step_type: ``'M'`` for mapper, ``'C'`` for combiner, ``'R'`` for reducer
+        :return: (read_function, write_function)
 
         By default, we use one protocol for reading input, one
         internal protocol for communication between steps, and one
         protocol for final output (which is usually the same as the
         internal protocol). Protocols can be controlled by setting
-        :py:attr:`DEFAULT_INPUT_PROTOCOL`,
-        :py:attr:`DEFAULT_PROTOCOL`, and
-        :py:attr:`DEFAULT_OUTPUT_PROTOCOL`,
-        or from the command line with :option:`--input-protocol`,
-        :option:`--protocol`, and :option:`--output-protocol`.
+        :py:attr:`INPUT_PROTOCOL`, :py:attr:`PROTOCOL`, and
+        :py:attr:`OUTPUT_PROTOCOL`.
 
         Re-define this if you need fine control over which protocols
         are used by which steps.
@@ -777,19 +779,48 @@ class MRJob(object):
 
         protocol_dict = self.protocols()
 
+        warn_deprecated = False
+
         # pick input protocol
+
+        # DEPRECATED:
         # first mapper handles input unless there is no mapper for the step
         if step_num == 0 and step_type == steps_desc[0][0]:
             read_protocol = self.options.input_protocol
         else:
             read_protocol = self.options.protocol
-        read = protocol_dict[read_protocol].read
-        
+
+        if read_protocol is not None:
+            warn_deprecated = True
+            read = protocol_dict[read_protocol].read
+        else:
+            # NON-DEPRECATED:
+            if step_num == 0 and step_type == steps_desc[0][0]:
+                read = self.INPUT_PROTOCOL.read
+            else:
+                read = self.PROTOCOL.read
+
+        # DEPRECATED:
         if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
             write_protocol = self.options.output_protocol
         else:
             write_protocol = self.options.protocol
-        write = protocol_dict[write_protocol].write
+
+        if write_protocol is not None:
+            warn_deprecated = True
+            write = protocol_dict[write_protocol].write
+        else:
+            # NON-DEPRECATED:
+            if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
+                if self.OUTPUT_PROTOCOL:
+                    write = self.OUTPUT_PROTOCOL.write
+                else:
+                    write = self.PROTOCOL.write
+            else:
+                write = self.PROTOCOL.write
+
+        if warn_deprecated:
+            pass
 
         return read, write
 
@@ -845,14 +876,14 @@ class MRJob(object):
             '--input-protocol', dest='input_protocol',
             opt_group=self.proto_opt_group,
             default=self.DEFAULT_INPUT_PROTOCOL, choices=protocol_choices,
-            help='protocol to read input with (default: %default)')
+            help='(deprecated) protocol to read input with (default: %default)')
 
         self.add_passthrough_option(
             '--output-protocol', dest='output_protocol',
             opt_group=self.proto_opt_group,
             default=self.DEFAULT_OUTPUT_PROTOCOL,
             choices=protocol_choices,
-             help='protocol for final output (default: %s)' % (
+             help='(deprecated) protocol for final output (default: %s)' % (
             'same as --protocol' if self.DEFAULT_OUTPUT_PROTOCOL is None
             else '%default'))
 
@@ -860,7 +891,7 @@ class MRJob(object):
             '-p', '--protocol', dest='protocol',
             opt_group=self.proto_opt_group,
             default=self.DEFAULT_PROTOCOL, choices=protocol_choices,
-            help='output protocol for mappers/reducers. Choices: %s (default: %%default)' % ', '.join(protocol_choices))
+            help='(deprecated) output protocol for mappers/reducers. Choices: %s (default: %%default)' % ', '.join(protocol_choices))
 
         self.add_passthrough_option(
             '--strict-protocols', dest='strict_protocols', default=None,
@@ -1291,6 +1322,14 @@ class MRJob(object):
         if not self.options.output_protocol:
             self.options.output_protocol = self.options.protocol
 
+        if (self.options.input_protocol or self.options.output_protocol
+            or self.options.protocol):
+            log.warn('Setting protocols via --input-protocol, --protocol,'
+                     ' --output-protocol, DEFAULT_INPUT_PROTOCOL,'
+                     ' DEFAULT_PROTOCOL, and DEFAULT_OUTPUT_PROTOCOL is'
+                     ' deprecated as of mrjob 0.3 and will no longer be'
+                     ' supported in mrjob 0.4.')
+
     def is_mapper_or_reducer(self):
         """True if this is a mapper/reducer.
 
@@ -1442,7 +1481,10 @@ class MRJob(object):
 
     @classmethod
     def protocols(cls):
-        """Mapping from protocol name to the protocol class to use
+        """Deprecated in favor of :py:attr:`INPUT_PROTOCOL`,
+        :py:attr:`OUTPUT_PROTOCOL`, and :py:attr:`PROTOCOL`.
+
+        Mapping from protocol name to the protocol class to use
         for parsing job input and writing job output. We give protocols names
         so that we can easily choose them from the command line.
 
@@ -1462,44 +1504,70 @@ class MRJob(object):
         """
         return PROTOCOL_DICT.copy() # copy to stop monkey-patching
 
-    #: Default protocol for reading input to the first mapper in your job.
-    #: Default: ``'raw_value'``.
+    #: Protocol for reading input to the first mapper in your job.
+    #: Default: :py:class:`RawValueProtocol`.
     #:
     #: For example you know your input data were in JSON format, you could set::
     #:
-    #:     DEFAULT_INPUT_PROTOCOL = 'json_value'
+    #:     INPUT_PROTOCOL = JsonValueProtocol
     #:
     #: in your class, and your initial mapper would receive decoded JSONs
     #: rather than strings.
     #:
-    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
-    #: protocols. Can be overridden by :option:`--input-protocol`.
-    DEFAULT_INPUT_PROTOCOL = 'raw_value'
+    #: See :py:data:`mrjob.protocol` for the full list of protocols.
+    INPUT_PROTOCOL = RawValueProtocol
 
-    #: Default protocol for communication between steps and final output.
-    #: Default: ``'json'``.
+    #: Protocol for communication between steps and final output.
+    #: Default: :py:class:`JSONProtocol`.
     #:
     #: For example if your step output weren't JSON-encodable, you could set::
     #:
-    #:     DEFAULT_PROTOCOL = 'pickle'
+    #:     PROTOCOL = PickleProtocol
     #:
     #: and step output would be encoded as string-escaped pickles.
     #:
-    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
-    #: protocols. Can be overridden by :option:`--protocol`.
-    DEFAULT_PROTOCOL = DEFAULT_PROTOCOL # i.e. the one from mrjob.protocols
+    #: See :py:data:`mrjob.protocol` for the full list of protocols.
+    PROTOCOL = JSONProtocol
 
-    #: Default protocol to use for writing output. By default, this is set to
-    #: ``None``, which means to fall back on ``DEFAULT_PROTOCOL``.
+    #: Protocol to use for writing output. By default, this is set to
+    #: ``None``, which means to fall back on ``PROTOCOL``.
     #:
     #: For example, if you wanted steps to communicate using pickle
     #: internally, but receive the final output in JSON, you could set::
     #:
-    #:     DEFAULT_PROTOCOL = 'pickle'
-    #:     DEFAULT_OUTPUT_PROTOCOL = 'json'
+    #:     PROTOCOL = PickleProtocol
+    #:     OUTPUT_PROTOCOL = JSONProtocol
+    #:
+    #: See :py:data:`mrjob.protocol` for the full list of protocols.
+    OUTPUT_PROTOCOL = None
+
+    #: DEPRECATED
+    #:
+    #: Default protocol for reading input to the first mapper in your job
+    #: specified by a string.
+    #: Default: None.
     #:
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
-    #: protocols. Can be overridden by the :option:`--output-protocol`.
+    #: protocol strings. Can be overridden by :option:`--input-protocol`.
+    DEFAULT_INPUT_PROTOCOL = None
+
+    #: DEPRECATED
+    #:
+    #: Default protocol for communication between steps and final output
+    #: specified by a string.
+    #: Default: None.
+    #:
+    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
+    #: protocol strings. Can be overridden by :option:`--protocol`.
+    DEFAULT_PROTOCOL = DEFAULT_PROTOCOL # i.e. the one from mrjob.protocols
+
+    #: DEPRECATED
+    #:
+    #: Default protocol to use for writing output specified by a string.
+    #: Default: NOne.
+    #:
+    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
+    #: protocol strings. Can be overridden by the :option:`--output-protocol`.
     DEFAULT_OUTPUT_PROTOCOL = None
 
     def parse_output_line(self, line):
@@ -1510,7 +1578,13 @@ class MRJob(object):
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
         """
-        reader = self.protocols()[self.options.output_protocol]
+        if self.options.output_protocol:
+            reader = self.protocols()[self.options.output_protocol]
+        else:
+            if self.OUTPUT_PROTOCOL:
+                reader = self.OUTPUT_PROTOCOL
+            else:
+                reader = self.PROTOCOL
         return reader.read(line)
 
     ### Testing ###
@@ -1599,7 +1673,12 @@ class MRJob(object):
         if self.stdout == sys.stdout:
             raise AssertionError('You must call sandbox() first; parse_output() is for testing only.')
 
-        reader = self.protocols()[protocol]
+        if isinstance(protocol, str):
+            reader = self.protocols()[protocol]
+        else:
+            if protocol is None:
+                protocol = self.PROTOCOL
+            reader = protocol
         lines = StringIO(self.stdout.getvalue())
         return [reader.read(line) for line in lines]
 

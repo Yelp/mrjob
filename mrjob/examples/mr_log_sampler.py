@@ -22,21 +22,22 @@ import random
 import sys
 
 from mrjob.job import MRJob
+from mrjob.protocol import RawValueProtocol, ReprProtocol
 
 SAMPLING_FUDGE_FACTOR = 1.2
 
 class MRLogSampler(MRJob):
-	# We use the 'raw_value' output protocol to be format agnostic
+	# We use RawValueProtocol for input to be format agnostic
 	# and avoid any type of parsing errors
-	DEFAULT_INPUT_PROTOCOL = 'raw_value'
+	INPUT_PROTOCOL = RawValueProtocol
 
-	# We use the 'raw_value' output protocol, so we can output raw lines
+	# We use RawValueProtocol for output so we can output raw lines
 	# instead of (k, v) pairs
-	DEFAULT_OUTPUT_PROTOCOL = 'raw_value'
+	OUTPUT_PROTOCOL = RawValueProtocol
 
 	# Encode the intermediate records using repr() instead of JSON, so the record
 	# doesn't get Unicode encoded
-	DEFAULT_PROTOCOL = 'repr'
+	PROTOCOL = ReprProtocol
 
 	def configure_options(self):
 		super(MRLogSampler, self).configure_options()

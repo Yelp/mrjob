@@ -30,13 +30,14 @@ to your data set -if you wish.
 For questions or comments you can contact me at:
 peter.b.harrington@gmail.com
 '''
-from mrjob.job import MRJob
-
 import pickle
 from numpy import mat, zeros, shape, random
 
+from mrjob.job import MRJob
+from mrjob.protocol import JSONValueProtocol
+
 class MRsvm(MRJob):
-    DEFAULT_INPUT_PROTOCOL = 'json_value'
+    INPUT_PROTOCOL = JSONValueProtocol
     
     def __init__(self, *args, **kwargs):
         super(MRsvm, self).__init__(*args, **kwargs)

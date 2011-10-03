@@ -51,11 +51,26 @@ Protocols
 
 See :doc:`protocols` for a complete description of protocols.
 
+.. autoattribute:: MRJob.INPUT_PROTOCOL
+.. autoattribute:: MRJob.PROTOCOL
+.. autoattribute:: MRJob.OUTPUT_PROTOCOL
 .. autoattribute:: MRJob.DEFAULT_INPUT_PROTOCOL
 .. autoattribute:: MRJob.DEFAULT_PROTOCOL
 .. autoattribute:: MRJob.DEFAULT_OUTPUT_PROTOCOL
 .. automethod:: MRJob.protocols
 .. automethod:: MRJob.pick_protocols
+
+Custom Protocols
+^^^^^^^^^^^^^^^^
+
+A protocol is a subclass of :py:class:`HadoopStreamingProtocol` with class
+methods ``read(cls, line)`` and ``write(cls, key, value)``. The ``read(line)``
+method takes a string and returns a 2-tuple of decoded objects, and
+``write(cls, key, value)`` takes the key and value and returns the line to be
+passed back to Hadoop Streaming or as output. To use a protocol, import it from
+:py:mod:`mrjob.protocols` and assign :py:attr:`MRJob.INPUT_PROTOCOL`, 
+:py:attr:`MRJob.PROTOCOL`, or :py:attr:`MRJob.OUTPUT_PROTOCOL` as
+appropriate.
 
 Custom command-line options
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

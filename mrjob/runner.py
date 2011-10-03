@@ -108,7 +108,7 @@ class MRJobRunner(object):
         :type conf_path: str
         :param conf_path: Alternate path to read configs from, or ``False`` to ignore all config files.
         :type extra_args: list of str
-        :param extra_args: a list of extra cmd-line arguments to pass to the mr_job script. For example: ``['--protocol', 'repr']``. This is a hook to allow jobs to take additional arguments.
+        :param extra_args: a list of extra cmd-line arguments to pass to the mr_job script. This is a hook to allow jobs to take additional arguments.
         :param file_upload_args: a list of tuples of ``('--ARGNAME', path)``. The file at the given path will be uploaded to the local directory of the mr_job script when it runs, and then passed into the script with ``--ARGNAME``. Useful for passing in SQLite DBs and other configuration files to your job.
         :type input_paths: list of str
         :param input_paths: Input files for your job. Supports globs and recursively walks directories (e.g. ``['data/common/', 'data/training/*.gz']``). If this is left blank, we'll read from stdin

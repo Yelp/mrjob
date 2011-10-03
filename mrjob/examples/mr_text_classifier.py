@@ -112,7 +112,7 @@ DEFAULT_MAX_NGRAM_SIZE = 4
 DEFAULT_STOP_WORDS = ['a', 'about', 'also', 'am', 'an', 'and', 'any', 'are', 'as', 'at', 'be', 'but', 'by', 'can', 'com', 'did', 'do', 'does', 'for', 'from', 'had', 'has', 'have', 'he', "he'd", "he'll", "he's", 'her', 'here', 'hers', 'him', 'his', 'i', "i'd", "i'll", "i'm", "i've", 'if', 'in', 'into', 'is', 'it', "it's", 'its', 'just', 'me', 'mine', 'my', 'of', 'on', 'or', 'org', 'our', 'ours', 'she', "she'd", "she'll", "she's", 'some', 'than', 'that', 'the', 'their', 'them', 'then', 'there', 'these', 'they', "they'd", "they'll", "they're", 'this', 'those', 'to', 'us', 'was', 'we', "we'd", "we'll", "we're", 'were', 'what', 'where', 'which', 'who', 'will', 'with', 'would', 'you', 'your', 'yours']
 
 class MRTextClassifier(MRJob):
-    DEFAULT_INPUT_PROTOCOL = 'json_value'
+    INPUT_PROTOCOL = JSONValueProtocol
 
     def steps(self):
         """Conceptually, the steps are:

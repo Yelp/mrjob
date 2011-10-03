@@ -21,7 +21,8 @@ languages. If you need more power, you can represent values as reprs
 or pickles.
 
 Also, if know that your input will always be in JSON format, consider
-the ``json_value`` protocol as an alternative to ``raw_value``.
+:py:class:`JSONValueProtocol` as an alternative to
+:py:class:`RawValueProtocol`.
 
 For more information on using alternate protocols in your job, see
 :ref:`job-protocols`.

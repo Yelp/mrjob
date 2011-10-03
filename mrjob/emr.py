@@ -347,7 +347,7 @@ class EMRJobRunner(MRJobRunner):
         :param emr_endpoint: optional host to connect to when communicating with S3 (e.g. ``us-west-1.elasticmapreduce.amazonaws.com``). Default is to infer this from *aws_region*.
         :type emr_job_flow_id: str
         :param emr_job_flow_id: the ID of a persistent EMR job flow to run jobs in (normally we launch our own job flow). It's fine for other jobs to be using the job flow; we give our job's steps a unique ID.
-        "type emr_job_flow_pool_name: str
+        :type emr_job_flow_pool_name: str
         :param emr_job_flow_pool_name: Specify a pool name to join. Set to "default" if not specified. Does not imply ``emr_job_flow_pool_name``.
         :type enable_emr_debugging: str
         :param enable_emr_debugging: store Hadoop logs in SimpleDB

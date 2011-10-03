@@ -248,7 +248,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -263,7 +263,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -277,7 +277,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -288,7 +288,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -302,7 +302,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -313,7 +313,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -1481,7 +1481,10 @@ class MRJob(object):
 
     @classmethod
     def protocols(cls):
-        """Mapping from protocol name to the protocol class to use
+        """Deprecated in favor of :py:attr:`INPUT_PROTOCOL`,
+        :py:attr:`OUTPUT_PROTOCOL`, and :py:attr:`PROTOCOL`.
+
+        Mapping from protocol name to the protocol class to use
         for parsing job input and writing job output. We give protocols names
         so that we can easily choose them from the command line.
 

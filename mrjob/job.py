@@ -796,9 +796,9 @@ class MRJob(object):
         else:
             # NON-DEPRECATED:
             if step_num == 0 and step_type == steps_desc[0][0]:
-                read = self.INPUT_PROTOCOL().read
+                read = self.INPUT_PROTOCOL.read
             else:
-                read = self.PROTOCOL().read
+                read = self.PROTOCOL.read
 
         # DEPRECATED:
         if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
@@ -813,11 +813,11 @@ class MRJob(object):
             # NON-DEPRECATED:
             if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
                 if self.OUTPUT_PROTOCOL:
-                    write = self.OUTPUT_PROTOCOL().write
+                    write = self.OUTPUT_PROTOCOL.write
                 else:
-                    write = self.PROTOCOL().write
+                    write = self.PROTOCOL.write
             else:
-                write = self.PROTOCOL().write
+                write = self.PROTOCOL.write
 
         if warn_deprecated:
             pass
@@ -1582,9 +1582,9 @@ class MRJob(object):
             reader = self.protocols()[self.options.output_protocol]
         else:
             if self.OUTPUT_PROTOCOL:
-                reader = self.OUTPUT_PROTOCOL()
+                reader = self.OUTPUT_PROTOCOL
             else:
-                reader = self.PROTOCOL()
+                reader = self.PROTOCOL
         return reader.read(line)
 
     ### Testing ###
@@ -1673,13 +1673,12 @@ class MRJob(object):
         if self.stdout == sys.stdout:
             raise AssertionError('You must call sandbox() first; parse_output() is for testing only.')
 
-        if self.options.output_protocol:
+        if isinstance(protocol, str):
             reader = self.protocols()[protocol]
         else:
-            if self.OUTPUT_PROTOCOL:
-                reader = self.OUTPUT_PROTOCOL()
-            else:
-                reader = self.PROTOCOL()
+            if protocol is None:
+                protocol = self.PROTOCOL
+            reader = self.PROTOCOL
         lines = StringIO(self.stdout.getvalue())
         return [reader.read(line) for line in lines]
 

@@ -338,6 +338,151 @@ class CountersAndStatusTestCase(TestCase):
                       'girl; interrupted': {'movie': 1}})
 
 
+class ProtocolsTestCase(TestCase):
+    # not putting these in their own files because we're not going to invoke
+    # it as a script anyway.
+
+    class MRBoringJob2(MRBoringJob):
+        INPUT_PROTOCOL = JSONProtocol
+        PROTOCOL = PickleProtocol
+        OUTPUT_PROTOCOL = ReprProtocol
+
+    class MRBoringJob3(MRBoringJob):
+        PROTOCOL = ReprProtocol
+
+    class MRTrivialJob(MRJob):
+        OUTPUT_PROTOCOL = ReprProtocol
+
+        def mapper(self, key, value):
+            yield key, value
+
+    def test_default_protocols(self):
+        mr_job = MRBoringJob()
+        assert_equal(mr_job.pick_protocols(0, 'M'),
+                     (RawValueProtocol.read, JSONProtocol.write))
+        assert_equal(mr_job.pick_protocols(0, 'R'),
+                     (JSONProtocol.read, JSONProtocol.write))
+
+    def test_explicit_default_protocols(self):
+        mr_job2 = self.MRBoringJob2().sandbox()
+        assert_equal(mr_job2.pick_protocols(0, 'M'),
+                     (JSONProtocol.read, PickleProtocol.write))
+        assert_equal(mr_job2.pick_protocols(0, 'R'),
+                     (PickleProtocol.read, ReprProtocol.write))
+
+        mr_job3 = self.MRBoringJob3()
+        assert_equal(mr_job3.pick_protocols(0, 'M'),
+                     (RawValueProtocol.read, ReprProtocol.write))
+        # output protocol should default to protocol
+        assert_equal(mr_job3.pick_protocols(0, 'R'),
+                     (ReprProtocol.read, ReprProtocol.write))
+
+    def test_mapper_raw_value_to_json(self):
+        RAW_INPUT = StringIO('foo\nbar\nbaz\n')
+
+        with no_handlers_for_logger():
+            mr_job = MRBoringJob(['--mapper'])
+        mr_job.sandbox(stdin=RAW_INPUT)
+        mr_job.run_mapper()
+
+        assert_equal(mr_job.stdout.getvalue(),
+                     'null\t"foo"\n' +
+                     'null\t"bar"\n' +
+                     'null\t"baz"\n')
+
+    def test_reducer_json_to_json(self):
+        JSON_INPUT = StringIO('"foo"\t"bar"\n' +
+                              '"foo"\t"baz"\n' +
+                              '"bar"\t"qux"\n')
+
+        with no_handlers_for_logger():
+            mr_job = MRBoringJob(args=['--reducer'])
+        mr_job.sandbox(stdin=JSON_INPUT)
+        mr_job.run_reducer()
+
+        assert_equal(mr_job.stdout.getvalue(),
+                     ('"foo"\t["bar", "baz"]\n' +
+                      '"bar"\t["qux"]\n'))
+
+    def test_output_protocol_with_no_final_reducer(self):
+        # if there's no reducer, the last mapper should use the
+        # output protocol (in this case, repr)
+        RAW_INPUT = StringIO('foo\nbar\nbaz\n')
+
+        with no_handlers_for_logger():
+            mr_job = self.MRTrivialJob(['--mapper'])
+        mr_job.sandbox(stdin=RAW_INPUT)
+        mr_job.run_mapper()
+
+        assert_equal(mr_job.stdout.getvalue(),
+                     ("None\t'foo'\n" +
+                      "None\t'bar'\n" +
+                      "None\t'baz'\n"))
+
+    def test_undecodable_input(self):
+        BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
+                                  '"foo"\t"bar"\n' +
+                                  '"too"\t"many"\t"tabs"\n' +
+                                  '"notabs"\n')
+
+        with no_handlers_for_logger():
+            mr_job = MRBoringJob(args=['--reducer'])
+        mr_job.sandbox(stdin=BAD_JSON_INPUT)
+        mr_job.run_reducer()
+
+        # good data should still get through
+        assert_equal(mr_job.stdout.getvalue(), '"foo"\t["bar"]\n')
+
+        # exception type varies between versions of simplejson,
+        # so just make sure there were three exceptions of some sort
+        counters = mr_job.parse_counters()
+        assert_equal(counters.keys(), ['Undecodable input'])
+        assert_equal(sum(counters['Undecodable input'].itervalues()), 3)
+
+    def test_undecodable_input_strict(self):
+        BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
+                                  '"foo"\t"bar"\n' +
+                                  '"too"\t"many"\t"tabs"\n' +
+                                  '"notabs"\n')
+
+        with no_handlers_for_logger():
+            mr_job = MRBoringJob(args=['--reducer', '--strict-protocols'])
+        mr_job.sandbox(stdin=BAD_JSON_INPUT)
+        
+        # make sure it raises an exception
+        assert_raises(Exception, mr_job.run_reducer)
+        
+    def test_unencodable_output(self):
+        UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
+                                         '\xaa\n' +
+                                         'bar\n')
+
+        with no_handlers_for_logger():
+            mr_job = MRBoringJob(args=['--mapper'])
+        mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
+        mr_job.run_mapper()
+
+        # good data should still get through
+        assert_equal(mr_job.stdout.getvalue(),
+                     ('null\t"foo"\n' + 'null\t"bar"\n'))
+
+        assert_equal(mr_job.parse_counters(),
+                     {'Unencodable output': {'UnicodeDecodeError': 1}})
+                     
+    def test_undecodable_output_strict(self):
+        UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
+                                         '\xaa\n' +
+                                         'bar\n')
+
+        with no_handlers_for_logger():
+            mr_job = MRBoringJob(args=['--mapper', '--strict-protocols'])
+        mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
+        
+        # make sure it raises an exception
+        assert_raises(Exception, mr_job.run_mapper)
+
+
+
 class DeprecatedProtocolsTestCase(TestCase):
     # not putting these in their own files because we're not going to invoke
     # it as a script anyway.

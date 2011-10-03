@@ -1678,7 +1678,7 @@ class MRJob(object):
         else:
             if protocol is None:
                 protocol = self.PROTOCOL
-            reader = self.PROTOCOL
+            reader = protocol
         lines = StringIO(self.stdout.getvalue())
         return [reader.read(line) for line in lines]
 

@@ -1411,10 +1411,9 @@ class EMRJobRunner(MRJobRunner):
                                          STEP_LOG_URI_RE,
                                          step_nums)
 
-    def ls_job_logs_ssh(self, step_nums):
+    def ls_job_logs_ssh(self):
         return self._enforce_path_regexp(self._ls_ssh_logs('history/'),
-                                         EMR_JOB_LOG_URI_RE,
-                                         step_nums)
+                                         EMR_JOB_LOG_URI_RE)
 
     def ls_node_logs_ssh(self):
         all_paths = []
@@ -1435,7 +1434,7 @@ class EMRJobRunner(MRJobRunner):
             self._set_s3_job_log_uri(self._describe_jobflow())
 
         if not self._s3_job_log_uri:
-            return None
+            raise LogFetchException('Could not determine S3 job log URI')
 
         return self.ls(self._s3_job_log_uri + relative_path)
 
@@ -1449,10 +1448,9 @@ class EMRJobRunner(MRJobRunner):
                                          STEP_LOG_URI_RE,
                                          step_nums)
 
-    def ls_job_logs_s3(self, step_nums):
+    def ls_job_logs_s3(self):
         return  self._enforce_path_regexp(self._ls_s3_logs('jobs/'),
-                                          EMR_JOB_LOG_URI_RE,
-                                          step_nums)
+                                          EMR_JOB_LOG_URI_RE)
 
     def ls_node_logs_s3(self):
         return self._enforce_path_regexp(self._ls_s3_logs('node/'), NODE_LOG_URI_RE)
@@ -1491,14 +1489,11 @@ class EMRJobRunner(MRJobRunner):
             self._counters.append(new_counters.get(step_num, {}))
 
     def _fetch_counters_ssh(self, step_nums):
-        uris = list(self.ls_job_logs_ssh(step_nums))
+        uris = list(self.ls_job_logs_ssh())
         log.info('Fetching counters from SSH...')
         return scan_for_counters_in_files(uris, self)
 
     def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
-        if not self._s3_job_log_uri:
-            return {}
-
         job_flow = self._describe_jobflow()
         if job_flow.keepjobflowalivewhennosteps in (True, 'true'):
             log.info("Can't fetch counters from S3 for five more minutes. Try"
@@ -1512,8 +1507,12 @@ class EMRJobRunner(MRJobRunner):
             self._wait_for_s3_eventual_consistency()
         self._wait_for_job_flow_termination()
 
-        uris = self.ls_job_logs_s3(step_nums)
-        return scan_for_counters_in_files(uris, self)
+        try:
+            uris = self.ls_job_logs_s3()
+            return scan_for_counters_in_files(uris, self)
+        except LogFetchException, e:
+            log.info("Unable to fetch counters: %s" % e)
+            return {}
 
     def counters(self):
         return self._counters
@@ -1545,7 +1544,7 @@ class EMRJobRunner(MRJobRunner):
     def _find_probable_cause_of_failure_ssh(self, step_nums):
         task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
         step_logs = self.ls_step_logs_ssh(step_nums)
-        job_logs = self.ls_job_logs_ssh(step_nums)
+        job_logs = self.ls_job_logs_ssh()
         log.info('Scanning SSH logs for probable cause of failure')
         return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
                                   step_logs=step_logs,
@@ -1553,16 +1552,13 @@ class EMRJobRunner(MRJobRunner):
                                   runner=self)
 
     def _find_probable_cause_of_failure_s3(self, step_nums):
-        if not self._s3_job_log_uri:
-            return None
-
         log.info('Scanning S3 logs for probable cause of failure')
         self._wait_for_s3_eventual_consistency()
         self._wait_for_job_flow_termination()
 
         task_attempt_logs = self.ls_task_attempt_logs_s3(step_nums)
         step_logs = self.ls_step_logs_s3(step_nums)
-        job_logs = self.ls_job_logs_s3(step_nums)
+        job_logs = self.ls_job_logs_s3()
         return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
                                   step_logs=step_logs,
                                   job_logs=job_logs,

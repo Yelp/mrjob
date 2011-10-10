@@ -37,7 +37,7 @@ class MRLogSampler(MRJob):
 
 	# Encode the intermediate records using repr() instead of JSON, so the record
 	# doesn't get Unicode encoded
-	PROTOCOL = ReprProtocol
+	INTERNAL_PROTOCOL = ReprProtocol
 
 	def configure_options(self):
 		super(MRLogSampler, self).configure_options()

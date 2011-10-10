@@ -38,7 +38,12 @@ try:
 except ImportError:
     import json # built in to Python 2.6 and later
 
-class HadoopStreamingProtocol(object):
+
+# DEPRECATED: Abstract base class for all protocols. Now just an alias for
+# ``object``.
+HadoopStreamingProtocol = object
+
+class KeyCachingProtocol(object):
     """Abstract base class for all protocols. Inherit from it and define
     your own :py:meth:`read` and :py:meth:`write` functions.
     """
@@ -63,7 +68,7 @@ class HadoopStreamingProtocol(object):
         :return: A line, without trailing newline."""
         raise NotImplementedError
 
-class JSONProtocol(HadoopStreamingProtocol):
+class JSONProtocol(KeyCachingProtocol):
     """Encode ``(key, value)`` as two JSONs separated by a tab.
 
     Note that JSON has some limitations; dictionary keys must be strings,
@@ -77,7 +82,7 @@ class JSONProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return '%s\t%s' % (json.dumps(key), json.dumps(value))
 
-class JSONValueProtocol(HadoopStreamingProtocol):
+class JSONValueProtocol(KeyCachingProtocol):
     """Encode ``value`` as a JSON and discard ``key``
     (``key`` is read in as ``None``).
     """
@@ -89,7 +94,7 @@ class JSONValueProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return json.dumps(value)
 
-class PickleProtocol(HadoopStreamingProtocol):
+class PickleProtocol(KeyCachingProtocol):
     """Encode ``(key, value)`` as two string-escaped pickles separated
     by a tab.
 
@@ -111,7 +116,7 @@ class PickleProtocol(HadoopStreamingProtocol):
             cPickle.dumps(key).encode('string_escape'),
             cPickle.dumps(value).encode('string_escape'))
 
-class PickleValueProtocol(HadoopStreamingProtocol):
+class PickleValueProtocol(KeyCachingProtocol):
     """Encode ``value`` as a string-escaped pickle and discard ``key``
     (``key`` is read in as ``None``).
     """
@@ -123,7 +128,7 @@ class PickleValueProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return cPickle.dumps(value).encode('string_escape')
 
-class RawValueProtocol(HadoopStreamingProtocol):
+class RawValueProtocol(KeyCachingProtocol):
     """Read in a line as ``(None, line)``. Write out ``(key, value)``
     as ``value``. ``value`` must be a ``str``.
 
@@ -137,7 +142,7 @@ class RawValueProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return value
 
-class ReprProtocol(HadoopStreamingProtocol):
+class ReprProtocol(KeyCachingProtocol):
     """Encode ``(key, value)`` as two reprs separated by a tab.
 
     This only works for basic types (we use :py:func:`mrjob.util.safeeval`).
@@ -151,7 +156,7 @@ class ReprProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return '%s\t%s' % (repr(key), repr(value))
 
-class ReprValueProtocol(HadoopStreamingProtocol):
+class ReprValueProtocol(KeyCachingProtocol):
     """Encode ``value`` as a repr and discard ``key`` (``key`` is read
     in as None).
 

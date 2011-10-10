@@ -52,7 +52,7 @@ Protocols
 See :doc:`protocols` for a complete description of protocols.
 
 .. autoattribute:: MRJob.INPUT_PROTOCOL
-.. autoattribute:: MRJob.PROTOCOL
+.. autoattribute:: MRJob.INTERNAL_PROTOCOL
 .. autoattribute:: MRJob.OUTPUT_PROTOCOL
 .. autoattribute:: MRJob.DEFAULT_INPUT_PROTOCOL
 .. autoattribute:: MRJob.DEFAULT_PROTOCOL
@@ -69,7 +69,7 @@ method takes a string and returns a 2-tuple of decoded objects, and
 ``write(cls, key, value)`` takes the key and value and returns the line to be
 passed back to Hadoop Streaming or as output. To use a protocol, import it from
 :py:mod:`mrjob.protocols` and assign :py:attr:`MRJob.INPUT_PROTOCOL`, 
-:py:attr:`MRJob.PROTOCOL`, or :py:attr:`MRJob.OUTPUT_PROTOCOL` as
+:py:attr:`MRJob.INTERNAL_PROTOCOL`, or :py:attr:`MRJob.OUTPUT_PROTOCOL` as
 appropriate.
 
 Custom command-line options

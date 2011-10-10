@@ -344,11 +344,11 @@ class ProtocolsTestCase(TestCase):
 
     class MRBoringJob2(MRBoringJob):
         INPUT_PROTOCOL = JSONProtocol
-        PROTOCOL = PickleProtocol
+        INTERNAL_PROTOCOL = PickleProtocol
         OUTPUT_PROTOCOL = ReprProtocol
 
     class MRBoringJob3(MRBoringJob):
-        PROTOCOL = ReprProtocol
+        INTERNAL_PROTOCOL = ReprProtocol
 
     class MRTrivialJob(MRJob):
         OUTPUT_PROTOCOL = ReprProtocol

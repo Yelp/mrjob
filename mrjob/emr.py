@@ -1560,7 +1560,7 @@ class EMRJobRunner(MRJobRunner):
 
         task_attempt_logs = self.ls_task_attempt_logs_s3(step_nums)
         step_logs = self.ls_step_logs_s3(step_nums)
-        job_logs = self.ls_job_logs_s3()
+        job_logs = self.ls_job_logs_s3(step_nums)
         return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
                                   step_logs=step_logs,
                                   job_logs=job_logs,

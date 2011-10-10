@@ -40,8 +40,6 @@ import shutil
 import stat
 import sys
 
-from mrjob import ssh
-
 
 def create_mock_ssh_script(path):
     """Dump a wrapper script to the given file object that runs this

@@ -1411,9 +1411,10 @@ class EMRJobRunner(MRJobRunner):
                                          STEP_LOG_URI_RE,
                                          step_nums)
 
-    def ls_job_logs_ssh(self):
+    def ls_job_logs_ssh(self, step_nums):
         return self._enforce_path_regexp(self._ls_ssh_logs('history/'),
-                                         EMR_JOB_LOG_URI_RE)
+                                         EMR_JOB_LOG_URI_RE,
+                                         step_nums)
 
     def ls_node_logs_ssh(self):
         all_paths = []
@@ -1448,9 +1449,10 @@ class EMRJobRunner(MRJobRunner):
                                          STEP_LOG_URI_RE,
                                          step_nums)
 
-    def ls_job_logs_s3(self):
+    def ls_job_logs_s3(self, step_nums):
         return  self._enforce_path_regexp(self._ls_s3_logs('jobs/'),
-                                          EMR_JOB_LOG_URI_RE)
+                                          EMR_JOB_LOG_URI_RE,
+                                          step_nums)
 
     def ls_node_logs_s3(self):
         return self._enforce_path_regexp(self._ls_s3_logs('node/'), NODE_LOG_URI_RE)
@@ -1489,7 +1491,7 @@ class EMRJobRunner(MRJobRunner):
             self._counters.append(new_counters.get(step_num, {}))
 
     def _fetch_counters_ssh(self, step_nums):
-        uris = list(self.ls_job_logs_ssh())
+        uris = list(self.ls_job_logs_ssh(step_nums))
         log.info('Fetching counters from SSH...')
         return scan_for_counters_in_files(uris, self)
 
@@ -1508,7 +1510,7 @@ class EMRJobRunner(MRJobRunner):
         self._wait_for_job_flow_termination()
 
         try:
-            uris = self.ls_job_logs_s3()
+            uris = self.ls_job_logs_s3(step_nums)
             return scan_for_counters_in_files(uris, self)
         except LogFetchException, e:
             log.info("Unable to fetch counters: %s" % e)
@@ -1544,7 +1546,7 @@ class EMRJobRunner(MRJobRunner):
     def _find_probable_cause_of_failure_ssh(self, step_nums):
         task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
         step_logs = self.ls_step_logs_ssh(step_nums)
-        job_logs = self.ls_job_logs_ssh()
+        job_logs = self.ls_job_logs_ssh(step_nums)
         log.info('Scanning SSH logs for probable cause of failure')
         return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
                                   step_logs=step_logs,

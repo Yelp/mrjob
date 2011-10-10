@@ -155,7 +155,7 @@ def list_relevant(runner, step_nums):
         logs = {
             TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_ssh(step_nums),
             STEP_LOGS: runner.ls_step_logs_ssh(step_nums),
-            JOB_LOGS: runner.ls_job_logs_ssh(),
+            JOB_LOGS: runner.ls_job_logs_ssh(step_nums),
             NODE_LOGS: runner.ls_node_logs_ssh(),
         }
         _prettyprint_relevant(logs)
@@ -164,7 +164,7 @@ def list_relevant(runner, step_nums):
         logs = {
             TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_s3(step_nums),
             STEP_LOGS: runner.ls_step_logs_s3(step_nums),
-            JOB_LOGS: runner.ls_job_logs_s3(),
+            JOB_LOGS: runner.ls_job_logs_s3(step_nums),
             NODE_LOGS: runner.ls_node_logs_s3(),
         }
         _prettyprint_relevant(logs)
@@ -202,7 +202,7 @@ def cat_relevant(runner, step_nums):
         logs = {
             TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_ssh(step_nums),
             STEP_LOGS: runner.ls_step_logs_ssh(step_nums),
-            JOB_LOGS: runner.ls_job_logs_ssh(),
+            JOB_LOGS: runner.ls_job_logs_ssh(step_nums),
             NODE_LOGS: runner.ls_node_logs_ssh(),
         }
         _cat_from_relevant(runner, logs)
@@ -211,7 +211,7 @@ def cat_relevant(runner, step_nums):
         logs = {
             TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_s3(step_nums),
             STEP_LOGS: runner.ls_step_logs_s3(step_nums),
-            JOB_LOGS: runner.ls_job_logs_s3(),
+            JOB_LOGS: runner.ls_job_logs_s3(step_nums),
             NODE_LOGS: runner.ls_node_logs_s3(),
         }
         _cat_from_relevant(runner, logs)

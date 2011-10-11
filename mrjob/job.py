@@ -789,7 +789,6 @@ class MRJob(object):
         else:
             read = self._internal_protocol.read
 
-        # DEPRECATED:
         if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
             write = self._output_protocol.write
         else:

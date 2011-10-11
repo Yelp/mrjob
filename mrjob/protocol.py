@@ -24,6 +24,18 @@ Also, if know that your input will always be in JSON format, consider
 :py:class:`JSONValueProtocol` as an alternative to
 :py:class:`RawValueProtocol`.
 
+Custom Protocols
+^^^^^^^^^^^^^^^^
+
+A protocol is an object with methods ``read(self, line)`` and
+``write(self, key, value)``. The ``read(line)`` method takes a string and
+returns a 2-tuple of decoded objects, and ``write(cls, key, value)`` takes
+the key and value and returns the line to be passed back to Hadoop Streaming
+or as output.
+
+The built-in protocols use class methods instead of instance methods for
+legacy reasons, but you should use instance methods.
+
 For more information on using alternate protocols in your job, see
 :ref:`job-protocols`.
 """
@@ -43,7 +55,7 @@ except ImportError:
 # ``object``.
 HadoopStreamingProtocol = object
 
-class KeyCachingProtocol(object):
+class ClassBasedKeyCachingProtocol(object):
     """Abstract base class for all protocols. Inherit from it and define
     your own :py:meth:`read` and :py:meth:`write` functions.
     """
@@ -68,7 +80,7 @@ class KeyCachingProtocol(object):
         :return: A line, without trailing newline."""
         raise NotImplementedError
 
-class JSONProtocol(KeyCachingProtocol):
+class JSONProtocol(ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two JSONs separated by a tab.
 
     Note that JSON has some limitations; dictionary keys must be strings,
@@ -82,7 +94,7 @@ class JSONProtocol(KeyCachingProtocol):
     def write(cls, key, value):
         return '%s\t%s' % (json.dumps(key), json.dumps(value))
 
-class JSONValueProtocol(KeyCachingProtocol):
+class JSONValueProtocol(ClassBasedKeyCachingProtocol):
     """Encode ``value`` as a JSON and discard ``key``
     (``key`` is read in as ``None``).
     """
@@ -94,7 +106,7 @@ class JSONValueProtocol(KeyCachingProtocol):
     def write(cls, key, value):
         return json.dumps(value)
 
-class PickleProtocol(KeyCachingProtocol):
+class PickleProtocol(ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two string-escaped pickles separated
     by a tab.
 
@@ -116,7 +128,7 @@ class PickleProtocol(KeyCachingProtocol):
             cPickle.dumps(key).encode('string_escape'),
             cPickle.dumps(value).encode('string_escape'))
 
-class PickleValueProtocol(KeyCachingProtocol):
+class PickleValueProtocol(ClassBasedKeyCachingProtocol):
     """Encode ``value`` as a string-escaped pickle and discard ``key``
     (``key`` is read in as ``None``).
     """
@@ -128,7 +140,7 @@ class PickleValueProtocol(KeyCachingProtocol):
     def write(cls, key, value):
         return cPickle.dumps(value).encode('string_escape')
 
-class RawValueProtocol(KeyCachingProtocol):
+class RawValueProtocol(ClassBasedKeyCachingProtocol):
     """Read in a line as ``(None, line)``. Write out ``(key, value)``
     as ``value``. ``value`` must be a ``str``.
 
@@ -142,7 +154,7 @@ class RawValueProtocol(KeyCachingProtocol):
     def write(cls, key, value):
         return value
 
-class ReprProtocol(KeyCachingProtocol):
+class ReprProtocol(ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two reprs separated by a tab.
 
     This only works for basic types (we use :py:func:`mrjob.util.safeeval`).
@@ -156,7 +168,7 @@ class ReprProtocol(KeyCachingProtocol):
     def write(cls, key, value):
         return '%s\t%s' % (repr(key), repr(value))
 
-class ReprValueProtocol(KeyCachingProtocol):
+class ReprValueProtocol(ClassBasedKeyCachingProtocol):
     """Encode ``value`` as a repr and discard ``key`` (``key`` is read
     in as None).
 

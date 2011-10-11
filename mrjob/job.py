@@ -1453,6 +1453,10 @@ class MRJob(object):
     ### protocols ###
 
     def input_protocol(self):
+        """Instance of the protocol to use to convert input lines to Python
+        objects. Default behavior is to return an instace of
+        :py:attr:`INPUT_PROTOCOL`.
+        """
         if self.options.input_protocol is not None:
             # deprecated
             protocol_name = self.options.input_protocol
@@ -1462,6 +1466,10 @@ class MRJob(object):
             return self.INPUT_PROTOCOL()
 
     def internal_protocol(self):
+        """Instance of the protocol to use to communicate between steps.
+        Default behavior is to return an instance of
+        :py:attr:`INTERNAL_PROTOCOL`.
+        """
         if self.options.protocol is not None:
             # deprecated
             protocol_name = self.options.protocol
@@ -1471,6 +1479,10 @@ class MRJob(object):
             return self.INTERNAL_PROTOCOL()
 
     def output_protocol(self):
+        """Instance of the protocol to use to convert Python objects to output
+        lines. Default behavior is to return an instance of
+        :py:attr:`OUTPUT_PROTOCOL`.
+        """
         if self.options.output_protocol is not None:
             # deprecated
             return self.protocols()[self.options.output_protocol]
@@ -1573,8 +1585,9 @@ class MRJob(object):
     DEFAULT_OUTPUT_PROTOCOL = None
 
     def parse_output_line(self, line):
-        """Parse a line from the final output of this MRJob into
-        ``(key, value)``::
+        """
+        Parse a line from the final output of this MRJob into
+        ``(key, value)``. Used extensively in tests like this::
 
             runner.run()
             for line in runner.stream_output():

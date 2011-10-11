@@ -62,73 +62,13 @@ except ImportError:
 HadoopStreamingProtocol = object
 
 
-class KeyCachingProtocol(object):
-    """Protocol that caches the last decoded key and presents a simpler
-    interface for encoding and decoding tab-delimited key-value pairs.
-
-    To use this class, override :py:meth:`load_from_string` and
-    :py:meth:`dump_to_string`.
-    """
-
-    def __init__(self):
-        self._last_decoded_key_raw = None
-        self._last_decoded_key_loaded = None
-
-    def load_from_string(self, string_value):
-        """Convert a key or value in string form to a Python object.
-
-        :type string_value: string
-        :param string_value: A key or value
-
-        :return: Python object of your choosing
-        """
-        raise NotImplementedError
-
-    def dump_to_string(self, value):
-        """Convert a key or value in Python object form to a string.
-
-        :type value: object
-        :param value: Python object coming out of a mapper, reducer, or combiner
-
-        :rtype: str
-        :return: string to send to Hadoop Streaming
-        """
-        raise NotImplementedError
-
-    def read(self, line):
-        """Decode a line of input.
-
-        :type line: str
-        :param line: A line of raw input to the job, without trailing newline.
-
-        :return: A tuple of ``(key, value)``."""
-
-        raw_key, raw_value = line.split('\t')
-
-        if raw_key != self._last_decoded_key_raw:
-            self._last_decoded_key_raw = raw_key
-            self._last_decoded_key_loaded = self.load_from_string(raw_key)
-        return (self._last_decoded_key_loaded, self.load_from_string(raw_value))
-
-    def write(self, key, value):
-        """Encode a key and value.
-
-        :param key: A key (of any type) yielded by a mapper/reducer
-        :param value: A value (of any type) yielded by a mapper/reducer
-
-        :rtype: str
-        :return: A line, without trailing newline."""
-        return '%s\t%s' % (self.dump_to_string(key),
-                           self.dump_to_string(value))
-
-class ClassBasedKeyCachingProtocol(object):
+class _ClassBasedKeyCachingProtocol(object):
     """Protocol that caches the last decoded key and uses class methods
-    instead of instance methods. Do not inherit from this. Use
-    :py:class:`KeyCachingProtocol` instead.
+    instead of instance methods. Do not inherit from this.
     """
 
-    _last_decoded_key_raw = None
-    _last_decoded_key_loaded = None
+    _last_key_encoded = None
+    _last_key_decoded = None
 
     @classmethod
     def load_from_string(self, value):
@@ -149,10 +89,10 @@ class ClassBasedKeyCachingProtocol(object):
 
         raw_key, raw_value = line.split('\t')
 
-        if raw_key != cls._last_decoded_key_raw:
-            cls._last_decoded_key_raw = raw_key
-            cls._last_decoded_key_loaded = cls.load_from_string(raw_key)
-        return (cls._last_decoded_key_loaded, cls.load_from_string(raw_value))
+        if raw_key != cls._last_key_encoded:
+            cls._last_key_encoded = raw_key
+            cls._last_key_decoded = cls.load_from_string(raw_key)
+        return (cls._last_key_decoded, cls.load_from_string(raw_value))
 
     @classmethod
     def write(cls, key, value):
@@ -166,7 +106,7 @@ class ClassBasedKeyCachingProtocol(object):
         return '%s\t%s' % (cls.dump_to_string(key),
                            cls.dump_to_string(value))
 
-class JSONProtocol(ClassBasedKeyCachingProtocol):
+class JSONProtocol(_ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two JSONs separated by a tab.
 
     Note that JSON has some limitations; dictionary keys must be strings,
@@ -192,7 +132,7 @@ class JSONValueProtocol(object):
     def write(cls, key, value):
         return json.dumps(value)
 
-class PickleProtocol(ClassBasedKeyCachingProtocol):
+class PickleProtocol(_ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two string-escaped pickles separated
     by a tab.
 
@@ -237,7 +177,7 @@ class RawValueProtocol(object):
     def write(cls, key, value):
         return value
 
-class ReprProtocol(ClassBasedKeyCachingProtocol):
+class ReprProtocol(_ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two reprs separated by a tab.
 
     This only works for basic types (we use :py:func:`mrjob.util.safeeval`).

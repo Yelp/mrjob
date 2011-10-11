@@ -56,8 +56,8 @@ JSON-encodable Python objects. The last step should accept JSON-decoded
 Python objects and return JSON-encodable Python objects, which will appear
 in the final output as JSON.
 
-There are four ways (one deprecated) to specify which protocol you want to
-use for a given step. The simplest way is to assign a class imported from
+There are three ways to specify which protocol you want to use for a given
+step. The simplest way is to assign a class imported from
 :py:mod:`mrjob.protocols` to one of the class variables
 :py:attr:`MRJob.INPUT_PROTOCOL`, :py:attr:`MRJob.INTERNAL_PROTOCOL`, or
 :py:attr:`MRJob.OUTPUT_PROTOCOL` on your job. The input protocol is the format
@@ -108,12 +108,6 @@ the life of a task rather than just on initialization, so if you instantiate
 the protocols every time it is called, you will lose some speed. (The built-in
 protocols optimize the decoding of consecutive identical keys, a benefit that
 is lost if you constantly re-instantiate them.)
-
-The last way to specify a custom protocol is to use the deprecated
-:option:`--input-protocol`, :option:`--protocol`, and
-:option:`--output-protocol` options. If you really need protocols to be
-accessible from the command line, please use the method overriding pattern
-described above.
 
 See :doc:`protocols` for more information about protocols, including how
 to implement your own.

@@ -33,6 +33,12 @@ returns a 2-tuple of decoded objects, and ``write(cls, key, value)`` takes
 the key and value and returns the line to be passed back to Hadoop Streaming
 or as output.
 
+For a simpler interface, inherit from :py:class:`KeyCachingProtocol` and
+override :py:meth:`KeyCachingProtocol.load_from_string` and
+:py:meth:`KeyCachingProtocol.load_from_string`. Protocols that follow this
+pattern only decode keys when they differ from the last key seen. This
+optimization can speed up jobs significantly.
+
 The built-in protocols use class methods instead of instance methods for
 legacy reasons, but you should use instance methods.
 
@@ -54,6 +60,66 @@ except ImportError:
 # DEPRECATED: Abstract base class for all protocols. Now just an alias for
 # ``object``.
 HadoopStreamingProtocol = object
+
+
+class KeyCachingProtocol(object):
+    """Protocol that caches the last decoded key and presents a simpler
+    interface for encoding and decoding tab-delimited key-value pairs.
+
+    To use this class, override :py:meth:`load_from_string` and
+    :py:meth:`dump_to_string`.
+    """
+
+    def __init__(self):
+        self._last_decoded_key_raw = None
+        self._last_decoded_key_loaded = None
+
+    def load_from_string(self, string_value):
+        """Convert a key or value in string form to a Python object.
+
+        :type string_value: string
+        :param string_value: A key or value
+
+        :return: Python object of your choosing
+        """
+        raise NotImplementedError
+
+    def dump_to_string(self, value):
+        """Convert a key or value in Python object form to a string.
+
+        :type value: object
+        :param value: Python object coming out of a mapper, reducer, or combiner
+
+        :rtype: str
+        :return: string to send to Hadoop Streaming
+        """
+        raise NotImplementedError
+
+    def read(self, line):
+        """Decode a line of input.
+
+        :type line: str
+        :param line: A line of raw input to the job, without trailing newline.
+
+        :return: A tuple of ``(key, value)``."""
+
+        raw_key, raw_value = line.split('\t')
+
+        if raw_key != self._last_decoded_key_raw:
+            self._last_decoded_key_raw = raw_key
+            self._last_decoded_key_loaded = self.load_from_string(raw_key)
+        return (self._last_decoded_key_loaded, self.load_from_string(raw_value))
+
+    def write(self, key, value):
+        """Encode a key and value.
+
+        :param key: A key (of any type) yielded by a mapper/reducer
+        :param value: A value (of any type) yielded by a mapper/reducer
+
+        :rtype: str
+        :return: A line, without trailing newline."""
+        return '%s\t%s' % (self.dump_to_string(key),
+                           self.dump_to_string(value))
 
 class ClassBasedKeyCachingProtocol(object):
     """Protocol that caches the last decoded key and uses class methods

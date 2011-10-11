@@ -5,6 +5,8 @@ v0.3.0, ??? -- ???!
    * job_name_prefix option is gone (was deprecated)
    * default Hadoop version on EMR is 0.20 (was 0.18)
  * hadoop_bin, python_bin, and ssh_bin can now all take switches (Issue #96)
+ * Old ways of specifying protocols are deprecated in favor of new instance-
+   based behavior
  * Removed debian packaging (should be handled separately)
 
 v0.2.7, 2011-07-12 -- Hooray for interns!

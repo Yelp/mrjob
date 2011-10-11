@@ -94,7 +94,7 @@ class JSONProtocol(ClassBasedKeyCachingProtocol):
     def write(cls, key, value):
         return '%s\t%s' % (json.dumps(key), json.dumps(value))
 
-class JSONValueProtocol(ClassBasedKeyCachingProtocol):
+class JSONValueProtocol(object):
     """Encode ``value`` as a JSON and discard ``key``
     (``key`` is read in as ``None``).
     """
@@ -128,7 +128,7 @@ class PickleProtocol(ClassBasedKeyCachingProtocol):
             cPickle.dumps(key).encode('string_escape'),
             cPickle.dumps(value).encode('string_escape'))
 
-class PickleValueProtocol(ClassBasedKeyCachingProtocol):
+class PickleValueProtocol(object):
     """Encode ``value`` as a string-escaped pickle and discard ``key``
     (``key`` is read in as ``None``).
     """
@@ -140,7 +140,7 @@ class PickleValueProtocol(ClassBasedKeyCachingProtocol):
     def write(cls, key, value):
         return cPickle.dumps(value).encode('string_escape')
 
-class RawValueProtocol(ClassBasedKeyCachingProtocol):
+class RawValueProtocol(object):
     """Read in a line as ``(None, line)``. Write out ``(key, value)``
     as ``value``. ``value`` must be a ``str``.
 
@@ -168,7 +168,7 @@ class ReprProtocol(ClassBasedKeyCachingProtocol):
     def write(cls, key, value):
         return '%s\t%s' % (repr(key), repr(value))
 
-class ReprValueProtocol(ClassBasedKeyCachingProtocol):
+class ReprValueProtocol(object):
     """Encode ``value`` as a repr and discard ``key`` (``key`` is read
     in as None).
 

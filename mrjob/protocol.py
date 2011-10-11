@@ -56,9 +56,22 @@ except ImportError:
 HadoopStreamingProtocol = object
 
 class ClassBasedKeyCachingProtocol(object):
-    """Abstract base class for all protocols. Inherit from it and define
-    your own :py:meth:`read` and :py:meth:`write` functions.
+    """Protocol that caches the last decoded key and uses class methods
+    instead of instance methods. Do not inherit from this. Use
+    :py:class:`KeyCachingProtocol` instead.
     """
+
+    _last_decoded_key_raw = None
+    _last_decoded_key_loaded = None
+
+    @classmethod
+    def load_from_string(self, value):
+        raise NotImplementedError
+
+    @classmethod
+    def dump_to_string(self, value):
+        raise NotImplementedError
+
     @classmethod
     def read(cls, line):
         """Decode a line of input.
@@ -67,7 +80,13 @@ class ClassBasedKeyCachingProtocol(object):
         :param line: A line of raw input to the job, without trailing newline.
 
         :return: A tuple of ``(key, value)``."""
-        raise NotImplementedError
+
+        raw_key, raw_value = line.split('\t')
+
+        if raw_key != cls._last_decoded_key_raw:
+            cls._last_decoded_key_raw = raw_key
+            cls._last_decoded_key_loaded = cls.load_from_string(raw_key)
+        return (cls._last_decoded_key_loaded, cls.load_from_string(raw_value))
 
     @classmethod
     def write(cls, key, value):
@@ -78,21 +97,22 @@ class ClassBasedKeyCachingProtocol(object):
 
         :rtype: str
         :return: A line, without trailing newline."""
-        raise NotImplementedError
+        return '%s\t%s' % (cls.dump_to_string(key),
+                           cls.dump_to_string(value))
 
 class JSONProtocol(ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two JSONs separated by a tab.
 
     Note that JSON has some limitations; dictionary keys must be strings,
     and there's no distinction between lists and tuples."""
-    @classmethod
-    def read(cls, line):
-        key, value = line.split('\t')
-        return json.loads(key), json.loads(value)
 
     @classmethod
-    def write(cls, key, value):
-        return '%s\t%s' % (json.dumps(key), json.dumps(value))
+    def load_from_string(cls, value):
+        return json.loads(value)
+
+    @classmethod
+    def dump_to_string(cls, value):
+        return json.dumps(value)
 
 class JSONValueProtocol(object):
     """Encode ``value`` as a JSON and discard ``key``
@@ -116,17 +136,14 @@ class PickleProtocol(ClassBasedKeyCachingProtocol):
 
     Ugly, but should work for any type.
     """
-    @classmethod
-    def read(cls, line):
-        key, value = line.split('\t')
-        return (cPickle.loads(key.decode('string_escape')),
-                cPickle.loads(value.decode('string_escape')))
 
     @classmethod
-    def write(cls, key, value):
-        return '%s\t%s' % (
-            cPickle.dumps(key).encode('string_escape'),
-            cPickle.dumps(value).encode('string_escape'))
+    def load_from_string(cls, value):
+        return cPickle.loads(value.decode('string_escape'))
+
+    @classmethod
+    def dump_to_string(cls, value):
+        return cPickle.dumps(value).encode('string_escape')
 
 class PickleValueProtocol(object):
     """Encode ``value`` as a string-escaped pickle and discard ``key``
@@ -159,14 +176,14 @@ class ReprProtocol(ClassBasedKeyCachingProtocol):
 
     This only works for basic types (we use :py:func:`mrjob.util.safeeval`).
     """
-    @classmethod
-    def read(cls, line):
-        key, value = line.split('\t')
-        return safeeval(key), safeeval(value)
 
     @classmethod
-    def write(cls, key, value):
-        return '%s\t%s' % (repr(key), repr(value))
+    def load_from_string(cls, value):
+        return safeeval(value)
+
+    @classmethod
+    def dump_to_string(cls, value):
+        return repr(value)
 
 class ReprValueProtocol(object):
     """Encode ``value`` as a repr and discard ``key`` (``key`` is read

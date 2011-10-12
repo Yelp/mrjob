@@ -55,6 +55,7 @@ def stepdict(mapper=_IDENTITY_MAPPER, reducer=None, combiner=None,
     d.update(kwargs)
     return d
 
+
 ### Test classes ###
 
 # These can't be invoked as a separate script, but they don't need to be

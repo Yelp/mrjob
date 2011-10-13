@@ -99,15 +99,10 @@ option, you can do this::
                 raise ValueError("Data format must be 'json' or 'raw'")
 
 If you need behavior even more complex than that, including using different
-protocols to communicate between different steps (like JSON between steps and
+protocols to communicate between different steps (like JSON between steps 1 and
 2, but pickle between steps 2 and 3), you can override
 :py:meth:`MRJob.pick_protocols` to return different protocols based on the
-step number and step type of the current process. Unlike the three methods
-shown in the previous paragraph, this method is called more than once during
-the life of a task rather than just on initialization, so if you instantiate
-the protocols every time it is called, you will lose some speed. (The built-in
-protocols optimize the decoding of consecutive identical keys, a benefit that
-is lost if you constantly re-instantiate them.)
+step number and step type of the current process.
 
 See :doc:`protocols` for more information about protocols, including how
 to implement your own.

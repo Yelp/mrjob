@@ -190,11 +190,6 @@ class MRJob(object):
         self.stdout = sys.stdout
         self.stderr = sys.stderr
 
-        # instantiate protocols
-        self._input_protocol = self.input_protocol()
-        self._internal_protocol = self.internal_protocol()
-        self._output_protocol = self.output_protocol()
-
     ### Defining one-step jobs ###
 
     def mapper(self, key, value):
@@ -785,14 +780,14 @@ class MRJob(object):
         # pick input protocol
 
         if step_num == 0 and step_type == steps_desc[0][0]:
-            read = self._input_protocol.read
+            read = self.input_protocol().read
         else:
-            read = self._internal_protocol.read
+            read = self.internal_protocol().read
 
         if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
-            write = self._output_protocol.write
+            write = self.output_protocol().write
         else:
-            write = self._internal_protocol.write
+            write = self.internal_protocol().write
 
         return read, write
 
@@ -1684,7 +1679,7 @@ class MRJob(object):
             reader = self.protocols()[protocol]
         else:
             if protocol is None:
-                protocol = self._internal_protocol
+                protocol = self.internal_protocol()
             reader = protocol
         lines = StringIO(self.stdout.getvalue())
         return [reader.read(line) for line in lines]

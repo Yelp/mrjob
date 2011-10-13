@@ -248,7 +248,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`PROTOCOL` to change this.
+        re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -263,7 +263,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`PROTOCOL` to change this.
+        re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -277,7 +277,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`PROTOCOL` to change this.
+        re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -288,7 +288,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`PROTOCOL` to change this.
+        re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -302,7 +302,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`PROTOCOL` to change this.
+        re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -313,7 +313,7 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`PROTOCOL` to change this.
+        re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -769,7 +769,7 @@ class MRJob(object):
         internal protocol for communication between steps, and one
         protocol for final output (which is usually the same as the
         internal protocol). Protocols can be controlled by setting
-        :py:attr:`INPUT_PROTOCOL`, :py:attr:`PROTOCOL`, and
+        :py:attr:`INPUT_PROTOCOL`, :py:attr:`INTERNAL_PROTOCOL`, and
         :py:attr:`OUTPUT_PROTOCOL`.
 
         Re-define this if you need fine control over which protocols
@@ -777,50 +777,17 @@ class MRJob(object):
         """
         steps_desc = self._steps_desc()
 
-        protocol_dict = self.protocols()
-
-        warn_deprecated = False
-
         # pick input protocol
 
-        # DEPRECATED:
-        # first mapper handles input unless there is no mapper for the step
         if step_num == 0 and step_type == steps_desc[0][0]:
-            read_protocol = self.options.input_protocol
+            read = self.input_protocol().read
         else:
-            read_protocol = self.options.protocol
+            read = self.internal_protocol().read
 
-        if read_protocol is not None:
-            warn_deprecated = True
-            read = protocol_dict[read_protocol].read
-        else:
-            # NON-DEPRECATED:
-            if step_num == 0 and step_type == steps_desc[0][0]:
-                read = self.INPUT_PROTOCOL.read
-            else:
-                read = self.PROTOCOL.read
-
-        # DEPRECATED:
         if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
-            write_protocol = self.options.output_protocol
+            write = self.output_protocol().write
         else:
-            write_protocol = self.options.protocol
-
-        if write_protocol is not None:
-            warn_deprecated = True
-            write = protocol_dict[write_protocol].write
-        else:
-            # NON-DEPRECATED:
-            if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
-                if self.OUTPUT_PROTOCOL:
-                    write = self.OUTPUT_PROTOCOL.write
-                else:
-                    write = self.PROTOCOL.write
-            else:
-                write = self.PROTOCOL.write
-
-        if warn_deprecated:
-            pass
+            write = self.internal_protocol().write
 
         return read, write
 
@@ -1479,10 +1446,51 @@ class MRJob(object):
 
     ### protocols ###
 
+    def input_protocol(self):
+        """Instance of the protocol to use to convert input lines to Python
+        objects. Default behavior is to return an instace of
+        :py:attr:`INPUT_PROTOCOL`.
+        """
+        if self.options.input_protocol is not None:
+            # deprecated
+            protocol_name = self.options.input_protocol
+            return self.protocols()[protocol_name]()
+        else:
+            # non-deprecated
+            return self.INPUT_PROTOCOL()
+
+    def internal_protocol(self):
+        """Instance of the protocol to use to communicate between steps.
+        Default behavior is to return an instance of
+        :py:attr:`INTERNAL_PROTOCOL`.
+        """
+        if self.options.protocol is not None:
+            # deprecated
+            protocol_name = self.options.protocol
+            return self.protocols()[protocol_name]
+        else:
+            # non-deprecated
+            return self.INTERNAL_PROTOCOL()
+
+    def output_protocol(self):
+        """Instance of the protocol to use to convert Python objects to output
+        lines. Default behavior is to return an instance of
+        :py:attr:`OUTPUT_PROTOCOL`.
+        """
+        if self.options.output_protocol is not None:
+            # deprecated
+            return self.protocols()[self.options.output_protocol]
+        else:
+            # non-deprecated
+            if self.OUTPUT_PROTOCOL:
+                return self.OUTPUT_PROTOCOL()
+            else:
+                return self.INTERNAL_PROTOCOL()
+
     @classmethod
     def protocols(cls):
         """Deprecated in favor of :py:attr:`INPUT_PROTOCOL`,
-        :py:attr:`OUTPUT_PROTOCOL`, and :py:attr:`PROTOCOL`.
+        :py:attr:`OUTPUT_PROTOCOL`, and :py:attr:`INTERNAL_PROTOCOL`.
 
         Mapping from protocol name to the protocol class to use
         for parsing job input and writing job output. We give protocols names
@@ -1522,20 +1530,20 @@ class MRJob(object):
     #:
     #: For example if your step output weren't JSON-encodable, you could set::
     #:
-    #:     PROTOCOL = PickleProtocol
+    #:     INTERNAL_PROTOCOL = PickleProtocol
     #:
     #: and step output would be encoded as string-escaped pickles.
     #:
     #: See :py:data:`mrjob.protocol` for the full list of protocols.
-    PROTOCOL = JSONProtocol
+    INTERNAL_PROTOCOL = JSONProtocol
 
     #: Protocol to use for writing output. By default, this is set to
-    #: ``None``, which means to fall back on ``PROTOCOL``.
+    #: ``None``, which means to fall back on ``INTERNAL_PROTOCOL``.
     #:
     #: For example, if you wanted steps to communicate using pickle
     #: internally, but receive the final output in JSON, you could set::
     #:
-    #:     PROTOCOL = PickleProtocol
+    #:     INTERNAL_PROTOCOL = PickleProtocol
     #:     OUTPUT_PROTOCOL = JSONProtocol
     #:
     #: See :py:data:`mrjob.protocol` for the full list of protocols.
@@ -1571,21 +1579,15 @@ class MRJob(object):
     DEFAULT_OUTPUT_PROTOCOL = None
 
     def parse_output_line(self, line):
-        """Parse a line from the final output of this MRJob into
-        ``(key, value)``::
+        """
+        Parse a line from the final output of this MRJob into
+        ``(key, value)``. Used extensively in tests like this::
 
             runner.run()
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
         """
-        if self.options.output_protocol:
-            reader = self.protocols()[self.options.output_protocol]
-        else:
-            if self.OUTPUT_PROTOCOL:
-                reader = self.OUTPUT_PROTOCOL
-            else:
-                reader = self.PROTOCOL
-        return reader.read(line)
+        return self.output_protocol().read(line)
 
     ### Testing ###
 
@@ -1677,7 +1679,7 @@ class MRJob(object):
             reader = self.protocols()[protocol]
         else:
             if protocol is None:
-                protocol = self.PROTOCOL
+                protocol = self.internal_protocol()
             reader = protocol
         lines = StringIO(self.stdout.getvalue())
         return [reader.read(line) for line in lines]

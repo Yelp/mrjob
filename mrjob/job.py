@@ -1261,7 +1261,7 @@ class MRJob(object):
         self._file_options.append(pass_opt)
 
     def load_options(self, args):
-        """Load command-line options into self.options.
+        """Load command-line options into ``self.options``.
 
         Called from :py:meth:`__init__()` after :py:meth:`configure_options`.
 
@@ -1273,7 +1273,7 @@ class MRJob(object):
             def load_options(self, args):
                 super(MRYourJob, self).load_options(args)
 
-                self.stop_words = self.option.stop_words.split(',')
+                self.stop_words = self.options.stop_words.split(',')
                 ...
         """
         self.options, self.args = self.option_parser.parse_args(args)

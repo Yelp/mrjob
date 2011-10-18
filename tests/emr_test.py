@@ -159,6 +159,14 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
+    @setup
+    def put_additional_emr_info_in_mrjob_conf(self):
+        dump_mrjob_conf({'runners': {'emr': {
+            'check_emr_status_every': 0.01,
+            's3_sync_wait_time': 0.01,
+            'additional_emr_info': {'key': 'value'},
+        }}}, open(self.mrjob_conf_path, 'w'))
+    
     def test_end_to_end(self):
         # read from STDIN, a local file, and a remote file
         stdin = StringIO('foo\nbar\n')
@@ -192,6 +200,12 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             # make sure that initializing the runner doesn't affect S3
             # (Issue #50)
             assert_equal(mock_s3_fs_snapshot, self.mock_s3_fs)
+
+            # make sure AdditionalInfo was JSON-ified from the config file.
+            # checked now because you can't actually read it from the job flow
+            # on real EMR.
+            assert_equal(runner._opts['additional_emr_info'],
+                         '{"key": "value"}')
 
             runner.run()
 

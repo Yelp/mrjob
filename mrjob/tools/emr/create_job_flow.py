@@ -77,6 +77,7 @@ def make_option_parser():
             'owner',
         ),
         emr_opt_group: (
+            'additional_emr_info',
             'aws_availability_zone',
             'aws_region',
             'bootstrap_actions',

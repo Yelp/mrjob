@@ -9,6 +9,13 @@ v0.3.0, ??? -- ???!
    based behavior
  * Removed debian packaging (should be handled separately)
 
+v0.2.8, 2011-09-07 -- Bugfixes and betas
+ * Fix log parsing crash dealing with timeout errors
+ * Make mr_travelling_salesman.py work with simplejson
+ * Add emr_additional_info option, to support EMR beta features
+ * Remove debian packaging (should be handled separately)
+ * Fix crash when creating tmp bucket for job in us-east-1
+
 v0.2.7, 2011-07-12 -- Hooray for interns!
  * All runner options can be set from the command line (Issue #121)
    * Including for mrjob.tools.emr.create_job_flow (Issue #142)

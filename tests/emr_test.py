@@ -1140,15 +1140,14 @@ class TestSSHLs(MockEMRAndS3TestCase):
         mock_ssh_dir('testmaster!testslave0', 'test')
         mock_ssh_file('testmaster!testslave0', posixpath.join('test', 'three'), '')
 
-        assert_equal(list(self.runner.ls('ssh://testmaster/test')),
-                     ['ssh://testmaster/test/one', 'ssh://testmaster/test/two'])
+        assert_equal(sorted(self.runner.ls('ssh://testmaster/test')),
+                     ['ssh://testmaster/test/one','ssh://testmaster/test/two'])
         assert_equal(list(self.runner.ls('ssh://testmaster!testslave0/test')),
                      ['ssh://testmaster!testslave0/test/three'])
-        # Define a quick inline function because runner.ls is a generator
-        # and won't fire unless we list() it
-        def die():
-            list(self.runner.ls('ssh://testmaster/does_not_exist'))
-        assert_raises(IOError, die)
+
+        # ls() is a generator, so the exception won't fire until we list() it
+        assert_raises(IOError, list,
+                      self.runner.ls('ssh://testmaster/does_not_exist'))
 
 
 class TestNoBoto(TestCase):

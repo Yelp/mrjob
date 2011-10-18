@@ -46,6 +46,7 @@ from tests.quiet import logger_disabled, no_handlers_for_logger
 try:
     import boto
     import boto.emr
+    from mrjob import boto_2_1_rc2
 except ImportError:
     boto = None
 
@@ -86,8 +87,8 @@ class MockEMRAndS3TestCase(TestCase):
         self._real_boto_connect_s3 = boto.connect_s3
         boto.connect_s3 = mock_boto_connect_s3
 
-        self._real_boto_emr_EmrConnection = boto.emr.EmrConnection
-        boto.emr.EmrConnection = mock_boto_emr_EmrConnection
+        self._real_boto_2_1_rc2_EmrConnection = boto_2_1_rc2.EmrConnection
+        boto_2_1_rc2.EmrConnection = mock_boto_emr_EmrConnection
 
         # copy the old environment just to be polite
         self._old_environ = os.environ.copy()
@@ -95,7 +96,7 @@ class MockEMRAndS3TestCase(TestCase):
     @teardown
     def unsandbox_boto(self):
         boto.connect_s3 = self._real_boto_connect_s3
-        boto.emr.EmrConnection = self._real_boto_emr_EmrConnection
+        boto_2_1_rc2.EmrConnection = self._real_boto_2_1_rc2_EmrConnection
 
     def add_mock_s3_data(self, data):
         """Update self.mock_s3_fs with a map from bucket name
@@ -260,7 +261,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         # job should get terminated
         emr_conn = runner.make_emr_conn()
         job_flow_id = runner.get_emr_job_flow_id()
-        for i in range(10):
+        for _ in xrange(10):
             emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -280,9 +281,9 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             with logger_disabled('mrjob.emr'):
                 assert_raises(Exception, runner.run)
 
-            emr_conn = boto.emr.EmrConnection()
+            emr_conn = runner.make_emr_conn()
             job_flow_id = runner.get_emr_job_flow_id()
-            for i in range(10):
+            for _ in xrange(10):
                 emr_conn.simulate_progress(job_flow_id)
 
             job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -291,7 +292,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         # job should get terminated on cleanup
         emr_conn = runner.make_emr_conn()
         job_flow_id = runner.get_emr_job_flow_id()
-        for i in range(10):
+        for _ in xrange(10):
             emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)

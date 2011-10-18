@@ -45,6 +45,7 @@ try:
     import boto.emr
     import boto.exception
     import boto.utils
+    from mrjob import boto_2_1_rc2
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
     # inside hadoop streaming
@@ -2136,8 +2137,12 @@ class EMRJobRunner(MRJobRunner):
     def make_emr_conn(self):
         """Create a connection to EMR.
 
-        :return: a :py:class:`boto.emr.connection.EmrConnection`, wrapped in a :py:class:`mrjob.retry.RetryWrapper`
+        :return: a :py:class:`mrjob.boto_2_1_rc2.EmrConnection`, a subclass of
+                 :py:class:`boto.emr.connection.EmrConnection`, wrapped in a
+                 :py:class:`mrjob.retry.RetryWrapper`
         """
+        # ...which is then wrapped in bacon! Mmmmm!
+
         # give a non-cryptic error message if boto isn't installed
         if boto is None:
             raise ImportError('You must install boto to connect to EMR')
@@ -2145,7 +2150,7 @@ class EMRJobRunner(MRJobRunner):
         region = self._get_region_info_for_emr_conn()
         log.debug('creating EMR connection (to %s)' % region.endpoint)
 
-        raw_emr_conn = boto.emr.EmrConnection(
+        raw_emr_conn = boto_2_1_rc2.EmrConnection(
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             region=region)
@@ -2155,7 +2160,8 @@ class EMRJobRunner(MRJobRunner):
         """Get a :py:class:`boto.ec2.regioninfo.RegionInfo` object to
         initialize EMR connections with.
 
-        This is kind of silly because all EmrConnection ever does with
+        This is kind of silly because all
+        :py:class:`boto.emr.connection.EmrConnection` ever does with
         this object is extract the hostname, but that's how boto rolls.
         """
         if self._opts['emr_endpoint']:

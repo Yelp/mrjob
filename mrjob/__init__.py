@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Write and run Hadoop Streaming jobs on Amazon Elastic MapReduce or your own Hadoop cluster.
+"""Write and run Hadoop Streaming jobs on Amazon Elastic MapReduce or your own
+Hadoop cluster.
 """
 
 __author__ = 'David Marin <dave@yelp.com>'

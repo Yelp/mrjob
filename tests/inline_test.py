@@ -107,7 +107,7 @@ class InlineMRJobRunnerCmdenvTest(TestCase):
          os.environ['SOMETHING'] = 'foofoofoo'
          old_env = os.environ.copy()
 
-         mr_job = MRCmdenvTest(['--runner', 'inline', 
+         mr_job = MRCmdenvTest(['--runner', 'inline',
                                 '-c', self.mrjob_conf_path,
                                 '--cmdenv=FOO=bar', input_path])
          mr_job.sandbox()
@@ -125,10 +125,10 @@ class InlineMRJobRunnerCmdenvTest(TestCase):
 
          assert_equal(sorted(results),
                       [('FOO', 'bar'), ('SOMETHING', 'foofoofoo')])
-        
-         # make sure we revert back              
+
+         # make sure we revert back
          assert_equal(old_env, os.environ)
-                      
-                      
+
+
 class TimeoutException(Exception):
     pass

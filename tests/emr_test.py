@@ -167,7 +167,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             's3_sync_wait_time': 0.01,
             'additional_emr_info': {'key': 'value'},
         }}}, open(self.mrjob_conf_path, 'w'))
-    
+
     def test_end_to_end(self):
         # read from STDIN, a local file, and a remote file
         stdin = StringIO('foo\nbar\n')
@@ -1204,7 +1204,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         yelpy_tar_gz_path = os.path.join(self.tmp_dir, 'yelpy.tar.gz')
         tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
 
-        # use all the bootstrap options        
+        # use all the bootstrap options
         runner = EMRJobRunner(conf_path=False,
                               bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
                               bootstrap_files=['/tmp/quz'],
@@ -1316,7 +1316,7 @@ class EMRNoMapperTest(MockEMRAndS3TestCase):
     @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
-    
+
     def test_no_mapper(self):
         # read from STDIN, a local file, and a remote file
         stdin = StringIO('foo\nbar\n')
@@ -1368,7 +1368,7 @@ class TestCat(MockEMRAndS3TestCase):
         local_input_path = os.path.join(self.tmp_dir, 'input')
         with open(local_input_path, 'w') as input_file:
             input_file.write('bar\nfoo\n')
-            
+
         remote_input_path = 's3://walrus/data/foo'
         self.add_mock_s3_data({'walrus': {'data/foo': 'foo\nfoo\n'}})
 
@@ -1376,11 +1376,11 @@ class TestCat(MockEMRAndS3TestCase):
             local_output = []
             for line in runner.cat(local_input_path):
                 local_output.append(line)
-            
+
             remote_output = []
             for line in runner.cat(remote_input_path):
                 remote_output.append(line)
-        
+
         assert_equal(local_output, ['bar\n', 'foo\n'])
         assert_equal(remote_output, ['foo\n', 'foo\n'])
 
@@ -1698,7 +1698,7 @@ class S3LockTestCase(MockEMRAndS3TestCase):
         assert not attempt_to_acquire_lock(s3_conn, self.lock_uri, 0, 'jf2'), 'Basic lock should fail for second'
 
     def test_key_race_condition(self):
-        # Test case where one attempt puts the key in existence 
+        # Test case where one attempt puts the key in existence
         runner = EMRJobRunner(conf_path=False)
         s3_conn = runner.make_s3_conn()
 

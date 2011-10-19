@@ -28,7 +28,7 @@ class MRJobConfTestOld(MRJob):
     def mapper(self, _, line):
         for jobconf in JOBCONF_LIST:
             yield (jobconf, get_jobconf_value(jobconf))
-            
+
 if __name__ == '__main__':
     MRJobConfTestOld.run()
 

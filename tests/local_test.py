@@ -90,7 +90,7 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
 
         assert_equal(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
-                     
+
     def test_end_to_end_multiple_tasks(self):
         # read from STDIN, a regular file, and a .gz
         stdin = StringIO('foo\nbar\n')
@@ -129,7 +129,7 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
 
         assert_equal(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
-    
+
     def test_get_file_splits_test(self):
         # set up input paths
         input_path = os.path.join(self.tmp_dir, 'input')
@@ -139,25 +139,25 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
         input_path2 = os.path.join(self.tmp_dir, 'input2')
         with open(input_path2, 'w') as input_file:
             input_file.write('foo\nbar\nbar\n')
-        
+
         runner = LocalMRJobRunner(conf_path=False)
-       
+
         # split into 3 files
         file_splits = runner._get_file_splits([input_path, input_path2], 3)
-        
+
         # make sure we get 3 files
         assert_equal(len(file_splits), 3)
-        
+
         # make sure all the data is preserved
         content = []
         for file_name in file_splits:
             f = open(file_name)
             content.extend(f.readlines())
-            
+
         assert_equal(sorted(content),
                     ['bar\n', 'bar\n', 'bar\n', 'bar\n', 'foo\n',
                      'foo\n', 'foo\n', 'qux\n', 'qux\n'])
-    
+
     def test_get_file_splits_sorted_test(self):
         # set up input paths
         input_path = os.path.join(self.tmp_dir, 'input')
@@ -176,11 +176,11 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
         for file_name in sorted(file_splits.keys()):
             f = open(file_name, 'r')
             content.extend(f.readlines())
-                
+
         assert_equal(content,
                     ['1\tbar\n', '1\tbar\n', '1\tbar\n', '2\tfoo\n', '2\tfoo\n',
                      '2\tfoo\n', '3\tqux\n', '3\tqux\n', '3\tqux\n'])
-        
+
     def test_multi_step_counters(self):
         # read from STDIN, a regular file, and a .gz
         stdin = StringIO('foo\nbar\n')
@@ -267,7 +267,7 @@ class PythonBinTestCase(TestCase):
         # should be available on most systems
         mr_job = MRTwoStepJob(['--python-bin', 'echo', '--no-conf'])
         mr_job.sandbox()
-        
+
         with mr_job.make_runner() as runner:
             assert isinstance(runner, LocalMRJobRunner)
             runner.run()
@@ -278,7 +278,7 @@ class PythonBinTestCase(TestCase):
         assert_in('mr_two_step_job.py', output)
         assert_in('--step-num=1', output)
         assert_in('--mapper', output)
- 
+
     def test_python_dash_v_as_python_bin(self):
         python_cmd = cmd_line([sys.executable or 'python', '-v'])
         mr_job = MRTwoStepJob(['--python-bin', python_cmd, '--no-conf'])
@@ -418,7 +418,7 @@ class LocalMRJobRunnerJobConfTestCase(TestCase):
 
         assert_equal(sorted(results),
                      [(input_path, 3), (input_gz_path, 1)])
-                     
+
     def test_others(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
@@ -440,19 +440,19 @@ class LocalMRJobRunnerJobConfTestCase(TestCase):
 
         # test that we are are not throwing exceptions
         assert_equal(sorted(results),
-                     [('mapreduce.job.cache.local.archives', runner._mrjob_tar_gz_path), 
-                     ('mapreduce.job.id', runner._job_name), 
-                     ('mapreduce.job.local.dir', runner._working_dir), 
-                     ('mapreduce.map.input.file', input_path), 
-                     ('mapreduce.map.input.length', '4'), 
-                     ('mapreduce.map.input.start', '0'), 
-                     ('mapreduce.task.attempt.id', 'attempt_%s_M_000000_0' % runner._job_name), 
-                     ('mapreduce.task.id', 'task_%s_M_000000' % runner._job_name), 
-                     ('mapreduce.task.ismap', 'True'), 
-                     ('mapreduce.task.output.dir', runner._output_dir), 
+                     [('mapreduce.job.cache.local.archives', runner._mrjob_tar_gz_path),
+                     ('mapreduce.job.id', runner._job_name),
+                     ('mapreduce.job.local.dir', runner._working_dir),
+                     ('mapreduce.map.input.file', input_path),
+                     ('mapreduce.map.input.length', '4'),
+                     ('mapreduce.map.input.start', '0'),
+                     ('mapreduce.task.attempt.id', 'attempt_%s_M_000000_0' % runner._job_name),
+                     ('mapreduce.task.id', 'task_%s_M_000000' % runner._job_name),
+                     ('mapreduce.task.ismap', 'True'),
+                     ('mapreduce.task.output.dir', runner._output_dir),
                      ('mapreduce.task.partition', '0'),
                      ('user.defined', 'something')])
-                     
+
     def test_others_old(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
@@ -473,16 +473,16 @@ class LocalMRJobRunnerJobConfTestCase(TestCase):
 
         # test that we are are not throwing exceptions
         assert_equal(sorted(results),
-                     [('mapreduce.job.cache.local.archives', runner._mrjob_tar_gz_path), 
-                      ('mapreduce.job.id', runner._job_name), 
-                      ('mapreduce.job.local.dir', runner._working_dir), 
-                      ('mapreduce.map.input.file', input_path), 
-                      ('mapreduce.map.input.length', '4'), 
-                      ('mapreduce.map.input.start', '0'), 
-                      ('mapreduce.task.attempt.id', 'attempt_%s_M_000000_0' % runner._job_name), 
-                      ('mapreduce.task.id', 'task_%s_M_000000' % runner._job_name), 
-                      ('mapreduce.task.ismap', 'True'), 
-                      ('mapreduce.task.output.dir', runner._output_dir), 
+                     [('mapreduce.job.cache.local.archives', runner._mrjob_tar_gz_path),
+                      ('mapreduce.job.id', runner._job_name),
+                      ('mapreduce.job.local.dir', runner._working_dir),
+                      ('mapreduce.map.input.file', input_path),
+                      ('mapreduce.map.input.length', '4'),
+                      ('mapreduce.map.input.start', '0'),
+                      ('mapreduce.task.attempt.id', 'attempt_%s_M_000000_0' % runner._job_name),
+                      ('mapreduce.task.id', 'task_%s_M_000000' % runner._job_name),
+                      ('mapreduce.task.ismap', 'True'),
+                      ('mapreduce.task.output.dir', runner._output_dir),
                       ('mapreduce.task.partition', '0'),])
 
 

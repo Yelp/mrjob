@@ -244,7 +244,7 @@ class TestCat(MockHadoopTestCase):
         local_input_path = os.path.join(self.tmp_dir, 'input')
         with open(local_input_path, 'w') as input_file:
             input_file.write('bar\nfoo\n')
-            
+
         input_to_upload = os.path.join(self.tmp_dir, 'remote_input')
         with open(input_to_upload, 'w') as input_to_upload_file:
             input_to_upload_file.write('foo\nfoo\n')
@@ -256,11 +256,11 @@ class TestCat(MockHadoopTestCase):
             local_output = []
             for line in runner.cat(local_input_path):
                 local_output.append(line)
-            
+
             remote_output = []
             for line in runner.cat(remote_input_path):
                 remote_output.append(line)
-        
+
         assert_equal(local_output, ['bar\n', 'foo\n'])
         assert_equal(remote_output, ['foo\n', 'foo\n'])
 

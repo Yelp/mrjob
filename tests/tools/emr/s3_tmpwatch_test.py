@@ -45,54 +45,54 @@ class S3TmpWatchTestCase(MockEMRAndS3TestCase):
 
     def test_cleanup(self):
         runner = EMRJobRunner(conf_path=False, s3_sync_wait_time=0.01)
-        
+
         # add some mock data and change last_modified
         remote_input_path = 's3://walrus/data/'
-        self.add_mock_s3_data({'walrus': {'data/foo': 'foo\n', 
+        self.add_mock_s3_data({'walrus': {'data/foo': 'foo\n',
                                         'data/bar': 'bar\n',
                                         'data/qux': 'qux\n'}})
-        
+
         s3_conn = runner.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(remote_input_path)
         bucket = s3_conn.get_bucket(bucket_name)
-        
+
         key_foo = bucket.get_key('data/foo')
         key_bar = bucket.get_key('data/bar')
         key_qux = bucket.get_key('data/qux')
         key_bar.last_modified = datetime.now() - timedelta(days=45)
         key_qux.last_modified = datetime.now() - timedelta(hours=50)
-        
+
         # make sure keys are there
         assert isinstance(key_foo, MockKey)
         assert isinstance(key_bar, MockKey)
         assert isinstance(key_qux, MockKey)
-            
+
         s3_cleanup(remote_input_path, timedelta(days=30), dry_run=True, conf_path=False)
-        
+
         # dry-run shouldn't delete anything
         assert isinstance(key_foo, MockKey)
         assert isinstance(key_bar, MockKey)
         assert isinstance(key_qux, MockKey)
-        
+
         s3_cleanup(remote_input_path, timedelta(days=30), conf_path=False)
-        
+
         key_foo = bucket.get_key('data/foo')
         key_bar = bucket.get_key('data/bar')
         key_qux = bucket.get_key('data/qux')
-        
+
         # make sure key_bar is deleted
         assert isinstance(key_foo, MockKey)
         assert_equal(key_bar, None)
         assert isinstance(key_qux, MockKey)
-        
+
         s3_cleanup(remote_input_path, timedelta(hours=48), conf_path=False)
-        
+
         key_foo = bucket.get_key('data/foo')
         key_bar = bucket.get_key('data/bar')
         key_qux = bucket.get_key('data/qux')
-        
+
         # make sure key_qux is deleted
         assert isinstance(key_foo, MockKey)
         assert_equal(key_bar, None)
         assert_equal(key_qux, None)
-   
+

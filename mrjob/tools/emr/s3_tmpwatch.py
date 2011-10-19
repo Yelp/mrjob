@@ -35,7 +35,7 @@ Options::
   --no-conf             Don't load mrjob.conf even if it's available
   -t, --test            Don't actually delete any files; just log that we
                         would
-    
+
 """
 from datetime import datetime, timedelta
 import logging
@@ -70,7 +70,7 @@ def main():
     log_to_stream(name='boto', level=logging.CRITICAL)
 
     time_old = process_time(args[0])
-   
+
     for path in args[1:]:
         s3_cleanup(path, time_old,
             conf_path=options.conf_path,
@@ -79,14 +79,14 @@ def main():
 
 def s3_cleanup(glob_path, time_old, dry_run=False, conf_path=None):
     """Delete all files older than *time_old* in *path*.
-       If *dry_run* is ``True``, then just log the files that need to be 
+       If *dry_run* is ``True``, then just log the files that need to be
        deleted without actually deleting them
        """
     runner = EMRJobRunner(conf_path=conf_path)
     s3_conn = runner.make_s3_conn()
 
     log.info('Deleting all files in %s that are older than %s' % (glob_path, time_old))
-    
+
     for path in runner.ls(glob_path):
         bucket_name, key_name = parse_s3_uri(path)
         bucket = s3_conn.get_bucket(bucket_name)

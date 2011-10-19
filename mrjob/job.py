@@ -358,7 +358,7 @@ class MRJob(object):
            mapper_init=None, mapper_final=None,
            reducer_init=None, reducer_final=None,
            combiner_init=None, combiner_final=None):
-        """Define a step (mapper, reducer, and/or any combination of 
+        """Define a step (mapper, reducer, and/or any combination of
         mapper_init, reducer_final, etc.) for your job.
 
         Used by :py:meth:`steps`. (Don't re-define this, just call it!)
@@ -526,7 +526,7 @@ class MRJob(object):
 
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception. If 
+        increment a counter rather than raising an exception. If
         --strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
@@ -564,7 +564,7 @@ class MRJob(object):
 
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception. If 
+        increment a counter rather than raising an exception. If
         --strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
@@ -609,7 +609,7 @@ class MRJob(object):
 
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception. If 
+        increment a counter rather than raising an exception. If
         --strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
@@ -730,7 +730,7 @@ class MRJob(object):
         step_type -- 'M' for mapper, 'C' for combiner, 'R' for reducer
         """
         read, write = self.pick_protocols(step_num, step_type)
-        
+
         def read_lines():
             for line in self._read_input():
                 try:

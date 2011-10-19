@@ -317,15 +317,15 @@ class ArchiveTestCase(TestCase):
 
 
 class read_fileTest(TestCase):
-    
+
     @setup
     def make_tmp_dir(self):
        self.tmp_dir = tempfile.mkdtemp()
-    
+
     @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
-        
+
     def test_read_file_uncompressed(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:

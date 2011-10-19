@@ -42,7 +42,7 @@ from boto.emr.step import JarStep
 # instance_groups and additional_info keyword args, which don't exist
 # in boto 2.0
 class EmrConnection(boto.emr.connection.EmrConnection):
-    
+
     def run_jobflow(self, name, log_uri, ec2_keyname=None, availability_zone=None,
                     master_instance_type='m1.small',
                     slave_instance_type='m1.small', num_instances=1,

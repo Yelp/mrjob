@@ -32,7 +32,7 @@ Options::
                         Max number of hours a job can run before being
                         terminated
   --dry-run             Don't actually kill idle jobs; just log that we would
-    
+
 """
 from datetime import datetime, timedelta
 import logging

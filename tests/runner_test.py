@@ -344,4 +344,4 @@ class TestCat(TestCase):
                 output.append(line)
 
         assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
-    
+

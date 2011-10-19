@@ -39,7 +39,7 @@ def cmd_line(args):
     """
     args = [str(x) for x in args]
     return ' '.join(pipes.quote(x) for x in args)
-    
+
 
 def extract_dir_for_tar(archive_path, compression='gz'):
     """Get the name of the directory the tar at *archive_path* extracts into.
@@ -273,7 +273,7 @@ def read_input(path, stdin=None):
     """
     if stdin is None:
         stdin = sys.stdin
-    
+
     # handle '-' (special case)
     if path == '-':
         for line in stdin:
@@ -308,7 +308,7 @@ def read_input(path, stdin=None):
 
 def read_file(path, fileobj=None):
     """Reads a file.
-    
+
     - Decompress ``.gz`` and ``.bz2`` files.
     - If *fileobj* is not ``None``, stream lines from the *fileobj*
     """
@@ -323,7 +323,7 @@ def read_file(path, fileobj=None):
         f = open(path)
     else:
         f = fileobj
-    
+
     for line in f:
         yield line
 
@@ -342,13 +342,13 @@ def bunzip2_stream(fileobj):
 
 @contextlib.contextmanager
 def save_current_environment():
-    """ Context manager that saves os.environ and loads 
+    """ Context manager that saves os.environ and loads
         it back again after execution
     """
     original_environ = os.environ.copy()
-    
+
     yield
-    
+
     os.environ.clear()
     os.environ.update(original_environ)
 

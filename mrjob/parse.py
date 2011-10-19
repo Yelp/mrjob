@@ -403,9 +403,9 @@ def parse_mr_job_stderr(stderr, counters=None):
 
 
 # Match a job output line containing counter data.
-# The line is of the form 
+# The line is of the form
 # "Job KEY="value" KEY2="value2" ... COUNTERS="<counter_string>"
-# We just want to pull out the counter string, which varies between 
+# We just want to pull out the counter string, which varies between
 # Hadoop versions.
 _KV_EXPR = r'\s+\w+=".*?"'  # this matches KEY="VALUE"
 _COUNTER_LINE_EXPR = r'^.*?JOBID=".*?_%s".*?COUNTERS="%s".*?$' % \
@@ -452,7 +452,7 @@ _COUNTER_FORMAT_IS_0_20 = re.compile(_0_20_EXPR)
 
 def _parse_counters_0_18(counter_string):
     # 0.18 counters look like this:
-    # GroupName.CounterName:Value,GroupName.Crackers:3,AnotherGroup.Nerf:243,... 
+    # GroupName.CounterName:Value,GroupName.Crackers:3,AnotherGroup.Nerf:243,...
     matches = _COUNTER_RE_0_18.findall(counter_string)
     for group, name, amount_str in matches:
         yield group, name, int(amount_str)
@@ -460,7 +460,7 @@ def _parse_counters_0_18(counter_string):
 
 def _parse_counters_0_20(group_string):
     # 0.20 counters look like this:
-    # {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...} 
+    # {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...}
     for group_id, group_name, counter_str in _GROUP_RE_0_20.findall(group_string):
         matches = _COUNTER_RE_0_20.findall(counter_str)
         for counter_id, counter_name, counter_value in matches:

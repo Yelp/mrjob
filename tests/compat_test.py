@@ -27,7 +27,7 @@ class EnvVarTestCase(TestCase):
     @setup
     def store_env(self):
         self._old_env = os.environ.copy()
-    
+
     @teardown
     def replace_env(self):
         os.environ.clear()

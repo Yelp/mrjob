@@ -111,7 +111,7 @@ class MockBucket:
 
     def new_key(self, key_name):
         if key_name not in self.mock_state():
-            self.mock_state()[key_name] = ('', 
+            self.mock_state()[key_name] = ('',
                     to_iso8601(datetime.datetime.utcnow()))
         return MockKey(bucket=self, name=key_name)
 
@@ -151,7 +151,7 @@ class MockKey(object):
 
     def write_mock_data(self, data):
         if self.name in self.bucket.mock_state():
-            self.bucket.mock_state()[self.name] = (data, 
+            self.bucket.mock_state()[self.name] = (data,
                         to_iso8601(datetime.datetime.utcnow()))
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
@@ -178,27 +178,27 @@ class MockKey(object):
 
     def make_public(self):
         pass
-        
+
     def __iter__(self):
         data = self.read_mock_data()
         for line in data.splitlines(True):
             yield line
-    
+
     def _get_last_modified(self):
         if self.name in self.bucket.mock_state():
             return self.bucket.mock_state()[self.name][1]
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
-    
+
     # option to change last_modified time for testing purposes
     def _set_last_modified(self, time_modified):
         if self.name in self.bucket.mock_state():
             data = self.bucket.mock_state()[self.name][0]
-            self.bucket.mock_state()[self.name] = (data, 
+            self.bucket.mock_state()[self.name] = (data,
                         to_iso8601(time_modified))
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
-    
+
     last_modified = property(_get_last_modified, _set_last_modified)
 
     def _get_etag(self):

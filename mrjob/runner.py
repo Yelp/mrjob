@@ -374,12 +374,12 @@ class MRJobRunner(object):
         using the read() method of the appropriate HadoopStreamingProtocol
         class."""
         assert self._ran_job
-        
+
         output_dir = self.get_output_dir()
         log.info('Streaming final output from %s' % output_dir)
-        
+
         return self.cat(self.path_join(output_dir, 'part-*'))
-     
+
     def _cleanup_local_scratch(self):
         """Cleanup any files/directories on the local machine we created while
         running this job. Should be safe to run this at any time, or multiple
@@ -557,9 +557,9 @@ class MRJobRunner(object):
                 yield path
 
     def cat(self, path):
-        """cat output from a given path. This would automatically decompress 
+        """cat output from a given path. This would automatically decompress
         .gz and .bz2 files.
-        
+
         Corresponds roughly to: ``hadoop fs -cat path``
         """
         for filename in self.ls(path):

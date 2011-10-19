@@ -20,8 +20,8 @@ class MRCmdenvTest(MRJob):
     def mapper(self, key, value):
         # try adding something
         os.environ['BAR'] = 'foo'
-        
-        # get cmdenvs 
+
+        # get cmdenvs
         yield('FOO', os.environ['FOO'])
         yield('SOMETHING', os.environ['SOMETHING'])
 

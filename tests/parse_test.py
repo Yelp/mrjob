@@ -150,7 +150,7 @@ class FindMiscTestCase(TestCase):
         assert_equal(
             find_interesting_hadoop_streaming_error(line for line in LOG_LINES),
             'Error launching job , Output path already exists : Output directory s3://yourbucket/logs/2010/07/23/ already exists and is not empty')
-    
+
     def test_find_timeout_error_1(self):
         LOG_LINES = [
             'Task TASKID="task_201010202309_0001_m_000153" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1287618918658" ERROR="Task attempt_201010202309_0001_m_000153_3 failed to report status for 602 seconds. Killing!"',
@@ -161,7 +161,7 @@ class FindMiscTestCase(TestCase):
         LOG_LINES_2 = [
             'Not a match',
         ]
-        
+
         assert_equal(find_timeout_error(LOG_LINES), 602)
         assert_equal(find_timeout_error(LOG_LINES_2), None)
 
@@ -172,7 +172,7 @@ class FindMiscTestCase(TestCase):
             'MapAttempt TASK_TYPE="MAP" TASKID="task_201105252346_0001_m_000000" TASK_ATTEMPT_ID="attempt_201105252346_0001_m_000000_0" START_TIME="1306367223172" HOSTNAME="/default-rack/ip-10-168-73-40.us-west-1.compute.internal" ',
             'Task TASKID="task_201105252346_0001_m_000000" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1306367233379" ERROR="Task attempt_201105252346_0001_m_000000_3 failed to report status for 0 seconds. Killing!"',
         ]
-        
+
         assert_equal(find_timeout_error(LOG_LINES), 0)
 
     def test_find_timeout_error_3(self):
@@ -245,15 +245,15 @@ class FindMiscTestCase(TestCase):
     def test_counters_fuzz(self):
         # test some strings that should break badly formulated parsing regexps
         freakquences = [
-            ('\\[\\]\\(\\}\\[\\{\\\\\\\\\\[\\]\\(', '[](}[{\\[]('), 
-            ('\\)\\}\\\\\\\\\\[\\[\\)\\{\\{\\}\\]', ')}\\[[){{}]'), 
-            ('\\(\\{\\(\\[\\(\\]\\\\\\\\\\(\\\\\\\\\\\\\\\\', '({([(]\\(\\\\'), 
-            ('\\)\\{\\[\\)\\)\\(\\}\\(\\\\\\\\\\\\\\\\', '){[))(}(\\\\'), 
-            ('\\}\\(\\{\\)\\]\\]\\(\\]\\[\\\\\\\\', '}({)]](][\\'), 
-            ('\\[\\{\\\\\\\\\\)\\\\\\\\\\{\\{\\]\\]\\(', '[{\\)\\{{]]('), 
-            ('\\\\\\\\\\(\\(\\)\\\\\\\\\\\\\\\\\\\\\\\\\\[\\{\\]', '\\(()\\\\\\[{]'), 
-            ('\\]\\(\\[\\)\\{\\(\\)\\)\\{\\]', ']([){()){]'), 
-            ('\\(\\[\\{\\[\\[\\(\\{\\}\\(\\{', '([{[[({}({'), 
+            ('\\[\\]\\(\\}\\[\\{\\\\\\\\\\[\\]\\(', '[](}[{\\[]('),
+            ('\\)\\}\\\\\\\\\\[\\[\\)\\{\\{\\}\\]', ')}\\[[){{}]'),
+            ('\\(\\{\\(\\[\\(\\]\\\\\\\\\\(\\\\\\\\\\\\\\\\', '({([(]\\(\\\\'),
+            ('\\)\\{\\[\\)\\)\\(\\}\\(\\\\\\\\\\\\\\\\', '){[))(}(\\\\'),
+            ('\\}\\(\\{\\)\\]\\]\\(\\]\\[\\\\\\\\', '}({)]](][\\'),
+            ('\\[\\{\\\\\\\\\\)\\\\\\\\\\{\\{\\]\\]\\(', '[{\\)\\{{]]('),
+            ('\\\\\\\\\\(\\(\\)\\\\\\\\\\\\\\\\\\\\\\\\\\[\\{\\]', '\\(()\\\\\\[{]'),
+            ('\\]\\(\\[\\)\\{\\(\\)\\)\\{\\]', ']([){()){]'),
+            ('\\(\\[\\{\\[\\[\\(\\{\\}\\(\\{', '([{[[({}({'),
             ('\\(\\{\\(\\{\\[\\{\\(\\{\\}\\}', '({({[{({}}')]
         for in_str, out_str in freakquences:
             counter_string = r'Job JOBID="_001" FAILED_REDUCES="0" COUNTERS="{(%s)(%s)[(a)(a)(1)]}"' % (in_str, in_str)
@@ -328,7 +328,7 @@ class ParseMRJobStderr(TestCase):
 
 class PortRangeListTestCase(TestCase):
     def test_port_range_list(self):
-        assert_equal(parse_port_range_list('1234'), [1234]) 
+        assert_equal(parse_port_range_list('1234'), [1234])
         assert_equal(parse_port_range_list('123,456,789'), [123,456,789])
         assert_equal(parse_port_range_list('1234,5678'), [1234, 5678])
         assert_equal(parse_port_range_list('1234:1236'), [1234, 1235, 1236])

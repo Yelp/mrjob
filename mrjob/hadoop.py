@@ -369,7 +369,7 @@ class HadoopJobRunner(MRJobRunner):
             if combiner:
                 streaming_args.append('-combiner')
                 streaming_args.append(combiner)
-            
+
             if 'R' in step:
                 streaming_args.append('-reducer')
                 streaming_args.append(cmd_line(self._reducer_args(step_num)))
@@ -690,8 +690,8 @@ class HadoopJobRunner(MRJobRunner):
             log.debug('> %s' % cmd_line(cat_args))
 
             cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
-        
-            def stream():  
+
+            def stream():
                 for line in cat_proc.stdout:
                     yield line
 
@@ -703,7 +703,7 @@ class HadoopJobRunner(MRJobRunner):
 
                 if returncode != 0:
                     raise CalledProcessError(returncode, cat_args)
-        
+
             return read_file(filename, stream())
         else:
             # read from local filesystem

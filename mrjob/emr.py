@@ -635,7 +635,7 @@ class EMRJobRunner(MRJobRunner):
                 elif not self._aws_region:
                     # aws_region not specified, so set it based on this
                     #   bucket's location and use this bucket
-                    self._aws_region = scratch_bucket_location 
+                    self._aws_region = scratch_bucket_location
                     log.info("inferring aws_region from scratch bucket's region (%s)" %
                              self._aws_region)
                     self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
@@ -992,7 +992,7 @@ class EMRJobRunner(MRJobRunner):
 
         # bootstrap actions
         bootstrap_action_args = []
-        
+
         for file_dict in self._bootstrap_actions:
             # file_dict is not populated the same way by tools and real job
             # runs, so use s3_uri or path as appropriate
@@ -1054,7 +1054,7 @@ class EMRJobRunner(MRJobRunner):
         step_list = []
 
         version = self.get_hadoop_version()
-        
+
         for step_num, step in enumerate(steps):
             # EMR-specific stuff
             name = '%s: Step %d of %d' % (
@@ -1076,7 +1076,7 @@ class EMRJobRunner(MRJobRunner):
                 combiner = cmd_line(self._combiner_args(step_num))
             else:
                 combiner = None
-                
+
             if 'R' in step: # i.e. if there is a reducer:
                 reducer = cmd_line(self._reducer_args(step_num))
             else:

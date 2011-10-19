@@ -143,7 +143,7 @@ class LocalMRJobRunner(MRJobRunner):
                 reducer_args = (wrapper_args + [self._script['name'],
                                  '--step-num=%d' % i, '--reducer'] +
                                 self._mr_job_extra_args())
-                self._invoke_step(reducer_args, 'step-%d-reducer' % i, step_num=i, 
+                self._invoke_step(reducer_args, 'step-%d-reducer' % i, step_num=i,
                         env=self._get_running_env(), num_tasks = self._reduce_tasks, step_type='R')
 
         # move final output to output directory
@@ -186,7 +186,7 @@ class LocalMRJobRunner(MRJobRunner):
 
         archives_var = compat.translate_jobconf(version, 'mapreduce.job.cache.local.archives')
         self._running_env[archives_var] = str(self._mrjob_tar_gz_path)
-    
+
     def _get_running_env(self):
         """ Converts . to _ in self._running_env and returns it
         """
@@ -194,7 +194,7 @@ class LocalMRJobRunner(MRJobRunner):
         for (key, value) in self._running_env.iteritems():
             env[key.replace('.','_')] = value
         return env
-    
+
     def _setup_working_dir(self):
         """Make a working directory with symlinks to our script and
         external files. Return name of the script"""
@@ -248,41 +248,41 @@ class LocalMRJobRunner(MRJobRunner):
         else:
             log.debug('copying %s -> %s' % (path, dest))
             shutil.copyfile(path, dest)
-    
+
     def _get_file_splits(self, input_paths, num_splits, keep_sorted=False):
         """ Split the input files into (roughly) *num_splits* files
-            
-            returns a dictionary that maps split_file names to a dictionary of 
-            properties: 
+
+            returns a dictionary that maps split_file names to a dictionary of
+            properties:
                 - original_name: the original name of the file whose data is in the split
                 - start: where the split starts
                 - length: the length of the split
         """
-        # sanity check, if keep_sorted=True, then we should only have one file here 
+        # sanity check, if keep_sorted=True, then we should only have one file here
         assert(not keep_sorted or len(input_paths) == 1)
-        
+
         # determine the size of each file split
         total_size = 0
         for input_path in input_paths:
             for path in self.ls(input_path):
                 total_size += os.stat(path)[stat.ST_SIZE]
         split_size = total_size / num_splits
-         
+
         # we want each file split to be as close to split_size as possible
-        # we also want different input files to be in different splits 
+        # we also want different input files to be in different splits
         tmp_directory = self._get_local_tmp_dir()
         file_names = defaultdict(str)
-        
+
         # Helper functions:
         def create_outfile(original_name = '', start = ''):
             # create a new ouput file and initialize its dictionary of properties
             outfile_name = tmp_directory + '/input_part-%05d' % len(file_names)
-            new_file = defaultdict(str) 
+            new_file = defaultdict(str)
             new_file['original_name'] = original_name
             new_file['start'] = start
-            file_names[outfile_name] = new_file 
+            file_names[outfile_name] = new_file
             return outfile_name
-        
+
         def line_generator(input_path):
             # generates lines from a given input_path, if keep_sorted is true then
             # we concatinate all lines with the same key before and yield them together
@@ -296,16 +296,16 @@ class LocalMRJobRunner(MRJobRunner):
             else:
                 for line in read_input(input_path):
                     yield line
-             
+
         for path in input_paths:
             # create a new split file for each new path
-            
+
             # initialize file and accumulators
             outfile_name = create_outfile(path, 0)
             outfile = open(outfile_name, 'w')
             bytes_written = 0
             total_bytes = 0
-            
+
             # write each line to a file as long as we are within the limit (split_size)
             for line in line_generator(path):
                 if bytes_written >= split_size:
@@ -315,10 +315,10 @@ class LocalMRJobRunner(MRJobRunner):
                     outfile_name = create_outfile(path, total_bytes)
                     outfile = open(outfile_name, 'w')
                     bytes_written = 0
-                    
+
                 outfile.write(line)
                 bytes_written += len(line)
-                
+
             file_names[outfile_name]['length'] = bytes_written
 
         return file_names
@@ -373,7 +373,7 @@ class LocalMRJobRunner(MRJobRunner):
         # and setup the task environment for each
         procs = []
         self._prev_outfiles = []
-        
+
         if step_type == 'S':
             # sort all the files into one main file
             # no need to split the input here
@@ -398,11 +398,11 @@ class LocalMRJobRunner(MRJobRunner):
             for (task_num, file_name) in enumerate(file_splits):
                 # set the task env
                 # generate a task id
-                mapreduce_task_id = 'task_%s_%s_%05d%d' % (self._job_name, step_type, step_num, task_num) 
+                mapreduce_task_id = 'task_%s_%s_%05d%d' % (self._job_name, step_type, step_num, task_num)
                 mapreduce_task_attempt_id = 'attempt_%s_%s_%05d%d_0' % (self._job_name, step_type, step_num, task_num) # we only have one attempt
 
                 task_vars = {
-                    task_id_var: mapreduce_task_id, 
+                    task_id_var: mapreduce_task_id,
                     task_attempt_id_var: mapreduce_task_attempt_id,
                 }
                 if step_type == 'M':
@@ -428,8 +428,8 @@ class LocalMRJobRunner(MRJobRunner):
             self._wait_for_process(proc, step_num)
 
         self.print_counters([step_num+1])
-        
-        
+
+
     def _invoke_process(self, args, outfile_name, env, combiner_args=None):
         """invokes the process described by *args* and which writes to *outfile_name*
 
@@ -441,7 +441,7 @@ class LocalMRJobRunner(MRJobRunner):
             log.info('> %s | sort | %s' % (cmd_line(args), cmd_line(combiner_args)))
         else:
             log.info('> %s' % cmd_line(args))
-        
+
         # set up outfile
         outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
         log.info('writing to %s' % outfile)
@@ -461,12 +461,12 @@ class LocalMRJobRunner(MRJobRunner):
             proc = Popen(args, stdout=write_to, stderr=PIPE,
                          cwd=self._working_dir, env=env)
         return {'proc': proc, 'args': args, 'write_to': write_to}
-    
+
     def _wait_for_process(self, proc, step_num):
         # handle counters, status msgs, and other stuff on stderr
         stderr_lines = self._process_stderr_from_script(proc['proc'].stderr, step_num=step_num)
         tb_lines = find_python_traceback(stderr_lines)
-        
+
         returncode = proc['proc'].wait()
 
         if returncode != 0:
@@ -480,7 +480,7 @@ class LocalMRJobRunner(MRJobRunner):
                 raise Exception(
                     'Command %r returned non-zero exit status %d: %s' %
                     (proc['args'], returncode))
-        
+
         # flush file descriptors
         proc['write_to'].flush()
 

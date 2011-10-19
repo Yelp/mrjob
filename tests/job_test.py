@@ -16,18 +16,30 @@
 
 from __future__ import with_statement
 
-from optparse import OptionError, OptionValueError
+from optparse import OptionError
+from optparse import OptionValueError
 import os
 import shutil
-from subprocess import Popen, PIPE
+from subprocess import Popen
+from subprocess import PIPE
 from StringIO import StringIO
 import sys
 import tempfile
-from testify import TestCase, assert_equal, assert_in, assert_not_equal, assert_not_in, assert_gt, assert_raises, setup, teardown
+from testify import TestCase
+from testify import assert_equal
+from testify import assert_in
+from testify import assert_not_equal
+from testify import assert_not_in
+from testify import assert_gt
+from testify import assert_raises
+from testify import setup
+from testify import teardown
 import time
 
 from mrjob.conf import combine_envs
-from mrjob.job import MRJob, _IDENTITY_MAPPER, UsageError
+from mrjob.job import MRJob
+from mrjob.job import _IDENTITY_MAPPER
+from mrjob.job import UsageError
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import *
@@ -35,7 +47,8 @@ from mrjob.util import log_to_stream
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_nomapper_multistep import MRNoMapper
-from tests.quiet import logger_disabled, no_handlers_for_logger
+from tests.quiet import logger_disabled
+from tests.quiet import no_handlers_for_logger
 
 
 def stepdict(mapper=_IDENTITY_MAPPER, reducer=None, combiner=None,

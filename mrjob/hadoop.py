@@ -17,7 +17,9 @@ import logging
 import os
 import posixpath
 import re
-from subprocess import Popen, PIPE, CalledProcessError
+from subprocess import Popen
+from subprocess import PIPE
+from subprocess import CalledProcessError
 
 try:
     from cStringIO import StringIO
@@ -25,11 +27,21 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob import compat
-from mrjob.conf import combine_cmds, combine_dicts, combine_paths
-from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, HADOOP_JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
-from mrjob.parse import HADOOP_STREAMING_JAR_RE, is_uri, urlparse
+from mrjob.conf import combine_cmds
+from mrjob.conf import combine_dicts
+from mrjob.conf import combine_paths
+from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
+from mrjob.logparsers import STEP_LOG_URI_RE
+from mrjob.logparsers import HADOOP_JOB_LOG_URI_RE
+from mrjob.logparsers import NODE_LOG_URI_RE
+from mrjob.logparsers import scan_for_counters_in_files
+from mrjob.logparsers import scan_logs_in_order
+from mrjob.parse import HADOOP_STREAMING_JAR_RE
+from mrjob.parse import is_uri
+from mrjob.parse import urlparse
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line, read_file
+from mrjob.util import cmd_line
+from mrjob.util import read_file
 
 
 log = logging.getLogger('mrjob.hadoop')

@@ -21,7 +21,13 @@ import mrjob
 import os
 import shutil
 import signal
-from testify import TestCase, assert_in, assert_equal, assert_not_equal, assert_not_in, setup, teardown
+from testify import TestCase
+from testify import assert_in
+from testify import assert_equal
+from testify import assert_not_equal
+from testify import assert_not_in
+from testify import setup
+from testify import teardown
 import tempfile
 
 from mrjob.conf import dump_mrjob_conf

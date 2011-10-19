@@ -13,7 +13,9 @@
 # limitations under the License.
 
 """Make sure all of our protocols work as advertised."""
-from testify import TestCase, assert_equal, assert_raises
+from testify import TestCase
+from testify import assert_equal
+from testify import assert_raises
 from mrjob.protocol import *
 
 # keys and values that should encode/decode properly in all protocols

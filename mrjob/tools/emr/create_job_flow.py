@@ -22,11 +22,13 @@ Usage::
 """
 from __future__ import with_statement
 
-from optparse import OptionParser, OptionGroup
+from optparse import OptionParser
+from optparse import OptionGroup
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.util import scrape_options_into_new_groups, log_to_stream
+from mrjob.util import scrape_options_into_new_groups
+from mrjob.util import log_to_stream
 
 
 def main():

@@ -17,13 +17,20 @@
 from __future__ import with_statement
 
 from StringIO import StringIO
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 import sys
-from testify import TestCase, assert_equal, assert_raises, setup, teardown
+from testify import TestCase
+from testify import assert_equal
+from testify import assert_raises
+from testify import setup
+from testify import teardown
 
 from mrjob.tools.emr.terminate_idle_job_flows import *
 from tests.emr_test import MockEMRAndS3TestCase
-from tests.mockboto import MockEmrObject, to_iso8601, MockEmrConnection
+from tests.mockboto import MockEmrObject
+from tests.mockboto import to_iso8601
+from tests.mockboto import MockEmrConnection
 
 
 class JobFlowInspectionTestCase(MockEMRAndS3TestCase):

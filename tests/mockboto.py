@@ -33,7 +33,8 @@ except ImportError:
     boto = None
 
 from mrjob.conf import combine_values
-from mrjob.parse import is_s3_uri, parse_s3_uri
+from mrjob.parse import is_s3_uri
+from mrjob.parse import parse_s3_uri
 
 
 DEFAULT_MAX_JOB_FLOWS_RETURNED = 500

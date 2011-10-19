@@ -31,10 +31,12 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from mrjob.conf import combine_dicts, combine_local_envs
+from mrjob.conf import combine_dicts
+from mrjob.conf import combine_local_envs
 from mrjob.runner import MRJobRunner
 from mrjob.job import MRJob
-from mrjob.util import read_file, save_current_environment
+from mrjob.util import read_file
+from mrjob.util import save_current_environment
 
 log = logging.getLogger('mrjob.inline')
 

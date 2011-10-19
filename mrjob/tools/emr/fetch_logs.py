@@ -41,14 +41,20 @@ Options::
 from __future__ import with_statement
 
 import functools
-from optparse import OptionParser, OptionValueError
+from optparse import OptionParser
+from optparse import OptionValueError
 import os
 import sys
 
-from mrjob.emr import EMRJobRunner, LogFetchException
+from mrjob.emr import EMRJobRunner
+from mrjob.emr import LogFetchException
 from mrjob.job import MRJob
-from mrjob.logparsers import TASK_ATTEMPT_LOGS, STEP_LOGS, JOB_LOGS, NODE_LOGS
-from mrjob.util import scrape_options_into_new_groups, log_to_stream
+from mrjob.logparsers import TASK_ATTEMPT_LOGS
+from mrjob.logparsers import STEP_LOGS
+from mrjob.logparsers import JOB_LOGS
+from mrjob.logparsers import NODE_LOGS
+from mrjob.util import scrape_options_into_new_groups
+from mrjob.util import log_to_stream
 
 
 def main():

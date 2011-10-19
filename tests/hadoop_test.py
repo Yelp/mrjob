@@ -26,9 +26,16 @@ import shutil
 from subprocess import check_call
 import sys
 import tempfile
-from testify import TestCase, assert_equal, assert_in, assert_lt, assert_not_in, setup, teardown
+from testify import TestCase
+from testify import assert_equal
+from testify import assert_in
+from testify import assert_lt
+from testify import assert_not_in
+from testify import setup
+from testify import teardown
 
-from tests.mockhadoop import create_mock_hadoop_script, add_mock_hadoop_output
+from tests.mockhadoop import create_mock_hadoop_script
+from tests.mockhadoop import add_mock_hadoop_output
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_nomapper_multistep import MRNoMapper
 from mrjob.hadoop import *

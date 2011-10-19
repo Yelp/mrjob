@@ -21,11 +21,21 @@ import optparse
 import os
 import shutil
 import stat
-from subprocess import Popen, PIPE, CalledProcessError, check_call
+from subprocess import Popen
+from subprocess import PIPE
+from subprocess import CalledProcessError
+from subprocess import check_call
 from StringIO import StringIO
 import tarfile
 import tempfile
-from testify import TestCase, assert_equal, assert_in, assert_raises, class_setup, class_teardown, setup, teardown
+from testify import TestCase
+from testify import assert_equal
+from testify import assert_in
+from testify import assert_raises
+from testify import class_setup
+from testify import class_teardown
+from testify import setup
+from testify import teardown
 
 from mrjob.util import *
 

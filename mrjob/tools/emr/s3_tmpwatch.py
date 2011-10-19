@@ -37,7 +37,8 @@ Options::
                         would
 
 """
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 import logging
 from optparse import OptionParser
 import re
@@ -47,7 +48,8 @@ try:
 except ImportError:
     boto = None
 
-from mrjob.emr import EMRJobRunner, iso8601_to_datetime
+from mrjob.emr import EMRJobRunner
+from mrjob.emr import iso8601_to_datetime
 from mrjob.parse import parse_s3_uri
 from mrjob.util import log_to_stream
 

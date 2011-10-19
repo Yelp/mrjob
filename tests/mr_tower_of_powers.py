@@ -18,7 +18,8 @@ n times."""
 from __future__ import with_statement
 
 import os
-from testify import assert_equal, assert_not_equal
+from testify import assert_equal
+from testify import assert_not_equal
 
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol

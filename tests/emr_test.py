@@ -28,20 +28,45 @@ import py_compile
 import shutil
 from StringIO import StringIO
 import tempfile
-from testify import TestCase, assert_equal, assert_gt, assert_in, assert_not_in, assert_raises, setup, teardown, assert_not_equal
+from testify import TestCase
+from testify import assert_equal
+from testify import assert_gt
+from testify import assert_in
+from testify import assert_not_in
+from testify import assert_raises
+from testify import setup
+from testify import teardown
+from testify import assert_not_equal
 
 import mrjob
 from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
-from mrjob.emr import EMRJobRunner, describe_all_job_flows, attempt_to_acquire_lock, _lock_acquire_step_1, _lock_acquire_step_2, make_lock_uri
-from mrjob.parse import JOB_NAME_RE, parse_s3_uri
-from mrjob.ssh import SSH_LOG_ROOT, SSH_PREFIX
+from mrjob.emr import EMRJobRunner
+from mrjob.emr import describe_all_job_flows
+from mrjob.emr import attempt_to_acquire_lock
+from mrjob.emr import _lock_acquire_step_1
+from mrjob.emr import _lock_acquire_step_2
+from mrjob.emr import make_lock_uri
+from mrjob.parse import JOB_NAME_RE
+from mrjob.parse import parse_s3_uri
+from mrjob.ssh import SSH_LOG_ROOT
+from mrjob.ssh import SSH_PREFIX
 from mrjob.util import tar_and_gzip
 
-from tests.mockboto import MockS3Connection, MockEmrConnection, MockEmrObject, MockKey, add_mock_s3_data, DEFAULT_MAX_DAYS_AGO, DEFAULT_MAX_JOB_FLOWS_RETURNED, to_iso8601
-from tests.mockssh import create_mock_ssh_script, mock_ssh_dir, mock_ssh_file
+from tests.mockboto import MockS3Connection
+from tests.mockboto import MockEmrConnection
+from tests.mockboto import MockEmrObject
+from tests.mockboto import MockKey
+from tests.mockboto import add_mock_s3_data
+from tests.mockboto import DEFAULT_MAX_DAYS_AGO
+from tests.mockboto import DEFAULT_MAX_JOB_FLOWS_RETURNED
+from tests.mockboto import to_iso8601
+from tests.mockssh import create_mock_ssh_script
+from tests.mockssh import mock_ssh_dir
+from tests.mockssh import mock_ssh_file
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.quiet import logger_disabled, no_handlers_for_logger
+from tests.quiet import logger_disabled
+from tests.quiet import no_handlers_for_logger
 
 try:
     import boto

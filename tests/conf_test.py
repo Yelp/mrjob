@@ -22,7 +22,14 @@ import shutil
 from StringIO import StringIO
 import tempfile
 
-from testify import TestCase, assert_equal, assert_in, assert_not_in, class_setup, class_teardown, setup, teardown
+from testify import TestCase
+from testify import assert_equal
+from testify import assert_in
+from testify import assert_not_in
+from testify import class_setup
+from testify import class_teardown
+from testify import setup
+from testify import teardown
 from mrjob.conf import *
 import mrjob.conf
 from tests.quiet import logger_disabled

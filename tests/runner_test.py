@@ -24,16 +24,27 @@ import gzip
 import os
 import shutil
 import tarfile
-from testify import TestCase, assert_equal, assert_in, assert_not_equal, assert_gte, assert_lte, assert_not_in, assert_raises, setup, teardown
+from testify import TestCase
+from testify import assert_equal
+from testify import assert_in
+from testify import assert_not_equal
+from testify import assert_gte
+from testify import assert_lte
+from testify import assert_not_in
+from testify import assert_raises
+from testify import setup
+from testify import teardown
 import tempfile
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import JOB_NAME_RE
-from mrjob.runner import MRJobRunner, CLEANUP_DEFAULT
+from mrjob.runner import MRJobRunner
+from mrjob.runner import CLEANUP_DEFAULT
 from mrjob.util import log_to_stream
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.quiet import logger_disabled, no_handlers_for_logger
+from tests.quiet import logger_disabled
+from tests.quiet import no_handlers_for_logger
 
 
 class WithStatementTestCase(TestCase):

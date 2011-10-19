@@ -15,10 +15,14 @@
 
 from __future__ import with_statement
 
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 import os
 import tempfile
-from testify import TestCase, assert_equal, setup, teardown
+from testify import TestCase
+from testify import assert_equal
+from testify import setup
+from testify import teardown
 import shutil
 
 try:

@@ -40,7 +40,8 @@ import logging
 from optparse import OptionParser
 import time
 
-from mrjob.emr import EMRJobRunner, describe_all_job_flows
+from mrjob.emr import EMRJobRunner
+from mrjob.emr import describe_all_job_flows
 from mrjob.parse import JOB_NAME_RE
 from mrjob.util import log_to_stream
 

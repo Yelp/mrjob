@@ -21,7 +21,8 @@ from __future__ import with_statement
 from collections import defaultdict
 import os
 import re
-from subprocess import Popen, PIPE
+from subprocess import Popen
+from subprocess import PIPE
 
 
 SSH_PREFIX = 'ssh://'

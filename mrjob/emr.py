@@ -25,7 +25,8 @@ import re
 import shlex
 import signal
 import socket
-from subprocess import Popen, PIPE
+from subprocess import Popen
+from subprocess import PIPE
 import time
 import urllib2
 
@@ -53,13 +54,34 @@ except ImportError:
 
 import mrjob
 from mrjob import compat
-from mrjob.conf import combine_cmds, combine_dicts, combine_lists, combine_paths, combine_path_lists
-from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE, STEP_LOG_URI_RE, EMR_JOB_LOG_URI_RE, NODE_LOG_URI_RE, scan_for_counters_in_files, scan_logs_in_order
-from mrjob.parse import is_s3_uri, parse_s3_uri
+from mrjob.conf import combine_cmds
+from mrjob.conf import combine_dicts
+from mrjob.conf import combine_lists
+from mrjob.conf import combine_paths
+from mrjob.conf import combine_path_lists
+from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
+from mrjob.logparsers import STEP_LOG_URI_RE
+from mrjob.logparsers import EMR_JOB_LOG_URI_RE
+from mrjob.logparsers import NODE_LOG_URI_RE
+from mrjob.logparsers import scan_for_counters_in_files
+from mrjob.logparsers import scan_logs_in_order
+from mrjob.parse import is_s3_uri
+from mrjob.parse import parse_s3_uri
 from mrjob.retry import RetryWrapper
-from mrjob.runner import MRJobRunner, GLOB_RE
-from mrjob.ssh import ssh_cat, ssh_ls, ssh_copy_key, ssh_slave_addresses, SSHException, SSH_PREFIX, SSH_LOG_ROOT, SSH_URI_RE
-from mrjob.util import cmd_line, extract_dir_for_tar, hash_object, read_file
+from mrjob.runner import MRJobRunner
+from mrjob.runner import GLOB_RE
+from mrjob.ssh import ssh_cat
+from mrjob.ssh import ssh_ls
+from mrjob.ssh import ssh_copy_key
+from mrjob.ssh import ssh_slave_addresses
+from mrjob.ssh import SSHException
+from mrjob.ssh import SSH_PREFIX
+from mrjob.ssh import SSH_LOG_ROOT
+from mrjob.ssh import SSH_URI_RE
+from mrjob.util import cmd_line
+from mrjob.util import extract_dir_for_tar
+from mrjob.util import hash_object
+from mrjob.util import read_file
 
 
 log = logging.getLogger('mrjob.emr')

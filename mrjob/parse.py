@@ -16,7 +16,8 @@ from functools import wraps
 import logging
 from optparse import OptionValueError
 import re
-from urlparse import ParseResult, urlparse as urlparse_buggy
+from urlparse import ParseResult
+from urlparse import urlparse as urlparse_buggy
 
 try:
     from cStringIO import StringIO

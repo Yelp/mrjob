@@ -28,7 +28,8 @@ import random
 import re
 import shutil
 import sys
-from subprocess import Popen, PIPE
+from subprocess import Popen
+from subprocess import PIPE
 import tempfile
 
 try:
@@ -37,8 +38,20 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob import compat
-from mrjob.conf import combine_cmds, combine_cmd_lists, combine_dicts, combine_envs, combine_local_envs, combine_lists, combine_opts, combine_paths, combine_path_lists, load_opts_from_mrjob_conf
-from mrjob.util import cmd_line, file_ext, read_file, tar_and_gzip
+from mrjob.conf import combine_cmds
+from mrjob.conf import combine_cmd_lists
+from mrjob.conf import combine_dicts
+from mrjob.conf import combine_envs
+from mrjob.conf import combine_local_envs
+from mrjob.conf import combine_lists
+from mrjob.conf import combine_opts
+from mrjob.conf import combine_paths
+from mrjob.conf import combine_path_lists
+from mrjob.conf import load_opts_from_mrjob_conf
+from mrjob.util import cmd_line
+from mrjob.util import file_ext
+from mrjob.util import read_file
+from mrjob.util import tar_and_gzip
 
 
 log = logging.getLogger('mrjob.runner')

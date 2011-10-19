@@ -19,7 +19,12 @@ import logging
 import posixpath
 import re
 
-from mrjob.parse import find_hadoop_java_stack_trace, find_input_uri_for_mapper, find_interesting_hadoop_streaming_error, find_python_traceback, find_timeout_error, parse_hadoop_counters_from_line
+from mrjob.parse import find_hadoop_java_stack_trace
+from mrjob.parse import find_input_uri_for_mapper
+from mrjob.parse import find_interesting_hadoop_streaming_error
+from mrjob.parse import find_python_traceback
+from mrjob.parse import find_timeout_error
+from mrjob.parse import parse_hadoop_counters_from_line
 
 
 log = logging.getLogger('mrjob.logparser')

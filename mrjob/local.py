@@ -23,14 +23,19 @@ import pprint
 import re
 import shutil
 import stat
-from subprocess import Popen, PIPE
+from subprocess import Popen
+from subprocess import PIPE
 import sys
 
 from mrjob import compat
-from mrjob.conf import combine_dicts, combine_local_envs
-from mrjob.parse import find_python_traceback, parse_mr_job_stderr
+from mrjob.conf import combine_dicts
+from mrjob.conf import combine_local_envs
+from mrjob.parse import find_python_traceback
+from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line, read_input, unarchive
+from mrjob.util import cmd_line
+from mrjob.util import read_input
+from mrjob.util import unarchive
 
 
 log = logging.getLogger('mrjob.local')

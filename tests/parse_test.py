@@ -16,8 +16,13 @@ from __future__ import with_statement
 
 import logging
 import random
-from subprocess import Popen, PIPE
-from testify import TestCase, assert_equal, assert_in, assert_not_equal, assert_raises
+from subprocess import Popen
+from subprocess import PIPE
+from testify import TestCase
+from testify import assert_equal
+from testify import assert_in
+from testify import assert_not_equal
+from testify import assert_raises
 
 from mrjob.parse import *
 from mrjob.util import log_to_stream

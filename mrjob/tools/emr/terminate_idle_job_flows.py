@@ -34,7 +34,8 @@ Options::
   --dry-run             Don't actually kill idle jobs; just log that we would
 
 """
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 import logging
 from optparse import OptionParser
 import posixpath
@@ -45,7 +46,8 @@ try:
 except ImportError:
     boto = None
 
-from mrjob.emr import EMRJobRunner, describe_all_job_flows
+from mrjob.emr import EMRJobRunner
+from mrjob.emr import describe_all_job_flows
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.util import log_to_stream
 

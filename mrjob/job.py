@@ -97,7 +97,11 @@ from copy import copy
 import inspect
 import itertools
 import logging
-from optparse import Option, OptionParser, OptionGroup, OptionError, OptionValueError
+from optparse import Option
+from optparse import OptionParser
+from optparse import OptionGroup
+from optparse import OptionError
+from optparse import OptionValueError
 import sys
 import time
 
@@ -108,10 +112,17 @@ except ImportError:
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
-from mrjob.parse import parse_port_range_list, parse_mr_job_stderr, parse_key_value_list
-from mrjob.protocol import DEFAULT_PROTOCOL, JSONProtocol, PROTOCOL_DICT, RawValueProtocol
+from mrjob.parse import parse_port_range_list
+from mrjob.parse import parse_mr_job_stderr
+from mrjob.parse import parse_key_value_list
+from mrjob.protocol import DEFAULT_PROTOCOL
+from mrjob.protocol import JSONProtocol
+from mrjob.protocol import PROTOCOL_DICT
+from mrjob.protocol import RawValueProtocol
 from mrjob.runner import CLEANUP_CHOICES
-from mrjob.util import log_to_stream, parse_and_save_options, read_input
+from mrjob.util import log_to_stream
+from mrjob.util import parse_and_save_options
+from mrjob.util import read_input
 
 
 log = logging.getLogger('mrjob.job')

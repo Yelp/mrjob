@@ -187,7 +187,7 @@ def est_time_to_hour(job_flow):
 
         minutes = (jf_end - jf_start) / 60.0
         hours = minutes / 60.0
-        return math.ceil(hours)*60 - minutes
+        return math.ceil(hours) * 60 - minutes
 
 
 def s3_key_to_uri(s3_key):
@@ -232,14 +232,17 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
         if created_before and created_after and created_before < created_after:
             break
 
-        log.debug('Calling describe_jobflows(states=%r, jobflow_ids=%r, created_after=%r, created_before=%r)' % (states, jobflow_ids, created_after, created_before))
+        log.debug('Calling describe_jobflows(states=%r, jobflow_ids=%r,'
+                  ' created_after=%r, created_before=%r)' %
+                  (states, jobflow_ids, created_after, created_before))
         try:
             results = emr_conn.describe_jobflows(
                 states=states, jobflow_ids=jobflow_ids,
                 created_after=created_after, created_before=created_before)
         except boto.exception.BotoServerError, ex:
             if 'ValidationError' in ex.body:
-                log.debug('  reached earliest allowed created_before time, done!')
+                log.debug(
+                    '  reached earliest allowed created_before time, done!')
                 break
             else:
                 raise
@@ -304,6 +307,7 @@ def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name):
 
     return False
 
+
 class LogFetchException(Exception):
     pass
 
@@ -318,8 +322,8 @@ class EMRJobRunner(MRJobRunner):
     waiting job flow, creating one if none exists, by setting
     *pool_emr_job_flows*.
 
-    Input, support, and jar files can be either local or on S3; use ``s3://...``
-    URLs to refer to files on S3.
+    Input, support, and jar files can be either local or on S3; use
+    ``s3://...`` URLs to refer to files on S3.
 
     This class has some useful utilities for talking directly to S3 and EMR,
     so you may find it useful to instantiate it without a script::
@@ -347,7 +351,11 @@ class EMRJobRunner(MRJobRunner):
         Additional options:
 
         :type additional_emr_info: JSON str, None, or JSON-encodable object
-        :param additional_emr_info: Special parameters to select additional features, mostly to support beta EMR features. Pass a JSON string on the command line or use regular data structures in the config file.
+        :param additional_emr_info: Special parameters to select additional
+                                    features, mostly to support beta EMR
+                                    features. Pass a JSON string on the command
+                                    line or use data structures in the config
+                                    file (which is itself basically JSON).
         :type aws_access_key_id: str
         :param aws_access_key_id: "username" for Amazon web services.
         :type aws_availability_zone: str
@@ -355,17 +363,44 @@ class EMRJobRunner(MRJobRunner):
         :type aws_secret_access_key: str
         :param aws_secret_access_key: your "password" on AWS
         :type aws_region: str
-        :param aws_region: region to connect to S3 and EMR on (e.g. ``us-west-1``). If you want to use separate regions for S3 and EMR, set *emr_endpoint* and *s3_endpoint*.
+        :param aws_region: region to connect to S3 and EMR on (e.g.
+                           ``us-west-1``). If you want to use separate regions
+                           for S3 and EMR, set *emr_endpoint* and
+                           *s3_endpoint*.
         :type bootstrap_actions: list of str
-        :param bootstrap_actions: a list of raw bootstrap actions (essentially scripts) to run prior to any of the other bootstrap steps. Any arguments should be separated from the command by spaces (we use :py:func:`shlex.split`). If the action is on the local filesystem, we'll automatically upload it to S3.
+        :param bootstrap_actions: a list of raw bootstrap actions (essentially
+                                  scripts) to run prior to any of the other
+                                  bootstrap steps. Any arguments should be
+                                  separated from the command by spaces (we use
+                                  :py:func:`shlex.split`). If the action is on
+                                  the local filesystem, we'll automatically
+                                  upload it to S3.
         :type bootstrap_cmds: list
-        :param bootstrap_cmds: a list of commands to run on the master node to set up libraries, etc. Like *setup_cmds*, these can be strings, which will be run in the shell, or lists of args, which will be run directly. Prepend ``sudo`` to commands to do things that require root privileges.
+        :param bootstrap_cmds: a list of commands to run on the master node to
+                               set up libraries, etc. Like *setup_cmds*, these
+                               can be strings, which will be run in the shell,
+                               or lists of args, which will be run directly.
+                               Prepend ``sudo`` to commands to do things that
+                               require root privileges.
         :type bootstrap_files: list of str
-        :param bootstrap_files: files to download to the bootstrap working directory on the master node before running *bootstrap_cmds* (for example, debian packages). May be local files for mrjob to upload to S3, or any URI that ``hadoop fs`` can handle.
+        :param bootstrap_files: files to download to the bootstrap working
+                                directory on the master node before running
+                                *bootstrap_cmds* (for example, Debian
+                                packages). May be local files for mrjob to
+                                upload to S3, or any URI that ``hadoop fs``
+                                can handle.
         :type bootstrap_mrjob: boolean
-        :param bootstrap_mrjob: This is actually an option in the base MRJobRunner class. If this is ``True`` (the default), we'll tar up :mod:`mrjob` from the local filesystem, and install it on the master node.
+        :param bootstrap_mrjob: This is actually an option in the base
+                                :py:class:`~mrjob.job.MRJobRunner` class. If
+                                this is ``True`` (the default), we'll tar up
+                                :py:mod:`mrjob` from the local filesystem, and
+                                install it on the master node.
         :type bootstrap_python_packages: list of str
-        :param bootstrap_python_packages: paths of python modules to install on EMR. These should be standard python module tarballs. If a module is named ``foo.tar.gz``, we expect to be able to run ``tar xfz foo.tar.gz; cd foo; sudo python setup.py install``.
+        :param bootstrap_python_packages: paths of python modules to install
+                                          on EMR. These should be standard
+                                          Python module tarballs. If a module
+                                          is named ``foo.tar.gz``, we expect to
+                                          be able to run ``tar xfz foo.tar.gz; cd foo; sudo python setup.py install``.
         :type bootstrap_scripts: list of str
         :param bootstrap_scripts: scripts to upload and then run on the master node (a combination of *bootstrap_cmds* and *bootstrap_files*). These are run after the command from bootstrap_cmds.
         :type check_emr_status_every: float

@@ -991,7 +991,7 @@ class RunJobTestCase(TestCase):
         assert_gt(len(stderr), len(normal_stderr))
 
     def test_no_output(self):
-        assert_equal(os.listdir(self.tmp_dir), []) # sanity check
+        assert_equal(os.listdir(self.tmp_dir), [])  # sanity check
 
         args = ['--no-output', '--output-dir', self.tmp_dir]
         stdout, stderr, returncode = self.run_job(args)

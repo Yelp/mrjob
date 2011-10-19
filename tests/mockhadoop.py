@@ -87,7 +87,7 @@ def get_mock_hadoop_output():
 
 def hdfs_path_to_real_path(hdfs_path):
     if hdfs_path.startswith('hdfs:///'):
-        hdfs_path = hdfs_path[7:] # keep one slash
+        hdfs_path = hdfs_path[7:]  # keep one slash
 
     if not hdfs_path.startswith('/'):
         hdfs_path = '/user/%s/%s' % (os.environ['USER'], hdfs_path)
@@ -152,7 +152,7 @@ def hadoop_fs(*args):
         sys.stderr.write('Usage: java FsShell\n')
         sys.exit(-1)
 
-    cmd = args[0][1:] # convert e.g. '-put' -> 'put'
+    cmd = args[0][1:]  # convert e.g. '-put' -> 'put'
     cmd_args = args[1:]
 
     # this doesn't have to be a giant switch statement, but it's a

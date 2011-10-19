@@ -94,7 +94,7 @@ class InlineMRJobRunner(MRJobRunner):
     def _run(self):
         self._setup_output_dir()
 
-        assert self._script # shouldn't be able to run if no script
+        assert self._script  # shouldn't be able to run if no script
 
         default_opts = self.get_default_opts()
 

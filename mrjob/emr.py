@@ -35,9 +35,9 @@ except ImportError:
     from StringIO import StringIO
 
 try:
-    import simplejson as json # preferred because of C speedups
+    import simplejson as json  # preferred because of C speedups
 except ImportError:
-    import json # built in to Python 2.6 and later
+    import json  # built in to Python 2.6 and later
 
 try:
     import boto
@@ -69,7 +69,7 @@ JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
 # if EMR throttles us, how long to wait (in seconds) before trying again?
 EMR_BACKOFF = 20
 EMR_BACKOFF_MULTIPLIER = 1.5
-EMR_MAX_TRIES = 20 # this takes about a day before we run out of tries
+EMR_MAX_TRIES = 20  # this takes about a day before we run out of tries
 
 # the port to tunnel to
 EMR_JOB_TRACKER_PORT = 9100
@@ -90,16 +90,16 @@ REGION_TO_EMR_ENDPOINT = {
     'EU': 'eu-west-1.elasticmapreduce.amazonaws.com',
     'us-east-1': 'us-east-1.elasticmapreduce.amazonaws.com',
     'us-west-1': 'us-west-1.elasticmapreduce.amazonaws.com',
-    '': 'elasticmapreduce.amazonaws.com', # when no region specified
+    '': 'elasticmapreduce.amazonaws.com',  # when no region specified
 }
 
 # map from AWS region to S3 endpoint
 # see http://docs.amazonwebservices.com/AmazonS3/latest/dev/MakingRequests.html#RequestEndpoints
 REGION_TO_S3_ENDPOINT = {
     'EU': 's3-eu-west-1.amazonaws.com',
-    'us-east-1': 's3.amazonaws.com', # no region-specific endpoint
+    'us-east-1': 's3.amazonaws.com',  # no region-specific endpoint
     'us-west-1': 's3-us-west-1.amazonaws.com',
-    'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com', # no EMR endpoint yet
+    'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com',  # no EMR endpoint yet
     '': 's3.amazonaws.com',
 }
 
@@ -820,11 +820,11 @@ class EMRJobRunner(MRJobRunner):
                 '-o', 'ExitOnForwardFailure=yes',
                 '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
                 '-L', '%d:localhost:%d' % (bind_port, EMR_JOB_TRACKER_PORT),
-                '-N', '-q', # no shell, no output
+                '-N', '-q',  # no shell, no output
                 '-i', self._opts['ec2_key_pair_file'],
             ]
             if self._opts['ssh_tunnel_is_open']:
-                args.extend(['-g', '-4']) # -4: listen on IPv4 only
+                args.extend(['-g', '-4'])  # -4: listen on IPv4 only
             args.append('hadoop@'+host)
             log.debug('> %s' % cmd_line(args))
 
@@ -1036,7 +1036,7 @@ class EMRJobRunner(MRJobRunner):
     def _build_steps(self):
         """Return a list of boto Step objects corresponding to the
         steps we want to run."""
-        assert self._script # can't build steps if no script!
+        assert self._script  # can't build steps if no script!
 
         # figure out local names for our files
         self._name_files()
@@ -1067,7 +1067,7 @@ class EMRJobRunner(MRJobRunner):
                 action_on_failure = 'TERMINATE_JOB_FLOW'
 
             # Hadoop streaming stuff
-            if 'M' not in step: # if we have an identity mapper
+            if 'M' not in step:  # if we have an identity mapper
                 mapper = 'cat'
             else:
                 mapper = cmd_line(self._mapper_args(step_num))
@@ -1077,7 +1077,7 @@ class EMRJobRunner(MRJobRunner):
             else:
                 combiner = None
 
-            if 'R' in step: # i.e. if there is a reducer:
+            if 'R' in step:  # i.e. if there is a reducer:
                 reducer = cmd_line(self._reducer_args(step_num))
             else:
                 reducer = None
@@ -1220,7 +1220,7 @@ class EMRJobRunner(MRJobRunner):
             step_states = []
             running_step_name = ''
             total_step_time = 0.0
-            step_nums = [] # step numbers belonging to us. 1-indexed
+            step_nums = []  # step numbers belonging to us. 1-indexed
 
             steps = job_flow.steps or []
             for i, step in enumerate(steps):
@@ -1305,7 +1305,7 @@ class EMRJobRunner(MRJobRunner):
             cause = self._find_probable_cause_of_failure(step_nums)
             if cause:
                 # log cause, and put it in exception
-                cause_msg = [] # lines to log and put in exception
+                cause_msg = []  # lines to log and put in exception
                 cause_msg.append('Probable cause of failure (from %s):' %
                            cause['log_file_uri'])
                 cause_msg.extend(line.strip('\n') for line in cause['lines'])
@@ -1327,7 +1327,7 @@ class EMRJobRunner(MRJobRunner):
         # gain anything from that, and EMR is touchy about distinguishing
         # python scripts from shell scripts
 
-        assert self._script # shouldn't call _script_args() if no script
+        assert self._script  # shouldn't call _script_args() if no script
 
         args = self._opts['python_bin'] + [self._script['name']]
         if self._wrapper_script:
@@ -1610,7 +1610,7 @@ class EMRJobRunner(MRJobRunner):
             return
 
         if not any(key.startswith('bootstrap_')
-                   and key != 'bootstrap_actions' # these are separate scripts
+                   and key != 'bootstrap_actions'  # these are separate scripts
                    and value
                    for (key, value) in self._opts.iteritems()):
             return

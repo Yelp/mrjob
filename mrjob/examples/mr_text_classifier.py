@@ -182,13 +182,13 @@ class MRTextClassifier(MRJob):
         n: ngram length
         ngram: ngram encoded encoded as a string (e.g. "pad thai")
             or None to indicate ANY ngram.
-        count: # of times an ngram appears in the document
+        count:  # of times an ngram appears in the document
         cats: a map from category name to a boolean indicating whether it's
         	this document is in the category
 
         doc_id: (hopefully) unique document ID
         doc: the encoded document. We'll fill these fields:
-            ngram_counts: map from (n, ngram) to # of times ngram appears
+            ngram_counts: map from (n, ngram) to  # of times ngram appears
         	    in the document, using (n, None) to represent the total
                 number of times ANY ngram of that size appears (essentially
                 number of words)
@@ -197,7 +197,7 @@ class MRTextClassifier(MRJob):
         """
         # only compute doc hash if we need it
         if doc.get('id') is not None and self.options.no_test_set:
-            doc_hash = '0' # don't need doc hash
+            doc_hash = '0'  # don't need doc hash
         else:
             doc_hash = hashlib.sha1(doc['text'].encode('utf-8')).hexdigest()
 
@@ -243,9 +243,9 @@ class MRTextClassifier(MRJob):
         ngram: ngram encoded encoded as a string (e.g. "pad thai")
             or None to indicate ANY ngram.
         cat_to_df: list of tuples of ((cat_name, is_in_category), df); df
-        	is # of documents of this type that the ngram appears in
+        	is  # of documents of this type that the ngram appears in
         cat_to_tf: list of tuples of ((cat_name, is_in_category), df); tf
-        	is # of time the ngram appears in docs of this type
+        	is  # of time the ngram appears in docs of this type
         doc_id: unique document ID
         doc: the encoded document
         """

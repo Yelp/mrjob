@@ -230,7 +230,7 @@ class MRJobRunner(object):
             self._ran_job = False
         else:
             self._script = None
-            self._ran_job = True # don't allow user to call run()
+            self._ran_job = True  # don't allow user to call run()
 
         # setup cmds and wrapper script
         self._setup_scripts = []
@@ -263,9 +263,9 @@ class MRJobRunner(object):
             self._add_python_archive(path)
 
         # where to read input from (log files, etc.)
-        self._input_paths = input_paths or ['-'] # by default read from stdin
+        self._input_paths = input_paths or ['-']  # by default read from stdin
         self._stdin = stdin or sys.stdin
-        self._stdin_path = None # temp file containing dump from stdin
+        self._stdin_path = None  # temp file containing dump from stdin
 
         # where a tarball of the mrjob library is stored locally
         self._mrjob_tar_gz_path = None
@@ -404,16 +404,16 @@ class MRJobRunner(object):
         while running this job. Should be safe to run this at any time, or
         multiple times.
         """
-        pass # this only happens on EMR
+        pass  # this only happens on EMR
 
     def _cleanup_logs(self):
         """Cleanup any log files that are created as a side-effect of the job.
         """
-        pass # this only happens on EMR
+        pass  # this only happens on EMR
 
     def _cleanup_jobs(self):
         """Stop any jobs that we created that are still running."""
-        pass # this only happens on EMR
+        pass  # this only happens on EMR
 
     def cleanup(self, mode=None):
         """Clean up running jobs, scratch dirs, and logs, subject to the *cleanup* option passed to the constructor.
@@ -664,7 +664,7 @@ class MRJobRunner(object):
         if '#' in path:
             path, name = path.split('#', 1)
             if '/' in name or '#' in name:
-                raise ValueError('Bad name %r; must not contain # or /' % name)
+                raise ValueError('Bad name %r; must not contain  # or /' % name)
             # empty names are okay
         else:
             name = os.path.basename(path)
@@ -688,7 +688,7 @@ class MRJobRunner(object):
 
         path -- path to the file on the local filesystem. Normally
             we just use the file's name as it's remote name. You can
-            use a # character to pick a different name for the file:
+            use a  # character to pick a different name for the file:
 
             /foo/bar#baz -> upload /foo/bar as baz
             /foo/bar# -> upload /foo/bar, pick any name for it
@@ -778,7 +778,7 @@ class MRJobRunner(object):
                     name = prefix + '%08x-%s' % (
                         random.randint(0,2**32-1), basename)
                 file_dict[name_field] = name
-                name_to_path[name] = path # reserve this name
+                name_to_path[name] = path  # reserve this name
 
     def _name_files(self):
         """Fill in the 'name' field for every file in self._files so

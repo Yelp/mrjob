@@ -83,7 +83,7 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
         tb = find_python_traceback(StringIO(stderr))
         assert_not_equal(tb, None)
         assert isinstance(tb, list)
-        assert_equal(len(tb), 3) # The first line ("Traceback...") is not skipped
+        assert_equal(len(tb), 3)  # The first line ("Traceback...") is not skipped
 
         # make sure we can find the same traceback in noise
         verbose_stdout, verbose_stderr = run(
@@ -314,12 +314,12 @@ class ParseMRJobStderr(TestCase):
         # we should be able to do something graceful with
         # garbled counters and status messages
         BAD_LINES = [
-            'reporter:counter:Foo,Bar,Baz,1\n', # too many items
-            'reporter:counter:Foo,1\n', # too few items
-            'reporter:counter:Foo,Bar,a million\n', # not a number
-            'reporter:counter:Foo,Bar,1.0\n', # not an int
-            'reporter:crounter:Foo,Bar,1\n', # not a valid reporter
-            'reporter,counter:Foo,Bar,1\n', # wrong format!
+            'reporter:counter:Foo,Bar,Baz,1\n',  # too many items
+            'reporter:counter:Foo,1\n',  # too few items
+            'reporter:counter:Foo,Bar,a million\n',  # not a number
+            'reporter:counter:Foo,Bar,1.0\n',  # not an int
+            'reporter:crounter:Foo,Bar,1\n',  # not a valid reporter
+            'reporter,counter:Foo,Bar,1\n',  # wrong format!
         ]
 
         assert_equal(parse_mr_job_stderr(BAD_LINES),

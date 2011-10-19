@@ -36,7 +36,7 @@ def encode_node(node_id, links=None, score=1):
 
 class MRPageRank(MRJob):
 
-    INPUT_PROTOCOL = JSONProtocol # read the same format we write
+    INPUT_PROTOCOL = JSONProtocol  # read the same format we write
 
     def configure_options(self):
         super(MRPageRank, self).configure_options()

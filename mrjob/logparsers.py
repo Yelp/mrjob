@@ -49,7 +49,7 @@ def scan_for_counters_in_files(log_file_uris, runner):
     """Scan *log_file_uris* for counters, using *runner* for file system access
     """
     counters = {}
-    relevant_logs = [] # list of (sort key, URI)
+    relevant_logs = []  # list of (sort key, URI)
 
     for log_file_uri in log_file_uris:
         match = EMR_JOB_LOG_URI_RE.match(log_file_uri)
@@ -162,7 +162,7 @@ def _make_sorting_func(regexp, sort_key_func):
 
         :return: [(sort_key, info, log_file_uri)]
         """
-        relevant_logs = [] # list of (sort key, info, URI)
+        relevant_logs = []  # list of (sort key, info, URI)
         for log_file_uri in log_file_uris:
             match = regexp.match(log_file_uri)
             if not match:

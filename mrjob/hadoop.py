@@ -306,7 +306,7 @@ class HadoopJobRunner(MRJobRunner):
         self._name_files()
 
         # send script and wrapper script (if any) to working dir
-        assert self._script # shouldn't be able to run if no script
+        assert self._script  # shouldn't be able to run if no script
         self._script['upload'] = 'file'
         if self._wrapper_script:
             self._wrapper_script['upload'] = 'file'
@@ -400,7 +400,7 @@ class HadoopJobRunner(MRJobRunner):
                 cause = self._find_probable_cause_of_failure([step_num+self._start_step_num])
                 if cause:
                     # log cause, and put it in exception
-                    cause_msg = [] # lines to log and put in exception
+                    cause_msg = []  # lines to log and put in exception
                     cause_msg.append('Probable cause of failure (from %s):' %
                                cause['log_file_uri'])
                     cause_msg.extend(line.strip('\n') for line in cause['lines'])
@@ -447,7 +447,7 @@ class HadoopJobRunner(MRJobRunner):
 
     def _script_args(self):
         """How to invoke the script inside Hadoop"""
-        assert self._script # shouldn't be able to run if no script
+        assert self._script  # shouldn't be able to run if no script
 
         args = self._opts['python_bin'] + [self._script['name']]
         if self._wrapper_script:

@@ -1235,7 +1235,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
     def test_bootstrap_actions_get_added(self):
         bootstrap_actions = [
             's3://elasticmapreduce/bootstrap-actions/configure-hadoop -m,mapred.tasktracker.map.tasks.maximum=1',
-            's3://foo/bar#xyzzy', # use alternate name for script
+            's3://foo/bar#xyzzy',  # use alternate name for script
         ]
 
         runner = EMRJobRunner(conf_path=False,
@@ -1422,7 +1422,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             shutil.rmtree(self.tmp_dir)
             self.teardown_ssh()
         except OSError:
-            pass # didn't set up SSH
+            pass  # didn't set up SSH
 
     def sorted_results_for_runner_with_args(self, job_args):
         mr_job = MRTwoStepJob(job_args)

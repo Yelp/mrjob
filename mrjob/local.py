@@ -108,7 +108,7 @@ class LocalMRJobRunner(MRJobRunner):
         jobconf = self._opts['jobconf']
         self._process_jobconf_args(jobconf)
 
-        assert self._script # shouldn't be able to run if no script
+        assert self._script  # shouldn't be able to run if no script
 
         wrapper_args = self._opts['python_bin']
         if self._wrapper_script:
@@ -137,7 +137,7 @@ class LocalMRJobRunner(MRJobRunner):
             if 'R' in step:
                 # sort the output
                 self._invoke_step(['sort'], 'step-%d-mapper-sorted' % i,
-                       env={'LC_ALL': 'C'}, step_num=i, step_type='S', num_tasks=1) # ignore locale
+                       env={'LC_ALL': 'C'}, step_num=i, step_type='S', num_tasks=1)  # ignore locale
 
                 # run the reducer
                 reducer_args = (wrapper_args + [self._script['name'],
@@ -399,7 +399,7 @@ class LocalMRJobRunner(MRJobRunner):
                 # set the task env
                 # generate a task id
                 mapreduce_task_id = 'task_%s_%s_%05d%d' % (self._job_name, step_type, step_num, task_num)
-                mapreduce_task_attempt_id = 'attempt_%s_%s_%05d%d_0' % (self._job_name, step_type, step_num, task_num) # we only have one attempt
+                mapreduce_task_attempt_id = 'attempt_%s_%s_%05d%d_0' % (self._job_name, step_type, step_num, task_num)  # we only have one attempt
 
                 task_vars = {
                     task_id_var: mapreduce_task_id,

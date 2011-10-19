@@ -116,9 +116,9 @@ import shlex
 from mrjob.util import expand_path
 
 try:
-    import simplejson as json # preferred because of C speedups
+    import simplejson as json  # preferred because of C speedups
 except ImportError:
-    import json # built in to Python 2.6 and later
+    import json  # built in to Python 2.6 and later
 
 # yaml is nice to have, but we can fall back on JSON if need be
 try:

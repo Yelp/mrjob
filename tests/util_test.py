@@ -199,7 +199,7 @@ class ArchiveTestCase(TestCase):
 
         self.tmp_dir = tempfile.mkdtemp()
 
-        os.mkdir(join(self.tmp_dir, 'a')) # contains files to archive
+        os.mkdir(join(self.tmp_dir, 'a'))  # contains files to archive
 
         # create a/foo
         with open(join(self.tmp_dir, 'a', 'foo'), 'w') as foo:

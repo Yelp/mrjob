@@ -78,14 +78,14 @@ on your own Hadoop cluster by specifying ``-r hadoop``:
 Use :py:meth:`~mrjob.job.MRJob.make_runner` to run an
 :py:class:`~mrjob.job.MRJob` from another script::
 
-    from __future__ import with_statement # only needed on Python 2.5
+    from __future__ import with_statement  # only needed on Python 2.5
 
     mr_job = MRWordCounter(args=['-r', 'emr'])
     with mr_job.make_runner() as runner:
         runner.run()
         for line in runner.stream_output():
             key, value = mr_job.parse_output_line(line)
-            ... # do something with the parsed output
+            ...  # do something with the parsed output
 
 See :py:mod:`mrjob.examples` for more examples.
 """
@@ -1514,7 +1514,7 @@ class MRJob(object):
 
             DEFAULT_PROTOCOL = 'rot13'
         """
-        return PROTOCOL_DICT.copy() # copy to stop monkey-patching
+        return PROTOCOL_DICT.copy()  # copy to stop monkey-patching
 
     #: Protocol for reading input to the first mapper in your job.
     #: Default: :py:class:`RawValueProtocol`.
@@ -1571,7 +1571,7 @@ class MRJob(object):
     #:
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
     #: protocol strings. Can be overridden by :option:`--protocol`.
-    DEFAULT_PROTOCOL = DEFAULT_PROTOCOL # i.e. the one from mrjob.protocols
+    DEFAULT_PROTOCOL = DEFAULT_PROTOCOL  # i.e. the one from mrjob.protocols
 
     #: DEPRECATED
     #:

@@ -52,9 +52,9 @@ import cPickle
 from mrjob.util import safeeval
 
 try:
-    import simplejson as json # preferred because of C speedups
+    import simplejson as json  # preferred because of C speedups
 except ImportError:
-    import json # built in to Python 2.6 and later
+    import json  # built in to Python 2.6 and later
 
 
 # DEPRECATED: Abstract base class for all protocols. Now just an alias for

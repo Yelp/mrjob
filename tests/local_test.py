@@ -208,7 +208,7 @@ class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):
     def remove_os_symlink(self):
         if hasattr(os, 'symlink'):
             self._real_os_symlink = os.symlink
-            del os.symlink # sorry, were you using that? :)
+            del os.symlink  # sorry, were you using that? :)
 
     @teardown
     def restore_os_symlink(self):

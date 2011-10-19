@@ -149,7 +149,7 @@ def print_report(options):
     earliest = min(info['created'] for info in job_flow_infos)
     latest = max(info['created'] for info in job_flow_infos)
 
-    print 'Total # of Job Flows: %d' % len(job_flow_infos)
+    print 'Total  # of Job Flows: %d' % len(job_flow_infos)
     print
 
     print '* All times are in UTC.'

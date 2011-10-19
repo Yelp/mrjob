@@ -145,7 +145,7 @@ def find_mrjob_conf():
     """
     def candidates():
         """Return (path, deprecation_warning)"""
-        if os.environ.has_key('MRJOB_CONF'):
+        if 'MRJOB_CONF' in os.environ:
             yield (expand_path(os.environ['MRJOB_CONF']), None)
 
         # $HOME isn't necessarily set on Windows, but ~ works
@@ -187,7 +187,8 @@ def load_mrjob_conf(conf_path=None):
     Returns ``None`` if we can't find :file:`mrjob.conf`.
 
     :type conf_path: str
-    :param conf_path: an alternate place to look for mrjob.conf. If this is ``False``, we'll always return ``None``.
+    :param conf_path: an alternate place to look for mrjob.conf. If this is
+                      ``False``, we'll always return ``None``.
     """
     if conf_path is False:
         return None
@@ -208,7 +209,8 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
     ``{}`` if we can't find them.
 
     :type conf_path: str
-    :param conf_path: an alternate place to look for mrjob.conf. If this is ``False``, we'll always return ``{}``.
+    :param conf_path: an alternate place to look for mrjob.conf. If this is
+                      ``False``, we'll always return ``{}``.
     """
     conf = load_mrjob_conf(conf_path=conf_path)
     if conf is None:
@@ -252,7 +254,7 @@ def dump_mrjob_conf(conf, f):
 def combine_values(*values):
     """Return the last value in *values* that is not ``None``.
 
-    The default combiner; useful for simple values (booleans, strings, numbers).
+    The default combiner; good for simple values (booleans, strings, numbers).
     """
     for v in reversed(values):
         if v is not None:
@@ -383,7 +385,9 @@ def combine_opts(combiners, *opts_list):
     """The master combiner, used to combine dictionaries of options with
     appropriate sub-combiners.
 
-    :param combiners: a map from option name to a combine_*() function to combine options by that name. By default, we combine options using :py:func:`combine_values`.
+    :param combiners: a map from option name to a combine_*() function to
+                      combine options by that name. By default, we combine
+                      options using :py:func:`combine_values`.
     :param opts_list: one or more dictionaries to combine
     """
     final_opts = {}

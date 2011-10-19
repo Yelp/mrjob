@@ -12,7 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run an MRJob inline by running all mappers and reducers through the same process.  Useful for debugging."""
+"""Run an MRJob inline by running all mappers and reducers through the same
+process. Useful for debugging."""
 from __future__ import with_statement
 
 __author__ = 'Matthew Tai <mtai@adku.com>'
@@ -52,10 +53,17 @@ class InlineMRJobRunner(MRJobRunner):
     alias = 'inline'
 
     def __init__(self, mrjob_cls=None, **kwargs):
-        """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
+        """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword
+        args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 
-        * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*, and *hadoop_streaming_jar*, and *jobconf* are ignored because they require Java. If you need to test these, consider starting up a standalone Hadoop instance and running your job with ``-r hadoop``.
-        * *cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*, *steps_python_bin*, *upload_archives*, and *upload_files* are ignored because we don't invoke the job as a subprocess or run it in its own directory.
+        * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*,
+          and *hadoop_streaming_jar*, and *jobconf* are ignored because they
+          require Java. If you need to test these, consider starting up a
+          standalone Hadoop instance and running your job with ``-r hadoop``.
+        * *cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*,
+          *steps_python_bin*, *upload_archives*, and *upload_files* are ignored
+          because we don't invoke the job as a subprocess or run it in its own
+          directory.
         """
         super(InlineMRJobRunner, self).__init__(**kwargs)
         assert issubclass(mrjob_cls, MRJob)
@@ -147,9 +155,11 @@ class InlineMRJobRunner(MRJobRunner):
         common_args = (['--step-num=%d' % step_number] +
                        self._mr_job_extra_args(local=True))
         if is_mapper:
-            child_args = ['--mapper'] + self._decide_input_paths() + common_args
+            child_args = (
+                ['--mapper'] + self._decide_input_paths() + common_args)
         elif is_reducer:
-            child_args = ['--reducer'] + self._decide_input_paths() + common_args
+            child_args = (
+                ['--reducer'] + self._decide_input_paths() + common_args)
         elif is_combiner:
             child_args = ['--combiner'] + common_args + ['-']
 
@@ -175,8 +185,8 @@ class InlineMRJobRunner(MRJobRunner):
 
         while len(self._counters) <= step_number:
             self._counters.append({})
-        child_instance.parse_counters(self._counters[step_number-1])
-        self.print_counters([step_number+1])
+        child_instance.parse_counters(self._counters[step_number - 1])
+        self.print_counters([step_number + 1])
 
         if has_combiner:
             self._invoke_inline_mrjob(step_number, outfile_name,

@@ -26,7 +26,8 @@ from subprocess import Popen, PIPE
 
 SSH_PREFIX = 'ssh://'
 SSH_LOG_ROOT = '/mnt/var/log/hadoop'
-SSH_URI_RE = re.compile(r'^%s(?P<hostname>[^/]+)?(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
+SSH_URI_RE = re.compile(
+    r'^%s(?P<hostname>[^/]+)?(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
 
 
 class SSHException(Exception):
@@ -50,7 +51,8 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     """Shortcut to call ssh on a Hadoop node via ``subprocess``.
 
     :param ssh_bin: Path to ``ssh`` binary
-    :param address: Address of your job's master node (obtained via EmrConnection.describe_jobflow())
+    :param address: Address of your job's master node (obtained via
+           :py:meth:`boto.emr.EmrConnection.describe_jobflow`)
     :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
     :param cmd_args: The command you want to run
     :param stdin: String to pass to the process's standard input
@@ -101,7 +103,6 @@ def _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
         return ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args)
 
 
-
 def _poor_mans_scp(ssh_bin, addr, ec2_key_pair_file, src, dest):
     """Copy a file from ``src`` on the local machine to ``dest`` on ``addr``.
 
@@ -139,10 +140,12 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     file doesn't exist or ``SSHException if SSH access fails.
 
     :param ssh_bin: Path to ``ssh`` binary
-    :param address: Address of your job's master node (obtained via EmrConnection.describe_jobflow())
+    :param address: Address of your job's master node (obtained via
+                    :py:meth:`boto.emr.EmrConnection.describe_jobflow`)
     :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
     :param path: Path on the remote host to get
-    :param keyfile: Name of the EMR private key file on the master node in case ``path`` exists on one of the slave nodes
+    :param keyfile: Name of the EMR private key file on the master node in case
+                    ``path`` exists on one of the slave nodes
     """
     out = _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
                                   keyfile, ['cat', path])
@@ -157,10 +160,12 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     path doesn't exist or ``SSHException if SSH access fails.
 
     :param ssh_bin: Path to ``ssh`` binary
-    :param address: Address of your job's master node (obtained via EmrConnection.describe_jobflow())
+    :param address: Address of your job's master node (obtained via
+                    :py:meth:`boto.emr.EmrConnection.describe_jobflow`)
     :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
     :param path: Path on the remote host to list
-    :param keyfile: Name of the EMR private key file on the master node in case ``path`` exists on one of the slave nodes
+    :param keyfile: Name of the EMR private key file on the master node in case
+                    ``path`` exists on one of the slave nodes
     """
     out = _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
                                   keyfile, ['find', path, '-type', 'f'])

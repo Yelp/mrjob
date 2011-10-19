@@ -39,6 +39,7 @@ from testify import teardown
 
 from mrjob.util import *
 
+
 class CmdLineTestCase(TestCase):
 
     def test_cmd_line(self):
@@ -48,7 +49,9 @@ class CmdLineTestCase(TestCase):
                   ("grep -e \"# DON'T USE\\$\"",
                    'grep -e \'# DON\'"\'"\'T USE$\''))
 
+
 # expand_path() is tested by tests.conf.CombineAndExpandPathsTestCase
+
 
 class FileExtTestCase(TestCase):
 
@@ -60,16 +63,20 @@ class FileExtTestCase(TestCase):
         assert_equal(file_ext('README,v'), '')
         assert_equal(file_ext('README.txt,v'), '.txt,v')
 
+
 class OptionScrapingTestCase(TestCase):
 
     @setup
     def setup_options(self):
-        self.original_parser = optparse.OptionParser(usage="don't", description='go away')
+        self.original_parser = optparse.OptionParser(
+            usage="don't", description='go away')
         self.original_group = optparse.OptionGroup(self.original_parser, '?')
         self.original_parser.add_option_group(self.original_group)
 
-        self.original_parser.add_option('-b', '--no-a', dest='a', action='store_false')
-        self.original_parser.add_option('-a', '--yes-a', dest='a', action='store_true', default=False)
+        self.original_parser.add_option(
+            '-b', '--no-a', dest='a', action='store_false')
+        self.original_parser.add_option(
+            '-a', '--yes-a', dest='a', action='store_true', default=False)
         self.original_group.add_option('-x', '--xx', dest='x', action='store')
         self.original_group.add_option('-y', '--yy', dest='y', action='store')
 
@@ -86,8 +93,10 @@ class OptionScrapingTestCase(TestCase):
         }
         old_groups = (self.original_parser, self.original_group)
         scrape_options_into_new_groups(old_groups, assignments)
-        assert_equal(self.original_parser.option_list[1:], self.new_parser.option_list[1:])
-        assert_equal(self.original_group.option_list, self.new_group_1.option_list)
+        assert_equal(self.original_parser.option_list[1:],
+                     self.new_parser.option_list[1:])
+        assert_equal(self.original_group.option_list,
+                     self.new_group_1.option_list)
 
     def test_scrape_different(self):
         assignments = {
@@ -199,7 +208,9 @@ class SafeEvalTestCase(TestCase):
     def test_globals_and_locals(self):
         # test passing in globals, locals
         a = -0.2
-        assert_equal(abs(a), safeeval('abs(a)', globals={'abs': abs}, locals={'a': a}))
+        assert_equal(abs(a),
+                     safeeval('abs(a)', globals={'abs': abs}, locals={'a': a}))
+
 
 class ArchiveTestCase(TestCase):
 
@@ -236,7 +247,8 @@ class ArchiveTestCase(TestCase):
 
         # make sure the files we expect are there
         expected_files = ['bar', 'baz', 'foo', 'qux']
-        expected_files = set(expected_files + added_files) - set(excluded_files)
+        expected_files = (set(expected_files + added_files) -
+                          set(excluded_files))
         assert_equal(sorted(os.listdir(join(self.tmp_dir, 'b'))),
                      sorted(expected_files))
         assert_equal(os.listdir(join(self.tmp_dir, 'b', 'qux')),
@@ -278,14 +290,17 @@ class ArchiveTestCase(TestCase):
                      out_path=join(self.tmp_dir, 'not_a.tar.gz'),
                      prefix='b')
 
-        assert_equal(extract_dir_for_tar(join(self.tmp_dir, 'not_a.tar.gz')), 'b')
+        assert_equal(extract_dir_for_tar(join(self.tmp_dir, 'not_a.tar.gz')),
+                     'b')
 
-    def archive_and_unarchive(self, extension, archive_template, added_files=[]):
+    def archive_and_unarchive(self, extension, archive_template,
+                              added_files=[]):
         join = os.path.join
 
         # archive it up
         archive_name = 'a.' + extension
-        variables = dict(archive_name=join('..', archive_name), files_to_archive='.')
+        variables = dict(archive_name=join('..', archive_name),
+                         files_to_archive='.')
         archive_command = [arg % variables for arg in archive_template]
         check_call(archive_command, cwd=join(self.tmp_dir, 'a'))
 
@@ -296,23 +311,27 @@ class ArchiveTestCase(TestCase):
 
     def test_unarchive_tar(self):
         # this test requires that tar is present
-        self.archive_and_unarchive('tar',
-                                   ['tar', 'chf', '%(archive_name)s', '%(files_to_archive)s'])
+        self.archive_and_unarchive(
+            'tar',
+            ['tar', 'chf', '%(archive_name)s', '%(files_to_archive)s'])
 
     def test_unarchive_tar_gz(self):
         # this test requires that tar is present and supports the "z" option
-        self.archive_and_unarchive('tar.gz',
-                                   ['tar', 'czhf', '%(archive_name)s', '%(files_to_archive)s'])
+        self.archive_and_unarchive(
+            'tar.gz',
+            ['tar', 'czhf', '%(archive_name)s', '%(files_to_archive)s'])
 
     def test_unarchive_tar_bz2(self):
         # this test requires that tar is present and supports the "j" option
-        self.archive_and_unarchive('tar.bz2',
-                                   ['tar', 'cjhf', '%(archive_name)s', '%(files_to_archive)s'])
+        self.archive_and_unarchive(
+            'tar.bz2',
+            ['tar', 'cjhf', '%(archive_name)s', '%(files_to_archive)s'])
 
     def test_unarchive_jar(self):
         # this test requires that jar is present
-        self.archive_and_unarchive('jar',
-                                   ['jar', 'cf', '%(archive_name)s', '%(files_to_archive)s'],
+        self.archive_and_unarchive(
+            'jar',
+            ['jar', 'cf', '%(archive_name)s', '%(files_to_archive)s'],
                                    added_files=['META-INF'])
 
     def test_unarchive_zip(self):
@@ -323,14 +342,15 @@ class ArchiveTestCase(TestCase):
     def test_unarchive_non_archive(self):
         join = os.path.join
 
-        assert_raises(IOError, unarchive, join(self.tmp_dir, 'a', 'foo'), join(self.tmp_dir, 'b'))
+        assert_raises(IOError, unarchive, join(self.tmp_dir, 'a', 'foo'),
+                      join(self.tmp_dir, 'b'))
 
 
 class read_fileTest(TestCase):
 
     @setup
     def make_tmp_dir(self):
-       self.tmp_dir = tempfile.mkdtemp()
+        self.tmp_dir = tempfile.mkdtemp()
 
     @teardown
     def rm_tmp_dir(self):
@@ -350,11 +370,11 @@ class read_fileTest(TestCase):
     def test_read_file_uncompressed_stream(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
-           input_file.write('bar\nfoo\n')
+            input_file.write('bar\nfoo\n')
 
         output = []
-        for line in read_file(input_path, fileobj = open(input_path)):
-           output.append(line)
+        for line in read_file(input_path, fileobj=open(input_path)):
+            output.append(line)
 
         assert_equal(output, ['bar\n', 'foo\n'])
 
@@ -366,7 +386,7 @@ class read_fileTest(TestCase):
 
         output = []
         for line in read_file(input_gz_path):
-           output.append(line)
+            output.append(line)
 
         assert_equal(output, ['foo\n', 'bar\n'])
 
@@ -377,7 +397,7 @@ class read_fileTest(TestCase):
 
         output = []
         for line in read_file(input_bz2_path):
-           output.append(line)
+            output.append(line)
 
         assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
 
@@ -388,8 +408,8 @@ class read_fileTest(TestCase):
         input_gz.close()
 
         output = []
-        for line in read_file(input_gz_path, fileobj = open(input_gz_path)):
-           output.append(line)
+        for line in read_file(input_gz_path, fileobj=open(input_gz_path)):
+            output.append(line)
 
         assert_equal(output, ['foo\n', 'bar\n'])
 
@@ -399,7 +419,7 @@ class read_fileTest(TestCase):
         input_bz2.close()
 
         output = []
-        for line in read_file(input_bz2_path, fileobj = open(input_bz2_path)):
-           output.append(line)
+        for line in read_file(input_bz2_path, fileobj=open(input_bz2_path)):
+            output.append(line)
 
         assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])

@@ -58,10 +58,10 @@ def encode_document(text, cats=None, id=None):
     Args:
     text -- the text of the document (as a unicode)
     cats -- a dictionary mapping a category name (e.g. 'sports') to True if
-    	the document is in the category, and False if it's not. None indicates
+        the document is in the category, and False if it's not. None indicates
         that we have no information about this documents' categories
     id -- a unique ID for the document (any kind of JSON-able value should
-    	work). If not specified, we'll auto-generate one.
+        work). If not specified, we'll auto-generate one.
     """
     text = unicode(text)
     cats = dict((unicode(cat), bool(is_in_cat))
@@ -77,13 +77,13 @@ def count_ngrams(text, max_ngram_size, stop_words):
 
     n: ngram size ("foo" is a 1-gram, "foo bar baz" is a 3-gram)
     ngram: the ngram, as a space-separated string or None to indicate the
-    	ANY ngram (basically the number of words in the document).
+        ANY ngram (basically the number of words in the document).
 
     Args:
     text -- text, as a unicode
     max_ngram_size -- maximum size of ngrams to consider
     stop_words -- a collection of words (in lowercase) to remove before
-    	parsing out ngrams (e.g. "the", "and")
+        parsing out ngrams (e.g. "the", "and")
     """
     if not isinstance(stop_words, set):
         stop_words = set(stop_words)
@@ -184,12 +184,12 @@ class MRTextClassifier(MRJob):
             or None to indicate ANY ngram.
         count:  # of times an ngram appears in the document
         cats: a map from category name to a boolean indicating whether it's
-        	this document is in the category
+            this document is in the category
 
         doc_id: (hopefully) unique document ID
         doc: the encoded document. We'll fill these fields:
             ngram_counts: map from (n, ngram) to  # of times ngram appears
-        	    in the document, using (n, None) to represent the total
+                in the document, using (n, None) to represent the total
                 number of times ANY ngram of that size appears (essentially
                 number of words)
             in_test_set: boolean indicating if this doc is in the test set
@@ -243,9 +243,9 @@ class MRTextClassifier(MRJob):
         ngram: ngram encoded encoded as a string (e.g. "pad thai")
             or None to indicate ANY ngram.
         cat_to_df: list of tuples of ((cat_name, is_in_category), df); df
-        	is  # of documents of this type that the ngram appears in
+            is  # of documents of this type that the ngram appears in
         cat_to_tf: list of tuples of ((cat_name, is_in_category), df); tf
-        	is  # of time the ngram appears in docs of this type
+            is  # of time the ngram appears in docs of this type
         doc_id: unique document ID
         doc: the encoded document
         """
@@ -310,7 +310,7 @@ class MRTextClassifier(MRJob):
         ngram: ngram encoded encoded as a string (e.g. "pad thai")
             or None to indicate ANY ngram.
         cat_to_score: map from (cat_name, is_in_category) to score for
-        	this ngram
+            this ngram
         doc_id: unique document ID
         doc: the encoded document
         """
@@ -392,7 +392,7 @@ class MRTextClassifier(MRJob):
         ngram: ngram encoded encoded as a string (e.g. "pad thai")
             or None to indicate ANY ngram.
         cat_to_score: map from (cat_name, is_in_category) to score for
-        	this ngram
+            this ngram
         doc_id: unique document ID
         doc: the encoded document
         """
@@ -458,10 +458,10 @@ class MRTextClassifier(MRJob):
         ngram: ngram encoded encoded as a string (e.g. "pad thai")
             or None to indicate ANY ngram.
         cat_to_score: map from (cat_name, is_in_category) to score for
-        	this ngram
+            this ngram
         doc_id: unique document ID
         doc: the encoded document. this will contain an extra field
-        	'cat_to_score', and will no longer have the 'ngram_counts' field.
+            'cat_to_score', and will no longer have the 'ngram_counts' field.
         """
         key_type, key = type_and_key
 

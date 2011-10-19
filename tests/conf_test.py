@@ -221,7 +221,7 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         contents = open(conf_path).read()
 
         assert_equal(contents.replace(' ','').replace('\n',''),
-					 '{"runners":{"foo":{"qux":"quux"}}}')
+                     '{"runners":{"foo":{"qux":"quux"}}}')
 
 class CombineValuesTestCase(TestCase):
 

@@ -870,7 +870,7 @@ class MRJobRunner(object):
 
         :type local: boolean
         :param local: if this is True, use files' local paths rather than
-        	the path they'll have inside Hadoop streaming
+            the path they'll have inside Hadoop streaming
         """
         return self._get_file_upload_args(local=local) + self._extra_args
 
@@ -880,7 +880,7 @@ class MRJobRunner(object):
 
         :type local: boolean
         :param local: if this is True, use files' local paths rather than
-        	the path they'll have inside Hadoop streaming
+            the path they'll have inside Hadoop streaming
         """
         args = []
         for arg, file_dict in self._file_upload_args:

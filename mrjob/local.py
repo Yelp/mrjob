@@ -40,6 +40,8 @@ from mrjob.util import unarchive
 
 log = logging.getLogger('mrjob.local')
 
+DEFAULT_MAP_TASKS = 2
+DEFAULT_REDUCE_TASKS = 2
 
 class LocalMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing
@@ -68,8 +70,8 @@ class LocalMRJobRunner(MRJobRunner):
         self._prev_outfiles = []
         self._counters = []
 
-        self._map_tasks = 1
-        self._reduce_tasks = 1
+        self._map_tasks = DEFAULT_MAP_TASKS
+        self._reduce_tasks = DEFAULT_REDUCE_TASKS
 
         self._running_env = defaultdict(str)
 

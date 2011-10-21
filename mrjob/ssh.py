@@ -53,7 +53,7 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
 
     :param ssh_bin: Path to ``ssh`` binary
     :param address: Address of your job's master node (obtained via
-           :py:meth:`boto.emr.EmrConnection.describe_jobflow`)
+                    :py:meth:`boto.emr.EmrConnection.describe_jobflow`)
     :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
     :param cmd_args: The command you want to run
     :param stdin: String to pass to the process's standard input

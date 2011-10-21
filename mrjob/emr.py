@@ -106,8 +106,8 @@ WAIT_FOR_SSH_TO_FAIL = 1.0
 # with boto.utils.ISO8601
 SUBSECOND_RE = re.compile('\.[0-9]+')
 
-# map from AWS region to EMR endpoint
-# see http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?ConceptsRequestEndpoints.html
+# map from AWS region to EMR endpoint. See
+# http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?ConceptsRequestEndpoints.html
 REGION_TO_EMR_ENDPOINT = {
     'EU': 'eu-west-1.elasticmapreduce.amazonaws.com',
     'us-east-1': 'us-east-1.elasticmapreduce.amazonaws.com',
@@ -115,8 +115,8 @@ REGION_TO_EMR_ENDPOINT = {
     '': 'elasticmapreduce.amazonaws.com',  # when no region specified
 }
 
-# map from AWS region to S3 endpoint
-# see http://docs.amazonwebservices.com/AmazonS3/latest/dev/MakingRequests.html#RequestEndpoints
+# map from AWS region to S3 endpoint. See
+# http://docs.amazonwebservices.com/AmazonS3/latest/dev/MakingRequests.html#RequestEndpoints
 REGION_TO_S3_ENDPOINT = {
     'EU': 's3-eu-west-1.amazonaws.com',
     'us-east-1': 's3.amazonaws.com',  # no region-specific endpoint
@@ -126,8 +126,8 @@ REGION_TO_S3_ENDPOINT = {
 }
 
 # map from AWS region to S3 LocationConstraint parameter for regions whose
-# location constraints differ from their AWS regions
-# see http://docs.amazonwebservices.com/AmazonS3/latest/API/index.html?RESTBucketPUT.html
+# location constraints differ from their AWS regions. See
+# http://docs.amazonwebservices.com/AmazonS3/latest/API/index.html?RESTBucketPUT.html
 REGION_TO_S3_LOCATION_CONSTRAINT = {
     'us-east-1': '',
 }
@@ -400,55 +400,133 @@ class EMRJobRunner(MRJobRunner):
                                           on EMR. These should be standard
                                           Python module tarballs. If a module
                                           is named ``foo.tar.gz``, we expect to
-                                          be able to run ``tar xfz foo.tar.gz; cd foo; sudo python setup.py install``.
+                                          be able to run ``tar xfz foo.tar.gz;
+                                          cd foo;
+                                          sudo python setup.py install``.
         :type bootstrap_scripts: list of str
-        :param bootstrap_scripts: scripts to upload and then run on the master node (a combination of *bootstrap_cmds* and *bootstrap_files*). These are run after the command from bootstrap_cmds.
+        :param bootstrap_scripts: scripts to upload and then run on the master
+                                  node (a combination of *bootstrap_cmds* and
+                                  *bootstrap_files*). These are run after the
+                                  command from bootstrap_cmds.
         :type check_emr_status_every: float
-        :param check_emr_status_every: How often to check on the status of EMR jobs.Default is 30 seconds (too often and AWS will throttle you).
+        :param check_emr_status_every: How often to check on the status of EMR
+                                       jobs. Default is 30 seconds (too often
+                                       and AWS will throttle you anyway).
         :type ec2_instance_type: str
-        :param ec2_instance_type: What sort of EC2 instance(s) to use on the nodes that actually run tasks (see http://aws.amazon.com/ec2/instance-types/). When you run multiple instances (see *num_ec2_instances*), the master node is just coordinating the other nodes, so usually the default instance type (``m1.small``) is fine, and using larger instances is wasteful.
+        :param ec2_instance_type: What sort of EC2 instance(s) to use on the
+                                  nodes that actually run tasks (see
+                                  http://aws.amazon.com/ec2/instance-types/).
+                                  When you run multiple instances (see
+                                  *num_ec2_instances*), the master node is just
+                                  coordinating the other nodes, so usually the
+                                  default instance type (``m1.small``) is fine,
+                                  and using larger instances is wasteful.
         :type ec2_key_pair: str
         :param ec2_key_pair: name of the SSH key you set up for EMR.
         :type ec2_key_pair_file: str
         :param ec2_key_pair_file: path to file containing the SSH key for EMR
         :type ec2_master_instance_type: str
-        :param ec2_master_instance_type: same as *ec2_instance_type*, but only for the master Hadoop node. Usually you just want to use *ec2_instance_type*. Defaults to ``'m1.small'``.
+        :param ec2_master_instance_type: same as *ec2_instance_type*, but only
+                                         for the master Hadoop node. Usually
+                                         you just want to use
+                                         *ec2_instance_type*. Defaults to
+                                         ``'m1.small'``.
         :type ec2_slave_instance_type: str
-        :param ec2_slave_instance_type: same as *ec2_instance_type*, but only for the slave Hadoop nodes. Usually you just want to use *ec2_instance_type*. Defaults to ``'m1.small'``.
+        :param ec2_slave_instance_type: same as *ec2_instance_type*, but only
+                                        for the slave Hadoop nodes. Usually you
+                                        just want to use *ec2_instance_type*.
+                                        Defaults to ``'m1.small'``.
         :type emr_endpoint: str
-        :param emr_endpoint: optional host to connect to when communicating with S3 (e.g. ``us-west-1.elasticmapreduce.amazonaws.com``). Default is to infer this from *aws_region*.
+        :param emr_endpoint: optional host to connect to when communicating
+                             with S3 (e.g.
+                             ``us-west-1.elasticmapreduce.amazonaws.com``).
+                             Default is to infer this from *aws_region*.
         :type emr_job_flow_id: str
-        :param emr_job_flow_id: the ID of a persistent EMR job flow to run jobs in (normally we launch our own job flow). It's fine for other jobs to be using the job flow; we give our job's steps a unique ID.
+        :param emr_job_flow_id: the ID of a persistent EMR job flow to run jobs
+                                in (normally we launch our own job flow). It's
+                                fine for other jobs to be using the job flow;
+                                we give our job's steps a unique ID.
         :type emr_job_flow_pool_name: str
-        :param emr_job_flow_pool_name: Specify a pool name to join. Set to "default" if not specified. Does not imply ``emr_job_flow_pool_name``.
+        :param emr_job_flow_pool_name: Specify a pool name to join. Is set to
+                                       ``'default'`` if not specified. Does not
+                                       imply ``pool_emr_job_flows``.
         :type enable_emr_debugging: str
         :param enable_emr_debugging: store Hadoop logs in SimpleDB
         :type hadoop_streaming_jar: str
-        :param hadoop_streaming_jar: This is actually an option in the base MRJobRunner class. Points to a custom hadoop streaming jar on the local filesystem or S3. If you want to point to a streaming jar already installed on the EMR instances (perhaps through a bootstrap action?), use *hadoop_streaming_jar_on_emr*.
+        :param hadoop_streaming_jar: This is actually an option in the base
+                                     :py:class:`~mrjob.runner.MRJobRunner`
+                                     class. Points to a custom hadoop streaming
+                                     jar on the local filesystem or S3. If you
+                                     want to point to a streaming jar already
+                                     installed on the EMR instances (perhaps
+                                     through a bootstrap action?), use
+                                     *hadoop_streaming_jar_on_emr*.
         :type hadoop_streaming_jar_on_emr: str
-        :param hadoop_streaming_jar_on_emr: Like *hadoop_streaming_jar*, except that it points to a path on the EMR instance, rather than to a local file or one on S3. Rarely necessary to set this by hand.
+        :param hadoop_streaming_jar_on_emr: Like *hadoop_streaming_jar*, except
+                                            that it points to a path on the EMR
+                                            instance, rather than to a local
+                                            file or one on S3. Rarely necessary
+                                            to set this by hand.
         :type hadoop_version: str
-        :param hadoop_version: Set the version of Hadoop to use on EMR. EMR currently accepts ``'0.18'`` or ``'0.20'``; default is ``'0.20'``.
+        :param hadoop_version: Set the version of Hadoop to use on EMR. EMR
+                               currently accepts ``'0.18'`` or ``'0.20'``;
+                               default is ``'0.20'``.
         :type num_ec2_instances: int
         :type pool_emr_job_flows: bool
-        :param pool_emr_job_flows: Try to run the job on a ``WAITING`` pooled job flow with the same bootstrap configuration. Prefer the one with the most compute units. Use S3 to "lock" the job flow and ensure that the job is not scheduled behind another job. If no suitable job flow is `WAITING`, create a new pooled job flow. **WARNING**: do not run this without having :py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job flows left idle can quickly become expensive!
-        :param num_ec2_instances: number of instances to start up. Default is ``1``.
+        :param pool_emr_job_flows: Try to run the job on a ``WAITING`` pooled
+                                   job flow with the same bootstrap
+                                   configuration. Prefer the one with the most
+                                   compute units. Use S3 to "lock" the job flo
+                                   and ensure that the job is not scheduled
+                                   behind another job. If no suitable job flow
+                                   is `WAITING`, create a new pooled job flow.
+                                   **WARNING**: do not run this without having\
+        :py:mod:`mrjob.tools.emr.terminate.idle_job_flows`
+                                   in your crontab; job flows left idle can
+                                   quickly become expensive!
+        :param num_ec2_instances: number of instances to start up. Default is
+                                  ``1``.
         :type s3_endpoint: str
-        :param s3_endpoint: Host to connect to when communicating with S3 (e.g. ``s3-us-west-1.amazonaws.com``). Default is to infer this from *aws_region*.
+        :param s3_endpoint: Host to connect to when communicating with S3 (e.g.
+                            ``s3-us-west-1.amazonaws.com``). Default is to
+                            infer this from *aws_region*.
         :type s3_log_uri: str
-        :param s3_log_uri:  where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for your job flow will go into a subdirectory, e.g. ``s3://yourbucket/logs/j-JOBFLOWID/``. in this example s3://yourbucket/logs/j-YOURJOBID/). Default is to append ``logs/`` to *s3_scratch_uri*.
+        :param s3_log_uri: where on S3 to put logs, for example
+                           ``s3://yourbucket/logs/``. Logs for your job flow
+                           will go into a subdirectory, e.g.
+                           ``s3://yourbucket/logs/j-JOBFLOWID/``. in this
+                           example s3://yourbucket/logs/j-YOURJOBID/). Default
+                           is to append ``logs/`` to *s3_scratch_uri*.
         :type s3_scratch_uri: str
-        :param s3_scratch_uri: S3 directory (URI ending in ``/``) to use as scratch space, e.g. ``s3://yourbucket/tmp/``. Default is ``tmp/mrjob/`` in the first bucket belonging to you.
+        :param s3_scratch_uri: S3 directory (URI ending in ``/``) to use as
+                               scratch space, e.g. ``s3://yourbucket/tmp/``.
+                               Default is ``tmp/mrjob/`` in the first bucket
+                               belonging to you.
         :type s3_sync_wait_time: float
-        :param s3_sync_wait_time: How long to wait for S3 to reach eventual consistency. This is typically less than a second (zero in us-west) but the default is 5.0 to be safe.
+        :param s3_sync_wait_time: How long to wait for S3 to reach eventual
+                                  consistency. This is typically less than a
+                                  second (zero in U.S. West) but the default is
+                                  5.0 to be safe.
         :type ssh_bin: str or list
-        :param ssh_bin: path to the ssh binary; may include switches (e.g. ``'ssh -v'`` or ``['ssh', '-v']``. Defaults to :command:`ssh`
+        :param ssh_bin: path to the ssh binary; may include switches (e.g.
+                        ``'ssh -v'`` or ``['ssh', '-v']``). Defaults to
+                        :command:`ssh`
         :type ssh_bind_ports: list of int
-        :param ssh_bind_ports: a list of ports that are safe to listen on. Defaults to ports ``40001`` thru ``40840``.
+        :param ssh_bind_ports: a list of ports that are safe to listen on.
+                               Defaults to ports ``40001`` thru ``40840``.
         :type ssh_tunnel_to_job_tracker: bool
-        :param ssh_tunnel_to_job_tracker: If True, create an ssh tunnel to the job tracker and listen on a randomly chosen port. This requires you to set *ec2_key_pair* and *ec2_key_pair_file*. See :ref:`ssh-tunneling` for detailed instructions.
+        :param ssh_tunnel_to_job_tracker: If True, create an ssh tunnel to the
+                                          job tracker and listen on a randomly
+                                          chosen port. This requires you to set
+                                          *ec2_key_pair* and
+                                          *ec2_key_pair_file*. See
+                                          :ref:`ssh-tunneling` for detailed
+                                          instructions.
         :type ssh_tunnel_is_open: bool
-        :param ssh_tunnel_is_open: if True, any host can connect to the job tracker through the SSH tunnel you open. Mostly useful if your browser is running on a different machine from your job.
+        :param ssh_tunnel_is_open: if True, any host can connect to the job
+                                   tracker through the SSH tunnel you open.
+                                   Mostly useful if your browser is running on
+                                   a different machine from your job runner.
         """
         super(EMRJobRunner, self).__init__(**kwargs)
 

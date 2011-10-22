@@ -246,7 +246,7 @@ class LocalMRJobRunner(MRJobRunner):
                     (args, returncode, ''.join(tb_lines)))
             else:
                 raise Exception(
-                    'Command %r returned non-zero exit status %d: %s' %
+                    'Command %r returned non-zero exit status %d' %
                     (args, returncode))
 
         # flush file descriptors

@@ -485,7 +485,7 @@ class LocalMRJobRunner(MRJobRunner):
                     (proc['args'], returncode, ''.join(tb_lines)))
             else:
                 raise Exception(
-                    'Command %r returned non-zero exit status %d: %s' %
+                    'Command %r returned non-zero exit status %d' %
                     (proc['args'], returncode))
 
         # flush file descriptors

@@ -53,13 +53,15 @@ HADOOP_STREAMING_OUTPUT_RE = re.compile(r'^(\S+ \S+ \S+ \S+: )?(.*)$')
 HADOOP_FILE_EXISTS_RE = re.compile(r'.*File exists.*')
 
 # used by ls()
-HADOOP_LSR_NO_SUCH_FILE = re.compile(r'^lsr: Cannot access .*: No such file or directory.')
+HADOOP_LSR_NO_SUCH_FILE = re.compile(
+    r'^lsr: Cannot access .*: No such file or directory.')
 
 # used by rm() (see below)
 HADOOP_RMR_NO_SUCH_FILE = re.compile(r'^rmr: hdfs://.*$')
 
 # used to extract the job timestamp from stderr
-HADOOP_JOB_TIMESTAMP_RE = re.compile('Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
+HADOOP_JOB_TIMESTAMP_RE = re.compile(
+    'Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
 
 # find version string in "Hadoop 0.20.203" etc.
 HADOOP_VERSION_RE = re.compile(r'^.*?(?P<version>(\d|\.)+).*?$')
@@ -108,8 +110,8 @@ class HadoopJobRunner(MRJobRunner):
     alias = 'hadoop'
 
     def __init__(self, **kwargs):
-        """:py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments as
-        :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
+        """:py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments
+        as :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
         which can be defaulted in :py:mod:`mrjob.conf`.
 
         *output_dir* and *hdfs_scratch_dir* need not be fully qualified
@@ -119,19 +121,25 @@ class HadoopJobRunner(MRJobRunner):
         Additional options:
 
         :type hadoop_bin: str or list
-        :param hadoop_bin: name/path of your hadoop program (may include arguments). Defaults to *hadoop_home* plus ``bin/hadoop``
+        :param hadoop_bin: name/path of your hadoop program (may include
+                           arguments). Defaults to *hadoop_home* plus
+                           ``bin/hadoop``.
         :type hadoop_home: str
-        :param hadoop_home: alternative to setting :envvar:`HADOOP_HOME` variable.
+        :param hadoop_home: alternative to setting the :envvar:`HADOOP_HOME`
+                            environment variable
         :type hdfs_scratch_dir: str
-        :param hdfs_scratch_dir: temp directory on HDFS. Default is ``tmp/mrjob``
+        :param hdfs_scratch_dir: temp directory on HDFS. Default is
+                                 ``tmp/mrjob``.
 
-        *hadoop_streaming_jar* is optional; by default, we'll search for it inside :envvar:`HADOOP_HOME`
+        *hadoop_streaming_jar* is optional; by default, we'll search for it
+        inside :envvar:`HADOOP_HOME`
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 
         # fix hadoop_home
         if not self._opts['hadoop_home']:
-            raise Exception('you must set $HADOOP_HOME, or pass in hadoop_home explicitly')
+            raise Exception(
+                'you must set $HADOOP_HOME, or pass in hadoop_home explicitly')
         self._opts['hadoop_home'] = os.path.abspath(self._opts['hadoop_home'])
 
         # fix hadoop_bin
@@ -370,7 +378,8 @@ class HadoopJobRunner(MRJobRunner):
                 if compat.supports_combiners_in_hadoop_streaming(version):
                     combiner = combiner_cmd
                 else:
-                    mapper = "bash -c '%s | sort | %s'" % (mapper, combiner_cmd)
+                    mapper = ("bash -c '%s | sort | %s'" %
+                              (mapper, combiner_cmd))
                     combiner = None
             else:
                 combiner = None
@@ -406,16 +415,19 @@ class HadoopJobRunner(MRJobRunner):
                 # printing needs step number relevant to this run of mrjob
                 self.print_counters([step_num+1])
             else:
-                msg = 'Job failed with return code %d: %s' % (step_proc.returncode, streaming_args)
+                msg = ('Job failed with return code %d: %s' %
+                       (step_proc.returncode, streaming_args))
                 log.error(msg)
                 # look for a Python traceback
-                cause = self._find_probable_cause_of_failure([step_num+self._start_step_num])
+                cause = self._find_probable_cause_of_failure(
+                    [step_num + self._start_step_num])
                 if cause:
                     # log cause, and put it in exception
                     cause_msg = []  # lines to log and put in exception
                     cause_msg.append('Probable cause of failure (from %s):' %
                                cause['log_file_uri'])
-                    cause_msg.extend(line.strip('\n') for line in cause['lines'])
+                    cause_msg.extend(line.strip('\n')
+                                     for line in cause['lines'])
                     if cause['input_uri']:
                         cause_msg.append('(while reading from %s)' %
                                          cause['input_uri'])
@@ -495,7 +507,8 @@ class HadoopJobRunner(MRJobRunner):
             # return list of strings ready for comma-joining for passing to the
             # hadoop binary
             def escaped_paths(file_dicts):
-                return ["%s#%s" % (fd['hdfs_uri'], fd['name']) for fd in file_dicts]
+                return ["%s#%s" % (fd['hdfs_uri'], fd['name'])
+                        for fd in file_dicts]
 
             # index by type
             all_files = {}
@@ -599,8 +612,10 @@ class HadoopJobRunner(MRJobRunner):
         for path in paths:
             m = regexp.match(path)
             if (m
-                and (step_nums is None or int(m.group('step_num')) in step_nums)
-                and (self._job_timestamp is None or m.group('timestamp') == self._job_timestamp)):
+                and (step_nums is None or
+                     int(m.group('step_num')) in step_nums)
+                and (self._job_timestamp is None or
+                     m.group('timestamp') == self._job_timestamp)):
                 yield path
 
     def _ls_logs(self, relative_path):
@@ -666,7 +681,8 @@ class HadoopJobRunner(MRJobRunner):
         try:
             return int(stdout.split()[1])
         except (ValueError, TypeError, IndexError):
-            raise Exception('Unexpected output from hadoop fs -du: %r' % stdout)
+            raise Exception(
+                'Unexpected output from hadoop fs -du: %r' % stdout)
 
     def ls(self, path_glob):
         if not is_uri(path_glob):

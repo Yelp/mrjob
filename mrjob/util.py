@@ -47,7 +47,8 @@ def extract_dir_for_tar(archive_path, compression='gz'):
     :type archive_path: str
     :param archive_path: path to archive file
     :type compression: str
-    :param compression: Compression type to use. This can be one of ``''``, ``bz2``, or ``gz``.
+    :param compression: Compression type to use. This can be one of ``''``,
+                        ``bz2``, or ``gz``.
     """
     # Open the file for read-only streaming (no random seeks)
     tar = tarfile.open(archive_path, mode='r|%s' % compression)

@@ -52,6 +52,7 @@ import re
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
 
+
 def encode_document(text, cats=None, id=None):
     """Encode a document as a JSON so that MRTextClassifier can read it.
 
@@ -70,6 +71,7 @@ def encode_document(text, cats=None, id=None):
 
     return JSONValueProtocol.write(
         None, {'text': text, 'cats': cats, 'id': id}) + '\n'
+
 
 def count_ngrams(text, max_ngram_size, stop_words):
     """Break text down into ngrams, and return a dictionary mapping
@@ -96,20 +98,33 @@ def count_ngrams(text, max_ngram_size, stop_words):
     for i in range(len(words)):
         for n in range(1, max_ngram_size + 1):
             if i + n <= len(words):
-                ngram = ' '.join(words[i:i+n])
+                ngram = ' '.join(words[i:i + n])
                 ngram_counts[(n, ngram)] += 1
 
     # add counts for ANY ngram
     for n in range(1, max_ngram_size + 1):
-        ngram_counts[(n, None)] = len(words)-n+1
+        ngram_counts[(n, None)] = len(words) - n + 1
 
     return ngram_counts
+
 
 WORD_RE = re.compile(r"[\w']+", re.UNICODE)
 
 DEFAULT_MAX_NGRAM_SIZE = 4
 
-DEFAULT_STOP_WORDS = ['a', 'about', 'also', 'am', 'an', 'and', 'any', 'are', 'as', 'at', 'be', 'but', 'by', 'can', 'com', 'did', 'do', 'does', 'for', 'from', 'had', 'has', 'have', 'he', "he'd", "he'll", "he's", 'her', 'here', 'hers', 'him', 'his', 'i', "i'd", "i'll", "i'm", "i've", 'if', 'in', 'into', 'is', 'it', "it's", 'its', 'just', 'me', 'mine', 'my', 'of', 'on', 'or', 'org', 'our', 'ours', 'she', "she'd", "she'll", "she's", 'some', 'than', 'that', 'the', 'their', 'them', 'then', 'there', 'these', 'they', "they'd", "they'll", "they're", 'this', 'those', 'to', 'us', 'was', 'we', "we'd", "we'll", "we're", 'were', 'what', 'where', 'which', 'who', 'will', 'with', 'would', 'you', 'your', 'yours']
+DEFAULT_STOP_WORDS = [
+    'a', 'about', 'also', 'am', 'an', 'and', 'any', 'are', 'as', 'at', 'be',
+    'but', 'by', 'can', 'com', 'did', 'do', 'does', 'for', 'from', 'had',
+    'has', 'have', 'he', "he'd", "he'll", "he's", 'her', 'here', 'hers',
+    'him', 'his', 'i', "i'd", "i'll", "i'm", "i've", 'if', 'in', 'into', 'is',
+    'it', "it's", 'its', 'just', 'me', 'mine', 'my', 'of', 'on', 'or', 'org',
+    'our', 'ours', 'she', "she'd", "she'll", "she's", 'some', 'than', 'that',
+    'the', 'their', 'them', 'then', 'there', 'these', 'they', "they'd",
+    "they'll", "they're", 'this', 'those', 'to', 'us', 'was', 'we', "we'd",
+    "we'll", "we're", 'were', 'what', 'where', 'which', 'who', 'will', 'with',
+    'would', 'you', 'your', 'yours',
+]
+
 
 class MRTextClassifier(MRJob):
     INPUT_PROTOCOL = JSONValueProtocol
@@ -140,10 +155,13 @@ class MRTextClassifier(MRJob):
 
         self.add_passthrough_option(
             '--min-df', dest='min_df', default=2, type='int',
-            help='min number of documents an n-gram must appear in for us to count it. Default: %default')
+            help=('min number of documents an n-gram must appear in for us to'
+                  ' count it. Default: %default'))
         self.add_passthrough_option(
             '--max-df', dest='max_df', default=10000000, type='int',
-            help='max number of documents an n-gram may appear in for us to count it (this keeps reducers from running out of memory). Default: %default')
+            help=('max number of documents an n-gram may appear in for us to'
+                  ' count it (this keeps reducers from running out of memory).'
+                  ' Default: %default'))
         self.add_passthrough_option(
             '--max-ngram-size', dest='max_ngram_size',
             default=DEFAULT_MAX_NGRAM_SIZE, type='int',
@@ -151,15 +169,22 @@ class MRTextClassifier(MRJob):
         self.add_passthrough_option(
             '--stop-words', dest='stop_words',
             default=', '.join(DEFAULT_STOP_WORDS),
-            help="comma-separated list of words to ignore. For example, --stop-words 'in, the' would cause 'hole in the wall' to be parsed as ['hole', 'wall']. Default: %default")
+            help=("comma-separated list of words to ignore. For example, "
+                  "--stop-words 'in, the' would cause 'hole in the wall' to be"
+                  " parsed as ['hole', 'wall']. Default: %default"))
         self.add_passthrough_option(
             '--short-doc-threshold', dest='short_doc_threshold',
             type='int', default=None,
-            help='Normally, for each n-gram size, we take the average score over all n-grams that appear. This allows us to penalize short documents by using this threshold as the denominator rather than the actual number of n-grams.')
+            help=('Normally, for each n-gram size, we take the average score'
+                  ' over all n-grams that appear. This allows us to penalize'
+                  ' short documents by using this threshold as the denominator'
+                  ' rather than the actual number of n-grams.'))
         self.add_passthrough_option(
             '--no-test-set', dest='no_test_set',
             action='store_true', default=False,
-            help="Choose about half of the documents to be the testing set (don't use them to train the classifier) based on a SHA1 hash of their text")
+            help=("Choose about half of the documents to be the testing set"
+                  " (don't use them to train the classifier) based on a SHA1"
+                  " hash of their text"))
 
     def load_options(self, args):
         """Parse stop_words option."""
@@ -359,13 +384,13 @@ class MRTextClassifier(MRJob):
                 tf = cat_to_tf.get(cat) or 0
                 # use Laplace's rule of succession to estimate p. See:
                 # http://en.wikipedia.org/wiki/Rule_of_succession#Generalization_to_any_number_of_possibilities
-                cat_to_p[cat] = (tf + (2.0/m))/(t+2)
+                cat_to_p[cat] = (tf + (2.0 / m)) / (t + 2)
 
             cats = set(cat for cat, in_cat in cat_to_t)
             cat_to_score = {}
             for cat in cats:
-                p_if_in = cat_to_p.get((cat, True), 1.0/m)
-                p_if_out = cat_to_p.get((cat, False), 1.0/m)
+                p_if_in = cat_to_p.get((cat, True), 1.0 / m)
+                p_if_out = cat_to_p.get((cat, False), 1.0 / m)
                 # take the log difference of probabilities
                 score = math.log(p_if_in) - math.log(p_if_out)
                 cat_to_score[cat] = score
@@ -517,4 +542,3 @@ class MRTextClassifier(MRJob):
 
 if __name__ == '__main__':
     MRTextClassifier.run()
-

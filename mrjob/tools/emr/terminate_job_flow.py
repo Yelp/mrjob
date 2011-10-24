@@ -39,6 +39,7 @@ from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.terminate_job_flow')
 
+
 def main():
     # parser command-line args
     option_parser = make_option_parser()
@@ -57,6 +58,7 @@ def main():
     log.debug('Terminating job flow %s' % emr_job_flow_id)
     runner.make_emr_conn().terminate_jobflow(emr_job_flow_id)
     log.info('Terminated job flow %s' % emr_job_flow_id)
+
 
 def make_option_parser():
     usage = '%prog [options] jobflowid'
@@ -78,6 +80,7 @@ def make_option_parser():
         help="Don't load mrjob.conf even if it's available")
 
     return option_parser
+
 
 if __name__ == '__main__':
     main()

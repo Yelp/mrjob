@@ -18,7 +18,9 @@ Usage::
 
     python -m mrjob.tools.emr.create_job_flow
 
-**WARNING**: do not run this without having :py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job flows left idle can quickly become expensive!
+**WARNING**: do not run this without having
+:py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job flows
+left idle can quickly become expensive!
 """
 from __future__ import with_statement
 
@@ -55,7 +57,10 @@ def main():
 
 def make_option_parser():
     usage = '%prog [options]'
-    description = 'Create a persistent EMR job flow to run jobs in. WARNING: do not run this without mrjob.tools.emr.terminate.idle_job_flows in your crontab; job flows left idle can quickly become expensive!'
+    description = (
+        'Create a persistent EMR job flow to run jobs in. WARNING: do not run'
+        ' this without mrjob.tools.emr.terminate.idle_job_flows in your'
+        ' crontab; job flows left idle can quickly become expensive!')
     option_parser = OptionParser(usage=usage, description=description)
 
     def make_option_group(halp):
@@ -64,8 +69,12 @@ def make_option_parser():
         return g
 
     runner_group = make_option_group('Running the entire job')
-    hadoop_emr_opt_group = make_option_group('Running on Hadoop or EMR (these apply when you set -r hadoop or -r emr)')
-    emr_opt_group = make_option_group('Running on Amazon Elastic MapReduce (these apply when you set -r emr)')
+    hadoop_emr_opt_group = make_option_group(
+        'Running on Hadoop or EMR (these apply when you set -r hadoop or -r'
+        ' emr)')
+    emr_opt_group = make_option_group(
+        'Running on Amazon Elastic MapReduce (these apply when you set -r'
+        ' emr)')
 
     assignments = {
         runner_group: (

@@ -47,6 +47,7 @@ from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.audit_emr_usage')
 
+
 def main():
     # parser command-line args
     option_parser = make_option_parser()
@@ -62,6 +63,7 @@ def main():
     log_to_stream(name='boto', level=logging.CRITICAL)
 
     print_report(options)
+
 
 def make_option_parser():
     usage = '%prog [options]'
@@ -81,8 +83,10 @@ def make_option_parser():
         help="Don't load mrjob.conf even if it's available")
     option_parser.add_option(
         '--max-days-ago', dest='max_days_ago', type='float', default=None,
-        help='Max number of days ago to look at jobs. By default, we go back as far as EMR supports (currently about 2 months)')
+        help=('Max number of days ago to look at jobs. By default, we go back'
+              ' as far as EMR supports (currently about 2 months)'))
     return option_parser
+
 
 def print_report(options):
 
@@ -134,11 +138,11 @@ def print_report(options):
         # mr_word_freq_count.dave.20101103.121249.638552
         match = JOB_NAME_RE.match(jf.name)
         if match:
-            job_flow_info['mr_job_name'] = match.group(1)
+            job_flow_info['job_name'] = match.group(1)
             job_flow_info['user'] = match.group(2)
         else:
             # not run by mrjob
-            job_flow_info['mr_job_name'] = None
+            job_flow_info['job_name'] = None
             job_flow_info['user'] = None
 
         job_flow_infos.append(job_flow_info)
@@ -155,7 +159,6 @@ def print_report(options):
 
     print '* All times are in UTC.'
     print
-
 
     print 'Min create time: %s' % earliest
     print 'Max create time: %s' % latest
@@ -194,9 +197,9 @@ def print_report(options):
         d -= datetime.timedelta(days=1)
     print
 
-    def fmt(mr_job_name_or_user):
-        if mr_job_name_or_user:
-            return mr_job_name_or_user
+    def fmt(job_name_or_user):
+        if job_name_or_user:
+            return job_name_or_user
         else:
             return '(not started by mrjob)'
 
@@ -206,21 +209,21 @@ def print_report(options):
 
     # Top jobs
     print 'Top jobs, by total usage:'
-    mr_job_name_to_hours = defaultdict(float)
+    job_name_to_hours = defaultdict(float)
     for info in job_flow_infos:
-        mr_job_name_to_hours[info['mr_job_name']] += info['hours']
-    for mr_job_name, hours in sorted(mr_job_name_to_hours.iteritems(),
+        job_name_to_hours[info['job_name']] += info['hours']
+    for job_name, hours in sorted(job_name_to_hours.iteritems(),
                                      key=lambda (n, h): (-h, n)):
-        print '  %6d %s' % (hours, fmt(mr_job_name))
+        print '  %6d %s' % (hours, fmt(job_name))
     print
 
     print 'Top jobs, by time billed but not used:'
-    mr_job_name_to_hours_bbnu = defaultdict(float)
+    job_name_to_hours_bbnu = defaultdict(float)
     for info in job_flow_infos:
-        mr_job_name_to_hours_bbnu[info['mr_job_name']] += info['hours_bbnu']
-    for mr_job_name, hours_bbnu in sorted(mr_job_name_to_hours_bbnu.iteritems(),
+        job_name_to_hours_bbnu[info['job_name']] += info['hours_bbnu']
+    for job_name, hours_bbnu in sorted(job_name_to_hours_bbnu.iteritems(),
                                      key=lambda (n, h): (-h, n)):
-        print '  %9.2f %s' % (hours_bbnu, fmt(mr_job_name))
+        print '  %9.2f %s' % (hours_bbnu, fmt(job_name))
     print
 
     # Top users
@@ -260,7 +263,8 @@ def print_report(options):
 
     print 'Details for all job flows:'
     print
-    print ' id              state         created             steps        time ran  usage     waste   user   name'
+    print (' id              state         created             steps'
+           '        time ran  usage     waste   user   name')
 
     all_job_flows = sorted(job_flow_infos, key=lambda i: i['created'],
                            reverse=True)
@@ -269,6 +273,7 @@ def print_report(options):
             info['id'], info['state'], info['created'], info['num_steps'],
             info['ran'], info['hours'], info['hours_bbnu'],
             (info['user'] or ''), fmt(info['mr_job_name']))
+
 
 def estimate_proportion_billed_but_not_used(job_flow):
     """Estimate what proportion of time that a job flow was billed for
@@ -323,15 +328,20 @@ def estimate_proportion_billed_but_not_used(job_flow):
 
         return (hours_billed - hours_used) / hours_billed
 
+
 def to_timestamp(iso8601_time):
-    if iso8601_time is None: return None
+    if iso8601_time is None:
+        return None
+
     return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
 
+
 def to_datetime(iso8601_time):
-    if iso8601_time is None: return None
+    if iso8601_time is None:
+        return None
+
     return datetime.datetime.strptime(iso8601_time, boto.utils.ISO8601)
+
 
 if __name__ == '__main__':
     main()
-
-

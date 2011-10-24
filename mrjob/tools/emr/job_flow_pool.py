@@ -47,9 +47,11 @@ def get_pools(emr_conn):
 
 
 def pprint_job_flow(jf):
-    """Print a job flow to stdout in this form:
-    job.flow.name
-    j-JOB_FLOW_ID: 2 instances (master=m1.small, slaves=m1.small, 20 minutes to the hour)
+    """Print a job flow to stdout in this form::
+
+        job.flow.name
+        j-JOB_FLOW_ID: 2 instances (master=m1.small, slaves=m1.small, 20 \
+minutes to the hour)
     """
     instance_count = int(jf.instancecount)
 
@@ -83,9 +85,9 @@ def pprint_job_flow(jf):
 def pprint_pools(runner):
     pools = get_pools(runner.make_emr_conn())
     for pool_name, job_flows in pools.iteritems():
-        print '-'*len(pool_name)
+        print '-' * len(pool_name)
         print pool_name
-        print '-'*len(pool_name)
+        print '-' * len(pool_name)
         for job_flow in job_flows:
             pprint_job_flow(job_flow)
 
@@ -100,9 +102,12 @@ def terminate(runner, pool_name):
     except KeyError:
         print 'No job flows match pool name "%s"' % pool_name
 
+
 def main():
     usage = '%prog [options]'
-    description = 'Inspect available job flow pools or identify job flows suitable for running a job with the specified options.'
+    description = (
+        'Inspect available job flow pools or identify job flows suitable for'
+        ' running a job with the specified options.')
     option_parser = OptionParser(usage=usage, description=description)
 
     import boto.emr.connection
@@ -118,27 +123,51 @@ def main():
     job_opt_group = make_option_group('Job flow configuration')
 
     assignments = {
-        option_parser: ('conf_path', 'quiet', 'verbose', 'emr_job_flow_pool_name'),
-        ec2_opt_group: ('ec2_instance_type', 'ec2_master_instance_type',
-                        'ec2_slave_instance_type', 'num_ec2_instances',
-                        'aws_availability_zone',
-                        'ec2_key_pair', 'ec2_key_pair_file',
-                        'emr_endpoint',),
-        hadoop_opt_group: ('hadoop_version', 'label', 'owner'),
-        job_opt_group: ('bootstrap_actions', 'bootstrap_mrjob', 'bootstrap_cmds',
-                        'bootstrap_files', 'bootstrap_python_packages',),
+        option_parser: (
+            'conf_path',
+            'emr_job_flow_pool_name',
+            'quiet',
+            'verbose',
+        ),
+        ec2_opt_group: (
+            'aws_availability_zone',
+            'ec2_instance_type',
+            'ec2_key_pair',
+            'ec2_key_pair_file',
+            'ec2_master_instance_type',
+            'ec2_slave_instance_type',
+            'emr_endpoint',
+            'num_ec2_instances',
+        ),
+        hadoop_opt_group: (
+            'hadoop_version',
+            'label',
+            'owner',
+        ),
+        job_opt_group: (
+            'bootstrap_actions',
+            'bootstrap_cmds',
+            'bootstrap_files',
+            'bootstrap_mrjob',
+            'bootstrap_python_packages',
+        ),
     }
 
     option_parser.add_option('-a', '--all', action='store_true',
                              default=False, dest='list_all',
-                             help='List all available job flows without filtering by configuration')
+                             help=('List all available job flows without'
+                                   ' filtering by configuration'))
     option_parser.add_option('-f', '--find', action='store_true',
                              default=False, dest='find',
-                             help='Find a job flow matching the pool name, bootstrap configuration, and instance number/type as specified on the command line and in the configuration files')
+                             help=('Find a job flow matching the pool name,'
+                                   ' bootstrap configuration, and instance'
+                                   ' number/type as specified on the command'
+                                   ' line and in the configuration files'))
     option_parser.add_option('-t', '--terminate', action='store',
                              default=None, dest='terminate',
                              metavar='JOB_FLOW_ID',
-                             help='Terminate all job flows in the given pool (defaults to pool "default")')
+                             help=('Terminate all job flows in the given pool'
+                                   ' (defaults to pool "default")'))
 
     # Scrape options from MRJob and index them by dest
     mr_job = MRJob()

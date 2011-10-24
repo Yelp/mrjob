@@ -17,7 +17,8 @@ message or for inspecting jobs whose output has been lost.
 
 Usage::
 
-    python -m mrjob.tools.emr.fetch_logs -[l|L|a|A|--counters] [-s STEP_NUM] JOB_FLOW_ID
+    python -m mrjob.tools.emr.fetch_logs -[l|L|a|A|--counters] [-s STEP_NUM]\
+ JOB_FLOW_ID
 
 Options::
 
@@ -59,12 +60,18 @@ from mrjob.util import log_to_stream
 
 def main():
     usage = 'usage: %prog [options] JOB_FLOW_ID'
-    description = 'List, display, and parse Hadoop logs associated with EMR job flows. Useful for debugging failed jobs for which mrjob did not display a useful error message or for inspecting jobs whose output has been lost.'
-    option_parser = OptionParser(usage=usage,description=description)
+    description = (
+        'List, display, and parse Hadoop logs associated with EMR job flows.'
+        ' Useful for debugging failed jobs for which mrjob did not display a'
+        ' useful error message or for inspecting jobs whose output has been'
+        ' lost.')
+
+    option_parser = OptionParser(usage=usage, description=description)
 
     option_parser.add_option('-f', '--find-failure', dest='find_failure',
                              action='store_true', default=False,
-                             help='Search the logs for information about why the job failed')
+                             help=('Search the logs for information about why'
+                                   ' the job failed'))
     option_parser.add_option('-l', '--list', dest='list_relevant',
                              action="store_true", default=False,
                              help='List log files MRJob finds relevant')
@@ -83,7 +90,8 @@ def main():
 
     option_parser.add_option('-s', '--step-num', dest='step_num',
                              action='store', type='int', default=None,
-                             help='Limit results to a single step. To be used with --list and --cat.')
+                             help=('Limit results to a single step. To be used'
+                                   ' with --list and --cat.'))
     option_parser.add_option('--counters', dest='get_counters',
                              action='store_true', default=False,
                              help='Show counters from the job flow')
@@ -132,7 +140,8 @@ def main():
         if options.get_counters:
             desc = runner._describe_jobflow()
             runner._set_s3_job_log_uri(desc)
-            runner._fetch_counters(range(1, len(desc.steps)+1), skip_s3_wait=True)
+            runner._fetch_counters(
+                xrange(1, len(desc.steps) + 1), skip_s3_wait=True)
             runner.print_counters()
 
         if options.find_failure:
@@ -236,7 +245,7 @@ def find_failure(runner, step_num):
         step_nums = [step_num]
     else:
         job_flow = runner._describe_jobflow()
-        step_nums = range(1, len(job_flow.steps)+1)
+        step_nums = range(1, len(job_flow.steps) + 1)
 
     cause = runner._find_probable_cause_of_failure(step_nums)
     if cause:

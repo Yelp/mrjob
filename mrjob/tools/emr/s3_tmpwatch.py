@@ -19,7 +19,8 @@ h for hours, d for days.  If no suffix is specified, time is in hours.
 
 Suggested usage: run this as a cron job with the -q option::
 
-    0 0 * * * python -m mrjob.tools.emr.s3_tmpwatch -q 30d s3://your-bucket/tmp/
+    0 0 * * * python -m mrjob.tools.emr.s3_tmpwatch -q 30d \
+s3://your-bucket/tmp/
 
 Usage::
 
@@ -87,7 +88,8 @@ def s3_cleanup(glob_path, time_old, dry_run=False, conf_path=None):
     runner = EMRJobRunner(conf_path=conf_path)
     s3_conn = runner.make_s3_conn()
 
-    log.info('Deleting all files in %s that are older than %s' % (glob_path, time_old))
+    log.info('Deleting all files in %s that are older than %s' %
+             (glob_path, time_old))
 
     for path in runner.ls(glob_path):
         bucket_name, key_name = parse_s3_uri(path)
@@ -116,7 +118,13 @@ def process_time(time):
 
 def make_option_parser():
     usage = '%prog [options] <time-untouched> <URIs>'
-    description = 'Delete all files in a given URI that are older than a specified time.\n\nThe time parameter defines the threshold for removing files. If the file has not been accessed for *time*, the  file is removed. The time argument is a number with an optional single-character suffix specifying the units: m for minutes, h for hours, d for days.  If no suffix is specified, time is in hours.'
+    description = (
+        'Delete all files in a given URI that are older than a specified'
+        ' time.\n\nThe time parameter defines the threshold for removing'
+        ' files. If the file has not been accessed for *time*, the file is'
+        ' removed. The time argument is a number with an optional'
+        ' single-character suffix specifying the units: m for minutes, h for'
+        ' hours, d for days.  If no suffix is specified, time is in hours.')
     option_parser = OptionParser(usage=usage, description=description)
     option_parser.add_option(
         '-v', '--verbose', dest='verbose', default=False,
@@ -142,4 +150,3 @@ def make_option_parser():
 
 if __name__ == '__main__':
     main()
-

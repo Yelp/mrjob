@@ -41,11 +41,7 @@ Options::
 """
 from __future__ import with_statement
 
-import functools
 from optparse import OptionParser
-from optparse import OptionValueError
-import os
-import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import LogFetchException

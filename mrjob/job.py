@@ -97,7 +97,6 @@ See :py:mod:`mrjob.examples` for more examples.
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
-from copy import copy
 import inspect
 import itertools
 import logging
@@ -105,7 +104,6 @@ from optparse import Option
 from optparse import OptionParser
 from optparse import OptionGroup
 from optparse import OptionError
-from optparse import OptionValueError
 import sys
 import time
 

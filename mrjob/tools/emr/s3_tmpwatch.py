@@ -42,7 +42,6 @@ from datetime import datetime
 from datetime import timedelta
 import logging
 from optparse import OptionParser
-import re
 
 try:
     import boto.utils

@@ -38,7 +38,6 @@ from datetime import datetime
 from datetime import timedelta
 import logging
 from optparse import OptionParser
-import posixpath
 import re
 
 try:
@@ -48,7 +47,6 @@ except ImportError:
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
-from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')

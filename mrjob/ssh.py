@@ -18,7 +18,6 @@
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
-from collections import defaultdict
 import os
 import re
 from subprocess import Popen

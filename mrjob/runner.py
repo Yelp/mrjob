@@ -15,12 +15,10 @@ from __future__ import with_statement
 
 """Base class for all runners."""
 
-import bz2
 import copy
 import datetime
 import getpass
 import glob
-import gzip
 import hashlib
 import logging
 import os
@@ -39,7 +37,6 @@ except ImportError:
 
 from mrjob import compat
 from mrjob.conf import combine_cmds
-from mrjob.conf import combine_cmd_lists
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
 from mrjob.conf import combine_local_envs

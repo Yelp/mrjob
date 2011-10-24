@@ -137,8 +137,8 @@ def parse_key_value_list(kv_string_list, error_fmt, error_func):
         try:
             k, v = value.split('=', 1)
             ret[k] = v
-        except ValueError, e:
-            error_func(error_fmt % value)
+        except ValueError:
+            error_func(error_fmt % (value,))
     return ret
 
 

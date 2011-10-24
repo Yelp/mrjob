@@ -18,10 +18,8 @@ from __future__ import with_statement
 
 __author__ = 'Matthew Tai <mtai@adku.com>'
 
-from collections import defaultdict
 import logging
 import os
-import pprint
 import shutil
 import subprocess
 import sys
@@ -35,7 +33,6 @@ from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
 from mrjob.runner import MRJobRunner
 from mrjob.job import MRJob
-from mrjob.util import read_file
 from mrjob.util import save_current_environment
 
 log = logging.getLogger('mrjob.inline')

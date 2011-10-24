@@ -19,7 +19,6 @@ from collections import defaultdict
 import itertools
 import logging
 import os
-import pprint
 import re
 import shutil
 import stat

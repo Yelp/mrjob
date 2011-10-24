@@ -33,7 +33,6 @@ from mrjob.conf import combine_paths
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
 from mrjob.logparsers import HADOOP_JOB_LOG_URI_RE
-from mrjob.logparsers import NODE_LOG_URI_RE
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import scan_logs_in_order
 from mrjob.parse import HADOOP_STREAMING_JAR_RE

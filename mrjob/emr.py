@@ -19,7 +19,6 @@ import logging
 import math
 import os
 import posixpath
-import pprint
 import random
 import re
 import shlex
@@ -1655,7 +1654,7 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['ec2_key_pair_file']:
             try:
                 new_counters = self._fetch_counters_ssh(step_nums)
-            except LogFetchException, e:
+            except LogFetchException:
                 new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
             except IOError:
                 # Can get 'file not found' if test suite was lazy or Hadoop
@@ -1717,7 +1716,7 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['ec2_key_pair_file']:
             try:
                 return self._find_probable_cause_of_failure_ssh(step_nums)
-            except LogFetchException, e:
+            except LogFetchException:
                 return self._find_probable_cause_of_failure_s3(step_nums)
         else:
             log.info('ec2_key_pair_file not specified, going to S3')
@@ -1929,7 +1928,6 @@ class EMRJobRunner(MRJobRunner):
         exclude = exclude or set()
 
         all_job_flows = emr_conn.describe_jobflows()
-        jf_args = self._job_flow_args(persistent=True)
 
         pool_arg = self._pool_arg()
 

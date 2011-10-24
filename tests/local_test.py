@@ -28,6 +28,7 @@ from testify import assert_in
 from testify import assert_equal
 from testify import assert_not_equal
 from testify import assert_not_in
+from testify import assert_not_reached
 from testify import setup
 from testify import teardown
 import tempfile
@@ -36,6 +37,7 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import cmd_line
 from tests.mr_counting_job import MRCountingJob
+from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_test_jobconf import MRJobConfTest
 from tests.mr_test_jobconf_old import MRJobConfTestOld
@@ -264,6 +266,21 @@ class LargeAmountsOfStderrTestCase(TestCase):
             assert_in('BOOM', repr(e))
         else:
             raise AssertionError()
+
+
+class ExitWithoutExceptionTestCase(TestCase):
+
+    def test_exit_42_job(self):
+        mr_job = MRExit42Job(['--no-conf'])
+        mr_job.sandbox()
+
+        try:
+            mr_job.run_job()
+        except Exception, e:
+            assert_in('returned non-zero exit status 42', repr(e))
+            return
+
+        assert_not_reached()
 
 
 class PythonBinTestCase(TestCase):

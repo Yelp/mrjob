@@ -337,7 +337,7 @@ class HadoopJobRunner(MRJobRunner):
         version = self.get_hadoop_version()
 
         for step_num, step in enumerate(steps):
-            log.debug('running step %d of %d' % (step_num+1, len(steps)))
+            log.debug('running step %d of %d' % (step_num + 1, len(steps)))
 
             streaming_args = (self._opts['hadoop_bin'] +
                               ['jar', self._opts['hadoop_streaming_jar']])
@@ -411,9 +411,9 @@ class HadoopJobRunner(MRJobRunner):
             returncode = step_proc.wait()
             if returncode == 0:
                 # parsing needs step number for whole job
-                self._fetch_counters([step_num+self._start_step_num])
+                self._fetch_counters([step_num + self._start_step_num])
                 # printing needs step number relevant to this run of mrjob
-                self.print_counters([step_num+1])
+                self.print_counters([step_num + 1])
             else:
                 msg = ('Job failed with return code %d: %s' %
                        (step_proc.returncode, streaming_args))
@@ -467,7 +467,7 @@ class HadoopJobRunner(MRJobRunner):
             return self._output_dir
         else:
             return posixpath.join(
-                self._hdfs_tmp_dir, 'step-output', str(step_num+1))
+                self._hdfs_tmp_dir, 'step-output', str(step_num + 1))
 
     def _script_args(self):
         """How to invoke the script inside Hadoop"""
@@ -751,7 +751,7 @@ class HadoopJobRunner(MRJobRunner):
             return super(HadoopJobRunner, self).path_exists(path_glob)
 
         return bool(self._invoke_hadoop(['fs', '-test', '-e', path_glob],
-                                        ok_returncodes=(0,1)))
+                                        ok_returncodes=(0, 1)))
 
     def path_join(self, dirname, filename):
         if is_uri(dirname):
@@ -781,8 +781,3 @@ class HadoopJobRunner(MRJobRunner):
             super(HadoopJobRunner, self).touchz(dest)
 
         self._invoke_hadoop(['fs', '-touchz', dest])
-
-
-
-
-

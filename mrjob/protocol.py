@@ -106,6 +106,7 @@ class _ClassBasedKeyCachingProtocol(object):
         return '%s\t%s' % (cls.dump_to_string(key),
                            cls.dump_to_string(value))
 
+
 class JSONProtocol(_ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two JSONs separated by a tab.
 
@@ -120,6 +121,7 @@ class JSONProtocol(_ClassBasedKeyCachingProtocol):
     def dump_to_string(cls, value):
         return json.dumps(value)
 
+
 class JSONValueProtocol(object):
     """Encode ``value`` as a JSON and discard ``key``
     (``key`` is read in as ``None``).
@@ -131,6 +133,7 @@ class JSONValueProtocol(object):
     @classmethod
     def write(cls, key, value):
         return json.dumps(value)
+
 
 class PickleProtocol(_ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two string-escaped pickles separated
@@ -151,6 +154,7 @@ class PickleProtocol(_ClassBasedKeyCachingProtocol):
     def dump_to_string(cls, value):
         return cPickle.dumps(value).encode('string_escape')
 
+
 class PickleValueProtocol(object):
     """Encode ``value`` as a string-escaped pickle and discard ``key``
     (``key`` is read in as ``None``).
@@ -162,6 +166,7 @@ class PickleValueProtocol(object):
     @classmethod
     def write(cls, key, value):
         return cPickle.dumps(value).encode('string_escape')
+
 
 class RawValueProtocol(object):
     """Read in a line as ``(None, line)``. Write out ``(key, value)``
@@ -177,6 +182,7 @@ class RawValueProtocol(object):
     def write(cls, key, value):
         return value
 
+
 class ReprProtocol(_ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two reprs separated by a tab.
 
@@ -190,6 +196,7 @@ class ReprProtocol(_ClassBasedKeyCachingProtocol):
     @classmethod
     def dump_to_string(cls, value):
         return repr(value)
+
 
 class ReprValueProtocol(object):
     """Encode ``value`` as a repr and discard ``key`` (``key`` is read

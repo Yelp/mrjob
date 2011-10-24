@@ -89,7 +89,6 @@ def urlparse(*args, **kwargs):
 
 ### OPTION PARSING ###
 
-
 def check_kv_pair(option, opt, value):
     items = value.split('=', 1)
     if len(items) == 2:
@@ -115,10 +114,11 @@ def parse_port_range_list(range_list_str):
     for range_str in range_list_str.split(','):
         if ':' in range_str:
             a, b = [int(x) for x in range_str.split(':')]
-            all_ranges.extend(range(a, b+1))
+            all_ranges.extend(xrange(a, b + 1))
         else:
             all_ranges.append(int(range_str))
     return all_ranges
+
 
 def parse_key_value_list(kv_string_list, error_fmt, error_func):
     """Parse a list of strings like ``KEY=VALUE`` into a dictionary.
@@ -146,6 +146,7 @@ def parse_key_value_list(kv_string_list, error_fmt, error_func):
 
 
 _HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.(){}[\]"\\])')
+
 
 def counter_unescape(escaped_string):
     """Fix names of counters and groups emitted by Hadoop 0.20+ logs, which
@@ -246,7 +247,9 @@ def find_hadoop_java_stack_trace(lines):
     else:
         return None
 
+
 _OPENING_FOR_READING_RE = re.compile("^.*: Opening '(.*)' for reading$")
+
 
 def find_input_uri_for_mapper(lines):
     """Scan a log file or other iterable for the path of an input file
@@ -271,6 +274,7 @@ _HADOOP_STREAMING_ERROR_RE = re.compile(
     r'^.*ERROR org\.apache\.hadoop\.streaming\.StreamJob \(main\): (.*)$')
 _HADOOP_STREAMING_ERROR_RE_2 = re.compile(r'^(.*does not exist.*)$')
 
+
 def find_interesting_hadoop_streaming_error(lines):
     """Scan a log file or other iterable for a hadoop streaming error
     other than "Job not Successful!". Return the error as a string, or None
@@ -294,6 +298,7 @@ def find_interesting_hadoop_streaming_error(lines):
 
 _MULTILINE_JOB_LOG_ERROR_RE = re.compile(
     r'^\w+Attempt.*?TASK_STATUS="FAILED".*?ERROR="(?P<first_line>[^"]*)$')
+
 
 def find_job_log_multiline_error(lines):
     """Scan a log file for an arbitrary multi-line error. Return it as a list
@@ -321,10 +326,11 @@ def find_job_log_multiline_error(lines):
             ... 10 more
         "
 
-    The first line returned will only include the text after ``ERROR="``.
+    The first line returned will only include the text after ``ERROR="``, and
+    discard the final line with just ``"``.
 
     These errors are parsed from jobs/\*.jar.
-    """  #"
+    """
     for line in lines:
         m = _MULTILINE_JOB_LOG_ERROR_RE.match(line)
         if m:
@@ -344,6 +350,7 @@ def find_job_log_multiline_error(lines):
 _TIMEOUT_ERROR_RE = re.compile(
     r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+)'
     r' seconds.*?"')
+
 
 def find_timeout_error(lines):
     """Scan a log file or other iterable for a timeout error from Hadoop.
@@ -370,6 +377,7 @@ def find_timeout_error(lines):
 # recognize hadoop streaming output
 _COUNTER_RE = re.compile(r'reporter:counter:([^,]*),([^,]*),(-?\d+)$')
 _STATUS_RE = re.compile(r'reporter:status:(.*)$')
+
 
 def parse_mr_job_stderr(stderr, counters=None):
     """Parse counters and status messages out of MRJob output.
@@ -460,6 +468,7 @@ _0_20_EXPR = r'{\(%s\)\(%s\)(%s)*' % (r'.*?',
                                       r'.*?',
                                       _COUNTER_0_20_EXPR)
 _COUNTER_FORMAT_IS_0_20 = re.compile(_0_20_EXPR)
+
 
 def _parse_counters_0_18(counter_string):
     # 0.18 counters look like this:

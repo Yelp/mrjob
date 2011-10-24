@@ -131,9 +131,11 @@ from mrjob.util import read_input
 
 log = logging.getLogger('mrjob.job')
 
+
 # used by mr() below, to fake no mapper
 def _IDENTITY_MAPPER(key, value):
     yield key, value
+
 
 # sentinel value; used when running MRJob as a script
 _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
@@ -154,7 +156,7 @@ class MRJob(object):
 
     #: :py:class:`optparse.Option` subclass to use with the
     #: :py:class:`optparse.OptionParser` instance.
-    OPTION_CLASS=Option
+    OPTION_CLASS = Option
 
     def __init__(self, args=None):
         """Entry point for running your job from other Python code.
@@ -194,9 +196,12 @@ class MRJob(object):
             # raise an exception on error rather than printing to stderr
             # and exiting.
             self._cl_args = args or []
+
             def error(msg):
                 raise ValueError(msg)
+
             self.option_parser.error = error
+
         self.load_options(self._cl_args)
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
@@ -916,7 +921,6 @@ class MRJob(object):
             action='store_true', help='If something violates an input/output '
             'protocol then raise an exception')
 
-
         # options for running the entire job
         self.runner_opt_group = OptionGroup(
             self.option_parser, 'Running the entire job')
@@ -1320,10 +1324,10 @@ class MRJob(object):
         If you want to pass files through to the mapper/reducer, use
         :py:meth:`add_file_option` instead.
         """
-        if not kwargs.has_key('opt_group'):
-            pass_opt = self.option_parser.add_option(*args, **kwargs)
-        else:
+        if 'opt_group' in kwargs:
             pass_opt = kwargs.pop('opt_group').add_option(*args, **kwargs)
+        else:
+            pass_opt = self.option_parser.add_option(*args, **kwargs)
 
         self._passthrough_options.append(pass_opt)
 
@@ -1823,4 +1827,3 @@ class MRJob(object):
 
 if __name__ == '__main__':
     MRJob.run()
-

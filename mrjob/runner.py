@@ -723,7 +723,7 @@ class MRJobRunner(object):
         # zero out the file
         open(path, 'w').close()
 
-    def _md5sum_file(self, fileobj, block_size=8**6):
+    def _md5sum_file(self, fileobj, block_size=(512 ** 2)):  # 256K default
         md5 = hashlib.md5()
         while True:
             data = fileobj.read(block_size)
@@ -888,7 +888,7 @@ class MRJobRunner(object):
                 # if name is taken, prepend some random stuff to it
                 while name in name_to_path:
                     name = prefix + '%08x-%s' % (
-                        random.randint(0,2**32-1), basename)
+                        random.randint(0, 2 ** 32 - 1), basename)
                 file_dict[name_field] = name
                 name_to_path[name] = path  # reserve this name
 
@@ -1012,6 +1012,7 @@ class MRJobRunner(object):
         self._name_files()
 
         out = StringIO()
+
         def writeln(line=''):
             out.write(line + '\n')
 

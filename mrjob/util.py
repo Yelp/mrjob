@@ -319,7 +319,7 @@ def read_file(path, fileobj=None):
     - If *fileobj* is not ``None``, stream lines from the *fileobj*
     """
     if path.endswith('.gz'):
-        f = gzip.GzipFile(path, fileobj = fileobj)
+        f = gzip.GzipFile(path, fileobj=fileobj)
     elif path.endswith('.bz2'):
         if fileobj is None:
             f = bz2.BZ2File(path)

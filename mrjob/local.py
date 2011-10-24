@@ -43,6 +43,7 @@ log = logging.getLogger('mrjob.local')
 DEFAULT_MAP_TASKS = 2
 DEFAULT_REDUCE_TASKS = 2
 
+
 class LocalMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing
     purposes.
@@ -159,7 +160,7 @@ class LocalMRJobRunner(MRJobRunner):
                                 self._mr_job_extra_args())
                 self._invoke_step(reducer_args, 'step-%d-reducer' % i,
                                   step_num=i, env=self._get_running_env(),
-                                  num_tasks = self._reduce_tasks,
+                                  num_tasks=self._reduce_tasks,
                                   step_type='R')
 
         # move final output to output directory
@@ -211,7 +212,7 @@ class LocalMRJobRunner(MRJobRunner):
         """
         env = {}
         for (key, value) in self._running_env.iteritems():
-            env[key.replace('.','_')] = value
+            env[key.replace('.', '_')] = value
         return env
 
     def _setup_working_dir(self):
@@ -277,7 +278,7 @@ class LocalMRJobRunner(MRJobRunner):
 
             returns a dictionary that maps split_file names to a dictionary of
             properties:
-            
+
             * orig_name: the original name of the file whose data is in
               the split
             * start: where the split starts
@@ -362,7 +363,7 @@ class LocalMRJobRunner(MRJobRunner):
         partition_var = compat.translate_env(
             version, 'mapreduce_task_partition')
         hadoop_env = {
-            ismap_var: str(step_type=='M'),
+            ismap_var: str(step_type == 'M'),
             partition_var: str(step_num),
         }
         return combine_local_envs({'PYTHONPATH': os.getcwd()},
@@ -370,7 +371,6 @@ class LocalMRJobRunner(MRJobRunner):
                                   self._get_cmdenv(),
                                   env or {},
                                   hadoop_env)
-
 
     def _invoke_step(self, args, outfile_name, env=None, step_num=0,
                      num_tasks=1, step_type='M', combiner_args=None):
@@ -468,8 +468,7 @@ class LocalMRJobRunner(MRJobRunner):
         for proc in procs:
             self._wait_for_process(proc, step_num)
 
-        self.print_counters([step_num+1])
-
+        self.print_counters([step_num + 1])
 
     def _invoke_process(self, args, outfile_name, env, combiner_args=None):
         """invoke the process described by *args* and write to *outfile_name*
@@ -516,7 +515,7 @@ class LocalMRJobRunner(MRJobRunner):
         returncode = proc['proc'].wait()
 
         if returncode != 0:
-            self.print_counters([step_num+1])
+            self.print_counters([step_num + 1])
             # try to throw a useful exception
             if tb_lines:
                 raise Exception(

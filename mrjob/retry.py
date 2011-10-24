@@ -17,6 +17,7 @@ import time
 
 log = logging.getLogger('mrjob.retry')
 
+
 class RetryWrapper(object):
     """This class can wrap any object. The wrapped object will behave like
     the original one, except that if you call a function and it raises a

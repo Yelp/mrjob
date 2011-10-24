@@ -576,7 +576,8 @@ class EMRJobRunner(MRJobRunner):
         for path in self._opts['bootstrap_python_packages']:
             name, path = self._split_path(path)
             if not path.endswith('.tar.gz'):
-                raise ValueError('bootstrap_python_packages only accepts .tar.gz files!')
+                raise ValueError(
+                    'bootstrap_python_packages only accepts .tar.gz files!')
             file_dict = self._add_bootstrap_file(path)
             self._bootstrap_python_packages.append(file_dict)
 
@@ -587,7 +588,8 @@ class EMRJobRunner(MRJobRunner):
 
         if not (isinstance(self._opts['additional_emr_info'], basestring)
                 or self._opts['additional_emr_info'] is None):
-            self._opts['additional_emr_info'] = json.dumps(self._opts['additional_emr_info'])
+            self._opts['additional_emr_info'] = json.dumps(
+                self._opts['additional_emr_info'])
 
         # if we're bootstrapping mrjob, keep track of the file_dict
         # for mrjob.tar.gz
@@ -726,12 +728,18 @@ class EMRJobRunner(MRJobRunner):
             bucket_loc = s3_conn.get_bucket(bucket_name).get_location()
 
             # make sure they can communicate if both specified
-            if self._aws_region and bucket_loc and self._aws_region != bucket_loc:
-                log.warning('warning: aws_region (%s) does not match bucket region (%s). Your EC2 instances may not be able to reach your S3 buckets.' % (self._aws_region, bucket_loc))
+            if (self._aws_region and bucket_loc and
+                self._aws_region != bucket_loc):
+                log.warning('warning: aws_region (%s) does not match bucket'
+                            ' region (%s). Your EC2 instances may not be able'
+                            ' to reach your S3 buckets.' %
+                            (self._aws_region, bucket_loc))
 
             # otherwise derive aws_region from bucket_loc
             elif bucket_loc and not self._aws_region:
-                log.info("inferring aws_region from scratch bucket's region (%s)" % bucket_loc)
+                log.info(
+                    "inferring aws_region from scratch bucket's region (%s)" %
+                    bucket_loc)
                 self._aws_region = bucket_loc
         # set s3_scratch_uri by checking for existing buckets
         else:
@@ -764,27 +772,32 @@ class EMRJobRunner(MRJobRunner):
             if scratch_bucket_location:
                 if scratch_bucket_location == self._aws_region:
                     # Regions are both specified and match
-                    log.info("using existing scratch bucket %s" % scratch_bucket_name)
-                    self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
+                    log.info("using existing scratch bucket %s" %
+                             scratch_bucket_name)
+                    self._opts['s3_scratch_uri'] = (
+                        's3://%s/tmp/' % scratch_bucket_name)
                     return
                 elif not self._aws_region:
                     # aws_region not specified, so set it based on this
                     #   bucket's location and use this bucket
                     self._aws_region = scratch_bucket_location
-                    log.info("inferring aws_region from scratch bucket's region (%s)" %
-                             self._aws_region)
-                    self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
+                    log.info("inferring aws_region from scratch bucket's"
+                             " region (%s)" % self._aws_region)
+                    self._opts['s3_scratch_uri'] = (
+                        's3://%s/tmp/' % scratch_bucket_name)
                     return
                 elif scratch_bucket_location != self._aws_region:
                     continue
             elif not self._aws_region:
-                # Only use regionless buckets if the job flow is also regionless
-                log.info("using existing scratch bucket %s" % scratch_bucket_name)
-                self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
+                # Only use regionless buckets if the job flow is regionless
+                log.info("using existing scratch bucket %s" %
+                         scratch_bucket_name)
+                self._opts['s3_scratch_uri'] = (
+                    's3://%s/tmp/' % scratch_bucket_name)
                 return
 
         # That may have all failed. If so, pick a name.
-        scratch_bucket_name = 'mrjob-%016x' % random.randint(0, 2**64-1)
+        scratch_bucket_name = 'mrjob-%016x' % random.randint(0, 2 ** 64 - 1)
         self._s3_temp_bucket_to_create = scratch_bucket_name
         log.info("creating new scratch bucket %s" % scratch_bucket_name)
         self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
@@ -804,7 +817,8 @@ class EMRJobRunner(MRJobRunner):
             s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as scratch space' %
                      self._s3_temp_bucket_to_create)
-            location = REGION_TO_S3_LOCATION_CONSTRAINT.get(self._aws_region, self._aws_region)
+            location = REGION_TO_S3_LOCATION_CONSTRAINT.get(
+                self._aws_region, self._aws_region)
             s3_conn.create_bucket(self._s3_temp_bucket_to_create,
                                   location=(location or ''))
             self._s3_temp_bucket_to_create = None
@@ -920,7 +934,9 @@ class EMRJobRunner(MRJobRunner):
         for opt_name in REQUIRED_OPTS:
             if not self._opts[opt_name]:
                 if not self._gave_cant_ssh_warning:
-                    log.warning("You must set %s in order to ssh to the job tracker!" % opt_name)
+                    log.warning(
+                        "You must set %s in order to ssh to the job tracker!" %
+                        opt_name)
                     self._gave_cant_ssh_warning = True
                 return
 
@@ -930,7 +946,8 @@ class EMRJobRunner(MRJobRunner):
             if self._ssh_proc.returncode is None:
                 return
             else:
-                log.warning('Oops, ssh subprocess exited with return code %d, restarting...' % self._ssh_proc.returncode)
+                log.warning('Oops, ssh subprocess exited with return code %d,'
+                            ' restarting...' % self._ssh_proc.returncode)
                 self._ssh_proc = None
 
         log.info('Opening ssh tunnel to Hadoop job tracker')
@@ -960,7 +977,7 @@ class EMRJobRunner(MRJobRunner):
             ]
             if self._opts['ssh_tunnel_is_open']:
                 args.extend(['-g', '-4'])  # -4: listen on IPv4 only
-            args.append('hadoop@'+host)
+            args.append('hadoop@' + host)
             log.debug('> %s' % cmd_line(args))
 
             ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
@@ -981,7 +998,7 @@ class EMRJobRunner(MRJobRunner):
             self._tracker_url = 'http://%s:%d%s' % (
                 bind_host, bind_port, EMR_JOB_TRACKER_PATH)
             self._show_tracker_progress = True
-            log.info( 'Connect to job tracker at: %s' % (self._tracker_url))
+            log.info('Connect to job tracker at: %s' % self._tracker_url)
 
     def _pick_ssh_bind_ports(self):
         """Pick a list of ports to try binding our SSH tunnel to.
@@ -1016,7 +1033,8 @@ class EMRJobRunner(MRJobRunner):
         if self._ssh_proc:
             self._ssh_proc.poll()
             if self._ssh_proc.returncode is None:
-                log.info('Killing our SSH tunnel (pid %d)' % self._ssh_proc.pid)
+                log.info('Killing our SSH tunnel (pid %d)' %
+                         self._ssh_proc.pid)
                 try:
                     os.kill(self._ssh_proc.pid, signal.SIGKILL)
                     self._ssh_proc = None
@@ -1266,9 +1284,10 @@ class EMRJobRunner(MRJobRunner):
             # them ourselves
 
             def escaped_paths(file_dicts):
-                # return list of strings ready for comma-joining for passing to the
+                # return list of strings to join with commas and pass to the
                 # hadoop binary
-                return ["%s#%s" % (fd['s3_uri'], fd['name']) for fd in file_dicts]
+                return ["%s#%s" % (fd['s3_uri'], fd['name'])
+                        for fd in file_dicts]
 
             # index by type
             all_files = {}
@@ -1428,9 +1447,10 @@ class EMRJobRunner(MRJobRunner):
 
         if success:
             log.info('Job completed.')
-            log.info('Running time was %.1fs (not counting time spent waiting for the EC2 instances)' % total_step_time)
+            log.info('Running time was %.1fs (not counting time spent waiting'
+                     ' for the EC2 instances)' % total_step_time)
             self._fetch_counters(step_nums)
-            self.print_counters(range(1, len(step_nums)+1))
+            self.print_counters(range(1, len(step_nums) + 1))
         else:
             msg = 'Job failed with status %s: %s' % (job_state, reason)
             log.error(msg)
@@ -1614,7 +1634,8 @@ class EMRJobRunner(MRJobRunner):
                                           step_nums)
 
     def ls_node_logs_s3(self):
-        return self._enforce_path_regexp(self._ls_s3_logs('node/'), NODE_LOG_URI_RE)
+        return self._enforce_path_regexp(self._ls_s3_logs('node/'),
+                                         NODE_LOG_URI_RE)
 
     def ls_all_logs_s3(self):
         """List all log files in the S3 log root directory"""
@@ -1637,8 +1658,8 @@ class EMRJobRunner(MRJobRunner):
             except LogFetchException, e:
                 new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
             except IOError:
-                # Can get 'file not found' if test suite was lazy or Hadoop logs
-                # moved. We shouldn't crash in either case.
+                # Can get 'file not found' if test suite was lazy or Hadoop
+                # logs moved. We shouldn't crash in either case.
                 new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
         else:
             log.info('ec2_key_pair_file not specified, going to S3')
@@ -1783,6 +1804,7 @@ class EMRJobRunner(MRJobRunner):
         that; _create_master_bootstrap_script() is responsible for that.
         """
         out = StringIO()
+
         def writeln(line=''):
             out.write(line + '\n')
 
@@ -1829,7 +1851,8 @@ class EMRJobRunner(MRJobRunner):
             # write to this directory. Don't fail if there is extra
             # un-compileable crud in the tarball.
             writeln("mrjob_dir = os.path.join(site_packages, 'mrjob')")
-            writeln("call(['sudo', 'python', '-m', 'compileall', '-f', mrjob_dir])")
+            writeln("call(["
+                    "'sudo', 'python', '-m', 'compileall', '-f', mrjob_dir])")
             writeln()
 
         # install our python modules
@@ -1842,7 +1865,9 @@ class EMRJobRunner(MRJobRunner):
                 assert file_dict['path'].endswith('.tar.gz')
                 cd_into = extract_dir_for_tar(file_dict['path'])
                 # install the module
-                writeln("check_call(['sudo', 'python', 'setup.py', 'install'], cwd=%r)" % cd_into)
+                writeln("check_call(["
+                        "'sudo', 'python', 'setup.py', 'install'], cwd=%r)" %
+                        cd_into)
 
         # run our commands
         if self._opts['bootstrap_cmds']:
@@ -1873,7 +1898,9 @@ class EMRJobRunner(MRJobRunner):
         You can also fetch the job ID by calling self.get_emr_job_flow_id()
         """
         if (self._emr_job_flow_id):
-            raise AssertionError('This runner is already associated with job flow ID %s' % (self._emr_job_flow_id))
+            raise AssertionError(
+                'This runner is already associated with job flow ID %s' %
+                (self._emr_job_flow_id))
 
         log.info('Creating persistent job flow to run several jobs in...')
 
@@ -1894,7 +1921,8 @@ class EMRJobRunner(MRJobRunner):
         """Get job flows that this runner can use. Sort by instance compute
         units and time left to an even instance hour.
 
-        :return: list of (job_minutes_float, :py:class:`botoemr.emrobject.JobFlow`)
+        :return: list of (job_minutes_float,
+                 :py:class:`botoemr.emrobject.JobFlow`)
         """
 
         emr_conn = emr_conn or self.make_emr_conn()
@@ -1919,11 +1947,13 @@ class EMRJobRunner(MRJobRunner):
             """Shortcut to calculate the compute units per task node of a job
             flow
             """
-            return EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(worker_instance_type(job_flow), 0)
+            return EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(
+                worker_instance_type(job_flow), 0)
 
         def mem(job_flow):
             """Shortcut to calculate the memory per task node of a job flow """
-            return EC2_INSTANCE_TYPE_TO_MEMORY.get(worker_instance_type(job_flow), 0)
+            return EC2_INSTANCE_TYPE_TO_MEMORY.get(
+                worker_instance_type(job_flow), 0)
 
         # get this run's information, unfortunately duplicating some logic from
         # the inner functions above
@@ -1931,7 +1961,8 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['num_ec2_instances'] > 1:
             my_instance_type = self._opts['ec2_slave_instance_type']
 
-        my_compute_units = EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(my_instance_type, 0)
+        my_compute_units = EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(
+            my_instance_type, 0)
         my_memory = EC2_INSTANCE_TYPE_TO_MEMORY.get(my_instance_type, 0)
 
         def matches(job_flow):
@@ -1949,7 +1980,8 @@ class EMRJobRunner(MRJobRunner):
             # convert from braindead string types to usable types
             job_flow.instancecount = int(job_flow.instancecount)
             keep_alive = job_flow.keepjobflowalivewhennosteps
-            job_flow.keepjobflowalivewhennosteps = (keep_alive in ('true', True))
+            job_flow.keepjobflowalivewhennosteps = (
+                keep_alive in ('true', True))
 
             # only take idle job flows
             if job_flow.state != 'WAITING':
@@ -1985,7 +2017,7 @@ class EMRJobRunner(MRJobRunner):
         available_job_flows = [jf for jf in all_job_flows if matches(jf)]
 
         def sort_key(job_flow):
-            return (cu(job_flow)*job_flow.instancecount,
+            return (cu(job_flow) * job_flow.instancecount,
                     est_time_to_hour(job_flow))
 
         return sorted(available_job_flows, key=sort_key)
@@ -2006,10 +2038,10 @@ class EMRJobRunner(MRJobRunner):
                 job_flow = sorted_tagged_job_flows[-1]
                 lock_uri = make_lock_uri(self._opts['s3_scratch_uri'],
                                          job_flow.jobflowid,
-                                        len(job_flow.steps)+1)
-                status = attempt_to_acquire_lock(s3_conn, lock_uri,
-                                                 self._opts['s3_sync_wait_time'],
-                                                 self._job_name)
+                                        len(job_flow.steps) + 1)
+                status = attempt_to_acquire_lock(
+                    s3_conn, lock_uri, self._opts['s3_sync_wait_time'],
+                    self._job_name)
                 if status:
                     return sorted_tagged_job_flows[-1]
                 else:
@@ -2053,7 +2085,8 @@ class EMRJobRunner(MRJobRunner):
                                      for fd in self._bootstrap_actions]
 
         things_to_hash = [
-            [self.md5sum(fd['path']) for fd in self._files if should_include_file(fd)],
+            [self.md5sum(fd['path'])
+             for fd in self._files if should_include_file(fd)],
             self._opts['bootstrap_mrjob'],
             self._opts['bootstrap_cmds'],
             cleaned_bootstrap_actions,
@@ -2144,7 +2177,6 @@ class EMRJobRunner(MRJobRunner):
         bucket = s3_conn.get_bucket(bucket_name)
         for key in bucket.list(key_name):
             yield s3_key_to_uri(key)
-
 
     def md5sum(self, path, s3_conn=None):
         if is_s3_uri(path):
@@ -2307,7 +2339,8 @@ class EMRJobRunner(MRJobRunner):
                 endpoint = REGION_TO_EMR_ENDPOINT[self._aws_region]
             except KeyError:
                 raise Exception(
-                    "Don't know the EMR endpoint for %s; try setting emr_endpoint explicitly" % self._aws_region)
+                    "Don't know the EMR endpoint for %s;"
+                    " try setting emr_endpoint explicitly" % self._aws_region)
 
         return boto.ec2.regioninfo.RegionInfo(None, self._aws_region, endpoint)
 
@@ -2319,7 +2352,8 @@ class EMRJobRunner(MRJobRunner):
         if not self._inferred_hadoop_version:
             if self._emr_job_flow_id:
                 # if joining a job flow, infer the version
-                self._inferred_hadoop_version = self._describe_jobflow().hadoopversion
+                self._inferred_hadoop_version = (
+                    self._describe_jobflow().hadoopversion)
             else:
                 # otherwise, read it from the config
                 self._inferred_hadoop_version = self._opts['hadoop_version']
@@ -2336,7 +2370,8 @@ class EMRJobRunner(MRJobRunner):
         try:
             jobflow = self._describe_jobflow(emr_conn)
             if jobflow.state not in ('WAITING', 'RUNNING'):
-                raise LogFetchException('Cannot ssh to master; job flow is not waiting or running')
+                raise LogFetchException(
+                    'Cannot ssh to master; job flow is not waiting or running')
         except boto.exception.S3ResponseError:
             # This error is raised by mockboto when the jobflow doesn't exist
             raise LogFetchException('Could not get job flow information')
@@ -2352,7 +2387,6 @@ class EMRJobRunner(MRJobRunner):
                 self._opts['ec2_key_pair_file'])
         return self._ssh_slave_addrs
 
-
     ### S3-specific FILESYSTEM STUFF ###
 
     # Utilities for interacting with S3 using S3 URIs.
@@ -2363,7 +2397,8 @@ class EMRJobRunner(MRJobRunner):
     def make_s3_conn(self):
         """Create a connection to S3.
 
-        :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a :py:class:`mrjob.retry.RetryWrapper`
+        :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a
+                 :py:class:`mrjob.retry.RetryWrapper`
         """
         # give a non-cryptic error message if boto isn't installed
         if boto is None:
@@ -2387,7 +2422,8 @@ class EMRJobRunner(MRJobRunner):
                 return REGION_TO_S3_ENDPOINT[self._aws_region]
             except KeyError:
                 raise Exception(
-                    "Don't know the S3 endpoint for %s; try setting s3_endpoint explicitly" % self._aws_region)
+                    "Don't know the S3 endpoint for %s;"
+                    " try setting s3_endpoint explicitly" % self._aws_region)
 
     def get_s3_key(self, uri, s3_conn=None):
         """Get the boto Key object matching the given S3 uri, or
@@ -2395,7 +2431,8 @@ class EMRJobRunner(MRJobRunner):
 
         uri is an S3 URI: ``s3://foo/bar``
 
-        You may optionally pass in an existing s3 connection through ``s3_conn``
+        You may optionally pass in an existing s3 connection through
+        ``s3_conn``.
         """
         if not s3_conn:
             s3_conn = self.make_s3_conn()
@@ -2409,7 +2446,8 @@ class EMRJobRunner(MRJobRunner):
 
         uri is an S3 URI: ``s3://foo/bar``
 
-        You may optionally pass in an existing S3 connection through ``s3_conn``
+        You may optionally pass in an existing S3 connection through
+        ``s3_conn``.
         """
         if not s3_conn:
             s3_conn = self.make_s3_conn()
@@ -2454,7 +2492,8 @@ class EMRJobRunner(MRJobRunner):
 
         This does not support globbing.
 
-        You may optionally pass in an existing S3 connection through ``s3_conn``
+        You may optionally pass in an existing S3 connection through
+        ``s3_conn``.
         """
         if not s3_conn:
             s3_conn = self.make_s3_conn()

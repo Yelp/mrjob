@@ -61,14 +61,16 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 #: cleanup options:
 #:
-#: - ``'ALL'``: delete local scratch, remote scratch, and logs
-#: - ``'LOCAL_SCRATCH'``: delete local scratch only
-#: - ``'LOGS'``: delete logs only
-#: - ``'NONE'``: delete nothing
-#: - ``'REMOTE_SCRATCH'``: delete remote scratch only
-#: - ``'SCRATCH'``: delete local and remote scratch, but not logs
-#: - ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL`` (not supported for ``cleanup_on_failure``)
-CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH', 'SCRATCH', 'IF_SUCCESSFUL']
+#: * ``'ALL'``: delete local scratch, remote scratch, and logs
+#: * ``'LOCAL_SCRATCH'``: delete local scratch only
+#: * ``'LOGS'``: delete logs only
+#: * ``'NONE'``: delete nothing
+#: * ``'REMOTE_SCRATCH'``: delete remote scratch only
+#: * ``'SCRATCH'``: delete local and remote scratch, but not logs
+#: * ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL``. Not supported for
+#:   ``cleanup_on_failure``.
+CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
+                   'SCRATCH', 'IF_SUCCESSFUL']
 
 #: DEPRECATED: the default cleanup-on-success option: ``'IF_SUCCESSFUL'``
 CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
@@ -87,12 +89,16 @@ class MRJobRunner(object):
     it's more like a utility that allows an :py:class:`~mrjob.job.MRJob`
     to run itself. Normally things work something like this:
 
-    - Get a runner by calling :py:meth:`~mrjob.job.MRJob.make_runner` on your job
-    - Call :py:meth:`~mrjob.runner.MRJobRunner.run` on your runner. This will:
+    * Get a runner by calling :py:meth:`~mrjob.job.MRJob.make_runner` on your
+      job
+    * Call :py:meth:`~mrjob.runner.MRJobRunner.run` on your runner. This will:
 
-      - Run your job with :option:`--steps` to find out how many mappers/reducers to run
-      - Copy your job and supporting files to Hadoop
-      - Instruct Hadoop to run your job with the appropriate :option:`--mapper`, :option:`--combiner`, :option:`--reducer`, and :option:`--step-num` arguments
+      * Run your job with :option:`--steps` to find out how many
+        mappers/reducers to run
+      * Copy your job and supporting files to Hadoop
+      * Instruct Hadoop to run your job with the appropriate
+        :option:`--mapper`, :option:`--combiner`, :option:`--reducer`, and
+        :option:`--step-num` arguments
 
     Each runner runs a single job once; if you want to run a job multiple
     times, make multiple runners.
@@ -117,59 +123,141 @@ class MRJobRunner(object):
         """All runners take the following keyword arguments:
 
         :type mr_job_script: str
-        :param mr_job_script: the path of the ``.py`` file containing the :py:class:`~mrjob.job.MRJob`. If this is None, you won't actually be able to :py:meth:`run` the job, but other utilities (e.g. :py:meth:`ls`) will work.
+        :param mr_job_script: the path of the ``.py`` file containing the
+                              :py:class:`~mrjob.job.MRJob`. If this is None,
+                              you won't actually be able to :py:meth:`run` the
+                              job, but other utilities (e.g. :py:meth:`ls`)
+                              will work.
         :type conf_path: str
-        :param conf_path: Alternate path to read configs from, or ``False`` to ignore all config files.
+        :param conf_path: Alternate path to read configs from, or ``False`` to
+                          ignore all config files.
         :type extra_args: list of str
-        :param extra_args: a list of extra cmd-line arguments to pass to the mr_job script. This is a hook to allow jobs to take additional arguments.
-        :param file_upload_args: a list of tuples of ``('--ARGNAME', path)``. The file at the given path will be uploaded to the local directory of the mr_job script when it runs, and then passed into the script with ``--ARGNAME``. Useful for passing in SQLite DBs and other configuration files to your job.
+        :param extra_args: a list of extra cmd-line arguments to pass to the
+                           mr_job script. This is a hook to allow jobs to take
+                           additional arguments.
+        :param file_upload_args: a list of tuples of ``('--ARGNAME', path)``.
+                                 The file at the given path will be uploaded
+                                 to the local directory of the mr_job script
+                                 when it runs, and then passed into the script
+                                 with ``--ARGNAME``. Useful for passing in
+                                 SQLite DBs and other configuration files to
+                                 your job.
         :type input_paths: list of str
-        :param input_paths: Input files for your job. Supports globs and recursively walks directories (e.g. ``['data/common/', 'data/training/*.gz']``). If this is left blank, we'll read from stdin
+        :param input_paths: Input files for your job. Supports globs and
+                            recursively walks directories (e.g.
+                            ``['data/common/', 'data/training/*.gz']``). If
+                            this is left blank, we'll read from stdin
         :type output_dir: str
-        :param output_dir: an empty/non-existent directory where Hadoop streaming should put the final output from the job. If you don't specify an output directory, we'll output into a subdirectory of this job's temporary directory. You can control this from the command line with ``--output-dir``.
-        :param stdin: an iterable (can be a ``StringIO`` or even a list) to use as stdin. This is a hook for testing; if you set ``stdin`` via :py:meth:`~mrjob.job.MRJob.sandbox`, it'll get passed through to the runner. If for some reason your lines are missing newlines, we'll add them; this makes it easier to write automated tests.
+        :param output_dir: an empty/non-existent directory where Hadoop
+                           streaming should put the final output from the job.
+                           If you don't specify an output directory, we'll
+                           output into a subdirectory of this job's temporary
+                           directory. You can control this from the command
+                           line with ``--output-dir``.
+        :param stdin: an iterable (can be a ``StringIO`` or even a list) to use
+                      as stdin. This is a hook for testing; if you set
+                      ``stdin`` via :py:meth:`~mrjob.job.MRJob.sandbox`, it'll
+                      get passed through to the runner. If for some reason
+                      your lines are missing newlines, we'll add them;
+                      this makes it easier to write automated tests.
 
         All runners also take the following options as keyword arguments.
         These can be defaulted in your :mod:`mrjob.conf` file:
 
         :type base_tmp_dir: str
-        :param base_tmp_dir: path to put local temp dirs inside. By default we just call :py:func:`tempfile.gettempdir`
+        :param base_tmp_dir: path to put local temp dirs inside. By default we
+                             just call :py:func:`tempfile.gettempdir`
         :type bootstrap_mrjob: bool
-        :param bootstrap_mrjob: should we automatically tar up the mrjob library and install it when we run the mrjob? Set this to ``False`` if you've already installed ``mrjob`` on your Hadoop cluster.
+        :param bootstrap_mrjob: should we automatically tar up the mrjob
+                                library and install it when we run the mrjob?
+                                Set this to ``False`` if you've already
+                                installed ``mrjob`` on your Hadoop cluster.
         :type cleanup: list
-        :param cleanup: List of which kinds of directories to delete when a job succeeds. See :py:data:`CLEANUP_CHOICES`.
+        :param cleanup: List of which kinds of directories to delete when a
+                        job succeeds. See :py:data:`CLEANUP_CHOICES`.
         :type cleanup_on_failure: list
-        :param cleanup_on_failure: Which kinds of directories to clean up when a job fails. See :py:data:`CLEANUP_CHOICES`.
+        :param cleanup_on_failure: Which kinds of directories to clean up when
+                                   a job fails. See :py:data:`CLEANUP_CHOICES`.
         :type cmdenv: dict
-        :param cmdenv: environment variables to pass to the job inside Hadoop streaming
+        :param cmdenv: environment variables to pass to the job inside Hadoop
+                       streaming
         :type hadoop_extra_args: list of str
         :param hadoop_extra_args: extra arguments to pass to hadoop streaming
         :type hadoop_input_format: str
-        :param hadoop_input_format: name of an optional Hadoop ``InputFormat`` class. Passed to Hadoop along with your first step with the ``-inputformat`` option. Note that if you write your own class, you'll need to include it in your own custom streaming jar (see *hadoop_streaming_jar*).
+        :param hadoop_input_format: name of an optional Hadoop ``InputFormat``
+                                    class. Passed to Hadoop along with your
+                                    first step with the ``-inputformat``
+                                    option. Note that if you write your own
+                                    class, you'll need to include it in your
+                                    own custom streaming jar (see
+                                    *hadoop_streaming_jar*).
         :type hadoop_output_format: str
-        :param hadoop_output_format: name of an optional Hadoop ``OutputFormat`` class. Passed to Hadoop along with your first step with the ``-outputformat`` option. Note that if you write your own class, you'll need to include it in your own custom streaming jar (see *hadoop_streaming_jar*).
+        :param hadoop_output_format: name of an optional Hadoop
+                                     ``OutputFormat`` class. Passed to Hadoop
+                                     along with your first step with the
+                                     ``-outputformat`` option. Note that if you
+                                     write your own class, you'll need to
+                                    include it in your own custom streaming
+                                    jar (see *hadoop_streaming_jar*).
         :type hadoop_streaming_jar: str
         :param hadoop_streaming_jar: path to a custom hadoop streaming jar.
         :type jobconf: dict
-        :param jobconf: ``-jobconf`` args to pass to hadoop streaming. This should be a map from property name to value. Equivalent to passing ``['-jobconf', 'KEY1=VALUE1', '-jobconf', 'KEY2=VALUE2', ...]`` to ``hadoop_extra_args``.
+        :param jobconf: ``-jobconf`` args to pass to hadoop streaming. This
+                        should be a map from property name to value.
+                        Equivalent to passing ``['-jobconf', 'KEY1=VALUE1',
+                        '-jobconf', 'KEY2=VALUE2', ...]`` to
+                        *hadoop_extra_args*.
         :type label: str
-        :param label: description of this job to use as the part of its name. By default, we use the script's module name, or ``no_script`` if there is none.
+        :param label: description of this job to use as the part of its name.
+                      By default, we use the script's module name, or
+                      ``no_script`` if there is none.
         :type owner: str
-        :param owner: who is running this job. Used solely to set the job name. By default, we use :py:func:`getpass.getuser`, or ``no_user`` if it fails.
+        :param owner: who is running this job. Used solely to set the job name.
+                      By default, we use :py:func:`getpass.getuser`, or
+                      ``no_user`` if it fails.
         :type python_archives: list of str
-        :param python_archives: same as upload_archives, except they get added to the job's :envvar:`PYTHONPATH`
+        :param python_archives: same as upload_archives, except they get added
+                                to the job's :envvar:`PYTHONPATH`
         :type python_bin: str
-        :param python_bin: Name/path of alternate python binary for mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to ``'python'``.
+        :param python_bin: Name/path of alternate python binary for
+                           mappers/reducers (e.g. for use with
+                           :py:mod:`virtualenv`). Defaults to ``'python'``.
         :type setup_cmds: list
-        :param setup_cmds: a list of commands to run before each mapper/reducer step (e.g. ``['cd my-src-tree; make', 'mkdir -p /tmp/foo']``). You can specify commands as strings, which will be run through the shell, or lists of args, which will be invoked directly. We'll use file locking to ensure that multiple mappers/reducers running on the same node won't run *setup_cmds* simultaneously (it's safe to run ``make``).
+        :param setup_cmds: a list of commands to run before each mapper/reducer
+                           step (e.g.
+                           ``['cd my-src-tree; make', 'mkdir -p /tmp/foo']``).
+                           You can specify commands as strings, which will be
+                           run through the shell, or lists of args, which will
+                           be invoked directly. We'll use file locking to
+                           ensure that multiple mappers/reducers running on
+                           the same node won't run *setup_cmds* simultaneously
+                           (it's safe to run ``make``).
         :type setup_scripts: list of str
-        :param setup_scripts: files that will be copied into the local working directory and then run. These are run after *setup_cmds*. Like with *setup_cmds*, we use file locking to keep multiple mappers/reducers on the same node from running *setup_scripts* simultaneously.
+        :param setup_scripts: files that will be copied into the local working
+                              directory and then run. These are run after
+                              *setup_cmds*. Like with *setup_cmds*, we use file
+                              locking to keep multiple mappers/reducers on the
+                              same node from running *setup_scripts*
+                              simultaneously.
         :type steps_python_bin: str
-        :param steps_python_bin: Name/path of alternate python binary to use to query the job about its steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults to ``sys.executable`` (the current Python interpreter).
+        :param steps_python_bin: Name/path of alternate python binary to use to
+                                 query the job about its steps (e.g. for use
+                                 with :py:mod:`virtualenv`). Rarely needed.
+                                 Defaults to ``sys.executable`` (the current
+                                 Python interpreter).
         :type upload_archives: list of str
-        :param upload_archives: a list of archives (e.g. tarballs) to unpack in the local directory of the mr_job script when it runs. You can set the local name of the dir we unpack into by appending ``#localname`` to the path; otherwise we just use the name of the archive file (e.g. ``foo.tar.gz``)
+        :param upload_archives: a list of archives (e.g. tarballs) to unpack in
+                                the local directory of the mr_job script when
+                                it runs. You can set the local name of the dir
+                                we unpack into by appending ``#localname`` to
+                                the path; otherwise we just use the name of the
+                                archive file (e.g. ``foo.tar.gz``)
         :type upload_files: list of str
-        :param upload_files: a list of files to copy to the local directory of the mr_job script when it runs. You can set the local name of the dir we unpack into by appending ``#localname`` to the path; otherwise we just use the name of the file
+        :param upload_files: a list of files to copy to the local directory of
+                             the mr_job script when it runs. You can set the
+                             local name of the dir we unpack into by appending
+                             ``#localname`` to the path; otherwise we just use
+                             the name of the file
         """
         # enforce correct arguments
         allowed_opts = set(self._allowed_opts())
@@ -220,20 +308,26 @@ class MRJobRunner(object):
                 if choice not in CLEANUP_CHOICES:
                     raise ValueError(error_str % choice)
             if 'NONE' in opt_list and len(opt_list) > 1:
-                self.option_parser.error('Cannot clean up both nothing and something!')
+                self.option_parser.error(
+                    'Cannot clean up both nothing and something!')
 
         cleanup_error = ('cleanup must be one of %s, not %%s' %
                          ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_error, self._opts['cleanup'])
         if 'IF_SUCCESSFUL' in self._opts['cleanup']:
-            log.warning('IF_SUCCESSFUL is deprecated and will be removed in mrjob 0.4. Use ALL instead.')
+            log.warning(
+                'IF_SUCCESSFUL is deprecated and will be removed in mrjob 0.4.'
+                ' Use ALL instead.')
 
-        cleanup_failure_error = ('cleanup_on_failure must be one of %s, not %%s' %
-                                 ', '.join(CLEANUP_CHOICES))
+        cleanup_failure_error = (
+            'cleanup_on_failure must be one of %s, not %%s' %
+            ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_failure_error,
                          self._opts['cleanup_on_failure'])
         if 'IF_SUCCESSFUL' in self._opts['cleanup_on_failure']:
-            raise ValueError('IF_SUCCESSFUL is not supported for cleanup_on_failure. Use NONE instead.')
+            raise ValueError(
+                'IF_SUCCESSFUL is not supported for cleanup_on_failure.'
+                ' Use NONE instead.')
 
         # add the script to our list of files (don't actually commit to
         # uploading it)
@@ -429,16 +523,19 @@ class MRJobRunner(object):
         pass  # this only happens on EMR
 
     def cleanup(self, mode=None):
-        """Clean up running jobs, scratch dirs, and logs, subject to the *cleanup* option passed to the constructor.
+        """Clean up running jobs, scratch dirs, and logs, subject to the
+        *cleanup* option passed to the constructor.
 
-        If you create your runner in a :keyword:`with` block, :py:meth:`cleanup` will be called automatically::
+        If you create your runner in a :keyword:`with` block,
+        :py:meth:`cleanup` will be called automatically::
 
             with mr_job.make_runner() as runner:
                 ...
 
             # cleanup() called automatically here
 
-        :param mode: override *cleanup* passed into the constructor. Should be a list of strings from :py:data:`CLEANUP_CHOICES`
+        :param mode: override *cleanup* passed into the constructor. Should be
+                     a list of strings from :py:data:`CLEANUP_CHOICES`
         """
         if self._ran_job:
             mode = mode or self._opts['cleanup']
@@ -475,9 +572,11 @@ class MRJobRunner(object):
         """Display this run's counters in a user-friendly way.
 
         :type first_step_num: int
-        :param first_step_num: Display step number of the counters from the first step
+        :param first_step_num: Display step number of the counters from the
+                               first step
         :type limit_to_steps: list of int
-        :param limit_to_steps: List of step numbers *relative to this job* to print, indexed from 1
+        :param limit_to_steps: List of step numbers *relative to this job* to
+                               print, indexed from 1
         """
         for step_num, step_counters in enumerate(self.counters()):
             step_num = step_num + 1
@@ -488,8 +587,8 @@ class MRJobRunner(object):
                         log.info('  %s:' % group_name)
                         group_counters = step_counters[group_name]
                         for counter_name in sorted(group_counters.keys()):
-                            log.info('    %s: %d' % (counter_name,
-                                                     group_counters[counter_name]))
+                            log.info('    %s: %d' % (
+                                counter_name, group_counters[counter_name]))
                 else:
                     log.info('  (no counters found)')
 
@@ -677,7 +776,7 @@ class MRJobRunner(object):
         if '#' in path:
             path, name = path.split('#', 1)
             if '/' in name or '#' in name:
-                raise ValueError('Bad name %r; must not contain  # or /' % name)
+                raise ValueError('Bad name %r; must not contain # or /' % name)
             # empty names are okay
         else:
             name = os.path.basename(path)
@@ -923,7 +1022,8 @@ class MRJobRunner(object):
         writeln()
 
         # make lock file and lock it
-        writeln("lock_file = open('/tmp/wrapper.lock.%s', 'a')" % self._job_name)
+        writeln("lock_file = open('/tmp/wrapper.lock.%s', 'a')" %
+                self._job_name)
         writeln('flock(lock_file, LOCK_EX)')
         writeln()
 

@@ -29,14 +29,20 @@ class RetryWrapper(object):
         """
         Wrap the given object
 
-        :param wrapped: the object to wrap. this should work for functions as well as regular objects (essentially, we're wrapping ``__call__``)
-        :param retry_if: a method that takes an exception, and returns whether we should retry
+        :param wrapped: the object to wrap. this should work for functions as
+                        well as regular objects (essentially, we're wrapping
+                        ``__call__``)
+        :param retry_if: a method that takes an exception, and returns whether
+                         we should retry
         :type backoff: float
-        :param backoff: the number of seconds to wait the first time we get a retriable error.
+        :param backoff: the number of seconds to wait the first time we get a
+                        retriable error.
         :type multiplier: float
-        :param multiplier: if we retry multiple times, the amount to multiply the backoff time by every time we get an error
+        :param multiplier: if we retry multiple times, the amount to multiply
+                           the backoff time by every time we get an error
         :type max_tries: int
-        :param max_tries: how many tries we get. ``0`` means to keep trying forever
+        :param max_tries: how many tries we get. ``0`` means to keep trying
+                          forever
         """
         self.__wrapped = wrapped
 

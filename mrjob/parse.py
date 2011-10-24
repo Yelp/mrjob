@@ -36,7 +36,8 @@ log = logging.getLogger('mrjob.parse')
 ### URI PARSING ###
 
 
-# Used to parse the real netloc out of a malformed path from Python 2.5 urlparse
+# Used to parse the real netloc out of a malformed path from Python 2.5
+# urlparse()
 NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
 
 
@@ -103,7 +104,9 @@ def check_range_list(option, opt, value):
         ports = parse_port_range_list(value)
         return ports
     except ValueError, e:
-        raise OptionValueError('option %s: invalid port range list "%s": \n%s' % (opt, value, e.args[0]))
+        raise OptionValueError(
+            'option %s: invalid port range list "%s": \n%s' %
+            (opt, value, e.args[0]))
 
 
 def parse_port_range_list(range_list_str):
@@ -120,9 +123,11 @@ def parse_port_range_list(range_list_str):
 def parse_key_value_list(kv_string_list, error_fmt, error_func):
     """Parse a list of strings like ``KEY=VALUE`` into a dictionary.
 
-    :param kv_string_list: Parse a list of strings like ``KEY=VALUE`` into a dictionary.
+    :param kv_string_list: Parse a list of strings like ``KEY=VALUE`` into a
+                           dictionary.
     :type kv_string_list: [str]
-    :param error_fmt: Format string accepting one ``%s`` argument which is the malformed (i.e. not ``KEY=VALUE``) string
+    :param error_fmt: Format string accepting one ``%s`` argument which is the
+                      malformed (i.e. not ``KEY=VALUE``) string
     :type error_fmt: str
     :param error_func: Function to call when a malformed string is encountered.
     :type error_func: function(str)
@@ -262,7 +267,8 @@ def find_input_uri_for_mapper(lines):
         return None
 
 
-_HADOOP_STREAMING_ERROR_RE = re.compile(r'^.*ERROR org\.apache\.hadoop\.streaming\.StreamJob \(main\): (.*)$')
+_HADOOP_STREAMING_ERROR_RE = re.compile(
+    r'^.*ERROR org\.apache\.hadoop\.streaming\.StreamJob \(main\): (.*)$')
 _HADOOP_STREAMING_ERROR_RE_2 = re.compile(r'^(.*does not exist.*)$')
 
 def find_interesting_hadoop_streaming_error(lines):
@@ -286,7 +292,8 @@ def find_interesting_hadoop_streaming_error(lines):
     return None
 
 
-_MULTILINE_JOB_LOG_ERROR_RE = re.compile(r'^\w+Attempt.*?TASK_STATUS="FAILED".*?ERROR="(?P<first_line>[^"]*)$')
+_MULTILINE_JOB_LOG_ERROR_RE = re.compile(
+    r'^\w+Attempt.*?TASK_STATUS="FAILED".*?ERROR="(?P<first_line>[^"]*)$')
 
 def find_job_log_multiline_error(lines):
     """Scan a log file for an arbitrary multi-line error. Return it as a list
@@ -317,7 +324,7 @@ def find_job_log_multiline_error(lines):
     The first line returned will only include the text after ``ERROR="``.
 
     These errors are parsed from jobs/\*.jar.
-    """
+    """  #"
     for line in lines:
         m = _MULTILINE_JOB_LOG_ERROR_RE.match(line)
         if m:
@@ -334,7 +341,9 @@ def find_job_log_multiline_error(lines):
     return None
 
 
-_TIMEOUT_ERROR_RE = re.compile(r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds.*?"')
+_TIMEOUT_ERROR_RE = re.compile(
+    r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+)'
+    r' seconds.*?"')
 
 def find_timeout_error(lines):
     """Scan a log file or other iterable for a timeout error from Hadoop.
@@ -366,7 +375,8 @@ def parse_mr_job_stderr(stderr, counters=None):
     """Parse counters and status messages out of MRJob output.
 
     :param data: a filehandle, a list of lines, or a str containing data
-    :type counters: Counters so far, to update; a map from group to counter name to count.
+    :type counters: Counters so far, to update; a map from group to counter
+                    name to count.
 
     Returns a dictionary with the keys *counters*, *statuses*, *other*:
 
@@ -453,7 +463,7 @@ _COUNTER_FORMAT_IS_0_20 = re.compile(_0_20_EXPR)
 
 def _parse_counters_0_18(counter_string):
     # 0.18 counters look like this:
-    # GroupName.CounterName:Value,GroupName.Crackers:3,AnotherGroup.Nerf:243,...
+    # GroupName.CounterName:Value,Group1.Crackers:3,Group2.Nerf:243,...
     matches = _COUNTER_RE_0_18.findall(counter_string)
     for group, name, amount_str in matches:
         yield group, name, int(amount_str)
@@ -462,7 +472,8 @@ def _parse_counters_0_18(counter_string):
 def _parse_counters_0_20(group_string):
     # 0.20 counters look like this:
     # {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...}
-    for group_id, group_name, counter_str in _GROUP_RE_0_20.findall(group_string):
+    groups = _GROUP_RE_0_20.findall(group_string)
+    for group_id, group_name, counter_str in groups:
         matches = _COUNTER_RE_0_20.findall(counter_str)
         for counter_id, counter_name, counter_value in matches:
             try:

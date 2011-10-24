@@ -37,17 +37,25 @@ JOB_LOGS = 'JOB_LOGS'
 NODE_LOGS = 'NODE_LOGS'
 
 # regex for matching task-attempts log URIs
-TASK_ATTEMPTS_LOG_URI_RE = re.compile(r'^.*/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
+TASK_ATTEMPTS_LOG_URI_RE = re.compile(
+    r'^.*/attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<node_type>m|r)'
+    r'_(?P<node_num>\d+)_(?P<attempt_num>\d+)/(?P<stream>stderr|syslog)$')
 
 # regex for matching step log URIs
-STEP_LOG_URI_RE = re.compile(r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)$')
+STEP_LOG_URI_RE = re.compile(
+    r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)$')
 
 # regex for matching job log URIs
-EMR_JOB_LOG_URI_RE = re.compile(r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
-HADOOP_JOB_LOG_URI_RE = re.compile(r'^.*?/job_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<mystery_string_1>\d+)_(?P<user>.*?)_streamjob(?P<mystery_string_2>\d+).jar$')
+EMR_JOB_LOG_URI_RE = re.compile(
+    r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)'
+    r'_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
+HADOOP_JOB_LOG_URI_RE = re.compile(
+    r'^.*?/job_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<mystery_string_1>\d+)'
+    r'_(?P<user>.*?)_streamjob(?P<mystery_string_2>\d+).jar$')
 
 # regex for matching slave log URIs
-NODE_LOG_URI_RE = re.compile(r'^.*?/hadoop-hadoop-(jobtracker|namenode).*.out$')
+NODE_LOG_URI_RE = re.compile(
+    r'^.*?/hadoop-hadoop-(jobtracker|namenode).*.out$')
 
 
 def scan_for_counters_in_files(log_file_uris, runner):
@@ -117,7 +125,8 @@ def scan_logs_in_order(task_attempt_logs, step_logs, job_logs, runner):
             val = _apply_parsers_to_log(parsers, log_file_uri, runner)
             if val:
                 if info.get('node_type', None) == 'm':
-                    val['input_uri'] = _scan_for_input_uri(log_file_uri, runner)
+                    val['input_uri'] = _scan_for_input_uri(log_file_uri,
+                                                           runner)
                 return val
 
     return None

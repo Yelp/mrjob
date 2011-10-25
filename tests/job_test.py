@@ -165,20 +165,20 @@ class MRCustomBoringJob(MRBoringJob):
         self.add_passthrough_option(
             '--foo-size', '-F', type='int', dest='foo_size', default=5)
         self.add_passthrough_option(
-            '--bar-name', type='string', dest='bar_name', default=None)
+            '--bar-name', '-B', type='string', dest='bar_name', default=None)
         self.add_passthrough_option(
-            '--enable-baz-mode', action='store_true', dest='baz_mode',
+            '--enable-baz-mode', '-M', action='store_true', dest='baz_mode',
             default=False)
         self.add_passthrough_option(
-            '--disable-quuxing', action='store_false', dest='quuxing',
+            '--disable-quuxing', '-Q', action='store_false', dest='quuxing',
             default=True)
         self.add_passthrough_option(
-            '--pill-type', type='choice', choices=(['red', 'blue']),
+            '--pill-type', '-T', type='choice', choices=(['red', 'blue']),
             default='blue')
         self.add_passthrough_option(
-            '--planck-constant', type='float', default=6.626068e-34)
+            '--planck-constant', '-C', type='float', default=6.626068e-34)
         self.add_passthrough_option(
-            '--extra-special-arg', action='append', dest='extra_special_args',
+            '--extra-special-arg', '-S', action='append', dest='extra_special_args',
             default=[])
 
         self.add_file_option('--foo-config', dest='foo_config', default=None)
@@ -870,6 +870,40 @@ class CommandLineArgsTest(TestCase):
                       '--disable-quuxing',
                       '--strict-protocols',
                       ])
+
+    def test_explicit_passthrough_options_short(self):
+        mr_job = MRCustomBoringJob(args=[
+            '-v',
+            '-F9', '-BAlembic', '-MQ', '-T', 'red', '-C1', '-C42',
+            '--extra-special-arg', 'you',
+            '--extra-special-arg', 'me',
+            '--strict-protocols',
+            ])
+
+        assert_equal(mr_job.options.input_protocol, None)
+        assert_equal(mr_job.options.protocol, None)
+        assert_equal(mr_job.options.output_protocol, None)
+        assert_equal(mr_job.options.foo_size, 9)
+        assert_equal(mr_job.options.bar_name, 'Alembic')
+        assert_equal(mr_job.options.baz_mode, True)
+        assert_equal(mr_job.options.quuxing, False)
+        assert_equal(mr_job.options.pill_type, 'red')
+        assert_equal(mr_job.options.planck_constant, 42)
+        assert_equal(mr_job.options.extra_special_args, ['you', 'me'])
+        assert_equal(mr_job.options.strict_protocols, True)
+        assert_equal(mr_job.generate_passthrough_arguments(),
+                     [
+                        '-B', 'Alembic',
+                        '-M',
+                         '--extra-special-arg', 'you',
+                         '--extra-special-arg', 'me',
+                         '-F', '9',
+                         '-T', 'red',
+                         '-C', '1',
+                         '-C', '42',
+                         '-Q',
+                         '--strict-protocols'
+                     ])
 
     def test_bad_custom_options(self):
         assert_raises(ValueError, MRCustomBoringJob, ['--planck-constant', 'c'])

@@ -152,24 +152,25 @@ def _process_long_opt(option_parser, arg_map, rargs, values):
     opt = option_parser._match_long_opt(opt)
     option = option_parser._long_opt[opt]
 
-    def gobbler():
-        """Consume *rargs*. The "before" and "after" values of *rargs* are
-        measured by :py:func:`_capture_args` and the difference is stored in
-        *arg_map*.
-        """
-        if option.takes_value():
-            nargs = option.nargs
-            if nargs == 1:
-                value = rargs.pop(0)
-            else:
-                value = tuple(rargs[0:nargs])
-                del rargs[0:nargs]
+    # Store the 'before' value of *rargs*
+    rargs_before_processing = [x for x in rargs]
+
+    if option.takes_value():
+        nargs = option.nargs
+        if nargs == 1:
+            value = rargs.pop(0)
         else:
-            value = None
+            value = tuple(rargs[0:nargs])
+            del rargs[0:nargs]
+    else:
+        value = None
 
-        option.process(opt, value, values, option_parser)
+    option.process(opt, value, values, option_parser)
 
-    arg_map[option.dest].extend(_capture_args(opt, rargs, gobbler))
+    # Measure rargs before and after processing. Store difference in arg_map.
+    length_difference = len(rargs_before_processing) - len(rargs)
+    list_difference = [opt] + rargs_before_processing[:length_difference]
+    arg_map[option.dest].extend(list_difference)
 
 
 def _process_short_opts(option_parser, arg_map, rargs, values):
@@ -184,31 +185,39 @@ def _process_short_opts(option_parser, arg_map, rargs, values):
         option = option_parser._short_opt.get(opt)
         i += 1                      # we have consumed a character
 
-        def gobbler():
-            """Consume *rargs*. The "before" and "after" values of *rargs* are
-            measured by :py:func:`_capture_args` and the difference is stored
-            in *arg_map*.
-            """
-            if option.takes_value():
-                # Any characters left in arg?  Pretend they're the
-                # next arg, and stop consuming characters of arg.
-                if i < len(arg):
-                    rargs.insert(0, arg[i:])
-                    stop = True
+        # Store the 'before' value of *rargs*
+        rargs_before_processing = [x for x in rargs]
 
-                nargs = option.nargs
-                if nargs == 1:
-                    value = rargs.pop(0)
-                else:
-                    value = tuple(rargs[0:nargs])
-                    del rargs[0:nargs]
+        # We won't see a difference in rargs for things like '-pJSON', so
+        # handle that edge case explicitly.
+        args_from_smashed_short_opt = []
 
-            else:                       # option doesn't take a value
-                value = None
+        if option.takes_value():
+            # Any characters left in arg?  Pretend they're the
+            # next arg, and stop consuming characters of arg.
+            if i < len(arg):
+                rargs.insert(0, arg[i:])
+                args_from_smashed_short_opt.append(arg[i:])
+                stop = True
 
-            option.process(opt, value, values, option_parser)
+            nargs = option.nargs
+            if nargs == 1:
+                value = rargs.pop(0)
+            else:
+                value = tuple(rargs[0:nargs])
+                del rargs[0:nargs]
 
-        arg_map[option.dest].extend(_capture_args(opt, rargs, gobbler))
+        else:                       # option doesn't take a value
+            value = None
+
+        option.process(opt, value, values, option_parser)
+
+        # Measure rargs before and after processing. Store difference in arg_map.
+        length_difference = len(rargs_before_processing) - len(rargs)
+        list_difference = ([opt] +
+                           args_from_smashed_short_opt +
+                           rargs_before_processing[:length_difference])
+        arg_map[option.dest].extend(list_difference)
 
         if stop:
             break

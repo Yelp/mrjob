@@ -874,7 +874,7 @@ class CommandLineArgsTest(TestCase):
     def test_explicit_passthrough_options_short(self):
         mr_job = MRCustomBoringJob(args=[
             '-v',
-            '-F9', '-BAlembic', '-M', '-Q', '-Tred', '-C1', '-C42',
+            '-F9', '-BAlembic', '-MQ', '-T', 'red', '-C1', '-C42',
             '--extra-special-arg', 'you',
             '--extra-special-arg', 'me',
             '--strict-protocols',

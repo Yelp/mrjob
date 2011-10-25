@@ -214,9 +214,9 @@ def _process_short_opts(option_parser, arg_map, rargs, values):
 
         # Measure rargs before and after processing. Store difference in arg_map.
         length_difference = len(rargs_before_processing) - len(rargs)
-        list_difference = ([opt]
-                           + args_from_smashed_short_opt
-                           + rargs_before_processing[:length_difference])
+        list_difference = ([opt] +
+                           args_from_smashed_short_opt +
+                           rargs_before_processing[:length_difference])
         arg_map[option.dest].extend(list_difference)
 
         if stop:

@@ -19,7 +19,6 @@ from collections import defaultdict
 import itertools
 import logging
 import os
-import re
 import shutil
 import stat
 from subprocess import Popen
@@ -309,22 +308,23 @@ class LocalMRJobRunner(MRJobRunner):
             file_names[outfile_name] = new_file
             return outfile_name
 
-        def line_generator(input_path):
-            # Generate lines from a given input_path, if keep_sorted is true,
+        def line_group_generator(input_path):
+            # Generate lines from a given input_path, if keep_sorted is True,
+            # group lines by key; otherwise have one line per group
             # concatenate all lines with the same key and yield them
             # together
             if keep_sorted:
+                def reducer_key(line):
+                    return line.split('\t')[0]
+
                 # assume that input is a collection of key <tab> value pairs
                 # match all non-tab characters
-                re_pattern = re.compile("^(\S*)")
-                for key, lines in itertools.groupby(
-                    read_input(input_path),
-                    key=lambda(line): re_pattern.search(line).group(1)):
-                    # FIXME: this is probably a bad idea!
-                    yield ''.join(lines)
+                for _, lines in itertools.groupby(
+                    read_input(input_path), key=reducer_key):
+                    yield lines
             else:
                 for line in read_input(input_path):
-                    yield line
+                    yield (line,)
 
         for path in input_paths:
             # create a new split file for each new path
@@ -337,7 +337,7 @@ class LocalMRJobRunner(MRJobRunner):
 
             # write each line to a file as long as we are within the limit
             # (split_size)
-            for line in line_generator(path):
+            for line_group in line_group_generator(path):
                 if bytes_written >= split_size:
                     # new split file if we exceeded the limit
                     file_names[outfile_name]['length'] = bytes_written
@@ -346,8 +346,9 @@ class LocalMRJobRunner(MRJobRunner):
                     outfile = open(outfile_name, 'w')
                     bytes_written = 0
 
-                outfile.write(line)
-                bytes_written += len(line)
+                for line in line_group:
+                    outfile.write(line)
+                    bytes_written += len(line)
 
             file_names[outfile_name]['length'] = bytes_written
 

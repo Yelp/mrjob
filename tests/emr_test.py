@@ -1464,8 +1464,8 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         return sorted(results)
 
-    def make_pooled_job_flow(self, name=None, back_in_time=0, **kwargs):
-        """Returns (runner, job_flow_id). Set back_in_time to set
+    def make_pooled_job_flow(self, name=None, minutes_ago=0, **kwargs):
+        """Returns (runner, job_flow_id). Set minutes_ago to set
         jobflow.startdatetime to seconds before datetime.datetime.now()."""
         runner = EMRJobRunner(conf_path=self.mrjob_conf_path,
                               pool_emr_job_flows=True,
@@ -1474,7 +1474,8 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         job_flow_id = runner.make_persistent_job_flow()
         jf = runner.make_emr_conn().describe_jobflow(job_flow_id)
         jf.state = 'WAITING'
-        start = (datetime.datetime.now() - datetime.timedelta(minutes=40))
+        start = (datetime.datetime.now() -
+                 datetime.timedelta(minutes=minutes_ago))
         jf.startdatetime = start.strftime(boto.utils.ISO8601)
         return runner, job_flow_id
 
@@ -1676,8 +1677,8 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         jf1.status = 'COMPLETED'
 
     def test_sorting_by_time(self):
-        _, job_flow_id_1 = self.make_pooled_job_flow('pool1', back_in_time=20)
-        _, job_flow_id_2 = self.make_pooled_job_flow('pool1', back_in_time=40)
+        _, job_flow_id_1 = self.make_pooled_job_flow('pool1', minutes_ago=20)
+        _, job_flow_id_2 = self.make_pooled_job_flow('pool1', minutes_ago=40)
 
         runner1 = self.make_simple_runner('pool1')
         runner2 = self.make_simple_runner('pool1')
@@ -1691,10 +1692,10 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
     def test_sorting_by_cpu_hours(self):
         _, job_flow_id_1 = self.make_pooled_job_flow('pool1',
-                                                     back_in_time=40,
+                                                     minutes_ago=40,
                                                      num_ec2_instances=2)
         _, job_flow_id_2 = self.make_pooled_job_flow('pool1',
-                                                     back_in_time=20,
+                                                     minutes_ago=20,
                                                      num_ec2_instances=1)
 
         runner1 = self.make_simple_runner('pool1')

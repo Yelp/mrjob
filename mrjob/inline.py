@@ -63,6 +63,9 @@ class InlineMRJobRunner(MRJobRunner):
           *steps_python_bin*, *upload_archives*, and *upload_files* are ignored
           because we don't invoke the job as a subprocess or run it in its own
           directory.
+        * Reducers currently *always* receive values associated with a key in
+          sorted order, regardless of whether *partitioner* and *sort_values*
+          are set.
         """
         super(InlineMRJobRunner, self).__init__(**kwargs)
         assert issubclass(mrjob_cls, MRJob)

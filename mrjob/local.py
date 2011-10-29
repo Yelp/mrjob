@@ -68,6 +68,9 @@ class LocalMRJobRunner(MRJobRunner):
           and *hadoop_streaming_jar* are ignored because they require Java. If
           you need to test these, consider starting up a standalone Hadoop
           instance and running your job with ``-r hadoop``.
+        * Reducers currently *always* receive values associated with a key in
+          sorted order, regardless of whether *partitioner* and *sort_values*
+          are set.
         """
         super(LocalMRJobRunner, self).__init__(**kwargs)
 

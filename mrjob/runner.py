@@ -115,7 +115,8 @@ class MRJobRunner(object):
 
     def __init__(self, mr_job_script=None, conf_path=None,
                  extra_args=None, file_upload_args=None,
-                 input_paths=None, output_dir=None, stdin=None,
+                 input_paths=None, output_dir=None, partitioner=None,
+                 sort_values=None, stdin=None,
                  **opts):
         """All runners take the following keyword arguments:
 
@@ -151,6 +152,18 @@ class MRJobRunner(object):
                            output into a subdirectory of this job's temporary
                            directory. You can control this from the command
                            line with ``--output-dir``.
+        :type partitioner: str
+        :param partitioner: Optional name of a Hadoop partitoner class, e.g.
+                            ``'org.apache.hadoop.mapred.lib.HashPartitioner'``.
+                            Hadoop streaming will use this to determine how
+                            mapper output should be sorted and distributed
+                            to reducers.
+        :type sort_values: bool
+        :param sort_values: If this is true, pick any partitioner that sorts
+                            lines passed to the reducers, so that the encoded
+                            versions of the values associated with any key will
+                            appear in sorted order. Ignored if you set
+                            *partitioner*  explicitly.
         :param stdin: an iterable (can be a ``StringIO`` or even a list) to use
                       as stdin. This is a hook for testing; if you set
                       ``stdin`` via :py:meth:`~mrjob.job.MRJob.sandbox`, it'll
@@ -377,6 +390,10 @@ class MRJobRunner(object):
         # store output_dir
         self._output_dir = output_dir
 
+        # store partitioner and sort_values
+        self._partitioner = partitioner
+        self._sort_values = sort_values
+
         # give this job a unique name
         self._job_name = self._make_unique_job_name(
             label=self._opts['label'], owner=self._opts['owner'])
@@ -390,7 +407,8 @@ class MRJobRunner(object):
 
     @classmethod
     def _allowed_opts(cls):
-        """A list of which keyword args we can pass to __init__()"""
+        """A list of the options that can be passed to :py:meth:`__init__`
+        *and* can be defaulted from :mod:`mrjob.conf`."""
         return [
             'base_tmp_dir',
             'bootstrap_mrjob',
@@ -1152,7 +1170,7 @@ class MRJobRunner(object):
         """Build a list of extra arguments to the hadoop binary.
 
         This handles *cmdenv*, *hadoop_extra_args*, *hadoop_input_format*,
-        *hadoop_output_format*, and *jobconf*
+        *hadoop_output_format*, *jobconf*, *partitioner*, and *sort_values*.
 
         This doesn't handle input, output, mappers, reducers, or uploading
         files.
@@ -1189,5 +1207,14 @@ class MRJobRunner(object):
         if not compat.uses_generic_jobconf(version):
             for key, value in sorted(self._opts['jobconf'].iteritems()):
                 args.extend(['-jobconf', '%s=%s' % (key, value)])
+
+        # set up partitioner
+        if self._partitioner:
+            args.extend(['-partitioner', self._partitioner])
+        elif self._sort_values:
+            # TODO: move this to compat
+            args.extend([
+                '-partitioner',
+                'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'])
 
         return args

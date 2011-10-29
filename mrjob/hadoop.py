@@ -352,11 +352,11 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args.extend(
                 self._hadoop_conf_args(step_num, len(steps)))
 
-            # setup input
+            # set up input
             for input_uri in self._hdfs_step_input_files(step_num):
                 streaming_args.extend(['-input', input_uri])
 
-            # setup output
+            # set up output
             streaming_args.append('-output')
             streaming_args.append(self._hdfs_step_output_dir(step_num))
 

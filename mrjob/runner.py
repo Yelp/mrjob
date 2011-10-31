@@ -1197,13 +1197,13 @@ class MRJobRunner(object):
                 'mapred.text.key.partitioner.options': '-k1,1',
                 'mapred.output.key.comparator.class':
                     'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
-                'mapred.text.key.comparator.options=-k2,2',
+                'mapred.text.key.comparator.options': '-k2,2',
             })
 
         # new-style jobconf
         version = self.get_hadoop_version()
         if compat.uses_generic_jobconf(version):
-            for key, value in sorted(self._opts['jobconf'].iteritems()):
+            for key, value in sorted(jobconf.iteritems()):
                 args.extend(['-D', '%s=%s' % (key, value)])
 
         # cmdenv
@@ -1223,7 +1223,7 @@ class MRJobRunner(object):
 
         # old-style jobconf
         if not compat.uses_generic_jobconf(version):
-            for key, value in sorted(self._opts['jobconf'].iteritems()):
+            for key, value in sorted(jobconf.iteritems()):
                 args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         return args

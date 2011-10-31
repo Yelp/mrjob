@@ -1182,6 +1182,24 @@ class MRJobRunner(object):
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])
 
+        # set up partitioner
+        if self._partitioner:
+            args.extend(['-partitioner', self._partitioner])
+
+        jobconf = self._opts['jobconf']
+
+        if self._sort_values:
+            args.extend([
+                '-partitioner',
+                'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'])
+            jobconf = combine_dicts(jobconf, {
+                'stream.num.map.output.key.fields': '2',
+                'mapred.text.key.partitioner.options': '-k1,1',
+                'mapred.output.key.comparator.class':
+                    'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
+                'mapred.text.key.comparator.options=-k2,2',
+            })
+
         # new-style jobconf
         version = self.get_hadoop_version()
         if compat.uses_generic_jobconf(version):
@@ -1207,14 +1225,5 @@ class MRJobRunner(object):
         if not compat.uses_generic_jobconf(version):
             for key, value in sorted(self._opts['jobconf'].iteritems()):
                 args.extend(['-jobconf', '%s=%s' % (key, value)])
-
-        # set up partitioner
-        if self._partitioner:
-            args.extend(['-partitioner', self._partitioner])
-        elif self._sort_values:
-            # TODO: move this to compat
-            args.extend([
-                '-partitioner',
-                'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'])
 
         return args

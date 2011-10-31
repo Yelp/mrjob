@@ -26,7 +26,6 @@ import hashlib
 
 try:
     from boto.emr.connection import EmrConnection
-    from boto.emr.step import JarStep
     import boto.exception
     import boto.utils
 except ImportError:
@@ -49,11 +48,12 @@ def add_mock_s3_data(mock_s3_fs, data):
     time last modified."""
     time_modified = to_iso8601(datetime.datetime.utcnow())
     for bucket_name, key_name_to_bytes in data.iteritems():
-        mock_s3_fs.setdefault(bucket_name, {'keys':{}, 'location': ''})
+        mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
 
         for key_name, bytes in key_name_to_bytes.iteritems():
             bucket['keys'][key_name] = (bytes, time_modified)
+
 
 class MockS3Connection(object):
     """Mock out boto.s3.Connection
@@ -91,13 +91,14 @@ class MockS3Connection(object):
         else:
             self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': ''}
 
+
 class MockBucket:
     """Mock out boto.s3.Bucket
     """
     def __init__(self, connection=None, name=None, location=None):
         """You can optionally specify a 'data' argument, which will instantiate
-        mock keys and mock data. data should be a map from key name to bytes and
-        time last modified.
+        mock keys and mock data. data should be a map from key name to bytes
+        and time last modified.
         """
         self.name = name
         self.connection = connection
@@ -132,6 +133,7 @@ class MockBucket:
         for key_name in sorted(self.mock_state()):
             if key_name.startswith(prefix):
                 yield MockKey(bucket=self, name=key_name)
+
 
 class MockKey(object):
     """Mock out boto.s3.Key"""
@@ -209,12 +211,14 @@ class MockKey(object):
 
     etag = property(_get_etag)
 
+
 ### EMR ###
 
 def to_iso8601(when):
     """Convert a datetime to ISO8601 format.
     """
     return when.strftime(boto.utils.ISO8601)
+
 
 class MockEmrConnection(object):
     """Mock out boto.emr.EmrConnection. This actually handles a small
@@ -241,16 +245,29 @@ class MockEmrConnection(object):
         Step numbers are 0-indexed.
 
         Extra args:
-        :param mock_s3_fs: a mock S3 filesystem to point to (just a dictionary mapping bucket name to key name to bytes)
-        :param mock_emr_job_flows: a mock set of EMR job flows to point to (just a map from job flow ID to a :py:class:`MockEmrObject` representing a job flow)
-        :param mock_emr_failures: a map from ``(job flow ID, step_num)`` to a failure message (or ``None`` for the default message)
-        :param mock_emr_output: a map from ``(job flow ID, step_num)`` to a list of ``str``s representing file contents to output when the job completes
+        :param mock_s3_fs: a mock S3 filesystem to point to (just a dictionary
+                           mapping bucket name to key name to bytes)
+        :param mock_emr_job_flows: a mock set of EMR job flows to point to
+                                   (just a map from job flow ID to a
+                                   :py:class:`MockEmrObject` representing a job
+                                   flow)
+        :param mock_emr_failures: a map from ``(job flow ID, step_num)`` to a
+                                  failure message (or ``None`` for the default
+                                  message)
+        :param mock_emr_output: a map from ``(job flow ID, step_num)`` to a
+                                list of ``str``s representing file contents to
+                                output when the job completes
         :type max_job_flows_returned: int
-        :param max_job_flows_returned: the maximum number of job flows that :py:meth:`describe_jobflows` can return, to simulate a real limitation of EMR
+        :param max_job_flows_returned: the maximum number of job flows that
+                                       :py:meth:`describe_jobflows` can return,
+                                       to simulate a real limitation of EMR
         :type max_days_ago: int
-        :param max_days_ago: the maximum amount of days that EMR will go back in time
+        :param max_days_ago: the maximum amount of days that EMR will go back
+                             in time
         :type max_simulation_steps: int
-        :param max_simulation_steps: the maximum number of times we can simulate the progress of EMR job flows (to protect against simulating forever)
+        :param max_simulation_steps: the maximum number of times we can
+                                     simulate the progress of EMR job flows (to
+                                     protect against simulating forever)
         """
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.mock_emr_job_flows = combine_values({}, mock_emr_job_flows)
@@ -350,7 +367,8 @@ class MockEmrConnection(object):
                                   datetime.timedelta(days=self.max_days_ago))
             if created_before < min_created_before:
                 raise boto.exception.BotoServerError(
-                    400, 'Bad Request', body="""<ErrorResponse xmlns="http://elasticmapreduce.amazonaws.com/doc/2009-03-31">
+                    400, 'Bad Request', body="""\
+<ErrorResponse xmlns="http://elasticmapreduce.amazonaws.com/doc/2009-03-31">
   <Error>
     <Type>Sender</Type>
     <Code>ValidationError</Code>
@@ -418,7 +436,7 @@ class MockEmrConnection(object):
         args = step.args()
         for i, arg in reversed(list(enumerate(args[:-1]))):
             if arg == '-output':
-                return args[i+1]
+                return args[i + 1]
         else:
             return None
 
@@ -509,7 +527,6 @@ class MockEmrConnection(object):
                     "(it doesn't output to S3)" %
                     (jobflow_id, step_num))
 
-
             # done!
             return
 
@@ -543,7 +560,7 @@ class MockEmrObject(object):
             return False
 
         for k, v in my_items:
-            if not other_items.has_key(k):
+            if not k in other_items:
                 return False
             else:
                 if v != other_items[k]:

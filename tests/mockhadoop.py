@@ -33,7 +33,6 @@ from __future__ import with_statement
 
 import datetime
 import glob
-import logging
 import os
 import pipes
 import shutil

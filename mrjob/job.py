@@ -1484,7 +1484,6 @@ class MRJob(object):
             'python_bin': self.options.python_bin,
             'setup_cmds': self.options.setup_cmds,
             'setup_scripts': self.options.setup_scripts,
-            'sort_values': self.sort_values(),
             'stdin': self.stdin,
             'steps_python_bin': self.options.steps_python_bin,
             'upload_archives': self.options.upload_archives,
@@ -1734,36 +1733,7 @@ class MRJob(object):
         """
         return self.output_protocol().read(line)
 
-    ### Sorting and Partitioning ###
-
-    #: Set this to ``True`` if you would like reducers to receive the values
-    #: associated with any key in sorted order (sorted by their *encoded*
-    #: value).
-    #:
-    #: This can be useful if you expect more values than you can fit in memory
-    #: to be associated with one key, but you want to apply information in
-    #: a small subset of these values to information in the other values.
-    #: For example, you may want to convert counts to percentages, and to do
-    #: this you first need to know the total count.
-    #:
-    #: Even though values are sorted by their encoded value, most encodings
-    #: will sort strings in order. For example, you could have values like:
-    #: ``['A', <total>]``, ``['B', <count_name>, <count>]``, and the value
-    #: containing the total should come first regardless of what protocol
-    #: you're using.
-    #:
-    #: This is ignored if you set Hadoop partitioner explicitly (see
-    #: :py:meth:`partitioner`).
-    SORT_VALUES = None
-
-    def sort_values(self):
-        """True if reducers to receive the values associated with any key in
-        sorted order.
-
-        This just returns :py:attr:`SORT_VALUES`. You probably don't need to
-        re-define this function; it's just here for consistency.
-        """
-        return self.SORT_VALUES
+    ### Partitioning ###
 
     #: Optional Hadoop partitioner class to use to determine how mapper
     #: output should be sorted and distributed to reducers. For example:

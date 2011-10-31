@@ -56,16 +56,14 @@ class InlineMRJobRunner(MRJobRunner):
         args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 
         * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*,
-          and *hadoop_streaming_jar*, and *jobconf* are ignored because they
-          require Java. If you need to test these, consider starting up a
-          standalone Hadoop instance and running your job with ``-r hadoop``.
+          and *hadoop_streaming_jar*, *jobconf*, and *partitioner* are ignored
+          because they require Java. If you need to test these, consider
+          starting up a standalone Hadoop instance and running your job with
+          ``-r hadoop``.
         * *cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*,
           *steps_python_bin*, *upload_archives*, and *upload_files* are ignored
           because we don't invoke the job as a subprocess or run it in its own
           directory.
-        * Reducers currently *always* receive values associated with a key in
-          sorted order, regardless of whether *partitioner* and *sort_values*
-          are set.
         """
         super(InlineMRJobRunner, self).__init__(**kwargs)
         assert issubclass(mrjob_cls, MRJob)

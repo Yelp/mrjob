@@ -65,12 +65,9 @@ class LocalMRJobRunner(MRJobRunner):
         * *python_bin* defaults to ``sys.executable`` (the current python
           interpreter)
         * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*,
-          and *hadoop_streaming_jar* are ignored because they require Java. If
-          you need to test these, consider starting up a standalone Hadoop
-          instance and running your job with ``-r hadoop``.
-        * Reducers currently *always* receive values associated with a key in
-          sorted order, regardless of whether *partitioner* and *sort_values*
-          are set.
+          *hadoop_streaming_jar*, and *partitioner* are ignored because they
+          require Java. If you need to test these, consider starting up a
+          standalone Hadoop instance and running your job with ``-r hadoop``.
         """
         super(LocalMRJobRunner, self).__init__(**kwargs)
 

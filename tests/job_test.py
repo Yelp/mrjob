@@ -17,7 +17,6 @@
 from __future__ import with_statement
 
 from optparse import OptionError
-from optparse import OptionValueError
 import os
 import shutil
 from subprocess import Popen
@@ -42,7 +41,10 @@ from mrjob.job import _IDENTITY_MAPPER
 from mrjob.job import UsageError
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import parse_mr_job_stderr
-from mrjob.protocol import *
+from mrjob.protocol import JSONProtocol
+from mrjob.protocol import PickleProtocol
+from mrjob.protocol import RawValueProtocol
+from mrjob.protocol import ReprProtocol
 from mrjob.util import log_to_stream
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
@@ -109,13 +111,13 @@ class MRInitJob(MRJob):
         self.multiplier += 10
 
     def reducer(self, key, values):
-        yield(None, sum(values)*self.multiplier)
+        yield(None, sum(values) * self.multiplier)
 
     def combiner_init(self):
         self.combiner_multiplier = 2
 
     def combiner(self, key, values):
-        yield(None, sum(values)*self.combiner_multiplier)
+        yield(None, sum(values) * self.combiner_multiplier)
 
 
 class MRInvisibleMapperJob(MRJob):
@@ -178,8 +180,8 @@ class MRCustomBoringJob(MRBoringJob):
         self.add_passthrough_option(
             '--planck-constant', '-C', type='float', default=6.626068e-34)
         self.add_passthrough_option(
-            '--extra-special-arg', '-S', action='append', dest='extra_special_args',
-            default=[])
+            '--extra-special-arg', '-S', action='append',
+            dest='extra_special_args', default=[])
 
         self.add_file_option('--foo-config', dest='foo_config', default=None)
         self.add_file_option('--accordian-file', dest='accordian_files',
@@ -192,12 +194,23 @@ class MRTestCase(TestCase):
     # some basic testing for the mr() function
     def test_mr(self):
 
-        def mapper(k, v): pass
-        def mapper_init(): pass
-        def mapper_final(): pass
-        def reducer(k, vs): pass
-        def reducer_init(): pass
-        def reducer_final(): pass
+        def mapper(k, v):
+            pass
+
+        def mapper_init():
+            pass
+
+        def mapper_final():
+            pass
+
+        def reducer(k, vs):
+            pass
+
+        def reducer_init():
+            pass
+
+        def reducer_final():
+            pass
 
         # make sure it returns the format we currently expect
         assert_equal(MRJob.mr(mapper, reducer),
@@ -216,9 +229,15 @@ class MRTestCase(TestCase):
                      stepdict(mapper))
 
     def test_no_mapper(self):
-        def mapper_init(): pass
-        def mapper_final(): pass
-        def reducer(k, vs): pass
+
+        def mapper_init():
+            pass
+
+        def mapper_final():
+            pass
+
+        def reducer(k, vs):
+            pass
 
         assert_raises(Exception, MRJob.mr)
         assert_equal(MRJob.mr(reducer=reducer),
@@ -233,8 +252,12 @@ class MRTestCase(TestCase):
                               mapper_init=mapper_init))
 
     def test_no_reducer(self):
-        def reducer_init(): pass
-        def reducer_final(): pass
+
+        def reducer_init():
+            pass
+
+        def reducer_final():
+            pass
 
         assert_equal(MRJob.mr(reducer_init=reducer_init),
                      stepdict(reducer_init=reducer_init))
@@ -247,7 +270,9 @@ class MRInitTestCase(TestCase):
     def test_init_funcs(self):
         num_inputs = 2
         stdin = StringIO("x\n" * num_inputs)
-        mr_job = MRInitJob(['-r', 'inline', '--no-conf', '-']).sandbox(stdin=stdin)
+        mr_job = MRInitJob(['-r', 'inline', '--no-conf', '-'])
+        mr_job.sandbox(stdin=stdin)
+
         results = []
         with mr_job.make_runner() as runner:
             runner.run()
@@ -256,7 +281,7 @@ class MRInitTestCase(TestCase):
                 results.append(value)
         # these numbers should match if mapper_init, reducer_init, and
         # combiner_init were called as expected
-        assert_equal(results[0], num_inputs*10*10*2)
+        assert_equal(results[0], num_inputs * 10 * 10 * 2)
 
 
 class MRNoOutputTestCase(TestCase):
@@ -264,7 +289,9 @@ class MRNoOutputTestCase(TestCase):
     def _test_no_main_with_class(self, cls):
         num_inputs = 2
         stdin = StringIO("x\n" * num_inputs)
-        mr_job = cls(['-r', 'inline', '--no-conf', '--strict-protocols', '-']).sandbox(stdin=stdin)
+        mr_job = cls(['-r', 'inline', '--no-conf', '--strict-protocols', '-'])
+        mr_job.sandbox(stdin=stdin)
+
         results = []
         with mr_job.make_runner() as runner:
             runner.run()
@@ -298,7 +325,7 @@ class NoTzsetTestCase(TestCase):
             time.tzset = self._real_time_tzset
 
     def test_init_does_not_require_tzset(self):
-        mr_job = MRJob()
+        MRJob()
 
 
 class CountersAndStatusTestCase(TestCase):
@@ -489,7 +516,6 @@ class ProtocolsTestCase(TestCase):
 
         # make sure it raises an exception
         assert_raises(Exception, mr_job.run_mapper)
-
 
 
 class DeprecatedProtocolsTestCase(TestCase):
@@ -737,7 +763,7 @@ class StepNumTestCase(TestCase):
             mr_job.run_mapper(0)
             assert_equal(mr_job.parse_output(),
                          [(None, 'foo'), ('foo', None),
-                          (None, 'bar'), ('bar', None),])
+                          (None, 'bar'), ('bar', None)])
 
         mapper0 = MRTwoStepJob()
         test_mapper0(mapper0, mapper0_input_lines)
@@ -755,7 +781,7 @@ class StepNumTestCase(TestCase):
             mr_job.sandbox(input_lines)
             mr_job.run_reducer(0)
             assert_equal(mr_job.parse_output(),
-                         [('bar', 1), ('foo', 1), (None, 2),])
+                         [('bar', 1), ('foo', 1), (None, 2)])
 
         reducer0 = MRTwoStepJob()
         test_reducer0(reducer0, reducer0_input_lines)
@@ -771,7 +797,7 @@ class StepNumTestCase(TestCase):
             mr_job.sandbox(input_lines)
             mr_job.run_mapper(1)
             assert_equal(mr_job.parse_output(),
-                         [(1, 'bar'), (1, 'foo'), (2, None),])
+                         [(1, 'bar'), (1, 'foo'), (2, None)])
 
         mapper1 = MRTwoStepJob()
         test_mapper1(mapper1, mapper1_input_lines)
@@ -906,7 +932,8 @@ class CommandLineArgsTest(TestCase):
                      ])
 
     def test_bad_custom_options(self):
-        assert_raises(ValueError, MRCustomBoringJob, ['--planck-constant', 'c'])
+        assert_raises(ValueError,
+                      MRCustomBoringJob, ['--planck-constant', 'c'])
         assert_raises(ValueError, MRCustomBoringJob, ['--pill-type=green'])
 
     def test_bad_option_types(self):
@@ -977,7 +1004,8 @@ class FileOptionsTestCase(TestCase):
 
         stdin = ['0\n', '1\n', '2\n']
 
-        mr_job = MRTowerOfPowers(['--no-conf', '-v', '--cleanup=NONE', '--n-file', n_file_path])
+        mr_job = MRTowerOfPowers(
+            ['--no-conf', '-v', '--cleanup=NONE', '--n-file', n_file_path])
         assert_equal(len(mr_job.steps()), 3)
 
         mr_job.sandbox(stdin=stdin)
@@ -986,7 +1014,8 @@ class FileOptionsTestCase(TestCase):
             with mr_job.make_runner() as runner:
                 assert isinstance(runner, LocalMRJobRunner)
                 # make sure our file gets "uploaded"
-                assert [fd for fd in runner._files if fd['path'] == n_file_path]
+                assert [fd for fd in runner._files
+                        if fd['path'] == n_file_path]
 
                 runner.run()
                 output = set()
@@ -994,7 +1023,7 @@ class FileOptionsTestCase(TestCase):
                     _, value = mr_job.parse_output_line(line)
                     output.add(value)
 
-        assert_equal(set(output), set([0, 1, ((2**3)**3)**3]))
+        assert_equal(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))
 
 
 class RunJobTestCase(TestCase):
@@ -1059,7 +1088,8 @@ class RunJobTestCase(TestCase):
 
 
 class TestBadMainCatch(TestCase):
-    """Ensure that the user cannot do anything but just call MRYourJob.run() from __main__"""
+    """Ensure that the user cannot do anything but just call MRYourJob.run()
+    from __main__()"""
 
     def test_bad_main_catch(self):
         sys.argv.append('--mapper')

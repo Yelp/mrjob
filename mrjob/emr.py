@@ -1212,8 +1212,9 @@ class EMRJobRunner(MRJobRunner):
             name = '%s: Step %d of %d' % (
                 self._job_name, step_num + 1, len(steps))
 
-            # don't terminate a job flow that we didn't create ourselves!
-            if self._opts['emr_job_flow_id']:
+            # don't terminate other people's job flows
+            if (self._opts['emr_job_flow_id'] or
+                self._opts['pool_emr_job_flows']):
                 action_on_failure = 'CANCEL_AND_WAIT'
             else:
                 action_on_failure = 'TERMINATE_JOB_FLOW'

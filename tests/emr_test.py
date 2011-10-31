@@ -501,6 +501,45 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
         assert_equal(sorted(results),
             [(1, 'bar'), (1, 'foo'), (2, None)])
 
+    def test_dont_take_down_job_flow_on_failure(self):
+        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
+        # set log_uri to None, so that when we describe the job flow, it
+        # won't have the loguri attribute, to test Issue #112
+        emr_job_flow_id = emr_conn.run_jobflow(
+            name='Development Job Flow', log_uri=None,
+            keep_alive=True)
+
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
+                               '-c', self.mrjob_conf_path,
+                               '--emr-job-flow-id', emr_job_flow_id])
+        mr_job.sandbox()
+
+        self.add_mock_s3_data({'walrus': {}})
+        self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
+
+        with mr_job.make_runner() as runner:
+            assert isinstance(runner, EMRJobRunner)
+
+            with logger_disabled('mrjob.emr'):
+                assert_raises(Exception, runner.run)
+
+            emr_conn = runner.make_emr_conn()
+            job_flow_id = runner.get_emr_job_flow_id()
+            for _ in xrange(10):
+                emr_conn.simulate_progress(job_flow_id)
+
+            job_flow = emr_conn.describe_jobflow(job_flow_id)
+            assert_equal(job_flow.state, 'WAITING')
+
+        # job shouldn't get terminated by cleanup
+        emr_conn = runner.make_emr_conn()
+        job_flow_id = runner.get_emr_job_flow_id()
+        for _ in xrange(10):
+            emr_conn.simulate_progress(job_flow_id)
+
+        job_flow = emr_conn.describe_jobflow(job_flow_id)
+        assert_equal(job_flow.state, 'WAITING')
+
 
 class HadoopVersionTestCase(MockEMRAndS3TestCase):
 
@@ -1446,7 +1485,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         try:
             shutil.rmtree(self.tmp_dir)
             self.teardown_ssh()
-        except OSError:
+        except (OSError, AttributeError):
             pass  # didn't set up SSH
 
     def sorted_results_for_runner_with_args(self, job_args):
@@ -1707,6 +1746,75 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         assert_equal(jf2.jobflowid, job_flow_id_2)
         jf1.status = 'COMPLETED'
         jf2.status = 'COMPLETED'
+
+    def test_dont_destroy_own_pooled_job_flow_on_failure(self):
+        # Issue 242: job failure shouldn't kill the pooled job flows
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
+                               '-c', self.mrjob_conf_path,
+                               '--pool-emr-job-flow'])
+        mr_job.sandbox()
+
+        self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
+
+        with mr_job.make_runner() as runner:
+            assert isinstance(runner, EMRJobRunner)
+
+            with logger_disabled('mrjob.emr'):
+                assert_raises(Exception, runner.run)
+
+            emr_conn = runner.make_emr_conn()
+            job_flow_id = runner.get_emr_job_flow_id()
+            for _ in xrange(10):
+                emr_conn.simulate_progress(job_flow_id)
+
+            job_flow = emr_conn.describe_jobflow(job_flow_id)
+            assert_equal(job_flow.state, 'WAITING')
+
+        # job shouldn't get terminated by cleanup
+        emr_conn = runner.make_emr_conn()
+        job_flow_id = runner.get_emr_job_flow_id()
+        for _ in xrange(10):
+            emr_conn.simulate_progress(job_flow_id)
+
+        job_flow = emr_conn.describe_jobflow(job_flow_id)
+        assert_equal(job_flow.state, 'WAITING')
+
+    def test_dont_destroy_other_pooled_job_flow_on_failure(self):
+        # Issue 242: job failure shouldn't kill the pooled job flows
+        _, job_flow_id = self.make_pooled_job_flow()
+         
+        self.mock_emr_failures = {(job_flow_id, 0): None}
+        
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
+                               '-c', self.mrjob_conf_path,
+                               '--pool-emr-job-flow'])
+        mr_job.sandbox()
+
+        self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
+
+        with mr_job.make_runner() as runner:
+            assert isinstance(runner, EMRJobRunner)
+
+            with logger_disabled('mrjob.emr'):
+                assert_raises(Exception, runner.run)
+
+            assert_equal(runner.get_emr_job_flow_id(), job_flow_id)
+
+            emr_conn = runner.make_emr_conn()
+            for _ in xrange(10):
+                emr_conn.simulate_progress(job_flow_id)
+
+            job_flow = emr_conn.describe_jobflow(job_flow_id)
+            assert_equal(job_flow.state, 'WAITING')
+
+        # job shouldn't get terminated by cleanup
+        emr_conn = runner.make_emr_conn()
+        job_flow_id = runner.get_emr_job_flow_id()
+        for _ in xrange(10):
+            emr_conn.simulate_progress(job_flow_id)
+
+        job_flow = emr_conn.describe_jobflow(job_flow_id)
+        assert_equal(job_flow.state, 'WAITING')
 
 
 class S3LockTestCase(MockEMRAndS3TestCase):

@@ -29,7 +29,7 @@ class MRNextWordStats(MRJob):
 
     def steps(self):
         return [self.mr(mapper=self.m_find_words,
-                        combiner=self.c_combine_counts,
+                        #combiner=self.c_combine_counts,
                         reducer=self.r_sum_counts),
                 self.mr(reducer=self.r_compute_stats)]
 

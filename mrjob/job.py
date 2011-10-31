@@ -1474,7 +1474,7 @@ class MRJob(object):
             'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
             'hadoop_version': self.options.hadoop_version,
             'input_paths': self.args,
-            'jobconf': self.options.jobconf,
+            'jobconf': self.jobconf(),
             'mr_job_script': self.mr_job_script(),
             'label': self.options.label,
             'output_dir': self.options.output_dir,
@@ -1746,8 +1746,43 @@ class MRJob(object):
 
         By default, returns whatever is passed to :option:`--partitioner`,
         of if that option isn't used, :py:attr:`PARTITIONER`.
+
+        You probably don't need to re-define this; it's just here for
+        completeness.
         """
-        return self.PARTITIONER
+        return self.options.partitioner or self.PARTITIONER
+
+    ### Jobconf ###
+
+    #: Optional jobconf arguments we should always pass to Hadoop. This
+    #: is a map from property name to value. e.g.:
+    #:
+    #: ``{'stream.num.map.output.key.fields': '4'}``
+    #:
+    #: It's recommended that you only use this to hard-code things that
+    #: affect the semantics of your job, and leave performance tweaks to
+    #: the command line or whatever you use to launch your job.
+    JOBCONF = {}
+
+    def jobconf(self):
+        """``-jobconf`` args to pass to hadoop streaming. This should be a map
+        from property name to value.
+
+        By default, this combines :option:`jobconf` options from the command
+        lines with :py:attr:`JOBCONF`, with command line arguments taking
+        precedence.
+
+        If you want to re-define this, it's strongly recommended that do
+        something like this, so as not to inadvertently disable
+        :option:`jobconf`::
+
+            def jobconf(self):
+                orig_jobconf = super(MyMRJobClass, self).jobconf()
+                custom_jobconf = ...
+
+                return mrjob.conf.combine_dicts(orig_jobconf, custom_jobconf)
+        """
+        return combine_dicts(self.JOBCONF, self.options.jobconf)
 
     ### Testing ###
 
@@ -1845,6 +1880,7 @@ class MRJob(object):
             reader = protocol
         lines = StringIO(self.stdout.getvalue())
         return [reader.read(line) for line in lines]
+
 
 if __name__ == '__main__':
     MRJob.run()

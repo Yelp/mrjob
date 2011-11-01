@@ -19,7 +19,6 @@ import os
 
 from testify import TestCase
 from testify import assert_equal
-from testify import assert_raises
 from testify import setup
 from testify import teardown
 

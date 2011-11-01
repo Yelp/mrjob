@@ -30,8 +30,23 @@ from testify import class_setup
 from testify import class_teardown
 from testify import setup
 from testify import teardown
-from mrjob.conf import *
+
 import mrjob.conf
+from mrjob.conf import combine_cmd_lists
+from mrjob.conf import combine_cmds
+from mrjob.conf import combine_dicts
+from mrjob.conf import combine_envs
+from mrjob.conf import combine_lists
+from mrjob.conf import combine_local_envs
+from mrjob.conf import combine_opts
+from mrjob.conf import combine_path_lists
+from mrjob.conf import combine_paths
+from mrjob.conf import combine_values
+from mrjob.conf import dump_mrjob_conf
+from mrjob.conf import expand_path
+from mrjob.conf import find_mrjob_conf
+from mrjob.conf import load_mrjob_conf
+from mrjob.conf import load_opts_from_mrjob_conf
 from tests.quiet import logger_disabled
 
 

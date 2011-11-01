@@ -17,9 +17,7 @@ from __future__ import with_statement
 
 from datetime import datetime
 from datetime import timedelta
-import os
 import tempfile
-from testify import TestCase
 from testify import assert_equal
 from testify import setup
 from testify import teardown
@@ -31,8 +29,9 @@ try:
 except ImportError:
     boto = None
 
-from mrjob.conf import dump_mrjob_conf
-from mrjob.tools.emr.s3_tmpwatch import *
+from mrjob.emr import EMRJobRunner
+from mrjob.parse import parse_s3_uri
+from mrjob.tools.emr.s3_tmpwatch import s3_cleanup
 from tests.emr_test import MockEMRAndS3TestCase
 from tests.mockboto import MockKey
 

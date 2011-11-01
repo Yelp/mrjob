@@ -30,13 +30,10 @@ mockssh.
 
 from __future__ import with_statement
 
-import glob
-import logging
 import os
 import pipes
 import posixpath
 import re
-import shutil
 import stat
 import sys
 

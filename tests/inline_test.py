@@ -17,27 +17,18 @@ from __future__ import with_statement
 
 from StringIO import StringIO
 import gzip
-import mrjob
 import os
 import shutil
-import signal
 from testify import TestCase
-from testify import assert_in
 from testify import assert_equal
-from testify import assert_not_equal
-from testify import assert_not_in
 from testify import setup
 from testify import teardown
 import tempfile
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.inline import InlineMRJobRunner
-from mrjob.job import MRJob
 from tests.mr_cmdenv_test import MRCmdenvTest
-from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.mr_verbose_job import MRVerboseJob
-from tests.quiet import no_handlers_for_logger
 
 
 class InlineMRJobRunnerEndToEndTestCase(TestCase):
@@ -118,7 +109,6 @@ class InlineMRJobRunnerCmdenvTest(TestCase):
                                 '--cmdenv=FOO=bar', input_path])
          mr_job.sandbox()
 
-         local_tmp_dir = None
          results = []
 
          with mr_job.make_runner() as runner:

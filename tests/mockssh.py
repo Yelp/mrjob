@@ -84,10 +84,20 @@ def mock_ssh_dir(host, path):
 
 def mock_ssh_file(host, path, contents):
     """Create a directory at ``path`` relative to the temp directory for
-    ``host``, where ``path`` is a POSIX path
+    ``host``, where ``path`` is a POSIX path.
+
+    Returns the path of the resulting file on the filesystem for sanity
+    checking.
     """
-    with open(rel_posix_to_abs_local(host, path), 'w') as f:
+    path = rel_posix_to_abs_local(host, path)
+
+    basename, name = os.path.split(path)
+    if not os.path.exists(basename):
+        os.makedirs(basename)
+
+    with open(path, 'w') as f:
         f.write(contents)
+    return path
 
 
 _SLAVE_ADDR_RE = re.compile(r'^(?P<master>.*?)!(?P<slave>.*?)=(?P<dir>.*)$')
@@ -136,7 +146,6 @@ def cat(host, args):
         print >> sys.stderr, 'No such file or directory:', local_dest
         sys.exit(1)
     with open(local_dest, 'r') as f:
-        print local_dest
         print f.read()
 
 

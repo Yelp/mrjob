@@ -14,17 +14,30 @@
 # limitations under the License.
 from __future__ import with_statement
 
-import logging
-import random
-from subprocess import Popen
+from StringIO import StringIO
 from subprocess import PIPE
+from subprocess import Popen
 from testify import TestCase
 from testify import assert_equal
 from testify import assert_in
 from testify import assert_not_equal
 from testify import assert_raises
+import logging
 
-from mrjob.parse import *
+from mrjob.parse import counter_unescape
+from mrjob.parse import find_hadoop_java_stack_trace
+from mrjob.parse import find_input_uri_for_mapper
+from mrjob.parse import find_interesting_hadoop_streaming_error
+from mrjob.parse import find_job_log_multiline_error
+from mrjob.parse import find_python_traceback
+from mrjob.parse import find_timeout_error
+from mrjob.parse import is_s3_uri
+from mrjob.parse import is_uri
+from mrjob.parse import parse_hadoop_counters_from_line
+from mrjob.parse import parse_mr_job_stderr
+from mrjob.parse import parse_port_range_list
+from mrjob.parse import parse_s3_uri
+from mrjob.parse import urlparse
 from mrjob.util import log_to_stream
 from tests.quiet import no_handlers_for_logger
 
@@ -112,6 +125,7 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
         total_traceback = self.EXAMPLE_STDERR_TRACEBACK_2 + 'junk\n'
         tb = find_python_traceback(StringIO(total_traceback))
         assert_equal(''.join(tb), self.EXAMPLE_STDERR_TRACEBACK_2)
+
 
 class FindMiscTestCase(TestCase):
 
@@ -262,7 +276,8 @@ class FindMiscTestCase(TestCase):
             ('\\(\\{\\(\\{\\[\\{\\(\\{\\}\\}', '({({[{({}}')]
         for in_str, out_str in freakquences:
             counter_string = r'Job JOBID="_001" FAILED_REDUCES="0" COUNTERS="{(%s)(%s)[(a)(a)(1)]}"' % (in_str, in_str)
-            assert_in(out_str, parse_hadoop_counters_from_line(counter_string)[0])
+            assert_in(out_str,
+                      parse_hadoop_counters_from_line(counter_string)[0])
 
 
 class ParseMRJobStderr(TestCase):
@@ -334,11 +349,13 @@ class ParseMRJobStderr(TestCase):
 class PortRangeListTestCase(TestCase):
     def test_port_range_list(self):
         assert_equal(parse_port_range_list('1234'), [1234])
-        assert_equal(parse_port_range_list('123,456,789'), [123,456,789])
+        assert_equal(parse_port_range_list('123,456,789'), [123, 456, 789])
         assert_equal(parse_port_range_list('1234,5678'), [1234, 5678])
         assert_equal(parse_port_range_list('1234:1236'), [1234, 1235, 1236])
-        assert_equal(parse_port_range_list('123:125,456'), [123,124,125,456])
-        assert_equal(parse_port_range_list('123:125,456:458'), [123,124,125,456,457,458])
+        assert_equal(parse_port_range_list('123:125,456'),
+                     [123, 124, 125, 456])
+        assert_equal(parse_port_range_list('123:125,456:458'),
+                     [123, 124, 125, 456, 457, 458])
         assert_equal(parse_port_range_list('0123'), [123])
 
         assert_raises(ValueError, parse_port_range_list, 'Alexandria')

@@ -1115,6 +1115,42 @@ class FileOptionsTestCase(TestCase):
         assert_equal(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))
 
 
+class ParseOutputTestCase(TestCase):
+    # test parse_output() method
+
+    def test_default(self):
+        # test parsing JSON
+        mr_job = MRJob()
+        output = '0\t1\n"a"\t"b"\n'
+        mr_job.stdout = StringIO(output)
+        assert_equal(mr_job.parse_output(), [(0, 1), ('a', 'b')])
+
+        # verify that stdout is not cleared
+        assert_equal(mr_job.stdout.getvalue(), output)
+
+    def test_protocol_instance(self):
+        # see if we can use the repr protocol
+        mr_job = MRJob()
+        output = "0\t1\n['a', 'b']\tset(['c', 'd'])\n"
+        mr_job.stdout = StringIO(output)
+        assert_equal(mr_job.parse_output(ReprProtocol()),
+                     [(0, 1), (['a', 'b'], set(['c', 'd']))])
+
+        # verify that stdout is not cleared
+        assert_equal(mr_job.stdout.getvalue(), output)
+
+    def test_deprecated_protocol_aliases(self):
+        # see if we can use the repr protocol
+        mr_job = MRJob()
+        output = "0\t1\n['a', 'b']\tset(['c', 'd'])\n"
+        mr_job.stdout = StringIO(output)
+        assert_equal(mr_job.parse_output('repr'),
+                     [(0, 1), (['a', 'b'], set(['c', 'd']))])
+
+        # verify that stdout is not cleared
+        assert_equal(mr_job.stdout.getvalue(), output)
+
+
 class RunJobTestCase(TestCase):
     # test invoking a job as a script
 
@@ -1176,7 +1212,7 @@ class RunJobTestCase(TestCase):
                      ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])
 
 
-class TestBadMainCatch(TestCase):
+class BadMainTestCase(TestCase):
     """Ensure that the user cannot do anything but just call MRYourJob.run()
     from __main__()"""
 

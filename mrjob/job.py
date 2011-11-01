@@ -1848,7 +1848,7 @@ class MRJob(object):
         stderr_results = parse_mr_job_stderr(self.stderr.getvalue(), counters)
         return stderr_results['counters']
 
-    def parse_output(self, protocol=DEFAULT_PROTOCOL):
+    def parse_output(self, protocol=None):
         """Convenience method for parsing output from any mapper or reducer,
         all at once.
 
@@ -1860,7 +1860,9 @@ class MRJob(object):
             output = mrjob.parse_output()
 
         :type protocol: str
-        :param protocol: the protocol to use (e.g. ``'json'``)
+        :param protocol: A protocol instance to use (e.g. JSONProtocol()),
+                         Also accepts protocol names (e.g. ``'json'``), but
+                         this is deprecated.
 
         This only works in sandbox mode. This does not clear ``self.stdout``.
         """
@@ -1868,14 +1870,13 @@ class MRJob(object):
             raise AssertionError('You must call sandbox() first;'
                                  ' parse_output() is for testing only.')
 
-        if isinstance(protocol, str):
-            reader = self.protocols()[protocol]
-        else:
-            if protocol is None:
-                protocol = self.internal_protocol()
-            reader = protocol
+        if protocol is None:
+            protocol = JSONProtocol()
+        elif isinstance(protocol, basestring):
+            protocol = self.protocols()[protocol]
+
         lines = StringIO(self.stdout.getvalue())
-        return [reader.read(line) for line in lines]
+        return [protocol.read(line) for line in lines]
 
 
 if __name__ == '__main__':

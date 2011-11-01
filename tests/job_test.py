@@ -704,6 +704,85 @@ class DeprecatedProtocolsTestCase(TestCase):
         assert_raises(Exception, mr_job.run_mapper)
 
 
+class JobConfTestCase(TestCase):
+
+    class MRJobConfJob(MRJob):
+        JOBCONF = {'mapred.foo': 'garply',
+                   'mapred.bar.bar.baz': 'foo'}
+
+    def test_empty(self):
+        mr_job = MRJob()
+
+        assert_equal(mr_job.job_runner_kwargs()['jobconf'], {})
+
+    def test_cmd_line_options(self):
+        mr_job = MRJob([
+            '--jobconf', 'mapred.foo=bar',
+            '--jobconf', 'mapred.foo=baz',
+            '--jobconf', 'mapred.qux=quux',
+        ])
+
+        assert_equal(mr_job.job_runner_kwargs()['jobconf'],
+                     {'mapred.foo': 'baz',  # second option takes priority
+                      'mapred.qux': 'quux'})
+        
+    def test_jobconf_attr(self):
+        mr_job = self.MRJobConfJob()
+
+        assert_equal(mr_job.job_runner_kwargs()['jobconf'],
+                     {'mapred.foo': 'garply',
+                      'mapred.bar.bar.baz': 'foo'})
+
+    def test_jobconf_attr_and_cmd_line_options(self):
+        mr_job = self.MRJobConfJob([
+            '--jobconf', 'mapred.foo=bar',
+            '--jobconf', 'mapred.foo=baz',
+            '--jobconf', 'mapred.qux=quux',
+        ])
+
+        assert_equal(mr_job.job_runner_kwargs()['jobconf'],
+                     {'mapred.bar.bar.baz': 'foo',
+                      'mapred.foo': 'baz',  # command line takes priority
+                      'mapred.qux': 'quux'})
+
+
+class JobConfTestCase(TestCase):
+
+    class MRPartitionerJob(MRJob):
+        PARTITIONER = 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
+
+    def test_empty(self):
+        mr_job = MRJob()
+
+        assert_equal(mr_job.job_runner_kwargs()['partitioner'], None)
+
+    def test_cmd_line_options(self):
+        mr_job = MRJob([
+            '--partitioner', 'java.lang.Object',
+            '--partitioner', 'org.apache.hadoop.mapreduce.Partitioner'
+        ])
+
+        # second option takes priority
+        assert_equal(mr_job.job_runner_kwargs()['partitioner'],
+                     'org.apache.hadoop.mapreduce.Partitioner')
+        
+    def test_partitioner_attr(self):
+        mr_job = self.MRPartitionerJob()
+
+        assert_equal(mr_job.job_runner_kwargs()['partitioner'],
+                     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
+
+    def test_partitioner_attr_and_cmd_line_options(self):
+        mr_job = self.MRPartitionerJob([
+            '--partitioner', 'java.lang.Object',
+            '--partitioner', 'org.apache.hadoop.mapreduce.Partitioner'
+        ])
+
+        # command line takes priority
+        assert_equal(mr_job.job_runner_kwargs()['partitioner'],
+                     'org.apache.hadoop.mapreduce.Partitioner')
+
+
 class IsMapperOrReducerTestCase(TestCase):
 
     def test_is_mapper_or_reducer(self):

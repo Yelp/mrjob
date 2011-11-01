@@ -297,18 +297,27 @@ class TestHadoopConfArgs(TestCase):
                       '-jobconf', 'FOO=bar',
                       ])
 
+    def test_partitioner(self):
+        partitioner = 'org.apache.hadoop.mapreduce.Partitioner'
+
+        runner = LocalMRJobRunner(conf_path=False, partitioner=partitioner)
+        assert_equal(runner._hadoop_conf_args(0, 1),
+                     ['-partitioner', partitioner])
+
     def test_hadoop_extra_args_comes_first(self):
         runner = LocalMRJobRunner(
-            conf_path=False,
             cmdenv={'FOO': 'bar'},
+            conf_path=False,
+            hadoop_extra_args=['-libjar', 'qux.jar'],
             hadoop_input_format='FooInputFormat',
             hadoop_output_format='BarOutputFormat',
             jobconf={'baz': 'quz'},
-            hadoop_extra_args=['-libjar', 'qux.jar'])
+            partitioner='java.lang.Object',
+        )
         # hadoop_extra_args should come first
         conf_args = runner._hadoop_conf_args(0, 1)
         assert_equal(conf_args[:2], ['-libjar', 'qux.jar'])
-        assert_equal(len(conf_args), 10)
+        assert_equal(len(conf_args), 12)
 
 
 class TestCat(TestCase):

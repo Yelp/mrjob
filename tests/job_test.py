@@ -393,6 +393,9 @@ class ProtocolsTestCase(TestCase):
         def internal_protocol(self):
             return ReprProtocol()
 
+    class MRBoringJob4(MRBoringJob):
+        INTERNAL_PROTOCOL = ReprProtocol
+
     class MRTrivialJob(MRJob):
         OUTPUT_PROTOCOL = ReprProtocol
 
@@ -416,8 +419,15 @@ class ProtocolsTestCase(TestCase):
         mr_job3 = self.MRBoringJob3()
         assert_equal(mr_job3.pick_protocols(0, 'M'),
                      (RawValueProtocol.read, ReprProtocol.write))
-        # output protocol should default to protocol
+        # output protocol should default to JSON
         assert_equal(mr_job3.pick_protocols(0, 'R'),
+                     (ReprProtocol.read, JSONProtocol.write))
+
+        mr_job4 = self.MRBoringJob4()
+        assert_equal(mr_job4.pick_protocols(0, 'M'),
+                     (RawValueProtocol.read, ReprProtocol.write))
+        # output protocol should default to JSON
+        assert_equal(mr_job4.pick_protocols(0, 'R'),
                      (ReprProtocol.read, JSONProtocol.write))
 
     def test_mapper_raw_value_to_json(self):

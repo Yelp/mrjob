@@ -1427,6 +1427,8 @@ class MRJob(object):
             self.options.cleanup_on_failure = parse_commas(
                 self.options.cleanup_on_failure)
 
+        # DEPRECATED protocol stuff 
+
         # output_protocol defaults to protocol
         if not self.options.output_protocol:
             self.options.output_protocol = self.options.protocol
@@ -1625,10 +1627,7 @@ class MRJob(object):
             return self.protocols()[self.options.output_protocol]
         else:
             # non-deprecated
-            if self.OUTPUT_PROTOCOL:
-                return self.OUTPUT_PROTOCOL()
-            else:
-                return self.INTERNAL_PROTOCOL()
+            return self.OUTPUT_PROTOCOL()
 
     @classmethod
     def protocols(cls):
@@ -1681,17 +1680,14 @@ class MRJob(object):
     #: See :py:data:`mrjob.protocol` for the full list of protocols.
     INTERNAL_PROTOCOL = JSONProtocol
 
-    #: Protocol to use for writing output. By default, this is set to
-    #: ``None``, which means to fall back on ``INTERNAL_PROTOCOL``.
+    #: Protocol to use for writing output. Default: :py:class:`JSONProtocol`.
     #:
-    #: For example, if you wanted steps to communicate using pickle
-    #: internally, but receive the final output in JSON, you could set::
+    #: For example, if you wanted the final output in repr, you could set::
     #:
-    #:     INTERNAL_PROTOCOL = PickleProtocol
-    #:     OUTPUT_PROTOCOL = JSONProtocol
+    #:     OUTPUT_PROTOCOL = ReprProtocol
     #:
     #: See :py:data:`mrjob.protocol` for the full list of protocols.
-    OUTPUT_PROTOCOL = None
+    OUTPUT_PROTOCOL = JSONProtocol
 
     #: DEPRECATED
     #:

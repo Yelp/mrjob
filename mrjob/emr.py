@@ -2190,7 +2190,9 @@ class EMRJobRunner(MRJobRunner):
         workaround.
         """
         for line in lines:
-            for subline in line[:-1].split('\n'):
+            if line.endswith('\n'):
+                line = line[:-1]
+            for subline in line.split('\n'):
                 yield subline + '\n'
 
     def _cat_file(self, filename):

@@ -1890,11 +1890,11 @@ class TestCatFallback(MockEMRAndS3TestCase):
         runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
                               conf_path=False)
 
-        assert_equal(list(runner.cat('s3://walrus/one')), ['one_text'])
+        assert_equal(list(runner.cat('s3://walrus/one')), ['one_text\n'])
 
     def test_ssh_cat(self):
         runner = EMRJobRunner(conf_path=False)
         self.prepare_runner_for_ssh(runner)
-        mock_ssh_file('testmaster', 'init.d', 'meow\n')
-        assert_equal(list(runner.cat('init.d')), ['meow'])
-        assert_raises(IOError, runner.cat, 'ssh://does_not_exist')
+        p = mock_ssh_file('testmaster', 'etc/init.d', 'meow')
+        assert_equal(list(runner.cat(SSH_PREFIX + runner._address + '/etc/init.d')), ['meow\n'])
+        assert_raises(IOError, list, runner.cat(SSH_PREFIX + runner._address + '/does_not_exist'))

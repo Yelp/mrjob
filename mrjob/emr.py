@@ -2190,8 +2190,10 @@ class EMRJobRunner(MRJobRunner):
         workaround.
         """
         for line in lines:
+            if line.endswith('\n'):
+                line = line[:-1]
             for subline in line.split('\n'):
-                yield subline
+                yield subline + '\n'
 
     def _cat_file(self, filename):
         ssh_match = SSH_URI_RE.match(filename)

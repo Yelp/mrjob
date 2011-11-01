@@ -1879,7 +1879,7 @@ class S3LockTestCase(MockEMRAndS3TestCase):
         assert not _lock_acquire_step_2(key, 'jf1'), 'Lock should fail'
 
 
-def TestCatFallback(MockEMRAndS3TestCase):
+class TestCatFallback(MockEMRAndS3TestCase):
 
     def test_s3_cat(self):
         self.add_mock_s3_data(
@@ -1890,11 +1890,11 @@ def TestCatFallback(MockEMRAndS3TestCase):
         runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
                               conf_path=False)
 
-        assert_equal(runner.cat('s3://walrus/one'), 'one_text')
+        assert_equal(list(runner.cat('s3://walrus/one')), ['one_text\n'])
 
     def test_ssh_cat(self):
         runner = EMRJobRunner(conf_path=False)
-        runner._address = 'not_a_real_ssh_host'
-        mock_ssh_cat({'/etc/init.d': 'meow'})
-        assert_equal(runner.cat('/etc/init.d'), 'meow')
-        assert_raises(IOError, runner.cat, 'ssh://does_not_exist')
+        self.prepare_runner_for_ssh(runner)
+        p = mock_ssh_file('testmaster', 'etc/init.d', 'meow')
+        assert_equal(list(runner.cat(SSH_PREFIX + runner._address + '/etc/init.d')), ['meow\n'])
+        assert_raises(IOError, list, runner.cat(SSH_PREFIX + runner._address + '/does_not_exist'))

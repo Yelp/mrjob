@@ -90,8 +90,11 @@ def mock_ssh_file(host, path, contents):
     checking.
     """
     path = rel_posix_to_abs_local(host, path)
+
     basename, name = os.path.split(path)
-    os.makedirs(basename)
+    if not os.path.exists(basename):
+        os.makedirs(basename)
+
     with open(path, 'w') as f:
         f.write(contents)
     return path

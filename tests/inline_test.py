@@ -57,8 +57,9 @@ class InlineMRJobRunnerEndToEndTestCase(TestCase):
         input_gz.write('foo\n')
         input_gz.close()
 
-        mr_job = MRTwoStepJob(['--runner', 'inline', '-c', self.mrjob_conf_path,
-                               '-', input_path, input_gz_path])
+        mr_job = MRTwoStepJob(
+            ['--runner', 'inline', '-c', self.mrjob_conf_path,
+             '-', input_path, input_gz_path])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
@@ -84,46 +85,46 @@ class InlineMRJobRunnerEndToEndTestCase(TestCase):
 
 class InlineMRJobRunnerCmdenvTest(TestCase):
 
-     @setup
-     def make_tmp_dir_and_mrjob_conf(self):
-         self.tmp_dir = tempfile.mkdtemp()
-         self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-         dump_mrjob_conf({'runners': {'inline': {}}},
+    @setup
+    def make_tmp_dir_and_mrjob_conf(self):
+        self.tmp_dir = tempfile.mkdtemp()
+        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        dump_mrjob_conf({'runners': {'inline': {}}},
                          open(self.mrjob_conf_path, 'w'))
 
-     @teardown
-     def rm_tmp_dir(self):
-         shutil.rmtree(self.tmp_dir)
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
 
-     def test_cmdenv(self):
-         input_path = os.path.join(self.tmp_dir, 'input')
-         with open(input_path, 'w') as input_file:
-             input_file.write('foo\n')
+    def test_cmdenv(self):
+        input_path = os.path.join(self.tmp_dir, 'input')
+        with open(input_path, 'w') as input_file:
+            input_file.write('foo\n')
 
-         # make sure previous environment is preserved
-         os.environ['SOMETHING'] = 'foofoofoo'
-         old_env = os.environ.copy()
+        # make sure previous environment is preserved
+        os.environ['SOMETHING'] = 'foofoofoo'
+        old_env = os.environ.copy()
 
-         mr_job = MRCmdenvTest(['--runner', 'inline',
-                                '-c', self.mrjob_conf_path,
-                                '--cmdenv=FOO=bar', input_path])
-         mr_job.sandbox()
+        mr_job = MRCmdenvTest(['--runner', 'inline',
+                               '-c', self.mrjob_conf_path,
+                               '--cmdenv=FOO=bar', input_path])
+        mr_job.sandbox()
 
-         results = []
+        results = []
 
-         with mr_job.make_runner() as runner:
-             assert isinstance(runner, InlineMRJobRunner)
-             runner.run()
+        with mr_job.make_runner() as runner:
+            assert isinstance(runner, InlineMRJobRunner)
+            runner.run()
 
-             for line in runner.stream_output():
-                 key, value = mr_job.parse_output_line(line)
-                 results.append((key, value))
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
 
-         assert_equal(sorted(results),
-                      [('FOO', 'bar'), ('SOMETHING', 'foofoofoo')])
+        assert_equal(sorted(results),
+                     [('FOO', 'bar'), ('SOMETHING', 'foofoofoo')])
 
-         # make sure we revert back
-         assert_equal(old_env, os.environ)
+        # make sure we revert back
+        assert_equal(old_env, os.environ)
 
 
 class TimeoutException(Exception):

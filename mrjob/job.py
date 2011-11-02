@@ -1078,16 +1078,21 @@ class MRJob(object):
 
         self.hadoop_emr_opt_group.add_option(
             '--hadoop-input-format', dest='hadoop_input_format', default=None,
-            help=('the hadoop InputFormat class used to write the data.'
-                  ' Custom formats must be included in your hadoop streaming'
-                  ' jar (see --hadoop-streaming-jar)'))
+            help=('DEPRECATED: the hadoop InputFormat class used by the first'
+                  ' step of your job to read data. Custom formats must be'
+                  ' included in your hadoop streaming jar (see'
+                  ' --hadoop-streaming-jar). Current best practice is to'
+                  ' redefine HADOOP_INPUT_FORMAT or hadoop_input_format()'
+                  ' in your job.'))
 
         self.hadoop_emr_opt_group.add_option(
-            '--hadoop-output-format', dest='hadoop_output_format',
-            default=None,
-            help=('the hadoop OutputFormat class used to write the data.'
-                  'Custom formats must be included in your hadoop streaming'
-                  ' jar (see --hadoop-streaming-jar)'))
+            '--hadoop-output-format', dest='hadoop_output_format', default=None,
+            help=('DEPRECATED: the hadoop OutputFormat class used by the first'
+                  ' step of your job to read data. Custom formats must be'
+                  ' included in your hadoop streaming jar (see'
+                  ' --hadoop-streaming-jar). Current best practice is to'
+                  ' redefine HADOOP_OUTPUT_FORMAT or hadoop_output_format()'
+                  ' in your job.'))
 
         self.hadoop_emr_opt_group.add_option(
             '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
@@ -1471,8 +1476,8 @@ class MRJob(object):
             'extra_args': self.generate_passthrough_arguments(),
             'file_upload_args': self.generate_file_upload_args(),
             'hadoop_extra_args': self.options.hadoop_extra_args,
-            'hadoop_input_format': self.options.hadoop_input_format,
-            'hadoop_output_format': self.options.hadoop_output_format,
+            'hadoop_input_format': self.hadoop_input_format(),
+            'hadoop_output_format': self.hadoop_output_format(),
             'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
             'hadoop_version': self.options.hadoop_version,
             'input_paths': self.args,
@@ -1728,6 +1733,53 @@ class MRJob(object):
                 key, value = mr_job.parse_output_line(line)
         """
         return self.output_protocol().read(line)
+
+    ### Hadoop Input/Output Formats ###
+
+    #: Optional name of an optional Hadoop ``InputFormat`` class, e.g.
+    #: ``'org.apache.hadoop.mapred.lib.NLineInputFormat'``.
+    #:
+    #: Passed to Hadoop with the *first* step of this job with the
+    #: ``-inputformat`` option.
+    HADOOP_INPUT_FORMAT = None
+
+    def hadoop_input_format(self):
+        """Optional Hadoop ``InputFormat`` class to parse input for
+        the first step of the job.
+
+        Normally, setting :py:attr:`HADOOP_INPUT_FORMAT` is sufficient;
+        redefining this method is only for when you want to get fancy.
+        """
+        if self.options.hadoop_input_format:
+            log.warn('--hadoop-input-format is deprecated as of mrjob 0.3 and'
+                     ' will no longer be supported in mrjob 0.4. Redefine'
+                     ' HADOOP_INPUT_FORMAT or hadoop_input_format() instead.')
+            return self.options.hadoop_input_format
+        else:
+            return self.HADOOP_INPUT_FORMAT
+
+    #: Optional name of an optional Hadoop ``OutputFormat`` class, e.g.
+    #: ``'org.apache.hadoop.mapred.lib.NLineOutputFormat'``.
+    #:
+    #: Passed to Hadoop with the *first* step of this job with the
+    #: ``-outputformat`` option.
+    HADOOP_OUTPUT_FORMAT = None
+
+    def hadoop_output_format(self):
+        """Optional Hadoop ``OutputFormat`` class to write output for
+        the last step of the job.
+
+        Normally, setting :py:attr:`HADOOP_OUTPUT_FORMAT` is sufficient;
+        redefining this method is only for when you want to get fancy.
+        """
+        if self.options.hadoop_output_format:
+            log.warn('--hadoop-output-format is deprecated as of mrjob 0.3 and'
+                     ' will no longer be supported in mrjob 0.4. Redefine '
+                     ' HADOOP_OUTPUT_FORMAT or hadoop_output_format() instead.'
+                     )
+            return self.options.hadoop_output_format
+        else:
+            return self.HADOOP_OUTPUT_FORMAT
 
     ### Partitioning ###
 

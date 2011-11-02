@@ -1,36 +1,37 @@
 Quick Reference
 ===============
 
-Command-line only options for all runners
------------------------------------------
+Options that can't be set from mrjob.conf (all runners)
+-------------------------------------------------------
 
-=================== ======================================================= ========================================================
-Option              Default                                                 Switches
-=================== ======================================================= ========================================================
-*conf_path*         (automatic; see :py:func:`~mrjob.conf.find_mrjob_conf`) :option:`-c`, :option:`--conf-path`, :option:`--no-conf`
-*extra_args*        ``[]``                                                  (see :py:meth:`~mrjob.job.MRJob.add_passthrough_option`)
-*file_upload_args*  ``[]``                                                  (see :py:meth:`~mrjob.job.MRJob.add_file_option`)
-*output_dir*        (automatic)                                             :option:`-o`, :option:`--output-dir`
-=================== ======================================================= ========================================================
+====================== ======================================================= ==========================================================================
+Option                 Default                                                 Switches
+====================== ======================================================= ==========================================================================
+*conf_path*            (automatic; see :py:func:`~mrjob.conf.find_mrjob_conf`) :option:`-c`, :option:`--conf-path`, :option:`--no-conf`
+*extra_args*           ``[]``                                                  (see :py:meth:`~mrjob.job.MRJob.add_passthrough_option`)
+*file_upload_args*     ``[]``                                                  (see :py:meth:`~mrjob.job.MRJob.add_file_option`)
+*hadoop_input_format*  ``None``                                                (see :py:meth:`~mrjob.job.MRJob.hadoop_input_format`)
+*hadoop_output_format* ``None``                                                (see :py:meth:`~mrjob.job.MRJob.hadoop_output_format`)
+*output_dir*           (automatic)                                             :option:`-o`, :option:`--output-dir`
+*partitioner*          ``None``                                                :option:`--partitioner` (see also :py:meth:`~mrjob.job.MRJob.partitioner`)
+====================== ======================================================= ==========================================================================
 
 See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
 
-Options for all runners
------------------------
+Other options for all runners
+-----------------------------
 
-====================== ============================== ========================================= ==========================================================
+====================== ============================== ========================================= ==================================================================
 Option                 Default                        Combined by                               Switches
-====================== ============================== ========================================= ==========================================================
+====================== ============================== ========================================= ==================================================================
 *base_tmp_dir*         (automatic)                    :py:func:`~mrjob.conf.combine_paths`      (set :envvar:`TMPDIR`)
 *bootstrap_mrjob*      ``True``                       :py:func:`~mrjob.conf.combine_values`     :option:`--boostrap-mrjob`, :option:`--no-bootstrap-mrjob`
 *cleanup*              ``'ALL'``                      :py:func:`~mrjob.conf.combine_values`     :option:`--cleanup`
 *cleanup_on_failure*   ``'NONE'``                     :py:func:`~mrjob.conf.combine_values`     :option:`--cleanup-on-failure`
 *cmdenv*               ``{}``                         :py:func:`~mrjob.conf.combine_envs`       :option:`--cmdenv`
 *hadoop_extra_args*    ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--hadoop-arg`
-*hadoop_input_format*  (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-input-format`
-*hadoop_output_format* (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-output-format`
 *hadoop_streaming_jar* (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-streaming-jar`
-*jobconf*              ``{}``                         :py:func:`~mrjob.conf.combine_dicts`      :option:`--jobconf`
+*jobconf*              ``{}``                         :py:func:`~mrjob.conf.combine_dicts`      :option:`--jobconf` (see also :py:meth:`~mrjob.job.MRJob.jobconf`)
 *label*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--label`
 *owner*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--owner`
 *python_archives*      ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--python-archive`
@@ -40,7 +41,7 @@ Option                 Default                        Combined by               
 *steps_python_bin*     (current Python interpreter)   :py:func:`~mrjob.conf.combine_cmds`       :option:`--steps-python-bin`
 *upload_archives*      ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--archive`
 *upload_files*         ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--file`
-====================== ============================== ========================================= ==========================================================
+====================== ============================== ========================================= ==================================================================
 
 See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
 

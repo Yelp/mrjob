@@ -83,10 +83,17 @@ class InlineMRJobRunner(MRJobRunner):
     # options that we ignore because they require real Hadoop
     IGNORED_HADOOP_OPTS = [
         'hadoop_extra_args',
-        'hadoop_input_format',
-        'hadoop_output_format',
         'hadoop_streaming_jar',
         'jobconf'
+    ]
+
+    # keyword arguments not in self._opts that we ignore
+    #
+    # These are stored in self._<kwarg_name>', and are always None by default
+    IGNORED_HADOOP_KWARGS = [
+        'hadoop_input_format',
+        'hadoop_output_format',
+        'partitioner',
     ]
 
     # options that we ignore because they involve running subprocesses
@@ -110,6 +117,13 @@ class InlineMRJobRunner(MRJobRunner):
             if self._opts[ignored_opt] != default_opts[ignored_opt]:
                 log.warning('ignoring %s option (requires real Hadoop): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
+
+        for ignored_kwarg in self.IGNORED_HADOOP_KWARGS:
+            value = getattr(self, '_' + ignored_kwarg)
+            if value is not None:
+                log.warning(
+                    'ignoring %s keyword arg (requires real Hadoop): %r' %
+                    (ignored_kwarg, value))
 
         for ignored_opt in self.IGNORED_LOCAL_OPTS:
             if self._opts[ignored_opt] != default_opts[ignored_opt]:

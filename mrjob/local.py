@@ -96,21 +96,35 @@ class LocalMRJobRunner(MRJobRunner):
             {'cmdenv': combine_local_envs})
 
     # options that we ignore because they require real Hadoop
-    IGNORED_OPTS = [
+    IGNORED_HADOOP_OPTS = [
         'hadoop_extra_args',
+        'hadoop_streaming_jar',
+    ]
+
+    # keyword arguments not in self._opts that we ignore
+    #
+    # These are stored in self._<kwarg_name>', and are always None by default
+    IGNORED_HADOOP_KWARGS = [
         'hadoop_input_format',
         'hadoop_output_format',
-        'hadoop_streaming_jar',
+        'partitioner',
     ]
 
     def _run(self):
         if self._opts['bootstrap_mrjob']:
             self._add_python_archive(self._create_mrjob_tar_gz() + '#')
 
-        for ignored_opt in self.IGNORED_OPTS:
+        for ignored_opt in self.IGNORED_HADOOP_OPTS:
             if self._opts[ignored_opt]:
                 log.warning('ignoring %s option (requires real Hadoop): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
+
+        for ignored_kwarg in self.IGNORED_HADOOP_KWARGS:
+            value = getattr(self, '_' + ignored_kwarg)
+            if value is not None:
+                log.warning(
+                    'ignoring %s keyword arg (requires real Hadoop): %r' %
+                    (ignored_kwarg, value))
 
         self._create_wrapper_script()
         self._setup_working_dir()

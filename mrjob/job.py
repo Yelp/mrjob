@@ -1421,7 +1421,8 @@ class MRJob(object):
                     new_cleanup_options.append(choice)
                 else:
                     self.option_parser.error(cleanup_error % choice)
-            if 'NONE' in new_cleanup_options and len(new_cleanup_options) > 1:
+            if ('NONE' in new_cleanup_options and
+                len(set(new_cleanup_options)) > 1):
                 self.option_parser.error(
                     'Cannot clean up both nothing and something!')
             return new_cleanup_options

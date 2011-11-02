@@ -311,8 +311,8 @@ class MRJobRunner(object):
             for choice in opt_list:
                 if choice not in CLEANUP_CHOICES:
                     raise ValueError(error_str % choice)
-            if 'NONE' in opt_list and len(opt_list) > 1:
-                self.option_parser.error(
+            if 'NONE' in opt_list and len(set(opt_list)) > 1:
+                raise ValueError(
                     'Cannot clean up both nothing and something!')
 
         cleanup_error = ('cleanup must be one of %s, not %%s' %

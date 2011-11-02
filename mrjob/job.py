@@ -1432,7 +1432,7 @@ class MRJob(object):
             self.options.cleanup_on_failure = parse_commas(
                 self.options.cleanup_on_failure)
 
-        # DEPRECATED protocol stuff 
+        # DEPRECATED protocol stuff
 
         # output_protocol defaults to protocol
         if not self.options.output_protocol:
@@ -1759,7 +1759,7 @@ class MRJob(object):
             return self.HADOOP_INPUT_FORMAT
 
     #: Optional name of an optional Hadoop ``OutputFormat`` class, e.g.
-    #: ``'org.apache.hadoop.mapred.lib.NLineOutputFormat'``.
+    #: ``'org.apache.hadoop.mapred.FileOutputFormat'``.
     #:
     #: Passed to Hadoop with the *first* step of this job with the
     #: ``-outputformat`` option.

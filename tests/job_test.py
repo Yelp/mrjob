@@ -46,6 +46,7 @@ from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.util import log_to_stream
+from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_nomapper_multistep import MRNoMapper
@@ -720,6 +721,10 @@ class JobConfTestCase(TestCase):
         JOBCONF = {'mapred.foo': 'garply',
                    'mapred.bar.bar.baz': 'foo'}
 
+    class MRJobConfMethodJob(MRJob):
+        def jobconf(self):
+            return {'mapred.baz': 'bar'}
+
     def test_empty(self):
         mr_job = MRJob()
 
@@ -735,7 +740,7 @@ class JobConfTestCase(TestCase):
         assert_equal(mr_job.job_runner_kwargs()['jobconf'],
                      {'mapred.foo': 'baz',  # second option takes priority
                       'mapred.qux': 'quux'})
-        
+
     def test_jobconf_attr(self):
         mr_job = self.MRJobConfJob()
 
@@ -755,8 +760,88 @@ class JobConfTestCase(TestCase):
                       'mapred.foo': 'baz',  # command line takes priority
                       'mapred.qux': 'quux'})
 
+    def test_redefined_jobconf_method(self):
+        mr_job = self.MRJobConfMethodJob()
 
-class JobConfTestCase(TestCase):
+        assert_equal(mr_job.job_runner_kwargs()['jobconf'],
+                     {'mapred.baz': 'bar'})
+
+    def test_redefined_jobconf_method_overrides_cmd_line(self):
+        mr_job = self.MRJobConfMethodJob([
+            '--jobconf', 'mapred.foo=bar',
+            '--jobconf', 'mapred.baz=foo',
+        ])
+
+        # --jobconf is ignored because that's the way we defined jobconf()
+        assert_equal(mr_job.job_runner_kwargs()['jobconf'],
+                     {'mapred.baz': 'bar'})
+
+
+class HadoopFormatTestCase(TestCase):
+
+    # MRHadoopFormatJob is imported above
+
+    class MRHadoopFormatMethodJob(MRJob):
+
+        def hadoop_input_format(self):
+            return 'mapred.ReasonableInputFormat'
+
+        def hadoop_output_format(self):
+            # not a real Java class, thank god :)
+            return 'mapred.EbcdicDb2EnterpriseXmlOutputFormat'
+
+    def test_empty(self):
+        mr_job = MRJob()
+
+        assert_equal(mr_job.job_runner_kwargs()['hadoop_input_format'], None)
+        assert_equal(mr_job.job_runner_kwargs()['hadoop_output_format'], None)
+
+    def test_hadoop_format_attributes(self):
+        mr_job = MRHadoopFormatJob()
+
+        assert_equal(mr_job.job_runner_kwargs()['hadoop_input_format'],
+                     'mapred.FooInputFormat')
+        assert_equal(mr_job.job_runner_kwargs()['hadoop_output_format'],
+                     'mapred.BarOutputFormat')
+
+    def test_hadoop_format_methods(self):
+        mr_job = self.MRHadoopFormatMethodJob()
+
+        assert_equal(mr_job.job_runner_kwargs()['hadoop_input_format'],
+                     'mapred.ReasonableInputFormat')
+        assert_equal(mr_job.job_runner_kwargs()['hadoop_output_format'],
+                     'mapred.EbcdicDb2EnterpriseXmlOutputFormat')
+
+    def test_deprecated_command_line_options(self):
+        mr_job = MRJob([
+            '--hadoop-input-format',
+            'org.apache.hadoop.mapred.lib.NLineInputFormat',
+            '--hadoop-output-format',
+            'org.apache.hadoop.mapred.FileOutputFormat',
+            ])
+
+        with logger_disabled('mrjob.job'):
+            assert_equal(mr_job.job_runner_kwargs()['hadoop_input_format'],
+                         'org.apache.hadoop.mapred.lib.NLineInputFormat')
+            assert_equal(mr_job.job_runner_kwargs()['hadoop_output_format'],
+                         'org.apache.hadoop.mapred.FileOutputFormat')
+
+    def test_deprecated_command_line_options_override_attrs(self):
+        mr_job = MRHadoopFormatJob([
+            '--hadoop-input-format',
+            'org.apache.hadoop.mapred.lib.NLineInputFormat',
+            '--hadoop-output-format',
+            'org.apache.hadoop.mapred.FileOutputFormat',
+            ])
+
+        with logger_disabled('mrjob.job'):
+            assert_equal(mr_job.job_runner_kwargs()['hadoop_input_format'],
+                         'org.apache.hadoop.mapred.lib.NLineInputFormat')
+            assert_equal(mr_job.job_runner_kwargs()['hadoop_output_format'],
+                         'org.apache.hadoop.mapred.FileOutputFormat')
+
+
+class PartitionerTestCase(TestCase):
 
     class MRPartitionerJob(MRJob):
         PARTITIONER = 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
@@ -775,7 +860,7 @@ class JobConfTestCase(TestCase):
         # second option takes priority
         assert_equal(mr_job.job_runner_kwargs()['partitioner'],
                      'org.apache.hadoop.mapreduce.Partitioner')
-        
+
     def test_partitioner_attr(self):
         mr_job = self.MRPartitionerJob()
 

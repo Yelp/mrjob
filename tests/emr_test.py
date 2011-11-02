@@ -62,6 +62,7 @@ from tests.mockssh import create_mock_ssh_script
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 
@@ -204,11 +205,9 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.mock_emr_output = {('j-MOCKJOBFLOW0', 1): [
             '1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n']}
 
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path,
-                               '-', local_input_path, remote_input_path,
-                               '--hadoop-input-format', 'FooFormat',
-                               '--hadoop-output-format', 'BarFormat'])
+        mr_job = MRHadoopFormatJob(['-r', 'emr', '-v',
+                                    '-c', self.mrjob_conf_path,
+                                    '-', local_input_path, remote_input_path])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
@@ -244,7 +243,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
             assert_equal(job_flow.state, 'COMPLETED')
             name_match = JOB_NAME_RE.match(job_flow.name)
-            assert_equal(name_match.group(1), 'mr_two_step_job')
+            assert_equal(name_match.group(1), 'mr_hadoop_format_job')
             assert_equal(name_match.group(2), getpass.getuser())
 
             # make sure our input and output formats are attached to
@@ -1415,9 +1414,7 @@ class EMRNoMapperTest(MockEMRAndS3TestCase):
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '-c', self.mrjob_conf_path,
-                               '-', local_input_path, remote_input_path,
-                               '--hadoop-input-format', 'FooFormat',
-                               '--hadoop-output-format', 'BarFormat'])
+                               '-', local_input_path, remote_input_path])
         mr_job.sandbox(stdin=stdin)
 
         results = []

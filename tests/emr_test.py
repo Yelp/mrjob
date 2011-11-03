@@ -692,6 +692,216 @@ class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
              'ec2_slave_instance_type': 'm2.xlarge'},
             'm1.large', 'c1.xlarge')
 
+    def test_ec2_core_instance_type(self):
+        self._test_instance_types(
+            {'ec2_core_instance_type': 'c1.medium',
+             'ec2_master_instance_type': 'm1.large',
+             'num_ec2_instances': 2},
+            'm1.large', 'c1.medium'
+            )
+
+class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
+
+    def _instance_group_to_tuple(self, instance_group):
+        """ Converts an InstanceGroup object to a tuple for easier
+        sorting/comparison."""
+
+        result = tuple(
+            getattr(instance_group, attr) for attr in
+            ('market', 'num_instances', 'role', 'type')
+            )
+        if hasattr(instance_group, 'bidprice'):
+            return result + (instance_group.bidprice,)
+        return result
+
+    def _assert_equal_instance_groups(self, one, another):
+        """ Takes two lists of InstanceGroups and compares them
+        for equality.
+        """
+        assert_equal(
+            sorted(self._instance_group_to_tuple(t) for t in one),
+            sorted(self._instance_group_to_tuple(t) for t in another)
+            )
+
+    def _test_instance_groups(self, kwargs, expected_groups):
+        runner = EMRJobRunner(conf_path=self.mrjob_conf_path, **kwargs)
+
+        job_flow_id = runner.make_persistent_job_flow()
+        job_flow = runner.make_emr_conn().describe_jobflow(job_flow_id)
+        self._assert_equal_instance_groups(
+            expected_groups, job_flow.instance_groups)
+
+    def test_single_instance(self):
+        self._test_instance_groups(
+            {'ec2_master_instance_type': 'c1.medium',
+             'num_ec2_core_instances' : 0},
+            [MockEmrObject(
+                role='MASTER',
+                type='c1.medium',
+                market='ON_DEMAND',
+                num_instances=1),
+             MockEmrObject(
+                role='CORE',
+                type='m1.small',
+                market='ON_DEMAND',
+                num_instances=0)
+            ])
+
+    def test_core_spot_instances(self):
+        self._test_instance_groups(
+            {'ec2_master_instance_type': 'm1.large',
+             'ec2_core_instance_type': 'c1.medium',
+             'ec2_core_instance_bid_price': '0.20',
+             'num_ec2_core_instances' : 5},
+            [MockEmrObject(
+                role='MASTER',
+                type='m1.large',
+                market='ON_DEMAND',
+                num_instances=1),
+             MockEmrObject(
+                role='CORE',
+                type='c1.medium',
+                market='SPOT',
+                bidprice='0.20',
+                num_instances=5)
+            ])
+
+    def test_core_on_demand_instances(self):
+        self._test_instance_groups(
+            {'ec2_master_instance_type': 'm1.large',
+             'ec2_core_instance_type': 'c1.medium',
+             'num_ec2_core_instances' : 5},
+            [MockEmrObject(
+                role='MASTER',
+                type='m1.large',
+                market='ON_DEMAND',
+                num_instances=1),
+             MockEmrObject(
+                role='CORE',
+                type='c1.medium',
+                market='ON_DEMAND',
+                num_instances=5)
+            ])
+
+        # Test the ec2_slave_instance_type alias
+        self._test_instance_groups(
+            {'ec2_master_instance_type': 'm1.large',
+             'ec2_slave_instance_type': 'c1.medium',
+             'num_ec2_instances' : 6},
+            [MockEmrObject(
+                role='MASTER',
+                type='m1.large',
+                market='ON_DEMAND',
+                num_instances=1),
+             MockEmrObject(
+                role='CORE',
+                type='c1.medium',
+                market='ON_DEMAND',
+                num_instances=5)
+            ])
+
+    def test_core_and_task_on_demand_instances(self):
+        self._test_instance_groups(
+            {'ec2_master_instance_type': 'm1.large',
+             'ec2_core_instance_type': 'c1.medium',
+             'num_ec2_core_instances' : 5,
+             'ec2_task_instance_type': 'm2.xlarge',
+             'num_ec2_task_instances': 20,
+             },
+            [MockEmrObject(
+                role='MASTER',
+                type='m1.large',
+                market='ON_DEMAND',
+                num_instances=1),
+             MockEmrObject(
+                role='CORE',
+                type='c1.medium',
+                market='ON_DEMAND',
+                num_instances=5),
+             MockEmrObject(
+                role='TASK',
+                type='m2.xlarge',
+                market='ON_DEMAND',
+                num_instances=20)
+            ])
+
+    def test_core_and_task_spot_instances(self):
+        self._test_instance_groups(
+            {'ec2_master_instance_type': 'm1.large',
+             'ec2_core_instance_type': 'c1.medium',
+             'ec2_core_instance_bid_price': '0.20',
+             'num_ec2_core_instances' : 10,
+             'ec2_task_instance_type': 'm2.xlarge',
+             'ec2_task_instance_bid_price': '1.00',
+             'num_ec2_task_instances': 20,
+             },
+            [MockEmrObject(
+                role='MASTER',
+                type='m1.large',
+                market='ON_DEMAND',
+                num_instances=1),
+             MockEmrObject(
+                role='CORE',
+                type='c1.medium',
+                market='SPOT',
+                bidprice='0.20',
+                num_instances=10,),
+             MockEmrObject(
+                role='TASK',
+                type='m2.xlarge',
+                market='SPOT',
+                bidprice='1.00',
+                num_instances=20)
+            ])
+
+        self._test_instance_groups(
+            {'ec2_master_instance_type': 'm1.large',
+             'ec2_core_instance_type': 'c1.medium',
+             'num_ec2_core_instances' : 10,
+             'ec2_task_instance_type': 'm2.xlarge',
+             'ec2_task_instance_bid_price': '1.00',
+             'num_ec2_task_instances': 20,
+             },
+            [MockEmrObject(
+                role='MASTER',
+                type='m1.large',
+                market='ON_DEMAND',
+                num_instances=1),
+             MockEmrObject(
+                role='CORE',
+                type='c1.medium',
+                market='ON_DEMAND',
+                num_instances=10),
+             MockEmrObject(
+                role='TASK',
+                type='m2.xlarge',
+                market='SPOT',
+                bidprice='1.00',
+                num_instances=20)
+            ])
+
+    def test_master_spot_instance(self):
+        self._test_instance_groups(
+            {'ec2_master_instance_type': 'm1.large',
+             'ec2_master_instance_bid_price': '0.50',
+             'ec2_core_instance_type': 'c1.medium',
+             'ec2_core_instance_bid_price': '0.20',
+             'num_ec2_core_instances' : 10,
+             },
+            [MockEmrObject(
+                role='MASTER',
+                type='m1.large',
+                market='SPOT',
+                bidprice='0.50',
+                num_instances=1),
+             MockEmrObject(
+                role='CORE',
+                type='c1.medium',
+                market='SPOT',
+                bidprice='0.20',
+                num_instances=10),
+            ])
+
 
 ### tests for error parsing ###
 

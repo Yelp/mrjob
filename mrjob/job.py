@@ -1098,7 +1098,7 @@ class MRJob(object):
 
         self.emr_opt_group.add_option(
             '--ec2-core-instance-type', dest='ec2_core_instance_type', default=None,
-            help='Alias for --ec2-slave-instance-type')
+            help='Type of EC2 instance for slave (or "core") nodes only')
 
         self.emr_opt_group.add_option(
             '--ec2-task-instance-type', dest='ec2_task_instance_type', default=None,

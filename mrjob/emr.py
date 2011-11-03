@@ -274,9 +274,9 @@ class EMRJobRunner(MRJobRunner):
         :type ec2_master_instance_type: str
         :param ec2_master_instance_type: same as *ec2_instance_type*, but only for the master Hadoop node. Usually you just want to use *ec2_instance_type*. Defaults to ``'m1.small'``.
         :type ec2_slave_instance_type: str
-        :param ec2_slave_instance_type: same as *ec2_instance_type*, but only for the slave Hadoop nodes. Usually you just want to use *ec2_instance_type*. Defaults to ``'m1.small'``.
+        :param ec2_slave_instance_type: same as *ec2_instance_type*, but only for the slave (or core) Hadoop nodes. Usually you just want to use *ec2_instance_type*. Defaults to ``'m1.small'``.
         :type ec2_core_instance_type: str
-        :param ec2_core_instance_type: alias for *ec2_slave_instance_type*.
+        :param ec2_core_instance_type: same as *ec2_instance_type*, but only for the slave (or core) Hadoop nodes. Usually you just want to use *ec2_instance_type*. Defaults to ``'m1.small'``.
         :type ec2_task_instance_type: str
         :param ec2_task_instance_type: same as *ec2_instance_type*, but only for the task Hadoop nodes. Used when creating a jobflow with both slave (aka "core") and task nodes.
         :type ec2_master_instance_bid_price: str
@@ -470,7 +470,7 @@ class EMRJobRunner(MRJobRunner):
         return combine_dicts(super(EMRJobRunner, cls)._default_opts(), {
             'check_emr_status_every': 30,
             'ec2_master_instance_type': 'm1.small',
-            'ec2_slave_instance_type': 'm1.small',
+            'ec2_core_instance_type': 'm1.small',
             'hadoop_streaming_jar_on_emr':
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
             'num_ec2_instances': 1,
@@ -505,23 +505,23 @@ class EMRJobRunner(MRJobRunner):
                instance type for the nodes that actually run tasks
                (see Issue #66)
 
-            2. Otherwise, if ec2_core_instance_type is specified,
+            2. Otherwise, if ec2_slave_instance_type is specified,
                (most likely via a mrjob.conf file), it is copied
-               over to ec2_slave_instance_type.
+               over to ec2_core_instance_type.
         """
         ec2_instance_type = self._opts['ec2_instance_type']
         if ec2_instance_type:
-            self._opts['ec2_slave_instance_type'] = ec2_instance_type
+            self._opts['ec2_core_instance_type'] = ec2_instance_type
             # master instance only does work when it's the only instance
             if self._opts['num_ec2_instances'] == 1:
                 self._opts['ec2_master_instance_type'] = ec2_instance_type
 
-        elif self._opts['ec2_core_instance_type']:
+        elif self._opts['ec2_slave_instance_type']:
             # ec2_core_instance_type is a command line & mrjob.conf alias
             # for ec2_slave_instance_type.
-            # Within EMRJobRunner we only ever use ec2_slave_instance_type.
-            self._opts['ec2_slave_instance_type'] = self._opts['ec2_core_instance_type']
-            self._opts['ec2_core_instance_type'] = None
+            # Within EMRJobRunner we only ever use ec2_core_instance_type.
+            self._opts['ec2_core_instance_type'] = self._opts['ec2_slave_instance_type']
+            self._opts['ec2_slave_instance_type'] = None
 
     def _fix_s3_scratch_and_log_uri_opts(self):
         """Fill in s3_scratch_uri and s3_log_uri (in self._opts) if they
@@ -947,8 +947,7 @@ class EMRJobRunner(MRJobRunner):
                     ),
                 self._create_instance_group(
                     'CORE',
-                    # (ec2_core_instance_type is an alias for slave...)
-                    self._opts['ec2_slave_instance_type'],
+                    self._opts['ec2_core_instance_type'],
                     self._opts['num_ec2_core_instances'],
                     self._opts['ec2_core_instance_bid_price']
                     )
@@ -969,7 +968,7 @@ class EMRJobRunner(MRJobRunner):
             # The common case: num_instances/master_instance_type/...
             args['num_instances'] = str(self._opts['num_ec2_instances'])
             args['master_instance_type'] = self._opts['ec2_master_instance_type']
-            args['slave_instance_type'] = self._opts['ec2_slave_instance_type']
+            args['slave_instance_type'] = self._opts['ec2_core_instance_type']
 
 
         # bootstrap actions

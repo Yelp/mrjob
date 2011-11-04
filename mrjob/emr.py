@@ -471,6 +471,7 @@ class EMRJobRunner(MRJobRunner):
             'check_emr_status_every': 30,
             'ec2_master_instance_type': 'm1.small',
             'ec2_core_instance_type': 'm1.small',
+            'ec2_task_instance_type': 'm1.small',
             'hadoop_streaming_jar_on_emr':
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
             'num_ec2_instances': 1,

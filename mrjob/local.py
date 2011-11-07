@@ -101,14 +101,15 @@ class LocalMRJobRunner(MRJobRunner):
         'hadoop_streaming_jar',
     ]
 
-    # keyword arguments not in self._opts that we ignore
-    #
-    # These are stored in self._<kwarg_name>', and are always None by default
-    IGNORED_HADOOP_KWARGS = [
-        'hadoop_input_format',
-        'hadoop_output_format',
-        'partitioner',
+    # keyword arguments that we ignore that are stored directly in
+    # self._<kwarg_name> because they aren't configurable from mrjob.conf
+    # use the version with the underscore to better support grepping our code
+    IGNORED_HADOOP_ATTRS = [
+        '_hadoop_input_format',
+        '_hadoop_output_format',
+        '_partitioner',
     ]
+
 
     def _run(self):
         if self._opts['bootstrap_mrjob']:
@@ -119,12 +120,12 @@ class LocalMRJobRunner(MRJobRunner):
                 log.warning('ignoring %s option (requires real Hadoop): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 
-        for ignored_kwarg in self.IGNORED_HADOOP_KWARGS:
-            value = getattr(self, '_' + ignored_kwarg)
+        for ignored_attr in self.IGNORED_HADOOP_ATTRS:
+            value = getattr(self, ignored_attr)
             if value is not None:
                 log.warning(
                     'ignoring %s keyword arg (requires real Hadoop): %r' %
-                    (ignored_kwarg, value))
+                    (ignored_attr[1:], value))
 
         self._create_wrapper_script()
         self._setup_working_dir()

@@ -40,7 +40,6 @@ from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_test_jobconf import MRTestJobConf
-from tests.mr_test_jobconf_old import MRTestJobConfOld
 from tests.mr_wordcount import MRWordCount
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
@@ -459,70 +458,30 @@ class LocalMRJobRunnerTestJobConfCase(TestCase):
                                input_path])
         mr_job.sandbox()
 
-        results = []
+        results = {}
 
         with mr_job.make_runner() as runner:
             runner.run()
 
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+                results[key] = value
 
-        # test that we are are not throwing exceptions
-        assert_equal(sorted(results),
-                     [('mapreduce.job.cache.archives',
-                       runner._mrjob_tar_gz_path + '#mrjob.tar.gz'),
-                     ('mapreduce.job.id', runner._job_name),
-                     ('mapreduce.job.local.dir', runner._working_dir),
-                     ('mapreduce.map.input.file', input_path),
-                     ('mapreduce.map.input.length', '4'),
-                     ('mapreduce.map.input.start', '0'),
-                     ('mapreduce.task.attempt.id',
-                      'attempt_%s_M_000000_0' % runner._job_name),
-                     ('mapreduce.task.id',
-                      'task_%s_M_000000' % runner._job_name),
-                     ('mapreduce.task.ismap', 'true'),
-                     ('mapreduce.task.output.dir',
-                      runner._output_dir),
-                     ('mapreduce.task.partition', '0'),
-                     ('user.defined', 'something')
-                    ])
-
-    def test_others_old(self):
-        input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as input_file:
-            input_file.write('foo\n')
-
-        mr_job = MRTestJobConfOld(['-c', self.mrjob_conf_path,
-                                    input_path])
-        mr_job.sandbox()
-
-        results = []
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
-
-        # test that we are are not throwing exceptions
-        assert_equal(sorted(results),
-                     [('mapreduce.job.cache.archives',
-                       runner._mrjob_tar_gz_path + '#mrjob.tar.gz'),
-                      ('mapreduce.job.id', runner._job_name),
-                      ('mapreduce.job.local.dir', runner._working_dir),
-                      ('mapreduce.map.input.file', input_path),
-                      ('mapreduce.map.input.length', '4'),
-                      ('mapreduce.map.input.start', '0'),
-                      ('mapreduce.task.attempt.id',
-                       'attempt_%s_M_000000_0' % runner._job_name),
-                      ('mapreduce.task.id',
-                       'task_%s_M_000000' % runner._job_name),
-                      ('mapreduce.task.ismap', 'true'),
-                      ('mapreduce.task.output.dir', runner._output_dir),
-                      ('mapreduce.task.partition', '0'),
-                      ])
+        assert_equal(results['mapreduce.job.cache.archives'],
+                     runner._mrjob_tar_gz_path + '#mrjob.tar.gz')
+        assert_equal(results['mapreduce.job.id'], runner._job_name),
+        assert_equal(results['mapreduce.job.local.dir'], runner._working_dir),
+        assert_equal(results['mapreduce.map.input.file'], input_path),
+        assert_equal(results['mapreduce.map.input.length'], '4'),
+        assert_equal(results['mapreduce.map.input.start'], '0'),
+        assert_equal(results['mapreduce.task.attempt.id'],
+                       'attempt_%s_m_000000_0' % runner._job_name),
+        assert_equal(results['mapreduce.task.id'],
+                       'task_%s_m_000000' % runner._job_name),
+        assert_equal(results['mapreduce.task.ismap'], 'true'),
+        assert_equal(results['mapreduce.task.output.dir'], runner._output_dir),
+        assert_equal(results['mapreduce.task.partition'], '0')
+        assert_equal(results['user.defined'], 'something')
 
 
 class CompatTestCase(TestCase):
@@ -531,10 +490,10 @@ class CompatTestCase(TestCase):
         runner = LocalMRJobRunner(hadoop_version='0.18', conf_path=False)
         runner._setup_working_dir()
         assert_in('mapred_cache_localArchives',
-                  runner._subprocess_env('M', 0).keys())
+                  runner._subprocess_env('M', 0, 0).keys())
 
     def test_environment_variables_021(self):
         runner = LocalMRJobRunner(hadoop_version='0.21', conf_path=False)
         runner._setup_working_dir()
         assert_in('mapreduce_job_cache_local_archives',
-                  runner._subprocess_env('M', 0).keys())
+                  runner._subprocess_env('M', 0, 0).keys())

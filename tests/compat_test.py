@@ -75,18 +75,6 @@ class CompatTestCase(TestCase):
         assert_equal(compat.supports_combiners_in_hadoop_streaming('0.20.203'),
                      True)
 
-    def test_translate_env(self):
-        assert_equal(compat.translate_env('0.18', 'user_name'),
-                     'user_name')
-        assert_equal(compat.translate_env('0.18', 'mapreduce_job_user_name'),
-                     'user_name')
-        assert_equal(compat.translate_env('0.19', 'user_name'),
-                     'user_name')
-        assert_equal(compat.translate_env('0.19', 'mapreduce_job_user_name'),
-                     'user_name')
-        assert_equal(compat.translate_env('0.21', 'user_name'),
-                     'mapreduce_job_user_name')
-
     def test_uses_generic_jobconf(self):
         assert_equal(compat.uses_generic_jobconf('0.18'), False)
         assert_equal(compat.uses_generic_jobconf('0.20'), True)

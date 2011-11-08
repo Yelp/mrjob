@@ -482,7 +482,7 @@ def get_jobconf_value(variable, default=None):
     return default
 
 
-def translate_jobconf(version, variable):
+def translate_jobconf(variable, version):
     """Translate *variable* to Hadoop version *version*. If it's not
     a variable we recognize, leave as-is.
     """

@@ -189,11 +189,7 @@ class LocalMRJobRunner(MRJobRunner):
         if jobconf:
             for (conf_arg, value) in jobconf.iteritems():
                 # Internally, use one canonical Hadoop version
-                try:
-                    canon_arg = translate_jobconf('0.21', conf_arg)
-                except KeyError:
-                    # probably user-defined
-                    canon_arg = conf_arg
+                canon_arg = translate_jobconf(conf_arg, '0.21')
 
                 if canon_arg == 'mapreduce.job.maps':
                     self._map_tasks = int(value)
@@ -437,7 +433,7 @@ class LocalMRJobRunner(MRJobRunner):
         version = self.get_hadoop_version()
 
         jobconf_env = dict(
-            (translate_jobconf(version, k).replace('.', '_'), v)
+            (translate_jobconf(k, version).replace('.', '_'), v)
             for (k, v) in self._opts['jobconf'].iteritems())
 
         internal_jobconf = self._simulate_jobconf_for_step(
@@ -445,7 +441,7 @@ class LocalMRJobRunner(MRJobRunner):
             input_start=input_start, input_length=input_length)
 
         internal_jobconf_env = dict(
-            (translate_jobconf(version, k).replace('.', '_'), v)
+            (translate_jobconf(k, version).replace('.', '_'), v)
             for (k, v) in internal_jobconf.iteritems())
 
         # keep the current environment because we need PATH to find binaries

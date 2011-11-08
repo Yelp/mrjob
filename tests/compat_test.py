@@ -22,7 +22,10 @@ from testify import assert_equal
 from testify import setup
 from testify import teardown
 
-from mrjob import compat
+from mrjob.compat import get_jobconf_value
+from mrjob.compat import supports_combiners_in_hadoop_streaming
+from mrjob.compat import translate_jobconf
+from mrjob.compat import uses_generic_jobconf
 
 
 class EnvVarTestCase(TestCase):
@@ -38,44 +41,44 @@ class EnvVarTestCase(TestCase):
 
     def test_get_jobconf_value_1(self):
         os.environ['user_name'] = 'Edsger W. Dijkstra'
-        assert_equal(compat.get_jobconf_value('user.name'),
+        assert_equal(get_jobconf_value('user.name'),
                      'Edsger W. Dijkstra')
-        assert_equal(compat.get_jobconf_value('mapreduce.job.user.name'),
+        assert_equal(get_jobconf_value('mapreduce.job.user.name'),
                      'Edsger W. Dijkstra')
 
     def test_get_jobconf_value_2(self):
         os.environ['mapreduce_job_user_name'] = 'Edsger W. Dijkstra'
-        assert_equal(compat.get_jobconf_value('user.name'),
+        assert_equal(get_jobconf_value('user.name'),
                      'Edsger W. Dijkstra')
-        assert_equal(compat.get_jobconf_value('mapreduce.job.user.name'),
+        assert_equal(get_jobconf_value('mapreduce.job.user.name'),
                      'Edsger W. Dijkstra')
 
 
 class CompatTestCase(TestCase):
 
     def test_translate_jobconf(self):
-        assert_equal(compat.translate_jobconf('0.18', 'user.name'),
+        assert_equal(translate_jobconf('user.name', '0.18'),
                      'user.name')
-        assert_equal(compat.translate_jobconf('0.18', 'mapreduce.job.user.name'),
+        assert_equal(translate_jobconf('mapreduce.job.user.name', '0.18'),
                      'user.name')
-        assert_equal(compat.translate_jobconf('0.19', 'user.name'),
+        assert_equal(translate_jobconf('user.name', '0.19'),
                      'user.name')
-        assert_equal(compat.translate_jobconf('0.19.2', 'mapreduce.job.user.name'),
+        assert_equal(translate_jobconf('mapreduce.job.user.name', '0.19.2'),
                      'user.name')
-        assert_equal(compat.translate_jobconf('0.21', 'user.name'),
+        assert_equal(translate_jobconf('user.name', '0.21'),
                      'mapreduce.job.user.name')
 
     def test_supports_combiners(self):
-        assert_equal(compat.supports_combiners_in_hadoop_streaming('0.19'),
+        assert_equal(supports_combiners_in_hadoop_streaming('0.19'),
                      False)
-        assert_equal(compat.supports_combiners_in_hadoop_streaming('0.19.2'),
+        assert_equal(supports_combiners_in_hadoop_streaming('0.19.2'),
                      False)
-        assert_equal(compat.supports_combiners_in_hadoop_streaming('0.20'),
+        assert_equal(supports_combiners_in_hadoop_streaming('0.20'),
                      True)
-        assert_equal(compat.supports_combiners_in_hadoop_streaming('0.20.203'),
+        assert_equal(supports_combiners_in_hadoop_streaming('0.20.203'),
                      True)
 
     def test_uses_generic_jobconf(self):
-        assert_equal(compat.uses_generic_jobconf('0.18'), False)
-        assert_equal(compat.uses_generic_jobconf('0.20'), True)
-        assert_equal(compat.uses_generic_jobconf('0.21'), True)
+        assert_equal(uses_generic_jobconf('0.18'), False)
+        assert_equal(uses_generic_jobconf('0.20'), True)
+        assert_equal(uses_generic_jobconf('0.21'), True)

@@ -17,19 +17,26 @@ from mrjob.job import MRJob
 from mrjob.compat import get_jobconf_value
 
 JOBCONF_LIST = [
-    'mapreduce.job.id', 'mapreduce.job.local.dir', 'mapreduce.task.id',
-    'mapreduce.task.attempt.id', 'mapreduce.task.ismap', 'mapreduce.task.partition',
-    'mapreduce.map.input.file', 'mapreduce.map.input.start', 'mapreduce.map.input.length',
-    'mapreduce.task.output.dir', 'mapreduce.job.cache.local.archives'
+    'mapreduce.job.id',
+    'mapreduce.job.local.dir',
+    'mapreduce.task.id',
+    'mapreduce.task.attempt.id',
+    'mapreduce.task.ismap',
+    'mapreduce.task.partition',
+    'mapreduce.map.input.file',
+    'mapreduce.map.input.start',
+    'mapreduce.map.input.length',
+    'mapreduce.task.output.dir',
+    'mapreduce.job.cache.archives'
 ]
 
-class MRJobConfTestOld(MRJob):
+
+class MRTestJobConfOld(MRJob):
 
     def mapper(self, _, line):
         for jobconf in JOBCONF_LIST:
             yield (jobconf, get_jobconf_value(jobconf))
 
+
 if __name__ == '__main__':
-    MRJobConfTestOld.run()
-
-
+    MRTestJobConfOld.run()

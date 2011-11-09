@@ -1354,7 +1354,7 @@ class MRJob(object):
         directory.
 
         We suggest against sending Berkeley DBs to your job, as
-        Berkeley DB is not forwards-compatiable (so a Berkeley DB that you
+        Berkeley DB is not forwards-compatible (so a Berkeley DB that you
         construct on your computer may not be readable from within
         Hadoop). Use SQLite databases instead. If all you need is an on-disk
         hash table, try out the :py:mod:`sqlite3dbm` module.

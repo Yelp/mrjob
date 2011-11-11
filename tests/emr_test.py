@@ -157,7 +157,9 @@ class MockEMRAndS3TestCase(TestCase):
         runner._opts['ec2_key_pair_file'] = self.keyfile_path
 
     def add_slave(self):
-        """Add a mocked slave to the cluster"""
+        """Add a mocked slave to the cluster. Caller is responsible for setting
+        runner._opts['num_ec2_instances'] to the correct number.
+        """
         slave_num = len(self.slave_ssh_roots)
         new_dir = tempfile.mkdtemp(prefix='slave_%d_ssh_root.' % slave_num)
         self.slave_ssh_roots.append(new_dir)

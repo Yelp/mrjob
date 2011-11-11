@@ -47,6 +47,19 @@ def _ssh_args(ssh_bin, address, ec2_key_pair_file):
     ]
 
 
+def check_output(out, err):
+    if err:
+        if 'No such file or directory' in err:
+            raise IOError(err)
+        elif 'Warning: Permanently added' not in err:
+            raise SSHException(err)
+
+    if 'Permission denied' in out:
+        raise SSHException(out)
+
+    return out
+
+
 def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     """Shortcut to call ssh on a Hadoop node via ``subprocess``.
 
@@ -61,21 +74,10 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     """
     args = _ssh_args(ssh_bin, address, ec2_key_pair_file) + list(cmd_args)
     p = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE)
-    out, err = p.communicate(stdin)
-
-    if err:
-        if 'No such file or directory' in err:
-            raise IOError(err)
-        elif 'Warning: Permanently added' not in err:
-            raise SSHException(err)
-
-    if 'Permission denied' in out:
-        raise SSHException(out)
-
-    return out
+    return p.communicate(stdin)
 
 
-def _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
+def ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
                             keyfile, cmd_args):
     """Some files exist on the master and can be accessed directly via SSH,
     but some files are on the slaves which can only be accessed via the master
@@ -110,7 +112,8 @@ def _poor_mans_scp(ssh_bin, addr, ec2_key_pair_file, src, dest):
     """
     with open(src, 'rb') as f:
         args = ['bash -c "cat > %s" && chmod 600 %s' % (dest, dest)]
-        ssh_run(ssh_bin, addr, ec2_key_pair_file, args, stdin=f.read())
+        check_output(*ssh_run(ssh_bin, addr, ec2_key_pair_file, args,
+                              stdin=f.read()))
 
 
 def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
@@ -131,7 +134,8 @@ def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
 
     cmd = "hadoop dfsadmin -report | grep ^Name | cut -f2 -d: | cut -f2 -d' '"
     args = ['bash -c "%s"' % cmd]
-    ips = ssh_run(ssh_bin, master_address, ec2_key_pair_file, args)
+    ips = check_output(*ssh_run(ssh_bin, master_address, ec2_key_pair_file,
+                                args))
     return [ip for ip in ips.split('\n') if ip]
 
 
@@ -147,8 +151,9 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
     """
-    out = _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
-                                  keyfile, ['cat', path])
+    out = check_output(*ssh_run_with_recursion(ssh_bin, address,
+                                               ec2_key_pair_file,
+                                               keyfile, ['cat', path]))
     if 'No such file or directory' in out:
         raise IOError("File not found: %s" % path)
     return out
@@ -167,8 +172,10 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
     """
-    out = _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
-                                  keyfile, ['find', path, '-type', 'f'])
+    out = check_output(*ssh_run_with_recursion(ssh_bin, address,
+                                                ec2_key_pair_file,
+                                                keyfile,
+                                                ['find', path, '-type', 'f']))
     if 'No such file or directory' in out:
         raise IOError("No such file or directory: %s" % path)
     return out.split('\n')

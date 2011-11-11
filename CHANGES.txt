@@ -46,14 +46,14 @@ v0.3.0, 2011-11-?? -- Worth the wait
      * default Hadoop version on EMR is 0.20 (was 0.18)
      * ec2_instance_type option now only sets instance type for slave nodes
        when there are multiple EC2 instances (Issue #66)
+     * New tool: mrjob.tools.emr.mrboss for running commands on all nodes and
+       saving output locally
    * inline mode:
      * Supports cmdenv (Issue #136)
    * local mode:
      * Runs 2 mappers and 2 reducers in parallel by default (Issue #228)
      * Preliminary Hadoop simulation for some jobconf variables (Issue #86)
  * Misc:
-   * New tool: mrjob.tools.emr.mrboss for running commands on all nodes and
-     saving output locally
    * boto 2.0+ is now required (Issue #92)
    * Removed debian packaging (should be handled separately)
 

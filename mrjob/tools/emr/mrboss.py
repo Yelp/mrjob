@@ -16,7 +16,7 @@ results in OUTPUT_DIR.
 
 Usage::
 
-    python -m mrjob.tools.emr.mrgod JOB_FLOW_ID [options] "command string"
+    python -m mrjob.tools.emr.mrboss JOB_FLOW_ID [options] "command string"
 
 Options::
 

@@ -82,15 +82,18 @@ def main():
     output_dir = os.path.abspath(options.output_dir or job_flow_id)
 
     with EMRJobRunner(emr_job_flow_id=job_flow_id, **runner_kwargs) as runner:
+        runner._enable_slave_ssh_access()
         run_on_all_nodes(runner, output_dir, cmd_args)
 
 
 def run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     """Given an :py:class:`EMRJobRunner`, run the command specified by
     *cmd_args* on all nodes in the job flow and save the stdout and stderr of
-    each run to subdirectories of *output_dir*
+    each run to subdirectories of *output_dir*.
+
+    You should probably have run :py:meth:`_enable_slave_ssh_access()` on the
+    runner before calling this function.
     """
-    runner._enable_slave_ssh_access()
 
     master_addr = runner._address_of_master()
     addresses = [master_addr]

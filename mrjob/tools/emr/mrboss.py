@@ -81,50 +81,50 @@ def main():
 
     output_dir = os.path.abspath(options.output_dir or job_flow_id)
 
-    run_on_all_nodes(job_flow_id, output_dir, runner_kwargs, cmd_args)
-
-
-def run_on_all_nodes(job_flow_id, output_dir, runner_kwargs, cmd_args):
-    """Given a job flow ID and kwargs for an :py:class:`EMRJobRunner`,
-    run the command specified by *cmd_args* on all nodes in the job flow
-    and save the stdout and stderr of each run to subdirectories of
-    *output_dir*
-    """
     with EMRJobRunner(emr_job_flow_id=job_flow_id, **runner_kwargs) as runner:
-        runner._enable_slave_ssh_access()
+        run_on_all_nodes(runner, output_dir, cmd_args)
 
-        master_addr = runner._address_of_master()
-        addresses = [master_addr]
-        if runner._opts['num_ec2_instances'] > 1:
-            addresses += ['%s!%s' % (master_addr, slave_addr)
-                          for slave_addr in runner._addresses_of_slaves()]
 
-        for addr in addresses:
-            stdout, stderr = ssh_run_with_recursion(
-                runner._opts['ssh_bin'],
-                addr,
-                runner._opts['ec2_key_pair_file'],
-                runner._ssh_key_name,
-                cmd_args,
-            )
+def run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
+    """Given an :py:class:`EMRJobRunner`, run the command specified by
+    *cmd_args* on all nodes in the job flow and save the stdout and stderr of
+    each run to subdirectories of *output_dir*
+    """
+    runner._enable_slave_ssh_access()
 
+    master_addr = runner._address_of_master()
+    addresses = [master_addr]
+    if runner._opts['num_ec2_instances'] > 1:
+        addresses += ['%s!%s' % (master_addr, slave_addr)
+                      for slave_addr in runner._addresses_of_slaves()]
+
+    for addr in addresses:
+        stdout, stderr = ssh_run_with_recursion(
+            runner._opts['ssh_bin'],
+            addr,
+            runner._opts['ec2_key_pair_file'],
+            runner._ssh_key_name,
+            cmd_args,
+        )
+
+        if print_stderr:
             print '---'
             print 'Command completed on %s.' % addr
             print stderr,
 
-            if '!' in addr:
-                base_dir = os.path.join(output_dir, 'slave ' + addr.split('!')[1])
-            else:
-                base_dir = os.path.join(output_dir, 'master')
+        if '!' in addr:
+            base_dir = os.path.join(output_dir, 'slave ' + addr.split('!')[1])
+        else:
+            base_dir = os.path.join(output_dir, 'master')
 
-            if not os.path.exists(base_dir):
-                os.makedirs(base_dir)
+        if not os.path.exists(base_dir):
+            os.makedirs(base_dir)
 
-            with open(os.path.join(base_dir, 'stdout'), 'w') as f:
-                f.write(stdout)
+        with open(os.path.join(base_dir, 'stdout'), 'w') as f:
+            f.write(stdout)
 
-            with open(os.path.join(base_dir, 'stsderr'), 'w') as f:
-                f.write(stderr)
+        with open(os.path.join(base_dir, 'stsderr'), 'w') as f:
+            f.write(stderr)
 
 
 if __name__ == '__main__':

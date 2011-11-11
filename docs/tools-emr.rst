@@ -19,6 +19,12 @@ fetch_logs
 .. automodule:: mrjob.tools.emr.fetch_logs
 
 
+mrboss
+------
+
+.. automodule:: mrjob.tools.emr.mrboss
+
+
 s3_tmpwatch
 -----------
 

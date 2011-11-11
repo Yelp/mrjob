@@ -83,4 +83,5 @@ class MRBossTestCase(MockEMRAndS3TestCase):
         with open(os.path.join(self.output_dir, 'slave testslave0', 'stdout'), 'r') as f:
             assert_equal(f.read(), 'file contents 2\n')
 
-        assert_equal(os.listdir(self.output_dir), ['master', 'slave testslave0'])
+        assert_equal(sorted(os.listdir(self.output_dir)),
+                     ['master', 'slave testslave0'])

@@ -81,10 +81,15 @@ def main():
 
     output_dir = os.path.abspath(options.output_dir or job_flow_id)
 
-    god_mode(job_flow_id, output_dir, runner_kwargs, cmd_args)
+    run_on_all_nodes(job_flow_id, output_dir, runner_kwargs, cmd_args)
 
 
-def god_mode(job_flow_id, output_dir, runner_kwargs, cmd_args):
+def run_on_all_nodes(job_flow_id, output_dir, runner_kwargs, cmd_args):
+    """Given a job flow ID and kwargs for an :py:class:`EMRJobRunner`,
+    run the command specified by *cmd_args* on all nodes in the job flow
+    and save the stdout and stderr of each run to subdirectories of
+    *output_dir*
+    """
     with EMRJobRunner(emr_job_flow_id=job_flow_id, **runner_kwargs) as runner:
         runner._enable_slave_ssh_access()
 

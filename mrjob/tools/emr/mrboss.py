@@ -94,9 +94,10 @@ def run_on_all_nodes(job_flow_id, output_dir, runner_kwargs, cmd_args):
         runner._enable_slave_ssh_access()
 
         master_addr = runner._address_of_master()
-        addresses = ([master_addr] +
-                     ['%s!%s' % (master_addr, slave_addr)
-                      for slave_addr in runner._addresses_of_slaves()])
+        addresses = [master_addr]
+        if runner._opts['num_ec2_instances'] > 1:
+            addresses += ['%s!%s' % (master_addr, slave_addr)
+                          for slave_addr in runner._addresses_of_slaves()]
 
         for addr in addresses:
             stdout, stderr = ssh_run_with_recursion(

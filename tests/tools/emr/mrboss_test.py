@@ -44,6 +44,7 @@ class MRBossTestCase(MockEMRAndS3TestCase):
                                    conf_path=False)
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
         self.prepare_runner_for_ssh(self.runner)
+        self.runner._enable_slave_ssh_access()
         self.output_dir = tempfile.mkdtemp(prefix='mrboss_wd')
 
     @teardown
@@ -83,4 +84,5 @@ class MRBossTestCase(MockEMRAndS3TestCase):
         with open(os.path.join(self.output_dir, 'slave testslave0', 'stdout'), 'r') as f:
             assert_equal(f.read(), 'file contents 2\n')
 
-        assert_equal(os.listdir(self.output_dir), ['master', 'slave testslave0'])
+        assert_equal(sorted(os.listdir(self.output_dir)),
+                     ['master', 'slave testslave0'])

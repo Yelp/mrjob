@@ -307,7 +307,7 @@ def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name):
     return False
 
 
-class LogFetchException(Exception):
+class LogFetchError(Exception):
     pass
 
 
@@ -1614,7 +1614,7 @@ class EMRJobRunner(MRJobRunner):
             self._set_s3_job_log_uri(self._describe_jobflow())
 
         if not self._s3_job_log_uri:
-            raise LogFetchException('Could not determine S3 job log URI')
+            raise LogFetchError('Could not determine S3 job log URI')
 
         return self.ls(self._s3_job_log_uri + relative_path)
 
@@ -1655,7 +1655,7 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['ec2_key_pair_file']:
             try:
                 new_counters = self._fetch_counters_ssh(step_nums)
-            except LogFetchException:
+            except LogFetchError:
                 new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
             except IOError:
                 # Can get 'file not found' if test suite was lazy or Hadoop
@@ -1692,7 +1692,7 @@ class EMRJobRunner(MRJobRunner):
         try:
             uris = self.ls_job_logs_s3(step_nums)
             return scan_for_counters_in_files(uris, self)
-        except LogFetchException, e:
+        except LogFetchError, e:
             log.info("Unable to fetch counters: %s" % e)
             return {}
 
@@ -1717,7 +1717,7 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['ec2_key_pair_file']:
             try:
                 return self._find_probable_cause_of_failure_ssh(step_nums)
-            except LogFetchException:
+            except LogFetchError:
                 return self._find_probable_cause_of_failure_s3(step_nums)
         else:
             log.info('ec2_key_pair_file not specified, going to S3')
@@ -2166,7 +2166,7 @@ class EMRJobRunner(MRJobRunner):
                 if line and not line.endswith('/'):
                     yield SSH_PREFIX + addr + line
         except SSHException, e:
-            raise LogFetchException(e)
+            raise LogFetchError(e)
 
     def _s3_ls(self, uri):
         """Helper for ls(); doesn't bother with globbing or directories"""
@@ -2216,7 +2216,7 @@ class EMRJobRunner(MRJobRunner):
                 )
                 return read_file(filename, fileobj=StringIO(output))
             except SSHException, e:
-                raise LogFetchException(e)
+                raise LogFetchError(e)
         else:
             # read from local filesystem
             return super(EMRJobRunner, self)._cat_file(filename)
@@ -2371,11 +2371,11 @@ class EMRJobRunner(MRJobRunner):
         try:
             jobflow = self._describe_jobflow(emr_conn)
             if jobflow.state not in ('WAITING', 'RUNNING'):
-                raise LogFetchException(
+                raise LogFetchError(
                     'Cannot ssh to master; job flow is not waiting or running')
         except boto.exception.S3ResponseError:
             # This error is raised by mockboto when the jobflow doesn't exist
-            raise LogFetchException('Could not get job flow information')
+            raise LogFetchError('Could not get job flow information')
 
         self._address = jobflow.masterpublicdnsname
         return self._address

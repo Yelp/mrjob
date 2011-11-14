@@ -8,6 +8,8 @@ v0.3.0, 2011-11-?? -- Worth the wait
    * Combiner support (Issue #74)
    * *_init() and *_final() methods for mappers, combiners, and reducers
      (Issue #124)
+   * mapper/combiner/reducer methods no longer need to contain a yield
+     statement if they emit no data
    * Protocols:
      * Protocols can be anything with read() and write() methods, and are
        instances by default (Issue #229)

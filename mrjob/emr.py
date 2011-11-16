@@ -1639,6 +1639,8 @@ class EMRJobRunner(MRJobRunner):
 
     def ls_all_logs_s3(self):
         """List all log files in the S3 log root directory"""
+        if not self._s3_job_log_uri:
+            self._set_s3_job_log_uri(self._describe_jobflow())
         return self.ls(self._s3_job_log_uri)
 
     ## LOG PARSING ##

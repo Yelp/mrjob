@@ -215,6 +215,7 @@ class HadoopJobRunner(MRJobRunner):
         })
 
     def get_hadoop_version(self):
+        """Invoke the hadoop executable to determine its version"""
         if not self._hadoop_version:
             stdout = self._invoke_hadoop(['version'], return_stdout=True)
             if stdout:

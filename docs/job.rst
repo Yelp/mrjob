@@ -167,6 +167,16 @@ Running specific parts of jobs
 .. automethod:: MRJob.run_reducer
 .. automethod:: MRJob.show_steps
 
+Hadoop Configuration
+^^^^^^^^^^^^^^^^^^^^
+.. autoattribute:: MRJob.HADOOP_INPUT_FORMAT
+.. automethod:: MRJob.hadoop_input_format
+.. autoattribute:: MRJob.HADOOP_OUTPUT_FORMAT
+.. automethod:: MRJob.hadoop_output_format
+.. autoattribute:: MRJob.PARTITIONER
+.. automethod:: MRJob.partitioner
+.. autoattribute:: MRJob.JOBCONF
+.. automethod:: MRJob.jobconf
 
 Hooks for testing
 -----------------

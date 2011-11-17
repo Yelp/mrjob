@@ -246,7 +246,7 @@ class HadoopJobRunner(MRJobRunner):
         local_input_files = []
 
         for path in self._input_paths:
-            if is_uri:
+            if is_uri(path):
                 # Don't even bother running the job if the input isn't there.
                 if not self.ls(path):
                     raise AssertionError(

@@ -18,15 +18,19 @@ Usage::
 
     python -m mrjob.tools.emr.create_job_flow
 
-**WARNING**: do not run this without having :py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job flows left idle can quickly become expensive!
+**WARNING**: do not run this without having
+:py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job flows
+left idle can quickly become expensive!
 """
 from __future__ import with_statement
 
-from optparse import OptionParser, OptionGroup
+from optparse import OptionParser
+from optparse import OptionGroup
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.util import scrape_options_into_new_groups, log_to_stream
+from mrjob.util import scrape_options_into_new_groups
+from mrjob.util import log_to_stream
 
 
 def main():
@@ -53,7 +57,10 @@ def main():
 
 def make_option_parser():
     usage = '%prog [options]'
-    description = 'Create a persistent EMR job flow to run jobs in. WARNING: do not run this without mrjob.tools.emr.terminate.idle_job_flows in your crontab; job flows left idle can quickly become expensive!'
+    description = (
+        'Create a persistent EMR job flow to run jobs in. WARNING: do not run'
+        ' this without mrjob.tools.emr.terminate.idle_job_flows in your'
+        ' crontab; job flows left idle can quickly become expensive!')
     option_parser = OptionParser(usage=usage, description=description)
 
     def make_option_group(halp):
@@ -62,8 +69,12 @@ def make_option_parser():
         return g
 
     runner_group = make_option_group('Running the entire job')
-    hadoop_emr_opt_group = make_option_group('Running on Hadoop or EMR (these apply when you set -r hadoop or -r emr)')
-    emr_opt_group = make_option_group('Running on Amazon Elastic MapReduce (these apply when you set -r emr)')
+    hadoop_emr_opt_group = make_option_group(
+        'Running on Hadoop or EMR (these apply when you set -r hadoop or -r'
+        ' emr)')
+    emr_opt_group = make_option_group(
+        'Running on Amazon Elastic MapReduce (these apply when you set -r'
+        ' emr)')
 
     assignments = {
         runner_group: (
@@ -89,9 +100,11 @@ def make_option_parser():
             'ec2_master_instance_type',
             'ec2_slave_instance_type',
             'emr_endpoint',
+            'emr_job_flow_pool_name',
             'enable_emr_debugging',
             'hadoop_version',
             'num_ec2_instances',
+            'pool_emr_job_flows',
             's3_endpoint',
             's3_log_uri',
             's3_scratch_uri',
@@ -101,9 +114,7 @@ def make_option_parser():
 
     # Scrape options from MRJob and index them by dest
     mr_job = MRJob()
-    job_option_groups = (mr_job.option_parser, mr_job.mux_opt_group,
-                         mr_job.proto_opt_group, mr_job.runner_opt_group,
-                         mr_job.hadoop_emr_opt_group, mr_job.emr_opt_group)
+    job_option_groups = mr_job.all_option_groups()
     scrape_options_into_new_groups(job_option_groups, assignments)
     return option_parser
 

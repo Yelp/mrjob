@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """To create your own map reduce job, subclass :py:class:`MRJob`, create a
-series of mappers and reducers, and override :py:meth:`~mrjob.job.MRJob.steps`. For example, a word counter::
+series of mappers and reducers, and override
+:py:meth:`~mrjob.job.MRJob.steps`.
+
+For example, a word counter::
 
     from mrjob.job import MRJob
 
@@ -36,7 +39,8 @@ to be run by Hadoop streaming.
 This will take in a file with lines of whitespace separated words, and
 output a file with tab-separated lines like: ``"stars"\t5``.
 
-For one-step jobs, you can also just redefine :py:meth:`~mrjob.job.MRJob.mapper` and :py:meth:`~mrjob.job.MRJob.reducer`::
+For one-step jobs, you can also just redefine
+:py:meth:`~mrjob.job.MRJob.mapper` and :py:meth:`~mrjob.job.MRJob.reducer`::
 
     from mrjob.job import MRJob
 
@@ -78,14 +82,14 @@ on your own Hadoop cluster by specifying ``-r hadoop``:
 Use :py:meth:`~mrjob.job.MRJob.make_runner` to run an
 :py:class:`~mrjob.job.MRJob` from another script::
 
-    from __future__ import with_statement # only needed on Python 2.5
+    from __future__ import with_statement  # only needed on Python 2.5
 
     mr_job = MRWordCounter(args=['-r', 'emr'])
     with mr_job.make_runner() as runner:
         runner.run()
         for line in runner.stream_output():
             key, value = mr_job.parse_output_line(line)
-            ... # do something with the parsed output
+            ...  # do something with the parsed output
 
 See :py:mod:`mrjob.examples` for more examples.
 """
@@ -93,10 +97,13 @@ See :py:mod:`mrjob.examples` for more examples.
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
-from copy import copy
 import inspect
 import itertools
-from optparse import Option, OptionParser, OptionGroup, OptionError, OptionValueError
+import logging
+from optparse import Option
+from optparse import OptionParser
+from optparse import OptionGroup
+from optparse import OptionError
 import sys
 import time
 
@@ -107,51 +114,48 @@ except ImportError:
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
-from mrjob.parse import parse_mr_job_stderr, parse_port_range_list, check_kv_pair, check_range_list
-from mrjob.protocol import DEFAULT_PROTOCOL, PROTOCOL_DICT
-from mrjob.runner import CLEANUP_CHOICES, CLEANUP_DEFAULT
-from mrjob.util import log_to_stream, read_input
+from mrjob.parse import parse_port_range_list
+from mrjob.parse import parse_mr_job_stderr
+from mrjob.parse import parse_key_value_list
+from mrjob.protocol import DEFAULT_PROTOCOL
+from mrjob.protocol import JSONProtocol
+from mrjob.protocol import PROTOCOL_DICT
+from mrjob.protocol import RawValueProtocol
+from mrjob.runner import CLEANUP_CHOICES
+from mrjob.util import log_to_stream
+from mrjob.util import parse_and_save_options
+from mrjob.util import read_input
+
+
+log = logging.getLogger('mrjob.job')
+
 
 # used by mr() below, to fake no mapper
 def _IDENTITY_MAPPER(key, value):
     yield key, value
 
+
 # sentinel value; used when running MRJob as a script
 _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
+
+
+# The former custom option class has been removed and this stub will disappear
+# permanently in mrjob 0.4.
+MRJobOptions = Option
 
 
 class UsageError(Exception):
     pass
 
 
-class MRJobOptions(Option):
-
-    TYPES = Option.TYPES + ('key_value_pair', 'range_list')
-    ACTIONS = Option.ACTIONS + ('set_key',)
-    STORE_ACTIONS = Option.STORE_ACTIONS + ('set_key',)
-    TYPED_ACTIONS = Option.TYPED_ACTIONS + ('set_key',)
-    ALWAYS_TYPED_ACTIONS = Option.ALWAYS_TYPED_ACTIONS + ('set_key',)
-
-    TYPE_CHECKER = copy(Option.TYPE_CHECKER)
-    TYPE_CHECKER["key_value_pair"] = check_kv_pair
-    TYPE_CHECKER["range_list"] = check_range_list
-
-    def take_action(self, action, dest, opt, value, values, parser):
-        if action == 'set_key':
-            try:
-                store_key, store_value = value
-            except ValueError:
-                raise OptionValueError(
-                    "option %s: value is not a key_value_pair" % opt)
-            values.ensure_value(dest, {})[store_key] = store_value
-        else:
-            Option.take_action(
-                self, action, dest, opt, value, values, parser)
-
-
 class MRJob(object):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
     for details."""
+
+    #: :py:class:`optparse.Option` subclass to use with the
+    #: :py:class:`optparse.OptionParser` instance.
+    OPTION_CLASS = Option
+
     def __init__(self, args=None):
         """Entry point for running your job from other Python code.
 
@@ -177,12 +181,26 @@ class MRJob(object):
         self._file_options = []
 
         usage = "usage: %prog [options] [input files]"
-        self.option_parser = OptionParser(
-            usage=usage, option_class=MRJobOptions)
+        self.option_parser = OptionParser(usage=usage,
+                                          option_class=self.OPTION_CLASS)
         self.configure_options()
 
-        # Load and validate options
-        self.load_options(args=args)
+        # don't pass None to parse_args unless we're actually running
+        # the MRJob script
+        if args is _READ_ARGS_FROM_SYS_ARGV:
+            self._cl_args = sys.argv[1:]
+        else:
+            # don't pass sys.argv to self.option_parser, and have it
+            # raise an exception on error rather than printing to stderr
+            # and exiting.
+            self._cl_args = args or []
+
+            def error(msg):
+                raise ValueError(msg)
+
+            self.option_parser.error = error
+
+        self.load_options(self._cl_args)
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
         # See sandbox(), below.
@@ -206,7 +224,8 @@ class MRJob(object):
         By default (if you don't mess with :ref:`job-protocols`):
          - ``key`` will be ``None``
          - ``value`` will be the raw input line, with newline stripped.
-         - ``out_key`` and ``out_value`` must be JSON-encodable: numeric, unicode, boolean, ``None``, list, or dict whose keys are unicodes.
+         - ``out_key`` and ``out_value`` must be JSON-encodable: numeric,
+           unicode, boolean, ``None``, list, or dict whose keys are unicodes.
         """
         raise NotImplementedError
 
@@ -216,11 +235,43 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``
 
         :param key: A key which was yielded by the mapper
-        :param value: A generator which yields all values yielded by the mapper which correspond to ``key``.
+        :param value: A generator which yields all values yielded by the
+                      mapper which correspond to ``key``.
 
         By default (if you don't mess with :ref:`job-protocols`):
          - ``out_key`` and ``out_value`` must be JSON-encodable.
-         - ``key`` and ``value`` will have been decoded from JSON (so tuples will become lists).
+         - ``key`` and ``value`` will have been decoded from JSON (so tuples
+           will become lists).
+        """
+        raise NotImplementedError
+
+    def combiner(self, key, values):
+        """Re-define this to define the combiner for a one-step job.
+
+        Yields one or more tuples of ``(out_key, out_value)``
+
+        :param key: A key which was yielded by the mapper
+        :param value: A generator which yields all values yielded by one mapper
+                      task/node which correspond to ``key``.
+
+        By default (if you don't mess with :ref:`job-protocols`):
+         - ``out_key`` and ``out_value`` must be JSON-encodable.
+         - ``key`` and ``value`` will have been decoded from JSON (so tuples
+           will become lists).
+        """
+        raise NotImplementedError
+
+    def mapper_init(self):
+        """Re-define this to define an action to run before the mapper
+        processes any input.
+
+        One use for this function is to initialize mapper-specific helper
+        structures.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -235,7 +286,57 @@ class MRJob(object):
         Yields one or more tuples of ``(out_key, out_value)``.
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
-        re-define :py:attr:`DEFAULT_PROTOCOL` to change this.
+        re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
+    def reducer_init(self):
+        """Re-define this to define an action to run before the reducer
+        processes any input.
+
+        One use for this function is to initialize reducer-specific helper
+        structures.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
+    def reducer_final(self):
+        """Re-define this to define an action to run after the reducer reaches
+        the end of input.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
+    def combiner_init(self):
+        """Re-define this to define an action to run before the combiner
+        processes any input.
+
+        One use for this function is to initialize combiner-specific helper
+        structures.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
+    def combiner_final(self):
+        """Re-define this to define an action to run after the combiner reaches
+        the end of input.
+
+        Yields one or more tuples of ``(out_key, out_value)``.
+
+        By default, ``out_key`` and ``out_value`` must be JSON-encodable;
+        re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
         """
         raise NotImplementedError
 
@@ -247,44 +348,95 @@ class MRJob(object):
         """Re-define this to make a multi-step job.
 
         If you don't re-define this, we'll automatically create a one-step
-        job using any of :py:meth:`mapper`, :py:meth:`mapper_final`, and
-        :py:meth:`reducer` that you've re-defined.
+        job using any of :py:meth:`mapper`, :py:meth:`mapper_init`,
+        :py:meth:`mapper_final`, :py:meth:`reducer_init`,
+        :py:meth:`reducer_final`, and :py:meth:`reducer` that you've
+        re-defined. For example::
+
+            def steps(self):
+                return [self.mr(mapper=self.transform_input,
+                                reducer=self.consolidate_1),
+                        self.mr(reducer_init=self.log_mapper_init,
+                                reducer=self.consolidate_2)]
 
         :return: a list of steps constructed with :py:meth:`mr`
         """
         # Use mapper(), mapper_final(), and reducer() only if they've been
         # re-defined
         kwargs = dict((func_name, getattr(self, func_name))
-                      for func_name in ('mapper', 'mapper_final', 'reducer')
+                      for func_name in ('mapper',
+                                        'mapper_init',
+                                        'mapper_final',
+                                        'reducer',
+                                        'reducer_init',
+                                        'reducer_final',
+                                        'combiner',
+                                        'combiner_init',
+                                        'combiner_final')
                       if (getattr(self, func_name).im_func is not
                           getattr(MRJob, func_name).im_func))
 
         return [self.mr(**kwargs)]
 
     @classmethod
-    def mr(cls, mapper=None, reducer=None, mapper_final=None):
-        """Define a step (mapper, final mapper action, and/or reducer) for your job.
+    def mr(cls, mapper=None, reducer=None, combiner=None,
+           mapper_init=None, mapper_final=None,
+           reducer_init=None, reducer_final=None,
+           combiner_init=None, combiner_final=None):
+        """Define a step (mapper, reducer, and/or any combination of
+        mapper_init, reducer_final, etc.) for your job.
 
         Used by :py:meth:`steps`. (Don't re-define this, just call it!)
 
-        :param mapper: function with same function signature as :py:meth:`mapper`, or ``None`` for an identity mapper.
-        :param reducer: function with same function signature as :py:meth:`reducer`, or ``None`` for no reducer.
-        :param mapper_final: function with same function signature as :py:meth:`mapper_final`, or ``None`` for no final mapper action. Please invoke this as a keyword argument.
+        :param mapper: function with same function signature as
+                       :py:meth:`mapper`, or ``None`` for an identity mapper.
+        :param reducer: function with same function signature as
+                        :py:meth:`reducer`, or ``None`` for no reducer.
+        :param combiner: function with same function signature as
+                         :py:meth:`combiner`, or ``None`` for no combiner.
+        :param mapper_init: function with same function signature as
+                            :py:meth:`mapper_init`, or ``None`` for no initial
+                            mapper action. Please invoke this as a keyword
+                            argument.
+        :param mapper_final: function with same function signature as
+                             :py:meth:`mapper_final`, or ``None`` for no final
+                             mapper action. Please invoke this as a keyword
+                             argument.
+        :param reducer_init: function with same function signature as
+                             :py:meth:`reducer_init`, or ``None`` for no
+                             initial reducer action. Please invoke this as a
+                             keyword argument.
+        :param reducer_final: function with same function signature as
+                              :py:meth:`reducer_final`, or ``None`` for no
+                              final reducer action. Please invoke this as a
+                              keyword argument.
+        :param combiner_init: function with same function signature as
+                              :py:meth:`combiner_init`, or ``None`` for no
+                              initial combiner action. Please invoke this as a
+                              keyword argument.
+        :param combiner_final: function with same function signature as
+                               :py:meth:`combiner_final`, or ``None`` for no
+                               final combiner action. Please invoke this as a
+                               keyword argument.
 
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.
         """
-        # Hadoop streaming requires a mapper, so patch in _IDENTITY_MAPPER
-        if not mapper:
-            mapper = _IDENTITY_MAPPER
+        step = dict(mapper=mapper, reducer=reducer, combiner=combiner,
+                    mapper_init=mapper_init, mapper_final=mapper_final,
+                    reducer_init=reducer_init, reducer_final=reducer_final,
+                    combiner_init=combiner_init, combiner_final=combiner_final)
 
-        if mapper_final:
-            return ((mapper, mapper_final), reducer)
-        else:
-            return (mapper, reducer)
+        if not any(step.itervalues()):
+            raise Exception("Step has no mappers and no reducers")
+
+        # Hadoop streaming requires a mapper, so patch in _IDENTITY_MAPPER
+        step['mapper'] = step['mapper'] or _IDENTITY_MAPPER
+
+        return step
 
     def increment_counter(self, group, counter, amount=1):
-        """Increment a hadoop counter in hadoop streaming by printing to stderr.
+        """Increment a counter in Hadoop streaming by printing to stderr.
 
         :type group: str
         :param group: counter group
@@ -337,6 +489,7 @@ class MRJob(object):
 
         * Print step information (:option:`--steps`). See :py:meth:`show_steps`
         * Run a mapper (:option:`--mapper`). See :py:meth:`run_mapper`
+        * Run a combiner (:option:`--combiner`). See :py:meth:`run_combiner`
         * Run a reducer (:option:`--reducer`). See :py:meth:`run_reducer`
         * Run the entire job. See :py:meth:`run_job`
         """
@@ -351,6 +504,9 @@ class MRJob(object):
         elif self.options.run_mapper:
             self.run_mapper(self.options.step_num)
 
+        elif self.options.run_combiner:
+            self.run_combiner(self.options.step_num)
+
         elif self.options.run_reducer:
             self.run_reducer(self.options.step_num)
 
@@ -363,11 +519,14 @@ class MRJob(object):
 
         :rtype: :py:class:`mrjob.runner.MRJobRunner`
         """
-        bad_words = ('--steps', '--mapper', '--reducer', '--step-num')
+        bad_words = (
+            '--steps', '--mapper', '--reducer', '--combiner', '--step-num')
         for w in bad_words:
             if w in sys.argv:
-                raise UsageError("make_runner() was called with %s. This probably means you tried to use it from __main__, which doesn't work." % w)
-        
+                raise UsageError("make_runner() was called with %s. This"
+                                 " probably means you tried to use it from"
+                                 " __main__, which doesn't work." % w)
+
         # have to import here so that we can still run the MRJob
         # without importing boto
         from mrjob.emr import EMRJobRunner
@@ -382,7 +541,8 @@ class MRJob(object):
             return HadoopJobRunner(**self.hadoop_job_runner_kwargs())
 
         elif self.options.runner == 'inline':
-            return InlineMRJobRunner(mrjob_cls=self.__class__, **self.inline_job_runner_kwargs())
+            return InlineMRJobRunner(
+                mrjob_cls=self.__class__, **self.inline_job_runner_kwargs())
 
         else:
             # run locally by default
@@ -416,7 +576,7 @@ class MRJob(object):
 
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception. If 
+        increment a counter rather than raising an exception. If
         --strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
@@ -425,24 +585,25 @@ class MRJob(object):
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
-        mapper = steps[step_num][0]
-
-        # special case: mapper is actually a tuple of mapper and final mapper
-        if isinstance(mapper, tuple):
-            mapper, mapper_final = mapper
-        else:
-            mapper_final = None
+        step = steps[step_num]
+        mapper = step['mapper']
+        mapper_init = step['mapper_init']
+        mapper_final = step['mapper_final']
 
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'M')
 
+        if mapper_init:
+            for out_key, out_value in mapper_init() or ():
+                write_line(out_key, out_value)
+
         # run the mapper on each line
         for key, value in read_lines():
-            for out_key, out_value in mapper(key, value):
+            for out_key, out_value in mapper(key, value) or ():
                 write_line(out_key, out_value)
 
         if mapper_final:
-            for out_key, out_value in mapper_final():
+            for out_key, out_value in mapper_final() or ():
                 write_line(out_key, out_value)
 
     def run_reducer(self, step_num=0):
@@ -453,7 +614,7 @@ class MRJob(object):
 
         If we encounter a line that can't be decoded by our input protocol,
         or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception. If 
+        increment a counter rather than raising an exception. If
         --strict-protocols is set, then an exception is raised
 
         Called from :py:meth:`run`. You'd probably only want to call this
@@ -462,12 +623,19 @@ class MRJob(object):
         steps = self.steps()
         if not 0 <= step_num < len(steps):
             raise ValueError('Out-of-range step: %d' % step_num)
-        reducer = steps[step_num][1]
+        step = steps[step_num]
+        reducer = step['reducer']
+        reducer_init = step['reducer_init']
+        reducer_final = step['reducer_final']
         if reducer is None:
             raise ValueError('No reducer in step %d' % step_num)
 
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'R')
+
+        if reducer_init:
+            for out_key, out_value in reducer_init() or ():
+                write_line(out_key, out_value)
 
         # group all values of the same key together, and pass to the reducer
         #
@@ -476,7 +644,56 @@ class MRJob(object):
         for key, kv_pairs in itertools.groupby(read_lines(),
                                                key=lambda(k, v): k):
             values = (v for k, v in kv_pairs)
-            for out_key, out_value in reducer(key, values):
+            for out_key, out_value in reducer(key, values) or ():
+                write_line(out_key, out_value)
+
+        if reducer_final:
+            for out_key, out_value in reducer_final() or ():
+                write_line(out_key, out_value)
+
+    def run_combiner(self, step_num=0):
+        """Run the combiner for the given step.
+
+        :type step_num: int
+        :param step_num: which step to run (0-indexed)
+
+        If we encounter a line that can't be decoded by our input protocol,
+        or a tuple that can't be encoded by our output protocol, we'll
+        increment a counter rather than raising an exception. If
+        --strict-protocols is set, then an exception is raised
+
+        Called from :py:meth:`run`. You'd probably only want to call this
+        directly from automated tests.
+        """
+        steps = self.steps()
+        if not 0 <= step_num < len(steps):
+            raise ValueError('Out-of-range step: %d' % step_num)
+        step = steps[step_num]
+        combiner = step['combiner']
+        combiner_init = step['combiner_init']
+        combiner_final = step['combiner_final']
+        if combiner is None:
+            raise ValueError('No combiner in step %d' % step_num)
+
+        # pick input and output protocol
+        read_lines, write_line = self._wrap_protocols(step_num, 'C')
+
+        if combiner_init:
+            for out_key, out_value in combiner_init() or ():
+                write_line(out_key, out_value)
+
+        # group all values of the same key together, and pass to the combiner
+        #
+        # be careful to use generators for everything, to allow for
+        # very large groupings of values
+        for key, kv_pairs in itertools.groupby(read_lines(),
+                                               key=lambda(k, v): k):
+            values = (v for k, v in kv_pairs)
+            for out_key, out_value in combiner(key, values) or ():
+                write_line(out_key, out_value)
+
+        if combiner_final:
+            for out_key, out_value in combiner_final() or ():
                 write_line(out_key, out_value)
 
     def show_steps(self):
@@ -493,7 +710,37 @@ class MRJob(object):
         print >> self.stdout, ' '.join(self._steps_desc())
 
     def _steps_desc(self):
-        return ['MR' if reducer else 'M' for (mapper, reducer) in self.steps()]
+        res = []
+        for step_num, step in enumerate(self.steps()):
+            mapper_funcs = ('mapper_init', 'mapper_final')
+            reducer_funcs = ('reducer', 'reducer_init', 'reducer_final')
+            combiner_funcs = ('combiner', 'combiner_init', 'combiner_final')
+
+            has_explicit_mapper = (step['mapper'] != _IDENTITY_MAPPER or
+                                   any(step[k] for k in mapper_funcs))
+            has_explicit_reducer = any(step[k] for k in reducer_funcs)
+            has_explicit_combiner = any(step[k] for k in combiner_funcs)
+
+            func_strs = []
+
+            # Print a mapper if:
+            # - The user specifies one
+            # - Different input and output protocols are used (infer from
+            #   step number)
+            # - We don't have anything else to print (excluding combiners)
+            if has_explicit_mapper \
+               or step_num == 0 \
+               or not has_explicit_reducer:
+                func_strs.append('M')
+
+            if has_explicit_combiner:
+                func_strs.append('C')
+
+            if has_explicit_reducer:
+                func_strs.append('R')
+
+            res.append(''.join(func_strs))
+        return res
 
     @classmethod
     def mr_job_script(cls):
@@ -531,7 +778,7 @@ class MRJob(object):
 
         Args:
         step_num -- which step to run (e.g. 0)
-        step_type -- 'M' for mapper, 'R' for reducer
+        step_type -- 'M' for mapper, 'C' for combiner, 'R' for reducer
         """
         read, write = self.pick_protocols(step_num, step_type)
 
@@ -566,44 +813,40 @@ class MRJob(object):
         :type step_num: int
         :param step_num: which step to run (e.g. ``0`` for the first step)
         :type step_type: str
-        :param step_type: ``'M'`` for mapper, ``'R'`` for reducer
+        :param step_type: ``'M'`` for mapper, ``'C'`` for combiner, ``'R'``
+                          for reducer
+        :return: (read_function, write_function)
 
         By default, we use one protocol for reading input, one
         internal protocol for communication between steps, and one
         protocol for final output (which is usually the same as the
         internal protocol). Protocols can be controlled by setting
-        :py:attr:`DEFAULT_INPUT_PROTOCOL`,
-        :py:attr:`DEFAULT_PROTOCOL`, and
-        :py:attr:`DEFAULT_OUTPUT_PROTOCOL`,
-        or from the command line with :option:`--input-protocol`,
-        :option:`--protocol`, and :option:`--output-protocol`.
+        :py:attr:`INPUT_PROTOCOL`, :py:attr:`INTERNAL_PROTOCOL`, and
+        :py:attr:`OUTPUT_PROTOCOL`.
 
         Re-define this if you need fine control over which protocols
         are used by which steps.
         """
         steps_desc = self._steps_desc()
 
-        protocol_dict = self.protocols()
-
         # pick input protocol
+
         if step_num == 0 and step_type == steps_desc[0][0]:
-            read_protocol = self.options.input_protocol
+            read = self.input_protocol().read
         else:
-            read_protocol = self.options.protocol
-        read = protocol_dict[read_protocol].read
+            read = self.internal_protocol().read
 
         if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
-            write_protocol = self.options.output_protocol
+            write = self.output_protocol().write
         else:
-            write_protocol = self.options.protocol
-        write = protocol_dict[write_protocol].write
+            write = self.internal_protocol().write
 
         return read, write
 
     ### Command-line arguments ###
 
     def configure_options(self):
-        """Define arguments for this script. Called from ``__init__()``.
+        """Define arguments for this script. Called from :py:meth:`__init__()`.
 
         Run ``python -m mrjob.job.MRJob --help`` to see all options.
 
@@ -631,8 +874,12 @@ class MRJob(object):
             help='run a mapper')
 
         self.mux_opt_group.add_option(
-            '--reducer', dest='run_reducer', action='store_true', default=False,
-            help='run a reducer')
+            '--combiner', dest='run_combiner', action='store_true',
+            default=False, help='run a combiner')
+
+        self.mux_opt_group.add_option(
+            '--reducer', dest='run_reducer', action='store_true',
+            default=False, help='run a reducer')
 
         self.mux_opt_group.add_option(
             '--step-num', dest='step_num', type='int', default=0,
@@ -648,14 +895,14 @@ class MRJob(object):
             '--input-protocol', dest='input_protocol',
             opt_group=self.proto_opt_group,
             default=self.DEFAULT_INPUT_PROTOCOL, choices=protocol_choices,
-            help='protocol to read input with (default: %default)')
+            help='DEPRECATED: protocol to read input with (default: %default)')
 
         self.add_passthrough_option(
             '--output-protocol', dest='output_protocol',
             opt_group=self.proto_opt_group,
             default=self.DEFAULT_OUTPUT_PROTOCOL,
             choices=protocol_choices,
-             help='protocol for final output (default: %s)' % (
+             help='DEPRECATED: protocol for final output (default: %s)' % (
             'same as --protocol' if self.DEFAULT_OUTPUT_PROTOCOL is None
             else '%default'))
 
@@ -663,14 +910,14 @@ class MRJob(object):
             '-p', '--protocol', dest='protocol',
             opt_group=self.proto_opt_group,
             default=self.DEFAULT_PROTOCOL, choices=protocol_choices,
-            help='output protocol for mappers/reducers. Choices: %s (default: %%default)' % ', '.join(protocol_choices))
+            help=('DEPRECATED: output protocol for mappers/reducers. Choices:'
+                  ' %s (default: %%default)' % ', '.join(protocol_choices)))
 
         self.add_passthrough_option(
             '--strict-protocols', dest='strict_protocols', default=None,
             opt_group=self.proto_opt_group,
             action='store_true', help='If something violates an input/output '
             'protocol then raise an exception')
-
 
         # options for running the entire job
         self.runner_opt_group = OptionGroup(
@@ -680,29 +927,51 @@ class MRJob(object):
         self.runner_opt_group.add_option(
             '--archive', dest='upload_archives', action='append',
             default=[],
-            help='Unpack archive in the working directory of this script. You can use --archive multiple times.')
+            help=('Unpack archive in the working directory of this script. You'
+                  ' can use --archive multiple times.'))
 
         self.runner_opt_group.add_option(
-            '--bootstrap-mrjob', dest='bootstrap_mrjob', action='store_true', default=None,
-            help="Automatically tar up the mrjob library and install it when we run the mrjob. This is the default. Use --no-bootstrap-mrjob if you've already installed mrjob on your Hadoop cluster.")
+            '--bootstrap-mrjob', dest='bootstrap_mrjob', action='store_true',
+            default=None,
+            help=("Automatically tar up the mrjob library and install it when"
+                  " we run the mrjob. This is the default. Use"
+                  " --no-bootstrap-mrjob if you've already installed mrjob on"
+                  " your Hadoop cluster."))
 
         self.runner_opt_group.add_option(
             '-c', '--conf-path', dest='conf_path', default=None,
             help='Path to alternate mrjob.conf file to read from')
 
         self.runner_opt_group.add_option(
-            '--cleanup', dest='cleanup',
-            choices=CLEANUP_CHOICES, default=CLEANUP_DEFAULT,
-            help="when to clean up tmp directories, etc. Choices: %s (default: %%default)" % ', '.join(CLEANUP_CHOICES))
+            '--cleanup', dest='cleanup', default=None,
+            help=('Comma-separated list of which directories to delete when'
+                  ' a job succeeds, e.g. SCRATCH,LOGS. Choices:'
+                  ' %s (default: ALL)' % ', '.join(CLEANUP_CHOICES)))
+
+        self.runner_opt_group.add_option(
+            '--cleanup-on-failure', dest='cleanup_on_failure', default=None,
+            help=('Comma-separated list of which directories to delete when'
+                  ' a job fails, e.g. SCRATCH,LOGS. Choices:'
+                  ' %s (default: NONE)' % ', '.join(CLEANUP_CHOICES)))
+
+        self.runner_opt_group.add_option(
+            '--cmdenv', dest='cmdenv', default=[], action='append',
+            help='set an environment variable for your job inside Hadoop '
+            'streaming. Must take the form KEY=VALUE. You can use --cmdenv '
+            'multiple times.')
 
         self.runner_opt_group.add_option(
             '--file', dest='upload_files', action='append',
             default=[],
-            help='Copy file to the working directory of this script. You can use --file multiple times.')
+            help=('Copy file to the working directory of this script. You can'
+                  ' use --file multiple times.'))
 
         self.runner_opt_group.add_option(
-            '--no-bootstrap-mrjob', dest='bootstrap_mrjob', action='store_false', default=None,
-            help="Don't automatically tar up the mrjob library and install it when we run the mrjob. Use this if you've already installed mrjob on your Hadoop cluster.")
+            '--no-bootstrap-mrjob', dest='bootstrap_mrjob',
+            action='store_false', default=None,
+            help=("Don't automatically tar up the mrjob library and install it"
+                  " when we run this job. Use this if you've already installed"
+                  " mrjob on your Hadoop cluster."))
 
         self.runner_opt_group.add_option(
             '--no-conf', dest='conf_path', action='store_false', default=None,
@@ -720,12 +989,22 @@ class MRJob(object):
             'and must be empty')
 
         self.runner_opt_group.add_option(
-            '--python-archive', dest='python_archives', default=[], action='append',
-            help='Archive to unpack and add to the PYTHONPATH of the mr_job script when it runs. You can use --python-archives multiple times.')
+            '--partitioner', dest='partitioner', default=None,
+            help=('Hadoop partitioner class to use to determine how mapper'
+                  ' output should be sorted and distributed to reducers. For'
+                  ' example: org.apache.hadoop.mapred.lib.HashPartitioner'))
+
+        self.runner_opt_group.add_option(
+            '--python-archive', dest='python_archives', default=[],
+            action='append',
+            help=('Archive to unpack and add to the PYTHONPATH of the mr_job'
+                  ' script when it runs. You can use --python-archives'
+                  ' multiple times.'))
 
         self.runner_opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
-            help='Name/path of alternate python binary for mappers/reducers.')
+            help=("Name/path of alternate python binary for mappers/reducers."
+                  " You can include arguments, e.g. --python-bin 'python -v'"))
 
         self.runner_opt_group.add_option(
             '-q', '--quiet', dest='quiet', default=None,
@@ -735,17 +1014,25 @@ class MRJob(object):
         self.runner_opt_group.add_option(
             '-r', '--runner', dest='runner', default='local',
             choices=('local', 'hadoop', 'emr', 'inline'),
-            help='Where to run the job: local to run locally, hadoop to run on your Hadoop cluster, emr to run on Amazon ElasticMapReduce. Default is local.')
+            help=('Where to run the job: local to run locally, hadoop to run'
+                  ' on your Hadoop cluster, emr to run on Amazon'
+                  ' ElasticMapReduce, and inline for local debugging. Default'
+                  ' is local.'))
 
         self.runner_opt_group.add_option(
             '--setup-cmd', dest='setup_cmds', action='append',
             default=[],
-            help='A command to run before each mapper/reducer step in the shell (e.g. "cd my-src-tree; make") specified as a string. You can use --setup-cmd more than once. Use mrjob.conf to specify arguments as a list to be run directly.')
+            help=('A command to run before each mapper/reducer step in the'
+                  ' shell (e.g. "cd my-src-tree; make") specified as a string.'
+                  ' You can use --setup-cmd more than once. Use mrjob.conf to'
+                  ' specify arguments as a list to be run directly.'))
 
         self.runner_opt_group.add_option(
             '--setup-script', dest='setup_scripts', action='append',
             default=[],
-            help='Path to file to be copied into the local working directory and then run. You can use --setup-script more than once. These are run after setup_cmds.')
+            help=('Path to file to be copied into the local working directory'
+                  ' and then run. You can use --setup-script more than once.'
+                  ' These are run after setup_cmds.'))
 
         self.runner_opt_group.add_option(
             '--steps-python-bin', dest='steps_python_bin', default=None,
@@ -758,16 +1045,31 @@ class MRJob(object):
             action='store_true',
             help='print more messages to stderr')
 
+        self.hadoop_opts_opt_group = OptionGroup(
+            self.option_parser,
+            'Configuring or emulating Hadoop (these apply when you set -r'
+            ' hadoop, -r emr, or -r local)')
+        self.option_parser.add_option_group(self.hadoop_opts_opt_group)
+
+        self.hadoop_opts_opt_group.add_option(
+            '--hadoop-version', dest='hadoop_version', default=None,
+            help=('Version of Hadoop to specify to EMR or to emulate for -r'
+                  ' local. Default is 0.20.'))
+
+        # for more info about jobconf:
+        # http://hadoop.apache.org/mapreduce/docs/current/mapred-default.html
+        self.hadoop_opts_opt_group.add_option(
+            '--jobconf', dest='jobconf', default=[], action='append',
+            help=('-jobconf arg to pass through to hadoop streaming; should'
+                  ' take the form KEY=VALUE. You can use --jobconf multiple'
+                  ' times.'))
+
         # options common to Hadoop and EMR
         self.hadoop_emr_opt_group = OptionGroup(
-            self.option_parser, 'Running on Hadoop or EMR (these apply when you set -r hadoop or -r emr)')
+            self.option_parser,
+            'Running on Hadoop or EMR (these apply when you set -r hadoop or'
+            ' -r emr)')
         self.option_parser.add_option_group(self.hadoop_emr_opt_group)
-
-        self.hadoop_emr_opt_group.add_option(
-            '--cmdenv', dest='cmdenv', default={}, action='set_key', type='key_value_pair',
-            help='set an environment variable for your job inside Hadoop '
-            'streaming. Must take the form KEY=VALUE. You can use --cmdenv '
-            'multiple times.')
 
         self.hadoop_emr_opt_group.add_option(
             '--hadoop-arg', dest='hadoop_extra_args', default=[],
@@ -776,15 +1078,21 @@ class MRJob(object):
 
         self.hadoop_emr_opt_group.add_option(
             '--hadoop-input-format', dest='hadoop_input_format', default=None,
-            help='the hadoop InputFormat class used to write the data. '
-            'Custom formats must be included in your hadoop streaming jar (see '
-            '--hadoop-streaming-jar)')
+            help=('DEPRECATED: the hadoop InputFormat class used by the first'
+                  ' step of your job to read data. Custom formats must be'
+                  ' included in your hadoop streaming jar (see'
+                  ' --hadoop-streaming-jar). Current best practice is to'
+                  ' redefine HADOOP_INPUT_FORMAT or hadoop_input_format()'
+                  ' in your job.'))
 
         self.hadoop_emr_opt_group.add_option(
             '--hadoop-output-format', dest='hadoop_output_format', default=None,
-            help='the hadoop OutputFormat class used to write the data. '
-            'Custom formats must be included in your hadoop streaming jar (see '
-            '--hadoop-streaming-jar)')
+            help=('DEPRECATED: the hadoop OutputFormat class used by the first'
+                  ' step of your job to read data. Custom formats must be'
+                  ' included in your hadoop streaming jar (see'
+                  ' --hadoop-streaming-jar). Current best practice is to'
+                  ' redefine HADOOP_OUTPUT_FORMAT or hadoop_output_format()'
+                  ' in your job.'))
 
         self.hadoop_emr_opt_group.add_option(
             '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
@@ -792,13 +1100,7 @@ class MRJob(object):
             help='Path of your hadoop streaming jar (locally, or on S3/HDFS)')
 
         self.hadoop_emr_opt_group.add_option(
-            '--jobconf', dest='jobconf', default={}, action='set_key', type='key_value_pair',
-            help='-jobconf arg to pass through to hadoop streaming; '
-            'should take the form KEY=VALUE. You can use --jobconf '
-            'multiple times.')
-
-        self.hadoop_emr_opt_group.add_option(
-            '--label', '--job-name-prefix', dest='label', default=None,
+            '--label', dest='label', default=None,
             help='custom prefix for job name, to help us identify the job')
 
         self.hadoop_emr_opt_group.add_option(
@@ -807,7 +1109,8 @@ class MRJob(object):
 
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(
-            self.option_parser, 'Running on Hadoop (these apply when you set -r hadoop)')
+            self.option_parser,
+            'Running on Hadoop (these apply when you set -r hadoop)')
         self.option_parser.add_option_group(self.hadoop_opt_group)
 
         self.hadoop_opt_group.add_option(
@@ -821,7 +1124,9 @@ class MRJob(object):
 
         # options for running the job on EMR
         self.emr_opt_group = OptionGroup(
-            self.option_parser, 'Running on Amazon Elastic MapReduce (these apply when you set -r emr)')
+            self.option_parser,
+            'Running on Amazon Elastic MapReduce (these apply when you set -r'
+            ' emr)')
         self.option_parser.add_option_group(self.emr_opt_group)
 
         self.emr_opt_group.add_option(
@@ -829,7 +1134,8 @@ class MRJob(object):
             help='A JSON string for selecting additional features on EMR')
 
         self.emr_opt_group.add_option(
-            '--aws-availability-zone', dest='aws_availability_zone', default=None,
+            '--aws-availability-zone', dest='aws_availability_zone',
+            default=None,
             help='Availability zone to run the job flow on')
 
         self.emr_opt_group.add_option(
@@ -839,27 +1145,42 @@ class MRJob(object):
         self.emr_opt_group.add_option(
             '--bootstrap-action', dest='bootstrap_actions', action='append',
             default=[],
-            help='Raw bootstrap action scripts to run before any of the other bootstrap steps. You can use --bootstrap-action more than once. Local scripts will be automatically uploaded to S3. To specify arguments, just use quotes: "foo.sh arg1 arg2"')
+            help=('Raw bootstrap action scripts to run before any of the other'
+                  ' bootstrap steps. You can use --bootstrap-action more than'
+                  ' once. Local scripts will be automatically uploaded to S3.'
+                  ' To add arguments, just use quotes: "foo.sh arg1 arg2"'))
 
         self.emr_opt_group.add_option(
             '--bootstrap-cmd', dest='bootstrap_cmds', action='append',
             default=[],
-            help='Commands to run on the master node to set up libraries, etc. You can use --bootstrap-cmd more than once. Use mrjob.conf to specify arguments as a list to be run directly.')
+            help=('Commands to run on the master node to set up libraries,'
+                  ' etc. You can use --bootstrap-cmd more than once. Use'
+                  ' mrjob.conf to specify arguments as a list to be run'
+                  ' directly.'))
 
         self.emr_opt_group.add_option(
             '--bootstrap-file', dest='bootstrap_files', action='append',
             default=[],
-            help='File to upload to the master node before running bootstrap_cmds (for example, debian packages). These will be made public on S3 due to a limitation of the bootstrap feature. You can use --bootstrap-file more than once.')
+            help=('File to upload to the master node before running'
+                  ' bootstrap_cmds (for example, debian packages). These will'
+                  ' be made public on S3 due to a limitation of the bootstrap'
+                  ' feature. You can use --bootstrap-file more than once.'))
 
         self.emr_opt_group.add_option(
-            '--bootstrap-python-package', dest='bootstrap_python_packages', action='append',
-            default=[],
-            help='Path to a Python module to install on EMR. These should be standard python module tarballs where you can cd into a subdirectory and run ``sudo python setup.py install``. You can use --bootstrap-python-package more than once.')
+            '--bootstrap-python-package', dest='bootstrap_python_packages',
+            action='append', default=[],
+            help=('Path to a Python module to install on EMR. These should be'
+                  ' standard python module tarballs where you can cd into a'
+                  ' subdirectory and run ``sudo python setup.py install``. You'
+                  ' can use --bootstrap-python-package more than once.'))
 
         self.emr_opt_group.add_option(
             '--bootstrap-script', dest='bootstrap_scripts', action='append',
             default=[],
-            help='Script to upload and then run on the master node (a combination of bootstrap_cmds and bootstrap_files). These are run after the command from bootstrap_cmds. You can use --bootstrap-script more than once.')
+            help=('Script to upload and then run on the master node (a'
+                  ' combination of bootstrap_cmds and bootstrap_files). These'
+                  ' are run after the command from bootstrap_cmds. You can use'
+                  ' --bootstrap-script more than once.'))
 
         self.emr_opt_group.add_option(
             '--check-emr-status-every', dest='check_emr_status_every',
@@ -868,7 +1189,10 @@ class MRJob(object):
 
         self.emr_opt_group.add_option(
             '--ec2-instance-type', dest='ec2_instance_type', default=None,
-            help='Type of EC2 instance(s) to launch (e.g. m1.small, c1.xlarge, m2.xlarge). See http://aws.amazon.com/ec2/instance-types/ for the full list.')
+            help=('Type of EC2 instance(s) to launch (e.g. m1.small,'
+                  ' c1.xlarge, m2.xlarge). See'
+                  ' http://aws.amazon.com/ec2/instance-types/ for the full'
+                  ' list.'))
 
         self.emr_opt_group.add_option(
             '--ec2-key-pair', dest='ec2_key_pair', default=None,
@@ -879,38 +1203,40 @@ class MRJob(object):
             help='Path to file containing SSH key for EMR')
 
         self.emr_opt_group.add_option(
-            '--ec2-master-instance-type', dest='ec2_master_instance_type', default=None,
+            '--ec2-master-instance-type', dest='ec2_master_instance_type',
+            default=None,
             help='Type of EC2 instance for master node only')
 
         self.emr_opt_group.add_option(
-            '--ec2-slave-instance-type', dest='ec2_slave_instance_type', default=None,
+            '--ec2-slave-instance-type', dest='ec2_slave_instance_type',
+            default=None,
             help='Type of EC2 instance for slave nodes only')
 
         self.emr_opt_group.add_option(
             '--emr-endpoint', dest='emr_endpoint', default=None,
-            help='Optional host to connect to when communicating with S3 (e.g. us-west-1.elasticmapreduce.amazonaws.com). Default is to infer this from aws_region.')
+            help=('Optional host to connect to when communicating with S3'
+                  ' (e.g. us-west-1.elasticmapreduce.amazonaws.com). Default'
+                  ' is to infer this from aws_region.'))
 
         self.emr_opt_group.add_option(
             '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
             help='ID of an existing EMR job flow to use')
 
         self.emr_opt_group.add_option(
-            '--enable-emr-debugging', dest='enable_emr_debugging', default=None,
-            action='store_true',
+            '--enable-emr-debugging', dest='enable_emr_debugging',
+            default=None, action='store_true',
             help='Enable storage of Hadoop logs in SimpleDB')
 
         self.emr_opt_group.add_option(
-            '--disable-emr-debugging', dest='enable_emr_debugging', action='store_false',
+            '--disable-emr-debugging', dest='enable_emr_debugging',
+            action='store_false',
             help='Enable storage of Hadoop logs in SimpleDB')
 
         self.emr_opt_group.add_option(
-            '--hadoop-streaming-jar-on-emr', dest='hadoop_streaming_jar_on_emr',
-            default=None,
-            help='Local path of the hadoop streaming jar on the EMR node. Rarely necessary')
-
-        self.emr_opt_group.add_option(
-            '--hadoop-version', dest='hadoop_version', default=None,
-            help='Version of Hadoop to spin up on EMR. Default is 0.18, but will change to 0.20 in v0.3.0 of mrjob.')
+            '--hadoop-streaming-jar-on-emr',
+            dest='hadoop_streaming_jar_on_emr', default=None,
+            help=('Local path of the hadoop streaming jar on the EMR node.'
+                  ' Rarely necessary.'))
 
         self.emr_opt_group.add_option(
             '--num-ec2-instances', dest='num_ec2_instances', default=None,
@@ -918,8 +1244,27 @@ class MRJob(object):
             help='Number of EC2 instances to launch')
 
         self.emr_opt_group.add_option(
+            '--pool-emr-job-flows', dest='pool_emr_job_flows',
+            action='store_true',
+            help='Add to an existing job flow or create a new one that does'
+                 ' not terminate when the job completes. Overrides other job'
+                 ' flow-related options including EC2 instance configuration.'
+                 ' Joins pool "default" if emr_job_flow_pool_name is not'
+                 ' specified. WARNING: do not run this without'
+                 ' mrjob.tools.emr.terminate.idle_job_flows in your crontab;'
+                 ' job flows left idle can quickly become expensive!')
+
+        self.emr_opt_group.add_option(
+            '--pool-name', dest='emr_job_flow_pool_name', action='store',
+            default=None,
+            help=('Specify a pool name to join. Set to "default" if not'
+                  ' specified.'))
+
+        self.emr_opt_group.add_option(
             '--s3-endpoint', dest='s3_endpoint', default=None,
-            help='Host to connect to when communicating with S3 (e.g. s3-us-west-1.amazonaws.com). Default is to infer this from aws_region.')
+            help=('Host to connect to when communicating with S3 (e.g.'
+                  ' s3-us-west-1.amazonaws.com). Default is to infer this from'
+                  ' region (see --aws-region).'))
 
         self.emr_opt_group.add_option(
             '--s3-log-uri', dest='s3_log_uri', default=None,
@@ -930,17 +1275,23 @@ class MRJob(object):
             help='URI on S3 to use as our temp directory.')
 
         self.emr_opt_group.add_option(
-            '--s3-sync-wait-time', dest='s3_sync_wait_time', default=None, type='float',
-            help='How long to wait for S3 to reach eventual consistency. This is typically less than a second (zero in us-west) but the default is 5.0 to be safe.')
+            '--s3-sync-wait-time', dest='s3_sync_wait_time', default=None,
+            type='float',
+            help=('How long to wait for S3 to reach eventual consistency. This'
+                  ' is typically less than a second (zero in us-west) but the'
+                  ' default is 5.0 to be safe.'))
 
         self.emr_opt_group.add_option(
             '--ssh-bin', dest='ssh_bin', default=None,
-            help='Path to the ssh binary. Defaults to ssh.')
+            help=("Name/path of ssh binary. Arguments are allowed (e.g."
+                  " --ssh-bin 'ssh -v')"))
 
         self.emr_opt_group.add_option(
             '--ssh-bind-ports', dest='ssh_bind_ports', default=None,
-            type='range_list',
-            help='A list of port ranges that are safe to listen on, delimited by colons and commas with the syntax 2000[:2001][,2003,2005:2008,etc]. Defaults to 40001:40840.')
+            help=('A list of port ranges that are safe to listen on, delimited'
+                  ' by colons and commas, with syntax like'
+                  ' 2000[:2001][,2003,2005:2008,etc].'
+                  ' Defaults to 40001:40840.'))
 
         self.emr_opt_group.add_option(
             '--ssh-tunnel-is-closed', dest='ssh_tunnel_is_open',
@@ -950,13 +1301,19 @@ class MRJob(object):
         self.emr_opt_group.add_option(
             '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',
             default=None, action='store_true',
-            help='Make ssh tunnel accessible from remote hosts (not just localhost)')
+            help=('Make ssh tunnel accessible from remote hosts (not just'
+                  ' localhost).'))
 
         self.emr_opt_group.add_option(
             '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
             default=None, action='store_true',
             help='Open up an SSH tunnel to the Hadoop job tracker')
 
+    def all_option_groups(self):
+        return (self.option_parser, self.mux_opt_group,
+                self.proto_opt_group, self.runner_opt_group,
+                self.hadoop_emr_opt_group, self.emr_opt_group,
+                self.hadoop_opts_opt_group)
 
     def add_passthrough_option(self, *args, **kwargs):
         """Function to create options which both the job runner
@@ -969,24 +1326,17 @@ class MRJob(object):
                 self.add_passthrough_option(
                     '--max-ngram-size', type='int', default=4, help='...')
 
+        Specify an *opt_group* keyword argument to add the option to that
+        :py:class:`OptionGroup` rather than the top-level
+        :py:class:`OptionParser`.
+
         If you want to pass files through to the mapper/reducer, use
         :py:meth:`add_file_option` instead.
         """
-        if not kwargs.has_key('opt_group'):
-            pass_opt = self.option_parser.add_option(*args, **kwargs)
-        else:
+        if 'opt_group' in kwargs:
             pass_opt = kwargs.pop('opt_group').add_option(*args, **kwargs)
-
-        # We only support a subset of option parser actions
-        SUPPORTED_ACTIONS = (
-            'store', 'append', 'store_const', 'store_true', 'store_false',)
-        if not pass_opt.action in SUPPORTED_ACTIONS:
-            raise OptionError('Expecting only actions %s, got %r' % (SUPPORTED_ACTIONS, pass_opt.action))
-
-        # We only support a subset of option parser choices
-        SUPPORTED_TYPES = ('int', 'long', 'float', 'string', 'choice', None)
-        if not pass_opt.type in SUPPORTED_TYPES:
-            raise OptionError('Expecting only types %s, got %r' % (SUPPORTED_TYPES, pass_opt.type))
+        else:
+            pass_opt = self.option_parser.add_option(*args, **kwargs)
 
         self._passthrough_options.append(pass_opt)
 
@@ -1004,7 +1354,7 @@ class MRJob(object):
         directory.
 
         We suggest against sending Berkeley DBs to your job, as
-        Berkeley DB is not forwards-compatiable (so a Berkeley DB that you
+        Berkeley DB is not forwards-compatible (so a Berkeley DB that you
         construct on your computer may not be readable from within
         Hadoop). Use SQLite databases instead. If all you need is an on-disk
         hash table, try out the :py:mod:`sqlite3dbm` module.
@@ -1012,46 +1362,90 @@ class MRJob(object):
         pass_opt = self.option_parser.add_option(*args, **kwargs)
 
         if not pass_opt.type == 'string':
-            raise OptionError('passthrough file options must take strings' % pass_opt.type)
+            raise OptionError(
+                'passthrough file options must take strings' % pass_opt.type)
 
         if not pass_opt.action in ('store', 'append'):
-            raise OptionError("passthrough file options must use the options 'store' or 'append'")
+            raise OptionError("passthrough file options must use the options"
+                              " 'store' or 'append'")
 
         self._file_options.append(pass_opt)
 
     def load_options(self, args):
-        """Load command-line options into self.options.
+        """Load command-line options into ``self.options``.
 
         Called from :py:meth:`__init__()` after :py:meth:`configure_options`.
 
         :type args: list of str
-        :param args: a list of command line arguments. ``None`` will be treated the same as ``[]``.
+        :param args: a list of command line arguments. ``None`` will be
+                     treated the same as ``[]``.
 
         Re-define if you want to post-process command-line arguments::
 
             def load_options(self, args):
                 super(MRYourJob, self).load_options(args)
 
-                self.stop_words = self.option.stop_words.split(',')
+                self.stop_words = self.options.stop_words.split(',')
                 ...
         """
-        # don't pass None to parse_args unless we're actually running
-        # the MRJob script
-        if args is _READ_ARGS_FROM_SYS_ARGV:
-            self.options, self.args = self.option_parser.parse_args()
-        else:
-            # don't pass sys.argv to self.option_parser, and have it
-            # raise an exception on error rather than printing to stderr
-            # and exiting.
-            args = args or []
-            def error(msg):
-                raise ValueError(msg)
-            self.option_parser.error = error
-            self.options, self.args = self.option_parser.parse_args(args)
+        self.options, self.args = self.option_parser.parse_args(args)
+
+        # parse custom options here to avoid setting a custom Option subclass
+        # and confusing users
+
+        if self.options.ssh_bind_ports:
+            try:
+                ports = parse_port_range_list(self.options.ssh_bind_ports)
+            except ValueError, e:
+                self.option_parser.error('invalid port range list "%s": \n%s' %
+                                         (self.options.ssh_bind_ports,
+                                          e.args[0]))
+            self.options.ssh_bind_ports = ports
+
+        cmdenv_err = 'cmdenv argument "%s" is not of the form KEY=VALUE'
+        self.options.cmdenv = parse_key_value_list(self.options.cmdenv,
+                                                   cmdenv_err,
+                                                   self.option_parser.error)
+
+        jobconf_err = 'jobconf argument "%s" is not of the form KEY=VALUE'
+        self.options.jobconf = parse_key_value_list(self.options.jobconf,
+                                                    jobconf_err,
+                                                    self.option_parser.error)
+
+        def parse_commas(cleanup_str):
+            cleanup_error = ('cleanup option %s is not one of '
+                             + ', '.join(CLEANUP_CHOICES))
+            new_cleanup_options = []
+            for choice in cleanup_str.split(','):
+                if choice in CLEANUP_CHOICES:
+                    new_cleanup_options.append(choice)
+                else:
+                    self.option_parser.error(cleanup_error % choice)
+            if ('NONE' in new_cleanup_options and
+                len(set(new_cleanup_options)) > 1):
+                self.option_parser.error(
+                    'Cannot clean up both nothing and something!')
+            return new_cleanup_options
+
+        if self.options.cleanup is not None:
+            self.options.cleanup = parse_commas(self.options.cleanup)
+        if self.options.cleanup_on_failure is not None:
+            self.options.cleanup_on_failure = parse_commas(
+                self.options.cleanup_on_failure)
+
+        # DEPRECATED protocol stuff
 
         # output_protocol defaults to protocol
         if not self.options.output_protocol:
             self.options.output_protocol = self.options.protocol
+
+        if (self.options.input_protocol or self.options.output_protocol
+            or self.options.protocol):
+            log.warn('Setting protocols via --input-protocol, --protocol,'
+                     ' --output-protocol, DEFAULT_INPUT_PROTOCOL,'
+                     ' DEFAULT_PROTOCOL, and DEFAULT_OUTPUT_PROTOCOL is'
+                     ' deprecated as of mrjob 0.3 and will no longer be'
+                     ' supported in mrjob 0.4.')
 
     def is_mapper_or_reducer(self):
         """True if this is a mapper/reducer.
@@ -1059,7 +1453,9 @@ class MRJob(object):
         This is mostly useful inside :py:meth:`load_options`, to disable
         loading options when we aren't running inside Hadoop Streaming.
         """
-        return self.options.run_mapper or self.options.run_reducer
+        return self.options.run_mapper \
+                or self.options.run_combiner \
+                or self.options.run_reducer
 
     def job_runner_kwargs(self):
         """Keyword arguments used to create runners when
@@ -1075,20 +1471,23 @@ class MRJob(object):
         return {
             'bootstrap_mrjob': self.options.bootstrap_mrjob,
             'cleanup': self.options.cleanup,
+            'cleanup_on_failure': self.options.cleanup_on_failure,
             'cmdenv': self.options.cmdenv,
             'conf_path': self.options.conf_path,
             'extra_args': self.generate_passthrough_arguments(),
             'file_upload_args': self.generate_file_upload_args(),
             'hadoop_extra_args': self.options.hadoop_extra_args,
-            'hadoop_input_format': self.options.hadoop_input_format,
-            'hadoop_output_format': self.options.hadoop_output_format,
+            'hadoop_input_format': self.hadoop_input_format(),
+            'hadoop_output_format': self.hadoop_output_format(),
             'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
+            'hadoop_version': self.options.hadoop_version,
             'input_paths': self.args,
-            'jobconf': self.options.jobconf,
+            'jobconf': self.jobconf(),
             'mr_job_script': self.mr_job_script(),
             'label': self.options.label,
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
+            'partitioner': self.partitioner(),
             'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
             'setup_cmds': self.options.setup_cmds,
@@ -1160,29 +1559,15 @@ class MRJob(object):
         hadoop or executed via subprocess.
 
         These are passed to :py:meth:`mrjob.runner.MRJobRunner.__init__`
-        as ``extra_args``.
+        as *extra_args*.
         """
-        master_option_dict = self.options.__dict__
-
+        arg_map = parse_and_save_options(self.option_parser, self._cl_args)
         output_args = []
-        for pass_opt in self._passthrough_options:
-            opt_prefix = pass_opt.get_opt_string()
-            opt_value = master_option_dict[pass_opt.dest]
 
-            # Pass through the arguments for these actions
-            if pass_opt.action == 'store' and opt_value is not None:
-                output_args.append(opt_prefix)
-                output_args.append(str(opt_value))
-            elif pass_opt.action == 'append':
-                for value in opt_value:
-                    output_args.append(opt_prefix)
-                    output_args.append(str(value))
-            if pass_opt.action == 'store_true' and opt_value == True:
-                output_args.append(opt_prefix)
-            elif pass_opt.action == 'store_false' and opt_value == False:
-                output_args.append(opt_prefix)
-            elif pass_opt.action == 'store_const' and opt_value is not None:
-                output_args.append(opt_prefix)
+        passthrough_dests = sorted(set(option.dest for option \
+                                       in self._passthrough_options))
+        for option_dest in passthrough_dests:
+            output_args.extend(arg_map.get(option_dest, []))
 
         return output_args
 
@@ -1212,9 +1597,50 @@ class MRJob(object):
 
     ### protocols ###
 
+    def input_protocol(self):
+        """Instance of the protocol to use to convert input lines to Python
+        objects. Default behavior is to return an instance of
+        :py:attr:`INPUT_PROTOCOL`.
+        """
+        if self.options.input_protocol is not None:
+            # deprecated
+            protocol_name = self.options.input_protocol
+            return self.protocols()[protocol_name]()
+        else:
+            # non-deprecated
+            return self.INPUT_PROTOCOL()
+
+    def internal_protocol(self):
+        """Instance of the protocol to use to communicate between steps.
+        Default behavior is to return an instance of
+        :py:attr:`INTERNAL_PROTOCOL`.
+        """
+        if self.options.protocol is not None:
+            # deprecated
+            protocol_name = self.options.protocol
+            return self.protocols()[protocol_name]
+        else:
+            # non-deprecated
+            return self.INTERNAL_PROTOCOL()
+
+    def output_protocol(self):
+        """Instance of the protocol to use to convert Python objects to output
+        lines. Default behavior is to return an instance of
+        :py:attr:`OUTPUT_PROTOCOL`.
+        """
+        if self.options.output_protocol is not None:
+            # deprecated
+            return self.protocols()[self.options.output_protocol]
+        else:
+            # non-deprecated
+            return self.OUTPUT_PROTOCOL()
+
     @classmethod
     def protocols(cls):
-        """Mapping from protocol name to the protocol class to use
+        """Deprecated in favor of :py:attr:`INPUT_PROTOCOL`,
+        :py:attr:`OUTPUT_PROTOCOL`, and :py:attr:`INTERNAL_PROTOCOL`.
+
+        Mapping from protocol name to the protocol class to use
         for parsing job input and writing job output. We give protocols names
         so that we can easily choose them from the command line.
 
@@ -1232,58 +1658,180 @@ class MRJob(object):
 
             DEFAULT_PROTOCOL = 'rot13'
         """
-        return PROTOCOL_DICT.copy() # copy to stop monkey-patching
+        return PROTOCOL_DICT.copy()  # copy to stop monkey-patching
 
-    #: Default protocol for reading input to the first mapper in your job.
-    #: Default: ``'raw_value'``.
+    #: Protocol for reading input to the first mapper in your job.
+    #: Default: :py:class:`RawValueProtocol`.
     #:
-    #: For example you know your input data were in JSON format, you could set::
+    #: For example you know your input data were in JSON format, you could
+    #: set::
     #:
-    #:     DEFAULT_INPUT_PROTOCOL = 'json_value'
+    #:     INPUT_PROTOCOL = JsonValueProtocol
     #:
     #: in your class, and your initial mapper would receive decoded JSONs
     #: rather than strings.
     #:
-    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
-    #: protocols. Can be overridden by :option:`--input-protocol`.
-    DEFAULT_INPUT_PROTOCOL = 'raw_value'
+    #: See :py:data:`mrjob.protocol` for the full list of protocols.
+    INPUT_PROTOCOL = RawValueProtocol
 
-    #: Default protocol for communication between steps and final output.
-    #: Default: ``'json'``.
+    #: Protocol for communication between steps and final output.
+    #: Default: :py:class:`JSONProtocol`.
     #:
     #: For example if your step output weren't JSON-encodable, you could set::
     #:
-    #:     DEFAULT_PROTOCOL = 'pickle'
+    #:     INTERNAL_PROTOCOL = PickleProtocol
     #:
     #: and step output would be encoded as string-escaped pickles.
     #:
-    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
-    #: protocols. Can be overridden by :option:`--protocol`.
-    DEFAULT_PROTOCOL = DEFAULT_PROTOCOL # i.e. the one from mrjob.protocols
+    #: See :py:data:`mrjob.protocol` for the full list of protocols.
+    INTERNAL_PROTOCOL = JSONProtocol
 
-    #: Default protocol to use for writing output. By default, this is set to
-    #: ``None``, which means to fall back on ``DEFAULT_PROTOCOL``.
+    #: Protocol to use for writing output. Default: :py:class:`JSONProtocol`.
     #:
-    #: For example, if you wanted steps to communicate using pickle
-    #: internally, but receive the final output in JSON, you could set::
+    #: For example, if you wanted the final output in repr, you could set::
     #:
-    #:     DEFAULT_PROTOCOL = 'pickle'
-    #:     DEFAULT_OUTPUT_PROTOCOL = 'json'
+    #:     OUTPUT_PROTOCOL = ReprProtocol
+    #:
+    #: See :py:data:`mrjob.protocol` for the full list of protocols.
+    OUTPUT_PROTOCOL = JSONProtocol
+
+    #: DEPRECATED
+    #:
+    #: Default protocol for reading input to the first mapper in your job
+    #: specified by a string.
+    #: Default: None.
     #:
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
-    #: protocols. Can be overridden by the :option:`--output-protocol`.
+    #: protocol strings. Can be overridden by :option:`--input-protocol`.
+    DEFAULT_INPUT_PROTOCOL = None
+
+    #: DEPRECATED
+    #:
+    #: Default protocol for communication between steps and final output
+    #: specified by a string.
+    #: Default: None.
+    #:
+    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
+    #: protocol strings. Can be overridden by :option:`--protocol`.
+    DEFAULT_PROTOCOL = DEFAULT_PROTOCOL  # i.e. the one from mrjob.protocols
+
+    #: DEPRECATED
+    #:
+    #: Default protocol to use for writing output specified by a string.
+    #: Default: None.
+    #:
+    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
+    #: protocol strings. Can be overridden by the :option:`--output-protocol`.
     DEFAULT_OUTPUT_PROTOCOL = None
 
     def parse_output_line(self, line):
-        """Parse a line from the final output of this MRJob into
-        ``(key, value)``::
+        """
+        Parse a line from the final output of this MRJob into
+        ``(key, value)``. Used extensively in tests like this::
 
             runner.run()
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
         """
-        reader = self.protocols()[self.options.output_protocol]
-        return reader.read(line)
+        return self.output_protocol().read(line)
+
+    ### Hadoop Input/Output Formats ###
+
+    #: Optional name of an optional Hadoop ``InputFormat`` class, e.g.
+    #: ``'org.apache.hadoop.mapred.lib.NLineInputFormat'``.
+    #:
+    #: Passed to Hadoop with the *first* step of this job with the
+    #: ``-inputformat`` option.
+    HADOOP_INPUT_FORMAT = None
+
+    def hadoop_input_format(self):
+        """Optional Hadoop ``InputFormat`` class to parse input for
+        the first step of the job.
+
+        Normally, setting :py:attr:`HADOOP_INPUT_FORMAT` is sufficient;
+        redefining this method is only for when you want to get fancy.
+        """
+        if self.options.hadoop_input_format:
+            log.warn('--hadoop-input-format is deprecated as of mrjob 0.3 and'
+                     ' will no longer be supported in mrjob 0.4. Redefine'
+                     ' HADOOP_INPUT_FORMAT or hadoop_input_format() instead.')
+            return self.options.hadoop_input_format
+        else:
+            return self.HADOOP_INPUT_FORMAT
+
+    #: Optional name of an optional Hadoop ``OutputFormat`` class, e.g.
+    #: ``'org.apache.hadoop.mapred.FileOutputFormat'``.
+    #:
+    #: Passed to Hadoop with the *first* step of this job with the
+    #: ``-outputformat`` option.
+    HADOOP_OUTPUT_FORMAT = None
+
+    def hadoop_output_format(self):
+        """Optional Hadoop ``OutputFormat`` class to write output for
+        the last step of the job.
+
+        Normally, setting :py:attr:`HADOOP_OUTPUT_FORMAT` is sufficient;
+        redefining this method is only for when you want to get fancy.
+        """
+        if self.options.hadoop_output_format:
+            log.warn('--hadoop-output-format is deprecated as of mrjob 0.3 and'
+                     ' will no longer be supported in mrjob 0.4. Redefine '
+                     ' HADOOP_OUTPUT_FORMAT or hadoop_output_format() instead.'
+                     )
+            return self.options.hadoop_output_format
+        else:
+            return self.HADOOP_OUTPUT_FORMAT
+
+    ### Partitioning ###
+
+    #: Optional Hadoop partitioner class to use to determine how mapper
+    #: output should be sorted and distributed to reducers. For example:
+    #: ``'org.apache.hadoop.mapred.lib.HashPartitioner'``.
+    PARTITIONER = None
+
+    def partitioner(self):
+        """Optional Hadoop partitioner class to use to determine how mapper
+        output should be sorted and distributed to reducers.
+
+        By default, returns whatever is passed to :option:`--partitioner`,
+        of if that option isn't used, :py:attr:`PARTITIONER`.
+
+        You probably don't need to re-define this; it's just here for
+        completeness.
+        """
+        return self.options.partitioner or self.PARTITIONER
+
+    ### Jobconf ###
+
+    #: Optional jobconf arguments we should always pass to Hadoop. This
+    #: is a map from property name to value. e.g.:
+    #:
+    #: ``{'stream.num.map.output.key.fields': '4'}``
+    #:
+    #: It's recommended that you only use this to hard-code things that
+    #: affect the semantics of your job, and leave performance tweaks to
+    #: the command line or whatever you use to launch your job.
+    JOBCONF = {}
+
+    def jobconf(self):
+        """``-jobconf`` args to pass to hadoop streaming. This should be a map
+        from property name to value.
+
+        By default, this combines :option:`jobconf` options from the command
+        lines with :py:attr:`JOBCONF`, with command line arguments taking
+        precedence.
+
+        If you want to re-define this, it's strongly recommended that do
+        something like this, so as not to inadvertently disable
+        :option:`jobconf`::
+
+            def jobconf(self):
+                orig_jobconf = super(MyMRJobClass, self).jobconf()
+                custom_jobconf = ...
+
+                return mrjob.conf.combine_dicts(orig_jobconf, custom_jobconf)
+        """
+        return combine_dicts(self.JOBCONF, self.options.jobconf)
 
     ### Testing ###
 
@@ -1337,7 +1885,7 @@ class MRJob(object):
 
         return self
 
-    def parse_counters(self):
+    def parse_counters(self, counters=None):
         """Convenience method for reading counters. This only works
         in sandbox mode. This does not clear ``self.stderr``.
 
@@ -1347,11 +1895,13 @@ class MRJob(object):
         use :py:meth:`mrjob.parse.parse_mr_job_stderr`.
         """
         if self.stderr == sys.stderr:
-            raise AssertionError('You must call sandbox() first; parse_counters() is for testing only.')
+            raise AssertionError('You must call sandbox() first;'
+                                 ' parse_counters() is for testing only.')
 
-        return parse_mr_job_stderr(self.stderr.getvalue())['counters']
+        stderr_results = parse_mr_job_stderr(self.stderr.getvalue(), counters)
+        return stderr_results['counters']
 
-    def parse_output(self, protocol=DEFAULT_PROTOCOL):
+    def parse_output(self, protocol=None):
         """Convenience method for parsing output from any mapper or reducer,
         all at once.
 
@@ -1363,17 +1913,24 @@ class MRJob(object):
             output = mrjob.parse_output()
 
         :type protocol: str
-        :param protocol: the protocol to use (e.g. ``'json'``)
+        :param protocol: A protocol instance to use (e.g. JSONProtocol()),
+                         Also accepts protocol names (e.g. ``'json'``), but
+                         this is deprecated.
 
         This only works in sandbox mode. This does not clear ``self.stdout``.
         """
         if self.stdout == sys.stdout:
-            raise AssertionError('You must call sandbox() first; parse_output() is for testing only.')
+            raise AssertionError('You must call sandbox() first;'
+                                 ' parse_output() is for testing only.')
 
-        reader = self.protocols()[protocol]
+        if protocol is None:
+            protocol = JSONProtocol()
+        elif isinstance(protocol, basestring):
+            protocol = self.protocols()[protocol]
+
         lines = StringIO(self.stdout.getvalue())
-        return [reader.read(line) for line in lines]
+        return [protocol.read(line) for line in lines]
+
 
 if __name__ == '__main__':
     MRJob.run()
-

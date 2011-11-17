@@ -21,7 +21,26 @@ languages. If you need more power, you can represent values as reprs
 or pickles.
 
 Also, if know that your input will always be in JSON format, consider
-the ``json_value`` protocol as an alternative to ``raw_value``.
+:py:class:`JSONValueProtocol` as an alternative to
+:py:class:`RawValueProtocol`.
+
+Custom Protocols
+^^^^^^^^^^^^^^^^
+
+A protocol is an object with methods ``read(self, line)`` and
+``write(self, key, value)``. The ``read(line)`` method takes a string and
+returns a 2-tuple of decoded objects, and ``write(cls, key, value)`` takes
+the key and value and returns the line to be passed back to Hadoop Streaming
+or as output.
+
+For a simpler interface, inherit from :py:class:`KeyCachingProtocol` and
+override :py:meth:`KeyCachingProtocol.load_from_string` and
+:py:meth:`KeyCachingProtocol.load_from_string`. Protocols that follow this
+pattern only decode keys when they differ from the last key seen. This
+optimization can speed up jobs significantly.
+
+The built-in protocols use class methods instead of instance methods for
+legacy reasons, but you should use instance methods.
 
 For more information on using alternate protocols in your job, see
 :ref:`job-protocols`.
@@ -33,14 +52,32 @@ import cPickle
 from mrjob.util import safeeval
 
 try:
-    import simplejson as json # preferred because of C speedups
+    import simplejson as json  # preferred because of C speedups
 except ImportError:
-    import json # built in to Python 2.6 and later
+    import json  # built in to Python 2.6 and later
 
-class HadoopStreamingProtocol(object):
-    """Abstract base class for all protocols. Inherit from it and define
-    your own :py:meth:`read` and :py:meth:`write` functions.
+
+# DEPRECATED: Abstract base class for all protocols. Now just an alias for
+# ``object``.
+HadoopStreamingProtocol = object
+
+
+class _ClassBasedKeyCachingProtocol(object):
+    """Protocol that caches the last decoded key and uses class methods
+    instead of instance methods. Do not inherit from this.
     """
+
+    _last_key_encoded = None
+    _last_key_decoded = None
+
+    @classmethod
+    def load_from_string(self, value):
+        raise NotImplementedError
+
+    @classmethod
+    def dump_to_string(self, value):
+        raise NotImplementedError
+
     @classmethod
     def read(cls, line):
         """Decode a line of input.
@@ -49,7 +86,13 @@ class HadoopStreamingProtocol(object):
         :param line: A line of raw input to the job, without trailing newline.
 
         :return: A tuple of ``(key, value)``."""
-        raise NotImplementedError
+
+        raw_key, raw_value = line.split('\t')
+
+        if raw_key != cls._last_key_encoded:
+            cls._last_key_encoded = raw_key
+            cls._last_key_decoded = cls.load_from_string(raw_key)
+        return (cls._last_key_decoded, cls.load_from_string(raw_value))
 
     @classmethod
     def write(cls, key, value):
@@ -60,23 +103,26 @@ class HadoopStreamingProtocol(object):
 
         :rtype: str
         :return: A line, without trailing newline."""
-        raise NotImplementedError
+        return '%s\t%s' % (cls.dump_to_string(key),
+                           cls.dump_to_string(value))
 
-class JSONProtocol(HadoopStreamingProtocol):
+
+class JSONProtocol(_ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two JSONs separated by a tab.
 
     Note that JSON has some limitations; dictionary keys must be strings,
     and there's no distinction between lists and tuples."""
-    @classmethod
-    def read(cls, line):
-        key, value = line.split('\t')
-        return json.loads(key), json.loads(value)
 
     @classmethod
-    def write(cls, key, value):
-        return '%s\t%s' % (json.dumps(key), json.dumps(value))
+    def load_from_string(cls, value):
+        return json.loads(value)
 
-class JSONValueProtocol(HadoopStreamingProtocol):
+    @classmethod
+    def dump_to_string(cls, value):
+        return json.dumps(value)
+
+
+class JSONValueProtocol(object):
     """Encode ``value`` as a JSON and discard ``key``
     (``key`` is read in as ``None``).
     """
@@ -88,7 +134,8 @@ class JSONValueProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return json.dumps(value)
 
-class PickleProtocol(HadoopStreamingProtocol):
+
+class PickleProtocol(_ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two string-escaped pickles separated
     by a tab.
 
@@ -98,19 +145,17 @@ class PickleProtocol(HadoopStreamingProtocol):
 
     Ugly, but should work for any type.
     """
-    @classmethod
-    def read(cls, line):
-        key, value = line.split('\t')
-        return (cPickle.loads(key.decode('string_escape')),
-                cPickle.loads(value.decode('string_escape')))
 
     @classmethod
-    def write(cls, key, value):
-        return '%s\t%s' % (
-            cPickle.dumps(key).encode('string_escape'),
-            cPickle.dumps(value).encode('string_escape'))
+    def load_from_string(cls, value):
+        return cPickle.loads(value.decode('string_escape'))
 
-class PickleValueProtocol(HadoopStreamingProtocol):
+    @classmethod
+    def dump_to_string(cls, value):
+        return cPickle.dumps(value).encode('string_escape')
+
+
+class PickleValueProtocol(object):
     """Encode ``value`` as a string-escaped pickle and discard ``key``
     (``key`` is read in as ``None``).
     """
@@ -122,7 +167,8 @@ class PickleValueProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return cPickle.dumps(value).encode('string_escape')
 
-class RawValueProtocol(HadoopStreamingProtocol):
+
+class RawValueProtocol(object):
     """Read in a line as ``(None, line)``. Write out ``(key, value)``
     as ``value``. ``value`` must be a ``str``.
 
@@ -136,21 +182,23 @@ class RawValueProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return value
 
-class ReprProtocol(HadoopStreamingProtocol):
+
+class ReprProtocol(_ClassBasedKeyCachingProtocol):
     """Encode ``(key, value)`` as two reprs separated by a tab.
 
     This only works for basic types (we use :py:func:`mrjob.util.safeeval`).
     """
-    @classmethod
-    def read(cls, line):
-        key, value = line.split('\t')
-        return safeeval(key), safeeval(value)
 
     @classmethod
-    def write(cls, key, value):
-        return '%s\t%s' % (repr(key), repr(value))
+    def load_from_string(cls, value):
+        return safeeval(value)
 
-class ReprValueProtocol(HadoopStreamingProtocol):
+    @classmethod
+    def dump_to_string(cls, value):
+        return repr(value)
+
+
+class ReprValueProtocol(object):
     """Encode ``value`` as a repr and discard ``key`` (``key`` is read
     in as None).
 
@@ -164,9 +212,13 @@ class ReprValueProtocol(HadoopStreamingProtocol):
     def write(cls, key, value):
         return repr(value)
 
-#: The default protocol for all encoded input and output: ``'json'``
-DEFAULT_PROTOCOL = 'json'
+#: DEPRECATED
+#:
+#: Formerly the default protocol for all encoded input and output: ``'json'``
+DEFAULT_PROTOCOL = None
 
+#: DEPRECATED
+#:
 #: Default mapping from protocol name to class:
 #:
 #: ============ ===============================

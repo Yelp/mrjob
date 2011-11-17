@@ -14,6 +14,7 @@ Running your job
 .. automethod:: MRJobRunner.run
 .. automethod:: MRJobRunner.stream_output
 .. automethod:: MRJobRunner.cleanup
+.. automethod:: MRJobRunner.get_hadoop_version
 .. autodata:: mrjob.runner.CLEANUP_CHOICES
 .. autodata:: mrjob.runner.CLEANUP_DEFAULT
 
@@ -32,6 +33,7 @@ have directories, so the semantics get a little weird.
 .. automethod:: MRJobRunner.get_output_dir
 .. automethod:: MRJobRunner.du
 .. automethod:: MRJobRunner.ls
+.. automethod:: MRJobRunner.cat
 .. automethod:: MRJobRunner.mkdir
 .. automethod:: MRJobRunner.path_exists
 .. automethod:: MRJobRunner.path_join

@@ -22,20 +22,23 @@ ad-hoc mock objects.
 """
 from __future__ import with_statement
 import datetime
+import hashlib
 
 try:
+    from boto.emr.connection import EmrConnection
     import boto.exception
     import boto.utils
 except ImportError:
     boto = None
 
-from mrjob.botoemr.connection import EmrConnection
-from mrjob.botoemr.step import JarStep
 from mrjob.conf import combine_values
-from mrjob.emr import S3_URI_RE, parse_s3_uri
+from mrjob.parse import is_s3_uri
+from mrjob.parse import parse_s3_uri
+
 
 DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
 DEFAULT_MAX_DAYS_AGO = 61
+
 
 ### S3 ###
 
@@ -45,11 +48,12 @@ def add_mock_s3_data(mock_s3_fs, data):
     time last modified."""
     time_modified = to_iso8601(datetime.datetime.utcnow())
     for bucket_name, key_name_to_bytes in data.iteritems():
-        mock_s3_fs.setdefault(bucket_name, {'keys':{}, 'location': ''})
+        mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
 
         for key_name, bytes in key_name_to_bytes.iteritems():
             bucket['keys'][key_name] = (bytes, time_modified)
+
 
 class MockS3Connection(object):
     """Mock out boto.s3.Connection
@@ -87,13 +91,14 @@ class MockS3Connection(object):
         else:
             self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': ''}
 
+
 class MockBucket:
     """Mock out boto.s3.Bucket
     """
     def __init__(self, connection=None, name=None, location=None):
         """You can optionally specify a 'data' argument, which will instantiate
-        mock keys and mock data. data should be a map from key name to bytes and
-        time last modified.
+        mock keys and mock data. data should be a map from key name to bytes
+        and time last modified.
         """
         self.name = name
         self.connection = connection
@@ -108,7 +113,7 @@ class MockBucket:
 
     def new_key(self, key_name):
         if key_name not in self.mock_state():
-            self.mock_state()[key_name] = ('', 
+            self.mock_state()[key_name] = ('',
                     to_iso8601(datetime.datetime.utcnow()))
         return MockKey(bucket=self, name=key_name)
 
@@ -129,6 +134,7 @@ class MockBucket:
             if key_name.startswith(prefix):
                 yield MockKey(bucket=self, name=key_name)
 
+
 class MockKey(object):
     """Mock out boto.s3.Key"""
 
@@ -148,7 +154,7 @@ class MockKey(object):
 
     def write_mock_data(self, data):
         if self.name in self.bucket.mock_state():
-            self.bucket.mock_state()[self.name] = (data, 
+            self.bucket.mock_state()[self.name] = (data,
                         to_iso8601(datetime.datetime.utcnow()))
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
@@ -161,6 +167,12 @@ class MockKey(object):
         with open(path) as f:
             self.write_mock_data(f.read())
 
+    def get_contents_as_string(self):
+        return self.read_mock_data()
+
+    def set_contents_from_string(self, string):
+        self.write_mock_data(string)
+
     def delete(self):
         if self.name in self.bucket.mock_state():
             del self.bucket.mock_state()[self.name]
@@ -169,23 +181,36 @@ class MockKey(object):
 
     def make_public(self):
         pass
-    
+
+    def __iter__(self):
+        data = self.read_mock_data()
+        for line in data.splitlines(True):
+            yield line
+
     def _get_last_modified(self):
         if self.name in self.bucket.mock_state():
             return self.bucket.mock_state()[self.name][1]
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
-    
+
     # option to change last_modified time for testing purposes
     def _set_last_modified(self, time_modified):
         if self.name in self.bucket.mock_state():
             data = self.bucket.mock_state()[self.name][0]
-            self.bucket.mock_state()[self.name] = (data, 
+            self.bucket.mock_state()[self.name] = (data,
                         to_iso8601(time_modified))
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
-    
+
     last_modified = property(_get_last_modified, _set_last_modified)
+
+    def _get_etag(self):
+        m = hashlib.md5()
+        m.update(self.get_contents_as_string())
+        return m.hexdigest()
+
+    etag = property(_get_etag)
+
 
 ### EMR ###
 
@@ -193,6 +218,7 @@ def to_iso8601(when):
     """Convert a datetime to ISO8601 format.
     """
     return when.strftime(boto.utils.ISO8601)
+
 
 class MockEmrConnection(object):
     """Mock out boto.emr.EmrConnection. This actually handles a small
@@ -219,16 +245,29 @@ class MockEmrConnection(object):
         Step numbers are 0-indexed.
 
         Extra args:
-        :param mock_s3_fs: a mock S3 filesystem to point to (just a dictionary mapping bucket name to key name to bytes)
-        :param mock_emr_job_flows: a mock set of EMR job flows to point to (just a map from job flow ID to a :py:class:`MockEmrObject` representing a job flow)
-        :param mock_emr_failures: a map from ``(job flow ID, step_num)`` to a failure message (or ``None`` for the default message)
-        :param mock_emr_output: a map from ``(job flow ID, step_num)`` to a list of ``str``s representing file contents to output when the job completes
+        :param mock_s3_fs: a mock S3 filesystem to point to (just a dictionary
+                           mapping bucket name to key name to bytes)
+        :param mock_emr_job_flows: a mock set of EMR job flows to point to
+                                   (just a map from job flow ID to a
+                                   :py:class:`MockEmrObject` representing a job
+                                   flow)
+        :param mock_emr_failures: a map from ``(job flow ID, step_num)`` to a
+                                  failure message (or ``None`` for the default
+                                  message)
+        :param mock_emr_output: a map from ``(job flow ID, step_num)`` to a
+                                list of ``str``s representing file contents to
+                                output when the job completes
         :type max_job_flows_returned: int
-        :param max_job_flows_returned: the maximum number of job flows that :py:meth:`describe_jobflows` can return, to simulate a real limitation of EMR
+        :param max_job_flows_returned: the maximum number of job flows that
+                                       :py:meth:`describe_jobflows` can return,
+                                       to simulate a real limitation of EMR
         :type max_days_ago: int
-        :param max_days_ago: the maximum amount of days that EMR will go back in time
+        :param max_days_ago: the maximum amount of days that EMR will go back
+                             in time
         :type max_simulation_steps: int
-        :param max_simulation_steps: the maximum number of times we can simulate the progress of EMR job flows (to protect against simulating forever)
+        :param max_simulation_steps: the maximum number of times we can
+                                     simulate the progress of EMR job flows (to
+                                     protect against simulating forever)
         """
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.mock_emr_job_flows = combine_values({}, mock_emr_job_flows)
@@ -269,14 +308,22 @@ class MockEmrConnection(object):
         jobflow_id = 'j-MOCKJOBFLOW%d' % len(self.mock_emr_job_flows)
         assert jobflow_id not in self.mock_emr_job_flows
 
+        def make_fake_action(real_action):
+            return MockEmrObject(name=real_action.name,
+                                 path=real_action.path,
+                                 args=[MockEmrObject(value=v) for v \
+                                       in real_action.bootstrap_action_args])
+
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunner uses
         job_flow = MockEmrObject(
             availabilityzone=availability_zone,
+            bootstrapactions=[make_fake_action(a) for a in bootstrap_actions],
             creationdatetime=to_iso8601(now),
             ec2keyname=ec2_keyname,
             hadoopversion=hadoop_version,
-            instancecount=num_instances,
+            instancecount=str(num_instances),
+            jobflowid=jobflow_id,
             keepjobflowalivewhennosteps=keep_alive,
             laststatechangereason='Provisioning Amazon EC2 capacity',
             masterinstancetype=master_instance_type,
@@ -288,13 +335,6 @@ class MockEmrConnection(object):
         # don't always set loguri, so we can test Issue #112
         if log_uri is not None:
             job_flow.loguri = log_uri
-
-        # setup bootstrap actions
-        if bootstrap_actions:
-            job_flow.bootstrapactions = [
-                MockEmrObject(
-                    name=action.name, path=action.path, args=action.args())
-                for action in bootstrap_actions]
 
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
@@ -327,7 +367,8 @@ class MockEmrConnection(object):
                                   datetime.timedelta(days=self.max_days_ago))
             if created_before < min_created_before:
                 raise boto.exception.BotoServerError(
-                    400, 'Bad Request', body="""<ErrorResponse xmlns="http://elasticmapreduce.amazonaws.com/doc/2009-03-31">
+                    400, 'Bad Request', body="""\
+<ErrorResponse xmlns="http://elasticmapreduce.amazonaws.com/doc/2009-03-31">
   <Error>
     <Type>Sender</Type>
     <Code>ValidationError</Code>
@@ -395,7 +436,7 @@ class MockEmrConnection(object):
         args = step.args()
         for i, arg in reversed(list(enumerate(args[:-1]))):
             if arg == '-output':
-                return args[i+1]
+                return args[i + 1]
         else:
             return None
 
@@ -470,7 +511,7 @@ class MockEmrConnection(object):
 
             # create fake output if we're supposed to write to S3
             output_uri = self._get_step_output_uri(step)
-            if output_uri and S3_URI_RE.match(output_uri):
+            if output_uri and is_s3_uri(output_uri):
                 mock_output = self.mock_emr_output.get(
                     (jobflow_id, step_num)) or ['']
 
@@ -485,7 +526,6 @@ class MockEmrConnection(object):
                     "can't use output for job flow ID %s, step %d "
                     "(it doesn't output to S3)" %
                     (jobflow_id, step_num))
-
 
             # done!
             return
@@ -520,7 +560,7 @@ class MockEmrObject(object):
             return False
 
         for k, v in my_items:
-            if not other_items.has_key(k):
+            if not k in other_items:
                 return False
             else:
                 if v != other_items[k]:
@@ -535,4 +575,3 @@ class MockEmrObject(object):
             self.__class__.__name__,
             ', '.join('%s=%r' % (k, v)
                       for k, v in sorted(self.__dict__.iteritems()))))
-                                        

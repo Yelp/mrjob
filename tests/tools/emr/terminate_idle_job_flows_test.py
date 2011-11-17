@@ -17,21 +17,22 @@
 from __future__ import with_statement
 
 from StringIO import StringIO
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 import sys
-from testify import TestCase, assert_equal, assert_raises, setup, teardown
+from testify import assert_equal
+from testify import setup
 
-try:
-    import boto
-    import boto.utils
-    from mrjob import botoemr
-except ImportError:
-    boto = None
-    botoemr = None
-
-from mrjob.tools.emr.terminate_idle_job_flows import *
+from mrjob.tools.emr.terminate_idle_job_flows import is_job_flow_done
+from mrjob.tools.emr.terminate_idle_job_flows import is_job_flow_running
+from mrjob.tools.emr.terminate_idle_job_flows import is_job_flow_non_streaming
+from mrjob.tools.emr.terminate_idle_job_flows import time_job_flow_idle
+from mrjob.tools.emr.terminate_idle_job_flows import (
+    inspect_and_maybe_terminate_job_flows,)
 from tests.emr_test import MockEMRAndS3TestCase
-from tests.mockboto import MockEmrObject, to_iso8601, MockEmrConnection
+from tests.mockboto import MockEmrObject
+from tests.mockboto import to_iso8601
+from tests.mockboto import MockEmrConnection
 
 
 class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
@@ -175,8 +176,6 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         assert_equal(time_job_flow_idle(jf, self.now), timedelta(hours=10))
 
     def test_currently_running(self):
-        now = datetime.utcnow().replace(microsecond=0)
-
         jf = self.mock_emr_job_flows['j-CURRENTLY_RUNNING']
         assert_equal(is_job_flow_done(jf), False)
         assert_equal(is_job_flow_running(jf), True)

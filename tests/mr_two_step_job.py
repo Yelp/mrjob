@@ -14,11 +14,51 @@
 """Trivial multi-step job, useful for testing runners."""
 from mrjob.job import MRJob
 
+try:
+    import simplejson as json  # preferred because of C speedups
+except ImportError:
+    import json  # built in to Python 2.6 and later
+
+
+class CustomRawValueProtocol(object):
+    """Just like :py:class:`mrjob.protocol.RawValueProtocol`, but using
+    instance methods instead of classmethods like we're supposed to
+    """
+
+    def read(self, line):
+        return (None, line)
+
+    def write(self, key, value):
+        return value
+
+
+class CustomJSONProtocol(object):
+    """Just like :py:class:`mrjob.protocol.JSONProtocol`, but using
+    instance methods instead of classmethods like we're supposed to
+    """
+
+    def read(self, line):
+        k, v = line.split('\t', 1)
+        return (json.loads(k), json.loads(v))
+
+    def write(self, key, value):
+        return '%s\t%s' % (json.dumps(key), json.dumps(value))
+
+
 class MRTwoStepJob(MRJob):
+
+    INPUT_PROTOCOL = CustomRawValueProtocol
+    INTERNAL_PROTOCOL = CustomJSONProtocol
 
     def mapper(self, key, value):
         yield key, value
         yield value, key
+
+    def combiner(self, key, values):
+        # just pass through and make note that this was run
+        self.increment_counter('count', 'combiners', 1)
+        for value in values:
+            yield key, value
 
     def reducer(self, key, values):
         yield key, len(list(values))
@@ -27,7 +67,7 @@ class MRTwoStepJob(MRJob):
         yield value, key
 
     def steps(self):
-        return [self.mr(self.mapper, self.reducer),
+        return [self.mr(self.mapper, self.reducer, self.combiner),
                 self.mr(self.mapper2)]
 
 if __name__ == '__main__':

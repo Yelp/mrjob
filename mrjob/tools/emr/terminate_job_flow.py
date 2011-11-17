@@ -15,7 +15,19 @@
 
 Usage::
 
-    python -m mrjob.tools.emr.terminate_job_flow j-JOBFLOWID
+    python -m mrjob.tools.emr.terminate_job_flow.py [options] j-JOBFLOWID
+
+Terminate an existing EMR job flow.
+
+Options::
+
+  -h, --help            show this help message and exit
+  -v, --verbose         print more messages to stderr
+  -q, --quiet           don't print anything
+  -c CONF_PATH, --conf-path=CONF_PATH
+                        Path to alternate mrjob.conf file to read from
+  --no-conf             Don't load mrjob.conf even if it's available
+
 """
 from __future__ import with_statement
 
@@ -26,6 +38,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.terminate_job_flow')
+
 
 def main():
     # parser command-line args
@@ -45,6 +58,7 @@ def main():
     log.debug('Terminating job flow %s' % emr_job_flow_id)
     runner.make_emr_conn().terminate_jobflow(emr_job_flow_id)
     log.info('Terminated job flow %s' % emr_job_flow_id)
+
 
 def make_option_parser():
     usage = '%prog [options] jobflowid'
@@ -66,6 +80,7 @@ def make_option_parser():
         help="Don't load mrjob.conf even if it's available")
 
     return option_parser
+
 
 if __name__ == '__main__':
     main()

@@ -445,6 +445,9 @@ class HadoopJobRunner(MRJobRunner):
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
             log.info('HADOOP: ' + line)
 
+            if 'Streaming Job Failed!' in line:
+                raise Exception(line)
+
             # The job identifier is printed to stderr. We only want to parse it
             # once because we know how many steps we have and just want to know
             # what Hadoop thinks the first step's number is.

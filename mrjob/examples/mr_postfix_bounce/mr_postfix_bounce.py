@@ -29,10 +29,14 @@ import time
 from mrjob.job import MRJob
 
 
-PROCESS_TYPE_PATTERN = re.compile(r'postfix-(?P<queue>[^/]+)/(?P<process>[^[]+)\[\d+\]:')
-MESSAGE_ID_PATTERN = re.compile(r'^(?P<message_id>[A-Z0-9]+): (?P<postfix_message>.*)')
+PROCESS_TYPE_PATTERN = re.compile(
+    r'postfix-(?P<queue>[^/]+)/(?P<process>[^[]+)\[\d+\]:')
+MESSAGE_ID_PATTERN = re.compile(
+    r'^(?P<message_id>[A-Z0-9]+): (?P<postfix_message>.*)')
 VAR_PATTERN = re.compile(r'(?P<name>\w+)=(?P<value>[^ ,]+)')
-HOST_PATTERN = re.compile(r'(?P<before>.*?)[\(]host (?P<host>\S+) (?P<action>[^:]+): (?P<message>.*)[\)]')
+HOST_PATTERN = re.compile(
+    r'(?P<before>.*?)[\(]host (?P<host>\S+) (?P<action>[^:]+):'
+    r' (?P<message>.*)[\)]')
 KEY_VALUE_PATTERN = re.compile(r'(?:^|, )(?P<key>\w+)=(?P<value>[^, ]+)')
 DOMAIN_PATTERN = re.compile(r'(?<=@)[^.]+\.\w+')
 
@@ -40,8 +44,12 @@ DOMAIN_PATTERN = re.compile(r'(?<=@)[^.]+\.\w+')
 def process_log_line(line):
     # log lines don't have year, so make that up
     # Note: not safe over year transitions
-    date_year, date_month, date_day, date_time, host, process, postfix_message = [str(datetime.date.today().year)] + line.split(None, 5)
-    timetuple = time.strptime(' '.join((date_month, date_day, date_time, date_year)), '%b %d %H:%M:%S %Y')
+    (date_year, date_month, date_day, date_time, host, process,
+     postfix_message) = [str(datetime.date.today().year)] + line.split(None, 5)
+
+    timetuple = time.strptime(
+        ' '.join((date_month, date_day, date_time, date_year)),
+        '%b %d %H:%M:%S %Y')
     timestamp = time.mktime(timetuple)
     date_ordinal = datetime.date(*timetuple[:3]).toordinal()
 
@@ -61,10 +69,13 @@ def process_log_line(line):
             else:
                 key_value_section = after_message_id
 
-            postfix_log_dict = dict(KEY_VALUE_PATTERN.findall(key_value_section))
+            postfix_log_dict = dict(
+                KEY_VALUE_PATTERN.findall(key_value_section))
             # find where key=value ends and save the rest of the string
             if postfix_log_dict:
-                after_vars_idx = max(after_message_id.index(value)+len(value)+1 for value in postfix_log_dict)
+                after_vars_idx = max(
+                    after_message_id.index(value) + len(value) + 1
+                    for value in postfix_log_dict)
                 after_vars = after_message_id[after_vars_idx:]
             else:
                 after_vars = after_message_id
@@ -89,7 +100,9 @@ def process_log_line(line):
 
             try:
                 if 'to' in postfix_log_dict:
-                    postfix_log_dict['domain'] = DOMAIN_PATTERN.search(postfix_log_dict['to']).group().lower()
+                    postfix_log_dict['domain'] = (
+                        DOMAIN_PATTERN.search(
+                            postfix_log_dict['to']).group().lower())
             except:
                 pass
             return postfix_log_dict
@@ -109,8 +122,10 @@ def process_postfix_log_dict(decoded, bounce_rules):
 
         # run over our per-domain bounce processing error conditions
         for domain_prefixes, failure_conditions in bounce_rules:
-            if any(domain_startswith(decoded, domain) for domain in domain_prefixes):
-                for point_of_failure, failure_strings in failure_conditions.iteritems():
+            if any(domain_startswith(decoded, domain)
+                   for domain in domain_prefixes):
+                for point_of_failure, failure_strings in (
+                    failure_conditions.iteritems()):
                     for failure_string in failure_strings:
                         if failure_string in decoded.get(point_of_failure, ''):
                             return to
@@ -129,13 +144,14 @@ class MRPostfixBounce(MRJob):
     def load_options(self, args):
         super(MRPostfixBounce, self).load_options(args=args)
         if self.is_mapper_or_reducer():
-            with open(self.options.bounce_processing_rules) as bounce_rules_file:
-                self.bounce_processing_rules = simplejson.load(bounce_rules_file)
+            with open(self.options.bounce_processing_rules) as bounce_rules_f:
+                self.bounce_processing_rules = simplejson.load(bounce_rules_f)
 
     def mapper(self, _, line):
         postfix_log_dict = process_log_line(line)
         if postfix_log_dict:
-            email_address = process_postfix_log_dict(postfix_log_dict, self.bounce_processing_rules)
+            email_address = process_postfix_log_dict(
+                postfix_log_dict, self.bounce_processing_rules)
             if email_address:
                 yield email_address, postfix_log_dict['date_ordinal']
 
@@ -145,4 +161,3 @@ class MRPostfixBounce(MRJob):
 
 if __name__ == '__main__':
     MRPostfixBounce().run()
-

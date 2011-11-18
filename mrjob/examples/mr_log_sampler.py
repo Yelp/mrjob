@@ -26,6 +26,7 @@ from mrjob.protocol import RawValueProtocol, ReprProtocol
 
 SAMPLING_FUDGE_FACTOR = 1.2
 
+
 class MRLogSampler(MRJob):
     # We use RawValueProtocol for input to be format agnostic
     # and avoid any type of parsing errors
@@ -35,8 +36,8 @@ class MRLogSampler(MRJob):
     # instead of (k, v) pairs
     OUTPUT_PROTOCOL = RawValueProtocol
 
-    # Encode the intermediate records using repr() instead of JSON, so the record
-    # doesn't get Unicode encoded
+    # Encode the intermediate records using repr() instead of JSON, so the
+    # record doesn't get Unicode-encoded
     INTERNAL_PROTOCOL = ReprProtocol
 
     def configure_options(self):
@@ -49,7 +50,8 @@ class MRLogSampler(MRJob):
         self.add_passthrough_option(
             '--expected-length',
             type=int,
-            help="Number of entries you expect in the log. If not specified, we'll pass every line to the reducer."
+            help=("Number of entries you expect in the log. If not specified,"
+                  " we'll pass every line to the reducer.")
         )
 
     def load_options(self, args):
@@ -60,15 +62,18 @@ class MRLogSampler(MRJob):
         else:
             self.sample_size = self.options.sample_size
 
-        # If we have an expected length, we can estimate the sampling probability
-        # for the mapper, so that the reducer doesn't have to process all records.
-        # Otherwise, pass everything thru to the reducer.
+        # If we have an expected length, we can estimate the sampling
+        # probability for the mapper, so that the reducer doesn't have to
+        # process all records. Otherwise, pass everything thru to the reducer.
         if self.options.expected_length is None:
             self.sampling_probability = 1.
         else:
             # We should be able to bound this probability by using the binomial
-            # distribution, but I haven't figured it out yet. So, let's just fudge it.
-            self.sampling_probability = float(self.sample_size) * SAMPLING_FUDGE_FACTOR / self.options.expected_length
+            # distribution, but I haven't figured it out yet. So, let's just
+            # fudge it.
+            self.sampling_probability = (float(self.sample_size) *
+                                         SAMPLING_FUDGE_FACTOR /
+                                         self.options.expected_length)
 
     def mapper(self, _, line):
         """
@@ -106,6 +111,7 @@ class MRLogSampler(MRJob):
             # enumerate() is 0-indexed, so add 1
             if line_num + 1 >= self.sample_size:
                 break
+
 
 if __name__ == '__main__':
     MRLogSampler.run()

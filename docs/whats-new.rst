@@ -89,27 +89,43 @@ Changes and Deprecations
 
     More info: :py:mod:`mrjob.conf`
 
- * Defining Jobs (MRJob):
-   * mapper/combiner/reducer methods no longer need to contain a yield
-     statement if they emit no data
-   * Protocols:
-     * Protocols can be anything with read() and write() methods, and are
-       instances by default (Issue #229)
-     * Set protocols with the *_PROTOCOL attributes or by re-defining the
-       *_protocol() methods
-     * Built-in protocol classes cache the encoded and decoded value of the
-       last key for faster decoding during reducing (Issue #230)
-     * --*protocol switches and aliases are deprecated (Issue #106)
-   * Set Hadoop formats with HADOOP_*_FORMAT attributes or the hadoop_*_format()
-     methods (Issue #241)
-     * --hadoop-*-format switches are deprecated
-     * Hadoop formats can no longer be set from mrjob.conf
-   * Set jobconf with JOBCONF attribute or the jobconf() method (in addition
-     to --jobconf)
-   * Set Hadoop partitioner class with --partitioner, PARTITIONER, or
-     partitioner() (Issue #6)
-   * Use mrjob.compat.get_jobconf_value() to get jobconf values from environment
- * Running jobs:
+**Defining Jobs (MRJob)**
+
+    Mapper, combiner, and reducer methods no longer need to contain a yield
+    statement if they emit no data.
+
+    The :option:`--hadoop-*-format` switches are deprecated. Instead, set your
+    job's Hadoop formats with
+    :py:attr:`.HADOOP_INPUT_FORMAT`/:py:attr:`.HADOOP_OUTPUT_FORMAT`
+    or :py:meth:`.hadoop_input_format()`/:py:meth:`.hadoop_output_format()`.
+    Hadoop formats can no longer be set from :file:`mrjob.conf`.
+
+    In addition to :option:`--jobconf`, you can now set jobconf values with the
+    :py:attr:`.JOBCONF` attribute or the :py:meth:`.jobconf()` method.  To read
+    jobconf values back, use :py:func:`mrjob.compat.get_jobconf_value()`, which
+    ensures that the correct name is used depending on which version of Hadoop
+    is active.
+
+    You can now set the Hadoop partioner class with :option:`--partitioner`,
+    the :py:attr:`.PARTITIONER` attribute, or the :py:meth:`.partitioner()`
+    method.
+
+    More info: :ref:`hadoop-config`
+
+    **Protocols**
+
+        Protocols can now be anything with a ``read()`` and ``write()``
+        method. Unlike previous versions of mrjob, they can be **instance
+        methods** rather than class methods. You should use instance methods
+        when defining your own protocols.
+
+        The :option:`--*protocol` switches and :py:attr:`DEFAULT_*PROTOCOL`
+        are deprecated. Instead, use the :py:attr:`*_PROTOCOL` attributes or
+        redefine the :py:meth:`*_protocol()` methods.
+
+        More info: :ref:`job-protocols`
+
+**Running Jobs**
    * All modes:
      * All runners are Hadoop-version aware and use the correct jobconf and
        combiner invocation styles (Issue #111)

@@ -40,6 +40,10 @@ DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
 DEFAULT_MAX_DAYS_AGO = 61
 
 
+# Size of each chunk returned by the MockKey iterator
+SIMULATED_BUFFER_SIZE = 256
+
+
 ### S3 ###
 
 def add_mock_s3_data(mock_s3_fs, data):
@@ -185,10 +189,9 @@ class MockKey(object):
     def __iter__(self):
         data = self.read_mock_data()
         i = 0
-        buf_size = 256
         while i < len(data):
-            yield data[i:min(len(data), i+buf_size)]
-            i += buf_size
+            yield data[i:min(len(data), i+SIMULATED_BUFFER_SIZE)]
+            i += SIMULATED_BUFFER_SIZE
 
     def _get_last_modified(self):
         if self.name in self.bucket.mock_state():

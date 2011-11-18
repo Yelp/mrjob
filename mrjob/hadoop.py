@@ -590,10 +590,6 @@ class HadoopJobRunner(MRJobRunner):
         else:
             return proc.returncode
 
-    def _process_stderr_from_hadoop(self, stderr):
-        for line in stderr:
-            log.info('HADOOP: %s' % line.rstrip('\n'))
-
     def _cleanup_local_scratch(self):
         super(HadoopJobRunner, self)._cleanup_local_scratch()
 

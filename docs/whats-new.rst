@@ -35,10 +35,10 @@ Features
 
 **Job Flow Pooling**
 
-    EMR jobs can pull job flows out of a "pool" of similarly configured (and
-    optionally named) job flows. This can make it easier to use a small set of
-    job flows across multiple automated jobs, save time and money while
-    debugging, and generally make your life simpler.
+    EMR jobs can pull job flows out of a "pool" of similarly configured job
+    flows. This can make it easier to use a small set of job flows across
+    multiple automated jobs, save time and money while debugging, and generally
+    make your life simpler.
 
     More info: :ref:`pooling-job-flows`
 

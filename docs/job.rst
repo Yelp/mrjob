@@ -11,32 +11,44 @@ Basic
 
 .. autoclass:: MRJob
 
+.. _writing-one-step-jobs:
+
 Writing one-step jobs
 ^^^^^^^^^^^^^^^^^^^^^
+
 .. automethod:: MRJob.mapper
 .. automethod:: MRJob.reducer
+.. automethod:: MRJob.combiner
 .. automethod:: MRJob.mapper_init
 .. automethod:: MRJob.mapper_final
 .. automethod:: MRJob.reducer_init
 .. automethod:: MRJob.reducer_final
+.. automethod:: MRJob.combiner_init
+.. automethod:: MRJob.combiner_final
+
+.. _writing-multi-step-jobs:
 
 Writing multi-step jobs
 ^^^^^^^^^^^^^^^^^^^^^^^
+
 .. automethod:: MRJob.steps
 .. automethod:: MRJob.mr
 
 Running the job
 ^^^^^^^^^^^^^^^
+
 .. automethod:: MRJob.run
 .. automethod:: MRJob.__init__
 .. automethod:: MRJob.make_runner
 
 Parsing the output
 ^^^^^^^^^^^^^^^^^^
+
 .. automethod:: MRJob.parse_output_line
 
 Counters and status messages
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. automethod:: MRJob.increment_counter
 .. automethod:: MRJob.set_status
 
@@ -130,6 +142,8 @@ See :doc:`configs-reference` for a complete list of all configuration options.
 .. automethod:: MRJob.load_options
 .. automethod:: MRJob.is_mapper_or_reducer
 
+.. _custom-options:
+
 Custom command-line types and actions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -167,6 +181,18 @@ Running specific parts of jobs
 .. automethod:: MRJob.run_reducer
 .. automethod:: MRJob.show_steps
 
+.. _hadoop-config:
+
+Hadoop Configuration
+^^^^^^^^^^^^^^^^^^^^
+.. autoattribute:: MRJob.HADOOP_INPUT_FORMAT
+.. automethod:: MRJob.hadoop_input_format
+.. autoattribute:: MRJob.HADOOP_OUTPUT_FORMAT
+.. automethod:: MRJob.hadoop_output_format
+.. autoattribute:: MRJob.JOBCONF
+.. automethod:: MRJob.jobconf
+.. autoattribute:: MRJob.PARTITIONER
+.. automethod:: MRJob.partitioner
 
 Hooks for testing
 -----------------

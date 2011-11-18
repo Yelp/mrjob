@@ -52,6 +52,23 @@ class LocalMRJobRunner(MRJobRunner):
 
     It's rare to need to instantiate this class directly (see
     :py:meth:`~LocalMRJobRunner.__init__` for details).
+
+    :py:class:`LocalMRJobRunner` simulates the following jobconf variables:
+
+    * ``mapreduce.job.cache.archives``
+    * ``mapreduce.job.cache.files``
+    * ``mapreduce.job.cache.local.archives``
+    * ``mapreduce.job.cache.local.files``
+    * ``mapreduce.job.id``
+    * ``mapreduce.job.local.dir``
+    * ``mapreduce.map.input.file``
+    * ``mapreduce.map.input.length``
+    * ``mapreduce.map.input.start``
+    * ``mapreduce.task.attempt.id``
+    * ``mapreduce.task.id``
+    * ``mapreduce.task.ismap``
+    * ``mapreduce.task.output.dir``
+    * ``mapreduce.task.partition``
     """
 
     alias = 'local'

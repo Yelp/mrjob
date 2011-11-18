@@ -47,7 +47,9 @@ from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
 from mrjob.conf import load_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
+from mrjob.util import log_to_stream
 from tests.quiet import logger_disabled
+from tests.quiet import no_handlers_for_logger
 
 
 class MRJobConfTestCase(TestCase):
@@ -76,22 +78,6 @@ class MRJobConfTestCase(TestCase):
     @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
-
-    @setup
-    def setup_log_capture(self):
-        self.log_file = StringIO()
-        self._log_handler = logging.StreamHandler(self.log_file)
-        self._log_handler.setLevel(logging.INFO)
-        self._log_handler.setFormatter(logging.Formatter('%(message)s'))
-        logger = logging.getLogger('mrjob.conf')
-        self._old_handlers = logger.handlers
-        logger.setLevel(logging.INFO)
-        logger.handlers = [self._log_handler]
-
-    @teardown
-    def rm_log_capture(self):
-        logger = logging.getLogger('mrjob.conf')
-        logger.handlers = self._old_handlers
 
     @setup
     def blank_out_environment(self):
@@ -148,9 +134,6 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         self._existing_paths.add(mrjob_conf_path)
         assert_equal(find_mrjob_conf(), mrjob_conf_path)
 
-        assert_not_in('This config path is deprecated',
-                      self.log_file.getvalue())
-
     def test_load_and_load_opts_use_find_mrjob_conf(self):
         os.environ['HOME'] = self.tmp_dir
 
@@ -186,14 +169,23 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
 
 class MRJobConfDeprecatedLocationTestCase(MRJobConfTestCase):
 
+    def _log_to_buffer(self):
+        buf = StringIO()
+        log = logging.getLogger('mrjob.conf')
+        log.addHandler(logging.StreamHandler(buf))
+        log.setLevel(logging.WARNING)
+        return buf
+
     def test_mrjob_conf_in_python_path(self):
         os.environ['PYTHONPATH'] = self.tmp_dir
         mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
         open(mrjob_conf_path, 'w').close()
         self._existing_paths = [mrjob_conf_path]
-        assert_equal(find_mrjob_conf(), mrjob_conf_path)
-        assert_in('This config path is deprecated',
-                      self.log_file.getvalue())
+
+        with no_handlers_for_logger():
+            buf = self._log_to_buffer()
+            assert_equal(find_mrjob_conf(), mrjob_conf_path)
+            assert_in('This config path is deprecated', buf.getvalue())
 
     def test_precedence_deprecated(self):
         os.environ['HOME'] = '/home/foo'
@@ -206,22 +198,28 @@ class MRJobConfDeprecatedLocationTestCase(MRJobConfTestCase):
         assert_equal(find_mrjob_conf(), '/etc/mrjob.conf')
 
         self._existing_paths.add('/py2/mrjob.conf')
-        assert_equal(find_mrjob_conf(), '/py2/mrjob.conf')
+        with no_handlers_for_logger():
+            buf = self._log_to_buffer()
+            assert_equal(find_mrjob_conf(), '/py2/mrjob.conf')
+            assert_in('This config path is deprecated', buf.getvalue())
 
         self._existing_paths.add('/py1/mrjob.conf')
-        assert_equal(find_mrjob_conf(), '/py1/mrjob.conf')
+        with no_handlers_for_logger():
+            buf = self._log_to_buffer()
+            assert_equal(find_mrjob_conf(), '/py1/mrjob.conf')
+            assert_in('This config path is deprecated', buf.getvalue())
 
         self._existing_paths.add('/home/foo/.mrjob')
-        assert_equal(find_mrjob_conf(), '/home/foo/.mrjob')
+        with no_handlers_for_logger():
+            buf = self._log_to_buffer()
+            assert_equal(find_mrjob_conf(), '/home/foo/.mrjob')
+            assert_in('This config path is deprecated', buf.getvalue())
 
         mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
         open(mrjob_conf_path, 'w').close()
         os.environ['MRJOB_CONF'] = mrjob_conf_path
         self._existing_paths.add(mrjob_conf_path)
         assert_equal(find_mrjob_conf(), mrjob_conf_path)
-
-        assert_in('This config path is deprecated',
-                      self.log_file.getvalue())
 
 
 class MRJobConfNoYAMLTestCase(MRJobConfTestCase):

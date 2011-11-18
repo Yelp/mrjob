@@ -15,10 +15,13 @@ Writing one-step jobs
 ^^^^^^^^^^^^^^^^^^^^^
 .. automethod:: MRJob.mapper
 .. automethod:: MRJob.reducer
+.. automethod:: MRJob.combiner
 .. automethod:: MRJob.mapper_init
 .. automethod:: MRJob.mapper_final
 .. automethod:: MRJob.reducer_init
 .. automethod:: MRJob.reducer_final
+.. automethod:: MRJob.combiner_init
+.. automethod:: MRJob.combiner_final
 
 Writing multi-step jobs
 ^^^^^^^^^^^^^^^^^^^^^^^

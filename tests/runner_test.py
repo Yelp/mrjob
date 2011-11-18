@@ -403,5 +403,5 @@ class TestStreamingOutput(TestCase):
 
         runner = LocalMRJobRunner()
         runner._output_dir = self.tmp_dir
-        assert_equal(list(runner.stream_output()),
-                     ['C', 'A', 'B'])
+        assert_equal(sorted(runner.stream_output()),
+                     ['A', 'B', 'C'])

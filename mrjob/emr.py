@@ -2186,24 +2186,32 @@ class EMRJobRunner(MRJobRunner):
         else:
             return super(EMRJobRunner, self).md5sum(path)
 
-    def _double_line_wrapper(self, lines):
-        """boto seems to sometimes include two lines in one step of the file
-        object iterator, like ``['line1\n', 'line2\nline3\n']``. This is a
-        workaround.
+    def _buffer_iterator_wrapper(self, iterator):
+        """boto's file iterator splits by buffer size instead of by newline, so
+        we have this wrapper
         """
-        for line in lines:
-            if line.endswith('\n'):
-                line = line[:-1]
-            for subline in line.split('\n'):
-                yield subline + '\n'
+        prepend = ""
+        buf = iterator.next()
+        while True:
+            if '\n' in buf:
+                (line, buf) = buf.split('\n', 1)
+                yield line + '\n'
+            else:
+                try:
+                    more = iterator.next()
+                    buf += more
+                except StopIteration:
+                    if buf:
+                        yield buf + '\n'
+                    return
 
     def _cat_file(self, filename):
         ssh_match = SSH_URI_RE.match(filename)
         if is_s3_uri(filename):
             # stream lines from the s3 key
             s3_key = self.get_s3_key(filename)
-            lines = read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
-            return self._double_line_wrapper(lines)
+            buffer_iterator = read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+            return self._buffer_iterator_wrapper(buffer_iterator)
         elif ssh_match:
             try:
                 addr = ssh_match.group('hostname') or self._address_of_master()

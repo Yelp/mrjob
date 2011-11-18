@@ -193,6 +193,6 @@ Changes and Deprecations
 
 **Other Stuff**
 
-    Boto 2.0+ is now required.
+    boto 2.0+ is now required.
 
     The Debian packaging has been removed from the repostory.

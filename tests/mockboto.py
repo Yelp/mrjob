@@ -184,8 +184,11 @@ class MockKey(object):
 
     def __iter__(self):
         data = self.read_mock_data()
-        for line in data.splitlines(True):
-            yield line
+        i = 0
+        buf_size = 256
+        while i < len(data):
+            yield data[i:min(len(data), i+buf_size)]
+            i += buf_size
 
     def _get_last_modified(self):
         if self.name in self.bucket.mock_state():

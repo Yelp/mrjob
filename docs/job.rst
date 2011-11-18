@@ -11,8 +11,11 @@ Basic
 
 .. autoclass:: MRJob
 
+.. _writing-one-step-jobs:
+
 Writing one-step jobs
 ^^^^^^^^^^^^^^^^^^^^^
+
 .. automethod:: MRJob.mapper
 .. automethod:: MRJob.reducer
 .. automethod:: MRJob.combiner
@@ -23,23 +26,29 @@ Writing one-step jobs
 .. automethod:: MRJob.combiner_init
 .. automethod:: MRJob.combiner_final
 
+.. _writing-multi-step-jobs:
+
 Writing multi-step jobs
 ^^^^^^^^^^^^^^^^^^^^^^^
+
 .. automethod:: MRJob.steps
 .. automethod:: MRJob.mr
 
 Running the job
 ^^^^^^^^^^^^^^^
+
 .. automethod:: MRJob.run
 .. automethod:: MRJob.__init__
 .. automethod:: MRJob.make_runner
 
 Parsing the output
 ^^^^^^^^^^^^^^^^^^
+
 .. automethod:: MRJob.parse_output_line
 
 Counters and status messages
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. automethod:: MRJob.increment_counter
 .. automethod:: MRJob.set_status
 
@@ -132,6 +141,8 @@ See :doc:`configs-reference` for a complete list of all configuration options.
 .. automethod:: MRJob.add_file_option
 .. automethod:: MRJob.load_options
 .. automethod:: MRJob.is_mapper_or_reducer
+
+.. _custom-options:
 
 Custom command-line types and actions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

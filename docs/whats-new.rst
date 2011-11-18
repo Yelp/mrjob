@@ -123,6 +123,9 @@ Changes and Deprecations
         are deprecated. Instead, use the :py:attr:`*_PROTOCOL` attributes or
         redefine the :py:meth:`*_protocol()` methods.
 
+        Protocols now cache the decoded values of keys. Informal testing shows
+        up to 30% speed improvements.
+
         More info: :ref:`job-protocols`
 
 **Running Jobs**

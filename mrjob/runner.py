@@ -194,10 +194,10 @@ class MRJobRunner(object):
                                 installed ``mrjob`` on your Hadoop cluster.
         :type cleanup: list
         :param cleanup: List of which kinds of directories to delete when a
-                        job succeeds. See :py:data:`CLEANUP_CHOICES`.
+                        job succeeds. See :py:data:`.CLEANUP_CHOICES`.
         :type cleanup_on_failure: list
         :param cleanup_on_failure: Which kinds of directories to clean up when
-                                   a job fails. See :py:data:`CLEANUP_CHOICES`.
+                                   a job fails. See :py:data:`.CLEANUP_CHOICES`.
         :type cmdenv: dict
         :param cmdenv: environment variables to pass to the job inside Hadoop
                        streaming

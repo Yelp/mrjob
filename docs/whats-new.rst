@@ -126,27 +126,73 @@ Changes and Deprecations
         More info: :ref:`job-protocols`
 
 **Running Jobs**
-   * All modes:
-     * All runners are Hadoop-version aware and use the correct jobconf and
-       combiner invocation styles (Issue #111)
-     * All types of URIs can be passed through to Hadoop (Issue #53)
-     * Speed up steps with no mapper by using cat (Issue #5)
-     * Stream compressed files with cat() method (Issue #17)
-     * hadoop_bin, python_bin, and ssh_bin can now all take switches (Issue #96)
-     * job_name_prefix option is gone (was deprecated)
-     * Better cleanup (Issue #10):
-       * Separate cleanup_on_failure option
-       * More granular cleanup options
-     * Cleaner handling of passthrough options (Issue #32)
-   * emr mode:
-     * default Hadoop version on EMR is 0.20 (was 0.18)
-     * ec2_instance_type option now only sets instance type for slave nodes
-       when there are multiple EC2 instances (Issue #66)
-   * inline mode:
-     * Supports cmdenv (Issue #136)
-   * local mode:
-     * Runs 2 mappers and 2 reducers in parallel by default (Issue #228)
-     * Preliminary Hadoop simulation for some jobconf variables (Issue #86)
- * Misc:
-   * boto 2.0+ is now required (Issue #92)
-   * Removed debian packaging (should be handled separately)
+
+    **All Modes**
+
+        All runners are Hadoop-version aware and use the correct jobconf and
+        combiner invocation styles. This change should decrease the number
+        of warnings in Hadoop 0.20 environments.
+
+        All ``*_bin`` configuration options (``hadoop_bin``, ``python_bin``,
+        and ``ssh_bin``) take lists instead of strings so you can add
+        arguments (like ``['python', '-v']``).  More info:
+        :doc:`configs-reference`
+
+        Cleanup options have been split into ``cleanup`` and
+        ``cleanup_on_failure``. There are more granular values for both of
+        these options. More info: :doc:`configs-runners`
+
+        Most limitations have been lifted from passthrough options, including
+        the former inability to use custom types and actions. More info:
+        :ref:`custom-options`
+
+        The ``job_name_prefix`` option is gone (was deprecated).
+
+        All URIs are passed through to Hadoop where possible. This should
+        relax some requirements about what URIs you can use.
+
+        Steps with no mapper use :command:`cat` instead of going through a
+        no-op mapper.
+
+        Compressed files can be streamed with the :py:meth:`.cat()` method.
+
+    **EMR Mode**
+
+        The default Hadoop version on EMR is now 0.20 (was 0.18).
+
+        The ``ec2_instance_type`` option only sets the instance type for slave
+        nodes when there are multiple EC2 instance. This is because the master
+        node can usually remain small without affecting the performance of the
+        job.
+
+    **Inline Mode**
+
+        Inline mode now supports the ``cmdenv`` option.
+
+    **Local Mode**
+
+        Local mode now runs 2 mappers and 2 reducers in parallel by default.
+
+        There is preliminary support for simulating some jobconf variables.
+        The current list of supported variables is:
+
+        * ``mapreduce.job.cache.archives``
+        * ``mapreduce.job.cache.files``
+        * ``mapreduce.job.cache.local.archives``
+        * ``mapreduce.job.cache.local.files``
+        * ``mapreduce.job.id``
+        * ``mapreduce.job.local.dir``
+        * ``mapreduce.map.input.file``
+        * ``mapreduce.map.input.length``
+        * ``mapreduce.map.input.start``
+        * ``mapreduce.task.attempt.id``
+        * ``mapreduce.task.id``
+        * ``mapreduce.task.ismap``
+        * ``mapreduce.task.output.dir``
+        * ``mapreduce.task.partition``
+
+**Other Stuff**
+
+    Boto 2.0+ is now required.
+
+    The Debian packaging has been removed from the repostory.

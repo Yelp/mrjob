@@ -123,18 +123,6 @@ def log_to_stream(name=None, stream=None, format=None, level=None,
     logger.addHandler(handler)
 
 
-def _capture_args(opt, rargs, func):
-    """Return a list containing *opt* plus the items of *rargs* consumed
-    by *func*
-    """
-    rargs_before_processing = [x for x in rargs]
-
-    func()
-
-    length_difference = len(rargs_before_processing) - len(rargs)
-    return [opt] + rargs_before_processing[:length_difference]
-
-
 def _process_long_opt(option_parser, arg_map, rargs, values):
     """Mimic function of the same name in ``OptionParser``, capturing the
     arguments consumed in *arg_map*

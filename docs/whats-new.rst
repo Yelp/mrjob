@@ -8,10 +8,10 @@ Features
 
     You can now use combiners in your job. Like :py:meth:`.mapper()` and
     :py:meth:`.reducer()`, you can redefine :py:meth:`.combiner()` in your
-    subclass to add a single combiner step to run after your method.
-    (:py:class:`MRWordFreqCount` does this.) :py:meth:`.combiner_init()` and
-    :py:meth:`.combiner_final()` are similar to their mapper and reducer
-    equivalents.
+    subclass to add a single combiner step to run after your mapper but before
+    your reducer.  (:py:class:`MRWordFreqCount` does this to improve
+    performance.) :py:meth:`.combiner_init()` and :py:meth:`.combiner_final()`
+    are similar to their mapper and reducer equivalents.
 
     You can also add combiners to custom steps by adding keyword argumens to
     your call to :py:meth:`.steps()`.

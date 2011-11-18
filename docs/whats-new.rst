@@ -50,10 +50,10 @@ Features
 
     More info: :ref:`ssh-tunneling`
 
-**New EMR Tool: fetchlogs**
+**New EMR Tool: fetch_logs**
 
     If you want to fetch the counters or error logs for a job after the fact,
-    you can use the new ``fetchlogs`` tool.
+    you can use the new ``fetch_logs`` tool.
 
     More info: :py:mod:`mrjob.tools.emr.fetch_logs`
 

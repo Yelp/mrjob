@@ -39,6 +39,7 @@ You can then add jobs to the job flow with the :option:`--emr-job-flow-id` switc
 
 Debugging will be difficult unless you complete SSH setup (see :ref:`ssh-tunneling`) since the logs will not be copied from the master node to S3 before either five minutes pass or the job flow terminates.
 
+.. _pooling-job-flows:
 
 Pooling Job Flows
 ^^^^^^^^^^^^^^^^^
@@ -84,7 +85,7 @@ SSH tunneling and log fetching
 ------------------------------
 
 To enable SSH tunneling and log fetching, so that you can view the Hadoop Job
-Tracker in your browser and see error logs more quickly:
+Tracker in your browser and see error logs faster:
 
 * Go to https://console.aws.amazon.com/ec2/home
 * Make sure the **Region** dropdown (upper left) matches the region you want to run jobs in (usually "US East").

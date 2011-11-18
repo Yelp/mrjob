@@ -369,3 +369,39 @@ class TestCat(TestCase):
                 output.append(line)
 
         assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
+
+
+class TestStreamingOutput(TestCase):
+
+    @setup
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    # Test regression for #269
+    def test_stream_output(self):
+        a_dir_path = os.path.join(self.tmp_dir, 'a')
+        b_dir_path = os.path.join(self.tmp_dir, 'b')
+        os.mkdir(a_dir_path)
+        os.mkdir(b_dir_path)
+
+        a_file_path = os.path.join(a_dir_path, 'part-00000')
+        b_file_path = os.path.join(b_dir_path, 'part-00001')
+        c_file_path = os.path.join(self.tmp_dir, 'part-00002')
+
+        with open(a_file_path, 'w') as f:
+            f.write('A')
+
+        with open(b_file_path, 'w') as f:
+            f.write('B')
+
+        with open(c_file_path, 'w') as f:
+            f.write('C')
+
+        runner = LocalMRJobRunner()
+        runner._output_dir = self.tmp_dir
+        assert_equal(list(runner.stream_output()),
+                     ['C', 'A', 'B'])

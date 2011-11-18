@@ -82,12 +82,12 @@ class WithStatementTestCase(TestCase):
 
     def test_cleanup_error(self):
         assert_raises(ValueError, self._test_cleanup_after_with_statement,
-                      ['NONE','ALL'], True)
+                      ['NONE', 'ALL'], True)
         assert_raises(ValueError, self._test_cleanup_after_with_statement,
                       ['GARBAGE'], True)
 
     def test_double_none_okay(self):
-        self._test_cleanup_after_with_statement(['NONE','NONE'], True)
+        self._test_cleanup_after_with_statement(['NONE', 'NONE'], True)
 
     def test_cleanup_deprecated(self):
         stderr = StringIO()

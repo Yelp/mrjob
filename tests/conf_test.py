@@ -242,8 +242,9 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         dump_mrjob_conf(conf, open(conf_path, 'w'))
         contents = open(conf_path).read()
 
-        assert_equal(contents.replace(' ','').replace('\n',''),
+        assert_equal(contents.replace(' ', '').replace('\n', ''),
                      '{"runners":{"foo":{"qux":"quux"}}}')
+
 
 class CombineValuesTestCase(TestCase):
 
@@ -270,6 +271,7 @@ class CombineValuesTestCase(TestCase):
         assert_equal(combine_values((1, 2, 3), ()), ())
         assert_equal(combine_values({'a': 'b'}, {}), {})
         assert_equal(combine_values(set([1]), set()), set())
+
 
 class CombineDictsTestCase(TestCase):
 
@@ -377,6 +379,7 @@ class CombineEnvsTestCase(TestCase):
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
 
+
 class CombineLocalEnvsTestCase(TestCase):
 
     @setup
@@ -401,6 +404,7 @@ class CombineLocalEnvsTestCase(TestCase):
              'PYTHONPATH': '/home/dave/python;/usr/lib/python/site-packages',
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
+
 
 class CombineListsTestCase(TestCase):
 
@@ -498,5 +502,3 @@ class CombineAndExpandPathsTestCase(TestCase):
             [bar_path, foo_path, foo_path,
              os.path.join(self.tmp_dir, 'q*'),
              's3://walrus/foo'])
-
-

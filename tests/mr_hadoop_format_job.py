@@ -14,6 +14,7 @@
 """Trivial two-step job which sets hadoop input and output format."""
 from mrjob.job import MRJob
 
+
 class MRHadoopFormatJob(MRJob):
 
     HADOOP_INPUT_FORMAT = 'mapred.FooInputFormat'

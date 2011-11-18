@@ -201,7 +201,9 @@ def hadoop_fs_lsr(*args):
         real_path_glob = hdfs_path_to_real_path(hdfs_path_glob)
         real_paths = glob.glob(real_path_glob)
         if not real_paths:
-            print >> sys.stderr, 'lsr: Cannot access %s: No such file or directory.' % hdfs_path_glob
+            print >> sys.stderr, (
+                'lsr: Cannot access %s: No such file or directory.' %
+                hdfs_path_glob)
             failed = True
         else:
             for real_path in real_paths:
@@ -227,7 +229,8 @@ def hadoop_fs_mkdir(*args):
     for path in args:
         real_path = hdfs_path_to_real_path(path)
         if os.path.exists(real_path):
-            sys.stderr.write('mkdir: cannot create directory %s: File exists' % path)
+            sys.stderr.write(
+                'mkdir: cannot create directory %s: File exists' % path)
             # continue to make directories on failure
             failed = True
 
@@ -268,7 +271,8 @@ def hadoop_fs_rmr(*args):
         if os.path.exists(real_path):
             shutil.rmtree(real_path)
         else:
-            sys.stderr.write('rmr: cannot remove %s: No such file or directory.' % path)
+            sys.stderr.write(
+                'rmr: cannot remove %s: No such file or directory.' % path)
             failed = True
 
     if failed:
@@ -282,13 +286,15 @@ def hadoop_jar(*args):
 
     jar_path = args[0]
     if not os.path.exists(jar_path):
-        sys.stderr.write('Exception in thread "main" java.io.IOException: Error opening job jar: %s\n' % jar_path)
+        sys.stderr.write(
+            'Exception in thread "main" java.io.IOException: Error opening job'
+            ' jar: %s\n' % jar_path)
         sys.exit(-1)
 
     streaming_args = args[1:]
     output_idx = list(streaming_args).index('-output')
     assert output_idx != -1
-    output_dir = streaming_args[output_idx+1]
+    output_dir = streaming_args[output_idx + 1]
     real_output_dir = hdfs_path_to_real_path(output_dir)
 
     mock_output_dir = get_mock_hadoop_output()
@@ -308,7 +314,8 @@ def hadoop_jar(*args):
 
 def hadoop_version(*args):
     sys.stderr.write("""Hadoop 0.20.2
-Subversion https://svn.apache.org/repos/asf/hadoop/common/branches/branch-0.20 -r 911707
+Subversion https://svn.apache.org/repos/asf/hadoop/common/branches/branch-0.20\
+ -r 911707
 Compiled by chrisdo on Fri Feb 19 08:07:34 UTC 2010
 """)
 

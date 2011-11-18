@@ -704,7 +704,7 @@ class HadoopJobRunner(MRJobRunner):
         for line in StringIO(stdout):
             fields = line.rstrip('\n').split()
             # expect lines like:
-            # -rw-r--r--   3 dave users       3276 2010-01-13 14:00 /user/dave/foox
+            # -rw-r--r--   3 dave users       3276 2010-01-13 14:00 /foo/bar
             if len(fields) < 8:
                 raise Exception('unexpected ls line from hadoop: %r' % line)
             # ignore directories

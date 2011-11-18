@@ -13,6 +13,7 @@
 # limitations under the License.
 from mrjob.job import MRJob
 
+
 class MRNoMapper(MRJob):
 
     def mapper(self, key, value):
@@ -28,6 +29,7 @@ class MRNoMapper(MRJob):
     def steps(self):
         return [self.mr(self.mapper, self.reducer),
                 self.mr(reducer=self.reducer2)]
+
 
 if __name__ == '__main__':
     MRNoMapper.run()

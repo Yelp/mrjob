@@ -41,6 +41,7 @@ from mrjob.parse import urlparse
 from mrjob.util import log_to_stream
 from tests.quiet import no_handlers_for_logger
 
+
 class FindPythonTracebackTestCase(TestCase):
 
     EXAMPLE_TRACEBACK = """Traceback (most recent call last):

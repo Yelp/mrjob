@@ -1086,7 +1086,8 @@ class MRJob(object):
                   ' in your job.'))
 
         self.hadoop_emr_opt_group.add_option(
-            '--hadoop-output-format', dest='hadoop_output_format', default=None,
+            '--hadoop-output-format', dest='hadoop_output_format',
+            default=None,
             help=('DEPRECATED: the hadoop OutputFormat class used by the first'
                   ' step of your job to read data. Custom formats must be'
                   ' included in your hadoop streaming jar (see'

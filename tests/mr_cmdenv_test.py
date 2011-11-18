@@ -15,6 +15,7 @@ import os
 
 from mrjob.job import MRJob
 
+
 class MRCmdenvTest(MRJob):
     """cmdenv test."""
     def mapper(self, key, value):
@@ -24,6 +25,7 @@ class MRCmdenvTest(MRJob):
         # get cmdenvs
         yield('FOO', os.environ['FOO'])
         yield('SOMETHING', os.environ['SOMETHING'])
+
 
 if __name__ == '__main__':
     MRCmdenvTest.run()

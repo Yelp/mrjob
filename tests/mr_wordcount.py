@@ -19,6 +19,7 @@ from mrjob.compat import get_jobconf_value
 
 WORD_RE = re.compile(r"[\w']+")
 
+
 class MRWordCount(MRJob):
     """ Trivial Job that returns the number of words in each input file
     """
@@ -36,5 +37,3 @@ class MRWordCount(MRJob):
 
 if __name__ == '__main__':
     MRWordCount.run()
-
-

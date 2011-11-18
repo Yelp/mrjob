@@ -190,7 +190,7 @@ class MockKey(object):
         data = self.read_mock_data()
         i = 0
         while i < len(data):
-            yield data[i:min(len(data), i+SIMULATED_BUFFER_SIZE)]
+            yield data[i:min(len(data), i + SIMULATED_BUFFER_SIZE)]
             i += SIMULATED_BUFFER_SIZE
 
     def _get_last_modified(self):

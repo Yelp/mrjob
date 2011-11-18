@@ -24,6 +24,7 @@ from testify import assert_not_equal
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
 
+
 class MRTowerOfPowers(MRJob):
 
     INPUT_PROTOCOL = JSONValueProtocol
@@ -66,6 +67,7 @@ class MRTowerOfPowers(MRJob):
                      os.environ['LOCAL_N_FILE_PATH'])
 
         super(MRTowerOfPowers, self).show_steps()
+
 
 if __name__ == '__main__':
     MRTowerOfPowers.run()

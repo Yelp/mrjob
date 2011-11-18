@@ -197,7 +197,8 @@ class MRJobRunner(object):
                         job succeeds. See :py:data:`.CLEANUP_CHOICES`.
         :type cleanup_on_failure: list
         :param cleanup_on_failure: Which kinds of directories to clean up when
-                                   a job fails. See :py:data:`.CLEANUP_CHOICES`.
+                                   a job fails. See
+                                   :py:data:`.CLEANUP_CHOICES`.
         :type cmdenv: dict
         :param cmdenv: environment variables to pass to the job inside Hadoop
                        streaming
@@ -495,7 +496,7 @@ class MRJobRunner(object):
         output_dir = self.get_output_dir()
         log.info('Streaming final output from %s' % output_dir)
 
-        return self.cat( output_dir )
+        return self.cat(output_dir)
 
     def _cleanup_local_scratch(self):
         """Cleanup any files/directories on the local machine we created while

@@ -212,7 +212,8 @@ def _process_short_opts(option_parser, arg_map, rargs, values):
 
         option.process(opt, value, values, option_parser)
 
-        # Measure rargs before and after processing. Store difference in arg_map.
+        # Measure rargs before and after processing. Store difference in
+        # arg_map.
         length_difference = len(rargs_before_processing) - len(rargs)
         list_difference = ([opt] +
                            args_from_smashed_short_opt +

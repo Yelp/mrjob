@@ -56,12 +56,14 @@ def path_for_host(host):
         this_host, this_path = kv_pair.split('=')
         if this_host == host:
             return os.path.abspath(this_path)
-    raise KeyError('Host %s is not specified in $MOCK_SSH_ROOTS (%s)' % (host, os.environ['MOCK_SSH_ROOTS']))
+    raise KeyError('Host %s is not specified in $MOCK_SSH_ROOTS (%s)' %
+                   (host, os.environ['MOCK_SSH_ROOTS']))
 
 
 def rel_posix_to_rel_local(path):
     """Convert a POSIX path to the current system's format"""
     return os.path.join(*path.split('/'))
+
 
 def rel_posix_to_abs_local(host, path):
     """Convert a POSIX path to the current system's format and prepend the
@@ -101,6 +103,8 @@ def mock_ssh_file(host, path, contents):
 
 
 _SLAVE_ADDR_RE = re.compile(r'^(?P<master>.*?)!(?P<slave>.*?)=(?P<dir>.*)$')
+
+
 def slave_addresses():
     """Get the addresses for slaves based on :envvar:`MOCK_SSH_ROOTS`"""
     for kv_pair in os.environ['MOCK_SSH_ROOTS'].split(':'):
@@ -110,6 +114,8 @@ def slave_addresses():
 
 
 _SCP_RE = re.compile(r'^.*"cat > (?P<filename>.*?)".*$')
+
+
 def receive_poor_mans_scp(host, args):
     """Mock SSH behavior for :py:func:`~mrjob.ssh.poor_mans_scp()`"""
     dest = _SCP_RE.match(args[0]).group('filename')
@@ -117,7 +123,7 @@ def receive_poor_mans_scp(host, args):
         with open(os.path.join(path_for_host(host), dest), 'w') as f:
             f.writelines(sys.stdin)
     except IOError:
-        print >> sys.stderr, 'No such file or directory:' , dest
+        print >> sys.stderr, 'No such file or directory:', dest
 
 
 def ls(host, args):
@@ -180,9 +186,10 @@ def run(host, remote_args, slave_key_file=None):
         while not remote_args[remote_arg_pos] == '-i':
             remote_arg_pos += 1
 
-        slave_key_file = remote_args[remote_arg_pos+1]
+        slave_key_file = remote_args[remote_arg_pos + 1]
 
-        if not os.path.exists(os.path.join(path_for_host(host), slave_key_file)):
+        if not os.path.exists(
+            os.path.join(path_for_host(host), slave_key_file)):
             # This is word-for-word what SSH says.
             print >> sys.stderr, 'Warning: Identity file',
             slave_key_file, 'not accessible: No such file or directory.'
@@ -197,11 +204,12 @@ def run(host, remote_args, slave_key_file=None):
 
         # build bang path
         run(slave_host,
-            remote_args[remote_arg_pos+1:],
+            remote_args[remote_arg_pos + 1:],
             slave_key_file)
         return
 
-    print >> sys.stderr, "Command line not recognized: %s" % ' '.join(remote_args)
+    print >> sys.stderr, ("Command line not recognized: %s" %
+                          ' '.join(remote_args))
     sys.exit(1)
 
 

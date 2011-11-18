@@ -103,7 +103,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             steps=[step(
                 start_time_back=4,
                 end_time_back=4,
-                jar='s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar',
+                jar=('s3://us-east-1.elasticmapreduce/libs/script-runner/'
+                     'script-runner.jar'),
                 args=[],
             )],
         )
@@ -116,7 +117,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             steps=[step(
                 start_time_back=4,
                 end_time_back=4,
-                jar='s3://my_bucket/tmp/somejob/files/oddjob-0.0.3-SNAPSHOT-standalone.jar',
+                jar=('s3://my_bucket/tmp/somejob/files/'
+                     'oddjob-0.0.3-SNAPSHOT-standalone.jar'),
                 args=[],
             )],
         )
@@ -130,8 +132,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         jf = mock_conn.describe_jobflow(jobflow_id)
         self.mock_emr_job_flows['j-DEBUG_ONLY'] = jf
         jf.state = 'WAITING'
-        jf.startdatetime=to_iso8601(self.now - timedelta(hours=2))
-        jf.steps[0].enddatetime=to_iso8601(self.now - timedelta(hours=2))
+        jf.startdatetime = to_iso8601(self.now - timedelta(hours=2))
+        jf.steps[0].enddatetime = to_iso8601(self.now - timedelta(hours=2))
 
         # hadoop debugging + actual job
         # same jar as hive but with different args
@@ -277,8 +279,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             now=self.now, dry_run=False)
 
         assert_equal(terminated_jfs(),
-                     ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY', 'j-HADOOP_DEBUGGING',
-                      'j-IDLE_AND_FAILED'])
+                     ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
+                      'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED'])
 
         # just to prove our point
         inspect_and_maybe_terminate_quietly(
@@ -286,7 +288,5 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             now=self.now, dry_run=False)
 
         assert_equal(terminated_jfs(),
-                     ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY', 'j-HADOOP_DEBUGGING',
-                      'j-IDLE_AND_FAILED'])
-
-
+                     ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
+                      'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED'])

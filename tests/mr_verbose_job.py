@@ -17,6 +17,7 @@ import sys
 
 from mrjob.job import MRJob
 
+
 class MRVerboseJob(MRJob):
 
     def mapper_final(self):
@@ -33,6 +34,6 @@ class MRVerboseJob(MRJob):
         # raise an exception so we can test stacktrace finding
         raise Exception('BOOM')
 
+
 if __name__ == '__main__':
     MRVerboseJob.run()
-

@@ -247,7 +247,7 @@ class HadoopJobRunner(MRJobRunner):
         local_input_files = []
 
         for path in self._input_paths:
-            if is_uri:
+            if is_uri(path):
                 # Don't even bother running the job if the input isn't there.
                 if not self.ls(path):
                     raise AssertionError(
@@ -445,6 +445,9 @@ class HadoopJobRunner(MRJobRunner):
         for line in stderr:
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
             log.info('HADOOP: ' + line)
+
+            if 'Streaming Job Failed!' in line:
+                raise Exception(line)
 
             # The job identifier is printed to stderr. We only want to parse it
             # once because we know how many steps we have and just want to know

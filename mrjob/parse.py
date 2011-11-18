@@ -88,25 +88,6 @@ def urlparse(*args, **kwargs):
 
 ### OPTION PARSING ###
 
-def check_kv_pair(option, opt, value):
-    items = value.split('=', 1)
-    if len(items) == 2:
-        return items
-    else:
-        raise OptionValueError(
-            "option %s: value is not of the form KEY=VALUE: %r" % (opt, value))
-
-
-def check_range_list(option, opt, value):
-    try:
-        ports = parse_port_range_list(value)
-        return ports
-    except ValueError, e:
-        raise OptionValueError(
-            'option %s: invalid port range list "%s": \n%s' %
-            (opt, value, e.args[0]))
-
-
 def parse_port_range_list(range_list_str):
     """Parse a port range list of the form (start[:end])(,(start[:end]))*"""
     all_ranges = []

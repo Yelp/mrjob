@@ -65,13 +65,30 @@ Features
     More info: :py:mod:`mrjob.tools.emr.mrboss`
 
 Changes and Deprecations
---------------------
+------------------------
 
- * Configuration:
-   * Saner mrjob.conf locations (Issue #97):
-     * ~/.mrjob is deprecated in favor of ~/.mrjob.conf
-     * searching in PYTHONPATH is deprecated
-     * MRJOB_CONF environment variable for custom
+**Configuration**
+
+    The search path order for ``mrjob.conf`` has changed. The new order is:
+
+    * The location specified by :envvar:`MRJOB_CONF`
+    * :file:`~/.mrjob.conf`
+    * :file:`~/.mrjob` **(deprecated)**
+    * :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH`
+      **(deprecated)**
+    * :file:`/etc/mrjob.conf`
+
+    If your :file:`mrjob.conf` path is deprecated, use this table to fix it:
+
+    ================================= ===============================
+    Old Location                      New Location
+    ================================= ===============================
+    :file:`~/.mrjob`                  :file:`~/.mrjob.conf`
+    somewhere in :envvar:`PYTHONPATH` Specify in :envvar:`MRJOB_CONF`
+    ================================= ===============================
+
+    More info: :py:mod:`mrjob.conf`
+
  * Defining Jobs (MRJob):
    * mapper/combiner/reducer methods no longer need to contain a yield
      statement if they emit no data

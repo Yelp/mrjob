@@ -496,7 +496,11 @@ class MRJobRunner(object):
         output_dir = self.get_output_dir()
         log.info('Streaming final output from %s' % output_dir)
 
-        return self.cat(output_dir)
+        for filename in self.ls(output_dir):
+            if ('/_logs/' not in filename and
+                not filename.endswith('/_SUCCESS')):
+                for line in self._cat_file(filename):
+                    yield line
 
     def _cleanup_local_scratch(self):
         """Cleanup any files/directories on the local machine we created while

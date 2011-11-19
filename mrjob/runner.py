@@ -493,11 +493,6 @@ class MRJobRunner(object):
         class."""
         assert self._ran_job
 
-        for path in self._ls_output_files():
-            for line in self.cat(path):
-                yield line
-
-    def _ls_output_files(self):
         output_dir = self.get_output_dir()
         log.info('Streaming final output from %s' % output_dir)
 

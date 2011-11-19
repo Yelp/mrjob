@@ -501,17 +501,11 @@ class MRJobRunner(object):
         output_dir = self.get_output_dir()
         log.info('Streaming final output from %s' % output_dir)
 
-        # safeguard against globs overlapping unexpectedly
-        done = set()
-        for path in self.ls(self.path_join(output_dir, 'part-*')):
-            if path not in done:
-                yield path
-                done.add(path)
-
-        for path in self.ls(self.path_join(output_dir, '*/part-*')):
-            if path not in done:
-                yield path
-                done.add(path)
+        for filename in self.ls(output_dir):
+            if ('/_logs/' not in filename and
+                not filename.endswith('/_SUCCESS')):
+                for line in self._cat_file(filename):
+                    yield line
 
     def _cleanup_local_scratch(self):
         """Cleanup any files/directories on the local machine we created while

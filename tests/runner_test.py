@@ -385,12 +385,16 @@ class TestStreamingOutput(TestCase):
     def test_stream_output(self):
         a_dir_path = os.path.join(self.tmp_dir, 'a')
         b_dir_path = os.path.join(self.tmp_dir, 'b')
+        l_dir_path = os.path.join(self.tmp_dir, '_logs')
         os.mkdir(a_dir_path)
         os.mkdir(b_dir_path)
+        os.mkdir(l_dir_path)
 
         a_file_path = os.path.join(a_dir_path, 'part-00000')
         b_file_path = os.path.join(b_dir_path, 'part-00001')
         c_file_path = os.path.join(self.tmp_dir, 'part-00002')
+        x_file_path = os.path.join(l_dir_path, 'log.xml')
+        y_file_path = os.path.join(self.tmp_dir, '_SUCCESS')
 
         with open(a_file_path, 'w') as f:
             f.write('A')
@@ -400,6 +404,12 @@ class TestStreamingOutput(TestCase):
 
         with open(c_file_path, 'w') as f:
             f.write('C')
+
+        with open(x_file_path, 'w') as f:
+            f.write('<XML XML XML/>')
+
+        with open(y_file_path, 'w') as f:
+            f.write('I win')
 
         runner = LocalMRJobRunner()
         runner._output_dir = self.tmp_dir

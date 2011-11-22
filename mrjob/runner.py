@@ -500,11 +500,6 @@ class MRJobRunner(object):
             while True:
                 base, name = os.path.split(path)
 
-                # don't worry about output_dir items, otherwise a _ in the
-                # base path would kill all output
-                if (path == output_dir or not path.startswith(output_dir)):
-                    break
-
                 # no more elements
                 if not name:
                     break
@@ -514,8 +509,8 @@ class MRJobRunner(object):
                 path = base
 
         for filename in self.ls(output_dir):
-            if not any(name.startswith('_')
-                       for name in split_path(filename)):
+            subpath = filename[len(output_dir):]
+            if not any(name.startswith('_') for name in split_path(subpath)):
                 for line in self._cat_file(filename):
                     yield line
 

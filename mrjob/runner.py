@@ -496,9 +496,21 @@ class MRJobRunner(object):
         output_dir = self.get_output_dir()
         log.info('Streaming final output from %s' % output_dir)
 
+        def split_path(path):
+            while True:
+                base, name = os.path.split(path)
+
+                # no more elements
+                if not name:
+                    break
+
+                yield name
+
+                path = base
+
         for filename in self.ls(output_dir):
-            if ('/_logs/' not in filename and
-                not filename.endswith('/_SUCCESS')):
+            subpath = filename[len(output_dir):]
+            if not any(name.startswith('_') for name in split_path(subpath)):
                 for line in self._cat_file(filename):
                     yield line
 

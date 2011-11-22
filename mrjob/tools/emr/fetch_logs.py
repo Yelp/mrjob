@@ -42,6 +42,7 @@ Options::
 from __future__ import with_statement
 
 from optparse import OptionParser
+import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import LogFetchError
@@ -241,7 +242,11 @@ def find_failure(runner, step_num):
         step_nums = [step_num]
     else:
         job_flow = runner._describe_jobflow()
-        step_nums = range(1, len(job_flow.steps) + 1)
+        if job_flow:
+            step_nums = range(1, len(job_flow.steps) + 1)
+        else:
+            print 'You do not have access to that job flow.'
+            sys.exit(1)
 
     cause = runner._find_probable_cause_of_failure(step_nums)
     if cause:

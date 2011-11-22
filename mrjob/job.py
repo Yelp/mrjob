@@ -894,8 +894,8 @@ class MRJob(object):
         self.add_passthrough_option(
             '--input-protocol', dest='input_protocol',
             opt_group=self.proto_opt_group,
-            default=self.DEFAULT_INPUT_PROTOCOL, choices=protocol_choices,
-            help='DEPRECATED: protocol to read input with (default: %default)')
+            default=None, choices=protocol_choices,
+            help='DEPRECATED: protocol to read input with (default: raw_value)')
 
         self.add_passthrough_option(
             '--output-protocol', dest='output_protocol',
@@ -909,9 +909,9 @@ class MRJob(object):
         self.add_passthrough_option(
             '-p', '--protocol', dest='protocol',
             opt_group=self.proto_opt_group,
-            default=self.DEFAULT_PROTOCOL, choices=protocol_choices,
+            default=None, choices=protocol_choices,
             help=('DEPRECATED: output protocol for mappers/reducers. Choices:'
-                  ' %s (default: %%default)' % ', '.join(protocol_choices)))
+                  ' %s (default: json)' % ', '.join(protocol_choices)))
 
         self.add_passthrough_option(
             '--strict-protocols', dest='strict_protocols', default=None,
@@ -1436,17 +1436,59 @@ class MRJob(object):
 
         # DEPRECATED protocol stuff
 
-        # output_protocol defaults to protocol
-        if not self.options.output_protocol:
-            self.options.output_protocol = self.options.protocol
+        ignore_switches = (
+            self.INPUT_PROTOCOL != RawValueProtocol or
+            self.INTERNAL_PROTOCOL != JSONProtocol or
+            self.OUTPUT_PROTOCOL != JSONProtocol or
+            any(
+                (getattr(self, func_name).im_func is not
+                 getattr(MRJob, func_name).im_func)
+                for func_name in (
+                    'input_protocol',
+                    'internal_protocol',
+                    'output_protocol',
+                )
+            )
+        )
 
-        if (self.options.input_protocol or self.options.output_protocol
-            or self.options.protocol):
-            log.warn('Setting protocols via --input-protocol, --protocol,'
-                     ' --output-protocol, DEFAULT_INPUT_PROTOCOL,'
-                     ' DEFAULT_PROTOCOL, and DEFAULT_OUTPUT_PROTOCOL is'
-                     ' deprecated as of mrjob 0.3 and will no longer be'
-                     ' supported in mrjob 0.4.')
+        warn_deprecated = False
+
+        if self.options.protocol is None:
+            self.options.protocol = self.DEFAULT_PROTOCOL
+            if self.DEFAULT_PROTOCOL != 'json':
+                warn_deprecated = True
+        else:
+            warn_deprecated = True
+
+        if self.options.input_protocol is None:
+            self.options.input_protocol = self.DEFAULT_INPUT_PROTOCOL
+            if self.DEFAULT_INPUT_PROTOCOL != 'raw_value':
+                warn_deprecated = True
+        else:
+            warn_deprecated = True
+
+        # output_protocol defaults to protocol
+        if self.options.output_protocol is None:
+            self.options.output_protocol = self.options.protocol
+        else:
+            warn_deprecated = True
+
+        if warn_deprecated:
+            if ignore_switches:
+                log.warn('You have specified custom behavior in both'
+                         ' deprecated and non-deprecated ways.'
+                         ' The custom non-deprecated behavior will override'
+                         ' the deprecated behavior in all cases, including'
+                         ' command line switches.')
+                self.options.input_protocol = None
+                self.options.protocol = None
+                self.options.output_protocol = None
+            else:
+                log.warn('Setting protocols via --input-protocol, --protocol,'
+                         ' --output-protocol, DEFAULT_INPUT_PROTOCOL,'
+                         ' DEFAULT_PROTOCOL, and DEFAULT_OUTPUT_PROTOCOL is'
+                         ' deprecated as of mrjob 0.3 and will no longer be'
+                         ' supported in mrjob 0.4.')
 
     def is_mapper_or_reducer(self):
         """True if this is a mapper/reducer.
@@ -1603,7 +1645,8 @@ class MRJob(object):
         objects. Default behavior is to return an instance of
         :py:attr:`INPUT_PROTOCOL`.
         """
-        if self.options.input_protocol is not None:
+        if (self.options.input_protocol is not None and
+            self.INPUT_PROTOCOL == RawValueProtocol):
             # deprecated
             protocol_name = self.options.input_protocol
             return self.protocols()[protocol_name]()
@@ -1616,7 +1659,8 @@ class MRJob(object):
         Default behavior is to return an instance of
         :py:attr:`INTERNAL_PROTOCOL`.
         """
-        if self.options.protocol is not None:
+        if (self.options.protocol is not None and
+            self.INTERNAL_PROTOCOL == JSONProtocol):
             # deprecated
             protocol_name = self.options.protocol
             return self.protocols()[protocol_name]
@@ -1629,7 +1673,8 @@ class MRJob(object):
         lines. Default behavior is to return an instance of
         :py:attr:`OUTPUT_PROTOCOL`.
         """
-        if self.options.output_protocol is not None:
+        if (self.options.output_protocol is not None and
+            self.OUTPUT_PROTOCOL == JSONProtocol):
             # deprecated
             return self.protocols()[self.options.output_protocol]
         else:
@@ -1700,17 +1745,21 @@ class MRJob(object):
     #:
     #: Default protocol for reading input to the first mapper in your job
     #: specified by a string.
-    #: Default: None.
+    #:
+    #: Default: ``raw_value`` to match :py:attr:`.INPUT_PROTOCOL`, but
+    #: overridden by any changes to :py:attr:`.INPUT_PROTOCOL`.
     #:
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
     #: protocol strings. Can be overridden by :option:`--input-protocol`.
-    DEFAULT_INPUT_PROTOCOL = None
+    DEFAULT_INPUT_PROTOCOL = 'raw_value'
 
     #: DEPRECATED
     #:
     #: Default protocol for communication between steps and final output
     #: specified by a string.
-    #: Default: None.
+    #:
+    #: Default: ``json`` to match :py:attr:`.INTERNAL_PROTOCOL`, but
+    #: overridden by any changes to :py:attr:`.INTERNAL_PROTOCOL`.
     #:
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
     #: protocol strings. Can be overridden by :option:`--protocol`.

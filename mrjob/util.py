@@ -34,6 +34,25 @@ import tarfile
 import zipfile
 
 
+def buffer_iterator_to_line_iterator(iterator):
+    """boto's file iterator splits by buffer size instead of by newline. This
+    wrapper puts them back into lines.
+    """
+    prepend = ""
+    buf = iterator.next()
+    while True:
+        if '\n' in buf:
+            (line, buf) = buf.split('\n', 1)
+            yield line + '\n'
+        else:
+            try:
+                more = iterator.next()
+                buf += more
+            except StopIteration:
+                if buf:
+                    yield buf + '\n'
+                return
+
 def cmd_line(args):
     """build a command line that works in a shell.
     """

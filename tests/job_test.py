@@ -547,14 +547,42 @@ class DeprecatedProtocolsTestCase(TestCase):
         def mapper(self, key, value):
             yield key, value
 
+    class MRInconsistentJob(MRJob):
+        DEFAULT_INPUT_PROTOCOL = 'json'
+        INPUT_PROTOCOL = ReprProtocol
+
+    class MRInconsistentJob2(MRJob):
+        DEFAULT_INPUT_PROTOCOL = 'json'
+
+        def input_protocol(self):
+            return ReprProtocol()
+
+    def test_mixed_behavior(self):
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.job', stderr)
+            mr_job = self.MRInconsistentJob()
+            assert_equal(mr_job.options.input_protocol, None)
+            assert_equal(mr_job.input_protocol().__class__, ReprProtocol)
+            assert_in('custom behavior', stderr.getvalue())
+
+    def test_mixed_behavior_2(self):
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.job', stderr)
+            mr_job = self.MRInconsistentJob2()
+            assert_equal(mr_job.options.input_protocol, None)
+            assert_equal(mr_job.input_protocol().__class__, ReprProtocol)
+            assert_in('custom behavior', stderr.getvalue())
+
     def test_default_protocols(self):
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job = MRBoringJob()
-            assert_equal(mr_job.options.input_protocol, None)
-            assert_equal(mr_job.options.protocol, None)
-            assert_equal(mr_job.options.output_protocol, None)
+            assert_equal(mr_job.options.input_protocol, 'raw_value')
+            assert_equal(mr_job.options.protocol, 'json')
+            assert_equal(mr_job.options.output_protocol, 'json')
             assert_not_in('deprecated', stderr.getvalue())
 
     def test_explicit_default_protocols(self):
@@ -571,7 +599,7 @@ class DeprecatedProtocolsTestCase(TestCase):
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job3 = self.MRBoringJob3()
-            assert_equal(mr_job3.options.input_protocol, None)
+            assert_equal(mr_job3.options.input_protocol, 'raw_value')
             assert_equal(mr_job3.options.protocol, 'repr')
             # output protocol should default to protocol
             assert_equal(mr_job3.options.output_protocol, 'repr')
@@ -593,7 +621,7 @@ class DeprecatedProtocolsTestCase(TestCase):
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job3 = MRBoringJob(args=['--protocol=repr'])
-            assert_equal(mr_job3.options.input_protocol, None)
+            assert_equal(mr_job3.options.input_protocol, 'raw_value')
             assert_equal(mr_job3.options.protocol, 'repr')
             # output protocol should default to protocol
             assert_equal(mr_job3.options.output_protocol, 'repr')
@@ -1017,7 +1045,7 @@ class CommandLineArgsTest(TestCase):
     def test_passthrough_options_defaults(self):
         mr_job = MRCustomBoringJob()
 
-        assert_equal(mr_job.options.input_protocol, None)
+        assert_equal(mr_job.options.input_protocol, 'raw_value')
         assert_equal(mr_job.options.foo_size, 5)
         assert_equal(mr_job.options.bar_name, None)
         assert_equal(mr_job.options.baz_mode, False)
@@ -1046,9 +1074,9 @@ class CommandLineArgsTest(TestCase):
             '--strict-protocols',
             ])
 
-        assert_equal(mr_job.options.input_protocol, None)
-        assert_equal(mr_job.options.protocol, None)
-        assert_equal(mr_job.options.output_protocol, None)
+        assert_equal(mr_job.options.input_protocol, 'raw_value')
+        assert_equal(mr_job.options.protocol, 'json')
+        assert_equal(mr_job.options.output_protocol, 'json')
         assert_equal(mr_job.options.foo_size, 9)
         assert_equal(mr_job.options.bar_name, 'Alembic')
         assert_equal(mr_job.options.baz_mode, True)
@@ -1080,9 +1108,9 @@ class CommandLineArgsTest(TestCase):
             '--strict-protocols',
             ])
 
-        assert_equal(mr_job.options.input_protocol, None)
-        assert_equal(mr_job.options.protocol, None)
-        assert_equal(mr_job.options.output_protocol, None)
+        assert_equal(mr_job.options.input_protocol, 'raw_value')
+        assert_equal(mr_job.options.protocol, 'json')
+        assert_equal(mr_job.options.output_protocol, 'json')
         assert_equal(mr_job.options.foo_size, 9)
         assert_equal(mr_job.options.bar_name, 'Alembic')
         assert_equal(mr_job.options.baz_mode, True)

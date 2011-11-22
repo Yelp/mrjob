@@ -1637,7 +1637,6 @@ class MRJob(object):
         :py:attr:`INPUT_PROTOCOL`.
         """
         if self.options.input_protocol is not None:
-            print 'depr_in'
             # deprecated
             protocol_name = self.options.input_protocol
             return self.protocols()[protocol_name]()

@@ -375,7 +375,9 @@ class TestStreamingOutput(TestCase):
 
     @setup
     def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
+        # use a leading underscore to test behavior of underscore-ignoring
+        # code that shouldn't ignore the entire output_dir
+        self.tmp_dir = tempfile.mkdtemp(prefix='_streamingtest')
 
     @teardown
     def rm_tmp_dir(self):

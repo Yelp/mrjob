@@ -499,9 +499,18 @@ class MRJobRunner(object):
         def split_path(path):
             while True:
                 base, name = os.path.split(path)
-                yield name
+
+                # don't worry about output_dir items, otherwise a _ in the
+                # base path would kill all output
+                if (path == output_dir or not path.startswith(output_dir)):
+                    break
+
+                # no more elements
                 if not name:
                     break
+
+                yield name
+
                 path = base
 
         for filename in self.ls(output_dir):

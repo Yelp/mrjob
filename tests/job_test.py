@@ -1030,7 +1030,7 @@ class CommandLineArgsTest(TestCase):
     def test_passthrough_options_defaults(self):
         mr_job = MRCustomBoringJob()
 
-        assert_equal(mr_job.options.input_protocol, None)
+        assert_equal(mr_job.options.input_protocol, 'raw_value')
         assert_equal(mr_job.options.foo_size, 5)
         assert_equal(mr_job.options.bar_name, None)
         assert_equal(mr_job.options.baz_mode, False)
@@ -1059,9 +1059,9 @@ class CommandLineArgsTest(TestCase):
             '--strict-protocols',
             ])
 
-        assert_equal(mr_job.options.input_protocol, None)
-        assert_equal(mr_job.options.protocol, None)
-        assert_equal(mr_job.options.output_protocol, None)
+        assert_equal(mr_job.options.input_protocol, 'raw_value')
+        assert_equal(mr_job.options.protocol, 'json')
+        assert_equal(mr_job.options.output_protocol, 'json')
         assert_equal(mr_job.options.foo_size, 9)
         assert_equal(mr_job.options.bar_name, 'Alembic')
         assert_equal(mr_job.options.baz_mode, True)
@@ -1093,9 +1093,9 @@ class CommandLineArgsTest(TestCase):
             '--strict-protocols',
             ])
 
-        assert_equal(mr_job.options.input_protocol, None)
-        assert_equal(mr_job.options.protocol, None)
-        assert_equal(mr_job.options.output_protocol, None)
+        assert_equal(mr_job.options.input_protocol, 'raw_value')
+        assert_equal(mr_job.options.protocol, 'json')
+        assert_equal(mr_job.options.output_protocol, 'json')
         assert_equal(mr_job.options.foo_size, 9)
         assert_equal(mr_job.options.bar_name, 'Alembic')
         assert_equal(mr_job.options.baz_mode, True)

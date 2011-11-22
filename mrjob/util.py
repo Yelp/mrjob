@@ -34,7 +34,7 @@ import tarfile
 import zipfile
 
 
-def buffer_iterator_wrapper(iterator):
+def buffer_iterator_to_line_iterator(iterator):
     """boto's file iterator splits by buffer size instead of by newline. This
     wrapper puts them back into lines.
     """

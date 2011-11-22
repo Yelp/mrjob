@@ -77,7 +77,7 @@ from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_URI_RE
-from mrjob.util import buffer_iterator_wrapper
+from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import hash_object
@@ -2193,7 +2193,7 @@ class EMRJobRunner(MRJobRunner):
             # stream lines from the s3 key
             s3_key = self.get_s3_key(filename)
             buffer_iterator = read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
-            return buffer_iterator_wrapper(buffer_iterator)
+            return buffer_iterator_to_line_iterator(buffer_iterator)
         elif ssh_match:
             try:
                 addr = ssh_match.group('hostname') or self._address_of_master()

@@ -551,11 +551,26 @@ class DeprecatedProtocolsTestCase(TestCase):
         DEFAULT_INPUT_PROTOCOL = 'json'
         INPUT_PROTOCOL = ReprProtocol
 
+    class MRInconsistentJob2(MRJob):
+        DEFAULT_INPUT_PROTOCOL = 'json'
+
+        def input_protocol(self):
+            return ReprProtocol()
+
     def test_mixed_behavior(self):
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job = self.MRInconsistentJob()
+            assert_equal(mr_job.options.input_protocol, None)
+            assert_equal(mr_job.input_protocol().__class__, ReprProtocol)
+            assert_in('custom behavior', stderr.getvalue())
+
+    def test_mixed_behavior_2(self):
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.job', stderr)
+            mr_job = self.MRInconsistentJob2()
             assert_equal(mr_job.options.input_protocol, None)
             assert_equal(mr_job.input_protocol().__class__, ReprProtocol)
             assert_in('custom behavior', stderr.getvalue())

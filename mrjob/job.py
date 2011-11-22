@@ -1439,7 +1439,16 @@ class MRJob(object):
         ignore_switches = (
             self.INPUT_PROTOCOL != RawValueProtocol or
             self.INTERNAL_PROTOCOL != JSONProtocol or
-            self.OUTPUT_PROTOCOL != JSONProtocol
+            self.OUTPUT_PROTOCOL != JSONProtocol or
+            any(
+                (getattr(self, func_name).im_func is not
+                 getattr(MRJob, func_name).im_func)
+                for func_name in (
+                    'input_protocol',
+                    'internal_protocol',
+                    'output_protocol',
+                )
+            )
         )
 
         warn_deprecated = False

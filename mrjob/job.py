@@ -1636,7 +1636,8 @@ class MRJob(object):
         objects. Default behavior is to return an instance of
         :py:attr:`INPUT_PROTOCOL`.
         """
-        if self.options.input_protocol is not None:
+        if (self.options.input_protocol is not None and
+            self.INPUT_PROTOCOL == RawValueProtocol):
             # deprecated
             protocol_name = self.options.input_protocol
             return self.protocols()[protocol_name]()
@@ -1649,7 +1650,8 @@ class MRJob(object):
         Default behavior is to return an instance of
         :py:attr:`INTERNAL_PROTOCOL`.
         """
-        if self.options.protocol is not None:
+        if (self.options.protocol is not None and
+            self.INTERNAL_PROTOCOL == JSONProtocol):
             # deprecated
             protocol_name = self.options.protocol
             return self.protocols()[protocol_name]
@@ -1662,7 +1664,8 @@ class MRJob(object):
         lines. Default behavior is to return an instance of
         :py:attr:`OUTPUT_PROTOCOL`.
         """
-        if self.options.output_protocol is not None:
+        if (self.options.output_protocol is not None and
+            self.OUTPUT_PROTOCOL == JSONProtocol):
             # deprecated
             return self.protocols()[self.options.output_protocol]
         else:

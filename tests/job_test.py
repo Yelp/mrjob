@@ -555,18 +555,19 @@ class DeprecatedProtocolsTestCase(TestCase):
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
-            mr_job = MRInconsistentJob()
-            assert_equal(mrjob.options.input_protocol, None)
-            assert_equal(mrjob.input_protocol().__class__, JSONProtocol)
+            mr_job = self.MRInconsistentJob()
+            assert_equal(mr_job.options.input_protocol, None)
+            assert_equal(mr_job.input_protocol().__class__, ReprProtocol)
+            assert_in('custom behavior', stderr.getvalue())
 
     def test_default_protocols(self):
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job = MRBoringJob()
-            assert_equal(mr_job.options.input_protocol, None)
-            assert_equal(mr_job.options.protocol, None)
-            assert_equal(mr_job.options.output_protocol, None)
+            assert_equal(mr_job.options.input_protocol, 'raw_value')
+            assert_equal(mr_job.options.protocol, 'json')
+            assert_equal(mr_job.options.output_protocol, 'json')
             assert_not_in('deprecated', stderr.getvalue())
 
     def test_explicit_default_protocols(self):
@@ -583,7 +584,7 @@ class DeprecatedProtocolsTestCase(TestCase):
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job3 = self.MRBoringJob3()
-            assert_equal(mr_job3.options.input_protocol, None)
+            assert_equal(mr_job3.options.input_protocol, 'raw_value')
             assert_equal(mr_job3.options.protocol, 'repr')
             # output protocol should default to protocol
             assert_equal(mr_job3.options.output_protocol, 'repr')
@@ -605,7 +606,7 @@ class DeprecatedProtocolsTestCase(TestCase):
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job3 = MRBoringJob(args=['--protocol=repr'])
-            assert_equal(mr_job3.options.input_protocol, None)
+            assert_equal(mr_job3.options.input_protocol, 'raw_value')
             assert_equal(mr_job3.options.protocol, 'repr')
             # output protocol should default to protocol
             assert_equal(mr_job3.options.output_protocol, 'repr')

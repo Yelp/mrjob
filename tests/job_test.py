@@ -547,6 +547,18 @@ class DeprecatedProtocolsTestCase(TestCase):
         def mapper(self, key, value):
             yield key, value
 
+    class MRInconsistentJob(MRJob):
+        DEFAULT_INPUT_PROTOCOL = 'json'
+        INPUT_PROTOCOL = ReprProtocol
+
+    def test_mixed_behavior(self):
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.job', stderr)
+            mr_job = MRInconsistentJob()
+            assert_equal(mrjob.options.input_protocol, None)
+            assert_equal(mrjob.input_protocol().__class__, JSONProtocol)
+
     def test_default_protocols(self):
         stderr = StringIO()
         with no_handlers_for_logger():

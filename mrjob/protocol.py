@@ -215,7 +215,7 @@ class ReprValueProtocol(object):
 #: DEPRECATED
 #:
 #: Formerly the default protocol for all encoded input and output: ``'json'``
-DEFAULT_PROTOCOL = None
+DEFAULT_PROTOCOL = 'json'
 
 #: DEPRECATED
 #:

@@ -1113,7 +1113,7 @@ class MRJobRunner(object):
 
         contents = self._wrapper_script_content()
         for line in StringIO(contents):
-            log.debug('WRAPPER: ' + line.rstrip('\n'))
+            log.debug('WRAPPER: ' + line.rstrip('\r\n'))
 
         f = open(path, 'w')
         f.write(contents)
@@ -1296,5 +1296,5 @@ class MRJobRunner(object):
         # looks like there was a problem. log it and raise an error
         with open(err_path) as err:
             for line in err:
-                log.error('STDERR: %s' % line.rstrip('\n'))
+                log.error('STDERR: %s' % line.rstrip('\r\n'))
         raise CalledProcessError(proc.returncode, args)

@@ -622,7 +622,7 @@ class LocalMRJobRunner(MRJobRunner):
                 log.info('status: %s' % status)
 
             for line in parsed['other']:
-                log.error('STDERR: %s' % line.rstrip('\n'))
+                log.error('STDERR: %s' % line.rstrip('\r\n'))
                 yield line
 
     def counters(self):

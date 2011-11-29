@@ -785,7 +785,7 @@ class MRJob(object):
         def read_lines():
             for line in self._read_input():
                 try:
-                    key, value = read(line.rstrip('\n'))
+                    key, value = read(line.rstrip('\r\n'))
                     yield key, value
                 except Exception, e:
                     if self.options.strict_protocols:

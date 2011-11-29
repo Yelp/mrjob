@@ -567,7 +567,7 @@ class HadoopJobRunner(MRJobRunner):
         log_func = log.debug if proc.returncode == 0 else log.error
         if not return_stdout:
             for line in StringIO(stdout):
-                log_func('STDOUT: ' + line.rstrip('\n'))
+                log_func('STDOUT: ' + line.rstrip('\r\n'))
 
         # check if STDERR is okay
         stderr_is_ok = False
@@ -579,7 +579,7 @@ class HadoopJobRunner(MRJobRunner):
 
         if not stderr_is_ok:
             for line in StringIO(stderr):
-                log_func('STDERR: ' + line.rstrip('\n'))
+                log_func('STDERR: ' + line.rstrip('\r\n'))
 
         ok_returncodes = ok_returncodes or [0]
 
@@ -699,7 +699,7 @@ class HadoopJobRunner(MRJobRunner):
             ok_stderr=[HADOOP_LSR_NO_SUCH_FILE])
 
         for line in StringIO(stdout):
-            fields = line.rstrip('\n').split()
+            fields = line.rstrip('\r\n').split()
             # expect lines like:
             # -rw-r--r--   3 dave users       3276 2010-01-13 14:00 /foo/bar
             if len(fields) < 8:

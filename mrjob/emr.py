@@ -1788,7 +1788,7 @@ class EMRJobRunner(MRJobRunner):
 
         contents = self._master_bootstrap_script_content()
         for line in StringIO(contents):
-            log.debug('BOOTSTRAP: ' + line.rstrip('\n'))
+            log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
         f = open(path, 'w')
         f.write(contents)

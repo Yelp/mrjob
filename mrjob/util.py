@@ -55,10 +55,10 @@ def buffer_iterator_to_line_iterator(iterator):
 
 
 def cmd_line(args):
-    """build a command line that works in a shell.
-    """
+    """build a command line that works in a shell."""
     args = [str(x) for x in args]
-    return ' '.join(pipes.quote(x) for x in args)
+    # don't put quotes around the command itself
+    return ' '.join(args[:1] + [pipes.quote(x) for x in args[1:]])
 
 
 def extract_dir_for_tar(archive_path, compression='gz'):

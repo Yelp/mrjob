@@ -355,7 +355,7 @@ def find_timeout_error(lines):
 
 
 # recognize hadoop streaming output
-_COUNTER_RE = re.compile(r'reporter:counter:([^,]*),([^,]*),(-?\d+)$')
+_COUNTER_RE = re.compile(r'reporter:counter:([^,]*),([^,]*),(-?\d+)\s*$')
 _STATUS_RE = re.compile(r'reporter:status:(.*)$')
 
 

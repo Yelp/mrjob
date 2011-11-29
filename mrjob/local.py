@@ -21,6 +21,7 @@ import logging
 import os
 import shutil
 import stat
+from subprocess import list2cmdline
 from subprocess import Popen
 from subprocess import PIPE
 import sys
@@ -31,7 +32,6 @@ from mrjob.conf import combine_local_envs
 from mrjob.parse import find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line
 from mrjob.util import read_input
 from mrjob.util import unarchive
 
@@ -543,9 +543,9 @@ class LocalMRJobRunner(MRJobRunner):
         """
         if combiner_args:
             log.info('> %s | sort | %s' %
-                     (cmd_line(args), cmd_line(combiner_args)))
+                     (list2cmdline(args), list2cmdline(combiner_args)))
         else:
-            log.info('> %s' % cmd_line(args))
+            log.info('> %s' % list2cmdline(args))
 
         # set up outfile
         outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
@@ -559,11 +559,11 @@ class LocalMRJobRunner(MRJobRunner):
                 # set up a pipeline: mapper | sort | combiner
                 mapper_proc = Popen(args, stdout=PIPE, stderr=PIPE,
                                     cwd=self._working_dir, env=env)
-                
+
                 sort_proc = Popen(['sort'], stdin=mapper_proc.stdout,
                                   stdout=PIPE, stderr=PIPE,
                                   cwd=self._working_dir, env=env)
-    
+
                 combiner_proc = Popen(combiner_args, stdin=sort_proc.stdout,
                                       stdout=write_to, stderr=PIPE,
                                       cwd=self._working_dir, env=env)
@@ -571,7 +571,7 @@ class LocalMRJobRunner(MRJobRunner):
                 # this process shouldn't read from the pipes
                 mapper_proc.stdout.close()
                 sort_proc.stdout.close()
-    
+
                 return [
                     {'proc': mapper_proc, 'args': args},
                     {'proc': sort_proc, 'args': ['sort']},

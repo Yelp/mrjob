@@ -30,6 +30,7 @@ from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
+from subprocess import list2cmdline
 import tempfile
 
 try:
@@ -47,7 +48,6 @@ from mrjob.conf import combine_opts
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_conf
-from mrjob.util import cmd_line
 from mrjob.util import file_ext
 from mrjob.util import read_file
 from mrjob.util import tar_and_gzip
@@ -986,7 +986,7 @@ class MRJobRunner(object):
                 args = (self._opts['steps_python_bin'] +
                         [self._script['path'], '--steps'] +
                         self._mr_job_extra_args(local=True))
-                log.debug('> %s' % cmd_line(args))
+                log.debug('> %s' % list2cmdline(args))
                 # add . to PYTHONPATH (in case mrjob isn't actually installed)
                 env = combine_local_envs(os.environ,
                                    {'PYTHONPATH': os.path.abspath('.')})
@@ -1260,7 +1260,7 @@ class MRJobRunner(object):
             with open(output_path, 'w') as output:
                 with open(err_path, 'w') as err:
                     args = ['sort'] + list(input_paths)
-                    log.info('> %s' % cmd_line(args))
+                    log.info('> %s' % list2cmdline(args))
                     try:
                         check_call(args, stdout=output, stderr=err, env=env)
                         return
@@ -1274,7 +1274,7 @@ class MRJobRunner(object):
         with open(output_path, 'w') as output:
             with open(err_path, 'w') as err:
                 args = ['sort']
-                log.info('> %s' % cmd_line(args))
+                log.info('> %s' % list2cmdline(args))
                 proc = Popen(args, stdin=PIPE, stdout=output, stderr=err,
                              env=env)
 

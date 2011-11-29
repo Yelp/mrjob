@@ -17,6 +17,7 @@ import logging
 import os
 import posixpath
 import re
+from subprocess import list2cmdline
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
@@ -39,7 +40,6 @@ from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_uri
 from mrjob.parse import urlparse
 from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line
 from mrjob.util import read_file
 
 
@@ -370,10 +370,10 @@ class HadoopJobRunner(MRJobRunner):
             if 'M' not in step:
                 mapper = 'cat'
             else:
-                mapper = cmd_line(self._mapper_args(step_num))
+                mapper = list2cmdline(self._mapper_args(step_num))
 
             if 'C' in step:
-                combiner_cmd = cmd_line(self._combiner_args(step_num))
+                combiner_cmd = list2cmdline(self._combiner_args(step_num))
                 version = self.get_hadoop_version()
                 if compat.supports_combiners_in_hadoop_streaming(version):
                     combiner = combiner_cmd
@@ -393,11 +393,12 @@ class HadoopJobRunner(MRJobRunner):
 
             if 'R' in step:
                 streaming_args.append('-reducer')
-                streaming_args.append(cmd_line(self._reducer_args(step_num)))
+                streaming_args.append(
+                    list2cmdline(self._reducer_args(step_num)))
             else:
                 streaming_args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
 
-            log.debug('> %s' % cmd_line(streaming_args))
+            log.debug('> %s' % list2cmdline(streaming_args))
             step_proc = Popen(streaming_args, stdout=PIPE, stderr=PIPE)
 
             # TODO: use a pty or something so that the hadoop binary
@@ -558,7 +559,7 @@ class HadoopJobRunner(MRJobRunner):
         """
         args = self._opts['hadoop_bin'] + args
 
-        log.debug('> %s' % cmd_line(args))
+        log.debug('> %s' % list2cmdline(args))
 
         proc = Popen(args, stdout=PIPE, stderr=PIPE)
         stdout, stderr = proc.communicate()
@@ -714,7 +715,7 @@ class HadoopJobRunner(MRJobRunner):
         if is_uri(filename):
             # stream from HDFS
             cat_args = self._opts['hadoop_bin'] + ['fs', '-cat', filename]
-            log.debug('> %s' % cmd_line(cat_args))
+            log.debug('> %s' % list2cmdline(cat_args))
 
             cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
 

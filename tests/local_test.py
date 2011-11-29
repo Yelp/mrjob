@@ -22,6 +22,7 @@ import mrjob
 import os
 import shutil
 import signal
+from subprocess import list2cmdline
 import sys
 from testify import TestCase
 from testify import assert_in
@@ -35,7 +36,6 @@ import tempfile
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
-from mrjob.util import cmd_line
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_job_where_are_you import MRJobWhereAreYou
@@ -308,7 +308,7 @@ class PythonBinTestCase(TestCase):
         assert_in('--mapper', output)
 
     def test_python_dash_v_as_python_bin(self):
-        python_cmd = cmd_line([sys.executable or 'python', '-v'])
+        python_cmd = list2cmdline([sys.executable or 'python', '-v'])
         mr_job = MRTwoStepJob(['--python-bin', python_cmd, '--no-conf'])
         mr_job.sandbox(stdin=['bar\n'])
 
@@ -488,12 +488,17 @@ class CompatTestCase(TestCase):
 
     def test_environment_variables_018(self):
         runner = LocalMRJobRunner(hadoop_version='0.18', conf_path=False)
-        runner._setup_working_dir()
-        assert_in('mapred_cache_localArchives',
+        # clean up after we're done. On windows, job names are only to
+        # the millisecond, so these two tests end up trying to create
+        # the same temp dir
+        with runner as runner:
+            runner._setup_working_dir()
+            assert_in('mapred_cache_localArchives',
                   runner._subprocess_env('M', 0, 0).keys())
 
     def test_environment_variables_021(self):
         runner = LocalMRJobRunner(hadoop_version='0.21', conf_path=False)
-        runner._setup_working_dir()
-        assert_in('mapreduce_job_cache_local_archives',
-                  runner._subprocess_env('M', 0, 0).keys())
+        with runner as runner:
+            runner._setup_working_dir()
+            assert_in('mapreduce_job_cache_local_archives',
+                      runner._subprocess_env('M', 0, 0).keys())

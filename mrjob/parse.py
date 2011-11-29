@@ -215,7 +215,7 @@ def find_hadoop_java_stack_trace(lines):
     (We omit the "Error running child" line from the results)
     """
     for line in lines:
-        if line.rstrip('\n').endswith("Error running child"):
+        if line.rstrip('\r\n').endswith("Error running child"):
             st_lines = []
             for line in lines:
                 st_lines.append(line)
@@ -355,8 +355,8 @@ def find_timeout_error(lines):
 
 
 # recognize hadoop streaming output
-_COUNTER_RE = re.compile(r'reporter:counter:([^,]*),([^,]*),(-?\d+)$')
-_STATUS_RE = re.compile(r'reporter:status:(.*)$')
+_COUNTER_RE = re.compile(r'^reporter:counter:([^,]*),([^,]*),(-?\d+)$')
+_STATUS_RE = re.compile(r'^reporter:status:(.*)$')
 
 
 def parse_mr_job_stderr(stderr, counters=None):
@@ -383,7 +383,7 @@ def parse_mr_job_stderr(stderr, counters=None):
     other = []
 
     for line in stderr:
-        m = _COUNTER_RE.match(line)
+        m = _COUNTER_RE.match(line.rstrip('\r\n'))
         if m:
             group, counter, amount_str = m.groups()
             counters.setdefault(group, {})
@@ -391,7 +391,7 @@ def parse_mr_job_stderr(stderr, counters=None):
             counters[group][counter] += int(amount_str)
             continue
 
-        m = _STATUS_RE.match(line)
+        m = _STATUS_RE.match(line.rstrip('\r\n'))
         if m:
             statuses.append(m.group(1))
             continue

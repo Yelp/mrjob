@@ -785,7 +785,7 @@ class MRJob(object):
         def read_lines():
             for line in self._read_input():
                 try:
-                    key, value = read(line.rstrip('\n'))
+                    key, value = read(line.rstrip('\r\n'))
                     yield key, value
                 except Exception, e:
                     if self.options.strict_protocols:
@@ -895,7 +895,8 @@ class MRJob(object):
             '--input-protocol', dest='input_protocol',
             opt_group=self.proto_opt_group,
             default=None, choices=protocol_choices,
-            help='DEPRECATED: protocol to read input with (default: raw_value)')
+            help=('DEPRECATED: protocol to read input with (default:'
+                  ' raw_value)'))
 
         self.add_passthrough_option(
             '--output-protocol', dest='output_protocol',

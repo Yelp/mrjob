@@ -558,10 +558,8 @@ class LocalMRJobRunner(MRJobRunner):
         if combiner_args:
             command = '%s | sort | %s' % (
                 cmd_line(args), cmd_line(combiner_args))
-            proc = Popen(['-c', command],
-                         stdout=write_to, stderr=PIPE,
-                         cwd=self._working_dir, env=env,
-                         shell=True)
+            proc = Popen(command, stdout=write_to, stderr=PIPE,
+                         cwd=self._working_dir, env=env, shell=True)
         else:
             proc = Popen(args, stdout=write_to, stderr=PIPE,
                          cwd=self._working_dir, env=env)

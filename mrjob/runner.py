@@ -1249,7 +1249,8 @@ class MRJobRunner(object):
 
         # ignore locale when sorting
         env = os.environ.copy()
-        env['LC_ALL'] = 'C'
+        env['LC_ALL'] = 'C'  # for UNIX
+        env['LOCALE'] = '"C"'  # for Windows; see issue #298
 
         log.info('writing to %s' % output_path)
 

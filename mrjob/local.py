@@ -183,10 +183,12 @@ class LocalMRJobRunner(MRJobRunner):
                               combiner_args=combiner_args)
 
             if 'R' in step:
-                # sort the output
-                self._invoke_step(['sort'], 'step-%d-mapper-sorted' % i,
-                                  env={'LC_ALL': 'C'}, step_num=i,
-                                  step_type='S', num_tasks=1)  # ignore locale
+                # sort the output. Treat this as a mini-step for the purpose
+                # of self._prev_outfiles
+                sort_output_path = os.path.join(
+                    self._get_local_tmp_dir(), 'step-%d-mapper-sorted' % i)
+                self._invoke_sort(self._step_input_paths(), sort_output_path)
+                self._prev_outfiles = [sort_output_path]
 
                 # run the reducer
                 reducer_args = (wrapper_args + [self._script['name'],
@@ -356,8 +358,22 @@ class LocalMRJobRunner(MRJobRunner):
 
         return file_names
 
-    def _invoke_step(self, args, outfile_name, env=None, step_num=0,
-                     num_tasks=1, step_type='M', combiner_args=None):
+    def _step_input_paths(self):
+        """Decide where to get input for a step. Dump stdin to a temp file
+        if need be."""
+        if self._prev_outfiles:
+            return self._prev_outfiles
+        else:
+            input_paths = []
+            for path in self._input_paths:
+                if path == '-':
+                    input_paths.append(self._dump_stdin_to_local_file())
+                else:
+                    input_paths.append(path)
+            return input_paths
+
+    def _invoke_step(self, args, outfile_name, step_num=0, num_tasks=1,
+                     step_type='M', combiner_args=None):
         """Run the given command, outputting into outfile, and reading
         from the previous outfile (or, for the first step, from our
         original output files).
@@ -371,16 +387,11 @@ class LocalMRJobRunner(MRJobRunner):
                               some extra shell wrangling, so pass the combiner
                               arguments in separately.
         """
-        # decide where to get input
-        if self._prev_outfiles:
-            input_paths = self._prev_outfiles
-        else:
-            input_paths = []
-            for path in self._input_paths:
-                if path == '-':
-                    input_paths.append(self._dump_stdin_to_local_file())
-                else:
-                    input_paths.append(path)
+
+        # get file splits for mappers and reducers
+        keep_sorted = (step_type == 'R')
+        file_splits = self._get_file_splits(
+            self._step_input_paths(), num_tasks, keep_sorted=keep_sorted)
 
         # Start the tasks associated with the step:
         # if we need to sort, then just sort all input files into one file
@@ -389,41 +400,25 @@ class LocalMRJobRunner(MRJobRunner):
         procs = []
         self._prev_outfiles = []
 
-        if step_type == 'S':
-            # sort all the files into one main file
-            # no need to split the input here
-            for path in input_paths:
-                args.append(os.path.abspath(path))
-            proc = self._invoke_process(args, outfile_name, env)
+        for task_num, file_name in enumerate(file_splits):
+
+            # setup environment variables
+            if step_type == 'M':
+                env = self._subprocess_env(
+                    step_type, step_num, task_num,
+                    # mappers have extra file split info
+                    input_file=file_splits[file_name]['orig_name'],
+                    input_start=file_splits[file_name]['start'],
+                    input_length=file_splits[file_name]['length'])
+            else:
+                env = self._subprocess_env(step_type, step_num, task_num)
+
+            task_outfile = outfile_name + '_part-%05d' % task_num
+
+            proc = self._invoke_process(args + [file_name], task_outfile,
+                                        env=env,
+                                        combiner_args=combiner_args)
             procs.append(proc)
-        else:
-            assert env is None  # only used by the sort command
-
-            # get file splits for mappers and reducers
-            keep_sorted = (step_type == 'R')
-            file_splits = self._get_file_splits(
-                input_paths, num_tasks, keep_sorted=keep_sorted)
-
-            # run the tasks
-            for task_num, file_name in enumerate(file_splits):
-
-                # setup environment variables
-                if step_type == 'M':
-                    env = self._subprocess_env(
-                        step_type, step_num, task_num,
-                        # mappers have extra file split info
-                        input_file=file_splits[file_name]['orig_name'],
-                        input_start=file_splits[file_name]['start'],
-                        input_length=file_splits[file_name]['length'])
-                else:
-                    env = self._subprocess_env(step_type, step_num, task_num)
-
-                task_outfile = outfile_name + '_part-%05d' % task_num
-
-                proc = self._invoke_process(args + [file_name], task_outfile,
-                                            env=env,
-                                            combiner_args=combiner_args)
-                procs.append(proc)
 
         for proc in procs:
             self._wait_for_process(proc, step_num)
@@ -555,7 +550,6 @@ class LocalMRJobRunner(MRJobRunner):
         # set up outfile
         outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
         log.info('writing to %s' % outfile)
-        log.debug('')
 
         self._prev_outfiles.append(outfile)
         write_to = open(outfile, 'w')

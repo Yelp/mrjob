@@ -22,6 +22,9 @@ import getpass
 import gzip
 import os
 import shutil
+import stat
+from subprocess import CalledProcessError
+import sys
 import tarfile
 from testify import TestCase
 from testify import assert_equal
@@ -38,6 +41,7 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import JOB_NAME_RE
 from mrjob.runner import CLEANUP_DEFAULT
+from mrjob.runner import MRJobRunner
 from mrjob.util import log_to_stream
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled
@@ -417,3 +421,123 @@ class TestStreamingOutput(TestCase):
         runner._output_dir = self.tmp_dir
         assert_equal(sorted(runner.stream_output()),
                      ['A', 'B', 'C'])
+
+
+class TestInvokeSort(TestCase):
+
+    @setup
+    def make_tmp_dir_and_set_up_files(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+        self.a = os.path.join(self.tmp_dir, 'a')
+        with open(self.a, 'w') as a:
+            a.write('A\n')
+            a.write('apple\n')
+            a.write('alligator\n')
+
+        self.b = os.path.join(self.tmp_dir, 'b')
+        with open(self.b, 'w') as b:
+            b.write('B\n')
+            b.write('banana\n')
+            b.write('ball\n')
+
+        self.out = os.path.join(self.tmp_dir, 'out')
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    @setup
+    def save_environment(self):
+        self._old_environ = os.environ.copy()
+
+    @teardown
+    def restore_environment(self):
+        os.environ.clear()
+        os.environ.update(self._old_environ)
+
+    def find_real_sort_bin(self):
+        for path in os.environ.get('PATH', '').split(os.pathsep) or ():
+            for sort_path in [os.path.join(path, 'sort'),
+                              os.path.join(path, 'sort.exe')]:
+                if os.path.exists(sort_path):
+                    return os.path.abspath(sort_path)
+
+        raise Exception("Can't find sort binary!")
+
+    def use_alternate_sort(self, script_contents):
+        sort_bin = os.path.join(self.tmp_dir, 'sort')
+        with open(sort_bin, 'w') as f:
+            f.write('#!%s\n' % sys.executable)
+            f.write(script_contents)
+
+        os.chmod(sort_bin, stat.S_IREAD | stat.S_IEXEC)
+        os.environ['PATH'] = self.tmp_dir
+
+    def use_simulated_windows_sort(self):
+        script_contents = """\
+import os
+from subprocess import check_call
+import sys
+
+if len(sys.argv) > 2:
+    print >> sys.stderr, 'Input file specified two times.'
+    sys.exit(1)
+
+real_sort_bin = %r
+
+check_call([real_sort_bin] + sys.argv[1:])
+""" % (self.find_real_sort_bin())
+
+        self.use_alternate_sort(script_contents)
+
+    def use_bad_sort(self):
+        script_contents = """\
+import sys
+
+print >> sys.stderr, 'Sorting is for chumps!'
+sys.exit(13)
+"""
+
+        self.use_alternate_sort(script_contents)
+
+    def test_no_files(self):
+        runner = MRJobRunner(conf_path=False)
+        assert_raises(ValueError,
+                      runner._invoke_sort, [], self.out)
+
+    def test_one_file(self):
+        runner = MRJobRunner(conf_path=False)
+        runner._invoke_sort([self.a], self.out)
+
+        assert_equal(list(open(self.out)),
+                     ['A\n',
+                      'alligator\n',
+                      'apple\n'])
+
+    def test_two_files(self):
+        runner = MRJobRunner(conf_path=False)
+        runner._invoke_sort([self.a, self.b], self.out)
+
+        assert_equal(list(open(self.out)),
+                     ['A\n',
+                      'B\n',
+                      'alligator\n',
+                      'apple\n',
+                      'ball\n',
+                      'banana\n'])
+
+    def test_windows_sort_on_one_file(self):
+        self.use_simulated_windows_sort()
+        self.test_one_file()
+
+    def test_windows_sort_on_two_files(self):
+        self.use_simulated_windows_sort()
+        self.test_two_files()
+
+    def test_bad_sort(self):
+        self.use_bad_sort()
+
+        runner = MRJobRunner(conf_path=False)
+        assert_raises(CalledProcessError,
+                      runner._invoke_sort, [self.a, self.b], self.out)

@@ -53,6 +53,7 @@ def buffer_iterator_to_line_iterator(iterator):
                     yield buf + '\n'
                 return
 
+
 def cmd_line(args):
     """build a command line that works in a shell.
     """

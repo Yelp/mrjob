@@ -149,16 +149,19 @@ def find_mrjob_conf():
             yield (expand_path(os.environ['MRJOB_CONF']), None)
 
         # $HOME isn't necessarily set on Windows, but ~ works
-        yield (expand_path('~/.mrjob.conf'), None)
+        # use os.path.join() so we don't end up mixing \ and /
+        yield (expand_path(os.path.join('~', '.mrjob.conf')), None)
 
         # DEPRECATED:
-        yield (expand_path('~/.mrjob'), 'use ~/.mrjob.conf instead.')
+        yield (expand_path(os.path.join('~', '.mrjob')),
+                           'use ~/.mrjob.conf instead.')
         if os.environ.get('PYTHONPATH'):
             for dirname in os.environ['PYTHONPATH'].split(os.pathsep):
                 yield (os.path.join(dirname, 'mrjob.conf'),
                       'Use $MRJOB_CONF to explicitly specify the path'
                        ' instead.')
 
+        # this only really makes sense on Unix, so no os.path.join()
         yield ('/etc/mrjob.conf', None)
 
     for path, deprecation_message in candidates():

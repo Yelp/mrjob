@@ -16,14 +16,40 @@
 
 from __future__ import with_statement
 
+import logging
 import os
 import shutil
+from StringIO import StringIO
 import tempfile
 
-from testify import TestCase, assert_equal, class_setup, class_teardown, setup, teardown
-from mrjob.conf import *
+from testify import TestCase
+from testify import assert_equal
+from testify import assert_in
+from testify import assert_not_in
+from testify import class_setup
+from testify import class_teardown
+from testify import setup
+from testify import teardown
+
 import mrjob.conf
+from mrjob.conf import combine_cmd_lists
+from mrjob.conf import combine_cmds
+from mrjob.conf import combine_dicts
+from mrjob.conf import combine_envs
+from mrjob.conf import combine_lists
+from mrjob.conf import combine_local_envs
+from mrjob.conf import combine_opts
+from mrjob.conf import combine_path_lists
+from mrjob.conf import combine_paths
+from mrjob.conf import combine_values
+from mrjob.conf import dump_mrjob_conf
+from mrjob.conf import expand_path
+from mrjob.conf import find_mrjob_conf
+from mrjob.conf import load_mrjob_conf
+from mrjob.conf import load_opts_from_mrjob_conf
+from mrjob.util import log_to_stream
 from tests.quiet import logger_disabled
+from tests.quiet import no_handlers_for_logger
 
 
 class MRJobConfTestCase(TestCase):
@@ -65,6 +91,9 @@ class MRJobConfTestCase(TestCase):
         os.environ.clear()
         os.environ.update(self._old_environ)
 
+
+class MRJobBasicConfTestCase(MRJobConfTestCase):
+
     def test_no_mrjob_conf(self):
         self._existing_paths = []
         assert_equal(find_mrjob_conf(), None)
@@ -75,7 +104,7 @@ class MRJobConfTestCase(TestCase):
 
     def test_mrjob_in_home_dir(self):
         os.environ['HOME'] = self.tmp_dir
-        dot_mrjob_path = os.path.join(self.tmp_dir, '.mrjob')
+        dot_mrjob_path = os.path.join(self.tmp_dir, '.mrjob.conf')
         open(dot_mrjob_path, 'w').close()
         assert_equal(find_mrjob_conf(), dot_mrjob_path)
 
@@ -85,12 +114,6 @@ class MRJobConfTestCase(TestCase):
         mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
         self._existing_paths = [mrjob_conf_path]
         assert_equal(find_mrjob_conf(), None)
-
-    def test_mrjob_conf_in_python_path(self):
-        os.environ['PYTHONPATH'] = self.tmp_dir
-        mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        open(mrjob_conf_path, 'w').close()
-        assert_equal(find_mrjob_conf(), mrjob_conf_path)
 
     def test_precedence(self):
         os.environ['HOME'] = '/home/foo'
@@ -102,19 +125,19 @@ class MRJobConfTestCase(TestCase):
         self._existing_paths.add('/etc/mrjob.conf')
         assert_equal(find_mrjob_conf(), '/etc/mrjob.conf')
 
-        self._existing_paths.add('/py2/mrjob.conf')
-        assert_equal(find_mrjob_conf(), '/py2/mrjob.conf')
+        self._existing_paths.add('/home/foo/.mrjob.conf')
+        assert_equal(find_mrjob_conf(), '/home/foo/.mrjob.conf')
 
-        self._existing_paths.add('/py1/mrjob.conf')
-        assert_equal(find_mrjob_conf(), '/py1/mrjob.conf')
-
-        self._existing_paths.add('/home/foo/.mrjob')
-        assert_equal(find_mrjob_conf(), '/home/foo/.mrjob')
+        mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        open(mrjob_conf_path, 'w').close()
+        os.environ['MRJOB_CONF'] = mrjob_conf_path
+        self._existing_paths.add(mrjob_conf_path)
+        assert_equal(find_mrjob_conf(), mrjob_conf_path)
 
     def test_load_and_load_opts_use_find_mrjob_conf(self):
         os.environ['HOME'] = self.tmp_dir
 
-        dot_mrjob_path = os.path.join(self.tmp_dir, '.mrjob')
+        dot_mrjob_path = os.path.join(self.tmp_dir, '.mrjob.conf')
         with open(dot_mrjob_path, 'w') as f:
             f.write('{"runners": {"foo": {"bar": "baz"}}}')
 
@@ -144,6 +167,61 @@ class MRJobConfTestCase(TestCase):
         assert_equal(conf, load_mrjob_conf(conf_path=conf_path))
 
 
+class MRJobConfDeprecatedLocationTestCase(MRJobConfTestCase):
+
+    def _log_to_buffer(self):
+        buf = StringIO()
+        log = logging.getLogger('mrjob.conf')
+        log.addHandler(logging.StreamHandler(buf))
+        log.setLevel(logging.WARNING)
+        return buf
+
+    def test_mrjob_conf_in_python_path(self):
+        os.environ['PYTHONPATH'] = self.tmp_dir
+        mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        open(mrjob_conf_path, 'w').close()
+        self._existing_paths = [mrjob_conf_path]
+
+        with no_handlers_for_logger():
+            buf = self._log_to_buffer()
+            assert_equal(find_mrjob_conf(), mrjob_conf_path)
+            assert_in('This config path is deprecated', buf.getvalue())
+
+    def test_precedence_deprecated(self):
+        os.environ['HOME'] = '/home/foo'
+        os.environ['PYTHONPATH'] = '/py1:/py2'
+        self._existing_paths = set()
+
+        assert_equal(find_mrjob_conf(), None)
+
+        self._existing_paths.add('/etc/mrjob.conf')
+        assert_equal(find_mrjob_conf(), '/etc/mrjob.conf')
+
+        self._existing_paths.add('/py2/mrjob.conf')
+        with no_handlers_for_logger():
+            buf = self._log_to_buffer()
+            assert_equal(find_mrjob_conf(), '/py2/mrjob.conf')
+            assert_in('This config path is deprecated', buf.getvalue())
+
+        self._existing_paths.add('/py1/mrjob.conf')
+        with no_handlers_for_logger():
+            buf = self._log_to_buffer()
+            assert_equal(find_mrjob_conf(), '/py1/mrjob.conf')
+            assert_in('This config path is deprecated', buf.getvalue())
+
+        self._existing_paths.add('/home/foo/.mrjob')
+        with no_handlers_for_logger():
+            buf = self._log_to_buffer()
+            assert_equal(find_mrjob_conf(), '/home/foo/.mrjob')
+            assert_in('This config path is deprecated', buf.getvalue())
+
+        mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        open(mrjob_conf_path, 'w').close()
+        os.environ['MRJOB_CONF'] = mrjob_conf_path
+        self._existing_paths.add(mrjob_conf_path)
+        assert_equal(find_mrjob_conf(), mrjob_conf_path)
+
+
 class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
 
     @setup
@@ -162,8 +240,9 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         dump_mrjob_conf(conf, open(conf_path, 'w'))
         contents = open(conf_path).read()
 
-        assert_equal(contents.replace(' ','').replace('\n',''),
-					 '{"runners":{"foo":{"qux":"quux"}}}')
+        assert_equal(contents.replace(' ', '').replace('\n', ''),
+                     '{"runners":{"foo":{"qux":"quux"}}}')
+
 
 class CombineValuesTestCase(TestCase):
 
@@ -190,6 +269,7 @@ class CombineValuesTestCase(TestCase):
         assert_equal(combine_values((1, 2, 3), ()), ())
         assert_equal(combine_values({'a': 'b'}, {}), {})
         assert_equal(combine_values(set([1]), set()), set())
+
 
 class CombineDictsTestCase(TestCase):
 
@@ -222,6 +302,51 @@ class CombineDictsTestCase(TestCase):
              'PS1': '\w> '})
 
 
+class CombineCmdsTestCase(TestCase):
+
+    def test_empty(self):
+        assert_equal(combine_cmds(), None)
+
+    def test_picks_last_value(self):
+        assert_equal(combine_cmds(['sort'], ['grep'], ['cat']), ['cat'])
+
+    def test_all_None(self):
+        assert_equal(combine_cmds(None, None, None), None)
+
+    def test_skips_None(self):
+        assert_equal(combine_values(None, ['cat']), ['cat'])
+        assert_equal(combine_values(['cat'], None), ['cat'])
+        assert_equal(combine_values(None, None, ['cat'], None), ['cat'])
+
+    def test_parse_string(self):
+        assert_equal(combine_cmds('sort', 'grep', 'cat'), ['cat'])
+        assert_equal(combine_cmds(['python'], 'python -S'), ['python', '-S'])
+
+    def test_parse_empty_string(self):
+        assert_equal(combine_cmds(''), [])
+
+    def test_convert_to_list(self):
+        assert_equal(combine_cmds('sort', ('grep', '-E')), ['grep', '-E'])
+
+
+class CombineCmdsListsCase(TestCase):
+
+    def test_empty(self):
+        assert_equal(combine_cmd_lists(), [])
+
+    def test_concatenation(self):
+        assert_equal(
+            combine_cmd_lists(
+                [['echo', 'foo']], None, (['mkdir', 'bar'], ['rmdir', 'bar'])),
+            [['echo', 'foo'], ['mkdir', 'bar'], ['rmdir', 'bar']])
+
+    def test_conversion(self):
+        assert_equal(
+            combine_cmd_lists(
+                ['echo "Hello World!"'], None, [('mkdir', '/tmp/baz')]),
+            [['echo', 'Hello World!'], ['mkdir', '/tmp/baz']])
+
+
 class CombineEnvsTestCase(TestCase):
 
     def test_empty(self):
@@ -252,6 +377,7 @@ class CombineEnvsTestCase(TestCase):
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
 
+
 class CombineLocalEnvsTestCase(TestCase):
 
     @setup
@@ -276,6 +402,7 @@ class CombineLocalEnvsTestCase(TestCase):
              'PYTHONPATH': '/home/dave/python;/usr/lib/python/site-packages',
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
+
 
 class CombineListsTestCase(TestCase):
 
@@ -373,5 +500,3 @@ class CombineAndExpandPathsTestCase(TestCase):
             [bar_path, foo_path, foo_path,
              os.path.join(self.tmp_dir, 'q*'),
              's3://walrus/foo'])
-
-

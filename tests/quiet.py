@@ -31,7 +31,7 @@ def logger_disabled(name=None):
     Use this in a `with` block. For example::
 
         with logger_disabled('mrjob.conf'):
-            find_mrjob_conf() # this would normally log stuff
+            find_mrjob_conf()  # this would normally log stuff
     """
     log = logging.getLogger(name)
     was_disabled = log.disabled
@@ -55,7 +55,7 @@ def no_handlers_for_logger(name=None):
         with no_handlers_for_logger('mrjob.local'):
             mr_job.run_job()
 
-        ... # look for logging messages inside mr_job.stderr
+        ...  # look for logging messages inside mr_job.stderr
 
     Any handlers you add inside the `with` block will be removed at the end.
     """

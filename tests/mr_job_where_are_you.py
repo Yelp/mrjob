@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import os
 import sys
 import warnings
@@ -23,6 +22,7 @@ if os.environ.get('PYTHONPATH'):
 
 import mrjob
 from mrjob.job import MRJob
+
 
 class MRJobWhereAreYou(MRJob):
     """Output what directory the mrjob library is in."""

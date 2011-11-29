@@ -13,8 +13,18 @@
 # limitations under the License.
 
 """Make sure all of our protocols work as advertised."""
-from testify import TestCase, assert_equal, assert_raises
-from mrjob.protocol import *
+from testify import TestCase
+from testify import assert_equal
+from testify import assert_raises
+
+from mrjob.protocol import JSONProtocol
+from mrjob.protocol import JSONValueProtocol
+from mrjob.protocol import PickleProtocol
+from mrjob.protocol import PickleValueProtocol
+from mrjob.protocol import RawValueProtocol
+from mrjob.protocol import ReprProtocol
+from mrjob.protocol import ReprValueProtocol
+
 
 # keys and values that should encode/decode properly in all protocols
 SAFE_KEYS_AND_VALUES = [
@@ -27,16 +37,20 @@ SAFE_KEYS_AND_VALUES = [
     ('\t', '\n'),
 ]
 
+
 def assert_round_trip_ok(protocol, key, value):
     """Assert that we can encode and decode the given key and value,
     and get the same key and value we started with."""
     assert_equal((key, value), protocol.read(protocol.write(key, value)))
 
+
 def assert_cant_encode(protocol, key, value):
     assert_raises(Exception, protocol.write, key, value)
 
+
 def assert_cant_decode(protocol, data):
     assert_raises(Exception, protocol.read, data)
+
 
 class Point(object):
     """A simple class to test encoding of objects."""
@@ -55,6 +69,7 @@ class Point(object):
         else:
             return cmp((self.x, self.y), (other.x, other.y))
 
+
 class JSONProtocolTestCase(TestCase):
 
     def test_round_trip(self):
@@ -71,8 +86,8 @@ class JSONProtocolTestCase(TestCase):
 
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
-        assert_equal(([1,2], [3,4]),
-                     JSONProtocol.read(JSONProtocol.write((1,2), (3,4))))
+        assert_equal(([1, 2], [3, 4]),
+                     JSONProtocol.read(JSONProtocol.write((1, 2), (3, 4))))
 
     def test_numerical_keys_become_strs(self):
         # JSON should convert numbers to strings when they are dict keys
@@ -84,7 +99,7 @@ class JSONProtocolTestCase(TestCase):
 
     def test_bad_keys_and_values(self):
         # dictionaries have to have strings as keys
-        assert_cant_encode(JSONProtocol, {(1,2): 3}, None)
+        assert_cant_encode(JSONProtocol, {(1, 2): 3}, None)
 
         # only unicodes (or bytes in utf-8) are allowed
         assert_cant_encode(JSONProtocol, '0\xa2', '\xe9')
@@ -94,6 +109,7 @@ class JSONProtocolTestCase(TestCase):
 
         # Point class has no representation in JSON
         assert_cant_encode(JSONProtocol, Point(2, 3), Point(1, 4))
+
 
 class JSONValueProtocolTestCase(TestCase):
 
@@ -111,8 +127,8 @@ class JSONValueProtocolTestCase(TestCase):
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
         assert_equal(
-            (None, [3,4]),
-            JSONValueProtocol.read(JSONValueProtocol.write(None, (3,4))))
+            (None, [3, 4]),
+            JSONValueProtocol.read(JSONValueProtocol.write(None, (3, 4))))
 
     def test_numerical_keys_become_strs(self):
         # JSON should convert numbers to strings when they are dict keys
@@ -125,7 +141,7 @@ class JSONValueProtocolTestCase(TestCase):
 
     def test_bad_keys_and_values(self):
         # dictionaries have to have strings as keys
-        assert_cant_encode(JSONValueProtocol, None, {(1,2): 3})
+        assert_cant_encode(JSONValueProtocol, None, {(1, 2): 3})
 
         # only unicodes (or bytes in utf-8) are allowed
         assert_cant_encode(JSONValueProtocol, None, '\xe9')
@@ -135,6 +151,7 @@ class JSONValueProtocolTestCase(TestCase):
 
         # Point class has no representation in JSON
         assert_cant_encode(JSONValueProtocol, None, Point(1, 4))
+
 
 class PickleProtocolTestCase(TestCase):
 
@@ -151,6 +168,7 @@ class PickleProtocolTestCase(TestCase):
 
     # no tests of what encoded data looks like; pickle is an opaque protocol
 
+
 class PickleValueProtocolTestCase(TestCase):
 
     def test_round_trip(self):
@@ -166,6 +184,7 @@ class PickleValueProtocolTestCase(TestCase):
 
     # no tests of what encoded data looks like; pickle is an opaque protocol
 
+
 class RawValueProtocolTestCase(TestCase):
 
     def test_dumps_keys(self):
@@ -179,6 +198,7 @@ class RawValueProtocolTestCase(TestCase):
 
     def test_no_strip(self):
         assert_equal(RawValueProtocol.read('foo\t \n\n'), (None, 'foo\t \n\n'))
+
 
 class ReprProtocolTestCase(TestCase):
 
@@ -203,6 +223,7 @@ class ReprProtocolTestCase(TestCase):
     def test_can_encode_point_but_not_decode(self):
         points_encoded = ReprProtocol.write(Point(2, 3), Point(1, 4))
         assert_cant_decode(ReprProtocol, points_encoded)
+
 
 class ReprValueProtocolTestCase(TestCase):
 

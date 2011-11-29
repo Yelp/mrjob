@@ -33,10 +33,6 @@ from __future__ import with_statement
 
 import datetime
 import glob
-import logging
-import os
-import pipes
-import shutil
 import os
 import pipes
 import shutil
@@ -90,7 +86,7 @@ def get_mock_hadoop_output():
 
 def hdfs_path_to_real_path(hdfs_path):
     if hdfs_path.startswith('hdfs:///'):
-        hdfs_path = hdfs_path[7:] # keep one slash
+        hdfs_path = hdfs_path[7:]  # keep one slash
 
     if not hdfs_path.startswith('/'):
         hdfs_path = '/user/%s/%s' % (os.environ['USER'], hdfs_path)
@@ -155,7 +151,7 @@ def hadoop_fs(*args):
         sys.stderr.write('Usage: java FsShell\n')
         sys.exit(-1)
 
-    cmd = args[0][1:] # convert e.g. '-put' -> 'put'
+    cmd = args[0][1:]  # convert e.g. '-put' -> 'put'
     cmd_args = args[1:]
 
     # this doesn't have to be a giant switch statement, but it's a
@@ -205,7 +201,9 @@ def hadoop_fs_lsr(*args):
         real_path_glob = hdfs_path_to_real_path(hdfs_path_glob)
         real_paths = glob.glob(real_path_glob)
         if not real_paths:
-            print >> sys.stderr, 'lsr: Cannot access %s: No such file or directory.' % hdfs_path_glob
+            print >> sys.stderr, (
+                'lsr: Cannot access %s: No such file or directory.' %
+                hdfs_path_glob)
             failed = True
         else:
             for real_path in real_paths:
@@ -231,7 +229,8 @@ def hadoop_fs_mkdir(*args):
     for path in args:
         real_path = hdfs_path_to_real_path(path)
         if os.path.exists(real_path):
-            sys.stderr.write('mkdir: cannot create directory %s: File exists' % path)
+            sys.stderr.write(
+                'mkdir: cannot create directory %s: File exists' % path)
             # continue to make directories on failure
             failed = True
 
@@ -272,7 +271,8 @@ def hadoop_fs_rmr(*args):
         if os.path.exists(real_path):
             shutil.rmtree(real_path)
         else:
-            sys.stderr.write('rmr: cannot remove %s: No such file or directory.' % path)
+            sys.stderr.write(
+                'rmr: cannot remove %s: No such file or directory.' % path)
             failed = True
 
     if failed:
@@ -286,13 +286,15 @@ def hadoop_jar(*args):
 
     jar_path = args[0]
     if not os.path.exists(jar_path):
-        sys.stderr.write('Exception in thread "main" java.io.IOException: Error opening job jar: %s\n' % jar_path)
+        sys.stderr.write(
+            'Exception in thread "main" java.io.IOException: Error opening job'
+            ' jar: %s\n' % jar_path)
         sys.exit(-1)
 
     streaming_args = args[1:]
     output_idx = list(streaming_args).index('-output')
     assert output_idx != -1
-    output_dir = streaming_args[output_idx+1]
+    output_dir = streaming_args[output_idx + 1]
     real_output_dir = hdfs_path_to_real_path(output_dir)
 
     mock_output_dir = get_mock_hadoop_output()
@@ -305,7 +307,17 @@ def hadoop_jar(*args):
 
     shutil.move(mock_output_dir, real_output_dir)
 
+    now = datetime.datetime.now()
+    sys.stderr.write(now.strftime('Running job: job_%Y%m%d%H%M_0001\n'))
     sys.stderr.write('Job succeeded!\n')
+
+
+def hadoop_version(*args):
+    sys.stderr.write("""Hadoop 0.20.2
+Subversion https://svn.apache.org/repos/asf/hadoop/common/branches/branch-0.20\
+ -r 911707
+Compiled by chrisdo on Fri Feb 19 08:07:34 UTC 2010
+""")
 
 
 if __name__ == '__main__':

@@ -17,11 +17,27 @@ hour) and terminate them.
 Suggested usage: run this as a cron job with the -q option::
 
     */30 * * * * python -m mrjob.tools.emr.terminate_idle_emr_job_flows -q
+
+Options::
+
+  -h, --help            show this help message and exit
+  -v, --verbose         Print more messages
+  -q, --quiet           Don't print anything to stderr; just print IDs of
+                        terminated job flows and idle time information to
+                        stdout
+  -c CONF_PATH, --conf-path=CONF_PATH
+                        Path to alternate mrjob.conf file to read from
+  --no-conf             Don't load mrjob.conf even if it's available
+  --max-hours-idle=MAX_HOURS_IDLE
+                        Max number of hours a job can run before being
+                        terminated
+  --dry-run             Don't actually kill idle jobs; just log that we would
+
 """
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 import logging
 from optparse import OptionParser
-import posixpath
 import re
 
 try:
@@ -29,15 +45,17 @@ try:
 except ImportError:
     boto = None
 
-from mrjob.emr import EMRJobRunner, describe_all_job_flows
-from mrjob.parse import HADOOP_STREAMING_JAR_RE
+from mrjob.emr import EMRJobRunner
+from mrjob.emr import describe_all_job_flows
 from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
 
 DEFAULT_MAX_HOURS_IDLE = 1
 
-DEBUG_JAR_RE = re.compile(r's3n://.*\.elasticmapreduce/libs/state-pusher/[^/]+/fetch')
+DEBUG_JAR_RE = re.compile(
+    r's3n://.*\.elasticmapreduce/libs/state-pusher/[^/]+/fetch')
+
 
 def main():
     option_parser = make_option_parser()
@@ -57,6 +75,7 @@ def main():
         max_hours_idle=options.max_hours_idle,
         now=datetime.utcnow(),
         dry_run=options.dry_run)
+
 
 def inspect_and_maybe_terminate_job_flows(
     conf_path, max_hours_idle, now, dry_run):
@@ -101,14 +120,17 @@ def inspect_and_maybe_terminate_job_flows(
                 to_terminate.append(
                     (jf.jobflowid, jf.name, time_idle))
 
-    log.info('Job flow statuses: %d running, %d idle, %d active non-streaming, %d done' %
-                  (num_running, num_idle, num_non_streaming, num_done))
+    log.info(
+        'Job flow statuses: %d running, %d idle, %d active non-streaming,'
+        ' %d done' % (num_running, num_idle, num_non_streaming, num_done))
 
     terminate_and_notify(emr_conn, to_terminate, dry_run=dry_run)
+
 
 def is_job_flow_done(job_flow):
     """Return True if the given job flow is done running."""
     return hasattr(job_flow, 'enddatetime')
+
 
 def is_job_flow_non_streaming(job_flow):
     """Return True if the give job flow has steps, but not of them are
@@ -130,8 +152,10 @@ def is_job_flow_non_streaming(job_flow):
     # job has at least one step, and none are streaming steps
     return True
 
+
 def is_job_flow_running(job_flow):
-    """Return true if the given job has any steps which are currently running."""
+    """Return ``True`` if the given job has any steps which are currently
+    running."""
     active_steps = [step for step in job_flow.steps
                     if step.state != 'CANCELLED']
 
@@ -139,6 +163,7 @@ def is_job_flow_running(job_flow):
         return False
 
     return not getattr(active_steps[-1], 'enddatetime', None)
+
 
 def time_job_flow_idle(job_flow, now):
     """How long has the given job flow been idle?
@@ -165,6 +190,7 @@ def time_job_flow_idle(job_flow, now):
         return now - datetime.strptime(job_flow.creationdatetime,
                                        boto.utils.ISO8601)
 
+
 def terminate_and_notify(emr_conn, to_terminate, dry_run=False):
     if not to_terminate:
         return
@@ -175,9 +201,11 @@ def terminate_and_notify(emr_conn, to_terminate, dry_run=False):
         print 'Terminated job flow %s (%s); was idle for %s' % (
             (job_flow_id, name, time_idle))
 
+
 def make_option_parser():
     usage = '%prog [options]'
-    description = 'Terminate all EMR job flows that have been idle for a long time (by default, one hour).'
+    description = ('Terminate all EMR job flows that have been idle for a long'
+                   ' time (by default, one hour).')
     option_parser = OptionParser(usage=usage, description=description)
     option_parser.add_option(
         '-v', '--verbose', dest='verbose', default=False,
@@ -186,7 +214,8 @@ def make_option_parser():
     option_parser.add_option(
         '-q', '--quiet', dest='quiet', default=False,
         action='store_true',
-        help="Don't print anything to stderr; just print IDs of terminated job flows and idle time information to stdout")
+        help=("Don't print anything to stderr; just print IDs of terminated"
+              " job flows and idle time information to stdout"))
     option_parser.add_option(
         '-c', '--conf-path', dest='conf_path', default=None,
         help='Path to alternate mrjob.conf file to read from')
@@ -204,6 +233,6 @@ def make_option_parser():
 
     return option_parser
 
+
 if __name__ == '__main__':
     main()
-

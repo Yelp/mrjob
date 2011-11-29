@@ -18,14 +18,17 @@ n times."""
 from __future__ import with_statement
 
 import os
-from testify import assert_equal, assert_not_equal
+from testify import assert_equal
+from testify import assert_not_equal
 
 from mrjob.job import MRJob
+from mrjob.protocol import JSONValueProtocol
+
 
 class MRTowerOfPowers(MRJob):
 
-    DEFAULT_INPUT_PROTOCOL = 'json_value'
-    DEFAULT_OUTPUT_PROTOCOL = 'json_value'
+    INPUT_PROTOCOL = JSONValueProtocol
+    OUTPUT_PROTOCOL = JSONValueProtocol
 
     def configure_options(self):
         super(MRTowerOfPowers, self).configure_options()
@@ -64,6 +67,7 @@ class MRTowerOfPowers(MRJob):
                      os.environ['LOCAL_N_FILE_PATH'])
 
         super(MRTowerOfPowers, self).show_steps()
+
 
 if __name__ == '__main__':
     MRTowerOfPowers.run()

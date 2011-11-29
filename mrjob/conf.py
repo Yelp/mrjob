@@ -17,9 +17,20 @@ for :py:mod:`mrjob`.
 
 We look for :file:`mrjob.conf` in these locations:
 
-- :file:`~/.mrjob`
-- :file:`mrjob.conf` anywhere in your :envvar:`PYTHONPATH`
+- The location specified by :envvar:`MRJOB_CONF`
+- :file:`~/.mrjob.conf`
+- :file:`~/.mrjob` **(deprecated)**
+- :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH` **(deprecated)**
 - :file:`/etc/mrjob.conf`
+
+If your :file:`mrjob.conf` path is deprecated, use this table to fix it:
+
+================================= ===============================
+Old Location                      New Location
+================================= ===============================
+:file:`~/.mrjob`                  :file:`~/.mrjob.conf`
+somewhere in :envvar:`PYTHONPATH` Specify in :envvar:`MRJOB_CONF`
+================================= ===============================
 
 The point of :file:`mrjob.conf` is to let you set up things you want every
 job to have access to so that you don't have to think about it. For example:
@@ -45,7 +56,7 @@ Now whenever you run ``mr_your_script.py -r emr``,
 
 Options specified on the command-line take precedence over
 :file:`mrjob.conf`. Usually this means simply overriding the option in
-:file:`mrjob.conf`. However, we know that *cmdenv*, contains environment
+:file:`mrjob.conf`. However, we know that *cmdenv* contains environment
 variables, so we do the right thing. For example, if your :file:`mrjob.conf`
 contained:
 
@@ -100,13 +111,14 @@ from __future__ import with_statement
 import glob
 import logging
 import os
+import shlex
 
 from mrjob.util import expand_path
 
 try:
-    import simplejson as json # preferred because of C speedups
+    import simplejson as json  # preferred because of C speedups
 except ImportError:
-    import json # built in to Python 2.6 and later
+    import json  # built in to Python 2.6 and later
 
 # yaml is nice to have, but we can fall back on JSON if need be
 try:
@@ -122,26 +134,40 @@ log = logging.getLogger('mrjob.conf')
 def find_mrjob_conf():
     """Look for :file:`mrjob.conf`, and return its path. Places we look:
 
-    - :file:`~/.mrjob`
-    - :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH`
+    - The location specified by :envvar:`MRJOB_CONF`
+    - :file:`~/.mrjob.conf`
+    - :file:`~/.mrjob` (deprecated)
+    - :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH` (deprecated)
     - :file:`/etc/mrjob.conf`
 
-    Return ``None`` if we can't find it.
+    Return ``None`` if we can't find it. Print a warning if its location is
+    deprecated.
     """
     def candidates():
-        # $HOME isn't necessarily set on Windows, but ~ works
-        yield expand_path('~/.mrjob')
+        """Return (path, deprecation_warning)"""
+        if 'MRJOB_CONF' in os.environ:
+            yield (expand_path(os.environ['MRJOB_CONF']), None)
 
+        # $HOME isn't necessarily set on Windows, but ~ works
+        yield (expand_path('~/.mrjob.conf'), None)
+
+        # DEPRECATED:
+        yield (expand_path('~/.mrjob'), 'use ~/.mrjob.conf instead.')
         if os.environ.get('PYTHONPATH'):
             for dirname in os.environ['PYTHONPATH'].split(os.pathsep):
-                yield os.path.join(dirname, 'mrjob.conf')
+                yield (os.path.join(dirname, 'mrjob.conf'),
+                      'Use $MRJOB_CONF to explicitly specify the path'
+                       ' instead.')
 
-        yield '/etc/mrjob.conf'
+        yield ('/etc/mrjob.conf', None)
 
-    for path in candidates():
+    for path, deprecation_message in candidates():
         log.debug('looking for configs in %s' % path)
         if os.path.exists(path):
             log.info('using configs in %s' % path)
+            if deprecation_message:
+                log.warning('This config path is deprecated and will stop'
+                            ' working in mrjob 0.4. %s' % deprecation_message)
             return path
     else:
         log.info("no configs found; falling back on auto-configuration")
@@ -161,7 +187,8 @@ def load_mrjob_conf(conf_path=None):
     Returns ``None`` if we can't find :file:`mrjob.conf`.
 
     :type conf_path: str
-    :param conf_path: an alternate place to look for mrjob.conf. If this is ``False``, we'll always return ``None``.
+    :param conf_path: an alternate place to look for mrjob.conf. If this is
+                      ``False``, we'll always return ``None``.
     """
     if conf_path is False:
         return None
@@ -182,7 +209,8 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
     ``{}`` if we can't find them.
 
     :type conf_path: str
-    :param conf_path: an alternate place to look for mrjob.conf. If this is ``False``, we'll always return ``{}``.
+    :param conf_path: an alternate place to look for mrjob.conf. If this is
+                      ``False``, we'll always return ``{}``.
     """
     conf = load_mrjob_conf(conf_path=conf_path)
     if conf is None:
@@ -226,7 +254,7 @@ def dump_mrjob_conf(conf, f):
 def combine_values(*values):
     """Return the last value in *values* that is not ``None``.
 
-    The default combiner; useful for simple values (booleans, strings, numbers).
+    The default combiner; good for simple values (booleans, strings, numbers).
     """
     for v in reversed(values):
         if v is not None:
@@ -248,6 +276,34 @@ def combine_lists(*seqs):
             result.extend(seq)
 
     return result
+
+
+def combine_cmds(*cmds):
+    """Take zero or more commands to run on the command line, and return
+    the last one that is not ``None``. Each command should either be a list
+    containing the command plus switches, or a string, which will be parsed
+    with :py:func:`shlex.split`
+
+    Returns either ``None`` or a list containing the command plus arguments.
+    """
+    cmd = combine_values(*cmds)
+
+    if cmd is None:
+        return None
+    elif isinstance(cmd, basestring):
+        return shlex.split(cmd)
+    else:
+        return list(cmd)
+
+
+def combine_cmd_lists(*seqs_of_cmds):
+    """Concatenate the given commands into a list. Ignore ``None`` values,
+    and parse strings with :py:func:`shlex.split`.
+
+    Returns a list of lists (each sublist contains the command plus arguments).
+    """
+    seq_of_cmds = combine_lists(*seqs_of_cmds)
+    return [combine_cmds(cmd) for cmd in seq_of_cmds]
 
 
 def combine_dicts(*dicts):
@@ -329,7 +385,9 @@ def combine_opts(combiners, *opts_list):
     """The master combiner, used to combine dictionaries of options with
     appropriate sub-combiners.
 
-    :param combiners: a map from option name to a combine_*() function to combine options by that name. By default, we combine options using :py:func:`combine_values`.
+    :param combiners: a map from option name to a combine_*() function to
+                      combine options by that name. By default, we combine
+                      options using :py:func:`combine_values`.
     :param opts_list: one or more dictionaries to combine
     """
     final_opts = {}

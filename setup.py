@@ -22,7 +22,9 @@ setup(
     ],
     description='Python MapReduce framework',
     install_requires=[
-        'boto>=1.6',
+        # todo: update this to whatever version of boto includes
+        # https://github.com/boto/boto/pull/190
+        'boto>=2.0b4',
         'PyYAML',
         'simplejson>=2.0.9'
     ],
@@ -30,7 +32,6 @@ setup(
     long_description=open('README.rst').read(),
     name='mrjob',
     packages=['mrjob',
-              'mrjob.botoemr',
               'mrjob.examples',
               'mrjob.tools',
               'mrjob.tools.emr'],

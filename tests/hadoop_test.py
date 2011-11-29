@@ -17,18 +17,29 @@
 from __future__ import with_statement
 
 from StringIO import StringIO
+import bz2
 import getpass
+import gzip
 import os
 import shlex
 import shutil
 from subprocess import check_call
-import sys
 import tempfile
-from testify import TestCase, assert_equal, assert_in, assert_lt, assert_not_in, setup, teardown
+from testify import TestCase
+from testify import assert_equal
+from testify import assert_in
+from testify import assert_lt
+from testify import assert_not_in
+from testify import setup
+from testify import teardown
 
-from tests.mockhadoop import create_mock_hadoop_script, add_mock_hadoop_output
+from tests.mockhadoop import create_mock_hadoop_script
+from tests.mockhadoop import add_mock_hadoop_output
 from tests.mr_two_step_job import MRTwoStepJob
-from mrjob.hadoop import *
+from tests.quiet import logger_disabled
+
+from mrjob.hadoop import HadoopJobRunner
+from mrjob.hadoop import find_hadoop_streaming_jar
 
 
 class TestFindHadoopStreamingJar(TestCase):
@@ -112,6 +123,7 @@ class MockHadoopTestCase(TestCase):
         shutil.rmtree(mock_output_dir)
         os.unlink(mock_log_path)
 
+
 class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
     @setup
@@ -122,7 +134,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
-    def test_end_to_end(self):
+    def _test_end_to_end(self, args=()):
         # read from STDIN, a local file, and a remote file
         stdin = StringIO('foo\nbar\n')
 
@@ -143,16 +155,21 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
                                '--no-conf', '--hadoop-arg', '-libjar',
-                               '--hadoop-arg', 'containsJars.jar',
-                               '-', local_input_path, remote_input_path,
-                               '--hadoop-input-format', 'FooFormat',
-                               '--hadoop-output-format', 'BarFormat'])
+                               '--hadoop-arg', 'containsJars.jar'] + list(args)
+                              + ['-', local_input_path, remote_input_path]
+                              + ['--hadoop-input-format', 'FooFormat']
+                              + ['--hadoop-output-format', 'BarFormat']
+                              + ['--jobconf', 'x=y'])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
         results = []
 
-        with mr_job.make_runner() as runner:
+        # don't care that --hadoop-*-format is deprecated
+        with logger_disabled('mrjob.job'):
+            runner = mr_job.make_runner()
+
+        with runner as runner:  # i.e. call cleanup when we're done
             assert isinstance(runner, HadoopJobRunner)
             runner.run()
 
@@ -212,6 +229,92 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             assert_in('-mapper', args)
             assert_lt(args.index('-libjar'), args.index('-mapper'))
 
+        # make sure -jobconf made it through
+        assert_in('-D', step_0_args)
+
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)
         assert not any(runner.ls(runner.get_output_dir()))
+
+    def test_end_to_end(self):
+        self._test_end_to_end()
+
+    def test_end_to_end_with_explicit_hadoop_bin(self):
+        self._test_end_to_end(['--hadoop-bin', self.hadoop_bin])
+
+
+class TestCat(MockHadoopTestCase):
+
+    @setup
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    @teardown
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def test_cat_uncompressed(self):
+        local_input_path = os.path.join(self.tmp_dir, 'input')
+        with open(local_input_path, 'w') as input_file:
+            input_file.write('bar\nfoo\n')
+
+        input_to_upload = os.path.join(self.tmp_dir, 'remote_input')
+        with open(input_to_upload, 'w') as input_to_upload_file:
+            input_to_upload_file.write('foo\nfoo\n')
+        remote_input_path = 'hdfs:///data/foo'
+        check_call([self.hadoop_bin,
+                    'fs', '-put', input_to_upload, remote_input_path])
+
+        with HadoopJobRunner(cleanup=['NONE']) as runner:
+            local_output = []
+            for line in runner.cat(local_input_path):
+                local_output.append(line)
+
+            remote_output = []
+            for line in runner.cat(remote_input_path):
+                remote_output.append(line)
+
+        assert_equal(local_output, ['bar\n', 'foo\n'])
+        assert_equal(remote_output, ['foo\n', 'foo\n'])
+
+    def test_cat_compressed(self):
+        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz = gzip.GzipFile(input_gz_path, 'w')
+        input_gz.write('foo\nbar\n')
+        input_gz.close()
+
+        with HadoopJobRunner(cleanup=['NONE']) as runner:
+            output = []
+            for line in runner.cat(input_gz_path):
+                output.append(line)
+
+        assert_equal(output, ['foo\n', 'bar\n'])
+
+        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
+        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
+        input_bz2.write('bar\nbar\nfoo\n')
+        input_bz2.close()
+
+        with HadoopJobRunner(cleanup=['NONE']) as runner:
+            output = []
+            for line in runner.cat(input_bz2_path):
+                output.append(line)
+
+        assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
+
+
+class TestURIs(MockHadoopTestCase):
+
+    def test_uris(self):
+        runner = HadoopJobRunner()
+        list(runner.ls('hdfs://tmp/waffles'))
+        list(runner.ls('lego://my/ego'))
+        list(runner.ls('/tmp'))
+
+        with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
+            hadoop_cmd_args = [shlex.split(line) for line in mock_log]
+
+        assert_equal(hadoop_cmd_args, [
+            ['fs', '-lsr', 'hdfs://tmp/waffles'],
+            ['fs', '-lsr', 'lego://my/ego'],
+        ])

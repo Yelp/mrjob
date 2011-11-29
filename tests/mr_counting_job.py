@@ -14,6 +14,7 @@
 """Trivial multi-step job for testing counter behavior"""
 from mrjob.job import MRJob
 
+
 class MRCountingJob(MRJob):
 
     def steps(self):
@@ -25,6 +26,6 @@ class MRCountingJob(MRJob):
         self.increment_counter('group', 'counter_name', 1)
         yield _, value
 
+
 if __name__ == '__main__':
     MRCountingJob.run()
-

@@ -304,8 +304,8 @@ class LocalMRJobRunner(MRJobRunner):
         # Helper functions:
         def create_outfile(orig_name='', start=''):
             # create a new output file and initialize its properties dict
-            outfile_name = (tmp_directory +
-                            '/input_part-%05d' % len(file_names))
+            outfile_name = os.path.join(tmp_directory,
+                                        'input_part-%05d' % len(file_names))
             new_file = defaultdict(str)
             new_file['orig_name'] = orig_name
             new_file['start'] = start

@@ -21,7 +21,6 @@ import logging
 import os
 import shutil
 import stat
-from subprocess import list2cmdline
 from subprocess import Popen
 from subprocess import PIPE
 import sys
@@ -32,6 +31,7 @@ from mrjob.conf import combine_local_envs
 from mrjob.parse import find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
+from mrjob.util import cmd_line
 from mrjob.util import read_input
 from mrjob.util import unarchive
 
@@ -543,9 +543,9 @@ class LocalMRJobRunner(MRJobRunner):
         """
         if combiner_args:
             log.info('> %s | sort | %s' %
-                     (list2cmdline(args), list2cmdline(combiner_args)))
+                     (cmd_line(args), cmd_line(combiner_args)))
         else:
-            log.info('> %s' % list2cmdline(args))
+            log.info('> %s' % cmd_line(args))
 
         # set up outfile
         outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)

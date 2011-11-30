@@ -160,7 +160,10 @@ class InlineMRJobRunner(MRJobRunner):
         shutil.move(self._prev_outfile, self._final_outfile)
 
     def _get_steps(self):
-        return self._mrjob_cls()._steps_desc()
+        """Redefine this so that we can get step descriptions without
+        calling a subprocess."""
+        job_args = ['--steps'] + self._mr_job_extra_args(local=True)
+        return self._mrjob_cls(job_args)._steps_desc()
 
     def _invoke_inline_mrjob(self, step_number, outfile_name, is_mapper=False,
                              is_reducer=False, is_combiner=False,

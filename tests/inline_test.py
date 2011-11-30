@@ -26,7 +26,9 @@ from testify import teardown
 import tempfile
 
 from mrjob.conf import dump_mrjob_conf
+from mrjob.job import MRJob
 from mrjob.inline import InlineMRJobRunner
+from mrjob.protocol import JSONValueProtocol
 from tests.mr_cmdenv_test import MRCmdenvTest
 from tests.mr_two_step_job import MRTwoStepJob
 
@@ -127,5 +129,43 @@ class InlineMRJobRunnerCmdenvTest(TestCase):
         assert_equal(old_env, os.environ)
 
 
-class TimeoutException(Exception):
-    pass
+# this doesn't need to be in its own file because it'll be run inline
+class MRIncrementerJob(MRJob):
+    """A terribly silly way to add a positive integer to values."""
+
+    INPUT_PROTOCOL = JSONValueProtocol
+    OUTPUT_PROTOCOL = JSONValueProtocol
+
+    def configure_options(self):
+        super(MRIncrementerJob, self).configure_options()
+
+        self.add_passthrough_option('--times', type='int', default=1)
+
+    def mapper(self, _, value):
+        yield None, value + 1
+
+    def steps(self):
+        return [self.mr(self.mapper)] * self.options.times
+
+
+class InlineRunnerStepsTestCase(TestCase):
+    # make sure file options get passed to --steps in inline mode
+
+    def test_adding_2(self):
+        stdin = ['0\n', '1\n', '2\n']
+        mr_job = MRIncrementerJob(
+            ['--no-conf', '-r', 'inline', '--times', '2'])
+        mr_job.sandbox(stdin=stdin)
+
+        assert_equal(len(mr_job.steps()), 2)
+
+        with mr_job.make_runner() as runner:
+            assert isinstance(runner, InlineMRJobRunner)
+            assert_equal(runner._get_steps(), ['M', 'M'])
+
+            runner.run()
+
+            output = sorted(mr_job.parse_output_line(line)[1]
+                            for line in runner.stream_output())
+
+            assert_equal(output, [2, 3, 4])

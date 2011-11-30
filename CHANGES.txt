@@ -1,9 +1,9 @@
-v0.3.0, 2011-11-?? -- Worth the wait
+v0.3.0, 2011-12-02 -- Worth the wait
  * Configuration:
    * Saner mrjob.conf locations (Issue #97):
      * ~/.mrjob is deprecated in favor of ~/.mrjob.conf
      * searching in PYTHONPATH is deprecated
-     * MRJOB_CONF environment variable for custom
+     * MRJOB_CONF environment variable for custom paths
  * Defining Jobs (MRJob):
    * Combiner support (Issue #74)
    * *_init() and *_final() methods for mappers, combiners, and reducers

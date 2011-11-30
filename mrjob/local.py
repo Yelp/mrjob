@@ -559,11 +559,11 @@ class LocalMRJobRunner(MRJobRunner):
                 # set up a pipeline: mapper | sort | combiner
                 mapper_proc = Popen(args, stdout=PIPE, stderr=PIPE,
                                     cwd=self._working_dir, env=env)
-                
+
                 sort_proc = Popen(['sort'], stdin=mapper_proc.stdout,
                                   stdout=PIPE, stderr=PIPE,
                                   cwd=self._working_dir, env=env)
-    
+
                 combiner_proc = Popen(combiner_args, stdin=sort_proc.stdout,
                                       stdout=write_to, stderr=PIPE,
                                       cwd=self._working_dir, env=env)
@@ -571,7 +571,7 @@ class LocalMRJobRunner(MRJobRunner):
                 # this process shouldn't read from the pipes
                 mapper_proc.stdout.close()
                 sort_proc.stdout.close()
-    
+
                 return [
                     {'proc': mapper_proc, 'args': args},
                     {'proc': sort_proc, 'args': ['sort']},

@@ -28,7 +28,7 @@ import hashlib
 import itertools
 import logging
 import os
-import pipes
+import subprocess
 import sys
 import tarfile
 import zipfile
@@ -54,11 +54,10 @@ def buffer_iterator_to_line_iterator(iterator):
                 return
 
 
-def cmd_line(args):
-    """build a command line that works in a shell.
-    """
-    args = [str(x) for x in args]
-    return ' '.join(pipes.quote(x) for x in args)
+#: DEPRECATED: Build a command line that works in a shell.
+#: This is now just an alias for :py:func:`subprocess.list2cmdline`, which
+#: you should call directly. This is going away in mrjob v0.4.
+cmd_line = subprocess.list2cmdline
 
 
 def extract_dir_for_tar(archive_path, compression='gz'):

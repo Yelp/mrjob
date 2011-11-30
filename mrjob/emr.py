@@ -24,6 +24,7 @@ import re
 import shlex
 import signal
 import socket
+from subprocess import list2cmdline
 from subprocess import Popen
 from subprocess import PIPE
 import time
@@ -78,7 +79,6 @@ from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_URI_RE
 from mrjob.util import buffer_iterator_to_line_iterator
-from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import hash_object
 from mrjob.util import read_file
@@ -978,7 +978,7 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['ssh_tunnel_is_open']:
                 args.extend(['-g', '-4'])  # -4: listen on IPv4 only
             args.append('hadoop@' + host)
-            log.debug('> %s' % cmd_line(args))
+            log.debug('> %s' % list2cmdline(args))
 
             ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
             time.sleep(WAIT_FOR_SSH_TO_FAIL)
@@ -1224,15 +1224,15 @@ class EMRJobRunner(MRJobRunner):
             if 'M' not in step:  # if we have an identity mapper
                 mapper = 'cat'
             else:
-                mapper = cmd_line(self._mapper_args(step_num))
+                mapper = list2cmdline(self._mapper_args(step_num))
 
             if 'C' in step:
-                combiner = cmd_line(self._combiner_args(step_num))
+                combiner = list2cmdline(self._combiner_args(step_num))
             else:
                 combiner = None
 
             if 'R' in step:  # i.e. if there is a reducer:
-                reducer = cmd_line(self._reducer_args(step_num))
+                reducer = list2cmdline(self._reducer_args(step_num))
             else:
                 reducer = None
 
@@ -1788,7 +1788,7 @@ class EMRJobRunner(MRJobRunner):
 
         contents = self._master_bootstrap_script_content()
         for line in StringIO(contents):
-            log.debug('BOOTSTRAP: ' + line.rstrip('\n'))
+            log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
         f = open(path, 'w')
         f.write(contents)

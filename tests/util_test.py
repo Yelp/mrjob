@@ -33,7 +33,6 @@ from testify import class_teardown
 from testify import setup
 from testify import teardown
 
-from mrjob.util import cmd_line
 from mrjob.util import file_ext
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import read_input
@@ -42,16 +41,6 @@ from mrjob.util import tar_and_gzip
 from mrjob.util import read_file
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import unarchive
-
-
-class CmdLineTestCase(TestCase):
-
-    def test_cmd_line(self):
-        assert_equal(cmd_line(['cut', '-f', 2, '-d', ' ']),
-                     "cut -f 2 -d ' '")
-        assert_in(cmd_line(['grep', '-e', "# DON'T USE$"]),
-                  ("grep -e \"# DON'T USE\\$\"",
-                   'grep -e \'# DON\'"\'"\'T USE$\''))
 
 
 # expand_path() is tested by tests.conf.CombineAndExpandPathsTestCase

@@ -952,6 +952,61 @@ class StepsTestCase(TestCase):
         mr_no_mapper.show_steps()
         assert_equal(mr_no_mapper.stdout.getvalue(), 'MR R\n')
 
+    def test_mapper_and_reducer_as_positional_args(self):
+        def mapper(k, v):
+            pass
+
+        def reducer(k, v):
+            pass
+
+        def combiner(k, v):
+            pass
+
+        assert_equal(MRJob.mr(mapper), MRJob.mr(mapper=mapper))
+
+        assert_equal(MRJob.mr(mapper, reducer),
+                     MRJob.mr(mapper=mapper, reducer=reducer))
+
+        assert_equal(MRJob.mr(mapper, reducer=reducer),
+                     MRJob.mr(mapper=mapper, reducer=reducer))
+
+        assert_equal(MRJob.mr(mapper, reducer, combiner=combiner),
+                     MRJob.mr(mapper=mapper, reducer=reducer,
+                              combiner=combiner))
+
+        # can't specify something as a positional and keyword arg
+        assert_raises(TypeError,
+                      MRJob.mr, mapper, mapper=mapper)
+        assert_raises(TypeError,
+                      MRJob.mr, mapper, reducer, reducer=reducer)
+
+    def test_deprecated_mapper_final_positional_arg(self):
+        def mapper(k, v):
+            pass
+
+        def reducer(k, v):
+            pass
+
+        def mapper_final():
+            pass
+
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.job', stderr)
+            step = MRJob.mr(mapper, reducer, mapper_final)
+
+        # should be allowed to specify mapper_final as a positional arg,
+        # but we log a warning
+        assert_equal(step, MRJob.mr(mapper=mapper,
+                                    reducer=reducer,
+                                    mapper_final=mapper_final))
+        assert_in('mapper_final should be specified', stderr.getvalue())
+
+        # can't specify mapper_final as a positional and keyword arg
+        assert_raises(
+            TypeError,
+            MRJob.mr, mapper, reducer, mapper_final, mapper_final=mapper_final)
+
 
 class StepNumTestCase(TestCase):
 
@@ -1287,19 +1342,25 @@ class RunJobTestCase(TestCase):
 
     def test_quiet(self):
         stdout, stderr, returncode = self.run_job(['-q'])
-        assert_equal(stdout, '2\t"bar"\n1\t"foo"\n3\tnull\n')
+        assert_equal(sorted(StringIO(stdout)), ['1\t"foo"\n',
+                                                '2\t"bar"\n',
+                                                '3\tnull\n'])
         assert_equal(stderr, '')
         assert_equal(returncode, 0)
 
     def test_verbose(self):
         stdout, stderr, returncode = self.run_job()
-        assert_equal(stdout, '2\t"bar"\n1\t"foo"\n3\tnull\n')
+        assert_equal(sorted(StringIO(stdout)), ['1\t"foo"\n',
+                                                '2\t"bar"\n',
+                                                '3\tnull\n'])
         assert_not_equal(stderr, '')
         assert_equal(returncode, 0)
         normal_stderr = stderr
 
         stdout, stderr, returncode = self.run_job(['-v'])
-        assert_equal(stdout, '2\t"bar"\n1\t"foo"\n3\tnull\n')
+        assert_equal(sorted(StringIO(stdout)), ['1\t"foo"\n',
+                                                '2\t"bar"\n',
+                                                '3\tnull\n'])
         assert_not_equal(stderr, '')
         assert_equal(returncode, 0)
         assert_gt(len(stderr), len(normal_stderr))

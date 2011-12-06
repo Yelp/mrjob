@@ -130,6 +130,20 @@ from mrjob.util import read_input
 log = logging.getLogger('mrjob.job')
 
 
+# all the parameters you can specify when definining a job step
+_JOB_STEP_PARAMS = (
+    'combiner',
+    'combiner_init',
+    'combiner_final',
+    'mapper',
+    'mapper_init',
+    'mapper_final',
+    'reducer',
+    'reducer_init',
+    'reducer_final',
+)
+
+
 # used by mr() below, to fake no mapper
 def _IDENTITY_MAPPER(key, value):
     yield key, value
@@ -361,32 +375,23 @@ class MRJob(object):
 
         :return: a list of steps constructed with :py:meth:`mr`
         """
-        # Use mapper(), mapper_final(), and reducer() only if they've been
-        # re-defined
+        # Use mapper(), reducer() etc. only if they've been re-defined
         kwargs = dict((func_name, getattr(self, func_name))
-                      for func_name in ('mapper',
-                                        'mapper_init',
-                                        'mapper_final',
-                                        'reducer',
-                                        'reducer_init',
-                                        'reducer_final',
-                                        'combiner',
-                                        'combiner_init',
-                                        'combiner_final')
+                      for func_name in _JOB_STEP_PARAMS
                       if (getattr(self, func_name).im_func is not
                           getattr(MRJob, func_name).im_func))
 
         return [self.mr(**kwargs)]
 
     @classmethod
-    def mr(cls, mapper=None, reducer=None, combiner=None,
-           mapper_init=None, mapper_final=None,
-           reducer_init=None, reducer_final=None,
-           combiner_init=None, combiner_final=None):
+    def mr(cls, mapper=None, reducer=None, _mapper_final=None, **kwargs):
         """Define a step (mapper, reducer, and/or any combination of
         mapper_init, reducer_final, etc.) for your job.
 
         Used by :py:meth:`steps`. (Don't re-define this, just call it!)
+
+        Accepts the following keyword arguments. For convenience, you may
+        specify *mapper* and *reducer* as positional arguments as well.
 
         :param mapper: function with same function signature as
                        :py:meth:`mapper`, or ``None`` for an identity mapper.
@@ -396,36 +401,49 @@ class MRJob(object):
                          :py:meth:`combiner`, or ``None`` for no combiner.
         :param mapper_init: function with same function signature as
                             :py:meth:`mapper_init`, or ``None`` for no initial
-                            mapper action. Please invoke this as a keyword
-                            argument.
+                            mapper action.
         :param mapper_final: function with same function signature as
                              :py:meth:`mapper_final`, or ``None`` for no final
-                             mapper action. Please invoke this as a keyword
-                             argument.
+                             mapper action.
         :param reducer_init: function with same function signature as
                              :py:meth:`reducer_init`, or ``None`` for no
-                             initial reducer action. Please invoke this as a
-                             keyword argument.
+                             initial reducer action.
         :param reducer_final: function with same function signature as
                               :py:meth:`reducer_final`, or ``None`` for no
-                              final reducer action. Please invoke this as a
-                              keyword argument.
+                              final reducer action.
         :param combiner_init: function with same function signature as
                               :py:meth:`combiner_init`, or ``None`` for no
-                              initial combiner action. Please invoke this as a
-                              keyword argument.
+                              initial combiner action.
         :param combiner_final: function with same function signature as
                                :py:meth:`combiner_final`, or ``None`` for no
-                               final combiner action. Please invoke this as a
-                               keyword argument.
+                               final combiner action.
 
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.
         """
-        step = dict(mapper=mapper, reducer=reducer, combiner=combiner,
-                    mapper_init=mapper_init, mapper_final=mapper_final,
-                    reducer_init=reducer_init, reducer_final=reducer_final,
-                    combiner_init=combiner_init, combiner_final=combiner_final)
+        # limit which keyword args can be specified
+        bad_kwargs = sorted(set(kwargs) - set(_JOB_STEP_PARAMS))
+        if bad_kwargs:
+            raise TypeError(
+                'mr() got an unexpected keyword argument %r' % bad_kwargs[0])
+
+        # handle incorrect usage of positional args. This was wrong in mrjob
+        # v0.2 as well, but we didn't issue a warning.
+        if _mapper_final is not None:
+            if 'mapper_final' in kwargs:
+                raise TypeError("mr() got multiple values for keyword argument"
+                                " 'mapper_final'")
+            else:
+                log.warn(
+                    'mapper_final should be specified as a keyword argument to'
+                    ' mr(), not a positional argument. This will be required'
+                    ' in mrjob 0.4.')
+                kwargs['mapper_final'] = _mapper_final
+
+        step = dict((f, None) for f in _JOB_STEP_PARAMS)
+        step['mapper'] = mapper
+        step['reducer'] = reducer
+        step.update(kwargs)
 
         if not any(step.itervalues()):
             raise Exception("Step has no mappers and no reducers")

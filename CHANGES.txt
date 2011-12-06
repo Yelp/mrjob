@@ -1,4 +1,4 @@
-v0.3.0, 2011-12-02 -- Worth the wait
+v0.3.0, 2011-12-07 -- Worth the wait
  * Configuration:
    * Saner mrjob.conf locations (Issue #97):
      * ~/.mrjob is deprecated in favor of ~/.mrjob.conf

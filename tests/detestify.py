@@ -5,7 +5,9 @@
 - You use a subset of testify asserts (easy to add to)
 - You don't use testify.run() (would be easy to add)
 
-This also doesn't handle blockquotes correctly.
+This also doesn't handle blockquotes correctly. It also doesn't correctly
+match # comments with the next function (basically its indent handling is
+bad).
 
 And doubtless some other stuff.
 """

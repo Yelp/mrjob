@@ -26,16 +26,12 @@ import stat
 from subprocess import CalledProcessError
 import sys
 import tarfile
-from testify import TestCase
-from testify import assert_equal
-from testify import assert_in
-from testify import assert_gte
-from testify import assert_lte
-from testify import assert_not_in
-from testify import assert_raises
-from testify import setup
-from testify import teardown
 import tempfile
+
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
@@ -48,13 +44,17 @@ from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 
 
-class WithStatementTestCase(TestCase):
+class WithStatementTestCase(unittest.TestCase):
 
-    @setup
+    def setUp(self):
+        self.setup_ivars()
+
+    def tearDown(self):
+        self.delete_tmpdir()
+
     def setup_ivars(self):
         self.local_tmp_dir = None
 
-    @teardown
     def delete_tmpdir(self):
         if self.local_tmp_dir:
             shutil.rmtree(self.local_tmp_dir)
@@ -65,7 +65,7 @@ class WithStatementTestCase(TestCase):
             self.local_tmp_dir = runner._get_local_tmp_dir()
             assert os.path.exists(self.local_tmp_dir)
 
-        assert_equal(os.path.exists(self.local_tmp_dir), should_exist)
+        self.assertEqual(os.path.exists(self.local_tmp_dir), should_exist)
         if not should_exist:
             self.local_tmp_dir = None
 
@@ -85,10 +85,10 @@ class WithStatementTestCase(TestCase):
         self._test_cleanup_after_with_statement(['NONE'], True)
 
     def test_cleanup_error(self):
-        assert_raises(ValueError, self._test_cleanup_after_with_statement,
-                      ['NONE', 'ALL'], True)
-        assert_raises(ValueError, self._test_cleanup_after_with_statement,
-                      ['GARBAGE'], True)
+        self.assertRaises(ValueError, self._test_cleanup_after_with_statement,
+                          ['NONE', 'ALL'], True)
+        self.assertRaises(ValueError, self._test_cleanup_after_with_statement,
+                          ['GARBAGE'], True)
 
     def test_double_none_okay(self):
         self._test_cleanup_after_with_statement(['NONE', 'NONE'], True)
@@ -101,18 +101,23 @@ class WithStatementTestCase(TestCase):
                 self.local_tmp_dir = runner._get_local_tmp_dir()
                 assert os.path.exists(self.local_tmp_dir)
 
-            assert_equal(os.path.exists(self.local_tmp_dir), False)
+            self.assertEqual(os.path.exists(self.local_tmp_dir), False)
             self.local_tmp_dir = None
-            assert_in('deprecated', stderr.getvalue())
+            self.assertIn('deprecated', stderr.getvalue())
 
     def test_cleanup_not_supported(self):
-        assert_raises(ValueError,
-                      LocalMRJobRunner, cleanup_on_failure=CLEANUP_DEFAULT)
+        self.assertRaises(ValueError,
+                          LocalMRJobRunner, cleanup_on_failure=CLEANUP_DEFAULT)
 
 
-class TestExtraKwargs(TestCase):
+class TestExtraKwargs(unittest.TestCase):
 
-    @setup
+    def setUp(self):
+        self.make_mrjob_conf()
+
+    def tearDown(self):
+        self.delete_mrjob_conf()
+
     def make_mrjob_conf(self):
         _, self.mrjob_conf_path = tempfile.mkstemp(prefix='mrjob.conf.')
         # include one fake kwarg, and one real one
@@ -121,39 +126,43 @@ class TestExtraKwargs(TestCase):
         with open(self.mrjob_conf_path, 'w') as conf_file:
             self.mrjob_conf = dump_mrjob_conf(conf, conf_file)
 
-    @teardown
     def delete_mrjob_conf(self):
         os.unlink(self.mrjob_conf_path)
 
     def test_extra_kwargs_in_mrjob_conf_okay(self):
         with logger_disabled('mrjob.runner'):
             with LocalMRJobRunner(conf_path=self.mrjob_conf_path) as runner:
-                assert_equal(runner._opts['setup_cmds'], ['echo foo'])
-                assert_not_in('qux', runner._opts)
+                self.assertEqual(runner._opts['setup_cmds'], ['echo foo'])
+                self.assertNotIn('qux', runner._opts)
 
     def test_extra_kwargs_passed_in_directly_okay(self):
         with logger_disabled('mrjob.runner'):
             with LocalMRJobRunner(
                 conf_path=False, base_tmp_dir='/var/tmp', foo='bar') as runner:
-                assert_equal(runner._opts['base_tmp_dir'], '/var/tmp')
-                assert_not_in('bar', runner._opts)
+                self.assertEqual(runner._opts['base_tmp_dir'], '/var/tmp')
+                self.assertNotIn('bar', runner._opts)
 
 
-class TestJobName(TestCase):
+class TestJobName(unittest.TestCase):
 
-    @setup
+    def setUp(self):
+        self.blank_out_environment()
+        self.monkey_patch_getuser()
+
+    def tearDown(self):
+        self.restore_getuser()
+        self.restore_environment()
+
     def blank_out_environment(self):
         self._old_environ = os.environ.copy()
         # don't do os.environ = {}! This won't actually set environment
         # variables; it just monkey-patches os.environ
         os.environ.clear()
 
-    @teardown
     def restore_environment(self):
         os.environ.clear()
         os.environ.update(self._old_environ)
 
-    @setup
     def monkey_patch_getuser(self):
         self._real_getuser = getpass.getuser
         self.getuser_should_fail = False
@@ -166,7 +175,6 @@ class TestJobName(TestCase):
 
         getpass.getuser = fake_getuser
 
-    @teardown
     def restore_getuser(self):
         getpass.getuser = self._real_getuser
 
@@ -174,31 +182,31 @@ class TestJobName(TestCase):
         runner = LocalMRJobRunner(conf_path=False)
         match = JOB_NAME_RE.match(runner.get_job_name())
 
-        assert_equal(match.group(1), 'no_script')
-        assert_equal(match.group(2), getpass.getuser())
+        self.assertEqual(match.group(1), 'no_script')
+        self.assertEqual(match.group(2), getpass.getuser())
 
     def test_empty_no_user(self):
         self.getuser_should_fail = True
         runner = LocalMRJobRunner(conf_path=False)
         match = JOB_NAME_RE.match(runner.get_job_name())
 
-        assert_equal(match.group(1), 'no_script')
-        assert_equal(match.group(2), 'no_user')
+        self.assertEqual(match.group(1), 'no_script')
+        self.assertEqual(match.group(2), 'no_user')
 
     def test_auto_label(self):
         runner = MRTwoStepJob(['--no-conf']).make_runner()
         match = JOB_NAME_RE.match(runner.get_job_name())
 
-        assert_equal(match.group(1), 'mr_two_step_job')
-        assert_equal(match.group(2), getpass.getuser())
+        self.assertEqual(match.group(1), 'mr_two_step_job')
+        self.assertEqual(match.group(2), getpass.getuser())
 
     def test_auto_owner(self):
         os.environ['USER'] = 'mcp'
         runner = LocalMRJobRunner(conf_path=False)
         match = JOB_NAME_RE.match(runner.get_job_name())
 
-        assert_equal(match.group(1), 'no_script')
-        assert_equal(match.group(2), 'mcp')
+        self.assertEqual(match.group(1), 'no_script')
+        self.assertEqual(match.group(2), 'mcp')
 
     def test_auto_everything(self):
         test_start = datetime.datetime.utcnow()
@@ -207,33 +215,34 @@ class TestJobName(TestCase):
         runner = MRTwoStepJob(['--no-conf']).make_runner()
         match = JOB_NAME_RE.match(runner.get_job_name())
 
-        assert_equal(match.group(1), 'mr_two_step_job')
-        assert_equal(match.group(2), 'mcp')
+        self.assertEqual(match.group(1), 'mr_two_step_job')
+        self.assertEqual(match.group(2), 'mcp')
 
         job_start = datetime.datetime.strptime(
             match.group(3) + match.group(4), '%Y%m%d%H%M%S')
         job_start = job_start.replace(microsecond=int(match.group(5)))
-        assert_gte(job_start, test_start)
-        assert_lte(job_start - test_start, datetime.timedelta(seconds=5))
+        self.assertGreaterEqual(job_start, test_start)
+        self.assertLessEqual(job_start - test_start,
+                             datetime.timedelta(seconds=5))
 
     def test_owner_and_label_switches(self):
         runner_opts = ['--no-conf', '--owner=ads', '--label=ads_chain']
         runner = MRTwoStepJob(runner_opts).make_runner()
         match = JOB_NAME_RE.match(runner.get_job_name())
 
-        assert_equal(match.group(1), 'ads_chain')
-        assert_equal(match.group(2), 'ads')
+        self.assertEqual(match.group(1), 'ads_chain')
+        self.assertEqual(match.group(2), 'ads')
 
     def test_owner_and_label_kwargs(self):
         runner = LocalMRJobRunner(conf_path=False,
                                   owner='ads', label='ads_chain')
         match = JOB_NAME_RE.match(runner.get_job_name())
 
-        assert_equal(match.group(1), 'ads_chain')
-        assert_equal(match.group(2), 'ads')
+        self.assertEqual(match.group(1), 'ads_chain')
+        self.assertEqual(match.group(2), 'ads')
 
 
-class CreateMrjobTarGzTestCase(TestCase):
+class CreateMrjobTarGzTestCase(unittest.TestCase):
 
     def test_create_mrjob_tar_gz(self):
         with LocalMRJobRunner(conf_path=False) as runner:
@@ -242,74 +251,74 @@ class CreateMrjobTarGzTestCase(TestCase):
             contents = mrjob_tar_gz.getnames()
 
             for path in contents:
-                assert_equal(path[:6], 'mrjob/')
+                self.assertEqual(path[:6], 'mrjob/')
 
-            assert_in('mrjob/job.py', contents)
+            self.assertIn('mrjob/job.py', contents)
 
 
-class TestHadoopConfArgs(TestCase):
+class TestHadoopConfArgs(unittest.TestCase):
 
     def test_empty(self):
         runner = LocalMRJobRunner(conf_path=False)
-        assert_equal(runner._hadoop_conf_args(0, 1), [])
+        self.assertEqual(runner._hadoop_conf_args(0, 1), [])
 
     def test_hadoop_extra_args(self):
         extra_args = ['-foo', 'bar']
         runner = LocalMRJobRunner(conf_path=False,
                                   hadoop_extra_args=extra_args)
-        assert_equal(runner._hadoop_conf_args(0, 1), extra_args)
+        self.assertEqual(runner._hadoop_conf_args(0, 1), extra_args)
 
     def test_cmdenv(self):
         cmdenv = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
         runner = LocalMRJobRunner(conf_path=False, cmdenv=cmdenv)
-        assert_equal(runner._hadoop_conf_args(0, 1),
-                     ['-cmdenv', 'BAX=Arnold',
-                      '-cmdenv', 'BAZ=qux',
-                      '-cmdenv', 'FOO=bar',
-                      ])
+        self.assertEqual(runner._hadoop_conf_args(0, 1),
+                         ['-cmdenv', 'BAX=Arnold',
+                          '-cmdenv', 'BAZ=qux',
+                          '-cmdenv', 'FOO=bar',
+                          ])
 
     def test_hadoop_input_format(self):
         format = 'org.apache.hadoop.mapred.SequenceFileInputFormat'
         runner = LocalMRJobRunner(conf_path=False, hadoop_input_format=format)
-        assert_equal(runner._hadoop_conf_args(0, 1),
-                     ['-inputformat', format])
+        self.assertEqual(runner._hadoop_conf_args(0, 1),
+                         ['-inputformat', format])
         # test multi-step job
-        assert_equal(runner._hadoop_conf_args(0, 2),
-                     ['-inputformat', format])
-        assert_equal(runner._hadoop_conf_args(1, 2), [])
+        self.assertEqual(runner._hadoop_conf_args(0, 2),
+                         ['-inputformat', format])
+        self.assertEqual(runner._hadoop_conf_args(1, 2), [])
 
     def test_hadoop_output_format(self):
         format = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
         runner = LocalMRJobRunner(conf_path=False, hadoop_output_format=format)
-        assert_equal(runner._hadoop_conf_args(0, 1),
-                     ['-outputformat', format])
+        self.assertEqual(runner._hadoop_conf_args(0, 1),
+                         ['-outputformat', format])
         # test multi-step job
-        assert_equal(runner._hadoop_conf_args(0, 2), [])
-        assert_equal(runner._hadoop_conf_args(1, 2),
+        self.assertEqual(runner._hadoop_conf_args(0, 2), [])
+        self.assertEqual(runner._hadoop_conf_args(1, 2),
                      ['-outputformat', format])
 
     def test_jobconf(self):
         jobconf = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
         runner = LocalMRJobRunner(conf_path=False, jobconf=jobconf)
-        assert_equal(runner._hadoop_conf_args(0, 1),
-                     ['-D', 'BAX=Arnold',
-                      '-D', 'BAZ=qux',
-                      '-D', 'FOO=bar',
-                      ])
+        self.assertEqual(runner._hadoop_conf_args(0, 1),
+                         ['-D', 'BAX=Arnold',
+                          '-D', 'BAZ=qux',
+                          '-D', 'FOO=bar',
+                          ])
         runner = LocalMRJobRunner(conf_path=False, jobconf=jobconf,
                                   hadoop_version='0.18')
-        assert_equal(runner._hadoop_conf_args(0, 1),
-                     ['-jobconf', 'BAX=Arnold',
-                      '-jobconf', 'BAZ=qux',
-                      '-jobconf', 'FOO=bar',
-                      ])
+        self.assertEqual(runner._hadoop_conf_args(0, 1),
+                         ['-jobconf', 'BAX=Arnold',
+                          '-jobconf', 'BAZ=qux',
+                          '-jobconf', 'FOO=bar',
+                          ])
 
     def test_partitioner(self):
         partitioner = 'org.apache.hadoop.mapreduce.Partitioner'
 
         runner = LocalMRJobRunner(conf_path=False, partitioner=partitioner)
-        assert_equal(runner._hadoop_conf_args(0, 1),
-                     ['-partitioner', partitioner])
+        self.assertEqual(runner._hadoop_conf_args(0, 1),
+                         ['-partitioner', partitioner])
 
     def test_hadoop_extra_args_comes_first(self):
         runner = LocalMRJobRunner(
@@ -323,17 +332,21 @@ class TestHadoopConfArgs(TestCase):
         )
         # hadoop_extra_args should come first
         conf_args = runner._hadoop_conf_args(0, 1)
-        assert_equal(conf_args[:2], ['-libjar', 'qux.jar'])
-        assert_equal(len(conf_args), 12)
+        self.assertEqual(conf_args[:2], ['-libjar', 'qux.jar'])
+        self.assertEqual(len(conf_args), 12)
 
 
-class TestCat(TestCase):
+class TestCat(unittest.TestCase):
 
-    @setup
+    def setUp(self):
+        self.make_tmp_dir()
+
+    def tearDown(self):
+        self.rm_tmp_dir()
+
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -347,7 +360,7 @@ class TestCat(TestCase):
             for line in runner.cat(input_path):
                 output.append(line)
 
-        assert_equal(output, ['bar\n', 'foo\n'])
+        self.assertEqual(output, ['bar\n', 'foo\n'])
 
     def test_cat_compressed(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
@@ -360,7 +373,7 @@ class TestCat(TestCase):
             for line in runner.cat(input_gz_path):
                 output.append(line)
 
-        assert_equal(output, ['foo\n', 'bar\n'])
+        self.assertEqual(output, ['foo\n', 'bar\n'])
 
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
         input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
@@ -372,18 +385,22 @@ class TestCat(TestCase):
             for line in runner.cat(input_bz2_path):
                 output.append(line)
 
-        assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
+        self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
 
 
-class TestStreamingOutput(TestCase):
+class TestStreamingOutput(unittest.TestCase):
 
-    @setup
+    def setUp(self):
+        self.make_tmp_dir()
+
+    def tearDown(self):
+        self.rm_tmp_dir()
+
     def make_tmp_dir(self):
         # use a leading underscore to test behavior of underscore-ignoring
         # code that shouldn't ignore the entire output_dir
         self.tmp_dir = tempfile.mkdtemp(prefix='_streamingtest')
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -419,13 +436,20 @@ class TestStreamingOutput(TestCase):
 
         runner = LocalMRJobRunner()
         runner._output_dir = self.tmp_dir
-        assert_equal(sorted(runner.stream_output()),
-                     ['A', 'B', 'C'])
+        self.assertEqual(sorted(runner.stream_output()),
+                         ['A', 'B', 'C'])
 
 
-class TestInvokeSort(TestCase):
+class TestInvokeSort(unittest.TestCase):
 
-    @setup
+    def setUp(self):
+        self.make_tmp_dir_and_set_up_files()
+        self.save_environment()
+
+    def tearDown(self):
+        self.restore_environment()
+        self.rm_tmp_dir()
+
     def make_tmp_dir_and_set_up_files(self):
         self.tmp_dir = tempfile.mkdtemp()
 
@@ -443,15 +467,12 @@ class TestInvokeSort(TestCase):
 
         self.out = os.path.join(self.tmp_dir, 'out')
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
-    @setup
     def save_environment(self):
         self._old_environ = os.environ.copy()
 
-    @teardown
     def restore_environment(self):
         os.environ.clear()
         os.environ.update(self._old_environ)
@@ -503,29 +524,29 @@ sys.exit(13)
 
     def test_no_files(self):
         runner = MRJobRunner(conf_path=False)
-        assert_raises(ValueError,
-                      runner._invoke_sort, [], self.out)
+        self.assertRaises(ValueError,
+                          runner._invoke_sort, [], self.out)
 
     def test_one_file(self):
         runner = MRJobRunner(conf_path=False)
         runner._invoke_sort([self.a], self.out)
 
-        assert_equal(list(open(self.out)),
-                     ['A\n',
-                      'alligator\n',
-                      'apple\n'])
+        self.assertEqual(list(open(self.out)),
+                         ['A\n',
+                          'alligator\n',
+                          'apple\n'])
 
     def test_two_files(self):
         runner = MRJobRunner(conf_path=False)
         runner._invoke_sort([self.a, self.b], self.out)
 
-        assert_equal(list(open(self.out)),
-                     ['A\n',
-                      'B\n',
-                      'alligator\n',
-                      'apple\n',
-                      'ball\n',
-                      'banana\n'])
+        self.assertEqual(list(open(self.out)),
+                         ['A\n',
+                          'B\n',
+                          'alligator\n',
+                          'apple\n',
+                          'ball\n',
+                          'banana\n'])
 
     def test_windows_sort_on_one_file(self):
         self.use_simulated_windows_sort()
@@ -539,5 +560,5 @@ sys.exit(13)
         self.use_bad_sort()
 
         runner = MRJobRunner(conf_path=False)
-        assert_raises(CalledProcessError,
-                      runner._invoke_sort, [self.a, self.b], self.out)
+        self.assertRaises(CalledProcessError,
+                          runner._invoke_sort, [self.a, self.b], self.out)

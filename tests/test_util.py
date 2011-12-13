@@ -24,14 +24,11 @@ from subprocess import check_call
 from StringIO import StringIO
 import tarfile
 import tempfile
-from testify import TestCase
-from testify import assert_equal
-from testify import assert_in
-from testify import assert_raises
-from testify import class_setup
-from testify import class_teardown
-from testify import setup
-from testify import teardown
+
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
@@ -44,33 +41,35 @@ from mrjob.util import extract_dir_for_tar
 from mrjob.util import unarchive
 
 
-class CmdLineTestCase(TestCase):
+class CmdLineTestCase(unittest.TestCase):
 
     def test_cmd_line(self):
-        assert_equal(cmd_line(['cut', '-f', 2, '-d', ' ']),
-                     "cut -f 2 -d ' '")
-        assert_in(cmd_line(['grep', '-e', "# DON'T USE$"]),
-                  ("grep -e \"# DON'T USE\\$\"",
-                   'grep -e \'# DON\'"\'"\'T USE$\''))
+        self.assertEqual(cmd_line(['cut', '-f', 2, '-d', ' ']),
+                         "cut -f 2 -d ' '")
+        self.assertIn(cmd_line(['grep', '-e', "# DON'T USE$"]),
+                      ("grep -e \"# DON'T USE\\$\"",
+                       'grep -e \'# DON\'"\'"\'T USE$\''))
 
 
 # expand_path() is tested by tests.conf.CombineAndExpandPathsTestCase
 
 
-class FileExtTestCase(TestCase):
+class FileExtTestCase(unittest.TestCase):
 
     def test_file_ext(self):
-        assert_equal(file_ext('foo.zip'), '.zip')
-        assert_equal(file_ext('foo.Z'), '.Z')
-        assert_equal(file_ext('foo.tar.gz'), '.tar.gz')
-        assert_equal(file_ext('README'), '')
-        assert_equal(file_ext('README,v'), '')
-        assert_equal(file_ext('README.txt,v'), '.txt,v')
+        self.assertEqual(file_ext('foo.zip'), '.zip')
+        self.assertEqual(file_ext('foo.Z'), '.Z')
+        self.assertEqual(file_ext('foo.tar.gz'), '.tar.gz')
+        self.assertEqual(file_ext('README'), '')
+        self.assertEqual(file_ext('README,v'), '')
+        self.assertEqual(file_ext('README.txt,v'), '.txt,v')
 
 
-class OptionScrapingTestCase(TestCase):
+class OptionScrapingTestCase(unittest.TestCase):
 
-    @setup
+    def setUp(self):
+        self.setup_options()
+
     def setup_options(self):
         self.original_parser = optparse.OptionParser(
             usage="don't", description='go away')
@@ -97,10 +96,10 @@ class OptionScrapingTestCase(TestCase):
         }
         old_groups = (self.original_parser, self.original_group)
         scrape_options_into_new_groups(old_groups, assignments)
-        assert_equal(self.original_parser.option_list[1:],
-                     self.new_parser.option_list[1:])
-        assert_equal(self.original_group.option_list,
-                     self.new_group_1.option_list)
+        self.assertEqual(self.original_parser.option_list[1:],
+                         self.new_parser.option_list[1:])
+        self.assertEqual(self.original_group.option_list,
+                         self.new_group_1.option_list)
 
     def test_scrape_different(self):
         assignments = {
@@ -113,20 +112,28 @@ class OptionScrapingTestCase(TestCase):
         target_1 = self.original_group.option_list[:1]
         target_2 = self.original_group.option_list[1:]
         target_3 = self.original_parser.option_list[1:]
-        assert_equal(target_1, self.new_parser.option_list[1:])
-        assert_equal(target_2, self.new_group_1.option_list)
-        assert_equal(target_3, self.new_group_2.option_list)
+        self.assertEqual(target_1, self.new_parser.option_list[1:])
+        self.assertEqual(target_2, self.new_group_1.option_list)
+        self.assertEqual(target_3, self.new_group_2.option_list)
         options, args = self.new_parser.parse_args(['-x', 'happy'])
-        assert_equal(options.x, 'happy')
+        self.assertEqual(options.x, 'happy')
 
 
-class ReadInputTestCase(TestCase):
+class ReadInputTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.setup_tmpdir_with_beaver_data()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.delete_tmpdir()
 
     # we're going to put the same data in every file, so we don't
     # have to worry about ordering
     BEAVER_DATA = 'Beavers mate for life.\n'
 
-    @class_setup
+    @classmethod
     def setup_tmpdir_with_beaver_data(self):
         self.tmpdir = tempfile.mkdtemp()
 
@@ -145,80 +152,86 @@ class ReadInputTestCase(TestCase):
         write_beaver_data_and_close(
             open(os.path.join(self.tmpdir, 'beavers/README.txt'), 'w'))
 
-    @class_teardown
+    @classmethod
     def delete_tmpdir(self):
         shutil.rmtree(self.tmpdir)
 
     def test_stdin(self):
         lines = read_input('-', stdin=StringIO(self.BEAVER_DATA))
-        assert_equal(list(lines), [self.BEAVER_DATA])
+        self.assertEqual(list(lines), [self.BEAVER_DATA])
 
     def test_stdin_can_be_iterator(self):
         lines = read_input('-', stdin=[self.BEAVER_DATA] * 5)
-        assert_equal(list(lines), [self.BEAVER_DATA] * 5)
+        self.assertEqual(list(lines), [self.BEAVER_DATA] * 5)
 
     def test_normal_file(self):
         lines = read_input(os.path.join(self.tmpdir, 'beavers'))
-        assert_equal(list(lines), [self.BEAVER_DATA])
+        self.assertEqual(list(lines), [self.BEAVER_DATA])
 
     def test_gz_file(self):
         lines = read_input(os.path.join(self.tmpdir, 'beavers.gz'))
-        assert_equal(list(lines), [self.BEAVER_DATA])
+        self.assertEqual(list(lines), [self.BEAVER_DATA])
 
     def test_bz2_file(self):
         lines = read_input(os.path.join(self.tmpdir, 'beavers.bz2'))
-        assert_equal(list(lines), [self.BEAVER_DATA])
+        self.assertEqual(list(lines), [self.BEAVER_DATA])
 
     def test_glob(self):
         lines = read_input(os.path.join(self.tmpdir, 'beavers.*'))
-        assert_equal(list(lines), [self.BEAVER_DATA] * 3)
+        self.assertEqual(list(lines), [self.BEAVER_DATA] * 3)
 
     def test_dir(self):
         lines = read_input(os.path.join(self.tmpdir, 'beavers/'))
-        assert_equal(list(lines), [self.BEAVER_DATA])
+        self.assertEqual(list(lines), [self.BEAVER_DATA])
 
     def test_dir_recursion(self):
         lines = read_input(self.tmpdir)
-        assert_equal(list(lines), [self.BEAVER_DATA] * 4)
+        self.assertEqual(list(lines), [self.BEAVER_DATA] * 4)
 
     def test_glob_including_dir(self):
         lines = read_input(os.path.join(self.tmpdir, 'beavers*'))
-        assert_equal(list(lines), [self.BEAVER_DATA] * 4)
+        self.assertEqual(list(lines), [self.BEAVER_DATA] * 4)
 
     def test_bad_path(self):
         # read_input is a generator, so we won't get an error
         # until we try to read from it
-        assert_raises(IOError, list,
-                      read_input(os.path.join(self.tmpdir, 'lions')))
+        self.assertRaises(IOError, list,
+                          read_input(os.path.join(self.tmpdir, 'lions')))
 
     def test_bad_glob(self):
         # read_input is a generator, so we won't get an error
         # until we try to read from it
-        assert_raises(IOError, list,
-                      read_input(os.path.join(self.tmpdir, 'lions*')))
+        self.assertRaises(IOError, list,
+                          read_input(os.path.join(self.tmpdir, 'lions*')))
 
 
-class SafeEvalTestCase(TestCase):
+class SafeEvalTestCase(unittest.TestCase):
 
     def test_simple_data_structure(self):
         # try unrepr-ing a bunch of simple data structures
         for x in True, None, 1, range(5), {'foo': False, 'bar': 2}:
-            assert_equal(x, safeeval(repr(x)))
+            self.assertEqual(x, safeeval(repr(x)))
 
     def test_no_mischief(self):
         # make sure we can't do mischief
-        assert_raises(NameError, safeeval, "open('/tmp')")
+        self.assertRaises(NameError, safeeval, "open('/tmp')")
 
     def test_globals_and_locals(self):
         # test passing in globals, locals
         a = -0.2
-        assert_equal(abs(a),
-                     safeeval('abs(a)', globals={'abs': abs}, locals={'a': a}))
+        self.assertEqual(
+            abs(a),
+            safeeval('abs(a)', globals={'abs': abs}, locals={'a': a}))
 
 
-class ArchiveTestCase(TestCase):
+class ArchiveTestCase(unittest.TestCase):
 
-    @setup
+    def setUp(self):
+        self.setup_tmp_dir()
+
+    def tearDown(self):
+        self.rm_tmp_dir()
+
     def setup_tmp_dir(self):
         join = os.path.join
 
@@ -242,7 +255,6 @@ class ArchiveTestCase(TestCase):
         with open(join(self.tmp_dir, 'a', 'qux', 'quux'), 'w') as quux:
             quux.write('QUUX\n')
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -253,20 +265,20 @@ class ArchiveTestCase(TestCase):
         expected_files = ['bar', 'baz', 'foo', 'qux']
         expected_files = (set(expected_files + added_files) -
                           set(excluded_files))
-        assert_equal(sorted(os.listdir(join(self.tmp_dir, 'b'))),
-                     sorted(expected_files))
-        assert_equal(os.listdir(join(self.tmp_dir, 'b', 'qux')),
-                     ['quux'])
+        self.assertEqual(sorted(os.listdir(join(self.tmp_dir, 'b'))),
+                         sorted(expected_files))
+        self.assertEqual(os.listdir(join(self.tmp_dir, 'b', 'qux')),
+                         ['quux'])
 
         # make sure their contents are intact
         with open(join(self.tmp_dir, 'b', 'foo')) as foo:
-            assert_equal(foo.read(), 'FOO\n')
+            self.assertEqual(foo.read(), 'FOO\n')
 
         with open(join(self.tmp_dir, 'b', 'bar')) as bar:
-            assert_equal(bar.read(), 'FOO\n')
+            self.assertEqual(bar.read(), 'FOO\n')
 
         with open(join(self.tmp_dir, 'b', 'qux', 'quux')) as quux:
-            assert_equal(quux.read(), 'QUUX\n')
+            self.assertEqual(quux.read(), 'QUUX\n')
 
         # make sure symlinks are converted to files
         assert os.path.isfile(join(self.tmp_dir, 'b', 'bar'))
@@ -294,8 +306,9 @@ class ArchiveTestCase(TestCase):
                      out_path=join(self.tmp_dir, 'not_a.tar.gz'),
                      prefix='b')
 
-        assert_equal(extract_dir_for_tar(join(self.tmp_dir, 'not_a.tar.gz')),
-                     'b')
+        self.assertEqual(
+            extract_dir_for_tar(join(self.tmp_dir, 'not_a.tar.gz')),
+            'b')
 
     def archive_and_unarchive(self, extension, archive_template,
                               added_files=[]):
@@ -346,17 +359,22 @@ class ArchiveTestCase(TestCase):
     def test_unarchive_non_archive(self):
         join = os.path.join
 
-        assert_raises(IOError, unarchive, join(self.tmp_dir, 'a', 'foo'),
-                      join(self.tmp_dir, 'b'))
+        self.assertRaises(
+            IOError,
+            unarchive, join(self.tmp_dir, 'a', 'foo'), join(self.tmp_dir, 'b'))
 
 
-class read_fileTest(TestCase):
+class read_fileTest(unittest.TestCase):
 
-    @setup
+    def setUp(self):
+        self.make_tmp_dir()
+
+    def tearDown(self):
+        self.rm_tmp_dir()
+
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -369,7 +387,7 @@ class read_fileTest(TestCase):
         for line in read_file(input_path):
             output.append(line)
 
-        assert_equal(output, ['bar\n', 'foo\n'])
+        self.assertEqual(output, ['bar\n', 'foo\n'])
 
     def test_read_file_uncompressed_stream(self):
         input_path = os.path.join(self.tmp_dir, 'input')
@@ -380,7 +398,7 @@ class read_fileTest(TestCase):
         for line in read_file(input_path, fileobj=open(input_path)):
             output.append(line)
 
-        assert_equal(output, ['bar\n', 'foo\n'])
+        self.assertEqual(output, ['bar\n', 'foo\n'])
 
     def test_read_file_compressed(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
@@ -392,7 +410,7 @@ class read_fileTest(TestCase):
         for line in read_file(input_gz_path):
             output.append(line)
 
-        assert_equal(output, ['foo\n', 'bar\n'])
+        self.assertEqual(output, ['foo\n', 'bar\n'])
 
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
         input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
@@ -403,7 +421,7 @@ class read_fileTest(TestCase):
         for line in read_file(input_bz2_path):
             output.append(line)
 
-        assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
+        self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
 
     def test_cat_compressed_stream(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
@@ -415,7 +433,7 @@ class read_fileTest(TestCase):
         for line in read_file(input_gz_path, fileobj=open(input_gz_path)):
             output.append(line)
 
-        assert_equal(output, ['foo\n', 'bar\n'])
+        self.assertEqual(output, ['foo\n', 'bar\n'])
 
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
         input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
@@ -426,4 +444,4 @@ class read_fileTest(TestCase):
         for line in read_file(input_bz2_path, fileobj=open(input_bz2_path)):
             output.append(line)
 
-        assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
+        self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])

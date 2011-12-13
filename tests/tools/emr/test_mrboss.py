@@ -20,22 +20,26 @@ import os
 import shutil
 import tempfile
 
-from testify import assert_equal
-from testify import setup
-from testify import teardown
 
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.mrboss import run_on_all_nodes
-from tests.emr_test import MockEMRAndS3TestCase
-from tests.emr_test import BUCKET_URI
-from tests.emr_test import LOG_DIR
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
+from tests.test_emr import MockEMRAndS3TestCase
+from tests.test_emr import BUCKET_URI
+from tests.test_emr import LOG_DIR
 
 
 class MRBossTestCase(MockEMRAndS3TestCase):
 
-    @setup
+    def setUp(self):
+        super(MRBossTestCase, self).setUp()
+        self.make_runner()
+
+    def tearDown(self):
+        self.cleanup_runner()
+        super(MRBossTestCase, self).tearDown()
+
     def make_runner(self):
         self.runner = EMRJobRunner(conf_path=False)
         self.add_mock_s3_data({'walrus': {}})
@@ -47,7 +51,6 @@ class MRBossTestCase(MockEMRAndS3TestCase):
         self.runner._enable_slave_ssh_access()
         self.output_dir = tempfile.mkdtemp(prefix='mrboss_wd')
 
-    @teardown
     def cleanup_runner(self):
         """This method assumes ``prepare_runner_for_ssh()`` was called. That
         method isn't a "proper" setup method because it requires different
@@ -64,9 +67,9 @@ class MRBossTestCase(MockEMRAndS3TestCase):
                          print_stderr=False)
 
         with open(os.path.join(self.output_dir, 'master', 'stdout'), 'r') as f:
-            assert_equal(f.read(), 'file contents\n')
+            self.assertEqual(f.read(), 'file contents\n')
 
-        assert_equal(os.listdir(self.output_dir), ['master'])
+        self.assertEqual(os.listdir(self.output_dir), ['master'])
 
     def test_two_nodes(self):
         self.add_slave()
@@ -79,11 +82,11 @@ class MRBossTestCase(MockEMRAndS3TestCase):
                          print_stderr=False)
 
         with open(os.path.join(self.output_dir, 'master', 'stdout'), 'r') as f:
-            assert_equal(f.read(), 'file contents 1\n')
+            self.assertEqual(f.read(), 'file contents 1\n')
 
         with open(os.path.join(self.output_dir, 'slave testslave0', 'stdout'),
                   'r') as f:
-            assert_equal(f.read(), 'file contents 2\n')
+            self.assertEqual(f.read(), 'file contents 2\n')
 
-        assert_equal(sorted(os.listdir(self.output_dir)),
-                     ['master', 'slave testslave0'])
+        self.assertEqual(sorted(os.listdir(self.output_dir)),
+                         ['master', 'slave testslave0'])

@@ -234,7 +234,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             # checked now because you can't actually read it from the job flow
             # on real EMR.
             self.assertEqual(runner._opts['additional_emr_info'],
-                         '{"key": "value"}')
+                             '{"key": "value"}')
 
             runner.run()
 
@@ -277,10 +277,10 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             # shouldn't be in PYTHONPATH (we dump it directly in site-packages)
             pythonpath = runner._get_cmdenv().get('PYTHONPATH') or ''
             self.assertNotIn(mrjob_tar_gz_file_dict['name'],
-                          pythonpath.split(':'))
+                             pythonpath.split(':'))
 
         self.assertEqual(sorted(results),
-                     [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+                         [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)
@@ -378,9 +378,9 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
     def test_cleanup_error(self):
         self.assertRaises(ValueError, self._test_remote_scratch_cleanup,
-                      'NONE,LOGS,REMOTE_SCRATCH', 0, 0)
+                          'NONE,LOGS,REMOTE_SCRATCH', 0, 0)
         self.assertRaises(ValueError, self._test_remote_scratch_cleanup,
-                      'GARBAGE', 0, 0)
+                          'GARBAGE', 0, 0)
 
     def test_args_version_018(self):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
@@ -394,10 +394,12 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertNotIn('-files', runner._describe_jobflow().steps[0].args())
-            self.assertIn('-cacheFile', runner._describe_jobflow().steps[0].args())
-            self.assertNotIn('-combiner',
+            self.assertNotIn('-files',
+                             runner._describe_jobflow().steps[0].args())
+            self.assertIn('-cacheFile',
                           runner._describe_jobflow().steps[0].args())
+            self.assertNotIn('-combiner',
+                             runner._describe_jobflow().steps[0].args())
 
     def test_args_version_020(self):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
@@ -413,8 +415,9 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             runner.run()
             self.assertIn('-files', runner._describe_jobflow().steps[0].args())
             self.assertNotIn('-cacheFile',
+                             runner._describe_jobflow().steps[0].args())
+            self.assertIn('-combiner',
                           runner._describe_jobflow().steps[0].args())
-            self.assertIn('-combiner', runner._describe_jobflow().steps[0].args())
 
 
 class S3ScratchURITestCase(MockEMRAndS3TestCase):
@@ -424,7 +427,7 @@ class S3ScratchURITestCase(MockEMRAndS3TestCase):
         runner = EMRJobRunner(conf_path=False)
 
         self.assertEqual(runner._opts['s3_scratch_uri'],
-                     's3://mrjob-walrus/tmp/')
+                         's3://mrjob-walrus/tmp/')
 
     def test_create_scratch_uri(self):
         # "walrus" bucket will be ignored; it doesn't start with "mrjob-"
@@ -501,7 +504,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
                 results.append((key, value))
 
         self.assertEqual(sorted(results),
-            [(1, 'bar'), (1, 'foo'), (2, None)])
+                         [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_take_down_job_flow_on_failure(self):
         emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
@@ -737,7 +740,7 @@ class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
         all_job_flows = describe_all_job_flows(emr_conn)
         self.assertEqual(len(all_job_flows), NUM_JOB_FLOWS)
         self.assertEqual(sorted(jf.jobflowid for jf in all_job_flows),
-                     [('j-%04d' % i) for i in range(NUM_JOB_FLOWS)])
+                         [('j-%04d' % i) for i in range(NUM_JOB_FLOWS)])
 
 
 class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
@@ -870,7 +873,8 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
 
     def test_empty(self):
         self.add_mock_s3_data({'walrus': {}})
-        self.assertEqual(self.runner._find_probable_cause_of_failure([1]), None)
+        self.assertEqual(self.runner._find_probable_cause_of_failure([1]),
+                         None)
 
     def test_python_exception(self):
         self.add_mock_s3_data({'walrus': {
@@ -879,22 +883,22 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
             ATTEMPT_0_DIR + 'syslog':
                 make_input_uri_line(BUCKET_URI + 'input.gz'),
         }})
-        self.assertEqual(self.runner._find_probable_cause_of_failure([1]),
-                     {'lines': list(StringIO(TRACEBACK_START + PY_EXCEPTION)),
-                      'log_file_uri':
-                          BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
-                      'input_uri': BUCKET_URI + 'input.gz'})
+        self.assertEqual(
+            self.runner._find_probable_cause_of_failure([1]),
+            {'lines': list(StringIO(TRACEBACK_START + PY_EXCEPTION)),
+             'log_file_uri': BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
+             'input_uri': BUCKET_URI + 'input.gz'})
 
     def test_python_exception_without_input_uri(self):
         self.add_mock_s3_data({'walrus': {
             ATTEMPT_0_DIR + 'stderr': (
                 GARBAGE + TRACEBACK_START + PY_EXCEPTION + GARBAGE),
         }})
-        self.assertEqual(self.runner._find_probable_cause_of_failure([1]),
-                     {'lines': list(StringIO(TRACEBACK_START + PY_EXCEPTION)),
-                      'log_file_uri':
-                          BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
-                      'input_uri': None})
+        self.assertEqual(
+            self.runner._find_probable_cause_of_failure([1]),
+            {'lines': list(StringIO(TRACEBACK_START + PY_EXCEPTION)),
+             'log_file_uri': BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
+             'input_uri': None})
 
     def test_java_exception(self):
         self.add_mock_s3_data({'walrus': {
@@ -906,11 +910,11 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 JAVA_STACK_TRACE +
                 GARBAGE,
         }})
-        self.assertEqual(self.runner._find_probable_cause_of_failure([1]),
-                     {'lines': list(StringIO(JAVA_STACK_TRACE)),
-                      'log_file_uri':
-                          BUCKET_URI + ATTEMPT_0_DIR + 'syslog',
-                      'input_uri': BUCKET_URI + 'input.gz'})
+        self.assertEqual(
+            self.runner._find_probable_cause_of_failure([1]),
+            {'lines': list(StringIO(JAVA_STACK_TRACE)),
+             'log_file_uri': BUCKET_URI + ATTEMPT_0_DIR + 'syslog',
+             'input_uri': BUCKET_URI + 'input.gz'})
 
     def test_java_exception_without_input_uri(self):
         self.add_mock_s3_data({'walrus': {
@@ -919,11 +923,11 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 JAVA_STACK_TRACE +
                 GARBAGE,
         }})
-        self.assertEqual(self.runner._find_probable_cause_of_failure([1]),
-                     {'lines': list(StringIO(JAVA_STACK_TRACE)),
-                      'log_file_uri':
-                          BUCKET_URI + ATTEMPT_0_DIR + 'syslog',
-                      'input_uri': None})
+        self.assertEqual(
+            self.runner._find_probable_cause_of_failure([1]),
+            {'lines': list(StringIO(JAVA_STACK_TRACE)),
+             'log_file_uri': BUCKET_URI + ATTEMPT_0_DIR + 'syslog',
+             'input_uri': None})
 
     def test_hadoop_streaming_error(self):
         # we should look only at step 2 since the errors in the other
@@ -942,11 +946,11 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
                 HADOOP_ERR_LINE_PREFIX + BORING_HADOOP_ERROR + '\n',
         }})
 
-        self.assertEqual(self.runner._find_probable_cause_of_failure([1, 2, 3]),
-                     {'lines': [USEFUL_HADOOP_ERROR + '\n'],
-                      'log_file_uri':
-                          BUCKET_URI + LOG_DIR + 'steps/2/syslog',
-                      'input_uri': None})
+        self.assertEqual(
+            self.runner._find_probable_cause_of_failure([1, 2, 3]),
+            {'lines': [USEFUL_HADOOP_ERROR + '\n'],
+             'log_file_uri': BUCKET_URI + LOG_DIR + 'steps/2/syslog',
+             'input_uri': None})
 
     def test_later_task_attempt_steps_win(self):
         # should look at later steps first
@@ -958,8 +962,8 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
         self.assertEqual(failure['log_file_uri'],
-                     BUCKET_URI + TASK_ATTEMPTS_DIR +
-                     'attempt_201007271720_0002_m_000004_0/syslog')
+                         BUCKET_URI + TASK_ATTEMPTS_DIR +
+                         'attempt_201007271720_0002_m_000004_0/syslog')
 
     def test_later_step_logs_win(self):
         self.add_mock_s3_data({'walrus': {
@@ -970,7 +974,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
         self.assertEqual(failure['log_file_uri'],
-                     BUCKET_URI + LOG_DIR + 'steps/2/syslog')
+                         BUCKET_URI + LOG_DIR + 'steps/2/syslog')
 
     def test_reducer_beats_mapper(self):
         # should look at reducers over mappers
@@ -982,8 +986,8 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
         self.assertEqual(failure['log_file_uri'],
-                     BUCKET_URI + TASK_ATTEMPTS_DIR +
-                     'attempt_201007271720_0001_r_000126_3/syslog')
+                         BUCKET_URI + TASK_ATTEMPTS_DIR +
+                         'attempt_201007271720_0001_r_000126_3/syslog')
 
     def test_more_attempts_win(self):
         # look at fourth attempt before looking at first attempt
@@ -995,8 +999,8 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
         self.assertEqual(failure['log_file_uri'],
-                     BUCKET_URI + TASK_ATTEMPTS_DIR +
-                     'attempt_201007271720_0001_m_000004_3/syslog')
+                         BUCKET_URI + TASK_ATTEMPTS_DIR +
+                         'attempt_201007271720_0001_m_000004_3/syslog')
 
     def test_py_exception_beats_java_stack_trace(self):
         self.add_mock_s3_data({'walrus': {
@@ -1005,7 +1009,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
         self.assertEqual(failure['log_file_uri'],
-                     BUCKET_URI + ATTEMPT_0_DIR + 'stderr')
+                         BUCKET_URI + ATTEMPT_0_DIR + 'stderr')
 
     def test_exception_beats_hadoop_error(self):
         self.add_mock_s3_data({'walrus': {
@@ -1016,8 +1020,8 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
         self.assertEqual(failure['log_file_uri'],
-                     BUCKET_URI + TASK_ATTEMPTS_DIR +
-                     'attempt_201007271720_0002_m_000126_0/stderr')
+                         BUCKET_URI + TASK_ATTEMPTS_DIR +
+                         'attempt_201007271720_0002_m_000126_0/stderr')
 
     def test_step_filtering(self):
         # same as previous test, but step 2 is filtered out
@@ -1029,7 +1033,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
         self.assertEqual(failure['log_file_uri'],
-                     BUCKET_URI + LOG_DIR + 'steps/1/syslog')
+                         BUCKET_URI + LOG_DIR + 'steps/1/syslog')
 
     def test_ignore_errors_from_steps_that_later_succeeded(self):
         # This tests the fix for Issue #31
@@ -1042,7 +1046,8 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
             ATTEMPT_1_DIR + 'syslog':
                 make_input_uri_line(BUCKET_URI + 'input.gz'),
         }})
-        self.assertEqual(self.runner._find_probable_cause_of_failure([1]), None)
+        self.assertEqual(self.runner._find_probable_cause_of_failure([1]),
+                         None)
 
 
 class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
@@ -1095,7 +1100,7 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
         self.assertEqual(failure['log_file_uri'],
-                     SSH_PREFIX + self.runner._address + ssh_lone_log_path)
+                         SSH_PREFIX + self.runner._address + ssh_lone_log_path)
 
     def test_ssh_works_with_slaves(self):
         self.add_slave()
@@ -1119,7 +1124,7 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
                       '')
         failure = self.runner._find_probable_cause_of_failure([1, 2])
         self.assertEqual(failure['log_file_uri'],
-                     SSH_PREFIX + 'testmaster!testslave0' + ssh_log_path)
+                         SSH_PREFIX + 'testmaster!testslave0' + ssh_log_path)
 
     def test_ssh_fails_to_s3(self):
         # the runner will try to use SSH and find itself unable to do so,
@@ -1133,8 +1138,8 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
         self.assertEqual(failure['log_file_uri'],
-                     BUCKET_URI + TASK_ATTEMPTS_DIR +
-                     'attempt_201007271720_0002_m_000126_0/stderr')
+                         BUCKET_URI + TASK_ATTEMPTS_DIR +
+                         'attempt_201007271720_0002_m_000126_0/stderr')
 
 
 class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
@@ -1142,66 +1147,66 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
     def test_no_region(self):
         runner = EMRJobRunner(conf_path=False)
         self.assertEqual(runner.make_emr_conn().endpoint,
-                     'elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
-                     's3.amazonaws.com')
+                         's3.amazonaws.com')
         self.assertEqual(runner._aws_region, '')
 
     def test_none_region(self):
         # blank region should be treated the same as no region
         runner = EMRJobRunner(conf_path=False, aws_region=None)
         self.assertEqual(runner.make_emr_conn().endpoint,
-                     'elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
-                     's3.amazonaws.com')
+                         's3.amazonaws.com')
         self.assertEqual(runner._aws_region, '')
 
     def test_blank_region(self):
         # blank region should be treated the same as no region
         runner = EMRJobRunner(conf_path=False, aws_region='')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                     'elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
-                     's3.amazonaws.com')
+                         's3.amazonaws.com')
         self.assertEqual(runner._aws_region, '')
 
     def test_eu(self):
         runner = EMRJobRunner(conf_path=False, aws_region='EU')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                     'eu-west-1.elasticmapreduce.amazonaws.com')
+                         'eu-west-1.elasticmapreduce.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
-                     's3-eu-west-1.amazonaws.com')
+                         's3-eu-west-1.amazonaws.com')
 
     def test_us_east_1(self):
         runner = EMRJobRunner(conf_path=False, aws_region='us-east-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                     'us-east-1.elasticmapreduce.amazonaws.com')
+                         'us-east-1.elasticmapreduce.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
-                     's3.amazonaws.com')
+                         's3.amazonaws.com')
 
     def test_us_west_1(self):
         runner = EMRJobRunner(conf_path=False, aws_region='us-west-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                     'us-west-1.elasticmapreduce.amazonaws.com')
+                         'us-west-1.elasticmapreduce.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
-                     's3-us-west-1.amazonaws.com')
+                         's3-us-west-1.amazonaws.com')
 
     def test_ap_southeast_1(self):
         runner = EMRJobRunner(conf_path=False, aws_region='ap-southeast-1')
         self.assertEqual(runner.make_s3_conn().endpoint,
-                     's3-ap-southeast-1.amazonaws.com')
+                         's3-ap-southeast-1.amazonaws.com')
         self.assertRaises(Exception, runner.make_emr_conn)
 
     def test_bad_region(self):
         # should fail in the constructor because the constructor connects to S3
         self.assertRaises(Exception, EMRJobRunner,
-                      conf_path=False, aws_region='the-moooooooon-1')
+                          conf_path=False, aws_region='the-moooooooon-1')
 
     def test_case_sensitive(self):
         self.assertRaises(Exception, EMRJobRunner,
-                      conf_path=False, aws_region='eu')
+                          conf_path=False, aws_region='eu')
         self.assertRaises(Exception, EMRJobRunner,
-                      conf_path=False, aws_region='US-WEST-1')
+                          conf_path=False, aws_region='US-WEST-1')
 
     def test_explicit_endpoints(self):
         runner = EMRJobRunner(conf_path=False, aws_region='EU',
@@ -1219,18 +1224,18 @@ class TestS3Ls(MockEMRAndS3TestCase):
                               conf_path=False)
 
         self.assertEqual(set(runner._s3_ls('s3://walrus/')),
-                     set(['s3://walrus/one',
-                          's3://walrus/two',
-                          's3://walrus/three',
-                          ]))
+                         set(['s3://walrus/one',
+                              's3://walrus/two',
+                              's3://walrus/three',
+                              ]))
 
         self.assertEqual(set(runner._s3_ls('s3://walrus/t')),
-                     set(['s3://walrus/two',
-                          's3://walrus/three',
-                          ]))
+                         set(['s3://walrus/two',
+                              's3://walrus/three',
+                              ]))
 
         self.assertEqual(set(runner._s3_ls('s3://walrus/t/')),
-                     set([]))
+                         set([]))
 
         # if we ask for a nonexistent bucket, we should get some sort
         # of exception (in practice, buckets with random names will
@@ -1266,15 +1271,16 @@ class TestSSHLs(MockEMRAndS3TestCase):
         mock_ssh_file('testmaster!testslave0',
                       posixpath.join('test', 'three'), '')
 
-        self.assertEqual(sorted(self.runner.ls('ssh://testmaster/test')),
-                     ['ssh://testmaster/test/one',
-                      'ssh://testmaster/test/two'])
-        self.assertEqual(list(self.runner.ls('ssh://testmaster!testslave0/test')),
-                     ['ssh://testmaster!testslave0/test/three'])
+        self.assertEqual(
+            sorted(self.runner.ls('ssh://testmaster/test')),
+            ['ssh://testmaster/test/one', 'ssh://testmaster/test/two'])
+        self.assertEqual(
+            list(self.runner.ls('ssh://testmaster!testslave0/test')),
+            ['ssh://testmaster!testslave0/test/three'])
 
         # ls() is a generator, so the exception won't fire until we list() it
         self.assertRaises(IOError, list,
-                      self.runner.ls('ssh://testmaster/does_not_exist'))
+                          self.runner.ls('ssh://testmaster/does_not_exist'))
 
 
 class TestNoBoto(TestCase):
@@ -1301,7 +1307,7 @@ class TestNoBoto(TestCase):
         # this also raises an exception because we have to check
         # the bucket location
         self.assertRaises(ImportError, EMRJobRunner,
-                      conf_path=False, s3_scratch_uri='s3://foo/tmp')
+                          conf_path=False, s3_scratch_uri='s3://foo/tmp')
 
 
 class TestMasterBootstrapScript(MockEMRAndS3TestCase):
@@ -1442,6 +1448,7 @@ class EMRNoMapperTest(MockEMRAndS3TestCase):
     def tearDown(self):
         super(EMRNoMapperTest, self).tearDown()
         self.rm_tmp_dir()
+
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
 
@@ -1478,7 +1485,7 @@ class EMRNoMapperTest(MockEMRAndS3TestCase):
                 results.append((key, value))
 
         self.assertEqual(sorted(results),
-                     [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+                         [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
 
 class TestCat(MockEMRAndS3TestCase):
@@ -1490,6 +1497,7 @@ class TestCat(MockEMRAndS3TestCase):
     def tearDown(self):
         super(TestCat, self).tearDown()
         self.rm_tmp_dir()
+
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
 
@@ -1632,7 +1640,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '-c', self.mrjob_conf_path])
         self.assertEqual(results,
-            [(1, 'bar'), (1, 'foo'), (2, None)])
+                         [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_join_named_pool(self):
         _, job_flow_id = self.make_pooled_job_flow('pool1')
@@ -1645,7 +1653,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             '--pool-name', 'pool1',
             '-c', self.mrjob_conf_path])
         self.assertEqual(results,
-            [(1, 'bar'), (1, 'foo'), (2, None)])
+                         [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_join_full_job_flow(self):
         dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
@@ -1659,7 +1667,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             '--pool-name', 'pool1',
             '-c', self.mrjob_conf_path])
         self.assertEqual(results,
-            [(1, 'bar'), (1, 'foo'), (2, None)])
+                         [(1, 'bar'), (1, 'foo'), (2, None)])
 
         # copy it
         jf = dummy_runner.make_emr_conn().describe_jobflow(job_flow_id)
@@ -1674,7 +1682,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             '--pool-name', 'pool1',
             '-c', self.mrjob_conf_path])
         self.assertNotEqual(results,
-            [(1, 'bar'), (1, 'foo'), (2, None)])
+                            [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_join_wrong_named_pool(self):
         _, job_flow_id = self.make_pooled_job_flow('pool1')
@@ -1688,7 +1696,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             '-c', self.mrjob_conf_path])
 
         self.assertNotEqual(results,
-            [(1, 'bar'), (1, 'foo'), (2, None)])
+                            [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_join_wrong_mrjob_version(self):
         _, job_flow_id = self.make_pooled_job_flow('pool1')
@@ -1706,7 +1714,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         mrjob.__version__ = old_version
 
         self.assertNotEqual(results,
-            [(1, 'bar'), (1, 'foo'), (2, None)])
+                            [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_join_similarly_bootstrapped_pool(self):
         local_input_path = os.path.join(self.tmp_dir, 'input')
@@ -1725,7 +1733,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             '-c', self.mrjob_conf_path])
 
         self.assertEqual(results,
-            [(1, 'bar'), (1, 'foo'), (2, None)])
+                         [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_join_differently_bootstrapped_pool(self):
         local_input_path = os.path.join(self.tmp_dir, 'input')
@@ -1743,7 +1751,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             '-c', self.mrjob_conf_path])
 
         self.assertNotEqual(results,
-            [(1, 'bar'), (1, 'foo'), (2, None)])
+                            [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_join_differently_bootstrapped_pool_2(self):
         local_input_path = os.path.join(self.tmp_dir, 'input')
@@ -1765,7 +1773,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             '-c', self.mrjob_conf_path])
 
         self.assertNotEqual(results,
-            [(1, 'bar'), (1, 'foo'), (2, None)])
+                            [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_pool_competition(self):
         _, job_flow_id = self.make_pooled_job_flow('robert_downey_jr')

@@ -32,7 +32,7 @@ class EnvVarTestCase(TestCase):
 
     def setUp(self):
         self._old_env = os.environ.copy()
- 
+
     def tearDown(self):
         os.environ.clear()
         os.environ.update(self._old_env)
@@ -40,41 +40,42 @@ class EnvVarTestCase(TestCase):
     def test_get_jobconf_value_1(self):
         os.environ['user_name'] = 'Edsger W. Dijkstra'
         self.assertEqual(get_jobconf_value('user.name'),
-                     'Edsger W. Dijkstra')
+                         'Edsger W. Dijkstra')
         self.assertEqual(get_jobconf_value('mapreduce.job.user.name'),
-                     'Edsger W. Dijkstra')
+                         'Edsger W. Dijkstra')
 
     def test_get_jobconf_value_2(self):
         os.environ['mapreduce_job_user_name'] = 'Edsger W. Dijkstra'
         self.assertEqual(get_jobconf_value('user.name'),
-                     'Edsger W. Dijkstra')
+                         'Edsger W. Dijkstra')
         self.assertEqual(get_jobconf_value('mapreduce.job.user.name'),
-                     'Edsger W. Dijkstra')
+                         'Edsger W. Dijkstra')
 
 
 class CompatTestCase(TestCase):
 
     def test_translate_jobconf(self):
         self.assertEqual(translate_jobconf('user.name', '0.18'),
-                     'user.name')
+                         'user.name')
         self.assertEqual(translate_jobconf('mapreduce.job.user.name', '0.18'),
-                     'user.name')
+                         'user.name')
         self.assertEqual(translate_jobconf('user.name', '0.19'),
-                     'user.name')
-        self.assertEqual(translate_jobconf('mapreduce.job.user.name', '0.19.2'),
-                     'user.name')
+                         'user.name')
+        self.assertEqual(
+            translate_jobconf('mapreduce.job.user.name', '0.19.2'),
+            'user.name')
         self.assertEqual(translate_jobconf('user.name', '0.21'),
-                     'mapreduce.job.user.name')
+                         'mapreduce.job.user.name')
 
     def test_supports_combiners(self):
         self.assertEqual(supports_combiners_in_hadoop_streaming('0.19'),
-                     False)
+                         False)
         self.assertEqual(supports_combiners_in_hadoop_streaming('0.19.2'),
-                     False)
+                         False)
         self.assertEqual(supports_combiners_in_hadoop_streaming('0.20'),
-                     True)
+                         True)
         self.assertEqual(supports_combiners_in_hadoop_streaming('0.20.203'),
-                     True)
+                         True)
 
     def test_uses_generic_jobconf(self):
         self.assertEqual(uses_generic_jobconf('0.18'), False)

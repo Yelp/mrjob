@@ -141,7 +141,7 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
             f.write('{"runners": {"foo": {"bar": "baz"}}}')
 
         self.assertEqual(load_mrjob_conf(),
-                     {'runners': {'foo': {'bar': 'baz'}}})
+                         {'runners': {'foo': {'bar': 'baz'}}})
         self.assertEqual(load_opts_from_mrjob_conf('foo'), {'bar': 'baz'})
 
     def test_load_mrjob_conf_and_load_opts(self):
@@ -150,9 +150,9 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
             f.write('{"runners": {"foo": {"qux": "quux"}}}')
 
         self.assertEqual(load_mrjob_conf(conf_path=conf_path),
-                     {'runners': {'foo': {'qux': 'quux'}}})
+                         {'runners': {'foo': {'qux': 'quux'}}})
         self.assertEqual(load_opts_from_mrjob_conf('foo', conf_path=conf_path),
-                     {'qux': 'quux'})
+                         {'qux': 'quux'})
         # test missing options
         with logger_disabled('mrjob.conf'):
             self.assertEqual(
@@ -246,7 +246,7 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         contents = open(conf_path).read()
 
         self.assertEqual(contents.replace(' ', '').replace('\n', ''),
-                     '{"runners":{"foo":{"qux":"quux"}}}')
+                         '{"runners":{"foo":{"qux":"quux"}}}')
 
 
 class CombineValuesTestCase(TestCase):
@@ -284,7 +284,7 @@ class CombineDictsTestCase(TestCase):
     def test_later_values_take_precedence(self):
         self.assertEqual(
             combine_dicts({'TMPDIR': '/tmp', 'HOME': '/home/dave'},
-                         {'TMPDIR': '/var/tmp'}),
+                          {'TMPDIR': '/var/tmp'}),
             {'TMPDIR': '/var/tmp', 'HOME': '/home/dave'})
 
     def test_skip_None(self):
@@ -325,7 +325,8 @@ class CombineCmdsTestCase(TestCase):
 
     def test_parse_string(self):
         self.assertEqual(combine_cmds('sort', 'grep', 'cat'), ['cat'])
-        self.assertEqual(combine_cmds(['python'], 'python -S'), ['python', '-S'])
+        self.assertEqual(combine_cmds(['python'], 'python -S'),
+                         ['python', '-S'])
 
     def test_parse_empty_string(self):
         self.assertEqual(combine_cmds(''), [])
@@ -365,7 +366,7 @@ class CombineEnvsTestCase(TestCase):
 
     def test_skip_None(self):
         self.assertEqual(combine_envs(None, {'USER': 'dave'}, None,
-                                  {'TERM': 'xterm'}, None),
+                                      {'TERM': 'xterm'}, None),
                      {'USER': 'dave', 'TERM': 'xterm'})
 
     def test_paths(self):

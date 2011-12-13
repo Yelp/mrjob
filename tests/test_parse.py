@@ -102,7 +102,8 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
         tb = find_python_traceback(StringIO(stderr))
         self.assertNotEqual(tb, None)
         assert isinstance(tb, list)
-        self.assertEqual(len(tb), 3)  # The first line ("Traceback...") is not skipped
+        # The first line ("Traceback...") is not skipped
+        self.assertEqual(len(tb), 3)
 
         # make sure we can find the same traceback in noise
         verbose_stdout, verbose_stderr = run(
@@ -145,7 +146,7 @@ class FindMiscTestCase(TestCase):
             "2010-07-27 17:54:54,344 INFO org.apache.hadoop.fs.s3native.NativeS3FileSystem (main): Opening 's3://yourbucket/logs/2010/07/23/log2-00078.gz' for reading\n",
         ]
         self.assertEqual(find_input_uri_for_mapper(line for line in LOG_LINES),
-                     's3://yourbucket/logs/2010/07/23/log2-00077.gz')
+                         's3://yourbucket/logs/2010/07/23/log2-00077.gz')
 
     def test_find_hadoop_java_stack_trace(self):
         LOG_LINES = [
@@ -156,9 +157,10 @@ class FindMiscTestCase(TestCase):
             'BLARG\n',
             '        at org.apache.hadoop.mapred.IFile$Reader.next(IFile.java:332)\n',
         ]
-        self.assertEqual(find_hadoop_java_stack_trace(line for line in LOG_LINES),
-                     ['java.lang.OutOfMemoryError: Java heap space\n',
-                      '        at org.apache.hadoop.mapred.IFile$Reader.readNextBlock(IFile.java:270)\n'])
+        self.assertEqual(
+            find_hadoop_java_stack_trace(line for line in LOG_LINES),
+            ['java.lang.OutOfMemoryError: Java heap space\n',
+             '        at org.apache.hadoop.mapred.IFile$Reader.readNextBlock(IFile.java:270)\n'])
 
     def test_find_interesting_hadoop_streaming_error(self):
         LOG_LINES = [
@@ -216,13 +218,17 @@ class FindMiscTestCase(TestCase):
             'java.io.IOException: Cannot run program "bash": java.io.IOException: error=12, Cannot allocate memory',
             '    ... 10 more',
         ]
-        self.assertEqual(find_job_log_multiline_error(line for line in LOG_LINES), SHOULD_EQUAL)
+        self.assertEqual(
+            find_job_log_multiline_error(line for line in LOG_LINES),
+            SHOULD_EQUAL)
 
     def test_find_counters_0_18(self):
         counters, step_num = parse_hadoop_counters_from_line('Job JOBID="job_201106061823_0001" FINISH_TIME="1307384737542" JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1" FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="File Systems.S3N bytes read:3726,File Systems.Local bytes read:4164,File Systems.S3N bytes written:1663,File Systems.Local bytes written:8410,Job Counters .Launched reduce tasks:1,Job Counters .Rack-local map tasks:2,Job Counters .Launched map tasks:2,Map-Reduce Framework.Reduce input groups:154,Map-Reduce Framework.Combine output records:0,Map-Reduce Framework.Map input records:68,Map-Reduce Framework.Reduce output records:154,Map-Reduce Framework.Map output bytes:3446,Map-Reduce Framework.Map input bytes:2483,Map-Reduce Framework.Map output records:336,Map-Reduce Framework.Combine input records:0,Map-Reduce Framework.Reduce input records:336,profile.reducer step 0 estimated IO time: 0.00:1,profile.mapper step 0 estimated IO time: 0.00:2,profile.reducer step 0 estimated CPU time: 0.00:1,profile.mapper step ☃ estimated CPU time: 0.00:2"')
 
-        self.assertEqual(counters['profile']['reducer step 0 estimated IO time: 0.00'], 1)
-        self.assertEqual(counters['profile']['mapper step ☃ estimated CPU time: 0.00'], 2)
+        self.assertEqual(
+            counters['profile']['reducer step 0 estimated IO time: 0.00'], 1)
+        self.assertEqual(
+            counters['profile']['mapper step ☃ estimated CPU time: 0.00'], 2)
         self.assertEqual(step_num, 1)
 
     def test_find_counters_0_20(self):
@@ -254,13 +260,15 @@ class FindMiscTestCase(TestCase):
         with no_handlers_for_logger(''):
             stderr = StringIO()
             log_to_stream('mrjob.parse', stderr, level=logging.WARN)
-            self.assertEqual((None, None), parse_hadoop_counters_from_line(counter_string))
+            self.assertEqual((None, None),
+                             parse_hadoop_counters_from_line(counter_string))
             self.assertIn('Cannot parse Hadoop counter line', stderr.getvalue())
 
     def test_freaky_counter_names(self):
         freaky_name = r'\\\\\{\}\(\)\[\]\.\\\\'
         counter_string = r'Job JOBID="_001" FAILED_REDUCES="0" COUNTERS="{(%s)(%s)[(a)(a)(1)]}"' % (freaky_name, freaky_name)
-        self.assertIn('\\{}()[].\\', parse_hadoop_counters_from_line(counter_string)[0])
+        self.assertIn('\\{}()[].\\',
+                      parse_hadoop_counters_from_line(counter_string)[0])
 
     def test_counters_fuzz(self):
         # test some strings that should break badly formulated parsing regexps
@@ -285,7 +293,7 @@ class ParseMRJobStderr(TestCase):
 
     def test_empty(self):
         self.assertEqual(parse_mr_job_stderr(StringIO()),
-                     {'counters': {}, 'statuses': [], 'other': []})
+                         {'counters': {}, 'statuses': [], 'other': []})
 
     def test_parsing(self):
         INPUT = StringIO(
@@ -316,20 +324,22 @@ class ParseMRJobStderr(TestCase):
     def test_read_single_line(self):
         # LocalMRJobRunner runs parse_mr_job_stderr on one line at a time.
         self.assertEqual(parse_mr_job_stderr('reporter:counter:Foo,Bar,2\n'),
-                     {'counters': {'Foo': {'Bar': 2}},
-                      'statuses': [], 'other': []})
+                         {'counters': {'Foo': {'Bar': 2}},
+                          'statuses': [], 'other': []})
 
     def test_read_multiple_lines_from_buffer(self):
-        self.assertEqual(parse_mr_job_stderr('reporter:counter:Foo,Bar,2\nwoot\n'),
-                     {'counters': {'Foo': {'Bar': 2}},
-                      'statuses': [], 'other': ['woot\n']})
+        self.assertEqual(
+            parse_mr_job_stderr('reporter:counter:Foo,Bar,2\nwoot\n'),
+            {'counters': {'Foo': {'Bar': 2}},
+             'statuses': [], 'other': ['woot\n']})
 
     def test_negative_counters(self):
         # kind of poor practice to use negative counters, but Hadoop
         # Streaming supports it (negative numbers are integers too!)
-        self.assertEqual(parse_mr_job_stderr(['reporter:counter:Foo,Bar,-2\n']),
-                     {'counters': {'Foo': {'Bar': -2}},
-                      'statuses': [], 'other': []})
+        self.assertEqual(
+            parse_mr_job_stderr(['reporter:counter:Foo,Bar,-2\n']),
+            {'counters': {'Foo': {'Bar': -2}},
+             'statuses': [], 'other': []})
 
     def test_garbled_counters(self):
         # we should be able to do something graceful with
@@ -344,7 +354,7 @@ class ParseMRJobStderr(TestCase):
         ]
 
         self.assertEqual(parse_mr_job_stderr(BAD_LINES),
-                     {'counters': {}, 'statuses': [], 'other': BAD_LINES})
+                         {'counters': {}, 'statuses': [], 'other': BAD_LINES})
 
 
 class PortRangeListTestCase(TestCase):
@@ -352,11 +362,12 @@ class PortRangeListTestCase(TestCase):
         self.assertEqual(parse_port_range_list('1234'), [1234])
         self.assertEqual(parse_port_range_list('123,456,789'), [123, 456, 789])
         self.assertEqual(parse_port_range_list('1234,5678'), [1234, 5678])
-        self.assertEqual(parse_port_range_list('1234:1236'), [1234, 1235, 1236])
+        self.assertEqual(parse_port_range_list('1234:1236'),
+                         [1234, 1235, 1236])
         self.assertEqual(parse_port_range_list('123:125,456'),
-                     [123, 124, 125, 456])
+                         [123, 124, 125, 456])
         self.assertEqual(parse_port_range_list('123:125,456:458'),
-                     [123, 124, 125, 456, 457, 458])
+                         [123, 124, 125, 456, 457, 458])
         self.assertEqual(parse_port_range_list('0123'), [123])
 
         self.assertRaises(ValueError, parse_port_range_list, 'Alexandria')
@@ -374,14 +385,14 @@ class URITestCase(TestCase):
 
     def test_urlparse(self):
         self.assertEqual(urlparse('http://www.yelp.com/lil_brudder'),
-                     ('http', 'www.yelp.com', '/lil_brudder', '', '', ''))
+                         ('http', 'www.yelp.com', '/lil_brudder', '', '', ''))
         self.assertEqual(urlparse('cant://touch/this'),
-                     ('cant', 'touch', '/this', '', '', ''))
+                         ('cant', 'touch', '/this', '', '', ''))
         self.assertEqual(urlparse('s3://bucket/path'),
-                     ('s3', 'bucket', '/path', '', '', ''))
+                         ('s3', 'bucket', '/path', '', '', ''))
         self.assertEqual(urlparse('s3://bucket/path#customname'),
-                     ('s3', 'bucket', '/path#customname', '', '', ''))
+                         ('s3', 'bucket', '/path#customname', '', '', ''))
         self.assertEqual(urlparse('s3://bucket'),
-                     ('s3', 'bucket', '', '', '', ''))
+                         ('s3', 'bucket', '', '', '', ''))
         self.assertEqual(urlparse('s3://bucket/'),
-                     ('s3', 'bucket', '/', '', '', ''))
+                         ('s3', 'bucket', '/', '', '', ''))

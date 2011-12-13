@@ -45,10 +45,10 @@ class CmdLineTestCase(TestCase):
 
     def test_cmd_line(self):
         self.assertEqual(cmd_line(['cut', '-f', 2, '-d', ' ']),
-                     "cut -f 2 -d ' '")
+                         "cut -f 2 -d ' '")
         self.assertIn(cmd_line(['grep', '-e', "# DON'T USE$"]),
-                  ("grep -e \"# DON'T USE\\$\"",
-                   'grep -e \'# DON\'"\'"\'T USE$\''))
+                      ("grep -e \"# DON'T USE\\$\"",
+                       'grep -e \'# DON\'"\'"\'T USE$\''))
 
 
 # expand_path() is tested by tests.conf.CombineAndExpandPathsTestCase
@@ -97,9 +97,9 @@ class OptionScrapingTestCase(TestCase):
         old_groups = (self.original_parser, self.original_group)
         scrape_options_into_new_groups(old_groups, assignments)
         self.assertEqual(self.original_parser.option_list[1:],
-                     self.new_parser.option_list[1:])
+                         self.new_parser.option_list[1:])
         self.assertEqual(self.original_group.option_list,
-                     self.new_group_1.option_list)
+                         self.new_group_1.option_list)
 
     def test_scrape_different(self):
         assignments = {
@@ -196,13 +196,13 @@ class ReadInputTestCase(TestCase):
         # read_input is a generator, so we won't get an error
         # until we try to read from it
         self.assertRaises(IOError, list,
-                      read_input(os.path.join(self.tmpdir, 'lions')))
+                          read_input(os.path.join(self.tmpdir, 'lions')))
 
     def test_bad_glob(self):
         # read_input is a generator, so we won't get an error
         # until we try to read from it
         self.assertRaises(IOError, list,
-                      read_input(os.path.join(self.tmpdir, 'lions*')))
+                          read_input(os.path.join(self.tmpdir, 'lions*')))
 
 
 class SafeEvalTestCase(TestCase):
@@ -219,8 +219,9 @@ class SafeEvalTestCase(TestCase):
     def test_globals_and_locals(self):
         # test passing in globals, locals
         a = -0.2
-        self.assertEqual(abs(a),
-                     safeeval('abs(a)', globals={'abs': abs}, locals={'a': a}))
+        self.assertEqual(
+            abs(a),
+            safeeval('abs(a)', globals={'abs': abs}, locals={'a': a}))
 
 
 class ArchiveTestCase(TestCase):
@@ -265,9 +266,9 @@ class ArchiveTestCase(TestCase):
         expected_files = (set(expected_files + added_files) -
                           set(excluded_files))
         self.assertEqual(sorted(os.listdir(join(self.tmp_dir, 'b'))),
-                     sorted(expected_files))
+                         sorted(expected_files))
         self.assertEqual(os.listdir(join(self.tmp_dir, 'b', 'qux')),
-                     ['quux'])
+                         ['quux'])
 
         # make sure their contents are intact
         with open(join(self.tmp_dir, 'b', 'foo')) as foo:
@@ -305,8 +306,9 @@ class ArchiveTestCase(TestCase):
                      out_path=join(self.tmp_dir, 'not_a.tar.gz'),
                      prefix='b')
 
-        self.assertEqual(extract_dir_for_tar(join(self.tmp_dir, 'not_a.tar.gz')),
-                     'b')
+        self.assertEqual(
+            extract_dir_for_tar(join(self.tmp_dir, 'not_a.tar.gz')),
+            'b')
 
     def archive_and_unarchive(self, extension, archive_template,
                               added_files=[]):
@@ -357,8 +359,9 @@ class ArchiveTestCase(TestCase):
     def test_unarchive_non_archive(self):
         join = os.path.join
 
-        self.assertRaises(IOError, unarchive, join(self.tmp_dir, 'a', 'foo'),
-                      join(self.tmp_dir, 'b'))
+        self.assertRaises(
+            IOError,
+            unarchive, join(self.tmp_dir, 'a', 'foo'), join(self.tmp_dir, 'b'))
 
 
 class read_fileTest(TestCase):

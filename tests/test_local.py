@@ -97,7 +97,7 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
         assert not os.path.exists(local_tmp_dir)
 
         self.assertEqual(sorted(results),
-                     [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+                         [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
     def test_end_to_end_multiple_tasks(self):
         # read from STDIN, a regular file, and a .gz
@@ -136,7 +136,7 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
         assert not os.path.exists(local_tmp_dir)
 
         self.assertEqual(sorted(results),
-                     [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+                         [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
     def test_get_file_splits_test(self):
         # set up input paths
@@ -163,8 +163,8 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
             content.extend(f.readlines())
 
         self.assertEqual(sorted(content),
-                    ['bar\n', 'bar\n', 'bar\n', 'bar\n', 'foo\n',
-                     'foo\n', 'foo\n', 'qux\n', 'qux\n'])
+                         ['bar\n', 'bar\n', 'bar\n', 'bar\n', 'foo\n',
+                          'foo\n', 'foo\n', 'qux\n', 'qux\n'])
 
     def test_get_file_splits_sorted_test(self):
         # set up input paths
@@ -189,9 +189,9 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
             content.extend(f.readlines())
 
         self.assertEqual(content,
-                     ['1\tbar\n', '1\tbar\n', '1\tbar\n',
-                      '2\tfoo\n', '2\tfoo\n', '2\tfoo\n',
-                      '3\tqux\n', '3\tqux\n', '3\tqux\n'])
+                         ['1\tbar\n', '1\tbar\n', '1\tbar\n',
+                          '2\tfoo\n', '2\tfoo\n', '2\tfoo\n',
+                          '3\tqux\n', '3\tqux\n', '3\tqux\n'])
 
     def test_multi_step_counters(self):
         # read from STDIN, a regular file, and a .gz
@@ -209,9 +209,10 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
                 key, value = mr_job.parse_output_line(line)
                 results.append((key, value))
 
-            self.assertEqual(runner._counters, [{'group': {'counter_name': 2}},
-                                            {'group': {'counter_name': 2}},
-                                            {'group': {'counter_name': 2}}])
+            self.assertEqual(runner._counters,
+                             [{'group': {'counter_name': 2}},
+                              {'group': {'counter_name': 2}},
+                              {'group': {'counter_name': 2}}])
 
 
 class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):
@@ -273,7 +274,8 @@ class LargeAmountsOfStderrTestCase(TestCase):
 
             # look for expected output from MRVerboseJob
             stderr = mr_job.stderr.getvalue()
-            self.assertIn("Counters from step 1:\n  Foo:\n    Bar: 10000", stderr)
+            self.assertIn(
+                "Counters from step 1:\n  Foo:\n    Bar: 10000", stderr)
             self.assertIn('status: 0\n', stderr)
             self.assertIn('status: 99\n', stderr)
             self.assertNotIn('status: 100\n', stderr)
@@ -331,7 +333,8 @@ class PythonBinTestCase(TestCase):
         self.assertIn('#', mr_job.stderr.getvalue())
 
         # should still get expected results
-        self.assertEqual(sorted(mr_job.parse_output()), [(1, None), (1, 'bar')])
+        self.assertEqual(sorted(mr_job.parse_output()),
+                         [(1, None), (1, 'bar')])
 
 
 class StepsPythonBinTestCase(TestCase):
@@ -465,7 +468,7 @@ class LocalMRJobRunnerTestJobConfCase(TestCase):
             self.assertEqual(runner.counters()[0]['count']['combiners'], 2)
 
         self.assertEqual(sorted(results),
-                     [(input_path, 3), (input_gz_path, 1)])
+                         [(input_path, 3), (input_gz_path, 1)])
 
     def test_others(self):
         input_path = os.path.join(self.tmp_dir, 'input')
@@ -487,18 +490,20 @@ class LocalMRJobRunnerTestJobConfCase(TestCase):
                 results[key] = value
 
         self.assertEqual(results['mapreduce.job.cache.archives'],
-                     runner._mrjob_tar_gz_path + '#mrjob.tar.gz')
-        self.assertEqual(results['mapreduce.job.id'], runner._job_name),
-        self.assertEqual(results['mapreduce.job.local.dir'], runner._working_dir),
-        self.assertEqual(results['mapreduce.map.input.file'], input_path),
-        self.assertEqual(results['mapreduce.map.input.length'], '4'),
-        self.assertEqual(results['mapreduce.map.input.start'], '0'),
+                         runner._mrjob_tar_gz_path + '#mrjob.tar.gz')
+        self.assertEqual(results['mapreduce.job.id'], runner._job_name)
+        self.assertEqual(results['mapreduce.job.local.dir'],
+                         runner._working_dir)
+        self.assertEqual(results['mapreduce.map.input.file'], input_path)
+        self.assertEqual(results['mapreduce.map.input.length'], '4')
+        self.assertEqual(results['mapreduce.map.input.start'], '0')
         self.assertEqual(results['mapreduce.task.attempt.id'],
-                       'attempt_%s_m_000000_0' % runner._job_name),
+                       'attempt_%s_m_000000_0' % runner._job_name)
         self.assertEqual(results['mapreduce.task.id'],
-                       'task_%s_m_000000' % runner._job_name),
-        self.assertEqual(results['mapreduce.task.ismap'], 'true'),
-        self.assertEqual(results['mapreduce.task.output.dir'], runner._output_dir),
+                       'task_%s_m_000000' % runner._job_name)
+        self.assertEqual(results['mapreduce.task.ismap'], 'true')
+        self.assertEqual(results['mapreduce.task.output.dir'],
+                         runner._output_dir)
         self.assertEqual(results['mapreduce.task.partition'], '0')
         self.assertEqual(results['user.defined'], 'something')
 
@@ -513,11 +518,11 @@ class CompatTestCase(TestCase):
         with runner as runner:
             runner._setup_working_dir()
             self.assertIn('mapred_cache_localArchives',
-                  runner._subprocess_env('M', 0, 0).keys())
+                          runner._subprocess_env('M', 0, 0).keys())
 
     def test_environment_variables_021(self):
         runner = LocalMRJobRunner(hadoop_version='0.21', conf_path=False)
         with runner as runner:
             runner._setup_working_dir()
             self.assertIn('mapreduce_job_cache_local_archives',
-                      runner._subprocess_env('M', 0, 0).keys())
+                          runner._subprocess_env('M', 0, 0).keys())

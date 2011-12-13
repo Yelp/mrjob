@@ -73,7 +73,7 @@ class TestFindHadoopStreamingJar(TestCase):
             jar_dir, 'hadoop-0.20.2-streaming.jar')
         open(streaming_jar_path, 'w').close()
         self.assertEqual(find_hadoop_streaming_jar(self.tmp_dir),
-                     streaming_jar_path)
+                         streaming_jar_path)
 
         # shouldn't find anything if we look in the wrong dir
         self.assertEqual(find_hadoop_streaming_jar(empty_dir), None)
@@ -199,9 +199,10 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             self.assertEqual(sorted(os.listdir(hdfs_root)), ['data', 'user'])
             home_dir = os.path.join(hdfs_root, 'user', getpass.getuser())
             self.assertEqual(os.listdir(home_dir), ['tmp'])
-            self.assertEqual(os.listdir(os.path.join(home_dir, 'tmp')), ['mrjob'])
+            self.assertEqual(os.listdir(os.path.join(home_dir, 'tmp')),
+                             ['mrjob'])
             self.assertEqual(runner._opts['hadoop_extra_args'],
-                         ['-libjar', 'containsJars.jar'])
+                             ['-libjar', 'containsJars.jar'])
 
             # make sure mrjob.tar.gz is uploaded and in PYTHONPATH
             assert runner._mrjob_tar_gz_path
@@ -215,10 +216,10 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
             pythonpath = runner._get_cmdenv()['PYTHONPATH']
             self.assertIn(mrjob_tar_gz_file_dict['name'],
-                      pythonpath.split(':'))
+                          pythonpath.split(':'))
 
         self.assertEqual(sorted(results),
-                     [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+                         [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
         # make sure we called hadoop the way we expected
         with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:

@@ -86,9 +86,9 @@ class WithStatementTestCase(TestCase):
 
     def test_cleanup_error(self):
         self.assertRaises(ValueError, self._test_cleanup_after_with_statement,
-                      ['NONE', 'ALL'], True)
+                          ['NONE', 'ALL'], True)
         self.assertRaises(ValueError, self._test_cleanup_after_with_statement,
-                      ['GARBAGE'], True)
+                          ['GARBAGE'], True)
 
     def test_double_none_okay(self):
         self._test_cleanup_after_with_statement(['NONE', 'NONE'], True)
@@ -107,7 +107,7 @@ class WithStatementTestCase(TestCase):
 
     def test_cleanup_not_supported(self):
         self.assertRaises(ValueError,
-                      LocalMRJobRunner, cleanup_on_failure=CLEANUP_DEFAULT)
+                          LocalMRJobRunner, cleanup_on_failure=CLEANUP_DEFAULT)
 
 
 class TestExtraKwargs(TestCase):
@@ -222,7 +222,8 @@ class TestJobName(TestCase):
             match.group(3) + match.group(4), '%Y%m%d%H%M%S')
         job_start = job_start.replace(microsecond=int(match.group(5)))
         self.assertGreaterEqual(job_start, test_start)
-        self.assertLessEqual(job_start - test_start, datetime.timedelta(seconds=5))
+        self.assertLessEqual(job_start - test_start,
+                             datetime.timedelta(seconds=5))
 
     def test_owner_and_label_switches(self):
         runner_opts = ['--no-conf', '--owner=ads', '--label=ads_chain']
@@ -271,26 +272,26 @@ class TestHadoopConfArgs(TestCase):
         cmdenv = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
         runner = LocalMRJobRunner(conf_path=False, cmdenv=cmdenv)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
-                     ['-cmdenv', 'BAX=Arnold',
-                      '-cmdenv', 'BAZ=qux',
-                      '-cmdenv', 'FOO=bar',
-                      ])
+                         ['-cmdenv', 'BAX=Arnold',
+                          '-cmdenv', 'BAZ=qux',
+                          '-cmdenv', 'FOO=bar',
+                          ])
 
     def test_hadoop_input_format(self):
         format = 'org.apache.hadoop.mapred.SequenceFileInputFormat'
         runner = LocalMRJobRunner(conf_path=False, hadoop_input_format=format)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
-                     ['-inputformat', format])
+                         ['-inputformat', format])
         # test multi-step job
         self.assertEqual(runner._hadoop_conf_args(0, 2),
-                     ['-inputformat', format])
+                         ['-inputformat', format])
         self.assertEqual(runner._hadoop_conf_args(1, 2), [])
 
     def test_hadoop_output_format(self):
         format = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
         runner = LocalMRJobRunner(conf_path=False, hadoop_output_format=format)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
-                     ['-outputformat', format])
+                         ['-outputformat', format])
         # test multi-step job
         self.assertEqual(runner._hadoop_conf_args(0, 2), [])
         self.assertEqual(runner._hadoop_conf_args(1, 2),
@@ -300,24 +301,24 @@ class TestHadoopConfArgs(TestCase):
         jobconf = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
         runner = LocalMRJobRunner(conf_path=False, jobconf=jobconf)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
-                     ['-D', 'BAX=Arnold',
-                      '-D', 'BAZ=qux',
-                      '-D', 'FOO=bar',
-                      ])
+                         ['-D', 'BAX=Arnold',
+                          '-D', 'BAZ=qux',
+                          '-D', 'FOO=bar',
+                          ])
         runner = LocalMRJobRunner(conf_path=False, jobconf=jobconf,
                                   hadoop_version='0.18')
         self.assertEqual(runner._hadoop_conf_args(0, 1),
-                     ['-jobconf', 'BAX=Arnold',
-                      '-jobconf', 'BAZ=qux',
-                      '-jobconf', 'FOO=bar',
-                      ])
+                         ['-jobconf', 'BAX=Arnold',
+                          '-jobconf', 'BAZ=qux',
+                          '-jobconf', 'FOO=bar',
+                          ])
 
     def test_partitioner(self):
         partitioner = 'org.apache.hadoop.mapreduce.Partitioner'
 
         runner = LocalMRJobRunner(conf_path=False, partitioner=partitioner)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
-                     ['-partitioner', partitioner])
+                         ['-partitioner', partitioner])
 
     def test_hadoop_extra_args_comes_first(self):
         runner = LocalMRJobRunner(
@@ -436,7 +437,7 @@ class TestStreamingOutput(TestCase):
         runner = LocalMRJobRunner()
         runner._output_dir = self.tmp_dir
         self.assertEqual(sorted(runner.stream_output()),
-                     ['A', 'B', 'C'])
+                         ['A', 'B', 'C'])
 
 
 class TestInvokeSort(TestCase):
@@ -524,28 +525,28 @@ sys.exit(13)
     def test_no_files(self):
         runner = MRJobRunner(conf_path=False)
         self.assertRaises(ValueError,
-                      runner._invoke_sort, [], self.out)
+                          runner._invoke_sort, [], self.out)
 
     def test_one_file(self):
         runner = MRJobRunner(conf_path=False)
         runner._invoke_sort([self.a], self.out)
 
         self.assertEqual(list(open(self.out)),
-                     ['A\n',
-                      'alligator\n',
-                      'apple\n'])
+                         ['A\n',
+                          'alligator\n',
+                          'apple\n'])
 
     def test_two_files(self):
         runner = MRJobRunner(conf_path=False)
         runner._invoke_sort([self.a, self.b], self.out)
 
         self.assertEqual(list(open(self.out)),
-                     ['A\n',
-                      'B\n',
-                      'alligator\n',
-                      'apple\n',
-                      'ball\n',
-                      'banana\n'])
+                         ['A\n',
+                          'B\n',
+                          'alligator\n',
+                          'apple\n',
+                          'ball\n',
+                          'banana\n'])
 
     def test_windows_sort_on_one_file(self):
         self.use_simulated_windows_sort()

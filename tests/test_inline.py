@@ -87,7 +87,7 @@ class InlineMRJobRunnerEndToEndTestCase(TestCase):
         assert not os.path.exists(local_tmp_dir)
 
         self.assertEqual(sorted(results),
-                     [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+                         [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
 
 class InlineMRJobRunnerCmdenvTest(TestCase):
@@ -132,7 +132,7 @@ class InlineMRJobRunnerCmdenvTest(TestCase):
                 results.append((key, value))
 
         self.assertEqual(sorted(results),
-                     [('FOO', 'bar'), ('SOMETHING', 'foofoofoo')])
+                         [('FOO', 'bar'), ('SOMETHING', 'foofoofoo')])
 
         # make sure we revert back
         self.assertEqual(old_env, os.environ)

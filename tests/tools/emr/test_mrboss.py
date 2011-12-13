@@ -89,4 +89,4 @@ class MRBossTestCase(MockEMRAndS3TestCase):
             self.assertEqual(f.read(), 'file contents 2\n')
 
         self.assertEqual(sorted(os.listdir(self.output_dir)),
-                     ['master', 'slave testslave0'])
+                         ['master', 'slave testslave0'])

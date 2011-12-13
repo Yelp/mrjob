@@ -65,14 +65,13 @@ class ProtocolTestCase(TestCase):
         and get the same key and value we started with."""
         self.assertEqual((key, value),
                          protocol.read(protocol.write(key, value)))
-    
+
     def assertCantEncode(self, protocol, key, value):
         self.assertRaises(Exception, protocol.write, key, value)
-    
-    
+
     def assertCantDecode(self, protocol, data):
         self.assertRaises(Exception, protocol.read, data)
-    
+
 
 class JSONProtocolTestCase(ProtocolTestCase):
 
@@ -91,12 +90,12 @@ class JSONProtocolTestCase(ProtocolTestCase):
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
         self.assertEqual(([1, 2], [3, 4]),
-                     JSONProtocol.read(JSONProtocol.write((1, 2), (3, 4))))
+                         JSONProtocol.read(JSONProtocol.write((1, 2), (3, 4))))
 
     def test_numerical_keys_become_strs(self):
         # JSON should convert numbers to strings when they are dict keys
         self.assertEqual(({'1': 2}, {'3': 4}),
-                     JSONProtocol.read(JSONProtocol.write({1: 2}, {3: 4})))
+                         JSONProtocol.read(JSONProtocol.write({1: 2}, {3: 4})))
 
     def test_bad_data(self):
         self.assertCantDecode(JSONProtocol, '{@#$@#!^&*$%^')
@@ -201,7 +200,8 @@ class RawValueProtocolTestCase(ProtocolTestCase):
         self.assertRoundTripOK(RawValueProtocol, None, '\xe90\c1a')
 
     def test_no_strip(self):
-        self.assertEqual(RawValueProtocol.read('foo\t \n\n'), (None, 'foo\t \n\n'))
+        self.assertEqual(RawValueProtocol.read('foo\t \n\n'),
+                         (None, 'foo\t \n\n'))
 
 
 class ReprProtocolTestCase(ProtocolTestCase):

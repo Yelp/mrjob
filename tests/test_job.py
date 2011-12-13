@@ -211,19 +211,19 @@ class MRTestCase(TestCase):
 
         # make sure it returns the format we currently expect
         self.assertEqual(MRJob.mr(mapper, reducer),
-                     stepdict(mapper, reducer))
+                         stepdict(mapper, reducer))
         self.assertEqual(MRJob.mr(mapper, reducer,
-                              mapper_init=mapper_init,
-                              mapper_final=mapper_final,
-                              reducer_init=reducer_init,
-                              reducer_final=reducer_final),
-                     stepdict(mapper, reducer,
-                              mapper_init=mapper_init,
-                              mapper_final=mapper_final,
-                              reducer_init=reducer_init,
-                              reducer_final=reducer_final))
+                                  mapper_init=mapper_init,
+                                  mapper_final=mapper_final,
+                                  reducer_init=reducer_init,
+                                  reducer_final=reducer_final),
+                         stepdict(mapper, reducer,
+                                  mapper_init=mapper_init,
+                                  mapper_final=mapper_final,
+                                  reducer_init=reducer_init,
+                                  reducer_final=reducer_final))
         self.assertEqual(MRJob.mr(mapper),
-                     stepdict(mapper))
+                         stepdict(mapper))
 
     def test_no_mapper(self):
 
@@ -238,15 +238,15 @@ class MRTestCase(TestCase):
 
         self.assertRaises(Exception, MRJob.mr)
         self.assertEqual(MRJob.mr(reducer=reducer),
-                     stepdict(reducer=reducer))
+                         stepdict(reducer=reducer))
         self.assertEqual(MRJob.mr(reducer=reducer,
-                              mapper_final=mapper_final),
-                     stepdict(reducer=reducer,
-                              mapper_final=mapper_final))
+                                  mapper_final=mapper_final),
+                         stepdict(reducer=reducer,
+                                  mapper_final=mapper_final))
         self.assertEqual(MRJob.mr(reducer=reducer,
-                              mapper_init=mapper_init),
-                     stepdict(reducer=reducer,
-                              mapper_init=mapper_init))
+                                  mapper_init=mapper_init),
+                         stepdict(reducer=reducer,
+                                  mapper_init=mapper_init))
 
     def test_no_reducer(self):
 
@@ -257,9 +257,9 @@ class MRTestCase(TestCase):
             pass
 
         self.assertEqual(MRJob.mr(reducer_init=reducer_init),
-                     stepdict(reducer_init=reducer_init))
+                         stepdict(reducer_init=reducer_init))
         self.assertEqual(MRJob.mr(reducer_final=reducer_final),
-                     stepdict(reducer_final=reducer_final))
+                         stepdict(reducer_final=reducer_final))
 
 
 class MRInitTestCase(TestCase):
@@ -343,10 +343,10 @@ class CountersAndStatusTestCase(TestCase):
         parsed_stderr = parse_mr_job_stderr(mr_job.stderr.getvalue())
 
         self.assertEqual(parsed_stderr,
-                     {'counters': {'Foo': {'Bar': 2, 'Baz': 20}},
-                      'statuses': ['Initializing qux gradients...',
-                                   'Sorting metasyntactic variables...'],
-                      'other': []})
+                         {'counters': {'Foo': {'Bar': 2, 'Baz': 20}},
+                          'statuses': ['Initializing qux gradients...',
+                                       'Sorting metasyntactic variables...'],
+                          'other': []})
 
         # make sure parse_counters() works
         self.assertEqual(mr_job.parse_counters(), parsed_stderr['counters'])
@@ -360,13 +360,15 @@ class CountersAndStatusTestCase(TestCase):
         mr_job.increment_counter('Qux', 'Quux', 0)
 
         self.assertEqual(mr_job.parse_counters(),
-                     {'Foo': {'Bar': -1, 'Baz': 0}, 'Qux': {'Quux': 0}})
+                         {'Foo': {'Bar': -1, 'Baz': 0}, 'Qux': {'Quux': 0}})
 
     def test_bad_counter_amounts(self):
         mr_job = MRJob().sandbox()
 
-        self.assertRaises(TypeError, mr_job.increment_counter, 'Foo', 'Bar', 'two')
-        self.assertRaises(TypeError, mr_job.increment_counter, 'Foo', 'Bar', None)
+        self.assertRaises(TypeError,
+                          mr_job.increment_counter, 'Foo', 'Bar', 'two')
+        self.assertRaises(TypeError,
+                          mr_job.increment_counter, 'Foo', 'Bar', None)
 
     def test_commas_in_counters(self):
         # commas should be replaced with semicolons
@@ -376,8 +378,8 @@ class CountersAndStatusTestCase(TestCase):
         mr_job.increment_counter('girl, interrupted', 'movie')
 
         self.assertEqual(mr_job.parse_counters(),
-                     {'Bad items': {'a; b; c': 1},
-                      'girl; interrupted': {'movie': 1}})
+                         {'Bad items': {'a; b; c': 1},
+                          'girl; interrupted': {'movie': 1}})
 
 
 class ProtocolsTestCase(TestCase):
@@ -406,30 +408,30 @@ class ProtocolsTestCase(TestCase):
     def test_default_protocols(self):
         mr_job = MRBoringJob()
         self.assertEqual(mr_job.pick_protocols(0, 'M'),
-                     (RawValueProtocol.read, JSONProtocol.write))
+                         (RawValueProtocol.read, JSONProtocol.write))
         self.assertEqual(mr_job.pick_protocols(0, 'R'),
-                     (JSONProtocol.read, JSONProtocol.write))
+                         (JSONProtocol.read, JSONProtocol.write))
 
     def test_explicit_default_protocols(self):
         mr_job2 = self.MRBoringJob2().sandbox()
         self.assertEqual(mr_job2.pick_protocols(0, 'M'),
-                     (JSONProtocol.read, PickleProtocol.write))
+                         (JSONProtocol.read, PickleProtocol.write))
         self.assertEqual(mr_job2.pick_protocols(0, 'R'),
-                     (PickleProtocol.read, ReprProtocol.write))
+                         (PickleProtocol.read, ReprProtocol.write))
 
         mr_job3 = self.MRBoringJob3()
         self.assertEqual(mr_job3.pick_protocols(0, 'M'),
-                     (RawValueProtocol.read, ReprProtocol.write))
+                         (RawValueProtocol.read, ReprProtocol.write))
         # output protocol should default to JSON
         self.assertEqual(mr_job3.pick_protocols(0, 'R'),
-                     (ReprProtocol.read, JSONProtocol.write))
+                         (ReprProtocol.read, JSONProtocol.write))
 
         mr_job4 = self.MRBoringJob4()
         self.assertEqual(mr_job4.pick_protocols(0, 'M'),
-                     (RawValueProtocol.read, ReprProtocol.write))
+                         (RawValueProtocol.read, ReprProtocol.write))
         # output protocol should default to JSON
         self.assertEqual(mr_job4.pick_protocols(0, 'R'),
-                     (ReprProtocol.read, JSONProtocol.write))
+                         (ReprProtocol.read, JSONProtocol.write))
 
     def test_mapper_raw_value_to_json(self):
         RAW_INPUT = StringIO('foo\nbar\nbaz\n')
@@ -439,9 +441,9 @@ class ProtocolsTestCase(TestCase):
         mr_job.run_mapper()
 
         self.assertEqual(mr_job.stdout.getvalue(),
-                     'null\t"foo"\n' +
-                     'null\t"bar"\n' +
-                     'null\t"baz"\n')
+                         'null\t"foo"\n' +
+                         'null\t"bar"\n' +
+                         'null\t"baz"\n')
 
     def test_reducer_json_to_json(self):
         JSON_INPUT = StringIO('"foo"\t"bar"\n' +
@@ -453,8 +455,8 @@ class ProtocolsTestCase(TestCase):
         mr_job.run_reducer()
 
         self.assertEqual(mr_job.stdout.getvalue(),
-                     ('"foo"\t["bar", "baz"]\n' +
-                      '"bar"\t["qux"]\n'))
+                         ('"foo"\t["bar", "baz"]\n' +
+                          '"bar"\t["qux"]\n'))
 
     def test_output_protocol_with_no_final_reducer(self):
         # if there's no reducer, the last mapper should use the
@@ -466,9 +468,9 @@ class ProtocolsTestCase(TestCase):
         mr_job.run_mapper()
 
         self.assertEqual(mr_job.stdout.getvalue(),
-                     ("None\t'foo'\n" +
-                      "None\t'bar'\n" +
-                      "None\t'baz'\n"))
+                         ("None\t'foo'\n" +
+                          "None\t'bar'\n" +
+                          "None\t'baz'\n"))
 
     def test_undecodable_input(self):
         BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
@@ -512,10 +514,10 @@ class ProtocolsTestCase(TestCase):
 
         # good data should still get through
         self.assertEqual(mr_job.stdout.getvalue(),
-                     ('null\t"foo"\n' + 'null\t"bar"\n'))
+                         ('null\t"foo"\n' + 'null\t"bar"\n'))
 
         self.assertEqual(mr_job.parse_counters(),
-                     {'Unencodable output': {'UnicodeDecodeError': 1}})
+                         {'Unencodable output': {'UnicodeDecodeError': 1}})
 
     def test_undecodable_output_strict(self):
         UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
@@ -646,9 +648,9 @@ class DeprecatedProtocolsTestCase(TestCase):
         mr_job.run_mapper()
 
         self.assertEqual(mr_job.stdout.getvalue(),
-                     'null\t"foo"\n' +
-                     'null\t"bar"\n' +
-                     'null\t"baz"\n')
+                         'null\t"foo"\n' +
+                         'null\t"bar"\n' +
+                         'null\t"baz"\n')
 
     def test_reducer_json_to_json(self):
         JSON_INPUT = StringIO('"foo"\t"bar"\n' +
@@ -661,8 +663,8 @@ class DeprecatedProtocolsTestCase(TestCase):
         mr_job.run_reducer()
 
         self.assertEqual(mr_job.stdout.getvalue(),
-                     ('"foo"\t["bar", "baz"]\n' +
-                      '"bar"\t["qux"]\n'))
+                         ('"foo"\t["bar", "baz"]\n' +
+                          '"bar"\t["qux"]\n'))
 
     def test_output_protocol_with_no_final_reducer(self):
         # if there's no reducer, the last mapper should use the
@@ -676,9 +678,9 @@ class DeprecatedProtocolsTestCase(TestCase):
 
         self.assertEqual(mr_job.options.output_protocol, 'repr')
         self.assertEqual(mr_job.stdout.getvalue(),
-                     ("None\t'foo'\n" +
-                      "None\t'bar'\n" +
-                      "None\t'baz'\n"))
+                         ("None\t'foo'\n" +
+                          "None\t'bar'\n" +
+                          "None\t'baz'\n"))
 
     def test_undecodable_input(self):
         BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
@@ -725,10 +727,10 @@ class DeprecatedProtocolsTestCase(TestCase):
 
         # good data should still get through
         self.assertEqual(mr_job.stdout.getvalue(),
-                     ('null\t"foo"\n' + 'null\t"bar"\n'))
+                         ('null\t"foo"\n' + 'null\t"bar"\n'))
 
         self.assertEqual(mr_job.parse_counters(),
-                     {'Unencodable output': {'UnicodeDecodeError': 1}})
+                         {'Unencodable output': {'UnicodeDecodeError': 1}})
 
     def test_undecodable_output_strict(self):
         UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
@@ -766,15 +768,15 @@ class JobConfTestCase(TestCase):
         ])
 
         self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
-                     {'mapred.foo': 'baz',  # second option takes priority
-                      'mapred.qux': 'quux'})
+                         {'mapred.foo': 'baz',  # second option takes priority
+                          'mapred.qux': 'quux'})
 
     def test_jobconf_attr(self):
         mr_job = self.MRJobConfJob()
 
         self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
-                     {'mapred.foo': 'garply',
-                      'mapred.bar.bar.baz': 'foo'})
+                         {'mapred.foo': 'garply',
+                          'mapred.bar.bar.baz': 'foo'})
 
     def test_jobconf_attr_and_cmd_line_options(self):
         mr_job = self.MRJobConfJob([
@@ -784,15 +786,15 @@ class JobConfTestCase(TestCase):
         ])
 
         self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
-                     {'mapred.bar.bar.baz': 'foo',
-                      'mapred.foo': 'baz',  # command line takes priority
-                      'mapred.qux': 'quux'})
+                         {'mapred.bar.bar.baz': 'foo',
+                          'mapred.foo': 'baz',  # command line takes priority
+                          'mapred.qux': 'quux'})
 
     def test_redefined_jobconf_method(self):
         mr_job = self.MRJobConfMethodJob()
 
         self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
-                     {'mapred.baz': 'bar'})
+                         {'mapred.baz': 'bar'})
 
     def test_redefined_jobconf_method_overrides_cmd_line(self):
         mr_job = self.MRJobConfMethodJob([
@@ -802,7 +804,7 @@ class JobConfTestCase(TestCase):
 
         # --jobconf is ignored because that's the way we defined jobconf()
         self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
-                     {'mapred.baz': 'bar'})
+                         {'mapred.baz': 'bar'})
 
 
 class HadoopFormatTestCase(TestCase):
@@ -821,24 +823,26 @@ class HadoopFormatTestCase(TestCase):
     def test_empty(self):
         mr_job = MRJob()
 
-        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_input_format'], None)
-        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'], None)
+        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_input_format'],
+                         None)
+        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'],
+                         None)
 
     def test_hadoop_format_attributes(self):
         mr_job = MRHadoopFormatJob()
 
         self.assertEqual(mr_job.job_runner_kwargs()['hadoop_input_format'],
-                     'mapred.FooInputFormat')
+                         'mapred.FooInputFormat')
         self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'],
-                     'mapred.BarOutputFormat')
+                         'mapred.BarOutputFormat')
 
     def test_hadoop_format_methods(self):
         mr_job = self.MRHadoopFormatMethodJob()
 
         self.assertEqual(mr_job.job_runner_kwargs()['hadoop_input_format'],
-                     'mapred.ReasonableInputFormat')
+                         'mapred.ReasonableInputFormat')
         self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'],
-                     'mapred.EbcdicDb2EnterpriseXmlOutputFormat')
+                         'mapred.EbcdicDb2EnterpriseXmlOutputFormat')
 
     def test_deprecated_command_line_options(self):
         mr_job = MRJob([
@@ -849,10 +853,11 @@ class HadoopFormatTestCase(TestCase):
             ])
 
         with logger_disabled('mrjob.job'):
-            self.assertEqual(mr_job.job_runner_kwargs()['hadoop_input_format'],
-                         'org.apache.hadoop.mapred.lib.NLineInputFormat')
-            self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'],
-                         'org.apache.hadoop.mapred.FileOutputFormat')
+            job_runner_kwargs = mr_job.job_runner_kwargs()
+            self.assertEqual(job_runner_kwargs['hadoop_input_format'],
+                             'org.apache.hadoop.mapred.lib.NLineInputFormat')
+            self.assertEqual(job_runner_kwargs['hadoop_output_format'],
+                             'org.apache.hadoop.mapred.FileOutputFormat')
 
     def test_deprecated_command_line_options_override_attrs(self):
         mr_job = MRHadoopFormatJob([
@@ -863,10 +868,11 @@ class HadoopFormatTestCase(TestCase):
             ])
 
         with logger_disabled('mrjob.job'):
-            self.assertEqual(mr_job.job_runner_kwargs()['hadoop_input_format'],
-                         'org.apache.hadoop.mapred.lib.NLineInputFormat')
-            self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'],
-                         'org.apache.hadoop.mapred.FileOutputFormat')
+            job_runner_kwargs = mr_job.job_runner_kwargs()
+            self.assertEqual(job_runner_kwargs['hadoop_input_format'],
+                             'org.apache.hadoop.mapred.lib.NLineInputFormat')
+            self.assertEqual(job_runner_kwargs['hadoop_output_format'],
+                             'org.apache.hadoop.mapred.FileOutputFormat')
 
 
 class PartitionerTestCase(TestCase):
@@ -887,13 +893,14 @@ class PartitionerTestCase(TestCase):
 
         # second option takes priority
         self.assertEqual(mr_job.job_runner_kwargs()['partitioner'],
-                     'org.apache.hadoop.mapreduce.Partitioner')
+                         'org.apache.hadoop.mapreduce.Partitioner')
 
     def test_partitioner_attr(self):
         mr_job = self.MRPartitionerJob()
 
-        self.assertEqual(mr_job.job_runner_kwargs()['partitioner'],
-                     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
+        self.assertEqual(
+            mr_job.job_runner_kwargs()['partitioner'],
+            'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
 
     def test_partitioner_attr_and_cmd_line_options(self):
         mr_job = self.MRPartitionerJob([
@@ -903,7 +910,7 @@ class PartitionerTestCase(TestCase):
 
         # command line takes priority
         self.assertEqual(mr_job.job_runner_kwargs()['partitioner'],
-                     'org.apache.hadoop.mapreduce.Partitioner')
+                         'org.apache.hadoop.mapreduce.Partitioner')
 
 
 class IsMapperOrReducerTestCase(TestCase):
@@ -921,14 +928,14 @@ class StepsTestCase(TestCase):
     def test_auto_build_steps(self):
         mrbj = MRBoringJob()
         self.assertEqual(mrbj.steps(),
-                     [stepdict(mapper=mrbj.mapper,
-                               reducer=mrbj.reducer)])
+                         [stepdict(mapper=mrbj.mapper,
+                                   reducer=mrbj.reducer)])
 
         mrfbj = MRFinalBoringJob()
         self.assertEqual(mrfbj.steps(),
-                     [stepdict(mapper=mrfbj.mapper,
-                               mapper_final=mrfbj.mapper_final,
-                               reducer=mrfbj.reducer)])
+                         [stepdict(mapper=mrfbj.mapper,
+                                   mapper_final=mrfbj.mapper_final,
+                                   reducer=mrfbj.reducer)])
 
     def test_show_steps(self):
         mr_boring_job = MRBoringJob(['--steps'])
@@ -965,20 +972,20 @@ class StepsTestCase(TestCase):
         self.assertEqual(MRJob.mr(mapper), MRJob.mr(mapper=mapper))
 
         self.assertEqual(MRJob.mr(mapper, reducer),
-                     MRJob.mr(mapper=mapper, reducer=reducer))
+                         MRJob.mr(mapper=mapper, reducer=reducer))
 
         self.assertEqual(MRJob.mr(mapper, reducer=reducer),
-                     MRJob.mr(mapper=mapper, reducer=reducer))
+                         MRJob.mr(mapper=mapper, reducer=reducer))
 
         self.assertEqual(MRJob.mr(mapper, reducer, combiner=combiner),
-                     MRJob.mr(mapper=mapper, reducer=reducer,
-                              combiner=combiner))
+                         MRJob.mr(mapper=mapper, reducer=reducer,
+                                  combiner=combiner))
 
         # can't specify something as a positional and keyword arg
         self.assertRaises(TypeError,
-                      MRJob.mr, mapper, mapper=mapper)
+                          MRJob.mr, mapper, mapper=mapper)
         self.assertRaises(TypeError,
-                      MRJob.mr, mapper, reducer, reducer=reducer)
+                          MRJob.mr, mapper, reducer, reducer=reducer)
 
     def test_deprecated_mapper_final_positional_arg(self):
         def mapper(k, v):
@@ -998,8 +1005,8 @@ class StepsTestCase(TestCase):
         # should be allowed to specify mapper_final as a positional arg,
         # but we log a warning
         self.assertEqual(step, MRJob.mr(mapper=mapper,
-                                    reducer=reducer,
-                                    mapper_final=mapper_final))
+                                        reducer=reducer,
+                                        mapper_final=mapper_final))
         self.assertIn('mapper_final should be specified', stderr.getvalue())
 
         # can't specify mapper_final as a positional and keyword arg
@@ -1019,8 +1026,8 @@ class StepNumTestCase(TestCase):
             mr_job.sandbox(input_lines)
             mr_job.run_mapper(0)
             self.assertEqual(mr_job.parse_output(),
-                         [(None, 'foo'), ('foo', None),
-                          (None, 'bar'), ('bar', None)])
+                             [(None, 'foo'), ('foo', None),
+                              (None, 'bar'), ('bar', None)])
 
         mapper0 = MRTwoStepJob()
         test_mapper0(mapper0, mapper0_input_lines)
@@ -1038,7 +1045,7 @@ class StepNumTestCase(TestCase):
             mr_job.sandbox(input_lines)
             mr_job.run_reducer(0)
             self.assertEqual(mr_job.parse_output(),
-                         [('bar', 1), ('foo', 1), (None, 2)])
+                             [('bar', 1), ('foo', 1), (None, 2)])
 
         reducer0 = MRTwoStepJob()
         test_reducer0(reducer0, reducer0_input_lines)
@@ -1054,7 +1061,7 @@ class StepNumTestCase(TestCase):
             mr_job.sandbox(input_lines)
             mr_job.run_mapper(1)
             self.assertEqual(mr_job.parse_output(),
-                         [(1, 'bar'), (1, 'foo'), (2, None)])
+                             [(1, 'bar'), (1, 'foo'), (2, None)])
 
         mapper1 = MRTwoStepJob()
         test_mapper1(mapper1, mapper1_input_lines)
@@ -1092,7 +1099,7 @@ class CommandLineArgsTest(TestCase):
              '--cmdenv', 'FOO=baz',
              '--cmdenv', 'BAZ=qux=quux'])
         self.assertEqual(mr_job.options.cmdenv,
-                     {'FOO': 'baz', 'BAZ': 'qux=quux'})
+                         {'FOO': 'baz', 'BAZ': 'qux=quux'})
 
         # must have KEY=VALUE
         self.assertRaises(ValueError, MRBoringJob, ['--cmdenv', 'FOO'])
@@ -1190,7 +1197,7 @@ class CommandLineArgsTest(TestCase):
 
     def test_bad_custom_options(self):
         self.assertRaises(ValueError,
-                      MRCustomBoringJob, ['--planck-constant', 'c'])
+                          MRCustomBoringJob, ['--planck-constant', 'c'])
         self.assertRaises(ValueError, MRCustomBoringJob, ['--pill-type=green'])
 
     def test_bad_option_types(self):
@@ -1306,7 +1313,7 @@ class ParseOutputTestCase(TestCase):
         output = "0\t1\n['a', 'b']\tset(['c', 'd'])\n"
         mr_job.stdout = StringIO(output)
         self.assertEqual(mr_job.parse_output(ReprProtocol()),
-                     [(0, 1), (['a', 'b'], set(['c', 'd']))])
+                         [(0, 1), (['a', 'b'], set(['c', 'd']))])
 
         # verify that stdout is not cleared
         self.assertEqual(mr_job.stdout.getvalue(), output)
@@ -1317,7 +1324,7 @@ class ParseOutputTestCase(TestCase):
         output = "0\t1\n['a', 'b']\tset(['c', 'd'])\n"
         mr_job.stdout = StringIO(output)
         self.assertEqual(mr_job.parse_output('repr'),
-                     [(0, 1), (['a', 'b'], set(['c', 'd']))])
+                         [(0, 1), (['a', 'b'], set(['c', 'd']))])
 
         # verify that stdout is not cleared
         self.assertEqual(mr_job.stdout.getvalue(), output)
@@ -1351,24 +1358,24 @@ class RunJobTestCase(TestCase):
     def test_quiet(self):
         stdout, stderr, returncode = self.run_job(['-q'])
         self.assertEqual(sorted(StringIO(stdout)), ['1\t"foo"\n',
-                                                '2\t"bar"\n',
-                                                '3\tnull\n'])
+                                                    '2\t"bar"\n',
+                                                    '3\tnull\n'])
         self.assertEqual(stderr, '')
         self.assertEqual(returncode, 0)
 
     def test_verbose(self):
         stdout, stderr, returncode = self.run_job()
         self.assertEqual(sorted(StringIO(stdout)), ['1\t"foo"\n',
-                                                '2\t"bar"\n',
-                                                '3\tnull\n'])
+                                                    '2\t"bar"\n',
+                                                    '3\tnull\n'])
         self.assertNotEqual(stderr, '')
         self.assertEqual(returncode, 0)
         normal_stderr = stderr
 
         stdout, stderr, returncode = self.run_job(['-v'])
         self.assertEqual(sorted(StringIO(stdout)), ['1\t"foo"\n',
-                                                '2\t"bar"\n',
-                                                '3\tnull\n'])
+                                                    '2\t"bar"\n',
+                                                    '3\tnull\n'])
         self.assertNotEqual(stderr, '')
         self.assertEqual(returncode, 0)
         self.assertGreater(len(stderr), len(normal_stderr))
@@ -1391,7 +1398,7 @@ class RunJobTestCase(TestCase):
                     output_lines.extend(output_f)
 
         self.assertEqual(sorted(output_lines),
-                     ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])
+                         ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])
 
 
 class BadMainTestCase(TestCase):

@@ -18,9 +18,6 @@ from __future__ import with_statement
 from datetime import datetime
 from datetime import timedelta
 import tempfile
-from testify import assert_equal
-from testify import setup
-from testify import teardown
 import shutil
 
 try:
@@ -32,17 +29,23 @@ except ImportError:
 from mrjob.emr import EMRJobRunner
 from mrjob.parse import parse_s3_uri
 from mrjob.tools.emr.s3_tmpwatch import s3_cleanup
-from tests.emr_test import MockEMRAndS3TestCase
 from tests.mockboto import MockKey
+from tests.test_emr import MockEMRAndS3TestCase
 
 
 class S3TmpWatchTestCase(MockEMRAndS3TestCase):
 
-    @setup
+    def setUp(self):
+        super(S3TmpWatchTestCase, self).setUp()
+        self.make_tmp_dir_and_mrjob_conf()
+
+    def tearDown(self):
+        self.rm_tmp_dir()
+        super(S3TmpWatchTestCase, self).tearDown()
+
     def make_tmp_dir_and_mrjob_conf(self):
         self.tmp_dir = tempfile.mkdtemp()
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -86,7 +89,7 @@ class S3TmpWatchTestCase(MockEMRAndS3TestCase):
 
         # make sure key_bar is deleted
         assert isinstance(key_foo, MockKey)
-        assert_equal(key_bar, None)
+        self.assertEqual(key_bar, None)
         assert isinstance(key_qux, MockKey)
 
         s3_cleanup(remote_input_path, timedelta(hours=48), conf_path=False)
@@ -97,5 +100,5 @@ class S3TmpWatchTestCase(MockEMRAndS3TestCase):
 
         # make sure key_qux is deleted
         assert isinstance(key_foo, MockKey)
-        assert_equal(key_bar, None)
-        assert_equal(key_qux, None)
+        self.assertEqual(key_bar, None)
+        self.assertEqual(key_qux, None)

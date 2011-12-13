@@ -16,7 +16,7 @@ import os
 from mrjob.job import MRJob
 
 
-class MRCmdenvTest(MRJob):
+class MRTestCmdenv(MRJob):
     """cmdenv test."""
     def mapper(self, key, value):
         # try adding something
@@ -28,4 +28,4 @@ class MRCmdenvTest(MRJob):
 
 
 if __name__ == '__main__':
-    MRCmdenvTest.run()
+    MRTestCmdenv.run()

@@ -24,16 +24,12 @@ from subprocess import PIPE
 from StringIO import StringIO
 import sys
 import tempfile
-from testify import TestCase
-from testify import assert_equal
-from testify import assert_in
-from testify import assert_not_equal
-from testify import assert_not_in
-from testify import assert_gt
-from testify import assert_raises
-from testify import setup
-from testify import teardown
 import time
+
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
@@ -191,7 +187,7 @@ class MRCustomBoringJob(MRBoringJob):
 
 ### Test cases ###
 
-class MRTestCase(TestCase):
+class MRTestCase(unittest.TestCase):
     # some basic testing for the mr() function
     def test_mr(self):
 
@@ -214,20 +210,20 @@ class MRTestCase(TestCase):
             pass
 
         # make sure it returns the format we currently expect
-        assert_equal(MRJob.mr(mapper, reducer),
-                     stepdict(mapper, reducer))
-        assert_equal(MRJob.mr(mapper, reducer,
-                              mapper_init=mapper_init,
-                              mapper_final=mapper_final,
-                              reducer_init=reducer_init,
-                              reducer_final=reducer_final),
-                     stepdict(mapper, reducer,
-                              mapper_init=mapper_init,
-                              mapper_final=mapper_final,
-                              reducer_init=reducer_init,
-                              reducer_final=reducer_final))
-        assert_equal(MRJob.mr(mapper),
-                     stepdict(mapper))
+        self.assertEqual(MRJob.mr(mapper, reducer),
+                         stepdict(mapper, reducer))
+        self.assertEqual(MRJob.mr(mapper, reducer,
+                                  mapper_init=mapper_init,
+                                  mapper_final=mapper_final,
+                                  reducer_init=reducer_init,
+                                  reducer_final=reducer_final),
+                         stepdict(mapper, reducer,
+                                  mapper_init=mapper_init,
+                                  mapper_final=mapper_final,
+                                  reducer_init=reducer_init,
+                                  reducer_final=reducer_final))
+        self.assertEqual(MRJob.mr(mapper),
+                         stepdict(mapper))
 
     def test_no_mapper(self):
 
@@ -240,17 +236,17 @@ class MRTestCase(TestCase):
         def reducer(k, vs):
             pass
 
-        assert_raises(Exception, MRJob.mr)
-        assert_equal(MRJob.mr(reducer=reducer),
-                     stepdict(reducer=reducer))
-        assert_equal(MRJob.mr(reducer=reducer,
-                              mapper_final=mapper_final),
-                     stepdict(reducer=reducer,
-                              mapper_final=mapper_final))
-        assert_equal(MRJob.mr(reducer=reducer,
-                              mapper_init=mapper_init),
-                     stepdict(reducer=reducer,
-                              mapper_init=mapper_init))
+        self.assertRaises(Exception, MRJob.mr)
+        self.assertEqual(MRJob.mr(reducer=reducer),
+                         stepdict(reducer=reducer))
+        self.assertEqual(MRJob.mr(reducer=reducer,
+                                  mapper_final=mapper_final),
+                         stepdict(reducer=reducer,
+                                  mapper_final=mapper_final))
+        self.assertEqual(MRJob.mr(reducer=reducer,
+                                  mapper_init=mapper_init),
+                         stepdict(reducer=reducer,
+                                  mapper_init=mapper_init))
 
     def test_no_reducer(self):
 
@@ -260,13 +256,13 @@ class MRTestCase(TestCase):
         def reducer_final():
             pass
 
-        assert_equal(MRJob.mr(reducer_init=reducer_init),
-                     stepdict(reducer_init=reducer_init))
-        assert_equal(MRJob.mr(reducer_final=reducer_final),
-                     stepdict(reducer_final=reducer_final))
+        self.assertEqual(MRJob.mr(reducer_init=reducer_init),
+                         stepdict(reducer_init=reducer_init))
+        self.assertEqual(MRJob.mr(reducer_final=reducer_final),
+                         stepdict(reducer_final=reducer_final))
 
 
-class MRInitTestCase(TestCase):
+class MRInitTestCase(unittest.TestCase):
 
     def test_init_funcs(self):
         num_inputs = 2
@@ -282,10 +278,10 @@ class MRInitTestCase(TestCase):
                 results.append(value)
         # these numbers should match if mapper_init, reducer_init, and
         # combiner_init were called as expected
-        assert_equal(results[0], num_inputs * 10 * 10 * 2)
+        self.assertEqual(results[0], num_inputs * 10 * 10 * 2)
 
 
-class MRNoOutputTestCase(TestCase):
+class MRNoOutputTestCase(unittest.TestCase):
 
     def _test_no_main_with_class(self, cls):
         num_inputs = 2
@@ -299,7 +295,7 @@ class MRNoOutputTestCase(TestCase):
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
                 results.append(value)
-        assert_equal(results[0], num_inputs)
+        self.assertEqual(results[0], num_inputs)
 
     def test_no_map(self):
         self._test_no_main_with_class(MRInvisibleMapperJob)
@@ -311,16 +307,20 @@ class MRNoOutputTestCase(TestCase):
         self._test_no_main_with_class(MRInvisibleCombinerJob)
 
 
-class NoTzsetTestCase(TestCase):
+class NoTzsetTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.remove_time_tzset()
+
+    def tearDown(self):
+        self.restore_time_tzset()
     """Test systems without time.tzset() (e.g. Windows). See Issue #46."""
 
-    @setup
     def remove_time_tzset(self):
         if hasattr(time, 'tzset'):
             self._real_time_tzset = time.tzset
             del time.tzset
 
-    @teardown
     def restore_time_tzset(self):
         if hasattr(self, '_real_time_tzset'):
             time.tzset = self._real_time_tzset
@@ -329,7 +329,7 @@ class NoTzsetTestCase(TestCase):
         MRJob()
 
 
-class CountersAndStatusTestCase(TestCase):
+class CountersAndStatusTestCase(unittest.TestCase):
 
     def test_counters_and_status(self):
         mr_job = MRJob().sandbox()
@@ -342,14 +342,14 @@ class CountersAndStatusTestCase(TestCase):
 
         parsed_stderr = parse_mr_job_stderr(mr_job.stderr.getvalue())
 
-        assert_equal(parsed_stderr,
-                     {'counters': {'Foo': {'Bar': 2, 'Baz': 20}},
-                      'statuses': ['Initializing qux gradients...',
-                                   'Sorting metasyntactic variables...'],
-                      'other': []})
+        self.assertEqual(parsed_stderr,
+                         {'counters': {'Foo': {'Bar': 2, 'Baz': 20}},
+                          'statuses': ['Initializing qux gradients...',
+                                       'Sorting metasyntactic variables...'],
+                          'other': []})
 
         # make sure parse_counters() works
-        assert_equal(mr_job.parse_counters(), parsed_stderr['counters'])
+        self.assertEqual(mr_job.parse_counters(), parsed_stderr['counters'])
 
     def test_negative_and_zero_counters(self):
         mr_job = MRJob().sandbox()
@@ -359,14 +359,16 @@ class CountersAndStatusTestCase(TestCase):
         mr_job.increment_counter('Foo', 'Baz', -1)
         mr_job.increment_counter('Qux', 'Quux', 0)
 
-        assert_equal(mr_job.parse_counters(),
-                     {'Foo': {'Bar': -1, 'Baz': 0}, 'Qux': {'Quux': 0}})
+        self.assertEqual(mr_job.parse_counters(),
+                         {'Foo': {'Bar': -1, 'Baz': 0}, 'Qux': {'Quux': 0}})
 
     def test_bad_counter_amounts(self):
         mr_job = MRJob().sandbox()
 
-        assert_raises(TypeError, mr_job.increment_counter, 'Foo', 'Bar', 'two')
-        assert_raises(TypeError, mr_job.increment_counter, 'Foo', 'Bar', None)
+        self.assertRaises(TypeError,
+                          mr_job.increment_counter, 'Foo', 'Bar', 'two')
+        self.assertRaises(TypeError,
+                          mr_job.increment_counter, 'Foo', 'Bar', None)
 
     def test_commas_in_counters(self):
         # commas should be replaced with semicolons
@@ -375,12 +377,12 @@ class CountersAndStatusTestCase(TestCase):
         mr_job.increment_counter('Bad items', 'a, b, c')
         mr_job.increment_counter('girl, interrupted', 'movie')
 
-        assert_equal(mr_job.parse_counters(),
-                     {'Bad items': {'a; b; c': 1},
-                      'girl; interrupted': {'movie': 1}})
+        self.assertEqual(mr_job.parse_counters(),
+                         {'Bad items': {'a; b; c': 1},
+                          'girl; interrupted': {'movie': 1}})
 
 
-class ProtocolsTestCase(TestCase):
+class ProtocolsTestCase(unittest.TestCase):
     # not putting these in their own files because we're not going to invoke
     # it as a script anyway.
 
@@ -405,31 +407,31 @@ class ProtocolsTestCase(TestCase):
 
     def test_default_protocols(self):
         mr_job = MRBoringJob()
-        assert_equal(mr_job.pick_protocols(0, 'M'),
-                     (RawValueProtocol.read, JSONProtocol.write))
-        assert_equal(mr_job.pick_protocols(0, 'R'),
-                     (JSONProtocol.read, JSONProtocol.write))
+        self.assertEqual(mr_job.pick_protocols(0, 'M'),
+                         (RawValueProtocol.read, JSONProtocol.write))
+        self.assertEqual(mr_job.pick_protocols(0, 'R'),
+                         (JSONProtocol.read, JSONProtocol.write))
 
     def test_explicit_default_protocols(self):
         mr_job2 = self.MRBoringJob2().sandbox()
-        assert_equal(mr_job2.pick_protocols(0, 'M'),
-                     (JSONProtocol.read, PickleProtocol.write))
-        assert_equal(mr_job2.pick_protocols(0, 'R'),
-                     (PickleProtocol.read, ReprProtocol.write))
+        self.assertEqual(mr_job2.pick_protocols(0, 'M'),
+                         (JSONProtocol.read, PickleProtocol.write))
+        self.assertEqual(mr_job2.pick_protocols(0, 'R'),
+                         (PickleProtocol.read, ReprProtocol.write))
 
         mr_job3 = self.MRBoringJob3()
-        assert_equal(mr_job3.pick_protocols(0, 'M'),
-                     (RawValueProtocol.read, ReprProtocol.write))
+        self.assertEqual(mr_job3.pick_protocols(0, 'M'),
+                         (RawValueProtocol.read, ReprProtocol.write))
         # output protocol should default to JSON
-        assert_equal(mr_job3.pick_protocols(0, 'R'),
-                     (ReprProtocol.read, JSONProtocol.write))
+        self.assertEqual(mr_job3.pick_protocols(0, 'R'),
+                         (ReprProtocol.read, JSONProtocol.write))
 
         mr_job4 = self.MRBoringJob4()
-        assert_equal(mr_job4.pick_protocols(0, 'M'),
-                     (RawValueProtocol.read, ReprProtocol.write))
+        self.assertEqual(mr_job4.pick_protocols(0, 'M'),
+                         (RawValueProtocol.read, ReprProtocol.write))
         # output protocol should default to JSON
-        assert_equal(mr_job4.pick_protocols(0, 'R'),
-                     (ReprProtocol.read, JSONProtocol.write))
+        self.assertEqual(mr_job4.pick_protocols(0, 'R'),
+                         (ReprProtocol.read, JSONProtocol.write))
 
     def test_mapper_raw_value_to_json(self):
         RAW_INPUT = StringIO('foo\nbar\nbaz\n')
@@ -438,10 +440,10 @@ class ProtocolsTestCase(TestCase):
         mr_job.sandbox(stdin=RAW_INPUT)
         mr_job.run_mapper()
 
-        assert_equal(mr_job.stdout.getvalue(),
-                     'null\t"foo"\n' +
-                     'null\t"bar"\n' +
-                     'null\t"baz"\n')
+        self.assertEqual(mr_job.stdout.getvalue(),
+                         'null\t"foo"\n' +
+                         'null\t"bar"\n' +
+                         'null\t"baz"\n')
 
     def test_reducer_json_to_json(self):
         JSON_INPUT = StringIO('"foo"\t"bar"\n' +
@@ -452,9 +454,9 @@ class ProtocolsTestCase(TestCase):
         mr_job.sandbox(stdin=JSON_INPUT)
         mr_job.run_reducer()
 
-        assert_equal(mr_job.stdout.getvalue(),
-                     ('"foo"\t["bar", "baz"]\n' +
-                      '"bar"\t["qux"]\n'))
+        self.assertEqual(mr_job.stdout.getvalue(),
+                         ('"foo"\t["bar", "baz"]\n' +
+                          '"bar"\t["qux"]\n'))
 
     def test_output_protocol_with_no_final_reducer(self):
         # if there's no reducer, the last mapper should use the
@@ -465,10 +467,10 @@ class ProtocolsTestCase(TestCase):
         mr_job.sandbox(stdin=RAW_INPUT)
         mr_job.run_mapper()
 
-        assert_equal(mr_job.stdout.getvalue(),
-                     ("None\t'foo'\n" +
-                      "None\t'bar'\n" +
-                      "None\t'baz'\n"))
+        self.assertEqual(mr_job.stdout.getvalue(),
+                         ("None\t'foo'\n" +
+                          "None\t'bar'\n" +
+                          "None\t'baz'\n"))
 
     def test_undecodable_input(self):
         BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
@@ -481,13 +483,13 @@ class ProtocolsTestCase(TestCase):
         mr_job.run_reducer()
 
         # good data should still get through
-        assert_equal(mr_job.stdout.getvalue(), '"foo"\t["bar"]\n')
+        self.assertEqual(mr_job.stdout.getvalue(), '"foo"\t["bar"]\n')
 
         # exception type varies between versions of simplejson,
         # so just make sure there were three exceptions of some sort
         counters = mr_job.parse_counters()
-        assert_equal(counters.keys(), ['Undecodable input'])
-        assert_equal(sum(counters['Undecodable input'].itervalues()), 3)
+        self.assertEqual(counters.keys(), ['Undecodable input'])
+        self.assertEqual(sum(counters['Undecodable input'].itervalues()), 3)
 
     def test_undecodable_input_strict(self):
         BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
@@ -499,7 +501,7 @@ class ProtocolsTestCase(TestCase):
         mr_job.sandbox(stdin=BAD_JSON_INPUT)
 
         # make sure it raises an exception
-        assert_raises(Exception, mr_job.run_reducer)
+        self.assertRaises(Exception, mr_job.run_reducer)
 
     def test_unencodable_output(self):
         UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
@@ -511,11 +513,11 @@ class ProtocolsTestCase(TestCase):
         mr_job.run_mapper()
 
         # good data should still get through
-        assert_equal(mr_job.stdout.getvalue(),
-                     ('null\t"foo"\n' + 'null\t"bar"\n'))
+        self.assertEqual(mr_job.stdout.getvalue(),
+                         ('null\t"foo"\n' + 'null\t"bar"\n'))
 
-        assert_equal(mr_job.parse_counters(),
-                     {'Unencodable output': {'UnicodeDecodeError': 1}})
+        self.assertEqual(mr_job.parse_counters(),
+                         {'Unencodable output': {'UnicodeDecodeError': 1}})
 
     def test_undecodable_output_strict(self):
         UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
@@ -526,10 +528,10 @@ class ProtocolsTestCase(TestCase):
         mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
 
         # make sure it raises an exception
-        assert_raises(Exception, mr_job.run_mapper)
+        self.assertRaises(Exception, mr_job.run_mapper)
 
 
-class DeprecatedProtocolsTestCase(TestCase):
+class DeprecatedProtocolsTestCase(unittest.TestCase):
     # not putting these in their own files because we're not going to invoke
     # it as a script anyway.
 
@@ -562,48 +564,48 @@ class DeprecatedProtocolsTestCase(TestCase):
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job = self.MRInconsistentJob()
-            assert_equal(mr_job.options.input_protocol, None)
-            assert_equal(mr_job.input_protocol().__class__, ReprProtocol)
-            assert_in('custom behavior', stderr.getvalue())
+            self.assertEqual(mr_job.options.input_protocol, None)
+            self.assertEqual(mr_job.input_protocol().__class__, ReprProtocol)
+            self.assertIn('custom behavior', stderr.getvalue())
 
     def test_mixed_behavior_2(self):
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job = self.MRInconsistentJob2()
-            assert_equal(mr_job.options.input_protocol, None)
-            assert_equal(mr_job.input_protocol().__class__, ReprProtocol)
-            assert_in('custom behavior', stderr.getvalue())
+            self.assertEqual(mr_job.options.input_protocol, None)
+            self.assertEqual(mr_job.input_protocol().__class__, ReprProtocol)
+            self.assertIn('custom behavior', stderr.getvalue())
 
     def test_default_protocols(self):
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job = MRBoringJob()
-            assert_equal(mr_job.options.input_protocol, 'raw_value')
-            assert_equal(mr_job.options.protocol, 'json')
-            assert_equal(mr_job.options.output_protocol, 'json')
-            assert_not_in('deprecated', stderr.getvalue())
+            self.assertEqual(mr_job.options.input_protocol, 'raw_value')
+            self.assertEqual(mr_job.options.protocol, 'json')
+            self.assertEqual(mr_job.options.output_protocol, 'json')
+            self.assertNotIn('deprecated', stderr.getvalue())
 
     def test_explicit_default_protocols(self):
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job2 = self.MRBoringJob2().sandbox(stderr=stderr)
-            assert_equal(mr_job2.options.input_protocol, 'json')
-            assert_equal(mr_job2.options.protocol, 'pickle')
-            assert_equal(mr_job2.options.output_protocol, 'repr')
-            assert_in('deprecated', stderr.getvalue())
+            self.assertEqual(mr_job2.options.input_protocol, 'json')
+            self.assertEqual(mr_job2.options.protocol, 'pickle')
+            self.assertEqual(mr_job2.options.output_protocol, 'repr')
+            self.assertIn('deprecated', stderr.getvalue())
 
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job3 = self.MRBoringJob3()
-            assert_equal(mr_job3.options.input_protocol, 'raw_value')
-            assert_equal(mr_job3.options.protocol, 'repr')
+            self.assertEqual(mr_job3.options.input_protocol, 'raw_value')
+            self.assertEqual(mr_job3.options.protocol, 'repr')
             # output protocol should default to protocol
-            assert_equal(mr_job3.options.output_protocol, 'repr')
-            assert_in('deprecated', stderr.getvalue())
+            self.assertEqual(mr_job3.options.output_protocol, 'repr')
+            self.assertIn('deprecated', stderr.getvalue())
 
     def test_setting_protocol(self):
         stderr = StringIO()
@@ -612,30 +614,30 @@ class DeprecatedProtocolsTestCase(TestCase):
             mr_job2 = MRBoringJob(args=[
                 '--input-protocol=json', '--protocol=pickle',
                 '--output-protocol=repr'])
-            assert_equal(mr_job2.options.input_protocol, 'json')
-            assert_equal(mr_job2.options.protocol, 'pickle')
-            assert_equal(mr_job2.options.output_protocol, 'repr')
-            assert_in('deprecated', stderr.getvalue())
+            self.assertEqual(mr_job2.options.input_protocol, 'json')
+            self.assertEqual(mr_job2.options.protocol, 'pickle')
+            self.assertEqual(mr_job2.options.output_protocol, 'repr')
+            self.assertIn('deprecated', stderr.getvalue())
 
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job3 = MRBoringJob(args=['--protocol=repr'])
-            assert_equal(mr_job3.options.input_protocol, 'raw_value')
-            assert_equal(mr_job3.options.protocol, 'repr')
+            self.assertEqual(mr_job3.options.input_protocol, 'raw_value')
+            self.assertEqual(mr_job3.options.protocol, 'repr')
             # output protocol should default to protocol
-            assert_equal(mr_job3.options.output_protocol, 'repr')
-            assert_in('deprecated', stderr.getvalue())
+            self.assertEqual(mr_job3.options.output_protocol, 'repr')
+            self.assertIn('deprecated', stderr.getvalue())
 
     def test_overriding_explicit_default_protocols(self):
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.job', stderr)
             mr_job = self.MRBoringJob2(args=['--protocol=json'])
-            assert_equal(mr_job.options.input_protocol, 'json')
-            assert_equal(mr_job.options.protocol, 'json')
-            assert_equal(mr_job.options.output_protocol, 'repr')
-            assert_in('deprecated', stderr.getvalue())
+            self.assertEqual(mr_job.options.input_protocol, 'json')
+            self.assertEqual(mr_job.options.protocol, 'json')
+            self.assertEqual(mr_job.options.output_protocol, 'repr')
+            self.assertIn('deprecated', stderr.getvalue())
 
     def test_mapper_raw_value_to_json(self):
         RAW_INPUT = StringIO('foo\nbar\nbaz\n')
@@ -645,10 +647,10 @@ class DeprecatedProtocolsTestCase(TestCase):
         mr_job.sandbox(stdin=RAW_INPUT)
         mr_job.run_mapper()
 
-        assert_equal(mr_job.stdout.getvalue(),
-                     'null\t"foo"\n' +
-                     'null\t"bar"\n' +
-                     'null\t"baz"\n')
+        self.assertEqual(mr_job.stdout.getvalue(),
+                         'null\t"foo"\n' +
+                         'null\t"bar"\n' +
+                         'null\t"baz"\n')
 
     def test_reducer_json_to_json(self):
         JSON_INPUT = StringIO('"foo"\t"bar"\n' +
@@ -660,9 +662,9 @@ class DeprecatedProtocolsTestCase(TestCase):
         mr_job.sandbox(stdin=JSON_INPUT)
         mr_job.run_reducer()
 
-        assert_equal(mr_job.stdout.getvalue(),
-                     ('"foo"\t["bar", "baz"]\n' +
-                      '"bar"\t["qux"]\n'))
+        self.assertEqual(mr_job.stdout.getvalue(),
+                         ('"foo"\t["bar", "baz"]\n' +
+                          '"bar"\t["qux"]\n'))
 
     def test_output_protocol_with_no_final_reducer(self):
         # if there's no reducer, the last mapper should use the
@@ -674,11 +676,11 @@ class DeprecatedProtocolsTestCase(TestCase):
         mr_job.sandbox(stdin=RAW_INPUT)
         mr_job.run_mapper()
 
-        assert_equal(mr_job.options.output_protocol, 'repr')
-        assert_equal(mr_job.stdout.getvalue(),
-                     ("None\t'foo'\n" +
-                      "None\t'bar'\n" +
-                      "None\t'baz'\n"))
+        self.assertEqual(mr_job.options.output_protocol, 'repr')
+        self.assertEqual(mr_job.stdout.getvalue(),
+                         ("None\t'foo'\n" +
+                          "None\t'bar'\n" +
+                          "None\t'baz'\n"))
 
     def test_undecodable_input(self):
         BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
@@ -692,13 +694,13 @@ class DeprecatedProtocolsTestCase(TestCase):
         mr_job.run_reducer()
 
         # good data should still get through
-        assert_equal(mr_job.stdout.getvalue(), '"foo"\t["bar"]\n')
+        self.assertEqual(mr_job.stdout.getvalue(), '"foo"\t["bar"]\n')
 
         # exception type varies between versions of simplejson,
         # so just make sure there were three exceptions of some sort
         counters = mr_job.parse_counters()
-        assert_equal(counters.keys(), ['Undecodable input'])
-        assert_equal(sum(counters['Undecodable input'].itervalues()), 3)
+        self.assertEqual(counters.keys(), ['Undecodable input'])
+        self.assertEqual(sum(counters['Undecodable input'].itervalues()), 3)
 
     def test_undecodable_input_strict(self):
         BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
@@ -711,7 +713,7 @@ class DeprecatedProtocolsTestCase(TestCase):
         mr_job.sandbox(stdin=BAD_JSON_INPUT)
 
         # make sure it raises an exception
-        assert_raises(Exception, mr_job.run_reducer)
+        self.assertRaises(Exception, mr_job.run_reducer)
 
     def test_unencodable_output(self):
         UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
@@ -724,11 +726,11 @@ class DeprecatedProtocolsTestCase(TestCase):
         mr_job.run_mapper()
 
         # good data should still get through
-        assert_equal(mr_job.stdout.getvalue(),
-                     ('null\t"foo"\n' + 'null\t"bar"\n'))
+        self.assertEqual(mr_job.stdout.getvalue(),
+                         ('null\t"foo"\n' + 'null\t"bar"\n'))
 
-        assert_equal(mr_job.parse_counters(),
-                     {'Unencodable output': {'UnicodeDecodeError': 1}})
+        self.assertEqual(mr_job.parse_counters(),
+                         {'Unencodable output': {'UnicodeDecodeError': 1}})
 
     def test_undecodable_output_strict(self):
         UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
@@ -740,10 +742,10 @@ class DeprecatedProtocolsTestCase(TestCase):
         mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
 
         # make sure it raises an exception
-        assert_raises(Exception, mr_job.run_mapper)
+        self.assertRaises(Exception, mr_job.run_mapper)
 
 
-class JobConfTestCase(TestCase):
+class JobConfTestCase(unittest.TestCase):
 
     class MRJobConfJob(MRJob):
         JOBCONF = {'mapred.foo': 'garply',
@@ -756,7 +758,7 @@ class JobConfTestCase(TestCase):
     def test_empty(self):
         mr_job = MRJob()
 
-        assert_equal(mr_job.job_runner_kwargs()['jobconf'], {})
+        self.assertEqual(mr_job.job_runner_kwargs()['jobconf'], {})
 
     def test_cmd_line_options(self):
         mr_job = MRJob([
@@ -765,16 +767,16 @@ class JobConfTestCase(TestCase):
             '--jobconf', 'mapred.qux=quux',
         ])
 
-        assert_equal(mr_job.job_runner_kwargs()['jobconf'],
-                     {'mapred.foo': 'baz',  # second option takes priority
-                      'mapred.qux': 'quux'})
+        self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
+                         {'mapred.foo': 'baz',  # second option takes priority
+                          'mapred.qux': 'quux'})
 
     def test_jobconf_attr(self):
         mr_job = self.MRJobConfJob()
 
-        assert_equal(mr_job.job_runner_kwargs()['jobconf'],
-                     {'mapred.foo': 'garply',
-                      'mapred.bar.bar.baz': 'foo'})
+        self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
+                         {'mapred.foo': 'garply',
+                          'mapred.bar.bar.baz': 'foo'})
 
     def test_jobconf_attr_and_cmd_line_options(self):
         mr_job = self.MRJobConfJob([
@@ -783,16 +785,16 @@ class JobConfTestCase(TestCase):
             '--jobconf', 'mapred.qux=quux',
         ])
 
-        assert_equal(mr_job.job_runner_kwargs()['jobconf'],
-                     {'mapred.bar.bar.baz': 'foo',
-                      'mapred.foo': 'baz',  # command line takes priority
-                      'mapred.qux': 'quux'})
+        self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
+                         {'mapred.bar.bar.baz': 'foo',
+                          'mapred.foo': 'baz',  # command line takes priority
+                          'mapred.qux': 'quux'})
 
     def test_redefined_jobconf_method(self):
         mr_job = self.MRJobConfMethodJob()
 
-        assert_equal(mr_job.job_runner_kwargs()['jobconf'],
-                     {'mapred.baz': 'bar'})
+        self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
+                         {'mapred.baz': 'bar'})
 
     def test_redefined_jobconf_method_overrides_cmd_line(self):
         mr_job = self.MRJobConfMethodJob([
@@ -801,11 +803,11 @@ class JobConfTestCase(TestCase):
         ])
 
         # --jobconf is ignored because that's the way we defined jobconf()
-        assert_equal(mr_job.job_runner_kwargs()['jobconf'],
-                     {'mapred.baz': 'bar'})
+        self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
+                         {'mapred.baz': 'bar'})
 
 
-class HadoopFormatTestCase(TestCase):
+class HadoopFormatTestCase(unittest.TestCase):
 
     # MRHadoopFormatJob is imported above
 
@@ -821,24 +823,26 @@ class HadoopFormatTestCase(TestCase):
     def test_empty(self):
         mr_job = MRJob()
 
-        assert_equal(mr_job.job_runner_kwargs()['hadoop_input_format'], None)
-        assert_equal(mr_job.job_runner_kwargs()['hadoop_output_format'], None)
+        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_input_format'],
+                         None)
+        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'],
+                         None)
 
     def test_hadoop_format_attributes(self):
         mr_job = MRHadoopFormatJob()
 
-        assert_equal(mr_job.job_runner_kwargs()['hadoop_input_format'],
-                     'mapred.FooInputFormat')
-        assert_equal(mr_job.job_runner_kwargs()['hadoop_output_format'],
-                     'mapred.BarOutputFormat')
+        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_input_format'],
+                         'mapred.FooInputFormat')
+        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'],
+                         'mapred.BarOutputFormat')
 
     def test_hadoop_format_methods(self):
         mr_job = self.MRHadoopFormatMethodJob()
 
-        assert_equal(mr_job.job_runner_kwargs()['hadoop_input_format'],
-                     'mapred.ReasonableInputFormat')
-        assert_equal(mr_job.job_runner_kwargs()['hadoop_output_format'],
-                     'mapred.EbcdicDb2EnterpriseXmlOutputFormat')
+        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_input_format'],
+                         'mapred.ReasonableInputFormat')
+        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'],
+                         'mapred.EbcdicDb2EnterpriseXmlOutputFormat')
 
     def test_deprecated_command_line_options(self):
         mr_job = MRJob([
@@ -849,10 +853,11 @@ class HadoopFormatTestCase(TestCase):
             ])
 
         with logger_disabled('mrjob.job'):
-            assert_equal(mr_job.job_runner_kwargs()['hadoop_input_format'],
-                         'org.apache.hadoop.mapred.lib.NLineInputFormat')
-            assert_equal(mr_job.job_runner_kwargs()['hadoop_output_format'],
-                         'org.apache.hadoop.mapred.FileOutputFormat')
+            job_runner_kwargs = mr_job.job_runner_kwargs()
+            self.assertEqual(job_runner_kwargs['hadoop_input_format'],
+                             'org.apache.hadoop.mapred.lib.NLineInputFormat')
+            self.assertEqual(job_runner_kwargs['hadoop_output_format'],
+                             'org.apache.hadoop.mapred.FileOutputFormat')
 
     def test_deprecated_command_line_options_override_attrs(self):
         mr_job = MRHadoopFormatJob([
@@ -863,13 +868,14 @@ class HadoopFormatTestCase(TestCase):
             ])
 
         with logger_disabled('mrjob.job'):
-            assert_equal(mr_job.job_runner_kwargs()['hadoop_input_format'],
-                         'org.apache.hadoop.mapred.lib.NLineInputFormat')
-            assert_equal(mr_job.job_runner_kwargs()['hadoop_output_format'],
-                         'org.apache.hadoop.mapred.FileOutputFormat')
+            job_runner_kwargs = mr_job.job_runner_kwargs()
+            self.assertEqual(job_runner_kwargs['hadoop_input_format'],
+                             'org.apache.hadoop.mapred.lib.NLineInputFormat')
+            self.assertEqual(job_runner_kwargs['hadoop_output_format'],
+                             'org.apache.hadoop.mapred.FileOutputFormat')
 
 
-class PartitionerTestCase(TestCase):
+class PartitionerTestCase(unittest.TestCase):
 
     class MRPartitionerJob(MRJob):
         PARTITIONER = 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
@@ -877,7 +883,7 @@ class PartitionerTestCase(TestCase):
     def test_empty(self):
         mr_job = MRJob()
 
-        assert_equal(mr_job.job_runner_kwargs()['partitioner'], None)
+        self.assertEqual(mr_job.job_runner_kwargs()['partitioner'], None)
 
     def test_cmd_line_options(self):
         mr_job = MRJob([
@@ -886,14 +892,15 @@ class PartitionerTestCase(TestCase):
         ])
 
         # second option takes priority
-        assert_equal(mr_job.job_runner_kwargs()['partitioner'],
-                     'org.apache.hadoop.mapreduce.Partitioner')
+        self.assertEqual(mr_job.job_runner_kwargs()['partitioner'],
+                         'org.apache.hadoop.mapreduce.Partitioner')
 
     def test_partitioner_attr(self):
         mr_job = self.MRPartitionerJob()
 
-        assert_equal(mr_job.job_runner_kwargs()['partitioner'],
-                     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
+        self.assertEqual(
+            mr_job.job_runner_kwargs()['partitioner'],
+            'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
 
     def test_partitioner_attr_and_cmd_line_options(self):
         mr_job = self.MRPartitionerJob([
@@ -902,55 +909,55 @@ class PartitionerTestCase(TestCase):
         ])
 
         # command line takes priority
-        assert_equal(mr_job.job_runner_kwargs()['partitioner'],
-                     'org.apache.hadoop.mapreduce.Partitioner')
+        self.assertEqual(mr_job.job_runner_kwargs()['partitioner'],
+                         'org.apache.hadoop.mapreduce.Partitioner')
 
 
-class IsMapperOrReducerTestCase(TestCase):
+class IsMapperOrReducerTestCase(unittest.TestCase):
 
     def test_is_mapper_or_reducer(self):
-        assert_equal(MRJob().is_mapper_or_reducer(), False)
-        assert_equal(MRJob(['--mapper']).is_mapper_or_reducer(), True)
-        assert_equal(MRJob(['--reducer']).is_mapper_or_reducer(), True)
-        assert_equal(MRJob(['--combiner']).is_mapper_or_reducer(), True)
-        assert_equal(MRJob(['--steps']).is_mapper_or_reducer(), False)
+        self.assertEqual(MRJob().is_mapper_or_reducer(), False)
+        self.assertEqual(MRJob(['--mapper']).is_mapper_or_reducer(), True)
+        self.assertEqual(MRJob(['--reducer']).is_mapper_or_reducer(), True)
+        self.assertEqual(MRJob(['--combiner']).is_mapper_or_reducer(), True)
+        self.assertEqual(MRJob(['--steps']).is_mapper_or_reducer(), False)
 
 
-class StepsTestCase(TestCase):
+class StepsTestCase(unittest.TestCase):
 
     def test_auto_build_steps(self):
         mrbj = MRBoringJob()
-        assert_equal(mrbj.steps(),
-                     [stepdict(mapper=mrbj.mapper,
-                               reducer=mrbj.reducer)])
+        self.assertEqual(mrbj.steps(),
+                         [stepdict(mapper=mrbj.mapper,
+                                   reducer=mrbj.reducer)])
 
         mrfbj = MRFinalBoringJob()
-        assert_equal(mrfbj.steps(),
-                     [stepdict(mapper=mrfbj.mapper,
-                               mapper_final=mrfbj.mapper_final,
-                               reducer=mrfbj.reducer)])
+        self.assertEqual(mrfbj.steps(),
+                         [stepdict(mapper=mrfbj.mapper,
+                                   mapper_final=mrfbj.mapper_final,
+                                   reducer=mrfbj.reducer)])
 
     def test_show_steps(self):
         mr_boring_job = MRBoringJob(['--steps'])
         mr_boring_job.sandbox()
         mr_boring_job.show_steps()
-        assert_equal(mr_boring_job.stdout.getvalue(), 'MR\n')
+        self.assertEqual(mr_boring_job.stdout.getvalue(), 'MR\n')
 
         # final mappers don't show up in the step description
         mr_final_boring_job = MRFinalBoringJob(['--steps'])
         mr_final_boring_job.sandbox()
         mr_final_boring_job.show_steps()
-        assert_equal(mr_final_boring_job.stdout.getvalue(), 'MR\n')
+        self.assertEqual(mr_final_boring_job.stdout.getvalue(), 'MR\n')
 
         mr_two_step_job = MRTwoStepJob(['--steps'])
         mr_two_step_job.sandbox()
         mr_two_step_job.show_steps()
-        assert_equal(mr_two_step_job.stdout.getvalue(), 'MCR M\n')
+        self.assertEqual(mr_two_step_job.stdout.getvalue(), 'MCR M\n')
 
         mr_no_mapper = MRNoMapper(['--steps'])
         mr_no_mapper.sandbox()
         mr_no_mapper.show_steps()
-        assert_equal(mr_no_mapper.stdout.getvalue(), 'MR R\n')
+        self.assertEqual(mr_no_mapper.stdout.getvalue(), 'MR R\n')
 
     def test_mapper_and_reducer_as_positional_args(self):
         def mapper(k, v):
@@ -962,23 +969,23 @@ class StepsTestCase(TestCase):
         def combiner(k, v):
             pass
 
-        assert_equal(MRJob.mr(mapper), MRJob.mr(mapper=mapper))
+        self.assertEqual(MRJob.mr(mapper), MRJob.mr(mapper=mapper))
 
-        assert_equal(MRJob.mr(mapper, reducer),
-                     MRJob.mr(mapper=mapper, reducer=reducer))
+        self.assertEqual(MRJob.mr(mapper, reducer),
+                         MRJob.mr(mapper=mapper, reducer=reducer))
 
-        assert_equal(MRJob.mr(mapper, reducer=reducer),
-                     MRJob.mr(mapper=mapper, reducer=reducer))
+        self.assertEqual(MRJob.mr(mapper, reducer=reducer),
+                         MRJob.mr(mapper=mapper, reducer=reducer))
 
-        assert_equal(MRJob.mr(mapper, reducer, combiner=combiner),
-                     MRJob.mr(mapper=mapper, reducer=reducer,
-                              combiner=combiner))
+        self.assertEqual(MRJob.mr(mapper, reducer, combiner=combiner),
+                         MRJob.mr(mapper=mapper, reducer=reducer,
+                                  combiner=combiner))
 
         # can't specify something as a positional and keyword arg
-        assert_raises(TypeError,
-                      MRJob.mr, mapper, mapper=mapper)
-        assert_raises(TypeError,
-                      MRJob.mr, mapper, reducer, reducer=reducer)
+        self.assertRaises(TypeError,
+                          MRJob.mr, mapper, mapper=mapper)
+        self.assertRaises(TypeError,
+                          MRJob.mr, mapper, reducer, reducer=reducer)
 
     def test_deprecated_mapper_final_positional_arg(self):
         def mapper(k, v):
@@ -997,18 +1004,18 @@ class StepsTestCase(TestCase):
 
         # should be allowed to specify mapper_final as a positional arg,
         # but we log a warning
-        assert_equal(step, MRJob.mr(mapper=mapper,
-                                    reducer=reducer,
-                                    mapper_final=mapper_final))
-        assert_in('mapper_final should be specified', stderr.getvalue())
+        self.assertEqual(step, MRJob.mr(mapper=mapper,
+                                        reducer=reducer,
+                                        mapper_final=mapper_final))
+        self.assertIn('mapper_final should be specified', stderr.getvalue())
 
         # can't specify mapper_final as a positional and keyword arg
-        assert_raises(
+        self.assertRaises(
             TypeError,
             MRJob.mr, mapper, reducer, mapper_final, mapper_final=mapper_final)
 
 
-class StepNumTestCase(TestCase):
+class StepNumTestCase(unittest.TestCase):
 
     def test_two_step_job_end_to_end(self):
         # represent input as a list so we can reuse it
@@ -1018,9 +1025,9 @@ class StepNumTestCase(TestCase):
         def test_mapper0(mr_job, input_lines):
             mr_job.sandbox(input_lines)
             mr_job.run_mapper(0)
-            assert_equal(mr_job.parse_output(),
-                         [(None, 'foo'), ('foo', None),
-                          (None, 'bar'), ('bar', None)])
+            self.assertEqual(mr_job.parse_output(),
+                             [(None, 'foo'), ('foo', None),
+                              (None, 'bar'), ('bar', None)])
 
         mapper0 = MRTwoStepJob()
         test_mapper0(mapper0, mapper0_input_lines)
@@ -1037,8 +1044,8 @@ class StepNumTestCase(TestCase):
         def test_reducer0(mr_job, input_lines):
             mr_job.sandbox(input_lines)
             mr_job.run_reducer(0)
-            assert_equal(mr_job.parse_output(),
-                         [('bar', 1), ('foo', 1), (None, 2)])
+            self.assertEqual(mr_job.parse_output(),
+                             [('bar', 1), ('foo', 1), (None, 2)])
 
         reducer0 = MRTwoStepJob()
         test_reducer0(reducer0, reducer0_input_lines)
@@ -1053,8 +1060,8 @@ class StepNumTestCase(TestCase):
         def test_mapper1(mr_job, input_lines):
             mr_job.sandbox(input_lines)
             mr_job.run_mapper(1)
-            assert_equal(mr_job.parse_output(),
-                         [(1, 'bar'), (1, 'foo'), (2, None)])
+            self.assertEqual(mr_job.parse_output(),
+                             [(1, 'bar'), (1, 'foo'), (2, None)])
 
         mapper1 = MRTwoStepJob()
         test_mapper1(mapper1, mapper1_input_lines)
@@ -1062,15 +1069,15 @@ class StepNumTestCase(TestCase):
     def test_nonexistent_steps(self):
         mr_job = MRTwoStepJob()
         mr_job.sandbox()
-        assert_raises(ValueError, mr_job.run_reducer, 1)
-        assert_raises(ValueError, mr_job.run_mapper, 2)
-        assert_raises(ValueError, mr_job.run_reducer, -1)
+        self.assertRaises(ValueError, mr_job.run_reducer, 1)
+        self.assertRaises(ValueError, mr_job.run_mapper, 2)
+        self.assertRaises(ValueError, mr_job.run_reducer, -1)
 
 
-class CommandLineArgsTest(TestCase):
+class CommandLineArgsTest(unittest.TestCase):
 
     def test_shouldnt_exit_when_invoked_as_object(self):
-        assert_raises(ValueError, MRJob, args=['--quux', 'baz'])
+        self.assertRaises(ValueError, MRJob, args=['--quux', 'baz'])
 
     def test_should_exit_when_invoked_as_script(self):
         args = [sys.executable, MRJob.mr_job_script(), '--quux', 'baz']
@@ -1079,41 +1086,41 @@ class CommandLineArgsTest(TestCase):
                            {'PYTHONPATH': os.path.abspath('.')})
         proc = Popen(args, stderr=PIPE, stdout=PIPE, env=env)
         proc.communicate()
-        assert_equal(proc.returncode, 2)
+        self.assertEqual(proc.returncode, 2)
 
     def test_custom_key_value_option_parsing(self):
         # simple example
         mr_job = MRBoringJob(['--cmdenv', 'FOO=bar'])
-        assert_equal(mr_job.options.cmdenv, {'FOO': 'bar'})
+        self.assertEqual(mr_job.options.cmdenv, {'FOO': 'bar'})
 
         # trickier example
         mr_job = MRBoringJob(
             ['--cmdenv', 'FOO=bar',
              '--cmdenv', 'FOO=baz',
              '--cmdenv', 'BAZ=qux=quux'])
-        assert_equal(mr_job.options.cmdenv,
-                     {'FOO': 'baz', 'BAZ': 'qux=quux'})
+        self.assertEqual(mr_job.options.cmdenv,
+                         {'FOO': 'baz', 'BAZ': 'qux=quux'})
 
         # must have KEY=VALUE
-        assert_raises(ValueError, MRBoringJob, ['--cmdenv', 'FOO'])
+        self.assertRaises(ValueError, MRBoringJob, ['--cmdenv', 'FOO'])
 
     def test_passthrough_options_defaults(self):
         mr_job = MRCustomBoringJob()
 
-        assert_equal(mr_job.options.input_protocol, 'raw_value')
-        assert_equal(mr_job.options.foo_size, 5)
-        assert_equal(mr_job.options.bar_name, None)
-        assert_equal(mr_job.options.baz_mode, False)
-        assert_equal(mr_job.options.quuxing, True)
-        assert_equal(mr_job.options.pill_type, 'blue')
-        assert_equal(mr_job.options.planck_constant, 6.626068e-34)
-        assert_equal(mr_job.options.extra_special_args, [])
+        self.assertEqual(mr_job.options.input_protocol, 'raw_value')
+        self.assertEqual(mr_job.options.foo_size, 5)
+        self.assertEqual(mr_job.options.bar_name, None)
+        self.assertEqual(mr_job.options.baz_mode, False)
+        self.assertEqual(mr_job.options.quuxing, True)
+        self.assertEqual(mr_job.options.pill_type, 'blue')
+        self.assertEqual(mr_job.options.planck_constant, 6.626068e-34)
+        self.assertEqual(mr_job.options.extra_special_args, [])
         # should include all --protocol options
         # should include default value of --num-items
         # should use long option names (--protocol, not -p)
         # shouldn't include --limit because it's None
         # items should be in the order they were instantiated
-        assert_equal(mr_job.generate_passthrough_arguments(), [])
+        self.assertEqual(mr_job.generate_passthrough_arguments(), [])
 
     def test_explicit_passthrough_options(self):
         mr_job = MRCustomBoringJob(args=[
@@ -1129,18 +1136,18 @@ class CommandLineArgsTest(TestCase):
             '--strict-protocols',
             ])
 
-        assert_equal(mr_job.options.input_protocol, 'raw_value')
-        assert_equal(mr_job.options.protocol, 'json')
-        assert_equal(mr_job.options.output_protocol, 'json')
-        assert_equal(mr_job.options.foo_size, 9)
-        assert_equal(mr_job.options.bar_name, 'Alembic')
-        assert_equal(mr_job.options.baz_mode, True)
-        assert_equal(mr_job.options.quuxing, False)
-        assert_equal(mr_job.options.pill_type, 'red')
-        assert_equal(mr_job.options.planck_constant, 42)
-        assert_equal(mr_job.options.extra_special_args, ['you', 'me'])
-        assert_equal(mr_job.options.strict_protocols, True)
-        assert_equal(mr_job.generate_passthrough_arguments(),
+        self.assertEqual(mr_job.options.input_protocol, 'raw_value')
+        self.assertEqual(mr_job.options.protocol, 'json')
+        self.assertEqual(mr_job.options.output_protocol, 'json')
+        self.assertEqual(mr_job.options.foo_size, 9)
+        self.assertEqual(mr_job.options.bar_name, 'Alembic')
+        self.assertEqual(mr_job.options.baz_mode, True)
+        self.assertEqual(mr_job.options.quuxing, False)
+        self.assertEqual(mr_job.options.pill_type, 'red')
+        self.assertEqual(mr_job.options.planck_constant, 42)
+        self.assertEqual(mr_job.options.extra_special_args, ['you', 'me'])
+        self.assertEqual(mr_job.options.strict_protocols, True)
+        self.assertEqual(mr_job.generate_passthrough_arguments(),
                      [
                       '--bar-name', 'Alembic',
                       '--enable-baz-mode',
@@ -1163,18 +1170,18 @@ class CommandLineArgsTest(TestCase):
             '--strict-protocols',
             ])
 
-        assert_equal(mr_job.options.input_protocol, 'raw_value')
-        assert_equal(mr_job.options.protocol, 'json')
-        assert_equal(mr_job.options.output_protocol, 'json')
-        assert_equal(mr_job.options.foo_size, 9)
-        assert_equal(mr_job.options.bar_name, 'Alembic')
-        assert_equal(mr_job.options.baz_mode, True)
-        assert_equal(mr_job.options.quuxing, False)
-        assert_equal(mr_job.options.pill_type, 'red')
-        assert_equal(mr_job.options.planck_constant, 42)
-        assert_equal(mr_job.options.extra_special_args, ['you', 'me'])
-        assert_equal(mr_job.options.strict_protocols, True)
-        assert_equal(mr_job.generate_passthrough_arguments(),
+        self.assertEqual(mr_job.options.input_protocol, 'raw_value')
+        self.assertEqual(mr_job.options.protocol, 'json')
+        self.assertEqual(mr_job.options.output_protocol, 'json')
+        self.assertEqual(mr_job.options.foo_size, 9)
+        self.assertEqual(mr_job.options.bar_name, 'Alembic')
+        self.assertEqual(mr_job.options.baz_mode, True)
+        self.assertEqual(mr_job.options.quuxing, False)
+        self.assertEqual(mr_job.options.pill_type, 'red')
+        self.assertEqual(mr_job.options.planck_constant, 42)
+        self.assertEqual(mr_job.options.extra_special_args, ['you', 'me'])
+        self.assertEqual(mr_job.options.strict_protocols, True)
+        self.assertEqual(mr_job.generate_passthrough_arguments(),
                      [
                         '-B', 'Alembic',
                         '-M',
@@ -1189,29 +1196,29 @@ class CommandLineArgsTest(TestCase):
                      ])
 
     def test_bad_custom_options(self):
-        assert_raises(ValueError,
-                      MRCustomBoringJob, ['--planck-constant', 'c'])
-        assert_raises(ValueError, MRCustomBoringJob, ['--pill-type=green'])
+        self.assertRaises(ValueError,
+                          MRCustomBoringJob, ['--planck-constant', 'c'])
+        self.assertRaises(ValueError, MRCustomBoringJob, ['--pill-type=green'])
 
     def test_bad_option_types(self):
         mr_job = MRJob()
-        assert_raises(
+        self.assertRaises(
             OptionError, mr_job.add_passthrough_option,
             '--stop-words', dest='stop_words', type='set', default=None)
-        assert_raises(
+        self.assertRaises(
             OptionError, mr_job.add_passthrough_option,
             '--leave-a-msg', dest='leave_a_msg', action='callback',
             default=None)
 
     def test_incorrect_option_types(self):
-        assert_raises(ValueError, MRJob, ['--cmdenv', 'cats'])
-        assert_raises(ValueError, MRJob, ['--ssh-bind-ports', 'athens'])
+        self.assertRaises(ValueError, MRJob, ['--cmdenv', 'cats'])
+        self.assertRaises(ValueError, MRJob, ['--ssh-bind-ports', 'athens'])
 
     def test_default_file_options(self):
         mr_job = MRCustomBoringJob()
-        assert_equal(mr_job.options.foo_config, None)
-        assert_equal(mr_job.options.accordian_files, [])
-        assert_equal(mr_job.generate_file_upload_args(), [])
+        self.assertEqual(mr_job.options.foo_config, None)
+        self.assertEqual(mr_job.options.accordian_files, [])
+        self.assertEqual(mr_job.generate_file_upload_args(), [])
 
     def test_explicit_file_options(self):
         mr_job = MRCustomBoringJob(args=[
@@ -1219,34 +1226,38 @@ class CommandLineArgsTest(TestCase):
             '--foo-config', '/etc/fooconf',
             '--accordian-file', 'WeirdAl.mp3',
             '--accordian-file', '/home/dave/JohnLinnell.ogg'])
-        assert_equal(mr_job.options.foo_config, '/etc/fooconf')
-        assert_equal(mr_job.options.accordian_files, [
+        self.assertEqual(mr_job.options.foo_config, '/etc/fooconf')
+        self.assertEqual(mr_job.options.accordian_files, [
             'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
-        assert_equal(mr_job.generate_file_upload_args(), [
+        self.assertEqual(mr_job.generate_file_upload_args(), [
             ('--foo-config', '/etc/fooconf'),
             ('--accordian-file', 'WeirdAl.mp3'),
             ('--accordian-file', '/home/dave/JohnLinnell.ogg')])
 
 
-class FileOptionsTestCase(TestCase):
+class FileOptionsTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.make_tmp_dir()
+        self.blank_out_environment()
+
+    def tearDown(self):
+        self.restore_environment()
+        self.rm_tmp_dir()
     # make sure custom file options work with --steps (Issue #45)
 
-    @setup
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
-    @setup
     def blank_out_environment(self):
         self._old_environ = os.environ.copy()
         # don't do os.environ = {}! This won't actually set environment
         # variables; it just monkey-patches os.environ
         os.environ.clear()
 
-    @teardown
     def restore_environment(self):
         os.environ.clear()
         os.environ.update(self._old_environ)
@@ -1263,7 +1274,7 @@ class FileOptionsTestCase(TestCase):
 
         mr_job = MRTowerOfPowers(
             ['--no-conf', '-v', '--cleanup=NONE', '--n-file', n_file_path])
-        assert_equal(len(mr_job.steps()), 3)
+        self.assertEqual(len(mr_job.steps()), 3)
 
         mr_job.sandbox(stdin=stdin)
 
@@ -1280,10 +1291,10 @@ class FileOptionsTestCase(TestCase):
                     _, value = mr_job.parse_output_line(line)
                     output.add(value)
 
-        assert_equal(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))
+        self.assertEqual(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))
 
 
-class ParseOutputTestCase(TestCase):
+class ParseOutputTestCase(unittest.TestCase):
     # test parse_output() method
 
     def test_default(self):
@@ -1291,42 +1302,46 @@ class ParseOutputTestCase(TestCase):
         mr_job = MRJob()
         output = '0\t1\n"a"\t"b"\n'
         mr_job.stdout = StringIO(output)
-        assert_equal(mr_job.parse_output(), [(0, 1), ('a', 'b')])
+        self.assertEqual(mr_job.parse_output(), [(0, 1), ('a', 'b')])
 
         # verify that stdout is not cleared
-        assert_equal(mr_job.stdout.getvalue(), output)
+        self.assertEqual(mr_job.stdout.getvalue(), output)
 
     def test_protocol_instance(self):
         # see if we can use the repr protocol
         mr_job = MRJob()
         output = "0\t1\n['a', 'b']\tset(['c', 'd'])\n"
         mr_job.stdout = StringIO(output)
-        assert_equal(mr_job.parse_output(ReprProtocol()),
-                     [(0, 1), (['a', 'b'], set(['c', 'd']))])
+        self.assertEqual(mr_job.parse_output(ReprProtocol()),
+                         [(0, 1), (['a', 'b'], set(['c', 'd']))])
 
         # verify that stdout is not cleared
-        assert_equal(mr_job.stdout.getvalue(), output)
+        self.assertEqual(mr_job.stdout.getvalue(), output)
 
     def test_deprecated_protocol_aliases(self):
         # see if we can use the repr protocol
         mr_job = MRJob()
         output = "0\t1\n['a', 'b']\tset(['c', 'd'])\n"
         mr_job.stdout = StringIO(output)
-        assert_equal(mr_job.parse_output('repr'),
-                     [(0, 1), (['a', 'b'], set(['c', 'd']))])
+        self.assertEqual(mr_job.parse_output('repr'),
+                         [(0, 1), (['a', 'b'], set(['c', 'd']))])
 
         # verify that stdout is not cleared
-        assert_equal(mr_job.stdout.getvalue(), output)
+        self.assertEqual(mr_job.stdout.getvalue(), output)
 
 
-class RunJobTestCase(TestCase):
+class RunJobTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.make_tmp_dir()
+
+    def tearDown(self):
+        self.rm_tmp_dir()
     # test invoking a job as a script
 
-    @setup
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -1342,55 +1357,55 @@ class RunJobTestCase(TestCase):
 
     def test_quiet(self):
         stdout, stderr, returncode = self.run_job(['-q'])
-        assert_equal(sorted(StringIO(stdout)), ['1\t"foo"\n',
-                                                '2\t"bar"\n',
-                                                '3\tnull\n'])
-        assert_equal(stderr, '')
-        assert_equal(returncode, 0)
+        self.assertEqual(sorted(StringIO(stdout)), ['1\t"foo"\n',
+                                                    '2\t"bar"\n',
+                                                    '3\tnull\n'])
+        self.assertEqual(stderr, '')
+        self.assertEqual(returncode, 0)
 
     def test_verbose(self):
         stdout, stderr, returncode = self.run_job()
-        assert_equal(sorted(StringIO(stdout)), ['1\t"foo"\n',
-                                                '2\t"bar"\n',
-                                                '3\tnull\n'])
-        assert_not_equal(stderr, '')
-        assert_equal(returncode, 0)
+        self.assertEqual(sorted(StringIO(stdout)), ['1\t"foo"\n',
+                                                    '2\t"bar"\n',
+                                                    '3\tnull\n'])
+        self.assertNotEqual(stderr, '')
+        self.assertEqual(returncode, 0)
         normal_stderr = stderr
 
         stdout, stderr, returncode = self.run_job(['-v'])
-        assert_equal(sorted(StringIO(stdout)), ['1\t"foo"\n',
-                                                '2\t"bar"\n',
-                                                '3\tnull\n'])
-        assert_not_equal(stderr, '')
-        assert_equal(returncode, 0)
-        assert_gt(len(stderr), len(normal_stderr))
+        self.assertEqual(sorted(StringIO(stdout)), ['1\t"foo"\n',
+                                                    '2\t"bar"\n',
+                                                    '3\tnull\n'])
+        self.assertNotEqual(stderr, '')
+        self.assertEqual(returncode, 0)
+        self.assertGreater(len(stderr), len(normal_stderr))
 
     def test_no_output(self):
-        assert_equal(os.listdir(self.tmp_dir), [])  # sanity check
+        self.assertEqual(os.listdir(self.tmp_dir), [])  # sanity check
 
         args = ['--no-output', '--output-dir', self.tmp_dir]
         stdout, stderr, returncode = self.run_job(args)
-        assert_equal(stdout, '')
-        assert_not_equal(stderr, '')
-        assert_equal(returncode, 0)
+        self.assertEqual(stdout, '')
+        self.assertNotEqual(stderr, '')
+        self.assertEqual(returncode, 0)
 
         # make sure the correct output is in the temp dir
-        assert_not_equal(os.listdir(self.tmp_dir), [])
+        self.assertNotEqual(os.listdir(self.tmp_dir), [])
         output_lines = []
         for dirpath, _, filenames in os.walk(self.tmp_dir):
             for filename in filenames:
                 with open(os.path.join(dirpath, filename)) as output_f:
                     output_lines.extend(output_f)
 
-        assert_equal(sorted(output_lines),
-                     ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])
+        self.assertEqual(sorted(output_lines),
+                         ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])
 
 
-class BadMainTestCase(TestCase):
+class BadMainTestCase(unittest.TestCase):
     """Ensure that the user cannot do anything but just call MRYourJob.run()
     from __main__()"""
 
     def test_bad_main_catch(self):
         sys.argv.append('--mapper')
-        assert_raises(UsageError, MRBoringJob().make_runner)
+        self.assertRaises(UsageError, MRBoringJob().make_runner)
         sys.argv = sys.argv[:-1]

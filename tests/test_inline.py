@@ -19,30 +19,35 @@ from StringIO import StringIO
 import gzip
 import os
 import shutil
-from testify import TestCase
-from testify import assert_equal
-from testify import setup
-from testify import teardown
 import tempfile
+
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.job import MRJob
 from mrjob.inline import InlineMRJobRunner
 from mrjob.protocol import JSONValueProtocol
-from tests.mr_cmdenv_test import MRCmdenvTest
+from tests.mr_test_cmdenv import MRTestCmdenv
 from tests.mr_two_step_job import MRTwoStepJob
 
 
-class InlineMRJobRunnerEndToEndTestCase(TestCase):
+class InlineMRJobRunnerEndToEndTestCase(unittest.TestCase):
 
-    @setup
+    def setUp(self):
+        self.make_tmp_dir_and_mrjob_conf()
+
+    def tearDown(self):
+        self.rm_tmp_dir()
+
     def make_tmp_dir_and_mrjob_conf(self):
         self.tmp_dir = tempfile.mkdtemp()
         self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
         dump_mrjob_conf({'runners': {'inline': {}}},
                         open(self.mrjob_conf_path, 'w'))
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -81,20 +86,24 @@ class InlineMRJobRunnerEndToEndTestCase(TestCase):
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)
 
-        assert_equal(sorted(results),
-                     [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+        self.assertEqual(sorted(results),
+                         [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
 
-class InlineMRJobRunnerCmdenvTest(TestCase):
+class InlineMRJobRunnerCmdenvTest(unittest.TestCase):
 
-    @setup
+    def setUp(self):
+        self.make_tmp_dir_and_mrjob_conf()
+
+    def tearDown(self):
+        self.rm_tmp_dir()
+
     def make_tmp_dir_and_mrjob_conf(self):
         self.tmp_dir = tempfile.mkdtemp()
         self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
         dump_mrjob_conf({'runners': {'inline': {}}},
                          open(self.mrjob_conf_path, 'w'))
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -107,7 +116,7 @@ class InlineMRJobRunnerCmdenvTest(TestCase):
         os.environ['SOMETHING'] = 'foofoofoo'
         old_env = os.environ.copy()
 
-        mr_job = MRCmdenvTest(['--runner', 'inline',
+        mr_job = MRTestCmdenv(['--runner', 'inline',
                                '-c', self.mrjob_conf_path,
                                '--cmdenv=FOO=bar', input_path])
         mr_job.sandbox()
@@ -122,11 +131,11 @@ class InlineMRJobRunnerCmdenvTest(TestCase):
                 key, value = mr_job.parse_output_line(line)
                 results.append((key, value))
 
-        assert_equal(sorted(results),
-                     [('FOO', 'bar'), ('SOMETHING', 'foofoofoo')])
+        self.assertEqual(sorted(results),
+                         [('FOO', 'bar'), ('SOMETHING', 'foofoofoo')])
 
         # make sure we revert back
-        assert_equal(old_env, os.environ)
+        self.assertEqual(old_env, os.environ)
 
 
 # this doesn't need to be in its own file because it'll be run inline
@@ -148,7 +157,7 @@ class MRIncrementerJob(MRJob):
         return [self.mr(self.mapper)] * self.options.times
 
 
-class InlineRunnerStepsTestCase(TestCase):
+class InlineRunnerStepsTestCase(unittest.TestCase):
     # make sure file options get passed to --steps in inline mode
 
     def test_adding_2(self):
@@ -157,15 +166,15 @@ class InlineRunnerStepsTestCase(TestCase):
             ['--no-conf', '-r', 'inline', '--times', '2'])
         mr_job.sandbox(stdin=stdin)
 
-        assert_equal(len(mr_job.steps()), 2)
+        self.assertEqual(len(mr_job.steps()), 2)
 
         with mr_job.make_runner() as runner:
             assert isinstance(runner, InlineMRJobRunner)
-            assert_equal(runner._get_steps(), ['M', 'M'])
+            self.assertEqual(runner._get_steps(), ['M', 'M'])
 
             runner.run()
 
             output = sorted(mr_job.parse_output_line(line)[1]
                             for line in runner.stream_output())
 
-            assert_equal(output, [2, 3, 4])
+            self.assertEqual(output, [2, 3, 4])

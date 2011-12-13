@@ -21,8 +21,8 @@ import os
 import shutil
 from StringIO import StringIO
 import tempfile
-
 from unittest2 import TestCase
+
 import mrjob.conf
 from mrjob.conf import combine_cmd_lists
 from mrjob.conf import combine_cmds
@@ -39,7 +39,6 @@ from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
 from mrjob.conf import load_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
-from mrjob.util import log_to_stream
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 

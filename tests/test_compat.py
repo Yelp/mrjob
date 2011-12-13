@@ -16,7 +16,6 @@
 """Test compatibility switching between different Hadoop versions"""
 
 import os
-
 from unittest2 import TestCase
 
 from mrjob.compat import get_jobconf_value

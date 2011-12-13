@@ -23,15 +23,8 @@ import os
 import shutil
 import signal
 import sys
-from testify import TestCase
-from testify import assert_in
-from testify import assert_equal
-from testify import assert_not_equal
-from testify import assert_not_in
-from testify import assert_not_reached
-from testify import setup
-from testify import teardown
 import tempfile
+from unittest2 import TestCase
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
@@ -48,14 +41,18 @@ from tests.quiet import no_handlers_for_logger
 
 class LocalMRJobRunnerEndToEndTestCase(TestCase):
 
-    @setup
+    def setUp(self):
+        self.make_tmp_dir_and_mrjob_conf()
+
+    def tearDown(self):
+        self.rm_tmp_dir()
+
     def make_tmp_dir_and_mrjob_conf(self):
         self.tmp_dir = tempfile.mkdtemp()
         self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
         dump_mrjob_conf({'runners': {'local': {}}},
                         open(self.mrjob_conf_path, 'w'))
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -90,12 +87,12 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
 
             local_tmp_dir = runner._get_local_tmp_dir()
             assert os.path.exists(local_tmp_dir)
-            assert_equal(runner.counters()[0]['count']['combiners'], 8)
+            self.assertEqual(runner.counters()[0]['count']['combiners'], 8)
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)
 
-        assert_equal(sorted(results),
+        self.assertEqual(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
     def test_end_to_end_multiple_tasks(self):
@@ -134,7 +131,7 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)
 
-        assert_equal(sorted(results),
+        self.assertEqual(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
     def test_get_file_splits_test(self):
@@ -153,7 +150,7 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
         file_splits = runner._get_file_splits([input_path, input_path2], 3)
 
         # make sure we get 3 files
-        assert_equal(len(file_splits), 3)
+        self.assertEqual(len(file_splits), 3)
 
         # make sure all the data is preserved
         content = []
@@ -161,7 +158,7 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
             f = open(file_name)
             content.extend(f.readlines())
 
-        assert_equal(sorted(content),
+        self.assertEqual(sorted(content),
                     ['bar\n', 'bar\n', 'bar\n', 'bar\n', 'foo\n',
                      'foo\n', 'foo\n', 'qux\n', 'qux\n'])
 
@@ -179,7 +176,7 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
                                               keep_sorted=True)
 
         # make sure we get 3 files
-        assert_equal(len(file_splits), 3)
+        self.assertEqual(len(file_splits), 3)
 
         # make sure all the data is preserved in sorted order
         content = []
@@ -187,7 +184,7 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
             f = open(file_name, 'r')
             content.extend(f.readlines())
 
-        assert_equal(content,
+        self.assertEqual(content,
                      ['1\tbar\n', '1\tbar\n', '1\tbar\n',
                       '2\tfoo\n', '2\tfoo\n', '2\tfoo\n',
                       '3\tqux\n', '3\tqux\n', '3\tqux\n'])
@@ -208,21 +205,27 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
                 key, value = mr_job.parse_output_line(line)
                 results.append((key, value))
 
-            assert_equal(runner._counters, [{'group': {'counter_name': 2}},
+            self.assertEqual(runner._counters, [{'group': {'counter_name': 2}},
                                             {'group': {'counter_name': 2}},
                                             {'group': {'counter_name': 2}}])
 
 
 class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):
+
+    def setUp(self):
+        super(LocalMRJobRunnerNoSymlinksTestCase, self).setUp()
+        self.remove_os_symlink()
+
+    def tearDown(self):
+        super(LocalMRJobRunnerNoSymlinksTestCase, self).tearDown()
+        self.restore_os_symlink()
     """Test systems without os.symlink (e.g. Windows). See Issue #46"""
 
-    @setup
     def remove_os_symlink(self):
         if hasattr(os, 'symlink'):
             self._real_os_symlink = os.symlink
             del os.symlink  # sorry, were you using that? :)
 
-    @teardown
     def restore_os_symlink(self):
         if hasattr(self, '_real_os_symlink'):
             os.symlink = self._real_os_symlink
@@ -234,7 +237,12 @@ class TimeoutException(Exception):
 
 class LargeAmountsOfStderrTestCase(TestCase):
 
-    @setup
+    def setUp(self):
+        self.set_alarm()
+
+    def tearDown(self):
+        self.restore_old_alarm_handler()
+
     def set_alarm(self):
         # if the test fails, it'll stall forever, so set an alarm
         def alarm_handler(*args, **kwargs):
@@ -243,7 +251,6 @@ class LargeAmountsOfStderrTestCase(TestCase):
         self._old_alarm_handler = signal.signal(signal.SIGALRM, alarm_handler)
         signal.alarm(10)
 
-    @teardown
     def restore_old_alarm_handler(self):
         signal.alarm(0)
         signal.signal(signal.SIGALRM, self._old_alarm_handler)
@@ -262,13 +269,13 @@ class LargeAmountsOfStderrTestCase(TestCase):
 
             # look for expected output from MRVerboseJob
             stderr = mr_job.stderr.getvalue()
-            assert_in("Counters from step 1:\n  Foo:\n    Bar: 10000", stderr)
-            assert_in('status: 0\n', stderr)
-            assert_in('status: 99\n', stderr)
-            assert_not_in('status: 100\n', stderr)
-            assert_in('STDERR: Qux\n', stderr)
+            self.assertIn("Counters from step 1:\n  Foo:\n    Bar: 10000", stderr)
+            self.assertIn('status: 0\n', stderr)
+            self.assertIn('status: 99\n', stderr)
+            self.assertNotIn('status: 100\n', stderr)
+            self.assertIn('STDERR: Qux\n', stderr)
             # exception should appear in exception message
-            assert_in('BOOM', repr(e))
+            self.assertIn('BOOM', repr(e))
         else:
             raise AssertionError()
 
@@ -282,10 +289,10 @@ class ExitWithoutExceptionTestCase(TestCase):
         try:
             mr_job.run_job()
         except Exception, e:
-            assert_in('returned non-zero exit status 42', repr(e))
+            self.assertIn('returned non-zero exit status 42', repr(e))
             return
 
-        assert_not_reached()
+        self.fail()
 
 
 class PythonBinTestCase(TestCase):
@@ -303,9 +310,9 @@ class PythonBinTestCase(TestCase):
 
         # the output should basically be the command we used to
         # run the last step, which in this case is a mapper
-        assert_in('mr_two_step_job.py', output)
-        assert_in('--step-num=1', output)
-        assert_in('--mapper', output)
+        self.assertIn('mr_two_step_job.py', output)
+        self.assertIn('--step-num=1', output)
+        self.assertIn('--mapper', output)
 
     def test_python_dash_v_as_python_bin(self):
         python_cmd = cmd_line([sys.executable or 'python', '-v'])
@@ -316,11 +323,11 @@ class PythonBinTestCase(TestCase):
             mr_job.run_job()
 
         # expect debugging messages in stderr
-        assert_in('import mrjob', mr_job.stderr.getvalue())
-        assert_in('#', mr_job.stderr.getvalue())
+        self.assertIn('import mrjob', mr_job.stderr.getvalue())
+        self.assertIn('#', mr_job.stderr.getvalue())
 
         # should still get expected results
-        assert_equal(sorted(mr_job.parse_output()), [(1, None), (1, 'bar')])
+        self.assertEqual(sorted(mr_job.parse_output()), [(1, None), (1, 'bar')])
 
 
 class StepsPythonBinTestCase(TestCase):
@@ -339,17 +346,21 @@ class StepsPythonBinTestCase(TestCase):
                 output = str(ex)
                 # the output should basically be the command used to
                 # run the steps command
-                assert_in('mr_two_step_job.py', output)
-                assert_in('--steps', output)
+                self.assertIn('mr_two_step_job.py', output)
+                self.assertIn('--steps', output)
 
 
 class LocalBootstrapMrjobTestCase(TestCase):
 
-    @setup
+    def setUp(self):
+        self.make_tmp_dir()
+
+    def tearDown(self):
+        self.rm_tmp_dir()
+
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -364,18 +375,18 @@ class LocalBootstrapMrjobTestCase(TestCase):
 
         with mr_job.make_runner() as runner:
             # sanity check
-            assert_equal(runner.get_opts()['bootstrap_mrjob'], True)
+            self.assertEqual(runner.get_opts()['bootstrap_mrjob'], True)
             local_tmp_dir = os.path.realpath(runner._get_local_tmp_dir())
 
             runner.run()
 
             output = list(runner.stream_output())
-            assert_equal(len(output), 1)
+            self.assertEqual(len(output), 1)
 
             # script should load mrjob from its working dir
             _, script_mrjob_dir = mr_job.parse_output_line(output[0])
 
-            assert_not_equal(our_mrjob_dir, script_mrjob_dir)
+            self.assertNotEqual(our_mrjob_dir, script_mrjob_dir)
             assert script_mrjob_dir.startswith(local_tmp_dir)
 
     def test_can_turn_off_bootstrap_mrjob(self):
@@ -393,28 +404,32 @@ class LocalBootstrapMrjobTestCase(TestCase):
 
         with mr_job.make_runner() as runner:
             # sanity check
-            assert_equal(runner.get_opts()['bootstrap_mrjob'], False)
+            self.assertEqual(runner.get_opts()['bootstrap_mrjob'], False)
             runner.run()
 
             output = list(runner.stream_output())
 
-            assert_equal(len(output), 1)
+            self.assertEqual(len(output), 1)
 
             # script should load mrjob from the same place our test does
             _, script_mrjob_dir = mr_job.parse_output_line(output[0])
-            assert_equal(our_mrjob_dir, script_mrjob_dir)
+            self.assertEqual(our_mrjob_dir, script_mrjob_dir)
 
 
 class LocalMRJobRunnerTestJobConfCase(TestCase):
 
-    @setup
+    def setUp(self):
+        self.make_tmp_dir_and_mrjob_conf()
+
+    def tearDown(self):
+        self.rm_tmp_dir()
+
     def make_tmp_dir_and_mrjob_conf(self):
         self.tmp_dir = tempfile.mkdtemp()
         self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
         dump_mrjob_conf({'runners': {'local': {}}},
                         open(self.mrjob_conf_path, 'w'))
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -443,9 +458,9 @@ class LocalMRJobRunnerTestJobConfCase(TestCase):
                 key, value = mr_job.parse_output_line(line)
                 results.append((key, value))
 
-            assert_equal(runner.counters()[0]['count']['combiners'], 2)
+            self.assertEqual(runner.counters()[0]['count']['combiners'], 2)
 
-        assert_equal(sorted(results),
+        self.assertEqual(sorted(results),
                      [(input_path, 3), (input_gz_path, 1)])
 
     def test_others(self):
@@ -467,21 +482,21 @@ class LocalMRJobRunnerTestJobConfCase(TestCase):
                 key, value = mr_job.parse_output_line(line)
                 results[key] = value
 
-        assert_equal(results['mapreduce.job.cache.archives'],
+        self.assertEqual(results['mapreduce.job.cache.archives'],
                      runner._mrjob_tar_gz_path + '#mrjob.tar.gz')
-        assert_equal(results['mapreduce.job.id'], runner._job_name),
-        assert_equal(results['mapreduce.job.local.dir'], runner._working_dir),
-        assert_equal(results['mapreduce.map.input.file'], input_path),
-        assert_equal(results['mapreduce.map.input.length'], '4'),
-        assert_equal(results['mapreduce.map.input.start'], '0'),
-        assert_equal(results['mapreduce.task.attempt.id'],
+        self.assertEqual(results['mapreduce.job.id'], runner._job_name),
+        self.assertEqual(results['mapreduce.job.local.dir'], runner._working_dir),
+        self.assertEqual(results['mapreduce.map.input.file'], input_path),
+        self.assertEqual(results['mapreduce.map.input.length'], '4'),
+        self.assertEqual(results['mapreduce.map.input.start'], '0'),
+        self.assertEqual(results['mapreduce.task.attempt.id'],
                        'attempt_%s_m_000000_0' % runner._job_name),
-        assert_equal(results['mapreduce.task.id'],
+        self.assertEqual(results['mapreduce.task.id'],
                        'task_%s_m_000000' % runner._job_name),
-        assert_equal(results['mapreduce.task.ismap'], 'true'),
-        assert_equal(results['mapreduce.task.output.dir'], runner._output_dir),
-        assert_equal(results['mapreduce.task.partition'], '0')
-        assert_equal(results['user.defined'], 'something')
+        self.assertEqual(results['mapreduce.task.ismap'], 'true'),
+        self.assertEqual(results['mapreduce.task.output.dir'], runner._output_dir),
+        self.assertEqual(results['mapreduce.task.partition'], '0')
+        self.assertEqual(results['user.defined'], 'something')
 
 
 class CompatTestCase(TestCase):
@@ -493,12 +508,12 @@ class CompatTestCase(TestCase):
         # the same temp dir
         with runner as runner:
             runner._setup_working_dir()
-            assert_in('mapred_cache_localArchives',
+            self.assertIn('mapred_cache_localArchives',
                   runner._subprocess_env('M', 0, 0).keys())
 
     def test_environment_variables_021(self):
         runner = LocalMRJobRunner(hadoop_version='0.21', conf_path=False)
         with runner as runner:
             runner._setup_working_dir()
-            assert_in('mapreduce_job_cache_local_archives',
+            self.assertIn('mapreduce_job_cache_local_archives',
                       runner._subprocess_env('M', 0, 0).keys())

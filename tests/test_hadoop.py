@@ -25,13 +25,7 @@ import shlex
 import shutil
 from subprocess import check_call
 import tempfile
-from testify import TestCase
-from testify import assert_equal
-from testify import assert_in
-from testify import assert_lt
-from testify import assert_not_in
-from testify import setup
-from testify import teardown
+from unittest2 import TestCase
 
 from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import add_mock_hadoop_output
@@ -44,17 +38,21 @@ from mrjob.hadoop import find_hadoop_streaming_jar
 
 class TestFindHadoopStreamingJar(TestCase):
 
-    @setup
+    def setUp(self):
+        self.setup_tmp_dir()
+
+    def tearDown(self):
+        self.rm_tmp_dir()
+
     def setup_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
     def test_find_hadoop_streaming_jar(self):
         # shouldn't find anything if nothing's there
-        assert_equal(find_hadoop_streaming_jar(self.tmp_dir), None)
+        self.assertEqual(find_hadoop_streaming_jar(self.tmp_dir), None)
 
         jar_dir = os.path.join(self.tmp_dir, 'a', 'b', 'c')
         os.makedirs(jar_dir)
@@ -64,22 +62,27 @@ class TestFindHadoopStreamingJar(TestCase):
         # not just any jar will do
         mason_jar_path = os.path.join(jar_dir, 'mason.jar')
         open(mason_jar_path, 'w').close()
-        assert_equal(find_hadoop_streaming_jar(self.tmp_dir), None)
+        self.assertEqual(find_hadoop_streaming_jar(self.tmp_dir), None)
 
         # should match streaming jar
         streaming_jar_path = os.path.join(
             jar_dir, 'hadoop-0.20.2-streaming.jar')
         open(streaming_jar_path, 'w').close()
-        assert_equal(find_hadoop_streaming_jar(self.tmp_dir),
+        self.assertEqual(find_hadoop_streaming_jar(self.tmp_dir),
                      streaming_jar_path)
 
         # shouldn't find anything if we look in the wrong dir
-        assert_equal(find_hadoop_streaming_jar(empty_dir), None)
+        self.assertEqual(find_hadoop_streaming_jar(empty_dir), None)
 
 
 class MockHadoopTestCase(TestCase):
 
-    @setup
+    def setUp(self):
+        self.setup_hadoop_home_and_environment_vars()
+
+    def tearDown(self):
+        self.delete_hadoop_home_and_restore_environment_vars()
+
     def setup_hadoop_home_and_environment_vars(self):
         self._old_environ = os.environ.copy()
 
@@ -110,7 +113,6 @@ class MockHadoopTestCase(TestCase):
         _, mock_log_path = tempfile.mkstemp(prefix='mockhadoop.log')
         os.environ['MOCK_HADOOP_LOG'] = mock_log_path
 
-    @teardown
     def delete_hadoop_home_and_restore_environment_vars(self):
         mock_hdfs_root = os.environ['MOCK_HDFS_ROOT']
         mock_output_dir = os.environ['MOCK_HADOOP_OUTPUT']
@@ -126,11 +128,17 @@ class MockHadoopTestCase(TestCase):
 
 class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
-    @setup
+    def setUp(self):
+        super(HadoopJobRunnerEndToEndTestCase, self).setUp()
+        self.make_tmp_dir()
+
+    def tearDown(self):
+        super(HadoopJobRunnerEndToEndTestCase, self).tearDown()
+        self.rm_tmp_dir()
+
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -184,11 +192,11 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
             # make sure we're writing to the correct path in HDFS
             hdfs_root = os.environ['MOCK_HDFS_ROOT']
-            assert_equal(sorted(os.listdir(hdfs_root)), ['data', 'user'])
+            self.assertEqual(sorted(os.listdir(hdfs_root)), ['data', 'user'])
             home_dir = os.path.join(hdfs_root, 'user', getpass.getuser())
-            assert_equal(os.listdir(home_dir), ['tmp'])
-            assert_equal(os.listdir(os.path.join(home_dir, 'tmp')), ['mrjob'])
-            assert_equal(runner._opts['hadoop_extra_args'],
+            self.assertEqual(os.listdir(home_dir), ['tmp'])
+            self.assertEqual(os.listdir(os.path.join(home_dir, 'tmp')), ['mrjob'])
+            self.assertEqual(runner._opts['hadoop_extra_args'],
                          ['-libjar', 'containsJars.jar'])
 
             # make sure mrjob.tar.gz is uploaded and in PYTHONPATH
@@ -196,16 +204,16 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             mrjob_tar_gz_file_dicts = [
                 file_dict for file_dict in runner._files
                 if file_dict['path'] == runner._mrjob_tar_gz_path]
-            assert_equal(len(mrjob_tar_gz_file_dicts), 1)
+            self.assertEqual(len(mrjob_tar_gz_file_dicts), 1)
 
             mrjob_tar_gz_file_dict = mrjob_tar_gz_file_dicts[0]
             assert mrjob_tar_gz_file_dict['name']
 
             pythonpath = runner._get_cmdenv()['PYTHONPATH']
-            assert_in(mrjob_tar_gz_file_dict['name'],
+            self.assertIn(mrjob_tar_gz_file_dict['name'],
                       pythonpath.split(':'))
 
-        assert_equal(sorted(results),
+        self.assertEqual(sorted(results),
                      [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
         # make sure we called hadoop the way we expected
@@ -214,23 +222,23 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         jar_cmd_args = [args for args in hadoop_cmd_args
                         if args[:1] == ['jar']]
-        assert_equal(len(jar_cmd_args), 2)
+        self.assertEqual(len(jar_cmd_args), 2)
         step_0_args, step_1_args = jar_cmd_args
 
         # check input/output format
-        assert_in('-inputformat', step_0_args)
-        assert_not_in('-outputformat', step_0_args)
-        assert_not_in('-inputformat', step_1_args)
-        assert_in('-outputformat', step_1_args)
+        self.assertIn('-inputformat', step_0_args)
+        self.assertNotIn('-outputformat', step_0_args)
+        self.assertNotIn('-inputformat', step_1_args)
+        self.assertIn('-outputformat', step_1_args)
 
         # make sure -libjar extra arg comes before -mapper
         for args in (step_0_args, step_1_args):
-            assert_in('-libjar', args)
-            assert_in('-mapper', args)
-            assert_lt(args.index('-libjar'), args.index('-mapper'))
+            self.assertIn('-libjar', args)
+            self.assertIn('-mapper', args)
+            self.assertLess(args.index('-libjar'), args.index('-mapper'))
 
         # make sure -jobconf made it through
-        assert_in('-D', step_0_args)
+        self.assertIn('-D', step_0_args)
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)
@@ -245,11 +253,17 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
 class TestCat(MockHadoopTestCase):
 
-    @setup
+    def setUp(self):
+        super(TestCat, self).setUp()
+        self.make_tmp_dir()
+
+    def tearDown(self):
+        super(TestCat, self).tearDown()
+        self.rm_tmp_dir()
+
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
 
-    @teardown
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
@@ -274,8 +288,8 @@ class TestCat(MockHadoopTestCase):
             for line in runner.cat(remote_input_path):
                 remote_output.append(line)
 
-        assert_equal(local_output, ['bar\n', 'foo\n'])
-        assert_equal(remote_output, ['foo\n', 'foo\n'])
+        self.assertEqual(local_output, ['bar\n', 'foo\n'])
+        self.assertEqual(remote_output, ['foo\n', 'foo\n'])
 
     def test_cat_compressed(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
@@ -288,7 +302,7 @@ class TestCat(MockHadoopTestCase):
             for line in runner.cat(input_gz_path):
                 output.append(line)
 
-        assert_equal(output, ['foo\n', 'bar\n'])
+        self.assertEqual(output, ['foo\n', 'bar\n'])
 
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
         input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
@@ -300,7 +314,7 @@ class TestCat(MockHadoopTestCase):
             for line in runner.cat(input_bz2_path):
                 output.append(line)
 
-        assert_equal(output, ['bar\n', 'bar\n', 'foo\n'])
+        self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
 
 
 class TestURIs(MockHadoopTestCase):
@@ -314,7 +328,7 @@ class TestURIs(MockHadoopTestCase):
         with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
             hadoop_cmd_args = [shlex.split(line) for line in mock_log]
 
-        assert_equal(hadoop_cmd_args, [
+        self.assertEqual(hadoop_cmd_args, [
             ['fs', '-lsr', 'hdfs://tmp/waffles'],
             ['fs', '-lsr', 'lego://my/ego'],
         ])

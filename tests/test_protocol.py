@@ -13,9 +13,7 @@
 # limitations under the License.
 
 """Make sure all of our protocols work as advertised."""
-from testify import TestCase
-from testify import assert_equal
-from testify import assert_raises
+from unittest2 import TestCase
 
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
@@ -38,20 +36,6 @@ SAFE_KEYS_AND_VALUES = [
 ]
 
 
-def assert_round_trip_ok(protocol, key, value):
-    """Assert that we can encode and decode the given key and value,
-    and get the same key and value we started with."""
-    assert_equal((key, value), protocol.read(protocol.write(key, value)))
-
-
-def assert_cant_encode(protocol, key, value):
-    assert_raises(Exception, protocol.write, key, value)
-
-
-def assert_cant_decode(protocol, data):
-    assert_raises(Exception, protocol.read, data)
-
-
 class Point(object):
     """A simple class to test encoding of objects."""
 
@@ -70,179 +54,195 @@ class Point(object):
             return cmp((self.x, self.y), (other.x, other.y))
 
 
-class JSONProtocolTestCase(TestCase):
+class ProtocolTestCase(TestCase):
+
+    def assertRoundTripOK(self, protocol, key, value):
+        """Assert that we can encode and decode the given key and value,
+        and get the same key and value we started with."""
+        self.assertEqual((key, value),
+                         protocol.read(protocol.write(key, value)))
+    
+    def assertCantEncode(self, protocol, key, value):
+        self.assertRaises(Exception, protocol.write, key, value)
+    
+    
+    def assertCantDecode(self, protocol, data):
+        self.assertRaises(Exception, protocol.read, data)
+    
+
+class JSONProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
         for k, v in SAFE_KEYS_AND_VALUES:
-            assert_round_trip_ok(JSONProtocol, k, v)
+            self.assertRoundTripOK(JSONProtocol, k, v)
 
     def test_uses_json_format(self):
         KEY = ['a', 1]
         VALUE = {'foo': {'bar': 3}, 'baz': None}
         ENCODED = '["a", 1]\t{"foo": {"bar": 3}, "baz": null}'
 
-        assert_equal((KEY, VALUE), JSONProtocol.read(ENCODED))
-        assert_equal(ENCODED, JSONProtocol.write(KEY, VALUE))
+        self.assertEqual((KEY, VALUE), JSONProtocol.read(ENCODED))
+        self.assertEqual(ENCODED, JSONProtocol.write(KEY, VALUE))
 
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
-        assert_equal(([1, 2], [3, 4]),
+        self.assertEqual(([1, 2], [3, 4]),
                      JSONProtocol.read(JSONProtocol.write((1, 2), (3, 4))))
 
     def test_numerical_keys_become_strs(self):
         # JSON should convert numbers to strings when they are dict keys
-        assert_equal(({'1': 2}, {'3': 4}),
+        self.assertEqual(({'1': 2}, {'3': 4}),
                      JSONProtocol.read(JSONProtocol.write({1: 2}, {3: 4})))
 
     def test_bad_data(self):
-        assert_cant_decode(JSONProtocol, '{@#$@#!^&*$%^')
+        self.assertCantDecode(JSONProtocol, '{@#$@#!^&*$%^')
 
     def test_bad_keys_and_values(self):
         # dictionaries have to have strings as keys
-        assert_cant_encode(JSONProtocol, {(1, 2): 3}, None)
+        self.assertCantEncode(JSONProtocol, {(1, 2): 3}, None)
 
         # only unicodes (or bytes in utf-8) are allowed
-        assert_cant_encode(JSONProtocol, '0\xa2', '\xe9')
+        self.assertCantEncode(JSONProtocol, '0\xa2', '\xe9')
 
         # sets don't exist in JSON
-        assert_cant_encode(JSONProtocol, set([1]), set())
+        self.assertCantEncode(JSONProtocol, set([1]), set())
 
         # Point class has no representation in JSON
-        assert_cant_encode(JSONProtocol, Point(2, 3), Point(1, 4))
+        self.assertCantEncode(JSONProtocol, Point(2, 3), Point(1, 4))
 
 
-class JSONValueProtocolTestCase(TestCase):
+class JSONValueProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
         for _, v in SAFE_KEYS_AND_VALUES:
-            assert_round_trip_ok(JSONValueProtocol, None, v)
+            self.assertRoundTripOK(JSONValueProtocol, None, v)
 
     def test_uses_json_format(self):
         VALUE = {'foo': {'bar': 3}, 'baz': None, 'quz': ['a', 1]}
         ENCODED = '{"foo": {"bar": 3}, "baz": null, "quz": ["a", 1]}'
 
-        assert_equal((None, VALUE), JSONValueProtocol.read(ENCODED))
-        assert_equal(ENCODED, JSONValueProtocol.write(None, VALUE))
+        self.assertEqual((None, VALUE), JSONValueProtocol.read(ENCODED))
+        self.assertEqual(ENCODED, JSONValueProtocol.write(None, VALUE))
 
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
-        assert_equal(
+        self.assertEqual(
             (None, [3, 4]),
             JSONValueProtocol.read(JSONValueProtocol.write(None, (3, 4))))
 
     def test_numerical_keys_become_strs(self):
         # JSON should convert numbers to strings when they are dict keys
-        assert_equal(
+        self.assertEqual(
             (None, {'3': 4}),
             JSONValueProtocol.read(JSONValueProtocol.write(None, {3: 4})))
 
     def test_bad_data(self):
-        assert_cant_decode(JSONValueProtocol, '{@#$@#!^&*$%^')
+        self.assertCantDecode(JSONValueProtocol, '{@#$@#!^&*$%^')
 
     def test_bad_keys_and_values(self):
         # dictionaries have to have strings as keys
-        assert_cant_encode(JSONValueProtocol, None, {(1, 2): 3})
+        self.assertCantEncode(JSONValueProtocol, None, {(1, 2): 3})
 
         # only unicodes (or bytes in utf-8) are allowed
-        assert_cant_encode(JSONValueProtocol, None, '\xe9')
+        self.assertCantEncode(JSONValueProtocol, None, '\xe9')
 
         # sets don't exist in JSON
-        assert_cant_encode(JSONValueProtocol, None, set())
+        self.assertCantEncode(JSONValueProtocol, None, set())
 
         # Point class has no representation in JSON
-        assert_cant_encode(JSONValueProtocol, None, Point(1, 4))
+        self.assertCantEncode(JSONValueProtocol, None, Point(1, 4))
 
 
-class PickleProtocolTestCase(TestCase):
+class PickleProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
         for k, v in SAFE_KEYS_AND_VALUES:
-            assert_round_trip_ok(PickleProtocol, k, v)
-        assert_round_trip_ok(PickleProtocol, (1, 2), (3, 4))
-        assert_round_trip_ok(PickleProtocol, '0\xa2', '\xe9')
-        assert_round_trip_ok(PickleProtocol, set([1]), set())
-        assert_round_trip_ok(PickleProtocol, Point(2, 3), Point(1, 4))
+            self.assertRoundTripOK(PickleProtocol, k, v)
+        self.assertRoundTripOK(PickleProtocol, (1, 2), (3, 4))
+        self.assertRoundTripOK(PickleProtocol, '0\xa2', '\xe9')
+        self.assertRoundTripOK(PickleProtocol, set([1]), set())
+        self.assertRoundTripOK(PickleProtocol, Point(2, 3), Point(1, 4))
 
     def test_bad_data(self):
-        assert_cant_decode(PickleProtocol, '{@#$@#!^&*$%^')
+        self.assertCantDecode(PickleProtocol, '{@#$@#!^&*$%^')
 
     # no tests of what encoded data looks like; pickle is an opaque protocol
 
 
-class PickleValueProtocolTestCase(TestCase):
+class PickleValueProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
         for _, v in SAFE_KEYS_AND_VALUES:
-            assert_round_trip_ok(PickleValueProtocol, None, v)
-        assert_round_trip_ok(PickleValueProtocol, None, (3, 4))
-        assert_round_trip_ok(PickleValueProtocol, None, '\xe9')
-        assert_round_trip_ok(PickleValueProtocol, None, set())
-        assert_round_trip_ok(PickleValueProtocol, None, Point(1, 4))
+            self.assertRoundTripOK(PickleValueProtocol, None, v)
+        self.assertRoundTripOK(PickleValueProtocol, None, (3, 4))
+        self.assertRoundTripOK(PickleValueProtocol, None, '\xe9')
+        self.assertRoundTripOK(PickleValueProtocol, None, set())
+        self.assertRoundTripOK(PickleValueProtocol, None, Point(1, 4))
 
     def test_bad_data(self):
-        assert_cant_decode(PickleValueProtocol, '{@#$@#!^&*$%^')
+        self.assertCantDecode(PickleValueProtocol, '{@#$@#!^&*$%^')
 
     # no tests of what encoded data looks like; pickle is an opaque protocol
 
 
-class RawValueProtocolTestCase(TestCase):
+class RawValueProtocolTestCase(ProtocolTestCase):
 
     def test_dumps_keys(self):
-        assert_equal(RawValueProtocol.write('foo', 'bar'), 'bar')
+        self.assertEqual(RawValueProtocol.write('foo', 'bar'), 'bar')
 
     def test_reads_raw_line(self):
-        assert_equal(RawValueProtocol.read('foobar'), (None, 'foobar'))
+        self.assertEqual(RawValueProtocol.read('foobar'), (None, 'foobar'))
 
     def test_bytestrings(self):
-        assert_round_trip_ok(RawValueProtocol, None, '\xe90\c1a')
+        self.assertRoundTripOK(RawValueProtocol, None, '\xe90\c1a')
 
     def test_no_strip(self):
-        assert_equal(RawValueProtocol.read('foo\t \n\n'), (None, 'foo\t \n\n'))
+        self.assertEqual(RawValueProtocol.read('foo\t \n\n'), (None, 'foo\t \n\n'))
 
 
-class ReprProtocolTestCase(TestCase):
+class ReprProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
         for k, v in SAFE_KEYS_AND_VALUES:
-            assert_round_trip_ok(ReprProtocol, k, v)
-        assert_round_trip_ok(ReprProtocol, (1, 2), (3, 4))
-        assert_round_trip_ok(ReprProtocol, '0\xa2', '\xe9')
-        assert_round_trip_ok(ReprProtocol, set([1]), set())
+            self.assertRoundTripOK(ReprProtocol, k, v)
+        self.assertRoundTripOK(ReprProtocol, (1, 2), (3, 4))
+        self.assertRoundTripOK(ReprProtocol, '0\xa2', '\xe9')
+        self.assertRoundTripOK(ReprProtocol, set([1]), set())
 
     def test_uses_repr_format(self):
         KEY = ['a', 1]
         VALUE = {'foo': {'bar': 3}, 'baz': None}
         ENCODED = '%r\t%r' % (KEY, VALUE)
 
-        assert_equal((KEY, VALUE), ReprProtocol.read(ENCODED))
-        assert_equal(ENCODED, ReprProtocol.write(KEY, VALUE))
+        self.assertEqual((KEY, VALUE), ReprProtocol.read(ENCODED))
+        self.assertEqual(ENCODED, ReprProtocol.write(KEY, VALUE))
 
     def test_bad_data(self):
-        assert_cant_decode(ReprProtocol, '{@#$@#!^&*$%^')
+        self.assertCantDecode(ReprProtocol, '{@#$@#!^&*$%^')
 
     def test_can_encode_point_but_not_decode(self):
         points_encoded = ReprProtocol.write(Point(2, 3), Point(1, 4))
-        assert_cant_decode(ReprProtocol, points_encoded)
+        self.assertCantDecode(ReprProtocol, points_encoded)
 
 
-class ReprValueProtocolTestCase(TestCase):
+class ReprValueProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
         for _, v in SAFE_KEYS_AND_VALUES:
-            assert_round_trip_ok(ReprValueProtocol, None, v)
-        assert_round_trip_ok(ReprValueProtocol, None, (3, 4))
-        assert_round_trip_ok(ReprValueProtocol, None, '\xe9')
-        assert_round_trip_ok(ReprValueProtocol, None, set())
+            self.assertRoundTripOK(ReprValueProtocol, None, v)
+        self.assertRoundTripOK(ReprValueProtocol, None, (3, 4))
+        self.assertRoundTripOK(ReprValueProtocol, None, '\xe9')
+        self.assertRoundTripOK(ReprValueProtocol, None, set())
 
     def test_uses_repr_format(self):
         VALUE = {'foo': {'bar': 3}, 'baz': None, 'quz': ['a', 1]}
 
-        assert_equal((None, VALUE), ReprValueProtocol.read(repr(VALUE)))
-        assert_equal(repr(VALUE), ReprValueProtocol.write(None, VALUE))
+        self.assertEqual((None, VALUE), ReprValueProtocol.read(repr(VALUE)))
+        self.assertEqual(repr(VALUE), ReprValueProtocol.write(None, VALUE))
 
     def test_bad_data(self):
-        assert_cant_decode(ReprValueProtocol, '{@#$@#!^&*$%^')
+        self.assertCantDecode(ReprValueProtocol, '{@#$@#!^&*$%^')
 
     def test_can_encode_point_but_not_decode(self):
         points_encoded = ReprValueProtocol.write(None, Point(1, 4))
-        assert_cant_decode(ReprValueProtocol, points_encoded)
+        self.assertCantDecode(ReprValueProtocol, points_encoded)

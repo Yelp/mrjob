@@ -1,7 +1,22 @@
 try:
     from setuptools import setup
+    # arguments that distutils doesn't understand
+    setuptools_kwargs = {
+        'install_requires': [
+            # todo: update this to whatever version of boto includes
+            # https://github.com/boto/boto/pull/190
+            'boto>=2.0b4',
+            'PyYAML',
+            'simplejson>=2.0.9',
+        ],
+        'provides': ['mrjob'],
+        'test_suite': 'tests.suite.load_tests',
+        'tests_require': ['unittest2'],
+        'zip_safe': False, # so that we can bootstrap mrjob
+    }
 except ImportError:
     from distutils.core import setup
+    setuptools_kwargs = {}
 
 import mrjob
 
@@ -21,13 +36,6 @@ setup(
         'Topic :: System :: Distributed Computing',
     ],
     description='Python MapReduce framework',
-    install_requires=[
-        # todo: update this to whatever version of boto includes
-        # https://github.com/boto/boto/pull/190
-        'boto>=2.0b4',
-        'PyYAML',
-        'simplejson>=2.0.9'
-    ],
     license='Apache',
     long_description=open('README.rst').read(),
     name='mrjob',
@@ -35,8 +43,7 @@ setup(
               'mrjob.examples',
               'mrjob.tools',
               'mrjob.tools.emr'],
-    provides=['mrjob'],
     url='http://github.com/Yelp/mrjob',
     version=mrjob.__version__,
-    zip_safe=False, # so that we can bootstrap mrjob
+    **setuptools_kwargs
 )

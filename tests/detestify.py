@@ -144,15 +144,22 @@ def process_class(lines, output):
         
         output.write('    def %s(%s):\n' % (method_type, cls_or_self))
 
+        # lines in the function. if this is a teardown method, we
+        # want these in reverse order
+        contents = []
         if parents != 'TestCase':
-            output.write('        super(%s, %s).%s()\n' %
+            contents.append('        super(%s, %s).%s()\n' %
                          (class_name, cls_or_self, method_type))
 
-        if 'tearDown' in method_type:
-            method_names = reversed(method_names)
-
         for method_name in method_names:
-            output.write('        %s.%s()\n' % (cls_or_self, method_name))
+            contents.append('        %s.%s()\n' % (cls_or_self, method_name))
+
+        if 'tearDown' in method_type:
+            contents = reversed(contents)
+
+        for content_line in contents:
+            output.write(content_line)
+
 
     # print lines of the class, with a wee bit of filtering
     for line in lines[1:]:

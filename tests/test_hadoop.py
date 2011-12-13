@@ -133,8 +133,8 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         self.make_tmp_dir()
 
     def tearDown(self):
-        super(HadoopJobRunnerEndToEndTestCase, self).tearDown()
         self.rm_tmp_dir()
+        super(HadoopJobRunnerEndToEndTestCase, self).tearDown()
 
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
@@ -258,8 +258,8 @@ class TestCat(MockHadoopTestCase):
         self.make_tmp_dir()
 
     def tearDown(self):
-        super(TestCat, self).tearDown()
         self.rm_tmp_dir()
+        super(TestCat, self).tearDown()
 
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()

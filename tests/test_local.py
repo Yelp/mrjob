@@ -211,15 +211,15 @@ class LocalMRJobRunnerEndToEndTestCase(TestCase):
 
 
 class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):
+    """Test systems without os.symlink (e.g. Windows). See Issue #46"""
 
     def setUp(self):
         super(LocalMRJobRunnerNoSymlinksTestCase, self).setUp()
         self.remove_os_symlink()
 
     def tearDown(self):
-        super(LocalMRJobRunnerNoSymlinksTestCase, self).tearDown()
         self.restore_os_symlink()
-    """Test systems without os.symlink (e.g. Windows). See Issue #46"""
+        super(LocalMRJobRunnerNoSymlinksTestCase, self).tearDown()
 
     def remove_os_symlink(self):
         if hasattr(os, 'symlink'):

@@ -178,8 +178,8 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.put_additional_emr_info_in_mrjob_conf()
 
     def tearDown(self):
-        super(EMRJobRunnerEndToEndTestCase, self).tearDown()
         self.rm_tmp_dir()
+        super(EMRJobRunnerEndToEndTestCase, self).tearDown()
 
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
@@ -849,11 +849,11 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         self.make_runner()
 
     def tearDown(self):
-        super(FindProbableCauseOfFailureTestCase, self).tearDown()
         self.cleanup_runner()
+        super(FindProbableCauseOfFailureTestCase, self).tearDown()
+
     # We're mostly concerned here that the right log files are read in the
     # right order. parsing of the logs is handled by tests.parse_test
-
     def make_runner(self):
         self.add_mock_s3_data({'walrus': {}})
         self.runner = EMRJobRunner(s3_sync_wait_time=0,
@@ -1050,8 +1050,8 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
     def tearDown(self):
         super(LogFetchingFallbackTestCase, self).tearDown()
         self.cleanup_runner()
-    # Make sure that SSH and S3 are accessed when we expect them to be
 
+    # Make sure that SSH and S3 are accessed when we expect them to be
     def make_runner(self):
         self.add_mock_s3_data({'walrus': {}})
 

@@ -224,8 +224,8 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         self.blank_out_yaml()
 
     def tearDown(self):
-        super(MRJobConfNoYAMLTestCase, self).tearDown()
         self.restore_yaml()
+        super(MRJobConfNoYAMLTestCase, self).tearDown()
 
     def blank_out_yaml(self):
         self._real_yaml = mrjob.conf.yaml

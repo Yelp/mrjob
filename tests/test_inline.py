@@ -26,7 +26,7 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.job import MRJob
 from mrjob.inline import InlineMRJobRunner
 from mrjob.protocol import JSONValueProtocol
-from tests.mr_cmdenv_test import MRCmdenvTest
+from tests.mr_test_cmdenv import MRTestCmdenv
 from tests.mr_two_step_job import MRTwoStepJob
 
 
@@ -112,7 +112,7 @@ class InlineMRJobRunnerCmdenvTest(TestCase):
         os.environ['SOMETHING'] = 'foofoofoo'
         old_env = os.environ.copy()
 
-        mr_job = MRCmdenvTest(['--runner', 'inline',
+        mr_job = MRTestCmdenv(['--runner', 'inline',
                                '-c', self.mrjob_conf_path,
                                '--cmdenv=FOO=bar', input_path])
         mr_job.sandbox()

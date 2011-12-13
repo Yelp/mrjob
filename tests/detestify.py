@@ -5,6 +5,8 @@
 - You use a subset of testify asserts (easy to add to)
 - You don't use testify.run() (would be easy to add)
 
+This also doesn't handle blockquotes correctly.
+
 And doubtless some other stuff.
 """
 from cStringIO import StringIO
@@ -96,7 +98,7 @@ def process_file(input, output):
             if m:
                 name = m.group(1)
                 if name in TESTIFY_IMPORTS_TO_KEEP:
-                    output.write('from unittest2 import %s' % name)
+                    output.write('from unittest2 import %s\n' % name)
                 # otherwise just delete it
             else:
                 output.write(line)

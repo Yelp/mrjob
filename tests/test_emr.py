@@ -30,9 +30,9 @@ from StringIO import StringIO
 import tempfile
 
 try:
-    from unittest2 import TestCase
+    import unittest2 as unittest
 except ImportError:
-    from unittest import TestCase
+    import unittest
 
 import mrjob
 from mrjob.conf import dump_mrjob_conf
@@ -70,7 +70,7 @@ except ImportError:
     boto = None
 
 
-class MockEMRAndS3TestCase(TestCase):
+class MockEMRAndS3TestCase(unittest.TestCase):
 
     def setUp(self):
         self.make_mrjob_conf()
@@ -1283,7 +1283,7 @@ class TestSSHLs(MockEMRAndS3TestCase):
                           self.runner.ls('ssh://testmaster/does_not_exist'))
 
 
-class TestNoBoto(TestCase):
+class TestNoBoto(unittest.TestCase):
 
     def setUp(self):
         self.blank_out_boto()

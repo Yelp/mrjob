@@ -26,9 +26,9 @@ import sys
 import tempfile
 
 try:
-    from unittest2 import TestCase
+    import unittest2 as unittest
 except ImportError:
-    from unittest import TestCase
+    import unittest
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
@@ -43,7 +43,7 @@ from tests.mr_verbose_job import MRVerboseJob
 from tests.quiet import no_handlers_for_logger
 
 
-class LocalMRJobRunnerEndToEndTestCase(TestCase):
+class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir_and_mrjob_conf()
@@ -240,7 +240,7 @@ class TimeoutException(Exception):
     pass
 
 
-class LargeAmountsOfStderrTestCase(TestCase):
+class LargeAmountsOfStderrTestCase(unittest.TestCase):
 
     def setUp(self):
         self.set_alarm()
@@ -286,7 +286,7 @@ class LargeAmountsOfStderrTestCase(TestCase):
             raise AssertionError()
 
 
-class ExitWithoutExceptionTestCase(TestCase):
+class ExitWithoutExceptionTestCase(unittest.TestCase):
 
     def test_exit_42_job(self):
         mr_job = MRExit42Job(['--no-conf'])
@@ -301,7 +301,7 @@ class ExitWithoutExceptionTestCase(TestCase):
         self.fail()
 
 
-class PythonBinTestCase(TestCase):
+class PythonBinTestCase(unittest.TestCase):
 
     def test_echo_as_python_bin(self):
         # "echo" is a pretty poor substitute for Python, but it
@@ -337,7 +337,7 @@ class PythonBinTestCase(TestCase):
                          [(1, None), (1, 'bar')])
 
 
-class StepsPythonBinTestCase(TestCase):
+class StepsPythonBinTestCase(unittest.TestCase):
 
     def test_echo_as_steps_python_bin(self):
         mr_job = MRTwoStepJob(
@@ -357,7 +357,7 @@ class StepsPythonBinTestCase(TestCase):
                 self.assertIn('--steps', output)
 
 
-class LocalBootstrapMrjobTestCase(TestCase):
+class LocalBootstrapMrjobTestCase(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir()
@@ -423,7 +423,7 @@ class LocalBootstrapMrjobTestCase(TestCase):
             self.assertEqual(our_mrjob_dir, script_mrjob_dir)
 
 
-class LocalMRJobRunnerTestJobConfCase(TestCase):
+class LocalMRJobRunnerTestJobConfCase(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir_and_mrjob_conf()
@@ -508,7 +508,7 @@ class LocalMRJobRunnerTestJobConfCase(TestCase):
         self.assertEqual(results['user.defined'], 'something')
 
 
-class CompatTestCase(TestCase):
+class CompatTestCase(unittest.TestCase):
 
     def test_environment_variables_018(self):
         runner = LocalMRJobRunner(hadoop_version='0.18', conf_path=False)

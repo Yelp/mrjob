@@ -27,9 +27,9 @@ from subprocess import check_call
 import tempfile
 
 try:
-    from unittest2 import TestCase
+    import unittest2 as unittest
 except ImportError:
-    from unittest import TestCase
+    import unittest
 
 from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import add_mock_hadoop_output
@@ -40,7 +40,7 @@ from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
 
 
-class TestFindHadoopStreamingJar(TestCase):
+class TestFindHadoopStreamingJar(unittest.TestCase):
 
     def setUp(self):
         self.setup_tmp_dir()
@@ -79,7 +79,7 @@ class TestFindHadoopStreamingJar(TestCase):
         self.assertEqual(find_hadoop_streaming_jar(empty_dir), None)
 
 
-class MockHadoopTestCase(TestCase):
+class MockHadoopTestCase(unittest.TestCase):
 
     def setUp(self):
         self.setup_hadoop_home_and_environment_vars()

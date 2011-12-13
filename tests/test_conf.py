@@ -23,9 +23,9 @@ from StringIO import StringIO
 import tempfile
 
 try:
-    from unittest2 import TestCase
+    import unittest2 as unittest
 except ImportError:
-    from unittest import TestCase
+    import unittest
 
 import mrjob.conf
 from mrjob.conf import combine_cmd_lists
@@ -47,7 +47,7 @@ from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 
 
-class MRJobConfTestCase(TestCase):
+class MRJobConfTestCase(unittest.TestCase):
 
     def setUp(self):
         self.patch_os_path_exists()
@@ -249,7 +249,7 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
                          '{"runners":{"foo":{"qux":"quux"}}}')
 
 
-class CombineValuesTestCase(TestCase):
+class CombineValuesTestCase(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_values(), None)
@@ -276,7 +276,7 @@ class CombineValuesTestCase(TestCase):
         self.assertEqual(combine_values(set([1]), set()), set())
 
 
-class CombineDictsTestCase(TestCase):
+class CombineDictsTestCase(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_dicts(), {})
@@ -307,7 +307,7 @@ class CombineDictsTestCase(TestCase):
              'PS1': '\w> '})
 
 
-class CombineCmdsTestCase(TestCase):
+class CombineCmdsTestCase(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_cmds(), None)
@@ -335,7 +335,7 @@ class CombineCmdsTestCase(TestCase):
         self.assertEqual(combine_cmds('sort', ('grep', '-E')), ['grep', '-E'])
 
 
-class CombineCmdsListsCase(TestCase):
+class CombineCmdsListsCase(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_cmd_lists(), [])
@@ -353,7 +353,7 @@ class CombineCmdsListsCase(TestCase):
             [['echo', 'Hello World!'], ['mkdir', '/tmp/baz']])
 
 
-class CombineEnvsTestCase(TestCase):
+class CombineEnvsTestCase(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_envs(), {})
@@ -384,7 +384,7 @@ class CombineEnvsTestCase(TestCase):
              'PS1': '\w> '})
 
 
-class CombineLocalEnvsTestCase(TestCase):
+class CombineLocalEnvsTestCase(unittest.TestCase):
 
     def setUp(self):
         self.set_os_pathsep()
@@ -414,7 +414,7 @@ class CombineLocalEnvsTestCase(TestCase):
              'PS1': '\w> '})
 
 
-class CombineListsTestCase(TestCase):
+class CombineListsTestCase(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_lists(), [])
@@ -423,7 +423,7 @@ class CombineListsTestCase(TestCase):
         self.assertEqual(combine_lists([1, 2], None, (3, 4)), [1, 2, 3, 4])
 
 
-class CombineOptsTestCase(TestCase):
+class CombineOptsTestCase(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_opts(combiners={}), {})
@@ -442,7 +442,7 @@ class CombineOptsTestCase(TestCase):
             {'foo': ['bar', 'baz'], 'baz': ['quux'], 'bar': 'garply'})
 
 
-class CombineAndExpandPathsTestCase(TestCase):
+class CombineAndExpandPathsTestCase(unittest.TestCase):
 
     def setUp(self):
         self.setup_tmp_dir()

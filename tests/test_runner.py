@@ -29,9 +29,9 @@ import tarfile
 import tempfile
 
 try:
-    from unittest2 import TestCase
+    import unittest2 as unittest
 except ImportError:
-    from unittest import TestCase
+    import unittest
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
@@ -44,7 +44,7 @@ from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 
 
-class WithStatementTestCase(TestCase):
+class WithStatementTestCase(unittest.TestCase):
 
     def setUp(self):
         self.setup_ivars()
@@ -110,7 +110,7 @@ class WithStatementTestCase(TestCase):
                           LocalMRJobRunner, cleanup_on_failure=CLEANUP_DEFAULT)
 
 
-class TestExtraKwargs(TestCase):
+class TestExtraKwargs(unittest.TestCase):
 
     def setUp(self):
         self.make_mrjob_conf()
@@ -143,7 +143,7 @@ class TestExtraKwargs(TestCase):
                 self.assertNotIn('bar', runner._opts)
 
 
-class TestJobName(TestCase):
+class TestJobName(unittest.TestCase):
 
     def setUp(self):
         self.blank_out_environment()
@@ -242,7 +242,7 @@ class TestJobName(TestCase):
         self.assertEqual(match.group(2), 'ads')
 
 
-class CreateMrjobTarGzTestCase(TestCase):
+class CreateMrjobTarGzTestCase(unittest.TestCase):
 
     def test_create_mrjob_tar_gz(self):
         with LocalMRJobRunner(conf_path=False) as runner:
@@ -256,7 +256,7 @@ class CreateMrjobTarGzTestCase(TestCase):
             self.assertIn('mrjob/job.py', contents)
 
 
-class TestHadoopConfArgs(TestCase):
+class TestHadoopConfArgs(unittest.TestCase):
 
     def test_empty(self):
         runner = LocalMRJobRunner(conf_path=False)
@@ -336,7 +336,7 @@ class TestHadoopConfArgs(TestCase):
         self.assertEqual(len(conf_args), 12)
 
 
-class TestCat(TestCase):
+class TestCat(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir()
@@ -388,7 +388,7 @@ class TestCat(TestCase):
         self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
 
 
-class TestStreamingOutput(TestCase):
+class TestStreamingOutput(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir()
@@ -440,7 +440,7 @@ class TestStreamingOutput(TestCase):
                          ['A', 'B', 'C'])
 
 
-class TestInvokeSort(TestCase):
+class TestInvokeSort(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir_and_set_up_files()

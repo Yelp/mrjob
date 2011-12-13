@@ -27,9 +27,9 @@ import tempfile
 import time
 
 try:
-    from unittest2 import TestCase
+    import unittest2 as unittest
 except ImportError:
-    from unittest import TestCase
+    import unittest
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
@@ -187,7 +187,7 @@ class MRCustomBoringJob(MRBoringJob):
 
 ### Test cases ###
 
-class MRTestCase(TestCase):
+class MRTestCase(unittest.TestCase):
     # some basic testing for the mr() function
     def test_mr(self):
 
@@ -262,7 +262,7 @@ class MRTestCase(TestCase):
                          stepdict(reducer_final=reducer_final))
 
 
-class MRInitTestCase(TestCase):
+class MRInitTestCase(unittest.TestCase):
 
     def test_init_funcs(self):
         num_inputs = 2
@@ -281,7 +281,7 @@ class MRInitTestCase(TestCase):
         self.assertEqual(results[0], num_inputs * 10 * 10 * 2)
 
 
-class MRNoOutputTestCase(TestCase):
+class MRNoOutputTestCase(unittest.TestCase):
 
     def _test_no_main_with_class(self, cls):
         num_inputs = 2
@@ -307,7 +307,7 @@ class MRNoOutputTestCase(TestCase):
         self._test_no_main_with_class(MRInvisibleCombinerJob)
 
 
-class NoTzsetTestCase(TestCase):
+class NoTzsetTestCase(unittest.TestCase):
 
     def setUp(self):
         self.remove_time_tzset()
@@ -329,7 +329,7 @@ class NoTzsetTestCase(TestCase):
         MRJob()
 
 
-class CountersAndStatusTestCase(TestCase):
+class CountersAndStatusTestCase(unittest.TestCase):
 
     def test_counters_and_status(self):
         mr_job = MRJob().sandbox()
@@ -382,7 +382,7 @@ class CountersAndStatusTestCase(TestCase):
                           'girl; interrupted': {'movie': 1}})
 
 
-class ProtocolsTestCase(TestCase):
+class ProtocolsTestCase(unittest.TestCase):
     # not putting these in their own files because we're not going to invoke
     # it as a script anyway.
 
@@ -531,7 +531,7 @@ class ProtocolsTestCase(TestCase):
         self.assertRaises(Exception, mr_job.run_mapper)
 
 
-class DeprecatedProtocolsTestCase(TestCase):
+class DeprecatedProtocolsTestCase(unittest.TestCase):
     # not putting these in their own files because we're not going to invoke
     # it as a script anyway.
 
@@ -745,7 +745,7 @@ class DeprecatedProtocolsTestCase(TestCase):
         self.assertRaises(Exception, mr_job.run_mapper)
 
 
-class JobConfTestCase(TestCase):
+class JobConfTestCase(unittest.TestCase):
 
     class MRJobConfJob(MRJob):
         JOBCONF = {'mapred.foo': 'garply',
@@ -807,7 +807,7 @@ class JobConfTestCase(TestCase):
                          {'mapred.baz': 'bar'})
 
 
-class HadoopFormatTestCase(TestCase):
+class HadoopFormatTestCase(unittest.TestCase):
 
     # MRHadoopFormatJob is imported above
 
@@ -875,7 +875,7 @@ class HadoopFormatTestCase(TestCase):
                              'org.apache.hadoop.mapred.FileOutputFormat')
 
 
-class PartitionerTestCase(TestCase):
+class PartitionerTestCase(unittest.TestCase):
 
     class MRPartitionerJob(MRJob):
         PARTITIONER = 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
@@ -913,7 +913,7 @@ class PartitionerTestCase(TestCase):
                          'org.apache.hadoop.mapreduce.Partitioner')
 
 
-class IsMapperOrReducerTestCase(TestCase):
+class IsMapperOrReducerTestCase(unittest.TestCase):
 
     def test_is_mapper_or_reducer(self):
         self.assertEqual(MRJob().is_mapper_or_reducer(), False)
@@ -923,7 +923,7 @@ class IsMapperOrReducerTestCase(TestCase):
         self.assertEqual(MRJob(['--steps']).is_mapper_or_reducer(), False)
 
 
-class StepsTestCase(TestCase):
+class StepsTestCase(unittest.TestCase):
 
     def test_auto_build_steps(self):
         mrbj = MRBoringJob()
@@ -1015,7 +1015,7 @@ class StepsTestCase(TestCase):
             MRJob.mr, mapper, reducer, mapper_final, mapper_final=mapper_final)
 
 
-class StepNumTestCase(TestCase):
+class StepNumTestCase(unittest.TestCase):
 
     def test_two_step_job_end_to_end(self):
         # represent input as a list so we can reuse it
@@ -1074,7 +1074,7 @@ class StepNumTestCase(TestCase):
         self.assertRaises(ValueError, mr_job.run_reducer, -1)
 
 
-class CommandLineArgsTest(TestCase):
+class CommandLineArgsTest(unittest.TestCase):
 
     def test_shouldnt_exit_when_invoked_as_object(self):
         self.assertRaises(ValueError, MRJob, args=['--quux', 'baz'])
@@ -1235,7 +1235,7 @@ class CommandLineArgsTest(TestCase):
             ('--accordian-file', '/home/dave/JohnLinnell.ogg')])
 
 
-class FileOptionsTestCase(TestCase):
+class FileOptionsTestCase(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir()
@@ -1294,7 +1294,7 @@ class FileOptionsTestCase(TestCase):
         self.assertEqual(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))
 
 
-class ParseOutputTestCase(TestCase):
+class ParseOutputTestCase(unittest.TestCase):
     # test parse_output() method
 
     def test_default(self):
@@ -1330,7 +1330,7 @@ class ParseOutputTestCase(TestCase):
         self.assertEqual(mr_job.stdout.getvalue(), output)
 
 
-class RunJobTestCase(TestCase):
+class RunJobTestCase(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir()
@@ -1401,7 +1401,7 @@ class RunJobTestCase(TestCase):
                          ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])
 
 
-class BadMainTestCase(TestCase):
+class BadMainTestCase(unittest.TestCase):
     """Ensure that the user cannot do anything but just call MRYourJob.run()
     from __main__()"""
 

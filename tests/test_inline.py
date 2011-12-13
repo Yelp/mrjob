@@ -22,9 +22,9 @@ import shutil
 import tempfile
 
 try:
-    from unittest2 import TestCase
+    import unittest2 as unittest
 except ImportError:
-    from unittest import TestCase
+    import unittest
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.job import MRJob
@@ -34,7 +34,7 @@ from tests.mr_test_cmdenv import MRTestCmdenv
 from tests.mr_two_step_job import MRTwoStepJob
 
 
-class InlineMRJobRunnerEndToEndTestCase(TestCase):
+class InlineMRJobRunnerEndToEndTestCase(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir_and_mrjob_conf()
@@ -90,7 +90,7 @@ class InlineMRJobRunnerEndToEndTestCase(TestCase):
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
 
-class InlineMRJobRunnerCmdenvTest(TestCase):
+class InlineMRJobRunnerCmdenvTest(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir_and_mrjob_conf()
@@ -157,7 +157,7 @@ class MRIncrementerJob(MRJob):
         return [self.mr(self.mapper)] * self.options.times
 
 
-class InlineRunnerStepsTestCase(TestCase):
+class InlineRunnerStepsTestCase(unittest.TestCase):
     # make sure file options get passed to --steps in inline mode
 
     def test_adding_2(self):

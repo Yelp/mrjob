@@ -18,9 +18,9 @@
 import os
 
 try:
-    from unittest2 import TestCase
+    import unittest2 as unittest
 except ImportError:
-    from unittest import TestCase
+    import unittest
 
 from mrjob.compat import get_jobconf_value
 from mrjob.compat import supports_combiners_in_hadoop_streaming
@@ -28,7 +28,7 @@ from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_generic_jobconf
 
 
-class EnvVarTestCase(TestCase):
+class EnvVarTestCase(unittest.TestCase):
 
     def setUp(self):
         self._old_env = os.environ.copy()
@@ -52,7 +52,7 @@ class EnvVarTestCase(TestCase):
                          'Edsger W. Dijkstra')
 
 
-class CompatTestCase(TestCase):
+class CompatTestCase(unittest.TestCase):
 
     def test_translate_jobconf(self):
         self.assertEqual(translate_jobconf('user.name', '0.18'),

@@ -26,9 +26,9 @@ import tarfile
 import tempfile
 
 try:
-    from unittest2 import TestCase
+    import unittest2 as unittest
 except ImportError:
-    from unittest import TestCase
+    import unittest
 
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
@@ -41,7 +41,7 @@ from mrjob.util import extract_dir_for_tar
 from mrjob.util import unarchive
 
 
-class CmdLineTestCase(TestCase):
+class CmdLineTestCase(unittest.TestCase):
 
     def test_cmd_line(self):
         self.assertEqual(cmd_line(['cut', '-f', 2, '-d', ' ']),
@@ -54,7 +54,7 @@ class CmdLineTestCase(TestCase):
 # expand_path() is tested by tests.conf.CombineAndExpandPathsTestCase
 
 
-class FileExtTestCase(TestCase):
+class FileExtTestCase(unittest.TestCase):
 
     def test_file_ext(self):
         self.assertEqual(file_ext('foo.zip'), '.zip')
@@ -65,7 +65,7 @@ class FileExtTestCase(TestCase):
         self.assertEqual(file_ext('README.txt,v'), '.txt,v')
 
 
-class OptionScrapingTestCase(TestCase):
+class OptionScrapingTestCase(unittest.TestCase):
 
     def setUp(self):
         self.setup_options()
@@ -119,7 +119,7 @@ class OptionScrapingTestCase(TestCase):
         self.assertEqual(options.x, 'happy')
 
 
-class ReadInputTestCase(TestCase):
+class ReadInputTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -205,7 +205,7 @@ class ReadInputTestCase(TestCase):
                           read_input(os.path.join(self.tmpdir, 'lions*')))
 
 
-class SafeEvalTestCase(TestCase):
+class SafeEvalTestCase(unittest.TestCase):
 
     def test_simple_data_structure(self):
         # try unrepr-ing a bunch of simple data structures
@@ -224,7 +224,7 @@ class SafeEvalTestCase(TestCase):
             safeeval('abs(a)', globals={'abs': abs}, locals={'a': a}))
 
 
-class ArchiveTestCase(TestCase):
+class ArchiveTestCase(unittest.TestCase):
 
     def setUp(self):
         self.setup_tmp_dir()
@@ -364,7 +364,7 @@ class ArchiveTestCase(TestCase):
             unarchive, join(self.tmp_dir, 'a', 'foo'), join(self.tmp_dir, 'b'))
 
 
-class read_fileTest(TestCase):
+class read_fileTest(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir()

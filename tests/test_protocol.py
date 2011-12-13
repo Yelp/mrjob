@@ -15,9 +15,9 @@
 """Make sure all of our protocols work as advertised."""
 
 try:
-    from unittest2 import TestCase
+    import unittest2 as unittest
 except ImportError:
-    from unittest import TestCase
+    import unittest
 
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
@@ -58,7 +58,7 @@ class Point(object):
             return cmp((self.x, self.y), (other.x, other.y))
 
 
-class ProtocolTestCase(TestCase):
+class ProtocolTestCase(unittest.TestCase):
 
     def assertRoundTripOK(self, protocol, key, value):
         """Assert that we can encode and decode the given key and value,

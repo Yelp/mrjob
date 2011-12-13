@@ -20,9 +20,9 @@ from subprocess import PIPE
 from subprocess import Popen
 
 try:
-    from unittest2 import TestCase
+    import unittest2 as unittest
 except ImportError:
-    from unittest import TestCase
+    import unittest
 
 from mrjob.parse import counter_unescape
 from mrjob.parse import find_hadoop_java_stack_trace
@@ -42,7 +42,7 @@ from mrjob.util import log_to_stream
 from tests.quiet import no_handlers_for_logger
 
 
-class FindPythonTracebackTestCase(TestCase):
+class FindPythonTracebackTestCase(unittest.TestCase):
 
     EXAMPLE_TRACEBACK = """Traceback (most recent call last):
   File "mr_collect_per_search_info_remote.py", line 8, in <module>
@@ -129,7 +129,7 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
         self.assertEqual(''.join(tb), self.EXAMPLE_STDERR_TRACEBACK_2)
 
 
-class FindMiscTestCase(TestCase):
+class FindMiscTestCase(unittest.TestCase):
 
     # we can't generate the output that the other find_*() methods look
     # for, so just search over some static data
@@ -289,7 +289,7 @@ class FindMiscTestCase(TestCase):
                       parse_hadoop_counters_from_line(counter_string)[0])
 
 
-class ParseMRJobStderr(TestCase):
+class ParseMRJobStderr(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(parse_mr_job_stderr(StringIO()),
@@ -357,7 +357,7 @@ class ParseMRJobStderr(TestCase):
                          {'counters': {}, 'statuses': [], 'other': BAD_LINES})
 
 
-class PortRangeListTestCase(TestCase):
+class PortRangeListTestCase(unittest.TestCase):
     def test_port_range_list(self):
         self.assertEqual(parse_port_range_list('1234'), [1234])
         self.assertEqual(parse_port_range_list('123,456,789'), [123, 456, 789])
@@ -374,7 +374,7 @@ class PortRangeListTestCase(TestCase):
         self.assertRaises(ValueError, parse_port_range_list, 'Athens:Alexandria')
 
 
-class URITestCase(TestCase):
+class URITestCase(unittest.TestCase):
     def test_uri_parsing(self):
         self.assertEqual(is_uri('notauri!'), False)
         self.assertEqual(is_uri('they://did/the/monster/mash'), True)

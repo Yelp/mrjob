@@ -1,9 +1,11 @@
-"""Convert testify decorators to unittest2. This assumes you use 4 spaces
-for tabs, and doubtless some other stuff. Motly this is an ad-hoc script
-for porting mrjob tests to unittest2
+"""Convert testify decorators to unittest2. This assumes:
 
-Imports and asserts are pretty easily handled using sed, so we're not doing
-that.
+- You use 4 spaces for indentation
+- Imports look like: from testify import <one thing>
+- You use a subset of testify asserts (easy to add to)
+- You don't use testify.run() (would be easy to add)
+
+And doubtless some other stuff.
 """
 from cStringIO import StringIO
 from collections import defaultdict
@@ -16,12 +18,32 @@ CLASS_RE = re.compile(r'class\s+(\w+)\((.*)\):')
 
 DEF_RE = re.compile(r'\s*def (\w+)')
 
+TESTIFY_IMPORT_RE = re.compile(r'^from testify import (\w+)$')
+
+ASSERT_RE = re.compile(r'assert_\w+')
+
 DECORATOR_MAP = {
     '@setup': 'setUp',
     '@teardown': 'tearDown',
     '@class_setup': 'setUpClass',
     '@class_teardown': 'tearDownClass',
 }
+
+
+ASSERT_MAP = {
+    'assert_equal': 'assertEqual',
+    'assert_gt': 'assertGreater',
+    'assert_gte': 'assertGreaterEqual',
+    'assert_in': 'assertIn',
+    'assert_lt': 'assertLess',
+    'assert_lte': 'assertLessEqual',
+    'assert_not_equal': 'assertNotEqual',
+    'assert_not_in': 'assertNotIn',
+    'assert_not_reached': 'fail',
+    'assert_raises': 'assertRaises',
+}
+
+TESTIFY_IMPORTS_TO_KEEP = set(['TestCase'])
 
 
 def main():
@@ -69,7 +91,15 @@ def process_file(input, output):
                 current_class_lines = []
 
         if current_class_lines is None:
-            output.write(line)
+            # imports of asserts, etc. need not be saved
+            m = TESTIFY_IMPORT_RE.match(line)
+            if m:
+                name = m.group(1)
+                if name in TESTIFY_IMPORTS_TO_KEEP:
+                    output.write('from unittest2 import %s' % name)
+                # otherwise just delete it
+            else:
+                output.write(line)
         else:
             current_class_lines.append(line)
 
@@ -84,7 +114,6 @@ def process_class(lines, output):
 
     setup_methods = defaultdict(list)
     method_type = None
-
     # find setup and teardown methods
     for line in lines:
         if line.strip() in DECORATOR_MAP:
@@ -117,17 +146,31 @@ def process_class(lines, output):
             output.write('        super(%s, %s).%s()\n' %
                          (class_name, cls_or_self, method_type))
 
+        if 'tearDown' in method_type:
+            method_names = reversed(method_names)
+
         for method_name in method_names:
             output.write('        %s.%s()\n' % (cls_or_self, method_name))
 
     # print lines of the class, with a wee bit of filtering
     for line in lines[1:]:
+
+        # strip out decorators
         if line.strip() in DECORATOR_MAP:
             if 'class' in line:
                 output.write('    @classmethod\n')
-            # and consume the decorator
-        else:
-            output.write(line)
+            continue
+
+        # translate asserts. leave asserts we don't recognize as-is
+        def translate_assert(m):
+            name = m.group(0)
+            if name in ASSERT_MAP:
+                return 'self.%s' % ASSERT_MAP[name]
+            else:
+                return name
+            
+        line = ASSERT_RE.sub(translate_assert, line)
+        output.write(line)
 
 
 if __name__ == '__main__':

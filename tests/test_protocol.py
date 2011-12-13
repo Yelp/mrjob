@@ -13,7 +13,11 @@
 # limitations under the License.
 
 """Make sure all of our protocols work as advertised."""
-from unittest2 import TestCase
+
+try:
+    from unittest2 import TestCase
+except ImportError:
+    from unittest import TestCase
 
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol

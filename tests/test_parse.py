@@ -18,7 +18,11 @@ import logging
 from StringIO import StringIO
 from subprocess import PIPE
 from subprocess import Popen
-from unittest2 import TestCase
+
+try:
+    from unittest2 import TestCase
+except ImportError:
+    from unittest import TestCase
 
 from mrjob.parse import counter_unescape
 from mrjob.parse import find_hadoop_java_stack_trace

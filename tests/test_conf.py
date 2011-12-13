@@ -21,7 +21,11 @@ import os
 import shutil
 from StringIO import StringIO
 import tempfile
-from unittest2 import TestCase
+
+try:
+    from unittest2 import TestCase
+except ImportError:
+    from unittest import TestCase
 
 import mrjob.conf
 from mrjob.conf import combine_cmd_lists

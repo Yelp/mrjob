@@ -16,7 +16,11 @@
 """Test compatibility switching between different Hadoop versions"""
 
 import os
-from unittest2 import TestCase
+
+try:
+    from unittest2 import TestCase
+except ImportError:
+    from unittest import TestCase
 
 from mrjob.compat import get_jobconf_value
 from mrjob.compat import supports_combiners_in_hadoop_streaming

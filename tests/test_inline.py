@@ -20,7 +20,11 @@ import gzip
 import os
 import shutil
 import tempfile
-from unittest2 import TestCase
+
+try:
+    from unittest2 import TestCase
+except ImportError:
+    from unittest import TestCase
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.job import MRJob

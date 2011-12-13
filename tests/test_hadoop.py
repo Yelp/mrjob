@@ -25,7 +25,11 @@ import shlex
 import shutil
 from subprocess import check_call
 import tempfile
-from unittest2 import TestCase
+
+try:
+    from unittest2 import TestCase
+except ImportError:
+    from unittest import TestCase
 
 from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import add_mock_hadoop_output

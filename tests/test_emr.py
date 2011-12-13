@@ -28,7 +28,11 @@ import py_compile
 import shutil
 from StringIO import StringIO
 import tempfile
-from unittest2 import TestCase
+
+try:
+    from unittest2 import TestCase
+except ImportError:
+    from unittest import TestCase
 
 import mrjob
 from mrjob.conf import dump_mrjob_conf

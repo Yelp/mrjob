@@ -25,7 +25,11 @@ from StringIO import StringIO
 import sys
 import tempfile
 import time
-from unittest2 import TestCase
+
+try:
+    from unittest2 import TestCase
+except ImportError:
+    from unittest import TestCase
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob

@@ -24,7 +24,11 @@ from subprocess import check_call
 from StringIO import StringIO
 import tarfile
 import tempfile
-from unittest2 import TestCase
+
+try:
+    from unittest2 import TestCase
+except ImportError:
+    from unittest import TestCase
 
 from mrjob.util import cmd_line
 from mrjob.util import file_ext

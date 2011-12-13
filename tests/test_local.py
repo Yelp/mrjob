@@ -24,7 +24,11 @@ import shutil
 import signal
 import sys
 import tempfile
-from unittest2 import TestCase
+
+try:
+    from unittest2 import TestCase
+except ImportError:
+    from unittest import TestCase
 
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner

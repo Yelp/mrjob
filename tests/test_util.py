@@ -20,7 +20,8 @@ import gzip
 import optparse
 import os
 import shutil
-from subprocess import check_call
+from subprocess import PIPE
+from subprocess import Popen
 from StringIO import StringIO
 import tarfile
 import tempfile
@@ -319,7 +320,14 @@ class ArchiveTestCase(unittest.TestCase):
         variables = dict(archive_name=join('..', archive_name),
                          files_to_archive='.')
         archive_command = [arg % variables for arg in archive_template]
-        check_call(archive_command, cwd=join(self.tmp_dir, 'a'))
+
+        # sometime the relevant command isn't available or doesn't work;
+        # if so, skip the test
+        proc = Popen(archive_command, cwd=join(self.tmp_dir, 'a'),
+                     stdout=PIPE, stderr=PIPE)
+        proc.communicate()  # discard output
+        if proc.returncode != 0:
+            self.skipTest("Can't run command to create archive.")
 
         # unarchive it into b/
         unarchive(join(self.tmp_dir, archive_name), join(self.tmp_dir, 'b'))

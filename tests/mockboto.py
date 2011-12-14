@@ -297,6 +297,7 @@ class MockEmrConnection(object):
                     steps=None,
                     bootstrap_actions=[],
                     additional_info=None,
+                    ami_version=None,
                     now=None):
         """Mock of run_jobflow().
 

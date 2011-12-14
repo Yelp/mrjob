@@ -45,7 +45,7 @@ try:
     import boto.emr
     import boto.exception
     import boto.utils
-    from mrjob import boto_2_1_1_5569d16b
+    from mrjob import boto_2_1_1_83aae37b
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
     # inside hadoop streaming
@@ -2327,7 +2327,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def make_emr_conn(self):
         """Create a connection to EMR.
 
-        :return: a :py:class:`mrjob.boto_2_1_1_5569d16b.EmrConnection`, a
+        :return: a :py:class:`mrjob.boto_2_1_1_83aae37b.EmrConnection`, a
                  subclass of :py:class:`boto.emr.connection.EmrConnection`,
                  wrapped in a :py:class:`mrjob.retry.RetryWrapper`
         """
@@ -2340,7 +2340,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         region = self._get_region_info_for_emr_conn()
         log.debug('creating EMR connection (to %s)' % region.endpoint)
 
-        raw_emr_conn = boto_2_1_1_5569d16b.EmrConnection(
+        raw_emr_conn = boto_2_1_1_83aae37b.EmrConnection(
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             region=region)

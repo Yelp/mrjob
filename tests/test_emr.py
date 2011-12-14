@@ -65,7 +65,7 @@ from tests.quiet import no_handlers_for_logger
 try:
     import boto
     import boto.emr
-    from mrjob import boto_2_1_1_5569d16b
+    from mrjob import boto_2_1_1_83aae37b
 except ImportError:
     boto = None
 
@@ -111,15 +111,15 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         self._real_boto_connect_s3 = boto.connect_s3
         boto.connect_s3 = mock_boto_connect_s3
 
-        self._real_boto_2_1_1_5569d16b_EmrConnection = boto_2_1_1_5569d16b.EmrConnection
-        boto_2_1_1_5569d16b.EmrConnection = mock_boto_emr_EmrConnection
+        self._real_boto_2_1_1_83aae37b_EmrConnection = boto_2_1_1_83aae37b.EmrConnection
+        boto_2_1_1_83aae37b.EmrConnection = mock_boto_emr_EmrConnection
 
         # copy the old environment just to be polite
         self._old_environ = os.environ.copy()
 
     def unsandbox_boto(self):
         boto.connect_s3 = self._real_boto_connect_s3
-        boto_2_1_1_5569d16b.EmrConnection = self._real_boto_2_1_1_5569d16b_EmrConnection
+        boto_2_1_1_83aae37b.EmrConnection = self._real_boto_2_1_1_83aae37b_EmrConnection
 
     def add_mock_s3_data(self, data):
         """Update self.mock_s3_fs with a map from bucket name

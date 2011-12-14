@@ -19,8 +19,8 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
-"""Code from boto 2.1rc2, copied here so that mrjob can formally depend
-on a stable release of boto (in this case, 2.0).
+"""Code from a bleeding-edge version of boto on github, copied here so that
+mrjob can formally depend on a stable release of boto (in this case, 2.0).
 
 This module will hopefully go away in mrjob v0.4.
 
@@ -41,9 +41,6 @@ from boto.emr.step import JarStep
 # copied in run_jobflow() and supporting functions. This supports the
 # additional_info, ami_version, and instance_groups keywords, which don't
 # exist in boto 2.0, as well as disabling the HadoopVersion API parameter.
-#
-# The version is funky because these functions are actually copied from
-# by pull request on GitHub; see https://github.com/boto/boto/pull/435.
 class EmrConnection(boto.emr.connection.EmrConnection):
 
     def run_jobflow(self, name, log_uri, ec2_keyname=None,
@@ -57,7 +54,7 @@ class EmrConnection(boto.emr.connection.EmrConnection):
                     bootstrap_actions=[],
                     instance_groups=None,
                     additional_info=None,
-                    ami_version='latest'):
+                    ami_version=None):
         """
         Runs a job flow
         :type name: str
@@ -91,7 +88,12 @@ class EmrConnection(boto.emr.connection.EmrConnection):
         :type enable_debugging: bool
         :param enable_debugging: Denotes whether AWS console debugging
             should be enabled.
-            
+
+        :type hadoop_version: str
+        :param hadoop_version: Version of Hadoop to use. If ami_version
+            is not set, defaults to '0.20' for backwards compatibility
+            with older versions of boto.
+
         :type steps: list(boto.emr.Step)
         :param steps: List of steps to add with the job
         
@@ -107,7 +109,9 @@ class EmrConnection(boto.emr.connection.EmrConnection):
                 
         :type ami_version: str
         :param ami_version: Amazon Machine Image (AMI) version to use
-            for instances.
+            for instances. Values accepted by EMR are '1.0', '2.0', and
+            'latest'; EMR currently defaults to '1.0' if you don't set
+            'ami_version'.
             
         :type additional_info: JSON str
         :param additional_info: A JSON string for selecting additional features
@@ -115,6 +119,11 @@ class EmrConnection(boto.emr.connection.EmrConnection):
         :rtype: str
         :return: The jobflow id
         """
+        # hadoop_version used to default to '0.20', but this won't work
+        # on later AMI versions, so only default if it ami_version isn't set.
+        if not (hadoop_version or ami_version):
+            hadoop_version = '0.20'
+
         params = {}
         if action_on_failure:
             params['ActionOnFailure'] = action_on_failure

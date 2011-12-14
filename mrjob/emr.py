@@ -170,6 +170,9 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
 # explicitly specified, so we can keep from passing deprecated command-line
 # options to Hadoop. If we encounter an AMI version we don't recognize,
 # we use whatever version matches 'latest'.
+#
+# The reason we don't just create a job flow and then query its Hadoop version
+# is that for most jobs, we create the steps and the job flow at the same time.
 AMI_VERSION_TO_HADOOP_VERSION = {
     None: '0.18',  # ami_version not specified means version 1.0
     '1.0': '0.18',

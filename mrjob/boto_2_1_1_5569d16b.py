@@ -39,53 +39,79 @@ from boto.emr.step import JarStep
 
 
 # copied in run_jobflow() and supporting functions. This supports the
-# instance_groups and additional_info keyword args, which don't exist
-# in boto 2.0
+# additional_info, ami_version, and instance_groups keywords, which don't
+# exist in boto 2.0, as well as disabling the HadoopVersion API parameter.
+#
+# The version is funky because these functions are actually copied from
+# by pull request on GitHub; see https://github.com/boto/boto/pull/435.
 class EmrConnection(boto.emr.connection.EmrConnection):
 
-    def run_jobflow(self, name, log_uri, ec2_keyname=None, availability_zone=None,
+    def run_jobflow(self, name, log_uri, ec2_keyname=None,
+                    availability_zone=None,
                     master_instance_type='m1.small',
                     slave_instance_type='m1.small', num_instances=1,
                     action_on_failure='TERMINATE_JOB_FLOW', keep_alive=False,
                     enable_debugging=False,
-                    hadoop_version='0.20',
+                    hadoop_version=None,
                     steps=[],
                     bootstrap_actions=[],
                     instance_groups=None,
-                    additional_info=None):
+                    additional_info=None,
+                    ami_version='latest'):
         """
         Runs a job flow
-
         :type name: str
         :param name: Name of the job flow
+        
         :type log_uri: str
         :param log_uri: URI of the S3 bucket to place logs
+        
         :type ec2_keyname: str
         :param ec2_keyname: EC2 key used for the instances
+        
         :type availability_zone: str
         :param availability_zone: EC2 availability zone of the cluster
+        
         :type master_instance_type: str
         :param master_instance_type: EC2 instance type of the master
+        
         :type slave_instance_type: str
         :param slave_instance_type: EC2 instance type of the slave nodes
+        
         :type num_instances: int
         :param num_instances: Number of instances in the Hadoop cluster
+        
         :type action_on_failure: str
         :param action_on_failure: Action to take if a step terminates
+        
         :type keep_alive: bool
-        :param keep_alive: Denotes whether the cluster should stay alive upon completion
+        :param keep_alive: Denotes whether the cluster should stay
+            alive upon completion
+            
         :type enable_debugging: bool
-        :param enable_debugging: Denotes whether AWS console debugging should be enabled.
+        :param enable_debugging: Denotes whether AWS console debugging
+            should be enabled.
+            
         :type steps: list(boto.emr.Step)
         :param steps: List of steps to add with the job
+        
         :type bootstrap_actions: list(boto.emr.BootstrapAction)
-        :param bootstrap_actions: List of bootstrap actions that run before Hadoop starts.
+        :param bootstrap_actions: List of bootstrap actions that run
+            before Hadoop starts.
+            
         :type instance_groups: list(boto.emr.InstanceGroup)
-        :param instance_groups: Optional list of instance groups to use when creating
-                      this job. NB: When provided, this argument supersedes
-                      num_instances and master/slave_instance_type.
+        :param instance_groups: Optional list of instance groups to
+            use when creating this job.
+            NB: When provided, this argument supersedes num_instances
+                and master/slave_instance_type.
+                
+        :type ami_version: str
+        :param ami_version: Amazon Machine Image (AMI) version to use
+            for instances.
+            
         :type additional_info: JSON str
         :param additional_info: A JSON string for selecting additional features
+        
         :rtype: str
         :return: The jobflow id
         """
@@ -98,7 +124,8 @@ class EmrConnection(boto.emr.connection.EmrConnection):
         # Common instance args
         common_params = self._build_instance_common_args(ec2_keyname,
                                                          availability_zone,
-                                                         keep_alive, hadoop_version)
+                                                         keep_alive,
+                                                         hadoop_version)
         params.update(common_params)
 
         # NB: according to the AWS API's error message, we must
@@ -139,6 +166,9 @@ class EmrConnection(boto.emr.connection.EmrConnection):
             bootstrap_action_args = [self._build_bootstrap_action_args(bootstrap_action) for bootstrap_action in bootstrap_actions]
             params.update(self._build_bootstrap_action_list(bootstrap_action_args))
 
+        if ami_version:
+            params['AmiVersion'] = ami_version
+
         if additional_info is not None:
             params['AdditionalInfo'] = additional_info
 
@@ -155,9 +185,10 @@ class EmrConnection(boto.emr.connection.EmrConnection):
         """
         params = {
             'Instances.KeepJobFlowAliveWhenNoSteps' : str(keep_alive).lower(),
-            'Instances.HadoopVersion' : hadoop_version
         }
 
+        if hadoop_version:
+            params['Instances.HadoopVersion'] = hadoop_version
         if ec2_keyname:
             params['Instances.Ec2KeyName'] = ec2_keyname
         if availability_zone:

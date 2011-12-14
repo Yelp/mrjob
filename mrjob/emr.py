@@ -45,7 +45,7 @@ try:
     import boto.emr
     import boto.exception
     import boto.utils
-    from mrjob import boto_2_1_rc2
+    from mrjob import boto_2_1_1_5569d16b
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
     # inside hadoop streaming
@@ -2297,7 +2297,7 @@ class EMRJobRunner(MRJobRunner):
     def make_emr_conn(self):
         """Create a connection to EMR.
 
-        :return: a :py:class:`mrjob.boto_2_1_rc2.EmrConnection`, a subclass of
+        :return: a :py:class:`mrjob.boto_2_1_1_5569d16b.EmrConnection`, a subclass of
                  :py:class:`boto.emr.connection.EmrConnection`, wrapped in a
                  :py:class:`mrjob.retry.RetryWrapper`
         """
@@ -2310,7 +2310,7 @@ class EMRJobRunner(MRJobRunner):
         region = self._get_region_info_for_emr_conn()
         log.debug('creating EMR connection (to %s)' % region.endpoint)
 
-        raw_emr_conn = boto_2_1_rc2.EmrConnection(
+        raw_emr_conn = boto_2_1_1_5569d16b.EmrConnection(
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             region=region)

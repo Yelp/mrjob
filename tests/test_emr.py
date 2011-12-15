@@ -755,6 +755,13 @@ class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
             (expected_master, expected_slave),
             (job_flow.masterinstancetype, job_flow.slaveinstancetype))
 
+    def set_in_mrjob_conf(self, **kwargs):
+        emr_opts = {'check_emr_status_every': 0.01,
+                    's3_sync_wait_time': 0.01,}
+        emr_opts.update(kwargs)
+        with open(self.mrjob_conf_path, 'w') as f:
+            dump_mrjob_conf({'runners': {'emr': emr_opts}}, f)
+
     def test_defaults(self):
         self._test_instance_types(
             {}, 'm1.small', 'm1.small')
@@ -785,19 +792,65 @@ class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
              'ec2_slave_instance_type': 'm2.xlarge'},
             'm1.large', 'm2.xlarge')
 
-    def test_ec2_instance_type_takes_precedence(self):
+    def test_explicit_instance_types_take_precedence(self):
         self._test_instance_types(
             {'ec2_instance_type': 'c1.xlarge',
              'ec2_master_instance_type': 'm1.large',
              'ec2_slave_instance_type': 'm2.xlarge'},
+            'm1.large', 'm2.xlarge')
+
+        self._test_instance_types(
+            {'ec2_instance_type': 'c1.xlarge',
+             'ec2_master_instance_type': 'm1.large',
+             'ec2_slave_instance_type': 'm2.xlarge',
+             'num_ec2_instances': 2},
+            'm1.large', 'm2.xlarge')
+
+    def test_cmd_line_opts_beat_mrjob_conf(self):
+        # set ec2_instance_type in mrjob.conf, 1 instance
+        self.set_in_mrjob_conf(ec2_instance_type='c1.xlarge')
+
+        self._test_instance_types(
+            {}, 'c1.xlarge', 'c1.xlarge')
+
+        self._test_instance_types(
+            {'ec2_master_instance_type': 'm1.large',
+             'ec2_slave_instance_type': 'm2.xlarge'},
+            'm1.large', 'm2.xlarge')
+
+        # set ec2_instance_type in mrjob.conf, 2 instances
+        self.set_in_mrjob_conf(ec2_instance_type='c1.xlarge',
+                               num_ec2_instances=2)
+
+        self._test_instance_types(
+            {}, 'm1.small', 'c1.xlarge')  # doesn't apply to master
+
+        self._test_instance_types(
+            {'ec2_master_instance_type': 'm1.large',
+             'ec2_slave_instance_type': 'm2.xlarge'},
+            'm1.large', 'm2.xlarge')
+
+        # set master and slave in mrjob.conf, 1 instance
+        self.set_in_mrjob_conf(ec2_master_instance_type='m1.large',
+                               ec2_slave_instance_type='m2.xlarge')
+
+        self._test_instance_types(
+            {}, 'm1.large', 'm2.xlarge')
+
+        self._test_instance_types(
+            {'ec2_instance_type': 'c1.xlarge'},
             'c1.xlarge', 'c1.xlarge')
-        # when there are multiple instances, ec2_instance_type only
-        # sets slave instance type
+
+        # set master and slave in mrjob.conf, 2 instances
+        self.set_in_mrjob_conf(ec2_master_instance_type='m1.large',
+                               ec2_slave_instance_type='m2.xlarge',
+                               num_ec2_instances=2)
+
         self._test_instance_types(
-            {'ec2_instance_type': 'c1.xlarge',
-             'ec2_master_instance_type': 'm1.large',
-             'num_ec2_instances': 2,
-             'ec2_slave_instance_type': 'm2.xlarge'},
+            {}, 'm1.large', 'm2.xlarge')
+
+        self._test_instance_types(
+            {'ec2_instance_type': 'c1.xlarge'},
             'm1.large', 'c1.xlarge')
 
 

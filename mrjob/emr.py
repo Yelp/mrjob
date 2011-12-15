@@ -704,15 +704,21 @@ class EMRJobRunner(MRJobRunner):
 
     def _fix_ec2_instance_types(self):
         """If the *ec2_instance_type* option is set, override instance
-        type for the nodes that actually run tasks (see Issue #66)
+        type for the nodes that actually run tasks (see Issue #66). Allow
+        command-line arguments to override defaults and arguments
+        in mrjob.conf (see Issue #311).
 
         Helper for __init__.
         """
         ec2_instance_type = self._opts['ec2_instance_type']
         if ec2_instance_type:
-            self._opts['ec2_slave_instance_type'] = ec2_instance_type
+            if (self._opt_priority['ec2_instance_type'] >
+                self._opt_priority['ec2_slave_instance_type']):
+                self._opts['ec2_slave_instance_type'] = ec2_instance_type
             # master instance only does work when it's the only instance
-            if self._opts['num_ec2_instances'] == 1:
+            if (self._opts['num_ec2_instances'] == 1 and
+                self._opt_priority['ec2_instance_type'] >
+                self._opt_priority['ec2_master_instance_type']):
                 self._opts['ec2_master_instance_type'] = ec2_instance_type
 
     def _fix_s3_scratch_and_log_uri_opts(self):

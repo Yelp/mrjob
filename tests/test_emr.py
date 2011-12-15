@@ -831,7 +831,7 @@ class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
             'm1.large', 'm2.xlarge')
 
         # set master and slave in mrjob.conf, 1 instance
-        self.set_in_mrjob_conf(ec2_master_instance_type='m1.xlarge',
+        self.set_in_mrjob_conf(ec2_master_instance_type='m1.large',
                                ec2_slave_instance_type='m2.xlarge')
 
         self._test_instance_types(
@@ -842,7 +842,7 @@ class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
             'c1.xlarge', 'c1.xlarge')
 
         # set master and slave in mrjob.conf, 2 instances
-        self.set_in_mrjob_conf(ec2_master_instance_type='m1.xlarge',
+        self.set_in_mrjob_conf(ec2_master_instance_type='m1.large',
                                ec2_slave_instance_type='m2.xlarge',
                                num_ec2_instances=2)
 

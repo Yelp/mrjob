@@ -335,6 +335,7 @@ class MockEmrConnection(object):
             laststatechangereason='Provisioning Amazon EC2 capacity',
             masterinstancetype=master_instance_type,
             name=name,
+            normalizedinstancehours='9999',  # just need this filled in for now
             slaveinstancetype=slave_instance_type,
             state='STARTING',
             steps=[],

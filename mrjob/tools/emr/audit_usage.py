@@ -21,7 +21,7 @@ Options::
 
   -h, --help            show this help message and exit
   -v, --verbose         print more messages to stderr
-  -q, --quiet           just print job flow ID to stdout
+  -q, --quiet           Don't log status messages; just print the report.
   -c CONF_PATH, --conf-path=CONF_PATH
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
@@ -38,6 +38,7 @@ import datetime
 import math
 import logging
 from optparse import OptionParser
+import sys
 import time
 
 from mrjob.emr import EMRJobRunner
@@ -45,13 +46,13 @@ from mrjob.emr import describe_all_job_flows
 from mrjob.parse import JOB_NAME_RE
 from mrjob.util import log_to_stream
 
-log = logging.getLogger('mrjob.tools.emr.audit_emr_usage')
+log = logging.getLogger('mrjob.tools.emr.audit_usage')
 
 
-def main():
+def main(args):
     # parser command-line args
     option_parser = make_option_parser()
-    options, args = option_parser.parse_args()
+    options, args = option_parser.parse_args(args)
 
     if args:
         option_parser.error('takes no arguments')
@@ -74,7 +75,7 @@ def make_option_parser():
         help='print more messages to stderr')
     option_parser.add_option(
         '-q', '--quiet', dest='quiet', default=False, action='store_true',
-        help='just print job flow ID to stdout')
+        help="Don't log status messages; just print the report.")
     option_parser.add_option(
         '-c', '--conf-path', dest='conf_path', default=None,
         help='Path to alternate mrjob.conf file to read from')
@@ -272,7 +273,7 @@ def print_report(options):
         print ' %-15s %-13s %19s %3d %17s %6d %9.2f %8s %s' % (
             info['id'], info['state'], info['created'], info['num_steps'],
             info['ran'], info['hours'], info['hours_bbnu'],
-            (info['user'] or ''), fmt(info['mr_job_name']))
+            (info['user'] or ''), fmt(info['job_name']))
 
 
 def estimate_proportion_billed_but_not_used(job_flow):
@@ -344,4 +345,4 @@ def to_datetime(iso8601_time):
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])

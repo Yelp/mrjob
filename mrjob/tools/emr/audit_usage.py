@@ -272,7 +272,7 @@ def print_report(options):
         print ' %-15s %-13s %19s %3d %17s %6d %9.2f %8s %s' % (
             info['id'], info['state'], info['created'], info['num_steps'],
             info['ran'], info['hours'], info['hours_bbnu'],
-            (info['user'] or ''), fmt(info['mr_job_name']))
+            (info['user'] or ''), fmt(info['job_name']))
 
 
 def estimate_proportion_billed_but_not_used(job_flow):

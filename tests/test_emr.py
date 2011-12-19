@@ -65,6 +65,7 @@ from tests.quiet import no_handlers_for_logger
 try:
     import boto
     import boto.emr
+    import boto.exception
     from mrjob import boto_2_1_1_83aae37b
 except ImportError:
     boto = None
@@ -111,7 +112,8 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         self._real_boto_connect_s3 = boto.connect_s3
         boto.connect_s3 = mock_boto_connect_s3
 
-        self._real_boto_2_1_1_83aae37b_EmrConnection = boto_2_1_1_83aae37b.EmrConnection
+        self._real_boto_2_1_1_83aae37b_EmrConnection = (
+            boto_2_1_1_83aae37b.EmrConnection)
         boto_2_1_1_83aae37b.EmrConnection = mock_boto_emr_EmrConnection
 
         # copy the old environment just to be polite
@@ -119,7 +121,8 @@ class MockEMRAndS3TestCase(unittest.TestCase):
 
     def unsandbox_boto(self):
         boto.connect_s3 = self._real_boto_connect_s3
-        boto_2_1_1_83aae37b.EmrConnection = self._real_boto_2_1_1_83aae37b_EmrConnection
+        boto_2_1_1_83aae37b.EmrConnection = (
+            self._real_boto_2_1_1_83aae37b_EmrConnection)
 
     def add_mock_s3_data(self, data):
         """Update self.mock_s3_fs with a map from bucket name
@@ -546,36 +549,77 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
         self.assertEqual(job_flow.state, 'WAITING')
 
 
-class HadoopVersionTestCase(MockEMRAndS3TestCase):
+class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
 
-    def test_default_hadoop_version(self):
+    def run_and_get_job_flow(self, *args):
         stdin = StringIO('foo\nbar\n')
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path])
+        mr_job = MRTwoStepJob(
+            ['-r', 'emr', '-v', '-c', self.mrjob_conf_path] + list(args))
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
 
-            self.assertEqual(job_flow.hadoopversion, '0.20')
+    def test_defaults(self):
+        job_flow = self.run_and_get_job_flow()
+        self.assertEqual(job_flow._ami_version_for_tests, '1.0')
+        self.assertEqual(job_flow.hadoopversion, '0.20')
 
-    def test_set_hadoop_version(self):
-        stdin = StringIO('foo\nbar\n')
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path,
-                               '--hadoop-version', '0.18'])
-        mr_job.sandbox(stdin=stdin)
+    def test_hadoop_version_0_18(self):
+        job_flow = self.run_and_get_job_flow('--hadoop-version', '0.18')
+        self.assertEqual(job_flow._ami_version_for_tests, '1.0')
+        self.assertEqual(job_flow.hadoopversion, '0.18')
 
-        with mr_job.make_runner() as runner:
-            runner.run()
+    def test_hadoop_version_0_20(self):
+        job_flow = self.run_and_get_job_flow('--hadoop-version', '0.20')
+        self.assertEqual(job_flow._ami_version_for_tests, '1.0')
+        self.assertEqual(job_flow.hadoopversion, '0.20')
 
-            emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+    def test_bad_hadoop_version(self):
+        self.assertRaises(boto.exception.EmrResponseError,
+                          self.run_and_get_job_flow,
+                          '--hadoop-version', '0.99')
 
-            self.assertEqual(job_flow.hadoopversion, '0.18')
+    def test_ami_version_1_0(self):
+        job_flow = self.run_and_get_job_flow('--ami-version', '1.0')
+        self.assertEqual(job_flow._ami_version_for_tests, '1.0')
+        self.assertEqual(job_flow.hadoopversion, '0.18')
+
+    def test_ami_version_2_0(self):
+        job_flow = self.run_and_get_job_flow('--ami-version', '2.0')
+        self.assertEqual(job_flow._ami_version_for_tests, '2.0')
+        self.assertEqual(job_flow.hadoopversion, '0.20.205')
+
+    def test_latest_ami_version(self):
+        job_flow = self.run_and_get_job_flow('--ami-version', 'latest')
+        self.assertEqual(job_flow._ami_version_for_tests, '2.0')
+        self.assertEqual(job_flow.hadoopversion, '0.20.205')
+
+    def test_bad_ami_version(self):
+        self.assertRaises(boto.exception.EmrResponseError,
+                          self.run_and_get_job_flow,
+                          '--ami-version', '1.5')
+
+    def test_ami_version_1_0_hadoop_version_0_18(self):
+        job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
+                                             '--hadoop-version', '0.18')
+        self.assertEqual(job_flow._ami_version_for_tests, '1.0')
+        self.assertEqual(job_flow.hadoopversion, '0.18')
+
+    def test_ami_version_1_0_hadoop_version_0_20(self):
+        job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
+                                             '--hadoop-version', '0.20')
+        self.assertEqual(job_flow._ami_version_for_tests, '1.0')
+        self.assertEqual(job_flow.hadoopversion, '0.20')
+
+    def test_mismatched_ami_and_hadoop_versions(self):
+        self.assertRaises(boto.exception.EmrResponseError,
+                          self.run_and_get_job_flow,
+                          '--ami-version', '1.0',
+                          '--hadoop-version', '0.20.205')
 
 
 class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
@@ -757,7 +801,7 @@ class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
 
     def set_in_mrjob_conf(self, **kwargs):
         emr_opts = {'check_emr_status_every': 0.01,
-                    's3_sync_wait_time': 0.01,}
+                    's3_sync_wait_time': 0.01}
         emr_opts.update(kwargs)
         with open(self.mrjob_conf_path, 'w') as f:
             dump_mrjob_conf({'runners': {'emr': emr_opts}}, f)

@@ -376,7 +376,7 @@ class EMRJobRunner(MRJobRunner):
                             Python is installed, among other things; see \
 http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.html?EnvironmentConfig_AMIVersion.html
                             for details. Implicitly defaults to AMI version
-                            1.0 (this will change to 2.0 in mrjob v0.3.0).
+                            1.0 (this will change to 2.0 in mrjob v0.4).
         :type aws_access_key_id: str
         :param aws_access_key_id: "username" for Amazon web services.
         :type aws_availability_zone: str
@@ -1169,7 +1169,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         """Build kwargs for emr_conn.run_jobflow()"""
         args = {}
 
-        args['ami_version'] = self._opts['hadoop_version']
+        args['ami_version'] = self._opts['ami_version']
         args['hadoop_version'] = self._opts['hadoop_version']
 
         if self._opts['aws_availability_zone']:
@@ -1274,7 +1274,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 reducer = None
 
             input = self._s3_step_input_uris(step_num)
-            output = self._s3_step_output_uri(step_num)
+            output = self._s3_step_output_uri(step_num)\
 
             step_args, cache_files, cache_archives = self._cache_args()
 
@@ -2399,7 +2399,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                         AMI_VERSION_TO_HADOOP_VERSION.get(ami_version) or
                         AMI_VERSION_TO_HADOOP_VERSION['latest'])
 
-                self._inferred_hadoop_version = self._opts['hadoop_version']
         return self._inferred_hadoop_version
 
     def _address_of_master(self, emr_conn=None):

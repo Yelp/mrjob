@@ -524,7 +524,10 @@ def uses_generic_jobconf(version):
 def version_gte(version, cmp_version_str):
     """Return True if version >= *cmp_version_str*."""
 
+    if not isinstance(version, basestring):
+        raise TypeError('%r is not a string' % version)
+
     if not isinstance(cmp_version_str, basestring):
-        raise ValueError('%s is not a string' % cmp_version_str)
+        raise TypeError('%r is not a string' % cmp_version_str)
 
     return LooseVersion(version) >= LooseVersion(cmp_version_str)

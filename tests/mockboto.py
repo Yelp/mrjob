@@ -39,9 +39,17 @@ from mrjob.parse import parse_s3_uri
 DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
 DEFAULT_MAX_DAYS_AGO = 61
 
-
 # Size of each chunk returned by the MockKey iterator
 SIMULATED_BUFFER_SIZE = 256
+
+# versions of hadoop available on each AMI version
+AMI_VERSION_TO_HADOOP_VERSIONS = {
+    '1.0': ['0.18', '0.20'],
+    '2.0': ['0.20.205'],
+}
+
+DEFAULT_AMI_VERSION = '1.0'
+LATEST_AMI_VERSION = '2.0'
 
 
 ### S3 ###
@@ -293,7 +301,7 @@ class MockEmrConnection(object):
                     slave_instance_type='m1.small', num_instances=1,
                     action_on_failure='TERMINATE_JOB_FLOW', keep_alive=False,
                     enable_debugging=False,
-                    hadoop_version='0.18',
+                    hadoop_version=None,
                     steps=None,
                     bootstrap_actions=[],
                     additional_info=None,
@@ -307,10 +315,32 @@ class MockEmrConnection(object):
         if now is None:
             now = datetime.datetime.utcnow()
 
-        steps = steps or []
+        # default and validate Hadoop and AMI versions
 
-        init_args = locals().copy()
-        del init_args['self']
+        # if nothing specified, use 0.20 for backwards compatibility
+        if ami_version is None and hadoop_version is None:
+            hadoop_version = '0.20'
+
+        # default AMI version
+        if ami_version is None:
+            ami_version = DEFAULT_AMI_VERSION
+        elif ami_version == 'latest':
+            ami_version = LATEST_AMI_VERSION
+
+        # check if AMI version is valid
+        if ami_version not in AMI_VERSION_TO_HADOOP_VERSIONS:
+            raise boto.exception.EmrResponseError(400, 'Bad Request')
+
+        available_hadoop_versions = AMI_VERSION_TO_HADOOP_VERSIONS[ami_version]
+
+        if hadoop_version is None:
+            hadoop_version = available_hadoop_versions[0]
+        elif hadoop_version not in available_hadoop_versions:
+            raise boto.exception.EmrResponseError(400, 'Bad Request')
+
+        # create a MockEmrObject corresponding to the job flow. We only
+        # need to fill in the fields that EMRJobRunner uses
+        steps = steps or []
 
         jobflow_id = 'j-MOCKJOBFLOW%d' % len(self.mock_emr_job_flows)
         assert jobflow_id not in self.mock_emr_job_flows
@@ -321,8 +351,6 @@ class MockEmrConnection(object):
                                  args=[MockEmrObject(value=v) for v \
                                        in real_action.bootstrap_action_args])
 
-        # create a MockEmrObject corresponding to the job flow. We only
-        # need to fill in the fields that EMRJobRunner uses
         job_flow = MockEmrObject(
             availabilityzone=availability_zone,
             bootstrapactions=[make_fake_action(a) for a in bootstrap_actions],
@@ -340,9 +368,15 @@ class MockEmrConnection(object):
             state='STARTING',
             steps=[],
         )
+
         # don't always set loguri, so we can test Issue #112
         if log_uri is not None:
             job_flow.loguri = log_uri
+
+        # mrjob currently can't read AMI version from job descriptions unless
+        # you're running a very recent version of boto, but tests need to
+        # be able to check it
+        job_flow._ami_version_for_tests = ami_version
 
         self.mock_emr_job_flows[jobflow_id] = job_flow
 

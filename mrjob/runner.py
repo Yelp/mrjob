@@ -293,8 +293,17 @@ class MRJobRunner(object):
 
         # combine all of these options
         # only __init__() methods should modify self._opts!
-        self._opts = self.combine_opts(blank_opts, self._default_opts(),
-                                       mrjob_conf_opts, opts)
+        opt_dicts = [blank_opts, self._default_opts(),
+                     mrjob_conf_opts, opts]
+        self._opts = self.combine_opts(*opt_dicts)
+        # keep track of where in the order opts were specified,
+        # to handle opts that affect the same thing (e.g. ec2_*instance_type)
+        self._opt_priority = dict((opt, -1) for opt in self._opts)
+        for priority, opt_dict in enumerate(opt_dicts):
+            if opt_dict:
+                for opt, value in opt_dict.iteritems():
+                    if value is not None:
+                        self._opt_priority[opt] = priority
 
         # we potentially have a lot of files to copy, so we keep track
         # of them as a list of dictionaries, with the following keys:

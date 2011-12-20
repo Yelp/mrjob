@@ -1,4 +1,4 @@
-v0.3.1, 2011-12-19 -- Nooooo there were bugs!
+v0.3.1, 2011-12-20 -- Nooooo there were bugs!
  * Instance-type command-line arguments always override mrjob.conf (Issue #311)
  * Fixed crash in mrjob.tools.emr.audit_usage (Issue #315)
  * Tests now use unittest; python setup.py test now works (Issue #292)

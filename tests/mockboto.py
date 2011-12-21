@@ -42,15 +42,15 @@ DEFAULT_MAX_DAYS_AGO = 61
 # Size of each chunk returned by the MockKey iterator
 SIMULATED_BUFFER_SIZE = 256
 
-# versions of hadoop available on each AMI version
+# versions of hadoop available on each AMI version. The EMR API treats None
+# and "latest" as separate logical AMIs, even though they're actually the
+# same AMIs as 1.0 and whatever they most recently released.
 AMI_VERSION_TO_HADOOP_VERSIONS = {
+    None: ['0.18', '0.20'],
     '1.0': ['0.18', '0.20'],
     '2.0': ['0.20.205'],
+    'latest': ['0.20.205'],
 }
-
-DEFAULT_AMI_VERSION = '1.0'
-LATEST_AMI_VERSION = '2.0'
-
 
 ### S3 ###
 
@@ -321,12 +321,6 @@ class MockEmrConnection(object):
         if ami_version is None and hadoop_version is None:
             hadoop_version = '0.20'
 
-        # default AMI version
-        if ami_version is None:
-            ami_version = DEFAULT_AMI_VERSION
-        elif ami_version == 'latest':
-            ami_version = LATEST_AMI_VERSION
-
         # check if AMI version is valid
         if ami_version not in AMI_VERSION_TO_HADOOP_VERSIONS:
             raise boto.exception.EmrResponseError(400, 'Bad Request')
@@ -369,14 +363,13 @@ class MockEmrConnection(object):
             steps=[],
         )
 
+        # AMI version is only set when you specify it explicitly
+        if ami_version is not None:
+            job_flow.amiversion = ami_version
+
         # don't always set loguri, so we can test Issue #112
         if log_uri is not None:
             job_flow.loguri = log_uri
-
-        # mrjob currently can't read AMI version from job descriptions unless
-        # you're running a very recent version of boto, but tests need to
-        # be able to check it
-        job_flow._ami_version_for_tests = ami_version
 
         self.mock_emr_job_flows[jobflow_id] = job_flow
 

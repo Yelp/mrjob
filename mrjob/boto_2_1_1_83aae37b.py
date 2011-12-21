@@ -34,14 +34,53 @@ to copy code from future versions of boto into mrjob.
 import types
 
 import boto.emr.connection
+import boto.emr.emrobject
 from boto.emr.emrobject import RunJobFlowResponse
 from boto.emr.step import JarStep
 
+# add the AmiVersion field to JobFlow
+class JobFlow(boto.emr.emrobject.JobFlow):
+    Fields = boto.emr.emrobject.JobFlow.Fields | set(['AmiVersion'])
+
+# this is used into describe_jobflows(), below. We don't actually patch
+# the code for describe_jobflows(); just by virtue of being in this module,
+# it refers to the JobFlow class above rather than the one in boto.
 
 # copied in run_jobflow() and supporting functions. This supports the
 # additional_info, ami_version, and instance_groups keywords, which don't
 # exist in boto 2.0, as well as disabling the HadoopVersion API parameter.
 class EmrConnection(boto.emr.connection.EmrConnection):
+
+    def describe_jobflows(self, states=None, jobflow_ids=None,
+                           created_after=None, created_before=None):
+        """
+        Retrieve all the Elastic MapReduce job flows on your account
+
+        :type states: list
+        :param states: A list of strings with job flow states wanted
+
+        :type jobflow_ids: list
+        :param jobflow_ids: A list of job flow IDs
+        :type created_after: datetime
+        :param created_after: Bound on job flow creation time
+
+        :type created_before: datetime
+        :param created_before: Bound on job flow creation time
+        """
+        params = {}
+
+        if states:
+            self.build_list_params(params, states, 'JobFlowStates.member')
+        if jobflow_ids:
+            self.build_list_params(params, jobflow_ids, 'JobFlowIds.member')
+        if created_after:
+            params['CreatedAfter'] = created_after.strftime(
+                boto.utils.ISO8601)
+        if created_before:
+            params['CreatedBefore'] = created_before.strftime(
+                boto.utils.ISO8601)
+
+        return self.get_list('DescribeJobFlows', params, [('member', JobFlow)])
 
     def run_jobflow(self, name, log_uri, ec2_keyname=None,
                     availability_zone=None,

@@ -565,17 +565,17 @@ class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
 
     def test_defaults(self):
         job_flow = self.run_and_get_job_flow()
-        self.assertEqual(job_flow._ami_version_for_tests, '1.0')
+        self.assertFalse(hasattr(job_flow, 'amiversion'))
         self.assertEqual(job_flow.hadoopversion, '0.20')
 
     def test_hadoop_version_0_18(self):
         job_flow = self.run_and_get_job_flow('--hadoop-version', '0.18')
-        self.assertEqual(job_flow._ami_version_for_tests, '1.0')
+        self.assertFalse(hasattr(job_flow, 'amiversion'))
         self.assertEqual(job_flow.hadoopversion, '0.18')
 
     def test_hadoop_version_0_20(self):
         job_flow = self.run_and_get_job_flow('--hadoop-version', '0.20')
-        self.assertEqual(job_flow._ami_version_for_tests, '1.0')
+        self.assertFalse(hasattr(job_flow, 'amiversion'))
         self.assertEqual(job_flow.hadoopversion, '0.20')
 
     def test_bad_hadoop_version(self):
@@ -585,17 +585,17 @@ class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
 
     def test_ami_version_1_0(self):
         job_flow = self.run_and_get_job_flow('--ami-version', '1.0')
-        self.assertEqual(job_flow._ami_version_for_tests, '1.0')
+        self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.18')
 
     def test_ami_version_2_0(self):
         job_flow = self.run_and_get_job_flow('--ami-version', '2.0')
-        self.assertEqual(job_flow._ami_version_for_tests, '2.0')
+        self.assertEqual(job_flow.amiversion, '2.0')
         self.assertEqual(job_flow.hadoopversion, '0.20.205')
 
     def test_latest_ami_version(self):
         job_flow = self.run_and_get_job_flow('--ami-version', 'latest')
-        self.assertEqual(job_flow._ami_version_for_tests, '2.0')
+        self.assertEqual(job_flow.amiversion, 'latest')
         self.assertEqual(job_flow.hadoopversion, '0.20.205')
 
     def test_bad_ami_version(self):
@@ -606,13 +606,13 @@ class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
     def test_ami_version_1_0_hadoop_version_0_18(self):
         job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
                                              '--hadoop-version', '0.18')
-        self.assertEqual(job_flow._ami_version_for_tests, '1.0')
+        self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.18')
 
     def test_ami_version_1_0_hadoop_version_0_20(self):
         job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
                                              '--hadoop-version', '0.20')
-        self.assertEqual(job_flow._ami_version_for_tests, '1.0')
+        self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.20')
 
     def test_mismatched_ami_and_hadoop_versions(self):

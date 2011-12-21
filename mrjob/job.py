@@ -1264,6 +1264,11 @@ class MRJob(object):
                   ' Rarely necessary.'))
 
         self.emr_opt_group.add_option(
+            '--no-pool-emr-job-flows', dest='pool_emr_job_flows',
+            action='store_false',
+            help="Don't try to run our job on a pooled job flow.")
+
+        self.emr_opt_group.add_option(
             '--num-ec2-instances', dest='num_ec2_instances', default=None,
             type='int',
             help='Number of EC2 instances to launch')

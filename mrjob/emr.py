@@ -43,7 +43,6 @@ try:
     import boto
     import boto.ec2
     import boto.emr
-    import boto.emr.instance_group
     import boto.exception
     import boto.utils
     from mrjob import boto_2_1_1_83aae37b
@@ -1243,7 +1242,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # Hard-code the instance group name to something sensible.
         name = 'mrjob-launch-%s' % role.lower()
 
-        return boto.emr.instance_group.InstanceGroup(
+        return boto_2_1_1_83aae37b.InstanceGroup(
             count, role, instance_type, market, name, bidprice=bid_price
             )
 

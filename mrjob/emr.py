@@ -45,7 +45,7 @@ try:
     import boto.emr
     import boto.exception
     import boto.utils
-    from mrjob import boto_2_1_rc2
+    from mrjob import boto_2_1_1_83aae37b
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
     # inside hadoop streaming
@@ -164,6 +164,20 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
     'c1.xlarge': 7,
     'cc1.4xlarge': 23,
     'cg1.4xlarge': 22,
+}
+
+# Use this to figure out which hadoop version we're using if it's not
+# explicitly specified, so we can keep from passing deprecated command-line
+# options to Hadoop. If we encounter an AMI version we don't recognize,
+# we use whatever version matches 'latest'.
+#
+# The reason we don't just create a job flow and then query its Hadoop version
+# is that for most jobs, we create the steps and the job flow at the same time.
+AMI_VERSION_TO_HADOOP_VERSION = {
+    None: '0.18',  # ami_version not specified means version 1.0
+    '1.0': '0.18',
+    '2.0': '0.20.205',
+    'latest': '0.20.205',
 }
 
 
@@ -356,6 +370,13 @@ class EMRJobRunner(MRJobRunner):
                                     features. Pass a JSON string on the command
                                     line or use data structures in the config
                                     file (which is itself basically JSON).
+        :type ami_version: str
+        :param ami_version: EMR AMI version to use. This controls which Hadoop
+                            version(s) are available and which version of
+                            Python is installed, among other things; see \
+http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.html?EnvironmentConfig_AMIVersion.html
+                            for details. Implicitly defaults to AMI version
+                            1.0 (this will change to 2.0 in mrjob v0.4).
         :type aws_access_key_id: str
         :param aws_access_key_id: "username" for Amazon web services.
         :type aws_availability_zone: str
@@ -468,9 +489,12 @@ class EMRJobRunner(MRJobRunner):
                                             file or one on S3. Rarely necessary
                                             to set this by hand.
         :type hadoop_version: str
-        :param hadoop_version: Set the version of Hadoop to use on EMR. EMR
-                               currently accepts ``'0.18'`` or ``'0.20'``;
-                               default is ``'0.20'``.
+        :param hadoop_version: Set the version of Hadoop to use on EMR.
+                               Consider setting *ami_version* instead; only AMI
+                               version 1.0 supports multiple versions of Hadoop
+                               anyway. If *ami_version* is not set, we'll
+                               default to Hadoop 0.20 for backwards
+                               compatibility with :py:mod:`mrjob` v0.3.0.
         :type num_ec2_instances: int
         :type pool_emr_job_flows: bool
         :param pool_emr_job_flows: Try to run the job on a ``WAITING`` pooled
@@ -626,6 +650,10 @@ class EMRJobRunner(MRJobRunner):
         # turn off tracker progress until tunnel is up
         self._show_tracker_progress = False
 
+        # default requested hadoop version if AMI version is not set
+        if not (self._opts['ami_version'] or self._opts['hadoop_version']):
+            self._opts['hadoop_version'] = '0.20'
+
         # init hadoop version cache
         self._inferred_hadoop_version = None
 
@@ -634,6 +662,7 @@ class EMRJobRunner(MRJobRunner):
         """A list of which keyword args we can pass to __init__()"""
         return super(EMRJobRunner, cls)._allowed_opts() + [
             'additional_emr_info',
+            'ami_version',
             'aws_access_key_id',
             'aws_availability_zone',
             'aws_secret_access_key',
@@ -675,6 +704,7 @@ class EMRJobRunner(MRJobRunner):
             'ec2_master_instance_type': 'm1.small',
             'ec2_slave_instance_type': 'm1.small',
             'emr_job_flow_pool_name': 'default',
+            'hadoop_version': None,  # defaulted in __init__()
             'hadoop_streaming_jar_on_emr':
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
             'num_ec2_instances': 1,
@@ -1139,6 +1169,7 @@ class EMRJobRunner(MRJobRunner):
         """Build kwargs for emr_conn.run_jobflow()"""
         args = {}
 
+        args['ami_version'] = self._opts['ami_version']
         args['hadoop_version'] = self._opts['hadoop_version']
 
         if self._opts['aws_availability_zone']:
@@ -1243,7 +1274,7 @@ class EMRJobRunner(MRJobRunner):
                 reducer = None
 
             input = self._s3_step_input_uris(step_num)
-            output = self._s3_step_output_uri(step_num)
+            output = self._s3_step_output_uri(step_num)\
 
             step_args, cache_files, cache_archives = self._cache_args()
 
@@ -1272,7 +1303,7 @@ class EMRJobRunner(MRJobRunner):
         each according to the correct behavior for the current Hadoop version.
 
         For < 0.20, populate cache_files and cache_archives.
-        For >= 20, populate step_args.
+        For >= 0.20, populate step_args.
 
         step_args should be inserted into the step arguments before anything
             else.
@@ -1686,7 +1717,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
         job_flow = self._describe_jobflow()
-        if job_flow.keepjobflowalivewhennosteps in (True, 'true'):
+        if job_flow.keepjobflowalivewhennosteps == 'true':
             log.info("Can't fetch counters from S3 for five more minutes. Try"
                      " 'python -m mrjob.tools.emr.fetch_logs --counters %s'"
                      " in five minutes." % job_flow.jobflowid)
@@ -1985,12 +2016,6 @@ class EMRJobRunner(MRJobRunner):
             if len(job_flow.steps) > 255:
                 return False
 
-            # convert from braindead string types to usable types
-            job_flow.instancecount = int(job_flow.instancecount)
-            keep_alive = job_flow.keepjobflowalivewhennosteps
-            job_flow.keepjobflowalivewhennosteps = (
-                keep_alive in ('true', True))
-
             # only take idle job flows
             if job_flow.state != 'WAITING':
                 return False
@@ -2004,11 +2029,16 @@ class EMRJobRunner(MRJobRunner):
                 return False
 
             # sanity check for proper type of job flow
-            if not job_flow.keepjobflowalivewhennosteps:
+            if job_flow.keepjobflowalivewhennosteps != 'true':
                 return False
 
             # match hadoop version
-            if not job_flow.hadoopversion == self._opts['hadoop_version']:
+            if job_flow.hadoopversion != self.get_hadoop_version():
+                return False
+
+            # match AMI version
+            job_flow_ami_version = getattr(job_flow, 'amiversion', None)
+            if job_flow_ami_version != self._opts['ami_version']:
                 return False
 
             # don't accept a job flow with worse performance characteristics
@@ -2017,7 +2047,7 @@ class EMRJobRunner(MRJobRunner):
                 return False
             if mem(job_flow) < my_memory:
                 return False
-            if job_flow.instancecount < self._opts['num_ec2_instances']:
+            if int(job_flow.instancecount) < self._opts['num_ec2_instances']:
                 return False
 
             return True
@@ -2095,6 +2125,7 @@ class EMRJobRunner(MRJobRunner):
         things_to_hash = [
             [self.md5sum(fd['path'])
              for fd in self._files if should_include_file(fd)],
+            self._opts['additional_emr_info'],
             self._opts['bootstrap_mrjob'],
             self._opts['bootstrap_cmds'],
             cleaned_bootstrap_actions,
@@ -2303,9 +2334,9 @@ class EMRJobRunner(MRJobRunner):
     def make_emr_conn(self):
         """Create a connection to EMR.
 
-        :return: a :py:class:`mrjob.boto_2_1_rc2.EmrConnection`, a subclass of
-                 :py:class:`boto.emr.connection.EmrConnection`, wrapped in a
-                 :py:class:`mrjob.retry.RetryWrapper`
+        :return: a :py:class:`mrjob.boto_2_1_1_83aae37b.EmrConnection`, a
+                 subclass of :py:class:`boto.emr.connection.EmrConnection`,
+                 wrapped in a :py:class:`mrjob.retry.RetryWrapper`
         """
         # ...which is then wrapped in bacon! Mmmmm!
 
@@ -2316,7 +2347,7 @@ class EMRJobRunner(MRJobRunner):
         region = self._get_region_info_for_emr_conn()
         log.debug('creating EMR connection (to %s)' % region.endpoint)
 
-        raw_emr_conn = boto_2_1_rc2.EmrConnection(
+        raw_emr_conn = boto_2_1_1_83aae37b.EmrConnection(
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             region=region)
@@ -2354,8 +2385,18 @@ class EMRJobRunner(MRJobRunner):
                 self._inferred_hadoop_version = (
                     self._describe_jobflow().hadoopversion)
             else:
-                # otherwise, read it from the config
-                self._inferred_hadoop_version = self._opts['hadoop_version']
+                # otherwise, read it from hadoop_version/ami_version
+                hadoop_version = self._opts['hadoop_version']
+                if hadoop_version:
+                    self._inferred_hadoop_version = hadoop_version
+                else:
+                    ami_version = self._opts['ami_version']
+                    # don't explode if we see an AMI version that's
+                    # newer than what we know about.
+                    self._inferred_hadoop_version = (
+                        AMI_VERSION_TO_HADOOP_VERSION.get(ami_version) or
+                        AMI_VERSION_TO_HADOOP_VERSION['latest'])
+
         return self._inferred_hadoop_version
 
     def _address_of_master(self, emr_conn=None):

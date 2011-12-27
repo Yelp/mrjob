@@ -6,5 +6,6 @@ try:
 except ImportError:
     import unittest
 
+
 def load_tests():
     return unittest.defaultTestLoader.discover(os.path.dirname(__file__))

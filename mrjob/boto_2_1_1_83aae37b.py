@@ -19,8 +19,8 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
-"""Code from boto 2.1rc2, copied here so that mrjob can formally depend
-on a stable release of boto (in this case, 2.0).
+"""Code from a bleeding-edge version of boto on github, copied here so that
+mrjob can formally depend on a stable release of boto (in this case, 2.0).
 
 This module will hopefully go away in mrjob v0.4.
 
@@ -34,61 +34,135 @@ to copy code from future versions of boto into mrjob.
 import types
 
 import boto.emr.connection
+import boto.emr.emrobject
 from boto.emr.emrobject import RunJobFlowResponse
 from boto.emr.step import JarStep
 
+# add the AmiVersion field to JobFlow
+class JobFlow(boto.emr.emrobject.JobFlow):
+    Fields = boto.emr.emrobject.JobFlow.Fields | set(['AmiVersion'])
+
+# this is used into describe_jobflows(), below. We don't actually patch
+# the code for describe_jobflows(); just by virtue of being in this module,
+# it refers to the JobFlow class above rather than the one in boto.
 
 # copied in run_jobflow() and supporting functions. This supports the
-# instance_groups and additional_info keyword args, which don't exist
-# in boto 2.0
+# additional_info, ami_version, and instance_groups keywords, which don't
+# exist in boto 2.0, as well as disabling the HadoopVersion API parameter.
 class EmrConnection(boto.emr.connection.EmrConnection):
 
-    def run_jobflow(self, name, log_uri, ec2_keyname=None, availability_zone=None,
+    def describe_jobflows(self, states=None, jobflow_ids=None,
+                           created_after=None, created_before=None):
+        """
+        Retrieve all the Elastic MapReduce job flows on your account
+
+        :type states: list
+        :param states: A list of strings with job flow states wanted
+
+        :type jobflow_ids: list
+        :param jobflow_ids: A list of job flow IDs
+        :type created_after: datetime
+        :param created_after: Bound on job flow creation time
+
+        :type created_before: datetime
+        :param created_before: Bound on job flow creation time
+        """
+        params = {}
+
+        if states:
+            self.build_list_params(params, states, 'JobFlowStates.member')
+        if jobflow_ids:
+            self.build_list_params(params, jobflow_ids, 'JobFlowIds.member')
+        if created_after:
+            params['CreatedAfter'] = created_after.strftime(
+                boto.utils.ISO8601)
+        if created_before:
+            params['CreatedBefore'] = created_before.strftime(
+                boto.utils.ISO8601)
+
+        return self.get_list('DescribeJobFlows', params, [('member', JobFlow)])
+
+    def run_jobflow(self, name, log_uri, ec2_keyname=None,
+                    availability_zone=None,
                     master_instance_type='m1.small',
                     slave_instance_type='m1.small', num_instances=1,
                     action_on_failure='TERMINATE_JOB_FLOW', keep_alive=False,
                     enable_debugging=False,
-                    hadoop_version='0.20',
+                    hadoop_version=None,
                     steps=[],
                     bootstrap_actions=[],
                     instance_groups=None,
-                    additional_info=None):
+                    additional_info=None,
+                    ami_version=None):
         """
         Runs a job flow
-
         :type name: str
         :param name: Name of the job flow
+        
         :type log_uri: str
         :param log_uri: URI of the S3 bucket to place logs
+        
         :type ec2_keyname: str
         :param ec2_keyname: EC2 key used for the instances
+        
         :type availability_zone: str
         :param availability_zone: EC2 availability zone of the cluster
+        
         :type master_instance_type: str
         :param master_instance_type: EC2 instance type of the master
+        
         :type slave_instance_type: str
         :param slave_instance_type: EC2 instance type of the slave nodes
+        
         :type num_instances: int
         :param num_instances: Number of instances in the Hadoop cluster
+        
         :type action_on_failure: str
         :param action_on_failure: Action to take if a step terminates
+        
         :type keep_alive: bool
-        :param keep_alive: Denotes whether the cluster should stay alive upon completion
+        :param keep_alive: Denotes whether the cluster should stay
+            alive upon completion
+            
         :type enable_debugging: bool
-        :param enable_debugging: Denotes whether AWS console debugging should be enabled.
+        :param enable_debugging: Denotes whether AWS console debugging
+            should be enabled.
+
+        :type hadoop_version: str
+        :param hadoop_version: Version of Hadoop to use. If ami_version
+            is not set, defaults to '0.20' for backwards compatibility
+            with older versions of boto.
+
         :type steps: list(boto.emr.Step)
         :param steps: List of steps to add with the job
+        
         :type bootstrap_actions: list(boto.emr.BootstrapAction)
-        :param bootstrap_actions: List of bootstrap actions that run before Hadoop starts.
+        :param bootstrap_actions: List of bootstrap actions that run
+            before Hadoop starts.
+            
         :type instance_groups: list(boto.emr.InstanceGroup)
-        :param instance_groups: Optional list of instance groups to use when creating
-                      this job. NB: When provided, this argument supersedes
-                      num_instances and master/slave_instance_type.
+        :param instance_groups: Optional list of instance groups to
+            use when creating this job.
+            NB: When provided, this argument supersedes num_instances
+                and master/slave_instance_type.
+                
+        :type ami_version: str
+        :param ami_version: Amazon Machine Image (AMI) version to use
+            for instances. Values accepted by EMR are '1.0', '2.0', and
+            'latest'; EMR currently defaults to '1.0' if you don't set
+            'ami_version'.
+            
         :type additional_info: JSON str
         :param additional_info: A JSON string for selecting additional features
+        
         :rtype: str
         :return: The jobflow id
         """
+        # hadoop_version used to default to '0.20', but this won't work
+        # on later AMI versions, so only default if it ami_version isn't set.
+        if not (hadoop_version or ami_version):
+            hadoop_version = '0.20'
+
         params = {}
         if action_on_failure:
             params['ActionOnFailure'] = action_on_failure
@@ -98,7 +172,8 @@ class EmrConnection(boto.emr.connection.EmrConnection):
         # Common instance args
         common_params = self._build_instance_common_args(ec2_keyname,
                                                          availability_zone,
-                                                         keep_alive, hadoop_version)
+                                                         keep_alive,
+                                                         hadoop_version)
         params.update(common_params)
 
         # NB: according to the AWS API's error message, we must
@@ -139,6 +214,9 @@ class EmrConnection(boto.emr.connection.EmrConnection):
             bootstrap_action_args = [self._build_bootstrap_action_args(bootstrap_action) for bootstrap_action in bootstrap_actions]
             params.update(self._build_bootstrap_action_list(bootstrap_action_args))
 
+        if ami_version:
+            params['AmiVersion'] = ami_version
+
         if additional_info is not None:
             params['AdditionalInfo'] = additional_info
 
@@ -155,9 +233,10 @@ class EmrConnection(boto.emr.connection.EmrConnection):
         """
         params = {
             'Instances.KeepJobFlowAliveWhenNoSteps' : str(keep_alive).lower(),
-            'Instances.HadoopVersion' : hadoop_version
         }
 
+        if hadoop_version:
+            params['Instances.HadoopVersion'] = hadoop_version
         if ec2_keyname:
             params['Instances.Ec2KeyName'] = ec2_keyname
         if availability_zone:

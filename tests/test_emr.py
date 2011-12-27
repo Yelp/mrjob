@@ -65,7 +65,8 @@ from tests.quiet import no_handlers_for_logger
 try:
     import boto
     import boto.emr
-    from mrjob import boto_2_1_rc2
+    import boto.exception
+    from mrjob import boto_2_1_1_83aae37b
 except ImportError:
     boto = None
 
@@ -111,15 +112,17 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         self._real_boto_connect_s3 = boto.connect_s3
         boto.connect_s3 = mock_boto_connect_s3
 
-        self._real_boto_2_1_rc2_EmrConnection = boto_2_1_rc2.EmrConnection
-        boto_2_1_rc2.EmrConnection = mock_boto_emr_EmrConnection
+        self._real_boto_2_1_1_83aae37b_EmrConnection = (
+            boto_2_1_1_83aae37b.EmrConnection)
+        boto_2_1_1_83aae37b.EmrConnection = mock_boto_emr_EmrConnection
 
         # copy the old environment just to be polite
         self._old_environ = os.environ.copy()
 
     def unsandbox_boto(self):
         boto.connect_s3 = self._real_boto_connect_s3
-        boto_2_1_rc2.EmrConnection = self._real_boto_2_1_rc2_EmrConnection
+        boto_2_1_1_83aae37b.EmrConnection = (
+            self._real_boto_2_1_1_83aae37b_EmrConnection)
 
     def add_mock_s3_data(self, data):
         """Update self.mock_s3_fs with a map from bucket name
@@ -192,11 +195,12 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         shutil.rmtree(self.tmp_dir)
 
     def put_additional_emr_info_in_mrjob_conf(self):
-        dump_mrjob_conf({'runners': {'emr': {
-            'check_emr_status_every': 0.01,
-            's3_sync_wait_time': 0.01,
-            'additional_emr_info': {'key': 'value'},
-        }}}, open(self.mrjob_conf_path, 'w'))
+        with open(self.mrjob_conf_path, 'w') as f:
+            dump_mrjob_conf({'runners': {'emr': {
+                'check_emr_status_every': 0.01,
+                's3_sync_wait_time': 0.01,
+                'additional_emr_info': {'key': 'value'},
+            }}}, f)
 
     def test_end_to_end(self):
         # read from STDIN, a local file, and a remote file
@@ -546,36 +550,77 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
         self.assertEqual(job_flow.state, 'WAITING')
 
 
-class HadoopVersionTestCase(MockEMRAndS3TestCase):
+class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
 
-    def test_default_hadoop_version(self):
+    def run_and_get_job_flow(self, *args):
         stdin = StringIO('foo\nbar\n')
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path])
+        mr_job = MRTwoStepJob(
+            ['-r', 'emr', '-v', '-c', self.mrjob_conf_path] + list(args))
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
 
-            self.assertEqual(job_flow.hadoopversion, '0.20')
+    def test_defaults(self):
+        job_flow = self.run_and_get_job_flow()
+        self.assertFalse(hasattr(job_flow, 'amiversion'))
+        self.assertEqual(job_flow.hadoopversion, '0.20')
 
-    def test_set_hadoop_version(self):
-        stdin = StringIO('foo\nbar\n')
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path,
-                               '--hadoop-version', '0.18'])
-        mr_job.sandbox(stdin=stdin)
+    def test_hadoop_version_0_18(self):
+        job_flow = self.run_and_get_job_flow('--hadoop-version', '0.18')
+        self.assertFalse(hasattr(job_flow, 'amiversion'))
+        self.assertEqual(job_flow.hadoopversion, '0.18')
 
-        with mr_job.make_runner() as runner:
-            runner.run()
+    def test_hadoop_version_0_20(self):
+        job_flow = self.run_and_get_job_flow('--hadoop-version', '0.20')
+        self.assertFalse(hasattr(job_flow, 'amiversion'))
+        self.assertEqual(job_flow.hadoopversion, '0.20')
 
-            emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+    def test_bad_hadoop_version(self):
+        self.assertRaises(boto.exception.EmrResponseError,
+                          self.run_and_get_job_flow,
+                          '--hadoop-version', '0.99')
 
-            self.assertEqual(job_flow.hadoopversion, '0.18')
+    def test_ami_version_1_0(self):
+        job_flow = self.run_and_get_job_flow('--ami-version', '1.0')
+        self.assertEqual(job_flow.amiversion, '1.0')
+        self.assertEqual(job_flow.hadoopversion, '0.18')
+
+    def test_ami_version_2_0(self):
+        job_flow = self.run_and_get_job_flow('--ami-version', '2.0')
+        self.assertEqual(job_flow.amiversion, '2.0')
+        self.assertEqual(job_flow.hadoopversion, '0.20.205')
+
+    def test_latest_ami_version(self):
+        job_flow = self.run_and_get_job_flow('--ami-version', 'latest')
+        self.assertEqual(job_flow.amiversion, 'latest')
+        self.assertEqual(job_flow.hadoopversion, '0.20.205')
+
+    def test_bad_ami_version(self):
+        self.assertRaises(boto.exception.EmrResponseError,
+                          self.run_and_get_job_flow,
+                          '--ami-version', '1.5')
+
+    def test_ami_version_1_0_hadoop_version_0_18(self):
+        job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
+                                             '--hadoop-version', '0.18')
+        self.assertEqual(job_flow.amiversion, '1.0')
+        self.assertEqual(job_flow.hadoopversion, '0.18')
+
+    def test_ami_version_1_0_hadoop_version_0_20(self):
+        job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
+                                             '--hadoop-version', '0.20')
+        self.assertEqual(job_flow.amiversion, '1.0')
+        self.assertEqual(job_flow.hadoopversion, '0.20')
+
+    def test_mismatched_ami_and_hadoop_versions(self):
+        self.assertRaises(boto.exception.EmrResponseError,
+                          self.run_and_get_job_flow,
+                          '--ami-version', '1.0',
+                          '--hadoop-version', '0.20.205')
 
 
 class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
@@ -757,7 +802,7 @@ class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
 
     def set_in_mrjob_conf(self, **kwargs):
         emr_opts = {'check_emr_status_every': 0.01,
-                    's3_sync_wait_time': 0.01,}
+                    's3_sync_wait_time': 0.01}
         emr_opts.update(kwargs)
         with open(self.mrjob_conf_path, 'w') as f:
             dump_mrjob_conf({'runners': {'emr': emr_opts}}, f)
@@ -1708,6 +1753,109 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.assertEqual(results,
                          [(1, 'bar'), (1, 'foo'), (2, None)])
 
+    def test_pooling_with_hadoop_version(self):
+        _, job_flow_id = self.make_pooled_job_flow(hadoop_version='0.18')
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--hadoop-version', '0.18',
+            '-c', self.mrjob_conf_path])
+        self.assertEqual(results,
+                         [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_dont_join_pool_with_wrong_hadoop_version(self):
+        _, job_flow_id = self.make_pooled_job_flow(hadoop_version='0.18')
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--hadoop-version', '0.20',
+            '-c', self.mrjob_conf_path])
+        self.assertNotEqual(results,
+                            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_pooling_with_ami_version(self):
+        _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0')
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ami-version', '2.0',
+            '-c', self.mrjob_conf_path])
+        self.assertEqual(results,
+                         [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_dont_join_pool_with_wrong_ami_version(self):
+        _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0')
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ami-version', '1.0',
+            '-c', self.mrjob_conf_path])
+        self.assertNotEqual(results,
+                            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_pooling_with_additional_emr_info(self):
+        info = '{"tomatoes": "actually a fruit!"}'
+        _, job_flow_id = self.make_pooled_job_flow(
+            additional_emr_info=info)
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--additional-emr-info', info,
+            '-c', self.mrjob_conf_path])
+        self.assertEqual(results,
+                         [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_dont_join_pool_with_wrong_additional_emr_info(self):
+        info = '{"tomatoes": "actually a fruit!"}'
+        _, job_flow_id = self.make_pooled_job_flow()
+
+        self.mock_emr_output = {(job_flow_id, 1): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--additional-emr-info', info,
+            '-c', self.mrjob_conf_path])
+        self.assertNotEqual(results,
+                            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_can_turn_off_pooling_from_cmd_line(self):
+        # turn on pooling in mrjob.conf
+        with open(self.mrjob_conf_path, 'w') as f:
+            dump_mrjob_conf({'runners': {'emr': {
+                'check_emr_status_every': 0.01,
+                's3_sync_wait_time': 0.01,
+                'pool_emr_job_flows': True,
+            }}}, f)
+
+        mr_job = MRTwoStepJob([
+            '-r', 'emr', '-v', '--no-pool-emr-job-flows',
+            '-c', self.mrjob_conf_path])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            self.prepare_runner_for_ssh(runner)
+            runner.run()
+
+            job_flow_id = runner.get_emr_job_flow_id()
+            jf = runner.make_emr_conn().describe_jobflow(job_flow_id)
+            self.assertEqual(jf.keepjobflowalivewhennosteps, 'false')
+
     def test_dont_join_full_job_flow(self):
         dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
 
@@ -1753,18 +1901,21 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
     def test_dont_join_wrong_mrjob_version(self):
         _, job_flow_id = self.make_pooled_job_flow('pool1')
+
         old_version = mrjob.__version__
-        mrjob.__version__ = 'OVER NINE THOUSAAAAAND'
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+        try:
+            mrjob.__version__ = 'OVER NINE THOUSAAAAAND'
 
-        results = self.sorted_results_for_runner_with_args([
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--pool-name', 'not_pool1',
-            '-c', self.mrjob_conf_path])
+            self.mock_emr_output = {(job_flow_id, 1): [
+                '1\t"bar"\n1\t"foo"\n2\tnull\n']}
 
-        mrjob.__version__ = old_version
+            results = self.sorted_results_for_runner_with_args([
+                '-r', 'emr', '-v', '--pool-emr-job-flows',
+                '--pool-name', 'not_pool1',
+                '-c', self.mrjob_conf_path])
+        finally:
+            mrjob.__version__ = old_version
 
         self.assertNotEqual(results,
                             [(1, 'bar'), (1, 'foo'), (2, None)])

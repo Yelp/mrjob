@@ -15,7 +15,7 @@
 from StringIO import StringIO
 import sys
 
-from mrjob import boto_2_1_rc2
+from mrjob import boto_2_1_1_83aae37b
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.audit_usage import main
 from tests.test_emr import MockEMRAndS3TestCase
@@ -38,7 +38,7 @@ class AuditUsageTestCase(MockEMRAndS3TestCase):
         main(['-q', '--no-conf'])  # just make sure it doesn't crash
 
     def test_with_one_job_flow(self):
-        emr_conn = boto_2_1_rc2.EmrConnection()
+        emr_conn = boto_2_1_1_83aae37b.EmrConnection()
         emr_conn.run_jobflow('no name', log_uri=None)
 
         main(['-q', '--no-conf'])

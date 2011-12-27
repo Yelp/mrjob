@@ -1154,6 +1154,11 @@ class MRJob(object):
             help='A JSON string for selecting additional features on EMR')
 
         self.emr_opt_group.add_option(
+            '--ami-version', dest='ami_version', default=None,
+            help=(
+                'AMI Version to use (currently 1.0, 2.0, or latest).'))
+
+        self.emr_opt_group.add_option(
             '--aws-availability-zone', dest='aws_availability_zone',
             default=None,
             help='Availability zone to run the job flow on')
@@ -1257,6 +1262,11 @@ class MRJob(object):
             dest='hadoop_streaming_jar_on_emr', default=None,
             help=('Local path of the hadoop streaming jar on the EMR node.'
                   ' Rarely necessary.'))
+
+        self.emr_opt_group.add_option(
+            '--no-pool-emr-job-flows', dest='pool_emr_job_flows',
+            action='store_false',
+            help="Don't try to run our job on a pooled job flow.")
 
         self.emr_opt_group.add_option(
             '--num-ec2-instances', dest='num_ec2_instances', default=None,

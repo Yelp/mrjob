@@ -1227,15 +1227,48 @@ class MRJob(object):
             '--ec2-key-pair-file', dest='ec2_key_pair_file', default=None,
             help='Path to file containing SSH key for EMR')
 
+        # EMR instance types
+        self.emr_opt_group.add_option(
+            '--ec2-core-instance-type', '--ec2-slave-instance-type',
+            dest='ec2_core_instance_type', default=None,
+            help='Type of EC2 instance for core (or "slave") nodes only')
+
         self.emr_opt_group.add_option(
             '--ec2-master-instance-type', dest='ec2_master_instance_type',
             default=None,
             help='Type of EC2 instance for master node only')
 
         self.emr_opt_group.add_option(
-            '--ec2-slave-instance-type', dest='ec2_slave_instance_type',
+            '--ec2-task-instance-type', dest='ec2_task_instance_type',
             default=None,
-            help='Type of EC2 instance for slave nodes only')
+            help='Type of EC2 instance for task nodes only')
+
+        # EMR instance bid prices
+        self.emr_opt_group.add_option(
+            '--ec2-core-instance-bid-price',
+            dest='ec2_core_instance_bid_price', default=None,
+            help=(
+                'Bid price to specify for core (or "slave") nodes when '
+                'setting them up as EC2 spot instances (you probably only want '
+                'to set a bid price for task instances).')
+            )
+
+        self.emr_opt_group.add_option(
+            '--ec2-master-instance-bid-price',
+            dest='ec2_master_instance_bid_price', default=None,
+            help=(
+                'Bid price to specify for the master node when setting it up '
+                'as an EC2 spot instance (you probably only want to set '
+                'a bid price for task instances).')
+            )
+
+        self.emr_opt_group.add_option(
+            '--ec2-task-instance-bid-price',
+            dest='ec2_task_instance_bid_price', default=None,
+            help=(
+                'Bid price to specify for task nodes when '
+                'setting them up as EC2 spot instances.')
+            )
 
         self.emr_opt_group.add_option(
             '--emr-endpoint', dest='emr_endpoint', default=None,
@@ -1271,7 +1304,23 @@ class MRJob(object):
         self.emr_opt_group.add_option(
             '--num-ec2-instances', dest='num_ec2_instances', default=None,
             type='int',
-            help='Number of EC2 instances to launch')
+            help='Total number of EC2 instances to launch ')
+
+        # NB: EMR instance counts are only applicable for slave/core and
+        # task, since a master count > 1 causes the EMR API to return the
+        # ValidationError "A master instance group must specify a single
+        # instance".
+        self.emr_opt_group.add_option(
+            '--num-ec2-core-instances', dest='num_ec2_core_instances',
+            default=None,
+            help=('Number of EC2 instances to start as core (or "slave") '
+                  'nodes. Overrides --num-ec2-instances.'))
+
+        self.emr_opt_group.add_option(
+            '--num-ec2-task-instances', dest='num_ec2_task_instances',
+            default=None,
+            help=('Number of EC2 instances to start as task '
+                  'nodes. Overrides --num-ec2-instances.'))
 
         self.emr_opt_group.add_option(
             '--pool-emr-job-flows', dest='pool_emr_job_flows',

@@ -296,6 +296,30 @@ class MockEmrConnection(object):
         else:
             self.endpoint = 'elasticmapreduce.amazonaws.com'
 
+    def _validate_instance_groups(self, instance_groups):
+        """Returns True if our list of instance_groups will work
+        with the real EMR API.
+        """
+        role_counts = {}
+        for role in (i.role for i in instance_groups):
+            role_counts.setdefault(role, 0)
+            role_counts[role] +=1
+        valid_role_counts = all([
+            role_counts['MASTER'] == 1,
+            role_counts['CORE'] == 1,
+            role_counts.get('TASK', 0) in (0, 1)
+            ])
+        if not valid_role_counts:
+            return False
+
+        for instance_group in instance_groups:
+            if instance_group.role == 'MASTER':
+                if instance_group.num_instances != 1:
+                    return False
+
+        return True
+
+
     def run_jobflow(self,
                     name, log_uri, ec2_keyname=None, availability_zone=None,
                     master_instance_type='m1.small',
@@ -305,6 +329,7 @@ class MockEmrConnection(object):
                     hadoop_version=None,
                     steps=None,
                     bootstrap_actions=[],
+                    instance_groups=None,
                     additional_info=None,
                     ami_version=None,
                     now=None):
@@ -346,6 +371,48 @@ class MockEmrConnection(object):
                                  args=[MockEmrObject(value=v) for v \
                                        in real_action.bootstrap_action_args])
 
+        # create a MockEmrObject corresponding to the job flow. We only
+        # need to fill in the fields that EMRJobRunnerUses
+        if not instance_groups:
+            mock_groups = [
+                MockEmrObject(
+                    market='ON_DEMAND',
+                    name='',
+                    num_instances=1,
+                    role='MASTER',
+                    type=master_instance_type
+                    ),
+                MockEmrObject(
+                    market='ON_DEMAND',
+                    name='',
+                    num_instances=(int(num_instances) - 1),
+                    role='CORE',
+                    type=slave_instance_type
+                    ),
+                ]
+        else:
+            self._validate_instance_groups(instance_groups)
+            master_instance_type = None
+            slave_instance_type = None
+
+            mock_groups = []
+            for instance_group in instance_groups:
+                emr_group = MockEmrObject(
+                    market=instance_group.market,
+                    name=instance_group.name,
+                    num_instances=instance_group.num_instances,
+                    role=instance_group.role,
+                    type=instance_group.type
+                    )
+                if instance_group.market == 'SPOT':
+                    emr_group.bidprice = instance_group.bidprice
+
+                if instance_group.role == 'MASTER':
+                    master_instance_type = instance_group.type
+                elif instance_group.role == 'CORE':
+                    slave_instance_type = instance_group.type
+                mock_groups.append(emr_group)
+
         job_flow = MockEmrObject(
             availabilityzone=availability_zone,
             bootstrapactions=[make_fake_action(a) for a in bootstrap_actions],
@@ -362,6 +429,7 @@ class MockEmrConnection(object):
             slaveinstancetype=slave_instance_type,
             state='STARTING',
             steps=[],
+            instance_groups=mock_groups,
         )
 
         # AMI version is only set when you specify it explicitly

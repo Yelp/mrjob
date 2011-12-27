@@ -1240,7 +1240,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             bid_price = None
 
         # Hard-code the instance group name to something sensible.
-        name = 'mrjob-launch-%s' % role.lower()
+        name = 'mrjob_%s' % role.lower()
 
         return boto_2_1_1_83aae37b.InstanceGroup(
             count, role, instance_type, market, name, bidprice=bid_price

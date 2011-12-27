@@ -2039,7 +2039,12 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 return False
 
             # match hadoop version
-            if not job_flow.hadoopversion == self._opts['hadoop_version']:
+            if job_flow.hadoopversion != self.get_hadoop_version():
+                return False
+
+            # match AMI version
+            job_flow_ami_version = getattr(job_flow, 'amiversion', None)
+            if job_flow_ami_version != self._opts['ami_version']:
                 return False
 
             # don't accept a job flow with worse performance characteristics
@@ -2126,11 +2131,10 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         things_to_hash = [
             [self.md5sum(fd['path'])
              for fd in self._files if should_include_file(fd)],
-            self._opts['ami_version'],
+            self._opts['additional_emr_info'],
             self._opts['bootstrap_mrjob'],
             self._opts['bootstrap_cmds'],
             cleaned_bootstrap_actions,
-            self._opts['hadoop_version'],
         ]
         if self._opts['bootstrap_mrjob']:
             things_to_hash.append(mrjob.__version__)

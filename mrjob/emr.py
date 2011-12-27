@@ -1717,7 +1717,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
         job_flow = self._describe_jobflow()
-        if job_flow.keepjobflowalivewhennosteps in (True, 'true'):
+        if job_flow.keepjobflowalivewhennosteps == 'true':
             log.info("Can't fetch counters from S3 for five more minutes. Try"
                      " 'python -m mrjob.tools.emr.fetch_logs --counters %s'"
                      " in five minutes." % job_flow.jobflowid)
@@ -2016,12 +2016,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             if len(job_flow.steps) > 255:
                 return False
 
-            # convert from braindead string types to usable types
-            job_flow.instancecount = int(job_flow.instancecount)
-            keep_alive = job_flow.keepjobflowalivewhennosteps
-            job_flow.keepjobflowalivewhennosteps = (
-                keep_alive in ('true', True))
-
             # only take idle job flows
             if job_flow.state != 'WAITING':
                 return False
@@ -2035,7 +2029,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 return False
 
             # sanity check for proper type of job flow
-            if not job_flow.keepjobflowalivewhennosteps:
+            if job_flow.keepjobflowalivewhennosteps != 'true':
                 return False
 
             # match hadoop version
@@ -2053,7 +2047,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 return False
             if mem(job_flow) < my_memory:
                 return False
-            if job_flow.instancecount < self._opts['num_ec2_instances']:
+            if int(job_flow.instancecount) < self._opts['num_ec2_instances']:
                 return False
 
             return True

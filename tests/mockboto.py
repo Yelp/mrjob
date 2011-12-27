@@ -52,6 +52,7 @@ AMI_VERSION_TO_HADOOP_VERSIONS = {
     'latest': ['0.20.205'],
 }
 
+
 ### S3 ###
 
 def add_mock_s3_data(mock_s3_fs, data):
@@ -353,7 +354,7 @@ class MockEmrConnection(object):
             hadoopversion=hadoop_version,
             instancecount=str(num_instances),
             jobflowid=jobflow_id,
-            keepjobflowalivewhennosteps=keep_alive,
+            keepjobflowalivewhennosteps=('true' if keep_alive else 'false'),
             laststatechangereason='Provisioning Amazon EC2 capacity',
             masterinstancetype=master_instance_type,
             name=name,
@@ -566,7 +567,7 @@ class MockEmrConnection(object):
             return
 
         # no pending steps. shut down job if appropriate
-        if job_flow.keepjobflowalivewhennosteps:
+        if job_flow.keepjobflowalivewhennosteps == 'true':
             job_flow.state = 'WAITING'
             job_flow.reason = 'Waiting for steps to run'
         else:

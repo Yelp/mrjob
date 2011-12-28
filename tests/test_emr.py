@@ -930,7 +930,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         job_flow_id = runner.make_persistent_job_flow()
         job_flow = runner.make_emr_conn().describe_jobflow(job_flow_id)
         self._assert_equal_instance_groups(
-            expected_groups, job_flow.instance_groups)
+            expected_groups, job_flow.instancegroups)
 
     def test_single_instance(self):
         self._test_instance_groups(

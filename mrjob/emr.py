@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import with_statement
 
+from collections import defaultdict
 import datetime
 import fnmatch
 import logging
@@ -179,6 +180,9 @@ AMI_VERSION_TO_HADOOP_VERSION = {
     '2.0': '0.20.205',
     'latest': '0.20.205',
 }
+
+# EMR's hard limit on number of steps in a job flow
+MAX_STEPS_PER_JOB_FLOW = 256
 
 
 def est_time_to_hour(job_flow):
@@ -482,7 +486,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                         run tasks but do not host HDFS. Usually
                                         you just want to use
                                         *ec2_instance_type*. Defaults to
-                                        ``'m1.small'``.
+                                        the same instance type as
+                                        *ec2_core_instance_type*.
         :param ec2_task_instance_bid_price: when specified and not "0", this
                                             creates the master Hadoop node as
                                             a spot instance at this bid price.
@@ -750,8 +755,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             'check_emr_status_every': 30,
             'ec2_core_instance_type': 'm1.small',
             'ec2_master_instance_type': 'm1.small',
-            'ec2_slave_instance_type': 'm1.small',
-            'ec2_task_instance_type': 'm1.small',
             'emr_job_flow_pool_name': 'default',
             'hadoop_version': None,  # defaulted in __init__()
             'hadoop_streaming_jar_on_emr':
@@ -787,8 +790,11 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         """If the *ec2_instance_type* option is set, override instance
         type for the nodes that actually run tasks (see Issue #66). Allow
         command-line arguments to override defaults and arguments
-        in mrjob.conf (see Issue #311). Also, make sure that core and
-        slave instance type are the same.
+        in mrjob.conf (see Issue #311).
+
+        Also, make sure that core and slave instance type are the same,
+        total number of instances matches number of master, core, and task
+        instances, and that bid prices of zero are converted to None.
 
         Helper for __init__.
         """
@@ -796,12 +802,20 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # Within EMRJobRunner we only ever use ec2_core_instance_type,
         # but we want ec2_slave_instance_type to be correct in the
         # options dictionary.
-        if (self._opt_priority['ec2_slave_instance_type'] >
-            self._opt_priority['ec2_core_instance_type']):
+        if (self._opts['ec2_slave_instance_type'] and 
+            (self._opt_priority['ec2_slave_instance_type'] >
+             self._opt_priority['ec2_core_instance_type'])):
             self._opts['ec2_core_instance_type'] = (
                 self._opts['ec2_slave_instance_type'])
         else:
             self._opts['ec2_slave_instance_type'] = (
+                self._opts['ec2_core_instance_type'])
+
+        # If task instance type is not set, use core instance type
+        # (This is mostly so that we don't inadvertently join a pool
+        # with task instance types with too little memory.)
+        if not self._opts['ec2_task_instance_type']:
+            self._opts['ec2_task_instance_type'] = (
                 self._opts['ec2_core_instance_type'])
 
         # Within EMRJobRunner, we use num_ec2_core_instances and
@@ -842,6 +856,12 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             if (self._opt_priority['ec2_instance_type'] >
                 self._opt_priority['ec2_task_instance_type']):
                 self._opts['ec2_task_instance_type'] = ec2_instance_type
+
+        # convert a bid price of '0' to None
+        for role in ('core', 'master', 'task'):
+            opt_name = 'ec2_%s_instance_bid_price' % role
+            if not (self._opts[opt_name] and float(self._opts[opt_name])):
+                self._opts[opt_name] = None
 
     def _fix_s3_scratch_and_log_uri_opts(self):
         """Fill in s3_scratch_uri and s3_log_uri (in self._opts) if they
@@ -1526,7 +1546,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # try to find a job flow from the pool. basically auto-fill
         # 'emr_job_flow_id' if possible and then follow normal behavior.
         if self._opts['pool_emr_job_flows']:
-            job_flow = self.find_job_flow()
+            job_flow = self.find_job_flow(num_steps=len(steps))
             if job_flow:
                 self._emr_job_flow_id = job_flow.jobflowid
 
@@ -2114,9 +2134,29 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def get_emr_job_flow_id(self):
         return self._emr_job_flow_id
 
-    def usable_job_flows(self, emr_conn=None, exclude=None):
-        """Get job flows that this runner can use. Sort by instance compute
-        units and time left to an even instance hour.
+    def usable_job_flows(self, emr_conn=None, exclude=None, num_steps=1):
+        """Get job flows that this runner can use.
+
+        To be usable, a job flow must:
+
+        - be set up for pooling, with the same pool name
+        - be available
+        - have enough space for our steps
+        - be bootstrapped the same way (including mrjob version)
+        - have the same Hadoop and AMI version
+        - have no instances with less memory than we request for instances
+          of that type (master, task, core)
+        - have at least as many compute units as we request. If we have a bid
+          price for a given type of instance, we only count instances with a
+          bid price at least that high, otherwise, we only count on-demand
+          instances.
+
+        We then sort by:
+        - total compute units for core + task nodes
+        - total compute units for master node
+        - time left to an even instance hour
+
+        Put most desirable job flows *last*.
 
         :return: list of (job_minutes_float,
                  :py:class:`botoemr.emrobject.JobFlow`)
@@ -2125,99 +2165,112 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         emr_conn = emr_conn or self.make_emr_conn()
         exclude = exclude or set()
 
-        all_job_flows = emr_conn.describe_jobflows()
-
         pool_arg = self._pool_arg()
 
-        def worker_instance_type(job_flow):
-            """We only care about the processing power of the task nodes, which
-            are determined by different values depending on the number of total
-            nodes.
-            """
-            if job_flow.instancecount > 1:
-                return job_flow.slaveinstancetype
+
+        # decide memory and total compute units requested for each
+        # role type
+        role_to_req_mem = {}
+        role_to_req_cu = {}
+        role_to_req_bid_price = {}
+            
+        for role in ('core', 'master', 'task'):
+            instance_type = self._opts['ec2_%s_instance_type' % role]
+            if role == 'master':
+                num_instances = 1
             else:
-                return job_flow.masterinstancetype
+                num_instances = self._opts['num_ec2_%s_instances' % role]
+                
+            role_to_req_bid_price[role] = (
+                self._opts['ec2_%s_instance_bid_price' % role])
 
-        def cu(job_flow):
-            """Shortcut to calculate the compute units per task node of a job
-            flow
-            """
-            return EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(
-                worker_instance_type(job_flow), 0)
+            role_to_req_mem[role] = (
+                EC2_INSTANCE_TYPE_TO_MEMORY.get(instance_type, 0.0))
+            role_to_req_cu[role] = (
+                num_instances *
+                EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(instance_type, 0.0))
 
-        def mem(job_flow):
-            """Shortcut to calculate the memory per task node of a job flow """
-            return EC2_INSTANCE_TYPE_TO_MEMORY.get(
-                worker_instance_type(job_flow), 0)
+        sort_keys_and_job_flows = []
 
-        # get this run's information, unfortunately duplicating some logic from
-        # the inner functions above
-        my_instance_type = self._opts['ec2_master_instance_type']
-        if self._opts['num_ec2_instances'] > 1:
-            my_instance_type = self._opts['ec2_slave_instance_type']
-
-        my_compute_units = EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(
-            my_instance_type, 0)
-        my_memory = EC2_INSTANCE_TYPE_TO_MEMORY.get(my_instance_type, 0)
-
-        def matches(job_flow):
-            """Return True if the given job flow supports the configuration of
-            this run, otherwise False.
-            """
+        def check(job_flow):
             # this may be a retry due to locked job flows
             if job_flow.jobflowid in exclude:
-                return False
+                return
 
-            # there is a hard limit of 256 steps per job flow
-            if len(job_flow.steps) > 255:
-                return False
+            # only take persistent job flows
+            if job_flow.keepjobflowalivewhennosteps != 'true':
+                return
 
-            # only take idle job flows
-            if job_flow.state != 'WAITING':
-                return False
-
-            # match bootstrap configuration and pool name and hash
+            # match pool name, and (bootstrap) hash
             if not job_flow.bootstrapactions:
-                return False
+                return
 
             args = [arg.value for arg in job_flow.bootstrapactions[-1].args]
-            if not args == [pool_arg, self._opts['emr_job_flow_pool_name']]:
-                return False
-
-            # sanity check for proper type of job flow
-            if job_flow.keepjobflowalivewhennosteps != 'true':
-                return False
+            if args != [pool_arg, self._opts['emr_job_flow_pool_name']]:
+                return
 
             # match hadoop version
             if job_flow.hadoopversion != self.get_hadoop_version():
-                return False
+                return
 
             # match AMI version
             job_flow_ami_version = getattr(job_flow, 'amiversion', None)
             if job_flow_ami_version != self._opts['ami_version']:
-                return False
+                return
 
-            # don't accept a job flow with worse performance characteristics
-            # than those specified by the config
-            if cu(job_flow) < my_compute_units:
-                return False
-            if mem(job_flow) < my_memory:
-                return False
-            if int(job_flow.instancecount) < self._opts['num_ec2_instances']:
-                return False
+            # there is a hard limit of 256 steps per job flow
+            if len(job_flow.steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
+                return
 
-            return True
+            role_to_cu = defaultdict(float)  # total compute units per group
 
-        available_job_flows = [jf for jf in all_job_flows if matches(jf)]
+            # check memory and compute units, bailing out if we hit
+            # an instance with too little memory
+            for ig in job_flow.instancegroups:
+                role = ig.role.lower()
 
-        def sort_key(job_flow):
-            return (cu(job_flow) * job_flow.instancecount,
-                    est_time_to_hour(job_flow))
+                # unknown, new kind of role; bail out!
+                if role not in ('core', 'master', 'task'):
+                    return
 
-        return sorted(available_job_flows, key=sort_key)
+                mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig.type, 0.0)
+                req_mem = role_to_req_mem.get(role, 0.0)
+                # if too little memory, bail out
+                if mem < req_mem:
+                    return
+                
+                # if bid price is too low, don't count compute units
+                req_bid_price = role_to_req_bid_price
+                bid_price = getattr(ig, 'bidprice', None)
+                if (bid_price and
+                    (not req_bid_price or req_bid_price > bid_price)):
+                    continue
 
-    def find_job_flow(self):
+                cu = (ig.num_instances *
+                      EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(ig.type, 0.0))
+                role_to_cu.setdefault(role, 0.0)
+                role_to_cu[role] += cu
+
+            # check if there are enough compute units
+            for role, req_cu in role_to_req_cu.iteritems():
+                cu = role_to_req_cu.get(role, 0.0)
+                if cu < req_cu:
+                    return
+
+            # make a sort key
+            sort_key = (role_to_cu['core'] + role_to_cu['task'],
+                        role_to_cu['master'],
+                        est_time_to_hour(job_flow))
+            
+            sort_keys_and_job_flows.append((sort_key, job_flow))
+
+        for job_flow in emr_conn.describe_jobflows(states=['WAITING']):
+            check(job_flow)
+
+        return [job_flow for (sort_key, job_flow)
+                in sorted(sort_keys_and_job_flows)]
+
+    def find_job_flow(self, num_steps=1):
         """Find a job flow that can host this runner. Prefer flows with more
         compute units. Break ties by choosing flow with longest idle time.
         Return ``None`` if no suitable flows exist.
@@ -2227,8 +2280,10 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         emr_conn = self.make_emr_conn()
         s3_conn = self.make_s3_conn()
         while chosen_job_flow is None:
-            sorted_tagged_job_flows = self.usable_job_flows(emr_conn=emr_conn,
-                                                            exclude=exclude)
+            sorted_tagged_job_flows = self.usable_job_flows(
+                emr_conn=emr_conn,
+                exclude=exclude,
+                num_steps=num_steps)
             if sorted_tagged_job_flows:
                 job_flow = sorted_tagged_job_flows[-1]
                 lock_uri = make_lock_uri(self._opts['s3_scratch_uri'],

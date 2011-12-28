@@ -429,6 +429,7 @@ class MockEmrConnection(object):
             ec2keyname=ec2_keyname,
             hadoopversion=hadoop_version,
             instancecount=str(num_instances),
+            instancegroups=mock_groups,
             jobflowid=jobflow_id,
             keepjobflowalivewhennosteps=('true' if keep_alive else 'false'),
             laststatechangereason='Provisioning Amazon EC2 capacity',
@@ -438,7 +439,6 @@ class MockEmrConnection(object):
             slaveinstancetype=slave_instance_type,
             state='STARTING',
             steps=[],
-            instance_groups=mock_groups,
         )
 
         # AMI version is only set when you specify it explicitly

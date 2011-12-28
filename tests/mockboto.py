@@ -367,21 +367,23 @@ class MockEmrConnection(object):
         if not instance_groups:
             mock_groups = [
                 MockEmrObject(
+                    instancetype=master_instance_type,
                     market='ON_DEMAND',
                     name='master',
-                    num_instances=1,
+                    instancerequestcount='1',
+                    instancerunningcount='0',
                     role='MASTER',
-                    type=master_instance_type
-                    ),
+                ),
             ]
             if num_instances > 1:
                 mock_groups.append(
                     MockEmrObject(
+                        instancerequestcount=str(num_instances - 1),
+                        instancerunningcount='0',
+                        instancetype=slave_instance_type,
                         market='ON_DEMAND',
                         name='core',
-                        num_instances=(num_instances - 1),
                         role='CORE',
-                        type=slave_instance_type
                     ),
                 )
             else:
@@ -401,12 +403,13 @@ class MockEmrConnection(object):
                         'An instance group must have at least one instance'))
 
                 emr_group = MockEmrObject(
+                    instancerequestcount=str(instance_group.num_instances),
+                    instancerunningcount='0',
+                    instancetype=instance_group.type,
                     market=instance_group.market,
                     name=instance_group.name,
-                    num_instances=instance_group.num_instances,
                     role=instance_group.role,
-                    type=instance_group.type
-                    )
+                )
                 if instance_group.market == 'SPOT':
                     emr_group.bidprice = instance_group.bidprice
 
@@ -593,6 +596,9 @@ class MockEmrConnection(object):
         if job_flow.state == 'STARTING':
             job_flow.state = 'WAITING'
             job_flow.startdatetime = to_iso8601(now)
+            # instances are now provisioned and running
+            for ig in job_flow.instancegroups:
+                ig.instancerunningcount = ig.instancerequestcount
 
         # if job is done, don't advance it
         if job_flow.state in ('COMPLETED', 'TERMINATED', 'FAILED'):

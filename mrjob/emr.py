@@ -2238,7 +2238,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 if role not in ('core', 'master', 'task'):
                     return
 
-                mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig.type, 0.0)
+                mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig.instancetype, 0.0)
                 req_mem = role_to_req_mem.get(role, 0.0)
                 # if too little memory, bail out
                 if mem < req_mem:
@@ -2251,8 +2251,9 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                     (not req_bid_price or req_bid_price > bid_price)):
                     continue
 
-                cu = (ig.num_instances *
-                      EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(ig.type, 0.0))
+                cu = (int(ig.instancerunningcount) *
+                      EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(
+                          ig.instancetype, 0.0))
                 role_to_cu.setdefault(role, 0.0)
                 role_to_cu[role] += cu
 

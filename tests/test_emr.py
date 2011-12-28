@@ -788,21 +788,64 @@ class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
                          [('j-%04d' % i) for i in range(NUM_JOB_FLOWS)])
 
 
-# TODO: rewrite this to include task instances, and test interactions
-# between number and type of instances.
-class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
+class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
 
-    def _test_instance_types(self, kwargs, expected_master, expected_slave):
-        runner = EMRJobRunner(conf_path=self.mrjob_conf_path, **kwargs)
+    def _test_instance_groups(self, opts, **expected):
+        """Run a job with the given option dictionary, and check for
+        for instance, number, and optional bid price for each instance role.
+
+        Specify expected instance group info like:
+
+        <role>=(num_instances, instance_type, bid_price)
+        """
+        runner = EMRJobRunner(conf_path=self.mrjob_conf_path, **opts)
 
         job_flow_id = runner.make_persistent_job_flow()
         job_flow = runner.make_emr_conn().describe_jobflow(job_flow_id)
 
-        self.assertEqual(
-            (expected_master,
-             expected_slave),
-            (job_flow.masterinstancetype,
-             getattr(job_flow, 'slaveinstancetype', None)))
+        # convert expected to a dict of dicts
+        role_to_expected = {}
+        for role, (num, instance_type, bid_price) in expected.iteritems():
+            info = {
+                'instancerequestcount': str(num),
+                'instancetype': instance_type,
+            }
+            if bid_price:
+                info['market'] = 'SPOT'
+                info['bidprice'] = bid_price
+            else:
+                info['market'] = 'ON_DEMAND'
+
+            role_to_expected[role.upper()] = info
+
+        # convert actual instance groups to dicts
+        role_to_actual = {}
+        for ig in job_flow.instancegroups:
+            info = {}
+            for field in ('bidprice', 'instancerequestcount',
+                          'instancetype', 'market'):
+                if hasattr(ig, field):
+                    info[field] = getattr(ig, field)
+            role_to_actual[ig.role] = info
+
+        self.assertEqual(role_to_expected, role_to_actual)
+
+        # also check master/slave and # of instance types
+        # this is mostly a sanity check of mockboto
+        expected_master_instance_type = role_to_expected.get(
+            'MASTER', {}).get('instancetype')
+        self.assertEqual(expected_master_instance_type,
+                         getattr(job_flow, 'masterinstancetype', None))
+
+        expected_slave_instance_type = role_to_expected.get(
+            'CORE', {}).get('instancetype')
+        self.assertEqual(expected_slave_instance_type,
+                         getattr(job_flow, 'slaveinstancetype', None))
+
+        expected_instance_count = str(sum(
+            int(info['instancerequestcount'])
+            for info in role_to_expected.itervalues()))
+        self.assertEqual(expected_instance_count, job_flow.instancecount)
 
     def set_in_mrjob_conf(self, **kwargs):
         emr_opts = {'check_emr_status_every': 0.01,
@@ -812,138 +855,116 @@ class EC2InstanceTypeTestCase(MockEMRAndS3TestCase):
             dump_mrjob_conf({'runners': {'emr': emr_opts}}, f)
 
     def test_defaults(self):
-        self._test_instance_types(
+        self._test_instance_groups(
             {},
-            'm1.small', None)
+            master=(1, 'm1.small', None))
 
-        self._test_instance_types(
-            {'num_ec2_instances': 2},
-            'm1.small', 'm1.small')
+        self._test_instance_groups(
+            {'num_ec2_instances': 3},
+            core=(2, 'm1.small', None),
+            master=(1, 'm1.small', None))
 
     def test_single_instance(self):
-        self._test_instance_types(
+        self._test_instance_groups(
             {'ec2_instance_type': 'c1.xlarge'},
-            'c1.xlarge', None)
+            master=(1, 'c1.xlarge', None))
 
     def test_multiple_instances(self):
-        self._test_instance_types(
-            {'ec2_instance_type': 'c1.xlarge', 'num_ec2_instances': 2},
-            'm1.small', 'c1.xlarge')
+        self._test_instance_groups(
+            {'ec2_instance_type': 'c1.xlarge', 'num_ec2_instances': 3},
+            core=(2, 'c1.xlarge', None),
+            master=(1, 'm1.small', None))
 
     def test_explicit_master_and_slave_instance_types(self):
-        self._test_instance_types(
+        self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large'},
-            'm1.large', None)
-        self._test_instance_types(
+            master=(1, 'm1.large', None))
+
+        self._test_instance_groups(
             {'ec2_slave_instance_type': 'm2.xlarge',
-             'num_ec2_instances': 2},
-            'm1.small', 'm2.xlarge')
-        self._test_instance_types(
+             'num_ec2_instances': 3},
+            core=(2, 'm2.xlarge', None),
+            master=(1, 'm1.small', None))
+
+        self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large',
              'ec2_slave_instance_type': 'm2.xlarge',
-             'num_ec2_instances': 2},
-            'm1.large', 'm2.xlarge')
+             'num_ec2_instances': 3},
+            core=(2, 'm2.xlarge', None),
+            master=(1, 'm1.large', None))
 
     def test_explicit_instance_types_take_precedence(self):
-        self._test_instance_types(
+        self._test_instance_groups(
             {'ec2_instance_type': 'c1.xlarge',
              'ec2_master_instance_type': 'm1.large'},
-            'm1.large', None)
+            master=(1, 'm1.large', None))
 
-        self._test_instance_types(
+        self._test_instance_groups(
             {'ec2_instance_type': 'c1.xlarge',
              'ec2_master_instance_type': 'm1.large',
              'ec2_slave_instance_type': 'm2.xlarge',
-             'num_ec2_instances': 2},
-            'm1.large', 'm2.xlarge')
+             'num_ec2_instances': 3},
+            core=(2, 'm2.xlarge', None),
+            master=(1, 'm1.large', None))
 
     def test_cmd_line_opts_beat_mrjob_conf(self):
         # set ec2_instance_type in mrjob.conf, 1 instance
         self.set_in_mrjob_conf(ec2_instance_type='c1.xlarge')
 
-        self._test_instance_types(
-            {}, 'c1.xlarge', None)
+        self._test_instance_groups(
+            {},
+            master=(1, 'c1.xlarge', None))
 
-        self._test_instance_types(
+        self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large'},
-            'm1.large', None)
+            master=(1, 'm1.large', None))
 
-        # set ec2_instance_type in mrjob.conf, 2 instances
+        # set ec2_instance_type in mrjob.conf, 3 instances
         self.set_in_mrjob_conf(ec2_instance_type='c1.xlarge',
-                               num_ec2_instances=2)
+                               num_ec2_instances=3)
 
-        self._test_instance_types(
-            {}, 'm1.small', 'c1.xlarge')  # doesn't apply to master
+        self._test_instance_groups(
+            {},
+            core=(2, 'c1.xlarge', None),
+            master=(1, 'm1.small', None))
 
-        self._test_instance_types(
+        self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large',
              'ec2_slave_instance_type': 'm2.xlarge'},
-            'm1.large', 'm2.xlarge')
+            core=(2, 'm2.xlarge', None),
+            master=(1, 'm1.large', None))
 
         # set master in mrjob.conf, 1 instance
         self.set_in_mrjob_conf(ec2_master_instance_type='m1.large')
 
-        self._test_instance_types(
-            {}, 'm1.large', None)
+        self._test_instance_groups(
+            {},
+            master=(1, 'm1.large', None))
 
-        self._test_instance_types(
+        self._test_instance_groups(
             {'ec2_instance_type': 'c1.xlarge'},
-            'c1.xlarge', None)
+            master=(1, 'c1.xlarge', None))
 
         # set master and slave in mrjob.conf, 2 instances
         self.set_in_mrjob_conf(ec2_master_instance_type='m1.large',
                                ec2_slave_instance_type='m2.xlarge',
-                               num_ec2_instances=2)
+                               num_ec2_instances=3)
 
-        self._test_instance_types(
-            {}, 'm1.large', 'm2.xlarge')
+        self._test_instance_groups(
+            {},
+            core=(2, 'm2.xlarge', None),
+            master=(1, 'm1.large', None))
 
-        self._test_instance_types(
+        self._test_instance_groups(
             {'ec2_instance_type': 'c1.xlarge'},
-            'm1.large', 'c1.xlarge')
+            core=(2, 'c1.xlarge', None),
+            master=(1, 'm1.large', None))
 
-
-class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
-
-    def _instance_group_to_tuple(self, instance_group):
-        """ Converts an InstanceGroup object to a tuple for easier
-        sorting/comparison."""
-
-        result = tuple(
-            getattr(instance_group, attr) for attr in
-            ('market', 'num_instances', 'role', 'type')
-            )
-        if hasattr(instance_group, 'bidprice'):
-            return result + (instance_group.bidprice,)
-        return result
-
-    def _assert_equal_instance_groups(self, one, another):
-        """ Takes two lists of InstanceGroups and compares them
-        for equality.
-        """
-        self.assertEqual(
-            sorted(self._instance_group_to_tuple(t) for t in one),
-            sorted(self._instance_group_to_tuple(t) for t in another)
-            )
-
-    def _test_instance_groups(self, kwargs, expected_groups):
-        runner = EMRJobRunner(conf_path=self.mrjob_conf_path, **kwargs)
-
-        job_flow_id = runner.make_persistent_job_flow()
-        job_flow = runner.make_emr_conn().describe_jobflow(job_flow_id)
-        self._assert_equal_instance_groups(
-            expected_groups, job_flow.instancegroups)
-
-    def test_single_instance(self):
+    def test_zero_core_instances(self):
         self._test_instance_groups(
             {'ec2_master_instance_type': 'c1.medium',
              'num_ec2_core_instances' : 0},
-            [MockEmrObject(
-                role='MASTER',
-                type='c1.medium',
-                market='ON_DEMAND',
-                num_instances=1),
-            ])
+            master=(1, 'c1.medium', None))
 
     def test_core_spot_instances(self):
         self._test_instance_groups(
@@ -951,52 +972,24 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
              'ec2_core_instance_type': 'c1.medium',
              'ec2_core_instance_bid_price': '0.20',
              'num_ec2_core_instances' : 5},
-            [MockEmrObject(
-                role='MASTER',
-                type='m1.large',
-                market='ON_DEMAND',
-                num_instances=1),
-             MockEmrObject(
-                role='CORE',
-                type='c1.medium',
-                market='SPOT',
-                bidprice='0.20',
-                num_instances=5)
-            ])
+            core=(5, 'c1.medium', '0.20'),
+            master=(1, 'm1.large', None))
 
     def test_core_on_demand_instances(self):
         self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large',
              'ec2_core_instance_type': 'c1.medium',
              'num_ec2_core_instances' : 5},
-            [MockEmrObject(
-                role='MASTER',
-                type='m1.large',
-                market='ON_DEMAND',
-                num_instances=1),
-             MockEmrObject(
-                role='CORE',
-                type='c1.medium',
-                market='ON_DEMAND',
-                num_instances=5)
-            ])
+            core=(5, 'c1.medium', None),
+            master=(1, 'm1.large', None))
 
         # Test the ec2_slave_instance_type alias
         self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large',
              'ec2_slave_instance_type': 'c1.medium',
              'num_ec2_instances' : 6},
-            [MockEmrObject(
-                role='MASTER',
-                type='m1.large',
-                market='ON_DEMAND',
-                num_instances=1),
-             MockEmrObject(
-                role='CORE',
-                type='c1.medium',
-                market='ON_DEMAND',
-                num_instances=5)
-            ])
+            core=(5, 'c1.medium', None),
+            master=(1, 'm1.large', None))
 
     def test_core_and_task_on_demand_instances(self):
         self._test_instance_groups(
@@ -1006,22 +999,9 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
              'ec2_task_instance_type': 'm2.xlarge',
              'num_ec2_task_instances': 20,
              },
-            [MockEmrObject(
-                role='MASTER',
-                type='m1.large',
-                market='ON_DEMAND',
-                num_instances=1),
-             MockEmrObject(
-                role='CORE',
-                type='c1.medium',
-                market='ON_DEMAND',
-                num_instances=5),
-             MockEmrObject(
-                role='TASK',
-                type='m2.xlarge',
-                market='ON_DEMAND',
-                num_instances=20)
-            ])
+            core=(5, 'c1.medium', None),
+            master=(1, 'm1.large', None),
+            task=(20, 'm2.xlarge', None))
 
     def test_core_and_task_spot_instances(self):
         self._test_instance_groups(
@@ -1033,24 +1013,9 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
              'ec2_task_instance_bid_price': '1.00',
              'num_ec2_task_instances': 20,
              },
-            [MockEmrObject(
-                role='MASTER',
-                type='m1.large',
-                market='ON_DEMAND',
-                num_instances=1),
-             MockEmrObject(
-                role='CORE',
-                type='c1.medium',
-                market='SPOT',
-                bidprice='0.20',
-                num_instances=10,),
-             MockEmrObject(
-                role='TASK',
-                type='m2.xlarge',
-                market='SPOT',
-                bidprice='1.00',
-                num_instances=20)
-            ])
+            core=(10, 'c1.medium', '0.20'),
+            master=(1, 'm1.large', None),
+            task=(20, 'm2.xlarge', '1.00'))
 
         self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large',
@@ -1060,25 +1025,11 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
              'ec2_task_instance_bid_price': '1.00',
              'num_ec2_task_instances': 20,
              },
-            [MockEmrObject(
-                role='MASTER',
-                type='m1.large',
-                market='ON_DEMAND',
-                num_instances=1),
-             MockEmrObject(
-                role='CORE',
-                type='c1.medium',
-                market='ON_DEMAND',
-                num_instances=10),
-             MockEmrObject(
-                role='TASK',
-                type='m2.xlarge',
-                market='SPOT',
-                bidprice='1.00',
-                num_instances=20)
-            ])
+            core=(10, 'c1.medium', None),
+            master=(1, 'm1.large', None),
+            task=(20, 'm2.xlarge', '1.00'))
 
-    def test_master_spot_instance(self):
+    def test_master_and_core_spot_instances(self):
         self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large',
              'ec2_master_instance_bid_price': '0.50',
@@ -1086,19 +1037,16 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
              'ec2_core_instance_bid_price': '0.20',
              'num_ec2_core_instances' : 10,
              },
-            [MockEmrObject(
-                role='MASTER',
-                type='m1.large',
-                market='SPOT',
-                bidprice='0.50',
-                num_instances=1),
-             MockEmrObject(
-                role='CORE',
-                type='c1.medium',
-                market='SPOT',
-                bidprice='0.20',
-                num_instances=10),
-            ])
+            core=(10, 'c1.medium', '0.20'),
+            master=(1, 'm1.large', '0.50'))
+
+    def test_master_spot_instance(self):
+        self._test_instance_groups(
+            {'ec2_master_instance_type': 'm1.large',
+             'ec2_master_instance_bid_price': '0.50',
+             },
+            master=(1, 'm1.large', '0.50'))
+
 
 
 ### tests for error parsing ###

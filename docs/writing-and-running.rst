@@ -168,7 +168,61 @@ must be set at bootstrap time and will not work with `--jobconf`. You must use
 Amazon's `configure-hadoop` script for this. For example, this limits the
 number of mappers and reducers to one per node::
 
-    --bootstrap-action="s3://elasticmapreduce/bootstrap-actions/configure-hadoop -m mapred.tasktracker.map.tasks.maximum=1 -m mapred.tasktracker.reduce.tasks.maximum=1"
+    --bootstrap-action="s3://elasticmapreduce/bootstrap-actions/configure-hadoop \
+    -m mapred.tasktracker.map.tasks.maximum=1 \
+    -m mapred.tasktracker.reduce.tasks.maximum=1"
+
+Enabling Python Core Dumps
+--------------------------
+
+Particularly bad errors may leave no traceback in the logs. To enable core
+dumps on your EMR instances, put this script in ``core_dump_bootstrap.sh``::
+
+    #!/bin/sh
+
+    chk_root () {
+        if [ ! $( id -u ) -eq 0 ]; then
+            exec sudo sh ${0}
+            exit ${?}
+        fi
+    }
+
+    chk_root
+
+    mkdir /tmp/cores
+    chmod -R 1777 /tmp/cores
+    echo "\n* soft core unlimited" >> /etc/security/limits.conf
+    echo "ulimit -c unlimited" >> /etc/profile
+    echo "/tmp/cores/core.%e.%p.%h.%t" > /proc/sys/kernel/core_pattern
+
+Use the script as a bootstrap action in your job::
+
+    --bootstrap-action=core_dump_setup.sh
+
+You'll probably want to use a version of Python with debugging symbols, so
+install it and use it as ``python_bin``::
+
+    --bootstrap-cmd="sudo apt-get install -y python2.6-dbg"
+    --python-bin=python2.6-dbg
+
+Run your job in a persistent job flow. When it fails, you can SSH to your nodes
+to inspect the core dump files::
+
+    you@local: emr --ssh j-MYJOBFLOWID
+
+    hadoop@ip-10-160-75-214:~$ gdb `which python` /tmp/cores/core.python.blah
+
+If you have multiple nodes, you may have to :command:`scp` your identity file
+to the master node and use it to SSH to the slave nodes, where the core dumps
+are located::
+
+    hadoop@ip-10-160-75-214:~$ hadoop dfsadmin -report | grep ^Name
+    Name: 10.166.50.85:9200
+    Name: 10.177.63.114:9200
+
+    hadoop@ip-10-160-75-214:~$ ssh -i uploaded_key.pem 10.166.50.85
+
+    hadoop@ip-10-166-50-85:~$ gdb `which python2.6-dbg` /tmp/cores/core.python.blah
 
 Example configuration file
 --------------------------

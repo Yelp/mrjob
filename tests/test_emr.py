@@ -46,6 +46,7 @@ from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import parse_s3_uri
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
+from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
 from tests.mockboto import MockS3Connection
@@ -963,7 +964,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
     def test_zero_core_instances(self):
         self._test_instance_groups(
             {'ec2_master_instance_type': 'c1.medium',
-             'num_ec2_core_instances' : 0},
+             'num_ec2_core_instances': 0},
             master=(1, 'c1.medium', None))
 
     def test_core_spot_instances(self):
@@ -971,7 +972,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
             {'ec2_master_instance_type': 'm1.large',
              'ec2_core_instance_type': 'c1.medium',
              'ec2_core_instance_bid_price': '0.20',
-             'num_ec2_core_instances' : 5},
+             'num_ec2_core_instances': 5},
             core=(5, 'c1.medium', '0.20'),
             master=(1, 'm1.large', None))
 
@@ -979,7 +980,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large',
              'ec2_core_instance_type': 'c1.medium',
-             'num_ec2_core_instances' : 5},
+             'num_ec2_core_instances': 5},
             core=(5, 'c1.medium', None),
             master=(1, 'm1.large', None))
 
@@ -987,7 +988,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large',
              'ec2_slave_instance_type': 'c1.medium',
-             'num_ec2_instances' : 6},
+             'num_ec2_instances': 6},
             core=(5, 'c1.medium', None),
             master=(1, 'm1.large', None))
 
@@ -995,7 +996,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large',
              'ec2_core_instance_type': 'c1.medium',
-             'num_ec2_core_instances' : 5,
+             'num_ec2_core_instances': 5,
              'ec2_task_instance_type': 'm2.xlarge',
              'num_ec2_task_instances': 20,
              },
@@ -1008,7 +1009,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
             {'ec2_master_instance_type': 'm1.large',
              'ec2_core_instance_type': 'c1.medium',
              'ec2_core_instance_bid_price': '0.20',
-             'num_ec2_core_instances' : 10,
+             'num_ec2_core_instances': 10,
              'ec2_task_instance_type': 'm2.xlarge',
              'ec2_task_instance_bid_price': '1.00',
              'num_ec2_task_instances': 20,
@@ -1020,7 +1021,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large',
              'ec2_core_instance_type': 'c1.medium',
-             'num_ec2_core_instances' : 10,
+             'num_ec2_core_instances': 10,
              'ec2_task_instance_type': 'm2.xlarge',
              'ec2_task_instance_bid_price': '1.00',
              'num_ec2_task_instances': 20,
@@ -1035,7 +1036,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
              'ec2_master_instance_bid_price': '0.50',
              'ec2_core_instance_type': 'c1.medium',
              'ec2_core_instance_bid_price': '0.20',
-             'num_ec2_core_instances' : 10,
+             'num_ec2_core_instances': 10,
              },
             core=(10, 'c1.medium', '0.20'),
             master=(1, 'm1.large', '0.50'))
@@ -1047,6 +1048,57 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
              },
             master=(1, 'm1.large', '0.50'))
 
+    def test_task_type_defaults_to_core_type(self):
+        self._test_instance_groups(
+            {'ec2_core_instance_type': 'c1.medium',
+             'num_ec2_core_instances': 5,
+             'num_ec2_task_instances': 20,
+             },
+            core=(5, 'c1.medium', None),
+            master=(1, 'm1.small', None),
+            task=(20, 'c1.medium', None))
+
+    def test_mixing_instance_number_opts_on_cmd_line(self):
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.emr', stderr)
+            self._test_instance_groups(
+                {'num_ec2_instances': 4,
+                 'num_ec2_core_instances': 10},
+                core=(10, 'm1.small', None),
+                master=(1, 'm1.small', None))
+
+        self.assertIn('does not make sense', stderr.getvalue())
+
+    def test_mixing_instance_number_opts_in_mrjob_conf(self):
+        self.set_in_mrjob_conf(num_ec2_instances=3,
+                               num_ec2_core_instances=5,
+                               num_ec2_task_instances=9)
+
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.emr', stderr)
+            self._test_instance_groups(
+                {},
+                core=(5, 'm1.small', None),
+                master=(1, 'm1.small', None),
+                task=(9, 'm1.small', None))
+
+        self.assertIn('does not make sense', stderr.getvalue())
+
+    def test_cmd_line_instance_numbers_beat_mrjob_conf(self):
+        self.set_in_mrjob_conf(num_ec2_core_instances=5,
+                               num_ec2_task_instances=9)
+
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.emr', stderr)
+            self._test_instance_groups(
+                {'num_ec2_instances': 3},
+                core=(2, 'm1.small', None),
+                master=(1, 'm1.small', None))
+
+        self.assertNotIn('does not make sense', stderr.getvalue())
 
 
 ### tests for error parsing ###

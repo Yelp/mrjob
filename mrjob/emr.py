@@ -461,22 +461,24 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         :param ec2_core_instance_bid_price: when specified and not "0", this
                                             creates the master Hadoop node as
                                             a spot instance at this bid price.
-                                            (You usually only want to set
-                                            bid price for task instances.)
+                                            You usually only want to set
+                                            bid price for task instances.
         :type ec2_master_instance_type: str
         :param ec2_master_instance_type: same as *ec2_instance_type*, but only
                                          for the master Hadoop node. This node
                                          hosts the task tracker and HDFS, and
-                                         runs tasks if there are no other nodes.
-                                         Usually you just want to use
+                                         runs tasks if there are no other
+                                         nodes. Usually you just want to use
                                          *ec2_instance_type*. Defaults to
                                          ``'m1.small'``.
         :type ec2_master_instance_bid_price: str
         :param ec2_master_instance_bid_price: when specified and not "0", this
                                               creates the master Hadoop node as
-                                              a spot instance at this bid price.
-                                              (You usually only want to set
-                                              bid price for task instances.)
+                                              a spot instance at this bid
+                                              price. You usually only want to
+                                              set bid price for task instances
+                                              unless the master instance is
+                                              your only instance.
         :type ec2_slave_instance_type: str
         :param ec2_slave_instance_type: An alias for *ec2_core_instance_type*,
                                         for consistency with the EMR API.
@@ -532,16 +534,17 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                default to Hadoop 0.20 for backwards
                                compatibility with :py:mod:`mrjob` v0.3.0.
         :type num_ec2_core_instances: int
-        :param num_ec2_core_instances: number of core (or "slave") instances to
-                                       start up. If provided, this will
-                                       override *num_ec2_instances*.
-        :type num_ec2_instances: int
-        :param num_ec2_instances: number of instances to start up. Default is
-                                  ``1``.
-        :type num_ec2_task_instances: int
-        :param num_ec2_task_instances: number of task instances to start up. If
-                                       provided, this will override
+        :param num_ec2_core_instances: Number of core (or "slave") instances to
+                                       start up. Incompatible with
                                        *num_ec2_instances*.
+        :type num_ec2_instances: int
+        :param num_ec2_instances: Total number of instances to start up;
+                                  basically the number of core instance you
+                                  want, plus 1 (there is always one master
+                                  instance). Default is ``1``.
+        :type num_ec2_task_instances: int
+        :param num_ec2_task_instances: number of task instances to start up.
+                                       Incompatible with *num_ec2_instances*.
         :type pool_emr_job_flows: bool
         :param pool_emr_job_flows: Try to run the job on a ``WAITING`` pooled
                                    job flow with the same bootstrap
@@ -609,7 +612,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         self._fix_s3_scratch_and_log_uri_opts()
 
-        self._fix_ec2_instance_types()
+        self._fix_ec2_instance_opts()
 
         # pick a tmp dir based on the job name
         self._s3_tmp_uri = self._opts['s3_scratch_uri'] + self._job_name + '/'
@@ -786,7 +789,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             'ssh_bin': combine_cmds,
         })
 
-    def _fix_ec2_instance_types(self):
+    def _fix_ec2_instance_opts(self):
         """If the *ec2_instance_type* option is set, override instance
         type for the nodes that actually run tasks (see Issue #66). Allow
         command-line arguments to override defaults and arguments
@@ -802,7 +805,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # Within EMRJobRunner we only ever use ec2_core_instance_type,
         # but we want ec2_slave_instance_type to be correct in the
         # options dictionary.
-        if (self._opts['ec2_slave_instance_type'] and 
+        if (self._opts['ec2_slave_instance_type'] and
             (self._opt_priority['ec2_slave_instance_type'] >
              self._opt_priority['ec2_core_instance_type'])):
             self._opts['ec2_core_instance_type'] = (
@@ -829,6 +832,15 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 self._opts['num_ec2_instances'] - 1)
             self._opts['num_ec2_task_instances'] = 0
         else:
+            # issue a warning if we used both kinds of instance number
+            # options on the command line or in mrjob.conf
+            if (self._opt_priority['num_ec2_instances'] >= 2 and
+                self._opt_priority['num_ec2_instances'] ==
+                max(self._opt_priority['num_ec2_core_instances'],
+                    self._opt_priority['num_ec2_task_instances'])):
+                log.warn('Mixing num_ec2_instances and'
+                         ' num_ec2_{core,task}_instances does not make sense;'
+                         ' ignoring num_ec2_instances')
             # recalculate number of EC2 instances
             self._opts['num_ec2_instances'] = (
                 1 +
@@ -1270,7 +1282,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         if bid_price and float(bid_price):
             market = 'SPOT'
-            bid_price = str(bid_price) # must be a string
+            bid_price = str(bid_price)  # must be a string
         else:
             market = 'ON_DEMAND'
             bid_price = None
@@ -1329,7 +1341,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 self._opts['ec2_master_instance_bid_price'] or
                 self._opts['ec2_task_instance_bid_price']):
             args['num_instances'] = self._opts['num_ec2_core_instances'] + 1
-            args['master_instance_type'] = self._opts['ec2_master_instance_type']
+            args['master_instance_type'] = (
+                self._opts['ec2_master_instance_type'])
             args['slave_instance_type'] = self._opts['ec2_core_instance_type']
         else:
             # Create a list of InstanceGroups
@@ -2172,20 +2185,19 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         pool_arg = self._pool_arg()
 
-
         # decide memory and total compute units requested for each
         # role type
         role_to_req_mem = {}
         role_to_req_cu = {}
         role_to_req_bid_price = {}
-            
+
         for role in ('core', 'master', 'task'):
             instance_type = self._opts['ec2_%s_instance_type' % role]
             if role == 'master':
                 num_instances = 1
             else:
                 num_instances = self._opts['num_ec2_%s_instances' % role]
-                
+
             role_to_req_bid_price[role] = (
                 self._opts['ec2_%s_instance_bid_price' % role])
 
@@ -2243,7 +2255,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 # if too little memory, bail out
                 if mem < req_mem:
                     return
-                
+
                 # if bid price is too low, don't count compute units
                 req_bid_price = role_to_req_bid_price
                 bid_price = getattr(ig, 'bidprice', None)
@@ -2267,7 +2279,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             sort_key = (role_to_cu['core'] + role_to_cu['task'],
                         role_to_cu['master'],
                         est_time_to_hour(job_flow))
-            
+
             sort_keys_and_job_flows.append((sort_key, job_flow))
 
         for job_flow in emr_conn.describe_jobflows(states=['WAITING']):

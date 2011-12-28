@@ -1248,9 +1248,9 @@ class MRJob(object):
             '--ec2-core-instance-bid-price',
             dest='ec2_core_instance_bid_price', default=None,
             help=(
-                'Bid price to specify for core (or "slave") nodes when '
-                'setting them up as EC2 spot instances (you probably only want '
-                'to set a bid price for task instances).')
+                'Bid price to specify for core (or "slave") nodes when'
+                ' setting them up as EC2 spot instances (you probably only'
+                ' want to set a bid price for task instances).')
             )
 
         self.emr_opt_group.add_option(
@@ -1314,13 +1314,13 @@ class MRJob(object):
             '--num-ec2-core-instances', dest='num_ec2_core_instances',
             default=None, type='int',
             help=('Number of EC2 instances to start as core (or "slave") '
-                  'nodes. Overrides --num-ec2-instances.'))
+                  'nodes. Incompatible with --num-ec2-instances.'))
 
         self.emr_opt_group.add_option(
             '--num-ec2-task-instances', dest='num_ec2_task_instances',
             default=None, type='int',
             help=('Number of EC2 instances to start as task '
-                  'nodes. Overrides --num-ec2-instances.'))
+                  'nodes. Incompatible with --num-ec2-instances.'))
 
         self.emr_opt_group.add_option(
             '--pool-emr-job-flows', dest='pool_emr_job_flows',

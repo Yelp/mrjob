@@ -941,11 +941,6 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
                 type='c1.medium',
                 market='ON_DEMAND',
                 num_instances=1),
-             MockEmrObject(
-                role='CORE',
-                type='m1.small',
-                market='ON_DEMAND',
-                num_instances=0)
             ])
 
     def test_core_spot_instances(self):

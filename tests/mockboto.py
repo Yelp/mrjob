@@ -377,23 +377,31 @@ class MockEmrConnection(object):
             mock_groups = [
                 MockEmrObject(
                     market='ON_DEMAND',
-                    name='',
+                    name='master',
                     num_instances=1,
                     role='MASTER',
                     type=master_instance_type
                     ),
-                MockEmrObject(
-                    market='ON_DEMAND',
-                    name='',
-                    num_instances=(int(num_instances) - 1),
-                    role='CORE',
-                    type=slave_instance_type
+            ]
+            if num_instances > 1:
+                mock_groups.append(
+                    MockEmrObject(
+                        market='ON_DEMAND',
+                        name='core',
+                        num_instances=(num_instances - 1),
+                        role='CORE',
+                        type=slave_instance_type
                     ),
-                ]
+                )
+            # this currently breaks our pooling tests
+            #else:
+            #    # don't display slave instance type if there are no slaves
+            #    slave_instance_type = None
         else:
             self._validate_instance_groups(instance_groups)
             master_instance_type = None
             slave_instance_type = None
+            num_instances = 0
 
             mock_groups = []
             for instance_group in instance_groups:
@@ -412,6 +420,7 @@ class MockEmrConnection(object):
                 elif instance_group.role == 'CORE':
                     slave_instance_type = instance_group.type
                 mock_groups.append(emr_group)
+                num_instances += instance_group.num_instances
 
         job_flow = MockEmrObject(
             availabilityzone=availability_zone,

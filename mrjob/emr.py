@@ -796,13 +796,30 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # Within EMRJobRunner we only ever use ec2_core_instance_type,
         # but we want ec2_slave_instance_type to be correct in the
         # options dictionary.
-        if (self._opt_priority['ec2_core_instance_type'] >=
-            self._opt_priority['ec2_slave_instance_type']):
-            self._opts['ec2_slave_instance_type'] = (
-                self._opts['ec2_core_instance_type'])
-        else:
+        if (self._opt_priority['ec2_slave_instance_type'] >
+            self._opt_priority['ec2_core_instance_type']):
             self._opts['ec2_core_instance_type'] = (
                 self._opts['ec2_slave_instance_type'])
+        else:
+            self._opts['ec2_slave_instance_type'] = (
+                self._opts['ec2_core_instance_type'])
+
+        # Within EMRJobRunner, we use num_ec2_core_instances and
+        # num_ec2_task_instances, not num_ec2_instances. (Number
+        # of master instances is always 1.)
+        if (self._opt_priority['num_ec2_instances'] >
+            max(self._opt_priority['num_ec2_core_instances'],
+                self._opt_priority['num_ec2_task_instances'])):
+            # assume 1 master, n - 1 core, 0 task
+            self._opts['num_ec2_core_instances'] = (
+                self._opts['num_ec2_instances'] - 1)
+            self._opts['num_ec2_task_instances'] = 0
+        else:
+            # recalculate number of EC2 instances
+            self._opts['num_ec2_instances'] = (
+                1 +
+                self._opts['num_ec2_core_instances'] +
+                self._opts['num_ec2_task_instances'])
 
         # Allow ec2 instance type to override other instance types
         ec2_instance_type = self._opts['ec2_instance_type']
@@ -815,8 +832,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 self._opts['ec2_slave_instance_type'] = ec2_instance_type
 
             # master instance only does work when it's the only instance
-            if (self._opts['num_ec2_instances'] == 1 and
-                self._opts['num_ec2_core_instances'] == 0 and
+            if (self._opts['num_ec2_core_instances'] == 0 and
                 self._opts['num_ec2_task_instances'] == 0 and
                 (self._opt_priority['ec2_instance_type'] >
                  self._opt_priority['ec2_master_instance_type'])):
@@ -1239,8 +1255,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             market = 'ON_DEMAND'
             bid_price = None
 
-        # Hard-code the instance group name to something sensible.
-        name = 'mrjob_%s' % role.lower()
+        # Just name the groups "master", "task", and "core"
+        name = role.lower()
 
         return boto_2_1_1_83aae37b.InstanceGroup(
             count, role, instance_type, market, name, bidprice=bid_price
@@ -1286,7 +1302,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         if self._opts['aws_availability_zone']:
             args['availability_zone'] = self._opts['aws_availability_zone']
 
-        if self._opts['num_ec2_core_instances']:
+        if (self._opts['num_ec2_core_instances'] or
+            self._opts['num_ec2_task_instances']):
             # The less common case: create a list of InstanceGroups
             args['instance_groups'] = [
                 self._create_instance_group(
@@ -1316,7 +1333,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                     )
         else:
             # The common case: num_instances/master_instance_type/...
-            args['num_instances'] = str(self._opts['num_ec2_instances'])
+            args['num_instances'] = self._opts['num_ec2_instances']
             args['master_instance_type'] = self._opts['ec2_master_instance_type']
             args['slave_instance_type'] = self._opts['ec2_core_instance_type']
 

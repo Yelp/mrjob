@@ -602,7 +602,7 @@ class MRJobRunner(object):
             self._cleanup_logs()
 
     def counters(self):
-        """Get counters associated with this run in this form:
+        """Get counters associated with this run in this form::
 
             [{'group name': {'counter1': 1, 'counter2': 2}},
              {'group name': ...]

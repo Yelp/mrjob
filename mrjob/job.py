@@ -1312,13 +1312,13 @@ class MRJob(object):
         # instance".
         self.emr_opt_group.add_option(
             '--num-ec2-core-instances', dest='num_ec2_core_instances',
-            default=None,
+            default=None, type='int',
             help=('Number of EC2 instances to start as core (or "slave") '
                   'nodes. Overrides --num-ec2-instances.'))
 
         self.emr_opt_group.add_option(
             '--num-ec2-task-instances', dest='num_ec2_task_instances',
-            default=None,
+            default=None, type='int',
             help=('Number of EC2 instances to start as task '
                   'nodes. Overrides --num-ec2-instances.'))
 

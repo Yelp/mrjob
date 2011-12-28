@@ -1322,9 +1322,17 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         if self._opts['aws_availability_zone']:
             args['availability_zone'] = self._opts['aws_availability_zone']
 
-        if (self._opts['num_ec2_core_instances'] or
-            self._opts['num_ec2_task_instances']):
-            # The less common case: create a list of InstanceGroups
+        # The old, simple API, available if we're not using task instances
+        # or bid prices
+        if not (self._opts['num_ec2_task_instances'] or
+                self._opts['ec2_core_instance_bid_price'] or
+                self._opts['ec2_master_instance_bid_price'] or
+                self._opts['ec2_task_instance_bid_price']):
+            args['num_instances'] = self._opts['num_ec2_core_instances'] + 1
+            args['master_instance_type'] = self._opts['ec2_master_instance_type']
+            args['slave_instance_type'] = self._opts['ec2_core_instance_type']
+        else:
+            # Create a list of InstanceGroups
             args['instance_groups'] = [
                 self._create_instance_group(
                     'MASTER',
@@ -1332,16 +1340,18 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                     1,
                     self._opts['ec2_master_instance_bid_price']
                     ),
-                self._create_instance_group(
-                    'CORE',
-                    self._opts['ec2_core_instance_type'],
-                    self._opts['num_ec2_core_instances'],
-                    self._opts['ec2_core_instance_bid_price']
-                    )
-                ]
+            ]
 
-            # MASTER and CORE instance groups are required;
-            # the initial TASK instance group is optional.
+            if self._opts['num_ec2_core_instances']:
+                args['instance_groups'].append(
+                    self._create_instance_group(
+                        'CORE',
+                        self._opts['ec2_core_instance_type'],
+                        self._opts['num_ec2_core_instances'],
+                        self._opts['ec2_core_instance_bid_price']
+                    )
+                )
+
             if self._opts['num_ec2_task_instances']:
                 args['instance_groups'].append(
                     self._create_instance_group(
@@ -1351,11 +1361,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                         self._opts['ec2_task_instance_bid_price']
                         )
                     )
-        else:
-            # The common case: num_instances/master_instance_type/...
-            args['num_instances'] = self._opts['num_ec2_instances']
-            args['master_instance_type'] = self._opts['ec2_master_instance_type']
-            args['slave_instance_type'] = self._opts['ec2_core_instance_type']
 
         # bootstrap actions
         bootstrap_action_args = []

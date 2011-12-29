@@ -1971,6 +1971,9 @@ class MRJob(object):
 
         To read everything from ``self.stderr`` (including status messages)
         use :py:meth:`mrjob.parse.parse_mr_job_stderr`.
+
+        When writing unit tests, you may find :py:meth:`MRJobRunner.counters()
+        <mrjob.runner.MRJobRunner.counters()>` more useful.
         """
         if self.stderr == sys.stderr:
             raise AssertionError('You must call sandbox() first;'

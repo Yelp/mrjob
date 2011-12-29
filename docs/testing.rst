@@ -169,3 +169,9 @@ example below demonstrates the use of counters in a test case.
                                  [{'group': {'counter_name': 2}},
                                   {'group': {'counter_name': 2}},
                                   {'group': {'counter_name': 2}}])
+
+.. note:: Prior to mrjob 0.3, the recommended way to read counters was
+    with :py:meth:`MRJob.parse_counters() <mrjob.job.MRJob.parse_counters()>`.
+    While that method still works for test
+    cases, :py:meth:`MRJobRunner.counters()
+    <mrjob.runner.MRJobRunner.counters()>` is more general and declarative.

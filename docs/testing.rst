@@ -153,6 +153,7 @@ example below demonstrates the use of counters in a test case.
 
     from tests.mr_counting_job import MRCountingJob
 
+
     class CounterTestCase(unittest.TestCase):
 
         def test_counters(self):

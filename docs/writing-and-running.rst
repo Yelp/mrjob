@@ -164,8 +164,26 @@ mrjob will convert your ``jobconf`` options between Hadoop versions if
 necessary. In this example, either ``jobconf`` line could be removed and the
 timeout would still be changed when using either version of Hadoop.
 
-Setting parameters in mapred-site.xml
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Writing compressed output
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To save space, you can have Hadoop automatically save your job's output as
+compressed files. This can be done using the same method as changing the task
+timeout, with ``jobconf`` and the appropriate environment variables. This
+example uses the Hadoop 0.21+ version::
+
+    runners:
+        hadoop: # this will work for both hadoop and emr
+            jobconf:
+               # "true" must be a string argument, not a boolean! (#323)
+               mapreduce.output.compress: "true"
+               mapreduce.output.compression.codec: org.apache.hadoop.io.compress.GzipCodec
+
+Common EMR configuration tasks
+------------------------------
+
+Setting parameters in mapred-site.xml on EMR
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Some Hadoop options, such as the maximum number of running map tasks per node,
 must be set at bootstrap time and will not work with `--jobconf`. You must use
@@ -176,8 +194,19 @@ number of mappers and reducers to one per node::
     -m mapred.tasktracker.map.tasks.maximum=1 \
     -m mapred.tasktracker.reduce.tasks.maximum=1"
 
-Enabling Python Core Dumps
---------------------------
+Setting up Ganglia
+^^^^^^^^^^^^^^^^^^
+
+`Ganglia <http://www.ganglia.info>`_` is a scalable distributed monitoring
+system for high-performance computing systems. You can enable it for your
+EMR cluster with Amazon's `install-ganglia`_ bootstrap action::
+
+    --bootstrap-action="s3://elasticmapreduce/bootstrap-actions/install-ganglia
+
+.. _install-ganglia: http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?init_Ganglia.html
+
+Enabling Python core dumps
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Particularly bad errors may leave no traceback in the logs. To enable core
 dumps on your EMR instances, put this script in ``core_dump_bootstrap.sh``::

@@ -605,7 +605,7 @@ class MRJobRunner(object):
         """Get counters associated with this run in this form::
 
             [{'group name': {'counter1': 1, 'counter2': 2}},
-             {'group name': ...]
+             {'group name': ...}]
 
         The list contains an entry for every step of the current job, ignoring
         earlier steps in the same job flow.

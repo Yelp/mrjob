@@ -1920,9 +1920,8 @@ class MRJob(object):
         You can set stdin, stdout, and stderr to file objects. By
         default, they'll be set to empty ``StringIO`` objects.
         You can then access the job's file handles through ``self.stdin``,
-        ``self.stdout``, and ``self.stderr``. You can use
-        :py:meth:`parse_counters` to read counters from stderr, or
-        :py:func:`mrjob.parse.parse_mr_job_stderr` for more complex testing.
+        ``self.stdout``, and ``self.stderr``. See :ref:`testing` for more
+        information about testing.
 
         You may call sandbox multiple times (this will essentially clear
         the file handles).

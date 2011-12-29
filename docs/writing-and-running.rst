@@ -235,7 +235,7 @@ Use the script as a bootstrap action in your job::
 You'll probably want to use a version of Python with debugging symbols, so
 install it and use it as ``python_bin``::
 
-    --bootstrap-cmd="sudo apt-get install -y python2.6-dbg"
+    --bootstrap-cmd="sudo apt-get install -y python2.6-dbg" \
     --python-bin=python2.6-dbg
 
 Run your job in a persistent job flow. When it fails, you can SSH to your nodes

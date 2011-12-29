@@ -2272,7 +2272,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 # are the same, we're okay
                 if bid_price and bid_price != req_bid_price:
                     # whoops, we didn't want spot instances at all
-                    if bid_price and not req_bid_price:
+                    if not req_bid_price:
                         continue
 
                     try:
@@ -2295,7 +2295,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
             # check if there are enough compute units
             for role, req_cu in role_to_req_cu.iteritems():
-                cu = role_to_req_cu.get(role, 0.0)
+                cu = role_to_cu.get(role, 0.0)
                 if cu < req_cu:
                     return
 

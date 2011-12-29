@@ -194,22 +194,15 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
                           '3\tqux\n', '3\tqux\n', '3\tqux\n'])
 
     def test_multi_step_counters(self):
-        # read from STDIN, a regular file, and a .gz
         stdin = StringIO('foo\nbar\n')
 
         mr_job = MRCountingJob(['-c', self.mrjob_conf_path, '-'])
         mr_job.sandbox(stdin=stdin)
 
-        results = []
-
         with mr_job.make_runner() as runner:
             runner.run()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
-
-            self.assertEqual(runner._counters,
+            self.assertEqual(runner.counters(),
                              [{'group': {'counter_name': 2}},
                               {'group': {'counter_name': 2}},
                               {'group': {'counter_name': 2}}])

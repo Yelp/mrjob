@@ -827,7 +827,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
                           'instancetype', 'market'):
                 if hasattr(ig, field):
                     info[field] = getattr(ig, field)
-            role_to_actual[ig.role] = info
+            role_to_actual[ig.instancerole] = info
 
         self.assertEqual(role_to_expected, role_to_actual)
 
@@ -1047,6 +1047,34 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
              'ec2_master_instance_bid_price': '0.50',
              },
             master=(1, 'm1.large', '0.50'))
+
+    def test_zero_bid_price_means_on_demand(self):
+        self._test_instance_groups(
+            {'ec2_master_instance_bid_price': '0',
+             },
+            master=(1, 'm1.small', None))
+
+        self._test_instance_groups(
+            {'num_ec2_core_instances': 3,
+             'ec2_core_instance_bid_price': '0.00',
+             },
+            core=(3, 'm1.small', None),
+            master=(1, 'm1.small', None))
+
+        self._test_instance_groups(
+            {'num_ec2_core_instances': 3,
+             'num_ec2_task_instances': 5,
+             'ec2_task_instance_bid_price': '',
+             },
+            core=(3, 'm1.small', None),
+            master=(1, 'm1.small', None),
+            task=(5, 'm1.small', None))
+
+    def test_pass_invalid_bid_prices_through_to_emr(self):
+        self.assertRaises(
+            boto.exception.EmrResponseError,
+            self._test_instance_groups,
+            {'ec2_master_instance_bid_price': 'all the gold in California'})
 
     def test_task_type_defaults_to_core_type(self):
         self._test_instance_groups(

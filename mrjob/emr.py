@@ -872,8 +872,16 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # convert a bid price of '0' to None
         for role in ('core', 'master', 'task'):
             opt_name = 'ec2_%s_instance_bid_price' % role
-            if not (self._opts[opt_name] and float(self._opts[opt_name])):
+            if not self._opts[opt_name]:
                 self._opts[opt_name] = None
+            else:
+                # convert "0", "0.00" etc. to None
+                try:
+                    value = float(self._opts[opt_name])
+                    if value == 0:
+                        self._opts[opt_name] = None
+                except ValueError:
+                    pass  # maybe EMR will accept non-floats?
 
     def _fix_s3_scratch_and_log_uri_opts(self):
         """Fill in s3_scratch_uri and s3_log_uri (in self._opts) if they
@@ -1280,7 +1288,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 raise ValueError('Missing instance type for %s node(s)'
                     % role)
 
-        if bid_price and float(bid_price):
+        if bid_price:
             market = 'SPOT'
             bid_price = str(bid_price)  # must be a string
         else:
@@ -2244,7 +2252,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
             for ig in job_flow.instancegroups:
-                role = ig.role.lower()
+                role = ig.instancerole.lower()
 
                 # unknown, new kind of role; bail out!
                 if role not in ('core', 'master', 'task'):
@@ -2263,7 +2271,11 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                     (not req_bid_price or req_bid_price > bid_price)):
                     continue
 
-                cu = (int(ig.instancerunningcount) *
+                # don't require instances to be running; we'd be worse off if
+                # we started our own job flow from scratch. (This can happen if
+                # the previous job finished while some task instances were
+                # still being provisioned.)
+                cu = (int(ig.instancerequestcount) *
                       EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(
                           ig.instancetype, 0.0))
                 role_to_cu.setdefault(role, 0.0)

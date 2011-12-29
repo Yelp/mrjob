@@ -367,23 +367,23 @@ class MockEmrConnection(object):
         if not instance_groups:
             mock_groups = [
                 MockEmrObject(
+                    instancerequestcount='1',
+                    instancerole='MASTER',
+                    instancerunningcount='0',
                     instancetype=master_instance_type,
                     market='ON_DEMAND',
                     name='master',
-                    instancerequestcount='1',
-                    instancerunningcount='0',
-                    role='MASTER',
                 ),
             ]
             if num_instances > 1:
                 mock_groups.append(
                     MockEmrObject(
                         instancerequestcount=str(num_instances - 1),
+                        instancerole='CORE',
                         instancerunningcount='0',
                         instancetype=slave_instance_type,
                         market='ON_DEMAND',
                         name='core',
-                        role='CORE',
                     ),
                 )
             else:
@@ -404,14 +404,32 @@ class MockEmrConnection(object):
 
                 emr_group = MockEmrObject(
                     instancerequestcount=str(instance_group.num_instances),
+                    instancerole=instance_group.role,
                     instancerunningcount='0',
                     instancetype=instance_group.type,
                     market=instance_group.market,
                     name=instance_group.name,
-                    role=instance_group.role,
                 )
                 if instance_group.market == 'SPOT':
-                    emr_group.bidprice = instance_group.bidprice
+                    bid_price = instance_group.bidprice
+
+                    # simulate EMR's bid price validation
+                    try:
+                        float(bid_price)
+                    except (TypeError, ValueError):
+                        raise boto.exception.EmrResponseError(
+                            400, 'Bad Request', body=err_xml(
+                            'The bid price supplied for an instance group is'
+                            ' invalid'))
+
+                    if ('.' in bid_price and
+                        len(bid_price.split('.', 1)[1]) > 3):
+                        raise boto.exception.EmrResponseError(
+                            400, 'Bad Request', body=err_xml(
+                            'No more than 3 digits are allowed after decimal'
+                            ' place in bid price'))
+
+                    emr_group.bidprice = bid_price
 
                 if instance_group.role in roles:
                     role_desc = instance_group.role.lower()
@@ -445,8 +463,8 @@ class MockEmrConnection(object):
                 if 'MASTER' not in roles:
                     raise boto.exception.EmrResponseError(
                         400, 'Bad Request', body=err_xml(
-                        'Zero master instance groups supplied, you must specify'
-                        ' exactly one master instance group'))
+                        'Zero master instance groups supplied, you must'
+                        ' specify exactly one master instance group'))
 
         job_flow = MockEmrObject(
             availabilityzone=availability_zone,

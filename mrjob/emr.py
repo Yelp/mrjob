@@ -2265,11 +2265,23 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                     return
 
                 # if bid price is too low, don't count compute units
-                req_bid_price = role_to_req_bid_price
+                req_bid_price = role_to_req_bid_price[role]
                 bid_price = getattr(ig, 'bidprice', None)
-                if (bid_price and
-                    (not req_bid_price or req_bid_price > bid_price)):
-                    continue
+
+                # if the instance is on-demand (no bid price) or bid prices
+                # are the same, we're okay
+                if bid_price and bid_price != req_bid_price:
+                    # whoops, we didn't want spot instances at all
+                    if bid_price and not req_bid_price:
+                        continue
+
+                    try:
+                        if float(req_bid_price) > float(bid_price):
+                            continue
+                    except ValueError:
+                        # we don't know what to do with non-float bid prices,
+                        # and we know it's not equal to what we requested
+                        continue
 
                 # don't require instances to be running; we'd be worse off if
                 # we started our own job flow from scratch. (This can happen if

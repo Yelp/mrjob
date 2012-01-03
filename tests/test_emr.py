@@ -1899,22 +1899,6 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         except (OSError, AttributeError):
             pass  # didn't set up SSH
 
-    def sorted_results_for_runner_with_args(self, job_args,
-                                            job_class=MRTwoStepJob):
-        mr_job = job_class(job_args)
-        mr_job.sandbox()
-
-        results = []
-        with mr_job.make_runner() as runner:
-            self.prepare_runner_for_ssh(runner)
-            runner.run()
-
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
-
-        return sorted(results)
-
     def make_pooled_job_flow(self, name=None, minutes_ago=0, **kwargs):
         """Returns (runner, job_flow_id). Set minutes_ago to set
         jobflow.startdatetime to seconds before datetime.datetime.now()."""
@@ -1929,6 +1913,52 @@ class PoolingTestCase(MockEMRAndS3TestCase):
                  datetime.timedelta(minutes=minutes_ago))
         jf.startdatetime = start.strftime(boto.utils.ISO8601)
         return runner, job_flow_id
+
+    def get_job_flow_and_results(self, job_args, mock_output=(),
+                                 job_class=MRTwoStepJob):
+        mr_job = job_class(job_args)
+        mr_job.sandbox()
+
+        results = []
+        with mr_job.make_runner() as runner:
+            self.prepare_runner_for_ssh(runner)
+            runner.run()
+
+            job_flow_id = runner.get_emr_job_flow_id()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+        return job_flow_id, sorted(results)
+
+    def assertJoins(self, job_flow_id, job_args, job_class=MRTwoStepJob,
+                    check_output=True):
+
+        if check_output:
+            mock_output = ['1\t"bar"\n1\t"foo"\n2\tnull\n']
+
+            steps_in_jf = len(self.mock_emr_job_flows[job_flow_id].steps)
+            steps_in_job = len(job_class(job_args).steps())
+            step_num = steps_in_jf + steps_in_job - 1
+
+            self.mock_emr_output[(job_flow_id, step_num)] = mock_output
+
+        actual_job_flow_id, results = self.get_job_flow_and_results(
+            job_args, job_class=job_class, mock_output=mock_output)
+
+        self.assertEqual(actual_job_flow_id, job_flow_id)
+
+        if check_output:
+            self.assertEqual(results,
+                             [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def assertDoesNotJoin(self, job_flow_id, job_args, job_class=MRTwoStepJob):
+
+        actual_job_flow_id, _ = self.get_job_flow_and_results(
+            job_args, job_class=job_class)
+
+        self.assertNotEqual(actual_job_flow_id, job_flow_id)
 
     def make_simple_runner(self, pool_name):
         """Make an EMRJobRunner that is ready to try to find a pool to join"""
@@ -1963,108 +1993,247 @@ class PoolingTestCase(MockEMRAndS3TestCase):
     def test_join_pooled_job_flow(self):
         _, job_flow_id = self.make_pooled_job_flow()
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '-c', self.mrjob_conf_path])
-        self.assertEqual(results,
-                         [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_join_named_pool(self):
         _, job_flow_id = self.make_pooled_job_flow('pool1')
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--pool-name', 'pool1',
             '-c', self.mrjob_conf_path])
-        self.assertEqual(results,
-                         [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_pooling_with_hadoop_version(self):
         _, job_flow_id = self.make_pooled_job_flow(hadoop_version='0.18')
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--hadoop-version', '0.18',
             '-c', self.mrjob_conf_path])
-        self.assertEqual(results,
-                         [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_join_pool_with_wrong_hadoop_version(self):
         _, job_flow_id = self.make_pooled_job_flow(hadoop_version='0.18')
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--hadoop-version', '0.20',
             '-c', self.mrjob_conf_path])
-        self.assertNotEqual(results,
-                            [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_pooling_with_ami_version(self):
         _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0')
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ami-version', '2.0',
             '-c', self.mrjob_conf_path])
-        self.assertEqual(results,
-                         [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_join_pool_with_wrong_ami_version(self):
         _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0')
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ami-version', '1.0',
             '-c', self.mrjob_conf_path])
-        self.assertNotEqual(results,
-                            [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_pooling_with_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
         _, job_flow_id = self.make_pooled_job_flow(
             additional_emr_info=info)
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--additional-emr-info', info,
             '-c', self.mrjob_conf_path])
-        self.assertEqual(results,
-                         [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_join_pool_with_wrong_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
         _, job_flow_id = self.make_pooled_job_flow()
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--additional-emr-info', info,
             '-c', self.mrjob_conf_path])
-        self.assertNotEqual(results,
-                            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+    def test_join_pool_with_same_instance_type_and_count(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_instance_type='m2.4xlarge',
+            num_ec2_instances=20)
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-instance-type', 'm2.4xlarge',
+            '--num-ec2-instances', '20',
+            '-c', self.mrjob_conf_path])
+
+    def test_join_pool_with_more_of_same_instance_type(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_instance_type='m2.4xlarge',
+            num_ec2_instances=20)
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-instance-type', 'm2.4xlarge',
+            '--num-ec2-instances', '5',
+            '-c', self.mrjob_conf_path])
+
+    def test_join_job_flow_with_bigger_instances(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_instance_type='m2.4xlarge',
+            num_ec2_instances=20)
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-instance-type', 'm1.small',
+            '--num-ec2-instances', '20',
+            '-c', self.mrjob_conf_path])
+
+    def test_join_job_flow_with_enough_cpu_and_memory(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_instance_type='c1.xlarge',
+            num_ec2_instances=3)
+
+        # join the pooled job flow even though it has less instances total,
+        # since they're have enough memory and CPU
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-instance-type', 'm1.small',
+            '--num-ec2-instances', '10',
+            '-c', self.mrjob_conf_path])
+
+    def test_dont_join_job_flow_with_instances_with_too_little_memory(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_instance_type='c1.xlarge',
+            num_ec2_instances=20)
+
+        self.assertDoesNotJoin(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-instance-type', 'm2.4xlarge',
+            '--num-ec2-instances', '2',
+            '-c', self.mrjob_conf_path])
+
+    def test_master_instance_has_to_be_big_enough(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_instance_type='c1.xlarge',
+            num_ec2_instances=10)
+
+        # We implicitly want a MASTER instance with c1.xlarge. The pooled
+        # job flow has an m1.small master instance and 9 c1.xlarge core
+        # instances, which doesn't match.
+        self.assertDoesNotJoin(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-instance-type', 'c1.xlarge',
+            '--num-ec2-instances', '1',
+            '-c', self.mrjob_conf_path])
+
+    def test_unknown_instance_type_against_matching_pool(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_instance_type='a1.sauce',
+            num_ec2_instances=10)
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-instance-type', 'a1.sauce',
+            '--num-ec2-instances', '10',
+            '-c', self.mrjob_conf_path])
+
+    def test_unknown_instance_type_against_pool_with_more_instances(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_instance_type='a1.sauce',
+            num_ec2_instances=20)
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-instance-type', 'a1.sauce',
+            '--num-ec2-instances', '10',
+            '-c', self.mrjob_conf_path])
+
+    def test_unknown_instance_type_against_pool_with_less_instances(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_instance_type='a1.sauce',
+            num_ec2_instances=5)
+
+        self.assertDoesNotJoin(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-instance-type', 'a1.sauce',
+            '--num-ec2-instances', '10',
+            '-c', self.mrjob_conf_path])
+
+    def test_unknown_instance_type_against_other_instance_types(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_instance_type='m2.4xlarge',
+            num_ec2_instances=100)
+
+        # for all we know, "a1.sauce" instances have even more memory and CPU
+        # than m2.4xlarge
+        self.assertDoesNotJoin(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-instance-type', 'a1.sauce',
+            '--num-ec2-instances', '2',
+            '-c', self.mrjob_conf_path])
+
+    def test_can_join_job_flow_with_same_bid_price(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_master_instance_bid_price='0.25')
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-master-instance-bid-price', '0.25',
+            '-c', self.mrjob_conf_path])
+
+    def test_can_join_job_flow_with_higher_bid_price(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_master_instance_bid_price='25.00')
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-master-instance-bid-price', '0.25',
+            '-c', self.mrjob_conf_path])
+
+    def test_cant_join_job_flow_with_lower_bid_price(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_master_instance_bid_price='0.25',
+            num_ec2_instances=100)
+
+        self.assertDoesNotJoin(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-master-instance-bid-price', '25.00',
+            '-c', self.mrjob_conf_path])
+
+    def test_on_demand_satisfies_any_bid_price(self):
+        _, job_flow_id = self.make_pooled_job_flow()
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ec2-master-instance-bid-price', '25.00',
+            '-c', self.mrjob_conf_path])
+
+    def test_no_bid_price_satisfies_on_demand(self):
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_master_instance_bid_price='25.00')
+
+        self.assertDoesNotJoin(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-c', self.mrjob_conf_path])
+
+    def test_core_and_task_instance_types(self):
+        # a tricky test that mixes and matches different criteria
+        _, job_flow_id = self.make_pooled_job_flow(
+            ec2_core_instance_bid_price='0.25',
+            ec2_task_instance_bid_price='25.00',
+            ec2_task_instance_type='c1.xlarge',
+            num_ec2_core_instances=2,
+            num_ec2_task_instances=3)
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--num-ec2-core-instances', '2',
+            '--num-ec2-task-instances', '10',  # more instances, but smaller
+            '--ec2-core-instance-bid-price', '0.10',
+            '--ec2-master-instance-bid-price', '77.77',
+            '--ec2-task-instance-bid-price', '22.00',
+            '-c', self.mrjob_conf_path])
 
     def test_can_turn_off_pooling_from_cmd_line(self):
         # turn on pooling in mrjob.conf
@@ -2092,46 +2261,34 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
 
         # fill the job flow
-        jf = dummy_runner.make_emr_conn().describe_jobflow(job_flow_id)
-        jf.steps = 'FAKE_STEP' * 255 
+        self.mock_emr_job_flows[job_flow_id].steps = 255 * [
+            MockEmrObject(
+                state='COMPLETED',
+                name='dummy',
+                actiononfailure='CANCEL_AND_WAIT',
+                args=[])]
 
         # a two-step job shouldn't fit
-        self.mock_emr_output = {(job_flow_id, 257): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--pool-name', 'pool1',
             '-c', self.mrjob_conf_path],
             job_class=MRTwoStepJob)
-        self.assertNotEqual(results,
-                            [(1, 'bar'), (1, 'foo'), (2, None)])
 
         # but a one-step job should fit
-        self.mock_emr_output = {(job_flow_id, 256): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--pool-name', 'pool1',
             '-c', self.mrjob_conf_path],
             job_class=MRWordCount)
-        self.assertNotEqual(results,
-                            [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_join_wrong_named_pool(self):
         _, job_flow_id = self.make_pooled_job_flow('pool1')
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--pool-name', 'not_pool1',
             '-c', self.mrjob_conf_path])
-
-        self.assertNotEqual(results,
-                            [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_join_wrong_mrjob_version(self):
         _, job_flow_id = self.make_pooled_job_flow('pool1')
@@ -2141,18 +2298,12 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         try:
             mrjob.__version__ = 'OVER NINE THOUSAAAAAND'
 
-            self.mock_emr_output = {(job_flow_id, 1): [
-                '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-            results = self.sorted_results_for_runner_with_args([
+            self.assertDoesNotJoin(job_flow_id, [
                 '-r', 'emr', '-v', '--pool-emr-job-flows',
                 '--pool-name', 'not_pool1',
                 '-c', self.mrjob_conf_path])
         finally:
             mrjob.__version__ = old_version
-
-        self.assertNotEqual(results,
-                            [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_join_similarly_bootstrapped_pool(self):
         local_input_path = os.path.join(self.tmp_dir, 'input')
@@ -2162,16 +2313,10 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         _, job_flow_id = self.make_pooled_job_flow(
             bootstrap_files=[local_input_path])
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--bootstrap-file', local_input_path,
             '-c', self.mrjob_conf_path])
-
-        self.assertEqual(results,
-                         [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_join_differently_bootstrapped_pool(self):
         local_input_path = os.path.join(self.tmp_dir, 'input')
@@ -2180,16 +2325,10 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         _, job_flow_id = self.make_pooled_job_flow()
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--bootstrap-file', local_input_path,
             '-c', self.mrjob_conf_path])
-
-        self.assertNotEqual(results,
-                            [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_join_differently_bootstrapped_pool_2(self):
         local_input_path = os.path.join(self.tmp_dir, 'input')
@@ -2202,18 +2341,12 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         _, job_flow_id = self.make_pooled_job_flow()
 
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
+        self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--bootstrap-action', bootstrap_path + ' a b c',
             '-c', self.mrjob_conf_path])
 
-        self.assertNotEqual(results,
-                            [(1, 'bar'), (1, 'foo'), (2, None)])
-
-    def test_pool_competition(self):
+    def test_pool_contention(self):
         _, job_flow_id = self.make_pooled_job_flow('robert_downey_jr')
 
         def runner_plz():

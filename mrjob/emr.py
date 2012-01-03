@@ -2163,31 +2163,30 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def usable_job_flows(self, emr_conn=None, exclude=None, num_steps=1):
         """Get job flows that this runner can use.
 
-        To be usable, a job flow must:
+        We basically expect to only join available job flows with the exact
+        same setup as our own, that is:
 
-        - be set up for pooling, with the same pool name
-        - be available
-        - have enough space for our steps
-        - be bootstrapped the same way (including mrjob version)
+        - same bootstrap setup (including mrjob version)
         - have the same Hadoop and AMI version
-        - have no instances with less memory than we request for instances
-          of that type (master, task, core)
-        - have at least as many compute units as we request. If we have a bid
-          price for a given type of instance, we only count instances with a
-          bid price at least that high, otherwise, we only count on-demand
-          instances.
+        - same number and type of instances
+
+        However, we allow joining job flows where for each role, every instance
+        has at least as much memory as we require, and the total number of
+        compute units is at least what we require.
+
+        There also must be room for our job in the job flow (job flows top out
+        at 256 steps).
 
         We then sort by:
         - total compute units for core + task nodes
         - total compute units for master node
         - time left to an even instance hour
 
-        Put most desirable job flows *last*.
+        The most desirable job flows come *last* in the list.
 
         :return: list of (job_minutes_float,
                  :py:class:`botoemr.emrobject.JobFlow`)
         """
-
         emr_conn = emr_conn or self.make_emr_conn()
         exclude = exclude or set()
 
@@ -2195,6 +2194,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         # decide memory and total compute units requested for each
         # role type
+        role_to_req_instance_type = {}
+        role_to_req_num_instances = {}
         role_to_req_mem = {}
         role_to_req_cu = {}
         role_to_req_bid_price = {}
@@ -2206,14 +2207,19 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             else:
                 num_instances = self._opts['num_ec2_%s_instances' % role]
 
+            role_to_req_instance_type[role] = instance_type
+            role_to_req_num_instances[role] = num_instances
+
             role_to_req_bid_price[role] = (
                 self._opts['ec2_%s_instance_bid_price' % role])
 
+            # unknown instance types can only match themselves
             role_to_req_mem[role] = (
-                EC2_INSTANCE_TYPE_TO_MEMORY.get(instance_type, 0.0))
+                EC2_INSTANCE_TYPE_TO_MEMORY.get(instance_type, float('Inf')))
             role_to_req_cu[role] = (
                 num_instances *
-                EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(instance_type, 0.0))
+                EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(instance_type,
+                                                       float('Inf')))
 
         sort_keys_and_job_flows = []
 
@@ -2247,7 +2253,11 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             if len(job_flow.steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
                 return
 
-            role_to_cu = defaultdict(float)  # total compute units per group
+            # total compute units per group
+            role_to_cu = defaultdict(float)
+            # total number of instances of the same type in each group.
+            # This allows us to match unknown instance types.
+            role_to_matched_instances = defaultdict(int)
 
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
@@ -2258,11 +2268,13 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 if role not in ('core', 'master', 'task'):
                     return
 
-                mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig.instancetype, 0.0)
-                req_mem = role_to_req_mem.get(role, 0.0)
-                # if too little memory, bail out
-                if mem < req_mem:
-                    return
+                req_instance_type = role_to_req_instance_type[role]
+                if ig.instancetype != req_instance_type:
+                    # if too little memory, bail out
+                    mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig.instancetype, 0.0)
+                    req_mem = role_to_req_mem.get(role, 0.0)
+                    if mem < req_mem:
+                        return
 
                 # if bid price is too low, don't count compute units
                 req_bid_price = role_to_req_bid_price[role]
@@ -2293,11 +2305,20 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 role_to_cu.setdefault(role, 0.0)
                 role_to_cu[role] += cu
 
+                # track number of instances of the same type
+                if ig.instancetype == req_instance_type:
+                    role_to_matched_instances[role] += (
+                        int(ig.instancerequestcount))
+
             # check if there are enough compute units
             for role, req_cu in role_to_req_cu.iteritems():
-                cu = role_to_cu.get(role, 0.0)
-                if cu < req_cu:
-                    return
+                req_num_instances = role_to_req_num_instances[role]
+                # if we have at least as many units of the right type,
+                # don't bother counting compute units
+                if req_num_instances > role_to_matched_instances[role]:
+                    cu = role_to_cu.get(role, 0.0)
+                    if cu < req_cu:
+                        return
 
             # make a sort key
             sort_key = (role_to_cu['core'] + role_to_cu['task'],

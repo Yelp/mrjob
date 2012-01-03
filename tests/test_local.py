@@ -37,7 +37,7 @@ from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_test_jobconf import MRTestJobConf
-from tests.mr_wordcount import MRWordCount
+from tests.mr_word_count import MRWordCount
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.quiet import no_handlers_for_logger

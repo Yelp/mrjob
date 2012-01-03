@@ -49,17 +49,18 @@ from mrjob.ssh import SSH_PREFIX
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
-from tests.mockboto import MockS3Connection
+from tests.mockboto import DEFAULT_MAX_JOB_FLOWS_RETURNED
 from tests.mockboto import MockEmrConnection
 from tests.mockboto import MockEmrObject
+from tests.mockboto import MockS3Connection
 from tests.mockboto import add_mock_s3_data
-from tests.mockboto import DEFAULT_MAX_JOB_FLOWS_RETURNED
 from tests.mockboto import to_iso8601
 from tests.mockssh import create_mock_ssh_script
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
-from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
+from tests.mr_two_step_job import MRTwoStepJob
+from tests.mr_word_count import MRWordCount
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 
@@ -1048,7 +1049,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
              },
             master=(1, 'm1.large', '0.50'))
 
-    def test_zero_bid_price_means_on_demand(self):
+    def test_zero_or_blank_bid_price_means_on_demand(self):
         self._test_instance_groups(
             {'ec2_master_instance_bid_price': '0',
              },
@@ -1898,8 +1899,9 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         except (OSError, AttributeError):
             pass  # didn't set up SSH
 
-    def sorted_results_for_runner_with_args(self, job_args):
-        mr_job = MRTwoStepJob(job_args)
+    def sorted_results_for_runner_with_args(self, job_args,
+                                            job_class=MRTwoStepJob):
+        mr_job = job_class(job_args)
         mr_job.sandbox()
 
         results = []
@@ -2089,29 +2091,31 @@ class PoolingTestCase(MockEMRAndS3TestCase):
     def test_dont_join_full_job_flow(self):
         dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
 
-        # insert first item
-        self.mock_emr_output = {(job_flow_id, 1): [
-            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
-
-        results = self.sorted_results_for_runner_with_args([
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--pool-name', 'pool1',
-            '-c', self.mrjob_conf_path])
-        self.assertEqual(results,
-                         [(1, 'bar'), (1, 'foo'), (2, None)])
-
-        # copy it
+        # fill the job flow
         jf = dummy_runner.make_emr_conn().describe_jobflow(job_flow_id)
-        jf.steps = jf.steps * 128
+        jf.steps = 'FAKE_STEP' * 255 
 
-        # make sure next attempt at joining uses new job flow
+        # a two-step job shouldn't fit
         self.mock_emr_output = {(job_flow_id, 257): [
             '1\t"bar"\n1\t"foo"\n2\tnull\n']}
 
         results = self.sorted_results_for_runner_with_args([
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--pool-name', 'pool1',
-            '-c', self.mrjob_conf_path])
+            '-c', self.mrjob_conf_path],
+            job_class=MRTwoStepJob)
+        self.assertNotEqual(results,
+                            [(1, 'bar'), (1, 'foo'), (2, None)])
+
+        # but a one-step job should fit
+        self.mock_emr_output = {(job_flow_id, 256): [
+            '1\t"bar"\n1\t"foo"\n2\tnull\n']}
+
+        results = self.sorted_results_for_runner_with_args([
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', 'pool1',
+            '-c', self.mrjob_conf_path],
+            job_class=MRWordCount)
         self.assertNotEqual(results,
                             [(1, 'bar'), (1, 'foo'), (2, None)])
 

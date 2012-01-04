@@ -451,12 +451,12 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         :type ec2_key_pair_file: str
         :param ec2_key_pair_file: path to file containing the SSH key for EMR
         :type ec2_core_instance_type: str
-        :param ec2_core_instance_type: same as *ec2_instance_type*, but only
-                                        for the core (also know as "slave")
-                                        Hadoop nodes; these nodes run tasks and
-                                        host HDFS. Usually you just want to use
-                                        *ec2_instance_type*. Defaults to
-                                        ``'m1.small'``.
+        :param ec2_core_instance_type: like *ec2_instance_type*, but only
+                                       for the core (also know as "slave")
+                                       Hadoop nodes; these nodes run tasks and
+                                       host HDFS. Usually you just want to use
+                                       *ec2_instance_type*. Defaults to
+                                       ``'m1.small'``.
         :type ec2_core_instance_bid_price: str
         :param ec2_core_instance_bid_price: when specified and not "0", this
                                             creates the master Hadoop node as
@@ -464,7 +464,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                             You usually only want to set
                                             bid price for task instances.
         :type ec2_master_instance_type: str
-        :param ec2_master_instance_type: same as *ec2_instance_type*, but only
+        :param ec2_master_instance_type: like *ec2_instance_type*, but only
                                          for the master Hadoop node. This node
                                          hosts the task tracker and HDFS, and
                                          runs tasks if there are no other
@@ -483,13 +483,13 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         :param ec2_slave_instance_type: An alias for *ec2_core_instance_type*,
                                         for consistency with the EMR API.
         :type ec2_task_instance_type: str
-        :param ec2_task_instance_type: same as *ec2_instance_type*, but only
-                                        for the task Hadoop nodes; these nodes
-                                        run tasks but do not host HDFS. Usually
-                                        you just want to use
-                                        *ec2_instance_type*. Defaults to
-                                        the same instance type as
-                                        *ec2_core_instance_type*.
+        :param ec2_task_instance_type: like *ec2_instance_type*, but only
+                                       for the task Hadoop nodes; these nodes
+                                       run tasks but do not host HDFS. Usually
+                                       you just want to use
+                                       *ec2_instance_type*. Defaults to
+                                       the same instance type as
+                                       *ec2_core_instance_type*.
         :param ec2_task_instance_bid_price: when specified and not "0", this
                                             creates the master Hadoop node as
                                             a spot instance at this bid price.
@@ -535,16 +535,26 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                compatibility with :py:mod:`mrjob` v0.3.0.
         :type num_ec2_core_instances: int
         :param num_ec2_core_instances: Number of core (or "slave") instances to
-                                       start up. Incompatible with
-                                       *num_ec2_instances*.
+                                       start up. These run your job and host
+                                       HDFS. Incompatible with
+                                       *num_ec2_instances*. This is in addition
+                                       to the single master instance.
         :type num_ec2_instances: int
         :param num_ec2_instances: Total number of instances to start up;
                                   basically the number of core instance you
                                   want, plus 1 (there is always one master
-                                  instance). Default is ``1``.
+                                  instance). Default is ``1``. Incompatible
+                                  with *num_ec2_core_instances* and
+                                  *num_ec2_task_instances*.
         :type num_ec2_task_instances: int
         :param num_ec2_task_instances: number of task instances to start up.
-                                       Incompatible with *num_ec2_instances*.
+                                       These run your job but do not host
+                                       HDFS. Incompatible with
+                                       *num_ec2_instances*. If you use this,
+                                       you must set *num_ec2_core_instances*;
+                                       EMR does not allow you to run task
+                                       instances without core instances (because
+                                       there's nowhere to host HDFS).
         :type pool_emr_job_flows: bool
         :param pool_emr_job_flows: Try to run the job on a ``WAITING`` pooled
                                    job flow with the same bootstrap

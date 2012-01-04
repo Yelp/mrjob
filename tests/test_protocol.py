@@ -23,6 +23,7 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import PickleValueProtocol
+from mrjob.protocol import RawProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
@@ -202,6 +203,36 @@ class RawValueProtocolTestCase(ProtocolTestCase):
     def test_no_strip(self):
         self.assertEqual(RawValueProtocol.read('foo\t \n\n'),
                          (None, 'foo\t \n\n'))
+
+
+class RawProtocolTestCase(ProtocolTestCase):
+
+    def test_round_trip(self):
+        self.assertRoundTripOK(RawProtocol(), 'foo', 'bar')
+        self.assertRoundTripOK(RawProtocol(), 'foo', None)
+        self.assertRoundTripOK(RawProtocol(), 'foo', '')
+        self.assertRoundTripOK(RawProtocol(), 'caf\xe9', '\xe90\c1a')
+
+    def test_no_tabs(self):
+        self.assertEqual(RawProtocol().write('foo', None), 'foo')
+        self.assertEqual(RawProtocol().write(None, 'foo'), 'foo')
+        self.assertEqual(RawProtocol().read('foo'), ('foo', None))
+
+        self.assertEqual(RawProtocol().write('', None), '')
+        self.assertEqual(RawProtocol().write(None, None), '')
+        self.assertEqual(RawProtocol().read(''), ('', None))
+
+    def test_extra_tabs(self):
+        self.assertEqual(RawProtocol().write('foo', 'bar\tbaz'),
+                         'foo\tbar\tbaz')
+        self.assertEqual(RawProtocol().write('foo\tbar', 'baz'),
+                         'foo\tbar\tbaz')
+        self.assertEqual(RawProtocol().read('foo\tbar\tbaz'),
+                         ('foo', 'bar\tbaz'))
+
+    def test_no_strip(self):
+        self.assertEqual(RawProtocol().read('foo\t \n\n'),
+                         ('foo', ' \n\n'))
 
 
 class ReprProtocolTestCase(ProtocolTestCase):

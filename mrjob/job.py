@@ -1770,34 +1770,33 @@ class MRJob(object):
     #: See :py:data:`mrjob.protocol` for the full list of protocols.
     OUTPUT_PROTOCOL = JSONProtocol
 
-    #: DEPRECATED
+    #: .. deprecated:: 0.3.0
     #:
     #: Default protocol for reading input to the first mapper in your job
     #: specified by a string.
     #:
-    #: Default: ``raw_value`` to match :py:attr:`.INPUT_PROTOCOL`, but
-    #: overridden by any changes to :py:attr:`.INPUT_PROTOCOL`.
+    #: Overridden by any changes to :py:attr:`.INPUT_PROTOCOL`.
     #:
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
     #: protocol strings. Can be overridden by :option:`--input-protocol`.
     DEFAULT_INPUT_PROTOCOL = 'raw_value'
 
-    #: DEPRECATED
+    #: .. deprecated:: 0.3.0
     #:
     #: Default protocol for communication between steps and final output
     #: specified by a string.
     #:
-    #: Default: ``json`` to match :py:attr:`.INTERNAL_PROTOCOL`, but
-    #: overridden by any changes to :py:attr:`.INTERNAL_PROTOCOL`.
+    #: Overridden by any changes to :py:attr:`.INTERNAL_PROTOCOL`.
     #:
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
     #: protocol strings. Can be overridden by :option:`--protocol`.
     DEFAULT_PROTOCOL = DEFAULT_PROTOCOL  # i.e. the one from mrjob.protocols
 
-    #: DEPRECATED
+    #: .. deprecated:: 0.3.0
     #:
-    #: Default protocol to use for writing output specified by a string.
-    #: Default: None.
+    #: Overridden by any changes to :py:attr:`.OUTPUT_PROTOCOL`. If
+    #: :py:attr:`.OUTPUT_PROTOCOL` is not set, defaults to
+    #: :py:attr:`.DEFAULT_PROTOCOL`.
     #:
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
     #: protocol strings. Can be overridden by the :option:`--output-protocol`.

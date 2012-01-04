@@ -71,7 +71,9 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
                    'SCRATCH', 'IF_SUCCESSFUL']
 
-#: DEPRECATED: the default cleanup-on-success option: ``'IF_SUCCESSFUL'``
+#: .. deprecated:: 0.3.0
+#:
+#: the default cleanup-on-success option: ``'IF_SUCCESSFUL'``
 CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
 
 _STEP_RE = re.compile(r'^M?C?R?$')

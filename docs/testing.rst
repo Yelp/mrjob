@@ -68,9 +68,11 @@ enable the sandbox with your :py:class:`StringIO` as stdin.
 
 The simplest way to test the full job is with the inline job runner. It runs
 the job in the same process as the test, so small jobs tend to run faster and
-stack traces are simpler.
+stack traces are simpler. You'll probably also want to specify ``--no-conf``
+so options from your local ``mrjob.conf`` don't pollute your testing
+environment.
 
-::
+This example reads from **stdin** (hence the ``-`` parameter)::
 
         def test_init_funcs(self):
             num_inputs = 2
@@ -92,8 +94,8 @@ through the job's output protocol with
 these lines in a list and check the contents of the list.
 
 .. warning:: Do not let your tests depend on the input lines being processed in
-    a certain order. Input is divided nondeterministically by the local,
-    hadoop, and emr runners.
+    a certain order. Input is divided nondeterministically by the ``local``,
+    ``hadoop``, and ``emr`` runners.
 
 ::
 
@@ -110,7 +112,9 @@ these lines in a list and check the contents of the list.
             self.assertEqual(results[0], num_inputs * 10 * 10 * 2)
 
 You should be able to switch out the ``inline`` runner for the ``local`` runner
-without changing any other code.
+without changing any other code. The ``local`` runner will launch multiple
+subprocesses to run your job, which may expose assumptions about input order
+or race conditions.
 
 Counters
 ^^^^^^^^

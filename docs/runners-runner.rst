@@ -14,9 +14,14 @@ Running your job
 .. automethod:: MRJobRunner.run
 .. automethod:: MRJobRunner.stream_output
 .. automethod:: MRJobRunner.cleanup
-.. automethod:: MRJobRunner.get_hadoop_version
 .. autodata:: mrjob.runner.CLEANUP_CHOICES
 .. autodata:: mrjob.runner.CLEANUP_DEFAULT
+
+Run Information
+---------------
+
+.. automethod:: MRJobRunner.counters
+.. automethod:: MRJobRunner.get_hadoop_version
 
 File management
 ---------------

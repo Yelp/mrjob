@@ -220,6 +220,7 @@ class RawProtocolTestCase(ProtocolTestCase):
 
         self.assertEqual(RawProtocol().write('', None), '')
         self.assertEqual(RawProtocol().write(None, None), '')
+        self.assertEqual(RawProtocol().write(None, ''), '')
         self.assertEqual(RawProtocol().read(''), ('', None))
 
     def test_extra_tabs(self):

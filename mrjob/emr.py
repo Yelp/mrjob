@@ -2233,7 +2233,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         sort_keys_and_job_flows = []
 
-        def check(job_flow):
+        def add_if_match(job_flow):
             # this may be a retry due to locked job flows
             if job_flow.jobflowid in exclude:
                 return
@@ -2338,7 +2338,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             sort_keys_and_job_flows.append((sort_key, job_flow))
 
         for job_flow in emr_conn.describe_jobflows(states=['WAITING']):
-            check(job_flow)
+            add_if_match(job_flow)
 
         return [job_flow for (sort_key, job_flow)
                 in sorted(sort_keys_and_job_flows)]

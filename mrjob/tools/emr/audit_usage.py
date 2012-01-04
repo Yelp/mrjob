@@ -43,8 +43,8 @@ import time
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
+from mrjob.job import MRJob
 from mrjob.parse import JOB_NAME_RE
-from mrjob.util import log_to_stream
 
 log = logging.getLogger('mrjob.tools.emr.audit_usage')
 
@@ -57,11 +57,7 @@ def main(args):
     if args:
         option_parser.error('takes no arguments')
 
-    # set up logging
-    if not options.quiet:
-        log_to_stream(name='mrjob', debug=options.verbose)
-    # suppress No handlers could be found for logger "boto" message
-    log_to_stream(name='boto', level=logging.CRITICAL)
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     print_report(options)
 

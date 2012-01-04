@@ -122,6 +122,7 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import PROTOCOL_DICT
 from mrjob.protocol import RawValueProtocol
 from mrjob.runner import CLEANUP_CHOICES
+from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
 from mrjob.util import read_input
@@ -566,6 +567,26 @@ class MRJob(object):
             # run locally by default
             return LocalMRJobRunner(**self.local_job_runner_kwargs())
 
+    @classmethod
+    def set_up_logging(cls, quiet=False, verbose=False, stream=None):
+        """Set up logging when running from the command line. This is also
+        used by the various command-line utilities.
+
+        :param bool quiet: If true, don't log. Overrides *verbose*.
+        :param bool verbose: If true, set log level to ``DEBUG`` (default is
+                             ``INFO``)
+        :param bool stream: Stream to log to (default is ``sys.stderr``)
+
+        This will also set up a null log handler for boto, so we don't get
+        warnings if boto tries to log about throttling and whatnot.
+        """
+        if quiet:
+            log_to_null(name='mrjob')
+        else:
+            log_to_stream(name='mrjob', debug=verbose, stream=stream)
+
+        log_to_null(name='boto')
+
     def run_job(self):
         """Run the all steps of the job, logging errors (and debugging output
         if :option:`--verbose` is specified) to STDERR and streaming the
@@ -574,9 +595,9 @@ class MRJob(object):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
-        if not self.options.quiet:
-            log_to_stream(
-                name='mrjob', stream=self.stderr, debug=self.options.verbose)
+        self.set_up_logging(quiet=self.options.quiet,
+                            verbose=self.options.verbose,
+                            stream=self.stderr)
 
         with self.make_runner() as runner:
             runner.run()

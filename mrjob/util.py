@@ -34,6 +34,11 @@ import tarfile
 import zipfile
 
 
+class NullHandler(logging.Handler):
+    def emit(self, record):
+        pass
+
+
 def buffer_iterator_to_line_iterator(iterator):
     """boto's file iterator splits by buffer size instead of by newline. This
     wrapper puts them back into lines.
@@ -108,6 +113,13 @@ def hash_object(obj):
     m = hashlib.md5()
     m.update(repr(obj))
     return m.hexdigest()
+
+
+def log_to_null(name=None):
+    """Set up a null handler for the given stream, to suppress
+    "no handlers could be found" warnings."""
+    logger = logging.getLogger(name)
+    logger.addHandler(NullHandler())
 
 
 def log_to_stream(name=None, stream=None, format=None, level=None,

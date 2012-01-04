@@ -47,7 +47,7 @@ except ImportError:
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
-from mrjob.util import log_to_stream
+from mrjob.job import MRJob
 
 log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
 
@@ -64,11 +64,7 @@ def main():
     if args:
         option_parser.error('takes no arguments')
 
-    # set up logging
-    if not options.quiet:
-        log_to_stream(name='mrjob', debug=options.verbose)
-    # suppress No handlers could be found for logger "boto" message
-    log_to_stream(name='boto', level=logging.CRITICAL)
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     inspect_and_maybe_terminate_job_flows(
         conf_path=options.conf_path,

@@ -43,8 +43,7 @@ def buffer_iterator_to_line_iterator(iterator):
     """boto's file iterator splits by buffer size instead of by newline. This
     wrapper puts them back into lines.
     """
-    prepend = ""
-    buf = iterator.next()
+    buf = iterator.next()  # might raise StopIteration, but that's okay
     while True:
         if '\n' in buf:
             (line, buf) = buf.split('\n', 1)

@@ -3,9 +3,6 @@ mrjob.protocol - input and output
 
 .. automodule:: mrjob.protocol
 
-.. autodata:: DEFAULT_PROTOCOL
-.. autodata:: PROTOCOL_DICT
-
 .. autoclass:: JSONProtocol
 .. autoclass:: JSONValueProtocol
 .. autoclass:: PickleProtocol
@@ -14,3 +11,6 @@ mrjob.protocol - input and output
 .. autoclass:: RawValueProtocol
 .. autoclass:: ReprProtocol
 .. autoclass:: ReprValueProtocol
+
+.. autodata:: DEFAULT_PROTOCOL
+.. autodata:: PROTOCOL_DICT

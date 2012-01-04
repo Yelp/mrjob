@@ -236,12 +236,12 @@ class ReprValueProtocol(object):
     def write(cls, key, value):
         return repr(value)
 
-#: DEPRECATED
+#: .. deprecated:: 0.3.0
 #:
 #: Formerly the default protocol for all encoded input and output: ``'json'``
 DEFAULT_PROTOCOL = 'json'
 
-#: DEPRECATED
+#: .. deprecated:: 0.3.0
 #:
 #: Default mapping from protocol name to class:
 #:

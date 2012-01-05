@@ -89,6 +89,143 @@ def make_option_parser():
     return option_parser
 
 
+def audit_job_flows(job_flows):
+    """Analyze a list of job flows, and return data in a format
+    than can be used in the report. Returns *job_flow_summaries*,
+    *hours*, *hours_bbnu*.
+
+    *job_flow_summaries* is a list of dictionaries describing each job flow.
+
+    *hours* is a map from a key (e.g. 'user', 'date') to map from
+    a value for that key to the number of normalized instance hours used by a
+    job or job flow matching that key.
+
+    *hours_bbnu* is the same as hours, only it tracks normalized instance hours
+    billed but not used.
+    """
+    pass
+
+
+def parse_label_and_owner(job_or_step_name):
+    if ':' in job_or_step_name:
+        job_or_step_name = job_or_step_name.split(':', 1)[0]
+    match = JOB_NAME_RE.match(job_or_step_name)
+    if match:
+        return match.group(0), match.group(1)
+    else:
+        return None, None
+    
+
+def count_job_flow_hours(job_flow):
+    # don't worry about jobs that haven't started
+    if not hasattr(job_flow, 'startdatetime'):
+        return
+
+    nih_billed_map = defaultdict(lambda: defaultdict(float))
+    nih_used_map = defaultdict(lambda: defaultdict(float))
+
+    start_time = to_timestamp(job_flow.startdatetime)
+    
+    end_time = to_timestamp(getattr(job_flow, 'enddatetime', None))
+
+    if end_time is None:
+        effective_end_time = time.time()
+    else:
+        # job effective ends on the full hour
+        full_hours = math.ceil((end_time - start_time) / 60.0 / 60.0)
+        effective_end_time = start_time + full_hours * 60.0 * 60.0
+
+    nih = float(job_flow.normalizedinstancehours)
+    nih_per_sec = nih / (effective_end_time - start_time)
+
+    # get initial job and user names
+    last_label, last_owner = parse_label_and_owner(job_flow.name)
+    last_end = start_time
+
+    for step in job_flow.steps:
+        # we've reached the last step that actually runs
+        if not hasattr(step, 'startdatetime'):
+            break
+
+        step_start = to_timestamp(step.startdatetime)
+
+        # charge the previous label and owner
+        nih_billed = nih_per_sec * (step_start - last_end)
+        nih_billed_map['label'][last_label] += nih_billed
+        nih_billed_map['owner'][last_owner] += nih_billed
+
+        step_end = to_timestamp(getattr(step, 'enddatetime', None))
+        # step is still running
+        if step_end is None:
+            step_end = time.time()
+
+        # figure out label and owner
+        label, owner = parse_label_and_owner(step.name)
+
+        nih_used = nih_per_sec * (step_end - step_start)
+        nih_used_map['label'][label] += nih_used
+        nih_used_map['owner'][owner] += nih_used
+
+        last_label = label
+        last_owner = owner
+        last_end = step_end
+
+    # bill for final step
+    nih_billed = nih_per_sec * (effective_end_time - last_end)
+    nih_billed_map['label'][last_label] += nih_billed
+    nih_billed_map['owner'][last_owner] += nih_billed
+
+    return nih_billed_map, nih_used_map
+
+
+def summarize_job_flow(job_flow):
+    """Helper method for audit_job_flows; takes a job flow and puts its
+    information into the appropriate auditing dicts."""
+    summary = {}
+
+    summary['id'] = job_flow.jobflowid
+
+    summary['name'] = job_flow.name
+
+    summary['created'] = to_datetime(job_flow.creationdatetime)
+
+    start_time = to_datetime(getattr(job_flow, 'startdatetime', None))
+    if start_time:
+        end_time = (to_datetime(getattr(job_flow, 'enddatetime', None)) or
+                    datetime.utcnow())
+        summary['ran'] = end_time - start_time
+    else:
+        summary['ran'] = datetime.timedelta(0)
+
+    summary['state'] = job_flow.state
+
+    summary['num_steps'] = len(job_flow.steps or [])
+
+    # this looks to be an integer, but let's protect against
+    # future changes
+    summary['hours'] = float(job_flow.normalizedinstancehours)
+
+    # estimate hours billed but not used
+    summary['hours_bbnu'] = (
+        summary['hours'] *
+        estimate_proportion_billed_but_not_used(job_flow))
+
+    # split out mr job name and user
+    # jobs flows created by MRJob have names like:
+    # mr_word_freq_count.dave.20101103.121249.638552
+    match = JOB_NAME_RE.match(job_flow.name)
+    if match:
+        summary['job_name'] = match.group(1)
+        summary['user'] = match.group(2)
+    else:
+        # not run by mrjob
+        summary['job_name'] = None
+        summary['user'] = None
+
+    
+
+    
+
 def print_report(options):
 
     emr_conn = EMRJobRunner(conf_path=options.conf_path).make_emr_conn()
@@ -205,7 +342,7 @@ def print_report(options):
             return '(not started by mrjob)'
 
     print '* Job flows are considered to belong to the user and job that'
-    print '  started them (even if other jobs use the job flow).'
+    print '  started them or last ran on them.'
     print
 
     # Top jobs

@@ -113,7 +113,7 @@ or in :py:mod:`mrjob.conf`, like this::
         ec2_instance_type: c1.medium
         num_ec2_instances: 5
 
-In most cases, your master instance type doesn't need to be larger than``m1.small`` to schedule tasks, so *ec2_instance_type* only applies to instances that actually run tasks. (In this example, there are 1 ``m1.small`` master instance, and 4 ``c1.medium`` core instances.) If you do need a bigger master instance, there is an *ec2_master_instance_type* option.
+In most cases, your master instance type doesn't need to be larger than``m1.small`` to schedule tasks, so *ec2_instance_type* only applies to instances that actually run tasks. (In this example, there are 1 ``m1.small`` master instance, and 4 ``c1.medium`` core instances.) You *will* need a larger master instance if you have a very large number of input files; in this case, use the *ec2_master_instance_type* option.
 
 If you want to run task instances, you instead must specify the number of core and task instances directly with the *num_ec2_core_instances* and *num_ec2_task_instances* options. There are also *ec2_core_instance_type* and *ec2_task_instance_type* options if you want to set these directly.
 

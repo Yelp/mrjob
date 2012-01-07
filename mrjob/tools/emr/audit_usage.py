@@ -34,7 +34,8 @@ from __future__ import with_statement
 
 import boto.utils
 from collections import defaultdict
-import datetime
+from datetime import datetime
+from datetime import timedelta
 import math
 import logging
 from optparse import OptionParser
@@ -111,10 +112,133 @@ def parse_label_and_owner(job_or_step_name):
         job_or_step_name = job_or_step_name.split(':', 1)[0]
     match = JOB_NAME_RE.match(job_or_step_name)
     if match:
-        return match.group(0), match.group(1)
+        return match.group(1), match.group(2)
     else:
         return None, None
-    
+
+
+def job_flow_to_intervals(job_flow):
+
+    now = datetime.utcnow()
+
+    jf_start = to_datetime(job_flow.startdatetime)
+    # once the job flow starts, it takes some time to bootstrap
+    jf_ready = to_datetime(getattr(job_flow, 'readydatetime', None)) or now
+    jf_end = to_datetime(getattr(job_flow, 'enddatetime', None))
+
+    # figure out effective end time for job, since we are billed
+    # for the full hour
+    if not jf_end:
+        jf_end_billing = now
+    else:
+        full_hours = math.ceil(to_secs(jf_end - jf_start) / 60.0 / 60.0)
+        jf_end_billing = jf_start + timedelta(hours=full_hours)
+
+    jf_nih = float(job_flow.normalizedinstancehours)
+    nih_per_sec = jf_nih / to_secs(jf_end_billing - jf_start)
+
+    jf_label, jf_owner = parse_label_and_owner(job_flow.name)
+
+    jf_pool = None
+    bootstrap_actions = getattr(job_flow, 'bootstrapactions', None)
+    if bootstrap_actions:
+        args = [arg.value for arg in bootstrap_actions[-1].args]
+        if len(args) == 2 and args[0].startswith('pool-'):
+            jf_pool = args[1]
+
+    intervals = []
+
+    # add a fake step for the job that started the job flow, and credit
+    # it for time spent bootstrapping.
+    intervals.append({
+        'label': jf_label,
+        'owner': jf_owner,
+        'pool': jf_pool,
+        'start': jf_start,
+        'end': jf_ready,
+    })
+
+    for step in job_flow.steps:
+        # we've reached the last step that actually runs
+        if not hasattr(step, 'startdatetime'):
+            break
+
+        step_start = to_datetime(step.startdatetime)
+
+        step_end = to_datetime(getattr(step, 'enddatetime', None))
+        # step is still running
+        if step_end is None:
+            step_end = now
+
+        step_label, step_owner = parse_label_and_owner(job_flow.name)
+
+        intervals.append({
+            'label': step_label,
+            'owner': step_owner,
+            'pool': jf_pool,
+            'start': step_start,
+            'end': step_end,
+        })
+
+    # fill in end_billing
+    for i in xrange(len(intervals) - 1):
+        intervals[i]['end_billing'] = intervals[i + 1]['start']
+
+    intervals[-1]['end_billing'] = jf_end_billing
+
+    # fill normalized usage information
+    for interval in intervals:
+
+        interval['nih'] = (
+            nih_per_sec *
+            to_secs(interval['end'] - interval['start']))
+
+        interval['date_to_nih'] = dict(
+            (d, nih_per_sec * secs)
+            for d, secs
+            in subdivide_interval_by_date(interval['start'],
+                                          interval['end']).iteritems())
+
+        interval['nih_billed'] = (
+            nih_per_sec *
+            to_secs(interval['end_billing'] - interval['start']))
+
+        interval['date_to_nih_billed'] = dict(
+            (d, nih_per_sec * secs)
+            for d, secs
+            in subdivide_interval_by_date(interval['start'],
+                                          interval['end_billing']).iteritems())
+        # time billed but not used
+        interval['nih_bbnu'] = interval['nih_billed'] - interval['nih']
+
+        interval['date_to_nih_bbnu'] = dict(
+            (d, nih_billed - interval['date_to_nih'].get(d, 0.0))
+            for d, nih_billed
+            in interval['date_to_nih_billed'].iteritems())
+
+    return intervals
+
+def subdivide_interval_by_date(start, end):
+    if start.date() == end.date():
+        return {start.date(): to_secs(end - start)}
+
+    date_to_secs = {}
+
+    date_to_secs[start.date()] = to_secs(
+        datetime(start.year, start.month, start.day) + timedelta(days=1) -
+        start)
+
+    date_to_secs[end.date()] = to_secs(
+        end - datetime(end.year, end.month, end.day))
+
+    # fill in dates in the middle
+    cur_date = start.date() + timedelta(days=1)
+    while cur_date < end.date():
+        date_to_secs[cur_date] = to_secs(timedelta(days=1))
+        cur_date += timedelta(days=1)
+
+    return date_to_secs
+
 
 def count_job_flow_hours(job_flow):
     # don't worry about jobs that haven't started
@@ -125,7 +249,7 @@ def count_job_flow_hours(job_flow):
     nih_used_map = defaultdict(lambda: defaultdict(float))
 
     start_time = to_timestamp(job_flow.startdatetime)
-    
+
     end_time = to_timestamp(getattr(job_flow, 'enddatetime', None))
 
     if end_time is None:
@@ -195,7 +319,7 @@ def summarize_job_flow(job_flow):
                     datetime.utcnow())
         summary['ran'] = end_time - start_time
     else:
-        summary['ran'] = datetime.timedelta(0)
+        summary['ran'] = timedelta(0)
 
     summary['state'] = job_flow.state
 
@@ -222,9 +346,6 @@ def summarize_job_flow(job_flow):
         summary['job_name'] = None
         summary['user'] = None
 
-    
-
-    
 
 def print_report(options):
 
@@ -232,12 +353,12 @@ def print_report(options):
 
     log.info('getting job flow history...')
     # microseconds just make our report messy
-    now = datetime.datetime.utcnow().replace(microsecond=0)
+    now = datetime.utcnow().replace(microsecond=0)
 
     # if --max-days-ago is set, only look at recent jobs
     created_after = None
     if options.max_days_ago is not None:
-        created_after = now - datetime.timedelta(days=options.max_days_ago)
+        created_after = now - timedelta(days=options.max_days_ago)
 
     job_flows = describe_all_job_flows(emr_conn, created_after=created_after)
 
@@ -256,7 +377,7 @@ def print_report(options):
             end_time = to_datetime(getattr(jf, 'enddatetime', None)) or now
             job_flow_info['ran'] = end_time - start_time
         else:
-            job_flow_info['ran'] = datetime.timedelta(0)
+            job_flow_info['ran'] = timedelta(0)
 
         job_flow_info['state'] = jf.state
 
@@ -332,7 +453,7 @@ def print_report(options):
     d = latest.date()
     while d >= earliest.date():
         print ' %10s %6d %9.2f' % (d, date_to_hours[d], date_to_hours_bbnu[d])
-        d -= datetime.timedelta(days=1)
+        d -= timedelta(days=1)
     print
 
     def fmt(job_name_or_user):
@@ -467,6 +588,11 @@ def estimate_proportion_billed_but_not_used(job_flow):
         return (hours_billed - hours_used) / hours_billed
 
 
+def to_secs(delta):
+    return (delta.days * 86400.0 +
+            delta.seconds +
+            delta.microseconds / 1000000.0)
+
 def to_timestamp(iso8601_time):
     if iso8601_time is None:
         return None
@@ -478,7 +604,7 @@ def to_datetime(iso8601_time):
     if iso8601_time is None:
         return None
 
-    return datetime.datetime.strptime(iso8601_time, boto.utils.ISO8601)
+    return datetime.strptime(iso8601_time, boto.utils.ISO8601)
 
 
 if __name__ == '__main__':

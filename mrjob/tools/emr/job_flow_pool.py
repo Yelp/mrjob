@@ -27,7 +27,6 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import est_time_to_hour
 from mrjob.job import MRJob
 from mrjob.util import scrape_options_into_new_groups
-from mrjob.util import log_to_stream
 
 
 def get_pools(emr_conn):
@@ -174,7 +173,7 @@ def main():
     scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
     options, args = option_parser.parse_args()
 
-    log_to_stream(name='mrjob', debug=options.verbose)
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     runner_kwargs = options.__dict__.copy()
     for non_runner_kwarg in ('quiet', 'verbose', 'list_all', 'find',

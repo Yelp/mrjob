@@ -1,12 +1,6 @@
 mrjob.emr - run on EMR
 ======================
 
-.. py:module:: mrjob.emr
-
-.. autoclass:: EMRJobRunner
-
-.. _amazon-setup:
-
 Setting up EMR on Amazon
 ------------------------
 
@@ -15,15 +9,125 @@ Setting up EMR on Amazon
 * Get your access and secret keys (click "Security Credentials" on `your account page <http://aws.amazon.com/account/>`_)
 * Set the environment variables :envvar:`AWS_ACCESS_KEY_ID` and :envvar:`AWS_SECRET_ACCESS_KEY` accordingly
 
-Advanced EMR Usage
-------------------
+Once you've done this, add ``-r emr`` to your job's command line to run it on EMR.
+
+Job Runner
+----------
+
+.. py:module:: mrjob.emr
+
+.. autoclass:: EMRJobRunner
+
+S3 Utilities
+------------
+
+.. automethod:: EMRJobRunner.make_s3_conn
+.. autofunction:: parse_s3_uri
+.. autofunction:: s3_key_to_uri
+.. automethod:: EMRJobRunner.get_s3_key
+.. automethod:: EMRJobRunner.get_s3_keys
+.. automethod:: EMRJobRunner.get_s3_folder_keys
+.. automethod:: EMRJobRunner.make_s3_key
+
+EMR Utilities
+-------------
+
+.. automethod:: EMRJobRunner.make_emr_conn
+.. autofunction:: describe_all_job_flows
+
+.. _amazon-setup:
+
+.. _ssh-tunneling:
+
+SSH Tunneling and Log Fetching
+------------------------------
+
+To enable SSH tunneling and log fetching, so that you can view the Hadoop Job
+Tracker in your browser and see error logs faster:
+
+* Go to https://console.aws.amazon.com/ec2/home
+* Make sure the **Region** dropdown (upper left) matches the region you want to run jobs in (usually "US East").
+* Click on **Key Pairs** (lower left)
+* Click on **Create Key Pair** (center).
+* Name your key pair ``EMR`` (any name will work but that's what we're using in this example)
+* Save :file:`EMR.pem` wherever you like (``~/.ssh`` is a good place)
+* Run ``chmod og-rwx /path/to/EMR.pem`` so that ``ssh`` will be happy
+* Add the following entries to your :py:mod:`mrjob.conf`::
+
+    runners:
+      emr:
+        ec2_key_pair: EMR
+        ec2_key_pair_file: /path/to/EMR.pem # ~/ and $ENV_VARS allowed here!
+        ssh_tunnel_to_job_tracker: true
+
+Choosing Type and Number of EC2 Instances
+-----------------------------------------
+
+When you create a job flow on EMR, you'll have the option of specifying a number
+and type of EC2 instances, which are basically virtual machines. Each instance
+type has different memory, CPU, I/O and network characteristics, and costs
+a different amount of money. See
+`Instance Types <http://aws.amazon.com/ec2/instance-types/>`_ and
+`Pricing <http://aws.amazon.com/elasticmapreduce/pricing/>`_ for details.
+
+Instances perform one of three roles:
+
+* **Master**: There is always one master instance. It handles scheduling of tasks
+  (i.e. mappers and reducers), but does not run them itself.
+* **Core**: You may have one or more core instances. These run tasks and host
+  HDFS.
+* **Task**: You may have zero or more of these. These run tasks, but do *not*
+  host HDFS. This is mostly useful because your job flow can lose task instances
+  without killing your job (see :ref:`spot-instances`).
+
+There's a special case where your job flow *only* has a single master instance, in which case the master instance schedules tasks, runs them, and hosts HDFS.
+
+By default, :py:mod:`mrjob` runs a single ``m1.small``, which is a cheap but not very powerful instance type. This can be quite adequate for testing your code on a small subset of your data, but otherwise give little advantage over running a job locally. To get more performance out of your job, you can either add more instances, use more powerful instances, or both.
+
+Here are some things to consider when tuning your instance settings:
+
+* Amazon bills you for the full hour even if your job flow only lasts for a few
+  minutes (this is an artifact of the EC2 billing structure), so for many
+  jobs that you run repeatedly, it is a good strategy to pick instance settings
+  that make your job consistently run in a little less than an hour.
+* Your job will take much longer and may fail if any task (usually a reducer)
+  runs out of memory and starts using swap. (You can verify this by using
+  :command:`vmstat` with :py:mod:`~mrjob.tools.emr.mrboss`.) Restructuring your
+  job is often the best solution, but if you can't, consider using a high-memory
+  instance type.
+* Larger instance types are usually a better deal if you have the workload
+  to justify them. For example, a ``c1.xlarge`` costs about 10 times as much
+  as an ``m1.small``, but it has about 20 times as much processing power
+  (and more memory).
+
+The basic way to control type and number of instances is with the
+*ec2_instance_type* and *num_ec2_instances* options, on the command line like
+this::
+
+    --ec2_instance_type c1.medium --num-ec2-instances 5
+
+or in :py:mod:`mrjob.conf`, like this::
+
+    runners:
+      emr:
+        ec2_instance_type: c1.medium
+        num_ec2_instances: 5
+
+In most cases, your master instance type doesn't need to be larger than``m1.small`` to schedule tasks, so *ec2_instance_type* only applies to instances that actually run tasks. (In this example, there are 1 ``m1.small`` master instance, and 4 ``c1.medium`` core instances.) You *will* need a larger master instance if you have a very large number of input files; in this case, use the *ec2_master_instance_type* option.
+
+If you want to run task instances, you instead must specify the number of core and task instances directly with the *num_ec2_core_instances* and *num_ec2_task_instances* options. There are also *ec2_core_instance_type* and *ec2_task_instance_type* options if you want to set these directly.
+
+Advanced EMR Strategies
+-----------------------
+
+.. _reusing-job-flows:
 
 Reusing Job Flows
 ^^^^^^^^^^^^^^^^^
 
 It can take several minutes to create a job flow. To decrease wait time when running multiple jobs, you may find it convenient to reuse a single job.
 
-mrjob includes a utility to create persistent job flows without running a job. For example, this command will create a job flow with 12 EC2 instances (1 master and 11 slaves), taking all other options from :py:mod:`mrjob.conf`::
+:py:mod:`mrjob` includes a utility to create persistent job flows without running a job. For example, this command will create a job flow with 12 EC2 instances (1 master and 11 slaves), taking all other options from :py:mod:`mrjob.conf`::
 
     > python mrjob/tools/emr/create_job_flow.py --num-ec2-instances=12
     ...
@@ -46,67 +150,56 @@ Pooling Job Flows
 
 Manually creating job flows to reuse and specifying the job flow ID for every run can be tedious. In addition, it is not convenient to coordinate job flow use among multiple users.
 
-To mitigate these problems, mrjob provides **job flow pools.** Rather than having to remember to start a job flow and copying its ID, simply pass :option:`--pool-emr-job-flows` on the command line. The first time you do this, a new job flow will be created that does not terminate when the job completes. When you use :option:`--pool-emr-job-flows` the next time, it will identify the job flow and add the job to it rather than creating a new one.
+To mitigate these problems, :py:mod:`mrjob` provides **job flow pools.** Rather than having to remember to start a job flow and copying its ID, simply pass :option:`--pool-emr-job-flows` on the command line. The first time you do this, a new job flow will be created that does not terminate when the job completes. When you use :option:`--pool-emr-job-flows` the next time, it will identify the job flow and add the job to it rather than creating a new one.
 
 **If you use job flow pools, keep** :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows` **in your crontab!** Otherwise you will forget to terminate your job flows and waste a lot of money.
 
-The criteria for finding an appropriate job flow for a job are as follows:
+Pooling is designed so that jobs run against the same :py:mod:`mrjob.conf` can share the same job flows. This means that the version of :py:mod:`mrjob`, boostrap configuration, Hadoop version and AMI version all need to be exactly the same.
 
-* The job flow must be in the ``WAITING`` state.
-* The bootstrap configuration (actions, packages, commands, etc.) must be identical. This is checked using an md5 sum.
-* The **pool name** must be the same. You can specify a pool name with :option:`--pool-name`.
-* The job flow must have at least as many instances, and  the instance type must have at least as many compute units and GB of memory, as the job configuration specifies. See `Amazon EC2 Instance Types <http://aws.amazon.com/ec2/instance-types/>`_ for a complete listing of instance types and their respective compute units.
-* Ties are broken first by total compute units in the job flow as calculated by ``number of instances * instance type compute units``, then by the number of minutes until an even instance hour. This strategy minimizes wasted instance hours.
+Pooled jobs will also only use job flows with the same **pool name**, so you can use the :option:`--pool-name` option to partition your job flows into separate pools.
 
-Most of the time you shouldn't need to worry about these things. Just use pool names to separate job flows into pools representing their type. As long as you keep passing the same bootstrapping arguments into your scripts, they will keep creating correctly-configured job flows.
+Pooling is flexible about instance type and number of instances; it will attempt to select the most powerful job flow available as long as the job flow's instances provide at least as much memory and at least as much CPU as your job requests. If there is a tie, it picks job flows that are closest to the end of a full hour, to minimize wasted instance hours.
 
-EMR provides no way to remove steps from a job flow once they are added. This introduces a race condition where two users identify the same job flow and join it simultaneously, causing one user's job to be delayed until the first user's is finished. mrjob avoids this situation using an S3-based locking mechanism.
+Amazon limits job flows to 256 steps total; pooling respects this and won't try to use pooled job flows that are "full." :py:mod:`mrjob` also uses an S3-based "locking" mechanism to prevent two jobs from simultaneously joining the same job flow. This is somewhat ugly but works in practice, and avoids :py:mod:`mrjob` depending on Amazon services other than EMR and S3.
 
-S3 utilities
-------------
+.. _spot-instances:
 
-.. automethod:: EMRJobRunner.make_s3_conn
-.. autofunction:: parse_s3_uri
-.. autofunction:: s3_key_to_uri
-.. automethod:: EMRJobRunner.get_s3_key
-.. automethod:: EMRJobRunner.get_s3_keys
-.. automethod:: EMRJobRunner.get_s3_folder_keys
-.. automethod:: EMRJobRunner.make_s3_key
+Spot Instances
+^^^^^^^^^^^^^^
 
-EMR utilities
--------------
+Amazon also has a spot market for EC2 instances. You can potentially save money by using the spot market. The catch is that if someone bids more for instances that you're using, they can be taken away from your job flow. If this happens, you aren't charged, but your job may fail.
 
-.. automethod:: EMRJobRunner.make_emr_conn
-.. autofunction:: describe_all_job_flows
+You can specify spot market bid prices using the *ec2_core_instance_bid_price*,
+*ec2_master_instance_bid_price*, and *ec2_task_instance_bid_price* options to specify a price in US dollars. For example, on the command line::
 
-.. _ssh-tunneling:
+    --ec2-task-instance-bid-price 0.42
 
-SSH tunneling and log fetching
-------------------------------
-
-To enable SSH tunneling and log fetching, so that you can view the Hadoop Job
-Tracker in your browser and see error logs faster:
-
-* Go to https://console.aws.amazon.com/ec2/home
-* Make sure the **Region** dropdown (upper left) matches the region you want to run jobs in (usually "US East").
-* Click on **Key Pairs** (lower left)
-* Click on **Create Key Pair** (center).
-* Name your key pair ``EMR`` (any name will work but that's what we're using in this example)
-* Save :file:`EMR.pem` wherever you like (``~/.ssh`` is a good place)
-* Run ``chmod og-rwx /path/to/EMR.pem`` so that ``ssh`` will be happy
-* Add the following entries to your :py:mod:`mrjob.conf`::
+or in :py:mod:`mrjob.conf`::
 
     runners:
       emr:
-        ec2_key_pair: EMR
-        ec2_key_pair_file: /path/to/EMR.pem # ~/ and $ENV_VARS allowed here!
-        ssh_tunnel_to_job_tracker: true
+        ec2_task_instance_bid_price: '0.42'
+
+(Note the quotes; bid prices are strings, not floats!)
+
+Amazon has a pretty thorough explanation of why and when you'd want to use spot
+instances
+`here <http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/UsingEMR_SpotInstances.html?r=9215>`_. The brief summary is that either
+you don't care if your job fails, in which case you want to purchase all
+your instances on the spot market, or you'd need your job to finish but you'd
+like to save time and money if you can, in which case you want to run
+task instances on the spot market and purchase master and core instances
+the regular way.
+
+Job flow pooling interacts with bid prices more or less how you'd expect;
+a job will join a pool with spot instances only if it requested spot instances
+at the same price or lower.
 
 Troubleshooting
 ---------------
 
 Many things can go wrong in an EMR job, and the system's distributed nature
-can make it difficult to find the source of a problem. mrjob attempts to
+can make it difficult to find the source of a problem. :py:mod:`mrjob` attempts to
 simplify the debugging process by automatically scanning logs for probable
 causes of failure. Specifically, it looks at logs relevant to your job for
 these errors:
@@ -115,13 +208,13 @@ these errors:
 * Hadoop Streaming errors in ``$S3_LOG_URI/steps/*``
 * Timeout errors in ``$S3_LOG_URI/jobs/*``
 
-As mentioned above, in addition to looking at S3, mrjob can be configured to
+As mentioned above, in addition to looking at S3, :py:mod:`mrjob` can be configured to
 also use SSH to fetch error logs directly from the master and slave nodes.
 This can speed up debugging significantly, because logs are only available on
 S3 five minutes after the job completes, or immediately after the job flow
 terminates.
 
-Using persistent job flows
+Using Persistent Job Flows
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When troubleshooting a job, it can be convenient to use a persistent job flow
@@ -199,7 +292,7 @@ job flow to bootstrap.
 
 Note that SSH must be set up for logs to be scanned from persistent jobs.
 
-Finding failures after the fact
+Finding Failures After the Fact
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 If you are trying to look at a failure after the original process has exited,
@@ -230,15 +323,14 @@ you can use the :py:mod:`mrjob.tools.emr.fetch_logs` tool to scan the logs::
     (while reading from s3://scratch-bucket/tmp/buggy_job.username.20110811.185410.536519/input/00000-README.rst)
     Removing all files in s3://scratch-bucket/tmp/no_script.username.20110811.190217.810442/
 
-Determining cause of failure when mrjob can't
+Determining Cause of Failure when mrjob Can't
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In some cases, mrjob will be unable to find the reason your job failed. You
-can look at the logs yourself by using Amazon's `elastic-mapreduce` tool to
-SSH to the master node::
+In some cases, :py:mod:`mrjob` will be unable to find the reason your job failed, or it will report an error that was merely a symptom of a larger problem. You
+can look at the logs yourself by using Amazon's `elastic-mapreduce <http://aws.amazon.com/developertools/2264>`_ tool to SSH to the master node::
 
     > elastic-mapreduce --ssh j-1NXMMBNEQHAFT
-    ssh -i /nail/etc/EMR.pem.dev hadoop@ec2-50-18-136-229.us-west-1.compute.amazonaws.com 
+    ssh -i /nail/etc/EMR.pem.dev hadoop@ec2-50-18-136-229.us-west-1.compute.amazonaws.com
     ...
     hadoop@ip-10-172-51-151:~$ grep --recursive 'Traceback' /mnt/var/log/hadoop
     /mnt/var/log/hadoop/userlogs/attempt_201108111855_0001_m_000000_0/stderr:Traceback (most recent call last):

@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2011 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,6 +51,21 @@ AMI_VERSION_TO_HADOOP_VERSIONS = {
     '2.0': ['0.20.205'],
     'latest': ['0.20.205'],
 }
+
+
+### Errors ###
+
+def err_xml(message, type='Sender', code='ValidationError'):
+    """Use this to create the body of boto response errors."""
+    return """\
+<ErrorResponse xmlns="http://elasticmapreduce.amazonaws.com/doc/2009-03-31">
+  <Error>
+    <Type>%s</Type>
+    <Code>%s</Code>
+    <Message>%s</Message>
+  </Error>
+  <RequestId>eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee</RequestId>
+</ErrorResponse>""" % (type, code, message)
 
 
 ### S3 ###
@@ -305,6 +320,7 @@ class MockEmrConnection(object):
                     hadoop_version=None,
                     steps=None,
                     bootstrap_actions=[],
+                    instance_groups=None,
                     additional_info=None,
                     ami_version=None,
                     now=None):
@@ -346,6 +362,110 @@ class MockEmrConnection(object):
                                  args=[MockEmrObject(value=v) for v \
                                        in real_action.bootstrap_action_args])
 
+        # create a MockEmrObject corresponding to the job flow. We only
+        # need to fill in the fields that EMRJobRunnerUses
+        if not instance_groups:
+            mock_groups = [
+                MockEmrObject(
+                    instancerequestcount='1',
+                    instancerole='MASTER',
+                    instancerunningcount='0',
+                    instancetype=master_instance_type,
+                    market='ON_DEMAND',
+                    name='master',
+                ),
+            ]
+            if num_instances > 1:
+                mock_groups.append(
+                    MockEmrObject(
+                        instancerequestcount=str(num_instances - 1),
+                        instancerole='CORE',
+                        instancerunningcount='0',
+                        instancetype=slave_instance_type,
+                        market='ON_DEMAND',
+                        name='core',
+                    ),
+                )
+            else:
+                # don't display slave instance type if there are no slaves
+                slave_instance_type = None
+        else:
+            slave_instance_type = None
+            num_instances = 0
+
+            mock_groups = []
+            roles = set()
+
+            for instance_group in instance_groups:
+                if instance_group.num_instances < 1:
+                    raise boto.exception.EmrResponseError(
+                        400, 'Bad Request', body=err_xml(
+                        'An instance group must have at least one instance'))
+
+                emr_group = MockEmrObject(
+                    instancerequestcount=str(instance_group.num_instances),
+                    instancerole=instance_group.role,
+                    instancerunningcount='0',
+                    instancetype=instance_group.type,
+                    market=instance_group.market,
+                    name=instance_group.name,
+                )
+                if instance_group.market == 'SPOT':
+                    bid_price = instance_group.bidprice
+
+                    # simulate EMR's bid price validation
+                    try:
+                        float(bid_price)
+                    except (TypeError, ValueError):
+                        raise boto.exception.EmrResponseError(
+                            400, 'Bad Request', body=err_xml(
+                            'The bid price supplied for an instance group is'
+                            ' invalid'))
+
+                    if ('.' in bid_price and
+                        len(bid_price.split('.', 1)[1]) > 3):
+                        raise boto.exception.EmrResponseError(
+                            400, 'Bad Request', body=err_xml(
+                            'No more than 3 digits are allowed after decimal'
+                            ' place in bid price'))
+
+                    emr_group.bidprice = bid_price
+
+                if instance_group.role in roles:
+                    role_desc = instance_group.role.lower()
+                    raise boto.exception.EmrResponseError(
+                        400, 'Bad Request', body=err_xml(
+                        'Multiple %s instance groups supplied, you'
+                        ' must specify exactly one %s instance group' %
+                        (role_desc, role_desc)))
+
+                if instance_group.role == 'MASTER':
+                    if instance_group.num_instances != 1:
+                        raise boto.exception.EmrResponseError(
+                            400, 'Bad Request', body=err_xml(
+                            'A master instance group must specify a single'
+                            ' instance'))
+
+                    master_instance_type = instance_group.type
+
+                elif instance_group.role == 'CORE':
+                    slave_instance_type = instance_group.type
+                mock_groups.append(emr_group)
+                num_instances += instance_group.num_instances
+                roles.add(instance_group.role)
+
+                if 'TASK' in roles and 'CORE' not in roles:
+                    raise boto.exception.EmrResponseError(
+                        400, 'Bad Request', body=err_xml(
+                        'Clusters with task nodes must also define core'
+                        ' nodes.'))
+
+                if 'MASTER' not in roles:
+                    raise boto.exception.EmrResponseError(
+                        400, 'Bad Request', body=err_xml(
+                        'Zero master instance groups supplied, you must'
+                        ' specify exactly one master instance group'))
+
         job_flow = MockEmrObject(
             availabilityzone=availability_zone,
             bootstrapactions=[make_fake_action(a) for a in bootstrap_actions],
@@ -353,16 +473,19 @@ class MockEmrConnection(object):
             ec2keyname=ec2_keyname,
             hadoopversion=hadoop_version,
             instancecount=str(num_instances),
+            instancegroups=mock_groups,
             jobflowid=jobflow_id,
             keepjobflowalivewhennosteps=('true' if keep_alive else 'false'),
             laststatechangereason='Provisioning Amazon EC2 capacity',
             masterinstancetype=master_instance_type,
             name=name,
             normalizedinstancehours='9999',  # just need this filled in for now
-            slaveinstancetype=slave_instance_type,
             state='STARTING',
             steps=[],
         )
+
+        if slave_instance_type is not None:
+            job_flow.slaveinstancetype = slave_instance_type
 
         # AMI version is only set when you specify it explicitly
         if ami_version is not None:
@@ -397,21 +520,13 @@ class MockEmrConnection(object):
     def describe_jobflows(self, states=None, jobflow_ids=None,
                           created_after=None, created_before=None):
 
-        # mrjob.emr.describe_all_job_flows() needs this particular error
         if created_before:
             min_created_before = (datetime.datetime.utcnow() -
                                   datetime.timedelta(days=self.max_days_ago))
             if created_before < min_created_before:
                 raise boto.exception.BotoServerError(
-                    400, 'Bad Request', body="""\
-<ErrorResponse xmlns="http://elasticmapreduce.amazonaws.com/doc/2009-03-31">
-  <Error>
-    <Type>Sender</Type>
-    <Code>ValidationError</Code>
-    <Message>Created-before field is before earliest allowed value</Message>
-  </Error>
-  <RequestId>eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee</RequestId>
-</ErrorResponse>""")
+                    400, 'Bad Request', body=err_xml(
+                    'Created-before field is before earliest allowed value'))
 
         jfs = sorted(self.mock_emr_job_flows.itervalues(),
                      key=lambda jf: jf.creationdatetime,
@@ -499,6 +614,9 @@ class MockEmrConnection(object):
         if job_flow.state == 'STARTING':
             job_flow.state = 'WAITING'
             job_flow.startdatetime = to_iso8601(now)
+            # instances are now provisioned and running
+            for ig in job_flow.instancegroups:
+                ig.instancerunningcount = ig.instancerequestcount
 
         # if job is done, don't advance it
         if job_flow.state in ('COMPLETED', 'TERMINATED', 'FAILED'):

@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2011 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -92,15 +92,22 @@ def make_option_parser():
             'bootstrap_cmds',
             'bootstrap_files',
             'bootstrap_python_packages',
+            'ec2_core_instance_bid_price',
+            'ec2_core_instance_type',
             'ec2_instance_type',
             'ec2_key_pair',
+            'ec2_master_instance_bid_price',
             'ec2_master_instance_type',
             'ec2_slave_instance_type',
+            'ec2_task_instance_bid_price',
+            'ec2_task_instance_type',
             'emr_endpoint',
             'emr_job_flow_pool_name',
             'enable_emr_debugging',
             'hadoop_version',
+            'num_ec2_core_instances',
             'num_ec2_instances',
+            'num_ec2_task_instances',
             'pool_emr_job_flows',
             's3_endpoint',
             's3_log_uri',

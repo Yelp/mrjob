@@ -35,6 +35,7 @@ import types
 
 import boto.emr.connection
 import boto.emr.emrobject
+import boto.emr.instance_group
 from boto.emr.emrobject import RunJobFlowResponse
 from boto.emr.step import JarStep
 
@@ -290,3 +291,29 @@ class EmrConnection(boto.emr.connection.EmrConnection):
             for key, value in ig_dict.iteritems():
                 params['InstanceGroups.member.%d.%s' % (i+1, key)] = value
         return params
+
+
+
+# This version of InstanceGroup has spot support.
+class InstanceGroup(boto.emr.instance_group.InstanceGroup):
+    def __init__(self, num_instances, role, type, market, name, bidprice=None):
+        self.num_instances = num_instances
+        self.role = role
+        self.type = type
+        self.market = market
+        self.name = name
+        if market == 'SPOT':
+            if not isinstance(bidprice, basestring):
+                raise ValueError('bidprice must be specified if market == SPOT')
+            self.bidprice = bidprice
+
+    def __repr__(self):
+        if self.market == 'SPOT':
+            return '%s.%s(name=%r, num_instances=%r, role=%r, type=%r, market = %r, bidprice = %r)' % (
+                self.__class__.__module__, self.__class__.__name__,
+                self.name, self.num_instances, self.role, self.type, self.market,
+                self.bidprice)
+        else:
+            return '%s.%s(name=%r, num_instances=%r, role=%r, type=%r, market = %r)' % (
+                self.__class__.__module__, self.__class__.__name__,
+                self.name, self.num_instances, self.role, self.type, self.market)

@@ -40,7 +40,6 @@ from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.ssh import ssh_run_with_recursion
 from mrjob.util import scrape_options_into_new_groups
-from mrjob.util import log_to_stream
 
 
 def main():
@@ -65,8 +64,7 @@ def main():
 
     options, args = option_parser.parse_args()
 
-    if not options.quiet:
-        log_to_stream(name='mrjob', debug=options.verbose)
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     runner_kwargs = options.__dict__.copy()
     for unused_arg in ('output_dir', 'quiet', 'verbose'):

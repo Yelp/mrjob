@@ -31,6 +31,7 @@ try:
 except ImportError:
     import unittest
 
+from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
 from mrjob.util import scrape_options_into_new_groups
@@ -40,6 +41,30 @@ from mrjob.util import tar_and_gzip
 from mrjob.util import read_file
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import unarchive
+
+
+class BufferIteratorToLineIteratorTestCase(unittest.TestCase):
+
+    def test_empty(self):
+        self.assertEqual(
+            list(buffer_iterator_to_line_iterator(_ for _ in ())),
+            [])
+
+    def test_buffered_lines(self):
+        self.assertEqual(
+            list(buffer_iterator_to_line_iterator(chunk for chunk in
+                                                  ['The quick\nbrown fox\nju',
+                                                   'mped over\nthe lazy\ndog',
+                                                   's.\n'])),
+            ['The quick\n', 'brown fox\n', 'jumped over\n', 'the lazy\n',
+             'dogs.\n'])
+
+    def test_add_trailing_newline(self):
+        self.assertEqual(
+            list(buffer_iterator_to_line_iterator(chunk for chunk in
+                                                  ['Alouette,\ngentille',
+                                                   ' Alouette.'])),
+            ['Alouette,\n', 'gentille Alouette.\n'])
 
 
 class CmdLineTestCase(unittest.TestCase):

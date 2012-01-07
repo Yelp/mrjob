@@ -30,7 +30,6 @@ from optparse import OptionGroup
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.util import scrape_options_into_new_groups
-from mrjob.util import log_to_stream
 
 
 def main():
@@ -41,9 +40,7 @@ def main():
     if args:
         option_parser.error('takes no arguments')
 
-    # set up logging
-    if not options.quiet:
-        log_to_stream(name='mrjob', debug=options.verbose)
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     # create the persistent job
     runner_kwargs = options.__dict__.copy()

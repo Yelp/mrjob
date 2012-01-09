@@ -122,6 +122,7 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import PROTOCOL_DICT
 from mrjob.protocol import RawValueProtocol
 from mrjob.runner import CLEANUP_CHOICES
+from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
 from mrjob.util import read_input
@@ -566,6 +567,26 @@ class MRJob(object):
             # run locally by default
             return LocalMRJobRunner(**self.local_job_runner_kwargs())
 
+    @classmethod
+    def set_up_logging(cls, quiet=False, verbose=False, stream=None):
+        """Set up logging when running from the command line. This is also
+        used by the various command-line utilities.
+
+        :param bool quiet: If true, don't log. Overrides *verbose*.
+        :param bool verbose: If true, set log level to ``DEBUG`` (default is
+                             ``INFO``)
+        :param bool stream: Stream to log to (default is ``sys.stderr``)
+
+        This will also set up a null log handler for boto, so we don't get
+        warnings if boto tries to log about throttling and whatnot.
+        """
+        if quiet:
+            log_to_null(name='mrjob')
+        else:
+            log_to_stream(name='mrjob', debug=verbose, stream=stream)
+
+        log_to_null(name='boto')
+
     def run_job(self):
         """Run the all steps of the job, logging errors (and debugging output
         if :option:`--verbose` is specified) to STDERR and streaming the
@@ -574,9 +595,9 @@ class MRJob(object):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
-        if not self.options.quiet:
-            log_to_stream(
-                name='mrjob', stream=self.stderr, debug=self.options.verbose)
+        self.set_up_logging(quiet=self.options.quiet,
+                            verbose=self.options.verbose,
+                            stream=self.stderr)
 
         with self.make_runner() as runner:
             runner.run()
@@ -1227,15 +1248,48 @@ class MRJob(object):
             '--ec2-key-pair-file', dest='ec2_key_pair_file', default=None,
             help='Path to file containing SSH key for EMR')
 
+        # EMR instance types
+        self.emr_opt_group.add_option(
+            '--ec2-core-instance-type', '--ec2-slave-instance-type',
+            dest='ec2_core_instance_type', default=None,
+            help='Type of EC2 instance for core (or "slave") nodes only')
+
         self.emr_opt_group.add_option(
             '--ec2-master-instance-type', dest='ec2_master_instance_type',
             default=None,
             help='Type of EC2 instance for master node only')
 
         self.emr_opt_group.add_option(
-            '--ec2-slave-instance-type', dest='ec2_slave_instance_type',
+            '--ec2-task-instance-type', dest='ec2_task_instance_type',
             default=None,
-            help='Type of EC2 instance for slave nodes only')
+            help='Type of EC2 instance for task nodes only')
+
+        # EMR instance bid prices
+        self.emr_opt_group.add_option(
+            '--ec2-core-instance-bid-price',
+            dest='ec2_core_instance_bid_price', default=None,
+            help=(
+                'Bid price to specify for core (or "slave") nodes when'
+                ' setting them up as EC2 spot instances (you probably only'
+                ' want to set a bid price for task instances).')
+            )
+
+        self.emr_opt_group.add_option(
+            '--ec2-master-instance-bid-price',
+            dest='ec2_master_instance_bid_price', default=None,
+            help=(
+                'Bid price to specify for the master node when setting it up '
+                'as an EC2 spot instance (you probably only want to set '
+                'a bid price for task instances).')
+            )
+
+        self.emr_opt_group.add_option(
+            '--ec2-task-instance-bid-price',
+            dest='ec2_task_instance_bid_price', default=None,
+            help=(
+                'Bid price to specify for task nodes when '
+                'setting them up as EC2 spot instances.')
+            )
 
         self.emr_opt_group.add_option(
             '--emr-endpoint', dest='emr_endpoint', default=None,
@@ -1271,7 +1325,23 @@ class MRJob(object):
         self.emr_opt_group.add_option(
             '--num-ec2-instances', dest='num_ec2_instances', default=None,
             type='int',
-            help='Number of EC2 instances to launch')
+            help='Total number of EC2 instances to launch ')
+
+        # NB: EMR instance counts are only applicable for slave/core and
+        # task, since a master count > 1 causes the EMR API to return the
+        # ValidationError "A master instance group must specify a single
+        # instance".
+        self.emr_opt_group.add_option(
+            '--num-ec2-core-instances', dest='num_ec2_core_instances',
+            default=None, type='int',
+            help=('Number of EC2 instances to start as core (or "slave") '
+                  'nodes. Incompatible with --num-ec2-instances.'))
+
+        self.emr_opt_group.add_option(
+            '--num-ec2-task-instances', dest='num_ec2_task_instances',
+            default=None, type='int',
+            help=('Number of EC2 instances to start as task '
+                  'nodes. Incompatible with --num-ec2-instances.'))
 
         self.emr_opt_group.add_option(
             '--pool-emr-job-flows', dest='pool_emr_job_flows',
@@ -1770,34 +1840,33 @@ class MRJob(object):
     #: See :py:data:`mrjob.protocol` for the full list of protocols.
     OUTPUT_PROTOCOL = JSONProtocol
 
-    #: DEPRECATED
+    #: .. deprecated:: 0.3.0
     #:
     #: Default protocol for reading input to the first mapper in your job
     #: specified by a string.
     #:
-    #: Default: ``raw_value`` to match :py:attr:`.INPUT_PROTOCOL`, but
-    #: overridden by any changes to :py:attr:`.INPUT_PROTOCOL`.
+    #: Overridden by any changes to :py:attr:`.INPUT_PROTOCOL`.
     #:
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
     #: protocol strings. Can be overridden by :option:`--input-protocol`.
     DEFAULT_INPUT_PROTOCOL = 'raw_value'
 
-    #: DEPRECATED
+    #: .. deprecated:: 0.3.0
     #:
     #: Default protocol for communication between steps and final output
     #: specified by a string.
     #:
-    #: Default: ``json`` to match :py:attr:`.INTERNAL_PROTOCOL`, but
-    #: overridden by any changes to :py:attr:`.INTERNAL_PROTOCOL`.
+    #: Overridden by any changes to :py:attr:`.INTERNAL_PROTOCOL`.
     #:
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
     #: protocol strings. Can be overridden by :option:`--protocol`.
     DEFAULT_PROTOCOL = DEFAULT_PROTOCOL  # i.e. the one from mrjob.protocols
 
-    #: DEPRECATED
+    #: .. deprecated:: 0.3.0
     #:
-    #: Default protocol to use for writing output specified by a string.
-    #: Default: None.
+    #: Overridden by any changes to :py:attr:`.OUTPUT_PROTOCOL`. If
+    #: :py:attr:`.OUTPUT_PROTOCOL` is not set, defaults to
+    #: :py:attr:`.DEFAULT_PROTOCOL`.
     #:
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
     #: protocol strings. Can be overridden by the :option:`--output-protocol`.

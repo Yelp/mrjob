@@ -59,42 +59,50 @@ In addition, it ignores *hadoop_input_format*, *hadoop_output_format*, *hadoop_s
 Additional options for :py:class:`~mrjob.emr.EMRJobRunner`
 ----------------------------------------------------------
 
-============================= ============================== ========================================= ===================================================================
-Option                        Default                        Combined by                               Switches
-============================= ============================== ========================================= ===================================================================
-*additional_emr_info*         ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--additional-emr-info`
-*aws_access_key_id*           (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_ACCESS_KEY_ID`)
-*aws_availability_zone*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--aws-availability-zone`
-*aws_secret_access_key*       (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_SECRET_ACCESS_KEY`)
-*aws_region*                  (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--aws-region`
-*bootstrap_actions*           ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--bootstrap-action`
-*bootstrap_cmds*              ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--bootstrap-cmd`
-*bootstrap_files*             ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--bootstrap-file`
-*bootstrap_python_packages*   ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--bootstrap-python-package`
-*bootstrap_scripts*           ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--bootstrap-script`
-*check_emr_status_every*      ``30``                         :py:func:`~mrjob.conf.combine_values`     :option:`--check-emr-status-every`
-*ec2_instance_type*           (effectively ``m1.small``)     :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-instance-type`
-*ec2_key_pair*                ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-key-pair`
-*ec2_key_pair_file*           ``None``                       :py:func:`~mrjob.conf.combine_paths`      :option:`--ec2-key-pair-file`
-*ec2_master_instance_type*    ``'m1.small'``                 :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-master-instance-type`
-*ec2_slave_instance_type*     ``'m1.small'``                 :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-slave-instance-type`
-*emr_endpoint*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--emr-endpoint`
-*emr_job_flow_id*             (create our own job flow)      :py:func:`~mrjob.conf.combine_values`     :option:`--emr-job-flow-id`
-*emr_job_flow_pool_name*      ``'default'``                  :py:func:`~mrjob.conf.combine_values`     :option:`--pool-name`
-*enable_emr_debugging*        ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--enable-emr-debugging`, :option:`--disable-emr-debugging`
-*hadoop_streaming_jar_on_emr* ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-streaming-jar-on-emr`
-*hadoop_version*              ``'0.20'``                     :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-version`
-*num_ec2_instances*           ``1``                          :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-instances`
-*pool_emr_job_flows*          ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--pool-emr-job-flows`
-*s3_endpoint*                 (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-endpoint`
-*s3_log_uri*                  (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-log-uri`
-*s3_scratch_uri*              (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--s3-scratch-uri`
-*s3_sync_wait_time*           ``5.0``                        :py:func:`~mrjob.conf.combine_values`     :option:`--s3-sync-wait-time`
-*ssh_bin*                     :command:`ssh`                 :py:func:`~mrjob.conf.combine_cmds`       :option:`--ssh-bin`
-*ssh_bind_ports*              ``range(40001, 40841)``        :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-bind-ports`
-*ssh_tunnel_to_job_tracker*   ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-to-job-tracker`
-*ssh_tunnel_is_open*          ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-is-open`, :option:`--ssh-tunnel-is-closed`
-============================= ============================== ========================================= ===================================================================
+=============================== ============================== ========================================= ===================================================================
+Option                          Default                        Combined by                               Switches
+=============================== ============================== ========================================= ===================================================================
+*additional_emr_info*           ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--additional-emr-info`
+*ami_version*                   ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--ami-version`
+*aws_access_key_id*             (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_ACCESS_KEY_ID`)
+*aws_availability_zone*         (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--aws-availability-zone`
+*aws_region*                    (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--aws-region`
+*aws_secret_access_key*         (automatic)                    :py:func:`~mrjob.conf.combine_values`     (set :envvar:`AWS_SECRET_ACCESS_KEY`)
+*bootstrap_actions*             ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--bootstrap-action`
+*bootstrap_cmds*                ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--bootstrap-cmd`
+*bootstrap_files*               ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--bootstrap-file`
+*bootstrap_python_packages*     ``[]``                         :py:func:`~mrjob.conf.combine_path_lists` :option:`--bootstrap-python-package`
+*bootstrap_scripts*             ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--bootstrap-script`
+*check_emr_status_every*        ``30``                         :py:func:`~mrjob.conf.combine_values`     :option:`--check-emr-status-every`
+*ec2_core_instance_bid_price*   ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-core-instance-bid-price`
+*ec2_core_instance_type*        ``'m1.small'``                 :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-core-instance-type`
+*ec2_instance_type*             (effectively ``m1.small``)     :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-instance-type`
+*ec2_key_pair*                  ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-key-pair`
+*ec2_key_pair_file*             ``None``                       :py:func:`~mrjob.conf.combine_paths`      :option:`--ec2-key-pair-file`
+*ec2_master_instance_bid_price* ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-master-instance-bid-price`
+*ec2_master_instance_type*      ``'m1.small'``                 :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-master-instance-type`
+*ec2_slave_instance_type*       (see *ec2_core_instance_type*) :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-slave-instance-type`
+*ec2_task_instance_bid_price*   ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-task-instance-bid-price`
+*ec2_task_instance_type*        (effectively ``'m1.small'``)   :py:func:`~mrjob.conf.combine_values`     :option:`--ec2-task-instance-type`
+*emr_endpoint*                  (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--emr-endpoint`
+*emr_job_flow_id*               (create our own job flow)      :py:func:`~mrjob.conf.combine_values`     :option:`--emr-job-flow-id`
+*emr_job_flow_pool_name*        ``'default'``                  :py:func:`~mrjob.conf.combine_values`     :option:`--pool-name`
+*enable_emr_debugging*          ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--enable-emr-debugging`, :option:`--disable-emr-debugging`
+*hadoop_streaming_jar_on_emr*   ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-streaming-jar-on-emr`
+*hadoop_version*                ``'0.20'``                     :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-version`
+*num_ec2_core_instances*        ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-core-instances`
+*num_ec2_instances*             ``1``                          :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-instances`
+*num_ec2_task_instances*        ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-task-instances`
+*pool_emr_job_flows*            ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--pool-emr-job-flows`, :option:`--no-pool-emr-job-flows`
+*s3_endpoint*                   (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-endpoint`
+*s3_log_uri*                    (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-log-uri`
+*s3_scratch_uri*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--s3-scratch-uri`
+*s3_sync_wait_time*             ``5.0``                        :py:func:`~mrjob.conf.combine_values`     :option:`--s3-sync-wait-time`
+*ssh_bin*                       :command:`ssh`                 :py:func:`~mrjob.conf.combine_cmds`       :option:`--ssh-bin`
+*ssh_bind_ports*                ``range(40001, 40841)``        :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-bind-ports`
+*ssh_tunnel_is_open*            ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-is-open`, :option:`--ssh-tunnel-is-closed`
+*ssh_tunnel_to_job_tracker*     ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--ssh-tunnel-to-job-tracker`
+=============================== ============================== ========================================= ===================================================================
 
 See :py:meth:`mrjob.emr.EMRJobRunner.__init__` for details.
 

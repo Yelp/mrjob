@@ -168,6 +168,30 @@ class PickleValueProtocol(object):
         return cPickle.dumps(value).encode('string_escape')
 
 
+# This was added in 0.3, so no @classmethod for backwards compatibility
+class RawProtocol(object):
+    """Encode ``(key, value)`` as ``key`` and ``value`` separated by
+    a tab (``key`` and ``value`` should be bytestrings).
+
+    If ``key`` or ``value`` is ``None``, don't include a tab. When decoding a
+    line with no tab in it, ``value`` will be ``None``.
+
+    When reading from a line with multiple tabs, we break on the first one.
+
+    Your key should probably not be ``None`` or have tab characters in it, but
+    we don't check.
+    """
+    def read(cls, line):
+        key_value = line.split('\t', 1)
+        if len(key_value) == 1:
+            key_value.append(None)
+
+        return tuple(key_value)
+
+    def write(cls, key, value):
+        return '\t'.join(x for x in (key, value) if x is not None)
+
+
 class RawValueProtocol(object):
     """Read in a line as ``(None, line)``. Write out ``(key, value)``
     as ``value``. ``value`` must be a ``str``.
@@ -212,12 +236,12 @@ class ReprValueProtocol(object):
     def write(cls, key, value):
         return repr(value)
 
-#: DEPRECATED
+#: .. deprecated:: 0.3.0
 #:
 #: Formerly the default protocol for all encoded input and output: ``'json'``
 DEFAULT_PROTOCOL = 'json'
 
-#: DEPRECATED
+#: .. deprecated:: 0.3.0
 #:
 #: Default mapping from protocol name to class:
 #:

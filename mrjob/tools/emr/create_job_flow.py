@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2011 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ from optparse import OptionGroup
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.util import scrape_options_into_new_groups
-from mrjob.util import log_to_stream
 
 
 def main():
@@ -41,9 +40,7 @@ def main():
     if args:
         option_parser.error('takes no arguments')
 
-    # set up logging
-    if not options.quiet:
-        log_to_stream(name='mrjob', debug=options.verbose)
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     # create the persistent job
     runner_kwargs = options.__dict__.copy()
@@ -95,15 +92,22 @@ def make_option_parser():
             'bootstrap_cmds',
             'bootstrap_files',
             'bootstrap_python_packages',
+            'ec2_core_instance_bid_price',
+            'ec2_core_instance_type',
             'ec2_instance_type',
             'ec2_key_pair',
+            'ec2_master_instance_bid_price',
             'ec2_master_instance_type',
             'ec2_slave_instance_type',
+            'ec2_task_instance_bid_price',
+            'ec2_task_instance_type',
             'emr_endpoint',
             'emr_job_flow_pool_name',
             'enable_emr_debugging',
             'hadoop_version',
+            'num_ec2_core_instances',
             'num_ec2_instances',
+            'num_ec2_task_instances',
             'pool_emr_job_flows',
             's3_endpoint',
             's3_log_uri',

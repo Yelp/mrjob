@@ -52,7 +52,6 @@ from mrjob.logparsers import STEP_LOGS
 from mrjob.logparsers import JOB_LOGS
 from mrjob.logparsers import NODE_LOGS
 from mrjob.util import scrape_options_into_new_groups
-from mrjob.util import log_to_stream
 
 
 def main():
@@ -107,8 +106,7 @@ def main():
 
     options, args = option_parser.parse_args()
 
-    if not options.quiet:
-        log_to_stream(name='mrjob', debug=options.verbose)
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     if options.step_num:
         step_nums = [options.step_num]

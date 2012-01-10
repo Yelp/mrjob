@@ -113,9 +113,9 @@ def parse_label_and_owner(job_or_step_name):
         return None, None
 
 
-def job_flow_to_intervals(job_flow):
-
-    now = datetime.utcnow()
+def job_flow_to_intervals(job_flow, now=None):
+    if now is None:
+        now = datetime.utcnow()
 
     jf_start = to_datetime(job_flow.startdatetime)
     # once the job flow starts, it takes some time to bootstrap
@@ -166,7 +166,7 @@ def job_flow_to_intervals(job_flow):
         if step_end is None:
             step_end = now
 
-        step_label, step_owner = parse_label_and_owner(job_flow.name)
+        step_label, step_owner = parse_label_and_owner(step.name)
 
         intervals.append({
             'label': step_label,
@@ -185,11 +185,11 @@ def job_flow_to_intervals(job_flow):
     # fill normalized usage information
     for interval in intervals:
 
-        interval['nih'] = (
+        interval['nih_used'] = (
             nih_per_sec *
             to_secs(interval['end'] - interval['start']))
 
-        interval['date_to_nih'] = dict(
+        interval['date_to_nih_used'] = dict(
             (d, nih_per_sec * secs)
             for d, secs
             in subdivide_interval_by_date(interval['start'],
@@ -205,33 +205,39 @@ def job_flow_to_intervals(job_flow):
             in subdivide_interval_by_date(interval['start'],
                                           interval['end_billing']).iteritems())
         # time billed but not used
-        interval['nih_bbnu'] = interval['nih_billed'] - interval['nih']
+        interval['nih_bbnu'] = interval['nih_billed'] - interval['nih_used']
 
-        interval['date_to_nih_bbnu'] = dict(
-            (d, nih_billed - interval['date_to_nih'].get(d, 0.0))
-            for d, nih_billed
-            in interval['date_to_nih_billed'].iteritems())
+        interval['date_to_nih_bbnu'] = {}
+        for d, nih_billed in interval['date_to_nih_billed'].iteritems():
+            nih_bbnu = nih_billed - interval['date_to_nih_used'].get(d, 0.0)
+            if nih_bbnu:
+                interval['date_to_nih_bbnu'][d] = nih_bbnu
 
     return intervals
 
+
 def subdivide_interval_by_date(start, end):
     if start.date() == end.date():
-        return {start.date(): to_secs(end - start)}
+        date_to_secs = {start.date(): to_secs(end - start)}
+    else:
+        date_to_secs = {}
 
-    date_to_secs = {}
+        date_to_secs[start.date()] = to_secs(
+            datetime(start.year, start.month, start.day) + timedelta(days=1) -
+            start)
 
-    date_to_secs[start.date()] = to_secs(
-        datetime(start.year, start.month, start.day) + timedelta(days=1) -
-        start)
+        date_to_secs[end.date()] = to_secs(
+            end - datetime(end.year, end.month, end.day))
 
-    date_to_secs[end.date()] = to_secs(
-        end - datetime(end.year, end.month, end.day))
+        # fill in dates in the middle
+        cur_date = start.date() + timedelta(days=1)
+        while cur_date < end.date():
+            date_to_secs[cur_date] = to_secs(timedelta(days=1))
+            cur_date += timedelta(days=1)
 
-    # fill in dates in the middle
-    cur_date = start.date() + timedelta(days=1)
-    while cur_date < end.date():
-        date_to_secs[cur_date] = to_secs(timedelta(days=1))
-        cur_date += timedelta(days=1)
+    # remove zeros
+    date_to_secs = dict(
+        (d, secs) for d, secs in date_to_secs.iteritems() if secs)
 
     return date_to_secs
 
@@ -588,6 +594,7 @@ def to_secs(delta):
     return (delta.days * 86400.0 +
             delta.seconds +
             delta.microseconds / 1000000.0)
+
 
 def to_timestamp(iso8601_time):
     if iso8601_time is None:

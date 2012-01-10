@@ -122,16 +122,21 @@ def job_flow_to_intervals(job_flow, now=None):
     jf_ready = to_datetime(getattr(job_flow, 'readydatetime', None)) or now
     jf_end = to_datetime(getattr(job_flow, 'enddatetime', None))
 
-    # figure out effective end time for job, since we are billed
-    # for the full hour
-    if not jf_end:
-        jf_end_billing = now
-    else:
-        full_hours = math.ceil(to_secs(jf_end - jf_start) / 60.0 / 60.0)
-        jf_end_billing = jf_start + timedelta(hours=full_hours)
-
+    # Figure out billing rate per second for the job, given that
+    # normalizedinstancehours is how much we're charged up until
+    # the next full hour.
+    full_hours = math.ceil(to_secs((jf_end or now) - jf_start) / 60.0 / 60.0)
     jf_nih = float(job_flow.normalizedinstancehours)
-    nih_per_sec = jf_nih / to_secs(jf_end_billing - jf_start)
+    nih_per_sec = jf_nih / (full_hours * 3600.0)
+
+    # Don't actually count a step as billed for the full hour until
+    # the job flow finishes. This means that our total "nih_billed"
+    # will be less than normalizedinstancehours in the job flow, but it
+    # also keeps stats stable for steps that have already finished.
+    if jf_end:
+        jf_end_billing = jf_start + timedelta(hours=full_hours)
+    else:
+        jf_end_billing = now
 
     jf_label, jf_owner = parse_label_and_owner(job_flow.name)
 

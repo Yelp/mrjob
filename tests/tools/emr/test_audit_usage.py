@@ -104,15 +104,15 @@ class JobFlowToIntervalsTestCase(unittest.TestCase):
         self.assertEqual(
             intervals,
             [{
-                'date_to_nih_used': {date(2010, 6, 6): 5.0},
-                'date_to_nih_bbnu': {date(2010, 6, 6): 5.0},
-                'date_to_nih_billed': {date(2010, 6, 6): 10.0},
+                'date_to_nih_used': {date(2010, 6, 6): 2.5},
+                'date_to_nih_bbnu': {date(2010, 6, 6): 2.5},
+                'date_to_nih_billed': {date(2010, 6, 6): 5.0},
                 'end': datetime(2010, 6, 6, 0, 15),
                 'end_billing': datetime(2010, 6, 6, 0, 30),
                 'label': 'mr_exciting',
-                'nih_used': 5.0,
-                'nih_bbnu': 5.0,
-                'nih_billed': 10.0,
+                'nih_used': 2.5,
+                'nih_bbnu': 2.5,
+                'nih_billed': 5.0,
                 'owner': 'woo',
                 'pool': None,
                 'start': datetime(2010, 6, 6, 0, 0),
@@ -132,15 +132,15 @@ class JobFlowToIntervalsTestCase(unittest.TestCase):
         self.assertEqual(
             intervals,
             [{
-                'date_to_nih_used': {date(2010, 6, 6): 10.0},
+                'date_to_nih_used': {date(2010, 6, 6): 5.0},
                 'date_to_nih_bbnu': {},
-                'date_to_nih_billed': {date(2010, 6, 6): 10.0},
+                'date_to_nih_billed': {date(2010, 6, 6): 5.0},
                 'end': datetime(2010, 6, 6, 0, 30),
                 'end_billing': datetime(2010, 6, 6, 0, 30),
                 'label': 'mr_exciting',
-                'nih_used': 10.0,
+                'nih_used': 5.0,
                 'nih_bbnu': 0.0,
-                'nih_billed': 10.0,
+                'nih_billed': 5.0,
                 'owner': 'woo',
                 'pool': None,
                 'start': datetime(2010, 6, 6, 0, 0),
@@ -177,10 +177,10 @@ class JobFlowToIntervalsTestCase(unittest.TestCase):
                 'start': datetime(2010, 6, 5, 23, 30),
             }])
 
-    def test_job_flow_with_step_still_running(self):
+    def test_job_flow_with_one_still_running_step(self):
         job_flow = MockEmrObject(
             name='mr_exciting.woo.20100605.000359.000000',
-            normalizedinstancehours='15',
+            normalizedinstancehours='20',
             readydatetime='2010-06-06T04:15:00Z',  # only 15 minutes "used"
             startdatetime='2010-06-06T04:00:00Z',
             steps=[

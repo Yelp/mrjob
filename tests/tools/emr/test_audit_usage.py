@@ -22,6 +22,7 @@ from mrjob import boto_2_1_1_83aae37b
 from mrjob.tools.emr.audit_usage import job_flow_to_full_summary
 from mrjob.tools.emr.audit_usage import subdivide_interval_by_date
 from mrjob.tools.emr.audit_usage import main
+from mrjob.tools.emr.audit_usage import percent
 from tests.mockboto import MockEmrObject
 from tests.test_emr import MockEMRAndS3TestCase
 
@@ -228,6 +229,39 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             'ready': None,
             'start': None,
             'state': 'STARTING',
+            'usage': [],
+        })
+
+    def test_job_flow_that_was_terminated_before_starting(self):
+        job_flow = MockEmrObject(
+            creationdatetime='2010-06-05T23:59:00Z',
+            enddatetime='2010-06-06T00:01:00Z',
+            jobflowid='j-ISFORJOURNEY',
+            name='mr_exciting.woo.20100605.235850.000000',
+            normalizedinstancehours='0',
+            state='TERMINATED',
+        )
+
+        summary = job_flow_to_full_summary(
+            job_flow, now=datetime(2010, 6, 6, 0, 30))
+
+        self.assertEqual(summary, {
+            'created': datetime(2010, 6, 5, 23, 59),
+            'end': datetime(2010, 6, 6, 0, 1),
+            'id': 'j-ISFORJOURNEY',
+            'label': 'mr_exciting',
+            'name': 'mr_exciting.woo.20100605.235850.000000',
+            'nih': 0.0,
+            'nih_bbnu': 0.0,
+            'nih_billed': 0.0,
+            'nih_used': 0.0,
+            'num_steps': 0,
+            'owner': 'woo',
+            'pool': None,
+            'ran': timedelta(0),
+            'ready': None,
+            'start': None,
+            'state': 'TERMINATED',
             'usage': [],
         })
 
@@ -734,3 +768,14 @@ class SubdivideIntervalByDateTestCase(unittest.TestCase):
              date(2010, 6, 9): 86400.0,
              date(2010, 6, 10): 18000.0}
         )
+
+
+class PercentTestCase(unittest.TestCase):
+
+    def test_basic(self):
+        self.assertEqual(62.5, percent(5, 8))
+
+    def test_default(self):
+        self.assertEqual(0.0, percent(1, 0))
+        self.assertEqual(0.0, percent(0, 0))
+        self.assertEqual(None, percent(0, 0, default=None))

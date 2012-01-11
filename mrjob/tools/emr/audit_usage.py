@@ -59,7 +59,7 @@ def main(args):
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
-    now = get_now()
+    now = datetime.utcnow()
 
     log.info('getting job flow history...')
     job_flows = get_job_flows(options.conf_path, options.max_days_ago, now=now)
@@ -94,6 +94,51 @@ def make_option_parser():
 
 
 def job_flows_to_stats(job_flows, now=None):
+    """Aggregate statistics for several job flows into a dictionary.
+
+    :param job_flows: a list of :py:class:`boto.emr.EmrObject`
+    :param now: the current UTC time, as a :py:class:`datetime.datetime`.
+                Defaults to the current time.
+
+    Returns a dictionary with many keys, including:
+
+    * *flows*: A list of dictionaries; the result of running
+      :py:func:`job_flow_to_full_summary` on each job flow.
+
+    total usage:
+
+    * *nih_billed*: total normalized instances hours billed, for all job flows
+    * *nih_used*: total normalized instance hours actually used for
+      bootstrapping and running jobs.
+    * *nih_bbnu*: total usage billed but not used (`nih_billed - nih_used`)
+
+    further breakdown of total usage:
+
+    * *bootstrap_nih_used*: total usage for bootstrapping
+    * *end_nih_bbnu*: unused time at the end of job flows
+    * *job_nih_used*: total usage for jobs (`nih_used - bootstrap_nih_used`)
+    * *other_nih_bbnu*: other unused time (`nih_bbnu - end_nih_bbnu`)
+
+    grouping by various keys:
+
+    (There is a *_used*, *_billed*, and *_bbnu* version of all stats below)
+
+    * *date_to_nih_\**: map from a :py:class:`datetime.date` to number
+      of normalized instance hours.
+    * *label_to_nih_\**: map from jobs' labels (usually the module name of
+      the job) to normalized instance hours, with ``None`` for
+      non-:py:mod:`mrjob` jobs. This includes usage data for bootstrapping.
+    * *job_step_to_nih_\**: map from jobs' labels and step number to
+      normalized instance hours, using ``(None, None)`` for non-:py:mod:`mrjob`
+      jobs. This does not include bootstrapping.
+    * *job_step_to_nih_\*_no_pool*: Same as *job_step_to_nih_\**, but only
+      including non-pooled job flows.
+    * *owner_to_nih_\**: map from jobs' owners (usually the user who ran them)
+      to normalized instance hours, with ``None`` for non-:py:mod:`mrjob` jobs.
+      This includes usage data for bootstrapping.
+    * *pool_to_nih_\**: Map from pool name to normalized instance hours,
+      with ``None`` for non-pooled jobs and non-:py:mod:`mrjob` jobs.
+    """
     s = {}  # stats for all job flows
 
     s['flows'] = [job_flow_to_full_summary(job_flow, now=now)
@@ -102,6 +147,14 @@ def job_flows_to_stats(job_flows, now=None):
     # total usage
     for nih_type in ('nih_billed', 'nih_used', 'nih_bbnu'):
         s[nih_type] = float(sum(jf[nih_type] for jf in s['flows']))
+
+    # break down by usage/waste
+    s['bootstrap_nih_used'] = float(sum(
+        jf['usage'][0]['nih_used'] for jf in s['flows'] if jf['usage']))
+    s['job_nih_used'] = s['nih_used'] - s['bootstrap_nih_used']
+    s['end_nih_bbnu'] = float(sum(
+        jf['usage'][-1]['nih_bbnu'] for jf in s['flows'] if jf['usage']))
+    s['other_nih_bbnu'] = s['nih_bbnu'] - s['end_nih_bbnu']
 
     # stats by date
     for nih_type in ('nih_billed', 'nih_used', 'nih_bbnu'):
@@ -112,18 +165,6 @@ def job_flows_to_stats(job_flows, now=None):
                     date_to_nih.setdefault(d, 0.0)
                     date_to_nih[d] += nih
         s['date_to_%s' % nih_type] = date_to_nih
-
-    # break down by usage/waste
-    s['bootstrap_nih_used'] = float(sum(
-        jf['usage'][0]['nih_used'] for jf in s['flows'] if jf['usage']))
-    s['job_nih_used'] = float(sum(
-        sum(u['nih_used'] for u in jf['usage'][1:])
-        for jf in s['flows']))
-    s['end_nih_bbnu'] = float(sum(
-        jf['usage'][-1]['nih_bbnu'] for jf in s['flows'] if jf['usage']))
-    s['other_nih_bbnu'] = float(sum(
-        sum(u['nih_bbnu'] for u in jf['usage'][:-1])
-        for jf in s['flows']))
 
     # break down by label ("job name") and owner ("user")
     for key in ('label', 'owner'):
@@ -165,7 +206,22 @@ def job_flows_to_stats(job_flows, now=None):
 
 def job_flow_to_full_summary(job_flow, now=None):
     """Convert a job flow to a full summary for use in creating a report,
-    including billing/usage information."""
+    including billing/usage information.
+
+    :param job_flow: a :py:class:`boto.emr.EmrObject`
+    :param now: the current UTC time, as a :py:class:`datetime.datetime`.
+                Defaults to the current time.
+
+    Returns a dictionary with the keys from
+    :py:func:`job_flow_to_basic_summary` plus:
+
+    * *nih_billed*: total normalized instances hours billed for this job flow
+    * *nih_used*: total normalized instance hours actually used for
+      bootstrapping and running jobs.
+    * *nih_bbnu*: total usage billed but not used (`nih_billed - nih_used`)
+    * *usage*: job-specific usage information, returned by
+      :py:func:`job_flow_to_usage_data`.
+    """
 
     jf = job_flow_to_basic_summary(job_flow, now=now)
 
@@ -185,13 +241,41 @@ def job_flow_to_full_summary(job_flow, now=None):
 
 
 def job_flow_to_basic_summary(job_flow, now=None):
-    """Extract fields such as creation time, owner, etc. from the job flow.
+    """Extract fields such as creation time, owner, etc. from the job flow,
+    so we can safely reference them without using :py:func:`getattr`.
 
-    We need to extract this information before we can compute billing
-    information for the full summary.
+    :param job_flow: a :py:class:`boto.emr.EmrObject`
+    :param now: the current UTC time, as a :py:class:`datetime.datetime`.
+                Defaults to the current time.
+
+    Returns a dictionary with the following keys. These will be ``None`` if the
+    corresponding field in the job flow is unavailable.
+
+    * *created*: UTC `datetime.datetime` that the job flow was created,
+      or ``None``
+    * *end*: UTC `datetime.datetime` that the job flow finished, or ``None``
+    * *id*: job flow ID, or ``None`` (this should never happen)
+    * *label*: The label for the job flow (usually the module name of the
+      :py:class:`~mrjob.job.MRJob` script that started it), or
+      ``None`` for non-:py:mod:`mrjob` job flows.
+    * *name*: job flow name, or ``None`` (this should never happen)
+    * *nih*: number of normalized instance hours used by the job flow.
+    * *num_steps*: Number of steps in the job flow.
+    * *owner*: The owner for the job flow (usually the user that started it),
+      or ``None`` for non-:py:mod:`mrjob` job flows.
+    * *pool*: pool name (e.g. ``'default'``) if the job flow is pooled,
+      otherwise ``None``.
+    * *ran*: How long the job flow ran, or has been running, as a
+      :py:class:`datetime.timedelta`. This will be ``timedelta(0)`` if
+      the job flow hasn't started.
+    * *ready*: UTC `datetime.datetime` that the job flow finished
+      bootstrapping, or ``None``
+    * *start*: UTC `datetime.datetime` that the job flow became available, or
+      ``None``
+    * *state*: The job flow's state as a string (e.g. ``'RUNNING'``)
     """
     if now is None:
-        now = get_now()
+        now = datetime.utcnow()
 
     jf = {}  # summary to fill in
 
@@ -203,7 +287,10 @@ def job_flow_to_basic_summary(job_flow, now=None):
     jf['ready'] = to_datetime(getattr(job_flow, 'readydatetime', None))
     jf['end'] = to_datetime(getattr(job_flow, 'enddatetime', None))
 
-    jf['ran'] = (jf['end'] or now) - (jf['start'] or now)
+    if jf['start']:
+        jf['ran'] = (jf['end'] or now) - jf['start']
+    else:
+        jf['ran'] = timedelta(0)
 
     jf['state'] = getattr(job_flow, 'state', None)
 
@@ -228,15 +315,45 @@ def job_flow_to_basic_summary(job_flow, now=None):
 
 
 def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
-    """Divide job flow into a list of dictionaries containing usage
-    information, one for bootstrapping, and one for each step.
+    """Break billing/usage information for a job flow down by job.
 
-    If the job flow hasn't started yet, return []
+    :param job_flow: a :py:class:`boto.emr.EmrObject`
+    :param basic_summary: a basic summary of the job flow, returned by
+                          :py:func:`job_flow_to_basic_summary`. If this
+                          is ``None``, we'll call
+                          :py:func:`job_flow_to_basic_summary` ourselves.
+    :param now: the current UTC time, as a :py:class:`datetime.datetime`.
+                Defaults to the current time.
+
+    Returns a list of dictionaries containing usage information, one for
+    bootstrapping, and one for each step that ran or is currently running. If
+    the job flow hasn't started yet, return ``[]``.
+
+    Usage dictionaries have the following keys:
+
+    * *end*: when the job finished running, or *now* if it's still running.
+    * *end_billing*: the effective end of the job for billing purposes, either
+      when the next job starts, the current time if the job
+      is still running, or the end of the next full hour
+      in the job flow.
+    * *nih_billed*: normalized instances hours billed for this job or
+      bootstrapping step
+    * *nih_used*: normalized instance hours actually used for running
+      the job or bootstrapping
+    * *nih_bbnu*: usage billed but not used (`nih_billed - nih_used`)
+    * *date_to_nih_\**: map from a :py:class:`datetime.date` to number
+      of normalized instance hours billed/used/billed but not used
+    * *label*: job's label (usually the module name of the job), or for the
+      bootstrapping step, the label of the job flow
+    * *owner*: job's owner (usually the user that started it), or for the
+      bootstrapping step, the owner of the job flow
+    * *start*: when the job or bootstrapping step started, as a
+      :py:class:`datetime.datetime`
     """
     jf = basic_summary or job_flow_to_basic_summary(job_flow)
 
     if now is None:
-        now = get_now()
+        now = datetime.utcnow()
 
     if not jf['start']:
         return []
@@ -341,6 +458,11 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
 
 
 def subdivide_interval_by_date(start, end):
+    """Convert a time interval to a map from :py:class:`datetime.date` to
+    the number of seconds within the interval on that date.
+
+    *start* and *end* are :py:class:`datetime.datetime` objects.
+    """
     if start.date() == end.date():
         date_to_secs = {start.date(): to_secs(end - start)}
     else:
@@ -366,15 +488,18 @@ def subdivide_interval_by_date(start, end):
     return date_to_secs
 
 
-def get_now():
-    """get the current time, without microseconds, which just make our
-    report messy."""
-    return datetime.utcnow().replace(microsecond=0)
-
-
 def get_job_flows(conf_path, max_days_ago=None, now=None):
+    """Get relevant job flow information from EMR.
+
+    :param str conf_path: Alternate path to read :py:mod:`mrjob.conf` from, or
+                          ``False`` to ignore all config files.
+    :param float max_days_ago: If set, don't fetch job flows created longer
+                               than this many days ago.
+    :param now: the current UTC time, as a :py:class:`datetime.datetime`.
+                Defaults to the current time.
+    """
     if now is None:
-        now = get_now()
+        now = datetime.utcnow()
 
     emr_conn = EMRJobRunner(conf_path=conf_path).make_emr_conn()
 
@@ -387,8 +512,14 @@ def get_job_flows(conf_path, max_days_ago=None, now=None):
 
 
 def print_report(stats, now=None):
+    """Print final report.
+
+    :param stats: a dictionary returned by :py:func:`job_flows_to_stats`
+    :param now: the current UTC time, as a :py:class:`datetime.datetime`.
+                Defaults to the current time.
+    """
     if now is None:
-        now = get_now()
+        now = datetime.utcnow()
 
     s = stats
 
@@ -404,7 +535,7 @@ def print_report(stats, now=None):
 
     print 'Min create time: %s' % min(jf['created'] for jf in s['flows'])
     print 'Max create time: %s' % max(jf['created'] for jf in s['flows'])
-    print '   Current time: %s' % now
+    print '   Current time: %s' % now.replace(microsecond=0)
     print
 
     print '* All usage is measured in Normalized Instance Hours, which are'
@@ -413,26 +544,31 @@ def print_report(stats, now=None):
     print
 
     # total compute-unit hours used
-    print 'Total billed:  %9.2f' % s['nih_billed']
-    print '  Total used:  %9.2f' % s['nih_used']
-    print '    bootstrap: %9.2f' % s['bootstrap_nih_used']
-    print '    jobs:      %9.2f' % s['job_nih_used']
-    print '  Total waste: %9.2f' % s['nih_bbnu']
-    print '    at end:    %9.2f' % s['end_nih_bbnu']
-    print '    other:     %9.2f' % s['other_nih_bbnu']
+    def with_pct(usage):
+        return (usage, percent(usage, s['nih_billed']))
+    
+    print 'Total billed:  %9.2f  %5.1f%%' % with_pct(s['nih_billed'])
+    print '  Total used:  %9.2f  %5.1f%%' % with_pct(s['nih_used'])
+    print '    bootstrap: %9.2f  %5.1f%%' % with_pct(s['bootstrap_nih_used'])
+    print '    jobs:      %9.2f  %5.1f%%' % with_pct(s['job_nih_used'])
+    print '  Total waste: %9.2f  %5.1f%%' % with_pct(s['nih_bbnu'])
+    print '    at end:    %9.2f  %5.1f%%' % with_pct(s['end_nih_bbnu'])
+    print '    other:     %9.2f  %5.1f%%' % with_pct(s['other_nih_bbnu'])
     print
 
     if s['date_to_nih_billed']:
         print 'Daily statistics:'
         print
-        print ' date        billed    used     waste'
+        print ' date          billed      used     waste   % waste'
         d = max(s['date_to_nih_billed'])
         while d >= min(s['date_to_nih_billed']):
-            print ' %10s %9.2f %9.2f %9.2f' % (
+            print ' %10s %9.2f %9.2f %9.2f     %5.1f' % (
                 d,
                 s['date_to_nih_billed'][d],
                 s['date_to_nih_used'].get(d, 0.0),
-                s['date_to_nih_bbnu'].get(d, 0.0))
+                s['date_to_nih_bbnu'].get(d, 0.0),
+                percent(s['date_to_nih_bbnu'].get(d, 0.0),
+                        s['date_to_nih_billed'][d]))
             d -= timedelta(days=1)
         print
 
@@ -528,21 +664,43 @@ def print_report(stats, now=None):
     for jf in all_job_flows:
         print ' %-15s %-13s %19s %3d %17s %9.2f %9.2f %8s %s' % (
             jf['id'], jf['state'], jf['created'], jf['num_steps'],
-            jf['ran'], jf['nih_used'], jf['nih_bbnu'],
+            strip_microseconds(jf['ran']), jf['nih_used'], jf['nih_bbnu'],
             (jf['owner'] or ''), (jf['label'] or ('not started by mrjob')))
 
 
 def to_secs(delta):
+    """Convert a :py:class:`datetime.timedelta` to a number of seconds.
+
+    (This is basically a backport of
+    :py:meth:`datetime.timedelta.total_seconds`.)
+    """
     return (delta.days * 86400.0 +
             delta.seconds +
             delta.microseconds / 1000000.0)
 
 
+def strip_microseconds(delta):
+    """Return the given :py:class:`datetime.timedelta`, without microseconds.
+    """
+    return timedelta(delta.days, delta.seconds)
+
+
 def to_datetime(iso8601_time):
+    """Convert a ISO8601-formatted datetime (from :py:mod:`boto`) to
+    a :py:class:`datetime.datetime`."""
     if iso8601_time is None:
         return None
 
     return datetime.strptime(iso8601_time, boto.utils.ISO8601)
+
+
+def percent(x, total, default=0.0):
+    """Return what percentage *x* is of *total*, or *default* if
+    *total* is zero."""
+    if total:
+        return 100.0 * x / total
+    else:
+        return default
 
 
 if __name__ == '__main__':

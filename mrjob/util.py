@@ -22,6 +22,7 @@ import bz2
 from collections import defaultdict
 import contextlib
 from copy import deepcopy
+from datetime import timedelta
 import glob
 import gzip
 import hashlib
@@ -450,6 +451,14 @@ def safeeval(expr, globals=None, locals=None):
         safe_globals.update(globals)
 
     return eval(expr, safe_globals, locals)
+
+
+def strip_microseconds(delta):
+    """Return the given :py:class:`datetime.timedelta`, without microseconds.
+
+    Useful for printing :py:class:`datetime.timedelta` objects.
+    """
+    return timedelta(delta.days, delta.seconds)
 
 
 def tar_and_gzip(dir, out_path, filter=None, prefix=''):

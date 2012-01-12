@@ -276,8 +276,8 @@ class LocalMRJobRunner(MRJobRunner):
             shutil.copyfile(path, dest)
 
     def _get_file_splits(self, input_paths, num_splits, keep_sorted=False):
-        """ Split the input files into (roughly) *num_splits* files. Compressed
-        files are not split, but each compressed file counts as one split.
+        """ Split the input files into (roughly) *num_splits* files. Gzipped
+        files are not split, but each gzipped file counts as one split.
 
         :param input_paths: Iterable of paths to be split
         :param num_splits: Number of splits to target
@@ -299,7 +299,7 @@ class LocalMRJobRunner(MRJobRunner):
 
         for input_path in input_paths:
             for path in self.ls(input_path):
-                if path.endswith('.gz') or path.endswith('.bz2'):
+                if path.endswith('.gz'):
                     # do not split compressed files
                     file_names[path] = {
                         'orig_name': path,

@@ -45,6 +45,7 @@ from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import STEP_NAME_RE
+from mrjob.util import strip_microseconds
 
 log = logging.getLogger('mrjob.tools.emr.audit_usage')
 
@@ -546,7 +547,7 @@ def print_report(stats, now=None):
     # total compute-unit hours used
     def with_pct(usage):
         return (usage, percent(usage, s['nih_billed']))
-    
+
     print 'Total billed:  %9.2f  %5.1f%%' % with_pct(s['nih_billed'])
     print '  Total used:  %9.2f  %5.1f%%' % with_pct(s['nih_used'])
     print '    bootstrap: %9.2f  %5.1f%%' % with_pct(s['bootstrap_nih_used'])
@@ -677,12 +678,6 @@ def to_secs(delta):
     return (delta.days * 86400.0 +
             delta.seconds +
             delta.microseconds / 1000000.0)
-
-
-def strip_microseconds(delta):
-    """Return the given :py:class:`datetime.timedelta`, without microseconds.
-    """
-    return timedelta(delta.days, delta.seconds)
 
 
 def to_datetime(iso8601_time):

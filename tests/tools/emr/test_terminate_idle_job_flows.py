@@ -21,12 +21,16 @@ from datetime import datetime
 from datetime import timedelta
 import sys
 
+from mrjob.tools.emr.terminate_idle_job_flows import (
+    inspect_and_maybe_terminate_job_flows,)
 from mrjob.tools.emr.terminate_idle_job_flows import is_job_flow_done
 from mrjob.tools.emr.terminate_idle_job_flows import is_job_flow_running
 from mrjob.tools.emr.terminate_idle_job_flows import is_job_flow_non_streaming
+from mrjob.tools.emr.terminate_idle_job_flows import job_flow_pool_name
 from mrjob.tools.emr.terminate_idle_job_flows import time_job_flow_idle
 from mrjob.tools.emr.terminate_idle_job_flows import (
-    inspect_and_maybe_terminate_job_flows,)
+    time_to_end_of_hour_for_job_flow,)
+
 from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
 from tests.mockboto import MockEmrConnection
@@ -44,9 +48,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         # empty job
         self.mock_emr_job_flows['j-EMPTY'] = MockEmrObject(
-            state='WAITING',
             creationdatetime=to_iso8601(self.now - timedelta(hours=10)),
-            steps=[],
+            state='WAITING',
         )
 
         # Build a step object easily
@@ -73,34 +76,35 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         # currently running job
         self.mock_emr_job_flows['j-CURRENTLY_RUNNING'] = MockEmrObject(
-            state='RUNNING',
             creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
-            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
+            startdatetime=to_iso8601(self.now - timedelta(hours=4,
+                                                          minutes=15)),
+            state='RUNNING',
             steps=[step(start_time_back=4, state='RUNNING')],
         )
 
         # finished job flow
         self.mock_emr_job_flows['j-DONE'] = MockEmrObject(
-            state='COMPLETE',
             creationdatetime=to_iso8601(self.now - timedelta(hours=10)),
-            startdatetime=to_iso8601(self.now - timedelta(hours=9)),
             enddatetime=to_iso8601(self.now - timedelta(hours=5)),
+            startdatetime=to_iso8601(self.now - timedelta(hours=9)),
+            state='COMPLETE',
             steps=[step(start_time_back=8, end_time_back=6)],
         )
 
         # idle job flow
         self.mock_emr_job_flows['j-DONE_AND_IDLE'] = MockEmrObject(
-            state='WAITING',
             creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
             startdatetime=to_iso8601(self.now - timedelta(hours=5)),
+            state='WAITING',
             steps=[step(start_time_back=4, end_time_back=2)],
         )
 
         # hive job flow (looks completed but isn't)
         self.mock_emr_job_flows['j-HIVE'] = MockEmrObject(
-            state='WAITING',
             creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
             startdatetime=to_iso8601(self.now - timedelta(hours=5)),
+            state='WAITING',
             steps=[step(
                 start_time_back=4,
                 end_time_back=4,
@@ -112,9 +116,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         # custom hadoop streaming jar
         self.mock_emr_job_flows['j-CUSTOM_DONE_AND_IDLE'] = MockEmrObject(
-            state='WAITING',
             creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
             startdatetime=to_iso8601(self.now - timedelta(hours=5)),
+            state='WAITING',
             steps=[step(
                 start_time_back=4,
                 end_time_back=4,
@@ -165,10 +169,46 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             ],
         )
 
+        # pooled job flow reaching end of full hour
+        self.mock_emr_job_flows['j-POOLED'] = MockEmrObject(
+            bootstrapactions=[
+                MockEmrObject(args=[]),
+                MockEmrObject(args=[
+                    MockEmrObject(
+                        value='pool-0123456789abcdef0123456789abcdef'),
+                    MockEmrObject(value='reflecting'),
+                ]),
+            ],
+            creationdatetime=to_iso8601(self.now - timedelta(hours=1)),
+            startdatetime=to_iso8601(self.now - timedelta(minutes=55)),
+            state='WAITING',
+            steps=[],
+        )
+
         # add job flow IDs and fake names to the mock job flows
         for jfid, jf in self.mock_emr_job_flows.iteritems():
             jf.jobflowid = jfid
             jf.name = jfid[2:].replace('_', ' ').title() + ' Job Flow'
+
+    def terminated_jfs(self):
+        return sorted(jf.jobflowid
+                      for jf in self.mock_emr_job_flows.itervalues()
+                      if jf.state in ('SHUTTING_DOWN', 'TERMINATED'))
+
+    def inspect_and_maybe_terminate_quietly(self, **kwargs):
+        if 'conf_path' not in kwargs:
+            kwargs['conf_path'] = False
+
+        if 'now' not in kwargs:
+            kwargs['now'] = self.now
+
+        # don't print anything out
+        real_stdout = sys.stdout
+        sys.stdout = StringIO()
+        try:
+            return inspect_and_maybe_terminate_job_flows(**kwargs)
+        finally:
+            sys.stdout = real_stdout
 
     def test_empty(self):
         jf = self.mock_emr_job_flows['j-EMPTY']
@@ -177,6 +217,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), False)
         self.assertEqual(is_job_flow_non_streaming(jf), False)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(hours=10))
+        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+                         timedelta(hours=1))
+        self.assertEqual(job_flow_pool_name(jf), None)
 
     def test_currently_running(self):
         jf = self.mock_emr_job_flows['j-CURRENTLY_RUNNING']
@@ -184,14 +227,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), True)
         self.assertEqual(is_job_flow_non_streaming(jf), False)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(0))
-
-    def test_done_and_idle(self):
-        jf = self.mock_emr_job_flows['j-DONE_AND_IDLE']
-
-        self.assertEqual(is_job_flow_done(jf), False)
-        self.assertEqual(is_job_flow_running(jf), False)
-        self.assertEqual(is_job_flow_non_streaming(jf), False)
-        self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(hours=2))
+        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+                         timedelta(minutes=45))
+        self.assertEqual(job_flow_pool_name(jf), None)
 
     def test_done(self):
         jf = self.mock_emr_job_flows['j-DONE']
@@ -200,6 +238,20 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), False)
         self.assertEqual(is_job_flow_non_streaming(jf), False)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(0))
+        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+                         timedelta(hours=1))
+        self.assertEqual(job_flow_pool_name(jf), None)
+
+    def test_done_and_idle(self):
+        jf = self.mock_emr_job_flows['j-DONE_AND_IDLE']
+
+        self.assertEqual(is_job_flow_done(jf), False)
+        self.assertEqual(is_job_flow_running(jf), False)
+        self.assertEqual(is_job_flow_non_streaming(jf), False)
+        self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(hours=2))
+        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+                         timedelta(hours=1))
+        self.assertEqual(job_flow_pool_name(jf), None)
 
     def test_hive_job_flow(self):
         jf = self.mock_emr_job_flows['j-HIVE']
@@ -208,6 +260,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), False)
         self.assertEqual(is_job_flow_non_streaming(jf), True)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(hours=4))
+        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+                         timedelta(hours=1))
+        self.assertEqual(job_flow_pool_name(jf), None)
 
     def test_hadoop_debugging_job_flow(self):
         jf = self.mock_emr_job_flows['j-HADOOP_DEBUGGING']
@@ -216,6 +271,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), False)
         self.assertEqual(is_job_flow_non_streaming(jf), False)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(hours=2))
+        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+                         timedelta(hours=1))
+        self.assertEqual(job_flow_pool_name(jf), None)
 
     def test_idle_and_failed(self):
         jf = self.mock_emr_job_flows['j-IDLE_AND_FAILED']
@@ -224,70 +282,139 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), False)
         self.assertEqual(is_job_flow_non_streaming(jf), False)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(hours=3))
+        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+                         timedelta(hours=1))
+        self.assertEqual(job_flow_pool_name(jf), None)
 
-    def test_inspect_and_maybe_terminate_job_flows(self):
+    def test_pooled(self):
+        jf = self.mock_emr_job_flows['j-POOLED']
 
-        def terminated_jfs():
-            return sorted(jf.jobflowid
-                          for jf in self.mock_emr_job_flows.itervalues()
-                          if jf.state in ('SHUTTING_DOWN', 'TERMINATED'))
+        self.assertEqual(is_job_flow_done(jf), False)
+        self.assertEqual(is_job_flow_running(jf), False)
+        self.assertEqual(is_job_flow_non_streaming(jf), False)
+        self.assertEqual(time_job_flow_idle(jf, self.now),
+                         timedelta(minutes=55))
+        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+                         timedelta(minutes=5))
+        self.assertEqual(job_flow_pool_name(jf), 'reflecting')
 
-        def inspect_and_maybe_terminate_quietly(*args, **kwargs):
-            # don't print anything out
-            real_stdout = sys.stdout
-            sys.stdout = StringIO()
-            try:
-                return inspect_and_maybe_terminate_job_flows(*args, **kwargs)
-            finally:
-                sys.stdout = real_stdout
-
-        self.assertEqual(terminated_jfs(), [])
+    def test_dry_run_does_nothing(self):
 
         # dry run shouldn't do anything
-        inspect_and_maybe_terminate_quietly(
-            conf_path=False, max_hours_idle=0.01,
-            now=self.now, dry_run=True)
+        self.inspect_and_maybe_terminate_quietly(
+            max_hours_idle=0.01, dry_run=True)
 
-        self.assertEqual(terminated_jfs(), [])
+        self.assertEqual(self.terminated_jfs(), [])
+
+    def test_increasing_idle_time(self):
+
+        self.assertEqual(self.terminated_jfs(), [])
 
         # no job flows are 20 hours old
-        inspect_and_maybe_terminate_quietly(
+        self.inspect_and_maybe_terminate_quietly(
             conf_path=False, max_hours_idle=20,
-            now=self.now, dry_run=False)
+            now=self.now)
 
         # terminate 5-hour-old jobs
-        inspect_and_maybe_terminate_quietly(
+        self.inspect_and_maybe_terminate_quietly(
             conf_path=False, max_hours_idle=5,
-            now=self.now, dry_run=False)
+            now=self.now)
 
         # j-HIVE is old enough to terminate, but it doesn't have streaming
         # steps, so we leave it alone
-        self.assertEqual(terminated_jfs(), ['j-EMPTY'])
+        self.assertEqual(self.terminated_jfs(), ['j-EMPTY'])
 
         # terminate 2-hour-old jobs
-        inspect_and_maybe_terminate_quietly(
+        self.inspect_and_maybe_terminate_quietly(
             conf_path=False, max_hours_idle=2,
-            now=self.now, dry_run=False)
+            now=self.now)
 
         # picky edge case: two jobs are EXACTLY 2 hours old, so they're
         # not over the maximum
 
-        self.assertEqual(terminated_jfs(), ['j-EMPTY', 'j-IDLE_AND_FAILED'])
+        self.assertEqual(self.terminated_jfs(),
+                         ['j-EMPTY', 'j-IDLE_AND_FAILED'])
 
-        # all the job flows we can terminate are at least 1 hour old
-        inspect_and_maybe_terminate_quietly(
-            conf_path=False, max_hours_idle=1,
-            now=self.now, dry_run=False)
+        self.inspect_and_maybe_terminate_quietly(max_hours_idle=1)
 
-        self.assertEqual(terminated_jfs(),
-                     ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
-                      'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED'])
+        self.assertEqual(self.terminated_jfs(),
+                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
+                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED'])
 
-        # just to prove our point
-        inspect_and_maybe_terminate_quietly(
-            conf_path=False, max_hours_idle=0,
-            now=self.now, dry_run=False)
+    def test_one_hour_is_the_default(self):
+        self.assertEqual(self.terminated_jfs(), [])
 
-        self.assertEqual(terminated_jfs(),
-                     ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
-                      'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED'])
+        self.inspect_and_maybe_terminate_quietly()
+
+        self.assertEqual(self.terminated_jfs(),
+                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
+                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED'])
+
+    def test_zero_idle_time(self):
+        self.assertEqual(self.terminated_jfs(), [])
+
+        self.inspect_and_maybe_terminate_quietly(max_hours_idle=0)
+
+        self.assertEqual(self.terminated_jfs(),
+                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
+                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED',
+                          'j-POOLED'])
+
+    def test_mins_to_end_of_hour(self):
+
+        self.inspect_and_maybe_terminate_quietly(mins_to_end_of_hour=2)
+
+        self.assertEqual(self.terminated_jfs(), [])
+
+        # edge case: it's exactly 5 minutes to end of hour
+        self.inspect_and_maybe_terminate_quietly(mins_to_end_of_hour=5)
+
+        self.assertEqual(self.terminated_jfs(), [])
+
+        self.inspect_and_maybe_terminate_quietly(mins_to_end_of_hour=6)
+
+        self.assertEqual(self.terminated_jfs(), ['j-POOLED'])
+
+    def test_terminate_pooled_only(self):
+        self.assertEqual(self.terminated_jfs(), [])
+
+        self.inspect_and_maybe_terminate_quietly(pooled_only=True)
+
+        # pooled job was not idle for an hour (the default)
+        self.assertEqual(self.terminated_jfs(), [])
+
+        self.inspect_and_maybe_terminate_quietly(
+            pooled_only=True, max_hours_idle=0.01)
+
+        self.assertEqual(self.terminated_jfs(), ['j-POOLED'])
+
+    def test_terminate_unpooled_only(self):
+        self.assertEqual(self.terminated_jfs(), [])
+
+        self.inspect_and_maybe_terminate_quietly(unpooled_only=True)
+
+        self.assertEqual(self.terminated_jfs(),
+                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
+                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED'])
+
+        self.inspect_and_maybe_terminate_quietly(
+            unpooled_only=True, max_hours_idle=0.01)
+
+        self.assertEqual(self.terminated_jfs(),
+                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
+                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED'])
+
+    def test_terminate_by_pool_name(self):
+        self.assertEqual(self.terminated_jfs(), [])
+
+        # wrong pool name
+        self.inspect_and_maybe_terminate_quietly(
+            pool_name='default', max_hours_idle=0.01)
+
+        self.assertEqual(self.terminated_jfs(), [])
+
+        # right pool name
+        self.inspect_and_maybe_terminate_quietly(
+            pool_name='reflecting', max_hours_idle=0.01)
+
+        self.assertEqual(self.terminated_jfs(), ['j-POOLED'])

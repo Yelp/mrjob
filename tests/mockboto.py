@@ -557,6 +557,9 @@ class MockEmrConnection(object):
 
         job_flow = self.mock_emr_job_flows[jobflow_id]
 
+        if getattr(job_flow, 'steps', None) is None:
+            job_flow.steps = []
+
         for step in steps:
             step_object = MockEmrObject(
                 state='PENDING',
@@ -576,7 +579,8 @@ class MockEmrConnection(object):
         job_flow.state = 'SHUTTING_DOWN'
         job_flow.reason = 'Terminated by user request'
 
-        for step in job_flow.steps:
+        steps = getattr(job_flow, 'steps', None) or []
+        for step in steps:
             if step.state not in ('COMPLETED', 'FAILED'):
                 step.state = 'CANCELLED'
 
@@ -632,7 +636,8 @@ class MockEmrConnection(object):
             return
 
         # if a step is currently running, advance it
-        for step_num, step in enumerate(job_flow.steps):
+        steps = getattr(job_flow, 'steps', None) or []
+        for step_num, step in enumerate(steps):
             # skip steps that are already done
             if step.state in ('COMPLETED', 'FAILED', 'CANCELLED'):
                 continue

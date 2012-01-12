@@ -276,16 +276,20 @@ class LocalMRJobRunner(MRJobRunner):
             shutil.copyfile(path, dest)
 
     def _get_file_splits(self, input_paths, num_splits, keep_sorted=False):
-        """ Split the input files into (roughly) *num_splits* files
+        """ Split the input files into (roughly) *num_splits* files. Compressed
+        files are not split, but each compressed file counts as one split.
 
-            returns a dictionary that maps split_file names to a dictionary of
-            properties:
+        :param input_paths: Iterable of paths to be split
+        :param num_splits: Number of splits to target
+        :param keep_sorted: If True, group lines by key
 
-            :param orig_name: the original name of the file whose data is in
-                              the split
-            :param start: where the split starts
-            :param length: the length of the split
-            :param keep_sorted: If True, group lines by key
+        Returns a dictionary that maps split_file names to a dictionary of
+        properties:
+
+        * *orig_name*: the original name of the file whose data is in
+                          the split
+        * *start*: where the split starts
+        * *length*: the length of the split
         """
         # sanity check: if keep_sorted is True, we should only have one file
         assert(not keep_sorted or len(input_paths) == 1)
@@ -584,6 +588,7 @@ class LocalMRJobRunner(MRJobRunner):
 
         self._prev_outfiles.append(outfile)
         write_to = open(outfile, 'w')
+
 
         with open(outfile, 'w') as write_to:
             if combiner_args:

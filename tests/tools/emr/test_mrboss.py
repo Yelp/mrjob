@@ -23,7 +23,6 @@ import tempfile
 
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.mrboss import run_on_all_nodes
-from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
 from tests.test_emr import MockEMRAndS3TestCase
 from tests.test_emr import BUCKET_URI

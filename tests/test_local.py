@@ -22,6 +22,7 @@ import mrjob
 import os
 import shutil
 import signal
+import stat
 import sys
 import tempfile
 
@@ -33,6 +34,7 @@ except ImportError:
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import cmd_line
+from mrjob.util import read_file
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_job_where_are_you import MRJobWhereAreYou
@@ -192,6 +194,50 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
                          ['1\tbar\n', '1\tbar\n', '1\tbar\n',
                           '2\tfoo\n', '2\tfoo\n', '2\tfoo\n',
                           '3\tqux\n', '3\tqux\n', '3\tqux\n'])
+
+    def test_dont_split_gz(self):
+        contents_gz = ['bar\n', 'qux\n', 'foo\n', 'bar\n', 'qux\n', 'foo\n']
+        contents_normal = ['foo\n', 'bar\n', 'bar\n']
+        all_contents_sorted = sorted(contents_gz + contents_normal)
+
+        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz = gzip.GzipFile(input_gz_path, 'w')
+        input_gz.write(''.join(contents_gz))
+        input_gz.close()
+
+        input_path2 = os.path.join(self.tmp_dir, 'input2')
+        with open(input_path2, 'w') as input_file:
+            input_file.write(''.join(contents_normal))
+
+        runner = LocalMRJobRunner(conf_path=False)
+
+        # split into 3 files
+        file_splits = runner._get_file_splits([input_gz_path, input_path2], 3)
+
+        # Make sure that input.gz occurs in a single split that starts at
+        # its beginning and ends at its end
+        for split_info in file_splits.values():
+            if split_info['orig_name'] == input_gz_path:
+                self.assertEqual(split_info['start'], 0)
+                self.assertEqual(split_info['length'],
+                                 os.stat(input_gz_path)[stat.ST_SIZE])
+
+        # make sure we get 3 files
+        self.assertEqual(len(file_splits), 3)
+
+        # make sure all the data is preserved
+        content = []
+        for file_name in file_splits:
+            lines = list(read_file(file_name))
+
+            # make sure the input_gz split got its entire contents
+            if file_name == input_gz_path:
+                self.assertEqual(lines, contents_gz)
+
+            content.extend(lines)
+
+        self.assertEqual(sorted(content),
+                         all_contents_sorted)
 
     def test_multi_step_counters(self):
         stdin = StringIO('foo\nbar\n')

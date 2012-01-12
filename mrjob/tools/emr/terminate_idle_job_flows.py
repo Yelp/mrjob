@@ -48,6 +48,7 @@ except ImportError:
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
+from mrjob.util import strip_microseconds
 
 log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
 
@@ -68,18 +69,52 @@ def main():
 
     inspect_and_maybe_terminate_job_flows(
         conf_path=options.conf_path,
+        dry_run=options.dry_run,
         max_hours_idle=options.max_hours_idle,
+        mins_to_end_of_hour=options.mins_to_end_of_hour,
+        unpooled_only=options.unpooled_only,
         now=datetime.utcnow(),
-        dry_run=options.dry_run)
+        pool_name=options.pool_name,
+        pooled_only=options.pooled_only,
+    )
+
+
+def job_flow_pool_name(job_flow):
+    """Get the pool name of the job flow, or ``None`` if it is not pooled.
+    """
+    bootstrap_actions = getattr(job_flow, 'bootstrapactions', None)
+    if bootstrap_actions:
+        args = [arg.value for arg in bootstrap_actions[-1].args]
+        if len(args) == 2 and args[0].startswith('pool-'):
+            return args[1]
+
+    return None
 
 
 def inspect_and_maybe_terminate_job_flows(
-    conf_path, max_hours_idle, now, dry_run):
+    conf_path=None,
+    dry_run=False,
+    max_hours_idle=None,
+    mins_to_end_of_hour=None,
+    now=None,
+    pool_name=None,
+    pooled_only=False,
+    unpooled_only=False,
+):
+
+    if now is None:
+        now = datetime.utcnow()
+
+    # old default behavior
+    if max_hours_idle is None and mins_to_end_of_hour is None:
+        max_hours_idle = DEFAULT_MAX_HOURS_IDLE
 
     emr_conn = EMRJobRunner(conf_path=conf_path).make_emr_conn()
 
     log.info(
         'getting info about all job flows (this goes back about 2 months)')
+    # We don't filter by job flow state because we want this to work even
+    # if Amazon adds another kind of idle state.
     job_flows = describe_all_job_flows(emr_conn)
 
     num_running = 0
@@ -106,15 +141,38 @@ def inspect_and_maybe_terminate_job_flows(
         else:
             num_idle += 1
             time_idle = time_job_flow_idle(jf, now=now)
+            time_to_end_of_hour = time_to_end_of_hour_for_job_flow(jf, now=now)
+            pool = job_flow_pool_name(jf)
 
-            # don't care about fractions of a second
-            time_idle = timedelta(time_idle.days, time_idle.seconds)
+            log.debug(
+                'Job flow %-15s idle for %s, %s to end of hour, %s (%s)' %
+                      (jf.jobflowid,
+                       strip_microseconds(time_idle),
+                       strip_microseconds(time_to_end_of_hour),
+                       ('unpooled' if pool is None else 'in %s pool' % pool),
+                       jf.name))
 
-            log.debug('Job flow %s (%s) idle for %s' %
-                      (jf.jobflowid, jf.name, time_idle))
-            if time_idle > timedelta(hours=max_hours_idle):
-                to_terminate.append(
-                    (jf.jobflowid, jf.name, time_idle))
+            # filter out job flows that don't meet our criteria
+            if (max_hours_idle is not None and
+                time_idle <= timedelta(hours=max_hours_idle)):
+                continue
+
+            if (mins_to_end_of_hour is not None and
+                time_to_end_of_hour >=
+                    timedelta(minutes=mins_to_end_of_hour)):
+                continue
+
+            if (pooled_only and pool is None):
+                continue
+
+            if (unpooled_only and pool is not None):
+                continue
+
+            if (pool_name is not None and pool != pool_name):
+                continue
+
+            to_terminate.append(
+                (jf.jobflowid, jf.name, time_idle, time_to_end_of_hour))
 
     log.info(
         'Job flow statuses: %d running, %d idle, %d active non-streaming,'
@@ -129,13 +187,15 @@ def is_job_flow_done(job_flow):
 
 
 def is_job_flow_non_streaming(job_flow):
-    """Return True if the give job flow has steps, but not of them are
+    """Return True if the give job flow has steps, but none of them are
     Hadoop streaming steps (for example, if the job flow is running Hive).
     """
-    if not job_flow.steps:
+    steps = getattr(job_flow, 'steps', None)
+
+    if not steps:
         return False
 
-    for step in job_flow.steps:
+    for step in steps:
         args = [a.value for a in step.args]
         for arg in args:
             # This is hadoop streaming
@@ -152,8 +212,8 @@ def is_job_flow_non_streaming(job_flow):
 def is_job_flow_running(job_flow):
     """Return ``True`` if the given job has any steps which are currently
     running."""
-    active_steps = [step for step in job_flow.steps
-                    if step.state != 'CANCELLED']
+    steps = getattr(job_flow, 'steps', None) or []
+    active_steps = [step for step in steps if step.state != 'CANCELLED']
 
     if not active_steps:
         return False
@@ -173,8 +233,8 @@ def time_job_flow_idle(job_flow, now):
     if is_job_flow_done(job_flow):
         return timedelta(0)
 
-    active_steps = [step for step in job_flow.steps
-                    if step.state != 'CANCELLED']
+    steps = getattr(job_flow, 'steps', None) or []
+    active_steps = [step for step in steps if step.state != 'CANCELLED']
 
     if active_steps:
         if not getattr(active_steps[-1], 'enddatetime', None):
@@ -182,26 +242,49 @@ def time_job_flow_idle(job_flow, now):
         else:
             return now - datetime.strptime(
                 active_steps[-1].enddatetime, boto.utils.ISO8601)
+    elif getattr(job_flow, 'startdatetime', None):
+        return now - datetime.strptime(job_flow.startdatetime,
+                                       boto.utils.ISO8601)
     else:
         return now - datetime.strptime(job_flow.creationdatetime,
                                        boto.utils.ISO8601)
+
+
+def time_to_end_of_hour_for_job_flow(job_flow, now):
+    """How long before job reaches the end of the next full hour,
+    for billing?'
+
+    If now is exactly on the hour, we return one hour, not zero.
+    """
+    startdatetime = getattr(job_flow, 'startdatetime', None)
+    if startdatetime:
+        start = datetime.strptime(startdatetime, boto.utils.ISO8601)
+    else:
+        start = datetime.strptime(job_flow.creationdatetime,
+                                  boto.utils.ISO8601)
+
+    run_time = now - start
+    return timedelta(seconds=((-run_time).seconds % 3600.0 or 3600.0))
 
 
 def terminate_and_notify(emr_conn, to_terminate, dry_run=False):
     if not to_terminate:
         return
 
-    for job_flow_id, name, time_idle in to_terminate:
+    for job_flow_id, name, time_idle, time_to_end_of_hour in to_terminate:
         if not dry_run:
             emr_conn.terminate_jobflow(job_flow_id)
-        print 'Terminated job flow %s (%s); was idle for %s' % (
-            (job_flow_id, name, time_idle))
+        print ('Terminated job flow %s (%s); was idle for %s,'
+               ' %s to end of hour' %
+               (job_flow_id, name, strip_microseconds(time_idle),
+                strip_microseconds(time_to_end_of_hour)))
 
 
 def make_option_parser():
     usage = '%prog [options]'
-    description = ('Terminate all EMR job flows that have been idle for a long'
-                   ' time (by default, one hour).')
+    description = ('Terminate idle EMR job flows that meet the criteria'
+                   ' passed in on the command line (or, by default,'
+                   ' job flows that have been idle for one hour).')
     option_parser = OptionParser(usage=usage, description=description)
     option_parser.add_option(
         '-v', '--verbose', dest='verbose', default=False,
@@ -220,8 +303,25 @@ def make_option_parser():
         help="Don't load mrjob.conf even if it's available")
     option_parser.add_option(
         '--max-hours-idle', dest='max_hours_idle',
-        default=DEFAULT_MAX_HOURS_IDLE, type='float',
+        default=None, type='float',
         help='Max number of hours a job can run before being terminated')
+    option_parser.add_option(
+        '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
+        default=None, type='float',
+        help=('Terminate job flows that are within this many minutes of'
+              ' the end of a full hour since the job started running'
+              ' (since job flows are billed by the full hour)'))
+    option_parser.add_option(
+        '--unpooled-only', dest='unpooled_only', action='store_true',
+        default=False,
+        help='Only terminate un-pooled job flows')
+    option_parser.add_option(
+        '--pooled-only', dest='pooled_only', action='store_true',
+        default=False,
+        help='Only terminate pooled job flows')
+    option_parser.add_option(
+        '--pool-name', dest='pool_name', default=None,
+        help='Only terminate job flows in the given named pool.')
     option_parser.add_option(
         '--dry-run', dest='dry_run', default=False,
         action='store_true',

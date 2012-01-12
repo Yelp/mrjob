@@ -281,17 +281,43 @@ class LocalMRJobRunner(MRJobRunner):
             returns a dictionary that maps split_file names to a dictionary of
             properties:
 
-            * orig_name: the original name of the file whose data is in
-              the split
-            * start: where the split starts
-            * length: the length of the split
+            :param orig_name: the original name of the file whose data is in
+                              the split
+            :param start: where the split starts
+            :param length: the length of the split
+            :param keep_sorted: If True, group lines by key
         """
         # sanity check: if keep_sorted is True, we should only have one file
         assert(not keep_sorted or len(input_paths) == 1)
 
+        file_names = {}
+        input_paths_to_split = []
+
+        for input_path in input_paths:
+            for path in self.ls(input_path):
+                if path.endswith('.gz') or path.endswith('.bz2'):
+                    # do not split compressed files
+                    file_names[path] = {
+                        'orig_name': path,
+                        'start': 0,
+                        'length': os.stat(path)[stat.ST_SIZE],
+                    }
+                    # this counts as "one split"
+                    num_splits -= 1
+                else:
+                    # do split uncompressed files
+                    input_paths_to_split.append(path)
+
+        # exit early if no uncompressed files given
+        if not input_paths_to_split:
+            return file_names
+
+        # account for user giving fewer splits than there are compressed files
+        num_splits = max(num_splits, 1)
+
         # determine the size of each file split
         total_size = 0
-        for input_path in input_paths:
+        for input_path in input_paths_to_split:
             for path in self.ls(input_path):
                 total_size += os.stat(path)[stat.ST_SIZE]
         split_size = total_size / num_splits
@@ -299,16 +325,16 @@ class LocalMRJobRunner(MRJobRunner):
         # we want each file split to be as close to split_size as possible
         # we also want different input files to be in different splits
         tmp_directory = self._get_local_tmp_dir()
-        file_names = defaultdict(str)
 
         # Helper functions:
         def create_outfile(orig_name='', start=''):
             # create a new output file and initialize its properties dict
             outfile_name = os.path.join(tmp_directory,
                                         'input_part-%05d' % len(file_names))
-            new_file = defaultdict(str)
-            new_file['orig_name'] = orig_name
-            new_file['start'] = start
+            new_file = {
+                'orig_name': orig_name,
+                'start': start,
+            }
             file_names[outfile_name] = new_file
             return outfile_name
 
@@ -330,7 +356,7 @@ class LocalMRJobRunner(MRJobRunner):
                 for line in read_input(input_path):
                     yield (line,)
 
-        for path in input_paths:
+        for path in input_paths_to_split:
             # create a new split file for each new path
 
             # initialize file and accumulators
@@ -346,8 +372,11 @@ class LocalMRJobRunner(MRJobRunner):
                     # new split file if we exceeded the limit
                     file_names[outfile_name]['length'] = bytes_written
                     total_bytes += bytes_written
+
+                    outfile.close()
                     outfile_name = create_outfile(path, total_bytes)
                     outfile = open(outfile_name, 'w')
+
                     bytes_written = 0
 
                 for line in line_group:
@@ -355,6 +384,8 @@ class LocalMRJobRunner(MRJobRunner):
                     bytes_written += len(line)
 
             file_names[outfile_name]['length'] = bytes_written
+
+            outfile.close()
 
         return file_names
 

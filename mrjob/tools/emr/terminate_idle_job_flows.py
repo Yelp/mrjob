@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License
-"""Find EMR job flows that have been idle for a long time (by default, one
-hour) and terminate them.
+"""Terminate idle EMR job flows that meet the criteria passed in on the command
+line (or, by default, job flows that have been idle for one hour).
 
 Suggested usage: run this as a cron job with the -q option::
 
@@ -31,8 +31,15 @@ Options::
   --max-hours-idle=MAX_HOURS_IDLE
                         Max number of hours a job can run before being
                         terminated
+  --mins-to-end-of-hour=MINS_TO_END_OF_HOUR
+                        Terminate job flows that are within this many minutes
+                        of the end of a full hour since the job started
+                        running (since job flows are billed by the full hour)
+  --unpooled-only       Only terminate un-pooled job flows
+  --pooled-only         Only terminate pooled job flows
+  --pool-name=POOL_NAME
+                        Only terminate job flows in the given named pool.
   --dry-run             Don't actually kill idle jobs; just log that we would
-
 """
 from datetime import datetime
 from datetime import timedelta

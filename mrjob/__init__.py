@@ -23,6 +23,7 @@ __credits__ = [
     'Hunter Blanks <hblanks@monetate.com>',
     'Jim Blomo <jblomo@yelp.com>',
     'James Brown <jbrown@yelp.com>',
+    'Kevin Burke <kevin@twilio.com>',
     'Adam Derewecki <derewecki@gmail.com>',
     'Benjamin Goldenberg <benjamin@yelp.com',
     'Peter Harrington <peter.b.harrington@gmail.com>',

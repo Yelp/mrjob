@@ -1351,7 +1351,7 @@ class MRJob(object):
                  ' flow-related options including EC2 instance configuration.'
                  ' Joins pool "default" if emr_job_flow_pool_name is not'
                  ' specified. WARNING: do not run this without'
-                 ' mrjob.tools.emr.terminate.idle_job_flows in your crontab;'
+                 ' mrjob.tools.emr.terminate_idle_job_flows in your crontab;'
                  ' job flows left idle can quickly become expensive!')
 
         self.emr_opt_group.add_option(

@@ -19,7 +19,7 @@ Usage::
     python -m mrjob.tools.emr.create_job_flow
 
 **WARNING**: do not run this without having
-:py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job flows
+:py:mod:`mrjob.tools.emr.terminate_idle_job_flows` in your crontab; job flows
 left idle can quickly become expensive!
 """
 from __future__ import with_statement
@@ -56,7 +56,7 @@ def make_option_parser():
     usage = '%prog [options]'
     description = (
         'Create a persistent EMR job flow to run jobs in. WARNING: do not run'
-        ' this without mrjob.tools.emr.terminate.idle_job_flows in your'
+        ' this without mrjob.tools.emr.terminate_idle_job_flows in your'
         ' crontab; job flows left idle can quickly become expensive!')
     option_parser = OptionParser(usage=usage, description=description)
 

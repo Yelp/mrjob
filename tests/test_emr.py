@@ -425,6 +425,20 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             self.assertIn('-combiner',
                           runner._describe_jobflow().steps[0].args())
 
+    def test_wait_for_job_flow_termination(self):
+        # Test regression from #338 where _wait_for_job_flow_termination
+        # would raise an IndexError whenever the job flow wasn't already
+        # finished
+        mr_job = MRTwoStepJob(['-r', 'emr',
+                               '-c', self.mrjob_conf_path,
+                               '--check-emr-status-every=0'])
+        mr_job.sandbox()
+        with mr_job.make_runner() as runner:
+            runner._launch_emr_job()
+            jf = runner._describe_jobflow()
+            jf.keepjobflowalivewhennosteps = 'false'
+            runner._wait_for_job_flow_termination()
+
 
 class S3ScratchURITestCase(MockEMRAndS3TestCase):
 

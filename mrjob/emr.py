@@ -1270,7 +1270,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             return
         while jobflow.state not in ('TERMINATED', 'COMPLETED', 'FAILED',
                                     'SHUTTING_DOWN'):
-            raise IndexError
             msg = 'Waiting for job flow to terminate (currently %s)' % \
                                                          jobflow.state
             log.info(msg)

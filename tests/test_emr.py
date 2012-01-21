@@ -2289,7 +2289,18 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             '-c', self.mrjob_conf_path],
             job_class=MRTwoStepJob)
 
-        # but a one-step job should fit
+    def test_join_almost_full_job_flow(self):
+        dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
+
+        # fill the job flow
+        self.mock_emr_job_flows[job_flow_id].steps = 255 * [
+            MockEmrObject(
+                state='COMPLETED',
+                name='dummy',
+                actiononfailure='CANCEL_AND_WAIT',
+                args=[])]
+
+        # a one-step job should fit
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--pool-name', 'pool1',

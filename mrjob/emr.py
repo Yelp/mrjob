@@ -1268,9 +1268,12 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         except boto.exception.S3ResponseError:
             # mockboto throws this for some reason
             return
+        if (jobflow.keepjobflowalivewhennosteps == 'true' and
+            jobflow.state == 'WAITING'):
+            raise Exception('Operation requires job flow to terminate, but'
+                            ' it may never do so.')
         while jobflow.state not in ('TERMINATED', 'COMPLETED', 'FAILED',
                                     'SHUTTING_DOWN'):
-            raise IndexError
             msg = 'Waiting for job flow to terminate (currently %s)' % \
                                                          jobflow.state
             log.info(msg)

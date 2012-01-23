@@ -56,6 +56,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.pool import est_time_to_hour
+from mrjob.pool import pool_hash_and_name
 from mrjob.util import strip_microseconds
 
 log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
@@ -85,18 +86,6 @@ def main():
         pool_name=options.pool_name,
         pooled_only=options.pooled_only,
     )
-
-
-def job_flow_pool_name(job_flow):
-    """Get the pool name of the job flow, or ``None`` if it is not pooled.
-    """
-    bootstrap_actions = getattr(job_flow, 'bootstrapactions', None)
-    if bootstrap_actions:
-        args = [arg.value for arg in bootstrap_actions[-1].args]
-        if len(args) == 2 and args[0].startswith('pool-'):
-            return args[1]
-
-    return None
 
 
 def inspect_and_maybe_terminate_job_flows(
@@ -150,7 +139,7 @@ def inspect_and_maybe_terminate_job_flows(
             num_idle += 1
             time_idle = time_job_flow_idle(jf, now=now)
             time_to_end_of_hour = est_time_to_hour(jf, now=now)
-            pool = job_flow_pool_name(jf)
+            _, pool = pool_hash_and_name(jf)
 
             log.debug(
                 'Job flow %-15s idle for %s, %s to end of hour, %s (%s)' %

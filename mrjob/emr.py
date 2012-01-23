@@ -67,6 +67,7 @@ from mrjob.logparsers import scan_logs_in_order
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
+from mrjob.pool import pool_hash_and_name
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner
 from mrjob.runner import GLOB_RE
@@ -1388,7 +1389,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             master_bootstrap_script_args = []
             if self._opts['pool_emr_job_flows']:
                 master_bootstrap_script_args = [
-                    self._pool_arg(),
+                    'pool-' + self._pool_hash(),
                     self._opts['emr_job_flow_pool_name'],
                 ]
             bootstrap_action_args.append(
@@ -2180,7 +2181,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         emr_conn = emr_conn or self.make_emr_conn()
         exclude = exclude or set()
 
-        pool_arg = self._pool_arg()
+        req_hash = self._pool_hash()
 
         # decide memory and total compute units requested for each
         # role type
@@ -2223,11 +2224,11 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 return
 
             # match pool name, and (bootstrap) hash
-            if not job_flow.bootstrapactions:
+            hash, name = pool_hash_and_name(job_flow)
+            if req_hash != hash:
                 return
 
-            args = [arg.value for arg in job_flow.bootstrapactions[-1].args]
-            if args != [pool_arg, self._opts['emr_job_flow_pool_name']]:
+            if self._opts['emr_job_flow_pool_name'] != name:
                 return
 
             # match hadoop version
@@ -2352,10 +2353,10 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             else:
                 return None
 
-    def _pool_arg(self):
+    def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to
-        match jobs and job flows. This value will be passed as an argument
-        to the bootstrap script.
+        match jobs and job flows. This first argument passed to the bootstrap
+        script will be ``'pool-'`` plus this hash.
         """
         def should_include_file(info):
             # Bootstrap scripts will always have a different checksum
@@ -2397,7 +2398,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         ]
         if self._opts['bootstrap_mrjob']:
             things_to_hash.append(mrjob.__version__)
-        return 'pool-%s' % hash_object(things_to_hash)
+        return hash_object(things_to_hash)
 
     ### GENERAL FILESYSTEM STUFF ###
 

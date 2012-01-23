@@ -49,3 +49,15 @@ def est_time_to_hour(job_flow, now=None):
         
     run_time = now - start
     return timedelta(seconds=((-run_time).seconds % 3600.0 or 3600.0))
+
+
+def pool_hash_and_name(job_flow):
+    """Return the hash and pool name for the given job flow, or
+    ``(None, None)`` if it isn't pooled."""
+    bootstrap_actions = getattr(job_flow, 'bootstrapactions', None)
+    if bootstrap_actions:
+        args = [arg.value for arg in bootstrap_actions[-1].args]
+        if len(args) == 2 and args[0].startswith('pool-'):
+            return args[0][5:], args[1]
+
+    return (None, None)

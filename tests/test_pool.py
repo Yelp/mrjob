@@ -20,6 +20,7 @@ except ImportError:
     import unittest
 
 from mrjob.pool import est_time_to_hour
+from mrjob.pool import pool_hash_and_name
 
 from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
@@ -95,5 +96,72 @@ class EstTimeToEndOfHourTestCase(unittest.TestCase):
             timedelta(seconds=1))
         
 
-        
-    
+class TestPoolHashAndName(unittest.TestCase):
+
+    def test_empty(self):
+        jf = MockEmrObject()
+
+        self.assertEqual(pool_hash_and_name(jf), (None, None))
+
+    def test_empty_bootstrap_actions(self):
+        jf = MockEmrObject(bootstrapactions=[])
+
+        self.assertEqual(pool_hash_and_name(jf), (None, None))
+
+    def test_pooled_job_flow(self):
+        jf = MockEmrObject(
+            bootstrapactions=[
+                MockEmrObject(args=[
+                    MockEmrObject(
+                        value='pool-0123456789abcdef0123456789abcdef'),
+                    MockEmrObject(value='reflecting'),
+                ]),
+            ])
+
+        self.assertEqual(pool_hash_and_name(jf),
+                         ('0123456789abcdef0123456789abcdef', 'reflecting'))
+
+    def test_pooled_job_flow_with_other_bootstrap_actions(self):
+        jf = MockEmrObject(
+            bootstrapactions=[
+                MockEmrObject(args=[]),
+                MockEmrObject(args=[]),
+                MockEmrObject(args=[
+                    MockEmrObject(
+                        value='pool-0123456789abcdef0123456789abcdef'),
+                    MockEmrObject(value='reflecting'),
+                ]),
+            ])
+
+        self.assertEqual(pool_hash_and_name(jf),
+                         ('0123456789abcdef0123456789abcdef', 'reflecting'))
+
+    def test_first_arg_doesnt_start_with_pool(self):
+        jf = MockEmrObject(
+            bootstrapactions=[
+                MockEmrObject(args=[
+                    MockEmrObject(value='cowsay'),
+                    MockEmrObject(value='mrjob'),
+                ]),
+            ])
+
+        self.assertEqual(pool_hash_and_name(jf), (None, None))
+
+    def test_too_many_args(self):
+        jf = MockEmrObject(
+            bootstrapactions=[
+                MockEmrObject(args=[
+                    MockEmrObject(value='cowsay'),
+                    MockEmrObject(value='-b'),
+                    MockEmrObject(value='mrjob'),
+                ]),
+            ])
+
+        self.assertEqual(pool_hash_and_name(jf), (None, None))
+
+    def test_too_few_args(self):
+        jf = MockEmrObject(
+            bootstrapactions=[MockEmrObject(args=[])])
+
+        self.assertEqual(pool_hash_and_name(jf), (None, None))
+

@@ -1974,6 +1974,11 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         self.assertNotEqual(actual_job_flow_id, job_flow_id)
 
+        # terminate the job flow created by this assert, to avoid
+        # very confusing behavior (see Issue #331)
+        emr_conn = EMRJobRunner().make_emr_conn()
+        emr_conn.terminate_jobflow(actual_job_flow_id)
+
     def make_simple_runner(self, pool_name):
         """Make an EMRJobRunner that is ready to try to find a pool to join"""
         mr_job = MRTwoStepJob([

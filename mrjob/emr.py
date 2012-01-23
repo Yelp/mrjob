@@ -17,7 +17,6 @@ from collections import defaultdict
 import datetime
 import fnmatch
 import logging
-import math
 import os
 import posixpath
 import random
@@ -67,6 +66,7 @@ from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import scan_logs_in_order
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
+from mrjob.pool import est_time_to_hour
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner
 from mrjob.runner import GLOB_RE
@@ -183,29 +183,6 @@ AMI_VERSION_TO_HADOOP_VERSION = {
 
 # EMR's hard limit on number of steps in a job flow
 MAX_STEPS_PER_JOB_FLOW = 256
-
-
-def est_time_to_hour(job_flow):
-    """If available, get the difference between hours billed and hours used.
-    This metric is used to determine which job flow to use if more than one
-    is available.
-    """
-
-    if not hasattr(job_flow, 'startdatetime'):
-        return 0.0
-    else:
-        now = time.time()
-
-        # find out how long the job flow has been running
-        jf_start = iso8601_to_timestamp(job_flow.startdatetime)
-        if hasattr(job_flow, 'enddatetime'):
-            jf_end = iso8601_to_timestamp(job_flow.enddatetime)
-        else:
-            jf_end = now
-
-        minutes = (jf_end - jf_start) / 60.0
-        hours = minutes / 60.0
-        return math.ceil(hours) * 60 - minutes
 
 
 def s3_key_to_uri(s3_key):

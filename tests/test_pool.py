@@ -35,7 +35,7 @@ class EstTimeToEndOfHourTestCase(unittest.TestCase):
     def test_not_yet_started(self):
         jf = MockEmrObject(
             creationdatetime=to_iso8601(datetime(2010, 6, 6, 4)))
-            
+
         self.assertEqual(
             est_time_to_hour(jf, now=datetime(2010, 6, 6, 4, 35)),
             timedelta(minutes=25))
@@ -43,7 +43,7 @@ class EstTimeToEndOfHourTestCase(unittest.TestCase):
         self.assertEqual(
             est_time_to_hour(jf, now=datetime(2010, 6, 6, 5, 20)),
             timedelta(minutes=40))
-        
+
         self.assertEqual(
             est_time_to_hour(jf, now=datetime(2010, 6, 6, 4)),
             timedelta(minutes=60))
@@ -52,7 +52,7 @@ class EstTimeToEndOfHourTestCase(unittest.TestCase):
         jf = MockEmrObject(
             creationdatetime=to_iso8601(datetime(2010, 6, 6, 4)),
             startdatetime=to_iso8601(datetime(2010, 6, 6, 4, 26)))
-            
+
         self.assertEqual(
             est_time_to_hour(jf, now=datetime(2010, 6, 6, 4, 35)),
             timedelta(minutes=51))
@@ -60,7 +60,7 @@ class EstTimeToEndOfHourTestCase(unittest.TestCase):
         self.assertEqual(
             est_time_to_hour(jf, now=datetime(2010, 6, 6, 5, 20)),
             timedelta(minutes=6))
-        
+
         self.assertEqual(
             est_time_to_hour(jf, now=datetime(2010, 6, 6, 6, 26)),
             timedelta(minutes=60))
@@ -94,7 +94,7 @@ class EstTimeToEndOfHourTestCase(unittest.TestCase):
         self.assertEqual(
             est_time_to_hour(jf, now=datetime(2010, 6, 6, 4, 25, 59)),
             timedelta(seconds=1))
-        
+
 
 class TestPoolHashAndName(unittest.TestCase):
 
@@ -164,4 +164,3 @@ class TestPoolHashAndName(unittest.TestCase):
             bootstrapactions=[MockEmrObject(args=[])])
 
         self.assertEqual(pool_hash_and_name(jf), (None, None))
-

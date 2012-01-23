@@ -46,7 +46,7 @@ def est_time_to_hour(job_flow, now=None):
     else:
         # do something reasonable if creationdatetime isn't set
         return timedelta(minutes=60)
-        
+
     run_time = now - start
     return timedelta(seconds=((-run_time).seconds % 3600.0 or 3600.0))
 

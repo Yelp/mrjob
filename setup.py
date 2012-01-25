@@ -3,9 +3,7 @@ try:
     # arguments that distutils doesn't understand
     setuptools_kwargs = {
         'install_requires': [
-            # todo: update this to whatever version of boto includes
-            # https://github.com/boto/boto/pull/190
-            'boto>=2.0b4',
+            'boto>=2.0',
             'PyYAML',
             'simplejson>=2.0.9',
         ],

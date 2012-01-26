@@ -15,7 +15,7 @@
 
 Usage::
 
-    python -m mrjob.tools.emr.terminate_job_flow.py [options] j-JOBFLOWID
+    python -m mrjob.tools.emr.terminate_job_flow [options] j-JOBFLOWID
 
 Terminate an existing EMR job flow.
 

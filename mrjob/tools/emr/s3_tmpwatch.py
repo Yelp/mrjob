@@ -24,7 +24,7 @@ s3://your-bucket/tmp/
 
 Usage::
 
-    python -m mrjob.tools.emr.s3_tmpwatch.py [options] <time-untouched> <URIs>
+    python -m mrjob.tools.emr.s3_tmpwatch [options] <time-untouched> <URIs>
 
 Options::
 

@@ -54,6 +54,23 @@ Now whenever you run ``mr_your_script.py -r emr``,
 :py:class:`~mrjob.emr.EMRJobRunner` will automatically set :envvar:`TZ` to
 ``America/Los_Angeles`` in your job's environment when it runs on EMR.
 
+If you don't have the :py:mod:`yaml` module installed, you can use JSON
+in your :file:`mrjob.conf` instead (JSON is a subset of YAML, so it'll still
+work once you install :py:mod:`yaml`). Here's how you'd render the above
+example in JSON:
+
+.. code-block:: js
+
+    {
+      "runners": {
+        "emr": {
+          "cmdenv": {
+            "TZ": "America/Los_Angeles"
+          }
+        }
+      }
+    }
+
 Options specified on the command-line take precedence over
 :file:`mrjob.conf`. Usually this means simply overriding the option in
 :file:`mrjob.conf`. However, we know that *cmdenv* contains environment
@@ -182,9 +199,10 @@ def load_mrjob_conf(conf_path=None):
     look something like this::
 
         {'runners':
-            'local': {'OPTION': VALUE, ...}
-            'emr': {'OPTION': VALUE, ...}
-            'hadoop: {'OPTION': VALUE, ...}
+            'emr': {'OPTION': VALUE, ...},
+            'hadoop: {'OPTION': VALUE, ...},
+            'inline': {'OPTION': VALUE, ...},
+            'local': {'OPTION': VALUE, ...},
         }
 
     Returns ``None`` if we can't find :file:`mrjob.conf`.

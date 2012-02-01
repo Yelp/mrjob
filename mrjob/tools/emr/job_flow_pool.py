@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import est_time_to_hour
 from mrjob.job import MRJob
 from mrjob.util import scrape_options_into_new_groups
+from mrjob.util import strip_microseconds
 
 
 def get_pools(emr_conn):
@@ -67,7 +68,8 @@ minutes to the hour)
     if instance_count > 1:
         comma_segments.append('slaves=%s' % jf.slaveinstancetype)
 
-    comma_segments.append('%0.0f minutes to the hour' % est_time_to_hour(jf))
+    comma_segments.append('%s to end of hour' %
+                          strip_microseconds(est_time_to_hour(jf)))
 
     nosep_segments += [
         ' (',

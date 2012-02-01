@@ -17,7 +17,6 @@ from collections import defaultdict
 import datetime
 import fnmatch
 import logging
-import math
 import os
 import posixpath
 import random
@@ -67,6 +66,8 @@ from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import scan_logs_in_order
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
+from mrjob.pool import est_time_to_hour
+from mrjob.pool import pool_hash_and_name
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner
 from mrjob.runner import GLOB_RE
@@ -183,29 +184,6 @@ AMI_VERSION_TO_HADOOP_VERSION = {
 
 # EMR's hard limit on number of steps in a job flow
 MAX_STEPS_PER_JOB_FLOW = 256
-
-
-def est_time_to_hour(job_flow):
-    """If available, get the difference between hours billed and hours used.
-    This metric is used to determine which job flow to use if more than one
-    is available.
-    """
-
-    if not hasattr(job_flow, 'startdatetime'):
-        return 0.0
-    else:
-        now = time.time()
-
-        # find out how long the job flow has been running
-        jf_start = iso8601_to_timestamp(job_flow.startdatetime)
-        if hasattr(job_flow, 'enddatetime'):
-            jf_end = iso8601_to_timestamp(job_flow.enddatetime)
-        else:
-            jf_end = now
-
-        minutes = (jf_end - jf_start) / 60.0
-        hours = minutes / 60.0
-        return math.ceil(hours) * 60 - minutes
 
 
 def s3_key_to_uri(s3_key):
@@ -1411,7 +1389,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             master_bootstrap_script_args = []
             if self._opts['pool_emr_job_flows']:
                 master_bootstrap_script_args = [
-                    self._pool_arg(),
+                    'pool-' + self._pool_hash(),
                     self._opts['emr_job_flow_pool_name'],
                 ]
             bootstrap_action_args.append(
@@ -2203,7 +2181,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         emr_conn = emr_conn or self.make_emr_conn()
         exclude = exclude or set()
 
-        pool_arg = self._pool_arg()
+        req_hash = self._pool_hash()
 
         # decide memory and total compute units requested for each
         # role type
@@ -2246,11 +2224,11 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 return
 
             # match pool name, and (bootstrap) hash
-            if not job_flow.bootstrapactions:
+            hash, name = pool_hash_and_name(job_flow)
+            if req_hash != hash:
                 return
 
-            args = [arg.value for arg in job_flow.bootstrapactions[-1].args]
-            if args != [pool_arg, self._opts['emr_job_flow_pool_name']]:
+            if self._opts['emr_job_flow_pool_name'] != name:
                 return
 
             # match hadoop version
@@ -2375,10 +2353,10 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             else:
                 return None
 
-    def _pool_arg(self):
+    def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to
-        match jobs and job flows. This value will be passed as an argument
-        to the bootstrap script.
+        match jobs and job flows. This first argument passed to the bootstrap
+        script will be ``'pool-'`` plus this hash.
         """
         def should_include_file(info):
             # Bootstrap scripts will always have a different checksum
@@ -2420,7 +2398,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         ]
         if self._opts['bootstrap_mrjob']:
             things_to_hash.append(mrjob.__version__)
-        return 'pool-%s' % hash_object(things_to_hash)
+        return hash_object(things_to_hash)
 
     ### GENERAL FILESYSTEM STUFF ###
 

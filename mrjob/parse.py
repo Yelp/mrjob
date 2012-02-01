@@ -14,7 +14,6 @@
 """Utilities for parsing errors, counters, and status messages."""
 from functools import wraps
 import logging
-from optparse import OptionValueError
 import re
 from urlparse import ParseResult
 from urlparse import urlparse as urlparse_buggy

@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,6 +55,8 @@ except ImportError:
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
+from mrjob.pool import est_time_to_hour
+from mrjob.pool import pool_hash_and_name
 from mrjob.util import strip_microseconds
 
 log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
@@ -84,18 +86,6 @@ def main():
         pool_name=options.pool_name,
         pooled_only=options.pooled_only,
     )
-
-
-def job_flow_pool_name(job_flow):
-    """Get the pool name of the job flow, or ``None`` if it is not pooled.
-    """
-    bootstrap_actions = getattr(job_flow, 'bootstrapactions', None)
-    if bootstrap_actions:
-        args = [arg.value for arg in bootstrap_actions[-1].args]
-        if len(args) == 2 and args[0].startswith('pool-'):
-            return args[1]
-
-    return None
 
 
 def inspect_and_maybe_terminate_job_flows(
@@ -148,8 +138,8 @@ def inspect_and_maybe_terminate_job_flows(
         else:
             num_idle += 1
             time_idle = time_job_flow_idle(jf, now=now)
-            time_to_end_of_hour = time_to_end_of_hour_for_job_flow(jf, now=now)
-            pool = job_flow_pool_name(jf)
+            time_to_end_of_hour = est_time_to_hour(jf, now=now)
+            _, pool = pool_hash_and_name(jf)
 
             log.debug(
                 'Job flow %-15s idle for %s, %s to end of hour, %s (%s)' %
@@ -255,23 +245,6 @@ def time_job_flow_idle(job_flow, now):
     else:
         return now - datetime.strptime(job_flow.creationdatetime,
                                        boto.utils.ISO8601)
-
-
-def time_to_end_of_hour_for_job_flow(job_flow, now):
-    """How long before job reaches the end of the next full hour,
-    for billing?'
-
-    If now is exactly on the hour, we return one hour, not zero.
-    """
-    startdatetime = getattr(job_flow, 'startdatetime', None)
-    if startdatetime:
-        start = datetime.strptime(startdatetime, boto.utils.ISO8601)
-    else:
-        start = datetime.strptime(job_flow.creationdatetime,
-                                  boto.utils.ISO8601)
-
-    run_time = now - start
-    return timedelta(seconds=((-run_time).seconds % 3600.0 or 3600.0))
 
 
 def terminate_and_notify(emr_conn, to_terminate, dry_run=False):

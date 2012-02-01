@@ -24,7 +24,6 @@ Table of Contents
     configs.rst
     utils.rst
     tools.rst
-    compat.rst
     testing.rst
 
 Indices and tables

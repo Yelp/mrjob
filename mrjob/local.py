@@ -15,7 +15,6 @@
 them together. Useful for testing."""
 from __future__ import with_statement
 
-from collections import defaultdict
 import itertools
 import logging
 import os
@@ -588,7 +587,6 @@ class LocalMRJobRunner(MRJobRunner):
 
         self._prev_outfiles.append(outfile)
         write_to = open(outfile, 'w')
-
 
         with open(outfile, 'w') as write_to:
             if combiner_args:

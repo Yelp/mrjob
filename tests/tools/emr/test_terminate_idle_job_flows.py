@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,15 +21,14 @@ from datetime import datetime
 from datetime import timedelta
 import sys
 
+from mrjob.pool import est_time_to_hour
+from mrjob.pool import pool_hash_and_name
 from mrjob.tools.emr.terminate_idle_job_flows import (
     inspect_and_maybe_terminate_job_flows,)
 from mrjob.tools.emr.terminate_idle_job_flows import is_job_flow_done
 from mrjob.tools.emr.terminate_idle_job_flows import is_job_flow_running
 from mrjob.tools.emr.terminate_idle_job_flows import is_job_flow_non_streaming
-from mrjob.tools.emr.terminate_idle_job_flows import job_flow_pool_name
 from mrjob.tools.emr.terminate_idle_job_flows import time_job_flow_idle
-from mrjob.tools.emr.terminate_idle_job_flows import (
-    time_to_end_of_hour_for_job_flow,)
 
 from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
@@ -217,9 +216,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), False)
         self.assertEqual(is_job_flow_non_streaming(jf), False)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(hours=10))
-        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+        self.assertEqual(est_time_to_hour(jf, self.now),
                          timedelta(hours=1))
-        self.assertEqual(job_flow_pool_name(jf), None)
+        self.assertEqual(pool_hash_and_name(jf), (None, None))
 
     def test_currently_running(self):
         jf = self.mock_emr_job_flows['j-CURRENTLY_RUNNING']
@@ -227,9 +226,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), True)
         self.assertEqual(is_job_flow_non_streaming(jf), False)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(0))
-        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+        self.assertEqual(est_time_to_hour(jf, self.now),
                          timedelta(minutes=45))
-        self.assertEqual(job_flow_pool_name(jf), None)
+        self.assertEqual(pool_hash_and_name(jf), (None, None))
 
     def test_done(self):
         jf = self.mock_emr_job_flows['j-DONE']
@@ -238,9 +237,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), False)
         self.assertEqual(is_job_flow_non_streaming(jf), False)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(0))
-        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+        self.assertEqual(est_time_to_hour(jf, self.now),
                          timedelta(hours=1))
-        self.assertEqual(job_flow_pool_name(jf), None)
+        self.assertEqual(pool_hash_and_name(jf), (None, None))
 
     def test_done_and_idle(self):
         jf = self.mock_emr_job_flows['j-DONE_AND_IDLE']
@@ -249,9 +248,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), False)
         self.assertEqual(is_job_flow_non_streaming(jf), False)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(hours=2))
-        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+        self.assertEqual(est_time_to_hour(jf, self.now),
                          timedelta(hours=1))
-        self.assertEqual(job_flow_pool_name(jf), None)
+        self.assertEqual(pool_hash_and_name(jf), (None, None))
 
     def test_hive_job_flow(self):
         jf = self.mock_emr_job_flows['j-HIVE']
@@ -260,9 +259,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), False)
         self.assertEqual(is_job_flow_non_streaming(jf), True)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(hours=4))
-        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+        self.assertEqual(est_time_to_hour(jf, self.now),
                          timedelta(hours=1))
-        self.assertEqual(job_flow_pool_name(jf), None)
+        self.assertEqual(pool_hash_and_name(jf), (None, None))
 
     def test_hadoop_debugging_job_flow(self):
         jf = self.mock_emr_job_flows['j-HADOOP_DEBUGGING']
@@ -271,9 +270,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), False)
         self.assertEqual(is_job_flow_non_streaming(jf), False)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(hours=2))
-        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+        self.assertEqual(est_time_to_hour(jf, self.now),
                          timedelta(hours=1))
-        self.assertEqual(job_flow_pool_name(jf), None)
+        self.assertEqual(pool_hash_and_name(jf), (None, None))
 
     def test_idle_and_failed(self):
         jf = self.mock_emr_job_flows['j-IDLE_AND_FAILED']
@@ -282,9 +281,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_running(jf), False)
         self.assertEqual(is_job_flow_non_streaming(jf), False)
         self.assertEqual(time_job_flow_idle(jf, self.now), timedelta(hours=3))
-        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+        self.assertEqual(est_time_to_hour(jf, self.now),
                          timedelta(hours=1))
-        self.assertEqual(job_flow_pool_name(jf), None)
+        self.assertEqual(pool_hash_and_name(jf), (None, None))
 
     def test_pooled(self):
         jf = self.mock_emr_job_flows['j-POOLED']
@@ -294,20 +293,18 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(is_job_flow_non_streaming(jf), False)
         self.assertEqual(time_job_flow_idle(jf, self.now),
                          timedelta(minutes=55))
-        self.assertEqual(time_to_end_of_hour_for_job_flow(jf, self.now),
+        self.assertEqual(est_time_to_hour(jf, self.now),
                          timedelta(minutes=5))
-        self.assertEqual(job_flow_pool_name(jf), 'reflecting')
+        self.assertEqual(pool_hash_and_name(jf),
+                         ('0123456789abcdef0123456789abcdef', 'reflecting'))
 
     def test_dry_run_does_nothing(self):
-
-        # dry run shouldn't do anything
         self.inspect_and_maybe_terminate_quietly(
             max_hours_idle=0.01, dry_run=True)
 
         self.assertEqual(self.terminated_jfs(), [])
 
     def test_increasing_idle_time(self):
-
         self.assertEqual(self.terminated_jfs(), [])
 
         # no job flows are 20 hours old

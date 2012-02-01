@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
 from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import parse_s3_uri
+from mrjob.pool import pool_hash_and_name
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
 from mrjob.util import log_to_stream
@@ -1974,6 +1975,11 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         self.assertNotEqual(actual_job_flow_id, job_flow_id)
 
+        # terminate the job flow created by this assert, to avoid
+        # very confusing behavior (see Issue #331)
+        emr_conn = EMRJobRunner().make_emr_conn()
+        emr_conn.terminate_jobflow(actual_job_flow_id)
+
     def make_simple_runner(self, pool_name):
         """Make an EMRJobRunner that is ready to try to find a pool to join"""
         mr_job = MRTwoStepJob([
@@ -2000,8 +2006,9 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             job_flow_id = runner.get_emr_job_flow_id()
             job_flow = emr_conn.describe_jobflow(job_flow_id)
             bootstrap_action = job_flow.bootstrapactions[0]
-            runner_jobflow_args = [a.value for a in bootstrap_action.args]
-            assert runner._pool_arg() in runner_jobflow_args
+            jf_hash, jf_name = pool_hash_and_name(job_flow)
+            self.assertEqual(jf_hash, runner._pool_hash())
+            self.assertEqual(jf_name, runner._opts['emr_job_flow_pool_name'])
             self.assertEqual(job_flow.state, 'WAITING')
 
     def test_join_pooled_job_flow(self):

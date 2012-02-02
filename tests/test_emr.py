@@ -1977,7 +1977,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         # terminate the job flow created by this assert, to avoid
         # very confusing behavior (see Issue #331)
-        emr_conn = EMRJobRunner(conf_path=self.mrjob_conf_path).make_emr_conn()
+        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
         emr_conn.terminate_jobflow(actual_job_flow_id)
 
     def make_simple_runner(self, pool_name):

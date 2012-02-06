@@ -33,9 +33,8 @@ from mrjob.util import scrape_options_into_new_groups
 
 
 def main():
-    """Run the create_job_flow tool. Pass **argv** to use arguments other
-    than sys.argv.
-    """
+    """Run the create_job_flow tool with arguments from ``sys.argv`` and
+    printing to ``sys.stdout``."""
     runner = EMRJobRunner(**runner_kwargs())
     emr_job_flow_id = runner.make_persistent_job_flow()
     print emr_job_flow_id

@@ -16,9 +16,9 @@
 
 from __future__ import with_statement
 
-from StringIO import StringIO
 from datetime import datetime
 from datetime import timedelta
+from StringIO import StringIO
 import sys
 
 from mrjob.tools.emr.create_job_flow import main as create_job_flow_main
@@ -30,9 +30,20 @@ from tests.test_emr import MockEMRAndS3TestCase
 
 class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
+    def setUp(self):
+        super(JobFlowInspectionTestCase, self).setUp()
+        self._original_argv = sys.argv
+        self._original_stdout = sys.stdout
+
+    def tearDown(self):
+        super(JobFlowInspectionTestCase, self).tearDown()
+        sys.argv = self._original_argv
+        sys.stdout = self._original_stdout
+
     def test_runner_kwargs(self):
+        sys.argv = [sys.argv[0], '--verbose']
         self.assertEqual(
-            runner_kwargs(['--verbose']),
+            runner_kwargs(),
             {'additional_emr_info': None,
              'aws_availability_zone': None,
              'aws_region': None,
@@ -67,9 +78,12 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
     def test_create_job_flow(self):
         self.add_mock_s3_data({'walrus': {}})
-        create_job_flow_main(['--quiet'],
-                             {'conf_path': False,
-                              's3_sync_wait_time': 0,
-                              's3_scratch_uri': 's3://walrus/tmp'},
-                              print_job_flow_id=False)
+        sys.argv = [sys.argv[0],
+                    '--quiet',
+                    '--no-conf',
+                    '--s3-sync-wait-time', '0',
+                    '--s3-scratch-uri', 's3://walrus/tmp']
+        sys.stdout = StringIO()
+        create_job_flow_main()
         self.assertEqual(list(self.mock_emr_job_flows.keys()), ['j-MOCKJOBFLOW0'])
+        self.assertEqual(sys.stdout.getvalue(), 'j-MOCKJOBFLOW0\n')

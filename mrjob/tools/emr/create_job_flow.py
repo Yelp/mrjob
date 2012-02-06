@@ -32,25 +32,22 @@ from mrjob.job import MRJob
 from mrjob.util import scrape_options_into_new_groups
 
 
-def main(argv=None, more_runner_kwargs=None, print_job_flow_id=True):
+def main():
     """Run the create_job_flow tool. Pass **argv** to use arguments other
     than sys.argv.
     """
-    all_runner_kwargs = runner_kwargs(argv)
-    all_runner_kwargs.update(more_runner_kwargs or {})
-    runner = EMRJobRunner(**all_runner_kwargs)
+    runner = EMRJobRunner(**runner_kwargs())
     emr_job_flow_id = runner.make_persistent_job_flow()
-    if print_job_flow_id:
-        print emr_job_flow_id
+    print emr_job_flow_id
 
 
-def runner_kwargs(argv):
+def runner_kwargs():
     """Parse command line arguments into arguments for
     :py:class:`EMRJobRunner`
     """
     # parser command-line args
     option_parser = make_option_parser()
-    options, args = option_parser.parse_args(argv)
+    options, args = option_parser.parse_args()
 
     if args:
         option_parser.error('takes no arguments')

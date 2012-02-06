@@ -16,10 +16,12 @@
 
 from __future__ import with_statement
 
+from optparse import OptionError
 from StringIO import StringIO
 import sys
 
 from mrjob.tools.emr.fetch_logs import main as fetch_logs_main
+from mrjob.tools.emr.fetch_logs import parse_args
 from mrjob.tools.emr.fetch_logs import runner_kwargs
 
 from tests.quiet import no_handlers_for_logger
@@ -45,10 +47,14 @@ class LogFetchingTestCase(MockEMRAndS3TestCase):
     def monkey_patch_stdout(self):
         sys.stdout = self.stdout
 
+    def test_bad_args(self):
+        self.monkey_patch_argv()
+        self.assertRaises(OptionError, parse_args)
+
     def test_runner_kwargs(self):
         self.monkey_patch_argv('--verbose', 'j-MOCKJOBFLOW0')
         self.assertEqual(
-            runner_kwargs(),
+            runner_kwargs(parse_args()),
             {'conf_path': None,
              'ec2_key_pair_file': None,
              'emr_job_flow_id': 'j-MOCKJOBFLOW0'})

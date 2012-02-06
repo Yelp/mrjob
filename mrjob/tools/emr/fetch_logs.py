@@ -56,7 +56,24 @@ from mrjob.util import scrape_options_into_new_groups
 
 
 def main():
-    with EMRJobRunner(**runner_kwargs()) as runner:
+    try:
+        options = parse_args()
+    except OptionError:
+        option_parser.print_usage()
+        sys.exit(1)
+
+    runner_kwargs = runner_kwargs(options)
+
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
+
+    perform_actions(options, runner_kwargs)
+
+    if options.step_num:
+        step_nums = [options.step_num]
+    else:
+        step_nums = None
+
+    with EMRJobRunner(**runner_kwargs) as runner:
         if options.list_relevant:
             list_relevant(runner, step_nums)
 
@@ -80,29 +97,30 @@ def main():
             find_failure(runner, options.step_num)
 
 
-def runner_kwargs():
+def parse_args():
     option_parser = make_option_parser()
     options, args = option_parser.parse_args()
 
     # should be one argument, the job flow ID
     if len(args) != 1:
-        option_parser.print_usage()
-        sys.exit(1)
+        raise OptionError('Must supply one positional argument as the job'
+                          ' flow ID', option_parser)
 
-    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
+    options.emr_job_flow_id = args[0]
 
-    if options.step_num:
-        step_nums = [options.step_num]
-    else:
-        step_nums = None
+    return options
 
+
+def runner_kwargs(options):
+    """Given the command line options, return the arguments to
+    :py:class:`EMRJobRunner`
+    """
     kwargs = options.__dict__.copy()
     for unused_arg in ('quiet', 'verbose', 'list_relevant', 'list_all',
                        'cat_relevant', 'cat_all', 'get_counters', 'step_num',
                        'find_failure'):
         del kwargs[unused_arg]
 
-    kwargs['emr_job_flow_id'] = args[0]
     return kwargs
 
 

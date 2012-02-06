@@ -16,8 +16,6 @@
 
 from __future__ import with_statement
 
-from datetime import datetime
-from datetime import timedelta
 from StringIO import StringIO
 import sys
 

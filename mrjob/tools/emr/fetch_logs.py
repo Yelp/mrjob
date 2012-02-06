@@ -41,6 +41,7 @@ Options::
 """
 from __future__ import with_statement
 
+from optparse import OptionError
 from optparse import OptionParser
 import sys
 
@@ -55,6 +56,57 @@ from mrjob.util import scrape_options_into_new_groups
 
 
 def main():
+    with EMRJobRunner(**runner_kwargs()) as runner:
+        if options.list_relevant:
+            list_relevant(runner, step_nums)
+
+        if options.list_all:
+            list_all(runner)
+
+        if options.cat_relevant:
+            cat_relevant(runner, step_nums)
+
+        if options.cat_all:
+            cat_all(runner)
+
+        if options.get_counters:
+            desc = runner._describe_jobflow()
+            runner._set_s3_job_log_uri(desc)
+            runner._fetch_counters(
+                xrange(1, len(desc.steps) + 1), skip_s3_wait=True)
+            runner.print_counters()
+
+        if options.find_failure:
+            find_failure(runner, options.step_num)
+
+
+def runner_kwargs():
+    option_parser = make_option_parser()
+    options, args = option_parser.parse_args()
+
+    # should be one argument, the job flow ID
+    if len(args) != 1:
+        option_parser.print_usage()
+        sys.exit(1)
+
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
+
+    if options.step_num:
+        step_nums = [options.step_num]
+    else:
+        step_nums = None
+
+    kwargs = options.__dict__.copy()
+    for unused_arg in ('quiet', 'verbose', 'list_relevant', 'list_all',
+                       'cat_relevant', 'cat_all', 'get_counters', 'step_num',
+                       'find_failure'):
+        del kwargs[unused_arg]
+
+    kwargs['emr_job_flow_id'] = args[0]
+    return kwargs
+
+
+def make_option_parser():
     usage = 'usage: %prog [options] JOB_FLOW_ID'
     description = (
         'List, display, and parse Hadoop logs associated with EMR job flows.'
@@ -103,44 +155,7 @@ def main():
                          mr_job.hadoop_emr_opt_group, mr_job.emr_opt_group,
                          mr_job.hadoop_opts_opt_group)
     scrape_options_into_new_groups(job_option_groups, assignments)
-
-    options, args = option_parser.parse_args()
-
-    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
-
-    if options.step_num:
-        step_nums = [options.step_num]
-    else:
-        step_nums = None
-
-    runner_kwargs = options.__dict__.copy()
-    for unused_arg in ('quiet', 'verbose', 'list_relevant', 'list_all',
-                       'cat_relevant', 'cat_all', 'get_counters', 'step_num',
-                      'find_failure'):
-        del runner_kwargs[unused_arg]
-
-    with EMRJobRunner(emr_job_flow_id=args[0], **runner_kwargs) as runner:
-        if options.list_relevant:
-            list_relevant(runner, step_nums)
-
-        if options.list_all:
-            list_all(runner)
-
-        if options.cat_relevant:
-            cat_relevant(runner, step_nums)
-
-        if options.cat_all:
-            cat_all(runner)
-
-        if options.get_counters:
-            desc = runner._describe_jobflow()
-            runner._set_s3_job_log_uri(desc)
-            runner._fetch_counters(
-                xrange(1, len(desc.steps) + 1), skip_s3_wait=True)
-            runner.print_counters()
-
-        if options.find_failure:
-            find_failure(runner, options.step_num)
+    return option_parser
 
 
 def prettyprint_paths(paths):

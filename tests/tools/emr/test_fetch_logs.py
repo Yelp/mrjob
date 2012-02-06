@@ -20,6 +20,8 @@ from optparse import OptionError
 from StringIO import StringIO
 import sys
 
+from boto.exception import S3ResponseError
+
 from mrjob.tools.emr.fetch_logs import main as fetch_logs_main
 from mrjob.tools.emr.fetch_logs import parse_args
 from mrjob.tools.emr.fetch_logs import runner_kwargs
@@ -59,10 +61,12 @@ class LogFetchingTestCase(MockEMRAndS3TestCase):
              'ec2_key_pair_file': None,
              'emr_job_flow_id': 'j-MOCKJOBFLOW0'})
 
-    def test_create_job_flow(self):
+    def test_fetch_counters(self):
         self.add_mock_s3_data({'walrus': {}})
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
-            '--s3-sync-wait-time', '0',
-            '--s3-scratch-uri', 's3://walrus/tmp',
+            '--counters',
             'j-MOCKJOBFLOW0')
+
+        # we haven't populated any test data, so this will fail
+        self.assertRaises(S3ResponseError, fetch_logs_main)

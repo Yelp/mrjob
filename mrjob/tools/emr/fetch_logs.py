@@ -62,39 +62,42 @@ def main():
         option_parser.print_usage()
         sys.exit(1)
 
-    runner_kwargs = runner_kwargs(options)
-
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
-    perform_actions(options, runner_kwargs)
+    with EMRJobRunner(**runner_kwargs(options)) as runner:
+        perform_actions(options, runner)
+
+def perform_actions(options, runner):
+    """Given the command line arguments and an :py:class:`EMRJobRunner`,
+    perform various actions.
+    """
 
     if options.step_num:
         step_nums = [options.step_num]
     else:
         step_nums = None
 
-    with EMRJobRunner(**runner_kwargs) as runner:
-        if options.list_relevant:
-            list_relevant(runner, step_nums)
+    if options.list_relevant:
+        list_relevant(runner, step_nums)
 
-        if options.list_all:
-            list_all(runner)
+    if options.list_all:
+        list_all(runner)
 
-        if options.cat_relevant:
-            cat_relevant(runner, step_nums)
+    if options.cat_relevant:
+        cat_relevant(runner, step_nums)
 
-        if options.cat_all:
-            cat_all(runner)
+    if options.cat_all:
+        cat_all(runner)
 
-        if options.get_counters:
-            desc = runner._describe_jobflow()
-            runner._set_s3_job_log_uri(desc)
-            runner._fetch_counters(
-                xrange(1, len(desc.steps) + 1), skip_s3_wait=True)
-            runner.print_counters()
+    if options.get_counters:
+        desc = runner._describe_jobflow()
+        runner._set_s3_job_log_uri(desc)
+        runner._fetch_counters(
+            xrange(1, len(desc.steps) + 1), skip_s3_wait=True)
+        runner.print_counters()
 
-        if options.find_failure:
-            find_failure(runner, options.step_num)
+    if options.find_failure:
+        find_failure(runner, options.step_num)
 
 
 def parse_args():

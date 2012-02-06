@@ -46,7 +46,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         sys.argv = [sys.argv[0]] + list(args)
 
     def test_runner_kwargs(self):
-        sys.argv = [sys.argv[0], '--verbose']
+        self.monkey_patch_argv('--verbose')
         self.assertEqual(
             runner_kwargs(),
             {'additional_emr_info': None,

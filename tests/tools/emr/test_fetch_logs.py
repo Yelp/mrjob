@@ -22,6 +22,7 @@ import sys
 
 from boto.exception import S3ResponseError
 
+from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.fetch_logs import main as fetch_logs_main
 from mrjob.tools.emr.fetch_logs import parse_args
 from mrjob.tools.emr.fetch_logs import runner_kwargs
@@ -37,6 +38,7 @@ class LogFetchingTestCase(MockEMRAndS3TestCase):
         self._original_argv = sys.argv
         self._original_stdout = sys.stdout
         self.stdout = StringIO()
+        self.stderr = StringIO()
 
     def tearDown(self):
         super(LogFetchingTestCase, self).tearDown()
@@ -48,6 +50,16 @@ class LogFetchingTestCase(MockEMRAndS3TestCase):
 
     def monkey_patch_stdout(self):
         sys.stdout = self.stdout
+
+    def monkey_patch_stderr(self):
+        sys.stderr = self.stderr
+
+    def make_job_flow(self):
+        self.add_mock_s3_data({'walrus': {}})
+        with EMRJobRunner(conf_path=False,
+                          s3_scratch_uri='s3://walrus/',
+                          s3_sync_wait_time=0) as runner:
+            runner.make_persistent_job_flow()
 
     def test_bad_args(self):
         self.monkey_patch_argv()
@@ -61,12 +73,56 @@ class LogFetchingTestCase(MockEMRAndS3TestCase):
              'ec2_key_pair_file': None,
              'emr_job_flow_id': 'j-MOCKJOBFLOW0'})
 
+    def test_find_failure(self):
+        self.make_job_flow()
+        self.monkey_patch_argv(
+            '--quiet', '--no-conf',
+            '--f',
+            'j-MOCKJOBFLOW0')
+        self.monkey_patch_stdout()
+
+        fetch_logs_main()
+
+        self.assertEqual(self.stdout.getvalue(),
+                         'No probable cause of failure found.\n')
+
+    def test_list(self):
+        self.make_job_flow()
+        self.monkey_patch_argv(
+            '--quiet', '--no-conf',
+            '-l',
+            'j-MOCKJOBFLOW0')
+
+        self.monkey_patch_stdout()
+
+        fetch_logs_main()
+
+        self.assertEqual(self.stdout.getvalue(),
+                         'SSH error: Cannot ssh to master; job flow is not'
+                         ' waiting or running\n'
+                         'Task attempts:\n\nSteps:\n\nJobs:\n\nNodes:\n\n')
+
+    def test_list_all(self):
+        self.make_job_flow()
+        self.monkey_patch_argv(
+            '--quiet', '--no-conf',
+            '-L',
+            'j-MOCKJOBFLOW0')
+
+        self.monkey_patch_stdout()
+
+        fetch_logs_main()
+
+        self.assertEqual(self.stdout.getvalue(),
+                         'SSH error: Cannot ssh to master; job flow is not'
+                         ' waiting or running\n\n')
+
     def test_fetch_counters(self):
-        self.add_mock_s3_data({'walrus': {}})
+        self.make_job_flow()
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '--counters',
             'j-MOCKJOBFLOW0')
-
-        # we haven't populated any test data, so this will fail
-        self.assertRaises(S3ResponseError, fetch_logs_main)
+        self.monkey_patch_stdout()
+        fetch_logs_main()
+        self.assertEqual(self.stdout.getvalue(), '')

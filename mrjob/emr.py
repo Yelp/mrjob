@@ -2039,6 +2039,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         """
         out = StringIO()
 
+        python_bin_in_list = ', '.join(repr(opt) for opt in self._opts['python_bin'])
+
         def writeln(line=''):
             out.write(line + '\n')
 
@@ -2086,7 +2088,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             # un-compileable crud in the tarball.
             writeln("mrjob_dir = os.path.join(site_packages, 'mrjob')")
             writeln("call(["
-                    "'sudo', 'python', '-m', 'compileall', '-f', mrjob_dir])")
+                    "'sudo', %s, '-m', 'compileall', '-f', mrjob_dir])" %
+                    python_bin_in_list)
             writeln()
 
         # install our python modules
@@ -2100,8 +2103,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 cd_into = extract_dir_for_tar(file_dict['path'])
                 # install the module
                 writeln("check_call(["
-                        "'sudo', 'python', 'setup.py', 'install'], cwd=%r)" %
-                        cd_into)
+                        "'sudo', %s, 'setup.py', 'install'], cwd=%r)" %
+                        (python_bin_in_list, cd_into))
 
         # run our commands
         if self._opts['bootstrap_cmds']:

@@ -19,14 +19,13 @@ from __future__ import with_statement
 from mrjob.tools.emr.create_job_flow import main as create_job_flow_main
 from mrjob.tools.emr.create_job_flow import runner_kwargs
 
-from tests.quiet import no_handlers_for_logger
 from tests.tools.emr import ToolTestCase
 
 
 class JobFlowInspectionTestCase(ToolTestCase):
 
     def test_runner_kwargs(self):
-        self.monkey_patch_argv('--verbose')
+        self.monkey_patch_argv('--quiet')
         self.assertEqual(
             runner_kwargs(),
             {'additional_emr_info': None,

@@ -16,15 +16,10 @@
 
 from __future__ import with_statement
 
-from optparse import OptionError
-
-from boto.exception import S3ResponseError
-
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.terminate_job_flow import main as terminate_main
 from mrjob.tools.emr.terminate_job_flow import make_option_parser
 
-from tests.quiet import no_handlers_for_logger
 from tests.tools.emr import ToolTestCase
 
 
@@ -35,12 +30,11 @@ class TerminateToolTestCase(ToolTestCase):
         self.assertEqual(True, True)
 
     def test_terminate_job_flow(self):
-        self.make_job_flow(pool_emr_job_flows=True)
-        self.monkey_patch_argv('--verbose', '--no-conf', 'j-MOCKJOBFLOW0')
-        self.monkey_patch_stderr()
+        jf_id = self.make_job_flow(pool_emr_job_flows=True)
+        self.monkey_patch_argv('--quiet', '--no-conf', 'j-MOCKJOBFLOW0')
 
         terminate_main()
 
-        value = self.stderr.getvalue()
-        self.assertIn('Terminating job flow j-MOCKJOBFLOW0', value)
-        self.assertIn('Terminated job flow j-MOCKJOBFLOW0', value)
+        emr_conn = EMRJobRunner(no_conf=True).make_emr_conn()
+        self.assertEqual(emr_conn.describe_jobflow(jf_id).state,
+                         'TERMINATED')

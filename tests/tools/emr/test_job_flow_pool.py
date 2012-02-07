@@ -65,10 +65,8 @@ class PoolingToolTestCase(ToolTestCase):
             '--quiet', '--no-conf',
             '-a')
         self.monkey_patch_stdout()
-        self.monkey_patch_stderr()
 
-        with no_handlers_for_logger():
-            pool_main()
+        pool_main()
 
         value = self.stdout.getvalue()
         self.assertIn('j-MOCKJOBFLOW0', value)
@@ -85,10 +83,8 @@ class PoolingToolTestCase(ToolTestCase):
             '--quiet', '--no-conf',
             '-f')
         self.monkey_patch_stdout()
-        self.monkey_patch_stderr()
 
-        with no_handlers_for_logger():
-            pool_main()
+        pool_main()
 
         value = self.stdout.getvalue()
         self.assertIn('j-MOCKJOBFLOW0', value)
@@ -104,10 +100,8 @@ class PoolingToolTestCase(ToolTestCase):
             '--quiet', '--no-conf',
             '-t', jf_id)
         self.monkey_patch_stdout()
-        self.monkey_patch_stderr()
 
-        with no_handlers_for_logger():
-            pool_main()
+        pool_main()
 
         value = self.stdout.getvalue()
         self.assertIn('j-MOCKJOBFLOW0', value)

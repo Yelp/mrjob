@@ -16,10 +16,6 @@
 
 from __future__ import with_statement
 
-from optparse import OptionError
-
-from boto.exception import S3ResponseError
-
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.terminate_job_flow import main as terminate_main
 from mrjob.tools.emr.terminate_job_flow import make_option_parser

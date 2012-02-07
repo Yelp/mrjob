@@ -18,14 +18,11 @@ from __future__ import with_statement
 
 from optparse import OptionError
 
-from boto.exception import S3ResponseError
-
 from mrjob.tools.emr.fetch_logs import main as fetch_logs_main
 from mrjob.tools.emr.fetch_logs import make_option_parser
 from mrjob.tools.emr.fetch_logs import parse_args
 from mrjob.tools.emr.fetch_logs import runner_kwargs
 
-from tests.quiet import no_handlers_for_logger
 from tests.tools.emr import ToolTestCase
 
 

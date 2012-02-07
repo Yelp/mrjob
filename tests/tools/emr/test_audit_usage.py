@@ -21,6 +21,7 @@ import sys
 from mrjob import boto_2_1_1_83aae37b
 from mrjob.tools.emr.audit_usage import job_flow_to_full_summary
 from mrjob.tools.emr.audit_usage import subdivide_interval_by_date
+from mrjob.tools.emr.audit_usage import subdivide_interval_by_hour
 from mrjob.tools.emr.audit_usage import main
 from mrjob.tools.emr.audit_usage import percent
 from tests.mockboto import MockEmrObject
@@ -767,6 +768,67 @@ class SubdivideIntervalByDateTestCase(unittest.TestCase):
              date(2010, 6, 8): 86400.0,
              date(2010, 6, 9): 86400.0,
              date(2010, 6, 10): 18000.0}
+        )
+
+
+class SubdivideIntervalByHourTestCase(unittest.TestCase):
+
+    def test_zero_interval(self):
+        self.assertEqual(
+            subdivide_interval_by_hour(
+                datetime(2010, 6, 6, 4, 26),
+                datetime(2010, 6, 6, 4, 26),
+            ),
+            {}
+        )
+
+    def test_same_hour(self):
+        self.assertEqual(
+            subdivide_interval_by_hour(
+                datetime(2010, 6, 6, 4, 24),
+                datetime(2010, 6, 6, 4, 26),
+            ),
+            {datetime(2010, 6, 6, 4): 120.0}
+        )
+
+    def test_start_at_midnight(self):
+        self.assertEqual(
+            subdivide_interval_by_hour(
+                datetime(2010, 6, 6, 0, 0),
+                datetime(2010, 6, 6, 0, 3),
+            ),
+            {datetime(2010, 6, 6, 0): 180.0}
+        )
+
+    def test_end_at_midnight(self):
+        self.assertEqual(
+            subdivide_interval_by_hour(
+                datetime(2010, 6, 5, 23, 55),
+                datetime(2010, 6, 6, 0, 0),
+            ),
+            {datetime(2010, 6, 5, 23): 300.0}
+        )
+
+    def test_split_over_midnight(self):
+        self.assertEqual(
+            subdivide_interval_by_hour(
+                datetime(2010, 6, 5, 23, 55),
+                datetime(2010, 6, 6, 0, 3),
+            ),
+            {datetime(2010, 6, 5, 23): 300.0,
+             datetime(2010, 6, 6, 0): 180.0}
+        )
+
+    def test_full_hours(self):
+        self.assertEqual(
+            subdivide_interval_by_hour(
+                datetime(2010, 6, 5, 23, 40),
+                datetime(2010, 6, 6, 2, 10),
+            ),
+            {datetime(2010, 6, 5, 23): 1200.0,
+             datetime(2010, 6, 6, 0): 3600.0,
+             datetime(2010, 6, 6, 1): 3600.0,
+             datetime(2010, 6, 6, 2): 600.0}
         )
 
 

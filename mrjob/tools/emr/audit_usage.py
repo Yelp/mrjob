@@ -125,7 +125,9 @@ def job_flows_to_stats(job_flows, now=None):
     (There is a *_used*, *_billed*, and *_bbnu* version of all stats below)
 
     * *date_to_nih_\**: map from a :py:class:`datetime.date` to number
-      of normalized instance hours.
+      of normalized instance hours on that date
+    * *hour_to_nih_\**: map from a :py:class:`datetime.datetime` to number
+      of normalized instance hours during the hour starting at that time
     * *label_to_nih_\**: map from jobs' labels (usually the module name of
       the job) to normalized instance hours, with ``None`` for
       non-:py:mod:`mrjob` jobs. This includes usage data for bootstrapping.
@@ -157,15 +159,17 @@ def job_flows_to_stats(job_flows, now=None):
         jf['usage'][-1]['nih_bbnu'] for jf in s['flows'] if jf['usage']))
     s['other_nih_bbnu'] = s['nih_bbnu'] - s['end_nih_bbnu']
 
-    # stats by date
-    for nih_type in ('nih_billed', 'nih_used', 'nih_bbnu'):
-        date_to_nih = {}
-        for jf in s['flows']:
-            for u in jf['usage']:
-                for d, nih in u['date_to_%s' % nih_type].iteritems():
-                    date_to_nih.setdefault(d, 0.0)
-                    date_to_nih[d] += nih
-        s['date_to_%s' % nih_type] = date_to_nih
+    # stats by date/hour
+    for interval_type in ('date', 'hour'):
+        for nih_type in ('nih_billed', 'nih_used', 'nih_bbnu'):
+            start_to_nih = {}
+            for jf in s['flows']:
+                for u in jf['usage']:
+                    key = '%s_to_%s' % (interval_type, nih_type)
+                    for start, nih in u[key].iteritems():
+                        start_to_nih.setdefault(start, 0.0)
+                        start_to_nih[start] += nih
+            s[key] = start_to_nih
 
     # break down by label ("job name") and owner ("user")
     for key in ('label', 'owner'):
@@ -343,7 +347,10 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
       the job or bootstrapping
     * *nih_bbnu*: usage billed but not used (`nih_billed - nih_used`)
     * *date_to_nih_\**: map from a :py:class:`datetime.date` to number
-      of normalized instance hours billed/used/billed but not used
+      of normalized instance hours billed/used/billed but not used on that date
+    * *hour_to_nih_\**: map from a :py:class:`datetime.datetime` to number
+      of normalized instance hours billed/used/billed but not used during
+      the hour starting at that time
     * *label*: job's label (usually the module name of the job), or for the
       bootstrapping step, the label of the job flow
     * *owner*: job's owner (usually the user that started it), or for the
@@ -437,6 +444,12 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
             in subdivide_interval_by_date(interval['start'],
                                           interval['end']).iteritems())
 
+        interval['hour_to_nih_used'] = dict(
+            (d, nih_per_sec * secs)
+            for d, secs
+            in subdivide_interval_by_hour(interval['start'],
+                                          interval['end']).iteritems())
+
         interval['nih_billed'] = (
             nih_per_sec *
             to_secs(interval['end_billing'] - interval['start']))
@@ -446,6 +459,13 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
             for d, secs
             in subdivide_interval_by_date(interval['start'],
                                           interval['end_billing']).iteritems())
+        
+        interval['hour_to_nih_billed'] = dict(
+            (d, nih_per_sec * secs)
+            for d, secs
+            in subdivide_interval_by_hour(interval['start'],
+                                          interval['end_billing']).iteritems())
+        
         # time billed but not used
         interval['nih_bbnu'] = interval['nih_billed'] - interval['nih_used']
 
@@ -454,6 +474,12 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
             nih_bbnu = nih_billed - interval['date_to_nih_used'].get(d, 0.0)
             if nih_bbnu:
                 interval['date_to_nih_bbnu'][d] = nih_bbnu
+
+        interval['hour_to_nih_bbnu'] = {}
+        for d, nih_billed in interval['hour_to_nih_billed'].iteritems():
+            nih_bbnu = nih_billed - interval['hour_to_nih_used'].get(d, 0.0)
+            if nih_bbnu:
+                interval['hour_to_nih_bbnu'][d] = nih_bbnu
 
     return intervals
 
@@ -487,6 +513,39 @@ def subdivide_interval_by_date(start, end):
         (d, secs) for d, secs in date_to_secs.iteritems() if secs)
 
     return date_to_secs
+
+
+def subdivide_interval_by_hour(start, end):
+    """Convert a time interval to a map from hours (represented as
+    :py:class:`datetime.datetime` for the start of the hour) to the number of
+    seconds during that hour that are within the interval
+
+    *start* and *end* are :py:class:`datetime.datetime` objects.
+    """
+    start_hour = start.replace(minute=0, second=0, microsecond=0)
+    end_hour = end.replace(minute=0, second=0, microsecond=0)
+
+    if start_hour == end_hour:
+        hour_to_secs = {start_hour: to_secs(end - start)}
+    else:
+        hour_to_secs = {}
+
+        hour_to_secs[start_hour] = to_secs(
+            start_hour + timedelta(hours=1) - start)
+
+        hour_to_secs[end_hour] = to_secs(end - end_hour)
+
+        # fill in dates in the middle
+        cur_hour = start_hour + timedelta(hours=1)
+        while cur_hour < end_hour:
+            hour_to_secs[cur_hour] = to_secs(timedelta(hours=1))
+            cur_hour += timedelta(hours=1)
+
+    # remove zeros
+    hour_to_secs = dict(
+        (h, secs) for h, secs in hour_to_secs.iteritems() if secs)
+
+    return hour_to_secs
 
 
 def get_job_flows(conf_path, max_days_ago=None, now=None):
@@ -565,12 +624,28 @@ def print_report(stats, now=None):
         while d >= min(s['date_to_nih_billed']):
             print ' %10s %9.2f %9.2f %9.2f     %5.1f' % (
                 d,
-                s['date_to_nih_billed'][d],
+                s['date_to_nih_billed'].get(d, 0.0),
                 s['date_to_nih_used'].get(d, 0.0),
                 s['date_to_nih_bbnu'].get(d, 0.0),
                 percent(s['date_to_nih_bbnu'].get(d, 0.0),
-                        s['date_to_nih_billed'][d]))
+                        s['date_to_nih_billed'].get(d, 0.0)))
             d -= timedelta(days=1)
+        print
+
+    if s['hour_to_nih_billed']:
+        print 'Hourly statistics:'
+        print
+        print ' hour              billed      used     waste   % waste'
+        h = max(s['hour_to_nih_billed'])
+        while h >= min(s['hour_to_nih_billed']):
+            print ' %13s  %9.2f %9.2f %9.2f     %5.1f' % (
+                h.strftime('%Y-%m-%d %H'),
+                s['hour_to_nih_billed'].get(h, 0.0),
+                s['hour_to_nih_used'].get(h, 0.0),
+                s['hour_to_nih_bbnu'].get(h, 0.0),
+                percent(s['hour_to_nih_bbnu'].get(h, 0.0),
+                        s['hour_to_nih_billed'].get(h, 0.0)))
+            h -= timedelta(hours=1)
         print
 
     print '* Job flows are considered to belong to the user and job that'

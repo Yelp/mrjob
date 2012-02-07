@@ -17,50 +17,19 @@
 from __future__ import with_statement
 
 from optparse import OptionError
-from StringIO import StringIO
-import sys
 
 from boto.exception import S3ResponseError
 
-from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.fetch_logs import main as fetch_logs_main
 from mrjob.tools.emr.fetch_logs import make_option_parser
 from mrjob.tools.emr.fetch_logs import parse_args
 from mrjob.tools.emr.fetch_logs import runner_kwargs
 
 from tests.quiet import no_handlers_for_logger
-from tests.test_emr import MockEMRAndS3TestCase
+from tests.tools.emr import ToolTestCase
 
 
-class LogFetchingTestCase(MockEMRAndS3TestCase):
-
-    def setUp(self):
-        super(LogFetchingTestCase, self).setUp()
-        self._original_argv = sys.argv
-        self._original_stdout = sys.stdout
-        self.stdout = StringIO()
-        self.stderr = StringIO()
-
-    def tearDown(self):
-        super(LogFetchingTestCase, self).tearDown()
-        sys.argv = self._original_argv
-        sys.stdout = self._original_stdout
-
-    def monkey_patch_argv(self, *args):
-        sys.argv = [sys.argv[0]] + list(args)
-
-    def monkey_patch_stdout(self):
-        sys.stdout = self.stdout
-
-    def monkey_patch_stderr(self):
-        sys.stderr = self.stderr
-
-    def make_job_flow(self):
-        self.add_mock_s3_data({'walrus': {}})
-        with EMRJobRunner(conf_path=False,
-                          s3_scratch_uri='s3://walrus/',
-                          s3_sync_wait_time=0) as runner:
-            runner.make_persistent_job_flow()
+class LogFetchingTestCase(ToolTestCase):
 
     def test_bad_args(self):
         self.monkey_patch_argv()

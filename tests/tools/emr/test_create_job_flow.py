@@ -16,32 +16,14 @@
 
 from __future__ import with_statement
 
-from StringIO import StringIO
-import sys
-
 from mrjob.tools.emr.create_job_flow import main as create_job_flow_main
 from mrjob.tools.emr.create_job_flow import runner_kwargs
 
 from tests.quiet import no_handlers_for_logger
-from tests.test_emr import MockEMRAndS3TestCase
+from tests.tools.emr import ToolTestCase
 
 
-class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
-
-    def setUp(self):
-        super(JobFlowInspectionTestCase, self).setUp()
-        self._original_argv = sys.argv
-        self._original_stdout = sys.stdout
-        self.stdout = StringIO()
-        sys.stdout = self.stdout
-
-    def tearDown(self):
-        super(JobFlowInspectionTestCase, self).tearDown()
-        sys.argv = self._original_argv
-        sys.stdout = self._original_stdout
-
-    def monkey_patch_argv(self, *args):
-        sys.argv = [sys.argv[0]] + list(args)
+class JobFlowInspectionTestCase(ToolTestCase):
 
     def test_runner_kwargs(self):
         self.monkey_patch_argv('--verbose')
@@ -85,6 +67,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             '--quiet', '--no-conf',
             '--s3-sync-wait-time', '0',
             '--s3-scratch-uri', 's3://walrus/tmp')
+        self.monkey_patch_stdout()
         create_job_flow_main()
         self.assertEqual(list(self.mock_emr_job_flows.keys()), ['j-MOCKJOBFLOW0'])
         self.assertEqual(self.stdout.getvalue(), 'j-MOCKJOBFLOW0\n')

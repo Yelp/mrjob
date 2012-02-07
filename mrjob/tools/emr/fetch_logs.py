@@ -101,6 +101,7 @@ def perform_actions(options, runner):
 
 
 def parse_args(option_parser):
+    option_parser = make_option_parser()
     options, args = option_parser.parse_args()
 
     # should be one argument, the job flow ID

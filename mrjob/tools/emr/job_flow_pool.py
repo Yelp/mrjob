@@ -110,7 +110,7 @@ def main():
     try:
         options = parse_args(option_parser)
     except OptionError:
-        sys.exit(1)
+        option_parser.error('This tool takes no arguments.')
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 

@@ -60,8 +60,7 @@ def main():
     try:
         options = parse_args(option_parser)
     except OptionError:
-        option_parser.print_usage()
-        sys.exit(1)
+        option_parser.error('This tool takes exactly one argument.')
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 

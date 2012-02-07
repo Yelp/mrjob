@@ -36,7 +36,7 @@ class LogFetchingTestCase(ToolTestCase):
         self.assertRaises(OptionError, parse_args, (make_option_parser(),))
 
     def test_runner_kwargs(self):
-        self.monkey_patch_argv('--verbose', 'j-MOCKJOBFLOW0')
+        self.monkey_patch_argv('--quiet', 'j-MOCKJOBFLOW0')
         self.assertEqual(
             runner_kwargs(parse_args(make_option_parser())),
             {'conf_path': None,

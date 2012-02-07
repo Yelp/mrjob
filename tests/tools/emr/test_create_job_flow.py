@@ -26,7 +26,7 @@ from tests.tools.emr import ToolTestCase
 class JobFlowInspectionTestCase(ToolTestCase):
 
     def test_runner_kwargs(self):
-        self.monkey_patch_argv('--verbose')
+        self.monkey_patch_argv('--quiet')
         self.assertEqual(
             runner_kwargs(),
             {'additional_emr_info': None,

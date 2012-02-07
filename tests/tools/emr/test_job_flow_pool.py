@@ -65,8 +65,10 @@ class PoolingToolTestCase(ToolTestCase):
             '--quiet', '--no-conf',
             '-a')
         self.monkey_patch_stdout()
+        self.monkey_patch_stderr()
 
-        pool_main()
+        with no_handlers_for_logger():
+            pool_main()
 
         value = self.stdout.getvalue()
         self.assertIn('j-MOCKJOBFLOW0', value)
@@ -83,8 +85,29 @@ class PoolingToolTestCase(ToolTestCase):
             '--quiet', '--no-conf',
             '-f')
         self.monkey_patch_stdout()
+        self.monkey_patch_stderr()
 
-        pool_main()
+        with no_handlers_for_logger():
+            pool_main()
+
+        value = self.stdout.getvalue()
+        self.assertIn('j-MOCKJOBFLOW0', value)
+
+    def test_terminate_pool(self):
+        jf_id = self.make_job_flow(pool_emr_job_flows=True)
+        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
+
+        for i in range(3):
+            emr_conn.simulate_progress(jf_id)
+
+        self.monkey_patch_argv(
+            '--quiet', '--no-conf',
+            '-t', jf_id)
+        self.monkey_patch_stdout()
+        self.monkey_patch_stderr()
+
+        with no_handlers_for_logger():
+            pool_main()
 
         value = self.stdout.getvalue()
         self.assertIn('j-MOCKJOBFLOW0', value)

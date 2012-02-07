@@ -20,8 +20,9 @@ Usage::
 """
 from __future__ import with_statement
 
-from optparse import OptionParser
+from optparse import OptionError
 from optparse import OptionGroup
+from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import est_time_to_hour
@@ -105,14 +106,24 @@ def terminate(runner, pool_name):
 
 
 def main():
+    option_parser = make_option_parser()
+    try:
+        options = parse_args(option_parser)
+    except OptionError:
+        option_parser.error('This tool takes no arguments.')
+
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
+
+    with EMRJobRunner(**runner_kwargs(options)) as runner:
+        perform_actions(options, runner)
+
+
+def make_option_parser():
     usage = '%prog [options]'
     description = (
         'Inspect available job flow pools or identify job flows suitable for'
         ' running a job with the specified options.')
     option_parser = OptionParser(usage=usage, description=description)
-
-    import boto.emr.connection
-    boto.emr.connection.JobFlow.Fields.add('HadoopVersion')
 
     def make_option_group(halp):
         g = OptionGroup(option_parser, halp)
@@ -136,7 +147,7 @@ def main():
             'ec2_key_pair',
             'ec2_key_pair_file',
             'ec2_master_instance_type',
-            'ec2_slave_instance_type',
+            'ec2_core_instance_type',
             'emr_endpoint',
             'num_ec2_instances',
         ),
@@ -173,17 +184,34 @@ def main():
     # Scrape options from MRJob and index them by dest
     mr_job = MRJob()
     scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
+    return option_parser
+
+
+def parse_args(option_parser):
     options, args = option_parser.parse_args()
 
-    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
+    if len(args) != 0:
+        raise OptionError('This program takes no arguments', option_parser)
 
-    runner_kwargs = options.__dict__.copy()
+    return options
+
+
+def runner_kwargs(options):
+    """Given the command line options, return the arguments to
+    :py:class:`EMRJobRunner`
+    """
+    kwargs = options.__dict__.copy()
     for non_runner_kwarg in ('quiet', 'verbose', 'list_all', 'find',
                              'terminate'):
-        del runner_kwargs[non_runner_kwarg]
+        del kwargs[non_runner_kwarg]
 
-    runner = EMRJobRunner(**runner_kwargs)
+    return kwargs
 
+
+def perform_actions(options, runner):
+    """Given the command line arguments and an :py:class:`EMRJobRunner`,
+    perform various actions for this tool.
+    """
     if options.list_all:
         pprint_pools(runner)
 

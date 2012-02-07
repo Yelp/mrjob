@@ -296,8 +296,8 @@ def populate_option_groups_with_options(assignments, indexed_options):
                                        key=lambda item: item.get_opt_string())
 
 
-def read_input(path, stdin=None):
-    """Stream input the way Hadoop would.
+def input_files(path, stdin=None):
+    """An iterable of file objects for Hadoop-like syntax
 
     - Resolve globs (``foo_*.gz``).
     - Decompress ``.gz`` and ``.bz2`` files.
@@ -309,41 +309,53 @@ def read_input(path, stdin=None):
     """
     if stdin is None:
         stdin = sys.stdin
-
-    # handle '-' (special case)
+        
     if path == '-':
-        for line in stdin:
-            yield line
+        yield stdin
         return
-
+        
     # resolve globs
     paths = glob.glob(path)
     if not paths:
         raise IOError(2, 'No such file or directory: %r' % path)
     elif len(paths) > 1:
         for path in paths:
-            for line in read_input(path, stdin=stdin):
-                yield line
+            for file in get_files_from_input(path, stdin=stdin):
+                yield file
         return
     else:
         path = paths[0]
-
+        
     # recurse through directories
     if os.path.isdir(path):
         for dirname, _, filenames in os.walk(path):
             for filename in filenames:
-                for line in read_input(os.path.join(dirname, filename),
+                for file in get_files_from_input(os.path.join(dirname, filename),
                                        stdin=stdin):
-                    yield line
+                    yield file
         return
 
     # read from files
-    for line in read_file(path):
-        yield line
+    yield file_object(path)
 
+def read_input(path, stdin=None):
+    """Stream input the way Hadoop would.
 
-def read_file(path, fileobj=None):
-    """Reads a file.
+    - Resolve globs (``foo_*.gz``).
+    - Decompress ``.gz`` and ``.bz2`` files.
+    - If path is ``'-'``, read from stdin
+    - If path is a directory, recursively read its contents.
+
+    You can redefine *stdin* for ease of testing. *stdin* can actually be
+    any iterable that yields lines (e.g. a list).
+    """
+    
+    for file in input_files(path,stdin):
+        for line in file:
+            yield line
+  
+def file_object(path, fileobj=None):
+    """Return  file.
 
     - Decompress ``.gz`` and ``.bz2`` files.
     - If *fileobj* is not ``None``, stream lines from the *fileobj*
@@ -360,9 +372,16 @@ def read_file(path, fileobj=None):
     else:
         f = fileobj
 
-    for line in f:
-        yield line
+    return f
 
+def read_file(path, fileobj=None):
+    """Reads a file.
+
+    - Decompress ``.gz`` and ``.bz2`` files.
+    - If *fileobj* is not ``None``, stream lines from the *fileobj*
+    """
+    for line in file_object(path, fileobj):
+        yield line
 
 def bunzip2_stream(fileobj):
     """Return an uncompressed bz2 stream from a file object

@@ -111,6 +111,8 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
+    
+import typedbytes    
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
@@ -126,6 +128,7 @@ from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
 from mrjob.util import read_input
+from mrjob.util import input_files
 
 
 log = logging.getLogger('mrjob.job')
@@ -788,6 +791,30 @@ class MRJob(object):
         return inspect.getsourcefile(cls)
 
     ### Other useful utilities ###
+    
+    def _wrap_typedbytes(self):
+        tbout = typedbytes.Output(self.stdout)
+        
+        def read_lines():
+            paths = self.args or ['-']
+            for path in paths:
+                for file in input_files(path, stdin=self.stdin):
+                    for key,val in typedbytes.PairedInput(file):
+                        log.info('Read keyval pair, key=%s', str(key))
+                        yield key,val
+
+        def write_line(key, value):
+            try:
+                tbout.write(key)
+                tbout.write(value)
+            except Exception, e:
+                if self.options.strict_protocols:
+                    raise
+                else:
+                    self.increment_counter('Unencodable output',
+                                            e.__class__.__name__)
+
+        return read_lines, write_line
 
     def _read_input(self):
         """Read from stdin, or one more files, or directories.
@@ -802,7 +829,7 @@ class MRJob(object):
         for path in paths:
             for line in read_input(path, stdin=self.stdin):
                 yield line
-
+                
     def _wrap_protocols(self, step_num, step_type):
         """Pick the protocol classes to use for reading and writing
         for the given step, and wrap them so that bad input and output
@@ -819,6 +846,11 @@ class MRJob(object):
         step_num -- which step to run (e.g. 0)
         step_type -- 'M' for mapper, 'C' for combiner, 'R' for reducer
         """
+        
+        # TEMP code to evaluate typedbytes
+        if True:
+            return self._wrap_typedbytes()
+            
         read, write = self.pick_protocols(step_num, step_type)
 
         def read_lines():

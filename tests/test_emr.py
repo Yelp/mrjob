@@ -1746,6 +1746,26 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         # make sure master bootstrap script is on S3
         assert runner.path_exists(actions[2].path)
 
+    def test_bootstrap_script_uses_python_bin(self):
+        # create a fake src tarball
+        with open(os.path.join(self.tmp_dir, 'foo.py'), 'w'):
+            pass
+
+        yelpy_tar_gz_path = os.path.join(self.tmp_dir, 'yelpy.tar.gz')
+        tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
+
+        # use all the bootstrap options
+        runner = EMRJobRunner(conf_path=False,
+                              bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
+                              bootstrap_files=['/tmp/quz'],
+                              bootstrap_mrjob=True,
+                              bootstrap_python_packages=[yelpy_tar_gz_path],
+                              bootstrap_scripts=['speedups.sh', '/tmp/s.sh'],
+                              python_bin=['anaconda'])
+        content = runner._master_bootstrap_script_content()
+        self.assertIn("call(['sudo', 'python2.6', '-m', 'compileall', '-f', mrjob_dir]", content)
+        self.assertIn("check_call(['sudo', 'python2.6', 'setup.py', 'install']", content)
+
     def test_local_bootstrap_action(self):
         # make sure that local bootstrap action scripts get uploaded to S3
         action_path = os.path.join(self.tmp_dir, 'apt-install.sh')

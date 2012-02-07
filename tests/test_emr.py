@@ -1762,9 +1762,12 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
                               bootstrap_python_packages=[yelpy_tar_gz_path],
                               bootstrap_scripts=['speedups.sh', '/tmp/s.sh'],
                               python_bin=['anaconda'])
-        content = runner._master_bootstrap_script_content()
-        self.assertIn("call(['sudo', 'python2.6', '-m', 'compileall', '-f', mrjob_dir]", content)
-        self.assertIn("check_call(['sudo', 'python2.6', 'setup.py', 'install']", content)
+        script_path = os.path.join(self.tmp_dir, 'b.py')
+        runner._create_master_bootstrap_script(dest=script_path)
+        with open(script_path, 'r') as f:
+            content = f.read()
+            self.assertIn("call(['sudo', 'anaconda', '-m', 'compileall', '-f', mrjob_dir]", content)
+            self.assertIn("check_call(['sudo', 'anaconda', 'setup.py', 'install']", content)
 
     def test_local_bootstrap_action(self):
         # make sure that local bootstrap action scripts get uploaded to S3

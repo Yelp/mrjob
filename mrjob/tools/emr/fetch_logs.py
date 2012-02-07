@@ -56,8 +56,9 @@ from mrjob.util import scrape_options_into_new_groups
 
 
 def main():
+    option_parser = make_option_parser()
     try:
-        options = parse_args()
+        options = parse_args(option_parser)
     except OptionError:
         option_parser.print_usage()
         sys.exit(1)
@@ -69,9 +70,8 @@ def main():
 
 def perform_actions(options, runner):
     """Given the command line arguments and an :py:class:`EMRJobRunner`,
-    perform various actions.
+    perform various actions for this tool.
     """
-
     if options.step_num:
         step_nums = [options.step_num]
     else:
@@ -100,8 +100,7 @@ def perform_actions(options, runner):
         find_failure(runner, options.step_num)
 
 
-def parse_args():
-    option_parser = make_option_parser()
+def parse_args(option_parser):
     options, args = option_parser.parse_args()
 
     # should be one argument, the job flow ID
@@ -296,6 +295,7 @@ def find_failure(runner, step_num):
         print '\n'.join(cause_msg)
     else:
         print 'No probable cause of failure found.'
+
 
 if __name__ == '__main__':
     main()

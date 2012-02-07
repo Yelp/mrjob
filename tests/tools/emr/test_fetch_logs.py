@@ -24,6 +24,7 @@ from boto.exception import S3ResponseError
 
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.fetch_logs import main as fetch_logs_main
+from mrjob.tools.emr.fetch_logs import make_option_parser
 from mrjob.tools.emr.fetch_logs import parse_args
 from mrjob.tools.emr.fetch_logs import runner_kwargs
 
@@ -63,12 +64,12 @@ class LogFetchingTestCase(MockEMRAndS3TestCase):
 
     def test_bad_args(self):
         self.monkey_patch_argv()
-        self.assertRaises(OptionError, parse_args)
+        self.assertRaises(OptionError, parse_args, (make_option_parser(),))
 
     def test_runner_kwargs(self):
         self.monkey_patch_argv('--verbose', 'j-MOCKJOBFLOW0')
         self.assertEqual(
-            runner_kwargs(parse_args()),
+            runner_kwargs(parse_args(make_option_parser())),
             {'conf_path': None,
              'ec2_key_pair_file': None,
              'emr_job_flow_id': 'j-MOCKJOBFLOW0'})

@@ -1999,10 +1999,14 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         if self._opts['emr_job_flow_id']:
             return
 
-        if not any(key.startswith('bootstrap_')
-                   and key != 'bootstrap_actions'  # these are separate scripts
-                   and value
-                   for (key, value) in self._opts.iteritems()):
+        # Also don't bother if we're not pooling (and therefore don't need
+        # to have a bootstrap script to attach to) and we're not bootstrapping
+        # anything else
+        if not (self._opts['pool_emr_job_flows'] or
+            any(key.startswith('bootstrap_') and
+                key != 'bootstrap_actions' and  # these are separate scripts
+                value
+                for (key, value) in self._opts.iteritems())):
             return
 
         if self._opts['bootstrap_mrjob']:

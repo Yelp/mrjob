@@ -146,7 +146,7 @@ class FindMiscTestCase(unittest.TestCase):
             "2010-07-27 17:54:54,344 INFO org.apache.hadoop.fs.s3native.NativeS3FileSystem (main): Opening 's3://yourbucket/logs/2010/07/23/log2-00078.gz' for reading\n",
         ]
         self.assertEqual(find_input_uri_for_mapper(line for line in LOG_LINES),
-                         's3://yourbucket/logs/2010/07/23/log2-00077.gz')
+                         's3://yourbucket/logs/2010/07/23/log2-00078.gz')
 
     def test_find_hadoop_java_stack_trace(self):
         LOG_LINES = [

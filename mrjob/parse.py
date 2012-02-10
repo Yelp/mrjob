@@ -245,12 +245,12 @@ def find_input_uri_for_mapper(lines):
 
         2010-07-27 17:54:54,344 INFO org.apache.hadoop.fs.s3native.NativeS3FileSystem (main): Opening 's3://yourbucket/logs/2010/07/23/log2-00077.gz' for reading
     """
+    val = None
     for line in lines:
         match = _OPENING_FOR_READING_RE.match(line)
         if match:
-            return match.group(1)
-    else:
-        return None
+            val = match.group(1)
+    return val
 
 
 _HADOOP_STREAMING_ERROR_RE = re.compile(

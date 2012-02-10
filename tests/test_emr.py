@@ -1701,10 +1701,27 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         # bootstrap actions don't figure into the master bootstrap script
         runner = EMRJobRunner(conf_path=False,
                               bootstrap_mrjob=False,
-                              bootstrap_actions=['foo', 'bar baz'])
+                              bootstrap_actions=['foo', 'bar baz'],
+                              pool_emr_job_flows=False)
         runner._create_master_bootstrap_script(dest=script_path)
 
         assert not os.path.exists(script_path)
+
+    def test_bootstrap_script_if_needed_for_pooling(self):
+        runner = EMRJobRunner(conf_path=False, bootstrap_mrjob=False)
+        script_path = os.path.join(self.tmp_dir, 'b.py')
+
+        runner._create_master_bootstrap_script(dest=script_path)
+        assert not os.path.exists(script_path)
+
+        # bootstrap actions don't figure into the master bootstrap script
+        runner = EMRJobRunner(conf_path=False,
+                              bootstrap_mrjob=False,
+                              bootstrap_actions=['foo', 'bar baz'],
+                              pool_emr_job_flows=True)
+        runner._create_master_bootstrap_script(dest=script_path)
+
+        assert os.path.exists(script_path)
 
     def test_bootstrap_actions_get_added(self):
         bootstrap_actions = [

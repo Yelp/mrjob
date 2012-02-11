@@ -18,7 +18,8 @@ from __future__ import with_statement
 
 import bz2
 import copy
-import datetime
+from datetime import datetime
+from datetime import timedelta
 import getpass
 import gzip
 import logging
@@ -780,8 +781,8 @@ class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
 
 class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
 
-    def test_can_get_all_job_flows(self):
-        now = datetime.datetime.utcnow()
+    def test_can_get_more_job_flows_than_limit(self):
+        now = datetime.utcnow()
 
         NUM_JOB_FLOWS = 2222
         self.assertGreater(NUM_JOB_FLOWS, DEFAULT_MAX_JOB_FLOWS_RETURNED)
@@ -790,7 +791,7 @@ class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
             job_flow_id = 'j-%04d' % i
             self.mock_emr_job_flows[job_flow_id] = MockEmrObject(
                 creationdatetime=to_iso8601(
-                    now - datetime.timedelta(minutes=i)),
+                    now - timedelta(minutes=i)),
                 jobflowid=job_flow_id)
 
         emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
@@ -803,6 +804,38 @@ class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
         self.assertEqual(len(all_job_flows), NUM_JOB_FLOWS)
         self.assertEqual(sorted(jf.jobflowid for jf in all_job_flows),
                          [('j-%04d' % i) for i in range(NUM_JOB_FLOWS)])
+
+    def test_no_params_hole(self):
+        # Issue #346: If we (incorrectly) include no parameters to
+        # DescribeJobFlows on our initial call, we'll skip over
+        # j-THREEWEEKSAGO, since it's neither currently active, nor
+        # in the last 2 weeks.
+        
+        now = datetime.utcnow()
+
+        self.mock_emr_job_flows['j-THREEWEEKSAGO'] = MockEmrObject(
+            creationdatetime=to_iso8601(now - timedelta(weeks=3)),
+            jobflowid='j-THREEWEEKSAGO',
+            state='COMPLETED',
+        )
+        
+        self.mock_emr_job_flows['j-LONGRUNNING'] = MockEmrObject(
+            creationdatetime=to_iso8601(now - timedelta(weeks=4)),
+            jobflowid='j-LONGRUNNING',
+            state='RUNNING',
+        )
+
+        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
+
+        # ordinary describe_jobflows() misses j-THREEWEEKSAGO
+        some_job_flows = emr_conn.describe_jobflows()
+        self.assertEqual(sorted(jf.jobflowid for jf in some_job_flows),
+                         ['j-LONGRUNNING'])
+
+        # describe_all_job_flows() should work around this
+        all_job_flows = describe_all_job_flows(emr_conn)
+        self.assertEqual(sorted(jf.jobflowid for jf in all_job_flows),
+                         ['j-LONGRUNNING', 'j-THREEWEEKSAGO'])
 
 
 class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
@@ -1938,8 +1971,9 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             pass  # didn't set up SSH
 
     def make_pooled_job_flow(self, name=None, minutes_ago=0, **kwargs):
-        """Returns (runner, job_flow_id). Set minutes_ago to set
-        jobflow.startdatetime to seconds before datetime.datetime.now()."""
+        """Returns ``(runner, job_flow_id)``. Set minutes_ago to set
+        ``jobflow.startdatetime`` to seconds before
+        ``datetime.datetime.now()``."""
         runner = EMRJobRunner(conf_path=self.mrjob_conf_path,
                               pool_emr_job_flows=True,
                               emr_job_flow_pool_name=name,
@@ -1947,8 +1981,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         job_flow_id = runner.make_persistent_job_flow()
         jf = runner.make_emr_conn().describe_jobflow(job_flow_id)
         jf.state = 'WAITING'
-        start = (datetime.datetime.now() -
-                 datetime.timedelta(minutes=minutes_ago))
+        start = datetime.now() - timedelta(minutes=minutes_ago)
         jf.startdatetime = start.strftime(boto.utils.ISO8601)
         return runner, job_flow_id
 
@@ -2028,7 +2061,6 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             emr_conn = runner.make_emr_conn()
             job_flow_id = runner.get_emr_job_flow_id()
             job_flow = emr_conn.describe_jobflow(job_flow_id)
-            bootstrap_action = job_flow.bootstrapactions[0]
             jf_hash, jf_name = pool_hash_and_name(job_flow)
             self.assertEqual(jf_hash, runner._pool_hash())
             self.assertEqual(jf_name, runner._opts['emr_job_flow_pool_name'])

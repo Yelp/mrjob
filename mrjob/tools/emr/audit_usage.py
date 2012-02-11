@@ -162,10 +162,10 @@ def job_flows_to_stats(job_flows, now=None):
     # stats by date/hour
     for interval_type in ('date', 'hour'):
         for nih_type in ('nih_billed', 'nih_used', 'nih_bbnu'):
+            key = '%s_to_%s' % (interval_type, nih_type)
             start_to_nih = {}
             for jf in s['flows']:
                 for u in jf['usage']:
-                    key = '%s_to_%s' % (interval_type, nih_type)
                     for start, nih in u[key].iteritems():
                         start_to_nih.setdefault(start, 0.0)
                         start_to_nih[start] += nih

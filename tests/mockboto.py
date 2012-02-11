@@ -21,7 +21,8 @@ some sort of sandboxing feature to boto, rather than extending these somewhat
 ad-hoc mock objects.
 """
 from __future__ import with_statement
-import datetime
+from datetime import datetime
+from datetime import timedelta
 import hashlib
 
 try:
@@ -74,7 +75,7 @@ def add_mock_s3_data(mock_s3_fs, data):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
     key to contents) with a map from bucket name to key name to data and
     time last modified."""
-    time_modified = to_iso8601(datetime.datetime.utcnow())
+    time_modified = to_iso8601(datetime.utcnow())
     for bucket_name, key_name_to_bytes in data.iteritems():
         mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
@@ -142,7 +143,7 @@ class MockBucket:
     def new_key(self, key_name):
         if key_name not in self.mock_state():
             self.mock_state()[key_name] = ('',
-                    to_iso8601(datetime.datetime.utcnow()))
+                    to_iso8601(datetime.utcnow()))
         return MockKey(bucket=self, name=key_name)
 
     def get_key(self, key_name):
@@ -183,7 +184,7 @@ class MockKey(object):
     def write_mock_data(self, data):
         if self.name in self.bucket.mock_state():
             self.bucket.mock_state()[self.name] = (data,
-                        to_iso8601(datetime.datetime.utcnow()))
+                        to_iso8601(datetime.utcnow()))
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -330,7 +331,7 @@ class MockEmrConnection(object):
         attribute, which is useful for testing.
         """
         if now is None:
-            now = datetime.datetime.utcnow()
+            now = datetime.utcnow()
 
         # default and validate Hadoop and AMI versions
 
@@ -519,10 +520,11 @@ class MockEmrConnection(object):
 
     def describe_jobflows(self, states=None, jobflow_ids=None,
                           created_after=None, created_before=None):
+        now = datetime.utcnow()
 
         if created_before:
-            min_created_before = (datetime.datetime.utcnow() -
-                                  datetime.timedelta(days=self.max_days_ago))
+            min_created_before = now - timedelta(days=self.max_days_ago)
+
             if created_before < min_created_before:
                 raise boto.exception.BotoServerError(
                     400, 'Bad Request', body=err_xml(
@@ -532,19 +534,31 @@ class MockEmrConnection(object):
                      key=lambda jf: jf.creationdatetime,
                      reverse=True)
 
-        if states:
-            jfs = [jf for jf in jfs if jf.state in states]
+        if states or jobflow_ids or created_after or created_before:
+            if states:
+                jfs = [jf for jf in jfs if jf.state in states]
 
-        if jobflow_ids:
-            jfs = [jf for jf in jfs if jf.jobflowid in jobflow_ids]
+            if jobflow_ids:
+                jfs = [jf for jf in jfs if jf.jobflowid in jobflow_ids]
 
-        if created_after:
-            after_timestamp = to_iso8601(created_after)
-            jfs = [jf for jf in jfs if jf.creationdatetime > after_timestamp]
-
-        if created_before:
-            before_timestamp = to_iso8601(created_before)
-            jfs = [jf for jf in jfs if jf.creationdatetime < before_timestamp]
+            if created_after:
+                after_timestamp = to_iso8601(created_after)
+                jfs = [jf for jf in jfs
+                       if jf.creationdatetime > after_timestamp]
+    
+            if created_before:
+                before_timestamp = to_iso8601(created_before)
+                jfs = [jf for jf in jfs
+                       if jf.creationdatetime < before_timestamp]
+        else:
+            # special case for no parameters, see:
+            # http://docs.amazonwebservices.com/ElasticMapReduce/latest/API/API_DescribeJobFlows.html
+            two_weeks_ago_timestamp = to_iso8601(
+                now - timedelta(weeks=2))
+            jfs = [jf for jf in jfs
+                   if (jf.creationdatetime > two_weeks_ago_timestamp or
+                       jf.state in ['RUNNING', 'WAITING',
+                                    'SHUTTING_DOWN', 'STARTING'])]
 
         if self.max_job_flows_returned:
             jfs = jfs[:self.max_job_flows_returned]
@@ -605,7 +619,7 @@ class MockEmrConnection(object):
         :param now: alternate time to use as the current time (should be UTC)
         """
         if now is None:
-            now = datetime.datetime.utcnow()
+            now = datetime.utcnow()
 
         if self.simulation_steps_left <= 0:
             raise AssertionError(

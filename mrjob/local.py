@@ -479,7 +479,7 @@ class LocalMRJobRunner(MRJobRunner):
         version = self.get_hadoop_version()
 
         jobconf_env = dict(
-            (translate_jobconf(k, version).replace('.', '_'), v)
+            (translate_jobconf(k, version).replace('.', '_'), str(v))
             for (k, v) in self._opts['jobconf'].iteritems())
 
         internal_jobconf = self._simulate_jobconf_for_step(
@@ -487,7 +487,7 @@ class LocalMRJobRunner(MRJobRunner):
             input_start=input_start, input_length=input_length)
 
         internal_jobconf_env = dict(
-            (translate_jobconf(k, version).replace('.', '_'), v)
+            (translate_jobconf(k, version).replace('.', '_'), str(v))
             for (k, v) in internal_jobconf.iteritems())
 
         # keep the current environment because we need PATH to find binaries

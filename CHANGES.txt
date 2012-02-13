@@ -2,6 +2,7 @@ v0.3.2, 2012-??-?? -- ???
  * mrboss no longer spells stderr 'stsderr'
  * 'Testing with mrjob' section in docs (includes #321)
  * ami_version option to allow switching between EMR AMIs (#306)
+ * local mode allows non-string jobconf values again (this changed in v0.3.0)
 
 v0.3.1, 2011-12-20 -- Nooooo there were bugs!
  * Instance-type command-line arguments always override mrjob.conf (Issue #311)

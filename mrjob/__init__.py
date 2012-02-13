@@ -28,6 +28,7 @@ __credits__ = [
     'Adam Derewecki <derewecki@gmail.com>',
     'Benjamin Goldenberg <benjamin@yelp.com',
     'Peter Harrington <peter.b.harrington@gmail.com>',
+    'Brandon Haynes <bhaynes@fas.harvard.edu>',
     'Brett Hoerner <brett@bretthoerner.com>',
     'Stephen Johnson <sjohnson@yelp.com>',
     'Matt Jones <mattj@yelp.com>',

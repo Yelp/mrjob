@@ -14,7 +14,8 @@
 from __future__ import with_statement
 
 from collections import defaultdict
-import datetime
+from datetime import datetime
+from datetime import timedelta
 import fnmatch
 import logging
 import os
@@ -198,7 +199,7 @@ def iso8601_to_timestamp(iso8601_time):
 
 def iso8601_to_datetime(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
-    return datetime.datetime.strptime(iso8601_time, boto.utils.ISO8601)
+    return datetime.strptime(iso8601_time, boto.utils.ISO8601)
 
 
 def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
@@ -212,17 +213,21 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
 
     :type states: list
     :param states: A list of strings with job flow states wanted
-
     :type jobflow_ids: list
     :param jobflow_ids: A list of job flow IDs
     :type created_after: datetime
     :param created_after: Bound on job flow creation time
-
     :type created_before: datetime
     :param created_before: Bound on job flow creation time
     """
     all_job_flows = []
     ids_seen = set()
+
+    # weird things can happen if we send no args the DescribeJobFlows API
+    # (see Issue #346), so if nothing else is set, set created_before
+    # to a day in the future.
+    if not (states or jobflow_ids or created_after or created_before):
+        created_before = datetime.utcnow() + timedelta(days=1)
 
     while True:
         if created_before and created_after and created_before < created_after:
@@ -256,14 +261,14 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
             # in the same second
             min_create_time = min(iso8601_to_datetime(jf.creationdatetime)
                                   for jf in job_flows)
-            created_before = min_create_time + datetime.timedelta(seconds=1)
+            created_before = min_create_time + timedelta(seconds=1)
             # if someone managed to start 501 job flows in the same second,
             # they are still screwed (the EMR API only returns up to 500),
             # but this seems unlikely. :)
         else:
             if not created_before:
-                created_before = datetime.datetime.utcnow()
-            created_before -= datetime.timedelta(weeks=2)
+                created_before = datetime.utcnow()
+            created_before -= timedelta(weeks=2)
 
     return all_job_flows
 

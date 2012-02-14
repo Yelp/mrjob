@@ -25,6 +25,12 @@ mrboss
 .. automodule:: mrjob.tools.emr.mrboss
 
 
+report_long_jobs
+----------------
+
+.. automodule:: mrjob.tools.emr.report_long_jobs
+
+
 s3_tmpwatch
 -----------
 

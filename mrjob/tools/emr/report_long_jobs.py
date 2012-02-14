@@ -12,12 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Report jobs running for more than a certain number of hours (by default,
-24).
+24.0). This can help catch buggy jobs and Hadoop/EMR operational issues.
 
-Suggested usage: run this as a cron job with the ``-q`` option::
+Suggested usage: run this as a daily cron job with the ``-q`` option::
 
-    python -m mrjob.tools.emr.report_long_jobs -q
+    0 0 * * * python -m mrjob.tools.emr.report_long_jobs -q
 
+Options::
+
+  -h, --help            show this help message and exit
+  -v, --verbose         print more messages to stderr
+  -q, --quiet           Don't log status messages; just print the report.
+  -c CONF_PATH, --conf-path=CONF_PATH
+                        Path to alternate mrjob.conf file to read from
+  --no-conf             Don't load mrjob.conf even if it's available
+  --min-hours=MIN_HOURS
+                        Minimum number of hours a job can run before we report
+                        it. Default: 24.0
 """
 from __future__ import with_statement
 
@@ -165,7 +176,8 @@ def format_timedelta(time):
 def make_option_parser():
     usage = '%prog [options]'
     description = ('Report jobs running for more than a certain number of'
-                   ' hours (by default, %d).' % DEFAULT_MIN_HOURS)
+                   ' hours (by default, %.1f). This can help catch buggy jobs'
+                   ' and Hadoop/EMR operational issues.' % DEFAULT_MIN_HOURS)
     option_parser = OptionParser(usage=usage, description=description)
     option_parser.add_option(
         '-v', '--verbose', dest='verbose', default=False, action='store_true',

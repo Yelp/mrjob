@@ -61,11 +61,32 @@ def main(args):
 
 
 def find_long_running_jobs(job_flows, min_time, now=None):
+    """Identify jobs that have been running or pending for a long time.
+
+    :param job_flows: a list of :py:class:`boto.emr.emrobject.JobFlow`
+                      objects to inspect.
+    :param min_time: a :py:class:`datetime.timedelta`: report jobs running or
+                     pending longer than this
+    :param now: the current UTC time, as a :py:class:`datetime.datetime`.
+                Defaults to the current time.
+
+    For each job that is running or pending longer than *min_time*, yields
+    a dictionary with the following keys:
+
+    * *job_flow_id*: the job flow's unique ID (e.g. ``j-SOMEJOBFLOW``)
+    * *step_name*: name of the step
+    * *step_num*: which step is currently running or pending. zero-indexed.
+    * *step_state*: state of the step, either ``'RUNNING'`` or ``'PENDING'``
+    * *total_steps*: total number of steps in the job flow
+    * *time*: amount of time step was running or pending, as a
+              :py:class:`datetime.timedelta`
+    """
     if now is None:
         now = datetime.utcnow()
 
     for jf in job_flows:
-        assert jf.state == 'RUNNING'
+        if jf.state != 'RUNNING':
+            continue
 
         total_steps = len(jf.steps)
         
@@ -86,8 +107,12 @@ def find_long_running_jobs(job_flows, min_time, now=None):
                 time_running = now - start
 
                 if time_running >= min_time:
-                    yield(jf.jobflowid, step_num, total_steps,
-                          step.name, step.state, time_running)
+                    yield({'job_flow_id': jf.jobflowid,
+                           'step_num': step_num,
+                           'total_steps': total_steps,
+                           'step_name': step.name,
+                           'step_state': step.state,
+                           'time': time_running})
 
         # sometimes EMR says it's "RUNNING" but doesn't actually run steps!
         elif num_and_pending_steps:
@@ -104,17 +129,23 @@ def find_long_running_jobs(job_flows, min_time, now=None):
             time_pending = now - start
 
             if time_pending >= min_time:
-                    yield(jf.jobflowid, step_num, total_steps,
-                          step.name, step.state, time_pending)
+                yield({'job_flow_id': jf.jobflowid,
+                       'step_num': step_num,
+                       'total_steps': total_steps,
+                       'step_name': step.name,
+                       'step_state': step.state,
+                       'time': time_pending})
 
 
 def print_report(job_info):
-
+    """Takes in a dictionary of info about a long-running job (see
+    :py:func:`find_long_running_jobs`), and prints information about it
+    on a single (long) line.
+    """
     for ji in job_info:
-        (job_flow_id, step_num, total_steps, step_name, step_state, time) = ji
         print '%-15s step %3d of %3d: %7s for %17s (%s)' % (
-            job_flow_id, step_num + 1, total_steps,
-            step_state, format_timedelta(time), step_name)
+            ji['job_flow_id'], ji['step_num'] + 1, ji['total_steps'],
+            ji['step_state'], format_timedelta(ji['time']), ji['step_name'])
 
 
 def format_timedelta(time):

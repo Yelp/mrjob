@@ -444,7 +444,7 @@ def safeeval(expr, globals=None, locals=None):
     """
     # blank out builtins, but keep None, True, and False
     safe_globals = {'__builtins__': None, 'True': True, 'False': False,
-                    'None': None, 'set': set, 'xrange': xrange}
+                    'None': None, 'set': set, 'xrange': xrange, 'null': None}
 
     # add the user-specified global variables
     if globals:

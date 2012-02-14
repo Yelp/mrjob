@@ -14,7 +14,7 @@
 """Terminate idle EMR job flows that meet the criteria passed in on the command
 line (or, by default, job flows that have been idle for one hour).
 
-Suggested usage: run this as a cron job with the -q option::
+Suggested usage: run this as a cron job with the ``-q`` option::
 
     */30 * * * * python -m mrjob.tools.emr.terminate_idle_job_flows -q
 

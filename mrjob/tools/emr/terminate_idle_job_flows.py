@@ -284,13 +284,17 @@ def make_option_parser():
     option_parser.add_option(
         '--max-hours-idle', dest='max_hours_idle',
         default=None, type='float',
-        help='Max number of hours a job can run before being terminated')
+        help=('Max number of hours a job flow can go without bootstrapping,'
+              ' running a step, or having a new step created. This will fire'
+              ' even if there are pending steps which EMR has failed to'
+              ' start.'))
     option_parser.add_option(
         '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
         default=None, type='float',
         help=('Terminate job flows that are within this many minutes of'
               ' the end of a full hour since the job started running'
-              ' (since job flows are billed by the full hour)'))
+              ' (since job flows are billed by the full hour). This will'
+              ' not fire if a job flow has any pending steps.'))
     option_parser.add_option(
         '--unpooled-only', dest='unpooled_only', action='store_true',
         default=False,

@@ -29,30 +29,16 @@ except ImportError:
     import unittest
 
 
-class ReportLongJobsTestCase(MockEMRAndS3TestCase):
-
-    def setUp(self):
-        super(ReportLongJobsTestCase, self).setUp()
-        # redirect print statements to self.stdout
-        self._real_stdout = sys.stdout
-        self.stdout = StringIO()
-        sys.stdout = self.stdout
-
-    def tearDown(self):
-        sys.stdout = self._real_stdout
-        super(ReportLongJobsTestCase, self).tearDown()
-
-    def test_with_no_job_flows(self):
-        main(['-q', '--no-conf'])  # just make sure it doesn't crash
-
-    def test_with_one_job_flow(self):
-        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
-        emr_conn.run_jobflow('no name', log_uri=None)
-        main(['-q', '--no-conf'])  # just make sure it doesn't crash
-
-
 JOB_FLOWS = [
     MockEmrObject(
+        creationdatetime='2010-06-06T00:00:00Z',
+    	jobflowid='j-BOOTSTRAPPING',
+        startdatetime='2010-06-06T00:05:00Z',
+        state='BOOTSTRAPPING',
+        steps=[],
+    ),
+    MockEmrObject(
+        creationdatetime='2010-06-06T00:00:00Z',
     	jobflowid='j-RUNNING1STEP',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
@@ -65,6 +51,7 @@ JOB_FLOWS = [
         ]
     ),
     MockEmrObject(
+        creationdatetime='2010-06-06T00:00:00Z',
     	jobflowid='j-RUNNING2STEPS',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
@@ -83,6 +70,7 @@ JOB_FLOWS = [
         ]
     ),
     MockEmrObject(
+        creationdatetime='2010-06-06T00:00:00Z',
     	jobflowid='j-RUNNINGANDPENDING',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
@@ -105,6 +93,7 @@ JOB_FLOWS = [
         ]
     ),
     MockEmrObject(
+        creationdatetime='2010-06-06T00:00:00Z',
     	jobflowid='j-PENDING1STEP',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
@@ -116,6 +105,7 @@ JOB_FLOWS = [
         ]
     ),
     MockEmrObject(
+        creationdatetime='2010-06-06T00:00:00Z',
     	jobflowid='j-PENDING2STEPS',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
@@ -134,6 +124,7 @@ JOB_FLOWS = [
     ),
     
     MockEmrObject(
+        creationdatetime='2010-06-06T00:00:00Z',
     	jobflowid='j-COMPLETED',
         readydatetime='2010-06-06T00:15:00Z',
         state='COMPLETED',
@@ -150,9 +141,47 @@ JOB_FLOWS = [
 
 JOB_FLOWS_BY_ID = dict((jf.jobflowid, jf) for jf in JOB_FLOWS)
 
+
+class ReportLongJobsTestCase(MockEMRAndS3TestCase):
+
+    def setUp(self):
+        super(ReportLongJobsTestCase, self).setUp()
+        # redirect print statements to self.stdout
+        self._real_stdout = sys.stdout
+        self.stdout = StringIO()
+        sys.stdout = self.stdout
+
+    def tearDown(self):
+        sys.stdout = self._real_stdout
+        super(ReportLongJobsTestCase, self).tearDown()
+
+    def test_with_no_job_flows(self):
+        main(['-q', '--no-conf'])  # just make sure it doesn't crash
+
+    def test_with_all_job_flows(self):
+        self.mock_emr_job_flows.update(JOB_FLOWS_BY_ID)
+        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
+        emr_conn.run_jobflow('no name', log_uri=None)
+        main(['-q', '--no-conf'])
+        lines = [line for line in StringIO(self.stdout.getvalue())]
+        self.assertEqual(len(lines), len(JOB_FLOWS_BY_ID) - 1)
+        
+
 class FindLongRunningJobsTestCase(unittest.TestCase):
 
     maxDiff = None  # show whole diff when tests fail
+
+    def test_bootstrapping(self):
+        self.assertEqual(
+            list(find_long_running_jobs(
+            	[JOB_FLOWS_BY_ID['j-BOOTSTRAPPING']],
+                min_time=timedelta(hours=1),
+                now=datetime(2010, 6, 6, 4)
+            )),
+            [{'job_flow_id': 'j-BOOTSTRAPPING',
+              'step_name': '',
+              'step_state': '',
+              'time': timedelta(hours=3, minutes=55)}])
 
     def test_running_one_step(self):
         self.assertEqual(
@@ -163,9 +192,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
             )),
             [{'job_flow_id': 'j-RUNNING1STEP',
               'step_name': 'mr_denial: Step 1 of 5',
-              'step_num': 0,
               'step_state': 'RUNNING',
-              'total_steps': 1,
               'time': timedelta(hours=3, minutes=40)}])
 
         # job hasn't been running for 1 day
@@ -186,9 +213,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
             )),
             [{'job_flow_id': 'j-RUNNING2STEPS',
               'step_name': 'mr_anger: Step 2 of 5',
-              'step_num': 1,
               'step_state': 'RUNNING',
-              'total_steps': 2,
               'time': timedelta(hours=3, minutes=30)}])
 
         # job hasn't been running for 1 day
@@ -209,9 +234,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
             )),
             [{'job_flow_id': 'j-RUNNINGANDPENDING',
               'step_name': 'mr_anger: Step 2 of 5',
-              'step_num': 1,
               'step_state': 'RUNNING',
-              'total_steps': 3,
               'time': timedelta(hours=3, minutes=30)}])
 
         # job hasn't been running for 1 day
@@ -232,9 +255,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
             )),
             [{'job_flow_id': 'j-PENDING1STEP',
               'step_name': 'mr_bargaining: Step 3 of 5',
-              'step_num': 0,
               'step_state': 'PENDING',
-              'total_steps': 1,
               'time': timedelta(hours=3, minutes=45)}])
 
         # job hasn't been running for 1 day
@@ -255,9 +276,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
             )),
             [{'job_flow_id': 'j-PENDING2STEPS',
               'step_name': 'mr_depression: Step 4 of 5',
-              'step_num': 1,
               'step_state': 'PENDING',
-              'total_steps': 2,
               'time': timedelta(hours=3, minutes=25)}])
 
         # job hasn't been running for 1 day
@@ -278,3 +297,35 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
             )),
             []
         )    
+
+    def test_all_together(self):
+        self.assertEqual(
+            list(find_long_running_jobs(
+                JOB_FLOWS,
+                min_time=timedelta(hours=1),
+                now=datetime(2010, 6, 6, 4)
+            )),
+            [{'job_flow_id': 'j-BOOTSTRAPPING',
+              'step_name': '',
+              'step_state': '',
+              'time': timedelta(hours=3, minutes=55)},
+             {'job_flow_id': 'j-RUNNING1STEP',
+              'step_name': 'mr_denial: Step 1 of 5',
+              'step_state': 'RUNNING',
+              'time': timedelta(hours=3, minutes=40)},
+             {'job_flow_id': 'j-RUNNING2STEPS',
+              'step_name': 'mr_anger: Step 2 of 5',
+              'step_state': 'RUNNING',
+              'time': timedelta(hours=3, minutes=30)},
+             {'job_flow_id': 'j-RUNNINGANDPENDING',
+              'step_name': 'mr_anger: Step 2 of 5',
+              'step_state': 'RUNNING',
+              'time': timedelta(hours=3, minutes=30)},
+             {'job_flow_id': 'j-PENDING1STEP',
+              'step_name': 'mr_bargaining: Step 3 of 5',
+              'step_state': 'PENDING',
+              'time': timedelta(hours=3, minutes=45)},
+             {'job_flow_id': 'j-PENDING2STEPS',
+              'step_name': 'mr_depression: Step 4 of 5',
+              'step_state': 'PENDING',
+              'time': timedelta(hours=3, minutes=25)}])   

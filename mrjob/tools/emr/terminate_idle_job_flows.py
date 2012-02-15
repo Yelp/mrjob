@@ -29,12 +29,14 @@ Options::
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
   --max-hours-idle=MAX_HOURS_IDLE
-                        Max number of hours a job can run before being
-                        terminated
+                        Max number of hours a job flow can go without
+                        bootstrapping, running a step, or having a new step
+                        created. This will fire even if there are pending
+                        steps which EMR has failed to start.
   --mins-to-end-of-hour=MINS_TO_END_OF_HOUR
                         Terminate job flows that are within this many minutes
                         of the end of a full hour since the job started
-                        running (since job flows are billed by the full hour)
+                        running AND have no pending steps.
   --unpooled-only       Only terminate un-pooled job flows
   --pooled-only         Only terminate pooled job flows
   --pool-name=POOL_NAME
@@ -334,8 +336,8 @@ def make_option_parser():
         '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
         default=None, type='float',
         help=('Terminate job flows that are within this many minutes of'
-              ' the end of a full hour since the job started running,'
-              ' and have no pending steps.'))
+              ' the end of a full hour since the job started running'
+              ' AND have no pending steps.'))
     option_parser.add_option(
         '--unpooled-only', dest='unpooled_only', action='store_true',
         default=False,

@@ -284,7 +284,7 @@ class TestCat(MockHadoopTestCase):
         check_call([self.hadoop_bin,
                     'fs', '-put', input_to_upload, remote_input_path])
 
-        with HadoopJobRunner(cleanup=['NONE']) as runner:
+        with HadoopJobRunner(cleanup=['NONE'], conf_path=False) as runner:
             local_output = []
             for line in runner.cat(local_input_path):
                 local_output.append(line)
@@ -302,7 +302,7 @@ class TestCat(MockHadoopTestCase):
         input_gz.write('foo\nbar\n')
         input_gz.close()
 
-        with HadoopJobRunner(cleanup=['NONE']) as runner:
+        with HadoopJobRunner(cleanup=['NONE'], conf_path=False) as runner:
             output = []
             for line in runner.cat(input_gz_path):
                 output.append(line)
@@ -314,7 +314,7 @@ class TestCat(MockHadoopTestCase):
         input_bz2.write('bar\nbar\nfoo\n')
         input_bz2.close()
 
-        with HadoopJobRunner(cleanup=['NONE']) as runner:
+        with HadoopJobRunner(cleanup=['NONE'], conf_path=False) as runner:
             output = []
             for line in runner.cat(input_bz2_path):
                 output.append(line)
@@ -325,9 +325,9 @@ class TestCat(MockHadoopTestCase):
 class TestURIs(MockHadoopTestCase):
 
     def test_uris(self):
-        runner = HadoopJobRunner()
+        runner = HadoopJobRunner(conf_path=False)
         list(runner.ls('hdfs://tmp/waffles'))
-        list(runner.ls('lego://my/ego'))
+        list(runner.ls('leggo://my/eggo'))
         list(runner.ls('/tmp'))
 
         with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
@@ -335,5 +335,5 @@ class TestURIs(MockHadoopTestCase):
 
         self.assertEqual(hadoop_cmd_args, [
             ['fs', '-lsr', 'hdfs://tmp/waffles'],
-            ['fs', '-lsr', 'lego://my/ego'],
+            ['fs', '-lsr', 'leggo://my/eggo'],
         ])

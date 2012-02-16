@@ -51,7 +51,10 @@ DEFAULT_MIN_HOURS = 24.0
 log = logging.getLogger('mrjob.tools.emr.report_long_jobs')
 
 
-def main(args):
+def main(args, now=None):
+    if now is None:
+        now = datetime.utcnow()
+
     option_parser = make_option_parser()
     options, args = option_parser.parse_args(args)
 
@@ -62,11 +65,12 @@ def main(args):
 
     log.info('getting information about running jobs')
     emr_conn = EMRJobRunner(conf_path=options.conf_path).make_emr_conn()
-    job_flows = describe_all_job_flows(emr_conn, states=['RUNNING'])
+    job_flows = describe_all_job_flows(
+        emr_conn, states=['BOOTSTRAPPING', 'RUNNING'])
 
     min_time = timedelta(hours=options.min_hours)
 
-    job_info = find_long_running_jobs(job_flows, min_time)
+    job_info = find_long_running_jobs(job_flows, min_time, now=now)
 
     print_report(job_info)
 
@@ -86,9 +90,7 @@ def find_long_running_jobs(job_flows, min_time, now=None):
 
     * *job_flow_id*: the job flow's unique ID (e.g. ``j-SOMEJOBFLOW``)
     * *step_name*: name of the step
-    * *step_num*: which step is currently running or pending. zero-indexed.
     * *step_state*: state of the step, either ``'RUNNING'`` or ``'PENDING'``
-    * *total_steps*: total number of steps in the job flow
     * *time*: amount of time step was running or pending, as a
               :py:class:`datetime.timedelta`
     """
@@ -96,21 +98,32 @@ def find_long_running_jobs(job_flows, min_time, now=None):
         now = datetime.utcnow()
 
     for jf in job_flows:
+
+        # special case for jobs that are taking a long time to bootstrap
+        if jf.state == 'BOOTSTRAPPING':
+            start_timestamp = jf.startdatetime
+            start = datetime.strptime(start_timestamp, boto.utils.ISO8601)
+
+            time_running = now - start
+
+            if time_running >= min_time:
+                # we tell bootstrapping info by step_state being empty,
+                # and only use job_flow_id and time in the report
+                yield({'job_flow_id': jf.jobflowid,
+                       'step_name': '',
+                       'step_state': '',
+                       'time': time_running})
+
+        # the default case: running job flows
         if jf.state != 'RUNNING':
             continue
 
-        total_steps = len(jf.steps)
-        
-        num_and_running_steps = [(step_num, step)
-                                 for (step_num, step) in enumerate(jf.steps)
-                                 if step.state == 'RUNNING']
-        num_and_pending_steps = [(step_num, step)
-                                 for (step_num, step) in enumerate(jf.steps)
-                                 if step.state == 'PENDING']
+        running_steps = [step for step in jf.steps if step.state == 'RUNNING']
+        pending_steps = [step for step in jf.steps if step.state == 'PENDING']
 
-        if num_and_running_steps:
+        if running_steps:
             # should be only one, but if not, we should know
-            for step_num, step in num_and_running_steps:
+            for step in running_steps:
                 
                 start_timestamp = step.startdatetime
                 start = datetime.strptime(start_timestamp, boto.utils.ISO8601)
@@ -119,15 +132,13 @@ def find_long_running_jobs(job_flows, min_time, now=None):
 
                 if time_running >= min_time:
                     yield({'job_flow_id': jf.jobflowid,
-                           'step_num': step_num,
-                           'total_steps': total_steps,
                            'step_name': step.name,
                            'step_state': step.state,
                            'time': time_running})
 
         # sometimes EMR says it's "RUNNING" but doesn't actually run steps!
-        elif num_and_pending_steps:
-            step_num, step = num_and_pending_steps[0]
+        elif pending_steps:
+            step = pending_steps[0]
 
             # PENDING job should have run starting when the job flow
             # became ready, or the previous step completed
@@ -141,8 +152,6 @@ def find_long_running_jobs(job_flows, min_time, now=None):
 
             if time_pending >= min_time:
                 yield({'job_flow_id': jf.jobflowid,
-                       'step_num': step_num,
-                       'total_steps': total_steps,
                        'step_name': step.name,
                        'step_state': step.state,
                        'time': time_pending})
@@ -154,9 +163,15 @@ def print_report(job_info):
     on a single (long) line.
     """
     for ji in job_info:
-        print '%-15s step %3d of %3d: %7s for %17s (%s)' % (
-            ji['job_flow_id'], ji['step_num'] + 1, ji['total_steps'],
-            ji['step_state'], format_timedelta(ji['time']), ji['step_name'])
+        # BOOTSTRAPPING case
+        if ji['time'] < timedelta(7) or not ji['step_state']:
+            print '%-15s BOOTSTRAPPING for %17s' % (
+                ji['job_flow_id'], format_timedelta(ji['time']))
+        else:
+            print '%-15s       %7s for %17s (%s)' % (
+                ji['job_flow_id'],
+                ji['step_state'], format_timedelta(ji['time']),
+                ji['step_name'])
 
 
 def format_timedelta(time):

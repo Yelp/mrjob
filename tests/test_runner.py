@@ -61,7 +61,7 @@ class WithStatementTestCase(unittest.TestCase):
             self.local_tmp_dir = None
 
     def _test_cleanup_after_with_statement(self, mode, should_exist):
-        with LocalMRJobRunner(cleanup=mode) as runner:
+        with LocalMRJobRunner(cleanup=mode, conf_path=False) as runner:
             self.local_tmp_dir = runner._get_local_tmp_dir()
             assert os.path.exists(self.local_tmp_dir)
 
@@ -97,7 +97,9 @@ class WithStatementTestCase(unittest.TestCase):
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob', stderr)
-            with LocalMRJobRunner(cleanup=CLEANUP_DEFAULT) as runner:
+            with LocalMRJobRunner(
+                cleanup=CLEANUP_DEFAULT, conf_path=False) as runner:
+
                 self.local_tmp_dir = runner._get_local_tmp_dir()
                 assert os.path.exists(self.local_tmp_dir)
 
@@ -106,8 +108,10 @@ class WithStatementTestCase(unittest.TestCase):
             self.assertIn('deprecated', stderr.getvalue())
 
     def test_cleanup_not_supported(self):
-        self.assertRaises(ValueError,
-                          LocalMRJobRunner, cleanup_on_failure=CLEANUP_DEFAULT)
+        self.assertRaises(
+            ValueError,
+            LocalMRJobRunner,
+            cleanup_on_failure=CLEANUP_DEFAULT, conf_path=False)
 
 
 class TestExtraKwargs(unittest.TestCase):
@@ -355,7 +359,7 @@ class TestCat(unittest.TestCase):
         with open(input_path, 'w') as input_file:
             input_file.write('bar\nfoo\n')
 
-        with LocalMRJobRunner() as runner:
+        with LocalMRJobRunner(conf_path=False) as runner:
             output = []
             for line in runner.cat(input_path):
                 output.append(line)
@@ -368,7 +372,7 @@ class TestCat(unittest.TestCase):
         input_gz.write('foo\nbar\n')
         input_gz.close()
 
-        with LocalMRJobRunner() as runner:
+        with LocalMRJobRunner(conf_path=False) as runner:
             output = []
             for line in runner.cat(input_gz_path):
                 output.append(line)
@@ -380,7 +384,7 @@ class TestCat(unittest.TestCase):
         input_bz2.write('bar\nbar\nfoo\n')
         input_bz2.close()
 
-        with LocalMRJobRunner() as runner:
+        with LocalMRJobRunner(conf_path=False) as runner:
             output = []
             for line in runner.cat(input_bz2_path):
                 output.append(line)
@@ -434,7 +438,7 @@ class TestStreamingOutput(unittest.TestCase):
         with open(y_file_path, 'w') as f:
             f.write('I win')
 
-        runner = LocalMRJobRunner()
+        runner = LocalMRJobRunner(conf_path=False)
         runner._output_dir = self.tmp_dir
         self.assertEqual(sorted(runner.stream_output()),
                          ['A', 'B', 'C'])

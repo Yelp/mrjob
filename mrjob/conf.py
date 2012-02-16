@@ -134,12 +134,14 @@ from mrjob.util import expand_path
 
 try:
     import simplejson as json  # preferred because of C speedups
+    json  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import json  # built in to Python 2.6 and later
 
 # yaml is nice to have, but we can fall back on JSON if need be
 try:
     import yaml
+    yaml  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     yaml = None
 

@@ -29,6 +29,7 @@ from tests.test_emr import MockEMRAndS3TestCase
 
 try:
     import unittest2 as unittest
+    unittest  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import unittest
 

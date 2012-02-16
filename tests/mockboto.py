@@ -29,6 +29,7 @@ try:
     from boto.emr.connection import EmrConnection
     import boto.exception
     import boto.utils
+    boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     boto = None
 

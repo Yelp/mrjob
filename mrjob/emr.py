@@ -32,11 +32,13 @@ import urllib2
 
 try:
     from cStringIO import StringIO
+    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     from StringIO import StringIO
 
 try:
     import simplejson as json  # preferred because of C speedups
+    json  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import json  # built in to Python 2.6 and later
 
@@ -47,6 +49,7 @@ try:
     import boto.exception
     import boto.utils
     from mrjob import boto_2_1_1_83aae37b
+    boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
     # inside hadoop streaming

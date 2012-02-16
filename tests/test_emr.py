@@ -32,6 +32,7 @@ import tempfile
 
 try:
     import unittest2 as unittest
+    unittest  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import unittest
 
@@ -71,6 +72,7 @@ try:
     import boto.emr
     import boto.exception
     from mrjob import boto_2_1_1_83aae37b
+    boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     boto = None
 

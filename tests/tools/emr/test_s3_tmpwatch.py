@@ -23,6 +23,7 @@ import shutil
 try:
     import boto
     import boto.utils
+    boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     boto = None
 

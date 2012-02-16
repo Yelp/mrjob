@@ -53,6 +53,7 @@ from mrjob.util import safeeval
 
 try:
     import simplejson as json  # preferred because of C speedups
+    json  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import json  # built in to Python 2.6 and later
 

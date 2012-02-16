@@ -219,9 +219,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.mock_emr_job_flows['j-PENDING_BUT_IDLE'] = MockEmrObject(
             creationdatetime=to_iso8601(self.now - timedelta(hours=3)),
             readydatetime=to_iso8601(
-            	self.now - timedelta(hours=2, minutes=50)),
+                self.now - timedelta(hours=2, minutes=50)),
             startdatetime=to_iso8601(
-            	self.now - timedelta(hours=2, minutes=55)),
+                self.now - timedelta(hours=2, minutes=55)),
             state='RUNNING',
             steps=[step(create_hours_ago=3, state='PENDING')],
         )
@@ -304,7 +304,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             self.mock_emr_job_flows['j-DEBUG_ONLY'],
             idle_for=timedelta(hours=2),
         )
-        
+
     def test_done_and_idle(self):
         self.assertJobFlowIs(
             self.mock_emr_job_flows['j-DONE_AND_IDLE'],

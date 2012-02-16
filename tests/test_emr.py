@@ -810,7 +810,7 @@ class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
         # DescribeJobFlows on our initial call, we'll skip over
         # j-THREEWEEKSAGO, since it's neither currently active, nor
         # in the last 2 weeks.
-        
+
         now = datetime.utcnow()
 
         self.mock_emr_job_flows['j-THREEWEEKSAGO'] = MockEmrObject(
@@ -818,7 +818,7 @@ class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
             jobflowid='j-THREEWEEKSAGO',
             state='COMPLETED',
         )
-        
+
         self.mock_emr_job_flows['j-LONGRUNNING'] = MockEmrObject(
             creationdatetime=to_iso8601(now - timedelta(weeks=4)),
             jobflowid='j-LONGRUNNING',

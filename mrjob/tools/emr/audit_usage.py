@@ -459,13 +459,13 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
             for d, secs
             in subdivide_interval_by_date(interval['start'],
                                           interval['end_billing']).iteritems())
-        
+
         interval['hour_to_nih_billed'] = dict(
             (d, nih_per_sec * secs)
             for d, secs
             in subdivide_interval_by_hour(interval['start'],
                                           interval['end_billing']).iteritems())
-        
+
         # time billed but not used
         interval['nih_bbnu'] = interval['nih_billed'] - interval['nih_used']
 

@@ -155,7 +155,6 @@ def inspect_and_maybe_terminate_job_flows(
             else:
                 num_idle += 1
 
-
             log.debug(
                 'Job flow %s %s for %s, %s to end of hour, %s (%s)' %
                       (jf.jobflowid,
@@ -242,7 +241,7 @@ def is_job_flow_bootstrapping(job_flow):
 
 def is_step_running(step):
     """Return true if the given job flow step is currently running."""
-    return bool(getattr(step, 'state', None) != 'CANCELLED' and 
+    return bool(getattr(step, 'state', None) != 'CANCELLED' and
                 getattr(step, 'startdatetime', None) and
                 not getattr(step, 'enddatetime', None))
 
@@ -260,7 +259,7 @@ def time_last_active(job_flow):
     * ``step.enddatetime`` for any step
 
     This is not really meant to be run on job flows which are currently
-    running, or done.    
+    running, or done.
     """
     timestamps = []
 

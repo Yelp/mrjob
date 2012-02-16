@@ -545,7 +545,7 @@ class MockEmrConnection(object):
                 after_timestamp = to_iso8601(created_after)
                 jfs = [jf for jf in jfs
                        if jf.creationdatetime > after_timestamp]
-    
+
             if created_before:
                 before_timestamp = to_iso8601(created_before)
                 jfs = [jf for jf in jfs

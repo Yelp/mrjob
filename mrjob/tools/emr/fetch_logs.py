@@ -67,6 +67,7 @@ def main():
     with EMRJobRunner(**runner_kwargs(options)) as runner:
         perform_actions(options, runner)
 
+
 def perform_actions(options, runner):
     """Given the command line arguments and an :py:class:`EMRJobRunner`,
     perform various actions for this tool.

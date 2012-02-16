@@ -32,14 +32,14 @@ except ImportError:
 JOB_FLOWS = [
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
-    	jobflowid='j-BOOTSTRAPPING',
+        jobflowid='j-BOOTSTRAPPING',
         startdatetime='2010-06-06T00:05:00Z',
         state='BOOTSTRAPPING',
         steps=[],
     ),
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
-    	jobflowid='j-RUNNING1STEP',
+        jobflowid='j-RUNNING1STEP',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
         steps=[
@@ -52,7 +52,7 @@ JOB_FLOWS = [
     ),
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
-    	jobflowid='j-RUNNING2STEPS',
+        jobflowid='j-RUNNING2STEPS',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
         steps=[
@@ -66,12 +66,12 @@ JOB_FLOWS = [
                 name='mr_anger: Step 2 of 5',
                 startdatetime='2010-06-06T00:30:00Z',
                 state='RUNNING',
-            ),            
+            ),
         ]
     ),
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
-    	jobflowid='j-RUNNINGANDPENDING',
+        jobflowid='j-RUNNINGANDPENDING',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
         steps=[
@@ -85,16 +85,16 @@ JOB_FLOWS = [
                 name='mr_anger: Step 2 of 5',
                 startdatetime='2010-06-06T00:30:00Z',
                 state='RUNNING',
-            ),            
+            ),
             MockEmrObject(
                 name='mr_bargaining: Step 3 of 5',
                 state='PENDING',
-            ),            
+            ),
         ]
     ),
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
-    	jobflowid='j-PENDING1STEP',
+        jobflowid='j-PENDING1STEP',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
         steps=[
@@ -106,7 +106,7 @@ JOB_FLOWS = [
     ),
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
-    	jobflowid='j-PENDING2STEPS',
+        jobflowid='j-PENDING2STEPS',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
         steps=[
@@ -122,10 +122,10 @@ JOB_FLOWS = [
             ),
         ]
     ),
-    
+
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
-    	jobflowid='j-COMPLETED',
+        jobflowid='j-COMPLETED',
         readydatetime='2010-06-06T00:15:00Z',
         state='COMPLETED',
         steps=[
@@ -165,7 +165,7 @@ class ReportLongJobsTestCase(MockEMRAndS3TestCase):
         main(['-q', '--no-conf'])
         lines = [line for line in StringIO(self.stdout.getvalue())]
         self.assertEqual(len(lines), len(JOB_FLOWS_BY_ID) - 1)
-        
+
 
 class FindLongRunningJobsTestCase(unittest.TestCase):
 
@@ -174,7 +174,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
     def test_bootstrapping(self):
         self.assertEqual(
             list(find_long_running_jobs(
-            	[JOB_FLOWS_BY_ID['j-BOOTSTRAPPING']],
+                [JOB_FLOWS_BY_ID['j-BOOTSTRAPPING']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -186,7 +186,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
     def test_running_one_step(self):
         self.assertEqual(
             list(find_long_running_jobs(
-            	[JOB_FLOWS_BY_ID['j-RUNNING1STEP']],
+                [JOB_FLOWS_BY_ID['j-RUNNING1STEP']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -198,7 +198,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
         # job hasn't been running for 1 day
         self.assertEqual(
             list(find_long_running_jobs(
-            	[JOB_FLOWS_BY_ID['j-RUNNING1STEP']],
+                [JOB_FLOWS_BY_ID['j-RUNNING1STEP']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -207,7 +207,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
     def test_running_two_steps(self):
         self.assertEqual(
             list(find_long_running_jobs(
-            	[JOB_FLOWS_BY_ID['j-RUNNING2STEPS']],
+                [JOB_FLOWS_BY_ID['j-RUNNING2STEPS']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -219,7 +219,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
         # job hasn't been running for 1 day
         self.assertEqual(
             list(find_long_running_jobs(
-            	[JOB_FLOWS_BY_ID['j-RUNNING2STEPS']],
+                [JOB_FLOWS_BY_ID['j-RUNNING2STEPS']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -228,7 +228,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
     def test_running_and_pending(self):
         self.assertEqual(
             list(find_long_running_jobs(
-            	[JOB_FLOWS_BY_ID['j-RUNNINGANDPENDING']],
+                [JOB_FLOWS_BY_ID['j-RUNNINGANDPENDING']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -240,7 +240,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
         # job hasn't been running for 1 day
         self.assertEqual(
             list(find_long_running_jobs(
-            	[JOB_FLOWS_BY_ID['j-RUNNINGANDPENDING']],
+                [JOB_FLOWS_BY_ID['j-RUNNINGANDPENDING']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -249,7 +249,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
     def test_pending_one_step(self):
         self.assertEqual(
             list(find_long_running_jobs(
-            	[JOB_FLOWS_BY_ID['j-PENDING1STEP']],
+                [JOB_FLOWS_BY_ID['j-PENDING1STEP']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -261,7 +261,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
         # job hasn't been running for 1 day
         self.assertEqual(
             list(find_long_running_jobs(
-            	[JOB_FLOWS_BY_ID['j-PENDING1STEP']],
+                [JOB_FLOWS_BY_ID['j-PENDING1STEP']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -270,7 +270,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
     def test_pending_two_steps(self):
         self.assertEqual(
             list(find_long_running_jobs(
-            	[JOB_FLOWS_BY_ID['j-PENDING2STEPS']],
+                [JOB_FLOWS_BY_ID['j-PENDING2STEPS']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -282,7 +282,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
         # job hasn't been running for 1 day
         self.assertEqual(
             list(find_long_running_jobs(
-            	[JOB_FLOWS_BY_ID['j-PENDING2STEPS']],
+                [JOB_FLOWS_BY_ID['j-PENDING2STEPS']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -291,12 +291,12 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
     def test_completed(self):
         self.assertEqual(
             list(find_long_running_jobs(
-            	[JOB_FLOWS_BY_ID['j-COMPLETED']],
+                [JOB_FLOWS_BY_ID['j-COMPLETED']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
             []
-        )    
+        )
 
     def test_all_together(self):
         self.assertEqual(
@@ -328,4 +328,4 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
              {'job_flow_id': 'j-PENDING2STEPS',
               'step_name': 'mr_depression: Step 4 of 5',
               'step_state': 'PENDING',
-              'time': timedelta(hours=3, minutes=25)}])   
+              'time': timedelta(hours=3, minutes=25)}])

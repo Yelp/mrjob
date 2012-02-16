@@ -124,7 +124,7 @@ def find_long_running_jobs(job_flows, min_time, now=None):
         if running_steps:
             # should be only one, but if not, we should know
             for step in running_steps:
-                
+
                 start_timestamp = step.startdatetime
                 start = datetime.strptime(start_timestamp, boto.utils.ISO8601)
 

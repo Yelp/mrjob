@@ -79,7 +79,7 @@ class EstTimeToEndOfHourTestCase(unittest.TestCase):
                 datetime.utcnow() - timedelta(minutes=1)),
             startdatetime=to_iso8601(datetime.utcnow()))
 
-        t = est_time_to_hour(jf)
+        t = est_time_to_hour(jf2)
 
         self.assertLessEqual(t, timedelta(minutes=60))
         self.assertGreater(t, timedelta(minutes=59))

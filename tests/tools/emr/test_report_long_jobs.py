@@ -34,6 +34,7 @@ JOB_FLOWS = [
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
         jobflowid='j-BOOTSTRAPPING',
+        name='mr_grieving',
         startdatetime='2010-06-06T00:05:00Z',
         state='BOOTSTRAPPING',
         steps=[],
@@ -41,6 +42,7 @@ JOB_FLOWS = [
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
         jobflowid='j-RUNNING1STEP',
+        name='mr_grieving',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
         steps=[
@@ -54,6 +56,7 @@ JOB_FLOWS = [
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
         jobflowid='j-RUNNING2STEPS',
+        name='mr_grieving',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
         steps=[
@@ -73,6 +76,7 @@ JOB_FLOWS = [
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
         jobflowid='j-RUNNINGANDPENDING',
+        name='mr_grieving',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
         steps=[
@@ -96,6 +100,7 @@ JOB_FLOWS = [
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
         jobflowid='j-PENDING1STEP',
+        name='mr_grieving',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
         steps=[
@@ -108,6 +113,7 @@ JOB_FLOWS = [
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
         jobflowid='j-PENDING2STEPS',
+        name='mr_grieving',
         readydatetime='2010-06-06T00:15:00Z',
         state='RUNNING',
         steps=[
@@ -123,10 +129,10 @@ JOB_FLOWS = [
             ),
         ]
     ),
-
     MockEmrObject(
         creationdatetime='2010-06-06T00:00:00Z',
         jobflowid='j-COMPLETED',
+        name='mr_grieving',
         readydatetime='2010-06-06T00:15:00Z',
         state='COMPLETED',
         steps=[
@@ -180,7 +186,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
                 now=datetime(2010, 6, 6, 4)
             )),
             [{'job_flow_id': 'j-BOOTSTRAPPING',
-              'step_name': '',
+              'name': 'mr_grieving',
               'step_state': '',
               'time': timedelta(hours=3, minutes=55)}])
 
@@ -192,7 +198,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
                 now=datetime(2010, 6, 6, 4)
             )),
             [{'job_flow_id': 'j-RUNNING1STEP',
-              'step_name': 'mr_denial: Step 1 of 5',
+              'name': 'mr_denial: Step 1 of 5',
               'step_state': 'RUNNING',
               'time': timedelta(hours=3, minutes=40)}])
 
@@ -213,7 +219,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
                 now=datetime(2010, 6, 6, 4)
             )),
             [{'job_flow_id': 'j-RUNNING2STEPS',
-              'step_name': 'mr_anger: Step 2 of 5',
+              'name': 'mr_anger: Step 2 of 5',
               'step_state': 'RUNNING',
               'time': timedelta(hours=3, minutes=30)}])
 
@@ -234,7 +240,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
                 now=datetime(2010, 6, 6, 4)
             )),
             [{'job_flow_id': 'j-RUNNINGANDPENDING',
-              'step_name': 'mr_anger: Step 2 of 5',
+              'name': 'mr_anger: Step 2 of 5',
               'step_state': 'RUNNING',
               'time': timedelta(hours=3, minutes=30)}])
 
@@ -255,7 +261,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
                 now=datetime(2010, 6, 6, 4)
             )),
             [{'job_flow_id': 'j-PENDING1STEP',
-              'step_name': 'mr_bargaining: Step 3 of 5',
+              'name': 'mr_bargaining: Step 3 of 5',
               'step_state': 'PENDING',
               'time': timedelta(hours=3, minutes=45)}])
 
@@ -276,7 +282,7 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
                 now=datetime(2010, 6, 6, 4)
             )),
             [{'job_flow_id': 'j-PENDING2STEPS',
-              'step_name': 'mr_depression: Step 4 of 5',
+              'name': 'mr_depression: Step 4 of 5',
               'step_state': 'PENDING',
               'time': timedelta(hours=3, minutes=25)}])
 
@@ -307,26 +313,26 @@ class FindLongRunningJobsTestCase(unittest.TestCase):
                 now=datetime(2010, 6, 6, 4)
             )),
             [{'job_flow_id': 'j-BOOTSTRAPPING',
-              'step_name': '',
+              'name': 'mr_grieving',
               'step_state': '',
               'time': timedelta(hours=3, minutes=55)},
              {'job_flow_id': 'j-RUNNING1STEP',
-              'step_name': 'mr_denial: Step 1 of 5',
+              'name': 'mr_denial: Step 1 of 5',
               'step_state': 'RUNNING',
               'time': timedelta(hours=3, minutes=40)},
              {'job_flow_id': 'j-RUNNING2STEPS',
-              'step_name': 'mr_anger: Step 2 of 5',
+              'name': 'mr_anger: Step 2 of 5',
               'step_state': 'RUNNING',
               'time': timedelta(hours=3, minutes=30)},
              {'job_flow_id': 'j-RUNNINGANDPENDING',
-              'step_name': 'mr_anger: Step 2 of 5',
+              'name': 'mr_anger: Step 2 of 5',
               'step_state': 'RUNNING',
               'time': timedelta(hours=3, minutes=30)},
              {'job_flow_id': 'j-PENDING1STEP',
-              'step_name': 'mr_bargaining: Step 3 of 5',
+              'name': 'mr_bargaining: Step 3 of 5',
               'step_state': 'PENDING',
               'time': timedelta(hours=3, minutes=45)},
              {'job_flow_id': 'j-PENDING2STEPS',
-              'step_name': 'mr_depression: Step 4 of 5',
+              'name': 'mr_depression: Step 4 of 5',
               'step_state': 'PENDING',
               'time': timedelta(hours=3, minutes=25)}])

@@ -2375,7 +2375,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         """
         def should_include_file(info):
             # Bootstrap scripts will always have a different checksum
-            if info['name'] in ('b.py', 'wrapper.py'):
+            if 'name' in info and info['name'] in ('b.py', 'wrapper.py'):
                 return False
 
             # Also do not include script used to spin up job

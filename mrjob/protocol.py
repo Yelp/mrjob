@@ -33,12 +33,6 @@ returns a 2-tuple of decoded objects, and ``write(cls, key, value)`` takes
 the key and value and returns the line to be passed back to Hadoop Streaming
 or as output.
 
-For a simpler interface, inherit from :py:class:`KeyCachingProtocol` and
-override :py:meth:`KeyCachingProtocol.load_from_string` and
-:py:meth:`KeyCachingProtocol.load_from_string`. Protocols that follow this
-pattern only decode keys when they differ from the last key seen. This
-optimization can speed up jobs significantly.
-
 The built-in protocols use class methods instead of instance methods for
 legacy reasons, but you should use instance methods.
 

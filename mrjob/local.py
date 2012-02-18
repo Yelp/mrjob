@@ -106,7 +106,7 @@ class LocalMRJobRunner(MRJobRunner):
         """A dictionary giving the default value of options."""
         return combine_dicts(super(LocalMRJobRunner, cls)._default_opts(), {
             # prefer whatever interpreter we're currently using
-            'python_bin': [sys.executable or 'python'],
+            'python_bin': ['python'],
         })
 
     @classmethod
@@ -171,6 +171,10 @@ class LocalMRJobRunner(MRJobRunner):
                             '--step-num=%d' % i, '--mapper'] +
                            self._mr_job_extra_args())
             combiner_args = []
+
+            if 'P' in step:
+                raise ValueError('Pig steps are currently not supported in local mode.')
+
             if 'C' in step:
                 combiner_args = (wrapper_args + [self._script['name'],
                                  '--step-num=%d' % i, '--combiner'] +

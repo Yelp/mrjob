@@ -139,6 +139,8 @@ class InlineMRJobRunner(MRJobRunner):
                 self._invoke_inline_mrjob(step_number, 'step-%d-mapper' %
                                           step_number, is_mapper=True,
                                           has_combiner=('C' in step_name))
+                if 'P' in step_name:
+                    raise ValueError("Pig steps are currently not supported in inline mode.")
 
                 if 'R' in step_name:
                     mapper_output_path = self._prev_outfile

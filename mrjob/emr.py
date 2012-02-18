@@ -28,6 +28,9 @@ from subprocess import Popen
 from subprocess import PIPE
 import time
 import urllib2
+import itertools
+
+SCRIPT_RUNNER_JAR = "s3://us-west-1.elasticmapreduce/libs/script-runner/script-runner.jar"
 
 try:
     from cStringIO import StringIO
@@ -88,12 +91,16 @@ from mrjob.util import read_file
 
 log = logging.getLogger('mrjob.emr')
 
+S3_URI_RE = re.compile(r'^s3://([A-Za-z0-9-\.]+)/(.*)$')
 JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?
 EMR_BACKOFF = 20
 EMR_BACKOFF_MULTIPLIER = 1.5
 EMR_MAX_TRIES = 20  # this takes about a day before we run out of tries
+
+S3_COPY_FILES_TO_TMP = 's3_copy_files_to_tmp'
+S3_DELETE_OUTPUT_DIR_IF_EXISTS = 's3_clear_output_dir'
 
 # the port to tunnel to
 EMR_JOB_TRACKER_PORT = 9100
@@ -103,6 +110,7 @@ MAX_SSH_RETRIES = 20
 
 # ssh should fail right away if it can't bind a port
 WAIT_FOR_SSH_TO_FAIL = 1.0
+WAIT_FOR_S3_COMMAND = 10.0
 
 # sometimes AWS gives us seconds as a decimal, which we can't parse
 # with boto.utils.ISO8601
@@ -623,6 +631,23 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             file_dict['args'] = args[1:]
             self._bootstrap_actions.append(file_dict)
 
+        if S3_URI_RE.match(self._output_dir):
+           # Don't even bother running the job if the output is already there,
+           # since it's costly to spin up instances. Similar logic to checking for presence of input dir.
+           # In this case, we check for the absence of the output dir.
+           if self.path_exists(self._output_dir) and not self._opts[S3_DELETE_OUTPUT_DIR_IF_EXISTS]:
+               raise AssertionError(
+                   'Output directory %s already exists, this will cause the job to fail midway!'
+                   ' Enable the %s option to force delete output-dir.' % (self._output_dir, S3_DELETE_OUTPUT_DIR_IF_EXISTS))
+           if self._opts[S3_DELETE_OUTPUT_DIR_IF_EXISTS]:
+            if self.path_exists(self._output_dir):
+                self.rm(self._output_dir)
+                time.sleep(WAIT_FOR_S3_COMMAND)
+            if self.path_exists(self._output_dir):
+               raise AssertionError(
+                   'Output directory %s already exists, and could not be deleted on a force delete!'
+                   % self._output_dir)
+
         for path in self._opts['bootstrap_files']:
             self._add_bootstrap_file(path)
 
@@ -735,7 +760,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             's3_sync_wait_time',
             'ssh_bin',
             'ssh_bind_ports',
-            'ssh_tunnel_is_open',
+            'ssh_tunnel_is_open', S3_COPY_FILES_TO_TMP, S3_DELETE_OUTPUT_DIR_IF_EXISTS,
             'ssh_tunnel_to_job_tracker',
         ]
 
@@ -758,6 +783,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             'ssh_bind_ports': range(40001, 40841),
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
+            S3_COPY_FILES_TO_TMP : False,
+            S3_DELETE_OUTPUT_DIR_IF_EXISTS : False,
         })
 
     @classmethod
@@ -1051,6 +1078,10 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         Okay to call this multiple times.
         """
+        if self._opts[S3_COPY_FILES_TO_TMP]:
+            pat_to_match = None
+        else:
+            pat_to_match = S3_URI_RE.match
         self._assign_unique_names_to_files(
             's3_uri', prefix=self._s3_tmp_uri + 'files/',
             match=is_s3_uri)
@@ -1068,16 +1099,25 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         s3_conn = self.make_s3_conn()
         for file_dict in self._files:
             path = file_dict['path']
+            src_s3_key = None
 
             # don't bother with files that are already on s3
             if is_s3_uri(path):
-                continue
+                if not self._opts[S3_COPY_FILES_TO_TMP]:
+                    continue
+                else:
+                    #Upload s3 to s3 if option is enabled
+                    src_s3_key = self.make_s3_key(path, s3_conn)
 
             s3_uri = file_dict['s3_uri']
 
             log.debug('uploading %s -> %s' % (path, s3_uri))
             s3_key = self.make_s3_key(s3_uri, s3_conn)
-            s3_key.set_contents_from_filename(file_dict['path'])
+            if src_s3_key:
+                src_s3_key.copy(s3_key.bucket.name, s3_key)
+            else:
+                s3_key.set_contents_from_filename(file_dict['path'])
+
 
     def setup_ssh_tunnel_to_job_tracker(self, host):
         """setup the ssh tunnel to the job tracker, if it's not currently
@@ -1417,6 +1457,17 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         return args
 
+    def install_pig_on_cluster(self, action_on_failure, name, step_list, step_num):
+        pig_install_args = self._pig_args(step_num, install=True)
+        log.debug("Pig Install command")
+        for s in pig_install_args:
+            log.debug("Pig_args: %s"%s)
+        streaming_step = boto.emr.JarStep(name=name,
+            # Refine this jar location
+            jar=SCRIPT_RUNNER_JAR,
+            action_on_failure=action_on_failure, step_args=pig_install_args)
+        step_list.append(streaming_step)
+
     def _build_steps(self):
         """Return a list of boto Step objects corresponding to the
         steps we want to run."""
@@ -1451,11 +1502,17 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             else:
                 action_on_failure = 'TERMINATE_JOB_FLOW'
 
-            # Hadoop streaming stuff
-            if 'M' not in step:  # if we have an identity mapper
-                mapper = 'cat'
+            pig_step = False
+            if 'P' in step:
+                pig_step = True
+                # Use pig, ignore mapper!
+
             else:
-                mapper = cmd_line(self._mapper_args(step_num))
+                # Hadoop streaming stuff
+                if 'M' not in step:  # if we have an identity mapper
+                    mapper = 'cat'
+                else:
+                    mapper = cmd_line(self._mapper_args(step_num))
 
             if 'C' in step:
                 combiner = cmd_line(self._combiner_args(step_num))
@@ -1468,27 +1525,57 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 reducer = None
 
             input = self._s3_step_input_uris(step_num)
-            output = self._s3_step_output_uri(step_num)\
+            output = self._s3_step_output_uri(step_num)
 
-            step_args, cache_files, cache_archives = self._cache_args()
+            if pig_step:
 
-            step_args.extend(self._hadoop_conf_args(step_num, len(steps)))
-            jar = self._get_jar()
+                self.install_pig_on_cluster(action_on_failure, name, step_list, step_num)
 
-            if combiner is not None:
-                if compat.supports_combiners_in_hadoop_streaming(version):
-                    step_args.extend(['-combiner', combiner])
-                else:
-                    mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
+                input_paths_str =  'INPUT=' + ','.join(input)
+                log.debug('Pig_input_paths_str: %s'%input_paths_str)
+                output_path_str = 'OUTPUT=' + output
+                log.debug('Pig_output_path_str: %s'%output_path_str)
+                step_args = []
+#                pig_cmd = cmd_line(self._pig_args(step_num))
 
-            streaming_step = boto.emr.StreamingStep(
-                name=name, mapper=mapper, reducer=reducer,
-                action_on_failure=action_on_failure,
-                cache_files=cache_files, cache_archives=cache_archives,
-                step_args=step_args, input=input, output=output,
-                jar=jar)
+                step_args.extend(self._pig_args(step_num))
+#                step_args.append(pig_cmd)
+                step_args.extend(['-p ', input_paths_str])
+                step_args.extend(['-p ', output_path_str])
 
-            step_list.append(streaming_step)
+                log.debug('Pig step args')
+                for s in step_args:
+                    log.debug('Pig step:%s'%s)
+
+                streaming_step = boto.emr.JarStep(name=name,
+                    # Refine this jar location
+                    jar=SCRIPT_RUNNER_JAR,
+                    action_on_failure=action_on_failure, step_args=step_args)
+                step_list.append(streaming_step)
+
+
+            else:
+
+                step_args, cache_files, cache_archives = self._cache_args()
+
+                step_args.extend(self._hadoop_conf_args(step_num, len(steps)))
+                jar = self._get_jar()
+
+                if combiner is not None:
+                    if compat.supports_combiners_in_hadoop_streaming(version):
+                        step_args.extend(['-combiner', combiner])
+                    else:
+                        mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
+
+                streaming_step = boto.emr.StreamingStep(
+                    name=name, mapper=mapper, reducer=reducer,
+                    action_on_failure=action_on_failure,
+                    cache_files=cache_files, cache_archives=cache_archives,
+                    step_args=step_args, input=input, output=output,
+                    jar=jar)
+                step_list.append(streaming_step)
+
+
 
         return step_list
 
@@ -1559,6 +1646,9 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         self._create_s3_temp_bucket_if_needed()
         # define out steps
         steps = self._build_steps()
+
+#        ## SHIV DEBUG
+#        exit(1)
 
         # try to find a job flow from the pool. basically auto-fill
         # 'emr_job_flow_id' if possible and then follow normal behavior.
@@ -1721,6 +1811,34 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             args = (self._opts['python_bin'] +
                     [self._wrapper_script['name']] +
                     args)
+
+        return args
+
+    def _pig_args(self, step_num, install = False):
+        pig_emr_dict = {'--pig_script':'--run-pig-script'}
+        # One can override base_path here
+
+        l = self._mr_job_extra_args()
+        options_dict = dict(itertools.izip_longest(*[iter(l)] * 2, fillvalue=""))
+        args = []
+        region = self._aws_region
+        if not region:
+            # Amazon default for pig packages
+            region = 'us-east-1'
+        args.append('s3://'+region+'.elasticmapreduce/libs/pig/pig-script')
+        args.append('--base-path')
+        args.append('s3://'+region+'.elasticmapreduce/libs/pig/')
+
+        # Install pig if its a startup step
+        if install:
+            args.append('--install-pig')
+        else:
+            for k,v in options_dict.iteritems():
+                if pig_emr_dict.has_key(k):
+                    args.append(pig_emr_dict[k])
+                    args.append('--args')
+                    args.append('-f')
+                    args.append(v)
 
         return args
 

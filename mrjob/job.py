@@ -129,10 +129,13 @@ from mrjob.util import read_input
 
 
 log = logging.getLogger('mrjob.job')
-
+# sentinel value; used when running MRJob as a script
+_READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
+PIG_STEP ='pig'
 
 # all the parameters you can specify when definining a job step
 _JOB_STEP_PARAMS = (
+    PIG_STEP,
     'combiner',
     'combiner_init',
     'combiner_final',
@@ -150,8 +153,6 @@ def _IDENTITY_MAPPER(key, value):
     yield key, value
 
 
-# sentinel value; used when running MRJob as a script
-_READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
 
 
 # The former custom option class has been removed and this stub will disappear
@@ -222,6 +223,9 @@ class MRJob(object):
         self.stdin = sys.stdin
         self.stdout = sys.stdout
         self.stderr = sys.stderr
+
+    def pig_step(self):
+        return PIG_STEP
 
     ### Defining one-step jobs ###
 
@@ -305,6 +309,11 @@ class MRJob(object):
         """
         raise NotImplementedError
 
+    def pig(self):
+        """ Re-define this to support pig steps. A simple returns True is enough.
+        """
+        raise NotImplementedError
+
     def reducer_init(self):
         """Re-define this to define an action to run before the reducer
         processes any input.
@@ -381,6 +390,11 @@ class MRJob(object):
                       for func_name in _JOB_STEP_PARAMS
                       if (getattr(self, func_name).im_func is not
                           getattr(MRJob, func_name).im_func))
+
+        if kwargs.has_key(PIG_STEP):
+            step = dict((f, None) for f in _JOB_STEP_PARAMS)
+            step[PIG_STEP]=PIG_STEP
+            return [step]
 
         return [self.mr(**kwargs)]
 
@@ -754,29 +768,35 @@ class MRJob(object):
             mapper_funcs = ('mapper_init', 'mapper_final')
             reducer_funcs = ('reducer', 'reducer_init', 'reducer_final')
             combiner_funcs = ('combiner', 'combiner_init', 'combiner_final')
+            func_strs = []
+
 
             has_explicit_mapper = (step['mapper'] != _IDENTITY_MAPPER or
                                    any(step[k] for k in mapper_funcs))
             has_explicit_reducer = any(step[k] for k in reducer_funcs)
             has_explicit_combiner = any(step[k] for k in combiner_funcs)
 
-            func_strs = []
 
+            if step[PIG_STEP]:
+                func_strs.append('P')
+            else:
             # Print a mapper if:
+            # - If not running a pig step
             # - The user specifies one
             # - Different input and output protocols are used (infer from
             #   step number)
             # - We don't have anything else to print (excluding combiners)
-            if has_explicit_mapper \
-               or step_num == 0 \
-               or not has_explicit_reducer:
-                func_strs.append('M')
+                if has_explicit_mapper \
+                   or step_num == 0 \
+                   or not has_explicit_reducer:
+                    func_strs.append('M')
 
             if has_explicit_combiner:
                 func_strs.append('C')
 
             if has_explicit_reducer:
                 func_strs.append('R')
+
 
             res.append(''.join(func_strs))
         return res

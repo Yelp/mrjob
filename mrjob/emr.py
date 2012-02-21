@@ -1819,7 +1819,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # One can override base_path here
 
         l = self._mr_job_extra_args()
-        options_dict = dict(itertools.izip_longest(*[iter(l)] * 2, fillvalue=""))
+        # Works only if there is a key value argument for every entry in the list
+        options_dict = dict(itertools.izip(*[iter(l)] * 2))
         args = []
         region = self._aws_region
         if not region:

@@ -186,8 +186,8 @@ def inspect_and_maybe_terminate_job_flows(
             if (pool_name is not None and pool != pool_name):
                 continue
 
-            to_terminate.append(
-                (jf.jobflowid, jf.name, time_idle, time_to_end_of_hour))
+            to_terminate.append((jf.jobflowid, jf.name, pending,
+                                 time_idle, time_to_end_of_hour))
 
     log.info(
         'Job flow statuses: %d bootstrapping, %d running, %d pending, %d idle,'
@@ -295,13 +295,14 @@ def terminate_and_notify(emr_conn, to_terminate, dry_run=False):
     if not to_terminate:
         return
 
-    for job_flow_id, name, time_idle, time_to_end_of_hour in to_terminate:
+    for id, name, pending, time_idle, time_to_end_of_hour in to_terminate:
         if not dry_run:
-            emr_conn.terminate_jobflow(job_flow_id)
-        print ('Terminated job flow %s (%s); was idle for %s,'
-               ' %s to end of hour' %
-               (job_flow_id, name, strip_microseconds(time_idle),
-                strip_microseconds(time_to_end_of_hour)))
+            emr_conn.terminate_jobflow(id)
+        print ('Terminated job flow %s (%s); was %s for %s, %s to end of hour'
+               % (id, name,
+                  'pending' if pending else 'idle',
+                  strip_microseconds(time_idle),
+                  strip_microseconds(time_to_end_of_hour)))
 
 
 def make_option_parser():

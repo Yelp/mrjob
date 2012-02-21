@@ -89,7 +89,7 @@ def find_long_running_jobs(job_flows, min_time, now=None):
     a dictionary with the following keys:
 
     * *job_flow_id*: the job flow's unique ID (e.g. ``j-SOMEJOBFLOW``)
-    * *step_name*: name of the step
+    * *name*: name of the step, or the job flow when bootstrapping
     * *step_state*: state of the step, either ``'RUNNING'`` or ``'PENDING'``
     * *time*: amount of time step was running or pending, as a
               :py:class:`datetime.timedelta`
@@ -110,7 +110,7 @@ def find_long_running_jobs(job_flows, min_time, now=None):
                 # we tell bootstrapping info by step_state being empty,
                 # and only use job_flow_id and time in the report
                 yield({'job_flow_id': jf.jobflowid,
-                       'step_name': '',
+                       'name': jf.name,
                        'step_state': '',
                        'time': time_running})
 
@@ -132,7 +132,7 @@ def find_long_running_jobs(job_flows, min_time, now=None):
 
                 if time_running >= min_time:
                     yield({'job_flow_id': jf.jobflowid,
-                           'step_name': step.name,
+                           'name': step.name,
                            'step_state': step.state,
                            'time': time_running})
 
@@ -152,7 +152,7 @@ def find_long_running_jobs(job_flows, min_time, now=None):
 
             if time_pending >= min_time:
                 yield({'job_flow_id': jf.jobflowid,
-                       'step_name': step.name,
+                       'name': step.name,
                        'step_state': step.state,
                        'time': time_pending})
 
@@ -164,14 +164,15 @@ def print_report(job_info):
     """
     for ji in job_info:
         # BOOTSTRAPPING case
-        if ji['time'] < timedelta(7) or not ji['step_state']:
-            print '%-15s BOOTSTRAPPING for %17s' % (
-                ji['job_flow_id'], format_timedelta(ji['time']))
+        if not ji['step_state']:
+            print '%-15s BOOTSTRAPPING for %17s (%s)' % (
+                ji['job_flow_id'], format_timedelta(ji['time']),
+                ji['name'])
         else:
             print '%-15s       %7s for %17s (%s)' % (
                 ji['job_flow_id'],
                 ji['step_state'], format_timedelta(ji['time']),
-                ji['step_name'])
+                ji['name'])
 
 
 def format_timedelta(time):

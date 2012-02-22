@@ -1,4 +1,4 @@
-v0.3.2, 2012-02-21 -- ???
+v0.3.2, 2012-02-21 -- Features, fixes, and garden gnomes
  * Docs:
    * 'Testing with mrjob' section in docs (includes #321)
    * MRJobRunner.counters() included in docs (#321)

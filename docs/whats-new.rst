@@ -24,7 +24,7 @@ The new :py:mod:`~mrjob.tools.emr.report_long_jobs` tool alerts on jobs that
 have run for more than X hours.
 
 For a complete list of changes, see `CHANGES.txt
-<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt`_
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
 0.3
 -----

@@ -25,8 +25,6 @@ The instance type/number options have changed to support spot instances:
 * *ec2_core_instance_bid_price*
 * *ec2_core_instance_type*
 * *ec2_instance_type*
-* *ec2_key_pair*
-* *ec2_key_pair_file*
 * *ec2_master_instance_bid_price*
 * *ec2_master_instance_type*
 * *ec2_slave_instance_type*

@@ -4,66 +4,27 @@ What's New
 0.3.2
 -----
 
-Documentation
-^^^^^^^^^^^^^
-
-* :ref:`testing`
-* Documentation for :py:meth:`.MRJobRunner.counters()`
-* Fixed several references to :py:func:`terminate_idle_job_flows()`
-
-Running Jobs
-
-**Local Mode**
-
-* Allow non-string jobconf values again (this changed in v0.3.0)
-* Don't split ``*.gz`` files
-
-**EMR Mode**
-
-The instance type/number options have changed to support spot instances:
+The EMR instance type/number options have changed to support spot instances:
 
 * *ec2_core_instance_bid_price*
 * *ec2_core_instance_type*
 * *ec2_instance_type*
 * *ec2_master_instance_bid_price*
 * *ec2_master_instance_type*
-* *ec2_slave_instance_type*
+* *ec2_slave_instance_type* (alias for *ec2_core_instance_type*)
 * *ec2_task_instance_bid_price*
 * *ec2_task_instance_type*
 
-There is also a new **ami_version** option to change the AMI your job flow uses
-for its nodes.
+There is also a new *ami_version* option to change the AMI your job flow uses
+for its nodes. 
 
 For more information, see :py:meth:`mrjob.emr.EMRJobRunner.__init__`.
 
-Other fixes:
+The new :py:mod:`~mrjob.tools.emr.report_long_jobs` tool alerts on jobs that
+have run for more than X hours.
 
-* 'Error while reading from input file' displays correct file
-* python_bin used for bootstrap_python_packages instead of just ``python``
-* Pooling works with ``bootstrap_mrjob=False``
-* Pooling makes sure a job flow has space for the new job before joining it
-
-**EMR Tools***
-
-* :py:mod:`~mrjob.tools.emr.create_job_flow` no longer tries to use an option
-  that does not exist
-* The new :py:mod:`~mrjob.tools.emr.report_long_jobs` tool alerts on jobs that
-  have run for more than X hours
-* :py:mod:`~mrjob.tools.emr.mrboss` no longer spells stderr "stsderr"
-* :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows` counts jobs with pending
-  (but not running) steps as idle
-* :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows` can terminate job flows
-  near the end of a billable hour
-* :py:mod:`~mrjob.tools.emr.audit_usage` breaks down job flows by pool
-* Various tools (e.g. :py:mod:`~mrjob.tools.emr.audit_usage`) determine their
-  lists of job flows to act on more effectively
-
-0.3.1
------
-
-* Instance-type command-line arguments always override ``mrjob.conf``
-* Fixed crash in :py:mod:`mrjob.tools.emr.audit_usage`
-* Tests now use :py:mod:`unittest`; ``python setup.py test`` now works
+For a complete list of changes, see `CHANGES.txt
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt`_
 
 0.3
 -----

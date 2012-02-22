@@ -1,8 +1,35 @@
-What's New in mrjob 0.3
-=======================
+What's New
+==========
+
+0.3.2
+-----
+
+The EMR instance type/number options have changed to support spot instances:
+
+* *ec2_core_instance_bid_price*
+* *ec2_core_instance_type*
+* *ec2_master_instance_bid_price*
+* *ec2_master_instance_type*
+* *ec2_slave_instance_type* (alias for *ec2_core_instance_type*)
+* *ec2_task_instance_bid_price*
+* *ec2_task_instance_type*
+
+There is also a new *ami_version* option to change the AMI your job flow uses
+for its nodes. 
+
+For more information, see :py:meth:`mrjob.emr.EMRJobRunner.__init__`.
+
+The new :py:mod:`~mrjob.tools.emr.report_long_jobs` tool alerts on jobs that
+have run for more than X hours.
+
+For a complete list of changes, see `CHANGES.txt
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
+
+0.3
+-----
 
 Features
---------
+^^^^^^^^
 
 **Support for Combiners**
 
@@ -65,7 +92,7 @@ Features
     More info: :py:mod:`mrjob.tools.emr.mrboss`
 
 Changes and Deprecations
-------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Configuration**
 

@@ -14,7 +14,6 @@ Table of Contents
 
 .. toctree::
     :maxdepth: 3
-    :numbered:
 
     whats-new.rst
     writing-and-running.rst

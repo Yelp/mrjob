@@ -1,14 +1,14 @@
 v0.3.2, 2012-02-21 -- ???
  * Docs:
    * 'Testing with mrjob' section in docs (includes #321)
-   * MRJobRuner.counters() included in docs (#321)
+   * MRJobRunner.counters() included in docs (#321)
    * terminate_idle_job_flows is spelled correctly in docs (#339)
  * Running jobs:
    * local mode:
      * Allow non-string jobconf values again (this changed in v0.3.0)
      * Don't split *.gz files (#333)
    * emr mode:
-     * Spot instance support via ec2_*_instace_bid_price and renamed instace
+     * Spot instance support via ec2_*_instance_bid_price and renamed instance
        type/number options (#219)
      * ami_version option to allow switching between EMR AMIs (#306)
      * 'Error while reading from input file' displays correct file (#358)
@@ -17,18 +17,18 @@ v0.3.2, 2012-02-21 -- ???
      * Pooling works with bootstrap_mrjob=False (#347)
      * Pooling makes sure a job flow has space for the new job before joining
        it (#324)
-     * Tools:
-       * create_job_flow no longer tries to use an option that does not exist
-         (#349)
-       * report_long_jobs tool alerts on jobs that have run for more than X hours
-         (#345)
-       * mrboss no longer spells stderr 'stsderr'
-       * terminate_idle_job_flows counts jobs with pending (but not running)
-         steps as idle (#365)
-       * terminate_idle_job_flows can terminate job flows near the end of a
-         billable hour (#319)
-       * audit_usage breaks down job flows by pool (#239)
-       * Various tools (e.g. audit_usage) get list of job flows correctly (#346)
+ * EMR tools:
+   * create_job_flow no longer tries to use an option that does not exist
+     (#349)
+   * report_long_jobs tool alerts on jobs that have run for more than X hours
+     (#345)
+   * mrboss no longer spells stderr 'stsderr'
+   * terminate_idle_job_flows counts jobs with pending (but not running)
+     steps as idle (#365)
+   * terminate_idle_job_flows can terminate job flows near the end of a
+     billable hour (#319)
+   * audit_usage breaks down job flows by pool (#239)
+   * Various tools (e.g. audit_usage) get list of job flows correctly (#346)
 
 v0.3.1, 2011-12-20 -- Nooooo there were bugs!
  * Instance-type command-line arguments always override mrjob.conf (Issue #311)

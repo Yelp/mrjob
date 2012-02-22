@@ -76,8 +76,7 @@ CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
 #: the default cleanup-on-success option: ``'IF_SUCCESSFUL'``
 CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
 
-_STEP_RE = re.compile(r'^M?C?P?R$')
-
+_STEP_RE = re.compile(r'^[MP]?C?R?$')
 # buffer for piping files into sort on Windows
 _BUFFER_SIZE = 4096
 

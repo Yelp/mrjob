@@ -665,6 +665,12 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             file_dict = self._add_bootstrap_file(path)
             self._bootstrap_python_packages.append(file_dict)
 
+
+        self._pig_script = None
+        if self._opts.get('pig_script'):
+            self._pig_script = self._add_file_for_upload(
+                self._opts['pig_script'])
+
         self._streaming_jar = None
         if self._opts.get('hadoop_streaming_jar'):
             self._streaming_jar = self._add_file_for_upload(
@@ -747,12 +753,13 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             'emr_job_flow_id',
             'emr_job_flow_pool_name',
             'enable_emr_debugging',
-            'enable_emr_debugging',
             'hadoop_streaming_jar_on_emr',
             'hadoop_version',
             'num_ec2_core_instances',
             'num_ec2_instances',
             'num_ec2_task_instances',
+            'pig_script',
+            'pig_params',
             'pool_emr_job_flows',
             's3_endpoint',
             's3_log_uri',
@@ -1540,8 +1547,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
                 step_args.extend(self._pig_args(step_num))
 #                step_args.append(pig_cmd)
-                step_args.extend(['-p ', input_paths_str])
-                step_args.extend(['-p ', output_path_str])
+                step_args.extend(['-p', input_paths_str])
+                step_args.extend(['-p', output_path_str])
 
                 log.debug('Pig step args')
                 for s in step_args:
@@ -1647,7 +1654,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # define out steps
         steps = self._build_steps()
 
-#        ## SHIV DEBUG
+        ## SHIV DEBUG
 #        exit(1)
 
         # try to find a job flow from the pool. basically auto-fill
@@ -1814,13 +1821,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         return args
 
-    def _pig_args(self, step_num, install = False):
-        pig_emr_dict = {'--pig_script':'--run-pig-script'}
-        # One can override base_path here
 
-        l = self._mr_job_extra_args()
-        # Works only if there is a key value argument for every entry in the list
-        options_dict = dict(itertools.izip(*[iter(l)] * 2))
+    def _pig_args(self, step_num, install = False):
         args = []
         region = self._aws_region
         if not region:
@@ -1834,12 +1836,17 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         if install:
             args.append('--install-pig')
         else:
-            for k,v in options_dict.iteritems():
-                if pig_emr_dict.has_key(k):
-                    args.append(pig_emr_dict[k])
-                    args.append('--args')
-                    args.append('-f')
-                    args.append(v)
+
+            args.append('--run-pig-script')
+            args.append('--args')
+            args.append('-f')
+            args.append(self._pig_script['s3_uri'])
+
+            if self._opts.has_key("pig_params"):
+                for entry in self._opts["pig_params"]:
+                    args.append('-p')
+                    args.append(entry)
+                # Get all script parameters as a list
 
         return args
 

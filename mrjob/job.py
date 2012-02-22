@@ -1124,6 +1124,21 @@ class MRJob(object):
                   ' take the form KEY=VALUE. You can use --jobconf multiple'
                   ' times.'))
 
+        # options common to Pig usage on hadoop and EMR
+        self.pig_opt_group = OptionGroup(
+            self.option_parser,
+            'Pig specific options. Currently only EMR mode is supported but should eventually work on hadoop and local as well')
+
+        self.option_parser.add_option_group(self.pig_opt_group)
+        self.pig_opt_group.add_option(
+            '--pig-params', dest='pig_params', default=[],
+            action='append',
+            help='Pig script parameters. List of "KEY=VALUE" entries e.g "UDF_PATH=<PATH>" This does not need to contain INPUT and OUTPUT parameters. Those will be auto-generated.')
+
+        self.pig_opt_group.add_option(
+            '--run-pig-script', dest='pig_script', default = None,
+            help='Pig script location. For now, use an s3 location.')
+
         # options common to Hadoop and EMR
         self.hadoop_emr_opt_group = OptionGroup(
             self.option_parser,
@@ -1650,6 +1665,8 @@ class MRJob(object):
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
             'partitioner': self.partitioner(),
+            'pig_params' : self.options.pig_params,
+            'pig_script' : self.options.pig_script,
             'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
             'setup_cmds': self.options.setup_cmds,

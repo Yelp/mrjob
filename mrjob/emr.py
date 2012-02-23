@@ -100,7 +100,7 @@ EMR_BACKOFF_MULTIPLIER = 1.5
 EMR_MAX_TRIES = 20  # this takes about a day before we run out of tries
 
 S3_COPY_FILES_TO_TMP = 's3_copy_files_to_tmp'
-S3_DELETE_OUTPUT_DIR_IF_EXISTS = 's3_clear_output_dir'
+FORCE_CLEAR_OUTPUT_DIR = 'force_clear_output_dir'
 
 # the port to tunnel to
 EMR_JOB_TRACKER_PORT = 9100
@@ -635,11 +635,11 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
            # Don't even bother running the job if the output is already there,
            # since it's costly to spin up instances. Similar logic to checking for presence of input dir.
            # In this case, we check for the absence of the output dir.
-           if self.path_exists(self._output_dir) and not self._opts[S3_DELETE_OUTPUT_DIR_IF_EXISTS]:
+           if self.path_exists(self._output_dir) and not self._opts[FORCE_CLEAR_OUTPUT_DIR]:
                raise AssertionError(
                    'Output directory %s already exists, this will cause the job to fail midway!'
-                   ' Enable the %s option to force delete output-dir.' % (self._output_dir, S3_DELETE_OUTPUT_DIR_IF_EXISTS))
-           if self._opts[S3_DELETE_OUTPUT_DIR_IF_EXISTS]:
+                   ' Enable the %s option to force delete output-dir.' % (self._output_dir, FORCE_CLEAR_OUTPUT_DIR))
+           if self._opts[FORCE_CLEAR_OUTPUT_DIR]:
             if self.path_exists(self._output_dir):
                 self.rm(self._output_dir)
                 time.sleep(WAIT_FOR_S3_COMMAND)
@@ -767,7 +767,9 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             's3_sync_wait_time',
             'ssh_bin',
             'ssh_bind_ports',
-            'ssh_tunnel_is_open', S3_COPY_FILES_TO_TMP, S3_DELETE_OUTPUT_DIR_IF_EXISTS,
+            'ssh_tunnel_is_open',
+            S3_COPY_FILES_TO_TMP,
+            FORCE_CLEAR_OUTPUT_DIR,
             'ssh_tunnel_to_job_tracker',
         ]
 
@@ -791,7 +793,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
             S3_COPY_FILES_TO_TMP : False,
-            S3_DELETE_OUTPUT_DIR_IF_EXISTS : False,
+            FORCE_CLEAR_OUTPUT_DIR : False,
         })
 
     @classmethod
@@ -1108,21 +1110,27 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             path = file_dict['path']
             src_s3_key = None
 
-            # don't bother with files that are already on s3
+            # don't bother with files that are already on s3 unless the s3_copy_files_to_tmp option is enabled.
             if is_s3_uri(path):
-                if not self._opts[S3_COPY_FILES_TO_TMP]:
-                    continue
-                else:
-                    #Upload s3 to s3 if option is enabled
+                if self._opts[S3_COPY_FILES_TO_TMP]:
+                    # Make an s3 key from the source path on s3
                     src_s3_key = self.make_s3_key(path, s3_conn)
+                else:
+                    continue
 
             s3_uri = file_dict['s3_uri']
 
-            log.debug('uploading %s -> %s' % (path, s3_uri))
-            s3_key = self.make_s3_key(s3_uri, s3_conn)
             if src_s3_key:
-                src_s3_key.copy(s3_key.bucket.name, s3_key)
+                target_s3_uri = s3_files_dir+file_dict['name']
+                target_s3_key = self.make_s3_key(target_s3_uri, s3_conn)
+                log.debug('uploading %s -> %s' % (s3_uri, target_s3_uri))
+
+                src_s3_key.copy(target_s3_key.bucket.name, target_s3_key)
+                file_dict['s3_uri'] = target_s3_uri
             else:
+
+                s3_key = self.make_s3_key(s3_uri, s3_conn)
+                log.debug('uploading %s -> %s' % (path, s3_uri))
                 s3_key.set_contents_from_filename(file_dict['path'])
 
 
@@ -1655,7 +1663,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         steps = self._build_steps()
 
         ## SHIV DEBUG
-#        exit(1)
+        #exit(1)
 
         # try to find a job flow from the pool. basically auto-fill
         # 'emr_job_flow_id' if possible and then follow normal behavior.

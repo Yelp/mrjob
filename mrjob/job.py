@@ -1130,6 +1130,8 @@ class MRJob(object):
             'Pig specific options. Currently only EMR mode is supported but should eventually work on hadoop and local as well')
 
         self.option_parser.add_option_group(self.pig_opt_group)
+
+        # Pig specific options
         self.pig_opt_group.add_option(
             '--pig-params', dest='pig_params', default=[],
             action='append',
@@ -1138,6 +1140,11 @@ class MRJob(object):
         self.pig_opt_group.add_option(
             '--run-pig-script', dest='pig_script', default = None,
             help='Pig script location. For now, use an s3 location.')
+
+        self.pig_opt_group.add_option(
+            '--pig-exec-location', dest='pig_exec_location', default = None,
+            help='Pig executable location. Meant only for local mode.')
+
 
         # options common to Hadoop and EMR
         self.hadoop_emr_opt_group = OptionGroup(
@@ -1204,6 +1211,10 @@ class MRJob(object):
             'Running on Amazon Elastic MapReduce (these apply when you set -r'
             ' emr)')
         self.option_parser.add_option_group(self.emr_opt_group)
+
+        self.emr_opt_group.add_option(
+            '--force-clear-output-dir', dest='force_clear_output_dir', action="store_true",
+            help='Forcefully clear the output directory. Currently only works for S3 locations.')
 
         self.emr_opt_group.add_option(
             '--additional-emr-info', dest='additional_emr_info', default=None,
@@ -1394,6 +1405,11 @@ class MRJob(object):
             default=None,
             help=('Specify a pool name to join. Set to "default" if not'
                   ' specified.'))
+
+        self.emr_opt_group.add_option(
+            '--s3-copy-files-to-tmp', dest='s3_copy_files_to_tmp', action="store_true",
+            help='Copies cache files on s3 to another location on s3. '
+                  'This is useful to ensure that the job runs when the cache files are updated.')
 
         self.emr_opt_group.add_option(
             '--s3-endpoint', dest='s3_endpoint', default=None,
@@ -1653,6 +1669,7 @@ class MRJob(object):
             'conf_path': self.options.conf_path,
             'extra_args': self.generate_passthrough_arguments(),
             'file_upload_args': self.generate_file_upload_args(),
+            'force_clear_output_dir': self.options.force_clear_output_dir,
             'hadoop_extra_args': self.options.hadoop_extra_args,
             'hadoop_input_format': self.hadoop_input_format(),
             'hadoop_output_format': self.hadoop_output_format(),
@@ -1665,6 +1682,7 @@ class MRJob(object):
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
             'partitioner': self.partitioner(),
+            'pig_exec_location' : self.options.pig_exec_location,
             'pig_params' : self.options.pig_params,
             'pig_script' : self.options.pig_script,
             'python_archives': self.options.python_archives,

@@ -29,6 +29,7 @@ class JobFlowInspectionTestCase(ToolTestCase):
         self.assertEqual(
             runner_kwargs(),
             {'additional_emr_info': None,
+             'ami_version': None,
              'aws_availability_zone': None,
              'aws_region': None,
              'bootstrap_actions': [],

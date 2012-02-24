@@ -94,6 +94,7 @@ def make_option_parser():
         ),
         emr_opt_group: (
             'additional_emr_info',
+            'ami_version',
             'aws_availability_zone',
             'aws_region',
             'bootstrap_actions',

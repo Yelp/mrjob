@@ -1147,13 +1147,12 @@ class MRJobRunner(object):
 
             stdin_path = os.path.join(self._get_local_tmp_dir(), 'STDIN')
             log.debug('dumping stdin to local file %s' % stdin_path)
-            stdin_file = open(stdin_path, 'w')
-            for line in self._stdin:
-                # catch missing newlines (this often happens with test data)
-                if not line.endswith('\n'):
-                    line += '\n'
-                stdin_file.write(line)
-            stdin_file.close()
+            with open(stdin_path, 'w') as stdin_file:
+                for line in self._stdin:
+                    # catch missing newlines (this often happens with test data)
+                    if not line.endswith('\n'):
+                        line += '\n'
+                    stdin_file.write(line)
 
             self._stdin_path = stdin_path
 
@@ -1292,7 +1291,7 @@ class MRJobRunner(object):
 
                 # shovel bytes into the sort process
                 for input_path in input_paths:
-                    with open(input_path) as input:
+                    with open(input_path, 'r') as input:
                         while True:
                             buf = input.read(_BUFFER_SIZE)
                             if not buf:

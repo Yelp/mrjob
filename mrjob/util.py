@@ -18,7 +18,6 @@
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
-import bz2
 from collections import defaultdict
 import contextlib
 from copy import deepcopy
@@ -34,6 +33,9 @@ import sys
 import tarfile
 import zipfile
 
+IRONPYTHON_TOKEN = "IronPython"
+is_ironpython = IRONPYTHON_TOKEN in sys.version
+if not is_ironpython: import bz2
 
 class NullHandler(logging.Handler):
     def emit(self, record):
@@ -348,21 +350,24 @@ def read_file(path, fileobj=None):
     - Decompress ``.gz`` and ``.bz2`` files.
     - If *fileobj* is not ``None``, stream lines from the *fileobj*
     """
-    if path.endswith('.gz'):
-        f = gzip.GzipFile(path, fileobj=fileobj)
-    elif path.endswith('.bz2'):
-        if fileobj is None:
-            f = bz2.BZ2File(path)
+    try:
+        if path.endswith('.gz'):
+           f = gzip.GzipFile(path, fileobj=fileobj)
+        elif path.endswith('.bz2'):
+            if fileobj is None:
+                f = bz2.BZ2File(path)
+            else:
+                f = bunzip2_stream(fileobj)
+        elif fileobj is None:
+            f = open(path)
         else:
-            f = bunzip2_stream(fileobj)
-    elif fileobj is None:
-        f = open(path)
-    else:
-        f = fileobj
+            f = fileobj 
 
-    for line in f:
-        yield line
-
+        for line in f:
+            yield line
+    finally:
+        if fileobj is None and not f is None: 
+            f.close()
 
 def bunzip2_stream(fileobj):
     """Return an uncompressed bz2 stream from a file object

@@ -457,7 +457,6 @@ _COUNTER_FORMAT_IS_0_20 = re.compile(_0_20_EXPR)
 def _parse_counters_0_18(counter_string):
     # 0.18 counters look like this:
     # GroupName.CounterName:Value,Group1.Crackers:3,Group2.Nerf:243,...
-    matches = _COUNTER_RE_0_18.findall(counter_string)
     for m in _COUNTER_RE_0_18.finditer(counter_string):
         yield m.group('group'), m.group('name'), int(m.group('value'))
 

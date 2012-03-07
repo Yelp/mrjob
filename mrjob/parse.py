@@ -497,8 +497,8 @@ def parse_hadoop_counters_from_line(line):
         return None, None
 
     parser_switch = (
-        (_COUNTER_FORMAT_IS_0_18, _parse_counters_0_18),
         (_COUNTER_FORMAT_IS_0_20, _parse_counters_0_20),
+        (_COUNTER_FORMAT_IS_0_18, _parse_counters_0_18),
     )
 
     counter_substring = m.group('counters')

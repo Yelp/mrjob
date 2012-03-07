@@ -418,12 +418,12 @@ _COUNTER_LINE_RE = re.compile(_COUNTER_LINE_EXPR)
 # 0.18-specific
 # see _parse_counters_0_18 for format
 # A counter looks like this: groupname.countername:countervalue
-_COUNTER_EXPR_0_18 = r'(?P<group>[^,]+?)[.](?P<name>.+?):(?P<value>\d+)'
+_COUNTER_EXPR_0_18 = r'(?P<group>[^,]+?)[.](?P<name>[^,]+):(?P<value>\d+)'
 _COUNTER_RE_0_18 = re.compile(_COUNTER_EXPR_0_18)
 
 # aggregate 'is this 0.18?' expression
 # these are comma-separated counter expressions (see _COUNTER_EXPR_0_18)
-_ONE_0_18_COUNTER = r'[^,]+?[.].+?:\d+'
+_ONE_0_18_COUNTER = r'[^,]+?[.][^,]+:\d+'
 _0_18_EXPR = r'(%s)(,%s)*' % (_ONE_0_18_COUNTER, _ONE_0_18_COUNTER)
 _COUNTER_FORMAT_IS_0_18 = re.compile(_0_18_EXPR)
 
@@ -458,8 +458,8 @@ def _parse_counters_0_18(counter_string):
     # 0.18 counters look like this:
     # GroupName.CounterName:Value,Group1.Crackers:3,Group2.Nerf:243,...
     matches = _COUNTER_RE_0_18.findall(counter_string)
-    for group, name, amount_str in matches:
-        yield group, name, int(amount_str)
+    for m in _COUNTER_RE_0_18.finditer(counter_string):
+        yield m.group('group'), m.group('name'), int(m.group('value'))
 
 
 def _parse_counters_0_20(group_string):

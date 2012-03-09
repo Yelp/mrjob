@@ -162,6 +162,7 @@ _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
 MRJobOptions = Option
 
 
+
 class UsageError(Exception):
     pass
 
@@ -173,6 +174,9 @@ class MRJob(object):
     #: :py:class:`optparse.Option` subclass to use with the
     #: :py:class:`optparse.OptionParser` instance.
     OPTION_CLASS = Option
+
+
+    STREAMING_INTERFACE_TYPED_BYTES = 'typed_bytes'
 
     def __init__(self, args=None):
         """Entry point for running your job from other Python code.
@@ -191,6 +195,7 @@ class MRJob(object):
         For a full list of command-line arguments, run:
         ``python -m mrjob.job --help``
         """
+
         # make sure we respect the $TZ (time zone) environment variable
         if hasattr(time, 'tzset'):
             time.tzset()
@@ -848,7 +853,8 @@ class MRJob(object):
         """
         
         # TEMP code to evaluate typedbytes
-        if True:
+
+        if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
             return self._wrap_typedbytes()
             
         read, write = self.pick_protocols(step_num, step_type)
@@ -898,6 +904,11 @@ class MRJob(object):
         Re-define this if you need fine control over which protocols
         are used by which steps.
         """
+        """
+        Changing for typed_bytes
+        """
+        if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES :
+            return None, None
         steps_desc = self._steps_desc()
 
         # pick input protocol
@@ -1903,6 +1914,8 @@ class MRJob(object):
     #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
     #: protocol strings. Can be overridden by the :option:`--output-protocol`.
     DEFAULT_OUTPUT_PROTOCOL = None
+
+    STREAMING_INTERFACE = None
 
     def parse_output_line(self, line):
         """

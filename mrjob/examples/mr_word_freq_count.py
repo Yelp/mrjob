@@ -21,6 +21,8 @@ WORD_RE = re.compile(r"[\w']+")
 
 class MRWordFreqCount(MRJob):
 
+    STREAMING_INTERFACE = MRJob.STREAMING_INTERFACE_TYPED_BYTES
+
     def mapper(self, _, line):
         for word in WORD_RE.findall(line):
             yield (word.lower(), 1)

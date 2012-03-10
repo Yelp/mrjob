@@ -445,6 +445,7 @@ class MRJobRunner(object):
             'steps_python_bin',
             'upload_archives',
             'upload_files',
+            'streaming_interface',
         ]
 
     @classmethod

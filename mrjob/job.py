@@ -1681,6 +1681,7 @@ class MRJob(object):
             'steps_python_bin': self.options.steps_python_bin,
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,
+            'streaming_interface': self.STREAMING_INTERFACE,
         }
 
     def inline_job_runner_kwargs(self):

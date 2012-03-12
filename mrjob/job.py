@@ -1967,6 +1967,10 @@ class MRJob(object):
         Normally, setting :py:attr:`HADOOP_OUTPUT_FORMAT` is sufficient;
         redefining this method is only for when you want to get fancy.
         """
+        # For supporting typed bytes
+        if self.STREAMING_INTERFACE_TYPED_BYTES == self.STREAMING_INTERFACE:
+            self.HADOOP_OUTPUT_FORMAT = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
+            return self.HADOOP_OUTPUT_FORMAT
         if self.options.hadoop_output_format:
             log.warn('--hadoop-output-format is deprecated as of mrjob 0.3 and'
                      ' will no longer be supported in mrjob 0.4. Redefine '

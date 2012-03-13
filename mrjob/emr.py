@@ -2104,6 +2104,16 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                     python_bin_in_list)
             writeln()
 
+        # run our commands
+        if self._opts['bootstrap_cmds']:
+            writeln('# run bootstrap cmds:')
+            for cmd in self._opts['bootstrap_cmds']:
+                if isinstance(cmd, basestring):
+                    writeln('check_call(%r, shell=True)' % cmd)
+                else:
+                    writeln('check_call(%r)' % cmd)
+            writeln()
+
         # install our python modules
         if self._bootstrap_python_packages:
             writeln('# install python modules:')
@@ -2117,16 +2127,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 writeln("check_call(["
                         "'sudo', %s, 'setup.py', 'install'], cwd=%r)" %
                         (python_bin_in_list, cd_into))
-
-        # run our commands
-        if self._opts['bootstrap_cmds']:
-            writeln('# run bootstrap cmds:')
-            for cmd in self._opts['bootstrap_cmds']:
-                if isinstance(cmd, basestring):
-                    writeln('check_call(%r, shell=True)' % cmd)
-                else:
-                    writeln('check_call(%r)' % cmd)
-            writeln()
 
         # run our scripts
         if self._bootstrap_scripts:

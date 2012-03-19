@@ -59,7 +59,7 @@ class MRTowerOfPowers(MRJob):
     def show_steps(self):
         # when we invoke the job with --steps, it should
         # be reading from the original version of n_file
-        assert self.options.n_file == os.environ['LOCAL_N_FILE_PATH'])
+        assert self.options.n_file == os.environ['LOCAL_N_FILE_PATH']
 
         super(MRTowerOfPowers, self).show_steps()
 

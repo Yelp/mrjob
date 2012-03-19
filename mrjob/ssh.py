@@ -110,7 +110,7 @@ def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
     master node. This is done via ``cat`` to avoid having to store an
     ``scp_bin`` variable.
     """
-    with open(src, 'rb') as f:
+    with open(keyfile, 'rb') as f:
         args = ['bash -c "cat > %s" && chmod 600 %s' % (dest, dest)]
         check_output(*ssh_run(ssh_bin, master_address, ec2_key_pair_file, args,
                               stdin=f.read()))

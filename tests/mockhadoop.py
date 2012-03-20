@@ -252,8 +252,8 @@ def hadoop_fs_dus(*args):
                 hdfs_path_glob)
             failed = True
         else:
-            total_size = 0
             for real_path in real_paths:
+                total_size = 0
                 if os.path.isdir(real_path):
                     for dirpath, dirnames, filenames in os.walk(real_path):
                         for filename in filenames:
@@ -261,7 +261,7 @@ def hadoop_fs_dus(*args):
                                 os.path.join(dirpath, filename))
                 else:
                     total_size += os.path.getsize(real_path)
-            print "%s    %d" % (real_path, total_size)
+                print "%s    %d" % (real_path, total_size)
 
     if failed:
         sys.exit(-1)

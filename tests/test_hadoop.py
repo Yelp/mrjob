@@ -338,8 +338,14 @@ class TestFilesystem(MockHadoopTestCase):
             f.write("defg")
         remote_data_2 = 'hdfs:///more/data2'
 
-        self.assertEqual(HadoopJobRunner(conf_path=False).du(root), 8)
-        self.assertEqual(HadoopJobRunner(conf_path=False).du(data_dir), 4)
+        data_path_3 = os.path.join(data_dir, 'data3')
+        with open(data_path_3, 'w') as f:
+            f.write("hijk")
+        remote_data_2 = 'hdfs:///more/data3'
+
+        self.assertEqual(HadoopJobRunner(conf_path=False).du(root), 12)
+        self.assertEqual(HadoopJobRunner(conf_path=False).du(remote_dir), 8)
+        self.assertEqual(HadoopJobRunner(conf_path=False).du(remote_dir + '/*'), 8)
         self.assertEqual(HadoopJobRunner(conf_path=False).du(remote_data_1), 4)
         self.assertEqual(HadoopJobRunner(conf_path=False).du(remote_data_2), 4)
 

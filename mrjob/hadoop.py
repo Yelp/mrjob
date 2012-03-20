@@ -679,7 +679,9 @@ class HadoopJobRunner(MRJobRunner):
                                      return_stdout=True)
 
         try:
-            return int(stdout.split()[1])
+            return sum(int(line.split()[1])
+                       for line in stdout.split('\n')
+                       if line.strip())
         except (ValueError, TypeError, IndexError):
             raise Exception(
                 'Unexpected output from hadoop fs -du: %r' % stdout)

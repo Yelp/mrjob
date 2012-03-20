@@ -1907,14 +1907,14 @@ class EMRNoMapperTest(MockEMRAndS3TestCase):
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
 
-class TestCat(MockEMRAndS3TestCase):
+class TestFilesystem(MockEMRAndS3TestCase):
 
     def setUp(self):
-        super(TestCat, self).setUp()
+        super(TestFilesystem, self).setUp()
         self.make_tmp_dir()
 
     def tearDown(self):
-        super(TestCat, self).tearDown()
+        super(TestFilesystem, self).tearDown()
         self.rm_tmp_dir()
 
     def make_tmp_dir(self):
@@ -1967,6 +1967,12 @@ class TestCat(MockEMRAndS3TestCase):
                 output.append(line)
 
         self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
+
+    def test_du(self):
+        remote_input_path = 's3://walrus/data/foo'
+        self.add_mock_s3_data({'walrus': {'data/foo': 'abcd'}})
+        self.assertEqual(EMRJobRunner(conf_path=False).du(remote_input_path),
+                         4)
 
 
 class PoolingTestCase(MockEMRAndS3TestCase):

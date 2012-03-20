@@ -2420,7 +2420,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def du(self, path_glob):
         """Get the size of all files matching path_glob."""
         if not is_s3_uri(path_glob):
-            return super(EMRJobRunner, self).getsize(path_glob)
+            return super(EMRJobRunner, self).du(path_glob)
 
         return sum(self.get_s3_key(uri).size for uri in self.ls(path_glob))
 

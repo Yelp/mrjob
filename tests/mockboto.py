@@ -243,6 +243,10 @@ class MockKey(object):
 
     etag = property(_get_etag)
 
+    @property
+    def size(self):
+        return len(self.get_contents_as_string())
+
 
 ### EMR ###
 

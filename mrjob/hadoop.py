@@ -673,7 +673,7 @@ class HadoopJobRunner(MRJobRunner):
         """Get the size of a file, or None if it's not a file or doesn't
         exist."""
         if not is_uri(path_glob):
-            return super(HadoopJobRunner, self).dus(path_glob)
+            return super(HadoopJobRunner, self).du(path_glob)
 
         stdout = self._invoke_hadoop(['fs', '-du', path_glob],
                                      return_stdout=True)

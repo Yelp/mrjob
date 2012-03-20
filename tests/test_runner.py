@@ -341,7 +341,7 @@ class TestHadoopConfArgs(unittest.TestCase):
         self.assertEqual(len(conf_args), 12)
 
 
-class TestCat(unittest.TestCase):
+class TestFilesystem(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir()
@@ -391,6 +391,13 @@ class TestCat(unittest.TestCase):
                 output.append(line)
 
         self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
+
+    def test_du(self):
+        input_path = os.path.join(self.tmp_dir, 'input')
+        with open(input_path, 'w') as f:
+            f.write("abcd")
+
+        self.assertEqual(LocalMRJobRunner(conf_path=False).du(input_path), 4)
 
 
 class TestStreamingOutput(unittest.TestCase):

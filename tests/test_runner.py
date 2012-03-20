@@ -393,11 +393,16 @@ class TestFilesystem(unittest.TestCase):
         self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
 
     def test_du(self):
-        input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as f:
+        data_path_1 = os.path.join(self.tmp_dir, 'data1')
+        with open(data_path_1, 'w') as f:
             f.write("abcd")
 
-        self.assertEqual(LocalMRJobRunner(conf_path=False).du(input_path), 4)
+        data_path_2 = os.path.join(self.tmp_dir, 'data2')
+        with open(data_path_2, 'w') as f:
+            f.write("defg")
+
+        self.assertEqual(LocalMRJobRunner(conf_path=False).du(self.tmp_dir), 8)
+        self.assertEqual(LocalMRJobRunner(conf_path=False).du(data_path_1), 4)
 
 
 class TestStreamingOutput(unittest.TestCase):

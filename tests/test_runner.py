@@ -397,12 +397,16 @@ class TestFilesystem(unittest.TestCase):
         with open(data_path_1, 'w') as f:
             f.write("abcd")
 
-        data_path_2 = os.path.join(self.tmp_dir, 'data2')
+        data_dir = os.path.join(self.tmp_dir, 'more')
+        os.mkdir(data_dir)
+
+        data_path_2 = os.path.join(data_dir, 'data2')
         with open(data_path_2, 'w') as f:
             f.write("defg")
 
         self.assertEqual(LocalMRJobRunner(conf_path=False).du(self.tmp_dir), 8)
         self.assertEqual(LocalMRJobRunner(conf_path=False).du(data_path_1), 4)
+        self.assertEqual(LocalMRJobRunner(conf_path=False).du(data_path_2), 4)
 
 
 class TestStreamingOutput(unittest.TestCase):

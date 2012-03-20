@@ -1971,10 +1971,12 @@ class TestFilesystem(MockEMRAndS3TestCase):
     def test_du(self):
         remote_dir = 's3://walrus/data/'
         remote_file = remote_dir + 'foo'
+        remote_file_2 = remote_dir + 'bar/baz'
         self.add_mock_s3_data({'walrus': {'data/foo': 'abcd'}})
-        self.add_mock_s3_data({'walrus': {'data/bar': 'defg'}})
+        self.add_mock_s3_data({'walrus': {'data/bar/baz': 'defg'}})
         self.assertEqual(EMRJobRunner(conf_path=False).du(remote_dir), 8)
         self.assertEqual(EMRJobRunner(conf_path=False).du(remote_file), 4)
+        self.assertEqual(EMRJobRunner(conf_path=False).du(remote_file_2), 4)
 
 
 class PoolingTestCase(MockEMRAndS3TestCase):

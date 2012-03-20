@@ -675,7 +675,7 @@ class HadoopJobRunner(MRJobRunner):
         if not is_uri(path_glob):
             return super(HadoopJobRunner, self).du(path_glob)
 
-        stdout = self._invoke_hadoop(['fs', '-du', path_glob],
+        stdout = self._invoke_hadoop(['fs', '-dus', path_glob],
                                      return_stdout=True)
 
         try:

@@ -105,23 +105,20 @@ def ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
         return ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args)
 
 
-def _poor_mans_scp(ssh_bin, addr, ec2_key_pair_file, src, dest):
-    """Copy a file from ``src`` on the local machine to ``dest`` on ``addr``.
-
-    We use this to avoid having to remember where ``scp`` lives.
-    """
-    with open(src, 'rb') as f:
-        args = ['bash -c "cat > %s" && chmod 600 %s' % (dest, dest)]
-        check_output(*ssh_run(ssh_bin, addr, ec2_key_pair_file, args,
-                              stdin=f.read()))
-
-
 def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
     """Prepare master to SSH to slaves by copying the EMR private key to the
-    master node.
+    master node. This is done via ``cat`` to avoid having to store an
+    ``scp_bin`` variable.
+
+    :param ssh_bin: Path to ``ssh`` binary
+    :param master_address: Address of node to copy keyfile to
+    :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
+    :param keyfile: What to call the key file on the master
     """
-    _poor_mans_scp(ssh_bin, master_address, ec2_key_pair_file,
-                   ec2_key_pair_file, keyfile)
+    with open(ec2_key_pair_file, 'rb') as f:
+        args = ['bash -c "cat > %s" && chmod 600 %s' % (keyfile, keyfile)]
+        check_output(*ssh_run(ssh_bin, master_address, ec2_key_pair_file, args,
+                              stdin=f.read()))
 
 
 def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):

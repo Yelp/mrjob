@@ -238,6 +238,35 @@ def hadoop_fs_mkdir(*args):
         sys.exit(-1)
 
 
+def hadoop_fs_dus(*args):
+    """Implements hadoop fs -dus."""
+    hdfs_path_globs = args or ['']
+
+    failed = False
+    for hdfs_path_glob in hdfs_path_globs:
+        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob)
+        real_paths = glob.glob(real_path_glob)
+        if not real_paths:
+            print >> sys.stderr, (
+                'lsr: Cannot access %s: No such file or directory.' %
+                hdfs_path_glob)
+            failed = True
+        else:
+            for real_path in real_paths:
+                total_size = 0
+                if os.path.isdir(real_path):
+                    for dirpath, dirnames, filenames in os.walk(real_path):
+                        for filename in filenames:
+                            total_size += os.path.getsize(
+                                os.path.join(dirpath, filename))
+                else:
+                    total_size += os.path.getsize(real_path)
+                print "%s    %d" % (real_path, total_size)
+
+    if failed:
+        sys.exit(-1)
+
+
 def hadoop_fs_put(*args):
     """Implements hadoop fs -put"""
     if len(args) < 2:

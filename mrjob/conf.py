@@ -224,7 +224,13 @@ def load_mrjob_conf(conf_path=None):
         if yaml:
             return yaml.safe_load(f)
         else:
-            return json.load(f)
+            try:
+                return json.load(f)
+            except json.JSONDecodeError as e:
+                msg = e.msg + (
+                    ' (If your mrjob.conf is in YAML, you need to install'
+                    ' yaml; see http://pypi.python.org/pypi/PyYAML/)')
+                raise json.JSONDecodeError(msg, e.doc, e.pos, e.end)
 
 
 def load_opts_from_mrjob_conf(runner_alias, conf_path=None):

@@ -21,6 +21,7 @@ import os
 import shutil
 from StringIO import StringIO
 import tempfile
+import yaml
 
 try:
     import unittest2 as unittest
@@ -244,10 +245,24 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
         dump_mrjob_conf(conf, open(conf_path, 'w'))
-        contents = open(conf_path).read()
+        with open(conf_path) as f:
+            contents = f.read()
 
         self.assertEqual(contents.replace(' ', '').replace('\n', ''),
                          '{"runners":{"foo":{"qux":"quux"}}}')
+
+    def test_json_error(self):
+        conf = {'runners': {'foo': {'qux': 'quux'}}}
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(conf_path, 'w') as f:
+            yaml.dump(conf, f)
+
+        try:
+            load_mrjob_conf(conf_path)
+            assert False
+        except mrjob.conf.json.JSONDecodeError as e:
+            self.assertIn('If your mrjob.conf is in YAML', e.msg)
 
 
 class CombineValuesTestCase(unittest.TestCase):

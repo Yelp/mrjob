@@ -129,6 +129,8 @@ def receive_poor_mans_scp(host, args):
 def ls(host, args):
     """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_ls()`"""
     dest = args[1]
+    if dest == '-L':
+        dest = args[2]
     root = path_for_host(host)
     local_dest = rel_posix_to_abs_local(host, dest)
 

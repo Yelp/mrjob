@@ -31,7 +31,7 @@ SSH_URI_RE = re.compile(
     r'^%s(?P<hostname>[^/]+)?(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
 
 
-log = logging.getLogger('mrjob.emr')
+log = logging.getLogger('mrjob.ssh')
 
 
 class SSHException(Exception):

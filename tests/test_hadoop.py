@@ -344,7 +344,7 @@ class TestFilesystem(MockHadoopTestCase):
         remote_data_2 = 'hdfs:///more/data3'
 
         runner = HadoopJobRunner(conf_path=False)
-        self.assertEqual(runner..du(root), 12)
+        self.assertEqual(runner.du(root), 12)
         self.assertEqual(runner.du(remote_dir), 8)
         self.assertEqual(runner.du(remote_dir + '/*'), 8)
         self.assertEqual(runner.du(remote_data_1), 4)

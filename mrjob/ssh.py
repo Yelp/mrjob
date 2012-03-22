@@ -18,6 +18,7 @@
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
+import logging
 import os
 import re
 from subprocess import Popen
@@ -28,6 +29,9 @@ SSH_PREFIX = 'ssh://'
 SSH_LOG_ROOT = '/mnt/var/log/hadoop'
 SSH_URI_RE = re.compile(
     r'^%s(?P<hostname>[^/]+)?(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
+
+
+log = logging.getLogger('mrjob.emr')
 
 
 class SSHException(Exception):
@@ -73,6 +77,7 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     :return: (stdout, stderr)
     """
     args = _ssh_args(ssh_bin, address, ec2_key_pair_file) + list(cmd_args)
+    log.debug('Run SSH command: %s' % args)
     p = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE)
     return p.communicate(stdin)
 
@@ -169,10 +174,9 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
     """
-    out = check_output(*ssh_run_with_recursion(ssh_bin, address,
-                                                ec2_key_pair_file,
-                                                keyfile,
-                                                ['find', path, '-type', 'f']))
+    out = check_output(*ssh_run_with_recursion(
+        ssh_bin, address, ec2_key_pair_file, keyfile,
+        ['find', '-L', path, '-type', 'f']))
     if 'No such file or directory' in out:
         raise IOError("No such file or directory: %s" % path)
     return out.split('\n')

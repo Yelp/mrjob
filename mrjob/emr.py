@@ -1799,7 +1799,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         """List logs over SSH by path relative to log root directory"""
         full_path = SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path
         log.debug('Search %s for logs' % full_path)
-        log.debug(list(self.ls(full_path)))
         return self.ls(full_path)
 
     def _ls_slave_ssh_logs(self, addr, relative_path):

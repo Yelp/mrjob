@@ -28,6 +28,7 @@ import posixpath
 import py_compile
 import shutil
 from StringIO import StringIO
+import subprocess
 import tempfile
 
 try:
@@ -61,6 +62,7 @@ from tests.mockboto import to_iso8601
 from tests.mockssh import create_mock_ssh_script
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
+from tests.mockssh import main as ssh_main
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
@@ -75,6 +77,28 @@ try:
     boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     boto = None
+
+
+class MockProcess(object):
+    def __init__(self, path_map, args, verify_key_file=False):
+        self.path_map = path_map
+        self.verify_key_file = verify_key_file
+        self.stdout = StringIO()
+        self.stderr = StringIO()
+        self.args = args
+
+    def communicate(self, stdin):
+        ssh_main(self.args, path_map=self.path_map,
+                 verify_key_file=self.verify_key_file, stdin=stdin,
+                 stdout=self.stdout, stderr=self.stderr)
+        return self.stdout.getvalue(), self.stderr.getvalue()
+
+
+def make_Popen(path_map, verify_key_file=False):
+    def my_Popen(args, stdin=None, stdout=None, stderr=None):
+        # drop stdin, stdout, stderr; we aren't really running a process
+        return MockProcess(path_map, args, verify_key_file)
+    return my_Popen
 
 
 class MockEMRAndS3TestCase(unittest.TestCase):
@@ -137,13 +161,19 @@ class MockEMRAndS3TestCase(unittest.TestCase):
 
     def prepare_runner_for_ssh(self, runner, num_slaves=0):
         # Set up environment variables
-        self._old_environ = os.environ.copy()
-        os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
+        #self._old_environ = os.environ.copy()
+        #os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
 
         # Create temporary directories and add them to MOCK_SSH_ROOTS
         self.master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
-        os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % self.master_ssh_root
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
+        self.ssh_path_map  = {
+            'testmaster': self.master_ssh_root
+        }
+
+        self._old_popen = subprocess.Popen
+        subprocess.Popen = make_Popen(self.ssh_path_map, True)
+
+        self.mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
 
         self.slave_ssh_roots = []
 
@@ -172,15 +202,24 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         slave_num = len(self.slave_ssh_roots)
         new_dir = tempfile.mkdtemp(prefix='slave_%d_ssh_root.' % slave_num)
         self.slave_ssh_roots.append(new_dir)
-        os.environ['MOCK_SSH_ROOTS'] += (':testmaster!testslave%d=%s'
-                                         % (slave_num, new_dir))
+        self.ssh_path_map['testmaster!testslave%d' % slave_num] = new_dir
+
+    def mock_ssh_file(self, host, path, contents):
+        mock_ssh_file(host, path, contents, self.ssh_path_map)
+
+    def mock_ssh_dir(self, host, path):
+        mock_ssh_dir(host, path, self.ssh_path_map)
 
     def teardown_ssh(self):
-        os.environ.clear()
-        os.environ.update(self._old_environ)
+        #os.environ.clear()
+        #os.environ.update(self._old_environ)
         shutil.rmtree(self.master_ssh_root)
         for path in self.slave_ssh_roots:
             shutil.rmtree(path)
+        try:
+            subprocess.Popen = self._old_popen
+        except AttributeError:
+            pass    # never set up SSH
 
 
 class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
@@ -1458,15 +1497,15 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
         self.teardown_ssh()
 
     def test_ssh_comes_first(self):
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/userlogs')
+        self.mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
+        self.mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
+        self.mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/userlogs')
 
         # Put a log file and error into SSH
         ssh_lone_log_path = posixpath.join(
             SSH_LOG_ROOT, 'steps', '1', 'syslog')
-        mock_ssh_file('testmaster', ssh_lone_log_path,
-                      HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n')
+        self.mock_ssh_file('testmaster', ssh_lone_log_path,
+                           HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n')
 
         # Put a 'more interesting' error in S3 to make sure that the
         # 'less interesting' one from SSH is read and S3 is never
@@ -1484,9 +1523,9 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
     def test_ssh_works_with_slaves(self):
         self.add_slave()
 
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
-        mock_ssh_dir(
+        self.mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
+        self.mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
+        self.mock_ssh_dir(
             'testmaster!testslave0',
             SSH_LOG_ROOT + '/userlogs/attempt_201007271720_0002_m_000126_0')
 
@@ -1497,10 +1536,10 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
         ssh_log_path_2 = posixpath.join(SSH_LOG_ROOT, 'userlogs',
                                         'attempt_201007271720_0002_m_000126_0',
                                         'syslog')
-        mock_ssh_file('testmaster!testslave0', ssh_log_path,
-                      TRACEBACK_START + PY_EXCEPTION)
-        mock_ssh_file('testmaster!testslave0', ssh_log_path_2,
-                      '')
+        self.mock_ssh_file('testmaster!testslave0', ssh_log_path,
+                           TRACEBACK_START + PY_EXCEPTION)
+        self.mock_ssh_file('testmaster!testslave0', ssh_log_path_2,
+                           '')
         failure = self.runner._find_probable_cause_of_failure([1, 2])
         self.assertEqual(failure['log_file_uri'],
                          SSH_PREFIX + 'testmaster!testslave0' + ssh_log_path)
@@ -1643,12 +1682,12 @@ class TestSSHLs(MockEMRAndS3TestCase):
     def test_ssh_ls(self):
         self.add_slave()
 
-        mock_ssh_dir('testmaster', 'test')
-        mock_ssh_file('testmaster', posixpath.join('test', 'one'), '')
-        mock_ssh_file('testmaster', posixpath.join('test', 'two'), '')
-        mock_ssh_dir('testmaster!testslave0', 'test')
-        mock_ssh_file('testmaster!testslave0',
-                      posixpath.join('test', 'three'), '')
+        self.mock_ssh_dir('testmaster', 'test')
+        self.mock_ssh_file('testmaster', posixpath.join('test', 'one'), '')
+        self.mock_ssh_file('testmaster', posixpath.join('test', 'two'), '')
+        self.mock_ssh_dir('testmaster!testslave0', 'test')
+        self.mock_ssh_file('testmaster!testslave0',
+                           posixpath.join('test', 'three'), '')
 
         self.assertEqual(
             sorted(self.runner.ls('ssh://testmaster/test')),
@@ -2653,7 +2692,7 @@ class TestCatFallback(MockEMRAndS3TestCase):
     def test_ssh_cat(self):
         runner = EMRJobRunner(conf_path=False)
         self.prepare_runner_for_ssh(runner)
-        mock_ssh_file('testmaster', 'etc/init.d', 'meow')
+        self.mock_ssh_file('testmaster', 'etc/init.d', 'meow')
 
         self.assertEqual(
             list(runner.cat(SSH_PREFIX + runner._address + '/etc/init.d')),

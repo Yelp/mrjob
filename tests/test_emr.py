@@ -62,7 +62,7 @@ from tests.mockboto import to_iso8601
 from tests.mockssh import create_mock_ssh_script
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
-from tests.mockssh import main as ssh_main
+from tests.mockssh import MockSSH
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
@@ -86,11 +86,11 @@ class MockProcess(object):
         self.stdout = StringIO()
         self.stderr = StringIO()
         self.args = args
+        self.mock_ssh = MockSSH(args, path_map, verify_key_file,
+                                self.stdout, self.stderr)
 
     def communicate(self, stdin):
-        ssh_main(self.args, path_map=self.path_map,
-                 verify_key_file=self.verify_key_file, stdin=stdin,
-                 stdout=self.stdout, stderr=self.stderr)
+        self.mock_ssh.run(stdin)
         return self.stdout.getvalue(), self.stderr.getvalue()
 
 

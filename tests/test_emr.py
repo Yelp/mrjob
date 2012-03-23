@@ -160,10 +160,6 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         add_mock_s3_data(self.mock_s3_fs, data)
 
     def prepare_runner_for_ssh(self, runner, num_slaves=0):
-        # Set up environment variables
-        #self._old_environ = os.environ.copy()
-        #os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
-
         # Create temporary directories and add them to MOCK_SSH_ROOTS
         self.master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
         self.ssh_path_map  = {
@@ -211,8 +207,6 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         mock_ssh_dir(host, path, self.ssh_path_map)
 
     def teardown_ssh(self):
-        #os.environ.clear()
-        #os.environ.update(self._old_environ)
         shutil.rmtree(self.master_ssh_root)
         for path in self.slave_ssh_roots:
             shutil.rmtree(path)

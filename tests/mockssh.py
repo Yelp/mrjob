@@ -92,13 +92,13 @@ def mock_ssh_file(host, path, contents, path_map):
     return path
 
 
-_SLAVE_ADDR_RE = re.compile(r'^(?P<master>.*?)!(?P<slave>.*?)=(?P<dir>.*)$')
+_SLAVE_ADDR_RE = re.compile(r'^(?P<master>.*?)!(?P<slave>.*?)$')
 
 
 def slave_addresses(stdout, stderr, path_map):
     """Get the addresses for slaves based on :envvar:`MOCK_SSH_ROOTS`"""
-    for kv_pair in os.environ['MOCK_SSH_ROOTS'].split(':'):
-        m = _SLAVE_ADDR_RE.match(kv_pair)
+    for key in path_map:
+        m = _SLAVE_ADDR_RE.match(key)
         if m:
             print >> stdout, m.group('slave')
 

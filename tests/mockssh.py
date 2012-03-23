@@ -101,6 +101,7 @@ def slave_addresses(stdout, stderr, path_map):
         m = _SLAVE_ADDR_RE.match(key)
         if m:
             print >> stdout, m.group('slave')
+    return 0
 
 
 _SCP_RE = re.compile(r'^.*"cat > (?P<filename>.*?)".*$')
@@ -112,8 +113,10 @@ def receive_poor_mans_scp(host, args, stdin, stdout, stderr, path_map):
     try:
         with open(os.path.join(path_map[host], dest), 'w') as f:
             f.writelines(stdin)
+        return 0
     except IOError:
         print >> stderr, 'No such file or directory:', dest
+        return 1
 
 
 def ls(host, args, stdout, stderr, path_map):
@@ -125,7 +128,7 @@ def ls(host, args, stdout, stderr, path_map):
     prefix_length = len(root)
     if not os.path.exists(local_dest):
         print >> stderr, 'No such file or directory:', local_dest
-        sys.exit(1)
+        return 1
     if not os.path.isdir(local_dest):
         print >> stdout, dest
     for root, dirs, files in os.walk(local_dest):
@@ -134,6 +137,7 @@ def ls(host, args, stdout, stderr, path_map):
         for filename in files:
             print >> stdout, '/' + posixpath.join(new_root,
                                                   filename)[prefix_length:]
+    return 0
 
 
 def cat(host, args, stdout, stderr, path_map):
@@ -141,9 +145,10 @@ def cat(host, args, stdout, stderr, path_map):
     local_dest = rel_posix_to_abs_local(host, args[1], path_map)
     if not os.path.exists(local_dest):
         print >> stderr, 'No such file or directory:', local_dest
-        sys.exit(1)
+        return 1
     with open(local_dest, 'r') as f:
         print >> stdout, f.read()
+    return 0
 
 
 def run(host, remote_args, slave_key_file, stdin, stdout, stderr, path_map):
@@ -153,24 +158,20 @@ def run(host, remote_args, slave_key_file, stdin, stdout, stderr, path_map):
 
     # Get slave addresses (this is 'bash -c "hadoop dfsadmn ...')
     if remote_args[0].startswith('bash -c "hadoop'):
-        slave_addresses(stdout, stderr, path_map)
-        return
+        return slave_addresses(stdout, stderr, path_map)
 
     # Accept stdin for a file transfer (this is 'bash -c "cat > ...')
     if remote_args[0].startswith('bash -c "cat'):
-        receive_poor_mans_scp(host, remote_args, stdin, stdout, stderr,
-                              path_map)
-        return
+        return receive_poor_mans_scp(host, remote_args, stdin, stdout, stderr,
+                                     path_map)
 
     # ls (this is 'find -type f ...')
     if remote_args[0] == 'find':
-        ls(host, remote_args, stdout, stderr, path_map)
-        return
+        return ls(host, remote_args, stdout, stderr, path_map)
 
     # cat (this is 'cat ...')
     if remote_args[0] == 'cat':
-        cat(host, remote_args, stdout, stderr, path_map)
-        return
+        return cat(host, remote_args, stdout, stderr, path_map)
 
     # Recursively call for slaves
     if remote_args[0] == 'ssh':
@@ -195,14 +196,14 @@ def run(host, remote_args, slave_key_file, stdin, stdout, stderr, path_map):
         slave_host = host + '!%s' % remote_args[remote_arg_pos].split('@')[1]
 
         # build bang path
-        run(slave_host,
-            remote_args[remote_arg_pos + 1:],
-            slave_key_file, stdin, stdout, stderr, path_map)
+        return run(slave_host,
+                   remote_args[remote_arg_pos + 1:],
+                   slave_key_file, stdin, stdout, stderr, path_map)
         return
 
     print >> stderr, ("Command line not recognized: %s" %
                       ' '.join(remote_args))
-    sys.exit(1)
+    return 1
 
 
 def main(args=None, path_map=None, verify_key_file=None,
@@ -234,9 +235,9 @@ def main(args=None, path_map=None, verify_key_file=None,
     # the rest are arguments are what to run on the remote machine
 
     arg_pos += 1
-    run(host, args[arg_pos:], slave_key_file=None,
-        stdin=stdin, stdout=stdout, stderr=stderr,
-        path_map=path_map)
+    return run(host, args[arg_pos:], slave_key_file=None,
+               stdin=stdin, stdout=stdout, stderr=stderr,
+               path_map=path_map)
 
 
 if __name__ == '__main__':
@@ -246,6 +247,7 @@ if __name__ == '__main__':
         path_map[this_host] = os.path.abspath(this_path)
 
     verify_key_file_str = os.environ.get('MOCK_SSH_VERIFY_KEY_FILE', 'false')
-    main(args=None, path_map=path_map,
-         verify_key_file=(verify_key_file_str == 'true'),
-         stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+    rv = main(args=None, path_map=path_map,
+              verify_key_file=(verify_key_file_str == 'true'),
+              stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+    sys.exit(rv)

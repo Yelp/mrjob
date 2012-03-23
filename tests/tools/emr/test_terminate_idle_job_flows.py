@@ -46,6 +46,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
     def create_fake_job_flows(self):
         self.now = datetime.utcnow().replace(microsecond=0)
+        self.add_mock_s3_data({'my_bucket': {}})
 
         # Build a step object easily
         # also make it respond to .args()
@@ -242,6 +243,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         if 'now' not in kwargs:
             kwargs['now'] = self.now
+
+        kwargs['s3_scratch_uri'] = 's3://my_bucket/locks/'
+        kwargs['s3_sync_wait_time'] = 0
 
         # don't print anything out
         real_stdout = sys.stdout

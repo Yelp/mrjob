@@ -102,6 +102,7 @@ def inspect_and_maybe_terminate_job_flows(
     pool_name=None,
     pooled_only=False,
     unpooled_only=False,
+    **kwargs
 ):
 
     if now is None:
@@ -111,7 +112,7 @@ def inspect_and_maybe_terminate_job_flows(
     if max_hours_idle is None and mins_to_end_of_hour is None:
         max_hours_idle = DEFAULT_MAX_HOURS_IDLE
 
-    runner = EMRJobRunner(conf_path=conf_path)
+    runner = EMRJobRunner(conf_path=conf_path, **kwargs)
     emr_conn = runner.make_emr_conn()
 
     log.info(

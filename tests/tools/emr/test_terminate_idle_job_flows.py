@@ -78,6 +78,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.mock_emr_job_flows['j-EMPTY'] = MockEmrObject(
             creationdatetime=to_iso8601(self.now - timedelta(hours=10)),
             state='STARTING',
+            steps=[],
         )
 
         # job that's bootstrapping

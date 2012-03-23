@@ -311,7 +311,7 @@ def terminate_and_notify(runner, to_terminate, dry_run=False):
                 runner._opts['s3_sync_wait_time'],
                 runner._make_unique_job_name(label='terminate'),
             )
-            runner.make_emr_conn().terminate_jobflow(id)
+            runner.make_emr_conn().terminate_jobflow(jf.jobflowid)
         print ('Terminated job flow %s (%s); was %s for %s, %s to end of hour'
                % (jf.jobflowid, jf.name,
                   'pending' if pending else 'idle',

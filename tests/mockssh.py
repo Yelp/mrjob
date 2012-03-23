@@ -38,18 +38,6 @@ import stat
 import sys
 
 
-def create_mock_ssh_script(path):
-    """Dump a wrapper script to the given file object that runs this
-    python script."""
-    # make this work even if $PATH or $PYTHONPATH changes
-    with open(path, 'w') as f:
-        f.write('#!/bin/sh\n')
-        f.write('%s %s "$@"\n' % (
-            pipes.quote(sys.executable),
-            pipes.quote(os.path.abspath(__file__))))
-    os.chmod(path, stat.S_IREAD | stat.S_IEXEC)
-
-
 def rel_posix_to_rel_local(path):
     """Convert a POSIX path to the current system's format"""
     return os.path.join(*path.split('/'))
@@ -236,16 +224,3 @@ class MockSSH(object):
         with open(local_dest, 'r') as f:
             print >> self.stdout, f.read()
         return 0
-
-
-if __name__ == '__main__':
-    path_map = {}
-    for kv_pair in os.environ['MOCK_SSH_ROOTS'].split(':'):
-        this_host, this_path = kv_pair.split('=')
-        path_map[this_host] = os.path.abspath(this_path)
-
-    verify_key_file_str = os.environ.get('MOCK_SSH_VERIFY_KEY_FILE', 'false')
-    mock = Mock(args=None, path_map=path_map,
-                verify_key_file=(verify_key_file_str == 'true'),
-                stdout=sys.stdout, stderr=sys.stderr)
-    sys.exit(mock.run(sys.stdin))

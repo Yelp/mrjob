@@ -59,7 +59,6 @@ from tests.mockboto import MockEmrObject
 from tests.mockboto import MockS3Connection
 from tests.mockboto import add_mock_s3_data
 from tests.mockboto import to_iso8601
-from tests.mockssh import create_mock_ssh_script
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
 from tests.mockssh import MockSSH
@@ -173,19 +172,12 @@ class MockEMRAndS3TestCase(unittest.TestCase):
 
         self.slave_ssh_roots = []
 
-        # Make the fake binary
-        os.mkdir(os.path.join(self.master_ssh_root, 'bin'))
-        self.ssh_bin = os.path.join(self.master_ssh_root, 'bin', 'ssh')
-        create_mock_ssh_script(self.ssh_bin)
-
         # Make a fake keyfile so that the 'file exists' requirements are
         # satsified
         self.keyfile_path = os.path.join(self.master_ssh_root, 'key.pem')
         with open(self.keyfile_path, 'w') as f:
             f.write('I AM DEFINITELY AN SSH KEY FILE')
 
-        # Tell the runner to use the fake binary
-        runner._opts['ssh_bin'] = [self.ssh_bin]
         # Inject master node hostname so it doesn't try to 'emr --describe' it
         runner._address = 'testmaster'
         # Also pretend to have an SSH key pair file

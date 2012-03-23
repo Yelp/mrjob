@@ -93,10 +93,12 @@ class MockProcess(object):
         return self.stdout.getvalue(), self.stderr.getvalue()
 
 
-def make_Popen(path_map, verify_key_file=False):
+def make_Popen(old_Popen, path_map, verify_key_file=False):
     def my_Popen(args, stdin=None, stdout=None, stderr=None):
-        # drop stdin, stdout, stderr; we aren't really running a process
-        return MockProcess(path_map, args, verify_key_file)
+        if args[0] == 'ssh':
+            return MockProcess(path_map, args, verify_key_file)
+        else:
+            return old_Popen(args, stdin=stdin, stdout=stdout, stderr=stderr)
     return my_Popen
 
 
@@ -166,7 +168,7 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         }
 
         self._old_popen = subprocess.Popen
-        subprocess.Popen = make_Popen(self.ssh_path_map, True)
+        subprocess.Popen = make_Popen(self._old_popen, self.ssh_path_map, True)
 
         self.mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
 

@@ -20,8 +20,7 @@ from __future__ import with_statement
 
 import os
 import re
-from subprocess import Popen
-from subprocess import PIPE
+import subprocess
 
 
 SSH_PREFIX = 'ssh://'
@@ -73,7 +72,8 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     :return: (stdout, stderr)
     """
     args = _ssh_args(ssh_bin, address, ec2_key_pair_file) + list(cmd_args)
-    p = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE)
+    p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         stdin=subprocess.PIPE)
     return p.communicate(stdin)
 
 

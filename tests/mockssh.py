@@ -220,8 +220,7 @@ def main(args=None, path_map=None, verify_key_file=None,
     arg_pos += 1
 
     # verify existence of key pair file if necessary
-    if os.environ.get('MOCK_SSH_VERIFY_KEY_FILE', 'false') == 'true' \
-       and not os.path.exists(args[arg_pos]):
+    if verify_key_file and not os.path.exists(args[arg_pos]):
         print >> stderr, 'Warning: Identity file',
         args[arg_pos], 'not accessible: No such file or directory.'
         sys.exit(1)

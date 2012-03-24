@@ -583,3 +583,57 @@ sys.exit(13)
         runner = MRJobRunner(conf_path=False)
         self.assertRaises(CalledProcessError,
                           runner._invoke_sort, [self.a, self.b], self.out)
+
+
+class MultipleConfigFilesTestCase(unittest.TestCase):
+
+    BASIC_CONF = {
+        'emr': {
+            'bootstrap_mrjob': True,
+            'hadoop_extra_args': [
+                'thing1',
+            ],
+        }
+    }
+
+    def larger_conf(self):
+        return {
+            'include': os.path.join(self.tmp_dir, 'mrjob.conf'),
+            'emr': {
+                'bootstrap_mrjob': False,
+                'hadoop_extra_args': [
+                    'thing2',
+                ],
+            }
+        }
+
+    def setUp(self):
+        super(MultipleConfigFilesTestCase, self).setUp()
+        self.make_tmp_dir()
+
+    def tearDown(self):
+        super(MultipleConfigFilesTestCase, self).tearDown()
+        self.rm_tmp_dir()
+
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def save_conf(self, name, conf):
+        conf_path = os.path.join(self.tmp_dir, name)
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf(conf, f)
+        return conf_path
+
+    def opts_for_conf(self, name, conf):
+        conf_path = self.save_conf('mrjob.conf', conf)
+        runner = MRJobRunner(conf_path=conf_path)
+        return runner._opts
+
+    def test_nothing(self):
+        opts_1 = self.opts_for_conf('mrjob.conf', self.BASIC_CONF)
+        opts_2 = self.opts_for_conf('mrjob.larger.conf', self.larger_conf())
+        self.assertEqual(opts_1['bootstrap_mrjob'], True)
+        self.assertEqual(opts_2['bootstrap_mrjob'], False)

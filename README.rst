@@ -33,8 +33,34 @@ Recommended insstallation process is to use pip and virtual environment:
 ``pip install mrjob``
 
 
-Try it out!
------------
+A Simple Map Reduce Job
+-----------------------
+
+Look in [example directory: https://github.com/ddehghan/mrjob/blob/master/mrjob/examples/mr_word_freq_count.py
+] for the complete example 
+
+   """The classic MapReduce job: count the frequency of words. 
+   """
+   from mrjob.job import MRJob
+   import re
+   
+   WORD_RE = re.compile(r"[\w']+")
+   
+   
+   class MRWordFreqCount(MRJob):
+   
+       def mapper(self, _, line):
+           for word in WORD_RE.findall(line):
+               yield (word.lower(), 1)
+   
+       def combiner(self, word, counts):
+           yield (word, sum(counts))
+   
+       def reducer(self, word, counts):
+           yield (word, sum(counts))
+
+Run a Map Reduce job locally or on Amazon EMR
+---------------------------------------------
 
 ::
 

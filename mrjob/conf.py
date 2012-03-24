@@ -228,8 +228,9 @@ def load_mrjob_conf(conf_path=None):
 
 
 def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
-    """Load the options to initialize a runner from mrjob.conf, or return
-    ``{}`` if we can't find them.
+    """Load a list of dictionaries representing the options in a given
+    mrjob.conf for a specific runner. Returns ``[(path, values)]``. If conf_path
+    is not found, return [(None, {})].
 
     :type conf_path: str
     :param conf_path: an alternate place to look for mrjob.conf. If this is
@@ -237,14 +238,21 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
     """
     conf = load_mrjob_conf(conf_path=conf_path)
     if conf is None:
-        return {}
+        return [(None, {})]
 
     try:
-        return conf['runners'][runner_alias] or {}
+        values = conf['runners'][runner_alias] or {}
     except (KeyError, TypeError, ValueError):
         log.warning('no configs for runner type %r; returning {}' %
                     runner_alias)
-        return {}
+        values = {}
+
+    parent = []
+    if conf.get('include', None):
+        if conf['include'] == conf_path:
+            raise ValueError('mrjob.conf cannot include itself!')
+        parent = load_opts_from_mrjob_conf(runner_alias, conf['include'])
+    return parent + [(conf_path, values)]
 
 
 def dump_mrjob_conf(conf, f):

@@ -36,8 +36,9 @@ Recommended insstallation process is to use pip and virtual environment:
 A Simple Map Reduce Job
 -----------------------
 
-Look in [example directory: https://github.com/ddehghan/mrjob/blob/master/mrjob/examples/mr_word_freq_count.py
-] for the complete example 
+For a complete example file look in mrjob/examples/ directory 
+
+::
 
    """The classic MapReduce job: count the frequency of words. 
    """

@@ -28,6 +28,11 @@ Installation
 
 ``python setup.py install``
 
+Recommended insstallation process is to use pip and virtual environment:
+
+''pip install mrjob''
+
+
 Try it out!
 -----------
 

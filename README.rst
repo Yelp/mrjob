@@ -30,7 +30,7 @@ Installation
 
 Recommended insstallation process is to use pip and virtual environment:
 
-''pip install mrjob''
+``pip install mrjob``
 
 
 Try it out!
@@ -61,9 +61,6 @@ for its conf file in:
 
 * The contents of ``$MRJOB_CONF``
 * ``~/.mrjob.conf``
-* ``~/.mrjob`` (deprecated)
-* ``mrjob.conf`` anywhere in your ``$PYTHONPATH`` (deprecated)
-* ``/etc/mrjob.conf``
 
 See ``mrjob.conf.example`` for more information.
 

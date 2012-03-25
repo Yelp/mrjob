@@ -100,5 +100,6 @@ Links
 * discussion group: <http://groups.google.com/group/mrjob>
 * Hadoop MapReduce: <http://hadoop.apache.org/mapreduce/>
 * Elastic MapReduce: <http://aws.amazon.com/documentation/elasticmapreduce/>
+* Mr job overview Video: <http://blip.tv/pycon-us-videos-2009-2010-2011/pycon-2011-mrjob-distributed-computing-for-everyone-4898987/>
 
 Thanks to `Greg Killion <mailto:greg@blind-works.net>`_ (`blind-works.net <http://www.blind-works.net/>`_) for the logo.

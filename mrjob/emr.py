@@ -1708,9 +1708,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                     cause_msg.append('(while reading from %s)' %
                                      cause['input_uri'])
 
-                for line in cause_msg:
-                    log.error(line)
-
                 # add cause_msg to exception message
                 msg += '\n' + '\n'.join(cause_msg) + '\n'
 

@@ -233,6 +233,8 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         super(MRJobConfNoYAMLTestCase, self).tearDown()
 
     def blank_out_yaml(self):
+        # This test doesn't care if you have YAML or not, but if you do, get
+        # rid of it temporarily
         self._real_yaml = mrjob.conf.yaml
         mrjob.conf.yaml = None
 

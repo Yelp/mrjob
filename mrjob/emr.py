@@ -1709,7 +1709,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                      cause['input_uri'])
 
                 for line in cause_msg:
-                    log.error(cause)
+                    log.error(line)
 
             raise Exception(msg)
 

@@ -21,7 +21,6 @@ import os
 import shutil
 from StringIO import StringIO
 import tempfile
-import yaml
 
 try:
     import unittest2 as unittest
@@ -252,11 +251,15 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
                          '{"runners":{"foo":{"qux":"quux"}}}')
 
     def test_json_error(self):
-        conf = {'runners': {'foo': {'qux': 'quux'}}}
+        conf = """
+            runners:
+                foo:
+                    qux: quux
+        """
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
         with open(conf_path, 'w') as f:
-            yaml.dump(conf, f)
+            f.write(conf)
 
         try:
             load_mrjob_conf(conf_path)

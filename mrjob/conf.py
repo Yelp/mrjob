@@ -227,11 +227,14 @@ def load_mrjob_conf(conf_path=None):
             try:
                 return json.load(f)
             except json.JSONDecodeError, e:
-                msg = (' (If your mrjob.conf is in YAML, you need to install'
-                       ' yaml; see http://pypi.python.org/pypi/PyYAML/)')
-                if not e.args:
-                    e.args = ['']
-                e.args[0] += msg
+                msg = ('If your mrjob.conf is in YAML, you need to install'
+                       ' yaml; see http://pypi.python.org/pypi/PyYAML/')
+                # JSONDecodeError currently has a msg attr, but it may not in
+                # the future
+                if hasattr(e, 'msg'):
+                    e.msg += ' (%s)' % msg
+                else:
+                    e.msg = msg
                 raise e
 
 

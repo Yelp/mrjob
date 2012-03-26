@@ -1783,15 +1783,20 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         """
         for path in paths:
             m = regexp.match(path)
-            if m:
-                if step_nums is None or int(m.group('step_num')) in step_nums:
-                    yield path
+            if (m and
+                (step_nums is None or
+                 int(m.group('step_num')) in step_nums)):
+                yield path
+            else:
+                log.debug('Ignore %s' % path)
 
     ## SSH LOG FETCHING
 
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
-        return self.ls(SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path)
+        full_path = SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path
+        log.debug('Search %s for logs' % full_path)
+        return self.ls(full_path)
 
     def _ls_slave_ssh_logs(self, addr, relative_path):
         """List logs over multi-hop SSH by path relative to log root directory
@@ -1800,6 +1805,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                    self._address_of_master(),
                                    addr,
                                    SSH_LOG_ROOT + '/' + relative_path)
+        log.debug('Search %s for logs' % root_path)
         return self.ls(root_path)
 
     def ls_task_attempt_logs_ssh(self, step_nums):
@@ -1853,7 +1859,9 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         if not self._s3_job_log_uri:
             raise LogFetchError('Could not determine S3 job log URI')
 
-        return self.ls(self._s3_job_log_uri + relative_path)
+        full_path = self._s3_job_log_uri + relative_path
+        log.debug('Search %s for logs' % full_path)
+        return self.ls(full_path)
 
     def ls_task_attempt_logs_s3(self, step_nums):
         return self._enforce_path_regexp(self._ls_s3_logs('task-attempts/'),

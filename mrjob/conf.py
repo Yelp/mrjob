@@ -232,7 +232,7 @@ def load_mrjob_conf(conf_path=None):
                 # JSONDecodeError currently has a msg attr, but it may not in
                 # the future
                 if hasattr(e, 'msg'):
-                    e.msg += ' (%s)' % msg
+                    e.msg = '%s (%s)' % (e.msg, msg)
                 else:
                     e.msg = msg
                 raise e

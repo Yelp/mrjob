@@ -484,15 +484,18 @@ def calculate_opt_priority(opts, opt_dicts):
     """Keep track of where in the order opts were specified,
     to handle opts that affect the same thing (e.g. ec2_*instance_type).
 
+    Here is a rough guide to the values set by this function. They are
+
+        Where specified     Priority
+        unset everywhere    -1
+        blank               0
+        non-blank default   1
+        base conf file      2
+        inheriting conf     [3-n]
+        command line        n+1
+
     :type opts: iterable
     :type opt_dicts: list of dicts with keys also appearing in **opts**
-
-    Where specified     Priority
-    blank               -1
-    non-blank default   0
-    base conf file      1
-    inheriting conf     [2-n]
-    command line        n+1
     """
     opt_priority = dict((opt, -1) for opt in opts)
     for priority, opt_dict in enumerate(opt_dicts):

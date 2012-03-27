@@ -290,7 +290,7 @@ def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
     # locking it, so if it's been a while, then it probably crashed and we
     # can just use this job flow.
     key_expired = False
-    if all(x is not None for x in (key, mins_to_expiration)):
+    if key and mins_to_expiration is not None:
         last_modified = iso8601_to_datetime(key.last_modified)
         age = datetime.utcnow() - last_modified
         if age > timedelta(minutes=mins_to_expiration):

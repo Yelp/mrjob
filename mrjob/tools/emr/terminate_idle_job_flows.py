@@ -58,6 +58,7 @@ except ImportError:
 from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
+from mrjob.emr import iso8601_to_datetime
 from mrjob.emr import make_lock_uri
 from mrjob.job import MRJob
 from mrjob.pool import est_time_to_hour
@@ -67,6 +68,7 @@ from mrjob.util import strip_microseconds
 log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
 
 DEFAULT_MAX_HOURS_IDLE = 1
+DEFAULT_MAX_MINUTES_LOCKED = 1
 
 DEBUG_JAR_RE = re.compile(
     r's3n://.*\.elasticmapreduce/libs/state-pusher/[^/]+/fetch')
@@ -347,6 +349,10 @@ def make_option_parser():
               ' running a step, or having a new step created. This will fire'
               ' even if there are pending steps which EMR has failed to'
               ' start.'))
+    option_parser.add_option(
+        '--max-minutes-locked', dest='max_minutes_locked',
+        default=DEFAULT_MAX_MINUTES_LOCKED, type='float',
+        help='Max number of minutes a job flow can be locked while idle.')
     option_parser.add_option(
         '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
         default=None, type='float',

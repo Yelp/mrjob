@@ -130,10 +130,10 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         boto_2_1_1_83aae37b.EmrConnection = (
             self._real_boto_2_1_1_83aae37b_EmrConnection)
 
-    def add_mock_s3_data(self, data):
+    def add_mock_s3_data(self, data, time_modified=None):
         """Update self.mock_s3_fs with a map from bucket name
         to key name to data."""
-        add_mock_s3_data(self.mock_s3_fs, data)
+        add_mock_s3_data(self.mock_s3_fs, data, time_modified)
 
     def prepare_runner_for_ssh(self, runner, num_slaves=0):
         # Set up environment variables

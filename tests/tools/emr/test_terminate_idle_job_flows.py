@@ -49,6 +49,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.now = datetime.utcnow().replace(microsecond=0)
         self.add_mock_s3_data({'my_bucket': {}})
 
+        s3_conn = MockS3Connection(mock_s3_fs=self.mock_s3_fs)
+        bucket = s3_conn.get_bucket('my_bucket')
+
         # Build a step object easily
         # also make it respond to .args()
         def step(jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
@@ -121,6 +124,20 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             steps=[step(start_hours_ago=4, end_hours_ago=2)],
         )
 
+        # idle job flow with an active lock
+        self.mock_emr_job_flows['j-IDLE_AND_LOCKED'] = MockEmrObject(
+            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
+            readydatetime=to_iso8601(self.now - timedelta(hours=5, minutes=5)),
+            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
+            state='WAITING',
+            steps=[step(start_hours_ago=4, end_hours_ago=2)],
+        )
+        self.add_mock_s3_data({
+            'my_bucket': {
+                'locks/j-IDLE_AND_LOCKED/2': 'not_you',
+            },
+        }, time_modified=datetime.utcnow())
+
         # idle job flow with an expired lock
         self.mock_emr_job_flows['j-IDLE_AND_EXPIRED'] = MockEmrObject(
             creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
@@ -131,13 +148,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         )
         self.add_mock_s3_data({
             'my_bucket': {
-                'locks/j-IDLE_AND_EXPIRED': 'not_you',
+                'locks/j-IDLE_AND_EXPIRED/2': 'not_you',
             },
-        })
-        conn = MockS3Connection(mock_s3_fs=self.mock_s3_fs)
-        bucket = conn.get_bucket('my_bucket')
-        key = bucket.get_key('locks/j-IDLE_AND_EXPIRED')
-        key.last_modified = datetime.utcnow() - timedelta(minutes=5)
+        }, time_modified=datetime.utcnow()-timedelta(minutes=5))
 
         # hive job flow (looks completed but isn't)
         self.mock_emr_job_flows['j-HIVE'] = MockEmrObject(
@@ -266,6 +279,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         kwargs['s3_scratch_uri'] = 's3://my_bucket/'
         kwargs['s3_sync_wait_time'] = 0
+        kwargs['max_mins_locked'] = 1
 
         # don't print anything out
         real_stdout = sys.stdout
@@ -409,8 +423,22 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.inspect_and_maybe_terminate_quietly(
             max_hours_idle=0.01, dry_run=True)
 
-        for jf in self.mock_emr_job_flows.values():
-            self.assertNotLocked(jf)
+        unlocked_ids = [
+            'j-BOOTSTRAPPING',
+            'j-CURRENTLY_RUNNING',
+            'j-CUSTOM_DONE_AND_IDLE',
+            'j-DEBUG_ONLY',
+            'j-DONE',
+            'j-DONE_AND_IDLE',
+            'j-EMPTY',
+            'j-HADOOP_DEBUGGING',
+            'j-HIVE',
+            'j-IDLE_AND_FAILED',
+            'j-PENDING_BUT_IDLE',
+            'j-POOLED'
+        ]
+        for jf_id in unlocked_ids:
+            self.assertNotLocked(self.mock_emr_job_flows[jf_id])
 
         self.assertEqual(self.terminated_jfs(), [])
 

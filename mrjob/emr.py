@@ -314,7 +314,7 @@ def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name,
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
-    key = _lock_acquire_step_1(s3_conn, lock_uri, job_name)
+    key = _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration)
     if key is not None:
         time.sleep(sync_wait_time)
         success = _lock_acquire_step_2(key, job_name)

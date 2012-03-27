@@ -306,14 +306,9 @@ def terminate_and_notify(runner, to_terminate, dry_run=False,
     for jf, pending, time_idle, time_to_end_of_hour in to_terminate:
         did_terminate = False
         if not dry_run:
-            lock_uri = make_lock_uri(
-                runner._opts['s3_scratch_uri'],
-                jf.jobflowid,
-                len(jf.steps) + 1
-            )
             status = attempt_to_acquire_lock(
                 runner.make_s3_conn(),
-                lock_uri,
+                runner._lock_uri(jf),
                 runner._opts['s3_sync_wait_time'],
                 runner._make_unique_job_name(label='terminate'),
                 mins_to_expiration=max_mins_locked,

@@ -2375,18 +2375,20 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 num_steps=num_steps)
             if sorted_tagged_job_flows:
                 job_flow = sorted_tagged_job_flows[-1]
-                lock_uri = make_lock_uri(self._opts['s3_scratch_uri'],
-                                         job_flow.jobflowid,
-                                        len(job_flow.steps) + 1)
                 status = attempt_to_acquire_lock(
-                    s3_conn, lock_uri, self._opts['s3_sync_wait_time'],
-                    self._job_name)
+                    s3_conn, self._lock_uri(job_flow),
+                    self._opts['s3_sync_wait_time'], self._job_name)
                 if status:
                     return sorted_tagged_job_flows[-1]
                 else:
                     exclude.add(job_flow.jobflowid)
             else:
                 return None
+
+    def _lock_uri(self, job_flow):
+        return make_lock_uri(self._opts['s3_scratch_uri'],
+                             job_flow.jobflowid,
+                             len(job_flow.steps) + 1)
 
     def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to

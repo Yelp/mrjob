@@ -35,6 +35,7 @@ from mrjob.tools.emr.terminate_idle_job_flows import time_last_active
 from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
 from tests.mockboto import MockEmrConnection
+from tests.mockboto import MockS3Connection
 from tests.test_emr import MockEMRAndS3TestCase
 
 
@@ -245,7 +246,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         if 'now' not in kwargs:
             kwargs['now'] = self.now
 
-        kwargs['s3_scratch_uri'] = 's3://my_bucket/locks/'
+        kwargs['s3_scratch_uri'] = 's3://my_bucket/'
         kwargs['s3_sync_wait_time'] = 0
 
         # don't print anything out
@@ -275,6 +276,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         pool_name=None,
         running=False,
         streaming=True,
+        locked=False,
     ):
         self.assertEqual(bootstrapping, is_job_flow_bootstrapping(jf))
         self.assertEqual(done, is_job_flow_done(jf))
@@ -284,6 +286,25 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual((pool_hash, pool_name), pool_hash_and_name(jf))
         self.assertEqual(running, is_job_flow_running(jf))
         self.assertEqual(streaming, is_job_flow_streaming(jf))
+
+    def _lock_contents(self, jf):
+        conn = MockS3Connection(mock_s3_fs=self.mock_s3_fs)
+        bucket = conn.get_bucket('my_bucket')
+        lock_key_name = 'locks/%s/%d' % (jf.jobflowid, len(jf.steps))
+        key = bucket.get_key(lock_key_name)
+        if key is None:
+            return None
+        else:
+            return key.get_contents_as_string()
+
+    def assertLockedByTerminate(self, jf):
+        self.assertIn('terminate', self._lock_contents(jf))
+
+    def assertLockedBySomethingElse(self, jf):
+        self.assertNotIn('terminate', self._lock_contents(jf))
+
+    def assertNotLocked(self, jf):
+        self.assertEqual(self._lock_contents(jf), None)
 
     def test_empty(self):
         self.assertJobFlowIs(
@@ -355,6 +376,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
     def test_dry_run_does_nothing(self):
         self.inspect_and_maybe_terminate_quietly(
             max_hours_idle=0.01, dry_run=True)
+
+        for jf in self.mock_emr_job_flows.values():
+            self.assertNotLocked(jf)
 
         self.assertEqual(self.terminated_jfs(), [])
 

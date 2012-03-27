@@ -233,6 +233,8 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         super(MRJobConfNoYAMLTestCase, self).tearDown()
 
     def blank_out_yaml(self):
+        # This test doesn't care if you have YAML or not, but if you do, get
+        # rid of it temporarily
         self._real_yaml = mrjob.conf.yaml
         mrjob.conf.yaml = None
 
@@ -244,10 +246,28 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
         dump_mrjob_conf(conf, open(conf_path, 'w'))
-        contents = open(conf_path).read()
+        with open(conf_path) as f:
+            contents = f.read()
 
         self.assertEqual(contents.replace(' ', '').replace('\n', ''),
                          '{"runners":{"foo":{"qux":"quux"}}}')
+
+    def test_json_error(self):
+        conf = """
+            runners:
+                foo:
+                    qux: quux
+        """
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(conf_path, 'w') as f:
+            f.write(conf)
+
+        try:
+            load_mrjob_conf(conf_path)
+            assert False
+        except mrjob.conf.json.JSONDecodeError as e:
+            self.assertIn('If your mrjob.conf is in YAML', e.msg)
 
 
 class CombineValuesTestCase(unittest.TestCase):

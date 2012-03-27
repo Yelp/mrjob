@@ -488,9 +488,9 @@ def calculate_opt_priority(opts, opt_dicts):
     :type opt_dicts: list of dicts with keys also appearing in **opts**
 
     Where specified     Priority
-    blank               0
-    non-blank default   1
-    base conf file      2
+    blank               -1
+    non-blank default   0
+    base conf file      1
     inheriting conf     [2-n]
     command line        n+1
     """

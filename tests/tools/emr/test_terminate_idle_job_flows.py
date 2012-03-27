@@ -287,24 +287,33 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(running, is_job_flow_running(jf))
         self.assertEqual(streaming, is_job_flow_streaming(jf))
 
-    def _lock_contents(self, jf):
+    def _lock_contents(self, jf, steps_ahead=0):
         conn = MockS3Connection(mock_s3_fs=self.mock_s3_fs)
         bucket = conn.get_bucket('my_bucket')
-        lock_key_name = 'locks/%s/%d' % (jf.jobflowid, len(jf.steps))
+        lock_key_name = 'locks/%s/%d' % (
+            jf.jobflowid, len(jf.steps) + steps_ahead)
         key = bucket.get_key(lock_key_name)
         if key is None:
             return None
         else:
             return key.get_contents_as_string()
 
-    def assertLockedByTerminate(self, jf):
-        self.assertIn('terminate', self._lock_contents(jf))
+    def assertLockedByTerminate(self, jf, steps_ahead=1):
+        contents = self._lock_contents(jf, steps_ahead=steps_ahead)
+        self.assertNotEqual(contents, None)
+        self.assertIn('terminate', contents)
 
-    def assertLockedBySomethingElse(self, jf):
-        self.assertNotIn('terminate', self._lock_contents(jf))
+    def assertLockedBySomethingElse(self, jf, steps_ahead=1):
+        contents = self._lock_contents(jf, steps_ahead=steps_ahead)
+        self.assertNotEqual(contents, None)
+        self.assertNotIn('terminate', contents)
 
-    def assertNotLocked(self, jf):
-        self.assertEqual(self._lock_contents(jf), None)
+    def assertNotLocked(self, jf, steps_ahead=1):
+        self.assertEqual(self._lock_contents(jf, steps_ahead=steps_ahead), None)
+
+    def assertAllTerminatedJobFlowsLockedByTerminate(self):
+        for jf_name in self.terminated_jfs():
+            self.assertLockedByTerminate(self.mock_emr_job_flows[jf_name])
 
     def test_empty(self):
         self.assertJobFlowIs(
@@ -413,6 +422,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         self.inspect_and_maybe_terminate_quietly(max_hours_idle=1)
 
+        self.assertAllTerminatedJobFlowsLockedByTerminate()
         self.assertEqual(self.terminated_jfs(),
                          ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED',
@@ -423,6 +433,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         self.inspect_and_maybe_terminate_quietly()
 
+        self.assertAllTerminatedJobFlowsLockedByTerminate()
         self.assertEqual(self.terminated_jfs(),
                          ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED',
@@ -433,6 +444,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         self.inspect_and_maybe_terminate_quietly(max_hours_idle=0)
 
+        self.assertAllTerminatedJobFlowsLockedByTerminate()
         self.assertEqual(self.terminated_jfs(),
                          ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED',
@@ -451,6 +463,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         self.inspect_and_maybe_terminate_quietly(mins_to_end_of_hour=6)
 
+        self.assertAllTerminatedJobFlowsLockedByTerminate()
+
         # j-PENDING_BUT_IDLE is also 5 mins from end of hour, but
         # is skipped because it has pending jobs.
         self.assertEqual(self.terminated_jfs(), ['j-POOLED'])
@@ -461,15 +475,19 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.inspect_and_maybe_terminate_quietly(mins_to_end_of_hour=61,
                                                  max_hours_idle=0.01)
 
+        self.assertAllTerminatedJobFlowsLockedByTerminate()
+
         self.assertEqual(self.terminated_jfs(),
                          ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED',
-                         'j-POOLED'])
+                          'j-POOLED'])
 
     def test_terminate_pooled_only(self):
         self.assertEqual(self.terminated_jfs(), [])
 
         self.inspect_and_maybe_terminate_quietly(pooled_only=True)
+
+        self.assertAllTerminatedJobFlowsLockedByTerminate()
 
         # pooled job was not idle for an hour (the default)
         self.assertEqual(self.terminated_jfs(), [])
@@ -483,6 +501,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(self.terminated_jfs(), [])
 
         self.inspect_and_maybe_terminate_quietly(unpooled_only=True)
+
+        self.assertAllTerminatedJobFlowsLockedByTerminate()
 
         self.assertEqual(self.terminated_jfs(),
                          ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
@@ -509,5 +529,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         # right pool name
         self.inspect_and_maybe_terminate_quietly(
             pool_name='reflecting', max_hours_idle=0.01)
+
+        self.assertAllTerminatedJobFlowsLockedByTerminate()
 
         self.assertEqual(self.terminated_jfs(), ['j-POOLED'])

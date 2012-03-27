@@ -196,29 +196,19 @@ def find_mrjob_conf():
         return None
 
 
-def load_mrjob_conf(conf_path=None):
-    """Load the entire data structure in :file:`mrjob.conf`, which should
-    look something like this::
-
-        {'runners':
-            'emr': {'OPTION': VALUE, ...},
-            'hadoop: {'OPTION': VALUE, ...},
-            'inline': {'OPTION': VALUE, ...},
-            'local': {'OPTION': VALUE, ...},
-        }
-
-    Returns ``None`` if we can't find :file:`mrjob.conf`.
-
-    :type conf_path: str
-    :param conf_path: an alternate place to look for mrjob.conf. If this is
-                      ``False``, we'll always return ``None``.
-    """
+def real_mrjob_conf_path(conf_path=None):
     if conf_path is False:
         return None
     elif conf_path is None:
         conf_path = find_mrjob_conf()
         if conf_path is None:
             return None
+    return conf_path
+
+
+def conf_object_at_path(conf_path):
+    if conf_path is None:
+        return None
 
     with open(conf_path) as f:
         if yaml:
@@ -238,7 +228,29 @@ def load_mrjob_conf(conf_path=None):
                 raise e
 
 
-def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
+def load_mrjob_conf(conf_path=None):
+    """Load the entire data structure in :file:`mrjob.conf`, which should
+    look something like this::
+
+        {'runners':
+            'emr': {'OPTION': VALUE, ...},
+            'hadoop: {'OPTION': VALUE, ...},
+            'inline': {'OPTION': VALUE, ...},
+            'local': {'OPTION': VALUE, ...},
+        }
+
+    Returns ``None`` if we can't find :file:`mrjob.conf`.
+
+    :type conf_path: str
+    :param conf_path: an alternate place to look for mrjob.conf. If this is
+                      ``False``, we'll always return ``None``.
+    """
+    # Only used by mrjob tests and possibly third parties.
+    conf_path = real_mrjob_conf_path(conf_path)
+    conf_object_at_path(conf_path)
+
+
+def load_opts_from_mrjob_conf(runner_alias, conf_path=None, loaded=None):
     """Load a list of dictionaries representing the options in a given
     mrjob.conf for a specific runner. Returns ``[(path, values)]``. If conf_path
     is not found, return [(None, {})].
@@ -247,9 +259,20 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
     :param conf_path: an alternate place to look for mrjob.conf. If this is
                       ``False``, we'll always return ``{}``.
     """
-    conf = load_mrjob_conf(conf_path=conf_path)
+    # Used to use load_mrjob_conf() here, but we need both the 'real' path and
+    # the conf object, which we can't get cleanly from load_mrjob_conf.  This
+    # means load_mrjob_conf() is basically useless now except for in tests,
+    # but it's exposed in the API, so we shouldn't kill it until 0.4 at least.
+    conf_path = real_mrjob_conf_path(conf_path)
+    conf = conf_object_at_path(conf_path)
+
     if conf is None:
         return [(None, {})]
+
+    if loaded is None:
+        loaded = []
+
+    loaded.append(conf_path)
 
     try:
         values = conf['runners'][runner_alias] or {}
@@ -260,9 +283,12 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
 
     parent = []
     if conf.get('include', None):
-        if conf['include'] == conf_path:
-            raise ValueError('mrjob.conf cannot include itself!')
-        parent = load_opts_from_mrjob_conf(runner_alias, conf['include'])
+        if conf['include'] in loaded:
+            log.warn('mrjob.conf tries to recursively include %s!' %
+                     conf['include'])
+        else:
+            parent = load_opts_from_mrjob_conf(runner_alias, conf['include'],
+                                               loaded)
     return parent + [(conf_path, values)]
 
 

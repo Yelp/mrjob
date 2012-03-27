@@ -704,3 +704,16 @@ class MultipleConfigFilesTestCase(unittest.TestCase):
     def test_combine_values(self):
         self.assertEqual(self.opts_1['hadoop_streaming_jar'], 'monkey.jar')
         self.assertEqual(self.opts_2['hadoop_streaming_jar'], 'banana.jar')
+
+    def test_recurse(self):
+        path = os.path.join(self.tmp_dir, 'LOL.conf')
+        recurse_conf = dict(include=path)
+        with open(path, 'w') as f:
+            dump_mrjob_conf(recurse_conf, f)
+
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.conf', stderr)
+            runner = LocalMRJobRunner(conf_path=path)
+            self.assertIn('mrjob.conf tries to recursively include',
+                          stderr.getvalue())

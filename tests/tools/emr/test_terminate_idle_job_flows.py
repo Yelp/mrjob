@@ -294,7 +294,6 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         pool_name=None,
         running=False,
         streaming=True,
-        locked=False,
     ):
         self.assertEqual(bootstrapping, is_job_flow_bootstrapping(jf))
         self.assertEqual(done, is_job_flow_done(jf))

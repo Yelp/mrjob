@@ -281,11 +281,22 @@ def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
     return s3_tmp_uri + 'locks/' + emr_job_flow_id + '/' + str(step_num)
 
 
-def _lock_acquire_step_1(s3_conn, lock_uri, job_name):
+def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
     bucket_name, key_prefix = parse_s3_uri(lock_uri)
     bucket = s3_conn.get_bucket(bucket_name)
     key = bucket.get_key(key_prefix)
-    if key is None:
+
+    # EMRJobRunner should start using a job flow within about a second of
+    # locking it, so if it's been a while, then it probably crashed and we
+    # can just use this job flow.
+    key_expired = False
+    if all(x is not None for x in (key, mins_to_expiration)):
+        last_modified = iso8601_to_datetime(key.last_modified)
+        age = datetime.utcnow() - last_modified
+        if age > timedelta(minutes=mins_to_expiration):
+            key_expired = True
+
+    if key is None or key_expired:
         key = bucket.new_key(key_prefix)
         key.set_contents_from_string(job_name)
         return key
@@ -298,7 +309,8 @@ def _lock_acquire_step_2(key, job_name):
     return (key_value == job_name)
 
 
-def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name):
+def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name,
+                            mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """

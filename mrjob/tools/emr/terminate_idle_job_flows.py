@@ -58,7 +58,6 @@ except ImportError:
 from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
-from mrjob.emr import iso8601_to_datetime
 from mrjob.emr import make_lock_uri
 from mrjob.job import MRJob
 from mrjob.pool import est_time_to_hour
@@ -92,6 +91,7 @@ def main():
         now=datetime.utcnow(),
         pool_name=options.pool_name,
         pooled_only=options.pooled_only,
+        max_mins_locked=options.max_mins_locked,
     )
 
 
@@ -104,6 +104,7 @@ def inspect_and_maybe_terminate_job_flows(
     pool_name=None,
     pooled_only=False,
     unpooled_only=False,
+    max_mins_locked=None,
     **kwargs
 ):
 
@@ -200,7 +201,8 @@ def inspect_and_maybe_terminate_job_flows(
         num_running, num_bootstrapping, num_pending, num_idle,
         num_non_streaming, num_done))
 
-    terminate_and_notify(runner, to_terminate, dry_run=dry_run)
+    terminate_and_notify(runner, to_terminate, dry_run=dry_run,
+                         max_mins_locked=max_mins_locked)
 
 
 def is_job_flow_done(job_flow):
@@ -296,29 +298,38 @@ def job_flow_has_pending_steps(job_flow):
                for step in steps)
 
 
-def terminate_and_notify(runner, to_terminate, dry_run=False):
+def terminate_and_notify(runner, to_terminate, dry_run=False,
+                         max_mins_locked=None):
     if not to_terminate:
         return
 
     for jf, pending, time_idle, time_to_end_of_hour in to_terminate:
+        did_terminate = False
         if not dry_run:
             lock_uri = make_lock_uri(
                 runner._opts['s3_scratch_uri'],
                 jf.jobflowid,
                 len(jf.steps) + 1
             )
-            attempt_to_acquire_lock(
+            status = attempt_to_acquire_lock(
                 runner.make_s3_conn(),
                 lock_uri,
                 runner._opts['s3_sync_wait_time'],
                 runner._make_unique_job_name(label='terminate'),
+                mins_to_expiration=max_mins_locked,
             )
-            runner.make_emr_conn().terminate_jobflow(jf.jobflowid)
-        print ('Terminated job flow %s (%s); was %s for %s, %s to end of hour'
-               % (jf.jobflowid, jf.name,
-                  'pending' if pending else 'idle',
-                  strip_microseconds(time_idle),
-                  strip_microseconds(time_to_end_of_hour)))
+            if status:
+                runner.make_emr_conn().terminate_jobflow(jf.jobflowid)
+                did_terminate = True
+
+        if did_terminate:
+            fmt = ('Terminated job flow %s (%s); was %s for %s, %s to end of'
+                   ' hour')
+            print fmt % (
+                    jf.jobflowid, jf.name,
+                    'pending' if pending else 'idle',
+                    strip_microseconds(time_idle),
+                    strip_microseconds(time_to_end_of_hour))
 
 
 def make_option_parser():
@@ -350,7 +361,7 @@ def make_option_parser():
               ' even if there are pending steps which EMR has failed to'
               ' start.'))
     option_parser.add_option(
-        '--max-minutes-locked', dest='max_minutes_locked',
+        '--max-mins-locked', dest='max_mins_locked',
         default=DEFAULT_MAX_MINUTES_LOCKED, type='float',
         help='Max number of minutes a job flow can be locked while idle.')
     option_parser.add_option(

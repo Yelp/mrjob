@@ -121,6 +121,24 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             steps=[step(start_hours_ago=4, end_hours_ago=2)],
         )
 
+        # idle job flow with an expired lock
+        self.mock_emr_job_flows['j-IDLE_AND_EXPIRED'] = MockEmrObject(
+            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
+            readydatetime=to_iso8601(self.now - timedelta(hours=5, minutes=5)),
+            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
+            state='WAITING',
+            steps=[step(start_hours_ago=4, end_hours_ago=2)],
+        )
+        self.add_mock_s3_data({
+            'my_bucket': {
+                'locks/j-IDLE_AND_EXPIRED': 'not_you',
+            },
+        })
+        conn = MockS3Connection(mock_s3_fs=self.mock_s3_fs)
+        bucket = conn.get_bucket('my_bucket')
+        key = bucket.get_key('locks/j-IDLE_AND_EXPIRED')
+        key.last_modified = datetime.utcnow() - timedelta(minutes=5)
+
         # hive job flow (looks completed but isn't)
         self.mock_emr_job_flows['j-HIVE'] = MockEmrObject(
             creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
@@ -346,6 +364,12 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             idle_for=timedelta(hours=2),
         )
 
+    def test_idle_and_expired(self):
+        self.assertJobFlowIs(
+            self.mock_emr_job_flows['j-IDLE_AND_EXPIRED'],
+            idle_for=timedelta(hours=2),
+        )
+
     def test_hive_job_flow(self):
         self.assertJobFlowIs(
             self.mock_emr_job_flows['j-HIVE'],
@@ -425,8 +449,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertAllTerminatedJobFlowsLockedByTerminate()
         self.assertEqual(self.terminated_jfs(),
                          ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
-                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED',
-                          'j-PENDING_BUT_IDLE'])
+                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
+                          'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
 
     def test_one_hour_is_the_default(self):
         self.assertEqual(self.terminated_jfs(), [])
@@ -436,8 +460,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertAllTerminatedJobFlowsLockedByTerminate()
         self.assertEqual(self.terminated_jfs(),
                          ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
-                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED',
-                          'j-PENDING_BUT_IDLE'])
+                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
+                          'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
 
     def test_zero_idle_time(self):
         self.assertEqual(self.terminated_jfs(), [])
@@ -447,8 +471,9 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertAllTerminatedJobFlowsLockedByTerminate()
         self.assertEqual(self.terminated_jfs(),
                          ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
-                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED',
-                          'j-PENDING_BUT_IDLE', 'j-POOLED'])
+                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
+                          'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE',
+                          'j-POOLED'])
 
     def test_mins_to_end_of_hour(self):
 
@@ -479,8 +504,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         self.assertEqual(self.terminated_jfs(),
                          ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
-                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED',
-                          'j-POOLED'])
+                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
+                          'j-IDLE_AND_FAILED', 'j-POOLED'])
 
     def test_terminate_pooled_only(self):
         self.assertEqual(self.terminated_jfs(), [])
@@ -506,16 +531,16 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         self.assertEqual(self.terminated_jfs(),
                          ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
-                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED',
-                          'j-PENDING_BUT_IDLE'])
+                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
+                          'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
 
         self.inspect_and_maybe_terminate_quietly(
             unpooled_only=True, max_hours_idle=0.01)
 
         self.assertEqual(self.terminated_jfs(),
                          ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
-                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_FAILED',
-                          'j-PENDING_BUT_IDLE'])
+                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
+                          'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
 
     def test_terminate_by_pool_name(self):
         self.assertEqual(self.terminated_jfs(), [])

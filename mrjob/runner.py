@@ -39,6 +39,7 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob import compat
+from mrjob.conf import calculate_opt_priority
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
@@ -396,14 +397,7 @@ class MRJobRunner(object):
             [opts]
         )
         self._opts = self.combine_opts(*opt_dicts)
-        # keep track of where in the order opts were specified,
-        # to handle opts that affect the same thing (e.g. ec2_*instance_type)
-        self._opt_priority = dict((opt, -1) for opt in self._opts)
-        for priority, opt_dict in enumerate(opt_dicts):
-            if opt_dict:
-                for opt, value in opt_dict.iteritems():
-                    if value is not None:
-                        self._opt_priority[opt] = priority
+        self._opt_priority = calculate_opt_priority(self._opts, opt_dicts)
 
     def _validate_cleanup(self):
         # old API accepts strings for cleanup

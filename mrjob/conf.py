@@ -475,3 +475,29 @@ def combine_opts(combiners, *opts_list):
         final_opts[key] = combine_func(*values)
 
     return final_opts
+
+
+### PRIORITY ###
+
+
+def calculate_opt_priority(opts, opt_dicts):
+    """Keep track of where in the order opts were specified,
+    to handle opts that affect the same thing (e.g. ec2_*instance_type).
+
+    :type opts: iterable
+    :type opt_dicts: list of dicts with keys also appearing in **opts**
+
+    Where specified     Priority
+    blank               0
+    non-blank default   1
+    base conf file      2
+    inheriting conf     [2-n]
+    command line        n+1
+    """
+    opt_priority = dict((opt, -1) for opt in opts)
+    for priority, opt_dict in enumerate(opt_dicts):
+        if opt_dict:
+            for opt, value in opt_dict.iteritems():
+                if value is not None:
+                    opt_priority[opt] = priority
+    return opt_priority

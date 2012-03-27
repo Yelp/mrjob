@@ -369,17 +369,21 @@ class MRJobRunner(object):
                         if k in allowed_opts)
 
         # issue a warning for unknown opts from mrjob.conf and filter them out
-        mrjob_conf_opt_dicts = load_opts_from_mrjob_conf(
+        unsanitized_opt_dicts = load_opts_from_mrjob_conf(
             self.alias, conf_path=conf_path)
 
-        for path, mrjob_conf_opts in mrjob_conf_opt_dicts:
+        sanitized_opt_dicts = []
+
+        for path, mrjob_conf_opts in unsanitized_opt_dicts:
             unrecognized_opts = set(mrjob_conf_opts) - allowed_opts
             if unrecognized_opts:
                 log.warn('got unexpected opts from %s: %s' % (
                          path, ', '.join(sorted(unrecognized_opts))))
-                mrjob_conf_opts = dict((k, v)
-                                       for k, v in mrjob_conf_opts.iteritems()
-                                       if k in allowed_opts)
+                new_opts = dict((k, v) for k, v in mrjob_conf_opts.iteritems()
+                                if k in allowed_opts)
+                sanitized_opt_dicts.append(new_opts)
+            else:
+                sanitized_opt_dicts.append(mrjob_conf_opts)
 
         # make sure all opts are at least set to None
         blank_opts = dict((key, None) for key in allowed_opts)
@@ -388,7 +392,7 @@ class MRJobRunner(object):
         # only __init__() methods should modify self._opts!
         opt_dicts = (
             [blank_opts, self._default_opts()] +
-            [values for path, values in mrjob_conf_opt_dicts] +
+            sanitized_opt_dicts +
             [opts]
         )
         self._opts = self.combine_opts(*opt_dicts)

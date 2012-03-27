@@ -247,7 +247,7 @@ def load_mrjob_conf(conf_path=None):
     """
     # Only used by mrjob tests and possibly third parties.
     conf_path = real_mrjob_conf_path(conf_path)
-    conf_object_at_path(conf_path)
+    return conf_object_at_path(conf_path)
 
 
 def load_opts_from_mrjob_conf(runner_alias, conf_path=None, loaded=None):

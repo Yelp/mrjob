@@ -358,8 +358,6 @@ class MRJob(object):
 
     ### Defining multi-step jobs ###
 
-    # Don't redefine this; use it inside steps()
-
     def steps(self):
         """Re-define this to make a multi-step job.
 

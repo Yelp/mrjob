@@ -1,3 +1,15 @@
+v0.3.3, 2012-03-29 -- Bugs bugs bugs bugs bugs FEATURES!
+ * EMR:
+   * Error detection code follows symlinks in Hadoop logs (#396)
+   * terminate_idle_job_flows locks job flows before terminating them (#391)
+   * terminate_idle_job_flows -qq silences all output (#380)
+ * Other fixes:
+   * mr_tower_of_powers test no longer requires Testify (#395)
+   * Various runner du() implementations no longer broken (#393, #394)
+   * Hadoop counter parser regex handles long lines better (#388)
+   * Hadoop counter parser regex is more correct (#305)
+   * Better error when trying to parse YAML without PyYAML (#348)
+
 v0.3.2, 2012-02-22 -- AMI versions, spot instances, and more
  * Docs:
    * 'Testing with mrjob' section in docs (includes #321)

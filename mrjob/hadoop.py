@@ -635,7 +635,8 @@ class HadoopJobRunner(MRJobRunner):
                                              HADOOP_JOB_LOG_URI_RE,
                                              step_nums)
         uris = list(job_logs)
-        new_counters = scan_for_counters_in_files(uris, self)
+        new_counters = scan_for_counters_in_files(uris, self,
+                                                  self.get_hadoop_version())
 
         # only include steps relevant to the current job
         for step_num in step_nums:

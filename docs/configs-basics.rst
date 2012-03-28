@@ -122,11 +122,11 @@ config files "inherit" from a base config file. For example, you may have one
 set of AWS credentials, but two code bases and default instance sizes. To
 accomplish this, use the ``include`` option:
 
-:file:`$MRJOB_CONFIGS/mrjob.very-large.conf`:
+:file:`~/mrjob.very-large.conf`:
 
 .. code-block:: yaml
 
-    include: /etc/mrjob.base.conf
+    include: ~/.mrjob.base.conf
     runners:
         emr:
             num_ec2_core_instances: 20
@@ -136,7 +136,7 @@ accomplish this, use the ``include`` option:
 
 .. code-block:: yaml
 
-    include: /etc/mrjob.base.conf
+    include: $HOME/mrjob.base.conf
     runners:
         emr:
             num_ec2_core_instances: 2

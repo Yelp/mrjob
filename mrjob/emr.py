@@ -1935,8 +1935,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def _fetch_counters_ssh(self, step_nums):
         uris = list(self.ls_job_logs_ssh(step_nums))
         log.info('Fetching counters from SSH...')
-        new_fmt = compat.uses_020_counters(self.get_hadoop_version())
-        return scan_for_counters_in_files(uris, self, new_fmt)
+        return scan_for_counters_in_files(uris, self,
+                                          self.get_hadoop_version())
 
     def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
         job_flow = self._describe_jobflow()
@@ -1954,8 +1954,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         try:
             uris = self.ls_job_logs_s3(step_nums)
-            new_fmt = compat.uses_020_counters(self.get_hadoop_version())
-            return scan_for_counters_in_files(uris, self, new_fmt)
+            return scan_for_counters_in_files(uris, self,
+                                              self.get_hadoop_version())
         except LogFetchError, e:
             log.info("Unable to fetch counters: %s" % e)
             return {}

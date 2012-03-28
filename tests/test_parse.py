@@ -223,8 +223,10 @@ class FindMiscTestCase(unittest.TestCase):
             find_job_log_multiline_error(line for line in LOG_LINES),
             SHOULD_EQUAL)
 
-    def test_find_counters_0_18(self):
-        counter_bits = [
+    TEST_COUNTERS_0_18 = (
+        'Job JOBID="job_201106061823_0001" FINISH_TIME="1307384737542"'
+        ' JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1"'
+        ' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="%s"' % ','.join([
             'File Systems.S3N bytes read:3726',
             'File Systems.Local bytes read:4164',
             'File Systems.S3N bytes written:1663',
@@ -245,17 +247,12 @@ class FindMiscTestCase(unittest.TestCase):
             'profile.mapper step 0 estimated IO time: 0.00:2',
             'profile.reducer step 0 estimated CPU time: 0.00:1',
             'profile.mapper step ☃ estimated CPU time: 0.00:2'
-        ]
-        counters, step_num = parse_hadoop_counters_from_line('Job JOBID="job_201106061823_0001" FINISH_TIME="1307384737542" JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1" FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="%s"' % ','.join(counter_bits), post_020_fmt=False)
+        ]))
 
-        self.assertEqual(
-            counters['profile']['reducer step 0 estimated IO time: 0.00'], 1)
-        self.assertEqual(
-            counters['profile']['mapper step ☃ estimated CPU time: 0.00'], 2)
-        self.assertEqual(step_num, 1)
-
-    def test_find_counters_0_20(self):
-        counter_bits = [
+    TEST_COUNTERS_0_20 = (
+        'Job JOBID="job_201106092314_0003" FINISH_TIME="1307662284564"'
+        ' JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1"'
+        ' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="%s" .' % ''.join([
             '{(org\.apache\.hadoop\.mapred\.JobInProgress$Counter)',
             '(Job Counters )',
             '[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]',
@@ -287,10 +284,21 @@ class FindMiscTestCase(unittest.TestCase):
             '[(mapper time \\(processing\\): 0\.46)(mapper time \\(processing\\): 0\.46)(1)]',
             '[(reducer time \\(other\\): 6\.31)(reducer time \\(other\\): 6\.31)(1)]',
             '[(mapper time \\(other\\): 3\.72)(mapper time \\(other\\): 3\.72)(1)]}',
-        ]
-        line = r'Job JOBID="job_201106092314_0003" FINISH_TIME="1307662284564" JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1" FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="%s" .' % ''.join(counter_bits)
+    ]))
+
+    def test_find_counters_0_18_explicit(self):
         counters, step_num = parse_hadoop_counters_from_line(
-                                line, post_020_fmt=True)
+            self.TEST_COUNTERS_0_18, hadoop_version='0.18')
+
+        self.assertEqual(
+            counters['profile']['reducer step 0 estimated IO time: 0.00'], 1)
+        self.assertEqual(
+            counters['profile']['mapper step ☃ estimated CPU time: 0.00'], 2)
+        self.assertEqual(step_num, 1)
+
+    def test_find_counters_0_20_explicit(self):
+        counters, step_num = parse_hadoop_counters_from_line(
+                                self.TEST_COUNTERS_0_20, hadoop_version='0.20')
 
         self.assertIn('reducer time (processing): 2.51', counters['profile'])
         self.assertEqual(step_num, 3)
@@ -328,7 +336,7 @@ class FindMiscTestCase(unittest.TestCase):
         ]
         line = r'Job JOBID="job_201106132124_0001" FINISH_TIME="1308000435810" JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1" FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="%s" .' % ''.join(counter_bits)
         counters, step_num = parse_hadoop_counters_from_line(
-                                line, post_020_fmt=True)
+                                line, hadoop_version='0.20')
 
         self.assertIn('{}', counters['weird counters'])
         self.assertIn('()', counters['weird counters'])

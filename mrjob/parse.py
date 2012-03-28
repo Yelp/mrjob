@@ -24,6 +24,9 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+from mrjob.compat import uses_020_counters
+
+
 # match the filename of a hadoop streaming jar
 HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*\.jar$')
 
@@ -473,7 +476,7 @@ def _parse_counters_0_20(group_string):
             yield group_name, counter_name, int(counter_value)
 
 
-def parse_hadoop_counters_from_line(line, post_020_fmt=True):
+def parse_hadoop_counters_from_line(line, hadoop_version=None):
     """Parse Hadoop counter values from a log line.
 
     The counter log line format changed significantly between Hadoop 0.18 and
@@ -488,7 +491,15 @@ def parse_hadoop_counters_from_line(line, post_020_fmt=True):
     if not m:
         return None, None
 
-    if post_020_fmt:
+    if hadoop_version is None:
+        # try both if hadoop_version not specified
+        counters_1, step_num_1 = parse_hadoop_counters_from_line(line, '0.20')
+        if counters_1:
+            return (counters_1, step_num_1)
+        else:
+            return parse_hadoop_counters_from_line(line, '0.18')
+
+    if uses_020_counters(hadoop_version):
         parse_func = _parse_counters_0_20
     else:
         parse_func = _parse_counters_0_18

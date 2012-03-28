@@ -715,5 +715,5 @@ class MultipleConfigFilesTestCase(unittest.TestCase):
         with no_handlers_for_logger():
             log_to_stream('mrjob.conf', stderr)
             runner = LocalMRJobRunner(conf_path=path)
-            self.assertIn('mrjob.conf tries to recursively include',
+            self.assertIn('%s tries to recursively include %s!' % (path, path),
                           stderr.getvalue())

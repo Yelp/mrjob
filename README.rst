@@ -64,6 +64,10 @@ Code for this example and more live in ``mrjob/examples``.
        def reducer(self, word, counts):
            yield (word, sum(counts))
 
+
+    if __name__ == '__main__':
+        MRWordFreqCount.run()
+
 Try It Out!
 -----------
 

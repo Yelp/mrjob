@@ -418,7 +418,7 @@ _COUNTER_LINE_RE = re.compile(_COUNTER_LINE_EXPR)
 # 0.18-specific
 # see _parse_counters_0_18 for format
 # A counter looks like this: groupname.countername:countervalue
-_COUNTER_EXPR_0_18 = r'(?P<group>[^,]+?)[.](?P<name>[^,]+):(?P<value>\d+)'
+_COUNTER_EXPR_0_18 = r'(,|^)(?P<group>[^,]+?)[.](?P<name>[^,]+):(?P<value>\d+)'
 _COUNTER_RE_0_18 = re.compile(_COUNTER_EXPR_0_18)
 
 # 0.20-specific

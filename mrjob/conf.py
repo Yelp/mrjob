@@ -39,9 +39,10 @@ job to have access to so that you don't have to think about it. For example:
 - where temp directories and logs should go
 - security credentials
 
-:file:`mrjob.conf` is just a `YAML <http://www.yaml.org>`_-encoded dictionary
-containing default values to pass in to the constructors of the various runner
-classes. Here's a minimal :file:`mrjob.conf`:
+:file:`mrjob.conf` is just a `YAML <http://www.yaml.org>`_- or `JSON
+<http://www.json.org>`_-encoded dictionary containing default values to pass in
+to the constructors of the various runner classes. Here's a minimal
+:file:`mrjob.conf`:
 
 .. code-block:: yaml
 
@@ -196,29 +197,18 @@ def find_mrjob_conf():
         return None
 
 
-def load_mrjob_conf(conf_path=None):
-    """Load the entire data structure in :file:`mrjob.conf`, which should
-    look something like this::
-
-        {'runners':
-            'emr': {'OPTION': VALUE, ...},
-            'hadoop: {'OPTION': VALUE, ...},
-            'inline': {'OPTION': VALUE, ...},
-            'local': {'OPTION': VALUE, ...},
-        }
-
-    Returns ``None`` if we can't find :file:`mrjob.conf`.
-
-    :type conf_path: str
-    :param conf_path: an alternate place to look for mrjob.conf. If this is
-                      ``False``, we'll always return ``None``.
-    """
+def real_mrjob_conf_path(conf_path=None):
     if conf_path is False:
         return None
     elif conf_path is None:
         conf_path = find_mrjob_conf()
-        if conf_path is None:
-            return None
+    else:
+        return conf_path
+
+
+def conf_object_at_path(conf_path):
+    if conf_path is None:
+        return None
 
     with open(conf_path) as f:
         if yaml:
@@ -238,24 +228,68 @@ def load_mrjob_conf(conf_path=None):
                 raise e
 
 
-def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
-    """Load the options to initialize a runner from mrjob.conf, or return
-    ``{}`` if we can't find them.
+def load_mrjob_conf(conf_path=None):
+    """Load the entire data structure in :file:`mrjob.conf`, which should
+    look something like this::
+
+        {'runners':
+            'emr': {'OPTION': VALUE, ...},
+            'hadoop: {'OPTION': VALUE, ...},
+            'inline': {'OPTION': VALUE, ...},
+            'local': {'OPTION': VALUE, ...},
+        }
+
+    Returns ``None`` if we can't find :file:`mrjob.conf`.
+
+    :type conf_path: str
+    :param conf_path: an alternate place to look for mrjob.conf. If this is
+                      ``False``, we'll always return ``None``.
+    """
+    # Only used by mrjob tests and possibly third parties.
+    conf_path = real_mrjob_conf_path(conf_path)
+    return conf_object_at_path(conf_path)
+
+
+def load_opts_from_mrjob_conf(runner_alias, conf_path=None, loaded=None):
+    """Load a list of dictionaries representing the options in a given
+    mrjob.conf for a specific runner. Returns ``[(path, values)]``. If conf_path
+    is not found, return [(None, {})].
 
     :type conf_path: str
     :param conf_path: an alternate place to look for mrjob.conf. If this is
                       ``False``, we'll always return ``{}``.
     """
-    conf = load_mrjob_conf(conf_path=conf_path)
+    # Used to use load_mrjob_conf() here, but we need both the 'real' path and
+    # the conf object, which we can't get cleanly from load_mrjob_conf.  This
+    # means load_mrjob_conf() is basically useless now except for in tests,
+    # but it's exposed in the API, so we shouldn't kill it until 0.4 at least.
+    conf_path = real_mrjob_conf_path(conf_path)
+    conf = conf_object_at_path(conf_path)
+
     if conf is None:
-        return {}
+        return [(None, {})]
+
+    if loaded is None:
+        loaded = []
+
+    loaded.append(conf_path)
 
     try:
-        return conf['runners'][runner_alias] or {}
+        values = conf['runners'][runner_alias] or {}
     except (KeyError, TypeError, ValueError):
         log.warning('no configs for runner type %r; returning {}' %
                     runner_alias)
-        return {}
+        values = {}
+
+    parent = []
+    if conf.get('include', None):
+        if conf['include'] in loaded:
+            log.warn('%s tries to recursively include %s! (Already included:'
+                     ' %s)' % (conf_path, conf['include'], ', '.join(loaded)))
+        else:
+            parent = load_opts_from_mrjob_conf(runner_alias, conf['include'],
+                                               loaded)
+    return parent + [(conf_path, values)]
 
 
 def dump_mrjob_conf(conf, f):
@@ -441,3 +475,32 @@ def combine_opts(combiners, *opts_list):
         final_opts[key] = combine_func(*values)
 
     return final_opts
+
+
+### PRIORITY ###
+
+
+def calculate_opt_priority(opts, opt_dicts):
+    """Keep track of where in the order opts were specified,
+    to handle opts that affect the same thing (e.g. ec2_*instance_type).
+
+    Here is a rough guide to the values set by this function. They are
+
+        Where specified     Priority
+        unset everywhere    -1
+        blank               0
+        non-blank default   1
+        base conf file      2
+        inheriting conf     [3-n]
+        command line        n+1
+
+    :type opts: iterable
+    :type opt_dicts: list of dicts with keys also appearing in **opts**
+    """
+    opt_priority = dict((opt, -1) for opt in opts)
+    for priority, opt_dict in enumerate(opt_dicts):
+        if opt_dict:
+            for opt, value in opt_dict.iteritems():
+                if value is not None:
+                    opt_priority[opt] = priority
+    return opt_priority

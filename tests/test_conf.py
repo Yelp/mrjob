@@ -143,21 +143,25 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
 
         self.assertEqual(load_mrjob_conf(),
                          {'runners': {'foo': {'bar': 'baz'}}})
-        self.assertEqual(load_opts_from_mrjob_conf('foo'), {'bar': 'baz'})
+        self.assertEqual(load_opts_from_mrjob_conf('foo')[0][1],
+                         {'bar': 'baz'})
 
     def test_load_mrjob_conf_and_load_opts(self):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf.2')
         with open(conf_path, 'w') as f:
             f.write('{"runners": {"foo": {"qux": "quux"}}}')
 
-        self.assertEqual(load_mrjob_conf(conf_path=conf_path),
-                         {'runners': {'foo': {'qux': 'quux'}}})
-        self.assertEqual(load_opts_from_mrjob_conf('foo', conf_path=conf_path),
-                         {'qux': 'quux'})
+        self.assertEqual(
+            load_mrjob_conf(conf_path=conf_path),
+            {'runners': {'foo': {'qux': 'quux'}}})
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path=conf_path)[0][1],
+            {'qux': 'quux'})
         # test missing options
         with logger_disabled('mrjob.conf'):
             self.assertEqual(
-                load_opts_from_mrjob_conf('bar', conf_path=conf_path), {})
+                load_opts_from_mrjob_conf('bar', conf_path=conf_path)[0][1],
+                {})
 
     def test_round_trip(self):
         conf = {'runners': {'foo': {'qux': 'quux'}}}

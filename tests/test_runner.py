@@ -583,3 +583,137 @@ sys.exit(13)
         runner = MRJobRunner(conf_path=False)
         self.assertRaises(CalledProcessError,
                           runner._invoke_sort, [self.a, self.b], self.out)
+
+
+class MultipleConfigFilesTestCase(unittest.TestCase):
+
+    BASIC_CONF = {
+        'runners': {
+            'local': {
+                'base_tmp_dir': '/tmp',
+                'cmdenv': {
+                    'A_PATH': 'A',
+                    'SOMETHING': 'X',
+                },
+                'hadoop_extra_args': [
+                    'thing1',
+                ],
+                'hadoop_streaming_jar': 'monkey.jar',
+                'jobconf': {
+                    'lorax_speaks_for': 'trees',
+                },
+                'python_bin': 'py3k',
+                'setup_scripts': ['/myscript.py'],
+            }
+        }
+    }
+
+    def larger_conf(self):
+        return {
+            'include': os.path.join(self.tmp_dir, 'mrjob.conf'),
+            'runners': {
+                'local': {
+                    'base_tmp_dir': '/var/tmp',
+                    'bootstrap_mrjob': False,
+                    'cmdenv': {
+                        'A_PATH': 'B',
+                        'SOMETHING': 'Y',
+                        'SOMETHING_ELSE': 'Z',
+                    },
+                    'hadoop_extra_args': [
+                        'thing2',
+                    ],
+                    'hadoop_streaming_jar': 'banana.jar',
+                    'jobconf': {
+                        'lorax_speaks_for': 'mazda',
+                        'dr_seuss_is': 'awesome',
+                    },
+                    'python_bin': 'py4k',
+                    'setup_scripts': ['/yourscript.py'],
+                }
+            }
+        }
+
+    def setUp(self):
+        super(MultipleConfigFilesTestCase, self).setUp()
+        self.make_tmp_dir()
+        self.opts_1 = self.opts_for_conf('mrjob.conf',
+                                         self.BASIC_CONF)
+        self.opts_2 = self.opts_for_conf('mrjob.larger.conf',
+                                         self.larger_conf())
+
+    def tearDown(self):
+        super(MultipleConfigFilesTestCase, self).tearDown()
+        self.rm_tmp_dir()
+
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def save_conf(self, name, conf):
+        conf_path = os.path.join(self.tmp_dir, name)
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf(conf, f)
+        return conf_path
+
+    def opts_for_conf(self, name, conf):
+        conf_path = self.save_conf(name, conf)
+        runner = LocalMRJobRunner(conf_path=conf_path)
+        return runner._opts
+
+    def test_combine_cmds(self):
+        self.assertEqual(self.opts_1['python_bin'], ['py3k'])
+        self.assertEqual(self.opts_2['python_bin'], ['py4k'])
+
+    def test_combine_dicts(self):
+        self.assertEqual(self.opts_1['jobconf'], {
+            'lorax_speaks_for': 'trees',
+        })
+        self.assertEqual(self.opts_2['jobconf'], {
+            'lorax_speaks_for': 'mazda',
+            'dr_seuss_is': 'awesome',
+        })
+
+    def test_combine_envs(self):
+        self.assertEqual(self.opts_1['cmdenv'], {
+            'A_PATH': 'A',
+            'SOMETHING': 'X',
+        })
+        self.assertEqual(self.opts_2['cmdenv'], {
+            'A_PATH': 'B:A',
+            'SOMETHING': 'Y',
+            'SOMETHING_ELSE': 'Z',
+        })
+
+    def test_combine_lists(self):
+        self.assertEqual(self.opts_1['hadoop_extra_args'], ['thing1'])
+        self.assertEqual(self.opts_2['hadoop_extra_args'],
+                         ['thing1', 'thing2'])
+
+    def test_combine_paths(self):
+        self.assertEqual(self.opts_1['base_tmp_dir'], '/tmp')
+        self.assertEqual(self.opts_2['base_tmp_dir'], '/var/tmp')
+
+    def test_combine_path_lists(self):
+        self.assertEqual(self.opts_1['setup_scripts'], ['/myscript.py'])
+        self.assertEqual(self.opts_2['setup_scripts'],
+                         ['/myscript.py', '/yourscript.py'])
+
+    def test_combine_values(self):
+        self.assertEqual(self.opts_1['hadoop_streaming_jar'], 'monkey.jar')
+        self.assertEqual(self.opts_2['hadoop_streaming_jar'], 'banana.jar')
+
+    def test_recurse(self):
+        path = os.path.join(self.tmp_dir, 'LOL.conf')
+        recurse_conf = dict(include=path)
+        with open(path, 'w') as f:
+            dump_mrjob_conf(recurse_conf, f)
+
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.conf', stderr)
+            runner = LocalMRJobRunner(conf_path=path)
+            self.assertIn('%s tries to recursively include %s!' % (path, path),
+                          stderr.getvalue())

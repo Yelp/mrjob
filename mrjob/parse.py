@@ -421,12 +421,6 @@ _COUNTER_LINE_RE = re.compile(_COUNTER_LINE_EXPR)
 _COUNTER_EXPR_0_18 = r'(?P<group>[^,]+?)[.](?P<name>[^,]+):(?P<value>\d+)'
 _COUNTER_RE_0_18 = re.compile(_COUNTER_EXPR_0_18)
 
-# aggregate 'is this 0.18?' expression
-# these are comma-separated counter expressions (see _COUNTER_EXPR_0_18)
-_ONE_0_18_COUNTER = r'[^,]+?[.][^,]+:\d+'
-_0_18_EXPR = r'(%s)(,%s)*' % (_ONE_0_18_COUNTER, _ONE_0_18_COUNTER)
-_COUNTER_FORMAT_IS_0_18 = re.compile(_0_18_EXPR)
-
 # 0.20-specific
 
 # capture one group including sub-counters
@@ -439,25 +433,20 @@ _GROUP_RE_0_20 = re.compile(r'{\(%s\)\(%s\)%s}' % (r'(?P<group_id>.*?)',
 # capture a single counter from a group
 # this is what the ... is in _COUNTER_LIST_EXPR (incl. the brackets).
 # it looks like: [(cid)(cname)(value)]
-_COUNTER_VALUE_EXPR = r'(?P<counter_value>\d+)'
 _COUNTER_0_20_EXPR = r'\[\(%s\)\(%s\)\(%s\)\]' % (r'(?P<counter_id>.*?)',
                                                   r'(?P<counter_name>.*?)',
-                                                  _COUNTER_VALUE_EXPR)
+                                                  r'(?P<counter_value>\d+)')
 _COUNTER_RE_0_20 = re.compile(_COUNTER_0_20_EXPR)
-
-# aggregate 'is this 0.20?' expression
-# combines most of the rules from the capturing expressions above
-# should match strings like: {(gid)(gname)[(cid)(cname)(cvalue)][...]...}
-_0_20_EXPR = r'{\(%s\)\(%s\)(%s)*' % (r'.*?',
-                                      r'.*?',
-                                      _COUNTER_0_20_EXPR)
-_COUNTER_FORMAT_IS_0_20 = re.compile(_0_20_EXPR)
 
 
 def _parse_counters_0_18(counter_string):
     # 0.18 counters look like this:
     # GroupName.CounterName:Value,Group1.Crackers:3,Group2.Nerf:243,...
-    for m in _COUNTER_RE_0_18.finditer(counter_string):
+    groups = _COUNTER_RE_0_18.finditer(counter_string)
+    if groups is None:
+        log.warn('Cannot parse Hadoop counter string: %s' % group_string)
+
+    for m in groups:
         yield m.group('group'), m.group('name'), int(m.group('value'))
 
 
@@ -465,6 +454,9 @@ def _parse_counters_0_20(group_string):
     # 0.20 counters look like this:
     # {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...}
     groups = _GROUP_RE_0_20.findall(group_string)
+    if not groups:
+        log.warn('Cannot parse Hadoop counter string: %s' % group_string)
+
     for group_id, group_name, counter_str in groups:
         matches = _COUNTER_RE_0_20.findall(counter_str)
         for counter_id, counter_name, counter_value in matches:
@@ -481,7 +473,7 @@ def _parse_counters_0_20(group_string):
             yield group_name, counter_name, int(counter_value)
 
 
-def parse_hadoop_counters_from_line(line):
+def parse_hadoop_counters_from_line(line, post_020_fmt=True):
     """Parse Hadoop counter values from a log line.
 
     The counter log line format changed significantly between Hadoop 0.18 and
@@ -496,25 +488,15 @@ def parse_hadoop_counters_from_line(line):
     if not m:
         return None, None
 
-    parser_switch = (
-        (_COUNTER_FORMAT_IS_0_20, _parse_counters_0_20),
-        (_COUNTER_FORMAT_IS_0_18, _parse_counters_0_18),
-    )
+    if post_020_fmt:
+        parse_func = _parse_counters_0_20
+    else:
+        parse_func = _parse_counters_0_18
 
     counter_substring = m.group('counters')
 
-    correct_func = None
-    for regex, func in parser_switch:
-        if regex.match(counter_substring):
-            correct_func = func
-            break
-
-    if correct_func is None:
-        log.warn('Cannot parse Hadoop counter line: %s' % line)
-        return None, None
-
     counters = {}
-    for group, counter, value in correct_func(counter_substring):
+    for group, counter, value in parse_func(counter_substring):
         counters.setdefault(group, {})
         counters[group].setdefault(counter, 0)
         counters[group][counter] += int(value)

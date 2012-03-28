@@ -68,12 +68,20 @@ class LocalMRJobRunner(MRJobRunner):
     * ``mapreduce.task.ismap``
     * ``mapreduce.task.output.dir``
     * ``mapreduce.task.partition``
+
+    :py:class:`LocalMRJobRunner` adds the current working directory to the
+    subprocesses' :envvar:`PYTHONPATH`, so if you're using it to test an EMR
+    job locally, be aware that it may see more Python modules than will
+    actaully be uploaded. This behavior may change in the future.
     """
 
     alias = 'local'
 
     def __init__(self, **kwargs):
-        """:py:class:`~mrjob.local.LocalMRJobRunner`'s constructor takes the
+        """Arguments to this constructor may also appear in :file:`mrjob.conf`
+        under ``runners/local``.
+
+        :py:class:`~mrjob.local.LocalMRJobRunner`'s constructor takes the
         same keyword args as
         :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 

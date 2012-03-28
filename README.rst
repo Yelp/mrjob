@@ -5,6 +5,8 @@ mrjob
 
 mrjob is a Python package that helps you write and run Hadoop Streaming jobs.
 
+**Main documentation: <http://packages.python.org/mrjob/>**
+
 mrjob fully supports Amazon's Elastic MapReduce (EMR) service, which allows you to buy time on a Hadoop cluster on an hourly basis. It also works with your own Hadoop cluster.
 
 Some important features:
@@ -26,19 +28,21 @@ Some important features:
 Installation
 ------------
 
-``python setup.py install``
-
-Recommended insstallation process is to use pip and virtual environment:
+From PyPI:
 
 ``pip install mrjob``
+
+From source:
+
+``python setup.py install``
 
 
 A Simple Map Reduce Job
 -----------------------
 
-For a complete example file look in mrjob/examples/ directory 
+Code for this example and more live in ``mrjob/examples``.
 
-::
+.. code:: python
 
    """The classic MapReduce job: count the frequency of words. 
    """
@@ -77,19 +81,24 @@ Setting up EMR on Amazon
 
 * create an `Amazon Web Services account <http://aws.amazon.com/>`_
 * sign up for `Elastic MapReduce <http://aws.amazon.com/elasticmapreduce/>`_
-* Get your access and secret keys (click "Security Credentials" on `your account page <http://aws.amazon.com/account/>`_)
-* Set the environment variables ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY`` accordingly
+* Get your access and secret keys (click "Security Credentials" on
+  `your account page <http://aws.amazon.com/account/>`_)
+* Set the environment variables ``$AWS_ACCESS_KEY_ID`` and
+  ``$AWS_SECRET_ACCESS_KEY`` accordingly
 
 Advanced Configuration
 ----------------------
+
 To run in other AWS regions, upload your source tree, run ``make``, and use 
 other advanced mrjob features, you'll need to set up ``mrjob.conf``. mrjob looks 
 for its conf file in:
 
 * The contents of ``$MRJOB_CONF``
 * ``~/.mrjob.conf``
+* ``/etc/mrjob.conf``
 
-See ``mrjob.conf.example`` for more information.
+See `the mrjob.conf documentation
+<http://packages.python.org/mrjob/configs-conf.html>`_ for more information.
 
 
 Links
@@ -100,6 +109,7 @@ Links
 * discussion group: <http://groups.google.com/group/mrjob>
 * Hadoop MapReduce: <http://hadoop.apache.org/mapreduce/>
 * Elastic MapReduce: <http://aws.amazon.com/documentation/elasticmapreduce/>
-* Mr job overview Video: <http://blip.tv/pycon-us-videos-2009-2010-2011/pycon-2011-mrjob-distributed-computing-for-everyone-4898987/>
+* PyCon 2011 mrjob overview: <http://blip.tv/pycon-us-videos-2009-2010-2011/pycon-2011-mrjob-distributed-computing-for-everyone-4898987/>
 
-Thanks to `Greg Killion <mailto:greg@blind-works.net>`_ (`blind-works.net <http://www.blind-works.net/>`_) for the logo.
+Thanks to `Greg Killion <mailto:greg@blind-works.net>`_
+(`blind-works.net <http://www.blind-works.net/>`_) for the logo.

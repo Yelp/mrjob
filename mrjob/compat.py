@@ -515,6 +515,9 @@ def supports_new_distributed_cache_options(version):
     """
     return version_gte(version, '0.20')
 
+def uses_020_counters(version):
+    return version_gte(version, '0.20')
+
 
 def uses_generic_jobconf(version):
     """Use ``-D`` instead of ``-jobconf``"""

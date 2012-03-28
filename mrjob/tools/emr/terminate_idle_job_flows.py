@@ -24,7 +24,7 @@ Options::
   -v, --verbose         Print more messages
   -q, --quiet           Don't print anything to stderr; just print IDs of
                         terminated job flows and idle time information to
-                        stdout
+                        stdout. Use twice to print absolutely nothing.
   -c CONF_PATH, --conf-path=CONF_PATH
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
@@ -80,7 +80,8 @@ def main():
     if args:
         option_parser.error('takes no arguments')
 
-    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
+    MRJob.set_up_logging(quiet=options.quiet,
+                         verbose=options.verbose)
 
     inspect_and_maybe_terminate_job_flows(
         conf_path=options.conf_path,
@@ -92,6 +93,7 @@ def main():
         pool_name=options.pool_name,
         pooled_only=options.pooled_only,
         max_mins_locked=options.max_mins_locked,
+        quiet=options.quiet,
     )
 
 
@@ -105,6 +107,7 @@ def inspect_and_maybe_terminate_job_flows(
     pooled_only=False,
     unpooled_only=False,
     max_mins_locked=None,
+    quiet=False,
     **kwargs
 ):
 
@@ -202,7 +205,7 @@ def inspect_and_maybe_terminate_job_flows(
         num_non_streaming, num_done))
 
     terminate_and_notify(runner, to_terminate, dry_run=dry_run,
-                         max_mins_locked=max_mins_locked)
+                         max_mins_locked=max_mins_locked, quiet=quiet)
 
 
 def is_job_flow_done(job_flow):
@@ -299,7 +302,7 @@ def job_flow_has_pending_steps(job_flow):
 
 
 def terminate_and_notify(runner, to_terminate, dry_run=False,
-                         max_mins_locked=None):
+                         max_mins_locked=None, quiet=False):
     if not to_terminate:
         return
 
@@ -317,7 +320,7 @@ def terminate_and_notify(runner, to_terminate, dry_run=False,
                 runner.make_emr_conn().terminate_jobflow(jf.jobflowid)
                 did_terminate = True
 
-        if did_terminate:
+        if did_terminate and not quiet:
             fmt = ('Terminated job flow %s (%s); was %s for %s, %s to end of'
                    ' hour')
             print fmt % (
@@ -338,10 +341,10 @@ def make_option_parser():
         action='store_true',
         help='Print more messages')
     option_parser.add_option(
-        '-q', '--quiet', dest='quiet', default=False,
-        action='store_true',
+        '-q', '--quiet', dest='quiet', action='count',
         help=("Don't print anything to stderr; just print IDs of terminated"
-              " job flows and idle time information to stdout"))
+              " job flows and idle time information to stdout. Use twice"
+              " to print absolutely nothing."))
     option_parser.add_option(
         '-c', '--conf-path', dest='conf_path', default=None,
         help='Path to alternate mrjob.conf file to read from')

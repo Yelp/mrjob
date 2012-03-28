@@ -270,7 +270,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                       for jf in self.mock_emr_job_flows.itervalues()
                       if jf.state in ('SHUTTING_DOWN', 'TERMINATED'))
 
-    def inspect_and_maybe_terminate_quietly(self, **kwargs):
+    def inspect_and_maybe_terminate_quietly(self, stdout=None, **kwargs):
         if 'conf_path' not in kwargs:
             kwargs['conf_path'] = False
 
@@ -283,7 +283,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         # don't print anything out
         real_stdout = sys.stdout
-        sys.stdout = StringIO()
+        sys.stdout = stdout or StringIO()
         try:
             return inspect_and_maybe_terminate_job_flows(**kwargs)
         finally:
@@ -585,3 +585,16 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertAllTerminatedJobFlowsLockedByTerminate()
 
         self.assertEqual(self.terminated_jfs(), ['j-POOLED'])
+
+    def test_its_quiet_too_quiet(self):
+        stdout = StringIO()
+        self.inspect_and_maybe_terminate_quietly(
+            stdout=stdout, max_hours_idle=0.01, quiet=True)
+        self.assertEqual(stdout.getvalue(), '')
+
+    def test_its_not_very_quiet(self):
+        stdout = StringIO()
+        self.inspect_and_maybe_terminate_quietly(
+            stdout=stdout, max_hours_idle=0.01)
+        output = 'Terminated job flow j-POOLED (Pooled Job Flow); was idle for 0:50:00, 0:05:00 to end of hour\nTerminated job flow j-PENDING_BUT_IDLE (Pending But Idle Job Flow); was pending for 2:50:00, 0:05:00 to end of hour\nTerminated job flow j-DEBUG_ONLY (Debug Only Job Flow); was idle for 2:00:00, 1:00:00 to end of hour\nTerminated job flow j-DONE_AND_IDLE (Done And Idle Job Flow); was idle for 2:00:00, 1:00:00 to end of hour\nTerminated job flow j-IDLE_AND_EXPIRED (Idle And Expired Job Flow); was idle for 2:00:00, 1:00:00 to end of hour\nTerminated job flow j-IDLE_AND_FAILED (Idle And Failed Job Flow); was idle for 3:00:00, 1:00:00 to end of hour\nTerminated job flow j-HADOOP_DEBUGGING (Hadoop Debugging Job Flow); was idle for 2:00:00, 1:00:00 to end of hour\nTerminated job flow j-EMPTY (Empty Job Flow); was idle for 10:00:00, 1:00:00 to end of hour\n'
+        self.assertEqual(stdout.getvalue(), output)

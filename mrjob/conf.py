@@ -284,8 +284,8 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None, loaded=None):
     parent = []
     if conf.get('include', None):
         if conf['include'] in loaded:
-            log.warn('%s tries to recursively include %s!' %
-                     (conf_path, conf['include']))
+            log.warn('%s tries to recursively include %s! (Already included:'
+                     ' %s)' % (conf_path, conf['include'], ', '.join(loaded)))
         else:
             parent = load_opts_from_mrjob_conf(runner_alias, conf['include'],
                                                loaded)

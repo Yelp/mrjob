@@ -28,8 +28,40 @@ Installation
 
 ``python setup.py install``
 
-Try it out!
------------
+Recommended insstallation process is to use pip and virtual environment:
+
+``pip install mrjob``
+
+
+A Simple Map Reduce Job
+-----------------------
+
+For a complete example file look in mrjob/examples/ directory 
+
+::
+
+   """The classic MapReduce job: count the frequency of words. 
+   """
+   from mrjob.job import MRJob
+   import re
+   
+   WORD_RE = re.compile(r"[\w']+")
+   
+   
+   class MRWordFreqCount(MRJob):
+   
+       def mapper(self, _, line):
+           for word in WORD_RE.findall(line):
+               yield (word.lower(), 1)
+   
+       def combiner(self, word, counts):
+           yield (word, sum(counts))
+   
+       def reducer(self, word, counts):
+           yield (word, sum(counts))
+
+Run a Map Reduce job locally or on Amazon EMR
+---------------------------------------------
 
 ::
 
@@ -56,9 +88,6 @@ for its conf file in:
 
 * The contents of ``$MRJOB_CONF``
 * ``~/.mrjob.conf``
-* ``~/.mrjob`` (deprecated)
-* ``mrjob.conf`` anywhere in your ``$PYTHONPATH`` (deprecated)
-* ``/etc/mrjob.conf``
 
 See ``mrjob.conf.example`` for more information.
 
@@ -71,5 +100,6 @@ Links
 * discussion group: <http://groups.google.com/group/mrjob>
 * Hadoop MapReduce: <http://hadoop.apache.org/mapreduce/>
 * Elastic MapReduce: <http://aws.amazon.com/documentation/elasticmapreduce/>
+* Mr job overview Video: <http://blip.tv/pycon-us-videos-2009-2010-2011/pycon-2011-mrjob-distributed-computing-for-everyone-4898987/>
 
 Thanks to `Greg Killion <mailto:greg@blind-works.net>`_ (`blind-works.net <http://www.blind-works.net/>`_) for the logo.

@@ -370,10 +370,10 @@ class MRJob(object):
         re-defined. For example::
 
             def steps(self):
-                return [self.mr(mapper=self.transform_input,
-                                reducer=self.consolidate_1),
-                        self.mr(reducer_init=self.log_mapper_init,
-                                reducer=self.consolidate_2)]
+                return [self.mr(mapper=self.my_mapper1,
+                                reducer=self.my_reducer1),
+                        self.mr(mapper=self.my_mapper2,
+                                reducer=self.my_reducer2)]
 
         :return: a list of steps constructed with :py:meth:`mr`
         """
@@ -390,7 +390,7 @@ class MRJob(object):
         """Define a step (mapper, reducer, and/or any combination of
         mapper_init, reducer_final, etc.) for your job.
 
-        Used by :py:meth:`steps`. (Don't re-define this, just call it!)
+        Used by :py:meth:`steps`. (Don't re-define mr method, just call it!)
 
         Accepts the following keyword arguments. For convenience, you may
         specify *mapper* and *reducer* as positional arguments as well.

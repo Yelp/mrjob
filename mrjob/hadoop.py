@@ -110,7 +110,10 @@ class HadoopJobRunner(MRJobRunner):
     alias = 'hadoop'
 
     def __init__(self, **kwargs):
-        """:py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments
+        """Arguments to this constructor may also appear in :file:`mrjob.conf`
+        under ``runners/hadoop``.
+
+        :py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments
         as :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
         which can be defaulted in :py:mod:`mrjob.conf`.
 

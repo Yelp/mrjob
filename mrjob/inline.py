@@ -53,7 +53,10 @@ class InlineMRJobRunner(MRJobRunner):
     alias = 'inline'
 
     def __init__(self, mrjob_cls=None, **kwargs):
-        """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword
+        """Arguments to this constructor may also appear in :file:`mrjob.conf`
+        under ``runners/inline``.
+
+        :py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword
         args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 
         * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*,

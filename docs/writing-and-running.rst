@@ -4,7 +4,7 @@ Getting started
 Writing and running a job
 -------------------------
 
-To create your own map reduce job, subclass :py:class:`MRJob`, create a
+To create your own map reduce job, subclass :py:class:`~mrjob.job.MRJob`, create a
 series of mappers and reducers, and override :py:meth:`~mrjob.job.MRJob.steps`. For example, a word counter::
 
     from mrjob.job import MRJob

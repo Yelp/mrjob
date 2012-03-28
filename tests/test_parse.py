@@ -265,7 +265,8 @@ class FindMiscTestCase(unittest.TestCase):
             '[(FILE_BYTES_WRITTEN)(FILE_BYTES_WRITTEN)(21773078)]',
             '[(S3_BYTES_WRITTEN)(S3_BYTES_WRITTEN)(49526580)]}',
 
-            '{(org\.apache\.hadoop\.mapred\.Task$Counter)(Map-Reduce Framework)',
+            '{(org\.apache\.hadoop\.mapred\.Task$Counter)',
+            '(Map-Reduce Framework)',
             '[(REDUCE_INPUT_GROUPS)(Reduce input groups)(18843)]',
             '[(COMBINE_OUTPUT_RECORDS)(Combine output records)(0)]',
             '[(MAP_INPUT_RECORDS)(Map input records)(29884)]',
@@ -278,12 +279,18 @@ class FindMiscTestCase(unittest.TestCase):
             '[(COMBINE_INPUT_RECORDS)(Combine input records)(0)]',
             '[(REDUCE_INPUT_RECORDS)(Reduce input records)(29884)]}',
             '{(profile)(profile)',
-            '[(reducer time \\(processing\\): 2\.51)(reducer time \\(processing\\): 2\.51)(1)]',
-            '[(mapper time \\(processing\\): 0\.50)(mapper time \\(processing\\): 0\.50)(1)]',
-            '[(mapper time \\(other\\): 3\.78)(mapper time \\(other\\): 3\.78)(1)]',
-            '[(mapper time \\(processing\\): 0\.46)(mapper time \\(processing\\): 0\.46)(1)]',
-            '[(reducer time \\(other\\): 6\.31)(reducer time \\(other\\): 6\.31)(1)]',
-            '[(mapper time \\(other\\): 3\.72)(mapper time \\(other\\): 3\.72)(1)]}',
+            '[(reducer time \\(processing\\): 2\.51)',
+            '(reducer time \\(processing\\): 2\.51)(1)]',
+            '[(mapper time \\(processing\\): 0\.50)',
+            '(mapper time \\(processing\\): 0\.50)(1)]',
+            '[(mapper time \\(other\\): 3\.78)',
+            '(mapper time \\(other\\): 3\.78)(1)]',
+            '[(mapper time \\(processing\\): 0\.46)',
+            '(mapper time \\(processing\\): 0\.46)(1)]',
+            '[(reducer time \\(other\\): 6\.31)',
+            '(reducer time \\(other\\): 6\.31)(1)]',
+            '[(mapper time \\(other\\): 3\.72)',
+            '(mapper time \\(other\\): 3\.72)(1)]}',
     ]))
 
     def test_find_counters_0_18_explicit(self):
@@ -315,11 +322,13 @@ class FindMiscTestCase(unittest.TestCase):
             '[(S3_BYTES_READ)(S3_BYTES_READ)(3726)]',
             '[(FILE_BYTES_WRITTEN)(FILE_BYTES_WRITTEN)(3459)]',
             '[(S3_BYTES_WRITTEN)(S3_BYTES_WRITTEN)(1663)]}',
+
             '{(weird counters)(weird counters)[(\\[\\])(\\[\\])(68)]',
             '[(\\\\)(\\\\)(68)]',
             '[(\\{\\})(\\{\\})(68)]',
             '[(\\(\\))(\\(\\))(68)]',
             '[(\.)(\.)(68)]}',
+
             '{(org\.apache\.hadoop\.mapred\.Task$Counter)',
             '(Map-Reduce Framework)',
             '[(REDUCE_INPUT_GROUPS)(Reduce input groups)(154)]',

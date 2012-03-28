@@ -64,8 +64,8 @@ Code for this example and more live in ``mrjob/examples``.
        def reducer(self, word, counts):
            yield (word, sum(counts))
 
-Run a Map Reduce job locally or on Amazon EMR
----------------------------------------------
+Try It Out!
+-----------
 
 ::
 

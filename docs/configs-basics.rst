@@ -124,7 +124,7 @@ config files "inherit" from a base config file. For example, you may have one
 set of AWS credentials, but two code bases and default instance sizes. To
 accomplish this, use the ``include`` option:
 
-:file:`/etc/mrjob.very-large.conf`:
+:file:`$MRJOB_CONFIGS/mrjob.very-large.conf`:
 
 .. code-block:: yaml
 
@@ -134,7 +134,7 @@ accomplish this, use the ``include`` option:
             num_ec2_core_instances: 20
             ec2_core_instace_type: m1.xlarge
 
-:file:`/etc/mrjob.very-small.conf`:
+:file:`~/mrjob.very-small.conf`:
 
 .. code-block:: yaml
 
@@ -159,3 +159,6 @@ accomplish this, use the ``include`` option:
 
 Options that are lists, commands, dictionaries, etc. combine the same way they
 do between the config files and the command line (with combiner functions).
+
+You can use ``$ENVIRONMENT_VARIABLES`` and ``~/file_in_your_home_dir`` inside
+``include``.

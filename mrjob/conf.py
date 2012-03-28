@@ -173,15 +173,20 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None, loaded=None):
                     runner_alias)
         values = {}
 
-    parent = []
+    inherited = []
     if conf.get('include', None):
-        if conf['include'] in loaded:
-            log.warn('%s tries to recursively include %s! (Already included:'
-                     ' %s)' % (conf_path, conf['include'], ', '.join(loaded)))
-        else:
-            parent = load_opts_from_mrjob_conf(runner_alias, conf['include'],
-                                               loaded)
-    return parent + [(conf_path, values)]
+        includes = conf['include']
+        if isinstance(includes, basestring):
+            includes = [includes]
+
+        for include in includes:
+            if include in loaded:
+                log.warn('%s tries to recursively include %s! (Already included:'
+                         ' %s)' % (conf_path, conf['include'], ', '.join(loaded)))
+            else:
+                inherited.extend(load_opts_from_mrjob_conf(
+                                    runner_alias, conf['include'], loaded))
+    return inherited + [(conf_path, values)]
 
 
 def dump_mrjob_conf(conf, f):

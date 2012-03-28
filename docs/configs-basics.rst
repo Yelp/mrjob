@@ -136,13 +136,13 @@ accomplish this, use the ``include`` option:
 
 .. code-block:: yaml
 
-    include: $HOME/mrjob.base.conf
+    include: $HOME/.mrjob.base.conf
     runners:
         emr:
             num_ec2_core_instances: 2
             ec2_core_instace_type: m1.small
 
-:file:`/etc/mrjob.base.conf`:
+:file:`~/.mrjob.base.conf`:
 
 .. code-block:: yaml
 

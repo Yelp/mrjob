@@ -355,12 +355,9 @@ class EMRJobRunner(MRJobRunner):
     alias = 'emr'
 
     def __init__(self, **kwargs):
-        """Arguments to this constructor may also appear in :file:`mrjob.conf`
-        under ``runners/emr``.
-
-        :py:class:`~mrjob.emr.EMRJobRunner` takes the same arguments as
+        """:py:class:`~mrjob.emr.EMRJobRunner` takes the same arguments as
         :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
-        which can be defaulted in :py:mod:`mrjob.conf`.
+        which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
 
         *aws_access_key_id* and *aws_secret_access_key* are required if you
         haven't set them up already for boto (e.g. by setting the environment

@@ -110,12 +110,9 @@ class HadoopJobRunner(MRJobRunner):
     alias = 'hadoop'
 
     def __init__(self, **kwargs):
-        """Arguments to this constructor may also appear in :file:`mrjob.conf`
-        under ``runners/hadoop``.
-
-        :py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments
+        """:py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments
         as :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
-        which can be defaulted in :py:mod:`mrjob.conf`.
+        which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
 
         *output_dir* and *hdfs_scratch_dir* need not be fully qualified
         ``hdfs://`` URIs because it's understood that they have to be on

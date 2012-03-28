@@ -185,7 +185,7 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None, loaded=None):
                          ' %s)' % (conf_path, conf['include'], ', '.join(loaded)))
             else:
                 inherited.extend(load_opts_from_mrjob_conf(
-                                    runner_alias, conf['include'], loaded))
+                                    runner_alias, include, loaded))
     return inherited + [(conf_path, values)]
 
 

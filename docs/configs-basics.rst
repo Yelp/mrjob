@@ -160,7 +160,7 @@ You can use ``$ENVIRONMENT_VARIABLES`` and ``~/file_in_your_home_dir`` inside
 
 You can inherit from multiple config files by passing ``include`` a list instead
 of a string. Files on the right will have precedence over files on the left.
-To continue the above examples, this config::
+To continue the above examples, this config:
 
 :file:`~/.mrjob.everything.conf`
 

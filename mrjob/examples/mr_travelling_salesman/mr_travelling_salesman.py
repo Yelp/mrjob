@@ -34,6 +34,7 @@ import numpy
 
 try:
     import simplejson as json
+    json  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import json
 

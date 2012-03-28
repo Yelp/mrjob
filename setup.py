@@ -1,5 +1,6 @@
 try:
     from setuptools import setup
+    setup  # quiet "redefinition of unused ..." warning from pyflakes
     # arguments that distutils doesn't understand
     setuptools_kwargs = {
         'install_requires': [
@@ -10,7 +11,7 @@ try:
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',
         'tests_require': ['unittest2'],
-        'zip_safe': False, # so that we can bootstrap mrjob
+        'zip_safe': False,  # so that we can bootstrap mrjob
     }
 except ImportError:
     from distutils.core import setup

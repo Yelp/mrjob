@@ -23,6 +23,7 @@ from subprocess import CalledProcessError
 
 try:
     from cStringIO import StringIO
+    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     from StringIO import StringIO
 
@@ -634,7 +635,8 @@ class HadoopJobRunner(MRJobRunner):
                                              HADOOP_JOB_LOG_URI_RE,
                                              step_nums)
         uris = list(job_logs)
-        new_counters = scan_for_counters_in_files(uris, self)
+        new_counters = scan_for_counters_in_files(uris, self,
+                                                  self.get_hadoop_version())
 
         # only include steps relevant to the current job
         for step_num in step_nums:
@@ -672,13 +674,15 @@ class HadoopJobRunner(MRJobRunner):
         """Get the size of a file, or None if it's not a file or doesn't
         exist."""
         if not is_uri(path_glob):
-            return super(HadoopJobRunner, self).dus(path_glob)
+            return super(HadoopJobRunner, self).du(path_glob)
 
-        stdout = self._invoke_hadoop(['fs', '-du', path_glob],
+        stdout = self._invoke_hadoop(['fs', '-dus', path_glob],
                                      return_stdout=True)
 
         try:
-            return int(stdout.split()[1])
+            return sum(int(line.split()[1])
+                       for line in stdout.split('\n')
+                       if line.strip())
         except (ValueError, TypeError, IndexError):
             raise Exception(
                 'Unexpected output from hadoop fs -du: %r' % stdout)

@@ -18,6 +18,7 @@
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
+import logging
 import os
 import re
 from subprocess import Popen
@@ -28,6 +29,9 @@ SSH_PREFIX = 'ssh://'
 SSH_LOG_ROOT = '/mnt/var/log/hadoop'
 SSH_URI_RE = re.compile(
     r'^%s(?P<hostname>[^/]+)?(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
+
+
+log = logging.getLogger('mrjob.ssh')
 
 
 class SSHException(Exception):
@@ -73,6 +77,7 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     :return: (stdout, stderr)
     """
     args = _ssh_args(ssh_bin, address, ec2_key_pair_file) + list(cmd_args)
+    log.debug('Run SSH command: %s' % args)
     p = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE)
     return p.communicate(stdin)
 
@@ -105,23 +110,20 @@ def ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
         return ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args)
 
 
-def _poor_mans_scp(ssh_bin, addr, ec2_key_pair_file, src, dest):
-    """Copy a file from ``src`` on the local machine to ``dest`` on ``addr``.
-
-    We use this to avoid having to remember where ``scp`` lives.
-    """
-    with open(src, 'rb') as f:
-        args = ['bash -c "cat > %s" && chmod 600 %s' % (dest, dest)]
-        check_output(*ssh_run(ssh_bin, addr, ec2_key_pair_file, args,
-                              stdin=f.read()))
-
-
 def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
     """Prepare master to SSH to slaves by copying the EMR private key to the
-    master node.
+    master node. This is done via ``cat`` to avoid having to store an
+    ``scp_bin`` variable.
+
+    :param ssh_bin: Path to ``ssh`` binary
+    :param master_address: Address of node to copy keyfile to
+    :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
+    :param keyfile: What to call the key file on the master
     """
-    _poor_mans_scp(ssh_bin, master_address, ec2_key_pair_file,
-                   ec2_key_pair_file, keyfile)
+    with open(ec2_key_pair_file, 'rb') as f:
+        args = ['bash -c "cat > %s" && chmod 600 %s' % (keyfile, keyfile)]
+        check_output(*ssh_run(ssh_bin, master_address, ec2_key_pair_file, args,
+                              stdin=f.read()))
 
 
 def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
@@ -172,10 +174,9 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
     """
-    out = check_output(*ssh_run_with_recursion(ssh_bin, address,
-                                                ec2_key_pair_file,
-                                                keyfile,
-                                                ['find', path, '-type', 'f']))
+    out = check_output(*ssh_run_with_recursion(
+        ssh_bin, address, ec2_key_pair_file, keyfile,
+        ['find', '-L', path, '-type', 'f']))
     if 'No such file or directory' in out:
         raise IOError("No such file or directory: %s" % path)
     return out.split('\n')

@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 them together. Useful for testing."""
 from __future__ import with_statement
 
-from collections import defaultdict
 import itertools
 import logging
 import os
@@ -480,7 +479,7 @@ class LocalMRJobRunner(MRJobRunner):
         version = self.get_hadoop_version()
 
         jobconf_env = dict(
-            (translate_jobconf(k, version).replace('.', '_'), v)
+            (translate_jobconf(k, version).replace('.', '_'), str(v))
             for (k, v) in self._opts['jobconf'].iteritems())
 
         internal_jobconf = self._simulate_jobconf_for_step(
@@ -488,7 +487,7 @@ class LocalMRJobRunner(MRJobRunner):
             input_start=input_start, input_length=input_length)
 
         internal_jobconf_env = dict(
-            (translate_jobconf(k, version).replace('.', '_'), v)
+            (translate_jobconf(k, version).replace('.', '_'), str(v))
             for (k, v) in internal_jobconf.iteritems())
 
         # keep the current environment because we need PATH to find binaries
@@ -556,7 +555,7 @@ class LocalMRJobRunner(MRJobRunner):
         # be true if we're just using pipes to simulate a combiner though
         j['mapreduce.task.ismap'] = str(step_type in ('M', 'C')).lower()
 
-        j['mapreduce.task.partition'] = str(step_num)
+        j['mapreduce.task.partition'] = str(task_num)
 
         if input_file is not None:
             j['mapreduce.map.input.file'] = input_file
@@ -588,7 +587,6 @@ class LocalMRJobRunner(MRJobRunner):
 
         self._prev_outfiles.append(outfile)
         write_to = open(outfile, 'w')
-
 
         with open(outfile, 'w') as write_to:
             if combiner_args:

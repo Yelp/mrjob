@@ -33,6 +33,17 @@ from mrjob.util import scrape_options_into_new_groups
 
 
 def main():
+    """Run the create_job_flow tool with arguments from ``sys.argv`` and
+    printing to ``sys.stdout``."""
+    runner = EMRJobRunner(**runner_kwargs())
+    emr_job_flow_id = runner.make_persistent_job_flow()
+    print emr_job_flow_id
+
+
+def runner_kwargs():
+    """Parse command line arguments into arguments for
+    :py:class:`EMRJobRunner`
+    """
     # parser command-line args
     option_parser = make_option_parser()
     options, args = option_parser.parse_args()
@@ -43,13 +54,10 @@ def main():
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     # create the persistent job
-    runner_kwargs = options.__dict__.copy()
-    del runner_kwargs['quiet']
-    del runner_kwargs['verbose']
-
-    runner = EMRJobRunner(**runner_kwargs)
-    emr_job_flow_id = runner.make_persistent_job_flow()
-    print emr_job_flow_id
+    kwargs = options.__dict__.copy()
+    del kwargs['quiet']
+    del kwargs['verbose']
+    return kwargs
 
 
 def make_option_parser():
@@ -86,6 +94,7 @@ def make_option_parser():
         ),
         emr_opt_group: (
             'additional_emr_info',
+            'ami_version',
             'aws_availability_zone',
             'aws_region',
             'bootstrap_actions',
@@ -98,7 +107,6 @@ def make_option_parser():
             'ec2_key_pair',
             'ec2_master_instance_bid_price',
             'ec2_master_instance_type',
-            'ec2_slave_instance_type',
             'ec2_task_instance_bid_price',
             'ec2_task_instance_type',
             'emr_endpoint',

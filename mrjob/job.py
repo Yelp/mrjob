@@ -109,6 +109,7 @@ import time
 
 try:
     from cStringIO import StringIO
+    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     from StringIO import StringIO
 
@@ -1910,7 +1911,7 @@ class MRJob(object):
     #: Optional name of an optional Hadoop ``OutputFormat`` class, e.g.
     #: ``'org.apache.hadoop.mapred.FileOutputFormat'``.
     #:
-    #: Passed to Hadoop with the *first* step of this job with the
+    #: Passed to Hadoop with the *last* step of this job with the
     #: ``-outputformat`` option.
     HADOOP_OUTPUT_FORMAT = None
 

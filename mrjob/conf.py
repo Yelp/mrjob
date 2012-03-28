@@ -54,6 +54,23 @@ Now whenever you run ``mr_your_script.py -r emr``,
 :py:class:`~mrjob.emr.EMRJobRunner` will automatically set :envvar:`TZ` to
 ``America/Los_Angeles`` in your job's environment when it runs on EMR.
 
+If you don't have the :py:mod:`yaml` module installed, you can use JSON
+in your :file:`mrjob.conf` instead (JSON is a subset of YAML, so it'll still
+work once you install :py:mod:`yaml`). Here's how you'd render the above
+example in JSON:
+
+.. code-block:: js
+
+    {
+      "runners": {
+        "emr": {
+          "cmdenv": {
+            "TZ": "America/Los_Angeles"
+          }
+        }
+      }
+    }
+
 Options specified on the command-line take precedence over
 :file:`mrjob.conf`. Usually this means simply overriding the option in
 :file:`mrjob.conf`. However, we know that *cmdenv* contains environment
@@ -117,12 +134,14 @@ from mrjob.util import expand_path
 
 try:
     import simplejson as json  # preferred because of C speedups
+    json  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import json  # built in to Python 2.6 and later
 
 # yaml is nice to have, but we can fall back on JSON if need be
 try:
     import yaml
+    yaml  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     yaml = None
 
@@ -182,9 +201,10 @@ def load_mrjob_conf(conf_path=None):
     look something like this::
 
         {'runners':
-            'local': {'OPTION': VALUE, ...}
-            'emr': {'OPTION': VALUE, ...}
-            'hadoop: {'OPTION': VALUE, ...}
+            'emr': {'OPTION': VALUE, ...},
+            'hadoop: {'OPTION': VALUE, ...},
+            'inline': {'OPTION': VALUE, ...},
+            'local': {'OPTION': VALUE, ...},
         }
 
     Returns ``None`` if we can't find :file:`mrjob.conf`.
@@ -204,7 +224,18 @@ def load_mrjob_conf(conf_path=None):
         if yaml:
             return yaml.safe_load(f)
         else:
-            return json.load(f)
+            try:
+                return json.load(f)
+            except json.JSONDecodeError, e:
+                msg = ('If your mrjob.conf is in YAML, you need to install'
+                       ' yaml; see http://pypi.python.org/pypi/PyYAML/')
+                # JSONDecodeError currently has a msg attr, but it may not in
+                # the future
+                if hasattr(e, 'msg'):
+                    e.msg = '%s (%s)' % (e.msg, msg)
+                else:
+                    e.msg = msg
+                raise e
 
 
 def load_opts_from_mrjob_conf(runner_alias, conf_path=None):

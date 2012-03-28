@@ -201,9 +201,8 @@ def real_mrjob_conf_path(conf_path=None):
         return None
     elif conf_path is None:
         conf_path = find_mrjob_conf()
-        if conf_path is None:
-            return None
-    return conf_path
+    else:
+        return conf_path
 
 
 def conf_object_at_path(conf_path):

@@ -179,6 +179,7 @@ Running specific parts of jobs
 .. automethod:: MRJob.run_job
 .. automethod:: MRJob.run_mapper
 .. automethod:: MRJob.run_reducer
+.. automethod:: MRJob.run_combiner
 .. automethod:: MRJob.show_steps
 
 .. _hadoop-config:

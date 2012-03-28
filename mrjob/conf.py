@@ -39,9 +39,10 @@ job to have access to so that you don't have to think about it. For example:
 - where temp directories and logs should go
 - security credentials
 
-:file:`mrjob.conf` is just a `YAML <http://www.yaml.org>`_-encoded dictionary
-containing default values to pass in to the constructors of the various runner
-classes. Here's a minimal :file:`mrjob.conf`:
+:file:`mrjob.conf` is just a `YAML <http://www.yaml.org>`_- or `JSON
+<http://www.json.org>`_-encoded dictionary containing default values to pass in
+to the constructors of the various runner classes. Here's a minimal
+:file:`mrjob.conf`:
 
 .. code-block:: yaml
 

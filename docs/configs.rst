@@ -68,6 +68,9 @@ example in JSON:
       }
     }
 
+Precedence and combining options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 Options specified on the command-line take precedence over
 :file:`mrjob.conf`. Usually this means simply overriding the option in
 :file:`mrjob.conf`. However, we know that *cmdenv* contains environment
@@ -95,8 +98,8 @@ What's going on here is that *cmdenv* is associated with
 :py:func:`combine_envs`. Each option is associated with an appropriate
 combiner function that that combines options in an appropriate way.
 
-Combiners can also do useful things like expanding environment variables and
-globs in paths. For example, you could set:
+Combiner functions can also do useful things like expanding environment
+variables and globs in paths. For example, you could set:
 
 .. code-block:: yaml
 
@@ -118,3 +121,47 @@ of them.
 
 See :doc:`configs-runners` for the entire dizzying array of configurable
 options.
+
+Using multiple config files
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you have several standard configurations, you may want to have several
+config files "inherit" from a base config file. For example, you may have one
+set of AWS credentials, but two code bases and default instance sizes. To
+accomplish this, use the ``include`` option:
+
+:file:`/etc/mrjob.very-large.conf`:
+
+.. code-block:: yaml
+
+    include: /etc/mrjob.base.conf
+    runners:
+        emr:
+            num_ec2_core_instances: 20
+            ec2_core_instace_type: m1.xlarge
+
+:file:`/etc/mrjob.very-small.conf`:
+
+.. code-block:: yaml
+
+    include: /etc/mrjob.base.conf
+    runners:
+        emr:
+            num_ec2_core_instances: 2
+            ec2_core_instace_type: m1.small
+
+:file:`/etc/mrjob.base.conf`:
+
+.. code-block:: yaml
+
+    runners:
+        emr:
+            aws_access_key_id: HADOOPHADOOPBOBADOOP
+            # We run on in the west region because we're located on the west coast,
+            # and there are no eventual consistency issues with newly created S3 keys.
+            aws_region: us-west-1
+            aws_secret_access_key: MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP
+            ec2_core_instace_type: m1.xlarge
+
+Options that are lists, commands, dictionaries, etc. combine the same way they
+do between the config files and the command line (with combiner functions).

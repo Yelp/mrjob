@@ -1,5 +1,5 @@
-mrjob.job.MRJob - base class for all jobs
-=========================================
+MRJob - Base class for all jobs
+===============================
 
 .. py:module:: mrjob.job
 

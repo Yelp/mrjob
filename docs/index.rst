@@ -13,13 +13,14 @@ To get started, install with ``pip``::
 
     pip install mrjob
 
-Then read :ref:`writing-and-running`. Other common documentation destinations
+Then read :doc:`writing-and-running`. Other common documentation destinations
 are:
 
 * :ref:`mrjob.conf`
-* :ref:`configs-reference`
-* :ref:`runners-emr`
-* :ref:`tools`
+* :doc:`configs-reference`
+* :doc:`job`
+* :doc:`runners-emr`
+* :doc:`tools`
 
 Table of Contents
 =================
@@ -29,8 +30,8 @@ Table of Contents
 
     whats-new.rst
     writing-and-running.rst
-    configs.rst
     job.rst
+    configs.rst
     protocols.rst
     runners.rst
     utils.rst

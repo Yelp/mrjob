@@ -1,5 +1,5 @@
-Runner configuration
-====================
+Configuration
+=============
 .. toctree::
 
     configs-runners.rst

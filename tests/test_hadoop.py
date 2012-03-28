@@ -257,15 +257,15 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         self._test_end_to_end(['--hadoop-bin', self.hadoop_bin])
 
 
-class TestCat(MockHadoopTestCase):
+class TestFilesystem(MockHadoopTestCase):
 
     def setUp(self):
-        super(TestCat, self).setUp()
+        super(TestFilesystem, self).setUp()
         self.make_tmp_dir()
 
     def tearDown(self):
         self.rm_tmp_dir()
-        super(TestCat, self).tearDown()
+        super(TestFilesystem, self).tearDown()
 
     def make_tmp_dir(self):
         self.tmp_dir = tempfile.mkdtemp()
@@ -321,6 +321,34 @@ class TestCat(MockHadoopTestCase):
                 output.append(line)
 
         self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
+
+    def test_du(self):
+        root = os.environ['MOCK_HDFS_ROOT']
+        data_path_1 = os.path.join(root, 'data1')
+        with open(data_path_1, 'w') as f:
+            f.write("abcd")
+        remote_data_1 = 'hdfs:///data1'
+
+        data_dir = os.path.join(root, 'more')
+        os.mkdir(data_dir)
+        remote_dir = 'hdfs:///more'
+
+        data_path_2 = os.path.join(data_dir, 'data2')
+        with open(data_path_2, 'w') as f:
+            f.write("defg")
+        remote_data_2 = 'hdfs:///more/data2'
+
+        data_path_3 = os.path.join(data_dir, 'data3')
+        with open(data_path_3, 'w') as f:
+            f.write("hijk")
+        remote_data_2 = 'hdfs:///more/data3'
+
+        runner = HadoopJobRunner(conf_path=False)
+        self.assertEqual(runner.du(root), 12)
+        self.assertEqual(runner.du(remote_dir), 8)
+        self.assertEqual(runner.du(remote_dir + '/*'), 8)
+        self.assertEqual(runner.du(remote_data_1), 4)
+        self.assertEqual(runner.du(remote_data_2), 4)
 
 
 class TestURIs(MockHadoopTestCase):

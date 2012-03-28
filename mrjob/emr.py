@@ -281,11 +281,22 @@ def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
     return s3_tmp_uri + 'locks/' + emr_job_flow_id + '/' + str(step_num)
 
 
-def _lock_acquire_step_1(s3_conn, lock_uri, job_name):
+def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
     bucket_name, key_prefix = parse_s3_uri(lock_uri)
     bucket = s3_conn.get_bucket(bucket_name)
     key = bucket.get_key(key_prefix)
-    if key is None:
+
+    # EMRJobRunner should start using a job flow within about a second of
+    # locking it, so if it's been a while, then it probably crashed and we
+    # can just use this job flow.
+    key_expired = False
+    if key and mins_to_expiration is not None:
+        last_modified = iso8601_to_datetime(key.last_modified)
+        age = datetime.utcnow() - last_modified
+        if age > timedelta(minutes=mins_to_expiration):
+            key_expired = True
+
+    if key is None or key_expired:
         key = bucket.new_key(key_prefix)
         key.set_contents_from_string(job_name)
         return key
@@ -298,11 +309,12 @@ def _lock_acquire_step_2(key, job_name):
     return (key_value == job_name)
 
 
-def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name):
+def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name,
+                            mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
-    key = _lock_acquire_step_1(s3_conn, lock_uri, job_name)
+    key = _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration)
     if key is not None:
         time.sleep(sync_wait_time)
         success = _lock_acquire_step_2(key, job_name)
@@ -1786,15 +1798,20 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         """
         for path in paths:
             m = regexp.match(path)
-            if m:
-                if step_nums is None or int(m.group('step_num')) in step_nums:
-                    yield path
+            if (m and
+                (step_nums is None or
+                 int(m.group('step_num')) in step_nums)):
+                yield path
+            else:
+                log.debug('Ignore %s' % path)
 
     ## SSH LOG FETCHING
 
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
-        return self.ls(SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path)
+        full_path = SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path
+        log.debug('Search %s for logs' % full_path)
+        return self.ls(full_path)
 
     def _ls_slave_ssh_logs(self, addr, relative_path):
         """List logs over multi-hop SSH by path relative to log root directory
@@ -1803,6 +1820,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                    self._address_of_master(),
                                    addr,
                                    SSH_LOG_ROOT + '/' + relative_path)
+        log.debug('Search %s for logs' % root_path)
         return self.ls(root_path)
 
     def ls_task_attempt_logs_ssh(self, step_nums):
@@ -1856,7 +1874,9 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         if not self._s3_job_log_uri:
             raise LogFetchError('Could not determine S3 job log URI')
 
-        return self.ls(self._s3_job_log_uri + relative_path)
+        full_path = self._s3_job_log_uri + relative_path
+        log.debug('Search %s for logs' % full_path)
+        return self.ls(full_path)
 
     def ls_task_attempt_logs_s3(self, step_nums):
         return self._enforce_path_regexp(self._ls_s3_logs('task-attempts/'),
@@ -2357,18 +2377,20 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 num_steps=num_steps)
             if sorted_tagged_job_flows:
                 job_flow = sorted_tagged_job_flows[-1]
-                lock_uri = make_lock_uri(self._opts['s3_scratch_uri'],
-                                         job_flow.jobflowid,
-                                        len(job_flow.steps) + 1)
                 status = attempt_to_acquire_lock(
-                    s3_conn, lock_uri, self._opts['s3_sync_wait_time'],
-                    self._job_name)
+                    s3_conn, self._lock_uri(job_flow),
+                    self._opts['s3_sync_wait_time'], self._job_name)
                 if status:
                     return sorted_tagged_job_flows[-1]
                 else:
                     exclude.add(job_flow.jobflowid)
             else:
                 return None
+
+    def _lock_uri(self, job_flow):
+        return make_lock_uri(self._opts['s3_scratch_uri'],
+                             job_flow.jobflowid,
+                             len(job_flow.steps) + 1)
 
     def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to
@@ -2422,7 +2444,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def du(self, path_glob):
         """Get the size of all files matching path_glob."""
         if not is_s3_uri(path_glob):
-            return super(EMRJobRunner, self).getsize(path_glob)
+            return super(EMRJobRunner, self).du(path_glob)
 
         return sum(self.get_s3_key(uri).size for uri in self.ls(path_glob))
 

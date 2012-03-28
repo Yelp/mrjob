@@ -555,7 +555,7 @@ class LocalMRJobRunner(MRJobRunner):
         # be true if we're just using pipes to simulate a combiner though
         j['mapreduce.task.ismap'] = str(step_type in ('M', 'C')).lower()
 
-        j['mapreduce.task.partition'] = str(step_num)
+        j['mapreduce.task.partition'] = str(task_num)
 
         if input_file is not None:
             j['mapreduce.map.input.file'] = input_file

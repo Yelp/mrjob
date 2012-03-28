@@ -72,11 +72,13 @@ def err_xml(message, type='Sender', code='ValidationError'):
 
 ### S3 ###
 
-def add_mock_s3_data(mock_s3_fs, data):
+def add_mock_s3_data(mock_s3_fs, data, time_modified=None):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
     key to contents) with a map from bucket name to key name to data and
     time last modified."""
-    time_modified = to_iso8601(datetime.utcnow())
+    if time_modified is None:
+        time_modified = datetime.utcnow()
+    time_modified = to_iso8601(time_modified)
     for bucket_name, key_name_to_bytes in data.iteritems():
         mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
@@ -242,6 +244,10 @@ class MockKey(object):
         return m.hexdigest()
 
     etag = property(_get_etag)
+
+    @property
+    def size(self):
+        return len(self.get_contents_as_string())
 
 
 ### EMR ###

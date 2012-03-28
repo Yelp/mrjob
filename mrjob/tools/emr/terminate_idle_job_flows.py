@@ -80,7 +80,7 @@ def main():
     if args:
         option_parser.error('takes no arguments')
 
-    MRJob.set_up_logging(quiet=(options.quietness>=1),
+    MRJob.set_up_logging(quiet=options.quiet,
                          verbose=options.verbose)
 
     inspect_and_maybe_terminate_job_flows(
@@ -93,7 +93,7 @@ def main():
         pool_name=options.pool_name,
         pooled_only=options.pooled_only,
         max_mins_locked=options.max_mins_locked,
-        quiet=(options.quietness>=2),
+        quiet=options.quiet,
     )
 
 
@@ -341,7 +341,7 @@ def make_option_parser():
         action='store_true',
         help='Print more messages')
     option_parser.add_option(
-        '-q', '--quiet', dest='quietness', action='count',
+        '-q', '--quiet', dest='quiet', action='count',
         help=("Don't print anything to stderr; just print IDs of terminated"
               " job flows and idle time information to stdout. Use twice"
               " to print absolutely nothing."))

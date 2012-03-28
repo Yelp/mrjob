@@ -283,7 +283,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         # don't print anything out
         real_stdout = sys.stdout
-        sys.stdout = StringIO() if stdout is None else stdout
+        sys.stdout = stdout or StringIO()
         try:
             return inspect_and_maybe_terminate_job_flows(**kwargs)
         finally:

@@ -157,3 +157,6 @@ accomplish this, use the ``include`` option:
 
 Options that are lists, commands, dictionaries, etc. combine the same way they
 do between the config files and the command line (with combiner functions).
+
+You can use ``$ENVIRONMENT_VARIABLES`` and ``~/file_in_your_home_dir`` inside
+``include``.

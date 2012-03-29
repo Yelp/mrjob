@@ -120,8 +120,11 @@ def conf_object_at_path(conf_path):
                 raise e
 
 
+# TODO 0.4: move to tests.test_conf
 def load_mrjob_conf(conf_path=None):
-    """Load the entire data structure in :file:`mrjob.conf`, which should
+    """.. deprecated:: 0.3.3
+
+    Load the entire data structure in :file:`mrjob.conf`, which should
     look something like this::
 
         {'runners':
@@ -138,6 +141,7 @@ def load_mrjob_conf(conf_path=None):
                       ``False``, we'll always return ``None``.
     """
     # Only used by mrjob tests and possibly third parties.
+    log.warn('mrjob.conf.load_mrjob_conf is deprecated.')
     conf_path = real_mrjob_conf_path(conf_path)
     return conf_object_at_path(conf_path)
 

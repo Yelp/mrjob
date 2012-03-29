@@ -93,7 +93,7 @@ def real_mrjob_conf_path(conf_path=None):
     if conf_path is False:
         return None
     elif conf_path is None:
-        conf_path = find_mrjob_conf()
+        return find_mrjob_conf()
     else:
         return conf_path
 
@@ -120,8 +120,11 @@ def conf_object_at_path(conf_path):
                 raise e
 
 
+# TODO 0.4: move to tests.test_conf
 def load_mrjob_conf(conf_path=None):
-    """Load the entire data structure in :file:`mrjob.conf`, which should
+    """.. deprecated:: 0.3.3
+
+    Load the entire data structure in :file:`mrjob.conf`, which should
     look something like this::
 
         {'runners':
@@ -138,18 +141,26 @@ def load_mrjob_conf(conf_path=None):
                       ``False``, we'll always return ``None``.
     """
     # Only used by mrjob tests and possibly third parties.
+    log.warn('mrjob.conf.load_mrjob_conf is deprecated.')
     conf_path = real_mrjob_conf_path(conf_path)
     return conf_object_at_path(conf_path)
 
 
-def load_opts_from_mrjob_conf(runner_alias, conf_path=None, loaded=None):
+def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
+                              already_loaded=None):
     """Load a list of dictionaries representing the options in a given
     mrjob.conf for a specific runner. Returns ``[(path, values)]``. If conf_path
     is not found, return [(None, {})].
 
+    :type runner_alias: str
+    :param runner_alias: String identifier of the runner type, e.g. ``emr``,
+                         ``local``, etc.
     :type conf_path: str
     :param conf_path: an alternate place to look for mrjob.conf. If this is
                       ``False``, we'll always return ``{}``.
+    :type already_loaded: list
+    :param already_loaded: list of :file:`mrjob.conf` paths that have already
+                           been loaded
     """
     # Used to use load_mrjob_conf() here, but we need both the 'real' path and
     # the conf object, which we can't get cleanly from load_mrjob_conf.  This
@@ -161,10 +172,10 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None, loaded=None):
     if conf is None:
         return [(None, {})]
 
-    if loaded is None:
-        loaded = []
+    if already_loaded is None:
+        already_loaded = []
 
-    loaded.append(conf_path)
+    already_loaded.append(conf_path)
 
     try:
         values = conf['runners'][runner_alias] or {}
@@ -173,15 +184,21 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None, loaded=None):
                     runner_alias)
         values = {}
 
-    parent = []
+    inherited = []
     if conf.get('include', None):
-        if conf['include'] in loaded:
-            log.warn('%s tries to recursively include %s! (Already included:'
-                     ' %s)' % (conf_path, conf['include'], ', '.join(loaded)))
-        else:
-            parent = load_opts_from_mrjob_conf(runner_alias, conf['include'],
-                                               loaded)
-    return parent + [(conf_path, values)]
+        includes = conf['include']
+        if isinstance(includes, basestring):
+            includes = [includes]
+
+        for include in includes:
+            if include in already_loaded:
+                log.warn('%s tries to recursively include %s! (Already included:'
+                         ' %s)' % (conf_path, conf['include'],
+                                   ', '.join(already_loaded)))
+            else:
+                inherited.extend(load_opts_from_mrjob_conf(
+                                    runner_alias, include, already_loaded))
+    return inherited + [(conf_path, values)]
 
 
 def dump_mrjob_conf(conf, f):

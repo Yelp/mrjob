@@ -124,11 +124,11 @@ config files "inherit" from a base config file. For example, you may have one
 set of AWS credentials, but two code bases and default instance sizes. To
 accomplish this, use the ``include`` option:
 
-:file:`$MRJOB_CONFIGS/mrjob.very-large.conf`:
+:file:`~/mrjob.very-large.conf`:
 
 .. code-block:: yaml
 
-    include: /etc/mrjob.base.conf
+    include: ~/.mrjob.base.conf
     runners:
         emr:
             num_ec2_core_instances: 20
@@ -138,27 +138,53 @@ accomplish this, use the ``include`` option:
 
 .. code-block:: yaml
 
-    include: /etc/mrjob.base.conf
+    include: $HOME/.mrjob.base.conf
     runners:
         emr:
             num_ec2_core_instances: 2
             ec2_core_instace_type: m1.small
 
-:file:`/etc/mrjob.base.conf`:
+:file:`~/.mrjob.base.conf`:
 
 .. code-block:: yaml
 
     runners:
         emr:
             aws_access_key_id: HADOOPHADOOPBOBADOOP
-            # We run on in the west region because we're located on the west coast,
-            # and there are no eventual consistency issues with newly created S3 keys.
             aws_region: us-west-1
             aws_secret_access_key: MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP
-            ec2_core_instace_type: m1.xlarge
 
 Options that are lists, commands, dictionaries, etc. combine the same way they
 do between the config files and the command line (with combiner functions).
 
 You can use ``$ENVIRONMENT_VARIABLES`` and ``~/file_in_your_home_dir`` inside
 ``include``.
+
+You can inherit from multiple config files by passing ``include`` a list instead
+of a string. Files on the right will have precedence over files on the left.
+To continue the above examples, this config:
+
+:file:`~/.mrjob.everything.conf`
+
+.. code-block:: yaml
+
+    include:
+    - ~/.mrjob.very-small.conf
+    - ~/.mrjob.very-large.conf
+
+will be equivalent to this one:
+
+:file:`~/.mrjob.everything-2.conf`
+
+.. code-block:: yaml
+
+    runners:
+        emr:
+            aws_access_key_id: HADOOPHADOOPBOBADOOP
+            aws_region: us-west-1
+            aws_secret_access_key: MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP
+            num_ec2_core_instances: 20
+            ec2_core_instace_type: m1.xlarge
+
+In this case, :file:`~/.mrjob.very-large.conf` has taken precedence over
+:file:`~/.mrjob.very-small.conf`.

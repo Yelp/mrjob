@@ -585,7 +585,35 @@ sys.exit(13)
                           runner._invoke_sort, [self.a, self.b], self.out)
 
 
-class MultipleConfigFilesTestCase(unittest.TestCase):
+class ConfigFilesTestCase(unittest.TestCase):
+
+    def setUp(self):
+        super(ConfigFilesTestCase, self).setUp()
+        self.make_tmp_dir()
+
+    def tearDown(self):
+        super(ConfigFilesTestCase, self).tearDown()
+        self.rm_tmp_dir()
+
+    def make_tmp_dir(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    def rm_tmp_dir(self):
+        shutil.rmtree(self.tmp_dir)
+
+    def save_conf(self, name, conf):
+        conf_path = os.path.join(self.tmp_dir, name)
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf(conf, f)
+        return conf_path
+
+    def opts_for_conf(self, name, conf):
+        conf_path = self.save_conf(name, conf)
+        runner = LocalMRJobRunner(conf_path=conf_path)
+        return runner._opts
+
+
+class MultipleConfigFilesTestCase(ConfigFilesTestCase):
 
     BASIC_CONF = {
         'runners': {
@@ -636,32 +664,10 @@ class MultipleConfigFilesTestCase(unittest.TestCase):
 
     def setUp(self):
         super(MultipleConfigFilesTestCase, self).setUp()
-        self.make_tmp_dir()
         self.opts_1 = self.opts_for_conf('mrjob.conf',
                                          self.BASIC_CONF)
         self.opts_2 = self.opts_for_conf('mrjob.larger.conf',
                                          self.larger_conf())
-
-    def tearDown(self):
-        super(MultipleConfigFilesTestCase, self).tearDown()
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
-    def save_conf(self, name, conf):
-        conf_path = os.path.join(self.tmp_dir, name)
-        with open(conf_path, 'w') as f:
-            dump_mrjob_conf(conf, f)
-        return conf_path
-
-    def opts_for_conf(self, name, conf):
-        conf_path = self.save_conf(name, conf)
-        runner = LocalMRJobRunner(conf_path=conf_path)
-        return runner._opts
 
     def test_combine_cmds(self):
         self.assertEqual(self.opts_1['python_bin'], ['py3k'])
@@ -717,3 +723,37 @@ class MultipleConfigFilesTestCase(unittest.TestCase):
             runner = LocalMRJobRunner(conf_path=path)
             self.assertIn('%s tries to recursively include %s!' % (path, path),
                           stderr.getvalue())
+
+
+class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
+
+    BASE_CONFIG_LEFT = {
+        'runners': {
+            'local': {
+                'jobconf': dict(from_left=1, from_both=1),
+                'label': 'i_dont_like_to_be_labelled',
+            }
+        }
+    }
+
+    BASE_CONFIG_RIGHT = {
+        'runners': {
+            'local': {
+                'jobconf': dict(from_right=2, from_both=2),
+                'owner': 'ownership_is_against_my_principles'
+            }
+        }
+    }
+
+    def test_mrjob_has_multiple_inheritance_next_lets_add_generics(self):
+        path_left = self.save_conf('left.conf', self.BASE_CONFIG_LEFT)
+        path_right = self.save_conf('right.conf', self.BASE_CONFIG_RIGHT)
+        opts_both = self.opts_for_conf('both.conf',
+                                       dict(include=[path_left, path_right]))
+
+        self.assertEqual(opts_both['jobconf'],
+                         dict(from_left=1, from_both=2, from_right=2))
+        self.assertEqual(opts_both['label'],
+                         'i_dont_like_to_be_labelled')
+        self.assertEqual(opts_both['owner'],
+                         'ownership_is_against_my_principles')

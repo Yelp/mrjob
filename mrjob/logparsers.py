@@ -50,10 +50,14 @@ TASK_ATTEMPTS_LOG_URI_RE = re.compile(
 STEP_LOG_URI_RE = re.compile(
     r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)$')
 
-# regex for matching job log URIs
+# regex for matching job log URIs. There is some variety in how these are
+# formatted, so this expression is pretty general.
 EMR_JOB_LOG_URI_RE = re.compile(
-    r'^.*?/.+?_(?P<mystery_string_1>\d+)_job_(?P<timestamp>\d+)'
-    r'_(?P<step_num>\d+)_hadoop_streamjob(?P<mystery_string_2>\d+).jar$')
+    r'^.*?'     # sometimes there is a number at the beginning, and the
+                # containing directory can be almost anything.
+    r'job_(?P<timestamp>\d+)_(?P<step_num>\d+)' # oh look, meaningful data!
+    r'(_\d+)?'  # sometimes there is a number here.
+    r'_hadoop_streamjob(\d+).jar$')
 HADOOP_JOB_LOG_URI_RE = re.compile(
     r'^.*?/job_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<mystery_string_1>\d+)'
     r'_(?P<user>.*?)_streamjob(?P<mystery_string_2>\d+).jar$')

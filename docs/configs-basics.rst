@@ -167,8 +167,8 @@ To continue the above examples, this config:
 .. code-block:: yaml
 
     include:
-        - ~/.mrjob.very-small.conf
-        - ~/.mrjob.very-large.conf
+    - ~/.mrjob.very-small.conf
+    - ~/.mrjob.very-large.conf
 
 will be equivalent to this one:
 

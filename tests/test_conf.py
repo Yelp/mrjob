@@ -141,8 +141,9 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         with open(dot_mrjob_path, 'w') as f:
             f.write('{"runners": {"foo": {"bar": "baz"}}}')
 
-        self.assertEqual(load_mrjob_conf(),
-                         {'runners': {'foo': {'bar': 'baz'}}})
+        with no_handlers_for_logger('mrjob.conf'):
+            self.assertEqual(load_mrjob_conf(),
+                             {'runners': {'foo': {'bar': 'baz'}}})
         self.assertEqual(load_opts_from_mrjob_conf('foo')[0][1],
                          {'bar': 'baz'})
 
@@ -151,9 +152,10 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         with open(conf_path, 'w') as f:
             f.write('{"runners": {"foo": {"qux": "quux"}}}')
 
-        self.assertEqual(
-            load_mrjob_conf(conf_path=conf_path),
-            {'runners': {'foo': {'qux': 'quux'}}})
+        with no_handlers_for_logger('mrjob.conf'):
+            self.assertEqual(
+                load_mrjob_conf(conf_path=conf_path),
+                {'runners': {'foo': {'qux': 'quux'}}})
         self.assertEqual(
             load_opts_from_mrjob_conf('foo', conf_path=conf_path)[0][1],
             {'qux': 'quux'})
@@ -168,7 +170,8 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
         dump_mrjob_conf(conf, open(conf_path, 'w'))
-        self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
+        with no_handlers_for_logger('mrjob.conf'):
+            self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
 
 
 class MRJobConfDeprecatedLocationTestCase(MRJobConfTestCase):

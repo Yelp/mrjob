@@ -357,7 +357,7 @@ class EMRJobRunner(MRJobRunner):
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.emr.EMRJobRunner` takes the same arguments as
         :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
-        which can be defaulted in :py:mod:`mrjob.conf`.
+        which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
 
         *aws_access_key_id* and *aws_secret_access_key* are required if you
         haven't set them up already for boto (e.g. by setting the environment
@@ -843,7 +843,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             # issue a warning if we used both kinds of instance number
             # options on the command line or in mrjob.conf
             if (self._opt_priority['num_ec2_instances'] >= 2 and
-                self._opt_priority['num_ec2_instances'] ==
+                self._opt_priority['num_ec2_instances'] <=
                 max(self._opt_priority['num_ec2_core_instances'],
                     self._opt_priority['num_ec2_task_instances'])):
                 log.warn('Mixing num_ec2_instances and'
@@ -866,8 +866,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 self._opts['ec2_slave_instance_type'] = ec2_instance_type
 
             # master instance only does work when it's the only instance
-            if (self._opts['num_ec2_core_instances'] == 0 and
-                self._opts['num_ec2_task_instances'] == 0 and
+            if (self._opts['num_ec2_core_instances'] <= 0 and
+                self._opts['num_ec2_task_instances'] <= 0 and
                 (self._opt_priority['ec2_instance_type'] >
                  self._opt_priority['ec2_master_instance_type'])):
                 self._opts['ec2_master_instance_type'] = ec2_instance_type

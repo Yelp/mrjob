@@ -4,7 +4,7 @@ Getting started
 Writing and running a job
 -------------------------
 
-To create your own map reduce job, subclass :py:class:`MRJob`, create a
+To create your own map reduce job, subclass :py:class:`~mrjob.job.MRJob`, create a
 series of mappers and reducers, and override :py:meth:`~mrjob.job.MRJob.steps`. For example, a word counter::
 
     from mrjob.job import MRJob
@@ -125,6 +125,12 @@ process.
 Increasing the task timeout
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. warning::
+
+    Some EMR AMIs appear to not support setting parameters like
+    timeout with ``jobconf`` at run time. Instead, you must use
+    :ref:`bootstrap-time-configuration`.
+
 If your mappers or reducers take a long time to process a single step, you may
 want to increase the amount of time Hadoop lets them run before failing them
 as timeouts. You can do this with ``jobconf`` and the version-appropriate
@@ -182,8 +188,10 @@ supports glob syntax::
         bootstrap_python_packages:
         - $MY_SOURCE_TREE/emr_packages/*.tar.gz
 
-Setting parameters in mapred-site.xml
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _bootstrap-time-configuration:
+
+Bootstrap-time configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Some Hadoop options, such as the maximum number of running map tasks per node,
 must be set at bootstrap time and will not work with `--jobconf`. You must use

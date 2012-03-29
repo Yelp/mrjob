@@ -1,4 +1,4 @@
-v0.3.3, 2012-03-29 -- Bugs bugs bugs bugs bugs FEATURES!
+v0.3.3, 2012-03-29 -- Bug...bug...bug...bug...bug...FEATURE!
  * EMR:
    * Error detection code follows symlinks in Hadoop logs (#396)
    * terminate_idle_job_flows locks job flows before terminating them (#391)

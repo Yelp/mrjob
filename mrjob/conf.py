@@ -95,7 +95,7 @@ def real_mrjob_conf_path(conf_path=None):
     elif conf_path is None:
         return find_mrjob_conf()
     else:
-        return conf_path
+        return expand_path(conf_path)
 
 
 def conf_object_at_path(conf_path):

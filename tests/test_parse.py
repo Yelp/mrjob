@@ -354,6 +354,29 @@ class FindMiscTestCase(unittest.TestCase):
         self.assertIn('\\', counters['weird counters'])
         self.assertEqual(step_num, 1)
 
+    def test_ambiguous_version_counter(self):
+        # minimum text required to match counter line regex
+        line = r'JOBID="_1" COUNTERS="{(a.b:1,)(c)[(.d:2)(,e.f:2)(1)]}"'
+        counters_018, _ = parse_hadoop_counters_from_line(
+                            line, hadoop_version='0.18')
+        counters_020, _ = parse_hadoop_counters_from_line(
+                            line, hadoop_version='0.20')
+        counters_inf, _ = parse_hadoop_counters_from_line(line)
+        self.assertEqual(counters_018, {
+            '{(a': {
+                'b': 1
+            },
+            ')(c)[(': {
+                'd': 2
+            },
+            'e': {
+                'f': 2
+            }
+        })
+        self.assertEqual(counters_020, {'c': {',e.f:2': 1}})
+        # if no version given, should default to 0.20 if possible
+        self.assertEqual(counters_020, counters_inf)
+
     def test_unescape(self):
         # cases covered by string_escape:
         self.assertEqual(counter_unescape(r'\n'), '\n')

@@ -15,8 +15,13 @@ All runners
 
 .. automethod:: mrjob.runner.MRJobRunner.__init__
 
-Locally
--------
+In-process local testing
+------------------------
+
+.. automethod:: mrjob.inline.InlineMRJobRunner.__init__
+
+Local Hadoop-like simulation
+----------------------------
 
 .. automethod:: mrjob.local.LocalMRJobRunner.__init__
 
@@ -29,11 +34,6 @@ On your Hadoop cluster
 ----------------------
 
 .. automethod:: mrjob.hadoop.HadoopJobRunner.__init__
-
-Alternate (debugger-friendly) local testing
--------------------------------------------
-
-.. automethod:: mrjob.inline.InlineMRJobRunner.__init__
 
 Getting configuration options out of runners
 --------------------------------------------

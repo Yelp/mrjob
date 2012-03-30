@@ -1968,7 +1968,7 @@ class MRJob(object):
         redefining this method is only for when you want to get fancy.
         """
         # For supporting typed bytes
-        if self.STREAMING_INTERFACE_TYPED_BYTES == self.STREAMING_INTERFACE:
+        if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
             self.HADOOP_OUTPUT_FORMAT = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
             return self.HADOOP_OUTPUT_FORMAT
         if self.options.hadoop_output_format:

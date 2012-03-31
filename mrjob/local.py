@@ -402,8 +402,6 @@ class LocalMRJobRunner(MRJobRunner):
                 if not outfile is None:
                     outfile.close()
 
-            outfile.close()
-
         return file_names
 
     def _step_input_paths(self):

@@ -33,6 +33,7 @@ import pipes
 import sys
 import tarfile
 import zipfile
+import tempfile
 
 
 class NullHandler(logging.Handler):
@@ -461,7 +462,7 @@ def strip_microseconds(delta):
     return timedelta(delta.days, delta.seconds)
 
 
-def tar_and_gzip(dir, out_path, filter=None, prefix=''):
+def tar_and_gzip(dir, out_path=None, filter=None, prefix=''):
     """Tar and gzip the given *dir* to a tarball at *out_path*.
 
     If we encounter symlinks, include the actual file, not the symlink.
@@ -482,22 +483,25 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
     if not filter:
         filter = lambda path: True
 
+    # Identify our archive name
+    if not out_path:
+        out_path = tempfile.mktemp() + '.tar.gz'
+
     # supposedly you can also call tarfile.TarFile(), but I couldn't
     # get this to work in Python 2.5.1. Please leave as-is.
-    tar_gz = tarfile.open(out_path, mode='w:gz')
+    with tarfile.open(out_path, mode='w:gz') as tar_gz:
+        for dirpath, dirnames, filenames in os.walk(dir):
+            for filename in filenames:
+                path = os.path.join(dirpath, filename)
+                # janky version of os.path.relpath() (Python 2.6):
+                rel_path = path[len(os.path.join(dir, '')):]
+                if filter(rel_path):
+                    # copy over real files, not symlinks
+                    real_path = os.path.realpath(path)
+                    path_in_tar_gz = os.path.join(prefix, rel_path)
+                    tar_gz.add(real_path, arcname=path_in_tar_gz, recursive=False)
 
-    for dirpath, dirnames, filenames in os.walk(dir):
-        for filename in filenames:
-            path = os.path.join(dirpath, filename)
-            # janky version of os.path.relpath() (Python 2.6):
-            rel_path = path[len(os.path.join(dir, '')):]
-            if filter(rel_path):
-                # copy over real files, not symlinks
-                real_path = os.path.realpath(path)
-                path_in_tar_gz = os.path.join(prefix, rel_path)
-                tar_gz.add(real_path, arcname=path_in_tar_gz, recursive=False)
-
-    tar_gz.close()
+    return out_path
 
 
 def unarchive(archive_path, dest):

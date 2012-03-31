@@ -1033,6 +1033,12 @@ class MRJob(object):
                   ' output should be sorted and distributed to reducers. For'
                   ' example: org.apache.hadoop.mapred.lib.HashPartitioner'))
 
+        self.add_passthrough_option(
+            '--python-files', type='string', default=[], action='append',
+            help=('Path to be archived and included in the PYTHONPATH of the mrjob'
+                  ' script when it runs (e.g., "~/mypath/*.py").  Inclusion is'
+                  'recursive.'))
+
         self.runner_opt_group.add_option(
             '--python-archive', dest='python_archives', default=[],
             action='append',
@@ -1629,6 +1635,7 @@ class MRJob(object):
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
             'partitioner': self.partitioner(),
+            'python_files': self.options.python_files,
             'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
             'setup_cmds': self.options.setup_cmds,

@@ -31,6 +31,7 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
 import tempfile
+from fnmatch import fnmatch
 
 try:
     from cStringIO import StringIO
@@ -231,6 +232,10 @@ class MRJobRunner(object):
         :type python_archives: list of str
         :param python_archives: same as upload_archives, except they get added
                                 to the job's :envvar:`PYTHONPATH`
+        :type python_files: list of str
+        :param python_files: path to be archived and included in the PYTHONPATH 
+                     of the mrjob script when it runs (e.g. "~/mypath/*.py").  
+                     Inclusion is recursive.
         :type python_bin: str
         :param python_bin: Name/path of alternate python binary for
                            mappers/reducers (e.g. for use with
@@ -320,6 +325,10 @@ class MRJobRunner(object):
             self._add_archive_for_upload(path)
         for path in self._opts['upload_files']:
             self._add_file_for_upload(path)
+
+        # translate python files into corresponding archives
+        self._opts['python_archives'] += \
+            map(self.__convert_to_archive, self._opts['python_files'])
 
         # set up python archives
         self._python_archives = []
@@ -432,6 +441,19 @@ class MRJobRunner(object):
                 'IF_SUCCESSFUL is not supported for cleanup_on_failure.'
                 ' Use NONE instead.')
 
+    def __convert_to_archive(self, relative_uri):
+        """ 
+        Given a source (e.g. './mypath/*.py#mydestination'), converts that 
+        source into the triple ('mypath', '*.py', 'mydestination'), uses the 
+        triple to create an archive.  Returns the archive name.
+        """
+        target, path = self._split_path(relative_uri) if '#' in relative_uri else (None, relative_uri)
+        path_components = os.path.split(path)
+        directory, criteria = path_components if path_components[1] else (path, '*.py')
+        return tar_and_gzip(directory or '.',
+                            prefix=target or directory,
+                            filter=(lambda f: fnmatch(f, criteria)) if criteria else None)
+
     @classmethod
     def _allowed_opts(cls):
         """A list of the options that can be passed to :py:meth:`__init__`
@@ -448,6 +470,7 @@ class MRJobRunner(object):
             'jobconf',
             'label',
             'owner',
+            'python_files',
             'python_archives',
             'python_bin',
             'setup_cmds',
@@ -487,6 +510,7 @@ class MRJobRunner(object):
             'cmdenv': combine_envs,
             'hadoop_extra_args': combine_lists,
             'jobconf': combine_dicts,
+            'python_files': combine_lists,
             'python_archives': combine_path_lists,
             'python_bin': combine_cmds,
             'setup_cmds': combine_lists,

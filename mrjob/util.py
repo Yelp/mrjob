@@ -348,20 +348,24 @@ def read_file(path, fileobj=None):
     - Decompress ``.gz`` and ``.bz2`` files.
     - If *fileobj* is not ``None``, stream lines from the *fileobj*
     """
-    if path.endswith('.gz'):
-        f = gzip.GzipFile(path, fileobj=fileobj)
-    elif path.endswith('.bz2'):
-        if fileobj is None:
-            f = bz2.BZ2File(path)
+    try:
+        if path.endswith('.gz'):
+            f = gzip.GzipFile(path, fileobj=fileobj)
+        elif path.endswith('.bz2'):
+            if fileobj is None:
+                f = bz2.BZ2File(path)
+            else:
+                f = bunzip2_stream(fileobj)
+        elif fileobj is None:
+            f = open(path)
         else:
-            f = bunzip2_stream(fileobj)
-    elif fileobj is None:
-        f = open(path)
-    else:
-        f = fileobj
+            f = fileobj
 
-    for line in f:
-        yield line
+        for line in f:
+            yield line
+    finally:
+        if fileobj is None and not f is None: 
+            f.close()
 
 
 def bunzip2_stream(fileobj):

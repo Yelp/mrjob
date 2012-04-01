@@ -1661,7 +1661,7 @@ class MRJob(object):
             'conf_path': self.options.conf_path,
             'extra_args': self.generate_passthrough_arguments(),
             'file_upload_args': self.generate_file_upload_args(),
-            'hadoop_extra_args': self.options.hadoop_extra_args,
+            'hadoop_extra_args': self.hadoop_extra_args(),
             'hadoop_input_format': self.hadoop_input_format(),
             'hadoop_output_format': self.hadoop_output_format(),
             'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
@@ -2031,6 +2031,17 @@ class MRJob(object):
         """
         return combine_dicts(self.JOBCONF, self.options.jobconf)
 
+    ### hadoop_extra_args ###
+
+    def hadoop_extra_args(self):
+        """ Setting input and output formats for supporting typed bytes.
+        """
+        if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
+            self.options.hadoop_extra_args.extend(['-outputformat', 'org.apache.hadoop.mapred.SequenceFileOutputFormat'])
+            self.options.hadoop_extra_args.extend(['-inputformat', 'org.apache.hadoop.mapred.SequenceFileInputFormat'])
+
+        return self.options.hadoop_extra_args
+        
     ### Testing ###
 
     def sandbox(self, stdin=None, stdout=None, stderr=None):

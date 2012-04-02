@@ -48,17 +48,6 @@ from tests.quiet import no_handlers_for_logger
 
 class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        cls.cls_tmp_dir = tempfile.mkdtemp()
-        cls.mrjob_conf_path = os.path.join(cls.cls_tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'local': {}}},
-                        open(cls.mrjob_conf_path, 'w'))
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(cls.cls_tmp_dir)
-
     def setUp(self):
         self.make_tmp_dir_and_mrjob_conf()
 
@@ -67,6 +56,9 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
 
     def make_tmp_dir_and_mrjob_conf(self):
         self.tmp_dir = tempfile.mkdtemp()
+        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        dump_mrjob_conf({'runners': {'local': {}}},
+                        open(self.mrjob_conf_path, 'w'))
 
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)

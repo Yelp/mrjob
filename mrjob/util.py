@@ -534,3 +534,49 @@ def unarchive(archive_path, dest):
                         dest_file.write(archive.read(name))
     else:
         raise IOError('Unknown archive type: %s' % (archive_path,))
+
+
+def guess_relative_module_path(path):
+    """Try to convert the path to a module (i.e. __file__) to the path relative
+    to one of our import paths, to make error reporting more succinct. If we
+    can't, return the path as-is.
+
+    :type path: str
+    :param path: path to a module (e.g. __file__)
+
+    Paths will be converted to the actual path, skipping any symlinks
+
+    For example:
+    '/home/mrjob/mrjob/mrjob/job.py' -> 'mrjob/job.py'
+    '/scratch/mrjob/foo.py' -> '/scratch/mrjob/foo.py'
+
+    Suggested usage is:
+
+    from mrjob.util import guess_relative_module_path
+    guess_relative_module_path(__file__)
+    """
+    try:
+        path = os.path.realpath(path)
+    except:
+        return path
+
+    shortest_so_far = path
+
+    for import_path in sys.path:
+        try:
+            import_path = os.path.realpath(import_path)
+        except:
+            continue
+
+        if not import_path.endswith('/'):
+            import_path = import_path + '/'
+
+        if path.startswith(import_path):
+            rel_path = path[len(import_path):]
+            if len(rel_path) < len(shortest_so_far):
+                shortest_so_far = rel_path
+
+    if shortest_so_far.endswith('.pyc'):
+        shortest_so_far = shortest_so_far[:-1]
+
+    return shortest_so_far

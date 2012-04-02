@@ -100,6 +100,7 @@ from __future__ import with_statement
 import inspect
 import itertools
 import logging
+import traceback
 from optparse import Option
 from optparse import OptionParser
 from optparse import OptionGroup
@@ -123,6 +124,7 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import PROTOCOL_DICT
 from mrjob.protocol import RawValueProtocol
 from mrjob.runner import CLEANUP_CHOICES
+from mrjob.util import guess_relative_module_path
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
@@ -483,6 +485,68 @@ class MRJob(object):
         self.stderr.write('reporter:counter:%s,%s,%d\n' %
                           (group, counter, amount))
         self.stderr.flush()
+
+    def error_counter_wrapper(self, mr_step, msg=None):
+        """Wrap an MR step to catch all Python errors, and increment counters
+        with the tracebacks.
+
+        :type mr_step: function
+        :param mr_step: MapReduce step, e.g. self.mapper or self.reducer
+        :type msg: str
+        :param msg: defaults to 'Executing ``mr_step.__name__``'
+
+        To use, wrap your MR step functions in steps()::
+
+            def steps(self):
+                return [self.mr(mapper=self.error_counter_wrapper(self.mapper),
+                                reducer=self.error_counter_wrapper(self.reducer,
+                                    msg='executing first reducer')]
+
+        Increments two counters::
+
+        * (semicolon-delimeted stack trace, exception)
+
+        * (class name, 'Uncaught exception while ``msg``')
+
+        e.g. for a KeyError raised on line 7 of the mapper of mr_word_counter,
+        both
+
+        * ``mr_word_counter.py:7:KeyError('bad key'))`` and
+
+        * ``<class '__main__.MRWordCounter'>:Uncaught exception while executing mapper
+
+        will be incremented.
+        """
+        if msg is None:
+            msg = 'executing %s' % mr_step.__name__
+
+        def wrapped_mr_step(key, vals):
+            try:
+                for k, v in mr_step(key, vals):
+                    yield k, v
+            except:
+                # generic error handling
+                exc_type, exc, exc_traceback = sys.exc_info()
+                tb_stack = traceback.extract_tb(exc_traceback)
+
+                # compact info about each level in the stack trace
+                stack_info = []
+
+                # Append info for all but the first line of the stack trace,
+                # so that we don't include mrjob/job.py in the counter text.
+                for path, lineno, fname, code in tb_stack[1:]:
+                    stack_info.append('%s:%i' % (
+                        guess_relative_module_path(path), lineno))
+
+                self.increment_counter(';'.join(stack_info), repr(exc))
+
+                # self.__class__ will be the MRJob subclass, e.g.
+                # <class '__main__.MRWordCounter'>, as opposed to __file__
+                # which will always be 'mrjob/job.py'
+                self.increment_counter(self.__class__,
+                    'Uncaught exception while %s' % msg)
+
+        return wrapped_mr_step
 
     def set_status(self, msg):
         """Set the job status in hadoop streaming by printing to stderr.

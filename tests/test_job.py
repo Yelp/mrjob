@@ -186,6 +186,9 @@ class MRCustomBoringJob(MRBoringJob):
                              action='append', default=[])
 
 
+
+
+
 ### Test cases ###
 
 class MRTestCase(unittest.TestCase):
@@ -387,6 +390,36 @@ class CountersAndStatusTestCase(unittest.TestCase):
                          {'Bad items': {'a; b; c': 1},
                           'girl; interrupted': {'movie': 1}})
 
+
+class ErrorCountersTestCase(unittest.TestCase):
+
+    class MRExceptionJob(MRJob):
+        def mapper(self, key, value):
+            # Throw a KeyError
+            d = {}
+            d[1]
+            yield key, value
+
+        def reducer(self, key, values):
+            yield key, list(values)
+
+        def steps(self):
+            return [self.mr(
+                mapper=self.error_counter_wrapper(self.mapper),
+                reducer=self.reducer)]
+
+    def test_counters(self):
+        RAW_INPUT = StringIO('foo\nbar\nbaz\n')
+
+        mr_job = self.MRExceptionJob(['-r', 'inline', '--no-conf', '-'])
+        mr_job.sandbox(stdin=RAW_INPUT)
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            self.assertEqual(runner.counters(),
+                [{"<class 'tests.test_job.MRExceptionJob'>":
+                    {'Uncaught exception while executing mapper': 3},
+                'tests/test_job.py:400': {'KeyError(1;)': 3}}])
 
 class ProtocolsTestCase(unittest.TestCase):
     # not putting these in their own files because we're not going to invoke

@@ -48,6 +48,17 @@ from tests.quiet import no_handlers_for_logger
 
 class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        cls.cls_tmp_dir = tempfile.mkdtemp()
+        cls.mrjob_conf_path = os.path.join(cls.cls_tmp_dir, 'mrjob.conf')
+        dump_mrjob_conf({'runners': {'local': {}}},
+                        open(cls.mrjob_conf_path, 'w'))
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.cls_tmp_dir)
+
     def setUp(self):
         self.make_tmp_dir_and_mrjob_conf()
 
@@ -56,9 +67,6 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
 
     def make_tmp_dir_and_mrjob_conf(self):
         self.tmp_dir = tempfile.mkdtemp()
-        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'local': {}}},
-                        open(self.mrjob_conf_path, 'w'))
 
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
@@ -566,3 +574,83 @@ class CompatTestCase(unittest.TestCase):
             runner._setup_working_dir()
             self.assertIn('mapreduce_job_cache_local_archives',
                           runner._subprocess_env('M', 0, 0).keys())
+
+
+class TestHadoopConfArgs(unittest.TestCase):
+
+    def test_empty(self):
+        runner = LocalMRJobRunner(conf_path=False)
+        self.assertEqual(runner._hadoop_conf_args(0, 1), [])
+
+    def test_hadoop_extra_args(self):
+        extra_args = ['-foo', 'bar']
+        runner = LocalMRJobRunner(conf_path=False,
+                                  hadoop_extra_args=extra_args)
+        self.assertEqual(runner._hadoop_conf_args(0, 1), extra_args)
+
+    def test_cmdenv(self):
+        cmdenv = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
+        runner = LocalMRJobRunner(conf_path=False, cmdenv=cmdenv)
+        self.assertEqual(runner._hadoop_conf_args(0, 1),
+                         ['-cmdenv', 'BAX=Arnold',
+                          '-cmdenv', 'BAZ=qux',
+                          '-cmdenv', 'FOO=bar',
+                          ])
+
+    def test_hadoop_input_format(self):
+        format = 'org.apache.hadoop.mapred.SequenceFileInputFormat'
+        runner = LocalMRJobRunner(conf_path=False, hadoop_input_format=format)
+        self.assertEqual(runner._hadoop_conf_args(0, 1),
+                         ['-inputformat', format])
+        # test multi-step job
+        self.assertEqual(runner._hadoop_conf_args(0, 2),
+                         ['-inputformat', format])
+        self.assertEqual(runner._hadoop_conf_args(1, 2), [])
+
+    def test_hadoop_output_format(self):
+        format = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
+        runner = LocalMRJobRunner(conf_path=False, hadoop_output_format=format)
+        self.assertEqual(runner._hadoop_conf_args(0, 1),
+                         ['-outputformat', format])
+        # test multi-step job
+        self.assertEqual(runner._hadoop_conf_args(0, 2), [])
+        self.assertEqual(runner._hadoop_conf_args(1, 2),
+                     ['-outputformat', format])
+
+    def test_jobconf(self):
+        jobconf = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
+        runner = LocalMRJobRunner(conf_path=False, jobconf=jobconf)
+        self.assertEqual(runner._hadoop_conf_args(0, 1),
+                         ['-D', 'BAX=Arnold',
+                          '-D', 'BAZ=qux',
+                          '-D', 'FOO=bar',
+                          ])
+        runner = LocalMRJobRunner(conf_path=False, jobconf=jobconf,
+                                  hadoop_version='0.18')
+        self.assertEqual(runner._hadoop_conf_args(0, 1),
+                         ['-jobconf', 'BAX=Arnold',
+                          '-jobconf', 'BAZ=qux',
+                          '-jobconf', 'FOO=bar',
+                          ])
+
+    def test_partitioner(self):
+        partitioner = 'org.apache.hadoop.mapreduce.Partitioner'
+
+        runner = LocalMRJobRunner(conf_path=False, partitioner=partitioner)
+        self.assertEqual(runner._hadoop_conf_args(0, 1),
+                         ['-partitioner', partitioner])
+
+    def test_hadoop_extra_args_comes_first(self):
+        runner = LocalMRJobRunner(
+            cmdenv={'FOO': 'bar'},
+            conf_path=False,
+            hadoop_extra_args=['-libjar', 'qux.jar'],
+            hadoop_input_format='FooInputFormat',
+            hadoop_output_format='BarOutputFormat',
+            jobconf={'baz': 'quz'},
+            partitioner='java.lang.Object',
+        )
+        # hadoop_extra_args should come first
+        conf_args = runner._hadoop_conf_args(0, 1)
+        self.assertEqual(conf_args[:2], ['-libjar', 'qux.jar'])
+        self.assertEqual(len(conf_args), 12)

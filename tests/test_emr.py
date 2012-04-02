@@ -87,13 +87,17 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         self.unsandbox_boto()
         self.rm_mrjob_conf()
 
+    def mrjob_conf_contents(self):
+        return {'runners': {'emr': {
+                'check_emr_status_every': 0.01,
+                's3_sync_wait_time': 0.01,
+                'bootstrap_mrjob': False,
+            }}}
+
     def make_mrjob_conf(self):
         _, self.mrjob_conf_path = tempfile.mkstemp(prefix='mrjob.conf.')
         with open(self.mrjob_conf_path, 'w') as f:
-            dump_mrjob_conf({'runners': {'emr': {
-                'check_emr_status_every': 0.01,
-                's3_sync_wait_time': 0.01,
-            }}}, f)
+            dump_mrjob_conf(self.mrjob_conf_contents(), f)
 
     def rm_mrjob_conf(self):
         os.unlink(self.mrjob_conf_path)
@@ -1998,6 +2002,12 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             self.teardown_ssh()
         except (OSError, AttributeError):
             pass  # didn't set up SSH
+
+    def mrjob_conf_contents(self):
+        return {'runners': {'emr': {
+                'check_emr_status_every': 0.01,
+                's3_sync_wait_time': 0.01,
+            }}}
 
     def make_pooled_job_flow(self, name=None, minutes_ago=0, **kwargs):
         """Returns ``(runner, job_flow_id)``. Set minutes_ago to set

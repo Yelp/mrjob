@@ -51,6 +51,11 @@ class OptionStore(dict):
         else:
             raise KeyError(key)
 
+    def __setitem__(self, key):
+        if key in self.ALLOWED_KEYS:
+            return super(OptionStore, self).__getitem__(key)
+        else:
+            raise KeyError(key)
 
 ### READING AND WRITING mrjob.conf ###
 

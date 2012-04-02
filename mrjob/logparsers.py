@@ -67,7 +67,7 @@ NODE_LOG_URI_RE = re.compile(
     r'^.*?/hadoop-hadoop-(jobtracker|namenode).*.out$')
 
 
-def scan_for_counters_in_files(log_file_uris, runner, post_020_fmt=True):
+def scan_for_counters_in_files(log_file_uris, runner, hadoop_version):
     """Scan *log_file_uris* for counters, using *runner* for file system access
     """
     counters = {}
@@ -92,7 +92,7 @@ def scan_for_counters_in_files(log_file_uris, runner, post_020_fmt=True):
 
         for line in log_lines:
             new_counters, step_num = parse_hadoop_counters_from_line(
-                                        line, post_020_fmt)
+                                        line, hadoop_version)
             if new_counters:
                 counters[step_num] = new_counters
     return counters

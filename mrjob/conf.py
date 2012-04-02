@@ -41,6 +41,17 @@ except ImportError:
 log = logging.getLogger('mrjob.conf')
 
 
+class OptionStore(dict):
+
+    ALLOWED_KEYS = set()
+
+    def __getitem__(self, key):
+        if key in self.ALLOWED_KEYS:
+            return super(OptionStore, self).__getitem__(key)
+        else:
+            raise KeyError(key)
+
+
 ### READING AND WRITING mrjob.conf ###
 
 def find_mrjob_conf():

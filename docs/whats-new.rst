@@ -1,6 +1,15 @@
 What's New
 ==========
 
+For a complete list of changes, see `CHANGES.txt
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
+
+0.3.3
+-----
+
+You can now :ref:`include one config file from another
+<multiple-config-files>`.
+
 0.3.2
 -----
 
@@ -21,9 +30,6 @@ For more information, see :py:meth:`mrjob.emr.EMRJobRunner.__init__`.
 
 The new :py:mod:`~mrjob.tools.emr.report_long_jobs` tool alerts on jobs that
 have run for more than X hours.
-
-For a complete list of changes, see `CHANGES.txt
-<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
 0.3
 -----

@@ -87,13 +87,17 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         self.unsandbox_boto()
         self.rm_mrjob_conf()
 
+    def mrjob_conf_contents(self):
+        return {'runners': {'emr': {
+                'check_emr_status_every': 0.00,
+                's3_sync_wait_time': 0.00,
+                'bootstrap_mrjob': False,
+            }}}
+
     def make_mrjob_conf(self):
         _, self.mrjob_conf_path = tempfile.mkstemp(prefix='mrjob.conf.')
         with open(self.mrjob_conf_path, 'w') as f:
-            dump_mrjob_conf({'runners': {'emr': {
-                'check_emr_status_every': 0.01,
-                's3_sync_wait_time': 0.01,
-            }}}, f)
+            dump_mrjob_conf(self.mrjob_conf_contents(), f)
 
     def rm_mrjob_conf(self):
         os.unlink(self.mrjob_conf_path)
@@ -203,8 +207,8 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
     def put_additional_emr_info_in_mrjob_conf(self):
         with open(self.mrjob_conf_path, 'w') as f:
             dump_mrjob_conf({'runners': {'emr': {
-                'check_emr_status_every': 0.01,
-                's3_sync_wait_time': 0.01,
+                'check_emr_status_every': 0.00,
+                's3_sync_wait_time': 0.00,
                 'additional_emr_info': {'key': 'value'},
             }}}, f)
 
@@ -457,7 +461,7 @@ class S3ScratchURITestCase(MockEMRAndS3TestCase):
         # "walrus" bucket will be ignored; it doesn't start with "mrjob-"
         self.add_mock_s3_data({'walrus': {}, 'zebra': {}})
 
-        runner = EMRJobRunner(conf_path=False, s3_sync_wait_time=0.01)
+        runner = EMRJobRunner(conf_path=False, s3_sync_wait_time=0.00)
 
         # bucket name should be mrjob- plus 16 random hex digits
         s3_scratch_uri = runner._opts['s3_scratch_uri']
@@ -651,8 +655,8 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
 
     def put_availability_zone_in_mrjob_conf(self):
         dump_mrjob_conf({'runners': {'emr': {
-            'check_emr_status_every': 0.01,
-            's3_sync_wait_time': 0.01,
+            'check_emr_status_every': 0.00,
+            's3_sync_wait_time': 0.00,
             'aws_availability_zone': 'PUPPYLAND',
         }}}, open(self.mrjob_conf_path, 'w'))
 
@@ -900,8 +904,8 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self.assertEqual(expected_instance_count, job_flow.instancecount)
 
     def set_in_mrjob_conf(self, **kwargs):
-        emr_opts = {'check_emr_status_every': 0.01,
-                    's3_sync_wait_time': 0.01}
+        emr_opts = {'check_emr_status_every': 0.00,
+                    's3_sync_wait_time': 0.00}
         emr_opts.update(kwargs)
         with open(self.mrjob_conf_path, 'w') as f:
             dump_mrjob_conf({'runners': {'emr': emr_opts}}, f)
@@ -1767,7 +1771,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
         runner = EMRJobRunner(conf_path=False,
                               bootstrap_actions=bootstrap_actions,
-                              s3_sync_wait_time=0.01)
+                              s3_sync_wait_time=0.00)
 
         job_flow_id = runner.make_persistent_job_flow()
 
@@ -1832,7 +1836,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
         runner = EMRJobRunner(conf_path=False,
                               bootstrap_actions=bootstrap_actions,
-                              s3_sync_wait_time=0.01)
+                              s3_sync_wait_time=0.00)
 
         job_flow_id = runner.make_persistent_job_flow()
 
@@ -1998,6 +2002,12 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             self.teardown_ssh()
         except (OSError, AttributeError):
             pass  # didn't set up SSH
+
+    def mrjob_conf_contents(self):
+        return {'runners': {'emr': {
+                'check_emr_status_every': 0.00,
+                's3_sync_wait_time': 0.00,
+            }}}
 
     def make_pooled_job_flow(self, name=None, minutes_ago=0, **kwargs):
         """Returns ``(runner, job_flow_id)``. Set minutes_ago to set
@@ -2344,8 +2354,8 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         # turn on pooling in mrjob.conf
         with open(self.mrjob_conf_path, 'w') as f:
             dump_mrjob_conf({'runners': {'emr': {
-                'check_emr_status_every': 0.01,
-                's3_sync_wait_time': 0.01,
+                'check_emr_status_every': 0.00,
+                's3_sync_wait_time': 0.00,
                 'pool_emr_job_flows': True,
             }}}, f)
 

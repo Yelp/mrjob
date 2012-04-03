@@ -79,6 +79,9 @@ class OptionStore(dict):
         self.update(combine_opts(self.COMBINERS, *self.cascading_dicts))
         self._opt_priority = calculate_opt_priority(self, self.cascading_dicts)
 
+    def is_default(self, key):
+        return self._opt_priority[key] >= 2
+
     def __getitem__(self, key):
         if key in self.ALLOWED_KEYS:
             return super(OptionStore, self).__getitem__(key)

@@ -125,8 +125,6 @@ class RunnerOptionStore(OptionStore):
     def __init__(self, alias, opts, conf_path):
         super(RunnerOptionStore, self).__init__()
 
-        self.cascading_dicts.append(self.default_options())
-
         # sanitize incoming options and issue warnings for bad keys
         opts = self._validated_options(
             opts, 'Got unexpected keyword arguments: %s')
@@ -146,12 +144,14 @@ class RunnerOptionStore(OptionStore):
         self._validate_cleanup()
 
     def default_options(self):
+        super_opts = super(RunnerOptionStore, self).default_options()
+
         try:
             owner = getpass.getuser()
         except:
             owner = None
 
-        return {
+        return combine_dicts(super_opts, {
             'base_tmp_dir': tempfile.gettempdir(),
             'bootstrap_mrjob': True,
             'cleanup': ['ALL'],
@@ -160,7 +160,7 @@ class RunnerOptionStore(OptionStore):
             'owner': owner,
             'python_bin': ['python'],
             'steps_python_bin': [sys.executable or 'python'],
-        }
+        })
 
     def _validated_options(self, opts, error_fmt):
         unrecognized_opts = set(opts) - self.ALLOWED_KEYS

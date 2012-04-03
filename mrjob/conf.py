@@ -42,21 +42,28 @@ log = logging.getLogger('mrjob.conf')
 
 
 class OptionStore(dict):
+    """Encapsulates logic about a configuration."""
 
+    #: Set of valid keys for this type of configuration
     ALLOWED_KEYS = set()
 
+    #: Mapping of key to function used to combine multiple values to override,
+    #: augment, etc.
     COMBINERS = dict()
 
     def __init__(self):
         super(OptionStore, self).__init__()
-        self.cascading_dicts = [{key: None} for key in self.ALLOWED_KEYS]
+        self.cascading_dicts = [
+            dict((key, None) for key in self.ALLOWED_KEYS),
+            self.default_options(),
+        ]
+
+    def default_options(self):
+        return {}
 
     def __getitem__(self, key):
         if key in self.ALLOWED_KEYS:
-            if hasattr(self, key):
-                return getattr(self, key)()
-            else:
-                return super(OptionStore, self).__getitem__(key)
+            return super(OptionStore, self).__getitem__(key)
         else:
             raise KeyError(key)
 

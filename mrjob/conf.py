@@ -45,15 +45,24 @@ class OptionStore(dict):
 
     ALLOWED_KEYS = set()
 
+    COMBINERS = dict()
+
+    def __init__(self):
+        super(OptionStore, self).__init__()
+        self.cascading_dicts = [{key: None} for key in self.ALLOWED_KEYS]
+
     def __getitem__(self, key):
         if key in self.ALLOWED_KEYS:
-            return super(OptionStore, self).__getitem__(key)
+            if hasattr(self, key):
+                return getattr(self, key)()
+            else:
+                return super(OptionStore, self).__getitem__(key)
         else:
             raise KeyError(key)
 
-    def __setitem__(self, key):
+    def __setitem__(self, key, value):
         if key in self.ALLOWED_KEYS:
-            return super(OptionStore, self).__getitem__(key)
+            return super(OptionStore, self).__setitem__(key, value)
         else:
             raise KeyError(key)
 

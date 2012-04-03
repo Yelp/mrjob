@@ -42,13 +42,14 @@ log = logging.getLogger('mrjob.conf')
 
 
 class OptionStore(dict):
-    """Encapsulates logic about a configuration."""
+    """Encapsulates logic about a configuration. With the exception of the
+    constructor, it can be accessed like a dictionary."""
 
     #: Set of valid keys for this type of configuration
     ALLOWED_KEYS = set()
 
     #: Mapping of key to function used to combine multiple values to override,
-    #: augment, etc.
+    #: augment, etc. Leave blank for :py:func:`combine_values()`.
     COMBINERS = dict()
 
     def __init__(self):
@@ -59,6 +60,7 @@ class OptionStore(dict):
         ]
 
     def default_options(self):
+        """Default options for this :py:class:`OptionStore`"""
         return {}
 
     def __getitem__(self, key):

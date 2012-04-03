@@ -398,7 +398,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ec2_core_instance_type': 'm1.small',
             'ec2_master_instance_type': 'm1.small',
             'emr_job_flow_pool_name': 'default',
-            'hadoop_version': None,  # defaulted in __init__()
+            'hadoop_version': None,
             'hadoop_streaming_jar_on_emr':
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
             'num_ec2_core_instances': 0,

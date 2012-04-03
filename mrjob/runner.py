@@ -865,11 +865,13 @@ class MRJobRunner(object):
         """
         self._name_files()
         # on Windows, PYTHONPATH should be separated by ;, not :
+        # so LocalJobRunner and EMRJobRunner use different combiners for cmdenv
+        cmdenv_combiner = self.OPTION_STORE_CLASS.COMBINERS['cmdenv']
         envs_to_combine = ([{'PYTHONPATH': file_dict['name']}
                             for file_dict in self._python_archives] +
                            [self._opts['cmdenv']])
 
-        return combine_local_envs(*envs_to_combine)
+        return cmdenv_combiner(*envs_to_combine)
 
     def _assign_unique_names_to_files(self, name_field, prefix='', match=None):
         """Go through self._files, and fill in name_field for all files where

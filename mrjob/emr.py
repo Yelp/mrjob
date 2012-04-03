@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -557,7 +557,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         :param pool_emr_job_flows: Try to run the job on a ``WAITING`` pooled
                                    job flow with the same bootstrap
                                    configuration. Prefer the one with the most
-                                   compute units. Use S3 to "lock" the job flo
+                                   compute units. Use S3 to "lock" the job flow
                                    and ensure that the job is not scheduled
                                    behind another job. If no suitable job flow
                                    is `WAITING`, create a new pooled job flow.

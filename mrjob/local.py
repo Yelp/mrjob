@@ -44,9 +44,6 @@ DEFAULT_REDUCE_TASKS = 2
 
 class LocalRunnerOptionStore(RunnerOptionStore):
 
-    ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
-    ]))
-
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
         'cmdenv': combine_local_envs,
     })

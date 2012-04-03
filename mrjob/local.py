@@ -30,6 +30,7 @@ from mrjob.conf import combine_local_envs
 from mrjob.parse import find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
+from mrjob.runner import RunnerOptionStore
 from mrjob.util import cmd_line
 from mrjob.util import read_input
 from mrjob.util import unarchive
@@ -39,6 +40,23 @@ log = logging.getLogger('mrjob.local')
 
 DEFAULT_MAP_TASKS = 2
 DEFAULT_REDUCE_TASKS = 2
+
+
+class LocalRunnerOptionStore(RunnerOptionStore):
+
+    ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
+    ]))
+
+    COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
+        'cmdenv': combine_local_envs,
+    })
+
+    def default_options(self):
+        super_opts = super(LocalRunnerOptionStore, self).default_options()
+        return combine_dicts(super_opts, {
+            # prefer whatever interpreter we're currently using
+            'python_bin': [sys.executable or 'python'],
+        })
 
 
 class LocalMRJobRunner(MRJobRunner):
@@ -77,6 +95,8 @@ class LocalMRJobRunner(MRJobRunner):
 
     alias = 'local'
 
+    OPTION_STORE_CLASS = LocalRunnerOptionStore
+
     def __init__(self, **kwargs):
         """Arguments to this constructor may also appear in :file:`mrjob.conf`
         under ``runners/local``.
@@ -108,21 +128,6 @@ class LocalMRJobRunner(MRJobRunner):
         # jobconf variables internally (they get auto-translated before
         # running the job)
         self._internal_jobconf = {}
-
-    @classmethod
-    def _default_opts(cls):
-        """A dictionary giving the default value of options."""
-        return combine_dicts(super(LocalMRJobRunner, cls)._default_opts(), {
-            # prefer whatever interpreter we're currently using
-            'python_bin': [sys.executable or 'python'],
-        })
-
-    @classmethod
-    def _opts_combiners(cls):
-        # on windows, PYTHONPATH should use ;, not :
-        return combine_dicts(
-            super(LocalMRJobRunner, cls)._opts_combiners(),
-            {'cmdenv': combine_local_envs})
 
     # options that we ignore because they require real Hadoop
     IGNORED_HADOOP_OPTS = [

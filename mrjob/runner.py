@@ -125,21 +125,7 @@ class RunnerOptionStore(OptionStore):
     def __init__(self, alias, opts, conf_path):
         super(RunnerOptionStore, self).__init__()
 
-        try:
-            owner = getpass.getuser()
-        except:
-            owner = None
-
-        self.cascading_dicts.append({
-            'base_tmp_dir': tempfile.gettempdir(),
-            'bootstrap_mrjob': True,
-            'cleanup': ['ALL'],
-            'cleanup_on_failure': ['NONE'],
-            'hadoop_version': '0.20',
-            'owner': owner,
-            'python_bin': ['python'],
-            'steps_python_bin': [sys.executable or 'python'],
-        })
+        self.cascading_dicts.append(self.default_options())
 
         # sanitize incoming options and issue warnings for bad keys
         opts = self._validated_options(
@@ -158,6 +144,23 @@ class RunnerOptionStore(OptionStore):
         self._opt_priority = calculate_opt_priority(self, self.cascading_dicts)
 
         self._validate_cleanup()
+
+    def default_options(self):
+        try:
+            owner = getpass.getuser()
+        except:
+            owner = None
+
+        return {
+            'base_tmp_dir': tempfile.gettempdir(),
+            'bootstrap_mrjob': True,
+            'cleanup': ['ALL'],
+            'cleanup_on_failure': ['NONE'],
+            'hadoop_version': '0.20',
+            'owner': owner,
+            'python_bin': ['python'],
+            'steps_python_bin': [sys.executable or 'python'],
+        }
 
     def _validated_options(self, opts, error_fmt):
         unrecognized_opts = set(opts) - self.ALLOWED_KEYS
@@ -636,12 +639,6 @@ class MRJobRunner(object):
         """Get options set for this runner, as a dict."""
         return copy.deepcopy(self._opts)
 
-    @classmethod
-    def get_default_opts(self):
-        """Get default options for this runner class, as a dict."""
-        blank_opts = dict((key, None) for key in self._allowed_opts())
-        return self.combine_opts(blank_opts, self._default_opts())
-
     def get_job_name(self):
         """Get the unique name for the job run by this runner.
         This has the format ``label.owner.date.time.microseconds``
@@ -868,12 +865,11 @@ class MRJobRunner(object):
         """
         self._name_files()
         # on Windows, PYTHONPATH should be separated by ;, not :
-        cmdenv_combiner = self._opts_combiners()['cmdenv']
         envs_to_combine = ([{'PYTHONPATH': file_dict['name']}
                             for file_dict in self._python_archives] +
                            [self._opts['cmdenv']])
 
-        return cmdenv_combiner(*envs_to_combine)
+        return combine_local_envs(*envs_to_combine)
 
     def _assign_unique_names_to_files(self, name_field, prefix='', match=None):
         """Go through self._files, and fill in name_field for all files where

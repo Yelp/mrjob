@@ -126,20 +126,19 @@ class RunnerOptionStore(OptionStore):
         super(RunnerOptionStore, self).__init__()
 
         # sanitize incoming options and issue warnings for bad keys
-        opts = self._validated_options(
+        opts = self.validated_options(
             opts, 'Got unexpected keyword arguments: %s')
 
         unsanitized_opt_dicts = load_opts_from_mrjob_conf(
             alias, conf_path=conf_path)
 
         for path, mrjob_conf_opts in unsanitized_opt_dicts:
-            self.cascading_dicts.append(self._validated_options(
+            self.cascading_dicts.append(self.validated_options(
                 mrjob_conf_opts, 'Got unexpected opts from %s: %%s' % path))
 
         self.cascading_dicts.append(opts)
 
-        self.update(combine_opts(self.COMBINERS, *self.cascading_dicts))
-        self._opt_priority = calculate_opt_priority(self, self.cascading_dicts)
+        self.populate_values_from_cascading_dicts()
 
         self._validate_cleanup()
 
@@ -161,15 +160,6 @@ class RunnerOptionStore(OptionStore):
             'python_bin': ['python'],
             'steps_python_bin': [sys.executable or 'python'],
         })
-
-    def _validated_options(self, opts, error_fmt):
-        unrecognized_opts = set(opts) - self.ALLOWED_KEYS
-        if unrecognized_opts:
-            log.warn(error_fmt % ', '.join(sorted(unrecognized_opts)))
-            return dict((k, v) for k, v in opts.iteritems()
-                        if k in self.ALLOWED_KEYS)
-        else:
-            return opts
 
     def _validate_cleanup(self):
         # old API accepts strings for cleanup

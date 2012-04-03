@@ -63,6 +63,22 @@ class OptionStore(dict):
         """Default options for this :py:class:`OptionStore`"""
         return {}
 
+    def validated_options(self, opts, error_fmt):
+        unrecognized_opts = set(opts) - self.ALLOWED_KEYS
+        if unrecognized_opts:
+            log.warn(error_fmt % ', '.join(sorted(unrecognized_opts)))
+            return dict((k, v) for k, v in opts.iteritems()
+                        if k in self.ALLOWED_KEYS)
+        else:
+            return opts
+
+    def populate_values_from_cascading_dicts(self):
+        """When ``cascading_dicts`` has been built, use it to populate the
+        dictionary with the ultimate values.
+        """
+        self.update(combine_opts(self.COMBINERS, *self.cascading_dicts))
+        self._opt_priority = calculate_opt_priority(self, self.cascading_dicts)
+
     def __getitem__(self, key):
         if key in self.ALLOWED_KEYS:
             return super(OptionStore, self).__getitem__(key)

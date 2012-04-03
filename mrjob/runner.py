@@ -39,13 +39,11 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob import compat
-from mrjob.conf import calculate_opt_priority
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
 from mrjob.conf import combine_local_envs
 from mrjob.conf import combine_lists
-from mrjob.conf import combine_opts
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_conf

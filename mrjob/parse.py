@@ -447,7 +447,7 @@ def _parse_counters_0_18(counter_string):
     # GroupName.CounterName:Value,Group1.Crackers:3,Group2.Nerf:243,...
     groups = _COUNTER_RE_0_18.finditer(counter_string)
     if groups is None:
-        log.warn('Cannot parse Hadoop counter string: %s' % group_string)
+        log.warn('Cannot parse Hadoop counter string: %s' % counter_string)
 
     for m in groups:
         yield m.group('group'), m.group('name'), int(m.group('value'))

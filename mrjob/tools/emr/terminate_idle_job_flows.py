@@ -58,7 +58,6 @@ except ImportError:
 from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
-from mrjob.emr import make_lock_uri
 from mrjob.job import MRJob
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name

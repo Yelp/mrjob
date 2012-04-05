@@ -195,14 +195,28 @@ def s3_key_to_uri(s3_key):
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
 
+# boto has a bug where it pulls last_modified out of the HTTP headers instead
+# of the S3 API response, so it's in RFC1123 instead of ISO8601.
+# Until that's fixed, we support both formats in our date/time parsing
+# functions.
+
+# Thu, 29 Mar 2012 04:55:44 GMT
+RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
+
 def iso8601_to_timestamp(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
-    return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
+    try:
+        return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
+    except ValueError:
+        return time.mktime(time.strptime(iso8601_time, RFC1123))
 
 
 def iso8601_to_datetime(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
-    return datetime.strptime(iso8601_time, boto.utils.ISO8601)
+    try:
+        return datetime.strptime(iso8601_time, boto.utils.ISO8601)
+    except ValueError:
+        return datetime.strptime(iso8601_time, RFC1123)
 
 
 def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,

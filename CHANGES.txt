@@ -1,3 +1,7 @@
+v0.3.3.1, 2012-04-02 -- Hothothothothothothotfix
+ * Fixed S3 locking mechanism parsing of last modified time to work around a
+   bug in boto
+
 v0.3.3, 2012-03-29 -- Bug...bug...bug...bug...bug...FEATURE!
  * EMR:
    * Error detection code follows symlinks in Hadoop logs (#396)

@@ -257,7 +257,7 @@ def parse_and_save_options(option_parser, args):
         arg = rargs[0]
         if arg == '--':
             del rargs[0]
-            return
+            return arg_map
         elif arg[0:2] == '--':
             _process_long_opt(option_parser, arg_map, rargs, values)
         elif arg[:1] == '-' and len(arg) > 1:

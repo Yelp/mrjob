@@ -40,8 +40,8 @@ import mrjob
 from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
 from mrjob.emr import EMRJobRunner
-from mrjob.emr import describe_all_job_flows
 from mrjob.emr import attempt_to_acquire_lock
+from mrjob.emr import describe_all_job_flows
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
 from mrjob.parse import JOB_NAME_RE
@@ -2603,8 +2603,11 @@ class S3LockTestCase(MockEMRAndS3TestCase):
         self.make_buckets()
 
     def make_buckets(self):
-        self.add_mock_s3_data({'locks': {}})
+        self.add_mock_s3_data({'locks': {
+            'expired_lock': 'x',
+        }}, datetime.utcnow() - timedelta(minutes=30))
         self.lock_uri = 's3://locks/some_lock'
+        self.expired_lock_uri = 's3://locks/expired_lock'
 
     def test_lock(self):
         # Most basic test case
@@ -2616,6 +2619,14 @@ class S3LockTestCase(MockEMRAndS3TestCase):
 
         self.assertEqual(
             False, attempt_to_acquire_lock(s3_conn, self.lock_uri, 0, 'jf2'))
+
+    def test_lock_expiration(self):
+        runner = EMRJobRunner(conf_path=False)
+        s3_conn = runner.make_s3_conn()
+        did_lock = attempt_to_acquire_lock(
+            s3_conn, self.expired_lock_uri, 0, 'jf1',
+            mins_to_expiration=5)
+        self.assertEqual(True, did_lock)
 
     def test_key_race_condition(self):
         # Test case where one attempt puts the key in existence

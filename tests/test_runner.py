@@ -501,8 +501,9 @@ sys.exit(13)
         self.use_bad_sort()
 
         runner = MRJobRunner(conf_path=False)
-        self.assertRaises(CalledProcessError,
-                          runner._invoke_sort, [self.a, self.b], self.out)
+        with no_handlers_for_logger():
+            self.assertRaises(CalledProcessError,
+                              runner._invoke_sort, [self.a, self.b], self.out)
 
 
 class ConfigFilesTestCase(unittest.TestCase):

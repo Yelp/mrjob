@@ -181,7 +181,7 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
         values = conf['runners'][runner_alias] or {}
     except (KeyError, TypeError, ValueError):
         log.warning('no configs for runner type %r in %s; returning {}' %
-                    (conf_path, runner_alias))
+                    (runner_alias, conf_path))
         values = {}
 
     inherited = []

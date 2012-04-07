@@ -534,7 +534,7 @@ class ConfigFilesTestCase(unittest.TestCase):
         return runner._opts
 
 
-class MultipleConfigFilesTestCase(ConfigFilesTestCase):
+class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
 
     BASIC_CONF = {
         'runners': {
@@ -632,6 +632,9 @@ class MultipleConfigFilesTestCase(ConfigFilesTestCase):
         self.assertEqual(self.opts_1['hadoop_streaming_jar'], 'monkey.jar')
         self.assertEqual(self.opts_2['hadoop_streaming_jar'], 'banana.jar')
 
+
+class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
+
     def test_recurse(self):
         path = os.path.join(self.tmp_dir, 'LOL.conf')
         recurse_conf = dict(include=path)
@@ -644,6 +647,18 @@ class MultipleConfigFilesTestCase(ConfigFilesTestCase):
             runner = InlineMRJobRunner(conf_path=path)
             self.assertIn('%s tries to recursively include %s!' % (path, path),
                           stderr.getvalue())
+
+    def test_empty_runner_error(self):
+        conf = dict(runner=dict(local=dict(base_tmp_dir='/tmp')))
+        path = self.save_conf('basic', conf)
+
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.conf', stderr)
+            runner = InlineMRJobRunner(conf_path=path)
+            self.assertIn(
+                "no configs for runner type 'inline' in %s" % path,
+                stderr.getvalue())
 
 
 class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):

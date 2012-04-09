@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -447,18 +447,18 @@ def _parse_counters_0_18(counter_string):
     # GroupName.CounterName:Value,Group1.Crackers:3,Group2.Nerf:243,...
     groups = _COUNTER_RE_0_18.finditer(counter_string)
     if groups is None:
-        log.warn('Cannot parse Hadoop counter string: %s' % group_string)
+        log.warn('Cannot parse Hadoop counter string: %s' % counter_string)
 
     for m in groups:
         yield m.group('group'), m.group('name'), int(m.group('value'))
 
 
-def _parse_counters_0_20(group_string):
+def _parse_counters_0_20(counter_string):
     # 0.20 counters look like this:
     # {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...}
-    groups = _GROUP_RE_0_20.findall(group_string)
+    groups = _GROUP_RE_0_20.findall(counter_string)
     if not groups:
-        log.warn('Cannot parse Hadoop counter string: %s' % group_string)
+        log.warn('Cannot parse Hadoop counter string: %s' % counter_string)
 
     for group_id, group_name, counter_str in groups:
         matches = _COUNTER_RE_0_20.findall(counter_str)

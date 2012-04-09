@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@ def real_mrjob_conf_path(conf_path=None):
     elif conf_path is None:
         return find_mrjob_conf()
     else:
-        return conf_path
+        return expand_path(conf_path)
 
 
 def conf_object_at_path(conf_path):

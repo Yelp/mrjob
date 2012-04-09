@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,4 +44,4 @@ __credits__ = [
     'Paul Wais <pwais@yelp.com>',
 ]
 
-__version__ = '0.3.2'
+__version__ = '0.3.3.1'

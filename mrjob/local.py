@@ -33,6 +33,7 @@ from mrjob.runner import MRJobRunner
 from mrjob.util import cmd_line
 from mrjob.util import read_input
 from mrjob.util import unarchive
+from mrjob.util import is_ironpython
 
 
 log = logging.getLogger('mrjob.local')
@@ -372,31 +373,33 @@ class LocalMRJobRunner(MRJobRunner):
 
             # initialize file and accumulators
             outfile_name = create_outfile(path, 0)
-            outfile = open(outfile_name, 'w')
             bytes_written = 0
             total_bytes = 0
 
-            # write each line to a file as long as we are within the limit
-            # (split_size)
-            for line_group in line_group_generator(path):
-                if bytes_written >= split_size:
-                    # new split file if we exceeded the limit
-                    file_names[outfile_name]['length'] = bytes_written
-                    total_bytes += bytes_written
+            try:
+                outfile = open(outfile_name, 'w')
 
-                    outfile.close()
-                    outfile_name = create_outfile(path, total_bytes)
-                    outfile = open(outfile_name, 'w')
+                # write each line to a file as long as we are within the limit
+                # (split_size)
+                for line_group in line_group_generator(path):
+                    if bytes_written >= split_size:
+                        # new split file if we exceeded the limit
+                        file_names[outfile_name]['length'] = bytes_written
+                        total_bytes += bytes_written 
 
-                    bytes_written = 0
+                        outfile_name = create_outfile(path, total_bytes)
+                        outfile.close()
+                        outfile = open(outfile_name, 'w')
 
-                for line in line_group:
-                    outfile.write(line)
-                    bytes_written += len(line)
+                        bytes_written = 0
 
-            file_names[outfile_name]['length'] = bytes_written
+                    for line in line_group:
+                        outfile.write(line)
+                        bytes_written += len(line)
 
-            outfile.close()
+                file_names[outfile_name]['length'] = bytes_written
+            finally:
+                outfile.close()
 
         return file_names
 
@@ -498,9 +501,12 @@ class LocalMRJobRunner(MRJobRunner):
             (translate_jobconf(k, version).replace('.', '_'), str(v))
             for (k, v) in internal_jobconf.iteritems())
 
+        ironpython_env = {'IRONPYTHONPATH': os.getcwd()} if is_ironpython else {}
+
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
         return combine_local_envs({'PYTHONPATH': os.getcwd()},
+                                  ironpython_env,
                                   os.environ,
                                   jobconf_env,
                                   internal_jobconf_env,
@@ -594,7 +600,6 @@ class LocalMRJobRunner(MRJobRunner):
         log.info('writing to %s' % outfile)
 
         self._prev_outfiles.append(outfile)
-        write_to = open(outfile, 'w')
 
         with open(outfile, 'w') as write_to:
             if combiner_args:

@@ -372,31 +372,35 @@ class LocalMRJobRunner(MRJobRunner):
 
             # initialize file and accumulators
             outfile_name = create_outfile(path, 0)
-            outfile = open(outfile_name, 'w')
             bytes_written = 0
             total_bytes = 0
+            outfile = None
 
-            # write each line to a file as long as we are within the limit
-            # (split_size)
-            for line_group in line_group_generator(path):
-                if bytes_written >= split_size:
-                    # new split file if we exceeded the limit
-                    file_names[outfile_name]['length'] = bytes_written
-                    total_bytes += bytes_written
+            try:
+                outfile = open(outfile_name, 'w')
+                
+                # write each line to a file as long as we are within the limit
+                # (split_size)
+                for line_group in line_group_generator(path):
+                    if bytes_written >= split_size:
+                        # new split file if we exceeded the limit
+                        file_names[outfile_name]['length'] = bytes_written
+                        total_bytes += bytes_written
 
+                        outfile_name = create_outfile(path, total_bytes)
+                        outfile.close()
+                        outfile = open(outfile_name, 'w')
+
+                        bytes_written = 0
+
+                    for line in line_group:
+                        outfile.write(line)
+                        bytes_written += len(line)
+
+                file_names[outfile_name]['length'] = bytes_written
+            finally:
+                if not outfile is None:
                     outfile.close()
-                    outfile_name = create_outfile(path, total_bytes)
-                    outfile = open(outfile_name, 'w')
-
-                    bytes_written = 0
-
-                for line in line_group:
-                    outfile.write(line)
-                    bytes_written += len(line)
-
-            file_names[outfile_name]['length'] = bytes_written
-
-            outfile.close()
 
         return file_names
 
@@ -594,7 +598,6 @@ class LocalMRJobRunner(MRJobRunner):
         log.info('writing to %s' % outfile)
 
         self._prev_outfiles.append(outfile)
-        write_to = open(outfile, 'w')
 
         with open(outfile, 'w') as write_to:
             if combiner_args:

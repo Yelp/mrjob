@@ -584,7 +584,7 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
         }
 
     def setUp(self):
-        super(MultipleConfigFilesTestCase, self).setUp()
+        super(MultipleConfigFilesValuesTestCase, self).setUp()
         self.opts_1 = self.opts_for_conf('mrjob.conf',
                                          self.BASIC_CONF)
         self.opts_2 = self.opts_for_conf('mrjob.larger.conf',

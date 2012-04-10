@@ -2399,10 +2399,27 @@ class PoolingTestCase(MockEMRAndS3TestCase):
                 state='COMPLETED',
                 name='dummy',
                 actiononfailure='CANCEL_AND_WAIT',
+                enddatetime='definitely not none',
                 args=[])]
 
         # a one-step job should fit
         self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', 'pool1',
+            '-c', self.mrjob_conf_path],
+            job_class=MRWordCount)
+
+    def test_dont_join_idle_with_steps(self):
+        dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
+
+        self.mock_emr_job_flows[job_flow_id].steps = [
+            MockEmrObject(
+                state='WAITING',
+                name='dummy',
+                actiononfailure='CANCEL_AND_WAIT',
+                args=[])]
+
+        self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--pool-name', 'pool1',
             '-c', self.mrjob_conf_path],

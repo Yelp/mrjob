@@ -318,8 +318,9 @@ def terminate_and_notify(runner, to_terminate, dry_run=False,
             if status:
                 runner.make_emr_conn().terminate_jobflow(jf.jobflowid)
                 did_terminate = True
-            else:
-                print 'Could not lock %s, aborting' % runner._lock_uri(jf)
+            elif not quiet:
+                log.info('%s was locked between getting job flow info and'
+                         ' trying to terminate it; skipping' % jf.jobflowid)
 
         if did_terminate and not quiet:
             fmt = ('Terminated job flow %s (%s); was %s for %s, %s to end of'

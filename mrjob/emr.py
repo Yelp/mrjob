@@ -195,10 +195,10 @@ def s3_key_to_uri(s3_key):
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
 
-# boto has a bug where it pulls last_modified out of the HTTP headers instead
-# of the S3 API response, so it's in RFC1123 instead of ISO8601.
-# Until that's fixed, we support both formats in our date/time parsing
-# functions.
+# AWS actually gives dates in two formats, and we only recently started using
+# API calls that return the second. So the date parsing function is called
+# iso8601_to_*, but it also parses RFC1123.
+# Until boto starts seamlessly parsing these, we check for them ourselves.
 
 # Thu, 29 Mar 2012 04:55:44 GMT
 RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'

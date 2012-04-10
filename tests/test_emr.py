@@ -2399,6 +2399,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
                 state='COMPLETED',
                 name='dummy',
                 actiononfailure='CANCEL_AND_WAIT',
+                enddatetime='definitely not none',
                 args=[])]
 
         # a one-step job should fit

@@ -92,7 +92,7 @@ def main():
         pool_name=options.pool_name,
         pooled_only=options.pooled_only,
         max_mins_locked=options.max_mins_locked,
-        quiet=options.quiet,
+        quiet=(options.quiet > 1),
     )
 
 

@@ -2295,6 +2295,12 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             if len(job_flow.steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
                 return
 
+            # in rare cases, job flow can be WAITING *and* have incomplete
+            # steps
+            if any(getattr(step, 'enddatetime', None) is None
+                   for step in job_flow.steps):
+                return
+
             # total compute units per group
             role_to_cu = defaultdict(float)
             # total number of instances of the same type in each group.

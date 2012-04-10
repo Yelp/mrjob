@@ -260,14 +260,10 @@ def to_iso8601(when):
 def to_rfc1123(when):
     """Convert a datetime to RFC1123 format.
     """
-    if when.tzinfo:
-        # If tzinfo is None, %Z is the empty string, so only send it back
-        # unchanged if there's a time zone.
-        return when.strftime(RFC1123)
-    else:
-        # AWS sends us a time zone in all cases, but in Python it's more
-        # annoying to figure out time zones, so just fake it.
-        return when.strftime(RFC1123) + 'GMT'
+    # AWS sends us a time zone in all cases, but in Python it's more
+    # annoying to figure out time zones, so just fake it.
+    assert when.tzinfo is None
+    return when.strftime(RFC1123) + 'GMT'
 
 
 class MockEmrConnection(object):

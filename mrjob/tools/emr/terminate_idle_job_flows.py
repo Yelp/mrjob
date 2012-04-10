@@ -318,7 +318,7 @@ def terminate_and_notify(runner, to_terminate, dry_run=False,
             if status:
                 runner.make_emr_conn().terminate_jobflow(jf.jobflowid)
                 did_terminate = True
-            else:
+            elif not quiet:
                 print 'Could not lock %s, aborting' % runner._lock_uri(jf)
 
         if did_terminate and not quiet:

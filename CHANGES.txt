@@ -1,3 +1,10 @@
+v0.3.3.2, 2012-04-10 -- It's a race [condition]!
+ * Option parsing no longer dies when -- is used as an argument (#435)
+ * Fixed race condition where two jobs can join same job flow thinking it is
+   idle, delaying one of the jobs (#438)
+ * Better error message when a config file contains no data for the current
+   runner (#433)
+
 v0.3.3.1, 2012-04-02 -- Hothothothothothothotfix
  * Fixed S3 locking mechanism parsing of last modified time to work around a
    bug in boto

@@ -32,7 +32,9 @@ Options::
                         Max number of hours a job flow can go without
                         bootstrapping, running a step, or having a new step
                         created. This will fire even if there are pending
-                        steps which EMR has failed to start.
+                        steps which EMR has failed to start. Make sure you set
+                        this higher than the amount of time your jobs can take
+                        to start instances and bootstrap.
   --mins-to-end-of-hour=MINS_TO_END_OF_HOUR
                         Terminate job flows that are within this many minutes
                         of the end of a full hour since the job started
@@ -92,7 +94,7 @@ def main():
         pool_name=options.pool_name,
         pooled_only=options.pooled_only,
         max_mins_locked=options.max_mins_locked,
-        quiet=options.quiet,
+        quiet=(options.quiet > 1),
     )
 
 
@@ -359,7 +361,8 @@ def make_option_parser():
         help=('Max number of hours a job flow can go without bootstrapping,'
               ' running a step, or having a new step created. This will fire'
               ' even if there are pending steps which EMR has failed to'
-              ' start.'))
+              ' start. Make sure you set this higher than the amount of time'
+              ' your jobs can take to start instances and bootstrap.'))
     option_parser.add_option(
         '--max-mins-locked', dest='max_mins_locked',
         default=DEFAULT_MAX_MINUTES_LOCKED, type='float',

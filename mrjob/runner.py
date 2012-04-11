@@ -78,8 +78,7 @@ CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
 #: the default cleanup-on-success option: ``'IF_SUCCESSFUL'``
 CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
 
-_STEP_RE = re.compile(r'^M?C?R?$')
-
+_STEP_RE = re.compile(r'^[MP]?C?R?$')
 # buffer for piping files into sort on Windows
 _BUFFER_SIZE = 4096
 
@@ -442,14 +441,19 @@ class MRJobRunner(object):
             'cleanup',
             'cleanup_on_failure',
             'cmdenv',
+            'force_clear_output_dir',
             'hadoop_extra_args',
             'hadoop_streaming_jar',
             'hadoop_version',
             'jobconf',
             'label',
             'owner',
+            'pig_exec_location',
+            'pig_params',
+            'pig_script',
             'python_archives',
             'python_bin',
+            's3_copy_files_to_tmp',
             'setup_cmds',
             'setup_scripts',
             'steps_python_bin',
@@ -474,7 +478,8 @@ class MRJobRunner(object):
             'hadoop_version': '0.20',
             'owner': owner,
             'python_bin': ['python'],
-            'steps_python_bin': [sys.executable or 'python'],
+            # Changed from sys.executable or 'python' as sys.executable may not be what you want if you are in a virtual env.
+            'steps_python_bin': ['python'],
         }
 
     @classmethod
@@ -1205,6 +1210,7 @@ class MRJobRunner(object):
             self._mrjob_tar_gz_path = tar_gz_path
 
         return self._mrjob_tar_gz_path
+
 
     def _hadoop_conf_args(self, step_num, num_steps):
         """Build a list of extra arguments to the hadoop binary.

@@ -114,7 +114,7 @@ class LocalMRJobRunner(MRJobRunner):
         """A dictionary giving the default value of options."""
         return combine_dicts(super(LocalMRJobRunner, cls)._default_opts(), {
             # prefer whatever interpreter we're currently using
-            'python_bin': [sys.executable or 'python'],
+            'python_bin': ['python'],
         })
 
     @classmethod
@@ -138,6 +138,29 @@ class LocalMRJobRunner(MRJobRunner):
         '_hadoop_output_format',
         '_partitioner',
     ]
+
+    def _pig_local_args(self):
+        args = [self._opts['pig_exec_location'], '-x', 'local', '-f', self._opts['pig_script']]
+
+        if self._opts.has_key("pig_params"):
+            for entry in self._opts["pig_params"]:
+                args.append('-p')
+                args.append(entry)
+        # Get all script parameters as a list
+
+#        abs_input_paths = []
+#        for i in self._input_paths:
+#            abs_input_paths.append(os.path.abspath(i))
+#
+#        input_paths_str =  'INPUT=' + ','.join(abs_input_paths)
+#        log.debug('Pig_input_paths_str: %s'%input_paths_str)
+#        output_path_str = 'OUTPUT=' + self._output_dir
+#        log.debug('Pig_output_path_str: %s'%output_path_str)
+#
+#
+#        args.extend(['-p', input_paths_str])
+#        args.extend(['-p', output_path_str])
+        return args
 
     def _run(self):
         if self._opts['bootstrap_mrjob']:
@@ -174,20 +197,38 @@ class LocalMRJobRunner(MRJobRunner):
         # run mapper, combiner, sort, reducer for each step
         for i, step in enumerate(self._get_steps()):
             self._counters.append({})
-            # run the mapper
-            mapper_args = (wrapper_args + [self._script['name'],
-                            '--step-num=%d' % i, '--mapper'] +
-                           self._mr_job_extra_args())
+            pig_step = False
+            if 'P' in step:
+                pig_step = True
+                if not self._opts.get('pig_exec_location'):
+                    raise ValueError('Running pig in local mode needs a pig executable location at pig-exec-location')
+                pig_args = self._pig_local_args()
+
+            else:
+                # run the mapper
+                mapper_args = (wrapper_args + [self._script['name'],
+                                '--step-num=%d' % i, '--mapper'] +
+                               self._mr_job_extra_args())
             combiner_args = []
+
+
+
             if 'C' in step:
                 combiner_args = (wrapper_args + [self._script['name'],
                                  '--step-num=%d' % i, '--combiner'] +
                                  self._mr_job_extra_args())
 
-            self._invoke_step(mapper_args, 'step-%d-mapper' % i,
-                              step_num=i, step_type='M',
-                              num_tasks=self._map_tasks,
-                              combiner_args=combiner_args)
+
+            if pig_step:
+#                self._invoke_process(cmd_line(pig_args))
+                self._invoke_step(pig_args, 'step-%d-pig' % i,
+                    step_num=i, step_type='P')
+
+            else:
+                self._invoke_step(mapper_args, 'step-%d-mapper' % i,
+                                  step_num=i, step_type='M',
+                                  num_tasks=self._map_tasks,
+                                  combiner_args=combiner_args)
 
             if 'R' in step:
                 # sort the output. Treat this as a mini-step for the purpose
@@ -446,6 +487,15 @@ class LocalMRJobRunner(MRJobRunner):
         all_proc_dicts = []
         self._prev_outfiles = []
 
+        if step_type == 'P':
+            abs_input_paths = []
+            for _, file_name in enumerate(file_splits):
+                abs_input_paths.append(file_name)
+            pig_input_paths_str = 'INPUT=' + ','.join(abs_input_paths)
+            pig_output_path_str = 'OUTPUT=' + outfile_name
+            args.extend(['-p',pig_input_paths_str])
+            args.extend(['-p', pig_output_path_str])
+
         for task_num, file_name in enumerate(file_splits):
 
             # setup environment variables
@@ -461,7 +511,12 @@ class LocalMRJobRunner(MRJobRunner):
 
             task_outfile = outfile_name + '_part-%05d' % task_num
 
-            proc_dicts = self._invoke_process(args + [file_name], task_outfile,
+            if step_type == 'P':
+                input_args = args
+            else:
+                input_args = args + [file_name]
+
+            proc_dicts = self._invoke_process(input_args, task_outfile,
                                               env=env,
                                               combiner_args=combiner_args)
             all_proc_dicts.extend(proc_dicts)

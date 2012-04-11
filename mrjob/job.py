@@ -130,10 +130,13 @@ from mrjob.util import read_input
 
 
 log = logging.getLogger('mrjob.job')
-
+# sentinel value; used when running MRJob as a script
+_READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
+PIG_STEP ='pig'
 
 # all the parameters you can specify when definining a job step
 _JOB_STEP_PARAMS = (
+    PIG_STEP,
     'combiner',
     'combiner_init',
     'combiner_final',
@@ -151,8 +154,6 @@ def _IDENTITY_MAPPER(key, value):
     yield key, value
 
 
-# sentinel value; used when running MRJob as a script
-_READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
 
 
 # The former custom option class has been removed and this stub will disappear
@@ -223,6 +224,9 @@ class MRJob(object):
         self.stdin = sys.stdin
         self.stdout = sys.stdout
         self.stderr = sys.stderr
+
+    def pig_step(self):
+        return PIG_STEP
 
     ### Defining one-step jobs ###
 
@@ -306,6 +310,11 @@ class MRJob(object):
         """
         raise NotImplementedError
 
+    def pig(self):
+        """ Re-define this to support pig steps. A simple returns True is enough.
+        """
+        raise NotImplementedError
+
     def reducer_init(self):
         """Re-define this to define an action to run before the reducer
         processes any input.
@@ -380,6 +389,11 @@ class MRJob(object):
                       for func_name in _JOB_STEP_PARAMS
                       if (getattr(self, func_name).im_func is not
                           getattr(MRJob, func_name).im_func))
+
+        if kwargs.has_key(PIG_STEP):
+            step = dict((f, None) for f in _JOB_STEP_PARAMS)
+            step[PIG_STEP]=PIG_STEP
+            return [step]
 
         return [self.mr(**kwargs)]
 
@@ -753,29 +767,35 @@ class MRJob(object):
             mapper_funcs = ('mapper_init', 'mapper_final')
             reducer_funcs = ('reducer', 'reducer_init', 'reducer_final')
             combiner_funcs = ('combiner', 'combiner_init', 'combiner_final')
+            func_strs = []
+
 
             has_explicit_mapper = (step['mapper'] != _IDENTITY_MAPPER or
                                    any(step[k] for k in mapper_funcs))
             has_explicit_reducer = any(step[k] for k in reducer_funcs)
             has_explicit_combiner = any(step[k] for k in combiner_funcs)
 
-            func_strs = []
 
+            if step[PIG_STEP]:
+                func_strs.append('P')
+            else:
             # Print a mapper if:
+            # - If not running a pig step
             # - The user specifies one
             # - Different input and output protocols are used (infer from
             #   step number)
             # - We don't have anything else to print (excluding combiners)
-            if has_explicit_mapper \
-               or step_num == 0 \
-               or not has_explicit_reducer:
-                func_strs.append('M')
+                if has_explicit_mapper \
+                   or step_num == 0 \
+                   or not has_explicit_reducer:
+                    func_strs.append('M')
 
             if has_explicit_combiner:
                 func_strs.append('C')
 
             if has_explicit_reducer:
                 func_strs.append('R')
+
 
             res.append(''.join(func_strs))
         return res
@@ -1103,6 +1123,28 @@ class MRJob(object):
                   ' take the form KEY=VALUE. You can use --jobconf multiple'
                   ' times.'))
 
+        # options common to Pig usage on hadoop and EMR
+        self.pig_opt_group = OptionGroup(
+            self.option_parser,
+            'Pig specific options. Currently only EMR mode is supported but should eventually work on hadoop and local as well')
+
+        self.option_parser.add_option_group(self.pig_opt_group)
+
+        # Pig specific options
+        self.pig_opt_group.add_option(
+            '--pig-params', dest='pig_params', default=[],
+            action='append',
+            help='Pig script parameters. List of "KEY=VALUE" entries e.g "UDF_PATH=<PATH>" This does not need to contain INPUT and OUTPUT parameters. Those will be auto-generated.')
+
+        self.pig_opt_group.add_option(
+            '--run-pig-script', dest='pig_script', default = None,
+            help='Pig script location. For now, use an s3 location.')
+
+        self.pig_opt_group.add_option(
+            '--pig-exec-location', dest='pig_exec_location', default = None,
+            help='Pig executable location. Meant only for local mode.')
+
+
         # options common to Hadoop and EMR
         self.hadoop_emr_opt_group = OptionGroup(
             self.option_parser,
@@ -1168,6 +1210,10 @@ class MRJob(object):
             'Running on Amazon Elastic MapReduce (these apply when you set -r'
             ' emr)')
         self.option_parser.add_option_group(self.emr_opt_group)
+
+        self.emr_opt_group.add_option(
+            '--force-clear-output-dir', dest='force_clear_output_dir', action="store_true",
+            help='Forcefully clear the output directory. Currently only works for S3 locations.')
 
         self.emr_opt_group.add_option(
             '--additional-emr-info', dest='additional_emr_info', default=None,
@@ -1358,6 +1404,11 @@ class MRJob(object):
             default=None,
             help=('Specify a pool name to join. Set to "default" if not'
                   ' specified.'))
+
+        self.emr_opt_group.add_option(
+            '--s3-copy-files-to-tmp', dest='s3_copy_files_to_tmp', action="store_true",
+            help='Copies cache files on s3 to another location on s3. '
+                  'This is useful to ensure that the job runs when the cache files are updated.')
 
         self.emr_opt_group.add_option(
             '--s3-endpoint', dest='s3_endpoint', default=None,
@@ -1617,6 +1668,7 @@ class MRJob(object):
             'conf_path': self.options.conf_path,
             'extra_args': self.generate_passthrough_arguments(),
             'file_upload_args': self.generate_file_upload_args(),
+            'force_clear_output_dir': self.options.force_clear_output_dir,
             'hadoop_extra_args': self.options.hadoop_extra_args,
             'hadoop_input_format': self.hadoop_input_format(),
             'hadoop_output_format': self.hadoop_output_format(),
@@ -1629,6 +1681,9 @@ class MRJob(object):
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
             'partitioner': self.partitioner(),
+            'pig_exec_location' : self.options.pig_exec_location,
+            'pig_params' : self.options.pig_params,
+            'pig_script' : self.options.pig_script,
             'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
             'setup_cmds': self.options.setup_cmds,

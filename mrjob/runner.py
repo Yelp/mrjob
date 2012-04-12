@@ -49,6 +49,7 @@ from mrjob.conf import combine_opts
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_conf
+from mrjob.fs.local import LocalFilesystem
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
 from mrjob.util import read_file
@@ -359,6 +360,9 @@ class MRJobRunner(object):
         # rather than feed it multiple files
         self._sort_is_windows_sort = None
 
+        # Initialize our filesystem access object
+        self._fs = self.make_filesystem()
+
     def _set_opts(self, opts, conf_path):
         # enforce correct arguments
         allowed_opts = set(self._allowed_opts())
@@ -504,6 +508,22 @@ class MRJobRunner(object):
         You don't need to re-implement this in a subclass
         """
         return combine_opts(cls._opts_combiners(), *opts_list)
+
+    ### Filesystem object ###
+
+    @property
+    def fs(self):
+        return self._fs
+
+    def make_filesystem(self):
+        return LocalFilesystem()
+
+    def __getattr__(self, name):
+        # For backward compatibility, forward filesystem methods
+        try:
+            return getattr(self._fs, name)
+        except AttributeError:
+            raise AttributeError(name)
 
     ### Running the job and parsing output ###
 
@@ -676,23 +696,6 @@ class MRJobRunner(object):
         """
         return self._job_name
 
-    ### file management utilties ###
-
-    # Some simple filesystem operations that work for all runners.
-
-    # To access files on HDFS (when using
-    # :py:class:``~mrjob.hadoop.HadoopJobRunner``) and S3 (when using
-    # ``~mrjob.emr.EMRJobRunner``), use ``hdfs://...`` and  ``s3://...``,
-    # respectively.
-
-    # We don't currently support ``mv()`` and ``cp()`` because S3 doesn't
-    # really have directories, so the semantics get a little weird.
-
-    # Some simple filesystem operations that are easy to implement.
-
-    # We don't support mv() and cp() because they don't totally make sense
-    # on S3, which doesn't really have moves or directories!
-
     def get_output_dir(self):
         """Find the directory containing the job output. If the job hasn't
         run yet, returns None"""
@@ -700,98 +703,6 @@ class MRJobRunner(object):
             return None
 
         return self._output_dir
-
-    def du(self, path_glob):
-        """Get the total size of files matching ``path_glob``
-
-        Corresponds roughly to: ``hadoop fs -dus path_glob``
-        """
-        return sum(os.path.getsize(path) for path in self.ls(path_glob))
-
-    def ls(self, path_glob):
-        """Recursively list all files in the given path.
-
-        We don't return directories for compatibility with S3 (which
-        has no concept of them)
-
-        Corresponds roughly to: ``hadoop fs -lsr path_glob``
-        """
-        for path in glob.glob(path_glob):
-            if os.path.isdir(path):
-                for dirname, _, filenames in os.walk(path):
-                    for filename in filenames:
-                        yield os.path.join(dirname, filename)
-            else:
-                yield path
-
-    def cat(self, path):
-        """cat output from a given path. This would automatically decompress
-        .gz and .bz2 files.
-
-        Corresponds roughly to: ``hadoop fs -cat path``
-        """
-        for filename in self.ls(path):
-            for line in self._cat_file(filename):
-                yield line
-
-    def mkdir(self, path):
-        """Create the given dir and its subdirs (if they don't already
-        exist).
-
-        Corresponds roughly to: ``hadoop fs -mkdir path``
-        """
-        if not os.path.isdir(path):
-            os.makedirs(path)
-
-    def path_exists(self, path_glob):
-        """Does the given path exist?
-
-        Corresponds roughly to: ``hadoop fs -test -e path_glob``
-        """
-        return bool(glob.glob(path_glob))
-
-    def path_join(self, dirname, filename):
-        """Join a directory name and filename."""
-        return os.path.join(dirname, filename)
-
-    def rm(self, path_glob):
-        """Recursively delete the given file/directory, if it exists
-
-        Corresponds roughly to: ``hadoop fs -rmr path_glob``
-        """
-        for path in glob.glob(path_glob):
-            if os.path.isdir(path):
-                log.debug('Recursively deleting %s' % path)
-                shutil.rmtree(path)
-            else:
-                log.debug('Deleting %s' % path)
-                os.remove(path)
-
-    def touchz(self, path):
-        """Make an empty file in the given location. Raises an error if
-        a non-zero length file already exists in that location.
-
-        Correponds to: ``hadoop fs -touchz path``
-        """
-        if os.path.isfile(path) and os.path.getsize(path) != 0:
-            raise OSError('Non-empty file %r already exists!' % (path,))
-
-        # zero out the file
-        open(path, 'w').close()
-
-    def _md5sum_file(self, fileobj, block_size=(512 ** 2)):  # 256K default
-        md5 = hashlib.md5()
-        while True:
-            data = fileobj.read(block_size)
-            if not data:
-                break
-            md5.update(data)
-        return md5.hexdigest()
-
-    def md5sum(self, path):
-        """Generate the md5 sum of the file at ``path``"""
-        with open(path, 'rb') as f:
-            return self._md5sum_file(f)
 
     ### other methods you need to implement in your subclass ###
 

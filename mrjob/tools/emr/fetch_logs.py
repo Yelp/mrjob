@@ -167,7 +167,7 @@ def make_option_parser():
 
     assignments = {
         option_parser: ('conf_path', 'quiet', 'verbose',
-                        'ec2_key_pair_file')
+                        'ec2_key_pair_file', 's3_sync_wait_time')
     }
 
     mr_job = MRJob()

@@ -38,6 +38,7 @@ class LogFetchingTestCase(ToolTestCase):
             runner_kwargs(parse_args(make_option_parser())),
             {'conf_path': None,
              'ec2_key_pair_file': None,
+             's3_sync_wait_time': None,
              'emr_job_flow_id': 'j-MOCKJOBFLOW0'})
 
     def test_find_failure(self):
@@ -45,6 +46,7 @@ class LogFetchingTestCase(ToolTestCase):
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '--f',
+            '--s3-sync-wait-time=0',
             'j-MOCKJOBFLOW0')
         self.monkey_patch_stdout()
 
@@ -58,6 +60,7 @@ class LogFetchingTestCase(ToolTestCase):
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '-l',
+            '--s3-sync-wait-time=0',
             'j-MOCKJOBFLOW0')
 
         self.monkey_patch_stdout()
@@ -74,21 +77,21 @@ class LogFetchingTestCase(ToolTestCase):
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '-L',
+            '--s3-sync-wait-time=0',
             'j-MOCKJOBFLOW0')
 
         self.monkey_patch_stdout()
 
         fetch_logs_main()
 
-        self.assertEqual(self.stdout.getvalue(),
-                         'SSH error: Cannot ssh to master; job flow is not'
-                         ' waiting or running\n\n')
+        self.assertEqual(self.stdout.getvalue(), '\n')
 
     def test_fetch_counters(self):
         self.make_job_flow()
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '--counters',
+            '--s3-sync-wait-time=0',
             'j-MOCKJOBFLOW0')
         self.monkey_patch_stdout()
         fetch_logs_main()

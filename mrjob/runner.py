@@ -18,8 +18,6 @@ from __future__ import with_statement
 import copy
 import datetime
 import getpass
-import glob
-import hashlib
 import logging
 import os
 import random
@@ -52,7 +50,6 @@ from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.fs.local import LocalFilesystem
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
-from mrjob.util import read_file
 from mrjob.util import tar_and_gzip
 
 

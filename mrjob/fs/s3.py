@@ -1,14 +1,7 @@
 import fnmatch
 import logging
-import os
 import posixpath
 import socket
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
 
 try:
     import boto
@@ -18,17 +11,10 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
-from mrjob.fs.local import LocalFilesystem
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
-from mrjob.ssh import ssh_cat
-from mrjob.ssh import ssh_copy_key
-from mrjob.ssh import ssh_ls
-from mrjob.ssh import SSHException
-from mrjob.ssh import SSH_PREFIX
-from mrjob.ssh import SSH_URI_RE
 from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import read_file
 

@@ -16,10 +16,8 @@ from __future__ import with_statement
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
-import fnmatch
 import logging
 import os
-import posixpath
 import random
 import re
 import shlex
@@ -66,9 +64,6 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.multi import MultiFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
-from mrjob.fs.s3 import EMR_BACKOFF
-from mrjob.fs.s3 import EMR_BACKOFF_MULTIPLIER
-from mrjob.fs.s3 import EMR_MAX_TRIES
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
@@ -80,20 +75,13 @@ from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
 from mrjob.runner import MRJobRunner
-from mrjob.runner import GLOB_RE
-from mrjob.ssh import ssh_cat
-from mrjob.ssh import ssh_ls
 from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_slave_addresses
-from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_LOG_ROOT
-from mrjob.ssh import SSH_URI_RE
-from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import hash_object
-from mrjob.util import read_file
 
 
 log = logging.getLogger('mrjob.emr')

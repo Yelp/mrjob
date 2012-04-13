@@ -41,10 +41,8 @@ from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import scan_logs_in_order
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_uri
-from mrjob.parse import urlparse
 from mrjob.runner import MRJobRunner
 from mrjob.util import cmd_line
-from mrjob.util import read_file
 
 
 log = logging.getLogger('mrjob.hadoop')

@@ -1,5 +1,4 @@
 import logging
-import os
 import posixpath
 import re
 from subprocess import Popen
@@ -12,7 +11,6 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from mrjob.fs.local import LocalFilesystem
 from mrjob.parse import is_uri
 from mrjob.parse import urlparse
 from mrjob.util import cmd_line

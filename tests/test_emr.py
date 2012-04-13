@@ -140,6 +140,8 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         add_mock_s3_data(self.mock_s3_fs, data, time_modified)
 
     def prepare_runner_for_ssh(self, runner, num_slaves=0):
+        # TODO: Refactor this abomination of a test harness
+
         # Set up environment variables
         self._old_environ = os.environ.copy()
         os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
@@ -169,7 +171,7 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         # Also pretend to have an SSH key pair file
         runner._opts['ec2_key_pair_file'] = self.keyfile_path
 
-        # re-initialize fs
+        # re-initialize fs, without ec2_key_pair_file EMRJobRunner disables ssh
         runner._ssh_key_name = None
         del runner._fs
         del runner._ssh_fs

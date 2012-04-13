@@ -10,6 +10,13 @@ class MultiFilesystem(object):
         super(MultiFilesystem, self).__init__()
         self.filesystems = filesystems
 
+    def __getattr__(self, name):
+        # Forward through to children for backward compatibility
+        for fs in self.filesystems:
+            if hasattr(fs, name):
+                return getattr(fs, name)
+        raise AttributeError(name)
+
     def _do_action(self, action, path, *args, **kwargs):
         """Call **action** on each filesystem object in turn. If one raises an
         :py:class:`IOError`, save the exception and try the rest. If none

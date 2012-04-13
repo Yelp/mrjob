@@ -2034,11 +2034,10 @@ class MRJob(object):
     ### hadoop_extra_args ###
 
     def hadoop_extra_args(self):
-        """ Setting input and output formats for supporting typed bytes.
+        """ Setting input format for supporting typed bytes.
         """
         if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
-            self.options.hadoop_extra_args.extend(['-outputformat', 'org.apache.hadoop.mapred.SequenceFileOutputFormat'])
-            self.options.hadoop_extra_args.extend(['-inputformat', 'org.apache.hadoop.mapred.SequenceFileInputFormat'])
+            self.options.hadoop_extra_args.extend(['-inputformat', 'org.apache.hadoop.streaming.AutoInputFormat'])
 
         return self.options.hadoop_extra_args
         

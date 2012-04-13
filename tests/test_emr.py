@@ -169,7 +169,12 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         # Also pretend to have an SSH key pair file
         runner._opts['ec2_key_pair_file'] = self.keyfile_path
 
+        # re-initialize fs
+        runner._ssh_key_name = None
         del runner._fs
+        del runner._ssh_fs
+        del runner._s3_fs
+        runner.fs
 
     def add_slave(self):
         """Add a mocked slave to the cluster. Caller is responsible for setting

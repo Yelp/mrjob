@@ -52,7 +52,7 @@ class SSHFilesystem(object):
             if not addr:
                 raise ValueError
 
-            if '!' in addr and self.ssh_key_name is not None:
+            if '!' in addr and self.ssh_key_name is None:
                 raise ValueError('ssh_key_name must not be None')
 
             output = ssh_ls(
@@ -77,7 +77,7 @@ class SSHFilesystem(object):
         ssh_match = SSH_URI_RE.match(filename)
         try:
             addr = ssh_match.group('hostname') or self._address_of_master()
-            if '!' in addr and self.ssh_key_name is not None:
+            if '!' in addr and self.ssh_key_name is None:
                 raise ValueError('ssh_key_name must not be None')
             output = ssh_cat(
                 self._ssh_bin,

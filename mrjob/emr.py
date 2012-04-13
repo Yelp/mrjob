@@ -2032,6 +2032,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             return self._find_probable_cause_of_failure_s3(step_nums)
 
     def _find_probable_cause_of_failure_ssh(self, step_nums):
+        self._enable_slave_ssh_access()
         task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
         step_logs = self.ls_step_logs_ssh(step_nums)
         job_logs = self.ls_job_logs_ssh(step_nums)

@@ -1661,6 +1661,8 @@ class TestSSHLs(MockEMRAndS3TestCase):
         mock_ssh_file('testmaster!testslave0',
                       posixpath.join('test', 'three'), '')
 
+        self.runner._enable_slave_ssh_access()
+
         self.assertEqual(
             sorted(self.runner.ls('ssh://testmaster/test')),
             ['ssh://testmaster/test/one', 'ssh://testmaster/test/two'])

@@ -1677,9 +1677,11 @@ class TestNoBoto(unittest.TestCase):
     def blank_out_boto(self):
         self._real_boto = mrjob.emr.boto
         mrjob.emr.boto = None
+        mrjob.fs.s3.boto = None
 
     def restore_boto(self):
         mrjob.emr.boto = self._real_boto
+        mrjob.fs.s3.boto = self._real_boto
 
     def test_init(self):
         # merely creating an EMRJobRunner should raise an exception

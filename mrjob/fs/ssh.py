@@ -22,19 +22,18 @@ from mrjob.util import read_file
 log = logging.getLogger('mrjob.fs.ssh')
 
 
-class S3Filesystem(LocalFilesystem):
+class SSHFilesystem(object):
 
-    def __init__(self, opts, aws_region, ssh_key_name):
-        super(S3Filesystem, self).__init__()
-        self._opts = opts
-        self._aws_region = aws_region
-        self._ssh_key_name = ssh_key_name
+    def __init__(self, ssh_bin, ec2_key_pair_file, key_name):
+        super(SSHFilesystem, self).__init__()
+        self._ssh_bin = ssh_bin
+        self._ec2_key_pair_file = ec2_key_pair_file
+        self.ssh_key_name = key_name
+        if self._ec2_key_pair_file is None:
+            raise ValueError('ec2_key_pair_file must be a path')
 
-        # this will be populated by EMRJobRunner when possible
-        self.address_of_master = None
-
-    def can_handle_path(self):
-        return SSH_URI_RE.match(filename) is not None
+    def can_handle_path(self, path):
+        return SSH_URI_RE.match(path) is not None
 
     def du(self, path_glob):
         raise IOError() # not implemented
@@ -50,13 +49,18 @@ class S3Filesystem(LocalFilesystem):
         m = SSH_URI_RE.match(uri)
         try:
             addr = m.group('hostname')
+            if not addr:
+                raise ValueError
+
+            if '!' in addr and self.ssh_key_name is not None:
+                raise ValueError('ssh_key_name must not be None')
 
             output = ssh_ls(
-                self._opts['ssh_bin'],
+                self._ssh_bin,
                 addr,
-                self._opts['ec2_key_pair_file'],
+                self._ec2_key_pair_file,
                 m.group('filesystem_path'),
-                self._ssh_key_name,
+                self.ssh_key_name,
             )
 
             for line in output:
@@ -73,14 +77,14 @@ class S3Filesystem(LocalFilesystem):
         ssh_match = SSH_URI_RE.match(filename)
         try:
             addr = ssh_match.group('hostname') or self._address_of_master()
-            if '!' in addr:
-                self._enable_slave_ssh_access()
+            if '!' in addr and self.ssh_key_name is not None:
+                raise ValueError('ssh_key_name must not be None')
             output = ssh_cat(
-                self._opts['ssh_bin'],
+                self._ssh_bin,
                 addr,
-                self._opts['ec2_key_pair_file'],
+                self._ec2_key_pair_file,
                 ssh_match.group('filesystem_path'),
-                self._ssh_key_name,
+                self.ssh_key_name,
             )
             return read_file(filename, fileobj=StringIO(output))
         except SSHException, e:

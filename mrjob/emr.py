@@ -1843,13 +1843,12 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     ## SSH LOG FETCHING
 
     def _ssh_path(self, relative):
-        return SSH_PREFIX + self._address_of_master() + '/' + relative
+        return SSH_PREFIX + self._address_of_master() + SSH_LOG_ROOT + '/' + relative
 
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
         self._enable_slave_ssh_access()
         log.debug('Search %s for logs' % self._ssh_path(relative_path))
-        print self._ssh_path(relative_path)
         return self.ls(self._ssh_path(relative_path))
 
     def _ls_slave_ssh_logs(self, addr, relative_path):

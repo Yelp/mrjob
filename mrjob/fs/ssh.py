@@ -1,6 +1,4 @@
-import fnmatch
 import logging
-import os
 import posixpath
 
 try:
@@ -10,12 +8,10 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob.ssh import ssh_cat
-from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_ls
 from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_URI_RE
-from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import read_file
 
 

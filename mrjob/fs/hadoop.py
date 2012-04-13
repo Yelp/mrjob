@@ -32,11 +32,14 @@ HADOOP_LSR_NO_SUCH_FILE = re.compile(
 HADOOP_RMR_NO_SUCH_FILE = re.compile(r'^rmr: hdfs://.*$')
 
 
-class HadoopFilesystem(LocalFilesystem):
+class HadoopFilesystem(object):
 
     def __init__(self, hadoop_bin):
         super(HadoopFilesystem, self).__init__()
         self._hadoop_bin = hadoop_bin
+
+    def can_handle_path(self, path):
+        return is_uri(path)
 
     def invoke_hadoop(self, args, ok_returncodes=None, ok_stderr=None,
                        return_stdout=False):
@@ -91,31 +94,29 @@ class HadoopFilesystem(LocalFilesystem):
     def du(self, path_glob):
         """Get the size of a file, or None if it's not a file or doesn't
         exist."""
-        if not is_uri(path_glob):
-            return super(HadoopFilesystem, self).du(path_glob)
-
-        stdout = self.invoke_hadoop(['fs', '-du', path_glob],
-                                     return_stdout=True)
+        try:
+            stdout = self.invoke_hadoop(['fs', '-du', path_glob],
+                                         return_stdout=True)
+        except CalledProcessError:
+            raise IOError(path_glob)
 
         try:
             return int(stdout.split()[1])
         except (ValueError, TypeError, IndexError):
-            raise Exception(
+            raise IOError(
                 'Unexpected output from hadoop fs -du: %r' % stdout)
 
     def ls(self, path_glob):
-        if not is_uri(path_glob):
-            for path in super(HadoopFilesystem, self).ls(path_glob):
-                yield path
-            return
-
         components = urlparse(path_glob)
         hdfs_prefix = '%s://%s' % (components.scheme, components.netloc)
 
-        stdout = self.invoke_hadoop(
-            ['fs', '-lsr', path_glob],
-            return_stdout=True,
-            ok_stderr=[HADOOP_LSR_NO_SUCH_FILE])
+        try:
+            stdout = self.invoke_hadoop(
+                ['fs', '-lsr', path_glob],
+                return_stdout=True,
+                ok_stderr=[HADOOP_LSR_NO_SUCH_FILE])
+        except CalledProcessError:
+            raise IOError("Could not ls %s" % path_glob)
 
         for line in StringIO(stdout):
             fields = line.rstrip('\r\n').split()
@@ -131,34 +132,33 @@ class HadoopFilesystem(LocalFilesystem):
             yield hdfs_prefix + path
 
     def _cat_file(self, filename):
-        if is_uri(filename):
-            # stream from HDFS
-            cat_args = self._hadoop_bin + ['fs', '-cat', filename]
-            log.debug('> %s' % cmd_line(cat_args))
+        # stream from HDFS
+        cat_args = self._hadoop_bin + ['fs', '-cat', filename]
+        log.debug('> %s' % cmd_line(cat_args))
 
-            cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
+        cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
 
-            def stream():
-                for line in cat_proc.stdout:
-                    yield line
+        def stream():
+            for line in cat_proc.stdout:
+                yield line
 
-                # there shouldn't be any stderr
-                for line in cat_proc.stderr:
-                    log.error('STDERR: ' + line)
+            # there shouldn't be any stderr
+            for line in cat_proc.stderr:
+                log.error('STDERR: ' + line)
 
-                returncode = cat_proc.wait()
+            returncode = cat_proc.wait()
 
-                if returncode != 0:
-                    raise CalledProcessError(returncode, cat_args)
+            if returncode != 0:
+                raise IOError("Could not stream %s" % filename)
 
-            return read_file(filename, stream())
-        else:
-            # read from local filesystem
-            return super(HadoopFilesystem, self)._cat_file(filename)
+        return read_file(filename, stream())
 
     def mkdir(self, path):
-        self.invoke_hadoop(
-            ['fs', '-mkdir', path], ok_stderr=[HADOOP_FILE_EXISTS_RE])
+        try:
+            self.invoke_hadoop(
+                ['fs', '-mkdir', path], ok_stderr=[HADOOP_FILE_EXISTS_RE])
+        except CalledProcessError:
+            raise IOError("Could not mkdir %s" % path)
 
     def path_exists(self, path_glob):
         """Does the given path exist?
@@ -166,17 +166,14 @@ class HadoopFilesystem(LocalFilesystem):
         If dest is a directory (ends with a "/"), we check if there are
         any files starting with that path.
         """
-        if not is_uri(path_glob):
-            return super(HadoopFilesystem, self).path_exists(path_glob)
-
-        return bool(self.invoke_hadoop(['fs', '-test', '-e', path_glob],
-                                        ok_returncodes=(0, 1)))
+        try:
+            return bool(self.invoke_hadoop(['fs', '-test', '-e', path_glob],
+                                            ok_returncodes=(0, 1)))
+        except CalledProcessError:
+            raise IOError("Could not check path %s" % path_glob)
 
     def path_join(self, dirname, filename):
-        if is_uri(dirname):
-            return posixpath.join(dirname, filename)
-        else:
-            return os.path.join(dirname, filename)
+        return posixpath.join(dirname, filename)
 
     def rm(self, path_glob):
         if not is_uri(path_glob):
@@ -191,12 +188,15 @@ class HadoopFilesystem(LocalFilesystem):
             # to STDERR something like:
             # rmr: <path>
             # which we can safely ignore
-            self.invoke_hadoop(
-                ['fs', '-rmr', path_glob],
-                return_stdout=True, ok_stderr=[HADOOP_RMR_NO_SUCH_FILE])
+            try:
+                self.invoke_hadoop(
+                    ['fs', '-rmr', path_glob],
+                    return_stdout=True, ok_stderr=[HADOOP_RMR_NO_SUCH_FILE])
+            except CalledProcessError:
+                raise IOError("Could not rm %s" % path_glob)
 
     def touchz(self, dest):
-        if not is_uri(dest):
-            super(HadoopFilesystem, self).touchz(dest)
-
-        self.invoke_hadoop(['fs', '-touchz', dest])
+        try:
+            self.invoke_hadoop(['fs', '-touchz', dest])
+        except CalledProcessError:
+            raise IOError("Could not touchz %s" % dest)

@@ -360,9 +360,6 @@ class MRJobRunner(object):
         # rather than feed it multiple files
         self._sort_is_windows_sort = None
 
-        # Initialize our filesystem access object
-        self._fs = self.make_filesystem()
-
     def _set_opts(self, opts, conf_path):
         # enforce correct arguments
         allowed_opts = set(self._allowed_opts())
@@ -513,15 +510,17 @@ class MRJobRunner(object):
 
     @property
     def fs(self):
+        if not hasattr(self, '_fs'):
+            self._fs = LocalFilesystem()
         return self._fs
-
-    def make_filesystem(self):
-        return LocalFilesystem()
 
     def __getattr__(self, name):
         # For backward compatibility, forward filesystem methods
+        if name == '_fs':
+            # what are you doing here?!
+            raise AttributeError('_fs')
         try:
-            return getattr(self._fs, name)
+            return getattr(self.fs, name)
         except AttributeError:
             raise AttributeError(name)
 
@@ -725,11 +724,6 @@ class MRJobRunner(object):
     def _run(self):
         """Run the job."""
         raise NotImplementedError
-
-    def _cat_file(self, filename):
-        """cat a file, decompress if necessary."""
-        for line in read_file(filename):
-            yield line
 
     ### internal utilities for implementing MRJobRunners ###
 

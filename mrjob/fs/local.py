@@ -19,6 +19,9 @@ class LocalFilesystem(object):
     # We don't currently support ``mv()`` and ``cp()`` because S3 doesn't
     # really have directories, so the semantics get a little weird.
 
+    def can_handle_path(self, path):
+        return True
+
     def du(self, path_glob):
         """Get the total size of files matching ``path_glob``
 
@@ -53,6 +56,9 @@ class LocalFilesystem(object):
 
         Corresponds roughly to: ``hadoop fs -cat path``
         """
+        # This is the only Filesystem class that contains an actual
+        # implementation of cat(). The rest are only used with MultiFilesystem,
+        # which provides cat(). The rest only provide _cat_file().
         for filename in self.ls(path):
             for line in self._cat_file(filename):
                 yield line

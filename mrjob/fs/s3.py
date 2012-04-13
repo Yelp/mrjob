@@ -2,6 +2,7 @@ import fnmatch
 import logging
 import os
 import posixpath
+import socket
 
 try:
     from cStringIO import StringIO

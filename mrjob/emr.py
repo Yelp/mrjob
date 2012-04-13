@@ -1834,6 +1834,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
+        self._enable_slave_ssh_access()
         full_path = SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path
         log.debug('Search %s for logs' % full_path)
         return self.ls(full_path)
@@ -1841,6 +1842,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def _ls_slave_ssh_logs(self, addr, relative_path):
         """List logs over multi-hop SSH by path relative to log root directory
         """
+        self._enable_slave_ssh_access()
         root_path = '%s%s!%s%s' % (SSH_PREFIX,
                                    self._address_of_master(),
                                    addr,
@@ -1869,16 +1871,19 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                          step_nums)
 
     def ls_step_logs_ssh(self, step_nums):
+        self._enable_slave_ssh_access()
         return self._enforce_path_regexp(self._ls_ssh_logs('steps/'),
                                          STEP_LOG_URI_RE,
                                          step_nums)
 
     def ls_job_logs_ssh(self, step_nums):
+        self._enable_slave_ssh_access()
         return self._enforce_path_regexp(self._ls_ssh_logs('history/'),
                                          EMR_JOB_LOG_URI_RE,
                                          step_nums)
 
     def ls_node_logs_ssh(self):
+        self._enable_slave_ssh_access()
         all_paths = []
         for addr in self._addresses_of_slaves():
             logs = self._ls_slave_ssh_logs(addr, '')
@@ -1887,6 +1892,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     def ls_all_logs_ssh(self):
         """List all log files in the log root directory"""
+        self._enable_slave_ssh_access()
         return self.ls(SSH_PREFIX + SSH_LOG_ROOT)
 
     ## S3 LOG FETCHING ##

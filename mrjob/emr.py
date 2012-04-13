@@ -1228,6 +1228,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def _enable_slave_ssh_access(self):
         if self._ssh_fs and not self._ssh_key_name:
             self._ssh_key_name = self._job_name + '.pem'
+            # also inject into the SSHFilesystem. there is probably a better
+            # way to handle this.
             self._ssh_fs.ssh_key_name = self._ssh_key_name
             ssh_copy_key(
                 self._opts['ssh_bin'],

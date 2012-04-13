@@ -351,6 +351,8 @@ def read_file(path, fileobj=None):
     - Decompress ``.gz`` and ``.bz2`` files.
     - If *fileobj* is not ``None``, stream lines from the *fileobj*
     """
+    # sometimes values declared in the ``try`` block aren't accessible from the
+    # ``finally`` block. not sure why.
     f = None
     try:
         if path.endswith('.gz'):

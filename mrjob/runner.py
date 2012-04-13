@@ -514,7 +514,7 @@ class MRJobRunner(object):
     def __getattr__(self, name):
         # For backward compatibility, forward filesystem methods
         if name == '_fs':
-            # what are you doing here?!
+            # somehow logic flow is getting here. how?!
             raise AttributeError('_fs')
         try:
             return getattr(self.fs, name)

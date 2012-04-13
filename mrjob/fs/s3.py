@@ -21,16 +21,6 @@ from mrjob.util import read_file
 
 log = logging.getLogger('mrjob.fs.s3')
 
-# map from AWS region to S3 endpoint. See
-# http://docs.amazonwebservices.com/AmazonS3/latest/dev/MakingRequests.html#RequestEndpoints
-REGION_TO_S3_ENDPOINT = {
-    'EU': 's3-eu-west-1.amazonaws.com',
-    'us-east-1': 's3.amazonaws.com',  # no region-specific endpoint
-    'us-west-1': 's3-us-west-1.amazonaws.com',
-    'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com',  # no EMR endpoint yet
-    '': 's3.amazonaws.com',
-}
-
 # if EMR throttles us, how long to wait (in seconds) before trying again?
 EMR_BACKOFF = 20
 EMR_BACKOFF_MULTIPLIER = 1.5

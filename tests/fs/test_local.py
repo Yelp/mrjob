@@ -13,6 +13,8 @@
 # limitations under the License.
 from __future__ import with_statement
 
+import bz2
+import gzip
 import os
 from shutil import rmtree
 from tempfile import mkdtemp
@@ -36,11 +38,14 @@ class LocalFSTestCase(TestCase):
         abs_path = os.path.join(self.root, path)
         if not os.path.exists(abs_path):
             os.makedirs(abs_path)
+        return abs_path
 
     def makefile(self, path, contents):
         self.makedirs(os.path.split(path)[0])
-        with open(os.path.join(self.root, path), 'w') as f:
+        abs_path = os.path.join(self.root, path)
+        with open(abs_path, 'w') as f:
             f.write(contents)
+        return abs_path
 
     def abs_paths(self, *paths):
         return [os.path.join(self.root, path) for path in paths]
@@ -66,5 +71,31 @@ class LocalFSTestCase(TestCase):
     def test_ls_recurse(self):
         self.makefile('f', 'contents')
         self.makefile('d/f2', 'contents')
-        self.assertEqual(list(self.fs.ls(self.root)), self.abs_paths('f',
-                                                                     'd/f2'))
+        self.assertEqual(list(self.fs.ls(self.root)),
+                         self.abs_paths('f', 'd/f2'))
+
+    def test_cat_uncompressed(self):
+        path = self.makefile('f', 'bar\nfoo\n')
+        self.assertEqual(list(self.fs.cat(path)), ['bar\n', 'foo\n'])
+
+    def test_cat_compressed(self):
+        input_gz_path = os.path.join(self.root, 'input.gz')
+        with gzip.GzipFile(input_gz_path, 'w') as input_gz:
+            input_gz.write('foo\nbar\n')
+
+        self.assertEqual(list(self.fs.cat(input_gz_path)), ['foo\n', 'bar\n'])
+
+        input_bz2_path = os.path.join(self.root, 'input.bz2')
+        with bz2.BZ2File(input_bz2_path, 'w') as input_bz2:
+            input_bz2.write('bar\nbar\nfoo\n')
+
+        self.assertEqual(list(self.fs.cat(input_bz2_path)),
+                         ['bar\n', 'bar\n', 'foo\n'])
+
+    def test_du(self):
+        data_path_1 = self.makefile('data1', 'abcd')
+        data_path_2 = self.makefile('more/data2', 'defg')
+
+        self.assertEqual(self.fs.du(self.root), 8)
+        self.assertEqual(self.fs.du(data_path_1), 4)
+        self.assertEqual(self.fs.du(data_path_2), 4)

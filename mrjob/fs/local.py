@@ -119,7 +119,8 @@ class LocalFilesystem(object):
             raise OSError('Non-empty file %r already exists!' % (path,))
 
         # zero out the file
-        open(path, 'w').close()
+        with open(path, 'w'):
+            pass
 
     def _md5sum_file(self, fileobj, block_size=(512 ** 2)):  # 256K default
         md5 = hashlib.md5()

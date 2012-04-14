@@ -36,7 +36,7 @@ class LocalFSTestCase(TestCase):
 
     def makedirs(self, path):
         abs_path = os.path.join(self.root, path)
-        if not os.path.exists(abs_path):
+        if not os.path.isdir(abs_path):
             os.makedirs(abs_path)
         return abs_path
 
@@ -100,3 +100,29 @@ class LocalFSTestCase(TestCase):
         self.assertEqual(self.fs.du(self.root), 8)
         self.assertEqual(self.fs.du(data_path_1), 4)
         self.assertEqual(self.fs.du(data_path_2), 4)
+
+    def test_mkdir(self):
+        path = os.path.join(self.root, 'dir')
+        self.fs.mkdir(path)
+        self.assertEqual(os.path.isdir(path), True)
+
+    def test_path_exists_no(self):
+        path = os.path.join(self.root, 'f')
+        self.assertEqual(self.fs.path_exists(path), False)
+
+    def test_path_exists_yes(self):
+        path = self.makefile('f', 'contents')
+        self.assertEqual(self.fs.path_exists(path), True)
+
+    def test_touchz(self):
+        path = os.path.join(self.root, 'f')
+        self.fs.touchz(path)
+        self.fs.touchz(path)
+        with open(path, 'w') as f:
+            f.write('not empty anymore')
+        self.assertRaises(OSError, self.fs.touchz, path)
+
+    def test_md5sum(self):
+        path = self.makefile('f', 'abcd')
+        self.assertEqual(self.fs.md5sum(path),
+                         'e2fc714c4727ee9395f324cd2e7f331f')

@@ -34,9 +34,8 @@ class HadoopFSTestCase(TempdirTestCase):
 
     def setUp(self):
         super(HadoopFSTestCase, self).setUp()
-        self.fs = MultiFilesystem(HadoopFilesystem(['hadoop']),
-                                  LocalFilesystem())
-        self.fs = HadoopFilesystem(['hadoop'])
+        # wrap HadoopFilesystem so it gets cat()
+        self.fs = MultiFilesystem(HadoopFilesystem(['hadoop']))
         self.mock_popen()
 
     def mock_popen(self):
@@ -132,9 +131,6 @@ class HadoopFSTestCase(TempdirTestCase):
     def test_cat_uncompressed(self):
         # mockhadoop doesn't support compressed files, so we won't test for it.
         # this is only a sanity check anyway.
-        path = self.makefile('f', 'bar\nfoo\n')
-        self.assertEqual(list(self.fs.cat(path)), ['bar\n', 'foo\n'])
-
         self.makefile(os.path.join('mock_hdfs_root', 'data', 'foo'), 'foo\nfoo\n')
         remote_path = self.fs.path_join('hdfs:///data', 'foo')
 
@@ -153,11 +149,12 @@ class HadoopFSTestCase(TempdirTestCase):
         self.makefile(os.path.join('mock_hdfs_root', 'more', 'data3'), 'hijk')
         remote_data_3 = 'hdfs:///more/data3'
 
-        self.assertEqual(self.fs.du(root), 12)
-        self.assertEqual(self.fs.du(remote_dir), 8)
-        self.assertEqual(self.fs.du(remote_dir + '/*'), 8)
-        self.assertEqual(self.fs.du(remote_data_1), 4)
-        self.assertEqual(self.fs.du(remote_data_2), 4)
+        self.assertEqual(self.fs.du('hdfs:///'), 12)
+        self.assertEqual(self.fs.du('hdfs:///data1'), 4)
+        self.assertEqual(self.fs.du('hdfs:///more'), 8)
+        self.assertEqual(self.fs.du('hdfs:///more/*'), 8)
+        self.assertEqual(self.fs.du('hdfs:///more/data2'), 4)
+        self.assertEqual(self.fs.du('hdfs:///more/data3'), 4)
 
     def test_mkdir(self):
         self.fs.mkdir('hdfs:///d')
@@ -169,3 +166,7 @@ class HadoopFSTestCase(TempdirTestCase):
         self.assertEqual(os.path.exists(local_path), True)
         self.fs.rm('hdfs:///f')
         self.assertEqual(os.path.exists(local_path), False)
+
+    def test_touchz(self):
+        # mockhadoop doesn't implement this.
+        pass

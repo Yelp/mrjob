@@ -46,7 +46,10 @@ class MultiFilesystem(object):
                     if first_exception is None:
                         first_exception = e
 
-        raise first_exception
+        if first_exception is None:
+            raise IOError('Could not %s: %s %s' % (action, path, args))
+        else:
+            raise first_exception
 
     def du(self, path_glob):
         return self._do_action('du', path_glob)

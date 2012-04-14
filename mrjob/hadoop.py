@@ -218,7 +218,7 @@ class HadoopJobRunner(MRJobRunner):
 
     @property
     def fs(self):
-        if not hasattr(self, '_fs'):
+        if self._fs is None:
             self._fs = MultiFilesystem(
                 HadoopFilesystem(self._opts['hadoop_bin']),
                 LocalFilesystem())

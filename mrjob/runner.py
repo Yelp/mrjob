@@ -271,6 +271,7 @@ class MRJobRunner(object):
                              the name of the file
         """
         self._set_opts(opts, conf_path)
+        self._fs = None
 
         # we potentially have a lot of files to copy, so we keep track
         # of them as a list of dictionaries, with the following keys:
@@ -507,15 +508,12 @@ class MRJobRunner(object):
 
     @property
     def fs(self):
-        if not hasattr(self, '_fs'):
+        if self._fs is None:
             self._fs = LocalFilesystem()
         return self._fs
 
     def __getattr__(self, name):
         # For backward compatibility, forward filesystem methods
-        if name == '_fs':
-            # somehow logic flow is getting here. how?!
-            raise AttributeError('_fs')
         try:
             return getattr(self.fs, name)
         except AttributeError:

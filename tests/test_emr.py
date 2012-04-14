@@ -173,10 +173,10 @@ class MockEMRAndS3TestCase(unittest.TestCase):
 
         # re-initialize fs, without ec2_key_pair_file EMRJobRunner disables ssh
         runner._ssh_key_name = None
-        del runner._fs
-        del runner._ssh_fs
-        del runner._s3_fs
-        runner.fs
+        runner._fs = None
+        runner._ssh_fs = None
+        runner._s3_fs = None
+        #runner.fs
 
     def add_slave(self):
         """Add a mocked slave to the cluster. Caller is responsible for setting

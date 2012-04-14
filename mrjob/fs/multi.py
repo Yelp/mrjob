@@ -70,7 +70,7 @@ class MultiFilesystem(object):
         return self._do_action('path_exists', path_glob)
 
     def path_join(self, dirname, filename):
-        return self._do_action('path_Join', dirname, filename)
+        return self._do_action('path_join', dirname, filename)
 
     def rm(self, path_glob):
         return self._do_action('rm', path_glob)

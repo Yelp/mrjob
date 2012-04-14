@@ -19,36 +19,15 @@ import os
 from shutil import rmtree
 from tempfile import mkdtemp
 
-try:
-    from unittest2 import TestCase
-except ImportError:
-    from unittest2 import TestCase
-
 from mrjob.fs.local import LocalFilesystem
 
+from tests.fs import TempdirTestCase
 
-class LocalFSTestCase(TestCase):
+class LocalFSTestCase(TempdirTestCase):
 
     def setUp(self):
-        self.root = mkdtemp()
-        self.addCleanup(rmtree, self.root)
+        super(LocalFSTestCase, self).setUp()
         self.fs = LocalFilesystem()
-
-    def makedirs(self, path):
-        abs_path = os.path.join(self.root, path)
-        if not os.path.isdir(abs_path):
-            os.makedirs(abs_path)
-        return abs_path
-
-    def makefile(self, path, contents):
-        self.makedirs(os.path.split(path)[0])
-        abs_path = os.path.join(self.root, path)
-        with open(abs_path, 'w') as f:
-            f.write(contents)
-        return abs_path
-
-    def abs_paths(self, *paths):
-        return [os.path.join(self.root, path) for path in paths]
 
     def test_can_handle_path_match(self):
         self.assertEqual(self.fs.can_handle_path('/dem/bitties'), True)

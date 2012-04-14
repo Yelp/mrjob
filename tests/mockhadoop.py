@@ -91,11 +91,13 @@ def hdfs_path_to_real_path(hdfs_path, environ):
     if not hdfs_path.startswith('/'):
         hdfs_path = '/user/%s/%s' % (environ['USER'], hdfs_path)
 
-    return os.path.join(os.environ['MOCK_HDFS_ROOT'], hdfs_path.lstrip('/'))
+    return os.path.join(environ['MOCK_HDFS_ROOT'], hdfs_path.lstrip('/'))
 
 
-def real_path_to_hdfs_path(real_path):
-    hdfs_root = os.environ['MOCK_HDFS_ROOT']
+def real_path_to_hdfs_path(real_path, environ=None):
+    if environ is None: # user may have passed empty dict
+        environ = os.environ
+    hdfs_root = environ['MOCK_HDFS_ROOT']
 
     if not real_path.startswith(hdfs_root):
         raise ValueError('path %s is not in %s' % (real_path, hdfs_root))
@@ -191,7 +193,7 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
     hdfs_path_globs = args or ['']
 
     def ls_line(real_path):
-        hdfs_path = real_path_to_hdfs_path(real_path)
+        hdfs_path = real_path_to_hdfs_path(real_path, environ)
         # we could actually implement ls here, but mrjob only cares about
         # the path
         path_is_dir = os.path.isdir(real_path)

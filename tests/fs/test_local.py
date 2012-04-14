@@ -33,12 +33,17 @@ class LocalFSTestCase(TestCase):
         self.fs = LocalFilesystem()
 
     def makedirs(self, path):
-        os.makedirs(os.path.join(self.root, path))
+        abs_path = os.path.join(self.root, path)
+        if not os.path.exists(abs_path):
+            os.makedirs(abs_path)
 
     def makefile(self, path, contents):
-        self.makedirs(os.path.split(path[0]))
+        self.makedirs(os.path.split(path)[0])
         with open(os.path.join(self.root, path), 'w') as f:
             f.write(contents)
+
+    def abs_paths(self, *paths):
+        return [os.path.join(self.root, path) for path in paths]
 
     def test_can_handle_path_match(self):
         self.assertEqual(self.fs.can_handle_path('/dem/bitties'), True)
@@ -48,3 +53,18 @@ class LocalFSTestCase(TestCase):
 
     def test_ls_empty(self):
         self.assertEqual(list(self.fs.ls(self.root)), [])
+
+    def test_ls_basic(self):
+        self.makefile('f', 'contents')
+        self.assertEqual(list(self.fs.ls(self.root)), self.abs_paths('f'))
+
+    def test_ls_basic_2(self):
+        self.makefile('f', 'contents')
+        self.makefile('f2', 'contents')
+        self.assertEqual(list(self.fs.ls(self.root)), self.abs_paths('f', 'f2'))
+
+    def test_ls_recurse(self):
+        self.makefile('f', 'contents')
+        self.makefile('d/f2', 'contents')
+        self.assertEqual(list(self.fs.ls(self.root)), self.abs_paths('f',
+                                                                     'd/f2'))

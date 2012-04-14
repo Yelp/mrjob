@@ -78,13 +78,14 @@ class LocalFSTestCase(TestCase):
         path = self.makefile('f', 'bar\nfoo\n')
         self.assertEqual(list(self.fs.cat(path)), ['bar\n', 'foo\n'])
 
-    def test_cat_compressed(self):
+    def test_cat_gz(self):
         input_gz_path = os.path.join(self.root, 'input.gz')
         with gzip.GzipFile(input_gz_path, 'w') as input_gz:
             input_gz.write('foo\nbar\n')
 
         self.assertEqual(list(self.fs.cat(input_gz_path)), ['foo\n', 'bar\n'])
 
+    def test_cat_bz2(self):
         input_bz2_path = os.path.join(self.root, 'input.bz2')
         with bz2.BZ2File(input_bz2_path, 'w') as input_bz2:
             input_bz2.write('bar\nbar\nfoo\n')

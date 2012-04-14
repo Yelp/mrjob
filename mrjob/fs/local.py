@@ -33,7 +33,7 @@ class LocalFilesystem(object):
     # really have directories, so the semantics get a little weird.
 
     def can_handle_path(self, path):
-        return True
+        return path.startswith('/')
 
     def du(self, path_glob):
         """Get the total size of files matching ``path_glob``

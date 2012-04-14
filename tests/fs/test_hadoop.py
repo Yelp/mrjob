@@ -36,6 +36,7 @@ class HadoopFSTestCase(TempdirTestCase):
         super(HadoopFSTestCase, self).setUp()
         self.fs = MultiFilesystem(HadoopFilesystem(['hadoop']),
                                   LocalFilesystem())
+        self.fs = HadoopFilesystem(['hadoop'])
         self.mock_popen()
 
     def mock_popen(self):
@@ -106,6 +107,28 @@ class HadoopFSTestCase(TempdirTestCase):
 
         return MockPopen
 
+    def make_hdfs_file(self, name, contents):
+        return self.makefile(os.path.join('mock_hdfs_root', name), contents)
+
+    def test_ls_empty(self):
+        self.assertEqual(list(self.fs.ls('hdfs:///')), [])
+
+    def test_ls_basic(self):
+        self.make_hdfs_file('f', 'contents')
+        self.assertEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///f'])
+
+    def test_ls_basic_2(self):
+        self.make_hdfs_file('f', 'contents')
+        self.make_hdfs_file('f2', 'contents')
+        self.assertEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///f',
+                                                        'hdfs:///f2'])
+
+    def test_ls_recurse(self):
+        self.make_hdfs_file('f', 'contents')
+        self.make_hdfs_file('d/f2', 'contents')
+        self.assertEqual(list(self.fs.ls('hdfs:///')),
+                         ['hdfs:///f', 'hdfs:///d/f2'])
+
     def test_cat_uncompressed(self):
         # mockhadoop doesn't support compressed files, so we won't test for it.
         # this is only a sanity check anyway.
@@ -135,3 +158,14 @@ class HadoopFSTestCase(TempdirTestCase):
         self.assertEqual(self.fs.du(remote_dir + '/*'), 8)
         self.assertEqual(self.fs.du(remote_data_1), 4)
         self.assertEqual(self.fs.du(remote_data_2), 4)
+
+    def test_mkdir(self):
+        self.fs.mkdir('hdfs:///d')
+        local_path = os.path.join(self.root, 'mock_hdfs_root', 'd')
+        self.assertEqual(os.path.isdir(local_path), True)
+
+    def test_rm(self):
+        local_path = self.make_hdfs_file('f', 'contents')
+        self.assertEqual(os.path.exists(local_path), True)
+        self.fs.rm('hdfs:///f')
+        self.assertEqual(os.path.exists(local_path), False)

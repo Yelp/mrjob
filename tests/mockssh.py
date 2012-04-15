@@ -103,120 +103,114 @@ def mock_ssh_file(host, path, contents):
 
 
 _SLAVE_ADDR_RE = re.compile(r'^(?P<master>.*?)!(?P<slave>.*?)=(?P<dir>.*)$')
-
-
-def slave_addresses():
-    """Get the addresses for slaves based on :envvar:`MOCK_SSH_ROOTS`"""
-    for kv_pair in os.environ['MOCK_SSH_ROOTS'].split(':'):
-        m = _SLAVE_ADDR_RE.match(kv_pair)
-        if m:
-            print m.group('slave')
-
-
 _SCP_RE = re.compile(r'^.*"cat > (?P<filename>.*?)".*$')
 
+def main(stdin, stdout, stderr, args, environ):
 
-def receive_poor_mans_scp(host, args):
-    """Mock SSH behavior for :py:func:`~mrjob.ssh.poor_mans_scp()`"""
-    dest = _SCP_RE.match(args[0]).group('filename')
-    try:
-        with open(os.path.join(path_for_host(host), dest), 'w') as f:
-            f.writelines(sys.stdin)
-    except IOError:
-        print >> sys.stderr, 'No such file or directory:', dest
+    def slave_addresses():
+        """Get the addresses for slaves based on :envvar:`MOCK_SSH_ROOTS`"""
+        for kv_pair in os.environ['MOCK_SSH_ROOTS'].split(':'):
+            m = _SLAVE_ADDR_RE.match(kv_pair)
+            if m:
+                print >> stdout, m.group('slave')
+        return 0
 
-
-def ls(host, args):
-    """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_ls()`"""
-    dest = args[1]
-    if dest == '-L':
-        dest = args[2]
-    root = path_for_host(host)
-    local_dest = rel_posix_to_abs_local(host, dest)
-
-    prefix_length = len(path_for_host(host))
-    if not os.path.exists(local_dest):
-        print >> sys.stderr, 'No such file or directory:', local_dest
-        sys.exit(1)
-    if not os.path.isdir(local_dest):
-        print dest
-    for root, dirs, files in os.walk(local_dest):
-        components = root.split(os.sep)
-        new_root = posixpath.join(*components)
-        for filename in files:
-            print '/' + posixpath.join(new_root, filename)[prefix_length:]
+    def receive_poor_mans_scp(host, args):
+        """Mock SSH behavior for :py:func:`~mrjob.ssh.poor_mans_scp()`"""
+        dest = _SCP_RE.match(args[0]).group('filename')
+        try:
+            with open(os.path.join(path_for_host(host), dest), 'w') as f:
+                f.writelines(stdin)
+            return 0
+        except IOError:
+            print >> stderr, 'No such file or directory:', dest
+            return 1
 
 
-def cat(host, args):
-    """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_cat()`"""
-    local_dest = rel_posix_to_abs_local(host, args[1])
-    if not os.path.exists(local_dest):
-        print >> sys.stderr, 'No such file or directory:', local_dest
-        sys.exit(1)
-    with open(local_dest, 'r') as f:
-        print f.read()
+    def ls(host, args):
+        """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_ls()`"""
+        dest = args[1]
+        if dest == '-L':
+            dest = args[2]
+        root = path_for_host(host)
+        local_dest = rel_posix_to_abs_local(host, dest)
+
+        prefix_length = len(path_for_host(host))
+        if not os.path.exists(local_dest):
+            print >> stderr, 'No such file or directory:', local_dest
+            return 1
+        if not os.path.isdir(local_dest):
+            print >> stdout, dest
+        for root, dirs, files in os.walk(local_dest):
+            components = root.split(os.sep)
+            new_root = posixpath.join(*components)
+            for filename in files:
+                print >> stdout, (
+                    '/' + posixpath.join(new_root, filename)[prefix_length:])
+        return 0
 
 
-def run(host, remote_args, slave_key_file=None):
-    """Execute a command as a "host." Recursively call for slave if necessary.
-    """
-    remote_arg_pos = 0
+    def cat(host, args):
+        """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_cat()`"""
+        local_dest = rel_posix_to_abs_local(host, args[1])
+        if not os.path.exists(local_dest):
+            print >> stderr, 'No such file or directory:', local_dest
+            return 1
+        with open(local_dest, 'r') as f:
+            print >> sys.stdout, f.read()
+            return 0
 
-    # Get slave addresses (this is 'bash -c "hadoop dfsadmn ...')
-    if remote_args[0].startswith('bash -c "hadoop'):
-        slave_addresses()
-        return
 
-    # Accept stdin for a file transfer (this is 'bash -c "cat > ...')
-    if remote_args[0].startswith('bash -c "cat'):
-        receive_poor_mans_scp(host, remote_args)
-        return
+    def run(host, remote_args, stdout, stderr, environ, slave_key_file=None):
+        """Execute a command as a "host." Recursively call for slave if necessary.
+        """
+        remote_arg_pos = 0
 
-    # ls (this is 'find -type f ...')
-    if remote_args[0] == 'find':
-        ls(host, remote_args)
-        return
+        # Get slave addresses (this is 'bash -c "hadoop dfsadmn ...')
+        if remote_args[0].startswith('bash -c "hadoop'):
+            return slave_addresses()
 
-    # cat (this is 'cat ...')
-    if remote_args[0] == 'cat':
-        cat(host, remote_args)
-        return
+        # Accept stdin for a file transfer (this is 'bash -c "cat > ...')
+        if remote_args[0].startswith('bash -c "cat'):
+            return receive_poor_mans_scp(host, remote_args)
 
-    # Recursively call for slaves
-    if remote_args[0] == 'ssh':
-        # Actually check the existence of the key file on the master node
-        while not remote_args[remote_arg_pos] == '-i':
-            remote_arg_pos += 1
+        # ls (this is 'find -type f ...')
+        if remote_args[0] == 'find':
+            return ls(host, remote_args)
 
-        slave_key_file = remote_args[remote_arg_pos + 1]
+        # cat (this is 'cat ...')
+        if remote_args[0] == 'cat':
+            return cat(host, remote_args)
 
-        if not os.path.exists(
-            os.path.join(path_for_host(host), slave_key_file)):
-            # This is word-for-word what SSH says.
-            print >> sys.stderr, 'Warning: Identity file',
-            slave_key_file, 'not accessible: No such file or directory.'
+        # Recursively call for slaves
+        if remote_args[0] == 'ssh':
+            # Actually check the existence of the key file on the master node
+            while not remote_args[remote_arg_pos] == '-i':
+                remote_arg_pos += 1
 
-            print >> sys.stderr, 'Permission denied (publickey).'
-            sys.exit(1)
+            slave_key_file = remote_args[remote_arg_pos + 1]
 
-        while not remote_args[remote_arg_pos].startswith('hadoop@'):
-            remote_arg_pos += 1
+            if not os.path.exists(
+                os.path.join(path_for_host(host), slave_key_file)):
+                # This is word-for-word what SSH says.
+                print >> stderr, 'Warning: Identity file',
+                slave_key_file, 'not accessible: No such file or directory.'
 
-        slave_host = host + '!%s' % remote_args[remote_arg_pos].split('@')[1]
+                print >> stderr, 'Permission denied (publickey).'
+                return 1
 
-        # build bang path
-        run(slave_host,
-            remote_args[remote_arg_pos + 1:],
-            slave_key_file)
-        return
+            while not remote_args[remote_arg_pos].startswith('hadoop@'):
+                remote_arg_pos += 1
 
-    print >> sys.stderr, ("Command line not recognized: %s" %
+            slave_host = host + '!%s' % remote_args[remote_arg_pos].split('@')[1]
+
+            # build bang path
+            return run(slave_host, remote_args[remote_arg_pos + 1:],
+                       stdin, stdout, stderr, slave_key_file)
+
+        print >> stderr, ("Command line not recognized: %s" %
                           ' '.join(remote_args))
-    sys.exit(1)
-
-
-def main():
-    args = sys.argv
+        return 1
 
     # Find where the user's commands begin
     arg_pos = 0
@@ -230,9 +224,9 @@ def main():
     # verify existence of key pair file if necessary
     if os.environ.get('MOCK_SSH_VERIFY_KEY_FILE', 'false') == 'true' \
        and not os.path.exists(args[arg_pos]):
-        print >> sys.stderr, 'Warning: Identity file',
+        print >> stderr, 'Warning: Identity file',
         args[arg_pos], 'not accessible: No such file or directory.'
-        sys.exit(1)
+        return 1
 
     # skip to host address
     while not args[arg_pos].startswith('hadoop@'):
@@ -243,8 +237,8 @@ def main():
     # the rest are arguments are what to run on the remote machine
 
     arg_pos += 1
-    run(host, args[arg_pos:])
+    return run(host, args[arg_pos:], stdout, stderr, environ, None)
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main(sys.stdin, sys.stdout, sys.stderr, sys.argv, os.environ))

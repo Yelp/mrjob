@@ -126,7 +126,7 @@ def invoke_cmd(stdout, stderr, environ, prefix, cmd, cmd_args, error_msg,
         return -1
 
 
-def main(stdout, stderr, argv, environ):
+def main(stdin, stdout, stderr, argv, environ):
     """Implements hadoop <args>"""
 
     # log what commands we ran
@@ -382,4 +382,4 @@ Compiled by chrisdo on Fri Feb 19 08:07:34 UTC 2010
 
 
 if __name__ == '__main__':
-    sys.exit(main(sys.stdout, sys.stderr, sys.argv, os.environ))
+    sys.exit(main(sys.stdin, sys.stdout, sys.stderr, sys.argv, os.environ))

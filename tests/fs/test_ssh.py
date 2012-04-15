@@ -16,7 +16,7 @@ import os
 
 from mrjob.fs.multi import MultiFilesystem
 from mrjob.fs.ssh import SSHFilesystem
-from mrjob.fs import ssh as fs_ssh
+from mrjob import ssh
 
 from tests.fs import MockSubprocessTestCase
 from tests.mockssh import main as mock_ssh_main
@@ -26,16 +26,28 @@ class SSHFSTestCase(MockSubprocessTestCase):
 
     def setUp(self):
         super(SSHFSTestCase, self).setUp()
-        self.ec2_key_pair_file = self.makefile('key.pem')
+        self.ec2_key_pair_file = self.makefile('key.pem', 'i am an ssh key')
         self.ssh_key_name = 'key_name'
         # wrap SSHFilesystem so it gets cat()
         self.fs = MultiFilesystem(
             SSHFilesystem(['ssh'], self.ec2_key_pair_file, self.ssh_key_name))
         self.set_up_mock_ssh()
-        self.mock_popen(fs_ssh, mock_hadoop_main)
+        self.mock_popen(ssh, mock_ssh_main, self.env)
 
     def set_up_mock_ssh(self):
-        pass
+        self.master_ssh_root = self.makedirs('master_ssh_root')
+        self.env = dict(
+            MOCK_SSH_VERIFY_KEY_FILE='true',
+            MOCK_SSH_ROOTS='testmaster=%s' % self.master_ssh_root,
+        )
+        self.ssh_slave_roots = []
+
+    def add_slave(self):
+        slave_num = len(self.slave_ssh_roots)
+        new_dir = self.makedirs('slave_%d_ssh_root' % slave_num)
+        self.slave_ssh_roots_append(new_dir)
+        self.env['MOCK_SSH_ROOTS'] += (':testmaster!testslave%d=%s'
+                                         % (slave_num, new_dir))
 
     def test_ls_empty(self):
         self.assertEqual(list(self.fs.ls('hdfs:///')), [])

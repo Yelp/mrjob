@@ -16,17 +16,38 @@
 
 from __future__ import with_statement
 
+from collections import namedtuple
 from optparse import OptionError
 
+from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.fetch_logs import main as fetch_logs_main
 from mrjob.tools.emr.fetch_logs import make_option_parser
 from mrjob.tools.emr.fetch_logs import parse_args
+from mrjob.tools.emr.fetch_logs import perform_actions
 from mrjob.tools.emr.fetch_logs import runner_kwargs
 
 from tests.tools.emr import ToolTestCase
 
 
+Args = namedtuple('Args', ['step_num', 'list_relevant', 'list_all',
+                           'cat_relevant', 'cat_all', 'get_counters',
+                           'find_failure'])
+
+def make_args(step_num=1, list_relevant=False, list_all=False,
+              cat_relevant=False, cat_all=True, get_counters=False,
+              find_failure=False):
+    return Args(step_num, list_relevant, list_all, cat_relevant, cat_all,
+                get_counters, find_failure)
+
+
 class LogFetchingTestCase(ToolTestCase):
+
+    def setUp(self):
+        super(LogFetchingTestCase, self).setUp()
+
+        self.runner = EMRJobRunner(conf_path=False,
+                                   s3_sync_wait_time=0,
+                                   emr_job_flow_id='j-MOCKJOBFLOW0')
 
     def test_bad_args(self):
         self.monkey_patch_argv()
@@ -43,21 +64,15 @@ class LogFetchingTestCase(ToolTestCase):
 
     def test_find_failure(self):
         self.make_job_flow()
-        self.monkey_patch_argv(
-            '--quiet', '--no-conf',
-            '--f',
-            '--s3-sync-wait-time=0',
-            'j-MOCKJOBFLOW0')
         self.monkey_patch_stdout()
 
-        fetch_logs_main()
+        perform_actions(make_args(find_failure=True), self.runner)
 
         self.assertEqual(self.stdout.getvalue(),
                          'No probable cause of failure found.\n')
 
     def test_list(self):
         jf = self.make_job_flow()
-        jf.state = 'WAITING'
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '-l',

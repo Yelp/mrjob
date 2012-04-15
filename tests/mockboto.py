@@ -494,6 +494,7 @@ class MockEmrConnection(object):
             keepjobflowalivewhennosteps=('true' if keep_alive else 'false'),
             laststatechangereason='Provisioning Amazon EC2 capacity',
             masterinstancetype=master_instance_type,
+            masterpublicdnsname='mockmaster',
             name=name,
             normalizedinstancehours='9999',  # just need this filled in for now
             state='STARTING',

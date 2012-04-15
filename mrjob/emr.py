@@ -1849,9 +1849,12 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
-        self._enable_slave_ssh_access()
-        log.debug('Search %s for logs' % self._ssh_path(relative_path))
-        return self.ls(self._ssh_path(relative_path))
+        try:
+            self._enable_slave_ssh_access()
+            log.debug('Search %s for logs' % self._ssh_path(relative_path))
+            return self.ls(self._ssh_path(relative_path))
+        except IOError, e:
+            raise LogFetchError(e)
 
     def _ls_slave_ssh_logs(self, addr, relative_path):
         """List logs over multi-hop SSH by path relative to log root directory
@@ -1907,8 +1910,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     def ls_all_logs_ssh(self):
         """List all log files in the log root directory"""
-        self._enable_slave_ssh_access()
-        return self.ls(self._ssh_path(''))
+        return self._ls_ssh_logs('')
 
     ## S3 LOG FETCHING ##
 

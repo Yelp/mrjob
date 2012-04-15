@@ -242,7 +242,7 @@ def hadoop_fs_mkdir(stdout, stderr, environ, *args):
             # continue to make directories on failure
             failed = True
         else:
-            os.mkdir(real_path)
+            os.makedirs(real_path)
 
     if failed:
         return -1

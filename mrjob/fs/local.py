@@ -25,31 +25,13 @@ log = logging.getLogger('mrjob.fs.local')
 
 class LocalFilesystem(object):
 
-    ### file management utilties ###
-
-    # Some simple filesystem operations that work for all runners.
-
-    # We don't currently support ``mv()`` and ``cp()`` because S3 doesn't
-    # really have directories, so the semantics get a little weird.
-
     def can_handle_path(self, path):
         return path.startswith('/')
 
     def du(self, path_glob):
-        """Get the total size of files matching ``path_glob``
-
-        Corresponds roughly to: ``hadoop fs -dus path_glob``
-        """
         return sum(os.path.getsize(path) for path in self.ls(path_glob))
 
     def ls(self, path_glob):
-        """Recursively list all files in the given path.
-
-        We don't return directories for compatibility with S3 (which
-        has no concept of them)
-
-        Corresponds roughly to: ``hadoop fs -lsr path_glob``
-        """
         for path in glob.glob(path_glob):
             if os.path.isdir(path):
                 for dirname, _, filenames in os.walk(path):
@@ -59,24 +41,14 @@ class LocalFilesystem(object):
                 yield path
 
     def _cat_file(self, filename):
-        """cat a file, decompress if necessary."""
         for line in read_file(filename):
             yield line
 
     def mkdir(self, path):
-        """Create the given dir and its subdirs (if they don't already
-        exist).
-
-        Corresponds roughly to: ``hadoop fs -mkdir path``
-        """
         if not os.path.isdir(path):
             os.makedirs(path)
 
     def path_exists(self, path_glob):
-        """Does the given path exist?
-
-        Corresponds roughly to: ``hadoop fs -test -e path_glob``
-        """
         return bool(glob.glob(path_glob))
 
     def path_join(self, dirname, filename):
@@ -84,10 +56,6 @@ class LocalFilesystem(object):
         return os.path.join(dirname, filename)
 
     def rm(self, path_glob):
-        """Recursively delete the given file/directory, if it exists
-
-        Corresponds roughly to: ``hadoop fs -rmr path_glob``
-        """
         for path in glob.glob(path_glob):
             if os.path.isdir(path):
                 log.debug('Recursively deleting %s' % path)
@@ -97,11 +65,6 @@ class LocalFilesystem(object):
                 os.remove(path)
 
     def touchz(self, path):
-        """Make an empty file in the given location. Raises an error if
-        a non-zero length file already exists in that location.
-
-        Correponds to: ``hadoop fs -touchz path``
-        """
         if os.path.isfile(path) and os.path.getsize(path) != 0:
             raise OSError('Non-empty file %r already exists!' % (path,))
 
@@ -119,6 +82,5 @@ class LocalFilesystem(object):
         return md5.hexdigest()
 
     def md5sum(self, path):
-        """Generate the md5 sum of the file at ``path``"""
         with open(path, 'rb') as f:
             return self._md5sum_file(f)

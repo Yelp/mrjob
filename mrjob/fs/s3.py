@@ -69,8 +69,7 @@ def wrap_aws_conn(raw_conn):
 
 class S3Filesystem(object):
 
-    def __init__(self, aws_access_key_id, aws_secret_access_key,
-                 s3_endpoint=None):
+    def __init__(self, aws_access_key_id, aws_secret_access_key, s3_endpoint):
         super(S3Filesystem, self).__init__()
         self._s3_endpoint = s3_endpoint
         self._aws_access_key_id = aws_access_key_id

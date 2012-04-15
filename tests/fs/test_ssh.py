@@ -49,24 +49,28 @@ class SSHFSTestCase(MockSubprocessTestCase):
         self.env['MOCK_SSH_ROOTS'] += (':testmaster!testslave%d=%s'
                                          % (slave_num, new_dir))
 
+    def make_master_file(self, path, contents):
+        self.makefile(os.path.join(self.master_ssh_root, path), contents)
+
     def test_ls_empty(self):
         self.assertEqual(list(self.fs.ls('ssh://testmaster/')), [])
 
     def test_ls_basic(self):
-        self.make_hdfs_file('f', 'contents')
-        self.assertEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///f'])
+        self.make_master_file('f', 'contents')
+        self.assertEqual(list(self.fs.ls('ssh://testmaster/')),
+                         ['ssh://testmaster/f'])
 
     def test_ls_basic_2(self):
-        self.make_hdfs_file('f', 'contents')
-        self.make_hdfs_file('f2', 'contents')
-        self.assertEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///f',
-                                                        'hdfs:///f2'])
+        self.make_master_file('f', 'contents')
+        self.make_master_file('f2', 'contents')
+        self.assertEqual(list(self.fs.ls('ssh://testmaster/')),
+                         ['ssh://testmaster/f', 'ssh://testmaster/f2'])
 
     def test_ls_recurse(self):
-        self.make_hdfs_file('f', 'contents')
-        self.make_hdfs_file('d/f2', 'contents')
-        self.assertEqual(list(self.fs.ls('hdfs:///')),
-                         ['hdfs:///f', 'hdfs:///d/f2'])
+        self.make_master_file('f', 'contents')
+        self.make_master_file('d/f2', 'contents')
+        self.assertEqual(list(self.fs.ls('ssh://testmaster/')),
+                         ['ssh://testmaster/f', 'ssh://testmaster/d/f2'])
 
     def test_cat_uncompressed(self):
         # mockhadoop doesn't support compressed files, so we won't test for it.

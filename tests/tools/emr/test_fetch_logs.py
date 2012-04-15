@@ -72,7 +72,7 @@ class LogFetchingTestCase(ToolTestCase):
                          'No probable cause of failure found.\n')
 
     def test_list(self):
-        jf = self.make_job_flow()
+        self.make_job_flow()
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '-l',

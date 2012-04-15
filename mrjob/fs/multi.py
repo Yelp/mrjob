@@ -82,7 +82,7 @@ class MultiFilesystem(object):
 
     def cat(self, path_glob):
         """cat all files matching **path_glob**, decompressing if necessary"""
-        for filename in self.ls(path):
+        for filename in self.ls(path_glob):
             for line in self._cat_file(filename):
                 yield line
 

@@ -49,8 +49,6 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.now = datetime.utcnow().replace(microsecond=0)
         self.add_mock_s3_data({'my_bucket': {}})
 
-        s3_conn = MockS3Connection(mock_s3_fs=self.mock_s3_fs)
-
         # Build a step object easily
         # also make it respond to .args()
         def step(jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',

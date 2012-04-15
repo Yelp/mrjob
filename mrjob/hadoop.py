@@ -21,12 +21,6 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
 
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
-
 from mrjob import compat
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts

@@ -52,5 +52,4 @@ class ToolTestCase(MockEMRAndS3TestCase):
             s3_scratch_uri='s3://walrus/',
             s3_sync_wait_time=0))
         with EMRJobRunner(**kwargs) as runner:
-            jf_id = runner.make_persistent_job_flow()
-            return runner.make_emr_conn().describe_jobflow(jf_id)
+            return runner.make_persistent_job_flow()

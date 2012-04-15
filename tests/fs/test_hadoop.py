@@ -11,44 +11,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import with_statement
-
-import bz2
-import gzip
 import os
 from StringIO import StringIO
-import subprocess
-from shutil import rmtree
-from tempfile import mkdtemp
 
 from mrjob.fs.hadoop import HadoopFilesystem
-from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.multi import MultiFilesystem
 from mrjob.fs import hadoop as fs_hadoop
 
-from tests.fs import TempdirTestCase
+from tests.fs import MockSubprocessTestCase
 from tests.mockhadoop import main as mock_hadoop_main
 
 
-class HadoopFSTestCase(TempdirTestCase):
+class HadoopFSTestCase(MockSubprocessTestCase):
 
     def setUp(self):
         super(HadoopFSTestCase, self).setUp()
         # wrap HadoopFilesystem so it gets cat()
         self.fs = MultiFilesystem(HadoopFilesystem(['hadoop']))
-        self.mock_popen()
-
-    def mock_popen(self):
-        self.command_log = []
-        self.io_log = []
-
         self.set_up_mock_hadoop()
-        PopenClass = self.make_popen_class()
-
-        original_popen = fs_hadoop.Popen
-        fs_hadoop.Popen = PopenClass
-
-        self.addCleanup(setattr, fs_hadoop, 'Popen', original_popen)
+        self.mock_popen(fs_hadoop, mock_hadoop_main)
 
     def set_up_mock_hadoop(self):
         # setup fake hadoop home
@@ -69,42 +50,6 @@ class HadoopFSTestCase(TempdirTestCase):
                                                     'mock_hadoop_output')
         self.hadoop_env['USER'] = 'mrjob_tests'
         # don't set MOCK_HADOOP_LOG, we get command history other ways
-
-    def make_popen_class(outer):
-
-        class MockPopen(object):
-
-            def __init__(self, args, stdin=None, stdout=None, stderr=None):
-                self.args = args
-
-                # discard incoming stdin/stdout/stderr objects
-                self.stdin = StringIO()
-                self.stdout = StringIO()
-                self.stderr = StringIO()
-
-                # pre-emptively run the "process"
-                self.returncode = mock_hadoop_main(
-                    self.stdout, self.stderr, self.args, outer.hadoop_env)
-
-                # log what happened
-                outer.command_log.append(self.args)
-                outer.io_log.append((stdout, stderr))
-
-                # store the result
-                self.stdout_result, self.stderr_result = (
-                    self.stdout.getvalue(), self.stderr.getvalue())
-
-                # expose the results as readable file objects
-                self.stdout = StringIO(self.stdout_result)
-                self.stderr = StringIO(self.stderr_result)
-
-            def communicate(self):
-                return self.stdout_result, self.stderr_result
-
-            def wait(self):
-                return self.returncode
-
-        return MockPopen
 
     def make_hdfs_file(self, name, contents):
         return self.makefile(os.path.join('mock_hdfs_root', name), contents)

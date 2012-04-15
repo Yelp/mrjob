@@ -28,9 +28,8 @@ class SSHFSTestCase(MockSubprocessTestCase):
         super(SSHFSTestCase, self).setUp()
         self.ec2_key_pair_file = self.makefile('key.pem', 'i am an ssh key')
         self.ssh_key_name = 'key_name.pem'
-        # wrap SSHFilesystem so it gets cat()
-        self.fs = MultiFilesystem(
-            SSHFilesystem(['ssh'], self.ec2_key_pair_file, self.ssh_key_name))
+        self.fs = SSHFilesystem(['ssh'], self.ec2_key_pair_file,
+                                self.ssh_key_name)
         self.set_up_mock_ssh()
         self.mock_popen(ssh, mock_ssh_main, self.env)
 
@@ -50,10 +49,12 @@ class SSHFSTestCase(MockSubprocessTestCase):
                                          % (slave_num, new_dir))
 
     def make_master_file(self, path, contents):
-        self.makefile(os.path.join(self.master_ssh_root, path), contents)
+        return self.makefile(os.path.join(self.master_ssh_root, path),
+                             contents)
 
     def make_slave_file(self, slave_num, path, contents):
-        self.makefile(os.path.join('testslave%d' % slave_num, path), contents)
+        return self.makefile(os.path.join('testslave%d' % slave_num, path),
+                             contents)
 
     def test_ls_empty(self):
         self.assertEqual(list(self.fs.ls('ssh://testmaster/')), [])
@@ -80,14 +81,15 @@ class SSHFSTestCase(MockSubprocessTestCase):
         self.make_master_file(os.path.join('data', 'foo'), 'foo\nfoo\n')
         remote_path = self.fs.path_join('ssh://testmaster/data', 'foo')
 
-        self.assertEqual(list(self.fs.cat(remote_path)), ['foo\n', 'foo\n'])
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n', 'foo\n'])
 
     def test_slave_cat(self):
         self.add_slave()
         self.make_slave_file(1, 'f', 'foo\nfoo\n')
         remote_path = 'ssh://testmaster!testslave1/f'
 
-        self.assertRaises(IOError, list, self.fs._cat_file(remote_path))
+        self.assertRaises(IOError, lambda: list(self.fs._cat_file(remote_path)))
 
         # it is not SSHFilesystem's responsibility to copy the key.
         self.make_master_file(self.ssh_key_name, 'key')

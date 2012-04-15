@@ -50,7 +50,7 @@ class SSHFSTestCase(MockSubprocessTestCase):
                                          % (slave_num, new_dir))
 
     def test_ls_empty(self):
-        self.assertEqual(list(self.fs.ls('hdfs:///')), [])
+        self.assertEqual(list(self.fs.ls('ssh://testmaster/')), [])
 
     def test_ls_basic(self):
         self.make_hdfs_file('f', 'contents')

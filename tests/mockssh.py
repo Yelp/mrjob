@@ -50,31 +50,6 @@ def create_mock_ssh_script(path):
     os.chmod(path, stat.S_IREAD | stat.S_IEXEC)
 
 
-def path_for_host(host):
-    """Get the filesystem path that the given host is being faked at"""
-    for kv_pair in os.environ['MOCK_SSH_ROOTS'].split(':'):
-        this_host, this_path = kv_pair.split('=')
-        if this_host == host:
-            return os.path.abspath(this_path)
-    raise KeyError('Host %s is not specified in $MOCK_SSH_ROOTS (%s)' %
-                   (host, os.environ['MOCK_SSH_ROOTS']))
-
-
-def rel_posix_to_rel_local(path):
-    """Convert a POSIX path to the current system's format"""
-    return os.path.join(*path.split('/'))
-
-
-def rel_posix_to_abs_local(host, path):
-    """Convert a POSIX path to the current system's format and prepend the
-    tmp directory the host's files are in
-    """
-    if path.startswith('/'):
-        path = path[1:]
-    root = path_for_host(host)
-    return os.path.join(root, *path.split('/'))
-
-
 def mock_ssh_dir(host, path):
     """Create a directory at ``path`` relative to the temp directory for
     ``host``, where ``path`` is a POSIX path
@@ -106,10 +81,33 @@ _SLAVE_ADDR_RE = re.compile(r'^(?P<master>.*?)!(?P<slave>.*?)=(?P<dir>.*)$')
 _SCP_RE = re.compile(r'^.*"cat > (?P<filename>.*?)".*$')
 
 def main(stdin, stdout, stderr, args, environ):
+    def path_for_host(host):
+        """Get the filesystem path that the given host is being faked at"""
+        for kv_pair in environ['MOCK_SSH_ROOTS'].split(':'):
+            this_host, this_path = kv_pair.split('=')
+            if this_host == host:
+                return os.path.abspath(this_path)
+        raise KeyError('Host %s is not specified in $MOCK_SSH_ROOTS (%s)' %
+                       (host, environ['MOCK_SSH_ROOTS']))
+
+
+    def rel_posix_to_rel_local(path):
+        """Convert a POSIX path to the current system's format"""
+        return os.path.join(*path.split('/'))
+
+
+    def rel_posix_to_abs_local(host, path):
+        """Convert a POSIX path to the current system's format and prepend the
+        tmp directory the host's files are in
+        """
+        if path.startswith('/'):
+            path = path[1:]
+        root = path_for_host(host)
+        return os.path.join(root, *path.split('/'))
 
     def slave_addresses():
         """Get the addresses for slaves based on :envvar:`MOCK_SSH_ROOTS`"""
-        for kv_pair in os.environ['MOCK_SSH_ROOTS'].split(':'):
+        for kv_pair in environ['MOCK_SSH_ROOTS'].split(':'):
             m = _SLAVE_ADDR_RE.match(kv_pair)
             if m:
                 print >> stdout, m.group('slave')
@@ -222,7 +220,7 @@ def main(stdin, stdout, stderr, args, environ):
     arg_pos += 1
 
     # verify existence of key pair file if necessary
-    if os.environ.get('MOCK_SSH_VERIFY_KEY_FILE', 'false') == 'true' \
+    if environ.get('MOCK_SSH_VERIFY_KEY_FILE', 'false') == 'true' \
        and not os.path.exists(args[arg_pos]):
         print >> stderr, 'Warning: Identity file',
         args[arg_pos], 'not accessible: No such file or directory.'

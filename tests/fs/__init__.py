@@ -70,29 +70,38 @@ class MockSubprocessTestCase(TempdirTestCase):
 
             def __init__(self, args, stdin=None, stdout=None, stderr=None):
                 self.args = args
+                self.stdin = stdin if stdin is not None else StringIO()
 
-                # discard incoming stdin/stdout/stderr objects
-                self.stdin = StringIO()
+                # discard incoming stdout/stderr objects
                 self.stdout = StringIO()
                 self.stderr = StringIO()
 
+                if stdin is None:
+                    self._run()
+
+            def _run(self):
                 # pre-emptively run the "process"
                 self.returncode = func(
                     self.stdin, self.stdout, self.stderr, self.args, env)
 
                 # log what happened
                 outer.command_log.append(self.args)
-                outer.io_log.append((stdout, stderr))
 
                 # store the result
                 self.stdout_result, self.stderr_result = (
                     self.stdout.getvalue(), self.stderr.getvalue())
 
+                outer.io_log.append((self.stdout_result, self.stderr_result))
+
                 # expose the results as readable file objects
                 self.stdout = StringIO(self.stdout_result)
                 self.stderr = StringIO(self.stderr_result)
 
-            def communicate(self):
+            def communicate(self, stdin=None):
+                if stdin is not None:
+                    self.stdin = stdin
+                    self._run()
+
                 return self.stdout_result, self.stderr_result
 
             def wait(self):

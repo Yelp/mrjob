@@ -26,7 +26,75 @@ class SSHFSTestCase(MockSubprocessTestCase):
 
     def setUp(self):
         super(SSHFSTestCase, self).setUp()
+        self.ec2_key_pair_file = self.makefile('key.pem')
+        self.ssh_key_name = 'key_name'
         # wrap SSHFilesystem so it gets cat()
-        self.fs = MultiFilesystem(SSHFilesystem(['hadoop']))
+        self.fs = MultiFilesystem(
+            SSHFilesystem(['ssh'], self.ec2_key_pair_file, self.ssh_key_name))
         self.set_up_mock_ssh()
         self.mock_popen(fs_ssh, mock_hadoop_main)
+
+    def set_up_mock_ssh(self):
+        pass
+
+    def test_ls_empty(self):
+        self.assertEqual(list(self.fs.ls('hdfs:///')), [])
+
+    def test_ls_basic(self):
+        self.make_hdfs_file('f', 'contents')
+        self.assertEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///f'])
+
+    def test_ls_basic_2(self):
+        self.make_hdfs_file('f', 'contents')
+        self.make_hdfs_file('f2', 'contents')
+        self.assertEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///f',
+                                                        'hdfs:///f2'])
+
+    def test_ls_recurse(self):
+        self.make_hdfs_file('f', 'contents')
+        self.make_hdfs_file('d/f2', 'contents')
+        self.assertEqual(list(self.fs.ls('hdfs:///')),
+                         ['hdfs:///f', 'hdfs:///d/f2'])
+
+    def test_cat_uncompressed(self):
+        # mockhadoop doesn't support compressed files, so we won't test for it.
+        # this is only a sanity check anyway.
+        self.makefile(os.path.join('mock_hdfs_root', 'data', 'foo'), 'foo\nfoo\n')
+        remote_path = self.fs.path_join('hdfs:///data', 'foo')
+
+        self.assertEqual(list(self.fs.cat(remote_path)), ['foo\n', 'foo\n'])
+
+    def test_du(self):
+        root = self.hadoop_env['MOCK_HDFS_ROOT']
+        self.makefile(os.path.join('mock_hdfs_root', 'data1'), 'abcd')
+        remote_data_1 = 'hdfs:///data1'
+
+        remote_dir = self.makedirs('mock_hdfs_root/more')
+
+        self.makefile(os.path.join('mock_hdfs_root', 'more', 'data2'), 'defg')
+        remote_data_2 = 'hdfs:///more/data2'
+
+        self.makefile(os.path.join('mock_hdfs_root', 'more', 'data3'), 'hijk')
+        remote_data_3 = 'hdfs:///more/data3'
+
+        self.assertEqual(self.fs.du('hdfs:///'), 12)
+        self.assertEqual(self.fs.du('hdfs:///data1'), 4)
+        self.assertEqual(self.fs.du('hdfs:///more'), 8)
+        self.assertEqual(self.fs.du('hdfs:///more/*'), 8)
+        self.assertEqual(self.fs.du('hdfs:///more/data2'), 4)
+        self.assertEqual(self.fs.du('hdfs:///more/data3'), 4)
+
+    def test_mkdir(self):
+        self.fs.mkdir('hdfs:///d')
+        local_path = os.path.join(self.root, 'mock_hdfs_root', 'd')
+        self.assertEqual(os.path.isdir(local_path), True)
+
+    def test_rm(self):
+        local_path = self.make_hdfs_file('f', 'contents')
+        self.assertEqual(os.path.exists(local_path), True)
+        self.fs.rm('hdfs:///f')
+        self.assertEqual(os.path.exists(local_path), False)
+
+    def test_touchz(self):
+        # mockhadoop doesn't implement this.
+        pass

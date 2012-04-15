@@ -29,12 +29,12 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         # wrap HadoopFilesystem so it gets cat()
         self.fs = MultiFilesystem(HadoopFilesystem(['hadoop']))
         self.set_up_mock_hadoop()
-        self.mock_popen(fs_hadoop, mock_hadoop_main)
+        self.mock_popen(fs_hadoop, mock_hadoop_main, self.env)
 
     def set_up_mock_hadoop(self):
         # setup fake hadoop home
-        self.hadoop_env = {}
-        self.hadoop_env['HADOOP_HOME'] = self.makedirs('mock_hadoop_home')
+        self.env = {}
+        self.env['HADOOP_HOME'] = self.makedirs('mock_hadoop_home')
 
         self.makefile(
             os.path.join(
@@ -45,10 +45,10 @@ class HadoopFSTestCase(MockSubprocessTestCase):
             'i are java bytecode',
         )
 
-        self.hadoop_env['MOCK_HDFS_ROOT'] = self.makedirs('mock_hdfs_root')
-        self.hadoop_env['MOCK_HADOOP_OUTPUT'] = self.makedirs(
+        self.env['MOCK_HDFS_ROOT'] = self.makedirs('mock_hdfs_root')
+        self.env['MOCK_HADOOP_OUTPUT'] = self.makedirs(
                                                     'mock_hadoop_output')
-        self.hadoop_env['USER'] = 'mrjob_tests'
+        self.env['USER'] = 'mrjob_tests'
         # don't set MOCK_HADOOP_LOG, we get command history other ways
 
     def make_hdfs_file(self, name, contents):
@@ -82,7 +82,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.assertEqual(list(self.fs.cat(remote_path)), ['foo\n', 'foo\n'])
 
     def test_du(self):
-        root = self.hadoop_env['MOCK_HDFS_ROOT']
+        root = self.env['MOCK_HDFS_ROOT']
         self.makefile(os.path.join('mock_hdfs_root', 'data1'), 'abcd')
         remote_data_1 = 'hdfs:///data1'
 

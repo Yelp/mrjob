@@ -50,21 +50,21 @@ class TempdirTestCase(TestCase):
 
 class MockSubprocessTestCase(TempdirTestCase):
 
-    def mock_popen(self, module, main_func):
+    def mock_popen(self, module, main_func, env):
         """Main func should take the arguments
         (stdin, stdout, stderr, argv, environ_dict).
         """
         self.command_log = []
         self.io_log = []
 
-        PopenClass = self._make_popen_class(main_func)
+        PopenClass = self._make_popen_class(main_func, env)
 
         original_popen = module.Popen
         module.Popen = PopenClass
 
         self.addCleanup(setattr, module, 'Popen', original_popen)
 
-    def _make_popen_class(outer, func):
+    def _make_popen_class(outer, func, env):
 
         class MockPopen(object):
 
@@ -78,8 +78,7 @@ class MockSubprocessTestCase(TempdirTestCase):
 
                 # pre-emptively run the "process"
                 self.returncode = func(
-                    self.stdin, self.stdout, self.stderr, self.args,
-                    outer.hadoop_env)
+                    self.stdin, self.stdout, self.stderr, self.args, env)
 
                 # log what happened
                 outer.command_log.append(self.args)

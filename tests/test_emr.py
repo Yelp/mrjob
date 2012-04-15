@@ -1925,68 +1925,6 @@ class EMRNoMapperTest(MockEMRAndS3TestCase):
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
 
-class TestFilesystem(MockEMRAndS3TestCase):
-
-    def setUp(self):
-        super(TestFilesystem, self).setUp()
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        super(TestFilesystem, self).tearDown()
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
-    def test_cat_uncompressed(self):
-        local_input_path = os.path.join(self.tmp_dir, 'input')
-        with open(local_input_path, 'w') as input_file:
-            input_file.write('bar\nfoo\n')
-
-        remote_input_path = 's3://walrus/data/foo'
-        self.add_mock_s3_data({'walrus': {'data/foo': 'foo\nfoo\n'}})
-
-        with EMRJobRunner(cleanup='NONE', conf_path=False) as runner:
-            local_output = []
-            for line in runner.cat(local_input_path):
-                local_output.append(line)
-
-            remote_output = []
-            for line in runner.cat(remote_input_path):
-                remote_output.append(line)
-
-        self.assertEqual(local_output, ['bar\n', 'foo\n'])
-        self.assertEqual(remote_output, ['foo\n', 'foo\n'])
-
-    def test_cat_compressed(self):
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\nbar\n')
-        input_gz.close()
-
-        with EMRJobRunner(cleanup=['NONE'], conf_path=False) as runner:
-            output = []
-            for line in runner.cat(input_gz_path):
-                output.append(line)
-
-        self.assertEqual(output, ['foo\n', 'bar\n'])
-
-        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
-        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
-        input_bz2.write('bar\nbar\nfoo\n')
-        input_bz2.close()
-
-        with EMRJobRunner(cleanup=['NONE'], conf_path=False) as runner:
-            output = []
-            for line in runner.cat(input_bz2_path):
-                output.append(line)
-
-        self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
-
-
 class PoolingTestCase(MockEMRAndS3TestCase):
 
     def setUp(self):

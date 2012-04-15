@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-from StringIO import StringIO
 
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.multi import MultiFilesystem
@@ -82,17 +81,10 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.assertEqual(list(self.fs.cat(remote_path)), ['foo\n', 'foo\n'])
 
     def test_du(self):
-        root = self.env['MOCK_HDFS_ROOT']
         self.makefile(os.path.join('mock_hdfs_root', 'data1'), 'abcd')
-        remote_data_1 = 'hdfs:///data1'
-
-        remote_dir = self.makedirs('mock_hdfs_root/more')
-
+        self.makedirs('mock_hdfs_root/more')
         self.makefile(os.path.join('mock_hdfs_root', 'more', 'data2'), 'defg')
-        remote_data_2 = 'hdfs:///more/data2'
-
         self.makefile(os.path.join('mock_hdfs_root', 'more', 'data3'), 'hijk')
-        remote_data_3 = 'hdfs:///more/data3'
 
         self.assertEqual(self.fs.du('hdfs:///'), 12)
         self.assertEqual(self.fs.du('hdfs:///data1'), 4)

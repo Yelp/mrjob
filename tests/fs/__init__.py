@@ -16,7 +16,6 @@ from __future__ import with_statement
 import os
 from shutil import rmtree
 from StringIO import StringIO
-import subprocess
 from tempfile import mkdtemp
 
 try:

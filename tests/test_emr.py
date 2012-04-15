@@ -16,12 +16,10 @@
 
 from __future__ import with_statement
 
-import bz2
 import copy
 from datetime import datetime
 from datetime import timedelta
 import getpass
-import gzip
 import logging
 import os
 import posixpath

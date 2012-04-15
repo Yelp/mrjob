@@ -16,8 +16,6 @@ from __future__ import with_statement
 import bz2
 import gzip
 import os
-from shutil import rmtree
-from tempfile import mkdtemp
 
 from mrjob.fs.local import LocalFilesystem
 

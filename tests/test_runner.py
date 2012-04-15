@@ -16,10 +16,8 @@
 from __future__ import with_statement
 
 from StringIO import StringIO
-import bz2
 import datetime
 import getpass
-import gzip
 import os
 import shutil
 import stat
@@ -576,7 +574,7 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.conf', stderr)
-            runner = InlineMRJobRunner(conf_path=path)
+            InlineMRJobRunner(conf_path=path)
             self.assertIn('%s tries to recursively include %s!' % (path, path),
                           stderr.getvalue())
 
@@ -587,7 +585,7 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.conf', stderr)
-            runner = InlineMRJobRunner(conf_path=path)
+            InlineMRJobRunner(conf_path=path)
             self.assertIn(
                 "no configs for runner type 'inline' in %s" % path,
                 stderr.getvalue())

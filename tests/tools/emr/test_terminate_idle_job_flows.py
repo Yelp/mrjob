@@ -50,7 +50,6 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.add_mock_s3_data({'my_bucket': {}})
 
         s3_conn = MockS3Connection(mock_s3_fs=self.mock_s3_fs)
-        bucket = s3_conn.get_bucket('my_bucket')
 
         # Build a step object easily
         # also make it respond to .args()

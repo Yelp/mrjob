@@ -77,33 +77,41 @@ def mock_ssh_file(host, path, contents):
     return path
 
 
+def path_for_host(host, environ=None):
+    """Get the filesystem path that the given host is being faked at"""
+    if environ is None:
+        environ = os.environ
+    for kv_pair in environ['MOCK_SSH_ROOTS'].split(':'):
+        this_host, this_path = kv_pair.split('=')
+        if this_host == host:
+            return os.path.abspath(this_path)
+    raise KeyError('Host %s is not specified in $MOCK_SSH_ROOTS (%s)' %
+                   (host, environ['MOCK_SSH_ROOTS']))
+
+
+def rel_posix_to_rel_local(path, environ=None):
+    """Convert a POSIX path to the current system's format"""
+    if environ is None:
+        environ = os.environ
+    return os.path.join(*path.split('/'))
+
+
+def rel_posix_to_abs_local(host, path, environ=None):
+    """Convert a POSIX path to the current system's format and prepend the
+    tmp directory the host's files are in
+    """
+    if environ is None:
+        environ = os.environ
+    if path.startswith('/'):
+        path = path[1:]
+    root = path_for_host(host, environ)
+    return os.path.join(root, *path.split('/'))
+
+
 _SLAVE_ADDR_RE = re.compile(r'^(?P<master>.*?)!(?P<slave>.*?)=(?P<dir>.*)$')
 _SCP_RE = re.compile(r'^.*"cat > (?P<filename>.*?)".*$')
 
 def main(stdin, stdout, stderr, args, environ):
-    def path_for_host(host):
-        """Get the filesystem path that the given host is being faked at"""
-        for kv_pair in environ['MOCK_SSH_ROOTS'].split(':'):
-            this_host, this_path = kv_pair.split('=')
-            if this_host == host:
-                return os.path.abspath(this_path)
-        raise KeyError('Host %s is not specified in $MOCK_SSH_ROOTS (%s)' %
-                       (host, environ['MOCK_SSH_ROOTS']))
-
-
-    def rel_posix_to_rel_local(path):
-        """Convert a POSIX path to the current system's format"""
-        return os.path.join(*path.split('/'))
-
-
-    def rel_posix_to_abs_local(host, path):
-        """Convert a POSIX path to the current system's format and prepend the
-        tmp directory the host's files are in
-        """
-        if path.startswith('/'):
-            path = path[1:]
-        root = path_for_host(host)
-        return os.path.join(root, *path.split('/'))
 
     def slave_addresses():
         """Get the addresses for slaves based on :envvar:`MOCK_SSH_ROOTS`"""
@@ -117,7 +125,8 @@ def main(stdin, stdout, stderr, args, environ):
         """Mock SSH behavior for :py:func:`~mrjob.ssh.poor_mans_scp()`"""
         dest = _SCP_RE.match(args[0]).group('filename')
         try:
-            with open(os.path.join(path_for_host(host), dest), 'w') as f:
+            path = os.path.join(path_for_host(host, environ), dest)
+            with open(path, 'w') as f:
                 f.writelines(stdin)
             return 0
         except IOError:
@@ -130,10 +139,10 @@ def main(stdin, stdout, stderr, args, environ):
         dest = args[1]
         if dest == '-L':
             dest = args[2]
-        root = path_for_host(host)
-        local_dest = rel_posix_to_abs_local(host, dest)
+        root = path_for_host(host, environ)
+        local_dest = rel_posix_to_abs_local(host, dest, environ)
 
-        prefix_length = len(path_for_host(host))
+        prefix_length = len(path_for_host(host, environ))
         if not os.path.exists(local_dest):
             print >> stderr, 'No such file or directory:', local_dest
             return 1
@@ -150,7 +159,7 @@ def main(stdin, stdout, stderr, args, environ):
 
     def cat(host, args):
         """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_cat()`"""
-        local_dest = rel_posix_to_abs_local(host, args[1])
+        local_dest = rel_posix_to_abs_local(host, args[1], environ)
         if not os.path.exists(local_dest):
             print >> stderr, 'No such file or directory:', local_dest
             return 1
@@ -189,7 +198,7 @@ def main(stdin, stdout, stderr, args, environ):
             slave_key_file = remote_args[remote_arg_pos + 1]
 
             if not os.path.exists(
-                os.path.join(path_for_host(host), slave_key_file)):
+                os.path.join(path_for_host(host, environ), slave_key_file)):
                 # This is word-for-word what SSH says.
                 print >> stderr, ('Warning: Identity file %s not accessible.'
                                   ' No such file or directory.' %

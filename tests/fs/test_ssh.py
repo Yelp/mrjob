@@ -14,7 +14,6 @@
 
 import os
 
-from mrjob.fs.multi import MultiFilesystem
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob import ssh
 

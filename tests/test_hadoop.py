@@ -17,9 +17,7 @@
 from __future__ import with_statement
 
 from StringIO import StringIO
-import bz2
 import getpass
-import gzip
 import os
 import shlex
 import shutil

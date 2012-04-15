@@ -1908,7 +1908,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def ls_all_logs_ssh(self):
         """List all log files in the log root directory"""
         self._enable_slave_ssh_access()
-        return self.ls(SSH_PREFIX + SSH_LOG_ROOT)
+        return self.ls(self._ssh_path(''))
 
     ## S3 LOG FETCHING ##
 

@@ -56,7 +56,8 @@ class LogFetchingTestCase(ToolTestCase):
                          'No probable cause of failure found.\n')
 
     def test_list(self):
-        self.make_job_flow()
+        jf = self.make_job_flow()
+        jf.state = 'WAITING'
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '-l',

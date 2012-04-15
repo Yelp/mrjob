@@ -155,7 +155,7 @@ def main(stdin, stdout, stderr, args, environ):
             print >> stderr, 'No such file or directory:', local_dest
             return 1
         with open(local_dest, 'r') as f:
-            print >> sys.stdout, f.read()
+            print >> stdout, f.read(),
             return 0
 
 

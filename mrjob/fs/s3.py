@@ -83,7 +83,7 @@ class S3Filesystem(object):
         return sum(self.get_s3_key(uri).size for uri in self.ls(path_glob))
 
     def ls(self, path_glob):
-        """Recursively list files locally or on S3.
+        """Recursively list files on S3.
 
         This doesn't list "directories" unless there's actually a
         corresponding key ending with a '/' (which is weird and confusing;

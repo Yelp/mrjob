@@ -63,19 +63,6 @@ class LocalFilesystem(object):
         for line in read_file(filename):
             yield line
 
-    def cat(self, path):
-        """cat output from a given path. This would automatically decompress
-        .gz and .bz2 files.
-
-        Corresponds roughly to: ``hadoop fs -cat path``
-        """
-        # This is the only Filesystem class that contains an actual
-        # implementation of cat(). The rest are only used with MultiFilesystem,
-        # which provides cat(). The rest only provide _cat_file().
-        for filename in self.ls(path):
-            for line in self._cat_file(filename):
-                yield line
-
     def mkdir(self, path):
         """Create the given dir and its subdirs (if they don't already
         exist).

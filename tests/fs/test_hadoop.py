@@ -14,7 +14,6 @@
 import os
 
 from mrjob.fs.hadoop import HadoopFilesystem
-from mrjob.fs.multi import MultiFilesystem
 from mrjob.fs import hadoop as fs_hadoop
 
 from tests.fs import MockSubprocessTestCase
@@ -26,7 +25,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
     def setUp(self):
         super(HadoopFSTestCase, self).setUp()
         # wrap HadoopFilesystem so it gets cat()
-        self.fs = MultiFilesystem(HadoopFilesystem(['hadoop']))
+        self.fs = HadoopFilesystem(['hadoop'])
         self.set_up_mock_hadoop()
         self.mock_popen(fs_hadoop, mock_hadoop_main, self.env)
 
@@ -78,7 +77,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.makefile(os.path.join('mock_hdfs_root', 'data', 'foo'), 'foo\nfoo\n')
         remote_path = self.fs.path_join('hdfs:///data', 'foo')
 
-        self.assertEqual(list(self.fs.cat(remote_path)), ['foo\n', 'foo\n'])
+        self.assertEqual(list(self.fs._cat_file(remote_path)), ['foo\n', 'foo\n'])
 
     def test_du(self):
         self.makefile(os.path.join('mock_hdfs_root', 'data1'), 'abcd')

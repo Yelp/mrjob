@@ -87,11 +87,23 @@ class SSHFSTestCase(MockSubprocessTestCase):
         self.make_slave_file(1, 'f', 'foo\nfoo\n')
         remote_path = 'ssh://testmaster!testslave1/f'
 
-        self.assertRaises(IOError, list, self.fs.cat(remote_path))
+        self.assertRaises(IOError, list, self.fs._cat_file(remote_path))
 
         # it is not SSHFilesystem's responsibility to copy the key.
         self.make_master_file(self.ssh_key_name, 'key')
         self.assertEqual(list(self.fs._cat_file(remote_path)), ['foo\n', 'foo\n'])
+
+    def test_slave_ls(self):
+        self.add_slave()
+        self.make_slave_file(1, 'f', 'foo\nfoo\n')
+        remote_path = 'ssh://testmaster!testslave1/'
+
+        self.assertRaises(IOError, list, self.fs.ls(remote_path))
+
+        # it is not SSHFilesystem's responsibility to copy the key.
+        self.make_master_file(self.ssh_key_name, 'key')
+        self.assertEqual(list(self.fs.ls(remote_path)),
+                         ['ssh://testmaster!testslave1/f'])
 
     def test_du(self):
         self.make_master_file('f', 'contents')

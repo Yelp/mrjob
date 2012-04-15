@@ -191,8 +191,9 @@ def main(stdin, stdout, stderr, args, environ):
             if not os.path.exists(
                 os.path.join(path_for_host(host), slave_key_file)):
                 # This is word-for-word what SSH says.
-                print >> stderr, 'Warning: Identity file',
-                slave_key_file, 'not accessible: No such file or directory.'
+                print >> stderr, ('Warning: Identity file %s not accessible.'
+                                  ' No such file or directory.' %
+                                  slave_key_file)
 
                 print >> stderr, 'Permission denied (publickey).'
                 return 1

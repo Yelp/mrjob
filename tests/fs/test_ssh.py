@@ -27,7 +27,7 @@ class SSHFSTestCase(MockSubprocessTestCase):
     def setUp(self):
         super(SSHFSTestCase, self).setUp()
         self.ec2_key_pair_file = self.makefile('key.pem', 'i am an ssh key')
-        self.ssh_key_name = 'key_name'
+        self.ssh_key_name = 'key_name.pem'
         # wrap SSHFilesystem so it gets cat()
         self.fs = MultiFilesystem(
             SSHFilesystem(['ssh'], self.ec2_key_pair_file, self.ssh_key_name))
@@ -35,7 +35,7 @@ class SSHFSTestCase(MockSubprocessTestCase):
         self.mock_popen(ssh, mock_ssh_main, self.env)
 
     def set_up_mock_ssh(self):
-        self.master_ssh_root = self.makedirs('master_ssh_root')
+        self.master_ssh_root = self.makedirs('testmaster')
         self.env = dict(
             MOCK_SSH_VERIFY_KEY_FILE='true',
             MOCK_SSH_ROOTS='testmaster=%s' % self.master_ssh_root,
@@ -43,14 +43,17 @@ class SSHFSTestCase(MockSubprocessTestCase):
         self.ssh_slave_roots = []
 
     def add_slave(self):
-        slave_num = len(self.slave_ssh_roots)
-        new_dir = self.makedirs('slave_%d_ssh_root' % slave_num)
-        self.slave_ssh_roots_append(new_dir)
+        slave_num = len(self.ssh_slave_roots) + 1
+        new_dir = self.makedirs('testslave%d' % slave_num)
+        self.ssh_slave_roots.append(new_dir)
         self.env['MOCK_SSH_ROOTS'] += (':testmaster!testslave%d=%s'
                                          % (slave_num, new_dir))
 
     def make_master_file(self, path, contents):
         self.makefile(os.path.join(self.master_ssh_root, path), contents)
+
+    def make_slave_file(self, slave_num, path, contents):
+        self.makefile(os.path.join('testslave%d' % slave_num, path), contents)
 
     def test_ls_empty(self):
         self.assertEqual(list(self.fs.ls('ssh://testmaster/')), [])
@@ -73,44 +76,41 @@ class SSHFSTestCase(MockSubprocessTestCase):
                          ['ssh://testmaster/f', 'ssh://testmaster/d/f2'])
 
     def test_cat_uncompressed(self):
-        # mockhadoop doesn't support compressed files, so we won't test for it.
-        # this is only a sanity check anyway.
-        self.makefile(os.path.join('mock_hdfs_root', 'data', 'foo'), 'foo\nfoo\n')
-        remote_path = self.fs.path_join('hdfs:///data', 'foo')
+        # mrjob's ssh doesn't support compressed files.
+        self.make_master_file(os.path.join('data', 'foo'), 'foo\nfoo\n')
+        remote_path = self.fs.path_join('ssh://testmaster/data', 'foo')
 
         self.assertEqual(list(self.fs.cat(remote_path)), ['foo\n', 'foo\n'])
 
+    def test_slave_cat(self):
+        self.add_slave()
+        self.make_slave_file(1, 'f', 'foo\nfoo\n')
+        remote_path = 'ssh://testmaster!testslave1/f'
+
+        self.assertRaises(IOError, list, self.fs.cat(remote_path))
+
+        # it is not SSHFilesystem's responsibility to copy the key.
+        self.make_master_file(self.ssh_key_name, 'key')
+        self.assertEqual(list(self.fs._cat_file(remote_path)), ['foo\n', 'foo\n'])
+
     def test_du(self):
-        root = self.hadoop_env['MOCK_HDFS_ROOT']
-        self.makefile(os.path.join('mock_hdfs_root', 'data1'), 'abcd')
-        remote_data_1 = 'hdfs:///data1'
-
-        remote_dir = self.makedirs('mock_hdfs_root/more')
-
-        self.makefile(os.path.join('mock_hdfs_root', 'more', 'data2'), 'defg')
-        remote_data_2 = 'hdfs:///more/data2'
-
-        self.makefile(os.path.join('mock_hdfs_root', 'more', 'data3'), 'hijk')
-        remote_data_3 = 'hdfs:///more/data3'
-
-        self.assertEqual(self.fs.du('hdfs:///'), 12)
-        self.assertEqual(self.fs.du('hdfs:///data1'), 4)
-        self.assertEqual(self.fs.du('hdfs:///more'), 8)
-        self.assertEqual(self.fs.du('hdfs:///more/*'), 8)
-        self.assertEqual(self.fs.du('hdfs:///more/data2'), 4)
-        self.assertEqual(self.fs.du('hdfs:///more/data3'), 4)
+        self.make_master_file('f', 'contents')
+        # not implemented
+        self.assertRaises(IOError, self.fs.du, 'ssh://testmaster/f')
 
     def test_mkdir(self):
-        self.fs.mkdir('hdfs:///d')
-        local_path = os.path.join(self.root, 'mock_hdfs_root', 'd')
-        self.assertEqual(os.path.isdir(local_path), True)
+        # not implemented
+        self.assertRaises(IOError, self.fs.mkdir, 'ssh://testmaster/d')
 
     def test_rm(self):
-        local_path = self.make_hdfs_file('f', 'contents')
-        self.assertEqual(os.path.exists(local_path), True)
-        self.fs.rm('hdfs:///f')
-        self.assertEqual(os.path.exists(local_path), False)
+        self.make_master_file('f', 'contents')
+        # not implemented
+        self.assertRaises(IOError, self.fs.rm, 'ssh://testmaster/f')
 
     def test_touchz(self):
-        # mockhadoop doesn't implement this.
-        pass
+        # not implemented
+        self.assertRaises(IOError, self.fs.touchz, 'ssh://testmaster/d')
+
+    def test_md5sum(self):
+        # not implemented
+        self.assertRaises(IOError, self.fs.md5sum, 'ssh://testmaster/d')

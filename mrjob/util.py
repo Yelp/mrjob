@@ -38,6 +38,8 @@ try:
 except ImportError:
     bz2 = None
 
+is_ironpython = "IronPython" in sys.version
+
 class NullHandler(logging.Handler):
     def emit(self, record):
         pass

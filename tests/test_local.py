@@ -36,6 +36,7 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import cmd_line
 from mrjob.util import read_file
+from mrjob.util import is_ironpython
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_job_where_are_you import MRJobWhereAreYou
@@ -646,3 +647,13 @@ class TestHadoopConfArgs(unittest.TestCase):
         conf_args = runner._hadoop_conf_args(0, 1)
         self.assertEqual(conf_args[:2], ['-libjar', 'qux.jar'])
         self.assertEqual(len(conf_args), 12)
+
+class TestIronPythonEnvironment(unittest.TestCase):
+    def test_ironpython_environment(self):
+        environment = LocalMRJobRunner()._subprocess_env('M', 0, 0)
+
+        if is_ironpython:
+            self.assertIn('IRONPYTHONPATH', environment)
+        else:
+            self.assertNotIn('IRONPYTHONPATH', environment)
+

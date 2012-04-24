@@ -48,6 +48,7 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_nomapper_multistep import MRNoMapper
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+from tests.mr_typed_bytes_job import MRWordFreqCount
 
 
 def stepdict(mapper=_IDENTITY_MAPPER, reducer=None, combiner=None,
@@ -1414,3 +1415,14 @@ class BadMainTestCase(unittest.TestCase):
         sys.argv.append('--mapper')
         self.assertRaises(UsageError, MRBoringJob().make_runner)
         sys.argv = sys.argv[:-1]
+
+class TypedBytesTestCase(unittest.TestCase):
+    def test_typed_bytes_format_attributes(self):
+        mr_job = MRWordFreqCount() 
+        
+        job_runner_kwargs = mr_job.job_runner_kwargs()
+        self.assertEqual(job_runner_kwargs['hadoop_input_format'],
+                          'org.apache.hadoop.streaming.AutoInputFormat')
+        self.assertEqual(job_runner_kwargs['hadoop_output_format'],
+                          'org.apache.hadoop.mapred.SequenceFileOutputFormat') 
+

@@ -1945,6 +1945,10 @@ class MRJob(object):
         Normally, setting :py:attr:`HADOOP_INPUT_FORMAT` is sufficient;
         redefining this method is only for when you want to get fancy.
         """
+        # For supporting typed bytes
+        if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
+            self.HADOOP_INPUT_FORMAT = 'org.apache.hadoop.streaming.AutoInputFormat'
+            return self.HADOOP_INPUT_FORMAT
         if self.options.hadoop_input_format:
             log.warn('--hadoop-input-format is deprecated as of mrjob 0.3 and'
                      ' will no longer be supported in mrjob 0.4. Redefine'
@@ -2034,11 +2038,6 @@ class MRJob(object):
     ### hadoop_extra_args ###
 
     def hadoop_extra_args(self):
-        """ Setting input format for supporting typed bytes.
-        """
-        if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
-            self.options.hadoop_extra_args.extend(['-inputformat', 'org.apache.hadoop.streaming.AutoInputFormat'])
-
         return self.options.hadoop_extra_args
         
     ### Testing ###

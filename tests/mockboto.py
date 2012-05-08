@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,17 +21,20 @@ some sort of sandboxing feature to boto, rather than extending these somewhat
 ad-hoc mock objects.
 """
 from __future__ import with_statement
-import datetime
+from datetime import datetime
+from datetime import timedelta
 import hashlib
 
 try:
     from boto.emr.connection import EmrConnection
     import boto.exception
     import boto.utils
+    boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     boto = None
 
 from mrjob.conf import combine_values
+from mrjob.emr import RFC1123
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 
@@ -70,11 +73,12 @@ def err_xml(message, type='Sender', code='ValidationError'):
 
 ### S3 ###
 
-def add_mock_s3_data(mock_s3_fs, data):
+def add_mock_s3_data(mock_s3_fs, data, time_modified=None):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
     key to contents) with a map from bucket name to key name to data and
     time last modified."""
-    time_modified = to_iso8601(datetime.datetime.utcnow())
+    if time_modified is None:
+        time_modified = datetime.utcnow()
     for bucket_name, key_name_to_bytes in data.iteritems():
         mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
@@ -142,12 +146,12 @@ class MockBucket:
     def new_key(self, key_name):
         if key_name not in self.mock_state():
             self.mock_state()[key_name] = ('',
-                    to_iso8601(datetime.datetime.utcnow()))
+                    to_iso8601(datetime.utcnow()))
         return MockKey(bucket=self, name=key_name)
 
     def get_key(self, key_name):
         if key_name in self.mock_state():
-            return MockKey(bucket=self, name=key_name)
+            return MockKey(bucket=self, name=key_name, date_to_str=to_rfc1123)
         else:
             return None
 
@@ -160,18 +164,20 @@ class MockBucket:
     def list(self, prefix=''):
         for key_name in sorted(self.mock_state()):
             if key_name.startswith(prefix):
-                yield MockKey(bucket=self, name=key_name)
+                yield MockKey(bucket=self, name=key_name,
+                              date_to_str=to_iso8601)
 
 
 class MockKey(object):
     """Mock out boto.s3.Key"""
 
-    def __init__(self, bucket=None, name=None):
+    def __init__(self, bucket=None, name=None, date_to_str=None):
         """You can optionally specify a 'data' argument, which will fill
         the key with mock data.
         """
         self.bucket = bucket
         self.name = name
+        self.date_to_str = date_to_str or to_iso8601
 
     def read_mock_data(self):
         """Read the bytes for this key out of the fake boto state."""
@@ -182,8 +188,7 @@ class MockKey(object):
 
     def write_mock_data(self, data):
         if self.name in self.bucket.mock_state():
-            self.bucket.mock_state()[self.name] = (data,
-                        to_iso8601(datetime.datetime.utcnow()))
+            self.bucket.mock_state()[self.name] = (data, datetime.utcnow())
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -219,7 +224,7 @@ class MockKey(object):
 
     def _get_last_modified(self):
         if self.name in self.bucket.mock_state():
-            return self.bucket.mock_state()[self.name][1]
+            return self.date_to_str(self.bucket.mock_state()[self.name][1])
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -227,8 +232,7 @@ class MockKey(object):
     def _set_last_modified(self, time_modified):
         if self.name in self.bucket.mock_state():
             data = self.bucket.mock_state()[self.name][0]
-            self.bucket.mock_state()[self.name] = (data,
-                        to_iso8601(time_modified))
+            self.bucket.mock_state()[self.name] = (data, time_modified)
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -241,6 +245,10 @@ class MockKey(object):
 
     etag = property(_get_etag)
 
+    @property
+    def size(self):
+        return len(self.get_contents_as_string())
+
 
 ### EMR ###
 
@@ -248,6 +256,14 @@ def to_iso8601(when):
     """Convert a datetime to ISO8601 format.
     """
     return when.strftime(boto.utils.ISO8601)
+
+def to_rfc1123(when):
+    """Convert a datetime to RFC1123 format.
+    """
+    # AWS sends us a time zone in all cases, but in Python it's more
+    # annoying to figure out time zones, so just fake it.
+    assert when.tzinfo is None
+    return when.strftime(RFC1123) + 'GMT'
 
 
 class MockEmrConnection(object):
@@ -330,7 +346,7 @@ class MockEmrConnection(object):
         attribute, which is useful for testing.
         """
         if now is None:
-            now = datetime.datetime.utcnow()
+            now = datetime.utcnow()
 
         # default and validate Hadoop and AMI versions
 
@@ -519,10 +535,11 @@ class MockEmrConnection(object):
 
     def describe_jobflows(self, states=None, jobflow_ids=None,
                           created_after=None, created_before=None):
+        now = datetime.utcnow()
 
         if created_before:
-            min_created_before = (datetime.datetime.utcnow() -
-                                  datetime.timedelta(days=self.max_days_ago))
+            min_created_before = now - timedelta(days=self.max_days_ago)
+
             if created_before < min_created_before:
                 raise boto.exception.BotoServerError(
                     400, 'Bad Request', body=err_xml(
@@ -532,19 +549,31 @@ class MockEmrConnection(object):
                      key=lambda jf: jf.creationdatetime,
                      reverse=True)
 
-        if states:
-            jfs = [jf for jf in jfs if jf.state in states]
+        if states or jobflow_ids or created_after or created_before:
+            if states:
+                jfs = [jf for jf in jfs if jf.state in states]
 
-        if jobflow_ids:
-            jfs = [jf for jf in jfs if jf.jobflowid in jobflow_ids]
+            if jobflow_ids:
+                jfs = [jf for jf in jfs if jf.jobflowid in jobflow_ids]
 
-        if created_after:
-            after_timestamp = to_iso8601(created_after)
-            jfs = [jf for jf in jfs if jf.creationdatetime > after_timestamp]
+            if created_after:
+                after_timestamp = to_iso8601(created_after)
+                jfs = [jf for jf in jfs
+                       if jf.creationdatetime > after_timestamp]
 
-        if created_before:
-            before_timestamp = to_iso8601(created_before)
-            jfs = [jf for jf in jfs if jf.creationdatetime < before_timestamp]
+            if created_before:
+                before_timestamp = to_iso8601(created_before)
+                jfs = [jf for jf in jfs
+                       if jf.creationdatetime < before_timestamp]
+        else:
+            # special case for no parameters, see:
+            # http://docs.amazonwebservices.com/ElasticMapReduce/latest/API/API_DescribeJobFlows.html
+            two_weeks_ago_timestamp = to_iso8601(
+                now - timedelta(weeks=2))
+            jfs = [jf for jf in jfs
+                   if (jf.creationdatetime > two_weeks_ago_timestamp or
+                       jf.state in ['RUNNING', 'WAITING',
+                                    'SHUTTING_DOWN', 'STARTING'])]
 
         if self.max_job_flows_returned:
             jfs = jfs[:self.max_job_flows_returned]
@@ -605,7 +634,7 @@ class MockEmrConnection(object):
         :param now: alternate time to use as the current time (should be UTC)
         """
         if now is None:
-            now = datetime.datetime.utcnow()
+            now = datetime.utcnow()
 
         if self.simulation_steps_left <= 0:
             raise AssertionError(

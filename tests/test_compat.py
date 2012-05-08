@@ -1,5 +1,5 @@
 
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import os
 
 try:
     import unittest2 as unittest
+    unittest  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import unittest
 

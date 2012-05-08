@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,8 @@
 from __future__ import with_statement
 
 from collections import defaultdict
-import datetime
+from datetime import datetime
+from datetime import timedelta
 import fnmatch
 import logging
 import os
@@ -31,11 +32,13 @@ import urllib2
 
 try:
     from cStringIO import StringIO
+    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     from StringIO import StringIO
 
 try:
     import simplejson as json  # preferred because of C speedups
+    json  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import json  # built in to Python 2.6 and later
 
@@ -46,6 +49,7 @@ try:
     import boto.exception
     import boto.utils
     from mrjob import boto_2_1_1_83aae37b
+    boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
     # inside hadoop streaming
@@ -191,14 +195,28 @@ def s3_key_to_uri(s3_key):
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
 
+# AWS actually gives dates in two formats, and we only recently started using
+# API calls that return the second. So the date parsing function is called
+# iso8601_to_*, but it also parses RFC1123.
+# Until boto starts seamlessly parsing these, we check for them ourselves.
+
+# Thu, 29 Mar 2012 04:55:44 GMT
+RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
+
 def iso8601_to_timestamp(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
-    return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
+    try:
+        return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
+    except ValueError:
+        return time.mktime(time.strptime(iso8601_time, RFC1123))
 
 
 def iso8601_to_datetime(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
-    return datetime.datetime.strptime(iso8601_time, boto.utils.ISO8601)
+    try:
+        return datetime.strptime(iso8601_time, boto.utils.ISO8601)
+    except ValueError:
+        return datetime.strptime(iso8601_time, RFC1123)
 
 
 def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
@@ -212,17 +230,21 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
 
     :type states: list
     :param states: A list of strings with job flow states wanted
-
     :type jobflow_ids: list
     :param jobflow_ids: A list of job flow IDs
     :type created_after: datetime
     :param created_after: Bound on job flow creation time
-
     :type created_before: datetime
     :param created_before: Bound on job flow creation time
     """
     all_job_flows = []
     ids_seen = set()
+
+    # weird things can happen if we send no args the DescribeJobFlows API
+    # (see Issue #346), so if nothing else is set, set created_before
+    # to a day in the future.
+    if not (states or jobflow_ids or created_after or created_before):
+        created_before = datetime.utcnow() + timedelta(days=1)
 
     while True:
         if created_before and created_after and created_before < created_after:
@@ -256,14 +278,14 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
             # in the same second
             min_create_time = min(iso8601_to_datetime(jf.creationdatetime)
                                   for jf in job_flows)
-            created_before = min_create_time + datetime.timedelta(seconds=1)
+            created_before = min_create_time + timedelta(seconds=1)
             # if someone managed to start 501 job flows in the same second,
             # they are still screwed (the EMR API only returns up to 500),
             # but this seems unlikely. :)
         else:
             if not created_before:
-                created_before = datetime.datetime.utcnow()
-            created_before -= datetime.timedelta(weeks=2)
+                created_before = datetime.utcnow()
+            created_before -= timedelta(weeks=2)
 
     return all_job_flows
 
@@ -273,11 +295,22 @@ def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
     return s3_tmp_uri + 'locks/' + emr_job_flow_id + '/' + str(step_num)
 
 
-def _lock_acquire_step_1(s3_conn, lock_uri, job_name):
+def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
     bucket_name, key_prefix = parse_s3_uri(lock_uri)
     bucket = s3_conn.get_bucket(bucket_name)
     key = bucket.get_key(key_prefix)
-    if key is None:
+
+    # EMRJobRunner should start using a job flow within about a second of
+    # locking it, so if it's been a while, then it probably crashed and we
+    # can just use this job flow.
+    key_expired = False
+    if key and mins_to_expiration is not None:
+        last_modified = iso8601_to_datetime(key.last_modified)
+        age = datetime.utcnow() - last_modified
+        if age > timedelta(minutes=mins_to_expiration):
+            key_expired = True
+
+    if key is None or key_expired:
         key = bucket.new_key(key_prefix)
         key.set_contents_from_string(job_name)
         return key
@@ -290,11 +323,12 @@ def _lock_acquire_step_2(key, job_name):
     return (key_value == job_name)
 
 
-def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name):
+def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name,
+                            mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
-    key = _lock_acquire_step_1(s3_conn, lock_uri, job_name)
+    key = _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration)
     if key is not None:
         time.sleep(sync_wait_time)
         success = _lock_acquire_step_2(key, job_name)
@@ -337,7 +371,7 @@ class EMRJobRunner(MRJobRunner):
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.emr.EMRJobRunner` takes the same arguments as
         :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
-        which can be defaulted in :py:mod:`mrjob.conf`.
+        which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
 
         *aws_access_key_id* and *aws_secret_access_key* are required if you
         haven't set them up already for boto (e.g. by setting the environment
@@ -537,7 +571,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         :param pool_emr_job_flows: Try to run the job on a ``WAITING`` pooled
                                    job flow with the same bootstrap
                                    configuration. Prefer the one with the most
-                                   compute units. Use S3 to "lock" the job flo
+                                   compute units. Use S3 to "lock" the job flow
                                    and ensure that the job is not scheduled
                                    behind another job. If no suitable job flow
                                    is `WAITING`, create a new pooled job flow.
@@ -823,7 +857,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             # issue a warning if we used both kinds of instance number
             # options on the command line or in mrjob.conf
             if (self._opt_priority['num_ec2_instances'] >= 2 and
-                self._opt_priority['num_ec2_instances'] ==
+                self._opt_priority['num_ec2_instances'] <=
                 max(self._opt_priority['num_ec2_core_instances'],
                     self._opt_priority['num_ec2_task_instances'])):
                 log.warn('Mixing num_ec2_instances and'
@@ -846,8 +880,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 self._opts['ec2_slave_instance_type'] = ec2_instance_type
 
             # master instance only does work when it's the only instance
-            if (self._opts['num_ec2_core_instances'] == 0 and
-                self._opts['num_ec2_task_instances'] == 0 and
+            if (self._opts['num_ec2_core_instances'] <= 0 and
+                self._opts['num_ec2_task_instances'] <= 0 and
                 (self._opt_priority['ec2_instance_type'] >
                  self._opt_priority['ec2_master_instance_type'])):
                 self._opts['ec2_master_instance_type'] = ec2_instance_type
@@ -1778,15 +1812,20 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         """
         for path in paths:
             m = regexp.match(path)
-            if m:
-                if step_nums is None or int(m.group('step_num')) in step_nums:
-                    yield path
+            if (m and
+                (step_nums is None or
+                 int(m.group('step_num')) in step_nums)):
+                yield path
+            else:
+                log.debug('Ignore %s' % path)
 
     ## SSH LOG FETCHING
 
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
-        return self.ls(SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path)
+        full_path = SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path
+        log.debug('Search %s for logs' % full_path)
+        return self.ls(full_path)
 
     def _ls_slave_ssh_logs(self, addr, relative_path):
         """List logs over multi-hop SSH by path relative to log root directory
@@ -1795,6 +1834,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                    self._address_of_master(),
                                    addr,
                                    SSH_LOG_ROOT + '/' + relative_path)
+        log.debug('Search %s for logs' % root_path)
         return self.ls(root_path)
 
     def ls_task_attempt_logs_ssh(self, step_nums):
@@ -1848,7 +1888,9 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         if not self._s3_job_log_uri:
             raise LogFetchError('Could not determine S3 job log URI')
 
-        return self.ls(self._s3_job_log_uri + relative_path)
+        full_path = self._s3_job_log_uri + relative_path
+        log.debug('Search %s for logs' % full_path)
+        return self.ls(full_path)
 
     def ls_task_attempt_logs_s3(self, step_nums):
         return self._enforce_path_regexp(self._ls_s3_logs('task-attempts/'),
@@ -1907,7 +1949,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def _fetch_counters_ssh(self, step_nums):
         uris = list(self.ls_job_logs_ssh(step_nums))
         log.info('Fetching counters from SSH...')
-        return scan_for_counters_in_files(uris, self)
+        return scan_for_counters_in_files(uris, self,
+                                          self.get_hadoop_version())
 
     def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
         job_flow = self._describe_jobflow()
@@ -1925,7 +1968,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         try:
             uris = self.ls_job_logs_s3(step_nums)
-            return scan_for_counters_in_files(uris, self)
+            return scan_for_counters_in_files(uris, self,
+                                              self.get_hadoop_version())
         except LogFetchError, e:
             log.info("Unable to fetch counters: %s" % e)
             return {}
@@ -1999,10 +2043,14 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         if self._opts['emr_job_flow_id']:
             return
 
-        if not any(key.startswith('bootstrap_')
-                   and key != 'bootstrap_actions'  # these are separate scripts
-                   and value
-                   for (key, value) in self._opts.iteritems()):
+        # Also don't bother if we're not pooling (and therefore don't need
+        # to have a bootstrap script to attach to) and we're not bootstrapping
+        # anything else
+        if not (self._opts['pool_emr_job_flows'] or
+            any(key.startswith('bootstrap_') and
+                key != 'bootstrap_actions' and  # these are separate scripts
+                value
+                for (key, value) in self._opts.iteritems())):
             return
 
         if self._opts['bootstrap_mrjob']:
@@ -2038,6 +2086,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         that; _create_master_bootstrap_script() is responsible for that.
         """
         out = StringIO()
+
+        python_bin_in_list = ', '.join(repr(opt) for opt in self._opts['python_bin'])
 
         def writeln(line=''):
             out.write(line + '\n')
@@ -2086,7 +2136,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             # un-compileable crud in the tarball.
             writeln("mrjob_dir = os.path.join(site_packages, 'mrjob')")
             writeln("call(["
-                    "'sudo', 'python', '-m', 'compileall', '-f', mrjob_dir])")
+                    "'sudo', %s, '-m', 'compileall', '-f', mrjob_dir])" %
+                    python_bin_in_list)
             writeln()
 
         # install our python modules
@@ -2100,8 +2151,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 cd_into = extract_dir_for_tar(file_dict['path'])
                 # install the module
                 writeln("check_call(["
-                        "'sudo', 'python', 'setup.py', 'install'], cwd=%r)" %
-                        cd_into)
+                        "'sudo', %s, 'setup.py', 'install'], cwd=%r)" %
+                        (python_bin_in_list, cd_into))
 
         # run our commands
         if self._opts['bootstrap_cmds']:
@@ -2244,6 +2295,12 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             if len(job_flow.steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
                 return
 
+            # in rare cases, job flow can be WAITING *and* have incomplete
+            # steps
+            if any(getattr(step, 'enddatetime', None) is None
+                   for step in job_flow.steps):
+                return
+
             # total compute units per group
             role_to_cu = defaultdict(float)
             # total number of instances of the same type in each group.
@@ -2340,18 +2397,20 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 num_steps=num_steps)
             if sorted_tagged_job_flows:
                 job_flow = sorted_tagged_job_flows[-1]
-                lock_uri = make_lock_uri(self._opts['s3_scratch_uri'],
-                                         job_flow.jobflowid,
-                                        len(job_flow.steps) + 1)
                 status = attempt_to_acquire_lock(
-                    s3_conn, lock_uri, self._opts['s3_sync_wait_time'],
-                    self._job_name)
+                    s3_conn, self._lock_uri(job_flow),
+                    self._opts['s3_sync_wait_time'], self._job_name)
                 if status:
                     return sorted_tagged_job_flows[-1]
                 else:
                     exclude.add(job_flow.jobflowid)
             else:
                 return None
+
+    def _lock_uri(self, job_flow):
+        return make_lock_uri(self._opts['s3_scratch_uri'],
+                             job_flow.jobflowid,
+                             len(job_flow.steps) + 1)
 
     def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to
@@ -2360,7 +2419,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         """
         def should_include_file(info):
             # Bootstrap scripts will always have a different checksum
-            if info['name'] in ('b.py', 'wrapper.py'):
+            if 'name' in info and info['name'] in ('b.py', 'wrapper.py'):
                 return False
 
             # Also do not include script used to spin up job
@@ -2405,7 +2464,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def du(self, path_glob):
         """Get the size of all files matching path_glob."""
         if not is_s3_uri(path_glob):
-            return super(EMRJobRunner, self).getsize(path_glob)
+            return super(EMRJobRunner, self).du(path_glob)
 
         return sum(self.get_s3_key(uri).size for uri in self.ls(path_glob))
 

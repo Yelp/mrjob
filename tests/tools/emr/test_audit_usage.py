@@ -21,6 +21,7 @@ import sys
 from mrjob import boto_2_1_1_83aae37b
 from mrjob.tools.emr.audit_usage import job_flow_to_full_summary
 from mrjob.tools.emr.audit_usage import subdivide_interval_by_date
+from mrjob.tools.emr.audit_usage import subdivide_interval_by_hour
 from mrjob.tools.emr.audit_usage import main
 from mrjob.tools.emr.audit_usage import percent
 from tests.mockboto import MockEmrObject
@@ -28,6 +29,7 @@ from tests.test_emr import MockEMRAndS3TestCase
 
 try:
     import unittest2 as unittest
+    unittest  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import unittest
 
@@ -98,6 +100,9 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'end': datetime(2010, 6, 6, 0, 15),
                 'end_billing': datetime(2010, 6, 6, 1, 0),
                 'label': 'mr_exciting',
+                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 0): 7.5},
+                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 10.0},
+                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
                 'nih_bbnu': 7.5,
                 'nih_billed': 10.0,
                 'nih_used': 2.5,
@@ -144,6 +149,9 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'end': datetime(2010, 6, 6, 0, 15),
                 'end_billing': datetime(2010, 6, 6, 0, 30),
+                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 5.0},
+                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
                 'label': 'mr_exciting',
                 'nih_bbnu': 2.5,
                 'nih_billed': 5.0,
@@ -190,6 +198,9 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_used': {date(2010, 6, 6): 5.0},
                 'end': datetime(2010, 6, 6, 0, 30),
                 'end_billing': datetime(2010, 6, 6, 0, 30),
+                'hour_to_nih_bbnu': {},
+                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 5.0},
+                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 5.0},
                 'label': 'mr_exciting',
                 'nih_bbnu': 0.0,
                 'nih_billed': 5.0,
@@ -330,6 +341,13 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_used': {date(2010, 6, 5): 2.5},
                 'end': datetime(2010, 6, 5, 23, 45),
                 'end_billing': datetime(2010, 6, 6, 1, 30),
+                'hour_to_nih_bbnu': {datetime(2010, 6, 5, 23): 2.5,
+                                     datetime(2010, 6, 6, 0): 10.0,
+                                     datetime(2010, 6, 6, 1): 5.0},
+                'hour_to_nih_billed': {datetime(2010, 6, 5, 23): 5.0,
+                                       datetime(2010, 6, 6, 0): 10.0,
+                                       datetime(2010, 6, 6, 1): 5.0},
+                'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5},
                 'label': 'mr_exciting',
                 'nih_bbnu': 17.5,
                 'nih_billed': 20.0,
@@ -384,6 +402,9 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_billed': {date(2010, 6, 6): 2.5},
                 'end': datetime(2010, 6, 6, 4, 15),
                 'end_billing': datetime(2010, 6, 6, 4, 15),
+                'hour_to_nih_used': {datetime(2010, 6, 6, 4): 2.5},
+                'hour_to_nih_bbnu': {},
+                'hour_to_nih_billed': {datetime(2010, 6, 6, 4): 2.5},
                 'label': 'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
@@ -398,6 +419,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_billed': {date(2010, 6, 6): 12.5},
                 'end': datetime(2010, 6, 6, 5, 30),
                 'end_billing': datetime(2010, 6, 6, 5, 30),
+                'hour_to_nih_used': {datetime(2010, 6, 6, 4): 7.5,
+                                     datetime(2010, 6, 6, 5): 5.0},
+                'hour_to_nih_bbnu': {},
+                'hour_to_nih_billed': {datetime(2010, 6, 6, 4): 7.5,
+                                       datetime(2010, 6, 6, 5): 5.0},
                 'label': 'mr_exciting',
                 'nih_used': 12.5,
                 'nih_bbnu': 0.0,
@@ -453,6 +479,9 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_billed': {date(2010, 6, 6): 2.5},
                 'end': datetime(2010, 6, 6, 4, 15),
                 'end_billing': datetime(2010, 6, 6, 4, 15),
+                'hour_to_nih_used': {datetime(2010, 6, 6, 4): 2.5},
+                'hour_to_nih_bbnu': {},
+                'hour_to_nih_billed': {datetime(2010, 6, 6, 4): 2.5},
                 'label': 'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
@@ -467,6 +496,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_billed': {date(2010, 6, 6): 17.5},
                 'end': datetime(2010, 6, 6, 4, 15),
                 'end_billing': datetime(2010, 6, 6, 6, 0),
+                'hour_to_nih_used': {},
+                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 4): 7.5,
+                                     datetime(2010, 6, 6, 5): 10.0},
+                'hour_to_nih_billed': {datetime(2010, 6, 6, 4): 7.5,
+                                       datetime(2010, 6, 6, 5): 10.0},
                 'label': 'mr_exciting',
                 'nih_used': 0.0,
                 'nih_bbnu': 17.5,
@@ -532,6 +566,9 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_billed': {date(2010, 6, 5): 2.5},
                 'end': datetime(2010, 6, 5, 23, 45),
                 'end_billing': datetime(2010, 6, 5, 23, 45),
+                'hour_to_nih_bbnu': {},
+                'hour_to_nih_billed': {datetime(2010, 6, 5, 23): 2.5},
+                'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5},
                 'label': 'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
@@ -548,6 +585,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                                        date(2010, 6, 6): 5.0},
                 'end': datetime(2010, 6, 6, 0, 15),
                 'end_billing': datetime(2010, 6, 6, 0, 30),
+                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_billed': {datetime(2010, 6, 5, 23): 2.5,
+                                       datetime(2010, 6, 6, 0): 5.0},
+                'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5,
+                                     datetime(2010, 6, 6, 0): 2.5},
                 'label': 'mr_exciting',
                 'nih_used': 5.0,
                 'nih_bbnu': 2.5,
@@ -562,6 +604,9 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_billed': {date(2010, 6, 6): 2.5},
                 'end': datetime(2010, 6, 6, 0, 45),
                 'end_billing': datetime(2010, 6, 6, 0, 45),
+                'hour_to_nih_bbnu': {},
+                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
                 'label': 'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
@@ -577,6 +622,10 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_billed': {date(2010, 6, 6): 7.5},
                 'end': datetime(2010, 6, 6, 1, 0),
                 'end_billing': datetime(2010, 6, 6, 1, 30),
+                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 1): 5.0},
+                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 2.5,
+                                       datetime(2010, 6, 6, 1): 5.0},
+                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
                 'label': 'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 5.0,
@@ -651,6 +700,9 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_billed': {date(2010, 6, 5): 2.5},
                 'end': datetime(2010, 6, 5, 23, 45),
                 'end_billing': datetime(2010, 6, 5, 23, 45),
+                'hour_to_nih_bbnu': {},
+                'hour_to_nih_billed': {datetime(2010, 6, 5, 23): 2.5},
+                'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5},
                 'label': 'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
@@ -667,6 +719,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                                        date(2010, 6, 6): 5.0},
                 'end': datetime(2010, 6, 6, 0, 15),
                 'end_billing': datetime(2010, 6, 6, 0, 30),
+                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_billed': {datetime(2010, 6, 5, 23): 2.5,
+                                       datetime(2010, 6, 6, 0): 5.0},
+                'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5,
+                                     datetime(2010, 6, 6, 0): 2.5},
                 'label': 'mr_exciting',
                 'nih_used': 5.0,
                 'nih_bbnu': 2.5,
@@ -681,6 +738,9 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_billed': {date(2010, 6, 6): 2.5},
                 'end': datetime(2010, 6, 6, 0, 45),
                 'end_billing': datetime(2010, 6, 6, 0, 45),
+                'hour_to_nih_bbnu': {},
+                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
                 'label': 'mr_whatever',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
@@ -696,6 +756,10 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'date_to_nih_billed': {date(2010, 6, 6): 7.5},
                 'end': datetime(2010, 6, 6, 1, 0),
                 'end_billing': datetime(2010, 6, 6, 1, 30),
+                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 1): 5.0},
+                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 2.5,
+                                       datetime(2010, 6, 6, 1): 5.0},
+                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
                 'label': 'mr_whatever',
                 'nih_used': 2.5,
                 'nih_bbnu': 5.0,
@@ -767,6 +831,67 @@ class SubdivideIntervalByDateTestCase(unittest.TestCase):
              date(2010, 6, 8): 86400.0,
              date(2010, 6, 9): 86400.0,
              date(2010, 6, 10): 18000.0}
+        )
+
+
+class SubdivideIntervalByHourTestCase(unittest.TestCase):
+
+    def test_zero_interval(self):
+        self.assertEqual(
+            subdivide_interval_by_hour(
+                datetime(2010, 6, 6, 4, 26),
+                datetime(2010, 6, 6, 4, 26),
+            ),
+            {}
+        )
+
+    def test_same_hour(self):
+        self.assertEqual(
+            subdivide_interval_by_hour(
+                datetime(2010, 6, 6, 4, 24),
+                datetime(2010, 6, 6, 4, 26),
+            ),
+            {datetime(2010, 6, 6, 4): 120.0}
+        )
+
+    def test_start_at_midnight(self):
+        self.assertEqual(
+            subdivide_interval_by_hour(
+                datetime(2010, 6, 6, 0, 0),
+                datetime(2010, 6, 6, 0, 3),
+            ),
+            {datetime(2010, 6, 6, 0): 180.0}
+        )
+
+    def test_end_at_midnight(self):
+        self.assertEqual(
+            subdivide_interval_by_hour(
+                datetime(2010, 6, 5, 23, 55),
+                datetime(2010, 6, 6, 0, 0),
+            ),
+            {datetime(2010, 6, 5, 23): 300.0}
+        )
+
+    def test_split_over_midnight(self):
+        self.assertEqual(
+            subdivide_interval_by_hour(
+                datetime(2010, 6, 5, 23, 55),
+                datetime(2010, 6, 6, 0, 3),
+            ),
+            {datetime(2010, 6, 5, 23): 300.0,
+             datetime(2010, 6, 6, 0): 180.0}
+        )
+
+    def test_full_hours(self):
+        self.assertEqual(
+            subdivide_interval_by_hour(
+                datetime(2010, 6, 5, 23, 40),
+                datetime(2010, 6, 6, 2, 10),
+            ),
+            {datetime(2010, 6, 5, 23): 1200.0,
+             datetime(2010, 6, 6, 0): 3600.0,
+             datetime(2010, 6, 6, 1): 3600.0,
+             datetime(2010, 6, 6, 2): 600.0}
         )
 
 

@@ -46,7 +46,7 @@ def main():
     options, args = option_parser.parse_args()
 
     if len(args) != 1:
-        option_parser.error('takes exactly one argument')
+        option_parser.error('This tool takes exactly one argument.')
     emr_job_flow_id = args[0]
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)

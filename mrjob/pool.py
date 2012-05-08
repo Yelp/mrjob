@@ -18,6 +18,7 @@ from datetime import timedelta
 
 try:
     import boto.utils
+    boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
     # inside hadoop streaming

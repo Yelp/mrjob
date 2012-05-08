@@ -18,8 +18,6 @@ n times."""
 from __future__ import with_statement
 
 import os
-from testify import assert_equal
-from testify import assert_not_equal
 
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
@@ -43,15 +41,13 @@ class MRTowerOfPowers(MRJob):
 
     def mapper(self, _, value):
         # mapper should always be reading from the "uploaded" file
-        assert_not_equal(self.options.n_file,
-                         os.environ['LOCAL_N_FILE_PATH'])
+        assert self.options.n_file != os.environ['LOCAL_N_FILE_PATH']
 
         yield None, value ** self.n
 
     def reducer(self, key, values):
         # reducer should always be reading from the "uploaded" file
-        assert_not_equal(self.options.n_file,
-                         os.environ['LOCAL_N_FILE_PATH'])
+        assert self.options.n_file != os.environ['LOCAL_N_FILE_PATH']
 
         # just pass through values as-is
         for value in values:
@@ -63,8 +59,7 @@ class MRTowerOfPowers(MRJob):
     def show_steps(self):
         # when we invoke the job with --steps, it should
         # be reading from the original version of n_file
-        assert_equal(self.options.n_file,
-                     os.environ['LOCAL_N_FILE_PATH'])
+        assert self.options.n_file == os.environ['LOCAL_N_FILE_PATH']
 
         super(MRTowerOfPowers, self).show_steps()
 

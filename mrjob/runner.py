@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,10 +34,12 @@ import tempfile
 
 try:
     from cStringIO import StringIO
+    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     from StringIO import StringIO
 
 from mrjob import compat
+from mrjob.conf import calculate_opt_priority
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
@@ -270,42 +272,7 @@ class MRJobRunner(object):
                              ``#localname`` to the path; otherwise we just use
                              the name of the file
         """
-        # enforce correct arguments
-        allowed_opts = set(self._allowed_opts())
-        unrecognized_opts = set(opts) - allowed_opts
-        if unrecognized_opts:
-            log.warn('got unexpected keyword arguments: ' +
-                     ', '.join(sorted(unrecognized_opts)))
-            opts = dict((k, v) for k, v in opts.iteritems()
-                        if k in allowed_opts)
-
-        # issue a warning for unknown opts from mrjob.conf and filter them out
-        mrjob_conf_opts = load_opts_from_mrjob_conf(
-            self.alias, conf_path=conf_path)
-        unrecognized_opts = set(mrjob_conf_opts) - set(self._allowed_opts())
-        if unrecognized_opts:
-            log.warn('got unexpected opts from mrjob.conf: ' +
-                     ', '.join(sorted(unrecognized_opts)))
-            mrjob_conf_opts = dict((k, v)
-                                   for k, v in mrjob_conf_opts.iteritems()
-                                   if k in allowed_opts)
-
-        # make sure all opts are at least set to None
-        blank_opts = dict((key, None) for key in allowed_opts)
-
-        # combine all of these options
-        # only __init__() methods should modify self._opts!
-        opt_dicts = [blank_opts, self._default_opts(),
-                     mrjob_conf_opts, opts]
-        self._opts = self.combine_opts(*opt_dicts)
-        # keep track of where in the order opts were specified,
-        # to handle opts that affect the same thing (e.g. ec2_*instance_type)
-        self._opt_priority = dict((opt, -1) for opt in self._opts)
-        for priority, opt_dict in enumerate(opt_dicts):
-            if opt_dict:
-                for opt, value in opt_dict.iteritems():
-                    if value is not None:
-                        self._opt_priority[opt] = priority
+        self._set_opts(opts, conf_path)
 
         # we potentially have a lot of files to copy, so we keep track
         # of them as a list of dictionaries, with the following keys:
@@ -317,37 +284,7 @@ class MRJobRunner(object):
         # on the Hadoop nodes. If 'archive', uncompress the file
         self._files = []
 
-        # old API accepts strings for cleanup
-        # new API wants lists
-        for opt_key in ('cleanup', 'cleanup_on_failure'):
-            if isinstance(self._opts[opt_key], basestring):
-                self._opts[opt_key] = [self._opts[opt_key]]
-
-        def validate_cleanup(error_str, opt_list):
-            for choice in opt_list:
-                if choice not in CLEANUP_CHOICES:
-                    raise ValueError(error_str % choice)
-            if 'NONE' in opt_list and len(set(opt_list)) > 1:
-                raise ValueError(
-                    'Cannot clean up both nothing and something!')
-
-        cleanup_error = ('cleanup must be one of %s, not %%s' %
-                         ', '.join(CLEANUP_CHOICES))
-        validate_cleanup(cleanup_error, self._opts['cleanup'])
-        if 'IF_SUCCESSFUL' in self._opts['cleanup']:
-            log.warning(
-                'IF_SUCCESSFUL is deprecated and will be removed in mrjob 0.4.'
-                ' Use ALL instead.')
-
-        cleanup_failure_error = (
-            'cleanup_on_failure must be one of %s, not %%s' %
-            ', '.join(CLEANUP_CHOICES))
-        validate_cleanup(cleanup_failure_error,
-                         self._opts['cleanup_on_failure'])
-        if 'IF_SUCCESSFUL' in self._opts['cleanup_on_failure']:
-            raise ValueError(
-                'IF_SUCCESSFUL is not supported for cleanup_on_failure.'
-                ' Use NONE instead.')
+        self._validate_cleanup()
 
         # add the script to our list of files (don't actually commit to
         # uploading it)
@@ -421,6 +358,79 @@ class MRJobRunner(object):
         # if this is True, we have to pipe input into the sort command
         # rather than feed it multiple files
         self._sort_is_windows_sort = None
+
+    def _set_opts(self, opts, conf_path):
+        # enforce correct arguments
+        allowed_opts = set(self._allowed_opts())
+        unrecognized_opts = set(opts) - allowed_opts
+        if unrecognized_opts:
+            log.warn('got unexpected keyword arguments: ' +
+                     ', '.join(sorted(unrecognized_opts)))
+            opts = dict((k, v) for k, v in opts.iteritems()
+                        if k in allowed_opts)
+
+        # issue a warning for unknown opts from mrjob.conf and filter them out
+        unsanitized_opt_dicts = load_opts_from_mrjob_conf(
+            self.alias, conf_path=conf_path)
+
+        sanitized_opt_dicts = []
+
+        for path, mrjob_conf_opts in unsanitized_opt_dicts:
+            unrecognized_opts = set(mrjob_conf_opts) - allowed_opts
+            if unrecognized_opts:
+                log.warn('got unexpected opts from %s: %s' % (
+                         path, ', '.join(sorted(unrecognized_opts))))
+                new_opts = dict((k, v) for k, v in mrjob_conf_opts.iteritems()
+                                if k in allowed_opts)
+                sanitized_opt_dicts.append(new_opts)
+            else:
+                sanitized_opt_dicts.append(mrjob_conf_opts)
+
+        # make sure all opts are at least set to None
+        blank_opts = dict((key, None) for key in allowed_opts)
+
+        # combine all of these options
+        # only __init__() methods should modify self._opts!
+        opt_dicts = (
+            [blank_opts, self._default_opts()] +
+            sanitized_opt_dicts +
+            [opts]
+        )
+        self._opts = self.combine_opts(*opt_dicts)
+        self._opt_priority = calculate_opt_priority(self._opts, opt_dicts)
+
+    def _validate_cleanup(self):
+        # old API accepts strings for cleanup
+        # new API wants lists
+        for opt_key in ('cleanup', 'cleanup_on_failure'):
+            if isinstance(self._opts[opt_key], basestring):
+                self._opts[opt_key] = [self._opts[opt_key]]
+
+        def validate_cleanup(error_str, opt_list):
+            for choice in opt_list:
+                if choice not in CLEANUP_CHOICES:
+                    raise ValueError(error_str % choice)
+            if 'NONE' in opt_list and len(set(opt_list)) > 1:
+                raise ValueError(
+                    'Cannot clean up both nothing and something!')
+
+        cleanup_error = ('cleanup must be one of %s, not %%s' %
+                         ', '.join(CLEANUP_CHOICES))
+        validate_cleanup(cleanup_error, self._opts['cleanup'])
+        if 'IF_SUCCESSFUL' in self._opts['cleanup']:
+            log.warning(
+                'IF_SUCCESSFUL is deprecated and will be removed in mrjob 0.4.'
+                ' Use ALL instead.')
+
+        cleanup_failure_error = (
+            'cleanup_on_failure must be one of %s, not %%s' %
+            ', '.join(CLEANUP_CHOICES))
+        validate_cleanup(cleanup_failure_error,
+                         self._opts['cleanup_on_failure'])
+        if 'IF_SUCCESSFUL' in self._opts['cleanup_on_failure']:
+            raise ValueError(
+                'IF_SUCCESSFUL is not supported for cleanup_on_failure.'
+                ' Use NONE instead.')
 
     @classmethod
     def _allowed_opts(cls):
@@ -1147,13 +1157,12 @@ class MRJobRunner(object):
 
             stdin_path = os.path.join(self._get_local_tmp_dir(), 'STDIN')
             log.debug('dumping stdin to local file %s' % stdin_path)
-            stdin_file = open(stdin_path, 'w')
-            for line in self._stdin:
-                # catch missing newlines (this often happens with test data)
-                if not line.endswith('\n'):
-                    line += '\n'
-                stdin_file.write(line)
-            stdin_file.close()
+            with open(stdin_path, 'w') as stdin_file:
+                for line in self._stdin:
+                    # catch missing newlines (this often happens with test data)
+                    if not line.endswith('\n'):
+                        line += '\n'
+                    stdin_file.write(line)
 
             self._stdin_path = stdin_path
 
@@ -1292,7 +1301,7 @@ class MRJobRunner(object):
 
                 # shovel bytes into the sort process
                 for input_path in input_paths:
-                    with open(input_path) as input:
+                    with open(input_path, 'r') as input:
                         while True:
                             buf = input.read(_BUFFER_SIZE)
                             if not buf:

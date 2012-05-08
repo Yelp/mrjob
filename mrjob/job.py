@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -109,6 +109,7 @@ import time
 
 try:
     from cStringIO import StringIO
+    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     from StringIO import StringIO
     
@@ -364,8 +365,6 @@ class MRJob(object):
         raise NotImplementedError
 
     ### Defining multi-step jobs ###
-
-    # Don't redefine this; use it inside steps()
 
     def steps(self):
         """Re-define this to make a multi-step job.
@@ -1960,7 +1959,7 @@ class MRJob(object):
     #: Optional name of an optional Hadoop ``OutputFormat`` class, e.g.
     #: ``'org.apache.hadoop.mapred.FileOutputFormat'``.
     #:
-    #: Passed to Hadoop with the *first* step of this job with the
+    #: Passed to Hadoop with the *last* step of this job with the
     #: ``-outputformat`` option.
     HADOOP_OUTPUT_FORMAT = None
 

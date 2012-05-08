@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
-import bz2
 from collections import defaultdict
 import contextlib
 from copy import deepcopy
@@ -34,6 +33,10 @@ import sys
 import tarfile
 import zipfile
 
+try:
+    import bz2
+except ImportError:
+    bz2 = None
 
 class NullHandler(logging.Handler):
     def emit(self, record):
@@ -257,7 +260,7 @@ def parse_and_save_options(option_parser, args):
         arg = rargs[0]
         if arg == '--':
             del rargs[0]
-            return
+            return arg_map
         elif arg[0:2] == '--':
             _process_long_opt(option_parser, arg_map, rargs, values)
         elif arg[:1] == '-' and len(arg) > 1:
@@ -296,48 +299,6 @@ def populate_option_groups_with_options(assignments, indexed_options):
                                        key=lambda item: item.get_opt_string())
 
 
-def input_files(path, stdin=None):
-    """An iterable of file objects for Hadoop-like syntax
-
-    - Resolve globs (``foo_*.gz``).
-    - Decompress ``.gz`` and ``.bz2`` files.
-    - If path is ``'-'``, read from stdin
-    - If path is a directory, recursively read its contents.
-
-    You can redefine *stdin* for ease of testing. *stdin* can actually be
-    any iterable that yields lines (e.g. a list).
-    """
-    if stdin is None:
-        stdin = sys.stdin
-        
-    if path == '-':
-        yield stdin
-        return
-        
-    # resolve globs
-    paths = glob.glob(path)
-    if not paths:
-        raise IOError(2, 'No such file or directory: %r' % path)
-    elif len(paths) > 1:
-        for path in paths:
-            for file in get_files_from_input(path, stdin=stdin):
-                yield file
-        return
-    else:
-        path = paths[0]
-        
-    # recurse through directories
-    if os.path.isdir(path):
-        for dirname, _, filenames in os.walk(path):
-            for filename in filenames:
-                for file in get_files_from_input(os.path.join(dirname, filename),
-                                       stdin=stdin):
-                    yield file
-        return
-
-    # read from files
-    yield file_object(path)
-
 def read_input(path, stdin=None):
     """Stream input the way Hadoop would.
 
@@ -353,41 +314,102 @@ def read_input(path, stdin=None):
     for file in input_files(path,stdin):
         for line in file:
             yield line
-  
-def file_object(path, fileobj=None):
-    """Return  file.
 
+def input_files(path,stdin):
+    """An iterable of file objects for Hadoop-like syntax
+
+    - Resolve globs (``foo_*.gz``).
     - Decompress ``.gz`` and ``.bz2`` files.
-    - If *fileobj* is not ``None``, stream lines from the *fileobj*
+    - If path is ``'-'``, read from stdin
+    - If path is a directory, recursively read its contents.
+
+    You can redefine *stdin* for ease of testing. *stdin* can actually be
+    any iterable that yields lines (e.g. a list).
+    
+    Example:
+      for file in input_files('*'):
+        for line in file:
+          yield line
+      will produce an iterable of all of the lines in all of the files 
+      in the current directory.
     """
-    if path.endswith('.gz'):
-        f = gzip.GzipFile(path, fileobj=fileobj)
-    elif path.endswith('.bz2'):
-        if fileobj is None:
-            f = bz2.BZ2File(path)
-        else:
-            f = bunzip2_stream(fileobj)
-    elif fileobj is None:
-        f = open(path)
+    
+    if stdin is None:
+        stdin = sys.stdin
+
+    # handle '-' (special case)
+    if path == '-':
+        yield stdin
+        return
+
+    # resolve globs
+    paths = glob.glob(path)
+    if not paths:
+        raise IOError(2, 'No such file or directory: %r' % path)
+    elif len(paths) > 1:
+        for path in paths:
+            for file in input_files(path, stdin=stdin):
+                yield file
+        return
     else:
-        f = fileobj
+        path = paths[0]
 
-    return f
+    # recurse through directories
+    if os.path.isdir(path):
+        for dirname, _, filenames in os.walk(path):
+            for filename in filenames:
+                for file in input_files(os.path.join(dirname, filename),
+                                       stdin=stdin):
+                    yield file
+        return
 
+    # read from files, automatically handling the final close
+    for file in file_object(path):
+        yield file
+    
+def file_object(path, fileobj=None):    
+    """Opens a file object handling decompression.
+
+    - Decompress ``.gz`` and ``.bz2`` files.
+    - If *fileobj* is not ``None``, decompress fileobj 
+    """
+    try:
+        if path.endswith('.gz'):
+            f = gzip.GzipFile(path, fileobj=fileobj)
+        elif path.endswith('.bz2'):
+            if bz2 is None:
+                raise Exception('bz2 module was not successfully imported (likely not installed).')
+            elif fileobj is None:
+                f = bz2.BZ2File(path)
+            else:
+                f = bunzip2_stream(fileobj)
+        elif fileobj is None:
+            f = open(path)
+        else:
+            f = fileobj
+
+        yield f
+    finally:
+        if fileobj is None and not f is None: 
+            f.close()
+            
 def read_file(path, fileobj=None):
-    """Reads a file.
+    """Reads a file by line
 
     - Decompress ``.gz`` and ``.bz2`` files.
     - If *fileobj* is not ``None``, stream lines from the *fileobj*
     """
-    for line in file_object(path, fileobj):
-        yield line
+    for file in file_object(path, fileobj):
+        for line in file:
+            yield line
 
 def bunzip2_stream(fileobj):
     """Return an uncompressed bz2 stream from a file object
     """
     # decompress chunks into a buffer, then stream from the buffer
     buffer = ''
+    if bz2 is None:
+        raise Exception('bz2 module was not successfully imported (likely not installed).')
     decomp = bz2.BZ2Decompressor()
     for part in fileobj:
         buffer = buffer.join(decomp.decompress(part))

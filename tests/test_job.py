@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import time
 
 try:
     import unittest2 as unittest
+    unittest  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import unittest
 
@@ -1417,6 +1418,7 @@ class BadMainTestCase(unittest.TestCase):
         sys.argv = sys.argv[:-1]
 
 class TypedBytesTestCase(unittest.TestCase):
+    """ Ensure that the correct input formats are set on the job runner. """
     def test_typed_bytes_format_attributes(self):
         mr_job = MRWordFreqCount() 
         

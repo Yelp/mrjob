@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -513,6 +513,9 @@ def supports_new_distributed_cache_options(version):
     """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
     ``-cacheArchive``
     """
+    return version_gte(version, '0.20')
+
+def uses_020_counters(version):
     return version_gte(version, '0.20')
 
 

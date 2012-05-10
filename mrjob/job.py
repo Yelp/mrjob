@@ -112,6 +112,8 @@ try:
     StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     from StringIO import StringIO
+    
+import typedbytes    
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
@@ -127,6 +129,7 @@ from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
 from mrjob.util import read_input
+from mrjob.util import input_files
 
 
 log = logging.getLogger('mrjob.job')
@@ -160,6 +163,7 @@ _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
 MRJobOptions = Option
 
 
+
 class UsageError(Exception):
     pass
 
@@ -171,6 +175,9 @@ class MRJob(object):
     #: :py:class:`optparse.Option` subclass to use with the
     #: :py:class:`optparse.OptionParser` instance.
     OPTION_CLASS = Option
+
+
+    STREAMING_INTERFACE_TYPED_BYTES = 'typed_bytes'
 
     def __init__(self, args=None):
         """Entry point for running your job from other Python code.
@@ -189,6 +196,7 @@ class MRJob(object):
         For a full list of command-line arguments, run:
         ``python -m mrjob.job --help``
         """
+
         # make sure we respect the $TZ (time zone) environment variable
         if hasattr(time, 'tzset'):
             time.tzset()
@@ -787,6 +795,30 @@ class MRJob(object):
         return inspect.getsourcefile(cls)
 
     ### Other useful utilities ###
+    
+    def _wrap_typedbytes(self):
+        tbout = typedbytes.Output(self.stdout)
+        
+        def read_lines():
+            paths = self.args or ['-']
+            for path in paths:
+                for file in input_files(path, stdin=self.stdin):
+                    for key,val in typedbytes.PairedInput(file):
+                        log.info('Read keyval pair, key=%s', str(key))
+                        yield key,val
+
+        def write_line(key, value):
+            try:
+                tbout.write(key)
+                tbout.write(value)
+            except Exception, e:
+                if self.options.strict_protocols:
+                    raise
+                else:
+                    self.increment_counter('Unencodable output',
+                                            e.__class__.__name__)
+
+        return read_lines, write_line
 
     def _read_input(self):
         """Read from stdin, or one more files, or directories.
@@ -801,7 +833,7 @@ class MRJob(object):
         for path in paths:
             for line in read_input(path, stdin=self.stdin):
                 yield line
-
+                
     def _wrap_protocols(self, step_num, step_type):
         """Pick the protocol classes to use for reading and writing
         for the given step, and wrap them so that bad input and output
@@ -818,6 +850,12 @@ class MRJob(object):
         step_num -- which step to run (e.g. 0)
         step_type -- 'M' for mapper, 'C' for combiner, 'R' for reducer
         """
+        
+        # TEMP code to evaluate typedbytes
+
+        if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
+            return self._wrap_typedbytes()
+            
         read, write = self.pick_protocols(step_num, step_type)
 
         def read_lines():
@@ -865,6 +903,11 @@ class MRJob(object):
         Re-define this if you need fine control over which protocols
         are used by which steps.
         """
+        """
+        Changing for typed_bytes
+        """
+        if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES :
+            return None, None
         steps_desc = self._steps_desc()
 
         # pick input protocol
@@ -1617,7 +1660,7 @@ class MRJob(object):
             'conf_path': self.options.conf_path,
             'extra_args': self.generate_passthrough_arguments(),
             'file_upload_args': self.generate_file_upload_args(),
-            'hadoop_extra_args': self.options.hadoop_extra_args,
+            'hadoop_extra_args': self.hadoop_extra_args(),
             'hadoop_input_format': self.hadoop_input_format(),
             'hadoop_output_format': self.hadoop_output_format(),
             'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
@@ -1637,6 +1680,7 @@ class MRJob(object):
             'steps_python_bin': self.options.steps_python_bin,
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,
+            'streaming_interface': self.STREAMING_INTERFACE,
         }
 
     def inline_job_runner_kwargs(self):
@@ -1871,6 +1915,8 @@ class MRJob(object):
     #: protocol strings. Can be overridden by the :option:`--output-protocol`.
     DEFAULT_OUTPUT_PROTOCOL = None
 
+    STREAMING_INTERFACE = None
+
     def parse_output_line(self, line):
         """
         Parse a line from the final output of this MRJob into
@@ -1898,6 +1944,11 @@ class MRJob(object):
         Normally, setting :py:attr:`HADOOP_INPUT_FORMAT` is sufficient;
         redefining this method is only for when you want to get fancy.
         """
+        # For supporting typed bytes
+        if self.HADOOP_INPUT_FORMAT is None and \
+           self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
+            self.HADOOP_INPUT_FORMAT = 'org.apache.hadoop.streaming.AutoInputFormat'
+            return self.HADOOP_INPUT_FORMAT
         if self.options.hadoop_input_format:
             log.warn('--hadoop-input-format is deprecated as of mrjob 0.3 and'
                      ' will no longer be supported in mrjob 0.4. Redefine'
@@ -1920,6 +1971,10 @@ class MRJob(object):
         Normally, setting :py:attr:`HADOOP_OUTPUT_FORMAT` is sufficient;
         redefining this method is only for when you want to get fancy.
         """
+        # For supporting typed bytes
+        if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
+            self.HADOOP_OUTPUT_FORMAT = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
+            return self.HADOOP_OUTPUT_FORMAT
         if self.options.hadoop_output_format:
             log.warn('--hadoop-output-format is deprecated as of mrjob 0.3 and'
                      ' will no longer be supported in mrjob 0.4. Redefine '
@@ -1978,8 +2033,20 @@ class MRJob(object):
 
                 return mrjob.conf.combine_dicts(orig_jobconf, custom_jobconf)
         """
+        
+        if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
+            self.JOBCONF['stream.map.input'] = 'typedbytes'
+            self.JOBCONF['stream.map.output'] = 'typedbytes'
+            self.JOBCONF['stream.reduce.input'] = 'typedbytes'
+            self.JOBCONF['stream.reduce.output'] = 'typedbytes'
+        
         return combine_dicts(self.JOBCONF, self.options.jobconf)
 
+    ### hadoop_extra_args ###
+
+    def hadoop_extra_args(self):
+        return self.options.hadoop_extra_args
+        
     ### Testing ###
 
     def sandbox(self, stdin=None, stdout=None, stderr=None):

@@ -310,13 +310,36 @@ def read_input(path, stdin=None):
     You can redefine *stdin* for ease of testing. *stdin* can actually be
     any iterable that yields lines (e.g. a list).
     """
+    
+    for file in input_files(path,stdin):
+        for line in file:
+            yield line
+
+def input_files(path,stdin):
+    """An iterable of file objects for Hadoop-like syntax
+
+    - Resolve globs (``foo_*.gz``).
+    - Decompress ``.gz`` and ``.bz2`` files.
+    - If path is ``'-'``, read from stdin
+    - If path is a directory, recursively read its contents.
+
+    You can redefine *stdin* for ease of testing. *stdin* can actually be
+    any iterable that yields lines (e.g. a list).
+    
+    Example:
+      for file in input_files('*'):
+        for line in file:
+          yield line
+      will produce an iterable of all of the lines in all of the files 
+      in the current directory.
+    """
+    
     if stdin is None:
         stdin = sys.stdin
 
     # handle '-' (special case)
     if path == '-':
-        for line in stdin:
-            yield line
+        yield stdin
         return
 
     # resolve globs
@@ -325,8 +348,8 @@ def read_input(path, stdin=None):
         raise IOError(2, 'No such file or directory: %r' % path)
     elif len(paths) > 1:
         for path in paths:
-            for line in read_input(path, stdin=stdin):
-                yield line
+            for file in input_files(path, stdin=stdin):
+                yield file
         return
     else:
         path = paths[0]
@@ -335,21 +358,20 @@ def read_input(path, stdin=None):
     if os.path.isdir(path):
         for dirname, _, filenames in os.walk(path):
             for filename in filenames:
-                for line in read_input(os.path.join(dirname, filename),
+                for file in input_files(os.path.join(dirname, filename),
                                        stdin=stdin):
-                    yield line
+                    yield file
         return
 
-    # read from files
-    for line in read_file(path):
-        yield line
-
-
-def read_file(path, fileobj=None):
-    """Reads a file.
+    # read from files, automatically handling the final close
+    for file in file_object(path):
+        yield file
+    
+def file_object(path, fileobj=None):    
+    """Opens a file object handling decompression.
 
     - Decompress ``.gz`` and ``.bz2`` files.
-    - If *fileobj* is not ``None``, stream lines from the *fileobj*
+    - If *fileobj* is not ``None``, decompress fileobj 
     """
     try:
         if path.endswith('.gz'):
@@ -366,12 +388,20 @@ def read_file(path, fileobj=None):
         else:
             f = fileobj
 
-        for line in f:
-            yield line
+        yield f
     finally:
         if fileobj is None and not f is None: 
             f.close()
+            
+def read_file(path, fileobj=None):
+    """Reads a file by line
 
+    - Decompress ``.gz`` and ``.bz2`` files.
+    - If *fileobj* is not ``None``, stream lines from the *fileobj*
+    """
+    for file in file_object(path, fileobj):
+        for line in file:
+            yield line
 
 def bunzip2_stream(fileobj):
     """Return an uncompressed bz2 stream from a file object

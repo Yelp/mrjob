@@ -43,7 +43,6 @@ from mrjob.runner import MRJobRunner
 from mrjob.util import cmd_line
 from mrjob.util import read_file
 
-
 log = logging.getLogger('mrjob.hadoop')
 
 # to filter out the log4j stuff that hadoop streaming prints out

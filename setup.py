@@ -7,6 +7,7 @@ try:
             'boto>=2.3.0',
             'PyYAML',
             'simplejson>=2.0.9',
+            'typedbytes',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',

@@ -1945,7 +1945,8 @@ class MRJob(object):
         redefining this method is only for when you want to get fancy.
         """
         # For supporting typed bytes
-        if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
+        if self.HADOOP_INPUT_FORMAT is None and \
+           self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
             self.HADOOP_INPUT_FORMAT = 'org.apache.hadoop.streaming.AutoInputFormat'
             return self.HADOOP_INPUT_FORMAT
         if self.options.hadoop_input_format:
@@ -2032,6 +2033,13 @@ class MRJob(object):
 
                 return mrjob.conf.combine_dicts(orig_jobconf, custom_jobconf)
         """
+        
+        if self.STREAMING_INTERFACE == self.STREAMING_INTERFACE_TYPED_BYTES:
+            self.JOBCONF['stream.map.input'] = 'typedbytes'
+            self.JOBCONF['stream.map.output'] = 'typedbytes'
+            self.JOBCONF['stream.reduce.input'] = 'typedbytes'
+            self.JOBCONF['stream.reduce.output'] = 'typedbytes'
+        
         return combine_dicts(self.JOBCONF, self.options.jobconf)
 
     ### hadoop_extra_args ###

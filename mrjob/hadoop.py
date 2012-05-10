@@ -42,8 +42,6 @@ from mrjob.parse import urlparse
 from mrjob.runner import MRJobRunner
 from mrjob.util import cmd_line
 from mrjob.util import read_file
-from mrjob.job import MRJob
-
 
 log = logging.getLogger('mrjob.hadoop')
 
@@ -398,13 +396,6 @@ class HadoopJobRunner(MRJobRunner):
                 streaming_args.append(cmd_line(self._reducer_args(step_num)))
             else:
                 streaming_args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
-                
-            # setup typedbytes communication
-            if MRJob.STREAMING_INTERFACE_TYPED_BYTES == self._opts['streaming_interface']: 
-                streaming_args.extend(['-jobconf', 'stream.map.input=typedbytes'])
-                streaming_args.extend(['-jobconf', 'stream.reduce.input=typedbytes'])
-                streaming_args.extend(['-jobconf', 'stream.reduce.output=typedbytes'])
-                streaming_args.extend(['-jobconf', 'stream.map.output=typedbytes'])
 
             log.debug('> %s' % cmd_line(streaming_args))
             step_proc = Popen(streaming_args, stdout=PIPE, stderr=PIPE)

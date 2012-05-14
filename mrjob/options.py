@@ -19,7 +19,7 @@ made public until at least 0.4 if not later or never.
 from mrjob.runner import CLEANUP_CHOICES
 
 
-def apply_protocol_opts(opt_group, protocol_choices, default_output_protocol):
+def add_protocol_opts(opt_group, protocol_choices, default_output_protocol):
     """Add options related to choosing protocols. These are all deprecated
     except for :opt:`--strict-protocols` and must be made available as
     passthrough options so the job picks it up under Hadoop Streaming.
@@ -52,7 +52,7 @@ def apply_protocol_opts(opt_group, protocol_choices, default_output_protocol):
     ]
 
 
-def apply_runner_opts(opt_group):
+def add_runner_opts(opt_group):
     """Options for all runners."""
     return [
         opt_group.add_option(
@@ -178,7 +178,7 @@ def apply_runner_opts(opt_group):
     ]
 
 
-def apply_hadoop_shared_opts(opt_group):
+def add_hadoop_shared_opts(opt_group):
     """Options for ``hadoop``, ``local``, and ``emr`` runners"""
     return [
         opt_group.add_option(
@@ -196,7 +196,7 @@ def apply_hadoop_shared_opts(opt_group):
     ]
 
 
-def apply_hadoop_emr_opts(opt_group):
+def add_hadoop_emr_opts(opt_group):
     """Options for ``hadoop`` and ``emr`` runners"""
     return [
         opt_group.add_option(
@@ -239,7 +239,7 @@ def apply_hadoop_emr_opts(opt_group):
     ]
 
 
-def apply_hadoop_opts(opt_group):
+def add_hadoop_opts(opt_group):
     """Options for ``hadoop`` runner"""
     return [
         opt_group.add_option(
@@ -253,7 +253,7 @@ def apply_hadoop_opts(opt_group):
     ]
 
 
-def apply_emr_opts(opt_group):
+def add_emr_opts(opt_group):
     """Options for ``emr`` runner"""
     return [
         opt_group.add_option(

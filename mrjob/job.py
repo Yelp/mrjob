@@ -115,12 +115,12 @@ except ImportError:
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
-from mrjob.options import apply_emr_opts
-from mrjob.options import apply_hadoop_opts
-from mrjob.options import apply_hadoop_emr_opts
-from mrjob.options import apply_hadoop_shared_opts
-from mrjob.options import apply_protocol_opts
-from mrjob.options import apply_runner_opts
+from mrjob.options import add_emr_opts
+from mrjob.options import add_hadoop_opts
+from mrjob.options import add_hadoop_emr_opts
+from mrjob.options import add_hadoop_shared_opts
+from mrjob.options import add_protocol_opts
+from mrjob.options import add_runner_opts
 from mrjob.parse import parse_port_range_list
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.parse import parse_key_value_list
@@ -930,13 +930,12 @@ class MRJob(object):
             help='which step to execute (default is 0)')
 
         # protocol stuff
-        protocol_choices = sorted(self.protocols())
         self.proto_opt_group = OptionGroup(
             self.option_parser, 'Protocols')
         self.option_parser.add_option_group(self.proto_opt_group)
 
         self._passthrough_options.extend(
-            apply_protocol_opts(
+            add_protocol_opts(
                 self.proto_opt_group,
                 sorted(self.protocols()),
                 self.DEFAULT_OUTPUT_PROTOCOL,
@@ -948,7 +947,7 @@ class MRJob(object):
             self.option_parser, 'Running the entire job')
         self.option_parser.add_option_group(self.runner_opt_group)
 
-        apply_runner_opts(self.runner_opt_group)
+        add_runner_opts(self.runner_opt_group)
 
         self.hadoop_opts_opt_group = OptionGroup(
             self.option_parser,
@@ -956,7 +955,7 @@ class MRJob(object):
             ' hadoop, -r emr, or -r local)')
         self.option_parser.add_option_group(self.hadoop_opts_opt_group)
 
-        apply_hadoop_shared_opts(self.hadoop_opts_opt_group)
+        add_hadoop_shared_opts(self.hadoop_opts_opt_group)
 
         # options common to Hadoop and EMR
         self.hadoop_emr_opt_group = OptionGroup(
@@ -965,7 +964,7 @@ class MRJob(object):
             ' -r emr)')
         self.option_parser.add_option_group(self.hadoop_emr_opt_group)
 
-        apply_hadoop_emr_opts(self.hadoop_emr_opt_group)
+        add_hadoop_emr_opts(self.hadoop_emr_opt_group)
 
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(
@@ -973,7 +972,7 @@ class MRJob(object):
             'Running on Hadoop (these apply when you set -r hadoop)')
         self.option_parser.add_option_group(self.hadoop_opt_group)
 
-        apply_hadoop_opts(self.hadoop_opt_group)
+        add_hadoop_opts(self.hadoop_opt_group)
 
         # options for running the job on EMR
         self.emr_opt_group = OptionGroup(
@@ -982,7 +981,7 @@ class MRJob(object):
             ' emr)')
         self.option_parser.add_option_group(self.emr_opt_group)
 
-        apply_emr_opts(self.emr_opt_group)
+        add_emr_opts(self.emr_opt_group)
 
     def all_option_groups(self):
         return (self.option_parser, self.mux_opt_group,

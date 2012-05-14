@@ -308,13 +308,21 @@ def terminate_and_notify(runner, to_terminate, dry_run=False,
         return
 
     for jf, pending, time_idle, time_to_end_of_hour in to_terminate:
+        fmt = ('Terminated job flow %s (%s); was %s for %s, %s to end of hour')
+        msg = fmt % (
+                jf.jobflowid, jf.name,
+                'pending' if pending else 'idle',
+                strip_microseconds(time_idle),
+                strip_microseconds(time_to_end_of_hour))
+
         did_terminate = False
         if not dry_run:
             status = attempt_to_acquire_lock(
                 runner.make_s3_conn(),
                 runner._lock_uri(jf),
                 runner._opts['s3_sync_wait_time'],
-                runner._make_unique_job_name(label='terminate'),
+                '%s (%s)' % (msg,
+                             runner._make_unique_job_name(label='terminate')),
                 mins_to_expiration=max_mins_locked,
             )
             if status:
@@ -325,13 +333,7 @@ def terminate_and_notify(runner, to_terminate, dry_run=False,
                          ' trying to terminate it; skipping' % jf.jobflowid)
 
         if did_terminate and not quiet:
-            fmt = ('Terminated job flow %s (%s); was %s for %s, %s to end of'
-                   ' hour')
-            print fmt % (
-                    jf.jobflowid, jf.name,
-                    'pending' if pending else 'idle',
-                    strip_microseconds(time_idle),
-                    strip_microseconds(time_to_end_of_hour))
+            print msg
 
 
 def make_option_parser():

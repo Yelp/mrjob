@@ -42,8 +42,45 @@ log = logging.getLogger('mrjob.conf')
 
 
 class OptionStore(dict):
+    """Encapsulates logic about a configuration. With the exception of the
+    constructor, it can be accessed like a dictionary."""
 
+    #: Set of valid keys for this type of configuration
     ALLOWED_KEYS = set()
+
+    #: Mapping of key to function used to combine multiple values to override,
+    #: augment, etc. Leave blank for :py:func:`combine_values()`.
+    COMBINERS = dict()
+
+    def __init__(self):
+        super(OptionStore, self).__init__()
+        self.cascading_dicts = [
+            dict((key, None) for key in self.ALLOWED_KEYS),
+            self.default_options(),
+        ]
+
+    def default_options(self):
+        """Default options for this :py:class:`OptionStore`"""
+        return {}
+
+    def validated_options(self, opts, error_fmt):
+        unrecognized_opts = set(opts) - self.ALLOWED_KEYS
+        if unrecognized_opts:
+            log.warn(error_fmt % ', '.join(sorted(unrecognized_opts)))
+            return dict((k, v) for k, v in opts.iteritems()
+                        if k in self.ALLOWED_KEYS)
+        else:
+            return opts
+
+    def populate_values_from_cascading_dicts(self):
+        """When ``cascading_dicts`` has been built, use it to populate the
+        dictionary with the ultimate values.
+        """
+        self.update(combine_opts(self.COMBINERS, *self.cascading_dicts))
+        self._opt_priority = calculate_opt_priority(self, self.cascading_dicts)
+
+    def is_default(self, key):
+        return self._opt_priority[key] >= 2
 
     def __getitem__(self, key):
         if key in self.ALLOWED_KEYS:
@@ -51,9 +88,9 @@ class OptionStore(dict):
         else:
             raise KeyError(key)
 
-    def __setitem__(self, key):
+    def __setitem__(self, key, value):
         if key in self.ALLOWED_KEYS:
-            return super(OptionStore, self).__getitem__(key)
+            return super(OptionStore, self).__setitem__(key, value)
         else:
             raise KeyError(key)
 

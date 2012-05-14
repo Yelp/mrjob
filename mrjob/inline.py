@@ -33,10 +33,18 @@ except ImportError:
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
 from mrjob.runner import MRJobRunner
+from mrjob.runner import RunnerOptionStore
 from mrjob.job import MRJob
 from mrjob.util import save_current_environment
 
 log = logging.getLogger('mrjob.inline')
+
+
+class InlineRunnerOptionStore(RunnerOptionStore):
+
+    COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
+        'cmdenv': combine_local_envs,
+    })
 
 
 class InlineMRJobRunner(MRJobRunner):
@@ -51,6 +59,8 @@ class InlineMRJobRunner(MRJobRunner):
     """
 
     alias = 'inline'
+
+    OPTION_STORE_CLASS = InlineRunnerOptionStore
 
     def __init__(self, mrjob_cls=None, **kwargs):
         """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword
@@ -73,13 +83,6 @@ class InlineMRJobRunner(MRJobRunner):
         self._prev_outfile = None
         self._final_outfile = None
         self._counters = []
-
-    @classmethod
-    def _opts_combiners(cls):
-        # on windows, PYTHONPATH should use ;, not :
-        return combine_dicts(
-            super(InlineMRJobRunner, cls)._opts_combiners(),
-            {'cmdenv': combine_local_envs})
 
     # options that we ignore because they require real Hadoop
     IGNORED_HADOOP_OPTS = [
@@ -112,10 +115,8 @@ class InlineMRJobRunner(MRJobRunner):
 
         assert self._script  # shouldn't be able to run if no script
 
-        default_opts = self.get_default_opts()
-
         for ignored_opt in self.IGNORED_HADOOP_OPTS:
-            if self._opts[ignored_opt] != default_opts[ignored_opt]:
+            if self._opts.is_default(ignored_opt):
                 log.warning('ignoring %s option (requires real Hadoop): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 
@@ -127,7 +128,7 @@ class InlineMRJobRunner(MRJobRunner):
                     (ignored_attr[1:], value))
 
         for ignored_opt in self.IGNORED_LOCAL_OPTS:
-            if self._opts[ignored_opt] != default_opts[ignored_opt]:
+            if self._opts.is_default(ignored_opt):
                 log.warning('ignoring %s option (use -r local instead): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 

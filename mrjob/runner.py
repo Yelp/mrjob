@@ -39,16 +39,15 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob import compat
-from mrjob.conf import calculate_opt_priority
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
 from mrjob.conf import combine_local_envs
 from mrjob.conf import combine_lists
-from mrjob.conf import combine_opts
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_conf
+from mrjob.conf import OptionStore
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
 from mrjob.util import read_file
@@ -82,6 +81,116 @@ _STEP_RE = re.compile(r'^M?C?R?$')
 
 # buffer for piping files into sort on Windows
 _BUFFER_SIZE = 4096
+
+
+class RunnerOptionStore(OptionStore):
+
+    ALLOWED_KEYS = OptionStore.ALLOWED_KEYS.union(set([
+        'base_tmp_dir',
+        'bootstrap_mrjob',
+        'cleanup',
+        'cleanup_on_failure',
+        'cmdenv',
+        'hadoop_extra_args',
+        'hadoop_streaming_jar',
+        'hadoop_version',
+        'jobconf',
+        'label',
+        'owner',
+        'python_archives',
+        'python_bin',
+        'setup_cmds',
+        'setup_scripts',
+        'steps_python_bin',
+        'upload_archives',
+        'upload_files',
+    ]))
+
+    COMBINERS = combine_dicts(OptionStore.COMBINERS, {
+        'base_tmp_dir': combine_paths,
+        'cmdenv': combine_envs,
+        'hadoop_extra_args': combine_lists,
+        'jobconf': combine_dicts,
+        'python_archives': combine_path_lists,
+        'python_bin': combine_cmds,
+        'setup_cmds': combine_lists,
+        'setup_scripts': combine_path_lists,
+        'steps_python_bin': combine_cmds,
+        'upload_archives': combine_path_lists,
+        'upload_files': combine_path_lists,
+    })
+
+    def __init__(self, alias, opts, conf_path):
+        super(RunnerOptionStore, self).__init__()
+
+        # sanitize incoming options and issue warnings for bad keys
+        opts = self.validated_options(
+            opts, 'Got unexpected keyword arguments: %s')
+
+        unsanitized_opt_dicts = load_opts_from_mrjob_conf(
+            alias, conf_path=conf_path)
+
+        for path, mrjob_conf_opts in unsanitized_opt_dicts:
+            self.cascading_dicts.append(self.validated_options(
+                mrjob_conf_opts, 'Got unexpected opts from %s: %%s' % path))
+
+        self.cascading_dicts.append(opts)
+
+        self.populate_values_from_cascading_dicts()
+
+        self._validate_cleanup()
+
+    def default_options(self):
+        super_opts = super(RunnerOptionStore, self).default_options()
+
+        try:
+            owner = getpass.getuser()
+        except:
+            owner = None
+
+        return combine_dicts(super_opts, {
+            'base_tmp_dir': tempfile.gettempdir(),
+            'bootstrap_mrjob': True,
+            'cleanup': ['ALL'],
+            'cleanup_on_failure': ['NONE'],
+            'hadoop_version': '0.20',
+            'owner': owner,
+            'python_bin': ['python'],
+            'steps_python_bin': [sys.executable or 'python'],
+        })
+
+    def _validate_cleanup(self):
+        # old API accepts strings for cleanup
+        # new API wants lists
+        for opt_key in ('cleanup', 'cleanup_on_failure'):
+            if isinstance(self[opt_key], basestring):
+                self[opt_key] = [self[opt_key]]
+
+        def validate_cleanup(error_str, opt_list):
+            for choice in opt_list:
+                if choice not in CLEANUP_CHOICES:
+                    raise ValueError(error_str % choice)
+            if 'NONE' in opt_list and len(set(opt_list)) > 1:
+                raise ValueError(
+                    'Cannot clean up both nothing and something!')
+
+        cleanup_error = ('cleanup must be one of %s, not %%s' %
+                         ', '.join(CLEANUP_CHOICES))
+        validate_cleanup(cleanup_error, self['cleanup'])
+        if 'IF_SUCCESSFUL' in self['cleanup']:
+            log.warning(
+                'IF_SUCCESSFUL is deprecated and will be removed in mrjob 0.4.'
+                ' Use ALL instead.')
+
+        cleanup_failure_error = (
+            'cleanup_on_failure must be one of %s, not %%s' %
+            ', '.join(CLEANUP_CHOICES))
+        validate_cleanup(cleanup_failure_error,
+                         self['cleanup_on_failure'])
+        if 'IF_SUCCESSFUL' in self['cleanup_on_failure']:
+            raise ValueError(
+                'IF_SUCCESSFUL is not supported for cleanup_on_failure.'
+                ' Use NONE instead.')
 
 
 class MRJobRunner(object):
@@ -118,6 +227,8 @@ class MRJobRunner(object):
     #: :py:mod:``mrjob.conf`` to load one of ``'local'``, ``'emr'``,
     #: or ``'hadoop'``
     alias = None
+
+    OPTION_STORE_CLASS = RunnerOptionStore
 
     ### methods to call from your batch script ###
 
@@ -272,7 +383,7 @@ class MRJobRunner(object):
                              ``#localname`` to the path; otherwise we just use
                              the name of the file
         """
-        self._set_opts(opts, conf_path)
+        self._opts = self.OPTION_STORE_CLASS(self.alias, opts, conf_path)
 
         # we potentially have a lot of files to copy, so we keep track
         # of them as a list of dictionaries, with the following keys:
@@ -283,8 +394,6 @@ class MRJobRunner(object):
         # 'cache': if 'file', copy into mr_job_script's working directory
         # on the Hadoop nodes. If 'archive', uncompress the file
         self._files = []
-
-        self._validate_cleanup()
 
         # add the script to our list of files (don't actually commit to
         # uploading it)
@@ -358,152 +467,6 @@ class MRJobRunner(object):
         # if this is True, we have to pipe input into the sort command
         # rather than feed it multiple files
         self._sort_is_windows_sort = None
-
-    def _set_opts(self, opts, conf_path):
-        # enforce correct arguments
-        allowed_opts = set(self._allowed_opts())
-        unrecognized_opts = set(opts) - allowed_opts
-        if unrecognized_opts:
-            log.warn('got unexpected keyword arguments: ' +
-                     ', '.join(sorted(unrecognized_opts)))
-            opts = dict((k, v) for k, v in opts.iteritems()
-                        if k in allowed_opts)
-
-        # issue a warning for unknown opts from mrjob.conf and filter them out
-        unsanitized_opt_dicts = load_opts_from_mrjob_conf(
-            self.alias, conf_path=conf_path)
-
-        sanitized_opt_dicts = []
-
-        for path, mrjob_conf_opts in unsanitized_opt_dicts:
-            unrecognized_opts = set(mrjob_conf_opts) - allowed_opts
-            if unrecognized_opts:
-                log.warn('got unexpected opts from %s: %s' % (
-                         path, ', '.join(sorted(unrecognized_opts))))
-                new_opts = dict((k, v) for k, v in mrjob_conf_opts.iteritems()
-                                if k in allowed_opts)
-                sanitized_opt_dicts.append(new_opts)
-            else:
-                sanitized_opt_dicts.append(mrjob_conf_opts)
-
-        # make sure all opts are at least set to None
-        blank_opts = dict((key, None) for key in allowed_opts)
-
-        # combine all of these options
-        # only __init__() methods should modify self._opts!
-        opt_dicts = (
-            [blank_opts, self._default_opts()] +
-            sanitized_opt_dicts +
-            [opts]
-        )
-        self._opts = self.combine_opts(*opt_dicts)
-        self._opt_priority = calculate_opt_priority(self._opts, opt_dicts)
-
-    def _validate_cleanup(self):
-        # old API accepts strings for cleanup
-        # new API wants lists
-        for opt_key in ('cleanup', 'cleanup_on_failure'):
-            if isinstance(self._opts[opt_key], basestring):
-                self._opts[opt_key] = [self._opts[opt_key]]
-
-        def validate_cleanup(error_str, opt_list):
-            for choice in opt_list:
-                if choice not in CLEANUP_CHOICES:
-                    raise ValueError(error_str % choice)
-            if 'NONE' in opt_list and len(set(opt_list)) > 1:
-                raise ValueError(
-                    'Cannot clean up both nothing and something!')
-
-        cleanup_error = ('cleanup must be one of %s, not %%s' %
-                         ', '.join(CLEANUP_CHOICES))
-        validate_cleanup(cleanup_error, self._opts['cleanup'])
-        if 'IF_SUCCESSFUL' in self._opts['cleanup']:
-            log.warning(
-                'IF_SUCCESSFUL is deprecated and will be removed in mrjob 0.4.'
-                ' Use ALL instead.')
-
-        cleanup_failure_error = (
-            'cleanup_on_failure must be one of %s, not %%s' %
-            ', '.join(CLEANUP_CHOICES))
-        validate_cleanup(cleanup_failure_error,
-                         self._opts['cleanup_on_failure'])
-        if 'IF_SUCCESSFUL' in self._opts['cleanup_on_failure']:
-            raise ValueError(
-                'IF_SUCCESSFUL is not supported for cleanup_on_failure.'
-                ' Use NONE instead.')
-
-    @classmethod
-    def _allowed_opts(cls):
-        """A list of the options that can be passed to :py:meth:`__init__`
-        *and* can be defaulted from :mod:`mrjob.conf`."""
-        return [
-            'base_tmp_dir',
-            'bootstrap_mrjob',
-            'cleanup',
-            'cleanup_on_failure',
-            'cmdenv',
-            'hadoop_extra_args',
-            'hadoop_streaming_jar',
-            'hadoop_version',
-            'jobconf',
-            'label',
-            'owner',
-            'python_archives',
-            'python_bin',
-            'setup_cmds',
-            'setup_scripts',
-            'steps_python_bin',
-            'upload_archives',
-            'upload_files',
-        ]
-
-    @classmethod
-    def _default_opts(cls):
-        """A dictionary giving the default value of options."""
-        # getpass.getuser() isn't available on all systems, and may fail
-        try:
-            owner = getpass.getuser()
-        except:
-            owner = None
-
-        return {
-            'base_tmp_dir': tempfile.gettempdir(),
-            'bootstrap_mrjob': True,
-            'cleanup': ['ALL'],
-            'cleanup_on_failure': ['NONE'],
-            'hadoop_version': '0.20',
-            'owner': owner,
-            'python_bin': ['python'],
-            'steps_python_bin': [sys.executable or 'python'],
-        }
-
-    @classmethod
-    def _opts_combiners(cls):
-        """Map from option name to a combine_*() function used to combine
-        values for that option. This allows us to specify that some options
-        are lists, or contain environment variables, or whatever."""
-        return {
-            'base_tmp_dir': combine_paths,
-            'cmdenv': combine_envs,
-            'hadoop_extra_args': combine_lists,
-            'jobconf': combine_dicts,
-            'python_archives': combine_path_lists,
-            'python_bin': combine_cmds,
-            'setup_cmds': combine_lists,
-            'setup_scripts': combine_path_lists,
-            'steps_python_bin': combine_cmds,
-            'upload_archives': combine_path_lists,
-            'upload_files': combine_path_lists,
-        }
-
-    @classmethod
-    def combine_opts(cls, *opts_list):
-        """Combine options from several sources (e.g. defaults, mrjob.conf,
-        command line). Options later in the list take precedence.
-
-        You don't need to re-implement this in a subclass
-        """
-        return combine_opts(cls._opts_combiners(), *opts_list)
 
     ### Running the job and parsing output ###
 
@@ -663,12 +626,6 @@ class MRJobRunner(object):
     def get_opts(self):
         """Get options set for this runner, as a dict."""
         return copy.deepcopy(self._opts)
-
-    @classmethod
-    def get_default_opts(self):
-        """Get default options for this runner class, as a dict."""
-        blank_opts = dict((key, None) for key in self._allowed_opts())
-        return self.combine_opts(blank_opts, self._default_opts())
 
     def get_job_name(self):
         """Get the unique name for the job run by this runner.
@@ -896,7 +853,8 @@ class MRJobRunner(object):
         """
         self._name_files()
         # on Windows, PYTHONPATH should be separated by ;, not :
-        cmdenv_combiner = self._opts_combiners()['cmdenv']
+        # so LocalJobRunner and EMRJobRunner use different combiners for cmdenv
+        cmdenv_combiner = self.OPTION_STORE_CLASS.COMBINERS['cmdenv']
         envs_to_combine = ([{'PYTHONPATH': file_dict['name']}
                             for file_dict in self._python_archives] +
                            [self._opts['cmdenv']])

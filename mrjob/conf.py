@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,113 +14,6 @@
 
 """"mrjob.conf" is the name of both this module, and the global config file
 for :py:mod:`mrjob`.
-
-We look for :file:`mrjob.conf` in these locations:
-
-- The location specified by :envvar:`MRJOB_CONF`
-- :file:`~/.mrjob.conf`
-- :file:`~/.mrjob` **(deprecated)**
-- :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH` **(deprecated)**
-- :file:`/etc/mrjob.conf`
-
-If your :file:`mrjob.conf` path is deprecated, use this table to fix it:
-
-================================= ===============================
-Old Location                      New Location
-================================= ===============================
-:file:`~/.mrjob`                  :file:`~/.mrjob.conf`
-somewhere in :envvar:`PYTHONPATH` Specify in :envvar:`MRJOB_CONF`
-================================= ===============================
-
-The point of :file:`mrjob.conf` is to let you set up things you want every
-job to have access to so that you don't have to think about it. For example:
-
-- libraries and source code you want to be available for your jobs
-- where temp directories and logs should go
-- security credentials
-
-:file:`mrjob.conf` is just a `YAML <http://www.yaml.org>`_-encoded dictionary
-containing default values to pass in to the constructors of the various runner
-classes. Here's a minimal :file:`mrjob.conf`:
-
-.. code-block:: yaml
-
-    runners:
-      emr:
-        cmdenv:
-          TZ: America/Los_Angeles
-
-Now whenever you run ``mr_your_script.py -r emr``,
-:py:class:`~mrjob.emr.EMRJobRunner` will automatically set :envvar:`TZ` to
-``America/Los_Angeles`` in your job's environment when it runs on EMR.
-
-If you don't have the :py:mod:`yaml` module installed, you can use JSON
-in your :file:`mrjob.conf` instead (JSON is a subset of YAML, so it'll still
-work once you install :py:mod:`yaml`). Here's how you'd render the above
-example in JSON:
-
-.. code-block:: js
-
-    {
-      "runners": {
-        "emr": {
-          "cmdenv": {
-            "TZ": "America/Los_Angeles"
-          }
-        }
-      }
-    }
-
-Options specified on the command-line take precedence over
-:file:`mrjob.conf`. Usually this means simply overriding the option in
-:file:`mrjob.conf`. However, we know that *cmdenv* contains environment
-variables, so we do the right thing. For example, if your :file:`mrjob.conf`
-contained:
-
-.. code-block:: yaml
-
-    runners:
-      emr:
-        cmdenv:
-          PATH: /usr/local/bin
-          TZ: America/Los_Angeles
-
-and you ran your job as::
-
-    mr_your_script.py -r emr --cmdenv TZ=Europe/Paris --cmdenv PATH=/usr/sbin
-
-We'd automatically handle the :envvar:`PATH`
-variables and your job's environment would be::
-
-    {'TZ': 'Europe/Paris', 'PATH': '/usr/sbin:/usr/local/bin'}
-
-What's going on here is that *cmdenv* is associated with
-:py:func:`combine_envs`. Each option is associated with an appropriate
-combiner function that that combines options in an appropriate way.
-
-Combiners can also do useful things like expanding environment variables and
-globs in paths. For example, you could set:
-
-.. code-block:: yaml
-
-    runners:
-      local:
-        upload_files: &upload_files
-        - $DATA_DIR/*.db
-      hadoop:
-        upload_files: *upload_files
-      emr:
-        upload_files: *upload_files
-
-and every time you ran a job, every job in your ``.db`` file in ``$DATA_DIR``
-would automatically be loaded into your job's current working directory.
-
-Also, if you specified additional files to upload with :option:`--file`, those
-files would be uploaded in addition to the ``.db`` files, rather than instead
-of them.
-
-See :doc:`configs-runners` for the entire dizzying array of configurable
-options.
 """
 
 from __future__ import with_statement
@@ -196,8 +89,42 @@ def find_mrjob_conf():
         return None
 
 
+def real_mrjob_conf_path(conf_path=None):
+    if conf_path is False:
+        return None
+    elif conf_path is None:
+        return find_mrjob_conf()
+    else:
+        return expand_path(conf_path)
+
+
+def conf_object_at_path(conf_path):
+    if conf_path is None:
+        return None
+
+    with open(conf_path) as f:
+        if yaml:
+            return yaml.safe_load(f)
+        else:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError, e:
+                msg = ('If your mrjob.conf is in YAML, you need to install'
+                       ' yaml; see http://pypi.python.org/pypi/PyYAML/')
+                # JSONDecodeError currently has a msg attr, but it may not in
+                # the future
+                if hasattr(e, 'msg'):
+                    e.msg = '%s (%s)' % (e.msg, msg)
+                else:
+                    e.msg = msg
+                raise e
+
+
+# TODO 0.4: move to tests.test_conf
 def load_mrjob_conf(conf_path=None):
-    """Load the entire data structure in :file:`mrjob.conf`, which should
+    """.. deprecated:: 0.3.3
+
+    Load the entire data structure in :file:`mrjob.conf`, which should
     look something like this::
 
         {'runners':
@@ -213,38 +140,65 @@ def load_mrjob_conf(conf_path=None):
     :param conf_path: an alternate place to look for mrjob.conf. If this is
                       ``False``, we'll always return ``None``.
     """
-    if conf_path is False:
-        return None
-    elif conf_path is None:
-        conf_path = find_mrjob_conf()
-        if conf_path is None:
-            return None
-
-    with open(conf_path) as f:
-        if yaml:
-            return yaml.safe_load(f)
-        else:
-            return json.load(f)
+    # Only used by mrjob tests and possibly third parties.
+    log.warn('mrjob.conf.load_mrjob_conf is deprecated.')
+    conf_path = real_mrjob_conf_path(conf_path)
+    return conf_object_at_path(conf_path)
 
 
-def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
-    """Load the options to initialize a runner from mrjob.conf, or return
-    ``{}`` if we can't find them.
+def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
+                              already_loaded=None):
+    """Load a list of dictionaries representing the options in a given
+    mrjob.conf for a specific runner. Returns ``[(path, values)]``. If conf_path
+    is not found, return [(None, {})].
 
+    :type runner_alias: str
+    :param runner_alias: String identifier of the runner type, e.g. ``emr``,
+                         ``local``, etc.
     :type conf_path: str
     :param conf_path: an alternate place to look for mrjob.conf. If this is
                       ``False``, we'll always return ``{}``.
+    :type already_loaded: list
+    :param already_loaded: list of :file:`mrjob.conf` paths that have already
+                           been loaded
     """
-    conf = load_mrjob_conf(conf_path=conf_path)
+    # Used to use load_mrjob_conf() here, but we need both the 'real' path and
+    # the conf object, which we can't get cleanly from load_mrjob_conf.  This
+    # means load_mrjob_conf() is basically useless now except for in tests,
+    # but it's exposed in the API, so we shouldn't kill it until 0.4 at least.
+    conf_path = real_mrjob_conf_path(conf_path)
+    conf = conf_object_at_path(conf_path)
+
     if conf is None:
-        return {}
+        return [(None, {})]
+
+    if already_loaded is None:
+        already_loaded = []
+
+    already_loaded.append(conf_path)
 
     try:
-        return conf['runners'][runner_alias] or {}
+        values = conf['runners'][runner_alias] or {}
     except (KeyError, TypeError, ValueError):
-        log.warning('no configs for runner type %r; returning {}' %
-                    runner_alias)
-        return {}
+        log.warning('no configs for runner type %r in %s; returning {}' %
+                    (runner_alias, conf_path))
+        values = {}
+
+    inherited = []
+    if conf.get('include', None):
+        includes = conf['include']
+        if isinstance(includes, basestring):
+            includes = [includes]
+
+        for include in includes:
+            if include in already_loaded:
+                log.warn('%s tries to recursively include %s! (Already included:'
+                         ' %s)' % (conf_path, conf['include'],
+                                   ', '.join(already_loaded)))
+            else:
+                inherited.extend(load_opts_from_mrjob_conf(
+                                    runner_alias, include, already_loaded))
+    return inherited + [(conf_path, values)]
 
 
 def dump_mrjob_conf(conf, f):
@@ -430,3 +384,32 @@ def combine_opts(combiners, *opts_list):
         final_opts[key] = combine_func(*values)
 
     return final_opts
+
+
+### PRIORITY ###
+
+
+def calculate_opt_priority(opts, opt_dicts):
+    """Keep track of where in the order opts were specified,
+    to handle opts that affect the same thing (e.g. ec2_*instance_type).
+
+    Here is a rough guide to the values set by this function. They are
+
+        Where specified     Priority
+        unset everywhere    -1
+        blank               0
+        non-blank default   1
+        base conf file      2
+        inheriting conf     [3-n]
+        command line        n+1
+
+    :type opts: iterable
+    :type opt_dicts: list of dicts with keys also appearing in **opts**
+    """
+    opt_priority = dict((opt, -1) for opt in opts)
+    for priority, opt_dict in enumerate(opt_dicts):
+        if opt_dict:
+            for opt, value in opt_dict.iteritems():
+                if value is not None:
+                    opt_priority[opt] = priority
+    return opt_priority

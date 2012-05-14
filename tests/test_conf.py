@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -141,30 +141,37 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         with open(dot_mrjob_path, 'w') as f:
             f.write('{"runners": {"foo": {"bar": "baz"}}}')
 
-        self.assertEqual(load_mrjob_conf(),
-                         {'runners': {'foo': {'bar': 'baz'}}})
-        self.assertEqual(load_opts_from_mrjob_conf('foo'), {'bar': 'baz'})
+        with no_handlers_for_logger('mrjob.conf'):
+            self.assertEqual(load_mrjob_conf(),
+                             {'runners': {'foo': {'bar': 'baz'}}})
+        self.assertEqual(load_opts_from_mrjob_conf('foo')[0][1],
+                         {'bar': 'baz'})
 
     def test_load_mrjob_conf_and_load_opts(self):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf.2')
         with open(conf_path, 'w') as f:
             f.write('{"runners": {"foo": {"qux": "quux"}}}')
 
-        self.assertEqual(load_mrjob_conf(conf_path=conf_path),
-                         {'runners': {'foo': {'qux': 'quux'}}})
-        self.assertEqual(load_opts_from_mrjob_conf('foo', conf_path=conf_path),
-                         {'qux': 'quux'})
+        with no_handlers_for_logger('mrjob.conf'):
+            self.assertEqual(
+                load_mrjob_conf(conf_path=conf_path),
+                {'runners': {'foo': {'qux': 'quux'}}})
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path=conf_path)[0][1],
+            {'qux': 'quux'})
         # test missing options
         with logger_disabled('mrjob.conf'):
             self.assertEqual(
-                load_opts_from_mrjob_conf('bar', conf_path=conf_path), {})
+                load_opts_from_mrjob_conf('bar', conf_path=conf_path)[0][1],
+                {})
 
     def test_round_trip(self):
         conf = {'runners': {'foo': {'qux': 'quux'}}}
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
         dump_mrjob_conf(conf, open(conf_path, 'w'))
-        self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
+        with no_handlers_for_logger('mrjob.conf'):
+            self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
 
 
 class MRJobConfDeprecatedLocationTestCase(MRJobConfTestCase):
@@ -233,6 +240,8 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         super(MRJobConfNoYAMLTestCase, self).tearDown()
 
     def blank_out_yaml(self):
+        # This test doesn't care if you have YAML or not, but if you do, get
+        # rid of it temporarily
         self._real_yaml = mrjob.conf.yaml
         mrjob.conf.yaml = None
 
@@ -244,10 +253,28 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
         dump_mrjob_conf(conf, open(conf_path, 'w'))
-        contents = open(conf_path).read()
+        with open(conf_path) as f:
+            contents = f.read()
 
         self.assertEqual(contents.replace(' ', '').replace('\n', ''),
                          '{"runners":{"foo":{"qux":"quux"}}}')
+
+    def test_json_error(self):
+        conf = """
+            runners:
+                foo:
+                    qux: quux
+        """
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(conf_path, 'w') as f:
+            f.write(conf)
+
+        try:
+            load_mrjob_conf(conf_path)
+            assert False
+        except mrjob.conf.json.JSONDecodeError, e:
+            self.assertIn('If your mrjob.conf is in YAML', e.msg)
 
 
 class CombineValuesTestCase(unittest.TestCase):

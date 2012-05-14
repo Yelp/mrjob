@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -357,8 +357,6 @@ class MRJob(object):
         raise NotImplementedError
 
     ### Defining multi-step jobs ###
-
-    # Don't redefine this; use it inside steps()
 
     def steps(self):
         """Re-define this to make a multi-step job.

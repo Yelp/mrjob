@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -195,14 +195,28 @@ def s3_key_to_uri(s3_key):
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
 
+# AWS actually gives dates in two formats, and we only recently started using
+# API calls that return the second. So the date parsing function is called
+# iso8601_to_*, but it also parses RFC1123.
+# Until boto starts seamlessly parsing these, we check for them ourselves.
+
+# Thu, 29 Mar 2012 04:55:44 GMT
+RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
+
 def iso8601_to_timestamp(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
-    return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
+    try:
+        return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
+    except ValueError:
+        return time.mktime(time.strptime(iso8601_time, RFC1123))
 
 
 def iso8601_to_datetime(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
-    return datetime.strptime(iso8601_time, boto.utils.ISO8601)
+    try:
+        return datetime.strptime(iso8601_time, boto.utils.ISO8601)
+    except ValueError:
+        return datetime.strptime(iso8601_time, RFC1123)
 
 
 def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
@@ -281,11 +295,22 @@ def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
     return s3_tmp_uri + 'locks/' + emr_job_flow_id + '/' + str(step_num)
 
 
-def _lock_acquire_step_1(s3_conn, lock_uri, job_name):
+def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
     bucket_name, key_prefix = parse_s3_uri(lock_uri)
     bucket = s3_conn.get_bucket(bucket_name)
     key = bucket.get_key(key_prefix)
-    if key is None:
+
+    # EMRJobRunner should start using a job flow within about a second of
+    # locking it, so if it's been a while, then it probably crashed and we
+    # can just use this job flow.
+    key_expired = False
+    if key and mins_to_expiration is not None:
+        last_modified = iso8601_to_datetime(key.last_modified)
+        age = datetime.utcnow() - last_modified
+        if age > timedelta(minutes=mins_to_expiration):
+            key_expired = True
+
+    if key is None or key_expired:
         key = bucket.new_key(key_prefix)
         key.set_contents_from_string(job_name)
         return key
@@ -298,11 +323,12 @@ def _lock_acquire_step_2(key, job_name):
     return (key_value == job_name)
 
 
-def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name):
+def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name,
+                            mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
-    key = _lock_acquire_step_1(s3_conn, lock_uri, job_name)
+    key = _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration)
     if key is not None:
         time.sleep(sync_wait_time)
         success = _lock_acquire_step_2(key, job_name)
@@ -345,7 +371,7 @@ class EMRJobRunner(MRJobRunner):
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.emr.EMRJobRunner` takes the same arguments as
         :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
-        which can be defaulted in :py:mod:`mrjob.conf`.
+        which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
 
         *aws_access_key_id* and *aws_secret_access_key* are required if you
         haven't set them up already for boto (e.g. by setting the environment
@@ -545,7 +571,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         :param pool_emr_job_flows: Try to run the job on a ``WAITING`` pooled
                                    job flow with the same bootstrap
                                    configuration. Prefer the one with the most
-                                   compute units. Use S3 to "lock" the job flo
+                                   compute units. Use S3 to "lock" the job flow
                                    and ensure that the job is not scheduled
                                    behind another job. If no suitable job flow
                                    is `WAITING`, create a new pooled job flow.
@@ -831,7 +857,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             # issue a warning if we used both kinds of instance number
             # options on the command line or in mrjob.conf
             if (self._opt_priority['num_ec2_instances'] >= 2 and
-                self._opt_priority['num_ec2_instances'] ==
+                self._opt_priority['num_ec2_instances'] <=
                 max(self._opt_priority['num_ec2_core_instances'],
                     self._opt_priority['num_ec2_task_instances'])):
                 log.warn('Mixing num_ec2_instances and'
@@ -854,8 +880,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 self._opts['ec2_slave_instance_type'] = ec2_instance_type
 
             # master instance only does work when it's the only instance
-            if (self._opts['num_ec2_core_instances'] == 0 and
-                self._opts['num_ec2_task_instances'] == 0 and
+            if (self._opts['num_ec2_core_instances'] <= 0 and
+                self._opts['num_ec2_task_instances'] <= 0 and
                 (self._opt_priority['ec2_instance_type'] >
                  self._opt_priority['ec2_master_instance_type'])):
                 self._opts['ec2_master_instance_type'] = ec2_instance_type
@@ -1920,7 +1946,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def _fetch_counters_ssh(self, step_nums):
         uris = list(self.ls_job_logs_ssh(step_nums))
         log.info('Fetching counters from SSH...')
-        return scan_for_counters_in_files(uris, self)
+        return scan_for_counters_in_files(uris, self,
+                                          self.get_hadoop_version())
 
     def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
         job_flow = self._describe_jobflow()
@@ -1938,7 +1965,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         try:
             uris = self.ls_job_logs_s3(step_nums)
-            return scan_for_counters_in_files(uris, self)
+            return scan_for_counters_in_files(uris, self,
+                                              self.get_hadoop_version())
         except LogFetchError, e:
             log.info("Unable to fetch counters: %s" % e)
             return {}
@@ -2264,6 +2292,12 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             if len(job_flow.steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
                 return
 
+            # in rare cases, job flow can be WAITING *and* have incomplete
+            # steps
+            if any(getattr(step, 'enddatetime', None) is None
+                   for step in job_flow.steps):
+                return
+
             # total compute units per group
             role_to_cu = defaultdict(float)
             # total number of instances of the same type in each group.
@@ -2360,18 +2394,20 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 num_steps=num_steps)
             if sorted_tagged_job_flows:
                 job_flow = sorted_tagged_job_flows[-1]
-                lock_uri = make_lock_uri(self._opts['s3_scratch_uri'],
-                                         job_flow.jobflowid,
-                                        len(job_flow.steps) + 1)
                 status = attempt_to_acquire_lock(
-                    s3_conn, lock_uri, self._opts['s3_sync_wait_time'],
-                    self._job_name)
+                    s3_conn, self._lock_uri(job_flow),
+                    self._opts['s3_sync_wait_time'], self._job_name)
                 if status:
                     return sorted_tagged_job_flows[-1]
                 else:
                     exclude.add(job_flow.jobflowid)
             else:
                 return None
+
+    def _lock_uri(self, job_flow):
+        return make_lock_uri(self._opts['s3_scratch_uri'],
+                             job_flow.jobflowid,
+                             len(job_flow.steps) + 1)
 
     def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to

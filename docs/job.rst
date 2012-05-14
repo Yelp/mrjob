@@ -1,5 +1,5 @@
-mrjob.job.MRJob - base class for all jobs
-=========================================
+MRJob - Base class for all jobs
+===============================
 
 .. py:module:: mrjob.job
 
@@ -179,6 +179,7 @@ Running specific parts of jobs
 .. automethod:: MRJob.run_job
 .. automethod:: MRJob.run_mapper
 .. automethod:: MRJob.run_reducer
+.. automethod:: MRJob.run_combiner
 .. automethod:: MRJob.show_steps
 
 .. _hadoop-config:

@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ HADOOP_RMR_NO_SUCH_FILE = re.compile(r'^rmr: hdfs://.*$')
 
 # used to extract the job timestamp from stderr
 HADOOP_JOB_TIMESTAMP_RE = re.compile(
-    'Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
+    r'(INFO: )?Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
 
 # find version string in "Hadoop 0.20.203" etc.
 HADOOP_VERSION_RE = re.compile(r'^.*?(?P<version>(\d|\.)+).*?$')
@@ -112,7 +112,7 @@ class HadoopJobRunner(MRJobRunner):
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments
         as :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
-        which can be defaulted in :py:mod:`mrjob.conf`.
+        which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
 
         *output_dir* and *hdfs_scratch_dir* need not be fully qualified
         ``hdfs://`` URIs because it's understood that they have to be on
@@ -635,7 +635,8 @@ class HadoopJobRunner(MRJobRunner):
                                              HADOOP_JOB_LOG_URI_RE,
                                              step_nums)
         uris = list(job_logs)
-        new_counters = scan_for_counters_in_files(uris, self)
+        new_counters = scan_for_counters_in_files(uris, self,
+                                                  self.get_hadoop_version())
 
         # only include steps relevant to the current job
         for step_num in step_nums:

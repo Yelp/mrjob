@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,13 +34,14 @@ except ImportError:
 
 from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
+from mrjob.util import extract_dir_for_tar
 from mrjob.util import file_ext
-from mrjob.util import scrape_options_into_new_groups
+from mrjob.util import parse_and_save_options
+from mrjob.util import read_file
 from mrjob.util import read_input
 from mrjob.util import safeeval
+from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import tar_and_gzip
-from mrjob.util import read_file
-from mrjob.util import extract_dir_for_tar
 from mrjob.util import unarchive
 
 
@@ -144,6 +145,27 @@ class OptionScrapingTestCase(unittest.TestCase):
         self.assertEqual(target_3, self.new_group_2.option_list)
         options, args = self.new_parser.parse_args(['-x', 'happy'])
         self.assertEqual(options.x, 'happy')
+
+    def test_parse_and_save_simple(self):
+        args = ['x.py', '-b', '-a', '--no-a', '-x', 'x', '-y', 'y', '-x', 'z']
+        self.assertEqual(
+            dict(parse_and_save_options(self.original_parser, args)),
+            {
+                'a': ['-b', '-a', '--no-a'],
+                'x': ['-x', 'x', '-x', 'z'],
+                'y': ['-y', 'y']
+            })
+
+    def test_parse_and_save_with_dashes(self):
+        args = ['x.py', '-b', '-a', '--no-a', '-x', 'x', '-y', 'y', '-x', 'z',
+                '--', 'ignore', 'these', 'args']
+        self.assertEqual(
+            dict(parse_and_save_options(self.original_parser, args)),
+            {
+                'a': ['-b', '-a', '--no-a'],
+                'x': ['-x', 'x', '-x', 'z'],
+                'y': ['-y', 'y']
+            })
 
 
 class ReadInputTestCase(unittest.TestCase):

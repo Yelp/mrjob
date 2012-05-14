@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ except ImportError:
     boto = None
 
 from mrjob.conf import combine_values
+from mrjob.emr import RFC1123
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 
@@ -72,11 +73,12 @@ def err_xml(message, type='Sender', code='ValidationError'):
 
 ### S3 ###
 
-def add_mock_s3_data(mock_s3_fs, data):
+def add_mock_s3_data(mock_s3_fs, data, time_modified=None):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
     key to contents) with a map from bucket name to key name to data and
     time last modified."""
-    time_modified = to_iso8601(datetime.utcnow())
+    if time_modified is None:
+        time_modified = datetime.utcnow()
     for bucket_name, key_name_to_bytes in data.iteritems():
         mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
@@ -149,7 +151,7 @@ class MockBucket:
 
     def get_key(self, key_name):
         if key_name in self.mock_state():
-            return MockKey(bucket=self, name=key_name)
+            return MockKey(bucket=self, name=key_name, date_to_str=to_rfc1123)
         else:
             return None
 
@@ -162,18 +164,20 @@ class MockBucket:
     def list(self, prefix=''):
         for key_name in sorted(self.mock_state()):
             if key_name.startswith(prefix):
-                yield MockKey(bucket=self, name=key_name)
+                yield MockKey(bucket=self, name=key_name,
+                              date_to_str=to_iso8601)
 
 
 class MockKey(object):
     """Mock out boto.s3.Key"""
 
-    def __init__(self, bucket=None, name=None):
+    def __init__(self, bucket=None, name=None, date_to_str=None):
         """You can optionally specify a 'data' argument, which will fill
         the key with mock data.
         """
         self.bucket = bucket
         self.name = name
+        self.date_to_str = date_to_str or to_iso8601
 
     def read_mock_data(self):
         """Read the bytes for this key out of the fake boto state."""
@@ -184,8 +188,7 @@ class MockKey(object):
 
     def write_mock_data(self, data):
         if self.name in self.bucket.mock_state():
-            self.bucket.mock_state()[self.name] = (data,
-                        to_iso8601(datetime.utcnow()))
+            self.bucket.mock_state()[self.name] = (data, datetime.utcnow())
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -221,7 +224,7 @@ class MockKey(object):
 
     def _get_last_modified(self):
         if self.name in self.bucket.mock_state():
-            return self.bucket.mock_state()[self.name][1]
+            return self.date_to_str(self.bucket.mock_state()[self.name][1])
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -229,8 +232,7 @@ class MockKey(object):
     def _set_last_modified(self, time_modified):
         if self.name in self.bucket.mock_state():
             data = self.bucket.mock_state()[self.name][0]
-            self.bucket.mock_state()[self.name] = (data,
-                        to_iso8601(time_modified))
+            self.bucket.mock_state()[self.name] = (data, time_modified)
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -254,6 +256,14 @@ def to_iso8601(when):
     """Convert a datetime to ISO8601 format.
     """
     return when.strftime(boto.utils.ISO8601)
+
+def to_rfc1123(when):
+    """Convert a datetime to RFC1123 format.
+    """
+    # AWS sends us a time zone in all cases, but in Python it's more
+    # annoying to figure out time zones, so just fake it.
+    assert when.tzinfo is None
+    return when.strftime(RFC1123) + 'GMT'
 
 
 class MockEmrConnection(object):

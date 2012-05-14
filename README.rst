@@ -3,9 +3,14 @@ mrjob
 
 .. image:: http://github.com/yelp/mrjob/raw/master/docs/logos/logo_medium.png
 
-mrjob is a Python package that helps you write and run Hadoop Streaming jobs.
+mrjob is a Python 2.5+ package that helps you write and run Hadoop Streaming
+jobs.
 
-mrjob fully supports Amazon's Elastic MapReduce (EMR) service, which allows you to buy time on a Hadoop cluster on an hourly basis. It also works with your own Hadoop cluster.
+`Main documentation <http://packages.python.org/mrjob/>`_
+
+mrjob fully supports Amazon's Elastic MapReduce (EMR) service, which allows you
+to buy time on a Hadoop cluster on an hourly basis. It also works with your own
+Hadoop cluster.
 
 Some important features:
 
@@ -21,14 +26,53 @@ Some important features:
 * SSH tunnel to hadoop job tracker on EMR
 * Minimal setup
     * To run on EMR, set ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY``
-    * To run on your Hadoop cluster, install ``simplejson`` and make sure ``$HADOOP_HOME`` is set.
+    * To run on your Hadoop cluster, install ``simplejson`` and make sure
+      ``$HADOOP_HOME`` is set.
 
 Installation
 ------------
 
+From PyPI:
+
+``pip install mrjob``
+
+From source:
+
 ``python setup.py install``
 
-Try it out!
+
+A Simple Map Reduce Job
+-----------------------
+
+Code for this example and more live in ``mrjob/examples``.
+
+::
+
+   """The classic MapReduce job: count the frequency of words. 
+   """
+   from mrjob.job import MRJob
+   import re
+
+   WORD_RE = re.compile(r"[\w']+")
+
+
+   class MRWordFreqCount(MRJob):
+
+       def mapper(self, _, line):
+           for word in WORD_RE.findall(line):
+               yield (word.lower(), 1)
+
+       def combiner(self, word, counts):
+           yield (word, sum(counts))
+
+       def reducer(self, word, counts):
+           yield (word, sum(counts))
+
+
+    if __name__ == '__main__':
+        MRWordFreqCount.run()
+
+Try It Out!
 -----------
 
 ::
@@ -45,22 +89,24 @@ Setting up EMR on Amazon
 
 * create an `Amazon Web Services account <http://aws.amazon.com/>`_
 * sign up for `Elastic MapReduce <http://aws.amazon.com/elasticmapreduce/>`_
-* Get your access and secret keys (click "Security Credentials" on `your account page <http://aws.amazon.com/account/>`_)
-* Set the environment variables ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY`` accordingly
+* Get your access and secret keys (click "Security Credentials" on
+  `your account page <http://aws.amazon.com/account/>`_)
+* Set the environment variables ``$AWS_ACCESS_KEY_ID`` and
+  ``$AWS_SECRET_ACCESS_KEY`` accordingly
 
 Advanced Configuration
 ----------------------
+
 To run in other AWS regions, upload your source tree, run ``make``, and use 
 other advanced mrjob features, you'll need to set up ``mrjob.conf``. mrjob looks 
 for its conf file in:
 
 * The contents of ``$MRJOB_CONF``
 * ``~/.mrjob.conf``
-* ``~/.mrjob`` (deprecated)
-* ``mrjob.conf`` anywhere in your ``$PYTHONPATH`` (deprecated)
 * ``/etc/mrjob.conf``
 
-See ``mrjob.conf.example`` for more information.
+See `the mrjob.conf documentation
+<http://packages.python.org/mrjob/configs-conf.html>`_ for more information.
 
 
 Links
@@ -71,5 +117,7 @@ Links
 * discussion group: <http://groups.google.com/group/mrjob>
 * Hadoop MapReduce: <http://hadoop.apache.org/mapreduce/>
 * Elastic MapReduce: <http://aws.amazon.com/documentation/elasticmapreduce/>
+* PyCon 2011 mrjob overview: <http://blip.tv/pycon-us-videos-2009-2010-2011/pycon-2011-mrjob-distributed-computing-for-everyone-4898987/>
 
-Thanks to `Greg Killion <mailto:greg@blind-works.net>`_ (`blind-works.net <http://www.blind-works.net/>`_) for the logo.
+Thanks to `Greg Killion <mailto:greg@blind-works.net>`_
+(`blind-works.net <http://www.blind-works.net/>`_) for the logo.

@@ -40,8 +40,8 @@ import mrjob
 from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
 from mrjob.emr import EMRJobRunner
-from mrjob.emr import describe_all_job_flows
 from mrjob.emr import attempt_to_acquire_lock
+from mrjob.emr import describe_all_job_flows
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
 from mrjob.parse import JOB_NAME_RE
@@ -87,13 +87,17 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         self.unsandbox_boto()
         self.rm_mrjob_conf()
 
+    def mrjob_conf_contents(self):
+        return {'runners': {'emr': {
+                'check_emr_status_every': 0.00,
+                's3_sync_wait_time': 0.00,
+                'bootstrap_mrjob': False,
+            }}}
+
     def make_mrjob_conf(self):
         _, self.mrjob_conf_path = tempfile.mkstemp(prefix='mrjob.conf.')
         with open(self.mrjob_conf_path, 'w') as f:
-            dump_mrjob_conf({'runners': {'emr': {
-                'check_emr_status_every': 0.01,
-                's3_sync_wait_time': 0.01,
-            }}}, f)
+            dump_mrjob_conf(self.mrjob_conf_contents(), f)
 
     def rm_mrjob_conf(self):
         os.unlink(self.mrjob_conf_path)
@@ -130,10 +134,10 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         boto_2_1_1_83aae37b.EmrConnection = (
             self._real_boto_2_1_1_83aae37b_EmrConnection)
 
-    def add_mock_s3_data(self, data):
+    def add_mock_s3_data(self, data, time_modified=None):
         """Update self.mock_s3_fs with a map from bucket name
         to key name to data."""
-        add_mock_s3_data(self.mock_s3_fs, data)
+        add_mock_s3_data(self.mock_s3_fs, data, time_modified)
 
     def prepare_runner_for_ssh(self, runner, num_slaves=0):
         # Set up environment variables
@@ -203,8 +207,8 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
     def put_additional_emr_info_in_mrjob_conf(self):
         with open(self.mrjob_conf_path, 'w') as f:
             dump_mrjob_conf({'runners': {'emr': {
-                'check_emr_status_every': 0.01,
-                's3_sync_wait_time': 0.01,
+                'check_emr_status_every': 0.00,
+                's3_sync_wait_time': 0.00,
                 'additional_emr_info': {'key': 'value'},
             }}}, f)
 
@@ -457,7 +461,7 @@ class S3ScratchURITestCase(MockEMRAndS3TestCase):
         # "walrus" bucket will be ignored; it doesn't start with "mrjob-"
         self.add_mock_s3_data({'walrus': {}, 'zebra': {}})
 
-        runner = EMRJobRunner(conf_path=False, s3_sync_wait_time=0.01)
+        runner = EMRJobRunner(conf_path=False, s3_sync_wait_time=0.00)
 
         # bucket name should be mrjob- plus 16 random hex digits
         s3_scratch_uri = runner._opts['s3_scratch_uri']
@@ -651,8 +655,8 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
 
     def put_availability_zone_in_mrjob_conf(self):
         dump_mrjob_conf({'runners': {'emr': {
-            'check_emr_status_every': 0.01,
-            's3_sync_wait_time': 0.01,
+            'check_emr_status_every': 0.00,
+            's3_sync_wait_time': 0.00,
             'aws_availability_zone': 'PUPPYLAND',
         }}}, open(self.mrjob_conf_path, 'w'))
 
@@ -900,8 +904,8 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self.assertEqual(expected_instance_count, job_flow.instancecount)
 
     def set_in_mrjob_conf(self, **kwargs):
-        emr_opts = {'check_emr_status_every': 0.01,
-                    's3_sync_wait_time': 0.01}
+        emr_opts = {'check_emr_status_every': 0.00,
+                    's3_sync_wait_time': 0.00}
         emr_opts.update(kwargs)
         with open(self.mrjob_conf_path, 'w') as f:
             dump_mrjob_conf({'runners': {'emr': emr_opts}}, f)
@@ -1767,7 +1771,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
         runner = EMRJobRunner(conf_path=False,
                               bootstrap_actions=bootstrap_actions,
-                              s3_sync_wait_time=0.01)
+                              s3_sync_wait_time=0.00)
 
         job_flow_id = runner.make_persistent_job_flow()
 
@@ -1832,7 +1836,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
         runner = EMRJobRunner(conf_path=False,
                               bootstrap_actions=bootstrap_actions,
-                              s3_sync_wait_time=0.01)
+                              s3_sync_wait_time=0.00)
 
         job_flow_id = runner.make_persistent_job_flow()
 
@@ -1998,6 +2002,12 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             self.teardown_ssh()
         except (OSError, AttributeError):
             pass  # didn't set up SSH
+
+    def mrjob_conf_contents(self):
+        return {'runners': {'emr': {
+                'check_emr_status_every': 0.00,
+                's3_sync_wait_time': 0.00,
+            }}}
 
     def make_pooled_job_flow(self, name=None, minutes_ago=0, **kwargs):
         """Returns ``(runner, job_flow_id)``. Set minutes_ago to set
@@ -2344,8 +2354,8 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         # turn on pooling in mrjob.conf
         with open(self.mrjob_conf_path, 'w') as f:
             dump_mrjob_conf({'runners': {'emr': {
-                'check_emr_status_every': 0.01,
-                's3_sync_wait_time': 0.01,
+                'check_emr_status_every': 0.00,
+                's3_sync_wait_time': 0.00,
                 'pool_emr_job_flows': True,
             }}}, f)
 
@@ -2389,10 +2399,27 @@ class PoolingTestCase(MockEMRAndS3TestCase):
                 state='COMPLETED',
                 name='dummy',
                 actiononfailure='CANCEL_AND_WAIT',
+                enddatetime='definitely not none',
                 args=[])]
 
         # a one-step job should fit
         self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--pool-name', 'pool1',
+            '-c', self.mrjob_conf_path],
+            job_class=MRWordCount)
+
+    def test_dont_join_idle_with_steps(self):
+        dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
+
+        self.mock_emr_job_flows[job_flow_id].steps = [
+            MockEmrObject(
+                state='WAITING',
+                name='dummy',
+                actiononfailure='CANCEL_AND_WAIT',
+                args=[])]
+
+        self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--pool-name', 'pool1',
             '-c', self.mrjob_conf_path],
@@ -2593,8 +2620,11 @@ class S3LockTestCase(MockEMRAndS3TestCase):
         self.make_buckets()
 
     def make_buckets(self):
-        self.add_mock_s3_data({'locks': {}})
+        self.add_mock_s3_data({'locks': {
+            'expired_lock': 'x',
+        }}, datetime.utcnow() - timedelta(minutes=30))
         self.lock_uri = 's3://locks/some_lock'
+        self.expired_lock_uri = 's3://locks/expired_lock'
 
     def test_lock(self):
         # Most basic test case
@@ -2606,6 +2636,14 @@ class S3LockTestCase(MockEMRAndS3TestCase):
 
         self.assertEqual(
             False, attempt_to_acquire_lock(s3_conn, self.lock_uri, 0, 'jf2'))
+
+    def test_lock_expiration(self):
+        runner = EMRJobRunner(conf_path=False)
+        s3_conn = runner.make_s3_conn()
+        did_lock = attempt_to_acquire_lock(
+            s3_conn, self.expired_lock_uri, 0, 'jf1',
+            mins_to_expiration=5)
+        self.assertEqual(True, did_lock)
 
     def test_key_race_condition(self):
         # Test case where one attempt puts the key in existence

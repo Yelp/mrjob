@@ -152,6 +152,15 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             },
         }, time_modified=datetime.utcnow()-timedelta(minutes=5))
 
+        # idle job flow with an expired lock
+        self.mock_emr_job_flows['j-IDLE_BUT_INCOMPLETE_STEPS'] = MockEmrObject(
+            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
+            readydatetime=to_iso8601(self.now - timedelta(hours=5, minutes=5)),
+            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
+            state='WAITING',
+            steps=[step(start_hours_ago=4, end_hours_ago=None)],
+        )
+
         # hive job flow (looks completed but isn't)
         self.mock_emr_job_flows['j-HIVE'] = MockEmrObject(
             creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
@@ -434,6 +443,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
             'j-HADOOP_DEBUGGING',
             'j-HIVE',
             'j-IDLE_AND_FAILED',
+            'j-IDLE_BUT_INCOMPLETE_STEPS',
             'j-PENDING_BUT_IDLE',
             'j-POOLED'
         ]
@@ -596,5 +606,13 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         stdout = StringIO()
         self.inspect_and_maybe_terminate_quietly(
             stdout=stdout, max_hours_idle=0.01)
-        output = 'Terminated job flow j-POOLED (Pooled Job Flow); was idle for 0:50:00, 0:05:00 to end of hour\nTerminated job flow j-PENDING_BUT_IDLE (Pending But Idle Job Flow); was pending for 2:50:00, 0:05:00 to end of hour\nTerminated job flow j-DEBUG_ONLY (Debug Only Job Flow); was idle for 2:00:00, 1:00:00 to end of hour\nTerminated job flow j-DONE_AND_IDLE (Done And Idle Job Flow); was idle for 2:00:00, 1:00:00 to end of hour\nTerminated job flow j-IDLE_AND_EXPIRED (Idle And Expired Job Flow); was idle for 2:00:00, 1:00:00 to end of hour\nTerminated job flow j-IDLE_AND_FAILED (Idle And Failed Job Flow); was idle for 3:00:00, 1:00:00 to end of hour\nTerminated job flow j-HADOOP_DEBUGGING (Hadoop Debugging Job Flow); was idle for 2:00:00, 1:00:00 to end of hour\nTerminated job flow j-EMPTY (Empty Job Flow); was idle for 10:00:00, 1:00:00 to end of hour\n'
+        output = """Terminated job flow j-POOLED (Pooled Job Flow); was idle for 0:50:00, 0:05:00 to end of hour
+Terminated job flow j-PENDING_BUT_IDLE (Pending But Idle Job Flow); was pending for 2:50:00, 0:05:00 to end of hour
+Terminated job flow j-DEBUG_ONLY (Debug Only Job Flow); was idle for 2:00:00, 1:00:00 to end of hour
+Terminated job flow j-DONE_AND_IDLE (Done And Idle Job Flow); was idle for 2:00:00, 1:00:00 to end of hour
+Terminated job flow j-IDLE_AND_EXPIRED (Idle And Expired Job Flow); was idle for 2:00:00, 1:00:00 to end of hour
+Terminated job flow j-IDLE_AND_FAILED (Idle And Failed Job Flow); was idle for 3:00:00, 1:00:00 to end of hour
+Terminated job flow j-HADOOP_DEBUGGING (Hadoop Debugging Job Flow); was idle for 2:00:00, 1:00:00 to end of hour
+Terminated job flow j-EMPTY (Empty Job Flow); was idle for 10:00:00, 1:00:00 to end of hour
+"""
         self.assertEqual(stdout.getvalue(), output)

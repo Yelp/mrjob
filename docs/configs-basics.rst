@@ -114,6 +114,8 @@ of them.
 See :doc:`configs-runners` for the entire dizzying array of configurable
 options.
 
+.. _multiple-config-files:
+
 Using multiple config files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

@@ -3,11 +3,14 @@ mrjob
 
 .. image:: http://github.com/yelp/mrjob/raw/master/docs/logos/logo_medium.png
 
-mrjob is a Python package that helps you write and run Hadoop Streaming jobs.
+mrjob is a Python 2.5+ package that helps you write and run Hadoop Streaming
+jobs.
 
 `Main documentation <http://packages.python.org/mrjob/>`_
 
-mrjob fully supports Amazon's Elastic MapReduce (EMR) service, which allows you to buy time on a Hadoop cluster on an hourly basis. It also works with your own Hadoop cluster.
+mrjob fully supports Amazon's Elastic MapReduce (EMR) service, which allows you
+to buy time on a Hadoop cluster on an hourly basis. It also works with your own
+Hadoop cluster.
 
 Some important features:
 
@@ -23,7 +26,8 @@ Some important features:
 * SSH tunnel to hadoop job tracker on EMR
 * Minimal setup
     * To run on EMR, set ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY``
-    * To run on your Hadoop cluster, install ``simplejson`` and make sure ``$HADOOP_HOME`` is set.
+    * To run on your Hadoop cluster, install ``simplejson`` and make sure
+      ``$HADOOP_HOME`` is set.
 
 Installation
 ------------

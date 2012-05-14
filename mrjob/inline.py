@@ -67,7 +67,7 @@ class InlineMRJobRunner(MRJobRunner):
           directory.
         """
         super(InlineMRJobRunner, self).__init__(**kwargs)
-        assert issubclass(mrjob_cls, MRJob)
+        assert ((mrjob_cls) is None or issubclass(mrjob_cls, MRJob))
 
         self._mrjob_cls = mrjob_cls
         self._prev_outfile = None

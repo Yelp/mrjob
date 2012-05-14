@@ -32,7 +32,9 @@ Options::
                         Max number of hours a job flow can go without
                         bootstrapping, running a step, or having a new step
                         created. This will fire even if there are pending
-                        steps which EMR has failed to start.
+                        steps which EMR has failed to start. Make sure you set
+                        this higher than the amount of time your jobs can take
+                        to start instances and bootstrap.
   --mins-to-end-of-hour=MINS_TO_END_OF_HOUR
                         Terminate job flows that are within this many minutes
                         of the end of a full hour since the job started
@@ -58,7 +60,6 @@ except ImportError:
 from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
-from mrjob.emr import make_lock_uri
 from mrjob.job import MRJob
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
@@ -93,7 +94,7 @@ def main():
         pool_name=options.pool_name,
         pooled_only=options.pooled_only,
         max_mins_locked=options.max_mins_locked,
-        quiet=options.quiet,
+        quiet=(options.quiet > 1),
     )
 
 
@@ -307,27 +308,32 @@ def terminate_and_notify(runner, to_terminate, dry_run=False,
         return
 
     for jf, pending, time_idle, time_to_end_of_hour in to_terminate:
+        fmt = ('Terminated job flow %s (%s); was %s for %s, %s to end of hour')
+        msg = fmt % (
+                jf.jobflowid, jf.name,
+                'pending' if pending else 'idle',
+                strip_microseconds(time_idle),
+                strip_microseconds(time_to_end_of_hour))
+
         did_terminate = False
         if not dry_run:
             status = attempt_to_acquire_lock(
                 runner.make_s3_conn(),
                 runner._lock_uri(jf),
                 runner._opts['s3_sync_wait_time'],
-                runner._make_unique_job_name(label='terminate'),
+                '%s (%s)' % (msg,
+                             runner._make_unique_job_name(label='terminate')),
                 mins_to_expiration=max_mins_locked,
             )
             if status:
                 runner.make_emr_conn().terminate_jobflow(jf.jobflowid)
                 did_terminate = True
+            elif not quiet:
+                log.info('%s was locked between getting job flow info and'
+                         ' trying to terminate it; skipping' % jf.jobflowid)
 
         if did_terminate and not quiet:
-            fmt = ('Terminated job flow %s (%s); was %s for %s, %s to end of'
-                   ' hour')
-            print fmt % (
-                    jf.jobflowid, jf.name,
-                    'pending' if pending else 'idle',
-                    strip_microseconds(time_idle),
-                    strip_microseconds(time_to_end_of_hour))
+            print msg
 
 
 def make_option_parser():
@@ -357,7 +363,8 @@ def make_option_parser():
         help=('Max number of hours a job flow can go without bootstrapping,'
               ' running a step, or having a new step created. This will fire'
               ' even if there are pending steps which EMR has failed to'
-              ' start.'))
+              ' start. Make sure you set this higher than the amount of time'
+              ' your jobs can take to start instances and bootstrap.'))
     option_parser.add_option(
         '--max-mins-locked', dest='max_mins_locked',
         default=DEFAULT_MAX_MINUTES_LOCKED, type='float',

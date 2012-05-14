@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -195,14 +195,28 @@ def s3_key_to_uri(s3_key):
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
 
+# AWS actually gives dates in two formats, and we only recently started using
+# API calls that return the second. So the date parsing function is called
+# iso8601_to_*, but it also parses RFC1123.
+# Until boto starts seamlessly parsing these, we check for them ourselves.
+
+# Thu, 29 Mar 2012 04:55:44 GMT
+RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
+
 def iso8601_to_timestamp(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
-    return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
+    try:
+        return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
+    except ValueError:
+        return time.mktime(time.strptime(iso8601_time, RFC1123))
 
 
 def iso8601_to_datetime(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
-    return datetime.strptime(iso8601_time, boto.utils.ISO8601)
+    try:
+        return datetime.strptime(iso8601_time, boto.utils.ISO8601)
+    except ValueError:
+        return datetime.strptime(iso8601_time, RFC1123)
 
 
 def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
@@ -557,7 +571,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         :param pool_emr_job_flows: Try to run the job on a ``WAITING`` pooled
                                    job flow with the same bootstrap
                                    configuration. Prefer the one with the most
-                                   compute units. Use S3 to "lock" the job flo
+                                   compute units. Use S3 to "lock" the job flow
                                    and ensure that the job is not scheduled
                                    behind another job. If no suitable job flow
                                    is `WAITING`, create a new pooled job flow.
@@ -2279,6 +2293,12 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
             # there is a hard limit of 256 steps per job flow
             if len(job_flow.steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
+                return
+
+            # in rare cases, job flow can be WAITING *and* have incomplete
+            # steps
+            if any(getattr(step, 'enddatetime', None) is None
+                   for step in job_flow.steps):
                 return
 
             # total compute units per group

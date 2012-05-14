@@ -162,6 +162,15 @@ Pooling is flexible about instance type and number of instances; it will attempt
 
 Amazon limits job flows to 256 steps total; pooling respects this and won't try to use pooled job flows that are "full." :py:mod:`mrjob` also uses an S3-based "locking" mechanism to prevent two jobs from simultaneously joining the same job flow. This is somewhat ugly but works in practice, and avoids :py:mod:`mrjob` depending on Amazon services other than EMR and S3.
 
+.. warning::
+
+    If S3 eventual consistency takes longer than *s3_sync_wait_time*, then you
+    may encounter race conditions when using pooling, e.g. two jobs claiming
+    the same job flow at the same time, or the idle job flow killer shutting
+    down your job before it has started to run. Regions with read-after-write
+    consistency (i.e. every region except US Standard) should not experience
+    these issues.
+
 .. _spot-instances:
 
 Spot Instances

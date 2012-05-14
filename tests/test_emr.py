@@ -70,8 +70,8 @@ from tests.quiet import no_handlers_for_logger
 try:
     import boto
     import boto.emr
-    import boto.emr.connection
     import boto.exception
+    from mrjob import boto_2_1_1_83aae37b
     boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     boto = None
@@ -122,15 +122,17 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         self._real_boto_connect_s3 = boto.connect_s3
         boto.connect_s3 = mock_boto_connect_s3
 
-        self._real_boto_EmrConnection = boto.emr.connection.EmrConnection
-        boto.emr.connection.EmrConnection = mock_boto_emr_EmrConnection
+        self._real_boto_2_1_1_83aae37b_EmrConnection = (
+            boto_2_1_1_83aae37b.EmrConnection)
+        boto_2_1_1_83aae37b.EmrConnection = mock_boto_emr_EmrConnection
 
         # copy the old environment just to be polite
         self._old_environ = os.environ.copy()
 
     def unsandbox_boto(self):
         boto.connect_s3 = self._real_boto_connect_s3
-        boto.emr.connection.EmrConnection = self._real_boto_EmrConnection
+        boto_2_1_1_83aae37b.EmrConnection = (
+            self._real_boto_2_1_1_83aae37b_EmrConnection)
 
     def add_mock_s3_data(self, data, time_modified=None):
         """Update self.mock_s3_fs with a map from bucket name

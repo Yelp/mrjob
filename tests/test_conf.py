@@ -44,6 +44,8 @@ from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
 from mrjob.conf import load_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
+from mrjob.inline import InlineMRJobRunner
+from mrjob.inline import InlineRunnerOptionStore
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 
@@ -550,3 +552,13 @@ class CombineAndExpandPathsTestCase(unittest.TestCase):
             [bar_path, foo_path, foo_path,
              os.path.join(self.tmp_dir, 'q*'),
              's3://walrus/foo'])
+
+
+class OptionStoreTestCase(unittest.TestCase):
+
+    def test_getattr_forward(self):
+        with no_handlers_for_logger():
+            r = InlineMRJobRunner()
+        store = r._opts
+        self.assertIsInstance(store, InlineRunnerOptionStore)
+        self.assertEqual(r.get_default_opts(), store.default_options())

@@ -468,10 +468,13 @@ class MRJobRunner(object):
         # rather than feed it multiple files
         self._sort_is_windows_sort = None
 
-    def __getattr__(self, name):
-        # For backward compatibility, forward get_default_opts()
-        if name == 'get_default_opts':
-            return self._opts.default_options
+    @classmethod
+    def get_default_opts(cls):
+        """.. deprecated:: 0.4.0
+
+        Get default options for this runner class, as a dict.
+        """
+        return cls.OPTION_STORE_CLASS(cls.alias, {}, None).default_options()
 
     ### Running the job and parsing output ###
 

@@ -561,5 +561,4 @@ class OptionStoreTestCase(unittest.TestCase):
             r = InlineMRJobRunner()
         store = r._opts
         self.assertIsInstance(store, InlineRunnerOptionStore)
-        self.assertEqual(r.get_default_opts, store.default_options)
         self.assertEqual(r.get_default_opts(), store.default_options())

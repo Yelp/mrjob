@@ -468,6 +468,11 @@ class MRJobRunner(object):
         # rather than feed it multiple files
         self._sort_is_windows_sort = None
 
+    def __getattr__(self, name):
+        # For backward compatibility, forward get_default_opts()
+        if name == 'get_default_opts':
+            return self._opts.default_options
+
     ### Running the job and parsing output ###
 
     def run(self):

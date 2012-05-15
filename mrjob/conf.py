@@ -38,6 +38,7 @@ try:
 except ImportError:
     yaml = None
 
+
 log = logging.getLogger('mrjob.conf')
 
 
@@ -94,7 +95,9 @@ class OptionStore(dict):
         else:
             raise KeyError(key)
 
+
 ### READING AND WRITING mrjob.conf ###
+
 
 def find_mrjob_conf():
     """Look for :file:`mrjob.conf`, and return its path. Places we look:
@@ -442,6 +445,7 @@ def combine_opts(combiners, *opts_list):
 ### PRIORITY ###
 
 
+# TODO 0.4: Move inside OptionStore
 def calculate_opt_priority(opts, opt_dicts):
     """Keep track of where in the order opts were specified,
     to handle opts that affect the same thing (e.g. ec2_*instance_type).

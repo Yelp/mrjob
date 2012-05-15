@@ -64,6 +64,7 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.multi import MultiFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
+from mrjob.fs.ssh import SSHFilesystem
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
@@ -1013,7 +1014,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     @property
     def fs(self):
-        if not hasattr(self, '_fs'):
+        if self._fs is None:
             if self._opts['s3_endpoint']:
                 s3_endpoint = self._opts['s3_endpoint']
             else:
@@ -1026,11 +1027,19 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                         " try setting s3_endpoint explicitly" % (
                             self._aws_region))
 
-            self._fs = MultiFilesystem(
-                S3Filesystem(self._opts['aws_access_key_id'],
-                             self._opts['aws_secret_access_key'],
-                             s3_endpoint),
-                LocalFilesystem())
+            self._s3_fs = S3Filesystem(self._opts['aws_access_key_id'],
+                                       self._opts['aws_secret_access_key'],
+                                       s3_endpoint)
+
+            if self._opts['ec2_key_pair_file']:
+                self._ssh_fs = SSHFilesystem(self._opts['ssh_bin'],
+                                             self._opts['ec2_key_pair_file'],
+                                             self._job_name + '.pem')
+                self._fs = MultiFilesystem(self._ssh_fs, self._s3_fs, LocalFilesystem())
+            else:
+                self._ssh_fs = None
+                self._fs = MultiFilesystem(self._s3_fs, LocalFilesystem())
+
         return self._fs
 
     def _run(self):
@@ -1217,8 +1226,11 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             random.setstate(random_state)
 
     def _enable_slave_ssh_access(self):
-        if not self._ssh_key_name:
+        if self._ssh_fs and not self._ssh_key_name:
             self._ssh_key_name = self._job_name + '.pem'
+            # also inject into the SSHFilesystem. there is probably a better
+            # way to handle this.
+            self._ssh_fs.ssh_key_name = self._ssh_key_name
             ssh_copy_key(
                 self._opts['ssh_bin'],
                 self._address_of_master(),
@@ -1832,15 +1844,22 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     ## SSH LOG FETCHING
 
+    def _ssh_path(self, relative):
+        return SSH_PREFIX + self._address_of_master() + SSH_LOG_ROOT + '/' + relative
+
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
-        full_path = SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path
-        log.debug('Search %s for logs' % full_path)
-        return self.ls(full_path)
+        try:
+            self._enable_slave_ssh_access()
+            log.debug('Search %s for logs' % self._ssh_path(relative_path))
+            return self.ls(self._ssh_path(relative_path))
+        except IOError, e:
+            raise LogFetchError(e)
 
     def _ls_slave_ssh_logs(self, addr, relative_path):
         """List logs over multi-hop SSH by path relative to log root directory
         """
+        self._enable_slave_ssh_access()
         root_path = '%s%s!%s%s' % (SSH_PREFIX,
                                    self._address_of_master(),
                                    addr,
@@ -1869,16 +1888,20 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                          step_nums)
 
     def ls_step_logs_ssh(self, step_nums):
-        return self._enforce_path_regexp(self._ls_ssh_logs('steps/'),
-                                         STEP_LOG_URI_RE,
-                                         step_nums)
+        self._enable_slave_ssh_access()
+        return self._enforce_path_regexp(
+            self._ls_ssh_logs('steps/'),
+            STEP_LOG_URI_RE,
+            step_nums)
 
     def ls_job_logs_ssh(self, step_nums):
+        self._enable_slave_ssh_access()
         return self._enforce_path_regexp(self._ls_ssh_logs('history/'),
                                          EMR_JOB_LOG_URI_RE,
                                          step_nums)
 
     def ls_node_logs_ssh(self):
+        self._enable_slave_ssh_access()
         all_paths = []
         for addr in self._addresses_of_slaves():
             logs = self._ls_slave_ssh_logs(addr, '')
@@ -1887,7 +1910,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     def ls_all_logs_ssh(self):
         """List all log files in the log root directory"""
-        return self.ls(SSH_PREFIX + SSH_LOG_ROOT)
+        return self._ls_ssh_logs('')
 
     ## S3 LOG FETCHING ##
 
@@ -2013,6 +2036,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             return self._find_probable_cause_of_failure_s3(step_nums)
 
     def _find_probable_cause_of_failure_ssh(self, step_nums):
+        self._enable_slave_ssh_access()
         task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
         step_logs = self.ls_step_logs_ssh(step_nums)
         job_logs = self.ls_job_logs_ssh(step_nums)

@@ -1,3 +1,16 @@
+# Copyright 2009-2012 Yelp and Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import fnmatch
 import logging
 import posixpath
@@ -20,16 +33,6 @@ from mrjob.util import read_file
 
 
 log = logging.getLogger('mrjob.fs.s3')
-
-# map from AWS region to S3 endpoint. See
-# http://docs.amazonwebservices.com/AmazonS3/latest/dev/MakingRequests.html#RequestEndpoints
-REGION_TO_S3_ENDPOINT = {
-    'EU': 's3-eu-west-1.amazonaws.com',
-    'us-east-1': 's3.amazonaws.com',  # no region-specific endpoint
-    'us-west-1': 's3-us-west-1.amazonaws.com',
-    'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com',  # no EMR endpoint yet
-    '': 's3.amazonaws.com',
-}
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?
 EMR_BACKOFF = 20
@@ -66,8 +69,7 @@ def wrap_aws_conn(raw_conn):
 
 class S3Filesystem(object):
 
-    def __init__(self, aws_access_key_id, aws_secret_access_key,
-                 s3_endpoint=None):
+    def __init__(self, aws_access_key_id, aws_secret_access_key, s3_endpoint):
         super(S3Filesystem, self).__init__()
         self._s3_endpoint = s3_endpoint
         self._aws_access_key_id = aws_access_key_id
@@ -81,7 +83,7 @@ class S3Filesystem(object):
         return sum(self.get_s3_key(uri).size for uri in self.ls(path_glob))
 
     def ls(self, path_glob):
-        """Recursively list files locally or on S3.
+        """Recursively list files on S3.
 
         This doesn't list "directories" unless there's actually a
         corresponding key ending with a '/' (which is weird and confusing;

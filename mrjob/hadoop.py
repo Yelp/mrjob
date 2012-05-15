@@ -21,12 +21,6 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
 
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
-
 from mrjob import compat
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -218,7 +212,7 @@ class HadoopJobRunner(MRJobRunner):
 
     @property
     def fs(self):
-        if not hasattr(self, '_fs'):
+        if self._fs is None:
             self._fs = MultiFilesystem(
                 HadoopFilesystem(self._opts['hadoop_bin']),
                 LocalFilesystem())
@@ -227,7 +221,7 @@ class HadoopJobRunner(MRJobRunner):
     def get_hadoop_version(self):
         """Invoke the hadoop executable to determine its version"""
         if not self._hadoop_version:
-            stdout = self._invoke_hadoop(['version'], return_stdout=True)
+            stdout = self.invoke_hadoop(['version'], return_stdout=True)
             if stdout:
                 first_line = stdout.split('\n')[0]
                 m = HADOOP_VERSION_RE.match(first_line)
@@ -312,11 +306,11 @@ class HadoopJobRunner(MRJobRunner):
 
     def _mkdir_on_hdfs(self, path):
         log.debug('Making directory %s on HDFS' % path)
-        self._invoke_hadoop(['fs', '-mkdir', path])
+        self.invoke_hadoop(['fs', '-mkdir', path])
 
     def _upload_to_hdfs(self, path, target):
         log.debug('Uploading %s -> %s on HDFS' % (path, target))
-        self._invoke_hadoop(['fs', '-put', path, target])
+        self.invoke_hadoop(['fs', '-put', path, target])
 
     def _dump_stdin_to_local_file(self):
         """Dump sys.stdin to a local file, and return the path to it."""
@@ -550,56 +544,6 @@ class HadoopJobRunner(MRJobRunner):
 
         return args
 
-    def _invoke_hadoop(self, args, ok_returncodes=None, ok_stderr=None,
-                       return_stdout=False):
-        """Run the given hadoop command, raising an exception on non-zero
-        return code. This only works for commands whose output we don't
-        care about.
-
-        Args:
-        ok_returncodes -- a list/tuple/set of return codes we expect to
-            get back from hadoop (e.g. [0,1]). By default, we only expect 0.
-            If we get an unexpected return code, we raise a CalledProcessError.
-        ok_stderr -- don't log STDERR or raise CalledProcessError if stderr
-            matches a regex in this list (even if the returncode is bad)
-        return_stdout -- return the stdout from the hadoop command rather
-            than logging it. If this is False, we return the returncode
-            instead.
-        """
-        args = self._opts['hadoop_bin'] + args
-
-        log.debug('> %s' % cmd_line(args))
-
-        proc = Popen(args, stdout=PIPE, stderr=PIPE)
-        stdout, stderr = proc.communicate()
-
-        log_func = log.debug if proc.returncode == 0 else log.error
-        if not return_stdout:
-            for line in StringIO(stdout):
-                log_func('STDOUT: ' + line.rstrip('\r\n'))
-
-        # check if STDERR is okay
-        stderr_is_ok = False
-        if ok_stderr:
-            for stderr_re in ok_stderr:
-                if stderr_re.match(stderr):
-                    stderr_is_ok = True
-                    break
-
-        if not stderr_is_ok:
-            for line in StringIO(stderr):
-                log_func('STDERR: ' + line.rstrip('\r\n'))
-
-        ok_returncodes = ok_returncodes or [0]
-
-        if not stderr_is_ok and proc.returncode not in ok_returncodes:
-            raise CalledProcessError(proc.returncode, args)
-
-        if return_stdout:
-            return stdout
-        else:
-            return proc.returncode
-
     def _cleanup_local_scratch(self):
         super(HadoopJobRunner, self)._cleanup_local_scratch()
 
@@ -607,7 +551,7 @@ class HadoopJobRunner(MRJobRunner):
             log.info('deleting %s from HDFS' % self._hdfs_tmp_dir)
 
             try:
-                self._invoke_hadoop(['fs', '-rmr', self._hdfs_tmp_dir])
+                self.invoke_hadoop(['fs', '-rmr', self._hdfs_tmp_dir])
             except Exception, e:
                 log.exception(e)
 

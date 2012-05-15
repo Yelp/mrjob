@@ -40,6 +40,7 @@ from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_uri
 from mrjob.parse import urlparse
 from mrjob.runner import MRJobRunner
+from mrjob.runner import RunnerOptionStore
 from mrjob.util import cmd_line
 from mrjob.util import read_file
 
@@ -98,6 +99,57 @@ def hadoop_log_dir():
         return os.path.join(os.environ['HADOOP_HOME'], 'logs')
 
 
+class HadoopRunnerOptionStore(RunnerOptionStore):
+
+    ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
+        'hadoop_bin',
+        'hadoop_home',
+        'hdfs_scratch_dir',
+    ]))
+
+    COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
+        'hadoop_bin': combine_cmds,
+        'hadoop_home': combine_paths,
+        'hdfs_scratch_dir': combine_paths,
+    })
+
+    def __init__(self, alias, opts, conf_path):
+        super(HadoopRunnerOptionStore, self).__init__(alias, opts, conf_path)
+
+        # fix hadoop_home
+        if not self['hadoop_home']:
+            raise Exception(
+                'you must set $HADOOP_HOME, or pass in hadoop_home explicitly')
+        self['hadoop_home'] = os.path.abspath(self['hadoop_home'])
+
+        # fix hadoop_bin
+        if not self['hadoop_bin']:
+            self['hadoop_bin'] = [
+                os.path.join(self['hadoop_home'], 'bin/hadoop')]
+
+        # fix hadoop_streaming_jar
+        if not self['hadoop_streaming_jar']:
+            log.debug('Looking for hadoop streaming jar in %s' %
+                      self['hadoop_home'])
+            self['hadoop_streaming_jar'] = find_hadoop_streaming_jar(
+                self['hadoop_home'])
+
+            if not self['hadoop_streaming_jar']:
+                raise Exception(
+                    "Couldn't find streaming jar in %s, bailing out" %
+                    self['hadoop_home'])
+
+        log.debug('Hadoop streaming jar is %s' %
+                  self['hadoop_streaming_jar'])
+
+    def default_options(self):
+        super_opts = super(HadoopRunnerOptionStore, self).default_options()
+        return combine_dicts(super_opts, {
+            'hadoop_home': os.environ.get('HADOOP_HOME'),
+            'hdfs_scratch_dir': 'tmp/mrjob',
+        })
+
+
 class HadoopJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.
 
@@ -108,6 +160,8 @@ class HadoopJobRunner(MRJobRunner):
     :py:meth:`~HadoopJobRunner.__init__` for details).
     """
     alias = 'hadoop'
+
+    OPTION_STORE_CLASS = HadoopRunnerOptionStore
 
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments
@@ -136,32 +190,6 @@ class HadoopJobRunner(MRJobRunner):
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 
-        # fix hadoop_home
-        if not self._opts['hadoop_home']:
-            raise Exception(
-                'you must set $HADOOP_HOME, or pass in hadoop_home explicitly')
-        self._opts['hadoop_home'] = os.path.abspath(self._opts['hadoop_home'])
-
-        # fix hadoop_bin
-        if not self._opts['hadoop_bin']:
-            self._opts['hadoop_bin'] = [
-                os.path.join(self._opts['hadoop_home'], 'bin/hadoop')]
-
-        # fix hadoop_streaming_jar
-        if not self._opts['hadoop_streaming_jar']:
-            log.debug('Looking for hadoop streaming jar in %s' %
-                      self._opts['hadoop_home'])
-            self._opts['hadoop_streaming_jar'] = find_hadoop_streaming_jar(
-                self._opts['hadoop_home'])
-
-            if not self._opts['hadoop_streaming_jar']:
-                raise Exception(
-                    "Couldn't find streaming jar in %s, bailing out" %
-                    self._opts['hadoop_home'])
-
-        log.debug('Hadoop streaming jar is %s' %
-                  self._opts['hadoop_streaming_jar'])
-
         self._hdfs_tmp_dir = fully_qualify_hdfs_path(
             posixpath.join(
             self._opts['hdfs_scratch_dir'], self._job_name))
@@ -186,34 +214,6 @@ class HadoopJobRunner(MRJobRunner):
 
         # init hadoop version cache
         self._hadoop_version = None
-
-    @classmethod
-    def _allowed_opts(cls):
-        """A list of which keyword args we can pass to __init__()"""
-        return super(HadoopJobRunner, cls)._allowed_opts() + [
-            'hadoop_bin',
-            'hadoop_home',
-            'hdfs_scratch_dir',
-        ]
-
-    @classmethod
-    def _default_opts(cls):
-        """A dictionary giving the default value of options."""
-        return combine_dicts(super(HadoopJobRunner, cls)._default_opts(), {
-            'hadoop_home': os.environ.get('HADOOP_HOME'),
-            'hdfs_scratch_dir': 'tmp/mrjob',
-        })
-
-    @classmethod
-    def _opts_combiners(cls):
-        """Map from option name to a combine_*() function used to combine
-        values for that option. This allows us to specify that some options
-        are lists, or contain environment variables, or whatever."""
-        return combine_dicts(super(HadoopJobRunner, cls)._opts_combiners(), {
-            'hadoop_bin': combine_cmds,
-            'hadoop_home': combine_paths,
-            'hdfs_scratch_dir': combine_paths,
-        })
 
     def get_hadoop_version(self):
         """Invoke the hadoop executable to determine its version"""

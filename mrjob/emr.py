@@ -1770,20 +1770,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 ['--step-num=%d' % step_num, '--combiner'] +
                 self._mr_job_extra_args())
 
-    def _upload_args(self):
-        """Args to upload files from S3 to the local nodes that EMR runs
-        on."""
-        args = []
-        for file_dict in self._files:
-            if file_dict.get('upload') == 'file':
-                args.append('--cache')
-                args.append('%s#%s' % (file_dict['s3_uri'], file_dict['name']))
-            elif file_dict.get('upload') == 'archive':
-                args.append('--cache-archive')
-                args.append('%s#%s' % (file_dict['s3_uri'], file_dict['name']))
-
-        return args
-
     def _s3_step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""
         if step_num == 0:

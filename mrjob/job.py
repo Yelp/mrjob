@@ -911,12 +911,12 @@ class MRJob(object):
 
         self.option_parser.add_option(
             '--help-emr', dest='help_emr', action='store_true', default=False,
-            help='show emr-related options')
+            help='show EMR-related options')
 
         self.option_parser.add_option(
             '--help-hadoop', dest='help_hadoop', action='store_true',
             default=False,
-            help='show hadoop-related options')
+            help='show Hadoop-related options')
 
         self.option_parser.add_option(
             '--help-runner', dest='help_runner', action='store_true',

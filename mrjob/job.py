@@ -121,6 +121,7 @@ from mrjob.options import add_hadoop_emr_opts
 from mrjob.options import add_hadoop_shared_opts
 from mrjob.options import add_protocol_opts
 from mrjob.options import add_runner_opts
+from mrjob.options import print_help_for_groups
 from mrjob.parse import parse_port_range_list
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.parse import parse_key_value_list
@@ -204,7 +205,8 @@ class MRJob(object):
 
         usage = "usage: %prog [options] [input files]"
         self.option_parser = OptionParser(usage=usage,
-                                          option_class=self.OPTION_CLASS)
+                                          option_class=self.OPTION_CLASS,
+                                          add_help_option=False)
         self.configure_options()
 
         # don't pass None to parse_args unless we're actually running
@@ -903,10 +905,22 @@ class MRJob(object):
                 self.add_file_option(...)
                 ...
         """
-        # To describe the steps
         self.option_parser.add_option(
-            '--steps', dest='show_steps', action='store_true', default=False,
-            help='show the steps of mappers and reducers')
+            '--help', dest='help_main', action='store_true', default=False,
+            help='show this message and exit')
+
+        self.option_parser.add_option(
+            '--help-emr', dest='help_emr', action='store_true', default=False,
+            help='show EMR-related options')
+
+        self.option_parser.add_option(
+            '--help-hadoop', dest='help_hadoop', action='store_true',
+            default=False,
+            help='show Hadoop-related options')
+
+        self.option_parser.add_option(
+            '--help-runner', dest='help_runner', action='store_true',
+            default=False, help='show runner-related options')
 
         # To run mappers or reducers
         self.mux_opt_group = OptionGroup(
@@ -928,6 +942,12 @@ class MRJob(object):
         self.mux_opt_group.add_option(
             '--step-num', dest='step_num', type='int', default=0,
             help='which step to execute (default is 0)')
+
+        # To describe the steps
+        self.mux_opt_group.add_option(
+            '--steps', dest='show_steps', action='store_true', default=False,
+            help=('print the mappers, combiners, and reducers that this job'
+                  ' defines'))
 
         # protocol stuff
         self.proto_opt_group = OptionGroup(
@@ -1063,6 +1083,28 @@ class MRJob(object):
                 ...
         """
         self.options, self.args = self.option_parser.parse_args(args)
+
+        if self.options.help_main:
+            self.option_parser.option_groups = [
+                self.mux_opt_group,
+                self.proto_opt_group,
+            ]
+            self.option_parser.print_help()
+            sys.exit(0)
+
+        if self.options.help_emr:
+            print_help_for_groups(self.hadoop_emr_opt_group,
+                                  self.emr_opt_group)
+            sys.exit(0)
+
+        if self.options.help_hadoop:
+            print_help_for_groups(self.hadoop_emr_opt_group,
+                                  self.hadoop_opts_opt_group)
+            sys.exit(0)
+
+        if self.options.help_runner:
+            print_help_for_groups(self.runner_opt_group)
+            sys.exit(0)
 
         # parse custom options here to avoid setting a custom Option subclass
         # and confusing users

@@ -398,7 +398,7 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--disable-emr-debugging', dest='enable_emr_debugging',
             action='store_false',
-            help='Enable storage of Hadoop logs in SimpleDB'),
+            help='Disable storage of Hadoop logs in SimpleDB'),
 
         opt_group.add_option(
             '--hadoop-streaming-jar-on-emr',

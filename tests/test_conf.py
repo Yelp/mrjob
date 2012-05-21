@@ -550,7 +550,8 @@ class OptionStoreTestCase(unittest.TestCase):
 
     def test_getattr_forward(self):
         with no_handlers_for_logger():
-            r = InlineMRJobRunner()
+            r = InlineMRJobRunner(conf_path=False)
         store = r._opts
         self.assertIsInstance(store, InlineRunnerOptionStore)
-        self.assertEqual(r.get_default_opts(), store.default_options())
+        a = r.get_default_opts()
+        self.assertEqual(a, store.default_options())

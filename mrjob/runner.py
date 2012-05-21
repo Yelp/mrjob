@@ -474,7 +474,7 @@ class MRJobRunner(object):
 
         Get default options for this runner class, as a dict.
         """
-        return cls.OPTION_STORE_CLASS(cls.alias, {}, None).default_options()
+        return cls.OPTION_STORE_CLASS(cls.alias, {}, False).default_options()
 
     ### Running the job and parsing output ###
 

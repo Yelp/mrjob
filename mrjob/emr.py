@@ -1271,7 +1271,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
-    def _job_flow_is_terminated(self, job_flow):
+    def _job_flow_is_done(self, job_flow):
         return job_flow.state in ('TERMINATED', 'COMPLETED', 'FAILED',
                                   'SHUTTING_DOWN')
 
@@ -1285,7 +1285,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             jobflow.state == 'WAITING'):
             raise Exception('Operation requires job flow to terminate, but'
                             ' it may never do so.')
-        while not self._job_flow_is_terminated(jobflow):
+        while not self._job_flow_is_done(jobflow):
             msg = 'Waiting for job flow to terminate (currently %s)' % \
                                                          jobflow.state
             log.info(msg)
@@ -1951,7 +1951,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
             if not results:
                 job_flow = self._describe_jobflow()
-                if not self._job_flow_is_terminated(job_flow):
+                if not self._job_flow_is_done(job_flow):
                     log.info("Counters may not have been uploaded to S3 yet. Try"
                              " again in 5 minutes with 'python -m"
                              " mrjob.tools.emr.fetch_logs --counters %s'." %

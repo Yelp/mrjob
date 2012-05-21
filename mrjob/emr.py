@@ -1271,6 +1271,10 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
+    def _job_flow_is_done(self, job_flow):
+        return job_flow.state in ('TERMINATED', 'COMPLETED', 'FAILED',
+                                  'SHUTTING_DOWN')
+
     def _wait_for_job_flow_termination(self):
         try:
             jobflow = self._describe_jobflow()
@@ -1281,8 +1285,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             jobflow.state == 'WAITING'):
             raise Exception('Operation requires job flow to terminate, but'
                             ' it may never do so.')
-        while jobflow.state not in ('TERMINATED', 'COMPLETED', 'FAILED',
-                                    'SHUTTING_DOWN'):
+        while not self._job_flow_is_done(jobflow):
             msg = 'Waiting for job flow to terminate (currently %s)' % \
                                                          jobflow.state
             log.info(msg)
@@ -1936,23 +1939,24 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                           self.get_hadoop_version())
 
     def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
-        job_flow = self._describe_jobflow()
-        if job_flow.keepjobflowalivewhennosteps == 'true':
-            log.info("Can't fetch counters from S3 for five more minutes. Try"
-                     " 'python -m mrjob.tools.emr.fetch_logs --counters %s'"
-                     " in five minutes." % job_flow.jobflowid)
-            return {}
-
         log.info('Fetching counters from S3...')
 
         if not skip_s3_wait:
             self._wait_for_s3_eventual_consistency()
-        self._wait_for_job_flow_termination()
 
         try:
             uris = self.ls_job_logs_s3(step_nums)
-            return scan_for_counters_in_files(uris, self,
-                                              self.get_hadoop_version())
+            results = scan_for_counters_in_files(uris, self,
+                                                 self.get_hadoop_version())
+
+            if not results:
+                job_flow = self._describe_jobflow()
+                if not self._job_flow_is_done(job_flow):
+                    log.info("Counters may not have been uploaded to S3 yet. Try"
+                             " again in 5 minutes with 'python -m"
+                             " mrjob.tools.emr.fetch_logs --counters %s'." %
+                             job_flow.jobflowid)
+            return results
         except LogFetchError, e:
             log.info("Unable to fetch counters: %s" % e)
             return {}

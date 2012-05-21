@@ -16,10 +16,8 @@
 
 from __future__ import with_statement
 
-import logging
 import os
 import shutil
-from StringIO import StringIO
 import tempfile
 
 try:
@@ -46,6 +44,7 @@ from mrjob.conf import load_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.inline import InlineMRJobRunner
 from mrjob.inline import InlineRunnerOptionStore
+from tests.quiet import log_to_buffer
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 
@@ -178,13 +177,6 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
 
 class MRJobConfDeprecatedLocationTestCase(MRJobConfTestCase):
 
-    def _log_to_buffer(self):
-        buf = StringIO()
-        log = logging.getLogger('mrjob.conf')
-        log.addHandler(logging.StreamHandler(buf))
-        log.setLevel(logging.WARNING)
-        return buf
-
     def test_mrjob_conf_in_python_path(self):
         os.environ['PYTHONPATH'] = self.tmp_dir
         mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
@@ -192,7 +184,7 @@ class MRJobConfDeprecatedLocationTestCase(MRJobConfTestCase):
         self._existing_paths = [mrjob_conf_path]
 
         with no_handlers_for_logger():
-            buf = self._log_to_buffer()
+            buf = log_to_buffer('mrjob.conf')
             self.assertEqual(find_mrjob_conf(), mrjob_conf_path)
             self.assertIn('This config path is deprecated', buf.getvalue())
 
@@ -208,19 +200,19 @@ class MRJobConfDeprecatedLocationTestCase(MRJobConfTestCase):
 
         self._existing_paths.add('/py2/mrjob.conf')
         with no_handlers_for_logger():
-            buf = self._log_to_buffer()
+            buf = log_to_buffer('mrjob.conf')
             self.assertEqual(find_mrjob_conf(), '/py2/mrjob.conf')
             self.assertIn('This config path is deprecated', buf.getvalue())
 
         self._existing_paths.add('/py1/mrjob.conf')
         with no_handlers_for_logger():
-            buf = self._log_to_buffer()
+            buf = log_to_buffer('mrjob.conf')
             self.assertEqual(find_mrjob_conf(), '/py1/mrjob.conf')
             self.assertIn('This config path is deprecated', buf.getvalue())
 
         self._existing_paths.add('/home/foo/.mrjob')
         with no_handlers_for_logger():
-            buf = self._log_to_buffer()
+            buf = log_to_buffer('mrjob.conf')
             self.assertEqual(find_mrjob_conf(), '/home/foo/.mrjob')
             self.assertIn('This config path is deprecated', buf.getvalue())
 

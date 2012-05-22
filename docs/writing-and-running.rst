@@ -264,9 +264,3 @@ are located::
     hadoop@ip-10-160-75-214:~$ ssh -i uploaded_key.pem 10.166.50.85
 
     hadoop@ip-10-166-50-85:~$ gdb `which python2.6-dbg` /tmp/cores/core.python.blah
-
-Example configuration file
---------------------------
-
-.. include:: ../mrjob.conf.example
-    :literal:

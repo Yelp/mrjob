@@ -26,13 +26,13 @@ The simplest way to write a job is by overriding :py:class:`~mrjob.job.MRJob`'s
 
         def mapper(self, _, line):
             for word in WORD_RE.findall(line):
-                yield (word.lower(), 1)
+                yield word.lower(), 1
 
         def combiner(self, word, counts):
-            yield (word, sum(counts))
+            yield word, sum(counts)
 
         def reducer(self, word, counts):
-            yield (word, sum(counts))
+            yield word, sum(counts)
 
 
     if __name__ == '__main__':
@@ -70,10 +70,10 @@ Many jobs require multiple steps. To define multiple steps, override the
 
         def get_words(self, _, line):
             for word in WORD_RE.findall(line):
-                yield (word.lower(), 1)
+                yield word.lower(), 1
 
         def sum_words(self, word, counts):
-            yield (word, sum(counts))
+            yield word, sum(counts)
 
         def double_counts(self, word, counts):
             yield word, counts * 2
@@ -116,10 +116,10 @@ methods::
 
         def final_get_words(self):
             for word, val in self.words.iteritems():
-                yield (word, val)
+                yield word, val
 
         def sum_words(self, word, counts):
-            yield (word, sum(counts))
+            yield word, sum(counts)
 
         def steps(self):
             return [self.mr(mapper_init=self.init_get_words,

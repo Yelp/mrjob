@@ -52,6 +52,9 @@ Counters and status messages
 .. automethod:: MRJob.increment_counter
 .. automethod:: MRJob.set_status
 
+Setting protocols
+^^^^^^^^^^^^^^^^^
+
 .. autoattribute:: MRJob.INPUT_PROTOCOL
 .. autoattribute:: MRJob.INTERNAL_PROTOCOL
 .. autoattribute:: MRJob.OUTPUT_PROTOCOL

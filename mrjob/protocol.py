@@ -14,7 +14,7 @@
 
 """Protocols deserialize and serialize the input and output of tasks to raw
 bytes for Hadoop to distribute to the next task or to write as output. For more
-information, see :ref:`using-protocols` and :ref:`writing-protocols`.
+information, see :ref:`job-protocols` and :ref:`writing-protocols`.
 """
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment

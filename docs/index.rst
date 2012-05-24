@@ -36,7 +36,7 @@ Writing MRJobs
 --------------
 
 * :ref:`writing-basics`
-* :ref:`using-protocols`
+* :ref:`job-protocols`
 * :ref:`writing-protocols`
 * :ref:`writing-cl-opts`
 

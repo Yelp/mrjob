@@ -52,83 +52,12 @@ Counters and status messages
 .. automethod:: MRJob.increment_counter
 .. automethod:: MRJob.set_status
 
-
-Advanced
---------
-
-.. _job-protocols:
-
-Protocols
-^^^^^^^^^
-
-Protocols convert data between string representations for Hadoop Streaming
-and Python data structures for input and output by steps. Using the default
-protocols, the first step will get raw strings as input and should return
-JSON-encodable Python objects. The last step should accept JSON-decoded
-Python objects and return JSON-encodable Python objects, which will appear
-in the final output as JSON.
-
-There are three ways to specify which protocol you want to use for a given
-step. The simplest way is to assign a class imported from
-:py:mod:`mrjob.protocols` to one of the class variables
-:py:attr:`MRJob.INPUT_PROTOCOL`, :py:attr:`MRJob.INTERNAL_PROTOCOL`, or
-:py:attr:`MRJob.OUTPUT_PROTOCOL` on your job. The input protocol is the format
-of your input data, the internal protocol is the format of data passed between
-steps, and the output protocol is what is produced at the end of the job. These
-classes are instantiated when your :py:class:`MRJob` is instantiated.
-
-For example, this class accepts raw strings, outputs JSON, and uses ``pickle``
-to communicate between steps::
-
-    from mrjob.job import MRJob
-    from mrjob.protocol import JSONValueProtocol, PickleProtocol, RawValueProtocol
-
-    class MRProtocolJob1(MRJob)
-        INPUT_PROTOCOL = RawValueProtocol
-        INTERNAL_PROTOCOL = PickleProtocol
-        OUTPUT_PROTOCOL = JSONValueProtocol
-
-The second way is to override :py:meth:`MRJob.input_protocol`,
-:py:meth:`MRJob.internal_protocol`, or :py:meth:`MRJob.output_protocol`. These
-methods should return *instances* of protocols. For example, if you want your
-job to operate on either JSON or raw strings depending on a command line
-option, you can do this::
-
-    from mrjob.job import MRJob
-    from mrjob.protocol import JSONValueProtocol, RawValueProtocol
-
-    class MRProtocolJob2(MRJob):
-
-        def configure_options(self):
-            # set up 'data_format' option
-
-        def input_protocol(self):
-            if self.options.data_format == 'json':
-                return JSONValueProtocol()
-            elif self.options.data_format == 'raw':
-                return RawValueProtocol()
-            else:
-                raise ValueError("Data format must be 'json' or 'raw'")
-
-If you need behavior even more complex than that, including using different
-protocols to communicate between different steps (like JSON between steps 1 and
-2, but pickle between steps 2 and 3), you can override
-:py:meth:`MRJob.pick_protocols` to return different protocols based on the
-step number and step type of the current process.
-
-See :doc:`protocols` for more information about protocols, including how
-to implement your own.
-
 .. autoattribute:: MRJob.INPUT_PROTOCOL
 .. autoattribute:: MRJob.INTERNAL_PROTOCOL
 .. autoattribute:: MRJob.OUTPUT_PROTOCOL
-.. autoattribute:: MRJob.DEFAULT_INPUT_PROTOCOL
-.. autoattribute:: MRJob.DEFAULT_PROTOCOL
-.. autoattribute:: MRJob.DEFAULT_OUTPUT_PROTOCOL
 .. automethod:: MRJob.input_protocol
 .. automethod:: MRJob.internal_protocol
 .. automethod:: MRJob.output_protocol
-.. automethod:: MRJob.protocols
 .. automethod:: MRJob.pick_protocols
 
 Custom command-line options

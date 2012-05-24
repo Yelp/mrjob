@@ -134,7 +134,7 @@ far, including multiple input lines.* When Hadoop Streaming stops sending data
 to the map task, mrjob calls ``final_get_words()`` and it emits a much smaller
 set of output lines.
 
-.. _using-protocols:
+.. _job-protocols:
 
 Protocols
 ---------
@@ -160,9 +160,6 @@ component (mapper, combiner, or reducer) to the final output format to be sent
 back to the output directory, stdout, etc.
 
 Here are the default values::
-
-    import mrjob
-
 
     class MyMRJob(mrjob.job.MRJob):
 
@@ -216,10 +213,22 @@ key is set to ``None``.
   :py:class:`~mrjob.protocol.ReprValueProtocol`: serialize with ``repr()``,
   deserialize with :py:func:`mrjob.util.safeeval`
 
+.. rubric:: Footnotes
+
+.. [#hc] This behavior is configurable, but there is currently no
+    mrjob-specific documentation. `Gitub pull requests
+    <http://www.github.com/yelp/mrjob>`_ are always
+    appreciated.
+
+.. _writing-cl-opts:
+
 Specifying protocols for your job
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Usually, you'll just want to set class variables::
+Usually, you'll just want to set one or more of the class variables
+:py:attr:`~mrjob.job.MRJob.INPUT_PROTOCOL`,
+:py:attr:`~mrjob.job.MRJob.INTERNAL_PROTOCOL`, and
+:py:attr:`~mrjob.job.MRJob.OUTPUT_PROTOCOL`::
 
     class BasicProtocolJob(MRJob):
 
@@ -285,15 +294,6 @@ Here is an implementation of a YAML protocol::
 You can improve performance by caching the serialization/deserialization
 results of keys. Look at the source code of :py:mod:`mrjob.protocol` for an
 example.
-
-.. rubric:: Footnotes
-
-.. [#hc] This behavior is configurable, but there is currently no
-    mrjob-specific documentation. `Gitub pull requests
-    <http://www.github.com/yelp/mrjob>`_ are always
-    appreciated.
-
-.. _writing-cl-opts:
 
 Defining command line options
 -----------------------------

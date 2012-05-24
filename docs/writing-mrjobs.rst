@@ -134,7 +134,7 @@ far, including multiple input lines.* When Hadoop Streaming stops sending data
 to the map task, mrjob calls ``final_get_words()`` and it emits a much smaller
 set of output lines.
 
-.. _writing-protocols:
+.. _using-protocols:
 
 Protocols
 ---------
@@ -145,8 +145,8 @@ bytes. Each line is separated into key and value by a tab character [#hc]_.
 When sending lines between tasks, Hadoop Streaming compares and sorts keys
 lexicographically, agnostic of encoding [#hc]_. mrjob is responsible for
 serializing and deserializing lines to and from the Python objects that your
-code operates on. Objects responsible for encoding and decoding keys and values
-from bytes to and from Python objects are called **protocols**.
+code operates on. Objects responsible for serializing and deserializing keys
+and values from bytes to and from Python objects are called **protocols**.
 
 The **input protocol** converts input lines into the key and value received by
 the first task in the first step. Depending on what step components you have
@@ -216,8 +216,10 @@ key is set to ``None``.
   :py:class:`~mrjob.protocol.ReprValueProtocol`: serialize with ``repr()``,
   deserialize with :py:func:`mrjob.util.safeeval`
 
-Writing Protocols
-^^^^^^^^^^^^^^^^^
+.. _writing-protocols:
+
+Writing Custom Protocols
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 A protocol is an object with methods ``read(self, line)`` and ``write(self,
 key, value)``. The ``read()`` method takes a string and returns a 2-tuple of

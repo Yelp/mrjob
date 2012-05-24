@@ -247,7 +247,7 @@ instance::
 
         def configure_options(self):
             super(CommandLineProtocolJob, self).configure_options()
-            self.option_parser.add_option(
+            self.add_passthrough_option(
                 '--input-format', default='raw', choices=['raw', 'json'])
 
         def input_protocol(self):

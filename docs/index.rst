@@ -35,10 +35,9 @@ Guides
 Writing MRJobs
 --------------
 
-* **One-step jobs**
-* **Multi-step jobs**
-* **Protocols**
-* **Defining command line options**
+* :ref:`writing-basics`
+* :ref:`writing-protocols`
+* :ref:`writing-cl-opts`
 
 Running MRJobs
 --------------

@@ -18,6 +18,10 @@ or from a `git`_ clone of the `source code`_::
 Writing a job
 -------------
 
+A job consists of an :py:class:`~mrjob.job.MRJob` subclass, one or more mapper,
+combiner, or reducer methods, a call at the bottom to invoke mrjob's logic, and
+all associated dependencies.
+
 For jobs that consist only of one mapper, combiner, and reducer, in that order,
 you can simply override one or more of the :py:meth:`~mrjob.job.MRJob.mapper`,
 :py:meth:`~mrjob.job.MRJob.combiner`, and :py:meth:`~mrjob.job.MRJob.reducer`

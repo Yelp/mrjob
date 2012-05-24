@@ -4,7 +4,7 @@ Concepts
 MapReduce and Apache Hadoop
 ---------------------------
 
-*This section uses text from Apache's `MapReduce Tutorial`_.*
+*This section uses text from Apache's* `MapReduce Tutorial`_.
 
 .. _`MapReduce Tutorial`: http://hadoop.apache.org/common/docs/current/mapred_tutorial.html
 

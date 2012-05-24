@@ -13,7 +13,7 @@ on the task nodes before the job is run, or uploaded to the cluster by mrjob
 when your job is submitted.
 
 The simplest way to write a job is by overriding :py:class:`~mrjob.job.MRJob`'s
-':py:meth:`~mrjob.job.MRJob.mapper`, :py:meth:`~mrjob.job.MRJob.combiner`, and
+:py:meth:`~mrjob.job.MRJob.mapper`, :py:meth:`~mrjob.job.MRJob.combiner`, and
 :py:meth:`~mrjob.job.MRJob.reducer` methods::
 
     from mrjob.job import MRJob
@@ -128,15 +128,126 @@ methods::
                             combiner=self.sum_words,
                             reducer=self.sum_words)]
 
-In this version, instead of yielding one line per word, the mapper yields one
-line per unique word in an input line. Fewer lines will then be sent to the
-combiner, but lines with many unique words (say, a trillion) would probably
-cause the task to run out of memory and crash.
+In this version, instead of yielding one line per word, the mapper keeps an
+internal count of word occurrences across *all lines this mapper has seen so
+far, including multiple input lines.* When Hadoop Streaming stops sending data
+to the map task, mrjob calls ``final_get_words()`` and it emits a much smaller
+set of output lines.
 
 .. _writing-protocols:
 
 Protocols
 ---------
+
+Input and output goes to and from each task in the form of newline-delimited
+bytes. Each line is separated into key and value by a tab character [#hc]_.
+
+When sending lines between tasks, Hadoop Streaming compares and sorts keys
+lexicographically, agnostic of encoding [#hc]_. mrjob is responsible for
+serializing and deserializing lines to and from the Python objects that your
+code operates on. Objects responsible for encoding and decoding keys and values
+from bytes to and from Python objects are called **protocols**.
+
+The **input protocol** converts input lines into the key and value received by
+the first task in the first step. Depending on what step components you have
+defined this could be either a mapper or a reducer.
+
+The **internal protocol** is used to convert lines for transmission between
+tasks in between input and output.
+
+The **output protocol** converts the objects yielded by the final step
+component (mapper, combiner, or reducer) to the final output format to be sent
+back to the output directory, stdout, etc.
+
+Here are the default values::
+
+    import mrjob
+
+
+    class MyMRJob(mrjob.job.MRJob):
+
+        INPUT_PROTOCOL = mrjob.protocol.RawValueProtocol
+        INTERNAL_PROTOCOL = mrjob.protocol.JSONProtocol
+        OUTPUT_PROTOCOL = mrjob.protocol.JSONProtocol
+
+The default input protocol, :py:class:`~mrjob.protocol.RawValueProtocol`,
+passes the entire line of input as the value parameter to the mapper, with the
+key as ``None``. The default internal and output protocols convert both the key
+and the value to and from JSON.
+
+Consider a job that must pass values between internal steps that are too
+complex for JSON to handle. Such a job might look like this::
+
+    class ComplicatedJob(MRJob):
+
+        INTERNAL_PROTOCOL = mrjob.protocol.PickleProtocol
+
+        def map_1(self, _, value):
+            pass # do stuff, yield complicated objects
+
+        def reduce_1(self, key, values):
+            pass # do more stuff
+
+        def reduce_2(self, key, values):
+            pass # do even more stuff
+
+        def steps(self):
+            return [self.mr(mapper=self.map_1,
+                            reducer=self.reduce_1),
+                    self.mr(reducer=self.reduce_2)]
+
+In this example, ``map_1()`` gets JSON-decoded values. Its output is serialized
+and deserialized into ``reduce_1()`` using ``pickle``, and again when sent to
+``reduce_2()``. The output keys and values of ``reduce_2()`` are serialized as
+JSON.
+
+Here is a complete list of built-in protocols. Classes named ``*ValueProtocol``
+ignore the key. For serialization, the value is serialized and sent as the
+entire line. For deserialization, the entire line is read as the value and the
+key is set to ``None``.
+
+* :py:class:`~mrjob.protocol.JSONProtocol` /
+  :py:class:`~mrjob.protocol.JSONValueProtocol`: JSON
+* :py:class:`~mrjob.protocol.PickleProtocol` /
+  :py:class:`~mrjob.protocol.PickleValueProtocol`: pickle
+* :py:class:`~mrjob.protocol.RawProtocol` /
+  :py:class:`~mrjob.protocol.RawValueProtocol`: raw string
+* :py:class:`~mrjob.protocol.ReprProtocol` /
+  :py:class:`~mrjob.protocol.ReprValueProtocol`: serialize with ``repr()``,
+  deserialize with :py:func:`mrjob.util.safeeval`
+
+Writing Protocols
+^^^^^^^^^^^^^^^^^
+
+A protocol is an object with methods ``read(self, line)`` and ``write(self,
+key, value)``. The ``read()`` method takes a string and returns a 2-tuple of
+decoded objects, and ``write()`` takes the key and value and returns the line
+to be passed back to Hadoop Streaming or as output.
+
+Here is an implementation of a YAML protocol::
+
+    import yaml
+
+
+    class YAMLProtocol(object):
+
+        def read(self, line):
+            k_str, v_str = line.split('\t', 1)
+            return yaml.loads(k_str), yaml.loads(v_str)
+
+        def write(self, key, value):
+            return '%s\t%s' % (yaml.dumps(key), yaml.dumps(value))
+
+You can improve performance by caching the serialization/deserialization
+results of keys. Look at the source code of :py:mod:`mrjob.protocol` for an
+example.
+
+.. rubric:: Footnotes
+
+.. [#hc] This behavior is configurable, but there is currently no
+    mrjob-specific documentation. `Gitub pull requests
+    <http://www.github.com/yelp/mrjob>`_ are always
+    appreciated.
 
 .. _writing-cl-opts:
 

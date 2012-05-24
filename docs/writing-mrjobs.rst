@@ -216,10 +216,52 @@ key is set to ``None``.
   :py:class:`~mrjob.protocol.ReprValueProtocol`: serialize with ``repr()``,
   deserialize with :py:func:`mrjob.util.safeeval`
 
+Specifying protocols for your job
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Usually, you'll just want to set class variables::
+
+    class BasicProtocolJob(MRJob):
+
+        # get input as raw strings
+        INPUT_PROTOCOL = RawValueProtocol
+        # pass data internally with pickle
+        INTERNAL_PROTOCOL = PickleProtocol
+        # write output as JSON
+        OUTPUT_PROTOCOL = JSONProtocol
+
+If you need more complex behavior, you can override
+:py:meth:`~mrjob.job.MRJob.input_protocol`,
+:py:meth:`~mrjob.job.MRJob.internal_protocol`, or
+:py:meth:`~mrjob.job.MRJob.output_protocol` and return a protocol object
+instance::
+
+    class CommandLineProtocolJob(MRJob):
+
+        def configure_options(self):
+            super(CommandLineProtocolJob, self).configure_options()
+            self.option_parser.add_option(
+                '--input-format', default='raw', choices=['raw', 'json'])
+
+        def input_protocol(self):
+            if self.options.input_format == 'json':
+                return JSONValueProtocol()
+            elif self.options.input_format == 'raw':
+                return RawValueProtocol()
+
+Finally, if you need to use a completely different concept of protocol
+assignment, you can override :py:meth:`mrjob.job.MRJob.pick_protocols`::
+
+    class WhatIsThisIDontEvenProtocolJob(MRJob):
+
+        def pick_protocols(self, step_num, step_type):
+            # step_type is 'M', 'C', or 'R'
+            return random.choice([Protocololol, ROFLcol, Trolltocol, Locotorp])
+
 .. _writing-protocols:
 
-Writing Custom Protocols
-^^^^^^^^^^^^^^^^^^^^^^^^
+Writing custom protocols
+------------------------
 
 A protocol is an object with methods ``read(self, line)`` and ``write(self,
 key, value)``. The ``read()`` method takes a string and returns a 2-tuple of

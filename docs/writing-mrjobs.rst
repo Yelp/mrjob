@@ -220,8 +220,6 @@ key is set to ``None``.
     <http://www.github.com/yelp/mrjob>`_ are always
     appreciated.
 
-.. _writing-cl-opts:
-
 Specifying protocols for your job
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -294,6 +292,8 @@ Here is an implementation of a YAML protocol::
 You can improve performance by caching the serialization/deserialization
 results of keys. Look at the source code of :py:mod:`mrjob.protocol` for an
 example.
+
+.. _writing-cl-opts:
 
 Defining command line options
 -----------------------------

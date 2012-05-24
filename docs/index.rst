@@ -17,69 +17,37 @@ To get started, install with ``pip``::
 
     pip install mrjob
 
-Then read :doc:`writing-and-running`. Other common documentation destinations
-are:
-
-* :ref:`mrjob.conf`
-* :doc:`configs-reference`
-* :doc:`job`
-* :doc:`runners-emr`
-* :doc:`tools`
-
 Guides
 ======
 
-* :doc:`quickstart`
-* :doc:`concepts`
+**Basics:** :doc:`quickstart`, :doc:`concepts`
 
-Writing MRJobs
---------------
+**Writing jobs:** :ref:`writing-basics`, :ref:`job-protocols`,
+:ref:`writing-protocols`, :ref:`writing-cl-opts`
 
-* :ref:`writing-basics`
-* :ref:`job-protocols`
-* :ref:`writing-protocols`
-* :ref:`writing-cl-opts`
+**Running jobs:** Runners, Running jobs programmatically,
+Making files available to tasks
 
-Running MRJobs
---------------
+**Configuration:** Config file format and location, Hadoop options,
+Other options, :doc:`configs-reference`
 
-* **Runners**
-* **Running jobs programmatically**
-* **Making files available to tasks**
+**Cookbook:** Putting your source tree in PYTHONPATH, Increasing task timeout,
+Writing compressed output
 
-Configuration
--------------
+**Testing:** Anatomy of a test case, Reading counters
 
-* **Config file format and location**
-* **Hadoop options**
-* **Other options**
+**Running jobs on Elastic MapReduce:**
 
-Cookbook
---------
+* Concepts
+* Configuring AWS credentials
+* Configuring SSH credentials
+* EMR runner options
+* :doc:`tools`
+* Troubleshooting
+* Advanced EMR strategies
 
-* **Putting your source tree in PYTHONPATH**
-* **Increasing task timeout**
-* **Writing compressed output**
-
-Testing
--------
-
-* **Anatomy of a test case**
-* **Counters**
-
-Running MRJobs on Elastic MapReduce
------------------------------------
-
-* **Concepts**
-* **Configuring AWS credentials**
-* **Configuring SSH credentials**
-* **EMR runner options**
-* **Tools**
-* **Troubleshooting**
-* **Advanced EMR strategies**
-
-Table of Contents
-=================
+Reference
+=========
 
 .. toctree::
     :maxdepth: 3

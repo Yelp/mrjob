@@ -1,5 +1,5 @@
-Writing MRJobs
-==============
+Writing jobs
+============
 
 .. _writing-basics:
 

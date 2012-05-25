@@ -34,11 +34,11 @@ Guides
 
 * :doc:`guides/runners`
 * :ref:`runners-programmatically`
-* Making files available to tasks
 
 **Configuration**
 
 * :doc:`guides/configs-basics`
+* Making files available to tasks
 * Hadoop options
 * Other options
 * :doc:`guides/configs-reference`

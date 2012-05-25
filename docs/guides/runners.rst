@@ -1,8 +1,17 @@
-Runners - launching your job
-============================
+Runners
+=======
 
-Runners are responsible for launching your job on Hadoop Streaming and
-fetching the results.
+While the :py:class:`~mrjob.job.MRJob` class is the part of the framework that
+handles the execution of your code in a MapReduce context, the **runner** is
+the part that packages and submits your job to be run, and reporting the
+results back to you.
+
+In most cases, you will interact with runners via the command line and
+configuration files. When you invoke mrjob via the command line, it reads your
+command line options (the ``--runner`` parameter) to determine which type of
+runner to create. Then it creates the runner, which reads your configuration
+files and command line args and starts your job running in whatever context
+you chose.
 
 Most of the time, you won't have any reason to construct a runner directly;
 it's more like a utility that allows an :py:class:`~mrjob.job.MRJob`
@@ -27,15 +36,18 @@ Subclasses: :py:class:`~mrjob.emr.EMRJobRunner`,
 :py:class:`~mrjob.inline.InlineMRJobRunner`,
 :py:class:`~mrjob.local.LocalMRJobRunner`
 
-Running locally
+Testing locally
 ---------------
 
 To test the job locally, just run::
 
    python your_mr_job_sub_class.py < log_file_or_whatever > output
 
-The script will automatically invoke itself to run the various steps,
-using :py:class:`~mrjob.local.LocalMRJobRunner`.
+The script will automatically invoke itself to run the various steps, using
+:py:class:`~mrjob.local.InlineMRJobRunner` (``--runner=inline``). If you want
+to simulate Hadoop more closely, you can use ``--runner=local``, which doesn't
+add your working directory to the :envvar:`PYTHONPATH`, sets a few Hadoop
+environment variables, and uses multiple subprocesses for tasks.
 
 You can also run individual steps:
 
@@ -43,7 +55,7 @@ You can also run individual steps:
 
     # test 1st step mapper:
     python your_mr_job_sub_class.py --mapper
-    # test 2nd step reducer (--step-num=1 because step numbers are 0-indexed):
+    # test 2nd step reducer (step numbers are 0-indexed):
     python your_mr_job_sub_class.py --reducer --step-num=1
 
 By default, we read from stdin, but you can also specify one or more
@@ -53,44 +65,50 @@ input files. It automatically decompresses .gz and .bz2 files::
 
 See :py:mod:`mrjob.examples` for more examples.
 
-Running on EMR
---------------
-
-* Set up your Amazon Account (see :ref:`amazon-setup`)
-* Set :envvar:`AWS_ACCESS_KEY_ID` and :envvar:`AWS_SECRET_ACCESS_KEY`
-* Run your job with ``-r emr``::
-
-    python your_mr_job_sub_class.py -r emr < input > output
-
 Running on your own Hadoop cluster
 ----------------------------------
 
 * Set up a hadoop cluster (see http://hadoop.apache.org/common/docs/current/)
-* If running Python 2.5 on your cluster, install the :py:mod:`simplejson` module on all nodes. (Recommended but not required for Python 2.6+)
+* If running Python 2.5 on your cluster, install the :py:mod:`simplejson`
+  module on all nodes (recommended but not required for Python 2.6+).
 * Make sure :envvar:`HADOOP_HOME` is set
 * Run your job with ``-r hadoop``::
 
     python your_mr_job_sub_class.py -r hadoop < input > output
 
+Running on EMR
+--------------
+
+* Set up your Amazon account and credentials (see :ref:`amazon-setup`)
+* Run your job with ``-r emr``::
+
+    python your_mr_job_sub_class.py -r emr < input > output
+
 Configuration
 -------------
 
-Runners are configured through keyword arguments to their init methods.
+Runners are configured by several methods:
 
-These can be set:
-
-- from :py:mod:`mrjob.conf`
+- from ``mrjob.conf`` (see :doc:`configs-basics`)
 - from the command line
-- by re-defining :py:meth:`~mrjob.job.MRJob.job_runner_kwargs` etc in your :py:class:`~mrjob.job.MRJob` (see :ref:`job-configuration`)
+- by re-defining :py:meth:`~mrjob.job.MRJob.job_runner_kwargs` etc in your
+  :py:class:`~mrjob.job.MRJob` (see :ref:`job-configuration`)
 - by instantiating the runner directly
+
+In most cases, you should put all configuration in ``mrjob.conf`` and use the
+command line args or class variables to customize how individual jobs are run.
 
 .. _runners-programmatically:
 
 Running your job programmatically
 ---------------------------------
 
-Use :py:meth:`~mrjob.job.MRJob.make_runner` to run an
-:py:class:`~mrjob.job.MRJob` from another Python script::
+It is fairly common to write an organization-specific wrapper around mrjob. Use
+:py:meth:`~mrjob.job.MRJob.make_runner` to run an :py:class:`~mrjob.job.MRJob`
+from another Python script. This pattern can also be used to write integration
+tests (see :doc:`testing`).
+
+::
 
     from __future__ import with_statement # only needed on Python 2.5
 
@@ -100,3 +118,13 @@ Use :py:meth:`~mrjob.job.MRJob.make_runner` to run an
         for line in runner.stream_output():
             key, value = mr_job.parse_output_line(line)
             ... # do something with the parsed output
+
+You the :py:class:`~mrjob.job.MRJob`, use a context manager to create the
+runner, run the job, iterate over the output lines, and use the job instance to
+parse each line with its output protocol.
+
+Further reference:
+
+* :py:meth:`~mrjob.job.MRJob.make_runner`
+* :py:meth:`~mrjob.runner.MRJobRunner.stream_output`
+* :py:meth:`~mrjob.job.MRJob.parse_output_line`

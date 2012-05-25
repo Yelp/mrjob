@@ -34,9 +34,6 @@ Guides
 
 * :doc:`guides/runners`
 * :ref:`runners-programmatically`
-
-**Configuration**
-
 * :doc:`guides/configs-basics`
 * Making files available to tasks
 * Hadoop options

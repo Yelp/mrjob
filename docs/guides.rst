@@ -9,6 +9,8 @@ Guides
     guides/writing-mrjobs.rst
     guides/runners.rst
     guides/configs-basics.rst
+    guides/configs-all-runners.rst
+    guides/configs-hadoopy-runners.rst
     guides/configs-reference.rst
     guides/cookbook.rst
     guides/testing.rst

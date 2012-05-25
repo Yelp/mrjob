@@ -105,8 +105,10 @@ Running your job programmatically
 
 It is fairly common to write an organization-specific wrapper around mrjob. Use
 :py:meth:`~mrjob.job.MRJob.make_runner` to run an :py:class:`~mrjob.job.MRJob`
-from another Python script. This pattern can also be used to write integration
-tests (see :doc:`testing`).
+from another Python script. The context manager guarantees that all temporary
+files are cleaned up regardless of the success or failure of your job.
+
+This pattern can also be used to write integration tests (see :doc:`testing`).
 
 ::
 
@@ -128,3 +130,61 @@ Further reference:
 * :py:meth:`~mrjob.job.MRJob.make_runner`
 * :py:meth:`~mrjob.runner.MRJobRunner.stream_output`
 * :py:meth:`~mrjob.job.MRJob.parse_output_line`
+
+Counters
+^^^^^^^^
+
+Counters may be read through the
+:py:meth:`~mrjob.runner.MRJobRunner.counters()` method on the runner. The
+example below demonstrates the use of counters in a test case.
+
+``mr_counting_job.py``
+::
+
+    from mrjob.job import MRJob
+
+
+    class MRCountingJob(MRJob):
+
+        def steps(self):
+            # 3 steps so we can check behavior of counters for multiple steps
+            return [self.mr(self.mapper),
+                    self.mr(self.mapper),
+                    self.mr(self.mapper)]
+
+        def mapper(self, _, value):
+            self.increment_counter('group', 'counter_name', 1)
+            yield _, value
+
+
+    if __name__ == '__main__':
+        MRCountingJob.run()
+
+``test_counters.py``
+::
+
+    from __future__ import with_statement
+
+    try:
+        import unittest2 as unittest
+    except ImportError:
+        import unittest
+
+    from tests.mr_counting_job import MRCountingJob
+
+
+    class CounterTestCase(unittest.TestCase):
+
+        def test_counters(self):
+            stdin = StringIO('foo\nbar\n')
+
+            mr_job = MRCountingJob(['--no-conf', '-'])
+            mr_job.sandbox(stdin=stdin)
+
+            with mr_job.make_runner() as runner:
+                runner.run()
+
+                self.assertEqual(runner.counters(),
+                                 [{'group': {'counter_name': 2}},
+                                  {'group': {'counter_name': 2}},
+                                  {'group': {'counter_name': 2}}])

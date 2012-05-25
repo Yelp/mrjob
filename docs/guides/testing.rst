@@ -1,12 +1,7 @@
 .. _testing:
 
-Testing with mrjob
+Writing test cases
 ==================
-
-.. _testing-anatomy:
-
-Anatomy of a Test Case
-^^^^^^^^^^^^^^^^^^^^^^
 
 mrjob's test cases use the :py:mod:`unittest2` module, which is available
 for Python 2.3 and up. Most tests also require the :keyword:`with` statement.
@@ -117,69 +112,3 @@ You should be able to switch out the ``inline`` runner for the ``local`` runner
 without changing any other code. The ``local`` runner will launch multiple
 subprocesses to run your job, which may expose assumptions about input order
 or race conditions.
-
-.. _testing-counters:
-
-Counters
-^^^^^^^^
-
-Counters may be read through the
-:py:meth:`~mrjob.runner.MRJobRunner.counters()` method on the runner. The
-example below demonstrates the use of counters in a test case.
-
-``mr_counting_job.py``
-::
-
-    from mrjob.job import MRJob
-
-
-    class MRCountingJob(MRJob):
-
-        def steps(self):
-            # 3 steps so we can check behavior of counters for multiple steps
-            return [self.mr(self.mapper),
-                    self.mr(self.mapper),
-                    self.mr(self.mapper)]
-
-        def mapper(self, _, value):
-            self.increment_counter('group', 'counter_name', 1)
-            yield _, value
-
-
-    if __name__ == '__main__':
-        MRCountingJob.run()
-
-``test_counters.py``
-::
-
-    from __future__ import with_statement
-
-    try:
-        import unittest2 as unittest
-    except ImportError:
-        import unittest
-
-    from tests.mr_counting_job import MRCountingJob
-
-
-    class CounterTestCase(unittest.TestCase):
-
-        def test_counters(self):
-            stdin = StringIO('foo\nbar\n')
-
-            mr_job = MRCountingJob(['--no-conf', '-'])
-            mr_job.sandbox(stdin=stdin)
-
-            with mr_job.make_runner() as runner:
-                runner.run()
-
-                self.assertEqual(runner.counters(),
-                                 [{'group': {'counter_name': 2}},
-                                  {'group': {'counter_name': 2}},
-                                  {'group': {'counter_name': 2}}])
-
-.. note:: Prior to mrjob 0.3, the recommended way to read counters was
-    with :py:meth:`MRJob.parse_counters() <mrjob.job.MRJob.parse_counters()>`.
-    While that method still works for test
-    cases, :py:meth:`MRJobRunner.counters()
-    <mrjob.runner.MRJobRunner.counters()>` is more general and declarative.

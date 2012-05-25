@@ -34,8 +34,12 @@ Guides
 
 * :doc:`guides/runners`
 * :ref:`runners-programmatically`
+* :doc:`guides/testing`
+
+**Configuration**
+
 * :doc:`guides/configs-basics`
-* Making files available to tasks
+* :ref:`configs-making-files-available`
 * Hadoop options
 * Other options
 * :doc:`guides/configs-reference`
@@ -45,11 +49,6 @@ Guides
 * :ref:`cookbook-src-tree-pythonpath`
 * :ref:`cookbook-task-timeout`
 * :ref:`cookbook-compressed-output`
-
-**Testing**
-
-* :ref:`testing-anatomy`
-* :ref:`testing-counters`
 
 **Running jobs on Elastic MapReduce**
 

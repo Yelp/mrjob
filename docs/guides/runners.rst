@@ -1,51 +1,34 @@
-Getting started
-===============
+Runners - launching your job
+============================
 
-Writing and running a job
--------------------------
+Runners are responsible for launching your job on Hadoop Streaming and
+fetching the results.
 
-To create your own map reduce job, subclass :py:class:`~mrjob.job.MRJob`, create a
-series of mappers and reducers, and override :py:meth:`~mrjob.job.MRJob.steps`. For example, a word counter::
+Most of the time, you won't have any reason to construct a runner directly;
+it's more like a utility that allows an :py:class:`~mrjob.job.MRJob`
+to run itself. Normally things work something like this:
 
-    from mrjob.job import MRJob
+* Get a runner by calling :py:meth:`~mrjob.job.MRJob.make_runner` on your
+  job
+* Call :py:meth:`~mrjob.runner.MRJobRunner.run` on your runner. This will:
 
-    class MRWordCounter(MRJob):
-        def get_words(self, key, line):
-            for word in line.split():
-                yield word, 1
+  * Run your job with :option:`--steps` to find out how many
+    mappers/reducers to run
+  * Copy your job and supporting files to Hadoop
+  * Instruct Hadoop to run your job with the appropriate
+    :option:`--mapper`, :option:`--combiner`, :option:`--reducer`, and
+    :option:`--step-num` arguments
 
-        def sum_words(self, word, occurrences):
-            yield word, sum(occurrences)
+Each runner runs a single job once; if you want to run a job multiple
+times, make multiple runners.
 
-        def steps(self):
-            return [self.mr(self.get_words, self.sum_words),]
-
-    if __name__ == '__main__':
-        MRWordCounter.run()
-
-**The two lines at the bottom are mandatory.** This is what allows your class
-to be run by Hadoop streaming.
-
-This will take in a file with lines of whitespace separated words, and
-output a file with tab-separated lines like: ``"stars"\t5``.
-
-For one-step jobs, you can also just redefine :py:meth:`~mrjob.job.MRJob.mapper` and :py:meth:`~mrjob.job.MRJob.reducer`::
-
-    from mrjob.job import MRJob
-
-    class MRWordCounter(MRJob):
-        def mapper(self, key, line):
-            for word in line.split():
-                yield word, 1
-
-        def reducer(self, word, occurrences):
-            yield word, sum(occurrences)
-
-    if __name__ == '__main__':
-        MRWordCounter.run()
+Subclasses: :py:class:`~mrjob.emr.EMRJobRunner`,
+:py:class:`~mrjob.hadoop.HadoopJobRunner`,
+:py:class:`~mrjob.inline.InlineMRJobRunner`,
+:py:class:`~mrjob.local.LocalMRJobRunner`
 
 Running locally
-^^^^^^^^^^^^^^^
+---------------
 
 To test the job locally, just run::
 
@@ -71,7 +54,7 @@ input files. It automatically decompresses .gz and .bz2 files::
 See :py:mod:`mrjob.examples` for more examples.
 
 Running on EMR
-^^^^^^^^^^^^^^
+--------------
 
 * Set up your Amazon Account (see :ref:`amazon-setup`)
 * Set :envvar:`AWS_ACCESS_KEY_ID` and :envvar:`AWS_SECRET_ACCESS_KEY`
@@ -80,7 +63,7 @@ Running on EMR
     python your_mr_job_sub_class.py -r emr < input > output
 
 Running on your own Hadoop cluster
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------------
 
 * Set up a hadoop cluster (see http://hadoop.apache.org/common/docs/current/)
 * If running Python 2.5 on your cluster, install the :py:mod:`simplejson` module on all nodes. (Recommended but not required for Python 2.6+)
@@ -89,8 +72,22 @@ Running on your own Hadoop cluster
 
     python your_mr_job_sub_class.py -r hadoop < input > output
 
-Running from another script
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Configuration
+-------------
+
+Runners are configured through keyword arguments to their init methods.
+
+These can be set:
+
+- from :py:mod:`mrjob.conf`
+- from the command line
+- by re-defining :py:meth:`~mrjob.job.MRJob.job_runner_kwargs` etc in your :py:class:`~mrjob.job.MRJob` (see :ref:`job-configuration`)
+- by instantiating the runner directly
+
+.. _runners-programmatically:
+
+Running your job programmatically
+---------------------------------
 
 Use :py:meth:`~mrjob.job.MRJob.make_runner` to run an
 :py:class:`~mrjob.job.MRJob` from another Python script::

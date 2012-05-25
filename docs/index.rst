@@ -20,8 +20,8 @@ Guides
 
 **Basics**
 
-* :doc:`quickstart`
-* :doc:`concepts`
+* :doc:`guides/quickstart`
+* :doc:`guides/concepts`
 
 **Writing jobs**
 
@@ -32,16 +32,16 @@ Guides
 
 **Running jobs**
 
-* Runners
-* Running jobs programmatically
+* :doc:`guides/runners`
+* :ref:`runners-programmatically`
 * Making files available to tasks
 
 **Configuration**
 
-* :doc:`configs-basics`
+* :doc:`guides/configs-basics`
 * Hadoop options
 * Other options
-* :doc:`configs-reference`
+* :doc:`guides/configs-reference`
 
 **Cookbook**
 
@@ -56,32 +56,22 @@ Guides
 
 **Running jobs on Elastic MapReduce**
 
-* :doc:`emr-concepts`
+* :doc:`guides/emr-concepts`
 * :ref:`amazon-setup`
 * :ref:`ssh-tunneling`
-* :doc:`emr-opts`
-* :doc:`emr-tools`
-* :doc:`emr-troubleshooting`
-* :doc:`emr-advanced`
+* :doc:`guides/emr-opts`
+* :doc:`guides/emr-tools`
+* :doc:`guides/emr-troubleshooting`
+* :doc:`guides/emr-advanced`
 
 Reference
 =========
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 2
 
     whats-new.rst
-    writing-and-running.rst
-    job.rst
-    configs.rst
-    protocols.rst
-    runners-runner.rst
-    runners-inline.rst
-    runners-local.rst
-    runners-hadoop.rst
-    runners-emr.rst
-    utils.rst
-    tools.rst
+    reference.rst
     guides.rst
 
 Indices and tables

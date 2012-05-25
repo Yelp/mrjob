@@ -98,5 +98,5 @@ You can put a config file at ``/etc/mrjob.conf``, ``~/.mrjob.conf``, or
 ``./mrjob.conf`` for mrjob to find it without passing it via ``--conf-path``.
 Here is an example file:
 
-.. include:: ../mrjob.conf.example
+.. include:: ../../mrjob.conf.example
     :literal:

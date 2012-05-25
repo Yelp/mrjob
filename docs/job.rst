@@ -1,11 +1,8 @@
-MRJob - Base class for all jobs
-===============================
+mrjob.job
+=========
 
 .. py:module:: mrjob.job
 
-
-Basic
------
 
 .. currentmodule:: mrjob.job
 
@@ -13,8 +10,8 @@ Basic
 
 .. _writing-one-step-jobs:
 
-Writing one-step jobs
-^^^^^^^^^^^^^^^^^^^^^
+One-step jobs
+-------------
 
 .. automethod:: MRJob.mapper
 .. automethod:: MRJob.reducer
@@ -28,32 +25,32 @@ Writing one-step jobs
 
 .. _writing-multi-step-jobs:
 
-Writing multi-step jobs
-^^^^^^^^^^^^^^^^^^^^^^^
+Multi-step jobs
+---------------
 
 .. automethod:: MRJob.steps
 .. automethod:: MRJob.mr
 
 Running the job
-^^^^^^^^^^^^^^^
+---------------
 
 .. automethod:: MRJob.run
 .. automethod:: MRJob.__init__
 .. automethod:: MRJob.make_runner
 
-Parsing the output
-^^^^^^^^^^^^^^^^^^
+Parsing output
+--------------
 
 .. automethod:: MRJob.parse_output_line
 
 Counters and status messages
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------
 
 .. automethod:: MRJob.increment_counter
 .. automethod:: MRJob.set_status
 
 Setting protocols
-^^^^^^^^^^^^^^^^^
+-----------------
 
 .. autoattribute:: MRJob.INPUT_PROTOCOL
 .. autoattribute:: MRJob.INTERNAL_PROTOCOL
@@ -61,13 +58,12 @@ Setting protocols
 .. automethod:: MRJob.input_protocol
 .. automethod:: MRJob.internal_protocol
 .. automethod:: MRJob.output_protocol
-.. automethod:: MRJob.pick_protocols
 
 Command-line options
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 
 See :ref:`writing-cl-opts` for information on adding command line options to
-your job. See :doc:`configs-reference` for a complete list of all
+your job. See :doc:`guides/configs-reference` for a complete list of all
 configuration options.
 
 .. automethod:: MRJob.configure_options
@@ -81,7 +77,7 @@ configuration options.
 .. _job-configuration:
 
 Job runner configuration
-^^^^^^^^^^^^^^^^^^^^^^^^
+------------------------
 .. automethod:: MRJob.job_runner_kwargs
 .. automethod:: MRJob.local_job_runner_kwargs
 .. automethod:: MRJob.emr_job_runner_kwargs
@@ -91,7 +87,7 @@ Job runner configuration
 .. automethod:: MRJob.mr_job_script
 
 Running specific parts of jobs
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+------------------------------
 .. automethod:: MRJob.run_job
 .. automethod:: MRJob.run_mapper
 .. automethod:: MRJob.run_reducer
@@ -101,7 +97,7 @@ Running specific parts of jobs
 .. _hadoop-config:
 
 Hadoop Configuration
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 .. autoattribute:: MRJob.HADOOP_INPUT_FORMAT
 .. automethod:: MRJob.hadoop_input_format
 .. autoattribute:: MRJob.HADOOP_OUTPUT_FORMAT

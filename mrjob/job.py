@@ -744,8 +744,9 @@ class MRJob(object):
 
     def show_steps(self):
         """Print information about how many steps there are, and whether
-        they contain a mapper or reducer. Job runners (see :doc:`runners`)
-        use this to determine how Hadoop should call this script.
+        they contain a mapper or reducer. Job runners (see
+        :doc:`guides/runners`) use this to determine how Hadoop should call
+        this script.
 
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.

@@ -134,6 +134,11 @@ far, including multiple input lines.* When Hadoop Streaming stops sending data
 to the map task, mrjob calls ``final_get_words()`` and it emits a much smaller
 set of output lines.
 
+Counters
+^^^^^^^^
+
+COUNTERS ARE SUPER SWEET
+
 .. _job-protocols:
 
 Protocols

@@ -172,7 +172,7 @@ Changes and Deprecations
         All ``*_bin`` configuration options (``hadoop_bin``, ``python_bin``,
         and ``ssh_bin``) take lists instead of strings so you can add
         arguments (like ``['python', '-v']``).  More info:
-        :doc:`configs-reference`
+        :doc:`guides/configs-reference`
 
         Cleanup options have been split into ``cleanup`` and
         ``cleanup_on_failure``. There are more granular values for both of

@@ -65,7 +65,7 @@ Temp files and cleanup
     Which kinds of directories to clean up when a job fails. Valid choices are
     the same as **cleanup**.
 
-**output_dir** (:option:`--output-dir`)
+**output_dir** (:option:`-o`, :option:`--output-dir`)
     An empty/non-existent directory where Hadoop streaming should put the
     final output from the job.  If you don't specify an output directory,
     we'll output into a subdirectory of this job's temporary directory. You
@@ -102,9 +102,11 @@ Job execution context
 Other
 -----
 
-**conf_path** (:option:`--conf-path`)
+**conf_path** (:option:`-c`, :option:`--conf-path`, :option:`--no-conf`)
     Path to a configuration file. This option cannot be used in configuration
-    files, because that would cause a universe-ending causality paradox.
+    files, because that would cause a universe-ending causality paradox. Use
+    `--no-conf` on the command line or `conf_path=False` to force mrjob to
+    load no configuration files at all.
 
 **steps_python_bin** (:option:`--steps-python-bin`)
     Name/path of alternate python binary to use to query the job about its

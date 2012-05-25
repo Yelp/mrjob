@@ -43,6 +43,12 @@ Options available to hadoop and emr runners
     Who is running this job. Used solely to set the job name.  By default, we
     use :py:func:`getpass.getuser`, or ``no_user`` if it fails.
 
+**partitioner** (:option:`--partitioner`)
+    Optional name of a Hadoop partitoner class, e.g.
+    ``'org.apache.hadoop.mapred.lib.HashPartitioner'``. Hadoop Streaming will
+    use this to determine how mapper output should be sorted and distributed
+    to reducers.
+
 Options available to hadoop runner only
 ---------------------------------------
 

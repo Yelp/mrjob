@@ -7,8 +7,6 @@ We look for :file:`mrjob.conf` in these locations:
 
 - The location specified by :envvar:`MRJOB_CONF`
 - :file:`~/.mrjob.conf`
-- :file:`~/.mrjob` **(deprecated)**
-- :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH` **(deprecated)**
 - :file:`/etc/mrjob.conf`
 
 If your :file:`mrjob.conf` path is deprecated, use this table to fix it:

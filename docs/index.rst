@@ -38,7 +38,7 @@ Guides
 
 **Configuration**
 
-* Config file format and location
+* :doc:`configs-basics`
 * Hadoop options
 * Other options
 * :doc:`configs-reference`

@@ -13,7 +13,8 @@ Reading and writing mrjob.conf
 Combining options
 -----------------
 
-Combiner functions take a list of values to combine, with later options taking precedence over earlier ones. ``None`` values are always ignored.
+Combiner functions take a list of values to combine, with later options taking
+precedence over earlier ones. ``None`` values are always ignored.
 
 .. autofunction:: combine_values
 .. autofunction:: combine_lists

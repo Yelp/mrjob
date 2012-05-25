@@ -89,6 +89,8 @@ features simulated. If you have configured mrjob to use Hadoop, you can use
 ``-r hadoop`` to run your job on the Hadoop cluster. If you have configured AWS
 credentials, you can use ``-r emr`` to run your job on EMR.
 
+If your code spans multiple files, see :ref:`cookbook-src-tree-pythonpath`.
+
 Configuration
 -------------
 

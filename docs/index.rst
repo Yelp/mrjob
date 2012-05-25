@@ -45,9 +45,9 @@ Guides
 
 **Cookbook**
 
-* Putting your source tree in PYTHONPATH
-* Increasing task timeout
-* Writing compressed output
+* :ref:`cookbook-src-tree-pythonpath`
+* :ref:`cookbook-task-timeout`
+* :ref:`cookbook-compressed-output`
 
 **Testing**
 
@@ -56,13 +56,13 @@ Guides
 
 **Running jobs on Elastic MapReduce**
 
-* Concepts
-* Configuring AWS credentials
-* Configuring SSH credentials
-* EMR runner options
-* :doc:`tools`
-* Troubleshooting
-* Advanced EMR strategies
+* :doc:`emr-concepts`
+* :ref:`amazon-setup`
+* :ref:`ssh-tunneling`
+* :doc:`emr-opts`
+* :doc:`emr-tools`
+* :doc:`emr-troubleshooting`
+* :doc:`emr-advanced`
 
 Reference
 =========
@@ -78,7 +78,7 @@ Reference
     runners.rst
     utils.rst
     tools.rst
-    testing.rst
+    guides.rst
 
 Indices and tables
 ==================

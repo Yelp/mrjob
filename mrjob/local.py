@@ -60,7 +60,7 @@ class LocalMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing
     purposes.
 
-    This is the default way of running jobs; we assume you'll spend some
+    This is NOT the default way of running jobs; we assume you'll spend some
     time debugging your job before you're ready to run it on EMR or
     Hadoop.
 

@@ -163,7 +163,6 @@ class HadoopJobRunner(MRJobRunner):
         """:py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments
         as :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
         which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
-
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 

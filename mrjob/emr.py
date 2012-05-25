@@ -716,13 +716,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                             instance, rather than to a local
                                             file or one on S3. Rarely necessary
                                             to set this by hand.
-        :type hadoop_version: str
-        :param hadoop_version: Set the version of Hadoop to use on EMR.
-                               Consider setting *ami_version* instead; only AMI
-                               version 1.0 supports multiple versions of Hadoop
-                               anyway. If *ami_version* is not set, we'll
-                               default to Hadoop 0.20 for backwards
-                               compatibility with :py:mod:`mrjob` v0.3.0.
         :type num_ec2_core_instances: int
         :param num_ec2_core_instances: Number of core (or "slave") instances to
                                        start up. These run your job and host

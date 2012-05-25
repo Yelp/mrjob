@@ -7,7 +7,8 @@ The format of each item in this document is:
     Description of option behavior
 
 Options that take multiple values can be passed multiple times on the command
-line.
+line. All options can be passed as keyword arguments to the runner if
+initialized programmatically.
 
 .. _configs-making-files-available:
 
@@ -19,17 +20,17 @@ data files, etc. This section covers options available to all runners that
 mrjob uses to upload files to your job's execution environments.
 
 
-**bootstrap_mrjob** (:option:`--bootstrap-mrjob`)
+**bootstrap_mrjob** (:option:`--bootstrap-mrjob`, :option:`--bootstrap-mrjob`)
     Should we automatically tar up the mrjob library and install it when we run
     job?  Set this to ``False`` if you've already installed ``mrjob`` on your
     Hadoop cluster or install it by some other method.
 
-**upload_files** (:option:`--upload-file`)
+**upload_files** (:option:`--file`)
     A list of files to copy to the local directory of the mr_job script when it
     runs. You can set the local name of the dir we unpack into by appending
     ``#localname`` to the path; otherwise we just use the name of the file.
 
-**upload_archives** (:option:`--upload-archive`)
+**upload_archives** (:option:`--archive`)
 
     A list of archives (e.g. tarballs) to unpack in the local directory of the
     mr_job script when it runs. You can set the local name of the dir we unpack
@@ -64,19 +65,20 @@ Temp files and cleanup
     Which kinds of directories to clean up when a job fails. Valid choices are
     the same as **cleanup**.
 
+**output_dir** (:option:`--output-dir`)
+    An empty/non-existent directory where Hadoop streaming should put the
+    final output from the job.  If you don't specify an output directory,
+    we'll output into a subdirectory of this job's temporary directory. You
+    can control this from the command line with ``--output-dir``. This option
+    cannot be set from configuration files. If used with the hadoop runner,
+    this path does not need to be fully qualified with ``hdfs://`` URIs
+    because it's understood that it has to be on HDFS.
+
 Job execution context
 ---------------------
 
 **cmdenv** (:option:`--cmdenv`)
     Environment variables to pass to the job inside Hadoop streaming
-
-**label** (:option:`--label`)
-    Description of this job to use as the part of its name.  By default, we
-    use the script's module name, or ``no_script`` if there is none.
-
-**owner** (:option:`--owner`)
-    Who is running this job. Used solely to set the job name.  By default, we
-    use :py:func:`getpass.getuser`, or ``no_user`` if it fails.
 
 **python_bin** (:option:`--python-bin`)
     Name/path of alternate python binary for mappers/reducers (e.g. for use
@@ -96,24 +98,38 @@ Job execution context
     locking to keep multiple mappers/reducers on the same node from running
     *setup_scripts* simultaneously.
 
-Hadoop configuration
---------------------
-
-**hadoop_extra_args** (:option:`--hadoop-extra-arg`)
-    Extra arguments to pass to hadoop streaming
-
-**hadoop_streaming_jar** (:option:`--hadoop-streaming-jar`)
-    Path to a custom hadoop streaming jar
-
-**jobconf** (:option:`--jobconf`)
-    ``-jobconf`` args to pass to hadoop streaming. This should be a map from
-    property name to value.  Equivalent to passing ``['-jobconf',
-    'KEY1=VALUE1', '-jobconf', 'KEY2=VALUE2', ...]`` to *hadoop_extra_args*.
 
 Other
 -----
+
+**conf_path** (:option:`--conf-path`)
+    Path to a configuration file. This option cannot be used in configuration
+    files, because that would cause a universe-ending causality paradox.
 
 **steps_python_bin** (:option:`--steps-python-bin`)
     Name/path of alternate python binary to use to query the job about its
     steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults
     to ``sys.executable`` (the current Python interpreter).
+
+Options ignored by the inline runner
+------------------------------------
+
+These options are ignored because they require a real instance of Hadoop:
+
+* *hadoop_extra_args*
+* *hadoop_input_format*
+* *hadoop_output_format*,
+* *hadoop_streaming_jar*
+* *jobconf*
+* *partitioner*
+
+These options are ignored because the inline runner does not invoke the job as
+a subprocess or run it in its own directory:
+
+* *cmdenv*
+* *python_bin*
+* *setup_cmds*
+* *setup_scripts*
+* *steps_python_bin*
+* *upload_archives*
+* *upload_files*

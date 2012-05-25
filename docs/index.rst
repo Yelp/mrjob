@@ -40,7 +40,7 @@ Guides
 
 * :doc:`guides/configs-basics`
 * :doc:`guides/configs-all-runners`
-* Hadoop options
+* :doc:`guides/configs-hadoopy-runners`
 * Other options
 * :doc:`guides/configs-reference`
 

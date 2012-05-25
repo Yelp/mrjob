@@ -254,12 +254,16 @@ class MRJobRunner(object):
                             ``['data/common/', 'data/training/*.gz']``). If
                             this is left blank, we'll read from stdin
         :type output_dir: str
-        :param output_dir: an empty/non-existent directory where Hadoop
+        :param output_dir: An empty/non-existent directory where Hadoop
                            streaming should put the final output from the job.
                            If you don't specify an output directory, we'll
                            output into a subdirectory of this job's temporary
                            directory. You can control this from the command
-                           line with ``--output-dir``.
+                           line with ``--output-dir``. This option cannot be
+                           set from configuration files. If used with the
+                           hadoop runner, this path does not need to be fully
+                           qualified with ``hdfs://`` URIs because it's
+                           understood that it has to be on HDFS.
         :type partitioner: str
         :param partitioner: Optional name of a Hadoop partitoner class, e.g.
                             ``'org.apache.hadoop.mapred.lib.HashPartitioner'``.

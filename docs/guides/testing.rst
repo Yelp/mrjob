@@ -1,7 +1,42 @@
 .. _testing:
 
-Writing test cases
-==================
+Testing jobs
+============
+
+
+Inline vs local runner
+----------------------
+
+The inline runner is the default runner for mrjob 0.4 and later. It runs your
+job in the same process as the runner so that you get faster feedback and
+simpler tracebacks.
+
+The local runner runs your job in subprocesses in another directory and
+simulates several features of Hadoop, including:
+
+* Multiple concurrent tasks
+* ``mapreduce.job.cache.archives``
+* ``mapreduce.job.cache.files``
+* ``mapreduce.job.cache.local.archives``
+* ``mapreduce.job.cache.local.files``
+* ``mapreduce.job.id``
+* ``mapreduce.job.local.dir``
+* ``mapreduce.map.input.file``
+* ``mapreduce.map.input.length``
+* ``mapreduce.map.input.start``
+* ``mapreduce.task.attempt.id``
+* ``mapreduce.task.id``
+* ``mapreduce.task.ismap``
+* ``mapreduce.task.output.dir``
+* ``mapreduce.task.partition``
+
+If you specify *hadoop_version* <= 0.18, the simulated environment variables
+will change to use the names corresponding with the older Hadoop version.
+
+See :py:class:`~mrjob.local.LocalMRJobRunner` for reference about its behavior.
+
+Anatomy of a test case
+----------------------
 
 mrjob's test cases use the :py:mod:`unittest2` module, which is available
 for Python 2.3 and up. Most tests also require the :keyword:`with` statement.

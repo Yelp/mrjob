@@ -1,8 +1,6 @@
 mrjob
 =====
 
-.. image:: logos/logo_medium.png
-
 **mrjob lets you write MapReduce jobs in Python 2.5+ and run them on several
 platforms.** You can:
 

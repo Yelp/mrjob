@@ -194,34 +194,7 @@ class RunnerOptionStore(OptionStore):
 
 
 class MRJobRunner(object):
-    """Abstract base class for all runners.
-
-    Runners are responsible for launching your job on Hadoop Streaming and
-    fetching the results.
-
-    Most of the time, you won't have any reason to construct a runner directly;
-    it's more like a utility that allows an :py:class:`~mrjob.job.MRJob`
-    to run itself. Normally things work something like this:
-
-    * Get a runner by calling :py:meth:`~mrjob.job.MRJob.make_runner` on your
-      job
-    * Call :py:meth:`~mrjob.runner.MRJobRunner.run` on your runner. This will:
-
-      * Run your job with :option:`--steps` to find out how many
-        mappers/reducers to run
-      * Copy your job and supporting files to Hadoop
-      * Instruct Hadoop to run your job with the appropriate
-        :option:`--mapper`, :option:`--combiner`, :option:`--reducer`, and
-        :option:`--step-num` arguments
-
-    Each runner runs a single job once; if you want to run a job multiple
-    times, make multiple runners.
-
-    Subclasses: :py:class:`~mrjob.emr.EMRJobRunner`,
-    :py:class:`~mrjob.hadoop.HadoopJobRunner`,
-    :py:class:`~mrjob.inline.InlineJobRunner`,
-    :py:class:`~mrjob.local.LocalMRJobRunner`
-    """
+    """Abstract base class for all runners"""
 
     #: alias for this runner; used for picking section of
     #: :py:mod:``mrjob.conf`` to load one of ``'local'``, ``'emr'``,
@@ -299,89 +272,6 @@ class MRJobRunner(object):
                       get passed through to the runner. If for some reason
                       your lines are missing newlines, we'll add them;
                       this makes it easier to write automated tests.
-
-        All runners also take the following options as keyword arguments.
-        These can be defaulted in your :mod:`mrjob.conf` file:
-
-        :type base_tmp_dir: str
-        :param base_tmp_dir: path to put local temp dirs inside. By default we
-                             just call :py:func:`tempfile.gettempdir`
-        :type bootstrap_mrjob: bool
-        :param bootstrap_mrjob: should we automatically tar up the mrjob
-                                library and install it when we run the mrjob?
-                                Set this to ``False`` if you've already
-                                installed ``mrjob`` on your Hadoop cluster.
-        :type cleanup: list
-        :param cleanup: List of which kinds of directories to delete when a
-                        job succeeds. See :py:data:`.CLEANUP_CHOICES`.
-        :type cleanup_on_failure: list
-        :param cleanup_on_failure: Which kinds of directories to clean up when
-                                   a job fails. See
-                                   :py:data:`.CLEANUP_CHOICES`.
-        :type cmdenv: dict
-        :param cmdenv: environment variables to pass to the job inside Hadoop
-                       streaming
-        :type hadoop_extra_args: list of str
-        :param hadoop_extra_args: extra arguments to pass to hadoop streaming
-        :type hadoop_streaming_jar: str
-        :param hadoop_streaming_jar: path to a custom hadoop streaming jar.
-        :type jobconf: dict
-        :param jobconf: ``-jobconf`` args to pass to hadoop streaming. This
-                        should be a map from property name to value.
-                        Equivalent to passing ``['-jobconf', 'KEY1=VALUE1',
-                        '-jobconf', 'KEY2=VALUE2', ...]`` to
-                        *hadoop_extra_args*.
-        :type label: str
-        :param label: description of this job to use as the part of its name.
-                      By default, we use the script's module name, or
-                      ``no_script`` if there is none.
-        :type owner: str
-        :param owner: who is running this job. Used solely to set the job name.
-                      By default, we use :py:func:`getpass.getuser`, or
-                      ``no_user`` if it fails.
-        :type python_archives: list of str
-        :param python_archives: same as upload_archives, except they get added
-                                to the job's :envvar:`PYTHONPATH`
-        :type python_bin: str
-        :param python_bin: Name/path of alternate python binary for
-                           mappers/reducers (e.g. for use with
-                           :py:mod:`virtualenv`). Defaults to ``'python'``.
-        :type setup_cmds: list
-        :param setup_cmds: a list of commands to run before each mapper/reducer
-                           step (e.g.
-                           ``['cd my-src-tree; make', 'mkdir -p /tmp/foo']``).
-                           You can specify commands as strings, which will be
-                           run through the shell, or lists of args, which will
-                           be invoked directly. We'll use file locking to
-                           ensure that multiple mappers/reducers running on
-                           the same node won't run *setup_cmds* simultaneously
-                           (it's safe to run ``make``).
-        :type setup_scripts: list of str
-        :param setup_scripts: files that will be copied into the local working
-                              directory and then run. These are run after
-                              *setup_cmds*. Like with *setup_cmds*, we use file
-                              locking to keep multiple mappers/reducers on the
-                              same node from running *setup_scripts*
-                              simultaneously.
-        :type steps_python_bin: str
-        :param steps_python_bin: Name/path of alternate python binary to use to
-                                 query the job about its steps (e.g. for use
-                                 with :py:mod:`virtualenv`). Rarely needed.
-                                 Defaults to ``sys.executable`` (the current
-                                 Python interpreter).
-        :type upload_archives: list of str
-        :param upload_archives: a list of archives (e.g. tarballs) to unpack in
-                                the local directory of the mr_job script when
-                                it runs. You can set the local name of the dir
-                                we unpack into by appending ``#localname`` to
-                                the path; otherwise we just use the name of the
-                                archive file (e.g. ``foo.tar.gz``)
-        :type upload_files: list of str
-        :param upload_files: a list of files to copy to the local directory of
-                             the mr_job script when it runs. You can set the
-                             local name of the dir we unpack into by appending
-                             ``#localname`` to the path; otherwise we just use
-                             the name of the file
         """
         self._opts = self.OPTION_STORE_CLASS(self.alias, opts, conf_path)
 

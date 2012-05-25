@@ -39,7 +39,7 @@ Guides
 **Configuration**
 
 * :doc:`guides/configs-basics`
-* :ref:`configs-making-files-available`
+* :doc:`guides/configs-all-runners`
 * Hadoop options
 * Other options
 * :doc:`guides/configs-reference`

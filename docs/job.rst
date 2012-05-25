@@ -63,10 +63,12 @@ Setting protocols
 .. automethod:: MRJob.output_protocol
 .. automethod:: MRJob.pick_protocols
 
-Custom command-line options
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Command-line options
+^^^^^^^^^^^^^^^^^^^^
 
-See :doc:`configs-reference` for a complete list of all configuration options.
+See :ref:`writing-cl-opts` for information on adding command line options to
+your job. See :doc:`configs-reference` for a complete list of all
+configuration options.
 
 .. automethod:: MRJob.configure_options
 .. automethod:: MRJob.add_passthrough_option
@@ -74,25 +76,7 @@ See :doc:`configs-reference` for a complete list of all configuration options.
 .. automethod:: MRJob.load_options
 .. automethod:: MRJob.is_mapper_or_reducer
 
-.. _custom-options:
-
-Custom command-line types and actions
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 .. autoattribute:: MRJob.OPTION_CLASS
-
-The :py:mod:`optparse` module allows the addition of new actions and types.
-See the `optparse docs <http://docs.python.org/library/optparse.html#extending-optparse>`_
-for instructions on defining custom options. The only difference is that
-instead of passing *option_class* to the :py:class:`OptionParser` instance
-yourself, you must set the :py:attr:`MRJob.OPTION_CLASS` attribute.
-
-Passthrough arguments have the additional caveat that mrjob uses some lesser
-magic to reproduce the argument values for the command lines of subprocesses.
-In practice you shouldn't encounter any problems here even with relatively
-exotic option behavior, but be aware that your options will be processed
-twice, with the second round using a copy of your default values produced by
-:py:func:`copy.deepcopy`.
 
 .. _job-configuration:
 

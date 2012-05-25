@@ -298,3 +298,89 @@ example.
 Defining command line options
 -----------------------------
 
+Remember that your script is executed in several contexts: once for the initial
+invokation, and once for each task. If you just add an option to your job's
+option parser, that option's value won't be propagated to other runs of your
+script. Instead, you can use mrjob's option API:
+:py:meth:`~mrjob.job.MRJob.add_passthrough_option` and
+:py:meth:`~mrjob.job.MRJob.add_file_option`.
+
+A **passthrough option** is an :py:mod:`optparse` option that mrjob is aware
+of. mrjob inspects the value of the option when you invoke your script [#popt]_
+and reproduces that value when it invokes your script in other contexts. The
+command line-switchable protocol example from before uses this feature::
+
+    class CommandLineProtocolJob(MRJob):
+
+        def configure_options(self):
+            super(CommandLineProtocolJob, self).configure_options()
+            self.add_passthrough_option(
+                '--input-format', default='raw', choices=['raw', 'json'])
+
+        def input_protocol(self):
+            if self.options.input_format == 'json':
+                return JSONValueProtocol()
+            elif self.options.input_format == 'raw':
+                return RawValueProtocol()
+
+When you run your script with ``--input-format=json``, mrjob detects that you
+passed ``--input-format`` on the command line. When your script is run in any
+other context, such as on Hadoop, it adds ``input-format=json`` to its
+command string.
+
+:py:meth:`~mrjob.job.MRJob.add_passthrough_option` takes the same arguments as
+:py:meth:`optparse.OptionParser.add_option`. For more information, see the
+`optparse docs`_.
+
+.. _`optparse docs`: http://docs.python.org/library/optparse.html
+
+A **file option** is takes a local file path as its argument. mrjob uploads the
+file to each task's working directory and updates the option value accordingly.
+For example, if you wanted to upload a :py:mod:`sqlite3` database to use
+within each map task, you could do this::
+
+    class SqliteJob(MRJob):
+
+        def configure_options(self):
+            super(CommandLineProtocolJob, self).configure_options()
+            self.add_file_option('--database', default='/etc/my_db.sqlite3')
+
+        def mapper_init(self):
+            # make sqlite3 database available to mapper
+            self.sqlite_conn = sqlite3.connect(self.options.database)
+
+.. rubric:: Footnotes
+
+.. [#popt] This is accomplished using crazy :py:mod:`optparse` hacks so you
+    don't need to limit yourself to certain option types. However, your default
+    values need to be compatible with :py:func:`copy.deepcopy`.
+
+.. _custom-options:
+
+Custom option types
+^^^^^^^^^^^^^^^^^^^
+
+:py:mod:`optparse` allows you to add custom types and actions to your options
+(see `extending optparse`_), but doing so requires passing a custom
+:py:class:`Option` object into the :py:class:`OptionParser`  constructor. mrjob
+creates its own :py:class:`OptionParser` object, so if you want to use a custom
+:py:class:`Option` class, you'll need to set the :py:attr:`MRJob.OPTION_CLASS`
+attribute.
+
+::
+
+    import optparse
+
+    import mrjob
+
+
+    class MyOption(optparse.Option):
+        pass    # extend optparse as documented by the Python standard library
+
+
+    class MyJob(mrjob.job.MRJob):
+
+        OPTION_CLASS = MyOption
+
+.. _`extending optparse`:
+    http://docs.python.org/library/optparse.html#extending-optparse

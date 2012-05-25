@@ -20,43 +20,43 @@ To get started, install with ``pip``::
 Guides
 ======
 
-**Basics:**
+**Basics**
 
 * :doc:`quickstart`
 * :doc:`concepts`
 
-**Writing jobs:**
+**Writing jobs**
 
 * :ref:`writing-basics`
 * :ref:`job-protocols`,
 * :ref:`writing-protocols`
 * :ref:`writing-cl-opts`
 
-**Running jobs:**
+**Running jobs**
 
 * Runners
 * Running jobs programmatically
 * Making files available to tasks
 
-**Configuration:**
+**Configuration**
 
 * Config file format and location
 * Hadoop options
 * Other options
 * :doc:`configs-reference`
 
-**Cookbook:**
+**Cookbook**
 
 * Putting your source tree in PYTHONPATH
 * Increasing task timeout
 * Writing compressed output
 
-**Testing:**
+**Testing**
 
 * :ref:`testing-anatomy`
 * :ref:`testing-counters`
 
-**Running jobs on Elastic MapReduce:**
+**Running jobs on Elastic MapReduce**
 
 * Concepts
 * Configuring AWS credentials

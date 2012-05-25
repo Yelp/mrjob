@@ -75,7 +75,11 @@ Reference
     job.rst
     configs.rst
     protocols.rst
-    runners.rst
+    runners-runner.rst
+    runners-inline.rst
+    runners-local.rst
+    runners-hadoop.rst
+    runners-emr.rst
     utils.rst
     tools.rst
     guides.rst

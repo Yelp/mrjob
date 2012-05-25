@@ -7,6 +7,7 @@ Guides
     quickstart.rst
     concepts.rst
     writing-mrjobs.rst
+    runners.rst
     configs-basics.rst
     configs-reference.rst
     cookbook.rst

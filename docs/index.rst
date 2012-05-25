@@ -26,7 +26,7 @@ Guides
 **Writing jobs**
 
 * :ref:`writing-basics`
-* :ref:`job-protocols`,
+* :ref:`job-protocols`
 * :ref:`writing-protocols`
 * :ref:`writing-cl-opts`
 

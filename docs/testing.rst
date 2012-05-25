@@ -3,6 +3,8 @@
 Testing with mrjob
 ==================
 
+.. _testing-anatomy:
+
 Anatomy of a Test Case
 ^^^^^^^^^^^^^^^^^^^^^^
 
@@ -115,6 +117,8 @@ You should be able to switch out the ``inline`` runner for the ``local`` runner
 without changing any other code. The ``local`` runner will launch multiple
 subprocesses to run your job, which may expose assumptions about input order
 or race conditions.
+
+.. _testing-counters:
 
 Counters
 ^^^^^^^^

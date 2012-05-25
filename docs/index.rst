@@ -53,8 +53,8 @@ Guides
 
 **Testing:**
 
-* Anatomy of a test case
-* Reading counters
+* :ref:`testing-anatomy`
+* :ref:`testing-counters`
 
 **Running jobs on Elastic MapReduce:**
 

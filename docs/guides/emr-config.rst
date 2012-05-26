@@ -33,10 +33,12 @@ master nodes to view live progress, see the job tracker in your browser, and
 fetch error logs quickly.
 
 * Go to https://console.aws.amazon.com/ec2/home
-* Make sure the **Region** dropdown (upper left) matches the region you want to run jobs in (usually "US East").
+* Make sure the **Region** dropdown (upper left) matches the region you want 
+  to run jobs in (usually "US East").
 * Click on **Key Pairs** (lower left)
 * Click on **Create Key Pair** (center).
-* Name your key pair ``EMR`` (any name will work but that's what we're using in this example)
+* Name your key pair ``EMR`` (any name will work but that's what we're using 
+  in this example)
 * Save :file:`EMR.pem` wherever you like (``~/.ssh`` is a good place)
 * Run ``chmod og-rwx /path/to/EMR.pem`` so that ``ssh`` will be happy
 * Add the following entries to your :py:mod:`mrjob.conf`::

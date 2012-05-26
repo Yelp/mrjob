@@ -32,8 +32,9 @@ Options available to hadoop and emr runners
     :py:class:`MRJobRunner`.
 
 **hadoop_streaming_jar** (:option:`--hadoop-streaming-jar`)
-    Path to a custom hadoop streaming jar. This is optional for the Hadoop
-    runner, which will search for it in :envvar:`HADOOP_HOME`.
+    Path to a custom hadoop streaming jar. This is optional for the hadoop
+    runner, which will search for it in :envvar:`HADOOP_HOME`. The emr runner
+    can take a path either local to your machine or on S3.
 
 **label** (:option:`--label`)
     Description of this job to use as the part of its name.  By default, we

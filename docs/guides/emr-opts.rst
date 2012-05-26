@@ -1,5 +1,28 @@
 EMR runner options
+==================
+
+All options from :doc:`configs-all-runners` and :doc:`configs-hadoopy-runners`
+are available to the emr runner.
+
+Amazon credentials
 ------------------
+
+See :doc:`emr-config` for specific instructions about setting these options.
+
+**aws_access_key_id** (:option:`--aws_access_key_id`)
+    "username" for Amazon web services.
+
+**aws_secret_access_key** (:option:`--aws_secret_access_key`)
+    your "password" on AWS
+
+**ec2_key_pair** (:option:`--ec2_key_pair`)
+    name of the SSH key you set up for EMR.
+
+**ec2_key_pair_file** (:option:`--ec2_key_pair_file`)
+    path to file containing the SSH key for EMR
+
+Job flow creation and configuration
+-----------------------------------
 
 **additional_emr_info** (:option:`--additional_emr_info`)
     Special parameters to select additional features, mostly to support beta
@@ -9,23 +32,37 @@ EMR runner options
 **ami_version** (:option:`--ami_version`)
     EMR AMI version to use. This controls which Hadoop version(s) are
     available and which version of Python is installed, among other things;
-    see \
-    http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.html?EnvironmentConfig_AMIVersion.html
-    for details. Implicitly defaults to AMI version 1.0 (this will change to
-    2.0 in mrjob v0.4).
+    see `the AWS docs on specifying the AMI version`_.  for details.
+    Implicitly defaults to AMI version 1.0 (this will change to 2.0 in mrjob
+    v0.4).
 
-**aws_access_key_id** (:option:`--aws_access_key_id`)
-    "username" for Amazon web services.
+    .. _`the AWS docs on specifying the AMI version`:
+        http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/EnvironmentConfig_AMIVersion.html
 
 **aws_availability_zone** (:option:`--aws_availability_zone`)
     availability zone to run the job in
 
-**aws_secret_access_key** (:option:`--aws_secret_access_key`)
-    your "password" on AWS
-
 **aws_region** (:option:`--aws_region`)
     region to connect to S3 and EMR on (e.g.  ``us-west-1``). If you want to
     use separate regions for S3 and EMR, set *emr_endpoint* and *s3_endpoint*.
+
+**emr_endpoint** (:option:`--emr_endpoint`)
+    optional host to connect to when communicating with S3 (e.g.
+    ``us-west-1.elasticmapreduce.amazonaws.com``).  Default is to infer this
+    from *aws_region*.
+
+**hadoop_streaming_jar_on_emr** (:option:`--hadoop_streaming_jar_on_emr`)
+    Like *hadoop_streaming_jar*, except that it points to a path on the EMR
+    instance, rather than to a local file or one on S3. Rarely necessary to
+    set this by hand.
+
+Bootstrapping
+-------------
+
+These options apply at *bootstrap time*, before the Hadoop cluster has
+started. Bootstrap time is a good time to install Debian packages or compile
+and install another Python binary. See :ref:`configs-making-files-available`
+for task-time setup.
 
 **bootstrap_actions** (:option:`--bootstrap_actions`)
     a list of raw bootstrap actions (essentially scripts) to run prior to any
@@ -45,11 +82,6 @@ EMR runner options
     local files for mrjob to upload to S3, or any URI that ``hadoop fs`` can
     handle.
 
-**bootstrap_mrjob** (:option:`--bootstrap_mrjob`)
-    This is actually an option in the base :py:class:`~mrjob.job.MRJobRunner`
-    class. If this is ``True`` (the default), we'll tar up :py:mod:`mrjob`
-    from the local filesystem, and install it on the master node.
-
 **bootstrap_python_packages** (:option:`--bootstrap_python_packages`)
     paths of python modules to install on EMR. These should be standard Python
     module tarballs. If a module is named ``foo.tar.gz``, we expect to be able
@@ -60,9 +92,18 @@ EMR runner options
     *bootstrap_cmds* and *bootstrap_files*). These are run after the command
     from bootstrap_cmds.
 
+Monitoring the job flow
+-----------------------
+
 **check_emr_status_every** (:option:`--check_emr_status_every`)
     How often to check on the status of EMR jobs. Default is 30 seconds (too
     often and AWS will throttle you anyway).
+
+**enable_emr_debugging** (:option:`--enable_emr_debugging`)
+    store Hadoop logs in SimpleDB
+
+Number and type of instances
+----------------------------
 
 **ec2_instance_type** (:option:`--ec2_instance_type`)
     What sort of EC2 instance(s) to use on the nodes that actually run tasks
@@ -70,12 +111,6 @@ EMR runner options
     instances (see *num_ec2_instances*), the master node is just coordinating
     the other nodes, so usually the default instance type (``m1.small``) is
     fine, and using larger instances is wasteful.
-
-**ec2_key_pair** (:option:`--ec2_key_pair`)
-    name of the SSH key you set up for EMR.
-
-**ec2_key_pair_file** (:option:`--ec2_key_pair_file`)
-    path to file containing the SSH key for EMR
 
 **ec2_core_instance_type** (:option:`--ec2_core_instance_type`)
     like *ec2_instance_type*, but only for the core (also know as "slave")
@@ -112,35 +147,6 @@ EMR runner options
     instance at this bid price.  (You usually only want to set bid price for
     task instances.)
 
-**emr_endpoint** (:option:`--emr_endpoint`)
-    optional host to connect to when communicating with S3 (e.g.
-    ``us-west-1.elasticmapreduce.amazonaws.com``).  Default is to infer this
-    from *aws_region*.
-
-**emr_job_flow_id** (:option:`--emr_job_flow_id`)
-    the ID of a persistent EMR job flow to run jobs in (normally we launch our
-    own job flow). It's fine for other jobs to be using the job flow; we give
-    our job's steps a unique ID.
-
-**emr_job_flow_pool_name** (:option:`--emr_job_flow_pool_name`)
-    Specify a pool name to join. Is set to ``'default'`` if not specified.
-    Does not imply ``pool_emr_job_flows``.
-
-**enable_emr_debugging** (:option:`--enable_emr_debugging`)
-    store Hadoop logs in SimpleDB
-
-**hadoop_streaming_jar** (:option:`--hadoop_streaming_jar`)
-    This is actually an option in the base
-    :py:class:`~mrjob.runner.MRJobRunner` class. Points to a custom hadoop
-    streaming jar on the local filesystem or S3. If you want to point to a
-    streaming jar already installed on the EMR instances (perhaps through a
-    bootstrap action?), use *hadoop_streaming_jar_on_emr*.
-
-**hadoop_streaming_jar_on_emr** (:option:`--hadoop_streaming_jar_on_emr`)
-    Like *hadoop_streaming_jar*, except that it points to a path on the EMR
-    instance, rather than to a local file or one on S3. Rarely necessary to
-    set this by hand.
-
 **num_ec2_core_instances** (:option:`--num_ec2_core_instances`)
     Number of core (or "slave") instances to start up. These run your job and
     host HDFS. Incompatible with *num_ec2_instances*. This is in addition to
@@ -158,6 +164,18 @@ EMR runner options
     set *num_ec2_core_instances*; EMR does not allow you to run task instances
     without core instances (because there's nowhere to host HDFS).
 
+Choosing/creating a job flow to join
+------------------------------------
+
+**emr_job_flow_id** (:option:`--emr_job_flow_id`)
+    the ID of a persistent EMR job flow to run jobs in (normally we launch our
+    own job flow). It's fine for other jobs to be using the job flow; we give
+    our job's steps a unique ID.
+
+**emr_job_flow_pool_name** (:option:`--emr_job_flow_pool_name`)
+    Specify a pool name to join. Is set to ``'default'`` if not specified.
+    Does not imply ``pool_emr_job_flows``.
+
 **pool_emr_job_flows** (:option:`--pool_emr_job_flows`)
     Try to run the job on a ``WAITING`` pooled job flow with the same
     bootstrap configuration. Prefer the one with the most compute units. Use
@@ -166,6 +184,9 @@ EMR runner options
     flow.  **WARNING**: do not run this without having\
     :py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job
     flows left idle can quickly become expensive!
+
+S3 paths and options
+--------------------
 
 **s3_endpoint** (:option:`--s3_endpoint`)
     Host to connect to when communicating with S3 (e.g.
@@ -187,6 +208,9 @@ EMR runner options
 **s3_sync_wait_time** (:option:`--s3_sync_wait_time`)
     How long to wait for S3 to reach eventual consistency. This is typically
     less than a second (zero in U.S. West) but the default is 5.0 to be safe.
+
+SSH access and tunneling
+------------------------
 
 **ssh_bin** (:option:`--ssh_bin`)
     path to the ssh binary; may include switches (e.g.  ``'ssh -v'`` or

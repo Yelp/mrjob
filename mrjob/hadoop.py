@@ -154,7 +154,8 @@ class HadoopJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.
 
     Input and support files can be either local or on HDFS; use ``hdfs://...``
-    URLs to refer to files on HDFS."""
+    URLs to refer to files on HDFS.
+    """
     alias = 'hadoop'
 
     OPTION_STORE_CLASS = HadoopRunnerOptionStore

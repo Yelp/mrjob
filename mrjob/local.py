@@ -382,7 +382,7 @@ class LocalMRJobRunner(MRJobRunner):
 
             try:
                 outfile = open(outfile_name, 'w')
-                
+
                 # write each line to a file as long as we are within the limit
                 # (split_size)
                 for line_group in line_group_generator(path):

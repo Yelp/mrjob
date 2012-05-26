@@ -12,7 +12,6 @@ Reference
     runners-local.rst
     runners-hadoop.rst
     runners-emr.rst
-    tools.rst
     utils-compat.rst
     utils-parse.rst
     utils-retry.rst

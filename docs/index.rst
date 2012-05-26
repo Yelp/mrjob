@@ -51,12 +51,12 @@ Guides
 
 **Running jobs on Elastic MapReduce**
 
-* :doc:`guides/emr-concepts`
 * :ref:`amazon-setup`
 * :ref:`ssh-tunneling`
 * :doc:`guides/emr-opts`
 * :doc:`guides/emr-tools`
 * :doc:`guides/emr-troubleshooting`
+* :ref:`picking-job-flow-config`
 * :doc:`guides/emr-advanced`
 
 Reference

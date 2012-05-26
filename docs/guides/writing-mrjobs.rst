@@ -385,10 +385,10 @@ Custom option types
 
 :py:mod:`optparse` allows you to add custom types and actions to your options
 (see `extending optparse`_), but doing so requires passing a custom
-:py:class:`Option` object into the :py:class:`OptionParser`  constructor. mrjob
-creates its own :py:class:`OptionParser` object, so if you want to use a custom
-:py:class:`Option` class, you'll need to set the :py:attr:`MRJob.OPTION_CLASS`
-attribute.
+:py:class:`Option` object into the :py:class:`OptionParser`  constructor.
+mrjob creates its own :py:class:`OptionParser` object, so if you want to use a
+custom :py:class:`Option` class, you'll need to set the
+:py:attr:`~mrjob.job.MRJob.OPTION_CLASS` attribute.
 
 ::
 

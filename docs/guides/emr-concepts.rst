@@ -1,6 +1,8 @@
 Concepts
 ========
 
+.. _picking-job-flow-config:
+
 Choosing Type and Number of EC2 Instances
 -----------------------------------------
 

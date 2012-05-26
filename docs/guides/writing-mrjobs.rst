@@ -137,7 +137,25 @@ set of output lines.
 Counters
 ^^^^^^^^
 
-COUNTERS ARE SUPER SWEET
+Hadoop lets you track *counters* that are aggregated over a step. A counter
+had a group, a name, and an integer value. Hadoop itself tracks a few counters
+automatically. mrjob prints your job's counters to the command line when your
+job finishes, and they are available to the runner object if you invoke it
+programmatically.
+
+To increment a counter from anywhere in your job, use the
+:py:meth:`~mrjob.job.MRJob.increment_counter` method::
+
+    class MRCountingJob(MRJob):
+
+        def mapper(self, _, value):
+            self.increment_counter('group', 'counter_name', 1)
+            yield _, value
+
+At the end of your job, you'll get the counter's total value::
+
+    group:
+        counter_name: 1
 
 .. _job-protocols:
 

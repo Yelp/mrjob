@@ -349,13 +349,11 @@ class LocalMRJobRunner(MRJobRunner):
         # Helper functions:
         def create_outfile(orig_name='', start=''):
             # create a new output file and initialize its properties dict
-            task_num = len(file_names)
             outfile_name = os.path.join(tmp_directory,
-                                        'input_part-%05d' % task_num)
+                                        'input_part-%05d' % len(file_names))
             new_file = {
                 'orig_name': orig_name,
                 'start': start,
-                'task_num': task_num,
             }
             file_names[outfile_name] = new_file
             return outfile_name
@@ -457,11 +455,7 @@ class LocalMRJobRunner(MRJobRunner):
         all_proc_dicts = []
         self._prev_outfiles = []
 
-        # The correctly-ordered list of task_num, file_name pairs
-        file_tasks = sorted([(t['task_num'], file_name) for file_name, t in
-                            file_splits.items()], key=lambda t: t[0])
-        
-        for task_num, file_name in file_tasks:
+        for task_num, file_name in enumerate(file_splits):
 
             # setup environment variables
             if step_type == 'M':

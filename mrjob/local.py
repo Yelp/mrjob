@@ -451,7 +451,7 @@ class LocalMRJobRunner(MRJobRunner):
         self._prev_outfiles = []
 
         # The correctly-ordered list of task_num, file_name pairs
-        file_tasks = sorted([(t['task_num'], file_name) for file_name, t in
+        file_tasks = sorted([(t.get('task_num', 0), file_name) for file_name, t in
                             file_splits.items()], key=lambda t: t[0])
         
         for task_num, file_name in file_tasks:

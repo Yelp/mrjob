@@ -313,6 +313,7 @@ class LocalMRJobRunner(MRJobRunner):
                     file_names[path] = {
                         'orig_name': path,
                         'start': 0,
+                        'task_num': 0,
                         'length': os.stat(path)[stat.ST_SIZE],
                     }
                     # this counts as "one split"

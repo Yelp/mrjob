@@ -35,6 +35,13 @@ from mrjob.util import cmd_line
 from mrjob.util import read_input
 from mrjob.util import unarchive
 
+try:
+    # Python 2.7+
+    from collections import OrderedDict
+except ImportError:
+    # Python 2.4+
+    from ordereddict import OrderedDict
+
 
 log = logging.getLogger('mrjob.local')
 
@@ -303,7 +310,7 @@ class LocalMRJobRunner(MRJobRunner):
         # sanity check: if keep_sorted is True, we should only have one file
         assert(not keep_sorted or len(input_paths) == 1)
 
-        file_names = {}
+        file_names = OrderedDict()
         input_paths_to_split = []
 
         for input_path in input_paths:

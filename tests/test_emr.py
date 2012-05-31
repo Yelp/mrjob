@@ -30,6 +30,8 @@ import shutil
 from StringIO import StringIO
 import tempfile
 
+from mock import patch
+
 try:
     import unittest2 as unittest
     unittest  # quiet "redefinition of unused ..." warning from pyflakes
@@ -80,11 +82,29 @@ except ImportError:
 
 class MockEMRAndS3TestCase(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        cls.fake_mrjob_tgz_path = tempfile.mkstemp(
+            prefix='fake_mrjob_tar_gz', suffix='.tar.gz')[1]
+
+    @classmethod
+    def tearDownClass(cls):
+        os.remove(cls.fake_mrjob_tgz_path)
+
     def setUp(self):
         self.make_mrjob_conf()
         self.sandbox_boto()
 
+        def fake_create_mrjob_tar_gz(*args, **kwargs):
+            return self.fake_mrjob_tgz_path
+
+        self.runner_tar_patcher = patch.object(
+            EMRJobRunner, '_create_mrjob_tar_gz',
+            side_effect=fake_create_mrjob_tar_gz)
+        self.runner_tar_patcher.start()
+
     def tearDown(self):
+        self.runner_tar_patcher.stop()
         self.unsandbox_boto()
         self.rm_mrjob_conf()
 
@@ -251,7 +271,15 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             self.assertEqual(runner._opts['additional_emr_info'],
                              '{"key": "value"}')
 
-            runner.run()
+            # have to patch _create_mrjob_tar_gz a little more sneakily so that
+            # runner._mrjob_tar_gz_path is set
+            def fake_create_mrjob_tar_gz(*args, **kwargs):
+                runner._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
+                return self.fake_mrjob_tgz_path
+
+            with patch.object(runner, '_create_mrjob_tar_gz',
+                       side_effect=fake_create_mrjob_tar_gz):
+                runner.run()
 
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)

@@ -100,22 +100,19 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         def fake_create_mrjob_tar_gz(*args, **kwargs):
             return self.fake_mrjob_tgz_path
 
-        self.runner_tar_patcher = patch.object(
-            EMRJobRunner, '_create_mrjob_tar_gz',
-            side_effect=fake_create_mrjob_tar_gz)
-        self.runner_tar_patcher.start()
-
-        def simple_patch(obj, attr):
-            patcher = patch.object(obj, attr)
+        def simple_patch(obj, attr, side_effect=None):
+            patcher = patch.object(obj, attr, side_effect=side_effect)
             patcher.start()
             self.addCleanup(patcher.stop)
+
+        simple_patch(EMRJobRunner, '_create_mrjob_tar_gz',
+                     fake_create_mrjob_tar_gz)
 
         simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
         simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
         simple_patch(time, 'sleep')
 
     def tearDown(self):
-        self.runner_tar_patcher.stop()
         self.unsandbox_boto()
         self.rm_mrjob_conf()
 

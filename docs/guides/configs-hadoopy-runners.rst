@@ -8,14 +8,14 @@ platform, and Elastic MapReduce, they are not all available for all runners.
 Options available to local, hadoop, and emr runners
 ---------------------------------------------------
 
-These options are both used by Hadoop and simulated by the local runner to
+These options are both used by Hadoop and simulated by the ``local`` runner to
 some degree.
 
 **hadoop_version** (:option:`--hadoop-version`)
-    Set the version of Hadoop to use on EMR or simulate in the local runner.
-    If using EMR, consider setting *ami_version* instead; only AMI version 1.0
-    supports multiple versions of Hadoop anyway. If *ami_version* is not set,
-    we'll default to Hadoop 0.20 for backwards compatibility with
+    Set the version of Hadoop to use on EMR or simulate in the ``local``
+    runner. If using EMR, consider setting *ami_version* instead; only AMI
+    version 1.0 supports multiple versions of Hadoop anyway. If *ami_version*
+    is not set, we'll default to Hadoop 0.20 for backwards compatibility with
     :py:mod:`mrjob` v0.3.0.
 
 **jobconf** (:option:`--jobconf`)
@@ -32,7 +32,7 @@ Options available to hadoop and emr runners
     :py:class:`MRJobRunner`.
 
 **hadoop_streaming_jar** (:option:`--hadoop-streaming-jar`)
-    Path to a custom hadoop streaming jar. This is optional for the hadoop
+    Path to a custom hadoop streaming jar. This is optional for the ``hadoop``
     runner, which will search for it in :envvar:`HADOOP_HOME`. The emr runner
     can take a path either local to your machine or on S3.
 

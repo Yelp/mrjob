@@ -7,11 +7,11 @@ Testing jobs
 Inline vs local runner
 ----------------------
 
-The inline runner is the default runner for mrjob 0.4 and later. It runs your
-job in the same process as the runner so that you get faster feedback and
+The ``inline`` runner is the default runner for mrjob 0.4 and later. It runs
+your job in the same process as the runner so that you get faster feedback and
 simpler tracebacks.
 
-The local runner runs your job in subprocesses in another directory and
+The ``local`` runner runs your job in subprocesses in another directory and
 simulates several features of Hadoop, including:
 
 * Multiple concurrent tasks
@@ -98,7 +98,7 @@ collected output. The most straightforward way to provide input is to use the
 object, populate it with data, initialize your job to read from stdin, and
 enable the sandbox with your :py:class:`StringIO` as stdin.
 
-The simplest way to test the full job is with the inline job runner. It runs
+The simplest way to test the full job is with the ``inline`` runner. It runs
 the job in the same process as the test, so small jobs tend to run faster and
 stack traces are simpler. You'll probably also want to specify ``--no-conf``
 so options from your local ``mrjob.conf`` don't pollute your testing

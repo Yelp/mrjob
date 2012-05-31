@@ -70,7 +70,7 @@ Temp files and cleanup
     final output from the job.  If you don't specify an output directory,
     we'll output into a subdirectory of this job's temporary directory. You
     can control this from the command line with ``--output-dir``. This option
-    cannot be set from configuration files. If used with the hadoop runner,
+    cannot be set from configuration files. If used with the ``hadoop`` runner,
     this path does not need to be fully qualified with ``hdfs://`` URIs
     because it's understood that it has to be on HDFS.
 
@@ -125,8 +125,8 @@ These options are ignored because they require a real instance of Hadoop:
 * *jobconf*
 * *partitioner*
 
-These options are ignored because the inline runner does not invoke the job as
-a subprocess or run it in its own directory:
+These options are ignored because the ``inline`` runner does not invoke the job
+as a subprocess or run it in its own directory:
 
 * *cmdenv*
 * *python_bin*

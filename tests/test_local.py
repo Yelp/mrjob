@@ -650,7 +650,9 @@ class TestHadoopConfArgs(unittest.TestCase):
 
 class TestIronPythonEnvironment(unittest.TestCase):
     def test_ironpython_environment(self):
-        environment = LocalMRJobRunner()._subprocess_env('M', 0, 0)
+        runner = LocalMRJobRunner()
+        runner._setup_working_dir()
+        environment = runner._subprocess_env('M', 0, 0)
 
         if is_ironpython:
             self.assertIn('IRONPYTHONPATH', environment)

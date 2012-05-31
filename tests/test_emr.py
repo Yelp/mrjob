@@ -85,11 +85,12 @@ class MockEMRAndS3TestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.fake_mrjob_tgz_path = tempfile.mkstemp(
-            prefix='fake_mrjob_tar_gz', suffix='.tar.gz')[1]
+            prefix='fake_mrjob_', suffix='.tar.gz')[1]
 
     @classmethod
     def tearDownClass(cls):
-        os.remove(cls.fake_mrjob_tgz_path)
+        if os.path.exists(cls.fake_mrjob_tgz_path):
+            os.remove(cls.fake_mrjob_tgz_path)
 
     def setUp(self):
         self.make_mrjob_conf()

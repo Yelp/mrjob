@@ -873,9 +873,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # ssh state
         self._ssh_proc = None
         self._gave_cant_ssh_warning = False
-        # file name of SSH key uploaded to master instance
-        self._ssh_key_name = self._job_name + '.pem'
-        # we don't upload the key until it's needed
+        # we don't upload the ssh key to master until it's needed
         self._ssh_key_is_copied = False
 
         # cache for SSH address
@@ -1011,6 +1009,10 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             s3_uri = s3_uri + '/'
 
         return s3_uri
+
+    @property
+    def _ssh_key_name(self):
+        return self._job_name + '.pem'
 
     @property
     def fs(self):

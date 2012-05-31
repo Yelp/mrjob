@@ -170,8 +170,7 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         # Also pretend to have an SSH key pair file
         runner._opts['ec2_key_pair_file'] = self.keyfile_path
 
-        # re-initialize fs, without ec2_key_pair_file EMRJobRunner disables ssh
-        runner._ssh_key_name = None
+        # re-initialize fs
         runner._fs = None
         runner._ssh_fs = None
         runner._s3_fs = None

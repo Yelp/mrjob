@@ -873,7 +873,10 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # ssh state
         self._ssh_proc = None
         self._gave_cant_ssh_warning = False
-        self._ssh_key_name = None
+        # file name of SSH key uploaded to master instance
+        self._ssh_key_name = self._job_name + '.pem'
+        # we don't upload the key until it's needed
+        self._ssh_key_is_copied = False
 
         # cache for SSH address
         self._address = None
@@ -1031,8 +1034,9 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             if self._opts['ec2_key_pair_file']:
                 self._ssh_fs = SSHFilesystem(self._opts['ssh_bin'],
                                              self._opts['ec2_key_pair_file'],
-                                             self._job_name + '.pem')
-                self._fs = MultiFilesystem(self._ssh_fs, self._s3_fs, LocalFilesystem())
+                                             self._ssh_key_name)
+                self._fs = MultiFilesystem(self._ssh_fs, self._s3_fs,
+                                           LocalFilesystem())
             else:
                 self._ssh_fs = None
                 self._fs = MultiFilesystem(self._s3_fs, LocalFilesystem())
@@ -1223,11 +1227,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             random.setstate(random_state)
 
     def _enable_slave_ssh_access(self):
-        if self._ssh_fs and not self._ssh_key_name:
-            self._ssh_key_name = self._job_name + '.pem'
-            # also inject into the SSHFilesystem. there is probably a better
-            # way to handle this.
-            self._ssh_fs.ssh_key_name = self._ssh_key_name
+        if self._ssh_fs and not self._ssh_key_is_copied:
             ssh_copy_key(
                 self._opts['ssh_bin'],
                 self._address_of_master(),

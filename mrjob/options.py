@@ -16,6 +16,9 @@ objects with categorized command line parameters. This module should not be
 made public until at least 0.4 if not later or never.
 """
 
+from optparse import OptionParser
+from optparse import SUPPRESS_USAGE
+
 from mrjob.runner import CLEANUP_CHOICES
 
 
@@ -395,7 +398,7 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--disable-emr-debugging', dest='enable_emr_debugging',
             action='store_false',
-            help='Enable storage of Hadoop logs in SimpleDB'),
+            help='Disable storage of Hadoop logs in SimpleDB'),
 
         opt_group.add_option(
             '--hadoop-streaming-jar-on-emr',
@@ -495,3 +498,9 @@ def add_emr_opts(opt_group):
             default=None, action='store_true',
             help='Open up an SSH tunnel to the Hadoop job tracker'),
     ]
+
+
+def print_help_for_groups(*args):
+    option_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
+    option_parser.option_groups = args
+    option_parser.print_help()

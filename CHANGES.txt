@@ -1,3 +1,6 @@
+v???
+ * Local runner sorts output consistently (was getting mixed up a little)
+
 v0.3.3.2, 2012-04-10 -- It's a race [condition]!
  * Option parsing no longer dies when -- is used as an argument (#435)
  * Fixed race condition where two jobs can join same job flow thinking it is
@@ -6,8 +9,8 @@ v0.3.3.2, 2012-04-10 -- It's a race [condition]!
    runner (#433)
 
 v0.3.3.1, 2012-04-02 -- Hothothothothothothotfix
- * Fixed S3 locking mechanism parsing of last modified time to work around a
-   bug in boto
+ * Fixed S3 locking mechanism parsing of last modified time to work around an
+   inconsistency in the EMR API
 
 v0.3.3, 2012-03-29 -- Bug...bug...bug...bug...bug...FEATURE!
  * EMR:

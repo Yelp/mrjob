@@ -84,8 +84,6 @@ class LogFetchingTestCase(ToolTestCase):
         fetch_logs_main()
 
         self.assertEqual(self.stdout.getvalue(),
-                         'SSH error: Cannot ssh to master; job flow is not'
-                         ' waiting or running\n'
                          'Task attempts:\n\nSteps:\n\nJobs:\n\nNodes:\n\n')
 
     def test_list_all(self):

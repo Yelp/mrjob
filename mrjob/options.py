@@ -147,7 +147,7 @@ def add_runner_opts(opt_group):
             help="Don't print anything to stderr"),
 
         opt_group.add_option(
-            '-r', '--runner', dest='runner', default='local',
+            '-r', '--runner', dest='runner', default='inline',
             choices=('local', 'hadoop', 'emr', 'inline'),
             help=('Where to run the job: local to run locally, hadoop to run'
                   ' on your Hadoop cluster, emr to run on Amazon'

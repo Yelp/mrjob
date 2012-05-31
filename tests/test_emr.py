@@ -29,6 +29,7 @@ import py_compile
 import shutil
 from StringIO import StringIO
 import tempfile
+import time
 
 from mock import patch
 
@@ -103,6 +104,15 @@ class MockEMRAndS3TestCase(unittest.TestCase):
             EMRJobRunner, '_create_mrjob_tar_gz',
             side_effect=fake_create_mrjob_tar_gz)
         self.runner_tar_patcher.start()
+
+        def simple_patch(obj, attr):
+            patcher = patch.object(obj, attr)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
+        simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
+        simple_patch(time, 'sleep')
 
     def tearDown(self):
         self.runner_tar_patcher.stop()

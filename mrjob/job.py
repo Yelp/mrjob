@@ -97,8 +97,10 @@ See :py:mod:`mrjob.examples` for more examples.
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import with_statement
 
+import codecs
 import inspect
 import itertools
+import locale
 import logging
 from optparse import Option
 from optparse import OptionParser
@@ -499,7 +501,10 @@ class MRJob(object):
         long time between outputs; Hadoop streaming usually times out jobs
         that give no output for longer than 10 minutes.
         """
-        self.stderr.write('reporter:status:%s\n' % (msg,))
+        status = u'reporter:status:%s\n' % (msg,)
+        encoding = locale.getpreferredencoding()
+        writer = codecs.getwriter(encoding)(self.stderr)
+        writer.write(status)
         self.stderr.flush()
 
     ### Running the job ###

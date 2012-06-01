@@ -1427,7 +1427,7 @@ class MRJob(object):
     #: For example you know your input data were in JSON format, you could
     #: set::
     #:
-    #:     INPUT_PROTOCOL = JsonValueProtocol
+    #:     INPUT_PROTOCOL = JSONValueProtocol
     #:
     #: in your class, and your initial mapper would receive decoded JSONs
     #: rather than strings.

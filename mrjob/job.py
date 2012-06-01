@@ -463,6 +463,10 @@ class MRJob(object):
 
         return step
 
+    def _wrapped_stream(self, stream):
+        encoding = locale.getpreferredencoding()
+        return codecs.getwriter(encoding)(stream)
+
     def increment_counter(self, group, counter, amount=1):
         """Increment a counter in Hadoop streaming by printing to stderr.
 
@@ -490,8 +494,8 @@ class MRJob(object):
         group = str(group).replace(',', ';')
         counter = str(counter).replace(',', ';')
 
-        self.stderr.write('reporter:counter:%s,%s,%d\n' %
-                          (group, counter, amount))
+        self._wrapped_stream(self.stderr).write(
+            u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
         self.stderr.flush()
 
     def set_status(self, msg):
@@ -502,9 +506,7 @@ class MRJob(object):
         that give no output for longer than 10 minutes.
         """
         status = u'reporter:status:%s\n' % (msg,)
-        encoding = locale.getpreferredencoding()
-        writer = codecs.getwriter(encoding)(self.stderr)
-        writer.write(status)
+        self._wrapped_stream(self.stderr).write(status)
         self.stderr.flush()
 
     ### Running the job ###

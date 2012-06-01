@@ -363,6 +363,11 @@ class CountersAndStatusTestCase(unittest.TestCase):
         # shouldn't raise an exception
         mr_job.set_status(u'💩')
 
+    def test_unicode_counter(self):
+        mr_job = MRJob().sandbox()
+        # shouldn't raise an exception
+        mr_job.increment_counter(u'💩', 'x', 1)
+
     def test_negative_and_zero_counters(self):
         mr_job = MRJob().sandbox()
 

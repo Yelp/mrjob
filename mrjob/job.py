@@ -491,8 +491,8 @@ class MRJob(object):
         #
         # The relevant Hadoop code is incrCounter(), here:
         # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup
-        group = str(group).replace(',', ';')
-        counter = str(counter).replace(',', ';')
+        group = unicode(group).replace(',', ';')
+        counter = unicode(counter).replace(',', ';')
 
         self._wrapped_stream(self.stderr).write(
             u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))

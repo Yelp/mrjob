@@ -1587,7 +1587,7 @@ class MRJob(object):
 
         If you want to re-define this, it's strongly recommended that do
         something like this, so as not to inadvertently disable
-        :option:`jobconf`::
+        the :option:`jobconf` option::
 
             def jobconf(self):
                 orig_jobconf = super(MyMRJobClass, self).jobconf()
@@ -1595,7 +1595,18 @@ class MRJob(object):
 
                 return mrjob.conf.combine_dicts(orig_jobconf, custom_jobconf)
         """
-        return combine_dicts(self.JOBCONF, self.options.jobconf)
+        unfiltered_jobconf = combine_dicts(self.JOBCONF, self.options.jobconf)
+        filtered_jobconf = {}
+        for key in unfiltered_jobconf:
+            unfiltered_value = unfiltered_jobconf[key]
+            filtered_value = unfiltered_value
+            if isinstance(unfiltered_value, bool):
+                if unfiltered_value:
+                    filtered_value = 'true'
+                else:
+                    filtered_value = 'false'
+            filtered_jobconf[key] = filtered_value
+        return filtered_jobconf
 
     ### Testing ###
 

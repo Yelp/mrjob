@@ -761,6 +761,10 @@ class JobConfTestCase(unittest.TestCase):
         def jobconf(self):
             return {'mapred.baz': 'bar'}
 
+    class MRBoolJobConfJob(MRJob):
+        JOBCONF = {'true_value': True,
+                   'false_value': False}
+
     def test_empty(self):
         mr_job = MRJob()
 
@@ -776,6 +780,11 @@ class JobConfTestCase(unittest.TestCase):
         self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
                          {'mapred.foo': 'baz',  # second option takes priority
                           'mapred.qux': 'quux'})
+
+    def test_bool_options(self):
+        mr_job = self.MRBoolJobConfJob()
+        self.assertEqual(mr_job.jobconf()['true_value'], 'true')
+        self.assertEqual(mr_job.jobconf()['false_value'], 'false')
 
     def test_jobconf_attr(self):
         mr_job = self.MRJobConfJob()

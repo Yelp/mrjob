@@ -1597,15 +1597,31 @@ class MRJob(object):
         """
         unfiltered_jobconf = combine_dicts(self.JOBCONF, self.options.jobconf)
         filtered_jobconf = {}
+
+        def format_hadoop_version(v_float):
+            v_int = int(v_float)
+            if abs(v_float - v_int) < 0.000001:
+                # e.g. 1.0
+                return '%.1f' % v_float
+            else:
+                # e.g. 0.18 or 0.20
+                return '%.2f' % v_float
+
+
         for key in unfiltered_jobconf:
-            unfiltered_value = unfiltered_jobconf[key]
-            filtered_value = unfiltered_value
-            if isinstance(unfiltered_value, bool):
-                if unfiltered_value:
-                    filtered_value = 'true'
+            unfiltered_val = unfiltered_jobconf[key]
+            filtered_val = unfiltered_val
+            if isinstance(unfiltered_val, bool):
+                if unfiltered_val:
+                    filtered_val = 'true'
                 else:
-                    filtered_value = 'false'
-            filtered_jobconf[key] = filtered_value
+                    filtered_val = 'false'
+            elif (key == 'hadoop_version' and
+                isinstance(unfiltered_val, float)):
+                log.warn('hadoop_version should be a string, not %s' %
+                         unfiltered_val)
+                filtered_val = format_hadoop_version(unfiltered_val)
+            filtered_jobconf[key] = filtered_val
         return filtered_jobconf
 
     ### Testing ###

@@ -44,6 +44,7 @@ from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
+from tests.mr_testing_job import MRTestingJob
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_nomapper_multistep import MRNoMapper
@@ -73,7 +74,7 @@ def stepdict(mapper=_IDENTITY_MAPPER, reducer=None, combiner=None,
 
 # These can't be invoked as a separate script, but they don't need to be
 
-class MRBoringJob(MRJob):
+class MRBoringJob(MRTestingJob):
     """It's a boring job, but somebody had to do it."""
     def mapper(self, key, value):
         yield(key, value)
@@ -91,7 +92,7 @@ class MRFinalBoringJob(MRBoringJob):
         yield('num_lines', self.num_lines)
 
 
-class MRInitJob(MRJob):
+class MRInitJob(MRTestingJob):
 
     def __init__(self, *args, **kwargs):
         super(MRInitJob, self).__init__(*args, **kwargs)
@@ -118,7 +119,7 @@ class MRInitJob(MRJob):
         yield(None, sum(values) * self.combiner_multiplier)
 
 
-class MRInvisibleMapperJob(MRJob):
+class MRInvisibleMapperJob(MRTestingJob):
 
     def mapper_init(self):
         self.things = 0
@@ -130,7 +131,7 @@ class MRInvisibleMapperJob(MRJob):
         yield None, self.things
 
 
-class MRInvisibleReducerJob(MRJob):
+class MRInvisibleReducerJob(MRTestingJob):
 
     def reducer_init(self):
         self.things = 0
@@ -142,7 +143,7 @@ class MRInvisibleReducerJob(MRJob):
         yield None, self.things
 
 
-class MRInvisibleCombinerJob(MRJob):
+class MRInvisibleCombinerJob(MRTestingJob):
 
     def mapper(self, key, value):
         yield key, 1
@@ -405,7 +406,7 @@ class ProtocolsTestCase(unittest.TestCase):
     class MRBoringJob4(MRBoringJob):
         INTERNAL_PROTOCOL = ReprProtocol
 
-    class MRTrivialJob(MRJob):
+    class MRTrivialJob(MRTestingJob):
         OUTPUT_PROTOCOL = ReprProtocol
 
         def mapper(self, key, value):
@@ -549,17 +550,17 @@ class DeprecatedProtocolsTestCase(unittest.TestCase):
     class MRBoringJob3(MRBoringJob):
         DEFAULT_PROTOCOL = 'repr'
 
-    class MRTrivialJob(MRJob):
+    class MRTrivialJob(MRTestingJob):
         DEFAULT_OUTPUT_PROTOCOL = 'repr'
 
         def mapper(self, key, value):
             yield key, value
 
-    class MRInconsistentJob(MRJob):
+    class MRInconsistentJob(MRTestingJob):
         DEFAULT_INPUT_PROTOCOL = 'json'
         INPUT_PROTOCOL = ReprProtocol
 
-    class MRInconsistentJob2(MRJob):
+    class MRInconsistentJob2(MRTestingJob):
         DEFAULT_INPUT_PROTOCOL = 'json'
 
         def input_protocol(self):
@@ -753,11 +754,11 @@ class DeprecatedProtocolsTestCase(unittest.TestCase):
 
 class JobConfTestCase(unittest.TestCase):
 
-    class MRJobConfJob(MRJob):
+    class MRJobConfJob(MRTestingJob):
         JOBCONF = {'mapred.foo': 'garply',
                    'mapred.bar.bar.baz': 'foo'}
 
-    class MRJobConfMethodJob(MRJob):
+    class MRJobConfMethodJob(MRTestingJob):
         def jobconf(self):
             return {'mapred.baz': 'bar'}
 
@@ -817,7 +818,7 @@ class HadoopFormatTestCase(unittest.TestCase):
 
     # MRHadoopFormatJob is imported above
 
-    class MRHadoopFormatMethodJob(MRJob):
+    class MRHadoopFormatMethodJob(MRTestingJob):
 
         def hadoop_input_format(self):
             return 'mapred.ReasonableInputFormat'
@@ -883,7 +884,7 @@ class HadoopFormatTestCase(unittest.TestCase):
 
 class PartitionerTestCase(unittest.TestCase):
 
-    class MRPartitionerJob(MRJob):
+    class MRPartitionerJob(MRTestingJob):
         PARTITIONER = 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
 
     def test_empty(self):

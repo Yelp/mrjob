@@ -561,23 +561,18 @@ class MRJob(object):
         from mrjob.inline import InlineMRJobRunner
 
         if self.options.runner == 'emr':
-            runner = EMRJobRunner(**self.emr_job_runner_kwargs())
+            return EMRJobRunner(**self.emr_job_runner_kwargs())
 
         elif self.options.runner == 'hadoop':
-            runner = HadoopJobRunner(**self.hadoop_job_runner_kwargs())
+            return HadoopJobRunner(**self.hadoop_job_runner_kwargs())
 
         elif self.options.runner == 'inline':
-            runner = InlineMRJobRunner(
+            return InlineMRJobRunner(
                 mrjob_cls=self.__class__, **self.inline_job_runner_kwargs())
 
         else:
             # run locally by default
-            runner = LocalMRJobRunner(**self.local_job_runner_kwargs())
-
-        # give the runner our steps so it doesn't have to do any unnecessary
-        # subprocess invokation
-        runner._steps = self._steps_desc()
-        return runner
+            return LocalMRJobRunner(**self.local_job_runner_kwargs())
 
     @classmethod
     def set_up_logging(cls, quiet=False, verbose=False, stream=None):

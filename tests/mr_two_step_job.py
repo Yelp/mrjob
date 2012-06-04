@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Trivial multi-step job, useful for testing runners."""
-from mrjob.job import MRJob
+from tests.mr_testing_job import MRTestingJob
 
 try:
     import simplejson as json  # preferred because of C speedups
@@ -46,7 +46,7 @@ class CustomJSONProtocol(object):
         return '%s\t%s' % (json.dumps(key), json.dumps(value))
 
 
-class MRTwoStepJob(MRJob):
+class MRTwoStepJob(MRTestingJob):
 
     INPUT_PROTOCOL = CustomRawValueProtocol
     INTERNAL_PROTOCOL = CustomJSONProtocol

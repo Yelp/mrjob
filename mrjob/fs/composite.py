@@ -62,20 +62,9 @@ class CompositeFilesystem(BaseFilesystem):
             raise first_exception
 
     def du(self, path_glob):
-        """Get the total size of files matching ``path_glob``
-
-        Corresponds roughly to: ``hadoop fs -dus path_glob``
-        """
         return self._do_action('du', path_glob)
 
     def ls(self, path_glob):
-        """Recursively list all files in the given path.
-
-        We don't return directories for compatibility with S3 (which
-        has no concept of them)
-
-        Corresponds roughly to: ``hadoop fs -lsr path_glob``
-        """
         return self._do_action('ls', path_glob)
 
     def _cat_file(self, path):
@@ -83,38 +72,19 @@ class CompositeFilesystem(BaseFilesystem):
             yield line
 
     def mkdir(self, path):
-        """Create the given dir and its subdirs (if they don't already
-        exist).
-
-        Corresponds roughly to: ``hadoop fs -mkdir path``
-        """
         return self._do_action('mkdir', path)
 
     def path_exists(self, path_glob):
-        """Does the given path exist?
-
-        Corresponds roughly to: ``hadoop fs -test -e path_glob``
-        """
         return self._do_action('path_exists', path_glob)
 
     def path_join(self, dirname, filename):
         return self._do_action('path_join', dirname, filename)
 
     def rm(self, path_glob):
-        """Recursively delete the given file/directory, if it exists
-
-        Corresponds roughly to: ``hadoop fs -rmr path_glob``
-        """
         return self._do_action('rm', path_glob)
 
     def touchz(self, path):
-        """Make an empty file in the given location. Raises an error if
-        a non-zero length file already exists in that location.
-
-        Correponds to: ``hadoop fs -touchz path``
-        """
         return self._do_action('touchz', path)
 
     def md5sum(self, path_glob):
-        """Generate the md5 sum of the file at ``path``"""
         return self._do_action('md5sum', path_glob)

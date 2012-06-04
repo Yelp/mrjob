@@ -100,7 +100,6 @@ from __future__ import with_statement
 import codecs
 import inspect
 import itertools
-import locale
 import logging
 from optparse import Option
 from optparse import OptionParser
@@ -464,8 +463,7 @@ class MRJob(object):
         return step
 
     def _wrapped_stream(self, stream):
-        encoding = locale.getpreferredencoding()
-        return codecs.getwriter(encoding)(stream)
+        return codecs.getwriter('utf-8')(stream)
 
     def increment_counter(self, group, counter, amount=1):
         """Increment a counter in Hadoop streaming by printing to stderr.
@@ -491,12 +489,19 @@ class MRJob(object):
         #
         # The relevant Hadoop code is incrCounter(), here:
         # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup
-        group = unicode(group).replace(',', ';')
-        counter = unicode(counter).replace(',', ';')
+        if isinstance(group, unicode) or isinstance(counter, unicode):
+            group = unicode(group).replace(',', ';')
+            counter = unicode(counter).replace(',', ';')
 
-        self._wrapped_stream(self.stderr).write(
-            u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
-        self.stderr.flush()
+            self._wrapped_stream(self.stderr).write(
+                u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
+        else:
+            group = str(group).replace(',', ';')
+            counter = str(counter).replace(',', ';')
+
+            self.stderr.write(
+                u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
+            self.stderr.flush()
 
     def set_status(self, msg):
         """Set the job status in hadoop streaming by printing to stderr.
@@ -505,8 +510,12 @@ class MRJob(object):
         long time between outputs; Hadoop streaming usually times out jobs
         that give no output for longer than 10 minutes.
         """
-        status = u'reporter:status:%s\n' % (msg,)
-        self._wrapped_stream(self.stderr).write(status)
+        if isinstance(msg, unicode):
+            status = u'reporter:status:%s\n' % (msg,)
+            self._wrapped_stream(self.stderr).write(status)
+        else:
+            status = 'reporter:status:%s\n' % (msg,)
+            self.stderr.write(status)
         self.stderr.flush()
 
     ### Running the job ###

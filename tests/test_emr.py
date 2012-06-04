@@ -29,6 +29,9 @@ import py_compile
 import shutil
 from StringIO import StringIO
 import tempfile
+import time
+
+from mock import patch
 
 try:
     import unittest2 as unittest
@@ -80,9 +83,36 @@ except ImportError:
 
 class MockEMRAndS3TestCase(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        cls.fake_mrjob_tgz_path = tempfile.mkstemp(
+            prefix='fake_mrjob_', suffix='.tar.gz')[1]
+
+    @classmethod
+    def tearDownClass(cls):
+        if os.path.exists(cls.fake_mrjob_tgz_path):
+            os.remove(cls.fake_mrjob_tgz_path)
+
     def setUp(self):
         self.make_mrjob_conf()
         self.sandbox_boto()
+
+        def simple_patch(obj, attr, side_effect=None, autospec=False):
+            patcher = patch.object(obj, attr, side_effect=side_effect,
+                                   autospec=autospec)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
+            mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
+            return self.fake_mrjob_tgz_path
+
+        simple_patch(EMRJobRunner, '_create_mrjob_tar_gz',
+                     fake_create_mrjob_tar_gz, autospec=True)
+
+        simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
+        simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
+        simple_patch(time, 'sleep')
 
     def tearDown(self):
         self.unsandbox_boto()
@@ -250,7 +280,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             # on real EMR.
             self.assertEqual(runner._opts['additional_emr_info'],
                              '{"key": "value"}')
-
             runner.run()
 
             for line in runner.stream_output():

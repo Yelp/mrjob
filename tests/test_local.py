@@ -387,6 +387,10 @@ class StepsPythonBinTestCase(unittest.TestCase):
         with mr_job.make_runner() as runner:
             assert isinstance(runner, LocalMRJobRunner)
             try:
+                # make_runner() populates _steps in the runner, so un-populate
+                # it here so that the runner actually tries to get the steps
+                # via subprocess
+                runner._steps = None
                 runner._get_steps()
                 assert False, 'Should throw exception'
             except ValueError, ex:

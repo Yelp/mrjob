@@ -97,16 +97,18 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         self.make_mrjob_conf()
         self.sandbox_boto()
 
-        def fake_create_mrjob_tar_gz(*args, **kwargs):
-            return self.fake_mrjob_tgz_path
-
-        def simple_patch(obj, attr, side_effect=None):
-            patcher = patch.object(obj, attr, side_effect=side_effect)
+        def simple_patch(obj, attr, side_effect=None, autospec=False):
+            patcher = patch.object(obj, attr, side_effect=side_effect,
+                                   autospec=autospec)
             patcher.start()
             self.addCleanup(patcher.stop)
 
+        def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
+            mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
+            return self.fake_mrjob_tgz_path
+
         simple_patch(EMRJobRunner, '_create_mrjob_tar_gz',
-                     fake_create_mrjob_tar_gz)
+                     fake_create_mrjob_tar_gz, autospec=True)
 
         simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
         simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')

@@ -466,7 +466,12 @@ class MRJob(object):
         return codecs.getwriter('utf-8')(stream)
 
     def increment_counter(self, group, counter, amount=1):
-        """Increment a counter in Hadoop streaming by printing to stderr.
+        """Increment a counter in Hadoop streaming by printing to stderr. If
+        the type of either **group** or **counter** is ``unicode``, then the
+        counter will be written as unicode. Otherwise, the counter will be
+        written as ASCII. Although writing non-ASCII will succeed, the
+        resulting counter names may not be displayed correctly at the end of
+        the job.
 
         :type group: str
         :param group: counter group
@@ -509,6 +514,9 @@ class MRJob(object):
         This is also a good way of doing a keepalive for a job that goes a
         long time between outputs; Hadoop streaming usually times out jobs
         that give no output for longer than 10 minutes.
+
+        If the type of **msg** is ``unicode``, then the message will be written
+        as unicode. Otherwise, it will be written as ASCII.
         """
         if isinstance(msg, unicode):
             status = u'reporter:status:%s\n' % (msg,)

@@ -47,7 +47,6 @@ from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.conf import OptionStore
 from mrjob.fs.local import LocalFilesystem
-from mrjob.fs.composite import CompositeFilesystem
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
 from mrjob.util import tar_and_gzip
@@ -481,8 +480,7 @@ class MRJobRunner(object):
     @property
     def fs(self):
         if self._fs is None:
-            # wrap in CompositeFilesystem so we get cat()
-            self._fs = CompositeFilesystem(LocalFilesystem())
+            self._fs = LocalFilesystem()
         return self._fs
 
     def __getattr__(self, name):

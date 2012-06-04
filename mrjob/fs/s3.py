@@ -24,7 +24,7 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
-from mrjob.fs import BaseFilesystem
+from mrjob.fs.base import BaseFilesystem
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.retry import RetryWrapper

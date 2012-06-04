@@ -20,7 +20,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from mrjob.fs import BaseFilesystem
+from mrjob.fs.base import BaseFilesystem
 from mrjob.ssh import ssh_cat
 from mrjob.ssh import ssh_ls
 from mrjob.ssh import SSHException

@@ -24,7 +24,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from mrjob.fs import BaseFilesystem
+from mrjob.fs.base import BaseFilesystem
 from mrjob.parse import is_uri
 from mrjob.parse import urlparse
 from mrjob.util import cmd_line

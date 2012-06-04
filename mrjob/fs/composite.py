@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 
-from mrjob.fs import BaseFilesystem
+from mrjob.fs.base import BaseFilesystem
 
 
 log = logging.getLogger('mrjob.fs.composite')

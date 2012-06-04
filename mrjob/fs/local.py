@@ -17,7 +17,7 @@ import logging
 import os
 import shutil
 
-from mrjob.fs import BaseFilesystem
+from mrjob.fs.base import BaseFilesystem
 from mrjob.util import read_file
 
 

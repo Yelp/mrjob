@@ -462,9 +462,6 @@ class MRJob(object):
 
         return step
 
-    def _wrapped_stream(self, stream):
-        return codecs.getwriter('utf-8')(stream)
-
     def increment_counter(self, group, counter, amount=1):
         """Increment a counter in Hadoop streaming by printing to stderr. If
         the type of either **group** or **counter** is ``unicode``, then the
@@ -497,16 +494,15 @@ class MRJob(object):
         if isinstance(group, unicode) or isinstance(counter, unicode):
             group = unicode(group).replace(',', ';')
             counter = unicode(counter).replace(',', ';')
-
-            self._wrapped_stream(self.stderr).write(
-                u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
+            stderr = codecs.getwriter('utf-8')(self.stderr)
         else:
             group = str(group).replace(',', ';')
             counter = str(counter).replace(',', ';')
+            stderr = self.stderr
 
-            self.stderr.write(
-                u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
-            self.stderr.flush()
+        stderr.write(
+            u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
+        self.stderr.flush()
 
     def set_status(self, msg):
         """Set the job status in hadoop streaming by printing to stderr.
@@ -520,10 +516,11 @@ class MRJob(object):
         """
         if isinstance(msg, unicode):
             status = u'reporter:status:%s\n' % (msg,)
-            self._wrapped_stream(self.stderr).write(status)
+            stderr = codecs.getwriter('utf-8')(self.stderr)
         else:
             status = 'reporter:status:%s\n' % (msg,)
-            self.stderr.write(status)
+            stderr = self.stderr
+        stderr.write(status)
         self.stderr.flush()
 
     ### Running the job ###

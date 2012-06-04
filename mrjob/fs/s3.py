@@ -24,6 +24,7 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
+from mrjob.fs import BaseFilesystem
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.retry import RetryWrapper
@@ -67,7 +68,7 @@ def wrap_aws_conn(raw_conn):
                         max_tries=EMR_MAX_TRIES)
 
 
-class S3Filesystem(object):
+class S3Filesystem(BaseFilesystem):
 
     def __init__(self, aws_access_key_id, aws_secret_access_key, s3_endpoint):
         super(S3Filesystem, self).__init__()

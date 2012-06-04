@@ -24,6 +24,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+from mrjob.fs import BaseFilesystem
 from mrjob.parse import is_uri
 from mrjob.parse import urlparse
 from mrjob.util import cmd_line
@@ -43,7 +44,7 @@ HADOOP_LSR_NO_SUCH_FILE = re.compile(
 HADOOP_RMR_NO_SUCH_FILE = re.compile(r'^rmr: hdfs://.*$')
 
 
-class HadoopFilesystem(object):
+class HadoopFilesystem(BaseFilesystem):
 
     def __init__(self, hadoop_bin):
         super(HadoopFilesystem, self).__init__()

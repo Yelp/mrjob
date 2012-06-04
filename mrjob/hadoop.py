@@ -27,7 +27,7 @@ from mrjob.conf import combine_dicts
 from mrjob.conf import combine_paths
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
-from mrjob.fs.multi import MultiFilesystem
+from mrjob.fs.composite import CompositeFilesystem
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
 from mrjob.logparsers import HADOOP_JOB_LOG_URI_RE
@@ -213,7 +213,7 @@ class HadoopJobRunner(MRJobRunner):
     @property
     def fs(self):
         if self._fs is None:
-            self._fs = MultiFilesystem(
+            self._fs = CompositeFilesystem(
                 HadoopFilesystem(self._opts['hadoop_bin']),
                 LocalFilesystem())
         return self._fs

@@ -61,7 +61,7 @@ from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
 from mrjob.fs.local import LocalFilesystem
-from mrjob.fs.multi import MultiFilesystem
+from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
@@ -1037,11 +1037,11 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 self._ssh_fs = SSHFilesystem(self._opts['ssh_bin'],
                                              self._opts['ec2_key_pair_file'],
                                              self._ssh_key_name)
-                self._fs = MultiFilesystem(self._ssh_fs, self._s3_fs,
-                                           LocalFilesystem())
+                self._fs = CompositeFilesystem(self._ssh_fs, self._s3_fs,
+                                               LocalFilesystem())
             else:
                 self._ssh_fs = None
-                self._fs = MultiFilesystem(self._s3_fs, LocalFilesystem())
+                self._fs = CompositeFilesystem(self._s3_fs, LocalFilesystem())
 
         return self._fs
 

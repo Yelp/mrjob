@@ -13,11 +13,13 @@
 # limitations under the License.
 import logging
 
+from mrjob.fs import BaseFilesystem
 
-log = logging.getLogger('mrjob.fs.multi')
+
+log = logging.getLogger('mrjob.fs.composite')
 
 
-class MultiFilesystem(object):
+class CompositeFilesystem(BaseFilesystem):
     """Combine multiple filesystem objects to allow access to a variety of
     storage locations such as the local filesystem, S3, a remote machine via
     SSH, or HDFS.
@@ -28,7 +30,7 @@ class MultiFilesystem(object):
     """
 
     def __init__(self, *filesystems):
-        super(MultiFilesystem, self).__init__()
+        super(CompositeFilesystem, self).__init__()
         self.filesystems = filesystems
 
     def __getattr__(self, name):
@@ -79,12 +81,6 @@ class MultiFilesystem(object):
     def _cat_file(self, path):
         for line in self._do_action('_cat_file', path):
             yield line
-
-    def cat(self, path_glob):
-        """cat all files matching **path_glob**, decompressing if necessary"""
-        for filename in self.ls(path_glob):
-            for line in self._cat_file(filename):
-                yield line
 
     def mkdir(self, path):
         """Create the given dir and its subdirs (if they don't already

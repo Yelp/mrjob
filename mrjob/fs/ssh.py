@@ -20,6 +20,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+from mrjob.fs import BaseFilesystem
 from mrjob.ssh import ssh_cat
 from mrjob.ssh import ssh_ls
 from mrjob.ssh import SSHException
@@ -31,7 +32,7 @@ from mrjob.util import read_file
 log = logging.getLogger('mrjob.fs.ssh')
 
 
-class SSHFilesystem(object):
+class SSHFilesystem(BaseFilesystem):
 
     def __init__(self, ssh_bin, ec2_key_pair_file, key_name):
         super(SSHFilesystem, self).__init__()

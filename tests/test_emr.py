@@ -280,16 +280,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             # on real EMR.
             self.assertEqual(runner._opts['additional_emr_info'],
                              '{"key": "value"}')
-
-            # have to patch _create_mrjob_tar_gz a little more sneakily so that
-            # runner._mrjob_tar_gz_path is set
-            def fake_create_mrjob_tar_gz(*args, **kwargs):
-                runner._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
-                return self.fake_mrjob_tgz_path
-
-            with patch.object(runner, '_create_mrjob_tar_gz',
-                       side_effect=fake_create_mrjob_tar_gz):
-                runner.run()
+            runner.run()
 
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)

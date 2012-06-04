@@ -1587,7 +1587,7 @@ class MRJob(object):
 
         If you want to re-define this, it's strongly recommended that do
         something like this, so as not to inadvertently disable
-        :option:`jobconf`::
+        the :option:`jobconf` option::
 
             def jobconf(self):
                 orig_jobconf = super(MyMRJobClass, self).jobconf()
@@ -1595,7 +1595,40 @@ class MRJob(object):
 
                 return mrjob.conf.combine_dicts(orig_jobconf, custom_jobconf)
         """
-        return combine_dicts(self.JOBCONF, self.options.jobconf)
+
+        # deal with various forms of bad behavior by users
+        unfiltered_jobconf = combine_dicts(self.JOBCONF, self.options.jobconf)
+        filtered_jobconf = {}
+
+        def format_hadoop_version(v_float):
+            if v_float >= 1.0:
+                # e.g. 1.0
+                return '%.1f' % v_float
+            else:
+                # e.g. 0.18 or 0.20
+                return '%.2f' % v_float
+
+
+        for key in unfiltered_jobconf:
+            unfiltered_val = unfiltered_jobconf[key]
+            filtered_val = unfiltered_val
+
+            # boolean values need to be lowercased
+            if isinstance(unfiltered_val, bool):
+                if unfiltered_val:
+                    filtered_val = 'true'
+                else:
+                    filtered_val = 'false'
+
+            # hadoop_version should be a string
+            elif (key == 'hadoop_version' and
+                isinstance(unfiltered_val, float)):
+                log.warn('hadoop_version should be a string, not %s' %
+                         unfiltered_val)
+                filtered_val = format_hadoop_version(unfiltered_val)
+            filtered_jobconf[key] = filtered_val
+
+        return filtered_jobconf
 
     ### Testing ###
 

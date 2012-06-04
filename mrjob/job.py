@@ -1601,8 +1601,7 @@ class MRJob(object):
         filtered_jobconf = {}
 
         def format_hadoop_version(v_float):
-            v_int = int(v_float)
-            if abs(v_float - v_int) < 0.000001:
+            if v_float >= 1.0:
                 # e.g. 1.0
                 return '%.1f' % v_float
             else:

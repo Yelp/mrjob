@@ -5,8 +5,7 @@ mrjob.runner - base class for all runners
 
 .. autoclass:: MRJobRunner
 
-Runners' constructors take a bewildering array of keyword arguments; we'll
-get to that in :doc:`configs-runners`
+.. automethod:: mrjob.runner.MRJobRunner.__init__
 
 Running your job
 ----------------
@@ -22,6 +21,12 @@ Run Information
 
 .. automethod:: MRJobRunner.counters
 .. automethod:: MRJobRunner.get_hadoop_version
+
+Configuration
+-------------
+
+.. automethod:: mrjob.runner.MRJobRunner.get_opts
+.. automethod:: mrjob.runner.MRJobRunner.get_default_opts
 
 File management
 ---------------

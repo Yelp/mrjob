@@ -12,32 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Protocols are what allow :py:class:`mrjob.job.MRJob` to input and
-output arbitrary values, rather than just strings.
-
-We use JSON as our default protocol rather than something more
-powerful because we want to encourage interoperability with other
-languages. If you need more power, you can represent values as reprs
-or pickles.
-
-Also, if know that your input will always be in JSON format, consider
-:py:class:`JSONValueProtocol` as an alternative to
-:py:class:`RawValueProtocol`.
-
-Custom Protocols
-^^^^^^^^^^^^^^^^
-
-A protocol is an object with methods ``read(self, line)`` and
-``write(self, key, value)``. The ``read(line)`` method takes a string and
-returns a 2-tuple of decoded objects, and ``write(cls, key, value)`` takes
-the key and value and returns the line to be passed back to Hadoop Streaming
-or as output.
-
-The built-in protocols use class methods instead of instance methods for
-legacy reasons, but you should use instance methods.
-
-For more information on using alternate protocols in your job, see
-:ref:`job-protocols`.
+"""Protocols deserialize and serialize the input and output of tasks to raw
+bytes for Hadoop to distribute to the next task or to write as output. For more
+information, see :ref:`job-protocols` and :ref:`writing-protocols`.
 """
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment

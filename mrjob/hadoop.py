@@ -155,9 +155,6 @@ class HadoopJobRunner(MRJobRunner):
 
     Input and support files can be either local or on HDFS; use ``hdfs://...``
     URLs to refer to files on HDFS.
-
-    It's rare to need to instantiate this class directly (see
-    :py:meth:`~HadoopJobRunner.__init__` for details).
     """
     alias = 'hadoop'
 
@@ -167,26 +164,6 @@ class HadoopJobRunner(MRJobRunner):
         """:py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments
         as :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
         which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
-
-        *output_dir* and *hdfs_scratch_dir* need not be fully qualified
-        ``hdfs://`` URIs because it's understood that they have to be on
-        HDFS (e.g. ``tmp/mrjob/`` would be okay)
-
-        Additional options:
-
-        :type hadoop_bin: str or list
-        :param hadoop_bin: name/path of your hadoop program (may include
-                           arguments). Defaults to *hadoop_home* plus
-                           ``bin/hadoop``.
-        :type hadoop_home: str
-        :param hadoop_home: alternative to setting the :envvar:`HADOOP_HOME`
-                            environment variable
-        :type hdfs_scratch_dir: str
-        :param hdfs_scratch_dir: temp directory on HDFS. Default is
-                                 ``tmp/mrjob``.
-
-        *hadoop_streaming_jar* is optional; by default, we'll search for it
-        inside :envvar:`HADOOP_HOME`
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 

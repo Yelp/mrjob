@@ -1,14 +1,12 @@
 .. _mrjob.conf:
 
 Config file format and location
--------------------------------
+===============================
 
 We look for :file:`mrjob.conf` in these locations:
 
 - The location specified by :envvar:`MRJOB_CONF`
 - :file:`~/.mrjob.conf`
-- :file:`~/.mrjob` **(deprecated)**
-- :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH` **(deprecated)**
 - :file:`/etc/mrjob.conf`
 
 If your :file:`mrjob.conf` path is deprecated, use this table to fix it:
@@ -61,7 +59,7 @@ example in JSON:
     }
 
 Precedence and combining options
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+--------------------------------
 
 Options specified on the command-line take precedence over
 :file:`mrjob.conf`. Usually this means simply overriding the option in
@@ -111,13 +109,13 @@ Also, if you specified additional files to upload with :option:`--file`, those
 files would be uploaded in addition to the ``.db`` files, rather than instead
 of them.
 
-See :doc:`configs-runners` for the entire dizzying array of configurable
+See :doc:`configs-reference` for the entire dizzying array of configurable
 options.
 
 .. _multiple-config-files:
 
 Using multiple config files
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------
 
 If you have several standard configurations, you may want to have several
 config files "inherit" from a base config file. For example, you may have one

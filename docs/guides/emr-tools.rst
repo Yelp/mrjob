@@ -1,5 +1,5 @@
-mrjob.tools.emr - managing EMR job flows
-========================================
+EMR job flow management tools
+=============================
 
 audit_usage
 -----------

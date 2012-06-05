@@ -298,23 +298,23 @@ key, value)``. The ``read()`` method takes a string and returns a 2-tuple of
 decoded objects, and ``write()`` takes the key and value and returns the line
 to be passed back to Hadoop Streaming or as output.
 
-Here is an implementation of a YAML protocol::
+Here is a simplified version of mrjob's JSON protocol::
 
-    import yaml
+    import json
 
 
-    class YAMLProtocol(object):
+    class JSONProtocol(object):
 
         def read(self, line):
             k_str, v_str = line.split('\t', 1)
-            return yaml.loads(k_str), yaml.loads(v_str)
+            return json.loads(k_str), json.loads(v_str)
 
         def write(self, key, value):
-            return '%s\t%s' % (yaml.dumps(key), yaml.dumps(value))
+            return '%s\t%s' % (json.dumps(key), json.dumps(value))
 
-You can improve performance by caching the serialization/deserialization
-results of keys. Look at the source code of :py:mod:`mrjob.protocol` for an
-example.
+You can improve performance significantly by caching the
+serialization/deserialization results of keys. Look at the source code of
+:py:mod:`mrjob.protocol` for an example.
 
 .. _writing-cl-opts:
 

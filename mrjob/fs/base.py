@@ -17,8 +17,22 @@ import logging
 log = logging.getLogger('mrjob.fs')
 
 
-class BaseFilesystem(object):
-    """Basic wrapper methods for filesystem objects."""
+class Filesystem(object):
+    """Some simple filesystem operations that are common across the local
+    filesystem, S3, HDFS, and remote machines via SSH. Different runners
+    provide functionality for different filesystems via their
+    :py:attr:`~mrjob.runner.MRJobRunner.fs` attribute. The ``hadoop`` and
+    ``emr`` runners provide support for multiple protocols using
+    :py:class:`~mrjob.job.composite.CompositeFilesystem`.
+
+    Protocol support:
+
+    * :py:class:`mrjob.fs.hadoop.HadoopFilesystem`: ``hdfs://``, others
+    * :py:class:`mrjob.fs.local.LocalFilesystem`: ``/``
+    * :py:class:`mrjob.fs.s3.S3Filesystem`: ``s3://bucket/path``,
+      ``s3n://bucket/path``
+    * :py:class:`mrjob.fs.ssh.SSHFilesystem`: ``ssh://hostname/path``
+    """
 
     def cat(self, path_glob):
         """cat all files matching **path_glob**, decompressing if necessary"""

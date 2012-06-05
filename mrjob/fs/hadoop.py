@@ -24,7 +24,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from mrjob.fs.base import BaseFilesystem
+from mrjob.fs.base import Filesystem
 from mrjob.parse import is_uri
 from mrjob.parse import urlparse
 from mrjob.util import cmd_line
@@ -44,9 +44,14 @@ HADOOP_LSR_NO_SUCH_FILE = re.compile(
 HADOOP_RMR_NO_SUCH_FILE = re.compile(r'^rmr: hdfs://.*$')
 
 
-class HadoopFilesystem(BaseFilesystem):
+class HadoopFilesystem(Filesystem):
+    """Filesystem for URIs accepted by ``hadoop fs``. Typically you will get
+    one of these via ``HadoopJobRunner().fs``, composed with
+    :py:class:`~mrjob.fs.local.LocalFilesystem`.
+    """
 
     def __init__(self, hadoop_bin):
+        """:param hadoop_bin: path to ``hadoop`` binary"""
         super(HadoopFilesystem, self).__init__()
         self._hadoop_bin = hadoop_bin
 

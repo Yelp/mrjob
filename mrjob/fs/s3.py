@@ -24,7 +24,7 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
-from mrjob.fs.base import BaseFilesystem
+from mrjob.fs.base import Filesystem
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.retry import RetryWrapper
@@ -68,9 +68,19 @@ def wrap_aws_conn(raw_conn):
                         max_tries=EMR_MAX_TRIES)
 
 
-class S3Filesystem(BaseFilesystem):
+class S3Filesystem(Filesystem):
+    """Filesystem for Amazon S3 URIs. Typically you will get one of these via
+    ``EMRJobRunner().fs, composed with
+    :py:class:`~mrjob.fs.ssh.SSHFilesystem` and
+    :py:class:`~mrjob.fs.local.LocalFilesystem`.
+    """
 
     def __init__(self, aws_access_key_id, aws_secret_access_key, s3_endpoint):
+        """
+        :param aws_access_key_id: Your AWS access key ID
+        :param aws_secret_access_key: Your AWS secret access key
+        :param s3_endpoint: S3 endpoint to access, e.g. ``us-west-1``
+        """
         super(S3Filesystem, self).__init__()
         self._s3_endpoint = s3_endpoint
         self._aws_access_key_id = aws_access_key_id

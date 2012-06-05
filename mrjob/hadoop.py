@@ -212,6 +212,9 @@ class HadoopJobRunner(MRJobRunner):
 
     @property
     def fs(self):
+        """:py:class:`mrjob.fs.base.Filesystem` object for HDFS and the local
+        filesystem.
+        """
         if self._fs is None:
             self._fs = CompositeFilesystem(
                 HadoopFilesystem(self._opts['hadoop_bin']),

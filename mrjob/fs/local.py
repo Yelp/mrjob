@@ -17,14 +17,17 @@ import logging
 import os
 import shutil
 
-from mrjob.fs.base import BaseFilesystem
+from mrjob.fs.base import Filesystem
 from mrjob.util import read_file
 
 
 log = logging.getLogger('mrjob.fs.local')
 
 
-class LocalFilesystem(BaseFilesystem):
+class LocalFilesystem(Filesystem):
+    """Filesystem for local files. Typically you will get one of these via
+    ``MRJobRunner().fs``.
+    """
 
     def can_handle_path(self, path):
         return path.startswith('/')

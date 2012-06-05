@@ -13,13 +13,13 @@
 # limitations under the License.
 import logging
 
-from mrjob.fs.base import BaseFilesystem
+from mrjob.fs.base import Filesystem
 
 
 log = logging.getLogger('mrjob.fs.composite')
 
 
-class CompositeFilesystem(BaseFilesystem):
+class CompositeFilesystem(Filesystem):
     """Combine multiple filesystem objects to allow access to a variety of
     storage locations such as the local filesystem, S3, a remote machine via
     SSH, or HDFS.

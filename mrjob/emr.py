@@ -1016,6 +1016,9 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     @property
     def fs(self):
+        """:py:class:`~mrjob.fs.base.Filesystem` object for SSH, S3, and the
+        local filesystem.
+        """
         if self._fs is None:
             if self._opts['s3_endpoint']:
                 s3_endpoint = self._opts['s3_endpoint']

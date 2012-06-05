@@ -20,7 +20,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from mrjob.fs.base import BaseFilesystem
+from mrjob.fs.base import Filesystem
 from mrjob.ssh import ssh_cat
 from mrjob.ssh import ssh_ls
 from mrjob.ssh import SSHException
@@ -32,9 +32,22 @@ from mrjob.util import read_file
 log = logging.getLogger('mrjob.fs.ssh')
 
 
-class SSHFilesystem(BaseFilesystem):
+class SSHFilesystem(Filesystem):
+    """Filesystem for remote systems accessed via SSH. Typically you will get
+    one of these via ``EMRJobRunner().fs``, composed with
+    :py:class:`~mrjob.fs.s3.S3Filesystem` and
+    :py:class:`~mrjob.fs.local.LocalFilesystem`.
+    """
 
     def __init__(self, ssh_bin, ec2_key_pair_file, key_name):
+        """
+        :param ssh_bin: path to ``ssh`` binary
+        :param ec2_key_pair_file: path to an SSH keyfile
+        :param key_name: Name of keyfile existing on servers, used to access
+                         slaves after '!' in hostname. Generally set by
+                         :py:class:`~mrjob.emr.EMRJobRunner`, which copies the
+                         key itself, to use for log fetching.
+        """
         super(SSHFilesystem, self).__init__()
         self._ssh_bin = ssh_bin
         self._ec2_key_pair_file = ec2_key_pair_file

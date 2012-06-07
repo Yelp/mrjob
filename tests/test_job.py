@@ -36,7 +36,7 @@ from mrjob.conf import combine_envs
 from mrjob.job import MRJob
 from mrjob.job import _IDENTITY_MAPPER
 from mrjob.job import UsageError
-from mrjob.local import LocalMRJobRunner
+from mrjob.inline import InlineMRJobRunner
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import PickleProtocol
@@ -262,6 +262,13 @@ class MRTestCase(unittest.TestCase):
                          stepdict(reducer_init=reducer_init))
         self.assertEqual(MRJob.mr(reducer_final=reducer_final),
                          stepdict(reducer_final=reducer_final))
+
+
+class MakeRunnerTestCase(unittest.TestCase):
+
+    def test_default_runner(self):
+        with MRBoringJob(['--no-conf']).make_runner() as runner:
+            self.assertIsInstance(runner, InlineMRJobRunner)
 
 
 class MRInitTestCase(unittest.TestCase):
@@ -1315,15 +1322,16 @@ class FileOptionsTestCase(unittest.TestCase):
 
         stdin = ['0\n', '1\n', '2\n']
 
+        # use local runner so that the file is actually sent somewhere
         mr_job = MRTowerOfPowers(
-            ['--no-conf', '-v', '--cleanup=NONE', '--n-file', n_file_path])
+            ['--no-conf', '-v', '--cleanup=NONE', '--n-file', n_file_path,
+             '--runner=local'])
         self.assertEqual(len(mr_job.steps()), 3)
 
         mr_job.sandbox(stdin=stdin)
 
         with logger_disabled('mrjob.local'):
             with mr_job.make_runner() as runner:
-                assert isinstance(runner, LocalMRJobRunner)
                 # make sure our file gets "uploaded"
                 assert [fd for fd in runner._files
                         if fd['path'] == n_file_path]

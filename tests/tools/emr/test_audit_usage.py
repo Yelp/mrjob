@@ -18,7 +18,7 @@ from datetime import timedelta
 from StringIO import StringIO
 import sys
 
-from mrjob import boto_2_1_1_83aae37b
+import boto.emr.connection
 from mrjob.tools.emr.audit_usage import job_flow_to_full_summary
 from mrjob.tools.emr.audit_usage import subdivide_interval_by_date
 from mrjob.tools.emr.audit_usage import subdivide_interval_by_hour
@@ -51,7 +51,7 @@ class AuditUsageTestCase(MockEMRAndS3TestCase):
         main(['-q', '--no-conf'])  # just make sure it doesn't crash
 
     def test_with_one_job_flow(self):
-        emr_conn = boto_2_1_1_83aae37b.EmrConnection()
+        emr_conn = boto.emr.connection.EmrConnection()
         emr_conn.run_jobflow('no name', log_uri=None)
 
         main(['-q', '--no-conf'])

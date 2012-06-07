@@ -44,9 +44,10 @@ try:
     import boto
     import boto.ec2
     import boto.emr
+    import boto.emr.connection
+    import boto.emr.instance_group
     import boto.exception
     import boto.utils
-    from mrjob import boto_2_1_1_83aae37b
     boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
@@ -1109,7 +1110,7 @@ class EMRJobRunner(MRJobRunner):
         # Just name the groups "master", "task", and "core"
         name = role.lower()
 
-        return boto_2_1_1_83aae37b.InstanceGroup(
+        return boto.emr.instance_group.InstanceGroup(
             count, role, instance_type, market, name, bidprice=bid_price
             )
 
@@ -2249,8 +2250,7 @@ class EMRJobRunner(MRJobRunner):
     def make_emr_conn(self):
         """Create a connection to EMR.
 
-        :return: a :py:class:`mrjob.boto_2_1_1_83aae37b.EmrConnection`, a
-                 subclass of :py:class:`boto.emr.connection.EmrConnection`,
+        :return: a :py:class:`boto.emr.connection.EmrConnection`,
                  wrapped in a :py:class:`mrjob.retry.RetryWrapper`
         """
         # ...which is then wrapped in bacon! Mmmmm!
@@ -2262,7 +2262,7 @@ class EMRJobRunner(MRJobRunner):
         region = self._get_region_info_for_emr_conn()
         log.debug('creating EMR connection (to %s)' % region.endpoint)
 
-        raw_emr_conn = boto_2_1_1_83aae37b.EmrConnection(
+        raw_emr_conn = boto.emr.connection.EmrConnection(
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             region=region)

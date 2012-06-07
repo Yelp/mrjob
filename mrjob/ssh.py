@@ -97,6 +97,8 @@ def ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
     the ``keyfile`` argument must be the same as was passed to that function.
     """
     if '!' in address:
+        if keyfile is None:
+            raise ValueError('SSH key file path cannot be None')
         host1, host2 = address.split('!')
         more_args = [
            'ssh', '-i', keyfile,

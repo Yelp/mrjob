@@ -16,10 +16,8 @@ from __future__ import with_statement
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
-import fnmatch
 import logging
 import os
-import posixpath
 import random
 import re
 import shlex
@@ -62,6 +60,11 @@ from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
+from mrjob.fs.local import LocalFilesystem
+from mrjob.fs.composite import CompositeFilesystem
+from mrjob.fs.s3 import S3Filesystem
+from mrjob.fs.s3 import wrap_aws_conn
+from mrjob.fs.ssh import SSHFilesystem
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
@@ -72,33 +75,20 @@ from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
-from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
-from mrjob.runner import GLOB_RE
-from mrjob.ssh import ssh_cat
-from mrjob.ssh import ssh_ls
 from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_slave_addresses
-from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_LOG_ROOT
-from mrjob.ssh import SSH_URI_RE
-from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import hash_object
-from mrjob.util import read_file
 
 
 log = logging.getLogger('mrjob.emr')
 
 JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
-
-# if EMR throttles us, how long to wait (in seconds) before trying again?
-EMR_BACKOFF = 20
-EMR_BACKOFF_MULTIPLIER = 1.5
-EMR_MAX_TRIES = 20  # this takes about a day before we run out of tries
 
 # the port to tunnel to
 EMR_JOB_TRACKER_PORT = 9100
@@ -883,7 +873,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # ssh state
         self._ssh_proc = None
         self._gave_cant_ssh_warning = False
-        self._ssh_key_name = None
+        # we don't upload the ssh key to master until it's needed
+        self._ssh_key_is_copied = False
 
         # cache for SSH address
         self._address = None
@@ -1018,6 +1009,44 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             s3_uri = s3_uri + '/'
 
         return s3_uri
+
+    @property
+    def _ssh_key_name(self):
+        return self._job_name + '.pem'
+
+    @property
+    def fs(self):
+        """:py:class:`~mrjob.fs.base.Filesystem` object for SSH, S3, and the
+        local filesystem.
+        """
+        if self._fs is None:
+            if self._opts['s3_endpoint']:
+                s3_endpoint = self._opts['s3_endpoint']
+            else:
+                # look it up in our table
+                try:
+                    s3_endpoint = REGION_TO_S3_ENDPOINT[self._aws_region]
+                except KeyError:
+                    raise Exception(
+                        "Don't know the S3 endpoint for %s;"
+                        " try setting s3_endpoint explicitly" % (
+                            self._aws_region))
+
+            self._s3_fs = S3Filesystem(self._opts['aws_access_key_id'],
+                                       self._opts['aws_secret_access_key'],
+                                       s3_endpoint)
+
+            if self._opts['ec2_key_pair_file']:
+                self._ssh_fs = SSHFilesystem(self._opts['ssh_bin'],
+                                             self._opts['ec2_key_pair_file'],
+                                             self._ssh_key_name)
+                self._fs = CompositeFilesystem(self._ssh_fs, self._s3_fs,
+                                               LocalFilesystem())
+            else:
+                self._ssh_fs = None
+                self._fs = CompositeFilesystem(self._s3_fs, LocalFilesystem())
+
+        return self._fs
 
     def _run(self):
         self._prepare_for_launch()
@@ -1203,8 +1232,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             random.setstate(random_state)
 
     def _enable_slave_ssh_access(self):
-        if not self._ssh_key_name:
-            self._ssh_key_name = self._job_name + '.pem'
+        if self._ssh_fs and not self._ssh_key_is_copied:
             ssh_copy_key(
                 self._opts['ssh_bin'],
                 self._address_of_master(),
@@ -1807,15 +1835,22 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     ## SSH LOG FETCHING
 
+    def _ssh_path(self, relative):
+        return SSH_PREFIX + self._address_of_master() + SSH_LOG_ROOT + '/' + relative
+
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
-        full_path = SSH_PREFIX + SSH_LOG_ROOT + '/' + relative_path
-        log.debug('Search %s for logs' % full_path)
-        return self.ls(full_path)
+        try:
+            self._enable_slave_ssh_access()
+            log.debug('Search %s for logs' % self._ssh_path(relative_path))
+            return self.ls(self._ssh_path(relative_path))
+        except IOError, e:
+            raise LogFetchError(e)
 
     def _ls_slave_ssh_logs(self, addr, relative_path):
         """List logs over multi-hop SSH by path relative to log root directory
         """
+        self._enable_slave_ssh_access()
         root_path = '%s%s!%s%s' % (SSH_PREFIX,
                                    self._address_of_master(),
                                    addr,
@@ -1844,16 +1879,20 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                          step_nums)
 
     def ls_step_logs_ssh(self, step_nums):
-        return self._enforce_path_regexp(self._ls_ssh_logs('steps/'),
-                                         STEP_LOG_URI_RE,
-                                         step_nums)
+        self._enable_slave_ssh_access()
+        return self._enforce_path_regexp(
+            self._ls_ssh_logs('steps/'),
+            STEP_LOG_URI_RE,
+            step_nums)
 
     def ls_job_logs_ssh(self, step_nums):
+        self._enable_slave_ssh_access()
         return self._enforce_path_regexp(self._ls_ssh_logs('history/'),
                                          EMR_JOB_LOG_URI_RE,
                                          step_nums)
 
     def ls_node_logs_ssh(self):
+        self._enable_slave_ssh_access()
         all_paths = []
         for addr in self._addresses_of_slaves():
             logs = self._ls_slave_ssh_logs(addr, '')
@@ -1862,7 +1901,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     def ls_all_logs_ssh(self):
         """List all log files in the log root directory"""
-        return self.ls(SSH_PREFIX + SSH_LOG_ROOT)
+        return self._ls_ssh_logs('')
 
     ## S3 LOG FETCHING ##
 
@@ -1989,6 +2028,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             return self._find_probable_cause_of_failure_s3(step_nums)
 
     def _find_probable_cause_of_failure_ssh(self, step_nums):
+        self._enable_slave_ssh_access()
         task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
         step_logs = self.ls_step_logs_ssh(step_nums)
         job_logs = self.ls_job_logs_ssh(step_nums)
@@ -2446,202 +2486,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             things_to_hash.append(mrjob.__version__)
         return hash_object(things_to_hash)
 
-    ### GENERAL FILESYSTEM STUFF ###
-
-    def du(self, path_glob):
-        """Get the size of all files matching path_glob."""
-        if not is_s3_uri(path_glob):
-            return super(EMRJobRunner, self).du(path_glob)
-
-        return sum(self.get_s3_key(uri).size for uri in self.ls(path_glob))
-
-    def ls(self, path_glob):
-        """Recursively list files locally or on S3.
-
-        This doesn't list "directories" unless there's actually a
-        corresponding key ending with a '/' (which is weird and confusing;
-        don't make S3 keys ending in '/')
-
-        To list a directory, path_glob must end with a trailing
-        slash (foo and foo/ are different on S3)
-        """
-        if SSH_URI_RE.match(path_glob):
-            for item in self._ssh_ls(path_glob):
-                yield item
-            return
-
-        if not is_s3_uri(path_glob):
-            for path in super(EMRJobRunner, self).ls(path_glob):
-                yield path
-            return
-
-        # support globs
-        glob_match = GLOB_RE.match(path_glob)
-
-        # if it's a "file" (doesn't end with /), just check if it exists
-        if not glob_match and not path_glob.endswith('/'):
-            uri = path_glob
-            if self.get_s3_key(uri):
-                yield uri
-            return
-
-        # we're going to search for all keys starting with base_uri
-        if glob_match:
-            # cut it off at first wildcard
-            base_uri = glob_match.group(1)
-        else:
-            base_uri = path_glob
-
-        for uri in self._s3_ls(base_uri):
-            # enforce globbing
-            if glob_match and not fnmatch.fnmatchcase(uri, path_glob):
-                continue
-
-            yield uri
-
-    def _ssh_ls(self, uri):
-        """Helper for ls(); obeys globbing"""
-        m = SSH_URI_RE.match(uri)
-        try:
-            addr = m.group('hostname') or self._address_of_master()
-            if '!' in addr:
-                self._enable_slave_ssh_access()
-            output = ssh_ls(
-                self._opts['ssh_bin'],
-                addr,
-                self._opts['ec2_key_pair_file'],
-                m.group('filesystem_path'),
-                self._ssh_key_name,
-            )
-            for line in output:
-                # skip directories, we only want to return downloadable files
-                if line and not line.endswith('/'):
-                    yield SSH_PREFIX + addr + line
-        except SSHException, e:
-            raise LogFetchError(e)
-
-    def _s3_ls(self, uri):
-        """Helper for ls(); doesn't bother with globbing or directories"""
-        s3_conn = self.make_s3_conn()
-        bucket_name, key_name = parse_s3_uri(uri)
-
-        bucket = s3_conn.get_bucket(bucket_name)
-        for key in bucket.list(key_name):
-            yield s3_key_to_uri(key)
-
-    def md5sum(self, path, s3_conn=None):
-        if is_s3_uri(path):
-            k = self.get_s3_key(path, s3_conn=s3_conn)
-            return k.etag.strip('"')
-        else:
-            return super(EMRJobRunner, self).md5sum(path)
-
-    def _cat_file(self, filename):
-        ssh_match = SSH_URI_RE.match(filename)
-        if is_s3_uri(filename):
-            # stream lines from the s3 key
-            s3_key = self.get_s3_key(filename)
-            buffer_iterator = read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
-            return buffer_iterator_to_line_iterator(buffer_iterator)
-        elif ssh_match:
-            try:
-                addr = ssh_match.group('hostname') or self._address_of_master()
-                if '!' in addr:
-                    self._enable_slave_ssh_access()
-                output = ssh_cat(
-                    self._opts['ssh_bin'],
-                    addr,
-                    self._opts['ec2_key_pair_file'],
-                    ssh_match.group('filesystem_path'),
-                    self._ssh_key_name,
-                )
-                return read_file(filename, fileobj=StringIO(output))
-            except SSHException, e:
-                raise LogFetchError(e)
-        else:
-            # read from local filesystem
-            return super(EMRJobRunner, self)._cat_file(filename)
-
-    def mkdir(self, dest):
-        """Make a directory. This does nothing on S3 because there are
-        no directories.
-        """
-        if not is_s3_uri(dest):
-            super(EMRJobRunner, self).mkdir(dest)
-
-    def path_exists(self, path_glob):
-        """Does the given path exist?
-
-        If dest is a directory (ends with a "/"), we check if there are
-        any files starting with that path.
-        """
-        if not is_s3_uri(path_glob):
-            return super(EMRJobRunner, self).path_exists(path_glob)
-
-        # just fall back on ls(); it's smart
-        return any(self.ls(path_glob))
-
-    def path_join(self, dirname, filename):
-        if is_s3_uri(dirname):
-            return posixpath.join(dirname, filename)
-        else:
-            return os.path.join(dirname, filename)
-
-    def rm(self, path_glob):
-        """Remove all files matching the given glob."""
-        if not is_s3_uri(path_glob):
-            return super(EMRJobRunner, self).rm(path_glob)
-
-        s3_conn = self.make_s3_conn()
-        for uri in self.ls(path_glob):
-            key = self.get_s3_key(uri, s3_conn)
-            if key:
-                log.debug('deleting ' + uri)
-                key.delete()
-
-            # special case: when deleting a directory, also clean up
-            # the _$folder$ files that EMR creates.
-            if uri.endswith('/'):
-                folder_uri = uri[:-1] + '_$folder$'
-                folder_key = self.get_s3_key(folder_uri, s3_conn)
-                if folder_key:
-                    log.debug('deleting ' + folder_uri)
-                    folder_key.delete()
-
-    def touchz(self, dest):
-        """Make an empty file in the given location. Raises an error if
-        a non-empty file already exists in that location."""
-        if not is_s3_uri(dest):
-            super(EMRJobRunner, self).touchz(dest)
-
-        key = self.get_s3_key(dest)
-        if key and key.size != 0:
-            raise OSError('Non-empty file %r already exists!' % (dest,))
-
-        self.make_s3_key(dest).set_contents_from_string('')
-
     ### EMR-specific STUFF ###
-
-    def _wrap_aws_conn(self, raw_conn):
-        """Wrap a given boto Connection object so that it can retry when
-        throttled."""
-        def retry_if(ex):
-            """Retry if we get a server error indicating throttling. Also
-            handle spurious 505s that are thought to be part of a load
-            balancer issue inside AWS."""
-            return ((isinstance(ex, boto.exception.BotoServerError) and
-                     ('Throttling' in ex.body or
-                      'RequestExpired' in ex.body or
-                      ex.status == 505)) or
-                    (isinstance(ex, socket.error) and
-                     ex.args in ((104, 'Connection reset by peer'),
-                                 (110, 'Connection timed out'))))
-
-        return RetryWrapper(raw_conn,
-                            retry_if=retry_if,
-                            backoff=EMR_BACKOFF,
-                            multiplier=EMR_BACKOFF_MULTIPLIER,
-                            max_tries=EMR_MAX_TRIES)
 
     def make_emr_conn(self):
         """Create a connection to EMR.
@@ -2663,7 +2508,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             region=region)
-        return self._wrap_aws_conn(raw_emr_conn)
+        return wrap_aws_conn(raw_emr_conn)
 
     def _get_region_info_for_emr_conn(self):
         """Get a :py:class:`boto.ec2.regioninfo.RegionInfo` object to
@@ -2738,124 +2583,3 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 self._address_of_master(),
                 self._opts['ec2_key_pair_file'])
         return self._ssh_slave_addrs
-
-    ### S3-specific FILESYSTEM STUFF ###
-
-    # Utilities for interacting with S3 using S3 URIs.
-
-    # Try to use the more general filesystem interface unless you really
-    # need to do something S3-specific (e.g. setting file permissions)
-
-    def make_s3_conn(self):
-        """Create a connection to S3.
-
-        :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a
-                 :py:class:`mrjob.retry.RetryWrapper`
-        """
-        # give a non-cryptic error message if boto isn't installed
-        if boto is None:
-            raise ImportError('You must install boto to connect to S3')
-
-        s3_endpoint = self._get_s3_endpoint()
-        log.debug('creating S3 connection (to %s)' % s3_endpoint)
-
-        raw_s3_conn = boto.connect_s3(
-            aws_access_key_id=self._opts['aws_access_key_id'],
-            aws_secret_access_key=self._opts['aws_secret_access_key'],
-            host=s3_endpoint)
-        return self._wrap_aws_conn(raw_s3_conn)
-
-    def _get_s3_endpoint(self):
-        if self._opts['s3_endpoint']:
-            return self._opts['s3_endpoint']
-        else:
-            # look it up in our table
-            try:
-                return REGION_TO_S3_ENDPOINT[self._aws_region]
-            except KeyError:
-                raise Exception(
-                    "Don't know the S3 endpoint for %s;"
-                    " try setting s3_endpoint explicitly" % self._aws_region)
-
-    def get_s3_key(self, uri, s3_conn=None):
-        """Get the boto Key object matching the given S3 uri, or
-        return None if that key doesn't exist.
-
-        uri is an S3 URI: ``s3://foo/bar``
-
-        You may optionally pass in an existing s3 connection through
-        ``s3_conn``.
-        """
-        if not s3_conn:
-            s3_conn = self.make_s3_conn()
-        bucket_name, key_name = parse_s3_uri(uri)
-
-        return s3_conn.get_bucket(bucket_name).get_key(key_name)
-
-    def make_s3_key(self, uri, s3_conn=None):
-        """Create the given S3 key, and return the corresponding
-        boto Key object.
-
-        uri is an S3 URI: ``s3://foo/bar``
-
-        You may optionally pass in an existing S3 connection through
-        ``s3_conn``.
-        """
-        if not s3_conn:
-            s3_conn = self.make_s3_conn()
-        bucket_name, key_name = parse_s3_uri(uri)
-
-        return s3_conn.get_bucket(bucket_name).new_key(key_name)
-
-    def get_s3_keys(self, uri, s3_conn=None):
-        """Get a stream of boto Key objects for each key inside
-        the given dir on S3.
-
-        uri is an S3 URI: ``s3://foo/bar``
-
-        You may optionally pass in an existing S3 connection through s3_conn
-        """
-        if not s3_conn:
-            s3_conn = self.make_s3_conn()
-
-        bucket_name, key_prefix = parse_s3_uri(uri)
-        bucket = s3_conn.get_bucket(bucket_name)
-        for key in bucket.list(key_prefix):
-            yield key
-
-    def get_s3_folder_keys(self, uri, s3_conn=None):
-        """Background: S3 is even less of a filesystem than HDFS in that it
-        doesn't have directories. EMR fakes directories by creating special
-        ``*_$folder$`` keys in S3.
-
-        For example if your job outputs ``s3://walrus/tmp/output/part-00000``,
-        EMR will also create these keys:
-
-        - ``s3://walrus/tmp_$folder$``
-        - ``s3://walrus/tmp/output_$folder$``
-
-        If you want to grant another Amazon user access to your files so they
-        can use them in S3, you must grant read access on the actual keys,
-        plus any ``*_$folder$`` keys that "contain" your keys; otherwise
-        EMR will error out with a permissions error.
-
-        This gets all the ``*_$folder$`` keys associated with the given URI,
-        as boto Key objects.
-
-        This does not support globbing.
-
-        You may optionally pass in an existing S3 connection through
-        ``s3_conn``.
-        """
-        if not s3_conn:
-            s3_conn = self.make_s3_conn()
-
-        bucket_name, key_name = parse_s3_uri(uri)
-        bucket = s3_conn.get_bucket(bucket_name)
-
-        dirs = key_name.split('/')
-        for i in range(len(dirs)):
-            folder_name = '/'.join(dirs[:i]) + '_$folder$'
-            key = bucket.get_key(folder_name)
-            if key:
-                yield key

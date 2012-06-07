@@ -16,10 +16,8 @@
 from __future__ import with_statement
 
 from StringIO import StringIO
-import bz2
 import datetime
 import getpass
-import gzip
 import os
 import shutil
 import stat
@@ -259,74 +257,6 @@ class CreateMrjobTarGzTestCase(unittest.TestCase):
                 self.assertEqual(path[:6], 'mrjob/')
 
             self.assertIn('mrjob/job.py', contents)
-
-
-class TestFilesystem(unittest.TestCase):
-
-    def setUp(self):
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
-    def test_cat_uncompressed(self):
-        input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as input_file:
-            input_file.write('bar\nfoo\n')
-
-        with InlineMRJobRunner(conf_path=False) as runner:
-            output = []
-            for line in runner.cat(input_path):
-                output.append(line)
-
-        self.assertEqual(output, ['bar\n', 'foo\n'])
-
-    def test_cat_compressed(self):
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\nbar\n')
-        input_gz.close()
-
-        with InlineMRJobRunner(conf_path=False) as runner:
-            output = []
-            for line in runner.cat(input_gz_path):
-                output.append(line)
-
-        self.assertEqual(output, ['foo\n', 'bar\n'])
-
-        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
-        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
-        input_bz2.write('bar\nbar\nfoo\n')
-        input_bz2.close()
-
-        with InlineMRJobRunner(conf_path=False) as runner:
-            output = []
-            for line in runner.cat(input_bz2_path):
-                output.append(line)
-
-        self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
-
-    def test_du(self):
-        data_path_1 = os.path.join(self.tmp_dir, 'data1')
-        with open(data_path_1, 'w') as f:
-            f.write("abcd")
-
-        data_dir = os.path.join(self.tmp_dir, 'more')
-        os.mkdir(data_dir)
-
-        data_path_2 = os.path.join(data_dir, 'data2')
-        with open(data_path_2, 'w') as f:
-            f.write("defg")
-
-        self.assertEqual(InlineMRJobRunner(conf_path=False).du(self.tmp_dir), 8)
-        self.assertEqual(InlineMRJobRunner(conf_path=False).du(data_path_1), 4)
-        self.assertEqual(InlineMRJobRunner(conf_path=False).du(data_path_2), 4)
 
 
 class TestStreamingOutput(unittest.TestCase):

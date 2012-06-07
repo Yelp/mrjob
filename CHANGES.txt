@@ -6,6 +6,7 @@ v0.4, 2012-06-?? -- Slouching toward nirvana
    * --hadoop-*-format
    * --*-protocol switches
    * MRJob.DEFAULT_*_PROTOCOL
+   * MRJob.get_default_opts()
    * MRJob.protocols()
    * PROTOCOL_DICT
    * IF_SUCCESSFUL

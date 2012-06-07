@@ -25,7 +25,6 @@ Configuration
 -------------
 
 .. automethod:: mrjob.runner.MRJobRunner.get_opts
-.. automethod:: mrjob.runner.MRJobRunner.get_default_opts
 
 File management
 ---------------

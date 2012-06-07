@@ -57,12 +57,10 @@ class LocalRunnerOptionStore(RunnerOptionStore):
 
 
 class LocalMRJobRunner(MRJobRunner):
-    """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing
-    purposes.
+    """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing purposes.
 
-    This is the default way of running jobs; we assume you'll spend some
-    time debugging your job before you're ready to run it on EMR or
-    Hadoop.
+    This is NOT the default way of running jobs; we assume you'll spend some
+    time debugging your job before you're ready to run it on EMR or Hadoop.
 
     It's rare to need to instantiate this class directly (see
     :py:meth:`~LocalMRJobRunner.__init__` for details).
@@ -83,6 +81,10 @@ class LocalMRJobRunner(MRJobRunner):
     * ``mapreduce.task.ismap``
     * ``mapreduce.task.output.dir``
     * ``mapreduce.task.partition``
+
+    If you specify *hadoop_version* <= 0.18, the simulated environment
+    variables will change to use the names corresponding with the older Hadoop
+    version.
 
     :py:class:`LocalMRJobRunner` adds the current working directory to the
     subprocesses' :envvar:`PYTHONPATH`, so if you're using it to test an EMR
@@ -383,7 +385,7 @@ class LocalMRJobRunner(MRJobRunner):
 
             try:
                 outfile = open(outfile_name, 'w')
-                
+
                 # write each line to a file as long as we are within the limit
                 # (split_size)
                 for line_group in line_group_generator(path):

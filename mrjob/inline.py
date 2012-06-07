@@ -51,11 +51,11 @@ class InlineMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` without invoking the job as
     a subprocess, so it's easy to attach a debugger.
 
-    This is NOT the default way of testing jobs; to more accurately
-    simulate your environment prior to running on Hadoop/EMR, use ``-r local``.
+    This is the default way of testing jobs; We assume you'll spend some time
+    debugging your job before you're ready to run it on EMR or Hadoop.
 
-    It's rare to need to instantiate this class directly (see
-    :py:meth:`~InlineMRJobRunner.__init__` for details).
+    To more accurately simulate your environment prior to running on
+    Hadoop/EMR, use ``-r local``.
     """
 
     alias = 'inline'

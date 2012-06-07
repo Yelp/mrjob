@@ -1,43 +1,73 @@
 mrjob
 =====
 
-.. image:: logos/logo_medium.png
+**mrjob lets you write MapReduce jobs in Python 2.5+ and run them on several
+platforms.** You can:
 
-mrjob is a Python 2.5+ package that helps you write and run Hadoop Streaming
-jobs.
+* Write multi-step MapReduce jobs in pure Python
+* Test on your local machine
+* Run on a Hadoop cluster
+* Run in the cloud using `Amazon Elastic MapReduce (EMR)`_
 
-mrjob fully supports Amazon's Elastic MapReduce (EMR) service, which allows you
-to buy time on a Hadoop cluster on an hourly basis. It also works with your own
-Hadoop cluster.
+.. _Amazon Elastic MapReduce (EMR): http://aws.amazon.com/documentation/elasticmapreduce/
 
 To get started, install with ``pip``::
 
     pip install mrjob
 
-Then read :doc:`writing-and-running`. Other common documentation destinations
-are:
+Guides
+======
 
-* :ref:`mrjob.conf`
-* :doc:`configs-reference`
-* :doc:`job`
-* :doc:`runners-emr`
-* :doc:`tools`
+**Basics**
 
-Table of Contents
-=================
+* :doc:`guides/quickstart`
+* :doc:`guides/concepts`
+
+**Writing jobs**
+
+* :ref:`writing-basics`
+* :ref:`job-protocols`
+* :ref:`writing-protocols`
+* :ref:`writing-cl-opts`
+
+**Running jobs**
+
+* :doc:`guides/runners`
+* :ref:`runners-programmatically`
+* :doc:`guides/testing`
+
+**Configuration**
+
+* :doc:`guides/configs-basics`
+* :doc:`guides/configs-all-runners`
+* :doc:`guides/configs-hadoopy-runners`
+* :doc:`guides/configs-reference`
+
+**Cookbook**
+
+* :ref:`cookbook-src-tree-pythonpath`
+* :ref:`cookbook-task-timeout`
+* :ref:`cookbook-compressed-output`
+
+**Running jobs on Elastic MapReduce**
+
+* :ref:`amazon-setup`
+* :ref:`ssh-tunneling`
+* :doc:`guides/emr-opts`
+* :doc:`guides/emr-tools`
+* :doc:`guides/emr-troubleshooting`
+* :ref:`picking-job-flow-config`
+* :doc:`guides/emr-advanced`
+
+Reference
+=========
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 2
 
     whats-new.rst
-    writing-and-running.rst
-    job.rst
-    configs.rst
-    protocols.rst
-    runners.rst
-    utils.rst
-    tools.rst
-    testing.rst
+    reference.rst
+    guides.rst
 
 Indices and tables
 ==================

@@ -1,5 +1,5 @@
-Quick Reference
-===============
+Configuration quick reference
+=============================
 
 Options that can't be set from mrjob.conf (all runners)
 -------------------------------------------------------

@@ -123,12 +123,6 @@ def add_runner_opts(opt_group):
             'and must be empty'),
 
         opt_group.add_option(
-            '--partitioner', dest='partitioner', default=None,
-            help=('Hadoop partitioner class to use to determine how mapper'
-                  ' output should be sorted and distributed to reducers. For'
-                  ' example: org.apache.hadoop.mapred.lib.HashPartitioner')),
-
-        opt_group.add_option(
             '--python-archive', dest='python_archives', default=[],
             action='append',
             help=('Archive to unpack and add to the PYTHONPATH of the mr_job'
@@ -239,6 +233,12 @@ def add_hadoop_emr_opts(opt_group):
             '--owner', dest='owner', default=None,
             help='custom username to use, to help us identify who ran the'
             ' job'),
+
+        opt_group.add_option(
+            '--partitioner', dest='partitioner', default=None,
+            help=('Hadoop partitioner class to use to determine how mapper'
+                  ' output should be sorted and distributed to reducers. For'
+                  ' example: org.apache.hadoop.mapred.lib.HashPartitioner')),
     ]
 
 

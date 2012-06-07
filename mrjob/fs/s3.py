@@ -70,7 +70,7 @@ def wrap_aws_conn(raw_conn):
 
 class S3Filesystem(Filesystem):
     """Filesystem for Amazon S3 URIs. Typically you will get one of these via
-    ``EMRJobRunner().fs, composed with
+    ``EMRJobRunner().fs``, composed with
     :py:class:`~mrjob.fs.ssh.SSHFilesystem` and
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """

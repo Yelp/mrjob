@@ -207,33 +207,3 @@ class ReprValueProtocol(object):
     @classmethod
     def write(cls, key, value):
         return repr(value)
-
-#: .. deprecated:: 0.3.0
-#:
-#: Formerly the default protocol for all encoded input and output: ``'json'``
-DEFAULT_PROTOCOL = 'json'
-
-#: .. deprecated:: 0.3.0
-#:
-#: Default mapping from protocol name to class:
-#:
-#: ============ ===============================
-#: name         class
-#: ============ ===============================
-#: json         :py:class:`JSONProtocol`
-#: json_value   :py:class:`JSONValueProtocol`
-#: pickle       :py:class:`PickleProtocol`
-#: pickle_value :py:class:`PickleValueProtocol`
-#: raw_value    :py:class:`RawValueProtocol`
-#: repr         :py:class:`ReprProtocol`
-#: repr_value   :py:class:`ReprValueProtocol`
-#: ============ ===============================
-PROTOCOL_DICT = {
-    'json': JSONProtocol,
-    'json_value': JSONValueProtocol,
-    'pickle': PickleProtocol,
-    'pickle_value': PickleValueProtocol,
-    'raw_value': RawValueProtocol,
-    'repr': ReprProtocol,
-    'repr_value': ReprValueProtocol,
-}

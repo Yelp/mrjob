@@ -18,6 +18,7 @@ from optparse import Option
 from optparse import OptionError
 from optparse import OptionGroup
 from optparse import OptionParser
+import os
 import sys
 import time
 
@@ -57,6 +58,8 @@ class Launcher(object):
 
     def __init__(self, script_path=None, args=None):
         super(Launcher, self).__init__()
+        if script_path is not None:
+            script_path = os.path.abspath(script_path)
         self._script_path = script_path
 
         # make sure we respect the $TZ (time zone) environment variable
@@ -128,7 +131,6 @@ class Launcher(object):
         from mrjob.emr import EMRJobRunner
         from mrjob.hadoop import HadoopJobRunner
         from mrjob.local import LocalMRJobRunner
-        from mrjob.inline import InlineMRJobRunner
 
         if self.options.runner == 'emr':
             return EMRJobRunner(**self.emr_job_runner_kwargs())
@@ -137,8 +139,8 @@ class Launcher(object):
             return HadoopJobRunner(**self.hadoop_job_runner_kwargs())
 
         elif self.options.runner == 'inline':
-            return InlineMRJobRunner(
-                mrjob_cls=self.__class__, **self.inline_job_runner_kwargs())
+            raise ValueError("inline is not supported in the multi-lingual"
+                             " launcher.")
 
         else:
             # run locally by default
@@ -335,6 +337,17 @@ class Launcher(object):
 
         self._file_options.append(pass_opt)
 
+    def _process_args(self, args):
+        """mrjob.run takes the first arg as the script path, but mrjob.job uses
+        all args as input files. This method determines the behavior.
+        """
+        if len(args) < 1:
+            self.option_parser.print_help()
+            sys.exit(1)
+
+        self._script_path = os.path.abspath(args[0])
+        self.args = args[1:]
+
     def load_options(self, args):
         """Load command-line options into ``self.options``.
 
@@ -353,13 +366,7 @@ class Launcher(object):
                 ...
         """
         self.options, args = self.option_parser.parse_args(args)
-
-        if len(args) < 1:
-            self.option_parser.print_help()
-            sys.exit(1)
-
-        self._script_path = args[0]
-        self.args = args[1:]
+        self._process_args(args)
 
         if self.options.help_main:
             self.option_parser.option_groups = [
@@ -452,7 +459,7 @@ class Launcher(object):
             'hadoop_version': self.options.hadoop_version,
             'input_paths': self.args,
             'jobconf': self.jobconf(),
-            'mr_job_script': self.script_path,
+            'mr_job_script': self._script_path,
             'label': self.options.label,
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
@@ -514,6 +521,22 @@ class Launcher(object):
         return combine_dicts(
             self.job_runner_kwargs(),
             self._get_kwargs_from_opt_group(self.hadoop_opt_group))
+
+    ### Default values for Hadoop stuff ###
+
+    def hadoop_input_format(self):
+        return None
+
+    def hadoop_output_format(self):
+        return None
+
+    def jobconf(self):
+        return {}
+
+    def partitioner(self):
+        return None
+
+    ### More option stuff ###
 
     def _get_kwargs_from_opt_group(self, opt_group):
         """Helper function that returns a dictionary of the values of options

@@ -736,6 +736,9 @@ class MRJob(Launcher):
                 or self.options.run_combiner \
                 or self.options.run_reducer
 
+    def _process_args(self, args):
+        self.args = args
+
     ### protocols ###
 
     def input_protocol(self):

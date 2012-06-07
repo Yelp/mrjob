@@ -65,15 +65,9 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #: * ``'NONE'``: delete nothing
 #: * ``'REMOTE_SCRATCH'``: delete remote scratch only
 #: * ``'SCRATCH'``: delete local and remote scratch, but not logs
-#: * ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL``. Not supported for
 #:   ``cleanup_on_failure``.
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
-                   'SCRATCH', 'IF_SUCCESSFUL']
-
-#: .. deprecated:: 0.3.0
-#:
-#: the default cleanup-on-success option: ``'IF_SUCCESSFUL'``
-CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
+                   'SCRATCH']
 
 _STEP_RE = re.compile(r'^M?C?R?$')
 
@@ -175,20 +169,12 @@ class RunnerOptionStore(OptionStore):
         cleanup_error = ('cleanup must be one of %s, not %%s' %
                          ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_error, self['cleanup'])
-        if 'IF_SUCCESSFUL' in self['cleanup']:
-            log.warning(
-                'IF_SUCCESSFUL is deprecated and will be removed in mrjob 0.4.'
-                ' Use ALL instead.')
 
         cleanup_failure_error = (
             'cleanup_on_failure must be one of %s, not %%s' %
             ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_failure_error,
                          self['cleanup_on_failure'])
-        if 'IF_SUCCESSFUL' in self['cleanup_on_failure']:
-            raise ValueError(
-                'IF_SUCCESSFUL is not supported for cleanup_on_failure.'
-                ' Use NONE instead.')
 
 
 class MRJobRunner(object):
@@ -361,14 +347,6 @@ class MRJobRunner(object):
         # rather than feed it multiple files
         self._sort_is_windows_sort = None
 
-    @classmethod
-    def get_default_opts(cls):
-        """.. deprecated:: 0.4.0
-
-        Get default options for this runner class, as a dict.
-        """
-        return cls.OPTION_STORE_CLASS(cls.alias, {}, False).default_options()
-
     ### Filesystem object ###
 
     @property
@@ -488,13 +466,13 @@ class MRJobRunner(object):
         def mode_has(*args):
             return any((choice in mode) for choice in args)
 
-        if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH', 'IF_SUCCESSFUL'):
+        if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH'):
             self._cleanup_local_scratch()
 
-        if mode_has('ALL', 'SCRATCH', 'REMOTE_SCRATCH', 'IF_SUCCESSFUL'):
+        if mode_has('ALL', 'SCRATCH', 'REMOTE_SCRATCH'):
             self._cleanup_remote_scratch()
 
-        if mode_has('ALL', 'LOGS', 'IF_SUCCESSFUL'):
+        if mode_has('ALL', 'LOGS'):
             self._cleanup_logs()
 
     def counters(self):

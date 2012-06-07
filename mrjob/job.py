@@ -45,9 +45,7 @@ from mrjob.options import print_help_for_groups
 from mrjob.parse import parse_port_range_list
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.parse import parse_key_value_list
-from mrjob.protocol import DEFAULT_PROTOCOL
 from mrjob.protocol import JSONProtocol
-from mrjob.protocol import PROTOCOL_DICT
 from mrjob.protocol import RawValueProtocol
 from mrjob.runner import CLEANUP_CHOICES
 from mrjob.util import log_to_null
@@ -876,12 +874,7 @@ class MRJob(object):
         self.option_parser.add_option_group(self.proto_opt_group)
 
         self._passthrough_options.extend(
-            add_protocol_opts(
-                self.proto_opt_group,
-                sorted(self.protocols()),
-                self.DEFAULT_OUTPUT_PROTOCOL,
-            )
-        )
+            add_protocol_opts(self.proto_opt_group))
 
         # options for running the entire job
         self.runner_opt_group = OptionGroup(
@@ -1070,62 +1063,6 @@ class MRJob(object):
             self.options.cleanup_on_failure = parse_commas(
                 self.options.cleanup_on_failure)
 
-        # DEPRECATED protocol stuff
-
-        ignore_switches = (
-            self.INPUT_PROTOCOL != RawValueProtocol or
-            self.INTERNAL_PROTOCOL != JSONProtocol or
-            self.OUTPUT_PROTOCOL != JSONProtocol or
-            any(
-                (getattr(self, func_name).im_func is not
-                 getattr(MRJob, func_name).im_func)
-                for func_name in (
-                    'input_protocol',
-                    'internal_protocol',
-                    'output_protocol',
-                )
-            )
-        )
-
-        warn_deprecated = False
-
-        if self.options.protocol is None:
-            self.options.protocol = self.DEFAULT_PROTOCOL
-            if self.DEFAULT_PROTOCOL != 'json':
-                warn_deprecated = True
-        else:
-            warn_deprecated = True
-
-        if self.options.input_protocol is None:
-            self.options.input_protocol = self.DEFAULT_INPUT_PROTOCOL
-            if self.DEFAULT_INPUT_PROTOCOL != 'raw_value':
-                warn_deprecated = True
-        else:
-            warn_deprecated = True
-
-        # output_protocol defaults to protocol
-        if self.options.output_protocol is None:
-            self.options.output_protocol = self.options.protocol
-        else:
-            warn_deprecated = True
-
-        if warn_deprecated:
-            if ignore_switches:
-                log.warn('You have specified custom behavior in both'
-                         ' deprecated and non-deprecated ways.'
-                         ' The custom non-deprecated behavior will override'
-                         ' the deprecated behavior in all cases, including'
-                         ' command line switches.')
-                self.options.input_protocol = None
-                self.options.protocol = None
-                self.options.output_protocol = None
-            else:
-                log.warn('Setting protocols via --input-protocol, --protocol,'
-                         ' --output-protocol, DEFAULT_INPUT_PROTOCOL,'
-                         ' DEFAULT_PROTOCOL, and DEFAULT_OUTPUT_PROTOCOL is'
-                         ' deprecated as of mrjob 0.3 and will no longer be'
-                         ' supported in mrjob 0.4.')
-
     def is_mapper_or_reducer(self):
         """True if this is a mapper/reducer.
 
@@ -1281,66 +1218,21 @@ class MRJob(object):
         objects. Default behavior is to return an instance of
         :py:attr:`INPUT_PROTOCOL`.
         """
-        if (self.options.input_protocol is not None and
-            self.INPUT_PROTOCOL == RawValueProtocol):
-            # deprecated
-            protocol_name = self.options.input_protocol
-            return self.protocols()[protocol_name]()
-        else:
-            # non-deprecated
-            return self.INPUT_PROTOCOL()
+        return self.INPUT_PROTOCOL()
 
     def internal_protocol(self):
         """Instance of the protocol to use to communicate between steps.
         Default behavior is to return an instance of
         :py:attr:`INTERNAL_PROTOCOL`.
         """
-        if (self.options.protocol is not None and
-            self.INTERNAL_PROTOCOL == JSONProtocol):
-            # deprecated
-            protocol_name = self.options.protocol
-            return self.protocols()[protocol_name]
-        else:
-            # non-deprecated
-            return self.INTERNAL_PROTOCOL()
+        return self.INTERNAL_PROTOCOL()
 
     def output_protocol(self):
         """Instance of the protocol to use to convert Python objects to output
         lines. Default behavior is to return an instance of
         :py:attr:`OUTPUT_PROTOCOL`.
         """
-        if (self.options.output_protocol is not None and
-            self.OUTPUT_PROTOCOL == JSONProtocol):
-            # deprecated
-            return self.protocols()[self.options.output_protocol]
-        else:
-            # non-deprecated
-            return self.OUTPUT_PROTOCOL()
-
-    @classmethod
-    def protocols(cls):
-        """Deprecated in favor of :py:attr:`INPUT_PROTOCOL`,
-        :py:attr:`OUTPUT_PROTOCOL`, and :py:attr:`INTERNAL_PROTOCOL`.
-
-        Mapping from protocol name to the protocol class to use
-        for parsing job input and writing job output. We give protocols names
-        so that we can easily choose them from the command line.
-
-        This returns :py:data:`mrjob.protocol.PROTOCOL_DICT` by default.
-
-        To add a custom protocol, define a subclass of
-        :py:class:`mrjob.protocol.HadoopStreamingProtocol`, and
-        re-define this method::
-
-            @classmethod
-            def protocols(cls):
-                protocol_dict = super(MRYourJob, cls).protocols()
-                protocol_dict['rot13'] = Rot13Protocol
-                return protocol_dict
-
-            DEFAULT_PROTOCOL = 'rot13'
-        """
-        return PROTOCOL_DICT.copy()  # copy to stop monkey-patching
+        return self.OUTPUT_PROTOCOL()
 
     #: Protocol for reading input to the first mapper in your job.
     #: Default: :py:class:`RawValueProtocol`.
@@ -1377,38 +1269,6 @@ class MRJob(object):
     #: See :py:data:`mrjob.protocol` for the full list of protocols.
     OUTPUT_PROTOCOL = JSONProtocol
 
-    #: .. deprecated:: 0.3.0
-    #:
-    #: Default protocol for reading input to the first mapper in your job
-    #: specified by a string.
-    #:
-    #: Overridden by any changes to :py:attr:`.INPUT_PROTOCOL`.
-    #:
-    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
-    #: protocol strings. Can be overridden by :option:`--input-protocol`.
-    DEFAULT_INPUT_PROTOCOL = 'raw_value'
-
-    #: .. deprecated:: 0.3.0
-    #:
-    #: Default protocol for communication between steps and final output
-    #: specified by a string.
-    #:
-    #: Overridden by any changes to :py:attr:`.INTERNAL_PROTOCOL`.
-    #:
-    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
-    #: protocol strings. Can be overridden by :option:`--protocol`.
-    DEFAULT_PROTOCOL = DEFAULT_PROTOCOL  # i.e. the one from mrjob.protocols
-
-    #: .. deprecated:: 0.3.0
-    #:
-    #: Overridden by any changes to :py:attr:`.OUTPUT_PROTOCOL`. If
-    #: :py:attr:`.OUTPUT_PROTOCOL` is not set, defaults to
-    #: :py:attr:`.DEFAULT_PROTOCOL`.
-    #:
-    #: See :py:data:`mrjob.protocol.PROTOCOL_DICT` for the full list of
-    #: protocol strings. Can be overridden by the :option:`--output-protocol`.
-    DEFAULT_OUTPUT_PROTOCOL = None
-
     def parse_output_line(self, line):
         """
         Parse a line from the final output of this MRJob into
@@ -1436,13 +1296,7 @@ class MRJob(object):
         Normally, setting :py:attr:`HADOOP_INPUT_FORMAT` is sufficient;
         redefining this method is only for when you want to get fancy.
         """
-        if self.options.hadoop_input_format:
-            log.warn('--hadoop-input-format is deprecated as of mrjob 0.3 and'
-                     ' will no longer be supported in mrjob 0.4. Redefine'
-                     ' HADOOP_INPUT_FORMAT or hadoop_input_format() instead.')
-            return self.options.hadoop_input_format
-        else:
-            return self.HADOOP_INPUT_FORMAT
+        return self.HADOOP_INPUT_FORMAT
 
     #: Optional name of an optional Hadoop ``OutputFormat`` class, e.g.
     #: ``'org.apache.hadoop.mapred.FileOutputFormat'``.
@@ -1458,14 +1312,7 @@ class MRJob(object):
         Normally, setting :py:attr:`HADOOP_OUTPUT_FORMAT` is sufficient;
         redefining this method is only for when you want to get fancy.
         """
-        if self.options.hadoop_output_format:
-            log.warn('--hadoop-output-format is deprecated as of mrjob 0.3 and'
-                     ' will no longer be supported in mrjob 0.4. Redefine '
-                     ' HADOOP_OUTPUT_FORMAT or hadoop_output_format() instead.'
-                     )
-            return self.options.hadoop_output_format
-        else:
-            return self.HADOOP_OUTPUT_FORMAT
+        return self.HADOOP_OUTPUT_FORMAT
 
     ### Partitioning ###
 
@@ -1634,8 +1481,6 @@ class MRJob(object):
 
         :type protocol: str
         :param protocol: A protocol instance to use (e.g. JSONProtocol()),
-                         Also accepts protocol names (e.g. ``'json'``), but
-                         this is deprecated.
 
         This only works in sandbox mode. This does not clear ``self.stdout``.
         """
@@ -1645,8 +1490,6 @@ class MRJob(object):
 
         if protocol is None:
             protocol = JSONProtocol()
-        elif isinstance(protocol, basestring):
-            protocol = self.protocols()[protocol]
 
         lines = StringIO(self.stdout.getvalue())
         return [protocol.read(line) for line in lines]

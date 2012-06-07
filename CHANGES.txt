@@ -2,6 +2,8 @@ v0.4, 2012-06-?? -- Slouching toward nirvana
  * 'inline' runner is the new default (was 'local') (#423)
  * Filesystem functionality moved out of MRJobRunner into into 'fs' objects
  * Requires boto 2.3.0 or later
+ * Removed --hadoop-*-format and --*-protocol switches
+ * Removed DEFAULT_*_PROTOCOL class variables from MRJob
 
 v???
  * Local runner sorts output consistently (was getting mixed up a little)

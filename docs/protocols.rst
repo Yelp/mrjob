@@ -11,6 +11,3 @@ mrjob.protocol - input and output
 .. autoclass:: RawValueProtocol
 .. autoclass:: ReprProtocol
 .. autoclass:: ReprValueProtocol
-
-.. autodata:: DEFAULT_PROTOCOL
-.. autodata:: PROTOCOL_DICT

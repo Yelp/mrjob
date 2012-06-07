@@ -22,32 +22,10 @@ from optparse import SUPPRESS_USAGE
 from mrjob.runner import CLEANUP_CHOICES
 
 
-def add_protocol_opts(opt_group, protocol_choices, default_output_protocol):
-    """Add options related to choosing protocols. These are all deprecated
-    except for :opt:`--strict-protocols` and must be made available as
-    passthrough options so the job picks it up under Hadoop Streaming.
+def add_protocol_opts(opt_group):
+    """Add options related to choosing protocols.
     """
     return [
-        opt_group.add_option(
-            '--input-protocol', dest='input_protocol',
-            default=None, choices=protocol_choices,
-            help=('DEPRECATED: protocol to read input with (default:'
-                  ' raw_value)')),
-
-        opt_group.add_option(
-            '--output-protocol', dest='output_protocol',
-            default=default_output_protocol,
-            choices=protocol_choices,
-             help='DEPRECATED: protocol for final output (default: %s)' % (
-            'same as --protocol' if default_output_protocol is None
-            else '%default')),
-
-        opt_group.add_option(
-            '-p', '--protocol', dest='protocol',
-            default=None, choices=protocol_choices,
-            help=('DEPRECATED: output protocol for mappers/reducers. Choices:'
-                  ' %s (default: json)' % ', '.join(protocol_choices))),
-
         opt_group.add_option(
             '--strict-protocols', dest='strict_protocols', default=None,
             action='store_true', help='If something violates an input/output '
@@ -200,25 +178,6 @@ def add_hadoop_emr_opts(opt_group):
             '--hadoop-arg', dest='hadoop_extra_args', default=[],
             action='append', help='Argument of any type to pass to hadoop '
             'streaming. You can use --hadoop-arg multiple times.'),
-
-        opt_group.add_option(
-            '--hadoop-input-format', dest='hadoop_input_format', default=None,
-            help=('DEPRECATED: the hadoop InputFormat class used by the first'
-                  ' step of your job to read data. Custom formats must be'
-                  ' included in your hadoop streaming jar (see'
-                  ' --hadoop-streaming-jar). Current best practice is to'
-                  ' redefine HADOOP_INPUT_FORMAT or hadoop_input_format()'
-                  ' in your job.')),
-
-        opt_group.add_option(
-            '--hadoop-output-format', dest='hadoop_output_format',
-            default=None,
-            help=('DEPRECATED: the hadoop OutputFormat class used by the first'
-                  ' step of your job to read data. Custom formats must be'
-                  ' included in your hadoop streaming jar (see'
-                  ' --hadoop-streaming-jar). Current best practice is to'
-                  ' redefine HADOOP_OUTPUT_FORMAT or hadoop_output_format()'
-                  ' in your job.')),
 
         opt_group.add_option(
             '--hadoop-streaming-jar', dest='hadoop_streaming_jar',

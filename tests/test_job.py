@@ -545,220 +545,6 @@ class ProtocolsTestCase(unittest.TestCase):
         self.assertRaises(Exception, mr_job.run_mapper)
 
 
-class DeprecatedProtocolsTestCase(unittest.TestCase):
-    # not putting these in their own files because we're not going to invoke
-    # it as a script anyway.
-
-    class MRBoringJob2(MRBoringJob):
-        DEFAULT_INPUT_PROTOCOL = 'json'
-        DEFAULT_PROTOCOL = 'pickle'
-        DEFAULT_OUTPUT_PROTOCOL = 'repr'
-
-    class MRBoringJob3(MRBoringJob):
-        DEFAULT_PROTOCOL = 'repr'
-
-    class MRTrivialJob(MRTestingJob):
-        DEFAULT_OUTPUT_PROTOCOL = 'repr'
-
-        def mapper(self, key, value):
-            yield key, value
-
-    class MRInconsistentJob(MRTestingJob):
-        DEFAULT_INPUT_PROTOCOL = 'json'
-        INPUT_PROTOCOL = ReprProtocol
-
-    class MRInconsistentJob2(MRTestingJob):
-        DEFAULT_INPUT_PROTOCOL = 'json'
-
-        def input_protocol(self):
-            return ReprProtocol()
-
-    def test_mixed_behavior(self):
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.job', stderr)
-            mr_job = self.MRInconsistentJob()
-            self.assertEqual(mr_job.options.input_protocol, None)
-            self.assertEqual(mr_job.input_protocol().__class__, ReprProtocol)
-            self.assertIn('custom behavior', stderr.getvalue())
-
-    def test_mixed_behavior_2(self):
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.job', stderr)
-            mr_job = self.MRInconsistentJob2()
-            self.assertEqual(mr_job.options.input_protocol, None)
-            self.assertEqual(mr_job.input_protocol().__class__, ReprProtocol)
-            self.assertIn('custom behavior', stderr.getvalue())
-
-    def test_default_protocols(self):
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.job', stderr)
-            mr_job = MRBoringJob()
-            self.assertEqual(mr_job.options.input_protocol, 'raw_value')
-            self.assertEqual(mr_job.options.protocol, 'json')
-            self.assertEqual(mr_job.options.output_protocol, 'json')
-            self.assertNotIn('deprecated', stderr.getvalue())
-
-    def test_explicit_default_protocols(self):
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.job', stderr)
-            mr_job2 = self.MRBoringJob2().sandbox(stderr=stderr)
-            self.assertEqual(mr_job2.options.input_protocol, 'json')
-            self.assertEqual(mr_job2.options.protocol, 'pickle')
-            self.assertEqual(mr_job2.options.output_protocol, 'repr')
-            self.assertIn('deprecated', stderr.getvalue())
-
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.job', stderr)
-            mr_job3 = self.MRBoringJob3()
-            self.assertEqual(mr_job3.options.input_protocol, 'raw_value')
-            self.assertEqual(mr_job3.options.protocol, 'repr')
-            # output protocol should default to protocol
-            self.assertEqual(mr_job3.options.output_protocol, 'repr')
-            self.assertIn('deprecated', stderr.getvalue())
-
-    def test_setting_protocol(self):
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.job', stderr)
-            mr_job2 = MRBoringJob(args=[
-                '--input-protocol=json', '--protocol=pickle',
-                '--output-protocol=repr'])
-            self.assertEqual(mr_job2.options.input_protocol, 'json')
-            self.assertEqual(mr_job2.options.protocol, 'pickle')
-            self.assertEqual(mr_job2.options.output_protocol, 'repr')
-            self.assertIn('deprecated', stderr.getvalue())
-
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.job', stderr)
-            mr_job3 = MRBoringJob(args=['--protocol=repr'])
-            self.assertEqual(mr_job3.options.input_protocol, 'raw_value')
-            self.assertEqual(mr_job3.options.protocol, 'repr')
-            # output protocol should default to protocol
-            self.assertEqual(mr_job3.options.output_protocol, 'repr')
-            self.assertIn('deprecated', stderr.getvalue())
-
-    def test_overriding_explicit_default_protocols(self):
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.job', stderr)
-            mr_job = self.MRBoringJob2(args=['--protocol=json'])
-            self.assertEqual(mr_job.options.input_protocol, 'json')
-            self.assertEqual(mr_job.options.protocol, 'json')
-            self.assertEqual(mr_job.options.output_protocol, 'repr')
-            self.assertIn('deprecated', stderr.getvalue())
-
-    def test_mapper_raw_value_to_json(self):
-        RAW_INPUT = StringIO('foo\nbar\nbaz\n')
-
-        with no_handlers_for_logger():
-            mr_job = MRBoringJob(['--mapper'])
-        mr_job.sandbox(stdin=RAW_INPUT)
-        mr_job.run_mapper()
-
-        self.assertEqual(mr_job.stdout.getvalue(),
-                         'null\t"foo"\n' +
-                         'null\t"bar"\n' +
-                         'null\t"baz"\n')
-
-    def test_reducer_json_to_json(self):
-        JSON_INPUT = StringIO('"foo"\t"bar"\n' +
-                              '"foo"\t"baz"\n' +
-                              '"bar"\t"qux"\n')
-
-        with no_handlers_for_logger():
-            mr_job = MRBoringJob(args=['--reducer'])
-        mr_job.sandbox(stdin=JSON_INPUT)
-        mr_job.run_reducer()
-
-        self.assertEqual(mr_job.stdout.getvalue(),
-                         ('"foo"\t["bar", "baz"]\n' +
-                          '"bar"\t["qux"]\n'))
-
-    def test_output_protocol_with_no_final_reducer(self):
-        # if there's no reducer, the last mapper should use the
-        # output protocol (in this case, repr)
-        RAW_INPUT = StringIO('foo\nbar\nbaz\n')
-
-        with no_handlers_for_logger():
-            mr_job = self.MRTrivialJob(['--mapper'])
-        mr_job.sandbox(stdin=RAW_INPUT)
-        mr_job.run_mapper()
-
-        self.assertEqual(mr_job.options.output_protocol, 'repr')
-        self.assertEqual(mr_job.stdout.getvalue(),
-                         ("None\t'foo'\n" +
-                          "None\t'bar'\n" +
-                          "None\t'baz'\n"))
-
-    def test_undecodable_input(self):
-        BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
-                                  '"foo"\t"bar"\n' +
-                                  '"too"\t"many"\t"tabs"\n' +
-                                  '"notabs"\n')
-
-        with no_handlers_for_logger():
-            mr_job = MRBoringJob(args=['--reducer'])
-        mr_job.sandbox(stdin=BAD_JSON_INPUT)
-        mr_job.run_reducer()
-
-        # good data should still get through
-        self.assertEqual(mr_job.stdout.getvalue(), '"foo"\t["bar"]\n')
-
-        # exception type varies between versions of simplejson,
-        # so just make sure there were three exceptions of some sort
-        counters = mr_job.parse_counters()
-        self.assertEqual(counters.keys(), ['Undecodable input'])
-        self.assertEqual(sum(counters['Undecodable input'].itervalues()), 3)
-
-    def test_undecodable_input_strict(self):
-        BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
-                                  '"foo"\t"bar"\n' +
-                                  '"too"\t"many"\t"tabs"\n' +
-                                  '"notabs"\n')
-
-        with no_handlers_for_logger():
-            mr_job = MRBoringJob(args=['--reducer', '--strict-protocols'])
-        mr_job.sandbox(stdin=BAD_JSON_INPUT)
-
-        # make sure it raises an exception
-        self.assertRaises(Exception, mr_job.run_reducer)
-
-    def test_unencodable_output(self):
-        UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
-                                         '\xaa\n' +
-                                         'bar\n')
-
-        with no_handlers_for_logger():
-            mr_job = MRBoringJob(args=['--mapper'])
-        mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
-        mr_job.run_mapper()
-
-        # good data should still get through
-        self.assertEqual(mr_job.stdout.getvalue(),
-                         ('null\t"foo"\n' + 'null\t"bar"\n'))
-
-        self.assertEqual(mr_job.parse_counters(),
-                         {'Unencodable output': {'UnicodeDecodeError': 1}})
-
-    def test_undecodable_output_strict(self):
-        UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
-                                         '\xaa\n' +
-                                         'bar\n')
-
-        with no_handlers_for_logger():
-            mr_job = MRBoringJob(args=['--mapper', '--strict-protocols'])
-        mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
-
-        # make sure it raises an exception
-        self.assertRaises(Exception, mr_job.run_mapper)
-
-
 class JobConfTestCase(unittest.TestCase):
 
     class MRJobConfJob(MRTestingJob):
@@ -893,36 +679,6 @@ class HadoopFormatTestCase(unittest.TestCase):
                          'mapred.ReasonableInputFormat')
         self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'],
                          'mapred.EbcdicDb2EnterpriseXmlOutputFormat')
-
-    def test_deprecated_command_line_options(self):
-        mr_job = MRJob([
-            '--hadoop-input-format',
-            'org.apache.hadoop.mapred.lib.NLineInputFormat',
-            '--hadoop-output-format',
-            'org.apache.hadoop.mapred.FileOutputFormat',
-            ])
-
-        with logger_disabled('mrjob.job'):
-            job_runner_kwargs = mr_job.job_runner_kwargs()
-            self.assertEqual(job_runner_kwargs['hadoop_input_format'],
-                             'org.apache.hadoop.mapred.lib.NLineInputFormat')
-            self.assertEqual(job_runner_kwargs['hadoop_output_format'],
-                             'org.apache.hadoop.mapred.FileOutputFormat')
-
-    def test_deprecated_command_line_options_override_attrs(self):
-        mr_job = MRHadoopFormatJob([
-            '--hadoop-input-format',
-            'org.apache.hadoop.mapred.lib.NLineInputFormat',
-            '--hadoop-output-format',
-            'org.apache.hadoop.mapred.FileOutputFormat',
-            ])
-
-        with logger_disabled('mrjob.job'):
-            job_runner_kwargs = mr_job.job_runner_kwargs()
-            self.assertEqual(job_runner_kwargs['hadoop_input_format'],
-                             'org.apache.hadoop.mapred.lib.NLineInputFormat')
-            self.assertEqual(job_runner_kwargs['hadoop_output_format'],
-                             'org.apache.hadoop.mapred.FileOutputFormat')
 
 
 class PartitionerTestCase(unittest.TestCase):
@@ -1157,7 +913,6 @@ class CommandLineArgsTest(unittest.TestCase):
     def test_passthrough_options_defaults(self):
         mr_job = MRCustomBoringJob()
 
-        self.assertEqual(mr_job.options.input_protocol, 'raw_value')
         self.assertEqual(mr_job.options.foo_size, 5)
         self.assertEqual(mr_job.options.bar_name, None)
         self.assertEqual(mr_job.options.baz_mode, False)
@@ -1186,9 +941,6 @@ class CommandLineArgsTest(unittest.TestCase):
             '--strict-protocols',
             ])
 
-        self.assertEqual(mr_job.options.input_protocol, 'raw_value')
-        self.assertEqual(mr_job.options.protocol, 'json')
-        self.assertEqual(mr_job.options.output_protocol, 'json')
         self.assertEqual(mr_job.options.foo_size, 9)
         self.assertEqual(mr_job.options.bar_name, 'Alembic')
         self.assertEqual(mr_job.options.baz_mode, True)
@@ -1220,9 +972,6 @@ class CommandLineArgsTest(unittest.TestCase):
             '--strict-protocols',
             ])
 
-        self.assertEqual(mr_job.options.input_protocol, 'raw_value')
-        self.assertEqual(mr_job.options.protocol, 'json')
-        self.assertEqual(mr_job.options.output_protocol, 'json')
         self.assertEqual(mr_job.options.foo_size, 9)
         self.assertEqual(mr_job.options.bar_name, 'Alembic')
         self.assertEqual(mr_job.options.baz_mode, True)
@@ -1364,17 +1113,6 @@ class ParseOutputTestCase(unittest.TestCase):
         output = "0\t1\n['a', 'b']\tset(['c', 'd'])\n"
         mr_job.stdout = StringIO(output)
         self.assertEqual(mr_job.parse_output(ReprProtocol()),
-                         [(0, 1), (['a', 'b'], set(['c', 'd']))])
-
-        # verify that stdout is not cleared
-        self.assertEqual(mr_job.stdout.getvalue(), output)
-
-    def test_deprecated_protocol_aliases(self):
-        # see if we can use the repr protocol
-        mr_job = MRJob()
-        output = "0\t1\n['a', 'b']\tset(['c', 'd'])\n"
-        mr_job.stdout = StringIO(output)
-        self.assertEqual(mr_job.parse_output('repr'),
                          [(0, 1), (['a', 'b'], set(['c', 'd']))])
 
         # verify that stdout is not cleared

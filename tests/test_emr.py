@@ -16,12 +16,10 @@
 
 from __future__ import with_statement
 
-import bz2
 import copy
 from datetime import datetime
 from datetime import timedelta
 import getpass
-import gzip
 import logging
 import os
 import posixpath
@@ -171,6 +169,8 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         add_mock_s3_data(self.mock_s3_fs, data, time_modified)
 
     def prepare_runner_for_ssh(self, runner, num_slaves=0):
+        # TODO: Refactor this abomination of a test harness
+
         # Set up environment variables
         self._old_environ = os.environ.copy()
         os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
@@ -199,6 +199,12 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         runner._address = 'testmaster'
         # Also pretend to have an SSH key pair file
         runner._opts['ec2_key_pair_file'] = self.keyfile_path
+
+        # re-initialize fs
+        runner._fs = None
+        runner._ssh_fs = None
+        runner._s3_fs = None
+        #runner.fs
 
     def add_slave(self):
         """Add a mocked slave to the cluster. Caller is responsible for setting
@@ -1737,6 +1743,9 @@ class TestSSHLs(MockEMRAndS3TestCase):
         self.assertEqual(
             sorted(self.runner.ls('ssh://testmaster/test')),
             ['ssh://testmaster/test/one', 'ssh://testmaster/test/two'])
+
+        self.runner._enable_slave_ssh_access()
+
         self.assertEqual(
             list(self.runner.ls('ssh://testmaster!testslave0/test')),
             ['ssh://testmaster!testslave0/test/three'])
@@ -1757,9 +1766,11 @@ class TestNoBoto(unittest.TestCase):
     def blank_out_boto(self):
         self._real_boto = mrjob.emr.boto
         mrjob.emr.boto = None
+        mrjob.fs.s3.boto = None
 
     def restore_boto(self):
         mrjob.emr.boto = self._real_boto
+        mrjob.fs.s3.boto = self._real_boto
 
     def test_init(self):
         # merely creating an EMRJobRunner should raise an exception
@@ -1989,78 +2000,6 @@ class EMRNoMapperTest(MockEMRAndS3TestCase):
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
-
-
-class TestFilesystem(MockEMRAndS3TestCase):
-
-    def setUp(self):
-        super(TestFilesystem, self).setUp()
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        super(TestFilesystem, self).tearDown()
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
-    def test_cat_uncompressed(self):
-        local_input_path = os.path.join(self.tmp_dir, 'input')
-        with open(local_input_path, 'w') as input_file:
-            input_file.write('bar\nfoo\n')
-
-        remote_input_path = 's3://walrus/data/foo'
-        self.add_mock_s3_data({'walrus': {'data/foo': 'foo\nfoo\n'}})
-
-        with EMRJobRunner(cleanup='NONE', conf_path=False) as runner:
-            local_output = []
-            for line in runner.cat(local_input_path):
-                local_output.append(line)
-
-            remote_output = []
-            for line in runner.cat(remote_input_path):
-                remote_output.append(line)
-
-        self.assertEqual(local_output, ['bar\n', 'foo\n'])
-        self.assertEqual(remote_output, ['foo\n', 'foo\n'])
-
-    def test_cat_compressed(self):
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\nbar\n')
-        input_gz.close()
-
-        with EMRJobRunner(cleanup=['NONE'], conf_path=False) as runner:
-            output = []
-            for line in runner.cat(input_gz_path):
-                output.append(line)
-
-        self.assertEqual(output, ['foo\n', 'bar\n'])
-
-        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
-        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
-        input_bz2.write('bar\nbar\nfoo\n')
-        input_bz2.close()
-
-        with EMRJobRunner(cleanup=['NONE'], conf_path=False) as runner:
-            output = []
-            for line in runner.cat(input_bz2_path):
-                output.append(line)
-
-        self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
-
-    def test_du(self):
-        remote_dir = 's3://walrus/data/'
-        remote_file = remote_dir + 'foo'
-        remote_file_2 = remote_dir + 'bar/baz'
-        self.add_mock_s3_data({'walrus': {'data/foo': 'abcd'}})
-        self.add_mock_s3_data({'walrus': {'data/bar/baz': 'defg'}})
-        self.assertEqual(EMRJobRunner(conf_path=False).du(remote_dir), 8)
-        self.assertEqual(EMRJobRunner(conf_path=False).du(remote_file), 4)
-        self.assertEqual(EMRJobRunner(conf_path=False).du(remote_file_2), 4)
 
 
 class PoolingTestCase(MockEMRAndS3TestCase):

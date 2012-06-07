@@ -84,18 +84,20 @@ def get_mock_hadoop_output():
         return None
 
 
-def hdfs_path_to_real_path(hdfs_path):
+def hdfs_path_to_real_path(hdfs_path, environ):
     if hdfs_path.startswith('hdfs:///'):
         hdfs_path = hdfs_path[7:]  # keep one slash
 
     if not hdfs_path.startswith('/'):
-        hdfs_path = '/user/%s/%s' % (os.environ['USER'], hdfs_path)
+        hdfs_path = '/user/%s/%s' % (environ['USER'], hdfs_path)
 
-    return os.path.join(os.environ['MOCK_HDFS_ROOT'], hdfs_path.lstrip('/'))
+    return os.path.join(environ['MOCK_HDFS_ROOT'], hdfs_path.lstrip('/'))
 
 
-def real_path_to_hdfs_path(real_path):
-    hdfs_root = os.environ['MOCK_HDFS_ROOT']
+def real_path_to_hdfs_path(real_path, environ=None):
+    if environ is None: # user may have passed empty dict
+        environ = os.environ
+    hdfs_root = environ['MOCK_HDFS_ROOT']
 
     if not real_path.startswith(hdfs_root):
         raise ValueError('path %s is not in %s' % (real_path, hdfs_root))
@@ -107,7 +109,8 @@ def real_path_to_hdfs_path(real_path):
     return hdfs_path
 
 
-def invoke_cmd(prefix, cmd, cmd_args, error_msg, error_status):
+def invoke_cmd(stdout, stderr, environ, prefix, cmd, cmd_args, error_msg,
+               error_status):
     """Helper function to call command and subcommands of the hadoop binary.
 
     Basically, combines prefix and cmd to make a function name, and calls
@@ -117,78 +120,80 @@ def invoke_cmd(prefix, cmd, cmd_args, error_msg, error_status):
     func_name = prefix + cmd
 
     if func_name in globals():
-        globals()[func_name](*cmd_args)
+        return globals()[func_name](stdout, stderr, environ, *cmd_args)
     else:
-        sys.stderr.write(error_msg)
-        sys.exit(-1)
+        stderr.write(error_msg)
+        return -1
 
 
-def main():
+def main(stdin, stdout, stderr, argv, environ):
     """Implements hadoop <args>"""
 
     # log what commands we ran
-    if os.environ.get('MOCK_HADOOP_LOG'):
-        with open(os.environ['MOCK_HADOOP_LOG'], 'a') as cmd_log:
-            cmd_log.write(' '.join(pipes.quote(arg) for arg in sys.argv[1:]))
+    if environ.get('MOCK_HADOOP_LOG'):
+        with open(environ['MOCK_HADOOP_LOG'], 'a') as cmd_log:
+            cmd_log.write(' '.join(pipes.quote(arg) for arg in argv[1:]))
             cmd_log.write('\n')
             cmd_log.flush()
 
-    if len(sys.argv) < 2:
-        sys.stderr.write('Usage: hadoop [--config confdir] COMMAND\n')
-        sys.exit(1)
+    if len(argv) < 2:
+        stderr.write('Usage: hadoop [--config confdir] COMMAND\n')
+        return 1
 
-    cmd = sys.argv[1]
-    cmd_args = sys.argv[2:]
+    cmd = argv[1]
+    cmd_args = argv[2:]
 
-    invoke_cmd(
-        'hadoop_', cmd, cmd_args,
+    return invoke_cmd(
+        stdout, stderr, environ, 'hadoop_', cmd, cmd_args,
         'Could not find the main class: %s.  Program will exit.\n\n' % cmd, 1)
 
 
-def hadoop_fs(*args):
+def hadoop_fs(stdout, stderr, environ, *args):
     """Implements hadoop fs <args>"""
     if len(args) < 1:
-        sys.stderr.write('Usage: java FsShell\n')
-        sys.exit(-1)
+        stderr.write('Usage: java FsShell\n')
+        return -1
 
     cmd = args[0][1:]  # convert e.g. '-put' -> 'put'
     cmd_args = args[1:]
 
     # this doesn't have to be a giant switch statement, but it's a
     # bit easier to understand this way. :)
-    invoke_cmd('hadoop_fs_', cmd, cmd_args,
+    return invoke_cmd(stdout, stderr, environ, 'hadoop_fs_', cmd, cmd_args,
                '%s: Unknown command\nUsage: java FsShell\n' % cmd, -1)
 
 
-def hadoop_fs_cat(*args):
+def hadoop_fs_cat(stdout, stderr, environ, *args):
     """Implements hadoop fs -cat <src>"""
     if len(args) < 1:
-        sys.stderr.write('Usage: java FsShell [-cat <src>]\n')
-        sys.exit(-1)
+        stderr.write('Usage: java FsShell [-cat <src>]\n')
+        return -1
 
     failed = False
     for hdfs_path_glob in args:
-        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob)
+        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
         paths = glob.glob(real_path_glob)
         if not paths:
-            sys.stderr.write('cat: File does not exist: %s\n' % hdfs_path_glob)
+            stderr.write('cat: File does not exist: %s\n' % hdfs_path_glob)
             failed = True
         else:
             for path in paths:
                 with open(path) as f:
                     for line in f:
-                        sys.stdout.write(line)
+                        stdout.write(line)
 
     if failed:
-        sys.exit(-1)
+        return -1
+    else:
+        return 0
 
 
-def hadoop_fs_lsr(*args):
+def hadoop_fs_lsr(stdout, stderr, environ, *args):
     """Implements hadoop fs -lsr."""
     hdfs_path_globs = args or ['']
 
     def ls_line(real_path):
-        hdfs_path = real_path_to_hdfs_path(real_path)
+        hdfs_path = real_path_to_hdfs_path(real_path, environ)
         # we could actually implement ls here, but mrjob only cares about
         # the path
         path_is_dir = os.path.isdir(real_path)
@@ -198,10 +203,10 @@ def hadoop_fs_lsr(*args):
 
     failed = False
     for hdfs_path_glob in hdfs_path_globs:
-        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob)
+        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
         real_paths = glob.glob(real_path_glob)
         if not real_paths:
-            print >> sys.stderr, (
+            print >> stderr, (
                 'lsr: Cannot access %s: No such file or directory.' %
                 hdfs_path_glob)
             failed = True
@@ -209,45 +214,52 @@ def hadoop_fs_lsr(*args):
             for real_path in real_paths:
                 if os.path.isdir(real_path):
                     for dirpath, dirnames, filenames in os.walk(real_path):
-                        print ls_line(dirpath)
+                        print >> stdout, ls_line(dirpath)
                         for filename in filenames:
-                            print ls_line(os.path.join(dirpath, filename))
+                            print >> stdout, ls_line(os.path.join(dirpath,
+                                                                  filename))
                 else:
-                    print ls_line(real_path)
+                    print >> stdout, ls_line(real_path)
 
     if failed:
-        sys.exit(-1)
+        return -1
+    else:
+        return 0
 
 
-def hadoop_fs_mkdir(*args):
+def hadoop_fs_mkdir(stdout, stderr, environ, *args):
     """Implements hadoop fs -mkdir"""
     if len(args) < 1:
-        sys.stderr.write('Usage: java FsShell [-mkdir <path>]\n')
-        sys.exit(-1)
+        stderr.write('Usage: java FsShell [-mkdir <path>]\n')
+        return -1
 
     failed = False
     for path in args:
-        real_path = hdfs_path_to_real_path(path)
+        real_path = hdfs_path_to_real_path(path, environ)
         if os.path.exists(real_path):
-            sys.stderr.write(
+            stderr.write(
                 'mkdir: cannot create directory %s: File exists' % path)
             # continue to make directories on failure
             failed = True
+        else:
+            os.makedirs(real_path)
 
     if failed:
-        sys.exit(-1)
+        return -1
+    else:
+        return 0
 
 
-def hadoop_fs_dus(*args):
+def hadoop_fs_dus(stdout, stderr, environ, *args):
     """Implements hadoop fs -dus."""
     hdfs_path_globs = args or ['']
 
     failed = False
     for hdfs_path_glob in hdfs_path_globs:
-        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob)
+        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
         real_paths = glob.glob(real_path_glob)
         if not real_paths:
-            print >> sys.stderr, (
+            print >> stderr, (
                 'lsr: Cannot access %s: No such file or directory.' %
                 hdfs_path_glob)
             failed = True
@@ -261,22 +273,24 @@ def hadoop_fs_dus(*args):
                                 os.path.join(dirpath, filename))
                 else:
                     total_size += os.path.getsize(real_path)
-                print "%s    %d" % (real_path, total_size)
+                print >> stdout, "%s    %d" % (real_path, total_size)
 
     if failed:
-        sys.exit(-1)
+        return -1
+    else:
+        return 0
 
 
-def hadoop_fs_put(*args):
+def hadoop_fs_put(stdout, stderr, environ, *args):
     """Implements hadoop fs -put"""
     if len(args) < 2:
-        sys.stderr.write('Usage: java FsShell [-put <localsrc> ... <dst>]')
-        sys.exit(-1)
+        stderr.write('Usage: java FsShell [-put <localsrc> ... <dst>]')
+        return -1
 
     srcs = args[:-1]
     dst = args[-1]
 
-    real_dst = hdfs_path_to_real_path(dst)
+    real_dst = hdfs_path_to_real_path(dst, environ)
     real_dir = os.path.dirname(real_dst)
     # dst could be a dir or a filename; we don't know
     if not (os.path.isdir(real_dst) or os.path.isdir(real_dir)):
@@ -284,52 +298,68 @@ def hadoop_fs_put(*args):
 
     for src in srcs:
         shutil.copy(src, real_dst)
+    return 0
 
 
-def hadoop_fs_rmr(*args):
+def hadoop_fs_rmr(stdout, stderr, environ, *args):
     """Implements hadoop fs -rmr."""
     if len(args) < 1:
-        sys.stderr.write('Usage: java FsShell [-rmr [-skipTrash] <src>]')
+        stderr.write('Usage: java FsShell [-rmr [-skipTrash] <src>]')
 
     if args[0] == '-skipTrash':
         args = args[1:]
 
     failed = False
     for path in args:
-        real_path = hdfs_path_to_real_path(path)
-        if os.path.exists(real_path):
+        real_path = hdfs_path_to_real_path(path, environ)
+        if os.path.isdir(real_path):
             shutil.rmtree(real_path)
+        elif os.path.exists(real_path):
+            os.remove(real_path)
         else:
-            sys.stderr.write(
+            stderr.write(
                 'rmr: cannot remove %s: No such file or directory.' % path)
             failed = True
 
     if failed:
-        sys.exit(-1)
+        return -1
+    else:
+        return 0
 
 
-def hadoop_jar(*args):
+def hadoop_fs_test(stdout, stderr, environ, *args):
+    """Implements hadoop fs -rmr."""
     if len(args) < 1:
-        sys.stderr.write('RunJar jarFile [mainClass] args...\n')
-        sys.exit(-1)
+        stderr.write('Usage: java FsShell [-test -[ezd] <src>]')
+
+    if os.path.exists(hdfs_path_to_real_path(args[1], environ)):
+        return 0
+    else:
+        return -1
+
+
+def hadoop_jar(stdout, stderr, environ, *args):
+    if len(args) < 1:
+        stderr.write('RunJar jarFile [mainClass] args...\n')
+        return -1
 
     jar_path = args[0]
     if not os.path.exists(jar_path):
-        sys.stderr.write(
+        stderr.write(
             'Exception in thread "main" java.io.IOException: Error opening job'
             ' jar: %s\n' % jar_path)
-        sys.exit(-1)
+        return -1
 
     streaming_args = args[1:]
     output_idx = list(streaming_args).index('-output')
     assert output_idx != -1
     output_dir = streaming_args[output_idx + 1]
-    real_output_dir = hdfs_path_to_real_path(output_dir)
+    real_output_dir = hdfs_path_to_real_path(output_dir, environ)
 
     mock_output_dir = get_mock_hadoop_output()
     if mock_output_dir is None:
-        sys.stderr.write('Job failed!')
-        sys.exit(-1)
+        stderr.write('Job failed!')
+        return -1
 
     if os.path.isdir(real_output_dir):
         os.rmdir(real_output_dir)
@@ -337,17 +367,19 @@ def hadoop_jar(*args):
     shutil.move(mock_output_dir, real_output_dir)
 
     now = datetime.datetime.now()
-    sys.stderr.write(now.strftime('Running job: job_%Y%m%d%H%M_0001\n'))
-    sys.stderr.write('Job succeeded!\n')
+    stderr.write(now.strftime('Running job: job_%Y%m%d%H%M_0001\n'))
+    stderr.write('Job succeeded!\n')
+    return 0
 
 
-def hadoop_version(*args):
-    sys.stderr.write("""Hadoop 0.20.2
+def hadoop_version(stdout, stderr, environ, *args):
+    stderr.write("""Hadoop 0.20.2
 Subversion https://svn.apache.org/repos/asf/hadoop/common/branches/branch-0.20\
  -r 911707
 Compiled by chrisdo on Fri Feb 19 08:07:34 UTC 2010
 """)
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main(sys.stdin, sys.stdout, sys.stderr, sys.argv, os.environ))

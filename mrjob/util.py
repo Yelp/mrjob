@@ -351,12 +351,17 @@ def read_file(path, fileobj=None):
     - Decompress ``.gz`` and ``.bz2`` files.
     - If *fileobj* is not ``None``, stream lines from the *fileobj*
     """
+    # sometimes values declared in the ``try`` block aren't accessible from the
+    # ``finally`` block. not sure why.
+    f = None
     try:
         if path.endswith('.gz'):
             f = gzip.GzipFile(path, fileobj=fileobj)
         elif path.endswith('.bz2'):
             if bz2 is None:
-                raise Exception('bz2 module was not successfully imported (likely not installed).')
+                f = None
+                raise Exception('bz2 module was not successfully imported'
+                                ' (likely not installed).')
             elif fileobj is None:
                 f = bz2.BZ2File(path)
             else:
@@ -369,7 +374,7 @@ def read_file(path, fileobj=None):
         for line in f:
             yield line
     finally:
-        if fileobj is None and not f is None: 
+        if fileobj is None and not f is None:
             f.close()
 
 

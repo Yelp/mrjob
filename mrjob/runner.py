@@ -747,7 +747,8 @@ class MRJobRunner(object):
             if not self._script:
                 self._steps = []
             else:
-                args = ([self._script['path'], '--steps'] +
+                args = (self._opts['steps_python_bin'] +
+                        [self._script['path'], '--steps'] +
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))
                 # add . to PYTHONPATH (in case mrjob isn't actually installed)

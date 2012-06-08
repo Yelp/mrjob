@@ -169,20 +169,22 @@ class LocalMRJobRunner(MRJobRunner):
 
         assert self._script  # shouldn't be able to run if no script
 
-        wrapper_args = []
+        wrapper_args = self._opts['python_bin']
         if self._wrapper_script:
-            wrapper_args = [self._wrapper_script['path']]
+            wrapper_args = (self._opts['python_bin'] +
+                            [self._wrapper_script['name']] +
+                            wrapper_args)
 
         # run mapper, combiner, sort, reducer for each step
         for i, step in enumerate(self._get_steps()):
             self._counters.append({})
             # run the mapper
-            mapper_args = (wrapper_args + [self._script['path'],
+            mapper_args = (wrapper_args + [self._script['name'],
                             '--step-num=%d' % i, '--mapper'] +
                            self._mr_job_extra_args())
             combiner_args = []
             if 'C' in step:
-                combiner_args = (wrapper_args + [self._script['path'],
+                combiner_args = (wrapper_args + [self._script['name'],
                                  '--step-num=%d' % i, '--combiner'] +
                                  self._mr_job_extra_args())
 
@@ -200,7 +202,7 @@ class LocalMRJobRunner(MRJobRunner):
                 self._prev_outfiles = [sort_output_path]
 
                 # run the reducer
-                reducer_args = (wrapper_args + [self._script['path'],
+                reducer_args = (wrapper_args + [self._script['name'],
                                  '--step-num=%d' % i, '--reducer'] +
                                 self._mr_job_extra_args())
                 self._invoke_step(reducer_args, 'step-%d-reducer' % i,

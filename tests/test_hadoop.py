@@ -32,8 +32,7 @@ except ImportError:
 
 from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import add_mock_hadoop_output
-from tests.mr_two_step_job import MRTwoStepJob
-from tests.quiet import logger_disabled
+from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
 
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
@@ -168,19 +167,13 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
                                '--no-conf', '--hadoop-arg', '-libjar',
                                '--hadoop-arg', 'containsJars.jar'] + list(args)
                               + ['-', local_input_path, remote_input_path]
-                              + ['--hadoop-input-format', 'FooFormat']
-                              + ['--hadoop-output-format', 'BarFormat']
                               + ['--jobconf', 'x=y'])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
         results = []
 
-        # don't care that --hadoop-*-format is deprecated
-        with logger_disabled('mrjob.job'):
-            runner = mr_job.make_runner()
-
-        with runner as runner:  # i.e. call cleanup when we're done
+        with mr_job.make_runner() as runner:
             assert isinstance(runner, HadoopJobRunner)
             runner.run()
 

@@ -35,7 +35,6 @@ except ImportError:
 from mrjob.conf import dump_mrjob_conf
 from mrjob.inline import InlineMRJobRunner
 from mrjob.parse import JOB_NAME_RE
-from mrjob.runner import CLEANUP_DEFAULT
 from mrjob.runner import MRJobRunner
 from mrjob.util import log_to_stream
 from tests.mr_two_step_job import MRTwoStepJob
@@ -91,26 +90,6 @@ class WithStatementTestCase(unittest.TestCase):
 
     def test_double_none_okay(self):
         self._test_cleanup_after_with_statement(['NONE', 'NONE'], True)
-
-    def test_cleanup_deprecated(self):
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob', stderr)
-            with InlineMRJobRunner(
-                cleanup=CLEANUP_DEFAULT, conf_path=False) as runner:
-
-                self.local_tmp_dir = runner._get_local_tmp_dir()
-                assert os.path.exists(self.local_tmp_dir)
-
-            self.assertEqual(os.path.exists(self.local_tmp_dir), False)
-            self.local_tmp_dir = None
-            self.assertIn('deprecated', stderr.getvalue())
-
-    def test_cleanup_not_supported(self):
-        self.assertRaises(
-            ValueError,
-            InlineMRJobRunner,
-            cleanup_on_failure=CLEANUP_DEFAULT, conf_path=False)
 
 
 class TestExtraKwargs(unittest.TestCase):

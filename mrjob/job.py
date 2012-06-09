@@ -502,7 +502,7 @@ class MRJob(object):
 
         stderr.write(
             u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
-        self.stderr.flush()
+        stderr.flush()
 
     def set_status(self, msg):
         """Set the job status in hadoop streaming by printing to stderr.
@@ -521,7 +521,7 @@ class MRJob(object):
             status = 'reporter:status:%s\n' % (msg,)
             stderr = self.stderr
         stderr.write(status)
-        self.stderr.flush()
+        stderr.flush()
 
     ### Running the job ###
 

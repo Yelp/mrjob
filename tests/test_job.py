@@ -1,3 +1,4 @@
+# -*- encoding: utf-8 -*-
 # Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -357,6 +358,16 @@ class CountersAndStatusTestCase(unittest.TestCase):
 
         # make sure parse_counters() works
         self.assertEqual(mr_job.parse_counters(), parsed_stderr['counters'])
+
+    def test_unicode_set_status(self):
+        mr_job = MRJob().sandbox()
+        # shouldn't raise an exception
+        mr_job.set_status(u'💩')
+
+    def test_unicode_counter(self):
+        mr_job = MRJob().sandbox()
+        # shouldn't raise an exception
+        mr_job.increment_counter(u'💩', 'x', 1)
 
     def test_negative_and_zero_counters(self):
         mr_job = MRJob().sandbox()

@@ -34,8 +34,8 @@ from mrjob.conf import combine_dicts
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
-from mrjob.run import Launcher
-from mrjob.run import _READ_ARGS_FROM_SYS_ARGV
+from mrjob.launch import MRJobLauncher
+from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.util import read_input
 
 
@@ -65,7 +65,7 @@ class UsageError(Exception):
     pass
 
 
-class MRJob(Launcher):
+class MRJob(MRJobLauncher):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
     for details."""
 
@@ -413,6 +413,13 @@ class MRJob(Launcher):
                                  " probably means you tried to use it from"
                                  " __main__, which doesn't work." % w)
 
+        # support inline runner when running from the MRJob itself
+        from mrjob.inline import InlineMRJobRunner
+
+        if self.options.runner == 'inline':
+            return InlineMRJobRunner(mrjob_cls=self.__class__,
+                                     **self.inline_job_runner_kwargs())
+
         return super(MRJob, self).make_runner()
 
     def run_mapper(self, step_num=0):
@@ -737,6 +744,10 @@ class MRJob(Launcher):
                 or self.options.run_reducer
 
     def _process_args(self, args):
+        """mrjob.launch takes the first arg as the script path, but mrjob.job
+        uses all args as input files. This method determines the behavior:
+        MRJob uses all args as input files.
+        """
         self.args = args
 
     ### protocols ###

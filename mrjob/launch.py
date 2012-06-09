@@ -43,6 +43,7 @@ from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
 
+
 log = logging.getLogger('mrjob.run')
 
 
@@ -50,14 +51,20 @@ log = logging.getLogger('mrjob.run')
 _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
 
 
-class Launcher(object):
+class MRJobLauncher(object):
+    """Handle running a MapReduce job on an executable from the command line.
+    This class will eventually support running arbitrary executables; for now
+    it only supports :py:class:`~mrjob.job.MRJob` subclasses. Up to v0.5 it is
+    effectively part of the :py:class:`~mrjob.job.MRJob` class itself and
+    should not be used externally in any way.
+    """
 
     #: :py:class:`optparse.Option` subclass to use with the
     #: :py:class:`optparse.OptionParser` instance.
     OPTION_CLASS = Option
 
     def __init__(self, script_path=None, args=None):
-        super(Launcher, self).__init__()
+        super(MRJobLauncher, self).__init__()
         if script_path is not None:
             script_path = os.path.abspath(script_path)
         self._script_path = script_path
@@ -99,6 +106,7 @@ class Launcher(object):
 
     @classmethod
     def _usage(cls):
+        """Command line usage string for this class"""
         return "usage: %prog [job_to_run|--help] [options] [input files]"
 
     @classmethod
@@ -338,8 +346,9 @@ class Launcher(object):
         self._file_options.append(pass_opt)
 
     def _process_args(self, args):
-        """mrjob.run takes the first arg as the script path, but mrjob.job uses
-        all args as input files. This method determines the behavior.
+        """mrjob.launch takes the first arg as the script path, but mrjob.job
+        uses all args as input files. This method determines the behavior:
+        MRJobLauncher takes off the first arg as the script path.
         """
         if len(args) < 1:
             self.option_parser.print_help()
@@ -525,15 +534,22 @@ class Launcher(object):
     ### Default values for Hadoop stuff ###
 
     def hadoop_input_format(self):
+        """Hadoop input format must be known by the launcher but is defined by
+        the job. We have no good way to do this, but
+        :py:class:`~mrjob.job.MRJob` handles it well for now.
+        """
         return None
 
     def hadoop_output_format(self):
+        """See hadoop_input_format()."""
         return None
 
     def jobconf(self):
+        """See hadoop_input_format()."""
         return {}
 
     def partitioner(self):
+        """See hadoop_input_format()."""
         return None
 
     ### More option stuff ###
@@ -640,4 +656,4 @@ class Launcher(object):
 
 
 if __name__ == '__main__':
-    Launcher.run()
+    MRJobLauncher.run()

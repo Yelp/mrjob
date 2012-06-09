@@ -13,14 +13,15 @@
 # limitations under the License.
 """Tests for JobConf Environment Variables
 """
-from mrjob.job import MRJob
 import re
+
 from mrjob.compat import get_jobconf_value
+from tests.mr_testing_job import MRTestingJob
 
 WORD_RE = re.compile(r"[\w']+")
 
 
-class MRWordCount(MRJob):
+class MRWordCount(MRTestingJob):
     """ Trivial Job that returns the number of words in each input file
     """
     def mapper(self, _, line):

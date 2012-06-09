@@ -26,8 +26,8 @@
 # limitations under the License.
 """Tests for JobConf Environment Variables
 """
-from mrjob.job import MRJob
 from mrjob.compat import get_jobconf_value
+from tests.mr_testing_job import MRTestingJob
 
 JOBCONF_LIST = [
     'mapreduce.job.id',
@@ -45,7 +45,7 @@ JOBCONF_LIST = [
 ]
 
 
-class MRTestJobConf(MRJob):
+class MRTestJobConf(MRTestingJob):
 
     def mapper(self, _, line):
         for jobconf in JOBCONF_LIST:

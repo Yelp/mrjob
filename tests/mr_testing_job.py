@@ -1,4 +1,4 @@
-# Copyright 2011 Yelp
+# Copyright 2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,21 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-
-from tests.mr_testing_job import MRTestingJob
+from mrjob.job import MRJob
 
 
-class MRTestCmdenv(MRTestingJob):
-    """cmdenv test."""
-    def mapper(self, key, value):
-        # try adding something
-        os.environ['BAR'] = 'foo'
+class MRTestingJob(MRJob):
+    """Simple optimization to make our test cases run faster"""
 
-        # get cmdenvs
-        yield('FOO', os.environ['FOO'])
-        yield('SOMETHING', os.environ['SOMETHING'])
-
-
-if __name__ == '__main__':
-    MRTestCmdenv.run()
+    def make_runner(self, *args, **kwargs):
+        runner = super(MRTestingJob, self).make_runner(*args, **kwargs)
+        runner._steps = self._steps_desc()
+        return runner

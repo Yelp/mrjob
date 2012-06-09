@@ -28,10 +28,10 @@ except ImportError:
     import unittest
 
 from mrjob.conf import dump_mrjob_conf
-from mrjob.job import MRJob
 from mrjob.inline import InlineMRJobRunner
 from mrjob.protocol import JSONValueProtocol
 from tests.mr_test_cmdenv import MRTestCmdenv
+from tests.mr_testing_job import MRTestingJob
 from tests.mr_two_step_job import MRTwoStepJob
 
 
@@ -140,7 +140,7 @@ class InlineMRJobRunnerCmdenvTest(unittest.TestCase):
 
 
 # this doesn't need to be in its own file because it'll be run inline
-class MRIncrementerJob(MRJob):
+class MRIncrementerJob(MRTestingJob):
     """A terribly silly way to add a positive integer to values."""
 
     INPUT_PROTOCOL = JSONValueProtocol

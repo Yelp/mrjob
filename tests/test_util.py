@@ -314,10 +314,15 @@ class ArchiveTestCase(unittest.TestCase):
         expected_files = ['bar', 'baz', 'foo', 'qux']
         expected_files = (set(expected_files + added_files) -
                           set(excluded_files))
-        self.assertEqual(sorted(os.listdir(join(self.tmp_dir, 'b'))),
-                         sorted(expected_files))
-        self.assertEqual(os.listdir(join(self.tmp_dir, 'b', 'qux')),
-                         ['quux'])
+
+        no_pax = lambda paths: (x for x in paths if x != 'PaxHeader')
+
+        self.assertEqual(
+            sorted(no_pax(os.listdir(join(self.tmp_dir, 'b')))),
+            sorted(expected_files))
+
+        self.assertEqual(
+            list(no_pax(os.listdir(join(self.tmp_dir, 'b', 'qux')))), ['quux'])
 
         # make sure their contents are intact
         with open(join(self.tmp_dir, 'b', 'foo')) as foo:

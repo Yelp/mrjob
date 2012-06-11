@@ -35,6 +35,7 @@ import zipfile
 
 try:
     import bz2
+    bz2  # redefine bz2 for pepflakes
 except ImportError:
     bz2 = None
 

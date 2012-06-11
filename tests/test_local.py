@@ -18,7 +18,6 @@ from __future__ import with_statement
 
 from StringIO import StringIO
 import gzip
-import mrjob
 import os
 import shutil
 import signal
@@ -32,11 +31,14 @@ try:
 except ImportError:
     import unittest
 
+from mock import patch
+
+import mrjob
+from mrjob import local
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import cmd_line
 from mrjob.util import read_file
-from mrjob.util import is_ironpython
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_job_where_are_you import MRJobWhereAreYou
@@ -660,14 +662,20 @@ class TestHadoopConfArgs(unittest.TestCase):
         self.assertEqual(conf_args[:2], ['-libjar', 'qux.jar'])
         self.assertEqual(len(conf_args), 12)
 
-class TestIronPythonEnvironment(unittest.TestCase):
-    def test_ironpython_environment(self):
-        runner = LocalMRJobRunner()
-        runner._setup_working_dir()
-        environment = runner._subprocess_env('M', 0, 0)
 
-        if is_ironpython:
+class TestIronPythonEnvironment(unittest.TestCase):
+
+    def setUp(self):
+        self.runner = LocalMRJobRunner(conf_path=False)
+        self.runner._setup_working_dir()
+
+    def test_env_ironpython(self):
+        with patch.object(local, 'is_ironpython', True):
+            environment = self.runner._subprocess_env('M', 0, 0)
             self.assertIn('IRONPYTHONPATH', environment)
-        else:
+
+    def test_env_no_ironpython(self):
+        with patch.object(local, 'is_ironpython', False):
+            environment = self.runner._subprocess_env('M', 0, 0)
             self.assertNotIn('IRONPYTHONPATH', environment)
 

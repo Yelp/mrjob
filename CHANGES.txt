@@ -1,4 +1,5 @@
 v0.3.4, 2012-06-11 -- We are friendly people.
+ * Experimental support for IronPython in the local and inline runners
  * set_status() and increment_counter() will encode messages/names of type
    'unicode' as UTF-8 when writing to Hadoop Streaming
  * EMR and Hadoop counter parsing is more correct

@@ -34,6 +34,7 @@ except ImportError:
     import unittest
 
 from mrjob.conf import combine_envs
+from mrjob.conf import dump_mrjob_conf
 from mrjob.job import MRJob
 from mrjob.job import _IDENTITY_MAPPER
 from mrjob.job import UsageError
@@ -1043,6 +1044,22 @@ class CommandLineArgsTest(unittest.TestCase):
             ('--foo-config', '/etc/fooconf'),
             ('--accordian-file', 'WeirdAl.mp3'),
             ('--accordian-file', '/home/dave/JohnLinnell.ogg')])
+
+    def test_multiple_config_files(self):
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        path_left = os.path.join(tmp_dir, 'left.yaml')
+        path_right = os.path.join(tmp_dir, 'right.yaml')
+        with open(path_left, 'w') as f:
+            dump_mrjob_conf({'runners': {'inline': {'jobconf': {'x': 1}}}}, f)
+        with open(path_right, 'w') as f:
+            dump_mrjob_conf({'runners': {'inline': {'jobconf': {'y': 2}}}}, f)
+        mr_job = MRCustomBoringJob(args=['-r', 'inline',
+                                         '-c', path_left, '-c', path_right])
+        with mr_job.make_runner() as r:
+            self.assertEqual(r._opts['jobconf']['x'], 1)
+            self.assertEqual(r._opts['jobconf']['y'], 2)
 
 
 class FileOptionsTestCase(unittest.TestCase):

@@ -51,7 +51,7 @@ def add_runner_opts(opt_group):
                   " your Hadoop cluster.")),
 
         opt_group.add_option(
-            '-c', '--conf-path', dest='conf_path', default=None,
+            '-c', '--conf-path', dest='conf_path', action='append',
             help='Path to alternate mrjob.conf file to read from'),
 
         opt_group.add_option(

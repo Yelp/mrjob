@@ -112,21 +112,36 @@ class RunnerOptionStore(OptionStore):
         'upload_files': combine_path_lists,
     })
 
-    def __init__(self, alias, opts, conf_path):
+    def __init__(self, alias, opts, conf_paths):
         super(RunnerOptionStore, self).__init__()
 
         # sanitize incoming options and issue warnings for bad keys
         opts = self.validated_options(
             opts, 'Got unexpected keyword arguments: %s')
 
-        unsanitized_opt_dicts = load_opts_from_mrjob_conf(
-            alias, conf_path=conf_path)
+        try:
+            # check for iterable
+            if isinstance(conf_paths, basestring):
+                # if string, put in list (strings are iterable but we don't
+                # want to try to load each character as a path)
+                conf_paths = [conf_paths]
+            else:
+                # otherwise, have Python try to listify
+                conf_paths = iter(conf_paths)
+        except TypeError:
+            # not iterable; make it so
+            conf_paths = [conf_paths]
 
-        for path, mrjob_conf_opts in unsanitized_opt_dicts:
-            self.cascading_dicts.append(self.validated_options(
-                mrjob_conf_opts, 'Got unexpected opts from %s: %%s' % path))
+        for conf_path in conf_paths:
+            unsanitized_opt_dicts = load_opts_from_mrjob_conf(
+                alias, conf_path=conf_path)
 
-        self.cascading_dicts.append(opts)
+            for path, mrjob_conf_opts in unsanitized_opt_dicts:
+                self.cascading_dicts.append(self.validated_options(
+                    mrjob_conf_opts,
+                    'Got unexpected opts from %s: %%s' % path))
+
+            self.cascading_dicts.append(opts)
 
         self.populate_values_from_cascading_dicts()
 
@@ -202,9 +217,10 @@ class MRJobRunner(object):
                               you won't actually be able to :py:meth:`run` the
                               job, but other utilities (e.g. :py:meth:`ls`)
                               will work.
-        :type conf_path: str
+        :type conf_path: str or list
         :param conf_path: Alternate path to read configs from, or ``False`` to
-                          ignore all config files.
+                          ignore all config files. Pass multiple paths as a
+                          list to have them combined together.
         :type extra_args: list of str
         :param extra_args: a list of extra cmd-line arguments to pass to the
                            mr_job script. This is a hook to allow jobs to take

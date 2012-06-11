@@ -34,6 +34,7 @@ from mrjob.runner import RunnerOptionStore
 from mrjob.util import cmd_line
 from mrjob.util import read_input
 from mrjob.util import unarchive
+from mrjob.util import is_ironpython
 
 
 log = logging.getLogger('mrjob.local')
@@ -511,9 +512,13 @@ class LocalMRJobRunner(MRJobRunner):
             (translate_jobconf(k, version).replace('.', '_'), str(v))
             for (k, v) in internal_jobconf.iteritems())
 
+        ironpython_env = {'IRONPYTHONPATH': os.getcwd()} if is_ironpython \
+                         else {}
+
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
         return combine_local_envs({'PYTHONPATH': os.getcwd()},
+                                  ironpython_env,
                                   os.environ,
                                   jobconf_env,
                                   internal_jobconf_env,

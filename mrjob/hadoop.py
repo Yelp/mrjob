@@ -210,7 +210,7 @@ class HadoopJobRunner(MRJobRunner):
         # Running jobs via mrjob only adds steps.
         # Store both of these values to enable log parsing.
         self._job_timestamp = None
-        self._start_step_num = None
+        self._start_step_num = 0
 
         # init hadoop version cache
         self._hadoop_version = None

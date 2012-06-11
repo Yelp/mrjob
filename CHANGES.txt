@@ -9,6 +9,7 @@ v0.3.4, 2012-06-11 -- We are friendly people.
    strings
  * hadoop_version can be a float in mrjob.conf, but a warning is printed to the
    console
+ * Command line help is split across several --help-* commands
  * Local runner sorts output consistently
 
 v0.3.3.2, 2012-04-10 -- It's a race [condition]!

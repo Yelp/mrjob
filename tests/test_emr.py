@@ -29,6 +29,9 @@ import py_compile
 import shutil
 from StringIO import StringIO
 import tempfile
+import time
+
+from mock import patch
 
 try:
     import unittest2 as unittest
@@ -64,6 +67,7 @@ from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
+from tests.quiet import log_to_buffer
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 
@@ -79,9 +83,36 @@ except ImportError:
 
 class MockEMRAndS3TestCase(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        cls.fake_mrjob_tgz_path = tempfile.mkstemp(
+            prefix='fake_mrjob_', suffix='.tar.gz')[1]
+
+    @classmethod
+    def tearDownClass(cls):
+        if os.path.exists(cls.fake_mrjob_tgz_path):
+            os.remove(cls.fake_mrjob_tgz_path)
+
     def setUp(self):
         self.make_mrjob_conf()
         self.sandbox_boto()
+
+        def simple_patch(obj, attr, side_effect=None, autospec=False):
+            patcher = patch.object(obj, attr, side_effect=side_effect,
+                                   autospec=autospec)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
+            mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
+            return self.fake_mrjob_tgz_path
+
+        simple_patch(EMRJobRunner, '_create_mrjob_tar_gz',
+                     fake_create_mrjob_tar_gz, autospec=True)
+
+        simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
+        simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
+        simple_patch(time, 'sleep')
 
     def tearDown(self):
         self.unsandbox_boto()
@@ -249,7 +280,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             # on real EMR.
             self.assertEqual(runner._opts['additional_emr_info'],
                              '{"key": "value"}')
-
             runner.run()
 
             for line in runner.stream_output():
@@ -1431,6 +1461,56 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         self.assertEqual(self.runner._find_probable_cause_of_failure([1]),
                          None)
+
+
+class CounterFetchingTestCase(MockEMRAndS3TestCase):
+
+    COUNTER_LINE = (
+        'Job JOBID="job_201106092314_0001" FINISH_TIME="1307662284564"'
+        ' JOB_STATUS="SUCCESS" FINISHED_MAPS="0" FINISHED_REDUCES="0"'
+        ' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="%s" .' % ''.join([
+            '{(org\.apache\.hadoop\.mapred\.JobInProgress$Counter)',
+            '(Job Counters )',
+            '[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]}',
+    ]))
+
+    def setUp(self):
+        super(CounterFetchingTestCase, self).setUp()
+        self.add_mock_s3_data({'walrus': {}})
+        kwargs = {
+            'conf_path': False,
+            's3_scratch_uri': 's3://walrus/',
+            's3_sync_wait_time': 0}
+        with EMRJobRunner(**kwargs) as runner:
+            self.job_flow_id = runner.make_persistent_job_flow()
+        self.runner = EMRJobRunner(emr_job_flow_id=self.job_flow_id, **kwargs)
+
+    def tearDown(self):
+        super(CounterFetchingTestCase, self).tearDown()
+        self.runner.cleanup()
+
+    def test_empty_counters_running_job(self):
+        self.runner._describe_jobflow().state = 'RUNNING'
+        with no_handlers_for_logger():
+            buf = log_to_buffer('mrjob.emr', logging.INFO)
+            self.runner._fetch_counters([1], True)
+            self.assertIn('5 minutes', buf.getvalue())
+
+    def test_present_counters_running_job(self):
+        self.add_mock_s3_data({'walrus': {
+            'logs/j-MOCKJOBFLOW0/jobs/job_0_1_hadoop_streamjob1.jar': self.COUNTER_LINE}})
+        self.runner._describe_jobflow().state = 'RUNNING'
+        self.runner._fetch_counters([1], True)
+        self.assertEqual(self.runner.counters(),
+                         [{'Job Counters ': {'Launched reduce tasks': 1}}])
+
+    def test_present_counters_terminated_job(self):
+        self.add_mock_s3_data({'walrus': {
+            'logs/j-MOCKJOBFLOW0/jobs/job_0_1_hadoop_streamjob1.jar': self.COUNTER_LINE}})
+        self.runner._describe_jobflow().state = 'TERMINATED'
+        self.runner._fetch_counters([1], True)
+        self.assertEqual(self.runner.counters(),
+                         [{'Job Counters ': {'Launched reduce tasks': 1}}])
 
 
 class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):

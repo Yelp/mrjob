@@ -74,6 +74,7 @@ from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner
+from mrjob.runner import RunnerOptionStore
 from mrjob.runner import GLOB_RE
 from mrjob.ssh import ssh_cat
 from mrjob.ssh import ssh_ls
@@ -342,6 +343,181 @@ class LogFetchError(Exception):
     pass
 
 
+class EMRRunnerOptionStore(RunnerOptionStore):
+
+    ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
+        'additional_emr_info',
+        'ami_version',
+        'aws_access_key_id',
+        'aws_availability_zone',
+        'aws_region',
+        'aws_secret_access_key',
+        'bootstrap_actions',
+        'bootstrap_cmds',
+        'bootstrap_files',
+        'bootstrap_python_packages',
+        'bootstrap_scripts',
+        'check_emr_status_every',
+        'ec2_core_instance_bid_price',
+        'ec2_core_instance_type',
+        'ec2_instance_type',
+        'ec2_key_pair',
+        'ec2_key_pair_file',
+        'ec2_master_instance_bid_price',
+        'ec2_master_instance_type',
+        'ec2_slave_instance_type',
+        'ec2_task_instance_bid_price',
+        'ec2_task_instance_type',
+        'emr_endpoint',
+        'emr_job_flow_id',
+        'emr_job_flow_pool_name',
+        'enable_emr_debugging',
+        'enable_emr_debugging',
+        'hadoop_streaming_jar_on_emr',
+        'hadoop_version',
+        'num_ec2_core_instances',
+        'num_ec2_instances',
+        'num_ec2_task_instances',
+        'pool_emr_job_flows',
+        's3_endpoint',
+        's3_log_uri',
+        's3_scratch_uri',
+        's3_sync_wait_time',
+        'ssh_bin',
+        'ssh_bind_ports',
+        'ssh_tunnel_is_open',
+        'ssh_tunnel_to_job_tracker',
+    ]))
+
+    COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
+        'bootstrap_actions': combine_lists,
+        'bootstrap_cmds': combine_lists,
+        'bootstrap_files': combine_path_lists,
+        'bootstrap_python_packages': combine_path_lists,
+        'bootstrap_scripts': combine_path_lists,
+        'ec2_key_pair_file': combine_paths,
+        's3_log_uri': combine_paths,
+        's3_scratch_uri': combine_paths,
+        'ssh_bin': combine_cmds,
+    })
+
+    def __init__(self, alias, opts, conf_path):
+        super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_path)
+        self._fix_ec2_instance_opts()
+
+    def default_options(self):
+        super_opts = super(EMRRunnerOptionStore, self).default_options()
+        return combine_dicts(super_opts, {
+            'check_emr_status_every': 30,
+            'ec2_core_instance_type': 'm1.small',
+            'ec2_master_instance_type': 'm1.small',
+            'emr_job_flow_pool_name': 'default',
+            'hadoop_version': None,
+            'hadoop_streaming_jar_on_emr':
+                '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
+            'num_ec2_core_instances': 0,
+            'num_ec2_instances': 1,
+            'num_ec2_task_instances': 0,
+            's3_sync_wait_time': 5.0,
+            'ssh_bin': ['ssh'],
+            'ssh_bind_ports': range(40001, 40841),
+            'ssh_tunnel_to_job_tracker': False,
+            'ssh_tunnel_is_open': False,
+        })
+
+    def _fix_ec2_instance_opts(self):
+        """If the *ec2_instance_type* option is set, override instance
+        type for the nodes that actually run tasks (see Issue #66). Allow
+        command-line arguments to override defaults and arguments
+        in mrjob.conf (see Issue #311).
+
+        Also, make sure that core and slave instance type are the same,
+        total number of instances matches number of master, core, and task
+        instances, and that bid prices of zero are converted to None.
+        """
+        # Make sure slave and core instance type have the same value
+        # Within EMRJobRunner we only ever use ec2_core_instance_type,
+        # but we want ec2_slave_instance_type to be correct in the
+        # options dictionary.
+        if (self['ec2_slave_instance_type'] and
+            (self._opt_priority['ec2_slave_instance_type'] >
+             self._opt_priority['ec2_core_instance_type'])):
+            self['ec2_core_instance_type'] = (
+                self['ec2_slave_instance_type'])
+        else:
+            self['ec2_slave_instance_type'] = (
+                self['ec2_core_instance_type'])
+
+        # If task instance type is not set, use core instance type
+        # (This is mostly so that we don't inadvertently join a pool
+        # with task instance types with too little memory.)
+        if not self['ec2_task_instance_type']:
+            self['ec2_task_instance_type'] = (
+                self['ec2_core_instance_type'])
+
+        # Within EMRJobRunner, we use num_ec2_core_instances and
+        # num_ec2_task_instances, not num_ec2_instances. (Number
+        # of master instances is always 1.)
+        if (self._opt_priority['num_ec2_instances'] >
+            max(self._opt_priority['num_ec2_core_instances'],
+                self._opt_priority['num_ec2_task_instances'])):
+            # assume 1 master, n - 1 core, 0 task
+            self['num_ec2_core_instances'] = (
+                self['num_ec2_instances'] - 1)
+            self['num_ec2_task_instances'] = 0
+        else:
+            # issue a warning if we used both kinds of instance number
+            # options on the command line or in mrjob.conf
+            if (self._opt_priority['num_ec2_instances'] >= 2 and
+                self._opt_priority['num_ec2_instances'] <=
+                max(self._opt_priority['num_ec2_core_instances'],
+                    self._opt_priority['num_ec2_task_instances'])):
+                log.warn('Mixing num_ec2_instances and'
+                         ' num_ec2_{core,task}_instances does not make sense;'
+                         ' ignoring num_ec2_instances')
+            # recalculate number of EC2 instances
+            self['num_ec2_instances'] = (
+                1 +
+                self['num_ec2_core_instances'] +
+                self['num_ec2_task_instances'])
+
+        # Allow ec2 instance type to override other instance types
+        ec2_instance_type = self['ec2_instance_type']
+        if ec2_instance_type:
+            # core (slave) instances
+            if (self._opt_priority['ec2_instance_type'] >
+                max(self._opt_priority['ec2_core_instance_type'],
+                    self._opt_priority['ec2_slave_instance_type'])):
+                self['ec2_core_instance_type'] = ec2_instance_type
+                self['ec2_slave_instance_type'] = ec2_instance_type
+
+            # master instance only does work when it's the only instance
+            if (self['num_ec2_core_instances'] <= 0 and
+                self['num_ec2_task_instances'] <= 0 and
+                (self._opt_priority['ec2_instance_type'] >
+                 self._opt_priority['ec2_master_instance_type'])):
+                self['ec2_master_instance_type'] = ec2_instance_type
+
+            # task instances
+            if (self._opt_priority['ec2_instance_type'] >
+                self._opt_priority['ec2_task_instance_type']):
+                self['ec2_task_instance_type'] = ec2_instance_type
+
+        # convert a bid price of '0' to None
+        for role in ('core', 'master', 'task'):
+            opt_name = 'ec2_%s_instance_bid_price' % role
+            if not self[opt_name]:
+                self[opt_name] = None
+            else:
+                # convert "0", "0.00" etc. to None
+                try:
+                    value = float(self[opt_name])
+                    if value == 0:
+                        self[opt_name] = None
+                except ValueError:
+                    pass  # maybe EMR will accept non-floats?
+
+
 class EMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
 
@@ -367,6 +543,8 @@ class EMRJobRunner(MRJobRunner):
     See also: :py:meth:`~EMRJobRunner.__init__`.
     """
     alias = 'emr'
+
+    OPTION_STORE_CLASS = EMRRunnerOptionStore
 
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.emr.EMRJobRunner` takes the same arguments as
@@ -634,8 +812,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         self._fix_s3_scratch_and_log_uri_opts()
 
-        self._fix_ec2_instance_opts()
-
         # pick a tmp dir based on the job name
         self._s3_tmp_uri = self._opts['s3_scratch_uri'] + self._job_name + '/'
 
@@ -725,185 +901,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         # init hadoop version cache
         self._inferred_hadoop_version = None
-
-    @classmethod
-    def _allowed_opts(cls):
-        """A list of which keyword args we can pass to __init__()"""
-        return super(EMRJobRunner, cls)._allowed_opts() + [
-            'additional_emr_info',
-            'ami_version',
-            'aws_access_key_id',
-            'aws_availability_zone',
-            'aws_region',
-            'aws_secret_access_key',
-            'bootstrap_actions',
-            'bootstrap_cmds',
-            'bootstrap_files',
-            'bootstrap_python_packages',
-            'bootstrap_scripts',
-            'check_emr_status_every',
-            'ec2_core_instance_bid_price',
-            'ec2_core_instance_type',
-            'ec2_instance_type',
-            'ec2_key_pair',
-            'ec2_key_pair_file',
-            'ec2_master_instance_bid_price',
-            'ec2_master_instance_type',
-            'ec2_slave_instance_type',
-            'ec2_task_instance_bid_price',
-            'ec2_task_instance_type',
-            'emr_endpoint',
-            'emr_job_flow_id',
-            'emr_job_flow_pool_name',
-            'enable_emr_debugging',
-            'enable_emr_debugging',
-            'hadoop_streaming_jar_on_emr',
-            'hadoop_version',
-            'num_ec2_core_instances',
-            'num_ec2_instances',
-            'num_ec2_task_instances',
-            'pool_emr_job_flows',
-            's3_endpoint',
-            's3_log_uri',
-            's3_scratch_uri',
-            's3_sync_wait_time',
-            'ssh_bin',
-            'ssh_bind_ports',
-            'ssh_tunnel_is_open',
-            'ssh_tunnel_to_job_tracker',
-        ]
-
-    @classmethod
-    def _default_opts(cls):
-        """A dictionary giving the default value of options."""
-        return combine_dicts(super(EMRJobRunner, cls)._default_opts(), {
-            'check_emr_status_every': 30,
-            'ec2_core_instance_type': 'm1.small',
-            'ec2_master_instance_type': 'm1.small',
-            'emr_job_flow_pool_name': 'default',
-            'hadoop_version': None,  # defaulted in __init__()
-            'hadoop_streaming_jar_on_emr':
-                '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
-            'num_ec2_core_instances': 0,
-            'num_ec2_instances': 1,
-            'num_ec2_task_instances': 0,
-            's3_sync_wait_time': 5.0,
-            'ssh_bin': ['ssh'],
-            'ssh_bind_ports': range(40001, 40841),
-            'ssh_tunnel_to_job_tracker': False,
-            'ssh_tunnel_is_open': False,
-        })
-
-    @classmethod
-    def _opts_combiners(cls):
-        """Map from option name to a combine_*() function used to combine
-        values for that option. This allows us to specify that some options
-        are lists, or contain environment variables, or whatever."""
-        return combine_dicts(super(EMRJobRunner, cls)._opts_combiners(), {
-            'bootstrap_actions': combine_lists,
-            'bootstrap_cmds': combine_lists,
-            'bootstrap_files': combine_path_lists,
-            'bootstrap_python_packages': combine_path_lists,
-            'bootstrap_scripts': combine_path_lists,
-            'ec2_key_pair_file': combine_paths,
-            's3_log_uri': combine_paths,
-            's3_scratch_uri': combine_paths,
-            'ssh_bin': combine_cmds,
-        })
-
-    def _fix_ec2_instance_opts(self):
-        """If the *ec2_instance_type* option is set, override instance
-        type for the nodes that actually run tasks (see Issue #66). Allow
-        command-line arguments to override defaults and arguments
-        in mrjob.conf (see Issue #311).
-
-        Also, make sure that core and slave instance type are the same,
-        total number of instances matches number of master, core, and task
-        instances, and that bid prices of zero are converted to None.
-
-        Helper for __init__.
-        """
-        # Make sure slave and core instance type have the same value
-        # Within EMRJobRunner we only ever use ec2_core_instance_type,
-        # but we want ec2_slave_instance_type to be correct in the
-        # options dictionary.
-        if (self._opts['ec2_slave_instance_type'] and
-            (self._opt_priority['ec2_slave_instance_type'] >
-             self._opt_priority['ec2_core_instance_type'])):
-            self._opts['ec2_core_instance_type'] = (
-                self._opts['ec2_slave_instance_type'])
-        else:
-            self._opts['ec2_slave_instance_type'] = (
-                self._opts['ec2_core_instance_type'])
-
-        # If task instance type is not set, use core instance type
-        # (This is mostly so that we don't inadvertently join a pool
-        # with task instance types with too little memory.)
-        if not self._opts['ec2_task_instance_type']:
-            self._opts['ec2_task_instance_type'] = (
-                self._opts['ec2_core_instance_type'])
-
-        # Within EMRJobRunner, we use num_ec2_core_instances and
-        # num_ec2_task_instances, not num_ec2_instances. (Number
-        # of master instances is always 1.)
-        if (self._opt_priority['num_ec2_instances'] >
-            max(self._opt_priority['num_ec2_core_instances'],
-                self._opt_priority['num_ec2_task_instances'])):
-            # assume 1 master, n - 1 core, 0 task
-            self._opts['num_ec2_core_instances'] = (
-                self._opts['num_ec2_instances'] - 1)
-            self._opts['num_ec2_task_instances'] = 0
-        else:
-            # issue a warning if we used both kinds of instance number
-            # options on the command line or in mrjob.conf
-            if (self._opt_priority['num_ec2_instances'] >= 2 and
-                self._opt_priority['num_ec2_instances'] <=
-                max(self._opt_priority['num_ec2_core_instances'],
-                    self._opt_priority['num_ec2_task_instances'])):
-                log.warn('Mixing num_ec2_instances and'
-                         ' num_ec2_{core,task}_instances does not make sense;'
-                         ' ignoring num_ec2_instances')
-            # recalculate number of EC2 instances
-            self._opts['num_ec2_instances'] = (
-                1 +
-                self._opts['num_ec2_core_instances'] +
-                self._opts['num_ec2_task_instances'])
-
-        # Allow ec2 instance type to override other instance types
-        ec2_instance_type = self._opts['ec2_instance_type']
-        if ec2_instance_type:
-            # core (slave) instances
-            if (self._opt_priority['ec2_instance_type'] >
-                max(self._opt_priority['ec2_core_instance_type'],
-                    self._opt_priority['ec2_slave_instance_type'])):
-                self._opts['ec2_core_instance_type'] = ec2_instance_type
-                self._opts['ec2_slave_instance_type'] = ec2_instance_type
-
-            # master instance only does work when it's the only instance
-            if (self._opts['num_ec2_core_instances'] <= 0 and
-                self._opts['num_ec2_task_instances'] <= 0 and
-                (self._opt_priority['ec2_instance_type'] >
-                 self._opt_priority['ec2_master_instance_type'])):
-                self._opts['ec2_master_instance_type'] = ec2_instance_type
-
-            # task instances
-            if (self._opt_priority['ec2_instance_type'] >
-                self._opt_priority['ec2_task_instance_type']):
-                self._opts['ec2_task_instance_type'] = ec2_instance_type
-
-        # convert a bid price of '0' to None
-        for role in ('core', 'master', 'task'):
-            opt_name = 'ec2_%s_instance_bid_price' % role
-            if not self._opts[opt_name]:
-                self._opts[opt_name] = None
-            else:
-                # convert "0", "0.00" etc. to None
-                try:
-                    value = float(self._opts[opt_name])
-                    if value == 0:
-                        self._opts[opt_name] = None
-                except ValueError:
-                    pass  # maybe EMR will accept non-floats?
 
     def _fix_s3_scratch_and_log_uri_opts(self):
         """Fill in s3_scratch_uri and s3_log_uri (in self._opts) if they
@@ -1274,6 +1271,10 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
+    def _job_flow_is_done(self, job_flow):
+        return job_flow.state in ('TERMINATED', 'COMPLETED', 'FAILED',
+                                  'SHUTTING_DOWN')
+
     def _wait_for_job_flow_termination(self):
         try:
             jobflow = self._describe_jobflow()
@@ -1284,8 +1285,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             jobflow.state == 'WAITING'):
             raise Exception('Operation requires job flow to terminate, but'
                             ' it may never do so.')
-        while jobflow.state not in ('TERMINATED', 'COMPLETED', 'FAILED',
-                                    'SHUTTING_DOWN'):
+        while not self._job_flow_is_done(jobflow):
             msg = 'Waiting for job flow to terminate (currently %s)' % \
                                                          jobflow.state
             log.info(msg)
@@ -1773,20 +1773,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 ['--step-num=%d' % step_num, '--combiner'] +
                 self._mr_job_extra_args())
 
-    def _upload_args(self):
-        """Args to upload files from S3 to the local nodes that EMR runs
-        on."""
-        args = []
-        for file_dict in self._files:
-            if file_dict.get('upload') == 'file':
-                args.append('--cache')
-                args.append('%s#%s' % (file_dict['s3_uri'], file_dict['name']))
-            elif file_dict.get('upload') == 'archive':
-                args.append('--cache-archive')
-                args.append('%s#%s' % (file_dict['s3_uri'], file_dict['name']))
-
-        return args
-
     def _s3_step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""
         if step_num == 0:
@@ -1953,23 +1939,24 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                                           self.get_hadoop_version())
 
     def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
-        job_flow = self._describe_jobflow()
-        if job_flow.keepjobflowalivewhennosteps == 'true':
-            log.info("Can't fetch counters from S3 for five more minutes. Try"
-                     " 'python -m mrjob.tools.emr.fetch_logs --counters %s'"
-                     " in five minutes." % job_flow.jobflowid)
-            return {}
-
         log.info('Fetching counters from S3...')
 
         if not skip_s3_wait:
             self._wait_for_s3_eventual_consistency()
-        self._wait_for_job_flow_termination()
 
         try:
             uris = self.ls_job_logs_s3(step_nums)
-            return scan_for_counters_in_files(uris, self,
-                                              self.get_hadoop_version())
+            results = scan_for_counters_in_files(uris, self,
+                                                 self.get_hadoop_version())
+
+            if not results:
+                job_flow = self._describe_jobflow()
+                if not self._job_flow_is_done(job_flow):
+                    log.info("Counters may not have been uploaded to S3 yet. Try"
+                             " again in 5 minutes with 'python -m"
+                             " mrjob.tools.emr.fetch_logs --counters %s'." %
+                             job_flow.jobflowid)
+            return results
         except LogFetchError, e:
             log.info("Unable to fetch counters: %s" % e)
             return {}

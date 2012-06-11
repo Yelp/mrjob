@@ -30,6 +30,7 @@ from mrjob.conf import combine_local_envs
 from mrjob.parse import find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
+from mrjob.runner import RunnerOptionStore
 from mrjob.util import cmd_line
 from mrjob.util import read_input
 from mrjob.util import unarchive
@@ -40,6 +41,20 @@ log = logging.getLogger('mrjob.local')
 
 DEFAULT_MAP_TASKS = 2
 DEFAULT_REDUCE_TASKS = 2
+
+
+class LocalRunnerOptionStore(RunnerOptionStore):
+
+    COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
+        'cmdenv': combine_local_envs,
+    })
+
+    def default_options(self):
+        super_opts = super(LocalRunnerOptionStore, self).default_options()
+        return combine_dicts(super_opts, {
+            # prefer whatever interpreter we're currently using
+            'python_bin': [sys.executable or 'python'],
+        })
 
 
 class LocalMRJobRunner(MRJobRunner):
@@ -78,6 +93,8 @@ class LocalMRJobRunner(MRJobRunner):
 
     alias = 'local'
 
+    OPTION_STORE_CLASS = LocalRunnerOptionStore
+
     def __init__(self, **kwargs):
         """Arguments to this constructor may also appear in :file:`mrjob.conf`
         under ``runners/local``.
@@ -109,21 +126,6 @@ class LocalMRJobRunner(MRJobRunner):
         # jobconf variables internally (they get auto-translated before
         # running the job)
         self._internal_jobconf = {}
-
-    @classmethod
-    def _default_opts(cls):
-        """A dictionary giving the default value of options."""
-        return combine_dicts(super(LocalMRJobRunner, cls)._default_opts(), {
-            # prefer whatever interpreter we're currently using
-            'python_bin': [sys.executable or 'python'],
-        })
-
-    @classmethod
-    def _opts_combiners(cls):
-        # on windows, PYTHONPATH should use ;, not :
-        return combine_dicts(
-            super(LocalMRJobRunner, cls)._opts_combiners(),
-            {'cmdenv': combine_local_envs})
 
     # options that we ignore because they require real Hadoop
     IGNORED_HADOOP_OPTS = [
@@ -312,6 +314,7 @@ class LocalMRJobRunner(MRJobRunner):
                     file_names[path] = {
                         'orig_name': path,
                         'start': 0,
+                        'task_num': 0,
                         'length': os.stat(path)[stat.ST_SIZE],
                     }
                     # this counts as "one split"
@@ -341,11 +344,13 @@ class LocalMRJobRunner(MRJobRunner):
         # Helper functions:
         def create_outfile(orig_name='', start=''):
             # create a new output file and initialize its properties dict
+            task_num = len(file_names)
             outfile_name = os.path.join(tmp_directory,
-                                        'input_part-%05d' % len(file_names))
+                                        'input_part-%05d' % task_num)
             new_file = {
                 'orig_name': orig_name,
                 'start': start,
+                'task_num': task_num,
             }
             file_names[outfile_name] = new_file
             return outfile_name
@@ -447,7 +452,11 @@ class LocalMRJobRunner(MRJobRunner):
         all_proc_dicts = []
         self._prev_outfiles = []
 
-        for task_num, file_name in enumerate(file_splits):
+        # The correctly-ordered list of task_num, file_name pairs
+        file_tasks = sorted([(t.get('task_num', 0), file_name) for file_name, t in
+                            file_splits.items()], key=lambda t: t[0])
+        
+        for task_num, file_name in file_tasks:
 
             # setup environment variables
             if step_type == 'M':

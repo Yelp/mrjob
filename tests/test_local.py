@@ -79,6 +79,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
         input_gz.close()
 
         mr_job = MRTwoStepJob(['-c', self.mrjob_conf_path,
+                               '-r', 'local',
                                '-', input_path, input_gz_glob])
         mr_job.sandbox(stdin=stdin)
 
@@ -117,6 +118,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
         input_gz.close()
 
         mr_job = MRTwoStepJob(['-c', self.mrjob_conf_path,
+                               '-r', 'local',
                                '--jobconf=mapred.map.tasks=2',
                                 '--jobconf=mapred.reduce.tasks=2',
                                '-', input_path, input_gz_path])
@@ -244,7 +246,8 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
     def test_multi_step_counters(self):
         stdin = StringIO('foo\nbar\n')
 
-        mr_job = MRCountingJob(['-c', self.mrjob_conf_path, '-'])
+        mr_job = MRCountingJob(['-c', self.mrjob_conf_path, '-r', 'local',
+                                '-'])
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
@@ -302,7 +305,7 @@ class LargeAmountsOfStderrTestCase(unittest.TestCase):
         signal.signal(signal.SIGALRM, self._old_alarm_handler)
 
     def test_large_amounts_of_stderr(self):
-        mr_job = MRVerboseJob(['--no-conf'])
+        mr_job = MRVerboseJob(['--no-conf', '-r', 'local'])
         mr_job.sandbox()
 
         try:
@@ -330,7 +333,7 @@ class LargeAmountsOfStderrTestCase(unittest.TestCase):
 class ExitWithoutExceptionTestCase(unittest.TestCase):
 
     def test_exit_42_job(self):
-        mr_job = MRExit42Job(['--no-conf'])
+        mr_job = MRExit42Job(['--no-conf', '--runner=local'])
         mr_job.sandbox()
 
         try:
@@ -347,7 +350,8 @@ class PythonBinTestCase(unittest.TestCase):
     def test_echo_as_python_bin(self):
         # "echo" is a pretty poor substitute for Python, but it
         # should be available on most systems
-        mr_job = MRTwoStepJob(['--python-bin', 'echo', '--no-conf'])
+        mr_job = MRTwoStepJob(['--python-bin', 'echo', '--no-conf',
+                               '-r', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -363,7 +367,8 @@ class PythonBinTestCase(unittest.TestCase):
 
     def test_python_dash_v_as_python_bin(self):
         python_cmd = cmd_line([sys.executable or 'python', '-v'])
-        mr_job = MRTwoStepJob(['--python-bin', python_cmd, '--no-conf'])
+        mr_job = MRTwoStepJob(['--python-bin', python_cmd, '--no-conf',
+                               '-r', 'local'])
         mr_job.sandbox(stdin=['bar\n'])
 
         with no_handlers_for_logger():
@@ -382,12 +387,17 @@ class StepsPythonBinTestCase(unittest.TestCase):
 
     def test_echo_as_steps_python_bin(self):
         mr_job = MRTwoStepJob(
-            ['--steps', '--steps-python-bin', 'echo', '--no-conf'])
+            ['--steps', '--steps-python-bin', 'echo', '--no-conf',
+             '-r', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             assert isinstance(runner, LocalMRJobRunner)
             try:
+                # make_runner() populates _steps in the runner, so un-populate
+                # it here so that the runner actually tries to get the steps
+                # via subprocess
+                runner._steps = None
                 runner._get_steps()
                 assert False, 'Should throw exception'
             except ValueError, ex:
@@ -418,7 +428,7 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
         # and the script loads from the .pyc compiled from that .py file.
         our_mrjob_dir = os.path.dirname(os.path.realpath(mrjob.__file__))
 
-        mr_job = MRJobWhereAreYou(['--no-conf'])
+        mr_job = MRJobWhereAreYou(['--no-conf', '-r', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -447,7 +457,7 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
         dump_mrjob_conf({'runners': {'local': {'bootstrap_mrjob': False}}},
                         open(self.mrjob_conf_path, 'w'))
 
-        mr_job = MRJobWhereAreYou(['-c', self.mrjob_conf_path])
+        mr_job = MRJobWhereAreYou(['-c', self.mrjob_conf_path, '-r', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -492,9 +502,10 @@ class LocalMRJobRunnerTestJobConfCase(unittest.TestCase):
         input_gz.close()
 
         mr_job = MRWordCount(['-c', self.mrjob_conf_path,
-                               '--jobconf=mapred.map.tasks=2',
-                                '--jobconf=mapred.reduce.tasks=2',
-                               input_path, input_gz_path])
+                              '-r', 'local',
+                              '--jobconf=mapred.map.tasks=2',
+                              '--jobconf=mapred.reduce.tasks=2',
+                              input_path, input_gz_path])
         mr_job.sandbox()
 
         results = []
@@ -517,6 +528,7 @@ class LocalMRJobRunnerTestJobConfCase(unittest.TestCase):
             input_file.write('foo\n')
 
         mr_job = MRTestJobConf(['-c', self.mrjob_conf_path,
+                                '-r', 'local',
                                 '--jobconf=user.defined=something',
                                input_path])
         mr_job.sandbox()

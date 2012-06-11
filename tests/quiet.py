@@ -16,12 +16,21 @@
 
 from contextlib import contextmanager
 import logging
+from StringIO import StringIO
 
 
 # this exists as logging.NullHandler as of Python 2.7
 class NullHandler(logging.Handler):
     def emit(self, record):
         pass
+
+
+def log_to_buffer(name=None, level=logging.WARNING):
+    buf = StringIO()
+    log = logging.getLogger(name)
+    log.addHandler(logging.StreamHandler(buf))
+    log.setLevel(level)
+    return buf
 
 
 @contextmanager

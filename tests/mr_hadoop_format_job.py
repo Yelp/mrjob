@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Trivial two-step job which sets hadoop input and output format."""
-from mrjob.job import MRJob
+from tests.mr_testing_job import MRTestingJob
 
 
-class MRHadoopFormatJob(MRJob):
+class MRHadoopFormatJob(MRTestingJob):
 
     HADOOP_INPUT_FORMAT = 'mapred.FooInputFormat'
     HADOOP_OUTPUT_FORMAT = 'mapred.BarOutputFormat'

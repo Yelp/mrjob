@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mrjob.job import MRJob
+from tests.mr_testing_job import MRTestingJob
 
 
-class MRNoMapper(MRJob):
+class MRNoMapper(MRTestingJob):
 
     def mapper(self, key, value):
         yield key, value

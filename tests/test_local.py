@@ -18,7 +18,6 @@ from __future__ import with_statement
 
 from StringIO import StringIO
 import gzip
-import mrjob
 import os
 import shutil
 import signal
@@ -32,6 +31,10 @@ try:
 except ImportError:
     import unittest
 
+from mock import patch
+
+import mrjob
+from mrjob import local
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import cmd_line
@@ -658,3 +661,21 @@ class TestHadoopConfArgs(unittest.TestCase):
         conf_args = runner._hadoop_conf_args(0, 1)
         self.assertEqual(conf_args[:2], ['-libjar', 'qux.jar'])
         self.assertEqual(len(conf_args), 12)
+
+
+class TestIronPythonEnvironment(unittest.TestCase):
+
+    def setUp(self):
+        self.runner = LocalMRJobRunner(conf_path=False)
+        self.runner._setup_working_dir()
+
+    def test_env_ironpython(self):
+        with patch.object(local, 'is_ironpython', True):
+            environment = self.runner._subprocess_env('M', 0, 0)
+            self.assertIn('IRONPYTHONPATH', environment)
+
+    def test_env_no_ironpython(self):
+        with patch.object(local, 'is_ironpython', False):
+            environment = self.runner._subprocess_env('M', 0, 0)
+            self.assertNotIn('IRONPYTHONPATH', environment)
+

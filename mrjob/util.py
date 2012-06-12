@@ -35,8 +35,11 @@ import zipfile
 
 try:
     import bz2
+    bz2  # redefine bz2 for pepflakes
 except ImportError:
     bz2 = None
+
+is_ironpython = "IronPython" in sys.version
 
 class NullHandler(logging.Handler):
     def emit(self, record):

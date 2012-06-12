@@ -113,6 +113,12 @@ class RunnerOptionStore(OptionStore):
     })
 
     def __init__(self, alias, opts, conf_paths):
+        """
+        :param alias: Runner alias (e.g. ``'local'``)
+        :param opts: Options from the command line
+        :param conf_paths: Either a file path or an iterable of paths to config
+                           files
+        """
         super(RunnerOptionStore, self).__init__()
 
         # sanitize incoming options and issue warnings for bad keys
@@ -141,7 +147,7 @@ class RunnerOptionStore(OptionStore):
                     mrjob_conf_opts,
                     'Got unexpected opts from %s: %%s' % path))
 
-            self.cascading_dicts.append(opts)
+        self.cascading_dicts.append(opts)
 
         self.populate_values_from_cascading_dicts()
 

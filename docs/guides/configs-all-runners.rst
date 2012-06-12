@@ -106,7 +106,28 @@ Other
     Path to a configuration file. This option cannot be used in configuration
     files, because that would cause a universe-ending causality paradox. Use
     `--no-conf` on the command line or `conf_path=False` to force mrjob to
-    load no configuration files at all.
+    load no configuration files at all. If no config path flags are given,
+    mrjob will look for one in the locations specified in :ref:`mrjob.conf`.
+
+    Config path flags can be used multiple times to combine config files, much
+    like the **include** config file directive. Using :option:`--no-conf` will
+    cause mrjob to ignore all preceding config path flags.
+
+    For example, this line will cause mrjob to combine settings from
+    ``left.conf`` and ``right .conf``::
+
+        python my_job.py -c left.conf -c right.conf
+
+    This line will cause mrjob to read no config file at all::
+
+        python my_job.py --no-conf
+
+    This line will cause mrjob to read only ``right.conf``, because
+    ``--no-conf`` nullifies ``-c left.conf``::
+
+        python my_job.py -c left.conf --no-conf -c right.conf
+
+
 
 **steps_python_bin** (:option:`--steps-python-bin`)
     Name/path of alternate python binary to use to query the job about its

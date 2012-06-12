@@ -7,7 +7,6 @@ Reading and writing mrjob.conf
 ------------------------------
 
 .. autofunction:: find_mrjob_conf
-.. autofunction:: load_mrjob_conf
 .. autofunction:: load_opts_from_mrjob_conf
 
 Combining options

@@ -1061,6 +1061,14 @@ class CommandLineArgsTest(unittest.TestCase):
             self.assertEqual(r._opts['jobconf']['x'], 1)
             self.assertEqual(r._opts['jobconf']['y'], 2)
 
+    def test_no_conf_overrides(self):
+        mr_job = MRCustomBoringJob(args=['-c', 'blah.conf', '--no-conf'])
+        self.assertEqual(mr_job.options.conf_path, False)
+
+    def test_no_conf_overridden(self):
+        mr_job = MRCustomBoringJob(args=['--no-conf', '-c', 'blah.conf'])
+        self.assertEqual(mr_job.options.conf_path, ['blah.conf'])
+
 
 class FileOptionsTestCase(unittest.TestCase):
 

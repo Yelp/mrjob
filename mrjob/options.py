@@ -22,6 +22,16 @@ from optparse import SUPPRESS_USAGE
 from mrjob.runner import CLEANUP_CHOICES
 
 
+def _append_with_checks(option, opt_str, value, parser):
+    """conf_path should be False if --no-conf is the last conf path-related
+    argument in an option list, or None if no --conf-path argumenst have
+    been given, but subsequent --conf-path switches should make this a list.
+    """
+    if parser.values.conf_path is False or parser.values.conf_path is None:
+        parser.values.conf_path = []
+    parser.values.conf_path.append(value)
+
+
 def add_protocol_opts(opt_group):
     """Add options related to choosing protocols.
     """
@@ -51,7 +61,8 @@ def add_runner_opts(opt_group):
                   " your Hadoop cluster.")),
 
         opt_group.add_option(
-            '-c', '--conf-path', dest='conf_path', action='append',
+            '-c', '--conf-path', dest='conf_path', action='callback',
+            callback=_append_with_checks, default=None, nargs=1, type='string',
             help='Path to alternate mrjob.conf file to read from'),
 
         opt_group.add_option(
@@ -86,7 +97,7 @@ def add_runner_opts(opt_group):
                   " mrjob on your Hadoop cluster.")),
 
         opt_group.add_option(
-            '--no-conf', dest='conf_path', action='store_false', default=None,
+            '--no-conf', dest='conf_path', action='store_false',
             help="Don't load mrjob.conf even if it's available"),
 
         opt_group.add_option(

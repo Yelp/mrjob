@@ -314,7 +314,7 @@ class LocalMRJobRunner(MRJobRunner):
                     file_names[path] = {
                         'orig_name': path,
                         'start': 0,
-                        'task_num': 0,
+                        'task_num': len(file_names),
                         'length': os.stat(path)[stat.ST_SIZE],
                     }
                     # this counts as "one split"
@@ -384,7 +384,7 @@ class LocalMRJobRunner(MRJobRunner):
 
             try:
                 outfile = open(outfile_name, 'w')
-                
+
                 # write each line to a file as long as we are within the limit
                 # (split_size)
                 for line_group in line_group_generator(path):
@@ -453,9 +453,10 @@ class LocalMRJobRunner(MRJobRunner):
         self._prev_outfiles = []
 
         # The correctly-ordered list of task_num, file_name pairs
-        file_tasks = sorted([(t.get('task_num', 0), file_name) for file_name, t in
-                            file_splits.items()], key=lambda t: t[0])
-        
+        file_tasks = sorted([
+            (t['task_num'], file_name) for file_name, t
+            in file_splits.items()], key=lambda t: t[0])
+
         for task_num, file_name in file_tasks:
 
             # setup environment variables

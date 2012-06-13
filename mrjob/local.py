@@ -307,6 +307,12 @@ class LocalMRJobRunner(MRJobRunner):
         file_names = {}
         input_paths_to_split = []
 
+        # Each file is assigned a 'task number' as if coming from some previous
+        # task. The task number is used to choose the split file name, and
+        # sometimes the file name of the sorted split. This is done so that
+        # when the output files are combined after the final step, they are in
+        # sorted order due to already being lexicographically sorted.
+
         for input_path in input_paths:
             for path in self.ls(input_path):
                 if path.endswith('.gz'):

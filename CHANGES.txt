@@ -1,3 +1,7 @@
+v0.3.4.1, 2012-06-12 -- The test suite doesn't catch everything...
+ * Local mode doesn't try to send multiple mappers to the same output file
+   when using multiple compressed files as input
+
 v0.3.4, 2012-06-11 -- We are friendly people.
  * Experimental support for IronPython in the local and inline runners
  * set_status() and increment_counter() will encode messages/names of type

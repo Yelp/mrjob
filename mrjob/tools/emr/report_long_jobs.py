@@ -43,6 +43,7 @@ import boto.utils
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
+from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import strip_microseconds
 
 # default minimum number of hours a job can run before we report it.
@@ -64,7 +65,7 @@ def main(args, now=None):
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     log.info('getting information about running jobs')
-    emr_conn = EMRJobRunner(conf_paths=[options.conf_path]).make_emr_conn()
+    emr_conn = EMRJobRunner(conf_paths=options.conf_paths).make_emr_conn()
     job_flows = describe_all_job_flows(
         emr_conn, states=['BOOTSTRAPPING', 'RUNNING'])
 
@@ -194,24 +195,21 @@ def make_option_parser():
     description = ('Report jobs running for more than a certain number of'
                    ' hours (by default, %.1f). This can help catch buggy jobs'
                    ' and Hadoop/EMR operational issues.' % DEFAULT_MIN_HOURS)
+
     option_parser = OptionParser(usage=usage, description=description)
-    option_parser.add_option(
-        '-v', '--verbose', dest='verbose', default=False, action='store_true',
-        help='print more messages to stderr')
-    option_parser.add_option(
-        '-q', '--quiet', dest='quiet', default=False, action='store_true',
-        help="Don't log status messages; just print the report.")
-    option_parser.add_option(
-        '-c', '--conf-path', dest='conf_path', default=None,
-        help='Path to alternate mrjob.conf file to read from')
-    option_parser.add_option(
-        '--no-conf', dest='conf_path', action='store_false',
-        help="Don't load mrjob.conf even if it's available")
+
     option_parser.add_option(
         '--min-hours', dest='min_hours', type='float',
         default=DEFAULT_MIN_HOURS,
         help=('Minimum number of hours a job can run before we report it.'
               ' Default: %default'))
+
+    assignments = {
+        option_parser: ('conf_paths', 'quiet', 'verbose')
+    }
+
+    mr_job = MRJob()
+    scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
 
     return option_parser
 

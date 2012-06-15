@@ -53,6 +53,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import iso8601_to_datetime
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
+from mrjob.util import scrape_options_into_new_groups
 
 
 log = logging.getLogger('mrjob.tools.emr.s3_tmpwatch')
@@ -66,22 +67,20 @@ def main():
     if not args or len(args) < 2:
         option_parser.error('Please specify time and one or more URIs')
 
-    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
-
     time_old = process_time(args[0])
 
     for path in args[1:]:
         s3_cleanup(path, time_old,
-            conf_paths=[options.conf_path],
+            conf_paths=options.conf_paths,
             dry_run=options.test)
 
 
-def s3_cleanup(glob_path, time_old, dry_run=False, conf_path=None):
+def s3_cleanup(glob_path, time_old, dry_run=False, conf_paths=None):
     """Delete all files older than *time_old* in *path*.
        If *dry_run* is ``True``, then just log the files that need to be
        deleted without actually deleting them
        """
-    runner = EMRJobRunner(conf_path=conf_path)
+    runner = EMRJobRunner(conf_paths=conf_paths)
     s3_conn = runner.make_s3_conn()
 
     log.info('Deleting all files in %s that are older than %s' %
@@ -121,25 +120,24 @@ def make_option_parser():
         ' removed. The time argument is a number with an optional'
         ' single-character suffix specifying the units: m for minutes, h for'
         ' hours, d for days.  If no suffix is specified, time is in hours.')
+
     option_parser = OptionParser(usage=usage, description=description)
-    option_parser.add_option(
-        '-v', '--verbose', dest='verbose', default=False,
-        action='store_true',
-        help='Print more messages')
-    option_parser.add_option(
-        '-q', '--quiet', dest='quiet', default=False,
-        action='store_true',
-        help='Report only fatal errors.')
-    option_parser.add_option(
-        '-c', '--conf-path', dest='conf_path', default=None,
-        help='Path to alternate mrjob.conf file to read from')
-    option_parser.add_option(
-        '--no-conf', dest='conf_path', action='store_false',
-        help="Don't load mrjob.conf even if it's available")
+
     option_parser.add_option(
         '-t', '--test', dest='test', default=False,
         action='store_true',
         help="Don't actually delete any files; just log that we would")
+
+    assignments = {
+        option_parser: ('conf_paths', 'quiet', 'verbose')
+    }
+
+    mr_job = MRJob()
+    scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
+
+    options, args = option_parser.parse_args()
+
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     return option_parser
 

@@ -36,6 +36,7 @@ from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
+from mrjob.util import scrape_options_into_new_groups
 
 log = logging.getLogger('mrjob.tools.emr.terminate_job_flow')
 
@@ -52,7 +53,7 @@ def main():
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     # create the persistent job
-    runner = EMRJobRunner(conf_paths=[options.conf_path])
+    runner = EMRJobRunner(conf_paths=options.conf_paths)
     log.debug('Terminating job flow %s' % emr_job_flow_id)
     runner.make_emr_conn().terminate_jobflow(emr_job_flow_id)
     log.info('Terminated job flow %s' % emr_job_flow_id)
@@ -61,21 +62,20 @@ def main():
 def make_option_parser():
     usage = '%prog [options] jobflowid'
     description = 'Terminate an existing EMR job flow.'
+
     option_parser = OptionParser(usage=usage, description=description)
+
     option_parser.add_option(
-        '-v', '--verbose', dest='verbose', default=False,
+        '-t', '--test', dest='test', default=False,
         action='store_true',
-        help='print more messages to stderr')
-    option_parser.add_option(
-        '-q', '--quiet', dest='quiet', default=False,
-        action='store_true',
-        help="don't print anything")
-    option_parser.add_option(
-        '-c', '--conf-path', dest='conf_path', default=None,
-        help='Path to alternate mrjob.conf file to read from')
-    option_parser.add_option(
-        '--no-conf', dest='conf_path', action='store_false',
-        help="Don't load mrjob.conf even if it's available")
+        help="Don't actually delete any files; just log that we would")
+
+    assignments = {
+        option_parser: ('conf_paths', 'quiet', 'verbose')
+    }
+
+    mr_job = MRJob()
+    scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
 
     return option_parser
 

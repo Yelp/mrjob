@@ -167,7 +167,7 @@ class ReportLongJobsTestCase(MockEMRAndS3TestCase):
 
     def test_with_all_job_flows(self):
         self.mock_emr_job_flows.update(JOB_FLOWS_BY_ID)
-        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
+        emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
         emr_conn.run_jobflow('no name', log_uri=None)
         main(['-q', '--no-conf'])
         lines = [line for line in StringIO(self.stdout.getvalue())]

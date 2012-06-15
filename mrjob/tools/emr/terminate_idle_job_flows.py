@@ -63,6 +63,7 @@ from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
+from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import strip_microseconds
 
 log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
@@ -341,22 +342,9 @@ def make_option_parser():
     description = ('Terminate idle EMR job flows that meet the criteria'
                    ' passed in on the command line (or, by default,'
                    ' job flows that have been idle for one hour).')
+
     option_parser = OptionParser(usage=usage, description=description)
-    option_parser.add_option(
-        '-v', '--verbose', dest='verbose', default=False,
-        action='store_true',
-        help='Print more messages')
-    option_parser.add_option(
-        '-q', '--quiet', dest='quiet', action='count',
-        help=("Don't print anything to stderr; just print IDs of terminated"
-              " job flows and idle time information to stdout. Use twice"
-              " to print absolutely nothing."))
-    option_parser.add_option(
-        '-c', '--conf-path', dest='conf_path', default=None,
-        help='Path to alternate mrjob.conf file to read from')
-    option_parser.add_option(
-        '--no-conf', dest='conf_path', action='store_false',
-        help="Don't load mrjob.conf even if it's available")
+
     option_parser.add_option(
         '--max-hours-idle', dest='max_hours_idle',
         default=None, type='float',
@@ -390,6 +378,18 @@ def make_option_parser():
         '--dry-run', dest='dry_run', default=False,
         action='store_true',
         help="Don't actually kill idle jobs; just log that we would")
+
+    option_parser.add_option(
+        '-t', '--test', dest='test', default=False,
+        action='store_true',
+        help="Don't actually delete any files; just log that we would")
+
+    assignments = {
+        option_parser: ('conf_paths', 'quiet', 'verbose')
+    }
+
+    mr_job = MRJob()
+    scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
 
     return option_parser
 

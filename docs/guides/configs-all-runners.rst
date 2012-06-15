@@ -102,12 +102,13 @@ Job execution context
 Other
 -----
 
-**conf_path** (:option:`-c`, :option:`--conf-path`, :option:`--no-conf`)
-    Path to a configuration file. This option cannot be used in configuration
-    files, because that would cause a universe-ending causality paradox. Use
-    `--no-conf` on the command line or `conf_path=False` to force mrjob to
-    load no configuration files at all. If no config path flags are given,
-    mrjob will look for one in the locations specified in :ref:`mrjob.conf`.
+**conf_paths** (:option:`-c`, :option:`--conf-path`, :option:`--no-conf`)
+    List of paths to configuration files. This option cannot be used in
+    configuration files, because that would cause a universe-ending causality
+    paradox. Use `--no-conf` on the command line or `conf_paths=[]` to force
+    mrjob to load no configuration files at all. If no config path flags are
+    given, mrjob will look for one in the locations specified in
+    :ref:`mrjob.conf`.
 
     Config path flags can be used multiple times to combine config files, much
     like the **include** config file directive. Using :option:`--no-conf` will

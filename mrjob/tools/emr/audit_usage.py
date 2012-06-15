@@ -45,6 +45,7 @@ from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import STEP_NAME_RE
+from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import strip_microseconds
 
 log = logging.getLogger('mrjob.tools.emr.audit_usage')
@@ -63,7 +64,7 @@ def main(args):
     now = datetime.utcnow()
 
     log.info('getting job flow history...')
-    job_flows = get_job_flows(options.conf_path, options.max_days_ago, now=now)
+    job_flows = get_job_flows(options.conf_paths, options.max_days_ago, now=now)
 
     log.info('compiling job flow stats...')
     stats = job_flows_to_stats(job_flows, now=now)
@@ -74,23 +75,21 @@ def main(args):
 def make_option_parser():
     usage = '%prog [options]'
     description = 'Print a giant report on EMR usage.'
+
     option_parser = OptionParser(usage=usage, description=description)
-    option_parser.add_option(
-        '-v', '--verbose', dest='verbose', default=False, action='store_true',
-        help='print more messages to stderr')
-    option_parser.add_option(
-        '-q', '--quiet', dest='quiet', default=False, action='store_true',
-        help="Don't log status messages; just print the report.")
-    option_parser.add_option(
-        '-c', '--conf-path', dest='conf_path', default=None,
-        help='Path to alternate mrjob.conf file to read from')
-    option_parser.add_option(
-        '--no-conf', dest='conf_path', action='store_false',
-        help="Don't load mrjob.conf even if it's available")
+
     option_parser.add_option(
         '--max-days-ago', dest='max_days_ago', type='float', default=None,
         help=('Max number of days ago to look at jobs. By default, we go back'
               ' as far as EMR supports (currently about 2 months)'))
+
+    assignments = {
+        option_parser: ('conf_paths', 'quiet', 'verbose')
+    }
+
+    mr_job = MRJob()
+    scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
+
     return option_parser
 
 
@@ -548,7 +547,7 @@ def subdivide_interval_by_hour(start, end):
     return hour_to_secs
 
 
-def get_job_flows(conf_path, max_days_ago=None, now=None):
+def get_job_flows(conf_paths, max_days_ago=None, now=None):
     """Get relevant job flow information from EMR.
 
     :param str conf_path: Alternate path to read :py:mod:`mrjob.conf` from, or
@@ -561,7 +560,7 @@ def get_job_flows(conf_path, max_days_ago=None, now=None):
     if now is None:
         now = datetime.utcnow()
 
-    emr_conn = EMRJobRunner(conf_paths=[conf_path]).make_emr_conn()
+    emr_conn = EMRJobRunner(conf_paths=conf_paths).make_emr_conn()
 
     # if --max-days-ago is set, only look at recent jobs
     created_after = None

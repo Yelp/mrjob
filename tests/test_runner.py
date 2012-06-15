@@ -563,10 +563,10 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
 
         stderr = StringIO()
         with no_handlers_for_logger():
-            log_to_stream('mrjob.conf', stderr)
-            InlineMRJobRunner(conf_path=path)
-            self.assertIn(
-                "no configs for runner type 'inline' in %s" % path,
+            log_to_stream('mrjob.runner', stderr)
+            InlineMRJobRunner(conf_paths=[path])
+            self.assertEqual(
+                "No configs specified for inline runner\n",
                 stderr.getvalue())
 
 

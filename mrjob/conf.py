@@ -19,6 +19,7 @@ for :py:mod:`mrjob`.
 from __future__ import with_statement
 
 import glob
+from itertools import chain
 import logging
 import os
 import shlex
@@ -179,15 +180,14 @@ def conf_object_at_path(conf_path):
 def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
                               already_loaded=None):
     """Load a list of dictionaries representing the options in a given
-    mrjob.conf for a specific runner. Returns ``[(path, values)]``. If conf_path
-    is not found, return [(None, {})].
+    mrjob.conf for a specific runner. Returns ``[(path, values)]``. If
+    conf_path is not found, return [(None, {})].
 
     :type runner_alias: str
     :param runner_alias: String identifier of the runner type, e.g. ``emr``,
                          ``local``, etc.
     :type conf_path: str
-    :param conf_path: an alternate place to look for mrjob.conf. If this is
-                      ``False``, we'll always return ``{}``.
+    :param conf_path: location of the file to load
     :type already_loaded: list
     :param already_loaded: list of :file:`mrjob.conf` paths that have already
                            been loaded
@@ -206,8 +206,6 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
     try:
         values = conf['runners'][runner_alias] or {}
     except (KeyError, TypeError, ValueError):
-        log.warning('no configs for runner type %r in %s; returning {}' %
-                    (runner_alias, conf_path))
         values = {}
 
     inherited = []
@@ -225,6 +223,27 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
                 inherited.extend(load_opts_from_mrjob_conf(
                                     runner_alias, include, already_loaded))
     return inherited + [(conf_path, values)]
+
+
+def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
+    """Load a list of dictionaries representing the options in a given
+    list of mrjob config files for a specific runner. Returns
+    ``[(path, values)]``. If a path is not found, use (None, {}) as its value.
+    If *conf_paths* is ``None``, look for a config file in the default
+    locations.
+
+    :type runner_alias: str
+    :param runner_alias: String identifier of the runner type, e.g. ``emr``,
+                         ``local``, etc.
+    :type conf_paths: list or ``None``
+    :param conf_path: locations of the files to load
+    """
+    if conf_paths is None:
+        return load_opts_from_mrjob_conf(runner_alias, find_mrjob_conf())
+    else:
+        return chain(*[
+            load_opts_from_mrjob_conf(runner_alias, path)
+            for path in conf_paths])
 
 
 def dump_mrjob_conf(conf, f):

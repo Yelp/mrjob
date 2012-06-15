@@ -22,7 +22,7 @@ from optparse import SUPPRESS_USAGE
 from mrjob.runner import CLEANUP_CHOICES
 
 
-def _append_with_checks(option, opt_str, value, parser):
+def _append_to_conf_paths(option, opt_str, value, parser):
     """conf_paths is None by default, but --no-conf or --conf-path should make
     it a list.
     """
@@ -48,7 +48,8 @@ def add_basic_opts(opt_group):
     return [
         opt_group.add_option(
             '-c', '--conf-path', dest='conf_paths', action='callback',
-            callback=_append_with_checks, default=None, nargs=1, type='string',
+            callback=_append_to_conf_paths, default=None, nargs=1,
+            type='string',
             help='Path to alternate mrjob.conf file to read from'),
 
         opt_group.add_option(

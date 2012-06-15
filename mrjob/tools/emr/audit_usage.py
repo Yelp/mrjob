@@ -43,9 +43,9 @@ import sys
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
+from mrjob.options import add_basic_opts
 from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import STEP_NAME_RE
-from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import strip_microseconds
 
 log = logging.getLogger('mrjob.tools.emr.audit_usage')
@@ -83,12 +83,7 @@ def make_option_parser():
         help=('Max number of days ago to look at jobs. By default, we go back'
               ' as far as EMR supports (currently about 2 months)'))
 
-    assignments = {
-        option_parser: ('conf_paths', 'quiet', 'verbose')
-    }
-
-    mr_job = MRJob()
-    scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
+    add_basic_opts(option_parser)
 
     return option_parser
 

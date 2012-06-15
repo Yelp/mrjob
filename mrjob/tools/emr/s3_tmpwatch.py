@@ -52,8 +52,8 @@ except ImportError:
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import iso8601_to_datetime
 from mrjob.job import MRJob
+from mrjob.options import add_basic_opts
 from mrjob.parse import parse_s3_uri
-from mrjob.util import scrape_options_into_new_groups
 
 
 log = logging.getLogger('mrjob.tools.emr.s3_tmpwatch')
@@ -62,6 +62,8 @@ log = logging.getLogger('mrjob.tools.emr.s3_tmpwatch')
 def main():
     option_parser = make_option_parser()
     options, args = option_parser.parse_args()
+
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     # make sure time and uris are given
     if not args or len(args) < 2:
@@ -128,16 +130,7 @@ def make_option_parser():
         action='store_true',
         help="Don't actually delete any files; just log that we would")
 
-    assignments = {
-        option_parser: ('conf_paths', 'quiet', 'verbose')
-    }
-
-    mr_job = MRJob()
-    scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
-
-    options, args = option_parser.parse_args()
-
-    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
+    add_basic_opts(option_parser)
 
     return option_parser
 

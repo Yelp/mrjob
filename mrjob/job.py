@@ -36,6 +36,7 @@ except ImportError:
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
+from mrjob.options import add_basic_opts
 from mrjob.options import add_emr_opts
 from mrjob.options import add_hadoop_opts
 from mrjob.options import add_hadoop_emr_opts
@@ -897,6 +898,7 @@ class MRJob(object):
             self.option_parser, 'Running the entire job')
         self.option_parser.add_option_group(self.runner_opt_group)
 
+        add_basic_opts(self.runner_opt_group)
         add_runner_opts(self.runner_opt_group)
 
         self.hadoop_opts_opt_group = OptionGroup(

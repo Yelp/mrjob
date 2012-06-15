@@ -36,7 +36,7 @@ from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.util import scrape_options_into_new_groups
+from mrjob.options import add_basic_opts
 
 log = logging.getLogger('mrjob.tools.emr.terminate_job_flow')
 
@@ -70,12 +70,7 @@ def make_option_parser():
         action='store_true',
         help="Don't actually delete any files; just log that we would")
 
-    assignments = {
-        option_parser: ('conf_paths', 'quiet', 'verbose')
-    }
-
-    mr_job = MRJob()
-    scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
+    add_basic_opts(option_parser)
 
     return option_parser
 

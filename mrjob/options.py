@@ -42,6 +42,30 @@ def add_protocol_opts(opt_group):
     ]
 
 
+def add_basic_opts(opt_group):
+    """Options for all command line tools"""
+
+    return [
+        opt_group.add_option(
+            '-c', '--conf-path', dest='conf_paths', action='callback',
+            callback=_append_with_checks, default=None, nargs=1, type='string',
+            help='Path to alternate mrjob.conf file to read from'),
+
+        opt_group.add_option(
+            '--no-conf', dest='conf_paths', action='store_const', const=[],
+            help="Don't load mrjob.conf even if it's available"),
+
+        opt_group.add_option(
+            '-q', '--quiet', dest='quiet', default=None,
+            action='store_true',
+            help="Don't print anything to stderr"),
+
+        opt_group.add_option(
+            '-v', '--verbose', dest='verbose', default=None,
+            action='store_true', help='print more messages to stderr'),
+    ]
+
+
 def add_runner_opts(opt_group):
     """Options for all runners."""
     return [
@@ -58,11 +82,6 @@ def add_runner_opts(opt_group):
                   " we run the mrjob. This is the default. Use"
                   " --no-bootstrap-mrjob if you've already installed mrjob on"
                   " your Hadoop cluster.")),
-
-        opt_group.add_option(
-            '-c', '--conf-path', dest='conf_paths', action='callback',
-            callback=_append_with_checks, default=None, nargs=1, type='string',
-            help='Path to alternate mrjob.conf file to read from'),
 
         opt_group.add_option(
             '--cleanup', dest='cleanup', default=None,
@@ -96,10 +115,6 @@ def add_runner_opts(opt_group):
                   " mrjob on your Hadoop cluster.")),
 
         opt_group.add_option(
-            '--no-conf', dest='conf_paths', action='store_const', const=[],
-            help="Don't load mrjob.conf even if it's available"),
-
-        opt_group.add_option(
             '--no-output', dest='no_output',
             default=None, action='store_true',
             help="Don't stream output after job completion"),
@@ -122,11 +137,6 @@ def add_runner_opts(opt_group):
             help=("Name/path of alternate python binary for mappers/reducers."
                   " You can include arguments, e.g. --python-bin 'python"
                   " -v'")),
-
-        opt_group.add_option(
-            '-q', '--quiet', dest='quiet', default=None,
-            action='store_true',
-            help="Don't print anything to stderr"),
 
         opt_group.add_option(
             '-r', '--runner', dest='runner', default='inline',
@@ -156,10 +166,6 @@ def add_runner_opts(opt_group):
             help='Name/path of alternate python binary to use to query the '
             'job about its steps, if different from the current Python '
             'interpreter. Rarely needed.'),
-
-        opt_group.add_option(
-            '-v', '--verbose', dest='verbose', default=None,
-            action='store_true', help='print more messages to stderr'),
     ]
 
 

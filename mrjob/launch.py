@@ -129,6 +129,10 @@ class MRJobLauncher(object):
         launcher = cls(args=_READ_ARGS_FROM_SYS_ARGV)
         launcher.run_job()
 
+    def execute(self):
+        # Launcher only runs jobs, doesn't do any Hadoop Streaming stuff
+        self.run_job()
+
     def make_runner(self):
         """Make a runner based on command-line arguments, so we can
         launch this job on EMR, on Hadoop, or locally.

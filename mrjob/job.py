@@ -406,6 +406,8 @@ class MRJob(MRJobLauncher):
         mr_job.execute()
 
     def execute(self):
+        # MRJob does Hadoop Streaming stuff, or defers to Launcher (superclass)
+        # if not otherwise instructed
         if self.options.show_steps:
             self.show_steps()
 

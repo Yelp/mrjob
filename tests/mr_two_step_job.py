@@ -71,5 +71,6 @@ class MRTwoStepJob(MRTestingJob):
         return [self.mr(self.mapper, self.reducer, combiner=self.combiner),
                 self.mr(self.mapper2)]
 
+
 if __name__ == '__main__':
     MRTwoStepJob.run()

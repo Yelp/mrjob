@@ -156,7 +156,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
         with open(input_path2, 'w') as input_file:
             input_file.write('foo\nbar\nbar\n')
 
-        runner = LocalMRJobRunner(conf_path=False)
+        runner = LocalMRJobRunner(conf_paths=[])
 
         # split into 3 files
         file_splits = runner._get_file_splits([input_path, input_path2], 3)
@@ -182,7 +182,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
                 '1\tbar\n1\tbar\n1\tbar\n2\tfoo\n2\tfoo\n2\tfoo\n3\tqux\n'
                 '3\tqux\n3\tqux\n')
 
-        runner = LocalMRJobRunner(conf_path=False)
+        runner = LocalMRJobRunner(conf_paths=[])
 
         file_splits = runner._get_file_splits([input_path], 3,
                                               keep_sorted=True)
@@ -215,7 +215,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
         with open(input_path2, 'w') as input_file:
             input_file.write(''.join(contents_normal))
 
-        runner = LocalMRJobRunner(conf_path=False)
+        runner = LocalMRJobRunner(conf_paths=[])
 
         # split into 3 files
         file_splits = runner._get_file_splits([input_gz_path, input_path2], 3)
@@ -589,7 +589,7 @@ class LocalMRJobRunnerTestJobConfCase(unittest.TestCase):
 class CompatTestCase(unittest.TestCase):
 
     def test_environment_variables_018(self):
-        runner = LocalMRJobRunner(hadoop_version='0.18', conf_path=False)
+        runner = LocalMRJobRunner(hadoop_version='0.18', conf_paths=[])
         # clean up after we're done. On windows, job names are only to
         # the millisecond, so these two tests end up trying to create
         # the same temp dir
@@ -599,7 +599,7 @@ class CompatTestCase(unittest.TestCase):
                           runner._subprocess_env('M', 0, 0).keys())
 
     def test_environment_variables_021(self):
-        runner = LocalMRJobRunner(hadoop_version='0.21', conf_path=False)
+        runner = LocalMRJobRunner(hadoop_version='0.21', conf_paths=[])
         with runner as runner:
             runner._setup_working_dir()
             self.assertIn('mapreduce_job_cache_local_archives',
@@ -609,18 +609,18 @@ class CompatTestCase(unittest.TestCase):
 class TestHadoopConfArgs(unittest.TestCase):
 
     def test_empty(self):
-        runner = LocalMRJobRunner(conf_path=False)
+        runner = LocalMRJobRunner(conf_paths=[])
         self.assertEqual(runner._hadoop_conf_args(0, 1), [])
 
     def test_hadoop_extra_args(self):
         extra_args = ['-foo', 'bar']
-        runner = LocalMRJobRunner(conf_path=False,
+        runner = LocalMRJobRunner(conf_paths=[],
                                   hadoop_extra_args=extra_args)
         self.assertEqual(runner._hadoop_conf_args(0, 1), extra_args)
 
     def test_cmdenv(self):
         cmdenv = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
-        runner = LocalMRJobRunner(conf_path=False, cmdenv=cmdenv)
+        runner = LocalMRJobRunner(conf_paths=[], cmdenv=cmdenv)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
                          ['-cmdenv', 'BAX=Arnold',
                           '-cmdenv', 'BAZ=qux',
@@ -629,7 +629,7 @@ class TestHadoopConfArgs(unittest.TestCase):
 
     def test_hadoop_input_format(self):
         format = 'org.apache.hadoop.mapred.SequenceFileInputFormat'
-        runner = LocalMRJobRunner(conf_path=False, hadoop_input_format=format)
+        runner = LocalMRJobRunner(conf_paths=[], hadoop_input_format=format)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
                          ['-inputformat', format])
         # test multi-step job
@@ -639,7 +639,7 @@ class TestHadoopConfArgs(unittest.TestCase):
 
     def test_hadoop_output_format(self):
         format = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
-        runner = LocalMRJobRunner(conf_path=False, hadoop_output_format=format)
+        runner = LocalMRJobRunner(conf_paths=[], hadoop_output_format=format)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
                          ['-outputformat', format])
         # test multi-step job
@@ -649,13 +649,13 @@ class TestHadoopConfArgs(unittest.TestCase):
 
     def test_jobconf(self):
         jobconf = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
-        runner = LocalMRJobRunner(conf_path=False, jobconf=jobconf)
+        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
                          ['-D', 'BAX=Arnold',
                           '-D', 'BAZ=qux',
                           '-D', 'FOO=bar',
                           ])
-        runner = LocalMRJobRunner(conf_path=False, jobconf=jobconf,
+        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf,
                                   hadoop_version='0.18')
         self.assertEqual(runner._hadoop_conf_args(0, 1),
                          ['-jobconf', 'BAX=Arnold',
@@ -666,14 +666,14 @@ class TestHadoopConfArgs(unittest.TestCase):
     def test_partitioner(self):
         partitioner = 'org.apache.hadoop.mapreduce.Partitioner'
 
-        runner = LocalMRJobRunner(conf_path=False, partitioner=partitioner)
+        runner = LocalMRJobRunner(conf_paths=[], partitioner=partitioner)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
                          ['-partitioner', partitioner])
 
     def test_hadoop_extra_args_comes_first(self):
         runner = LocalMRJobRunner(
             cmdenv={'FOO': 'bar'},
-            conf_path=False,
+            conf_paths=[],
             hadoop_extra_args=['-libjar', 'qux.jar'],
             hadoop_input_format='FooInputFormat',
             hadoop_output_format='BarOutputFormat',
@@ -689,7 +689,7 @@ class TestHadoopConfArgs(unittest.TestCase):
 class TestIronPythonEnvironment(unittest.TestCase):
 
     def setUp(self):
-        self.runner = LocalMRJobRunner(conf_path=False)
+        self.runner = LocalMRJobRunner(conf_paths=[])
         self.runner._setup_working_dir()
 
     def test_env_ironpython(self):

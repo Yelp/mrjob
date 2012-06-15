@@ -166,7 +166,7 @@ def make_option_parser():
                              help='Show counters from the job flow')
 
     assignments = {
-        option_parser: ('conf_path', 'quiet', 'verbose',
+        option_parser: ('conf_paths', 'quiet', 'verbose',
                         'ec2_key_pair_file', 's3_sync_wait_time')
     }
 

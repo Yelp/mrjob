@@ -51,7 +51,7 @@ class S3TmpWatchTestCase(MockEMRAndS3TestCase):
         shutil.rmtree(self.tmp_dir)
 
     def test_cleanup(self):
-        runner = EMRJobRunner(conf_path=False, s3_sync_wait_time=0.01)
+        runner = EMRJobRunner(conf_paths=[], s3_sync_wait_time=0.01)
 
         # add some mock data and change last_modified
         remote_input_path = 's3://walrus/data/'
@@ -75,14 +75,14 @@ class S3TmpWatchTestCase(MockEMRAndS3TestCase):
         assert isinstance(key_qux, MockKey)
 
         s3_cleanup(remote_input_path, timedelta(days=30), dry_run=True,
-                   conf_path=False)
+                   conf_paths=[])
 
         # dry-run shouldn't delete anything
         assert isinstance(key_foo, MockKey)
         assert isinstance(key_bar, MockKey)
         assert isinstance(key_qux, MockKey)
 
-        s3_cleanup(remote_input_path, timedelta(days=30), conf_path=False)
+        s3_cleanup(remote_input_path, timedelta(days=30), conf_paths=[])
 
         key_foo = bucket.get_key('data/foo')
         key_bar = bucket.get_key('data/bar')
@@ -93,7 +93,7 @@ class S3TmpWatchTestCase(MockEMRAndS3TestCase):
         self.assertEqual(key_bar, None)
         assert isinstance(key_qux, MockKey)
 
-        s3_cleanup(remote_input_path, timedelta(hours=48), conf_path=False)
+        s3_cleanup(remote_input_path, timedelta(hours=48), conf_paths=[])
 
         key_foo = bucket.get_key('data/foo')
         key_bar = bucket.get_key('data/bar')

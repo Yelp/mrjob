@@ -45,7 +45,7 @@ class LogFetchingTestCase(ToolTestCase):
     def setUp(self):
         super(LogFetchingTestCase, self).setUp()
 
-        self.runner = EMRJobRunner(conf_path=False,
+        self.runner = EMRJobRunner(conf_paths=[],
                                    s3_sync_wait_time=0,
                                    emr_job_flow_id='j-MOCKJOBFLOW0')
 
@@ -57,7 +57,7 @@ class LogFetchingTestCase(ToolTestCase):
         self.monkey_patch_argv('--quiet', 'j-MOCKJOBFLOW0')
         self.assertEqual(
             runner_kwargs(parse_args(make_option_parser())),
-            {'conf_path': None,
+            {'conf_paths': None,
              'ec2_key_pair_file': None,
              's3_sync_wait_time': None,
              'emr_job_flow_id': 'j-MOCKJOBFLOW0'})

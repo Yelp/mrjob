@@ -61,6 +61,7 @@ from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
+from mrjob.options import add_basic_opts
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
 from mrjob.util import strip_microseconds
@@ -85,7 +86,7 @@ def main():
                          verbose=options.verbose)
 
     inspect_and_maybe_terminate_job_flows(
-        conf_path=options.conf_path,
+        conf_paths=[options.conf_path],
         dry_run=options.dry_run,
         max_hours_idle=options.max_hours_idle,
         mins_to_end_of_hour=options.mins_to_end_of_hour,
@@ -341,22 +342,9 @@ def make_option_parser():
     description = ('Terminate idle EMR job flows that meet the criteria'
                    ' passed in on the command line (or, by default,'
                    ' job flows that have been idle for one hour).')
+
     option_parser = OptionParser(usage=usage, description=description)
-    option_parser.add_option(
-        '-v', '--verbose', dest='verbose', default=False,
-        action='store_true',
-        help='Print more messages')
-    option_parser.add_option(
-        '-q', '--quiet', dest='quiet', action='count',
-        help=("Don't print anything to stderr; just print IDs of terminated"
-              " job flows and idle time information to stdout. Use twice"
-              " to print absolutely nothing."))
-    option_parser.add_option(
-        '-c', '--conf-path', dest='conf_path', default=None,
-        help='Path to alternate mrjob.conf file to read from')
-    option_parser.add_option(
-        '--no-conf', dest='conf_path', action='store_false',
-        help="Don't load mrjob.conf even if it's available")
+
     option_parser.add_option(
         '--max-hours-idle', dest='max_hours_idle',
         default=None, type='float',
@@ -390,6 +378,13 @@ def make_option_parser():
         '--dry-run', dest='dry_run', default=False,
         action='store_true',
         help="Don't actually kill idle jobs; just log that we would")
+
+    option_parser.add_option(
+        '-t', '--test', dest='test', default=False,
+        action='store_true',
+        help="Don't actually delete any files; just log that we would")
+
+    add_basic_opts(option_parser)
 
     return option_parser
 

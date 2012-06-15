@@ -260,6 +260,29 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
                               {'group': {'counter_name': 2}},
                               {'group': {'counter_name': 2}}])
 
+    def test_gz_split_regression(self):
+        gz_path_1 = os.path.join(self.tmp_dir, '1.gz')
+        gz_path_2 = os.path.join(self.tmp_dir, '2.gz')
+        path_3 = os.path.join(self.tmp_dir, '3')
+
+        input_gz_1 = gzip.GzipFile(gz_path_1, 'w')
+        input_gz_1.write('x\n')
+        input_gz_1.close()
+
+        input_gz_2 = gzip.GzipFile(gz_path_2, 'w')
+        input_gz_2.write('y\n')
+        input_gz_2.close()
+
+        with open(path_3, 'w') as f:
+            f.write('z')
+
+        mr_job = MRCountingJob(['--no-conf', '-r', 'local', gz_path_1,
+                               gz_path_2, path_3])
+        with mr_job.make_runner() as r:
+            splits = r._get_file_splits([gz_path_1, gz_path_2, path_3], 1)
+            self.assertEqual(
+                len(set(s['task_num'] for s in splits.values())), 3)
+
 
 class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):
     """Test systems without os.symlink (e.g. Windows). See Issue #46"""

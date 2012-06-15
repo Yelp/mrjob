@@ -50,7 +50,7 @@ def main():
     option_parser = OptionParser(usage=usage, description=description)
 
     assignments = {
-        option_parser: ('conf_path', 'quiet', 'verbose',
+        option_parser: ('conf_paths', 'quiet', 'verbose',
                         'ec2_key_pair_file')
     }
 

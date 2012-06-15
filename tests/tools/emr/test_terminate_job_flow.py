@@ -35,6 +35,6 @@ class TerminateToolTestCase(ToolTestCase):
 
         terminate_main()
 
-        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
+        emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
         self.assertEqual(emr_conn.describe_jobflow(jf_id).state,
                          'TERMINATED')

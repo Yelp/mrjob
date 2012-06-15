@@ -48,7 +48,7 @@ class ToolTestCase(MockEMRAndS3TestCase):
     def make_job_flow(self, **kwargs):
         self.add_mock_s3_data({'walrus': {}})
         kwargs.update(dict(
-            conf_path=False,
+            conf_paths=[],
             s3_scratch_uri='s3://walrus/',
             s3_sync_wait_time=0))
         with EMRJobRunner(**kwargs) as runner:

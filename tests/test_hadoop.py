@@ -251,7 +251,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 class TestURIs(MockHadoopTestCase):
 
     def test_uris(self):
-        runner = HadoopJobRunner(conf_path=False)
+        runner = HadoopJobRunner(conf_paths=[])
         list(runner.ls('hdfs://tmp/waffles'))
         list(runner.ls('leggo://my/eggo'))
         list(runner.ls('/tmp'))

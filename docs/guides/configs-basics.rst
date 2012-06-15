@@ -18,6 +18,9 @@ Old Location                      New Location
 somewhere in :envvar:`PYTHONPATH` Specify in :envvar:`MRJOB_CONF`
 ================================= ===============================
 
+You can specify one or more configuration files with the :option:`--conf-path`
+flag. See :doc:`configs-all-runners` for more information.
+
 The point of :file:`mrjob.conf` is to let you set up things you want every
 job to have access to so that you don't have to think about it. For example:
 

@@ -37,14 +37,23 @@ from mrjob.conf import combine_opts
 from mrjob.conf import combine_path_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_values
+from mrjob.conf import conf_object_at_path
 from mrjob.conf import dump_mrjob_conf
 from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
-from mrjob.conf import load_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
+from mrjob.conf import real_mrjob_conf_path
 from tests.quiet import log_to_buffer
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+
+
+def load_mrjob_conf(conf_path=None):
+    """Shortcut for automatically loading mrjob.conf from one of the predefined
+    locations and returning the de-YAMLed object
+    """
+    conf_path = real_mrjob_conf_path(conf_path)
+    return conf_object_at_path(conf_path)
 
 
 class MRJobConfTestCase(unittest.TestCase):

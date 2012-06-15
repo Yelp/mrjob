@@ -1,7 +1,7 @@
 v0.4, 2012-06-?? -- Slouching toward nirvana
  * Changed default runner from 'local' to 'inline' (#423)
  * Filesystem functionality moved out of MRJobRunner into into 'fs' objects
- * Requires boto 2.3.0 or later
+ * Requires boto 2.2.0 or later
  * Removed deprecated functionality
    * --hadoop-*-format
    * --*-protocol switches
@@ -12,8 +12,23 @@ v0.4, 2012-06-?? -- Slouching toward nirvana
    * IF_SUCCESSFUL
    * DEFAULT_CLEANUP
 
-v???
- * Local runner sorts output consistently (was getting mixed up a little)
+v0.3.4.1, 2012-06-12 -- The test suite doesn't catch everything...
+ * Local mode doesn't try to send multiple mappers to the same output file
+   when using multiple compressed files as input
+
+v0.3.4, 2012-06-11 -- We are friendly people.
+ * Experimental support for IronPython in the local and inline runners
+ * set_status() and increment_counter() will encode messages/names of type
+   'unicode' as UTF-8 when writing to Hadoop Streaming
+ * EMR and Hadoop counter parsing is more correct
+ * mrjob.tools.emr.fetch_logs fetches logs from S3 when asked instead of
+   incorrectly refusing to do so
+ * jobconf values can be booleans in mrjob.conf as well as 'true' and 'false'
+   strings
+ * hadoop_version can be a float in mrjob.conf, but a warning is printed to the
+   console
+ * Command line help is split across several --help-* commands
+ * Local runner sorts output consistently
 
 v0.3.3.2, 2012-04-10 -- It's a race [condition]!
  * Option parsing no longer dies when -- is used as an argument (#435)

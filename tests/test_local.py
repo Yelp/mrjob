@@ -18,7 +18,6 @@ from __future__ import with_statement
 
 from StringIO import StringIO
 import gzip
-import mrjob
 import os
 import shutil
 import signal
@@ -32,6 +31,10 @@ try:
 except ImportError:
     import unittest
 
+from mock import patch
+
+import mrjob
+from mrjob import local
 from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import cmd_line
@@ -78,6 +81,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
         input_gz.close()
 
         mr_job = MRTwoStepJob(['-c', self.mrjob_conf_path,
+                               '-r', 'local',
                                '-', input_path, input_gz_glob])
         mr_job.sandbox(stdin=stdin)
 
@@ -116,6 +120,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
         input_gz.close()
 
         mr_job = MRTwoStepJob(['-c', self.mrjob_conf_path,
+                               '-r', 'local',
                                '--jobconf=mapred.map.tasks=2',
                                 '--jobconf=mapred.reduce.tasks=2',
                                '-', input_path, input_gz_path])
@@ -151,7 +156,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
         with open(input_path2, 'w') as input_file:
             input_file.write('foo\nbar\nbar\n')
 
-        runner = LocalMRJobRunner(conf_path=False)
+        runner = LocalMRJobRunner(conf_paths=[])
 
         # split into 3 files
         file_splits = runner._get_file_splits([input_path, input_path2], 3)
@@ -177,7 +182,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
                 '1\tbar\n1\tbar\n1\tbar\n2\tfoo\n2\tfoo\n2\tfoo\n3\tqux\n'
                 '3\tqux\n3\tqux\n')
 
-        runner = LocalMRJobRunner(conf_path=False)
+        runner = LocalMRJobRunner(conf_paths=[])
 
         file_splits = runner._get_file_splits([input_path], 3,
                                               keep_sorted=True)
@@ -210,7 +215,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
         with open(input_path2, 'w') as input_file:
             input_file.write(''.join(contents_normal))
 
-        runner = LocalMRJobRunner(conf_path=False)
+        runner = LocalMRJobRunner(conf_paths=[])
 
         # split into 3 files
         file_splits = runner._get_file_splits([input_gz_path, input_path2], 3)
@@ -243,7 +248,8 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
     def test_multi_step_counters(self):
         stdin = StringIO('foo\nbar\n')
 
-        mr_job = MRCountingJob(['-c', self.mrjob_conf_path, '-'])
+        mr_job = MRCountingJob(['-c', self.mrjob_conf_path, '-r', 'local',
+                                '-'])
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
@@ -253,6 +259,29 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
                              [{'group': {'counter_name': 2}},
                               {'group': {'counter_name': 2}},
                               {'group': {'counter_name': 2}}])
+
+    def test_gz_split_regression(self):
+        gz_path_1 = os.path.join(self.tmp_dir, '1.gz')
+        gz_path_2 = os.path.join(self.tmp_dir, '2.gz')
+        path_3 = os.path.join(self.tmp_dir, '3')
+
+        input_gz_1 = gzip.GzipFile(gz_path_1, 'w')
+        input_gz_1.write('x\n')
+        input_gz_1.close()
+
+        input_gz_2 = gzip.GzipFile(gz_path_2, 'w')
+        input_gz_2.write('y\n')
+        input_gz_2.close()
+
+        with open(path_3, 'w') as f:
+            f.write('z')
+
+        mr_job = MRCountingJob(['--no-conf', '-r', 'local', gz_path_1,
+                               gz_path_2, path_3])
+        with mr_job.make_runner() as r:
+            splits = r._get_file_splits([gz_path_1, gz_path_2, path_3], 1)
+            self.assertEqual(
+                len(set(s['task_num'] for s in splits.values())), 3)
 
 
 class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):
@@ -301,7 +330,7 @@ class LargeAmountsOfStderrTestCase(unittest.TestCase):
         signal.signal(signal.SIGALRM, self._old_alarm_handler)
 
     def test_large_amounts_of_stderr(self):
-        mr_job = MRVerboseJob(['--no-conf'])
+        mr_job = MRVerboseJob(['--no-conf', '-r', 'local'])
         mr_job.sandbox()
 
         try:
@@ -329,7 +358,7 @@ class LargeAmountsOfStderrTestCase(unittest.TestCase):
 class ExitWithoutExceptionTestCase(unittest.TestCase):
 
     def test_exit_42_job(self):
-        mr_job = MRExit42Job(['--no-conf'])
+        mr_job = MRExit42Job(['--no-conf', '--runner=local'])
         mr_job.sandbox()
 
         try:
@@ -346,7 +375,8 @@ class PythonBinTestCase(unittest.TestCase):
     def test_echo_as_python_bin(self):
         # "echo" is a pretty poor substitute for Python, but it
         # should be available on most systems
-        mr_job = MRTwoStepJob(['--python-bin', 'echo', '--no-conf'])
+        mr_job = MRTwoStepJob(['--python-bin', 'echo', '--no-conf',
+                               '-r', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -362,7 +392,8 @@ class PythonBinTestCase(unittest.TestCase):
 
     def test_python_dash_v_as_python_bin(self):
         python_cmd = cmd_line([sys.executable or 'python', '-v'])
-        mr_job = MRTwoStepJob(['--python-bin', python_cmd, '--no-conf'])
+        mr_job = MRTwoStepJob(['--python-bin', python_cmd, '--no-conf',
+                               '-r', 'local'])
         mr_job.sandbox(stdin=['bar\n'])
 
         with no_handlers_for_logger():
@@ -381,7 +412,8 @@ class StepsPythonBinTestCase(unittest.TestCase):
 
     def test_echo_as_steps_python_bin(self):
         mr_job = MRTwoStepJob(
-            ['--steps', '--steps-python-bin', 'echo', '--no-conf'])
+            ['--steps', '--steps-python-bin', 'echo', '--no-conf',
+             '-r', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -421,7 +453,7 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
         # and the script loads from the .pyc compiled from that .py file.
         our_mrjob_dir = os.path.dirname(os.path.realpath(mrjob.__file__))
 
-        mr_job = MRJobWhereAreYou(['--no-conf'])
+        mr_job = MRJobWhereAreYou(['--no-conf', '-r', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -450,7 +482,7 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
         dump_mrjob_conf({'runners': {'local': {'bootstrap_mrjob': False}}},
                         open(self.mrjob_conf_path, 'w'))
 
-        mr_job = MRJobWhereAreYou(['-c', self.mrjob_conf_path])
+        mr_job = MRJobWhereAreYou(['-c', self.mrjob_conf_path, '-r', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -495,9 +527,10 @@ class LocalMRJobRunnerTestJobConfCase(unittest.TestCase):
         input_gz.close()
 
         mr_job = MRWordCount(['-c', self.mrjob_conf_path,
-                               '--jobconf=mapred.map.tasks=2',
-                                '--jobconf=mapred.reduce.tasks=2',
-                               input_path, input_gz_path])
+                              '-r', 'local',
+                              '--jobconf=mapred.map.tasks=2',
+                              '--jobconf=mapred.reduce.tasks=2',
+                              input_path, input_gz_path])
         mr_job.sandbox()
 
         results = []
@@ -520,6 +553,7 @@ class LocalMRJobRunnerTestJobConfCase(unittest.TestCase):
             input_file.write('foo\n')
 
         mr_job = MRTestJobConf(['-c', self.mrjob_conf_path,
+                                '-r', 'local',
                                 '--jobconf=user.defined=something',
                                input_path])
         mr_job.sandbox()
@@ -555,7 +589,7 @@ class LocalMRJobRunnerTestJobConfCase(unittest.TestCase):
 class CompatTestCase(unittest.TestCase):
 
     def test_environment_variables_018(self):
-        runner = LocalMRJobRunner(hadoop_version='0.18', conf_path=False)
+        runner = LocalMRJobRunner(hadoop_version='0.18', conf_paths=[])
         # clean up after we're done. On windows, job names are only to
         # the millisecond, so these two tests end up trying to create
         # the same temp dir
@@ -565,7 +599,7 @@ class CompatTestCase(unittest.TestCase):
                           runner._subprocess_env('M', 0, 0).keys())
 
     def test_environment_variables_021(self):
-        runner = LocalMRJobRunner(hadoop_version='0.21', conf_path=False)
+        runner = LocalMRJobRunner(hadoop_version='0.21', conf_paths=[])
         with runner as runner:
             runner._setup_working_dir()
             self.assertIn('mapreduce_job_cache_local_archives',
@@ -575,18 +609,18 @@ class CompatTestCase(unittest.TestCase):
 class TestHadoopConfArgs(unittest.TestCase):
 
     def test_empty(self):
-        runner = LocalMRJobRunner(conf_path=False)
+        runner = LocalMRJobRunner(conf_paths=[])
         self.assertEqual(runner._hadoop_conf_args(0, 1), [])
 
     def test_hadoop_extra_args(self):
         extra_args = ['-foo', 'bar']
-        runner = LocalMRJobRunner(conf_path=False,
+        runner = LocalMRJobRunner(conf_paths=[],
                                   hadoop_extra_args=extra_args)
         self.assertEqual(runner._hadoop_conf_args(0, 1), extra_args)
 
     def test_cmdenv(self):
         cmdenv = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
-        runner = LocalMRJobRunner(conf_path=False, cmdenv=cmdenv)
+        runner = LocalMRJobRunner(conf_paths=[], cmdenv=cmdenv)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
                          ['-cmdenv', 'BAX=Arnold',
                           '-cmdenv', 'BAZ=qux',
@@ -595,7 +629,7 @@ class TestHadoopConfArgs(unittest.TestCase):
 
     def test_hadoop_input_format(self):
         format = 'org.apache.hadoop.mapred.SequenceFileInputFormat'
-        runner = LocalMRJobRunner(conf_path=False, hadoop_input_format=format)
+        runner = LocalMRJobRunner(conf_paths=[], hadoop_input_format=format)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
                          ['-inputformat', format])
         # test multi-step job
@@ -605,7 +639,7 @@ class TestHadoopConfArgs(unittest.TestCase):
 
     def test_hadoop_output_format(self):
         format = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
-        runner = LocalMRJobRunner(conf_path=False, hadoop_output_format=format)
+        runner = LocalMRJobRunner(conf_paths=[], hadoop_output_format=format)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
                          ['-outputformat', format])
         # test multi-step job
@@ -615,13 +649,13 @@ class TestHadoopConfArgs(unittest.TestCase):
 
     def test_jobconf(self):
         jobconf = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
-        runner = LocalMRJobRunner(conf_path=False, jobconf=jobconf)
+        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
                          ['-D', 'BAX=Arnold',
                           '-D', 'BAZ=qux',
                           '-D', 'FOO=bar',
                           ])
-        runner = LocalMRJobRunner(conf_path=False, jobconf=jobconf,
+        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf,
                                   hadoop_version='0.18')
         self.assertEqual(runner._hadoop_conf_args(0, 1),
                          ['-jobconf', 'BAX=Arnold',
@@ -632,14 +666,14 @@ class TestHadoopConfArgs(unittest.TestCase):
     def test_partitioner(self):
         partitioner = 'org.apache.hadoop.mapreduce.Partitioner'
 
-        runner = LocalMRJobRunner(conf_path=False, partitioner=partitioner)
+        runner = LocalMRJobRunner(conf_paths=[], partitioner=partitioner)
         self.assertEqual(runner._hadoop_conf_args(0, 1),
                          ['-partitioner', partitioner])
 
     def test_hadoop_extra_args_comes_first(self):
         runner = LocalMRJobRunner(
             cmdenv={'FOO': 'bar'},
-            conf_path=False,
+            conf_paths=[],
             hadoop_extra_args=['-libjar', 'qux.jar'],
             hadoop_input_format='FooInputFormat',
             hadoop_output_format='BarOutputFormat',
@@ -650,3 +684,21 @@ class TestHadoopConfArgs(unittest.TestCase):
         conf_args = runner._hadoop_conf_args(0, 1)
         self.assertEqual(conf_args[:2], ['-libjar', 'qux.jar'])
         self.assertEqual(len(conf_args), 12)
+
+
+class TestIronPythonEnvironment(unittest.TestCase):
+
+    def setUp(self):
+        self.runner = LocalMRJobRunner(conf_paths=[])
+        self.runner._setup_working_dir()
+
+    def test_env_ironpython(self):
+        with patch.object(local, 'is_ironpython', True):
+            environment = self.runner._subprocess_env('M', 0, 0)
+            self.assertIn('IRONPYTHONPATH', environment)
+
+    def test_env_no_ironpython(self):
+        with patch.object(local, 'is_ironpython', False):
+            environment = self.runner._subprocess_env('M', 0, 0)
+            self.assertNotIn('IRONPYTHONPATH', environment)
+

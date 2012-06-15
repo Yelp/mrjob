@@ -44,7 +44,7 @@ from mrjob.conf import combine_local_envs
 from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
-from mrjob.conf import load_opts_from_mrjob_conf
+from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.local import LocalFilesystem
 from mrjob.util import cmd_line
@@ -112,21 +112,32 @@ class RunnerOptionStore(OptionStore):
         'upload_files': combine_path_lists,
     })
 
-    def __init__(self, alias, opts, conf_path):
+    def __init__(self, alias, opts, conf_paths):
+        """
+        :param alias: Runner alias (e.g. ``'local'``)
+        :param opts: Options from the command line
+        :param conf_paths: Either a file path or an iterable of paths to config
+                           files
+        """
         super(RunnerOptionStore, self).__init__()
 
         # sanitize incoming options and issue warnings for bad keys
         opts = self.validated_options(
             opts, 'Got unexpected keyword arguments: %s')
 
-        unsanitized_opt_dicts = load_opts_from_mrjob_conf(
-            alias, conf_path=conf_path)
+        unsanitized_opt_dicts = load_opts_from_mrjob_confs(
+            alias, conf_paths=conf_paths)
 
         for path, mrjob_conf_opts in unsanitized_opt_dicts:
             self.cascading_dicts.append(self.validated_options(
-                mrjob_conf_opts, 'Got unexpected opts from %s: %%s' % path))
+                mrjob_conf_opts,
+                'Got unexpected opts from %s: %%s' % path))
 
         self.cascading_dicts.append(opts)
+
+        if (len(self.cascading_dicts) > 2 and
+            all(len(d) == 0 for d in self.cascading_dicts[2:-1])):
+            log.warning('No configs specified for %s runner' % alias)
 
         self.populate_values_from_cascading_dicts()
 
@@ -193,7 +204,7 @@ class MRJobRunner(object):
                  extra_args=None, file_upload_args=None,
                  hadoop_input_format=None, hadoop_output_format=None,
                  input_paths=None, output_dir=None, partitioner=None,
-                 stdin=None, **opts):
+                 stdin=None, conf_paths=None, **opts):
         """All runners take the following keyword arguments:
 
         :type mr_job_script: str
@@ -202,9 +213,13 @@ class MRJobRunner(object):
                               you won't actually be able to :py:meth:`run` the
                               job, but other utilities (e.g. :py:meth:`ls`)
                               will work.
-        :type conf_path: str
-        :param conf_path: Alternate path to read configs from, or ``False`` to
-                          ignore all config files.
+        :type conf_path: str, None, or False
+        :param conf_path: Deprecated. Alternate path to read configs from, or
+                          ``False`` to ignore all config files. Use
+                          *conf_paths* instead.
+        :type conf_paths: None or list
+        :param conf_paths: List of config files to combine and use, or None to
+                           search for mrjob.conf in the default locations.
         :type extra_args: list of str
         :param extra_args: a list of extra cmd-line arguments to pass to the
                            mr_job script. This is a hook to allow jobs to take
@@ -261,7 +276,17 @@ class MRJobRunner(object):
                       your lines are missing newlines, we'll add them;
                       this makes it easier to write automated tests.
         """
-        self._opts = self.OPTION_STORE_CLASS(self.alias, opts, conf_path)
+        if conf_path is not None:
+            if conf_paths is not None:
+                raise ValueError("Can't specify both conf_path and conf_paths")
+            else:
+                log.warn("The conf_path argument to MRJobRunner() is"
+                         " deprecated. Use conf_paths instead.")
+                if conf_path is False:
+                    conf_paths = []
+                else:
+                    conf_paths = [conf_path]
+        self._opts = self.OPTION_STORE_CLASS(self.alias, opts, conf_paths)
         self._fs = None
 
         # we potentially have a lot of files to copy, so we keep track

@@ -40,11 +40,11 @@ class MRBossTestCase(MockEMRAndS3TestCase):
         super(MRBossTestCase, self).tearDown()
 
     def make_runner(self):
-        self.runner = EMRJobRunner(conf_path=False)
+        self.runner = EMRJobRunner(conf_paths=[])
         self.add_mock_s3_data({'walrus': {}})
         self.runner = EMRJobRunner(s3_sync_wait_time=0,
                                    s3_scratch_uri='s3://walrus/tmp',
-                                   conf_path=False)
+                                   conf_paths=[])
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
         self.prepare_runner_for_ssh(self.runner)
         self.runner._enable_slave_ssh_access()

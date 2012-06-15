@@ -37,7 +37,7 @@ class JobFlowInspectionTestCase(ToolTestCase):
              'bootstrap_files': [],
              'bootstrap_mrjob': None,
              'bootstrap_python_packages': [],
-             'conf_path': None,
+             'conf_paths': None,
              'ec2_core_instance_bid_price': None,
              'ec2_core_instance_type': None,
              'ec2_instance_type': None,

@@ -59,7 +59,7 @@ class WithStatementTestCase(unittest.TestCase):
             self.local_tmp_dir = None
 
     def _test_cleanup_after_with_statement(self, mode, should_exist):
-        with InlineMRJobRunner(cleanup=mode, conf_path=False) as runner:
+        with InlineMRJobRunner(cleanup=mode, conf_paths=[]) as runner:
             self.local_tmp_dir = runner._get_local_tmp_dir()
             assert os.path.exists(self.local_tmp_dir)
 
@@ -120,7 +120,7 @@ class TestExtraKwargs(unittest.TestCase):
     def test_extra_kwargs_passed_in_directly_okay(self):
         with logger_disabled('mrjob.runner'):
             with InlineMRJobRunner(
-                conf_path=False, base_tmp_dir='/var/tmp', foo='bar') as runner:
+                conf_paths=[], base_tmp_dir='/var/tmp', foo='bar') as runner:
                 self.assertEqual(runner._opts['base_tmp_dir'], '/var/tmp')
                 self.assertNotIn('bar', runner._opts)
 
@@ -161,7 +161,7 @@ class TestJobName(unittest.TestCase):
         getpass.getuser = self._real_getuser
 
     def test_empty(self):
-        runner = InlineMRJobRunner(conf_path=False)
+        runner = InlineMRJobRunner(conf_paths=[])
         match = JOB_NAME_RE.match(runner.get_job_name())
 
         self.assertEqual(match.group(1), 'no_script')
@@ -169,7 +169,7 @@ class TestJobName(unittest.TestCase):
 
     def test_empty_no_user(self):
         self.getuser_should_fail = True
-        runner = InlineMRJobRunner(conf_path=False)
+        runner = InlineMRJobRunner(conf_paths=[])
         match = JOB_NAME_RE.match(runner.get_job_name())
 
         self.assertEqual(match.group(1), 'no_script')
@@ -184,7 +184,7 @@ class TestJobName(unittest.TestCase):
 
     def test_auto_owner(self):
         os.environ['USER'] = 'mcp'
-        runner = InlineMRJobRunner(conf_path=False)
+        runner = InlineMRJobRunner(conf_paths=[])
         match = JOB_NAME_RE.match(runner.get_job_name())
 
         self.assertEqual(match.group(1), 'no_script')
@@ -216,7 +216,7 @@ class TestJobName(unittest.TestCase):
         self.assertEqual(match.group(2), 'ads')
 
     def test_owner_and_label_kwargs(self):
-        runner = InlineMRJobRunner(conf_path=False,
+        runner = InlineMRJobRunner(conf_paths=[],
                                   owner='ads', label='ads_chain')
         match = JOB_NAME_RE.match(runner.get_job_name())
 
@@ -227,7 +227,7 @@ class TestJobName(unittest.TestCase):
 class CreateMrjobTarGzTestCase(unittest.TestCase):
 
     def test_create_mrjob_tar_gz(self):
-        with InlineMRJobRunner(conf_path=False) as runner:
+        with InlineMRJobRunner(conf_paths=[]) as runner:
             mrjob_tar_gz_path = runner._create_mrjob_tar_gz()
             mrjob_tar_gz = tarfile.open(mrjob_tar_gz_path)
             contents = mrjob_tar_gz.getnames()
@@ -284,7 +284,7 @@ class TestStreamingOutput(unittest.TestCase):
         with open(y_file_path, 'w') as f:
             f.write('I win')
 
-        runner = InlineMRJobRunner(conf_path=False)
+        runner = InlineMRJobRunner(conf_paths=[])
         runner._output_dir = self.tmp_dir
         self.assertEqual(sorted(runner.stream_output()),
                          ['A', 'B', 'C'])
@@ -373,12 +373,12 @@ sys.exit(13)
         self.use_alternate_sort(script_contents)
 
     def test_no_files(self):
-        runner = MRJobRunner(conf_path=False)
+        runner = MRJobRunner(conf_paths=[])
         self.assertRaises(ValueError,
                           runner._invoke_sort, [], self.out)
 
     def test_one_file(self):
-        runner = MRJobRunner(conf_path=False)
+        runner = MRJobRunner(conf_paths=[])
         runner._invoke_sort([self.a], self.out)
 
         self.assertEqual(list(open(self.out)),
@@ -387,7 +387,7 @@ sys.exit(13)
                           'apple\n'])
 
     def test_two_files(self):
-        runner = MRJobRunner(conf_path=False)
+        runner = MRJobRunner(conf_paths=[])
         runner._invoke_sort([self.a, self.b], self.out)
 
         self.assertEqual(list(open(self.out)),
@@ -409,7 +409,7 @@ sys.exit(13)
     def test_bad_sort(self):
         self.use_bad_sort()
 
-        runner = MRJobRunner(conf_path=False)
+        runner = MRJobRunner(conf_paths=[])
         with no_handlers_for_logger():
             self.assertRaises(CalledProcessError,
                               runner._invoke_sort, [self.a, self.b], self.out)
@@ -563,10 +563,10 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
 
         stderr = StringIO()
         with no_handlers_for_logger():
-            log_to_stream('mrjob.conf', stderr)
-            InlineMRJobRunner(conf_path=path)
-            self.assertIn(
-                "no configs for runner type 'inline' in %s" % path,
+            log_to_stream('mrjob.runner', stderr)
+            InlineMRJobRunner(conf_paths=[path])
+            self.assertEqual(
+                "No configs specified for inline runner\n",
                 stderr.getvalue())
 
 
@@ -602,3 +602,10 @@ class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
                          'i_dont_like_to_be_labelled')
         self.assertEqual(opts_both['owner'],
                          'ownership_is_against_my_principles')
+
+    def test_multiple_configs_via_runner_args(self):
+        path_left = self.save_conf('left.conf', self.BASE_CONFIG_LEFT)
+        path_right = self.save_conf('right.conf', self.BASE_CONFIG_RIGHT)
+        runner = InlineMRJobRunner(conf_paths=[path_left, path_right])
+        self.assertEqual(runner._opts['jobconf'],
+                         dict(from_left=1, from_both=2, from_right=2))

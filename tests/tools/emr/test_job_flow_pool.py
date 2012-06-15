@@ -43,7 +43,7 @@ class PoolingToolTestCase(ToolTestCase):
              'bootstrap_files': [],
              'bootstrap_mrjob': None,
              'bootstrap_python_packages': [],
-             'conf_path': None,
+             'conf_paths': None,
              'ec2_core_instance_type': None,
              'ec2_instance_type': None,
              'ec2_key_pair': None,
@@ -71,7 +71,7 @@ class PoolingToolTestCase(ToolTestCase):
 
     def test_find_job_flow(self):
         jf_id = self.make_job_flow(pool_emr_job_flows=True)
-        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
+        emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
 
         for i in range(3):
             emr_conn.simulate_progress(jf_id)
@@ -88,7 +88,7 @@ class PoolingToolTestCase(ToolTestCase):
 
     def test_terminate_pool(self):
         jf_id = self.make_job_flow(pool_emr_job_flows=True)
-        emr_conn = EMRJobRunner(conf_path=False).make_emr_conn()
+        emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
 
         for i in range(3):
             emr_conn.simulate_progress(jf_id)

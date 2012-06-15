@@ -561,7 +561,7 @@ def get_job_flows(conf_path, max_days_ago=None, now=None):
     if now is None:
         now = datetime.utcnow()
 
-    emr_conn = EMRJobRunner(conf_path=conf_path).make_emr_conn()
+    emr_conn = EMRJobRunner(conf_paths=[conf_path]).make_emr_conn()
 
     # if --max-days-ago is set, only look at recent jobs
     created_after = None

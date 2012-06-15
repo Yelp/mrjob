@@ -277,8 +277,8 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                       if jf.state in ('SHUTTING_DOWN', 'TERMINATED'))
 
     def inspect_and_maybe_terminate_quietly(self, stdout=None, **kwargs):
-        if 'conf_path' not in kwargs:
-            kwargs['conf_path'] = False
+        if 'conf_paths' not in kwargs:
+            kwargs['conf_paths'] = []
 
         if 'now' not in kwargs:
             kwargs['now'] = self.now
@@ -454,12 +454,12 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         # no job flows are 20 hours old
         self.inspect_and_maybe_terminate_quietly(
-            conf_path=False, max_hours_idle=20,
+            conf_paths=[], max_hours_idle=20,
             now=self.now)
 
         # terminate 5-hour-old jobs
         self.inspect_and_maybe_terminate_quietly(
-            conf_path=False, max_hours_idle=5,
+            conf_paths=[], max_hours_idle=5,
             now=self.now)
 
         # j-HIVE is old enough to terminate, but it doesn't have streaming
@@ -468,7 +468,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
 
         # terminate 2-hour-old jobs
         self.inspect_and_maybe_terminate_quietly(
-            conf_path=False, max_hours_idle=2,
+            conf_paths=[], max_hours_idle=2,
             now=self.now)
 
         # picky edge case: two jobs are EXACTLY 2 hours old, so they're

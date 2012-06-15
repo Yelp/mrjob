@@ -85,7 +85,7 @@ def main():
                          verbose=options.verbose)
 
     inspect_and_maybe_terminate_job_flows(
-        conf_path=options.conf_path,
+        conf_paths=[options.conf_path],
         dry_run=options.dry_run,
         max_hours_idle=options.max_hours_idle,
         mins_to_end_of_hour=options.mins_to_end_of_hour,

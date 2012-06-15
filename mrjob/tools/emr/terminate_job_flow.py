@@ -52,7 +52,7 @@ def main():
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     # create the persistent job
-    runner = EMRJobRunner(conf_path=options.conf_path)
+    runner = EMRJobRunner(conf_paths=[options.conf_path])
     log.debug('Terminating job flow %s' % emr_job_flow_id)
     runner.make_emr_conn().terminate_jobflow(emr_job_flow_id)
     log.info('Terminated job flow %s' % emr_job_flow_id)

@@ -72,7 +72,7 @@ def main():
 
     for path in args[1:]:
         s3_cleanup(path, time_old,
-            conf_path=options.conf_path,
+            conf_paths=[options.conf_path],
             dry_run=options.test)
 
 

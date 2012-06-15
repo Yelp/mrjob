@@ -84,7 +84,7 @@ def make_option_parser():
     assignments = {
         runner_group: (
             'bootstrap_mrjob',
-            'conf_path',
+            'conf_paths',
             'quiet',
             'verbose'
         ),

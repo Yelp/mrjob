@@ -64,7 +64,7 @@ def main(args, now=None):
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     log.info('getting information about running jobs')
-    emr_conn = EMRJobRunner(conf_path=options.conf_path).make_emr_conn()
+    emr_conn = EMRJobRunner(conf_paths=[options.conf_path]).make_emr_conn()
     job_flows = describe_all_job_flows(
         emr_conn, states=['BOOTSTRAPPING', 'RUNNING'])
 

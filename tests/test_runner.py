@@ -606,6 +606,6 @@ class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
     def test_multiple_configs_via_runner_args(self):
         path_left = self.save_conf('left.conf', self.BASE_CONFIG_LEFT)
         path_right = self.save_conf('right.conf', self.BASE_CONFIG_RIGHT)
-        runner = InlineMRJobRunner(conf_path=[path_left, path_right])
+        runner = InlineMRJobRunner(conf_paths=[path_left, path_right])
         self.assertEqual(runner._opts['jobconf'],
                          dict(from_left=1, from_both=2, from_right=2))

@@ -136,7 +136,7 @@ def make_option_parser():
 
     assignments = {
         option_parser: (
-            'conf_path',
+            'conf_paths',
             'emr_job_flow_pool_name',
             'quiet',
             'verbose',

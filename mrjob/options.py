@@ -23,13 +23,12 @@ from mrjob.runner import CLEANUP_CHOICES
 
 
 def _append_with_checks(option, opt_str, value, parser):
-    """conf_path should be False if --no-conf is the last conf path-related
-    argument in an option list, or None if no --conf-path argumenst have
-    been given, but subsequent --conf-path switches should make this a list.
+    """conf_paths is None by default, but --no-conf or --conf-path should make
+    it a list.
     """
-    if parser.values.conf_path is False or parser.values.conf_path is None:
-        parser.values.conf_path = []
-    parser.values.conf_path.append(value)
+    if parser.values.conf_paths is None:
+        parser.values.conf_paths = []
+    parser.values.conf_paths.append(value)
 
 
 def add_protocol_opts(opt_group):
@@ -61,7 +60,7 @@ def add_runner_opts(opt_group):
                   " your Hadoop cluster.")),
 
         opt_group.add_option(
-            '-c', '--conf-path', dest='conf_path', action='callback',
+            '-c', '--conf-path', dest='conf_paths', action='callback',
             callback=_append_with_checks, default=None, nargs=1, type='string',
             help='Path to alternate mrjob.conf file to read from'),
 
@@ -97,7 +96,7 @@ def add_runner_opts(opt_group):
                   " mrjob on your Hadoop cluster.")),
 
         opt_group.add_option(
-            '--no-conf', dest='conf_path', action='store_false',
+            '--no-conf', dest='conf_paths', action='store_const', const=[],
             help="Don't load mrjob.conf even if it's available"),
 
         opt_group.add_option(

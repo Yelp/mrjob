@@ -125,18 +125,11 @@ class RunnerOptionStore(OptionStore):
         opts = self.validated_options(
             opts, 'Got unexpected keyword arguments: %s')
 
-        try:
-            # check for iterable
-            if isinstance(conf_paths, basestring):
-                # if string, put in list (strings are iterable but we don't
-                # want to try to load each character as a path)
-                conf_paths = [conf_paths]
-            else:
-                # otherwise, have Python try to listify
-                conf_paths = iter(conf_paths)
-        except TypeError:
-            # not iterable; make it so
-            conf_paths = [conf_paths]
+        if conf_paths is None:
+            # mrjob.conf module takes care of loading config from default
+            # locations, but not combining lists of configs. It knows what to
+            # do with None.
+            conf_paths = [None]
 
         for conf_path in conf_paths:
             unsanitized_opt_dicts = load_opts_from_mrjob_conf(
@@ -214,7 +207,7 @@ class MRJobRunner(object):
                  extra_args=None, file_upload_args=None,
                  hadoop_input_format=None, hadoop_output_format=None,
                  input_paths=None, output_dir=None, partitioner=None,
-                 stdin=None, **opts):
+                 stdin=None, conf_paths=None, **opts):
         """All runners take the following keyword arguments:
 
         :type mr_job_script: str
@@ -223,10 +216,12 @@ class MRJobRunner(object):
                               you won't actually be able to :py:meth:`run` the
                               job, but other utilities (e.g. :py:meth:`ls`)
                               will work.
-        :type conf_path: str or list
-        :param conf_path: Alternate path to read configs from, or ``False`` to
-                          ignore all config files. Pass multiple paths as a
-                          list to have them combined together.
+        :type conf_path: str, None, or False
+        :param conf_path: Deprecated. Alternate path to read configs from, or
+                          ``False`` to ignore all config files.
+        :type conf_paths: None or list
+        :param conf_paths: List of config files to combine and use, or None to
+                           search for mrjob.conf in the default locations.
         :type extra_args: list of str
         :param extra_args: a list of extra cmd-line arguments to pass to the
                            mr_job script. This is a hook to allow jobs to take
@@ -283,7 +278,17 @@ class MRJobRunner(object):
                       your lines are missing newlines, we'll add them;
                       this makes it easier to write automated tests.
         """
-        self._opts = self.OPTION_STORE_CLASS(self.alias, opts, conf_path)
+        if conf_path is not None:
+            if conf_paths is not None:
+                raise ValueError("Can't specify both conf_path and conf_paths")
+            else:
+                log.warn("The conf_path argument to MRJobRunner() is"
+                         " deprecated. Use conf_paths instead.")
+                if conf_path is False:
+                    conf_paths = []
+                else:
+                    conf_paths = [conf_path]
+        self._opts = self.OPTION_STORE_CLASS(self.alias, opts, conf_paths)
         self._fs = None
 
         # we potentially have a lot of files to copy, so we keep track

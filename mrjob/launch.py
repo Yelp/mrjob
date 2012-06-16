@@ -356,8 +356,7 @@ class MRJobLauncher(object):
         MRJobLauncher takes off the first arg as the script path.
         """
         if len(args) < 1:
-            self.option_parser.print_help()
-            sys.exit(1)
+            self.option_parser.error('Must supply script path')
 
         self._script_path = os.path.abspath(args[0])
         self.args = args[1:]

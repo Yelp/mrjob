@@ -65,7 +65,6 @@ class MRJobLauncher(object):
     OPTION_CLASS = Option
 
     def __init__(self, script_path=None, args=None):
-        super(MRJobLauncher, self).__init__()
         if script_path is not None:
             script_path = os.path.abspath(script_path)
         self._script_path = script_path

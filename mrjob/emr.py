@@ -1524,9 +1524,6 @@ class EMRJobRunner(MRJobRunner):
                 for line in cause_msg:
                     log.error(line)
 
-                # add cause_msg to exception message
-                msg += '\n' + '\n'.join(cause_msg) + '\n'
-
             raise Exception(msg)
 
     def _script_args(self):

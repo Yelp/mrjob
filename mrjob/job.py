@@ -1498,7 +1498,7 @@ class MRJob(object):
             mr_job.run_mapper(step_num=0)
             output = mrjob.parse_output()
 
-        :type protocol: str
+        :type protocol: protocol
         :param protocol: A protocol instance to use (e.g. JSONProtocol()),
 
         This only works in sandbox mode. This does not clear ``self.stdout``.

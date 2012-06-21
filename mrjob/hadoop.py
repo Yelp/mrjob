@@ -89,14 +89,21 @@ def fully_qualify_hdfs_path(path):
         return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
 
 
-def hadoop_log_dir():
-    """Return the path where Hadoop stores logs"""
+def hadoop_log_dir(hadoop_home=None):
+    """Return the path where Hadoop stores logs.
+
+    :param hadoop_home: putative value of :envvar:`HADOOP_HOME`, or None to
+                        default to the actual value if used. This is only used
+                        if :envvar:`HADOOP_LOG_DIR` is not defined.
+    """
     try:
         return os.environ['HADOOP_LOG_DIR']
     except KeyError:
         # Defaults to $HADOOP_HOME/logs
         # http://wiki.apache.org/hadoop/HowToConfigure
-        return os.path.join(os.environ['HADOOP_HOME'], 'logs')
+        if hadoop_home is None:
+            hadoop_home = os.environ['HADOOP_HOME']
+        return os.path.join(hadoop_home, 'logs')
 
 
 class HadoopRunnerOptionStore(RunnerOptionStore):

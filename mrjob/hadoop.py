@@ -211,7 +211,7 @@ class HadoopJobRunner(MRJobRunner):
         # temp dir for input
         self._hdfs_input_dir = None
 
-        self._hadoop_log_dir = hadoop_log_dir()
+        self._hadoop_log_dir = hadoop_log_dir(self._opts['hadoop_home'])
 
         # Running jobs via hadoop assigns a new timestamp to each job.
         # Running jobs via mrjob only adds steps.

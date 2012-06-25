@@ -34,20 +34,20 @@ from mrjob import ssh
 
 class HadoopJobKillTestCase(unittest.TestCase):
 
-    EXPECTED_LIST_CALL = [
+    SSH_ARGS = [
         'ssh_bin', '-i', 'key.pem', '-o', 'StrictHostKeyChecking=no',
         '-o', 'UserKnownHostsFile=/dev/null', 'hadoop@address',
-        'hadoop', 'job', '-list',
     ]
+
+
+    EXPECTED_LIST_CALL = SSH_ARGS + ['hadoop', 'job', '-list']
 
     GOOD_LIST_OUTPUT = (
         "1 jobs currently running\n"
         "JobId   State   StartTime   UserName    Priority    SchedulingInfo\n"
         "job_201205162225_0003   4   1337208155510   hadoop  NORMAL  NA\n")
 
-    EXPECTED_KILL_CALL = [
-        'ssh_bin', '-i', 'key.pem', '-o', 'StrictHostKeyChecking=no',
-        '-o', 'UserKnownHostsFile=/dev/null', 'hadoop@address',
+    EXPECTED_KILL_CALL = SSH_ARGS + [
         'hadoop', 'job', '-kill', 'job_201205162225_0003',
     ]
 

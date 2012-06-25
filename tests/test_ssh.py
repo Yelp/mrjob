@@ -53,7 +53,7 @@ class HadoopJobKillTestCase(unittest.TestCase):
 
     GOOD_KILL_OUTPUT = "Killed job job_201205162225_0003\n"
 
-    def test_hadoop_job_kill(self):
+    def test_expected(self):
 
         values = [self.GOOD_LIST_OUTPUT, self.GOOD_KILL_OUTPUT]
 
@@ -70,3 +70,52 @@ class HadoopJobKillTestCase(unittest.TestCase):
             self.assertEqual(m.call_args_list[1],
                              call(self.EXPECTED_KILL_CALL,
                                   stdin=PIPE, stdout=PIPE, stderr=PIPE))
+
+    def test_too_many_jobs_on_the_dance_floor(self):
+
+        def fake_popen(*args, **kwargs):
+            m = Mock()
+            m.communicate.return_value = ("2 jobs currently running\n", '')
+            return m
+
+        with patch.object(ssh, 'Popen', side_effect=fake_popen):
+            self.assertRaises(IOError, ssh.ssh_terminate_single_job,
+                              ['ssh_bin'], 'address', 'key.pem')
+
+    def test_dance_floor_is_empty(self):
+
+        def fake_popen(*args, **kwargs):
+            m = Mock()
+            m.communicate.return_value = ("0 jobs currently running\n", '')
+            return m
+
+        with patch.object(ssh, 'Popen', side_effect=fake_popen):
+            self.assertEqual(
+                None, ssh.ssh_terminate_single_job(
+                    ['ssh_bin'], 'address', 'key.pem'))
+
+    def test_junk_list_output(self):
+
+        def fake_popen(*args, **kwargs):
+            m = Mock()
+            m.communicate.return_value = ("yah output, its gahbage\n", '')
+            return m
+
+        with patch.object(ssh, 'Popen', side_effect=fake_popen):
+            self.assertRaises(IOError, ssh.ssh_terminate_single_job,
+                              ['ssh_bin'], 'address', 'key.pem')
+
+    def test_junk_kill_output(self):
+
+        values = [self.GOOD_LIST_OUTPUT, "yah output, its gahbage\n"]
+
+        def fake_popen(*args, **kwargs):
+            m = Mock()
+            m.communicate.return_value = (values.pop(0), '')
+            return m
+
+        with patch.object(ssh, 'Popen', side_effect=fake_popen):
+            self.assertEqual(
+                ssh.ssh_terminate_single_job(
+                    ['ssh_bin'], 'address', 'key.pem'),
+                'yah output, its gahbage\n')

@@ -281,7 +281,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         mock_s3_fs_snapshot = copy.deepcopy(self.mock_s3_fs)
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, EMRJobRunner)
+            assert isinstance(runner, RealEMRJobRunner)
 
             # make sure that initializing the runner doesn't affect S3
             # (Issue #50)
@@ -360,7 +360,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, EMRJobRunner)
+            assert isinstance(runner, RealEMRJobRunner)
 
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
@@ -593,7 +593,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, EMRJobRunner)
+            assert isinstance(runner, RealEMRJobRunner)
 
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
@@ -2645,7 +2645,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, EMRJobRunner)
+            assert isinstance(runner, RealEMRJobRunner)
 
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
@@ -2681,7 +2681,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, EMRJobRunner)
+            assert isinstance(runner, RealEMRJobRunner)
 
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)

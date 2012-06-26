@@ -79,6 +79,7 @@ from mrjob.runner import GLOB_RE
 from mrjob.ssh import ssh_cat
 from mrjob.ssh import ssh_ls
 from mrjob.ssh import ssh_copy_key
+from mrjob.ssh import ssh_terminate_single_job
 from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
@@ -1263,6 +1264,29 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 self._s3_job_log_uri = None
             except Exception, e:
                 log.exception(e)
+
+    def _cleanup_jobs(self, mode):
+        # kill the job if we won't be taking down the whole job flow
+        if not ((mode is None or 'JOB' in mode) and
+            self._emr_job_flow_id and
+            (self._opts['emr_job_flow_id'] or
+             self._opts['pool_emr_job_flows'])):
+            return
+
+        error_msg = ('Unable to kill job without terminating job flow and'
+                     ' job is still running. You may wish to terminate it'
+                     ' yourself with "python -m mrjob.tools.emr.terminate_job_'
+                     'flow %s".' % self._emr_job_flow_id)
+
+        try:
+            ssh_terminate_single_job(
+                self._opts['ssh_bin'],
+                self._address_of_master(),
+                self._opts['ec2_key_pair_file'])
+        except SSHException:
+            log.info(error_msg)
+        except IOError:
+            log.info(error_msg)
 
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.

@@ -61,16 +61,18 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 #: cleanup options:
 #:
-#: * ``'ALL'``: delete local scratch, remote scratch, and logs
+#: * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job if
+#:   running on EMR and job flow is not to be terminated
 #: * ``'LOCAL_SCRATCH'``: delete local scratch only
 #: * ``'LOGS'``: delete logs only
 #: * ``'NONE'``: delete nothing
 #: * ``'REMOTE_SCRATCH'``: delete remote scratch only
 #: * ``'SCRATCH'``: delete local and remote scratch, but not logs
+#: * ``'JOB'``: stop job if running on EMR and job flow is not to be terminated
 #: * ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL``. Not supported for
 #:   ``cleanup_on_failure``.
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
-                   'SCRATCH', 'IF_SUCCESSFUL']
+                   'SCRATCH', 'JOB', 'IF_SUCCESSFUL']
 
 #: .. deprecated:: 0.3.0
 #:
@@ -570,7 +572,7 @@ class MRJobRunner(object):
             mode = mode or self._opts['cleanup_on_failure']
 
         # always terminate running jobs
-        self._cleanup_jobs()
+        self._cleanup_jobs(mode)
 
         def mode_has(*args):
             return any((choice in mode) for choice in args)

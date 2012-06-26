@@ -31,6 +31,7 @@ from StringIO import StringIO
 import tempfile
 import time
 
+from mock import Mock
 from mock import patch
 
 try:
@@ -79,6 +80,16 @@ try:
     boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     boto = None
+
+
+RealEMRJobRunner = EMRJobRunner
+
+
+class EMRJobRunner(RealEMRJobRunner):
+
+    # most test cases don't care about this at all
+    def _cleanup_logs(self):
+        pass
 
 
 class MockEMRAndS3TestCase(unittest.TestCase):
@@ -170,7 +181,8 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         to key name to data."""
         add_mock_s3_data(self.mock_s3_fs, data, time_modified)
 
-    def prepare_runner_for_ssh(self, runner, num_slaves=0):
+    def prepare_runner_for_ssh(self, runner, num_slaves=0,
+                               mock_cleanup_job=True):
         # Set up environment variables
         self._old_environ = os.environ.copy()
         os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
@@ -2779,3 +2791,7 @@ class TestCatFallback(MockEMRAndS3TestCase):
         self.assertRaises(
             IOError, list,
             runner.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
+
+class TestCleanUpJob(MockEMRAndS3TestCase):
+
+    pass

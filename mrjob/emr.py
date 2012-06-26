@@ -1267,10 +1267,10 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     def _cleanup_jobs(self, mode):
         # kill the job if we won't be taking down the whole job flow
-        if not ((mode is None or 'JOB' in mode) and
-            self._emr_job_flow_id and
-            (self._opts['emr_job_flow_id'] or
-             self._opts['pool_emr_job_flows'])):
+        if not (self._emr_job_flow_id or
+                self._opts['emr_job_flow_id'] or
+                self._opts['pool_emr_job_flows']):
+            # we're taking down the job flow, don't bother
             return
 
         error_msg = ('Unable to kill job without terminating job flow and'

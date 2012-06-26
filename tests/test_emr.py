@@ -17,6 +17,8 @@
 from __future__ import with_statement
 
 import bz2
+from contextlib import contextmanager
+from contextlib import nested
 import copy
 from datetime import datetime
 from datetime import timedelta
@@ -31,7 +33,6 @@ from StringIO import StringIO
 import tempfile
 import time
 
-from mock import Mock
 from mock import patch
 
 try:
@@ -53,6 +54,7 @@ from mrjob.parse import parse_s3_uri
 from mrjob.pool import pool_hash_and_name
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
+from mrjob.ssh import SSHException
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
@@ -2794,4 +2796,90 @@ class TestCatFallback(MockEMRAndS3TestCase):
 
 class TestCleanUpJob(MockEMRAndS3TestCase):
 
-    pass
+    @contextmanager
+    def _test_mode(self, mode):
+        r = EMRJobRunner(conf_path=False)
+        with nested(
+            patch.object(r, '_cleanup_local_scratch'),
+            patch.object(r, '_cleanup_remote_scratch'),
+            patch.object(r, '_cleanup_logs'),
+            patch.object(r, '_cleanup_jobs')) as (
+                m_local_scratch,
+                m_remote_scratch,
+                m_logs,
+                m_jobs):
+            r.cleanup(mode=mode)
+            yield (m_local_scratch, m_remote_scratch, m_logs, m_jobs)
+
+    def test_cleanup_all(self):
+        with self._test_mode('ALL') as (
+                m_local_scratch,
+                m_remote_scratch,
+                m_logs,
+                m_jobs):
+            self.assertTrue(m_local_scratch.called)
+            self.assertTrue(m_remote_scratch.called)
+            self.assertTrue(m_logs.called)
+            self.assertTrue(m_jobs.called)
+
+    def test_cleanup_job(self):
+        with self._test_mode('JOB') as (
+                m_local_scratch,
+                m_remote_scratch,
+                m_logs,
+                m_jobs):
+            self.assertFalse(m_local_scratch.called)
+            self.assertFalse(m_remote_scratch.called)
+            self.assertFalse(m_logs.called)
+            self.assertTrue(m_jobs.called)
+
+    def test_cleanup_none(self):
+        with self._test_mode('NONE') as (
+                m_local_scratch,
+                m_remote_scratch,
+                m_logs,
+                m_jobs):
+            self.assertFalse(m_local_scratch.called)
+            self.assertFalse(m_remote_scratch.called)
+            self.assertFalse(m_logs.called)
+            self.assertFalse(m_jobs.called)
+
+    def test_job_cleanup_mechanics_succeed(self):
+        with no_handlers_for_logger():
+            r = EMRJobRunner(conf_path=False)
+            r._emr_job_flow_id = 'kevin'
+            r._address = 'Albuquerque, NM'
+            with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
+                r._cleanup_jobs('JOB')
+            self.assertTrue(m.called)
+            m.assert_any_call(['ssh'], 'Albuquerque, NM', None)
+
+    def test_job_cleanup_mechanics_ssh_fail(self):
+        def die_ssh(*args, **kwargs):
+            raise SSHException
+
+        with no_handlers_for_logger('mrjob.emr'):
+            r = EMRJobRunner(conf_path=False)
+            r._emr_job_flow_id = 'kevin'
+            r._address = 'Albuquerque, NM'
+            stderr = StringIO()
+            log_to_stream('mrjob.emr', stderr)
+            with patch.object(mrjob.emr, 'ssh_terminate_single_job',
+                              side_effect=die_ssh):
+                r._cleanup_jobs('JOB')
+                self.assertIn('Unable to kill job', stderr.getvalue())
+
+    def test_job_cleanup_mechanics_io_fail(self):
+        def die_io(*args, **kwargs):
+            raise IOError
+
+        with no_handlers_for_logger('mrjob.emr'):
+            r = EMRJobRunner(conf_path=False)
+            r._emr_job_flow_id = 'kevin'
+            r._address = 'Albuquerque, NM'
+            with patch.object(mrjob.emr, 'ssh_terminate_single_job',
+                              side_effect=die_io):
+                stderr = StringIO()
+                log_to_stream('mrjob.emr', stderr)
+                r._cleanup_jobs('JOB')
+                self.assertIn('Unable to kill job', stderr.getvalue())

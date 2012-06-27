@@ -356,6 +356,9 @@ class CombineCmdsTestCase(unittest.TestCase):
     def test_convert_to_list(self):
         self.assertEqual(combine_cmds('sort', ('grep', '-E')), ['grep', '-E'])
 
+    def test_unicode(self):
+        self.assertEqual(combine_cmds(u'wunderbar!'), ['wunderbar!'])
+
 
 class CombineCmdsListsCase(unittest.TestCase):
 

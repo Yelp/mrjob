@@ -84,16 +84,6 @@ except ImportError:
     boto = None
 
 
-RealEMRJobRunner = EMRJobRunner
-
-
-class EMRJobRunner(RealEMRJobRunner):
-
-    # most test cases don't care about this at all
-    def _cleanup_jobs(self):
-        pass
-
-
 class MockEMRAndS3TestCase(unittest.TestCase):
 
     @classmethod
@@ -283,7 +273,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         mock_s3_fs_snapshot = copy.deepcopy(self.mock_s3_fs)
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, RealEMRJobRunner)
+            assert isinstance(runner, EMRJobRunner)
 
             # make sure that initializing the runner doesn't affect S3
             # (Issue #50)
@@ -362,7 +352,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, RealEMRJobRunner)
+            assert isinstance(runner, EMRJobRunner)
 
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
@@ -595,7 +585,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, RealEMRJobRunner)
+            assert isinstance(runner, EMRJobRunner)
 
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
@@ -2647,7 +2637,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, RealEMRJobRunner)
+            assert isinstance(runner, EMRJobRunner)
 
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
@@ -2683,7 +2673,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, RealEMRJobRunner)
+            assert isinstance(runner, EMRJobRunner)
 
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
@@ -2798,7 +2788,7 @@ class TestCleanUpJob(MockEMRAndS3TestCase):
 
     @contextmanager
     def _test_mode(self, mode):
-        r = RealEMRJobRunner(conf_path=False)
+        r = EMRJobRunner(conf_path=False)
         with nested(
             patch.object(r, '_cleanup_local_scratch'),
             patch.object(r, '_cleanup_remote_scratch'),
@@ -2812,7 +2802,7 @@ class TestCleanUpJob(MockEMRAndS3TestCase):
             yield (m_local_scratch, m_remote_scratch, m_logs, m_jobs)
 
     def _quick_runner(self):
-        r = RealEMRJobRunner(conf_path=False)
+        r = EMRJobRunner(conf_path=False)
         r._emr_job_flow_id = 'kevin'
         r._address = 'Albuquerque, NM'
         return r

@@ -2792,13 +2792,9 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             patch.object(r, '_cleanup_local_scratch'),
             patch.object(r, '_cleanup_remote_scratch'),
             patch.object(r, '_cleanup_logs'),
-            patch.object(r, '_cleanup_jobs')) as (
-                m_local_scratch,
-                m_remote_scratch,
-                m_logs,
-                m_jobs):
+            patch.object(r, '_cleanup_jobs')) as mocks:
             r.cleanup(mode=mode)
-            yield (m_local_scratch, m_remote_scratch, m_logs, m_jobs)
+            yield mocks
 
     def _quick_runner(self):
         r = EMRJobRunner(conf_path=False)

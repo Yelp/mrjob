@@ -17,6 +17,8 @@
 from __future__ import with_statement
 
 import bz2
+from contextlib import contextmanager
+from contextlib import nested
 import copy
 from datetime import datetime
 from datetime import timedelta
@@ -52,6 +54,7 @@ from mrjob.parse import parse_s3_uri
 from mrjob.pool import pool_hash_and_name
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
+from mrjob.ssh import SSHException
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
@@ -2779,3 +2782,98 @@ class TestCatFallback(MockEMRAndS3TestCase):
         self.assertRaises(
             IOError, list,
             runner.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
+
+class CleanUpJobTestCase(MockEMRAndS3TestCase):
+
+    @contextmanager
+    def _test_mode(self, mode):
+        r = EMRJobRunner(conf_path=False)
+        with nested(
+            patch.object(r, '_cleanup_local_scratch'),
+            patch.object(r, '_cleanup_remote_scratch'),
+            patch.object(r, '_cleanup_logs'),
+            patch.object(r, '_cleanup_job')) as mocks:
+            r.cleanup(mode=mode)
+            yield mocks
+
+    def _quick_runner(self):
+        r = EMRJobRunner(conf_path=False)
+        r._emr_job_flow_id = 'j-ESSEOWENS'
+        r._address = 'Albuquerque, NM'
+        r._ran_job = False
+        return r
+
+    def test_cleanup_all(self):
+        with self._test_mode('ALL') as (
+                m_local_scratch,
+                m_remote_scratch,
+                m_logs,
+                m_jobs):
+            self.assertTrue(m_local_scratch.called)
+            self.assertTrue(m_remote_scratch.called)
+            self.assertTrue(m_logs.called)
+            self.assertTrue(m_jobs.called)
+
+    def test_cleanup_job(self):
+        with self._test_mode('JOB') as (
+                m_local_scratch,
+                m_remote_scratch,
+                m_logs,
+                m_jobs):
+            self.assertFalse(m_local_scratch.called)
+            self.assertFalse(m_remote_scratch.called)
+            self.assertFalse(m_logs.called)
+            self.assertTrue(m_jobs.called)
+
+    def test_cleanup_none(self):
+        with self._test_mode('NONE') as (
+                m_local_scratch,
+                m_remote_scratch,
+                m_logs,
+                m_jobs):
+            self.assertFalse(m_local_scratch.called)
+            self.assertFalse(m_remote_scratch.called)
+            self.assertFalse(m_logs.called)
+            self.assertFalse(m_jobs.called)
+
+    def test_job_cleanup_mechanics_succeed(self):
+        with no_handlers_for_logger():
+            r = self._quick_runner()
+            with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
+                r._cleanup_job()
+            self.assertTrue(m.called)
+            m.assert_any_call(['ssh'], 'Albuquerque, NM', None)
+
+    def test_job_cleanup_mechanics_ssh_fail(self):
+        def die_ssh(*args, **kwargs):
+            raise SSHException
+
+        with no_handlers_for_logger('mrjob.emr'):
+            r = self._quick_runner()
+            stderr = StringIO()
+            log_to_stream('mrjob.emr', stderr)
+            with patch.object(mrjob.emr, 'ssh_terminate_single_job',
+                              side_effect=die_ssh):
+                r._cleanup_job()
+                self.assertIn('Unable to kill job', stderr.getvalue())
+
+    def test_job_cleanup_mechanics_io_fail(self):
+        def die_io(*args, **kwargs):
+            raise IOError
+
+        with no_handlers_for_logger('mrjob.emr'):
+            r = self._quick_runner()
+            with patch.object(mrjob.emr, 'ssh_terminate_single_job',
+                              side_effect=die_io):
+                stderr = StringIO()
+                log_to_stream('mrjob.emr', stderr)
+                r._cleanup_job()
+                self.assertIn('Unable to kill job', stderr.getvalue())
+
+    def test_dont_kill_if_successful(self):
+        with no_handlers_for_logger('mrjob.emr'):
+            r = self._quick_runner()
+            with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
+                r._ran_job = True
+                r._cleanup_job()
+                m.assert_not_called()

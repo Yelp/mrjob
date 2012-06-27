@@ -79,6 +79,7 @@ from mrjob.runner import GLOB_RE
 from mrjob.ssh import ssh_cat
 from mrjob.ssh import ssh_ls
 from mrjob.ssh import ssh_copy_key
+from mrjob.ssh import ssh_terminate_single_job
 from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
@@ -1263,6 +1264,45 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 self._s3_job_log_uri = None
             except Exception, e:
                 log.exception(e)
+
+    def _cleanup_job(self):
+        # kill the job if we won't be taking down the whole job flow
+        if not (self._emr_job_flow_id or
+                self._opts['emr_job_flow_id'] or
+                self._opts['pool_emr_job_flows']):
+            # we're taking down the job flow, don't bother
+            return
+
+        error_msg = ('Unable to kill job without terminating job flow and'
+                     ' job is still running. You may wish to terminate it'
+                     ' yourself with "python -m mrjob.tools.emr.terminate_job_'
+                     'flow %s".' % self._emr_job_flow_id)
+
+        try:
+            addr = self._address_of_master()
+        except:
+            # no job flow to terminate, and the exception hierarchy for really
+            # dealing with this will be completely bonkers until 0.4.
+            # That function can raise AttributeError, LogFetchError,
+            # IOError...blech.
+            return
+
+        if not self._ran_job:
+            try:
+                log.info("Attempting to terminate job...")
+                had_job = ssh_terminate_single_job(
+                    self._opts['ssh_bin'],
+                    addr,
+                    self._opts['ec2_key_pair_file'])
+                if had_job:
+                    log.info("Succeeded in terminating job")
+                else:
+                    log.info("Job appears to have already been terminated")
+
+            except SSHException:
+                log.info(error_msg)
+            except IOError:
+                log.info(error_msg)
 
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.

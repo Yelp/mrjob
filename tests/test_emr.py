@@ -173,8 +173,7 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         to key name to data."""
         add_mock_s3_data(self.mock_s3_fs, data, time_modified)
 
-    def prepare_runner_for_ssh(self, runner, num_slaves=0,
-                               mock_cleanup_job=True):
+    def prepare_runner_for_ssh(self, runner, num_slaves=0):
         # Set up environment variables
         self._old_environ = os.environ.copy()
         os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'

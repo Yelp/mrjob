@@ -93,6 +93,10 @@ class EMRJobRunner(RealEMRJobRunner):
     def _cleanup_logs(self):
         pass
 
+    # most test cases don't care about this at all
+    def _cleanup_jobs(self):
+        pass
+
 
 class MockEMRAndS3TestCase(unittest.TestCase):
 
@@ -2798,7 +2802,7 @@ class TestCleanUpJob(MockEMRAndS3TestCase):
 
     @contextmanager
     def _test_mode(self, mode):
-        r = EMRJobRunner(conf_path=False)
+        r = RealEMRJobRunner(conf_path=False)
         with nested(
             patch.object(r, '_cleanup_local_scratch'),
             patch.object(r, '_cleanup_remote_scratch'),
@@ -2810,6 +2814,12 @@ class TestCleanUpJob(MockEMRAndS3TestCase):
                 m_jobs):
             r.cleanup(mode=mode)
             yield (m_local_scratch, m_remote_scratch, m_logs, m_jobs)
+
+    def _quick_runner(self):
+        r = RealEMRJobRunner(conf_path=False)
+        r._emr_job_flow_id = 'kevin'
+        r._address = 'Albuquerque, NM'
+        return r
 
     def test_cleanup_all(self):
         with self._test_mode('ALL') as (
@@ -2846,9 +2856,7 @@ class TestCleanUpJob(MockEMRAndS3TestCase):
 
     def test_job_cleanup_mechanics_succeed(self):
         with no_handlers_for_logger():
-            r = EMRJobRunner(conf_path=False)
-            r._emr_job_flow_id = 'kevin'
-            r._address = 'Albuquerque, NM'
+            r = self._quick_runner()
             with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
                 r._cleanup_jobs()
             self.assertTrue(m.called)
@@ -2859,9 +2867,7 @@ class TestCleanUpJob(MockEMRAndS3TestCase):
             raise SSHException
 
         with no_handlers_for_logger('mrjob.emr'):
-            r = EMRJobRunner(conf_path=False)
-            r._emr_job_flow_id = 'kevin'
-            r._address = 'Albuquerque, NM'
+            r = self._quick_runner()
             stderr = StringIO()
             log_to_stream('mrjob.emr', stderr)
             with patch.object(mrjob.emr, 'ssh_terminate_single_job',
@@ -2874,9 +2880,7 @@ class TestCleanUpJob(MockEMRAndS3TestCase):
             raise IOError
 
         with no_handlers_for_logger('mrjob.emr'):
-            r = EMRJobRunner(conf_path=False)
-            r._emr_job_flow_id = 'kevin'
-            r._address = 'Albuquerque, NM'
+            r = self._quick_runner()
             with patch.object(mrjob.emr, 'ssh_terminate_single_job',
                               side_effect=die_io):
                 stderr = StringIO()

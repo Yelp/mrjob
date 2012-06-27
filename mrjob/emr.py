@@ -1279,10 +1279,19 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                      'flow %s".' % self._emr_job_flow_id)
 
         try:
+            addr = self._address_of_master()
+        except:
+            # no job flow to terminate, and the exception hierarchy for really
+            # dealing with this will be completely bonkers until 0.4.
+            # That function can raise AttributeError, LogFetchError,
+            # IOError...blech.
+            return
+
+        try:
             log.info("Attempting to terminate job...")
             had_job = ssh_terminate_single_job(
                 self._opts['ssh_bin'],
-                self._address_of_master(),
+                addr,
                 self._opts['ec2_key_pair_file'])
             if had_job:
                 log.info("Succeeded in terminating job")

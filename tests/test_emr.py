@@ -90,10 +90,6 @@ RealEMRJobRunner = EMRJobRunner
 class EMRJobRunner(RealEMRJobRunner):
 
     # most test cases don't care about this at all
-    def _cleanup_logs(self):
-        pass
-
-    # most test cases don't care about this at all
     def _cleanup_jobs(self):
         pass
 

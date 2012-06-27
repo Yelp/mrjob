@@ -61,16 +61,18 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 #: cleanup options:
 #:
-#: * ``'ALL'``: delete local scratch, remote scratch, and logs
+#: * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job if
+#:   running on EMR and job flow is not to be terminated
 #: * ``'LOCAL_SCRATCH'``: delete local scratch only
 #: * ``'LOGS'``: delete logs only
 #: * ``'NONE'``: delete nothing
 #: * ``'REMOTE_SCRATCH'``: delete remote scratch only
 #: * ``'SCRATCH'``: delete local and remote scratch, but not logs
+#: * ``'JOB'``: stop job if running on EMR and job flow is not to be terminated
 #: * ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL``. Not supported for
 #:   ``cleanup_on_failure``.
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
-                   'SCRATCH', 'IF_SUCCESSFUL']
+                   'SCRATCH', 'JOB', 'IF_SUCCESSFUL']
 
 #: .. deprecated:: 0.3.0
 #:
@@ -514,6 +516,13 @@ class MRJobRunner(object):
                 for line in self._cat_file(filename):
                     yield line
 
+    def _cleanup_mode(self, mode=None):
+        """Actual cleanup action to take based on various options"""
+        if self._ran_job:
+            return mode or self._opts['cleanup']
+        else:
+            return mode or self._opts['cleanup_on_failure']
+
     def _cleanup_local_scratch(self):
         """Cleanup any files/directories on the local machine we created while
         running this job. Should be safe to run this at any time, or multiple
@@ -545,7 +554,7 @@ class MRJobRunner(object):
         """
         pass  # this only happens on EMR
 
-    def _cleanup_jobs(self):
+    def _cleanup_job(self):
         """Stop any jobs that we created that are still running."""
         pass  # this only happens on EMR
 
@@ -564,16 +573,13 @@ class MRJobRunner(object):
         :param mode: override *cleanup* passed into the constructor. Should be
                      a list of strings from :py:data:`CLEANUP_CHOICES`
         """
-        if self._ran_job:
-            mode = mode or self._opts['cleanup']
-        else:
-            mode = mode or self._opts['cleanup_on_failure']
-
-        # always terminate running jobs
-        self._cleanup_jobs()
+        mode = self._cleanup_mode(mode)
 
         def mode_has(*args):
             return any((choice in mode) for choice in args)
+
+        if mode_has('ALL', 'JOB'):
+            self._cleanup_job()
 
         if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH', 'IF_SUCCESSFUL'):
             self._cleanup_local_scratch()

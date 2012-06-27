@@ -2850,7 +2850,7 @@ class TestCleanUpJob(MockEMRAndS3TestCase):
             r._emr_job_flow_id = 'kevin'
             r._address = 'Albuquerque, NM'
             with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
-                r._cleanup_jobs('JOB')
+                r._cleanup_jobs()
             self.assertTrue(m.called)
             m.assert_any_call(['ssh'], 'Albuquerque, NM', None)
 
@@ -2866,7 +2866,7 @@ class TestCleanUpJob(MockEMRAndS3TestCase):
             log_to_stream('mrjob.emr', stderr)
             with patch.object(mrjob.emr, 'ssh_terminate_single_job',
                               side_effect=die_ssh):
-                r._cleanup_jobs('JOB')
+                r._cleanup_jobs()
                 self.assertIn('Unable to kill job', stderr.getvalue())
 
     def test_job_cleanup_mechanics_io_fail(self):
@@ -2881,5 +2881,5 @@ class TestCleanUpJob(MockEMRAndS3TestCase):
                               side_effect=die_io):
                 stderr = StringIO()
                 log_to_stream('mrjob.emr', stderr)
-                r._cleanup_jobs('JOB')
+                r._cleanup_jobs()
                 self.assertIn('Unable to kill job', stderr.getvalue())

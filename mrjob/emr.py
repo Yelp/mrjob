@@ -1265,7 +1265,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             except Exception, e:
                 log.exception(e)
 
-    def _cleanup_jobs(self, mode):
+    def _cleanup_jobs(self):
         # kill the job if we won't be taking down the whole job flow
         if not (self._emr_job_flow_id or
                 self._opts['emr_job_flow_id'] or
@@ -1279,10 +1279,16 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                      'flow %s".' % self._emr_job_flow_id)
 
         try:
-            ssh_terminate_single_job(
+            log.info("Attempting to terminate job...")
+            had_job = ssh_terminate_single_job(
                 self._opts['ssh_bin'],
                 self._address_of_master(),
                 self._opts['ec2_key_pair_file'])
+            if had_job:
+                log.info("Succeeded in terminating job")
+            else:
+                log.info("Job appears to have already been terminated")
+
         except SSHException:
             log.info(error_msg)
         except IOError:

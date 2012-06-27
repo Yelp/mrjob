@@ -2784,7 +2784,7 @@ class TestCatFallback(MockEMRAndS3TestCase):
             IOError, list,
             runner.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
 
-class TestCleanUpJob(MockEMRAndS3TestCase):
+class CleanUpJobTestCase(MockEMRAndS3TestCase):
 
     @contextmanager
     def _test_mode(self, mode):
@@ -2805,6 +2805,7 @@ class TestCleanUpJob(MockEMRAndS3TestCase):
         r = EMRJobRunner(conf_path=False)
         r._emr_job_flow_id = 'kevin'
         r._address = 'Albuquerque, NM'
+        r._ran_job = False
         return r
 
     def test_cleanup_all(self):
@@ -2873,3 +2874,11 @@ class TestCleanUpJob(MockEMRAndS3TestCase):
                 log_to_stream('mrjob.emr', stderr)
                 r._cleanup_jobs()
                 self.assertIn('Unable to kill job', stderr.getvalue())
+
+    def test_dont_kill_if_successful(self):
+        with no_handlers_for_logger('mrjob.emr'):
+            r = self._quick_runner()
+            with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
+                r._ran_job = True
+                r._cleanup_jobs()
+                m.assert_not_called()

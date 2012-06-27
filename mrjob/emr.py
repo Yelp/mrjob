@@ -1287,21 +1287,22 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             # IOError...blech.
             return
 
-        try:
-            log.info("Attempting to terminate job...")
-            had_job = ssh_terminate_single_job(
-                self._opts['ssh_bin'],
-                addr,
-                self._opts['ec2_key_pair_file'])
-            if had_job:
-                log.info("Succeeded in terminating job")
-            else:
-                log.info("Job appears to have already been terminated")
+        if not self._ran_job:
+            try:
+                log.info("Attempting to terminate job...")
+                had_job = ssh_terminate_single_job(
+                    self._opts['ssh_bin'],
+                    addr,
+                    self._opts['ec2_key_pair_file'])
+                if had_job:
+                    log.info("Succeeded in terminating job")
+                else:
+                    log.info("Job appears to have already been terminated")
 
-        except SSHException:
-            log.info(error_msg)
-        except IOError:
-            log.info(error_msg)
+            except SSHException:
+                log.info(error_msg)
+            except IOError:
+                log.info(error_msg)
 
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.

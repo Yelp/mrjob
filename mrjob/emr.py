@@ -1265,7 +1265,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             except Exception, e:
                 log.exception(e)
 
-    def _cleanup_jobs(self):
+    def _cleanup_job(self):
         # kill the job if we won't be taking down the whole job flow
         if not (self._emr_job_flow_id or
                 self._opts['emr_job_flow_id'] or

@@ -2792,13 +2792,13 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             patch.object(r, '_cleanup_local_scratch'),
             patch.object(r, '_cleanup_remote_scratch'),
             patch.object(r, '_cleanup_logs'),
-            patch.object(r, '_cleanup_jobs')) as mocks:
+            patch.object(r, '_cleanup_job')) as mocks:
             r.cleanup(mode=mode)
             yield mocks
 
     def _quick_runner(self):
         r = EMRJobRunner(conf_path=False)
-        r._emr_job_flow_id = 'kevin'
+        r._emr_job_flow_id = 'j-ESSEOWENS'
         r._address = 'Albuquerque, NM'
         r._ran_job = False
         return r
@@ -2840,7 +2840,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
         with no_handlers_for_logger():
             r = self._quick_runner()
             with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
-                r._cleanup_jobs()
+                r._cleanup_job()
             self.assertTrue(m.called)
             m.assert_any_call(['ssh'], 'Albuquerque, NM', None)
 
@@ -2854,7 +2854,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             log_to_stream('mrjob.emr', stderr)
             with patch.object(mrjob.emr, 'ssh_terminate_single_job',
                               side_effect=die_ssh):
-                r._cleanup_jobs()
+                r._cleanup_job()
                 self.assertIn('Unable to kill job', stderr.getvalue())
 
     def test_job_cleanup_mechanics_io_fail(self):
@@ -2867,7 +2867,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
                               side_effect=die_io):
                 stderr = StringIO()
                 log_to_stream('mrjob.emr', stderr)
-                r._cleanup_jobs()
+                r._cleanup_job()
                 self.assertIn('Unable to kill job', stderr.getvalue())
 
     def test_dont_kill_if_successful(self):
@@ -2875,5 +2875,5 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             r = self._quick_runner()
             with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
                 r._ran_job = True
-                r._cleanup_jobs()
+                r._cleanup_job()
                 m.assert_not_called()

@@ -554,7 +554,7 @@ class MRJobRunner(object):
         """
         pass  # this only happens on EMR
 
-    def _cleanup_jobs(self):
+    def _cleanup_job(self):
         """Stop any jobs that we created that are still running."""
         pass  # this only happens on EMR
 
@@ -579,7 +579,7 @@ class MRJobRunner(object):
             return any((choice in mode) for choice in args)
 
         if mode_has('ALL', 'JOB'):
-            self._cleanup_jobs()
+            self._cleanup_job()
 
         if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH', 'IF_SUCCESSFUL'):
             self._cleanup_local_scratch()

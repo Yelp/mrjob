@@ -350,25 +350,31 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.add_mock_s3_data({'walrus': {}})
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
-        with mr_job.make_runner() as runner:
-            assert isinstance(runner, EMRJobRunner)
+        with no_handlers_for_logger('mrjob.emr'):
+            stderr = StringIO()
+            log_to_stream('mrjob.emr', stderr)
 
-            with logger_disabled('mrjob.emr'):
+            with mr_job.make_runner() as runner:
+                assert isinstance(runner, EMRJobRunner)
+
                 self.assertRaises(Exception, runner.run)
+                # make sure job flow ID printed in error string
+                self.assertIn('Job on job flow j-MOCKJOBFLOW0 failed',
+                              stderr.getvalue())
 
+                emr_conn = runner.make_emr_conn()
+                job_flow_id = runner.get_emr_job_flow_id()
+                for _ in xrange(10):
+                    emr_conn.simulate_progress(job_flow_id)
+
+                job_flow = emr_conn.describe_jobflow(job_flow_id)
+                self.assertEqual(job_flow.state, 'FAILED')
+
+            # job should get terminated on cleanup
             emr_conn = runner.make_emr_conn()
             job_flow_id = runner.get_emr_job_flow_id()
             for _ in xrange(10):
                 emr_conn.simulate_progress(job_flow_id)
-
-            job_flow = emr_conn.describe_jobflow(job_flow_id)
-            self.assertEqual(job_flow.state, 'FAILED')
-
-        # job should get terminated on cleanup
-        emr_conn = runner.make_emr_conn()
-        job_flow_id = runner.get_emr_job_flow_id()
-        for _ in xrange(10):
-            emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
         self.assertEqual(job_flow.state, 'TERMINATED')

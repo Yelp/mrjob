@@ -315,7 +315,8 @@ def combine_cmds(*cmds):
     """Take zero or more commands to run on the command line, and return
     the last one that is not ``None``. Each command should either be a list
     containing the command plus switches, or a string, which will be parsed
-    with :py:func:`shlex.split`
+    with :py:func:`shlex.split`. The string must either be a byte string or a
+    unicode string containing no non-ASCII characters.
 
     Returns either ``None`` or a list containing the command plus arguments.
     """
@@ -324,7 +325,7 @@ def combine_cmds(*cmds):
     if cmd is None:
         return None
     elif isinstance(cmd, basestring):
-        return shlex.split(cmd)
+        return shlex.split(str(cmd))
     else:
         return list(cmd)
 

@@ -1758,7 +1758,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             self._fetch_counters(step_nums)
             self.print_counters(range(1, len(step_nums) + 1))
         else:
-            msg = 'Job failed with status %s: %s' % (job_state, reason)
+            msg = 'Job on job flow %s failed with status %s: %s' % (
+                job_flow.jobflowid, job_state, reason)
             log.error(msg)
             if self._s3_job_log_uri:
                 log.info('Logs are in %s' % self._s3_job_log_uri)

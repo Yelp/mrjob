@@ -57,7 +57,12 @@ class TestHadoopHomeRegression(unittest.TestCase):
             self.tmp_dir, 'hadoop-0.20.20-streaming.jar')
         open(mason_jar_path, 'w').close()
 
-        del os.environ['HADOOP_HOME']
+        # kill $HADOOP_HOME if it exists
+        try:
+            del os.environ['HADOOP_HOME']
+        except KeyError:
+            pass
+
         HadoopJobRunner(hadoop_home=self.tmp_dir, conf_path=False)
 
 

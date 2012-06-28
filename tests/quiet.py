@@ -76,4 +76,7 @@ def no_handlers_for_logger(name=None):
 
     yield
 
-    log.handlers = old_handlers
+    if old_handlers:
+        log.handlers = old_handlers
+    else:
+        log.propagate = True

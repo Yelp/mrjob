@@ -70,13 +70,18 @@ def no_handlers_for_logger(name=None):
     """
     log = logging.getLogger(name)
     old_handlers = log.handlers
+    old_propagate = log.propagate
 
     # add null handler so logging doesn't yell about there being no handlers
     log.handlers = [NullHandler()]
 
     yield
 
+    # logging module logic for setting handlers and propagate is opaque.
+    # Setting both effectively ends with propagate = 0 in all cases.
+    # We just want to avoid 'no handlers for logger...' junk messages in tests
+    # cases.
     if old_handlers:
         log.handlers = old_handlers
     else:
-        log.propagate = True
+        log.propagate = old_propagate

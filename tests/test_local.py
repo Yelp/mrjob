@@ -35,12 +35,9 @@ from mock import patch
 
 import mrjob
 from mrjob import local
-from mrjob import runner
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import cmd_line
 from mrjob.util import read_file
-from mrjob.util import read_input
-from tests.mocks import MockFS
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_job_where_are_you import MRJobWhereAreYou
@@ -49,46 +46,9 @@ from tests.mr_word_count import MRWordCount
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.quiet import no_handlers_for_logger
-
-
-def mock_read_input_factory(files):
-    def mock_read_input(path, stdin=None):
-        if path in files:
-            for line in files[path].splitlines():
-                yield line
-        else:
-            for line in read_input(path):
-                yield line
-    return mock_read_input
-
-
-# simple config that also silences 'no config options for runner' logging
-EMPTY_MRJOB_CONF = {'runners': {'local': {'label': 'test_job'}}}
-
-
-def mrjob_conf_patcher(substitute_conf=EMPTY_MRJOB_CONF):
-    def mock_load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
-        return [(None, substitute_conf['runners'][runner_alias])]
-
-    return patch.object(runner, 'load_opts_from_mrjob_confs',
-                        mock_load_opts_from_mrjob_confs)
-
-
-class EmptyMrjobConfTestCase(unittest.TestCase):
-
-    def setUp(self):
-        super(EmptyMrjobConfTestCase, self).setUp()
-        patcher = mrjob_conf_patcher()
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-
-class SandboxedTestCase(EmptyMrjobConfTestCase):
-
-    def setUp(self):
-        super(SandboxedTestCase, self).setUp()
-        self.tmp_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.tmp_dir)
+from tests.util import mrjob_conf_patcher
+from tests.util import EmptyMrjobConfTestCase
+from tests.util import SandboxedTestCase
 
 
 class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):

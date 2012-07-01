@@ -20,8 +20,9 @@ from tempfile import mkdtemp
 
 try:
     from unittest2 import TestCase
+    TestCase  # silence pyflakes
 except ImportError:
-    from unittest2 import TestCase
+    from unittest import TestCase
 
 
 class TempdirTestCase(TestCase):

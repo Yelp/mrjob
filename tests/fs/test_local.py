@@ -21,6 +21,7 @@ from mrjob.fs.local import LocalFilesystem
 
 from tests.fs import TempdirTestCase
 
+
 class LocalFSTestCase(TempdirTestCase):
 
     def setUp(self):

@@ -38,7 +38,6 @@ except ImportError:
     import unittest
 
 import mrjob
-from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import attempt_to_acquire_lock
@@ -68,7 +67,7 @@ from tests.mr_word_count import MRWordCount
 from tests.quiet import log_to_buffer
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
-from tests.util import EmptyMrjobConfTestCase
+from tests.util import mrjob_conf_patcher
 from tests.util import SandboxedTestCase
 
 try:
@@ -894,11 +893,11 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self.assertEqual(expected_instance_count, job_flow.instancecount)
 
     def set_in_mrjob_conf(self, **kwargs):
-        emr_opts = {'check_emr_status_every': 0.00,
-                    's3_sync_wait_time': 0.00}
-        emr_opts.update(kwargs)
-        with open(self.mrjob_conf_path, 'w') as f:
-            dump_mrjob_conf({'runners': {'emr': emr_opts}}, f)
+        emr_opts = copy.deepcopy(self.MRJOB_CONF_CONTENTS)
+        emr_opts['runners']['emr'].update(kwargs)
+        patcher = mrjob_conf_patcher(emr_opts)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_defaults(self):
         self._test_instance_groups(

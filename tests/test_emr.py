@@ -67,6 +67,7 @@ from tests.mr_word_count import MRWordCount
 from tests.quiet import log_to_buffer
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+from tests.util import mock_open
 from tests.util import mrjob_conf_patcher
 from tests.util import SandboxedTestCase
 
@@ -1970,49 +1971,26 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         jf.startdatetime = start.strftime(boto.utils.ISO8601)
         return runner, job_flow_id
 
-    def get_job_flow_and_results(self, job_args, mock_output=(),
-                                 job_class=MRTwoStepJob):
+    def get_job_flow(self, job_args, job_class=MRTwoStepJob):
         mr_job = job_class(job_args)
         mr_job.sandbox()
 
-        results = []
         with mr_job.make_runner() as runner:
             self.prepare_runner_for_ssh(runner)
             runner.run()
 
             job_flow_id = runner.get_emr_job_flow_id()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+        return job_flow_id
 
-        return job_flow_id, sorted(results)
-
-    def assertJoins(self, job_flow_id, job_args, job_class=MRTwoStepJob,
-                    check_output=True):
-
-        if check_output:
-            mock_output = ['1\t"bar"\n1\t"foo"\n2\tnull\n']
-
-            steps_in_jf = len(self.mock_emr_job_flows[job_flow_id].steps)
-            steps_in_job = len(job_class(job_args).steps())
-            step_num = steps_in_jf + steps_in_job - 1
-
-            self.mock_emr_output[(job_flow_id, step_num)] = mock_output
-
-        actual_job_flow_id, results = self.get_job_flow_and_results(
-            job_args, job_class=job_class, mock_output=mock_output)
+    def assertJoins(self, job_flow_id, job_args, job_class=MRTwoStepJob):
+        actual_job_flow_id = self.get_job_flow(job_args, job_class=job_class)
 
         self.assertEqual(actual_job_flow_id, job_flow_id)
 
-        if check_output:
-            self.assertEqual(results,
-                             [(1, 'bar'), (1, 'foo'), (2, None)])
-
     def assertDoesNotJoin(self, job_flow_id, job_args, job_class=MRTwoStepJob):
 
-        actual_job_flow_id, _ = self.get_job_flow_and_results(
-            job_args, job_class=job_class)
+        actual_job_flow_id = self.get_job_flow(job_args, job_class=job_class)
 
         self.assertNotEqual(actual_job_flow_id, job_flow_id)
 

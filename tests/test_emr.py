@@ -67,6 +67,7 @@ from tests.mr_word_count import MRWordCount
 from tests.quiet import log_to_buffer
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+from tests.util import mock_open
 from tests.util import mrjob_conf_patcher
 from tests.util import SandboxedTestCase
 

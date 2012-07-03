@@ -116,7 +116,7 @@ class InlineMRJobRunner(MRJobRunner):
         assert self._script  # shouldn't be able to run if no script
 
         for ignored_opt in self.IGNORED_HADOOP_OPTS:
-            if self._opts.is_default(ignored_opt):
+            if not self._opts.is_default(ignored_opt):
                 log.warning('ignoring %s option (requires real Hadoop): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 
@@ -128,7 +128,7 @@ class InlineMRJobRunner(MRJobRunner):
                     (ignored_attr[1:], value))
 
         for ignored_opt in self.IGNORED_LOCAL_OPTS:
-            if self._opts.is_default(ignored_opt):
+            if not self._opts.is_default(ignored_opt):
                 log.warning('ignoring %s option (use -r local instead): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 

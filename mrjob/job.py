@@ -21,12 +21,8 @@ import codecs
 import inspect
 import itertools
 import logging
-from optparse import Option
-from optparse import OptionParser
 from optparse import OptionGroup
-from optparse import OptionError
 import sys
-import time
 
 try:
     from cStringIO import StringIO
@@ -36,23 +32,12 @@ except ImportError:
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
-from mrjob.options import add_basic_opts
-from mrjob.options import add_emr_opts
-from mrjob.options import add_hadoop_opts
-from mrjob.options import add_hadoop_emr_opts
-from mrjob.options import add_hadoop_shared_opts
-from mrjob.options import add_protocol_opts
-from mrjob.options import add_runner_opts
-from mrjob.options import print_help_for_groups
-from mrjob.parse import parse_port_range_list
+
 from mrjob.parse import parse_mr_job_stderr
-from mrjob.parse import parse_key_value_list
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
-from mrjob.runner import CLEANUP_CHOICES
-from mrjob.util import log_to_null
-from mrjob.util import log_to_stream
-from mrjob.util import parse_and_save_options
+from mrjob.launch import MRJobLauncher
+from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.util import read_input
 
 
@@ -78,21 +63,13 @@ def _IDENTITY_MAPPER(key, value):
     yield key, value
 
 
-# sentinel value; used when running MRJob as a script
-_READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
-
-
 class UsageError(Exception):
     pass
 
 
-class MRJob(object):
+class MRJob(MRJobLauncher):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
     for details."""
-
-    #: :py:class:`optparse.Option` subclass to use with the
-    #: :py:class:`optparse.OptionParser` instance.
-    OPTION_CLASS = Option
 
     def __init__(self, args=None):
         """Entry point for running your job from other Python code.
@@ -111,41 +88,11 @@ class MRJob(object):
         For a full list of command-line arguments, run:
         ``python -m mrjob.job --help``
         """
-        # make sure we respect the $TZ (time zone) environment variable
-        if hasattr(time, 'tzset'):
-            time.tzset()
+        super(MRJob, self).__init__(self.mr_job_script(), args)
 
-        self._passthrough_options = []
-        self._file_options = []
-
-        usage = "usage: %prog [options] [input files]"
-        self.option_parser = OptionParser(usage=usage,
-                                          option_class=self.OPTION_CLASS,
-                                          add_help_option=False)
-        self.configure_options()
-
-        # don't pass None to parse_args unless we're actually running
-        # the MRJob script
-        if args is _READ_ARGS_FROM_SYS_ARGV:
-            self._cl_args = sys.argv[1:]
-        else:
-            # don't pass sys.argv to self.option_parser, and have it
-            # raise an exception on error rather than printing to stderr
-            # and exiting.
-            self._cl_args = args or []
-
-            def error(msg):
-                raise ValueError(msg)
-
-            self.option_parser.error = error
-
-        self.load_options(self._cl_args)
-
-        # Make it possible to redirect stdin, stdout, and stderr, for testing
-        # See sandbox(), below.
-        self.stdin = sys.stdin
-        self.stdout = sys.stdout
-        self.stderr = sys.stderr
+    @classmethod
+    def _usage(cls):
+        return "usage: %prog [options] [input files]"
 
     ### Defining one-step jobs ###
 
@@ -459,6 +406,8 @@ class MRJob(object):
         mr_job.execute()
 
     def execute(self):
+        # MRJob does Hadoop Streaming stuff, or defers to Launcher (superclass)
+        # if not otherwise instructed
         if self.options.show_steps:
             self.show_steps()
 
@@ -472,7 +421,7 @@ class MRJob(object):
             self.run_reducer(self.options.step_num)
 
         else:
-            self.run_job()
+            super(MRJob, self).execute()
 
     def make_runner(self):
         """Make a runner based on command-line arguments, so we can
@@ -488,66 +437,14 @@ class MRJob(object):
                                  " probably means you tried to use it from"
                                  " __main__, which doesn't work." % w)
 
-        # have to import here so that we can still run the MRJob
-        # without importing boto
-        from mrjob.emr import EMRJobRunner
-        from mrjob.hadoop import HadoopJobRunner
-        from mrjob.local import LocalMRJobRunner
+        # support inline runner when running from the MRJob itself
         from mrjob.inline import InlineMRJobRunner
 
-        if self.options.runner == 'emr':
-            return EMRJobRunner(**self.emr_job_runner_kwargs())
+        if self.options.runner == 'inline':
+            return InlineMRJobRunner(mrjob_cls=self.__class__,
+                                     **self.inline_job_runner_kwargs())
 
-        elif self.options.runner == 'hadoop':
-            return HadoopJobRunner(**self.hadoop_job_runner_kwargs())
-
-        elif self.options.runner == 'inline':
-            return InlineMRJobRunner(
-                mrjob_cls=self.__class__, **self.inline_job_runner_kwargs())
-
-        else:
-            # run locally by default
-            return LocalMRJobRunner(**self.local_job_runner_kwargs())
-
-    @classmethod
-    def set_up_logging(cls, quiet=False, verbose=False, stream=None):
-        """Set up logging when running from the command line. This is also
-        used by the various command-line utilities.
-
-        :param bool quiet: If true, don't log. Overrides *verbose*.
-        :param bool verbose: If true, set log level to ``DEBUG`` (default is
-                             ``INFO``)
-        :param bool stream: Stream to log to (default is ``sys.stderr``)
-
-        This will also set up a null log handler for boto, so we don't get
-        warnings if boto tries to log about throttling and whatnot.
-        """
-        if quiet:
-            log_to_null(name='mrjob')
-        else:
-            log_to_stream(name='mrjob', debug=verbose, stream=stream)
-
-        log_to_null(name='boto')
-
-    def run_job(self):
-        """Run the all steps of the job, logging errors (and debugging output
-        if :option:`--verbose` is specified) to STDERR and streaming the
-        output to STDOUT.
-
-        Called from :py:meth:`run`. You'd probably only want to call this
-        directly from automated tests.
-        """
-        self.set_up_logging(quiet=self.options.quiet,
-                            verbose=self.options.verbose,
-                            stream=self.stderr)
-
-        with self.make_runner() as runner:
-            runner.run()
-
-            if not self.options.no_output:
-                for line in runner.stream_output():
-                    self.stdout.write(line)
-                self.stdout.flush()
+        return super(MRJob, self).make_runner()
 
     def run_mapper(self, step_num=0):
         """Run the mapper and final mapper action for the given step.
@@ -828,35 +725,7 @@ class MRJob(object):
     ### Command-line arguments ###
 
     def configure_options(self):
-        """Define arguments for this script. Called from :py:meth:`__init__()`.
-
-        Run ``python -m mrjob.job.MRJob --help`` to see all options.
-
-        Re-define to define custom command-line arguments::
-
-            def configure_options(self):
-                super(MRYourJob, self).configure_options
-
-                self.add_passthrough_option(...)
-                self.add_file_option(...)
-                ...
-        """
-        self.option_parser.add_option(
-            '--help', dest='help_main', action='store_true', default=False,
-            help='show this message and exit')
-
-        self.option_parser.add_option(
-            '--help-emr', dest='help_emr', action='store_true', default=False,
-            help='show EMR-related options')
-
-        self.option_parser.add_option(
-            '--help-hadoop', dest='help_hadoop', action='store_true',
-            default=False,
-            help='show Hadoop-related options')
-
-        self.option_parser.add_option(
-            '--help-runner', dest='help_runner', action='store_true',
-            default=False, help='show runner-related options')
+        super(MRJob, self).configure_options()
 
         # To run mappers or reducers
         self.mux_opt_group = OptionGroup(
@@ -885,201 +754,8 @@ class MRJob(object):
             help=('print the mappers, combiners, and reducers that this job'
                   ' defines'))
 
-        # protocol stuff
-        self.proto_opt_group = OptionGroup(
-            self.option_parser, 'Protocols')
-        self.option_parser.add_option_group(self.proto_opt_group)
-
-        self._passthrough_options.extend(
-            add_protocol_opts(self.proto_opt_group))
-
-        # options for running the entire job
-        self.runner_opt_group = OptionGroup(
-            self.option_parser, 'Running the entire job')
-        self.option_parser.add_option_group(self.runner_opt_group)
-
-        add_basic_opts(self.runner_opt_group)
-        add_runner_opts(self.runner_opt_group)
-
-        self.hadoop_opts_opt_group = OptionGroup(
-            self.option_parser,
-            'Configuring or emulating Hadoop (these apply when you set -r'
-            ' hadoop, -r emr, or -r local)')
-        self.option_parser.add_option_group(self.hadoop_opts_opt_group)
-
-        add_hadoop_shared_opts(self.hadoop_opts_opt_group)
-
-        # options common to Hadoop and EMR
-        self.hadoop_emr_opt_group = OptionGroup(
-            self.option_parser,
-            'Running on Hadoop or EMR (these apply when you set -r hadoop or'
-            ' -r emr)')
-        self.option_parser.add_option_group(self.hadoop_emr_opt_group)
-
-        add_hadoop_emr_opts(self.hadoop_emr_opt_group)
-
-        # options for running the job on Hadoop
-        self.hadoop_opt_group = OptionGroup(
-            self.option_parser,
-            'Running on Hadoop (these apply when you set -r hadoop)')
-        self.option_parser.add_option_group(self.hadoop_opt_group)
-
-        add_hadoop_opts(self.hadoop_opt_group)
-
-        # options for running the job on EMR
-        self.emr_opt_group = OptionGroup(
-            self.option_parser,
-            'Running on Amazon Elastic MapReduce (these apply when you set -r'
-            ' emr)')
-        self.option_parser.add_option_group(self.emr_opt_group)
-
-        add_emr_opts(self.emr_opt_group)
-
     def all_option_groups(self):
-        return (self.option_parser, self.mux_opt_group,
-                self.proto_opt_group, self.runner_opt_group,
-                self.hadoop_emr_opt_group, self.emr_opt_group,
-                self.hadoop_opts_opt_group)
-
-    def add_passthrough_option(self, *args, **kwargs):
-        """Function to create options which both the job runner
-        and the job itself respect (we use this for protocols, for example).
-
-        Use it like you would use :py:func:`optparse.OptionParser.add_option`::
-
-            def configure_options(self):
-                super(MRYourJob, self).configure_options()
-                self.add_passthrough_option(
-                    '--max-ngram-size', type='int', default=4, help='...')
-
-        Specify an *opt_group* keyword argument to add the option to that
-        :py:class:`OptionGroup` rather than the top-level
-        :py:class:`OptionParser`.
-
-        If you want to pass files through to the mapper/reducer, use
-        :py:meth:`add_file_option` instead.
-        """
-        if 'opt_group' in kwargs:
-            pass_opt = kwargs.pop('opt_group').add_option(*args, **kwargs)
-        else:
-            pass_opt = self.option_parser.add_option(*args, **kwargs)
-
-        self._passthrough_options.append(pass_opt)
-
-    def add_file_option(self, *args, **kwargs):
-        """Add a command-line option that sends an external file
-        (e.g. a SQLite DB) to Hadoop::
-
-             def configure_options(self):
-                super(MRYourJob, self).configure_options()
-                self.add_file_option('--scoring-db', help=...)
-
-        This does the right thing: the file will be uploaded to the working
-        dir of the script on Hadoop, and the script will be passed the same
-        option, but with the local name of the file in the script's working
-        directory.
-
-        We suggest against sending Berkeley DBs to your job, as
-        Berkeley DB is not forwards-compatible (so a Berkeley DB that you
-        construct on your computer may not be readable from within
-        Hadoop). Use SQLite databases instead. If all you need is an on-disk
-        hash table, try out the :py:mod:`sqlite3dbm` module.
-        """
-        pass_opt = self.option_parser.add_option(*args, **kwargs)
-
-        if not pass_opt.type == 'string':
-            raise OptionError(
-                'passthrough file options must take strings' % pass_opt.type)
-
-        if not pass_opt.action in ('store', 'append'):
-            raise OptionError("passthrough file options must use the options"
-                              " 'store' or 'append'")
-
-        self._file_options.append(pass_opt)
-
-    def load_options(self, args):
-        """Load command-line options into ``self.options``.
-
-        Called from :py:meth:`__init__()` after :py:meth:`configure_options`.
-
-        :type args: list of str
-        :param args: a list of command line arguments. ``None`` will be
-                     treated the same as ``[]``.
-
-        Re-define if you want to post-process command-line arguments::
-
-            def load_options(self, args):
-                super(MRYourJob, self).load_options(args)
-
-                self.stop_words = self.options.stop_words.split(',')
-                ...
-        """
-        self.options, self.args = self.option_parser.parse_args(args)
-
-        if self.options.help_main:
-            self.option_parser.option_groups = [
-                self.mux_opt_group,
-                self.proto_opt_group,
-            ]
-            self.option_parser.print_help()
-            sys.exit(0)
-
-        if self.options.help_emr:
-            print_help_for_groups(self.hadoop_emr_opt_group,
-                                  self.emr_opt_group)
-            sys.exit(0)
-
-        if self.options.help_hadoop:
-            print_help_for_groups(self.hadoop_emr_opt_group,
-                                  self.hadoop_opts_opt_group)
-            sys.exit(0)
-
-        if self.options.help_runner:
-            print_help_for_groups(self.runner_opt_group)
-            sys.exit(0)
-
-        # parse custom options here to avoid setting a custom Option subclass
-        # and confusing users
-
-        if self.options.ssh_bind_ports:
-            try:
-                ports = parse_port_range_list(self.options.ssh_bind_ports)
-            except ValueError, e:
-                self.option_parser.error('invalid port range list "%s": \n%s' %
-                                         (self.options.ssh_bind_ports,
-                                          e.args[0]))
-            self.options.ssh_bind_ports = ports
-
-        cmdenv_err = 'cmdenv argument "%s" is not of the form KEY=VALUE'
-        self.options.cmdenv = parse_key_value_list(self.options.cmdenv,
-                                                   cmdenv_err,
-                                                   self.option_parser.error)
-
-        jobconf_err = 'jobconf argument "%s" is not of the form KEY=VALUE'
-        self.options.jobconf = parse_key_value_list(self.options.jobconf,
-                                                    jobconf_err,
-                                                    self.option_parser.error)
-
-        def parse_commas(cleanup_str):
-            cleanup_error = ('cleanup option %s is not one of '
-                             + ', '.join(CLEANUP_CHOICES))
-            new_cleanup_options = []
-            for choice in cleanup_str.split(','):
-                if choice in CLEANUP_CHOICES:
-                    new_cleanup_options.append(choice)
-                else:
-                    self.option_parser.error(cleanup_error % choice)
-            if ('NONE' in new_cleanup_options and
-                len(set(new_cleanup_options)) > 1):
-                self.option_parser.error(
-                    'Cannot clean up both nothing and something!')
-            return new_cleanup_options
-
-        if self.options.cleanup is not None:
-            self.options.cleanup = parse_commas(self.options.cleanup)
-        if self.options.cleanup_on_failure is not None:
-            self.options.cleanup_on_failure = parse_commas(
-                self.options.cleanup_on_failure)
+        return super(MRJob, self).all_option_groups() + (self.mux_opt_group,)
 
     def is_mapper_or_reducer(self):
         """True if this is a mapper/reducer.
@@ -1091,144 +767,12 @@ class MRJob(object):
                 or self.options.run_combiner \
                 or self.options.run_reducer
 
-    def job_runner_kwargs(self):
-        """Keyword arguments used to create runners when
-        :py:meth:`make_runner` is called.
-
-        :return: map from arg name to value
-
-        Re-define this if you want finer control of runner initialization.
-
-        You might find :py:meth:`mrjob.conf.combine_dicts` useful if you
-        want to add or change lots of keyword arguments.
+    def _process_args(self, args):
+        """mrjob.launch takes the first arg as the script path, but mrjob.job
+        uses all args as input files. This method determines the behavior:
+        MRJob uses all args as input files.
         """
-        return {
-            'bootstrap_mrjob': self.options.bootstrap_mrjob,
-            'cleanup': self.options.cleanup,
-            'cleanup_on_failure': self.options.cleanup_on_failure,
-            'cmdenv': self.options.cmdenv,
-            'conf_path': None,
-            'conf_paths': self.options.conf_paths,
-            'extra_args': self.generate_passthrough_arguments(),
-            'file_upload_args': self.generate_file_upload_args(),
-            'hadoop_extra_args': self.options.hadoop_extra_args,
-            'hadoop_input_format': self.hadoop_input_format(),
-            'hadoop_output_format': self.hadoop_output_format(),
-            'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
-            'hadoop_version': self.options.hadoop_version,
-            'input_paths': self.args,
-            'jobconf': self.jobconf(),
-            'mr_job_script': self.mr_job_script(),
-            'label': self.options.label,
-            'output_dir': self.options.output_dir,
-            'owner': self.options.owner,
-            'partitioner': self.partitioner(),
-            'python_archives': self.options.python_archives,
-            'python_bin': self.options.python_bin,
-            'setup_cmds': self.options.setup_cmds,
-            'setup_scripts': self.options.setup_scripts,
-            'stdin': self.stdin,
-            'steps_python_bin': self.options.steps_python_bin,
-            'upload_archives': self.options.upload_archives,
-            'upload_files': self.options.upload_files,
-        }
-
-    def inline_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job locally
-        (``-r inline``).
-
-        :return: map from arg name to value
-
-        Re-define this if you want finer control when running jobs locally.
-        """
-        return self.job_runner_kwargs()
-
-    def local_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job locally
-        (``-r local``).
-
-        :return: map from arg name to value
-
-        Re-define this if you want finer control when running jobs locally.
-        """
-        return self.job_runner_kwargs()
-
-    def emr_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job on EMR
-        (``-r emr``).
-
-        :return: map from arg name to value
-
-        Re-define this if you want finer control when running jobs on EMR.
-        """
-        return combine_dicts(
-            self.job_runner_kwargs(),
-            self._get_kwargs_from_opt_group(self.emr_opt_group))
-
-    def hadoop_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job on EMR
-        (``-r hadoop``).
-
-        :return: map from arg name to value
-
-        Re-define this if you want finer control when running jobs on hadoop.
-        """
-        return combine_dicts(
-            self.job_runner_kwargs(),
-            self._get_kwargs_from_opt_group(self.hadoop_opt_group))
-
-    def _get_kwargs_from_opt_group(self, opt_group):
-        """Helper function that returns a dictionary of the values of options
-        in the given options group (this works because the options and the
-        keyword args we want to set have identical names).
-        """
-        keys = set(opt.dest for opt in opt_group.option_list)
-        return dict((key, getattr(self.options, key)) for key in keys)
-
-    def generate_passthrough_arguments(self):
-        """Returns a list of arguments to pass to subprocesses, either on
-        hadoop or executed via subprocess.
-
-        These are passed to :py:meth:`mrjob.runner.MRJobRunner.__init__`
-        as *extra_args*.
-        """
-        arg_map = parse_and_save_options(self.option_parser, self._cl_args)
-        output_args = []
-
-        passthrough_dests = sorted(set(option.dest for option \
-                                       in self._passthrough_options))
-        for option_dest in passthrough_dests:
-            output_args.extend(arg_map.get(option_dest, []))
-
-        return output_args
-
-    def generate_file_upload_args(self):
-        """Figure out file upload args to pass through to the job runner.
-
-        Instead of generating a list of args, we're generating a list
-        of tuples of ``('--argname', path)``
-
-        These are passed to :py:meth:`mrjob.runner.MRJobRunner.__init__`
-        as ``file_upload_args``.
-        """
-        file_upload_args = []
-
-        master_option_dict = self.options.__dict__
-
-        for opt in self._file_options:
-            opt_prefix = opt.get_opt_string()
-            opt_value = master_option_dict[opt.dest]
-
-            if opt_value:
-                paths = opt_value if opt.action == 'append' else [opt_value]
-                for path in paths:
-                    file_upload_args.append((opt_prefix, path))
-
-        return file_upload_args
+        self.args = args
 
     ### protocols ###
 
@@ -1418,55 +962,6 @@ class MRJob(object):
         return filtered_jobconf
 
     ### Testing ###
-
-    def sandbox(self, stdin=None, stdout=None, stderr=None):
-        """Redirect stdin, stdout, and stderr for automated testing.
-
-        You can set stdin, stdout, and stderr to file objects. By
-        default, they'll be set to empty ``StringIO`` objects.
-        You can then access the job's file handles through ``self.stdin``,
-        ``self.stdout``, and ``self.stderr``. See :ref:`testing` for more
-        information about testing.
-
-        You may call sandbox multiple times (this will essentially clear
-        the file handles).
-
-        ``stdin`` is empty by default. You can set it to anything that yields
-        lines::
-
-            mr_job.sandbox(stdin=StringIO('some_data\\n'))
-
-        or, equivalently::
-
-            mr_job.sandbox(stdin=['some_data\\n'])
-
-        For convenience, this sandbox() returns self, so you can do::
-
-            mr_job = MRJobClassToTest().sandbox()
-
-        Simple testing example::
-
-            mr_job = MRYourJob.sandbox()
-            assert_equal(list(mr_job.reducer('foo', ['bar', 'baz'])), [...])
-
-        More complex testing example::
-
-            from StringIO import StringIO
-
-            mr_job = MRYourJob(args=[...])
-
-            fake_input = '"foo"\\t"bar"\\n"foo"\\t"baz"\\n'
-            mr_job.sandbox(stdin=StringIO(fake_input))
-
-            mr_job.run_reducer(link_num=0)
-            assert_equal(mr_job.parse_output(), ...)
-            assert_equal(mr_job.parse_counters(), ...)
-        """
-        self.stdin = stdin or StringIO()
-        self.stdout = stdout or StringIO()
-        self.stderr = stderr or StringIO()
-
-        return self
 
     def parse_counters(self, counters=None):
         """Convenience method for reading counters. This only works

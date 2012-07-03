@@ -17,7 +17,6 @@
 
 from __future__ import with_statement
 
-from optparse import OptionError
 import os
 import shutil
 from subprocess import Popen
@@ -34,11 +33,9 @@ except ImportError:
     import unittest
 
 from mrjob.conf import combine_envs
-from mrjob.conf import dump_mrjob_conf
 from mrjob.job import MRJob
 from mrjob.job import _IDENTITY_MAPPER
 from mrjob.job import UsageError
-from mrjob.inline import InlineMRJobRunner
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import PickleProtocol
@@ -266,13 +263,6 @@ class MRTestCase(unittest.TestCase):
                          stepdict(reducer_final=reducer_final))
 
 
-class MakeRunnerTestCase(unittest.TestCase):
-
-    def test_default_runner(self):
-        with MRBoringJob(['--no-conf']).make_runner() as runner:
-            self.assertIsInstance(runner, InlineMRJobRunner)
-
-
 class MRInitTestCase(unittest.TestCase):
 
     def test_mapper(self):
@@ -295,32 +285,6 @@ class MRInitTestCase(unittest.TestCase):
         # these numbers should match if mapper_init, reducer_init, and
         # combiner_init were called as expected
         self.assertEqual(results[0], num_inputs * 10 * 10 * 2)
-
-
-class MRNoOutputTestCase(unittest.TestCase):
-
-    def _test_no_main_with_class(self, cls):
-        num_inputs = 2
-        stdin = StringIO("x\n" * num_inputs)
-        mr_job = cls(['-r', 'inline', '--no-conf', '--strict-protocols', '-'])
-        mr_job.sandbox(stdin=stdin)
-
-        results = []
-        with mr_job.make_runner() as runner:
-            runner.run()
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append(value)
-        self.assertEqual(results[0], num_inputs)
-
-    def test_no_map(self):
-        self._test_no_main_with_class(MRInvisibleMapperJob)
-
-    def test_no_reduce(self):
-        self._test_no_main_with_class(MRInvisibleReducerJob)
-
-    def test_no_combine(self):
-        self._test_no_main_with_class(MRInvisibleCombinerJob)
 
 
 class NoTzsetTestCase(unittest.TestCase):
@@ -890,184 +854,6 @@ class StepNumTestCase(unittest.TestCase):
         self.assertRaises(ValueError, mr_job.run_reducer, 1)
         self.assertRaises(ValueError, mr_job.run_mapper, 2)
         self.assertRaises(ValueError, mr_job.run_reducer, -1)
-
-
-class CommandLineArgsTest(unittest.TestCase):
-
-    def test_shouldnt_exit_when_invoked_as_object(self):
-        self.assertRaises(ValueError, MRJob, args=['--quux', 'baz'])
-
-    def test_should_exit_when_invoked_as_script(self):
-        args = [sys.executable, MRJob.mr_job_script(), '--quux', 'baz']
-        # add . to PYTHONPATH (in case mrjob isn't actually installed)
-        env = combine_envs(os.environ,
-                           {'PYTHONPATH': os.path.abspath('.')})
-        proc = Popen(args, stderr=PIPE, stdout=PIPE, env=env)
-        proc.communicate()
-        self.assertEqual(proc.returncode, 2)
-
-    def test_custom_key_value_option_parsing(self):
-        # simple example
-        mr_job = MRBoringJob(['--cmdenv', 'FOO=bar'])
-        self.assertEqual(mr_job.options.cmdenv, {'FOO': 'bar'})
-
-        # trickier example
-        mr_job = MRBoringJob(
-            ['--cmdenv', 'FOO=bar',
-             '--cmdenv', 'FOO=baz',
-             '--cmdenv', 'BAZ=qux=quux'])
-        self.assertEqual(mr_job.options.cmdenv,
-                         {'FOO': 'baz', 'BAZ': 'qux=quux'})
-
-        # must have KEY=VALUE
-        self.assertRaises(ValueError, MRBoringJob, ['--cmdenv', 'FOO'])
-
-    def test_passthrough_options_defaults(self):
-        mr_job = MRCustomBoringJob()
-
-        self.assertEqual(mr_job.options.foo_size, 5)
-        self.assertEqual(mr_job.options.bar_name, None)
-        self.assertEqual(mr_job.options.baz_mode, False)
-        self.assertEqual(mr_job.options.quuxing, True)
-        self.assertEqual(mr_job.options.pill_type, 'blue')
-        self.assertEqual(mr_job.options.planck_constant, 6.626068e-34)
-        self.assertEqual(mr_job.options.extra_special_args, [])
-        # should include all --protocol options
-        # should include default value of --num-items
-        # should use long option names (--protocol, not -p)
-        # shouldn't include --limit because it's None
-        # items should be in the order they were instantiated
-        self.assertEqual(mr_job.generate_passthrough_arguments(), [])
-
-    def test_explicit_passthrough_options(self):
-        mr_job = MRCustomBoringJob(args=[
-            '-v',
-            '--foo-size=9',
-            '--bar-name', 'Alembic',
-            '--enable-baz-mode', '--disable-quuxing',
-            '--pill-type', 'red',
-            '--planck-constant', '1',
-            '--planck-constant', '42',
-            '--extra-special-arg', 'you',
-            '--extra-special-arg', 'me',
-            '--strict-protocols',
-            ])
-
-        self.assertEqual(mr_job.options.foo_size, 9)
-        self.assertEqual(mr_job.options.bar_name, 'Alembic')
-        self.assertEqual(mr_job.options.baz_mode, True)
-        self.assertEqual(mr_job.options.quuxing, False)
-        self.assertEqual(mr_job.options.pill_type, 'red')
-        self.assertEqual(mr_job.options.planck_constant, 42)
-        self.assertEqual(mr_job.options.extra_special_args, ['you', 'me'])
-        self.assertEqual(mr_job.options.strict_protocols, True)
-        self.assertEqual(mr_job.generate_passthrough_arguments(),
-                     [
-                      '--bar-name', 'Alembic',
-                      '--enable-baz-mode',
-                      '--extra-special-arg', 'you',
-                      '--extra-special-arg', 'me',
-                      '--foo-size', '9',
-                      '--pill-type', 'red',
-                      '--planck-constant', '1',
-                      '--planck-constant', '42',
-                      '--disable-quuxing',
-                      '--strict-protocols',
-                      ])
-
-    def test_explicit_passthrough_options_short(self):
-        mr_job = MRCustomBoringJob(args=[
-            '-v',
-            '-F9', '-BAlembic', '-MQ', '-T', 'red', '-C1', '-C42',
-            '--extra-special-arg', 'you',
-            '--extra-special-arg', 'me',
-            '--strict-protocols',
-            ])
-
-        self.assertEqual(mr_job.options.foo_size, 9)
-        self.assertEqual(mr_job.options.bar_name, 'Alembic')
-        self.assertEqual(mr_job.options.baz_mode, True)
-        self.assertEqual(mr_job.options.quuxing, False)
-        self.assertEqual(mr_job.options.pill_type, 'red')
-        self.assertEqual(mr_job.options.planck_constant, 42)
-        self.assertEqual(mr_job.options.extra_special_args, ['you', 'me'])
-        self.assertEqual(mr_job.options.strict_protocols, True)
-        self.assertEqual(mr_job.generate_passthrough_arguments(),
-                     [
-                        '-B', 'Alembic',
-                        '-M',
-                         '--extra-special-arg', 'you',
-                         '--extra-special-arg', 'me',
-                         '-F', '9',
-                         '-T', 'red',
-                         '-C', '1',
-                         '-C', '42',
-                         '-Q',
-                         '--strict-protocols'
-                     ])
-
-    def test_bad_custom_options(self):
-        self.assertRaises(ValueError,
-                          MRCustomBoringJob, ['--planck-constant', 'c'])
-        self.assertRaises(ValueError, MRCustomBoringJob, ['--pill-type=green'])
-
-    def test_bad_option_types(self):
-        mr_job = MRJob()
-        self.assertRaises(
-            OptionError, mr_job.add_passthrough_option,
-            '--stop-words', dest='stop_words', type='set', default=None)
-        self.assertRaises(
-            OptionError, mr_job.add_passthrough_option,
-            '--leave-a-msg', dest='leave_a_msg', action='callback',
-            default=None)
-
-    def test_incorrect_option_types(self):
-        self.assertRaises(ValueError, MRJob, ['--cmdenv', 'cats'])
-        self.assertRaises(ValueError, MRJob, ['--ssh-bind-ports', 'athens'])
-
-    def test_default_file_options(self):
-        mr_job = MRCustomBoringJob()
-        self.assertEqual(mr_job.options.foo_config, None)
-        self.assertEqual(mr_job.options.accordian_files, [])
-        self.assertEqual(mr_job.generate_file_upload_args(), [])
-
-    def test_explicit_file_options(self):
-        mr_job = MRCustomBoringJob(args=[
-            '--foo-config', '/tmp/.fooconf',
-            '--foo-config', '/etc/fooconf',
-            '--accordian-file', 'WeirdAl.mp3',
-            '--accordian-file', '/home/dave/JohnLinnell.ogg'])
-        self.assertEqual(mr_job.options.foo_config, '/etc/fooconf')
-        self.assertEqual(mr_job.options.accordian_files, [
-            'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
-        self.assertEqual(mr_job.generate_file_upload_args(), [
-            ('--foo-config', '/etc/fooconf'),
-            ('--accordian-file', 'WeirdAl.mp3'),
-            ('--accordian-file', '/home/dave/JohnLinnell.ogg')])
-
-    def test_multiple_config_files(self):
-        tmp_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, tmp_dir)
-
-        path_left = os.path.join(tmp_dir, 'left.yaml')
-        path_right = os.path.join(tmp_dir, 'right.yaml')
-        with open(path_left, 'w') as f:
-            dump_mrjob_conf({'runners': {'inline': {'jobconf': {'x': 1}}}}, f)
-        with open(path_right, 'w') as f:
-            dump_mrjob_conf({'runners': {'inline': {'jobconf': {'y': 2}}}}, f)
-        mr_job = MRCustomBoringJob(args=['-r', 'inline',
-                                         '-c', path_left, '-c', path_right])
-        with mr_job.make_runner() as r:
-            self.assertEqual(r._opts['jobconf']['x'], 1)
-            self.assertEqual(r._opts['jobconf']['y'], 2)
-
-    def test_no_conf_overrides(self):
-        mr_job = MRCustomBoringJob(args=['-c', 'blah.conf', '--no-conf'])
-        self.assertEqual(mr_job.options.conf_paths, [])
-
-    def test_no_conf_overridden(self):
-        mr_job = MRCustomBoringJob(args=['--no-conf', '-c', 'blah.conf'])
-        self.assertEqual(mr_job.options.conf_paths, ['blah.conf'])
 
 
 class FileOptionsTestCase(unittest.TestCase):

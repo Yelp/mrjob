@@ -37,8 +37,10 @@ EMPTY_MRJOB_CONF = {'runners': {
         'boostrap_mrjob': False,
     },
     'hadoop': {
+        'label': 'test_job'
     },
     'inline': {
+        'label': 'test_job'
     },
 }}
 

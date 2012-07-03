@@ -1479,23 +1479,15 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
 
     def setUp(self):
         super(LogFetchingFallbackTestCase, self).setUp()
-        self.make_runner()
-
-    def tearDown(self):
-        super(LogFetchingFallbackTestCase, self).tearDown()
-        self.cleanup_runner()
-
-    # Make sure that SSH and S3 are accessed when we expect them to be
-    def make_runner(self):
+        # Make sure that SSH and S3 are accessed when we expect them to be
         self.add_mock_s3_data({'walrus': {}})
 
-        self.runner = EMRJobRunner(s3_sync_wait_time=0,
-                                   s3_scratch_uri='s3://walrus/tmp',
-                                   conf_paths=[])
+        self.runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp')
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
         self.prepare_runner_for_ssh(self.runner)
 
-    def cleanup_runner(self):
+    def tearDown(self):
+        super(LogFetchingFallbackTestCase, self).tearDown()
         """This method assumes ``prepare_runner_for_ssh()`` was called. That
         method isn't a "proper" setup method because it requires different
         arguments for different tests.

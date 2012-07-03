@@ -1234,3 +1234,30 @@ class BadMainTestCase(unittest.TestCase):
         sys.argv.append('--mapper')
         self.assertRaises(UsageError, MRBoringJob().make_runner)
         sys.argv = sys.argv[:-1]
+
+
+class ProtocolTypeTestCase(unittest.TestCase):
+
+    class StrangeJob(MRJob):
+
+        def INPUT_PROTOCOL(self):
+            return JSONProtocol()
+
+        def INTERNAL_PROTOCOL(self):
+            return JSONProtocol()
+
+        def OUTPUT_PROTOCOL(self):
+            return JSONProtocol()
+
+    def test_attrs_should_be_classes(self):
+        with no_handlers_for_logger('mrjob.job'):
+            stderr = StringIO()
+            log_to_stream('mrjob.job', stderr)
+            job = self.StrangeJob(args=['--no-conf'])
+            self.assertIsInstance(job.input_protocol(), JSONProtocol)
+            self.assertIsInstance(job.internal_protocol(), JSONProtocol)
+            self.assertIsInstance(job.output_protocol(), JSONProtocol)
+            logs = stderr.getvalue()
+            self.assertIn('INPUT_PROTOCOL should be a class', logs)
+            self.assertIn('INTERNAL_PROTOCOL should be a class', logs)
+            self.assertIn('OUTPUT_PROTOCOL should be a class', logs)

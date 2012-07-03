@@ -38,6 +38,31 @@ from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
 
 
+class TestHadoopHomeRegression(unittest.TestCase):
+
+    def setUp(self):
+        self.tmp_dir = tempfile.mkdtemp()
+        self._old_environ = os.environ.copy()
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self._old_environ)
+        shutil.rmtree(self.tmp_dir)
+
+    def test_hadoop_home_regression(self):
+        mason_jar_path = os.path.join(
+            self.tmp_dir, 'hadoop-0.20.20-streaming.jar')
+        open(mason_jar_path, 'w').close()
+
+        # kill $HADOOP_HOME if it exists
+        try:
+            del os.environ['HADOOP_HOME']
+        except KeyError:
+            pass
+
+        HadoopJobRunner(hadoop_home=self.tmp_dir, conf_path=False)
+
+
 class TestFindHadoopStreamingJar(unittest.TestCase):
 
     def setUp(self):

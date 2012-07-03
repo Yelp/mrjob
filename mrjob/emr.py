@@ -79,6 +79,7 @@ from mrjob.pool import pool_hash_and_name
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.ssh import ssh_copy_key
+from mrjob.ssh import ssh_terminate_single_job
 from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_LOG_ROOT
@@ -1051,6 +1052,43 @@ class EMRJobRunner(MRJobRunner):
             except Exception, e:
                 log.exception(e)
 
+    def _cleanup_job(self):
+        # kill the job if we won't be taking down the whole job flow
+        if not (self._emr_job_flow_id or
+                self._opts['emr_job_flow_id'] or
+                self._opts['pool_emr_job_flows']):
+            # we're taking down the job flow, don't bother
+            return
+
+        error_msg = ('Unable to kill job without terminating job flow and'
+                     ' job is still running. You may wish to terminate it'
+                     ' yourself with "python -m mrjob.tools.emr.terminate_job_'
+                     'flow %s".' % self._emr_job_flow_id)
+
+        try:
+            addr = self._address_of_master()
+        except:
+            # no job flow to terminate, and the exception hierarchy for really
+            # dealing with this will be completely bonkers until 0.4.
+            # That function can raise AttributeError, LogFetchError,
+            # IOError...blech.
+            return
+
+        if not self._ran_job:
+            try:
+                log.info("Attempting to terminate job...")
+                had_job = ssh_terminate_single_job(
+                    self._opts['ssh_bin'],
+                    addr,
+                    self._opts['ec2_key_pair_file'])
+                if had_job:
+                    log.info("Succeeded in terminating job")
+                else:
+                    log.info("Job appears to have already been terminated")
+
+            except IOError:
+                log.info(error_msg)
+
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.
         """
@@ -1505,7 +1543,8 @@ class EMRJobRunner(MRJobRunner):
             self._fetch_counters(step_nums)
             self.print_counters(range(1, len(step_nums) + 1))
         else:
-            msg = 'Job failed with status %s: %s' % (job_state, reason)
+            msg = 'Job on job flow %s failed with status %s: %s' % (
+                job_flow.jobflowid, job_state, reason)
             log.error(msg)
             if self._s3_job_log_uri:
                 log.info('Logs are in %s' % self._s3_job_log_uri)

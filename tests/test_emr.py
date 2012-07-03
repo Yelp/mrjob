@@ -40,7 +40,6 @@ except ImportError:
     import unittest
 
 import mrjob
-from mrjob.conf import dump_mrjob_conf
 import mrjob.emr
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import attempt_to_acquire_lock
@@ -71,6 +70,8 @@ from tests.mr_word_count import MRWordCount
 from tests.quiet import log_to_buffer
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import mrjob_conf_patcher
+from tests.sandbox import SandboxedTestCase
 
 try:
     import boto
@@ -82,10 +83,12 @@ except ImportError:
     boto = None
 
 
-class MockEMRAndS3TestCase(unittest.TestCase):
+class MockEMRAndS3TestCase(SandboxedTestCase):
 
     @classmethod
     def setUpClass(cls):
+        # we don't care what's in this file, just want mrjob to stop creating
+        # and deleting a complicated archive.
         cls.fake_mrjob_tgz_path = tempfile.mkstemp(
             prefix='fake_mrjob_', suffix='.tar.gz')[1]
 
@@ -95,7 +98,7 @@ class MockEMRAndS3TestCase(unittest.TestCase):
             os.remove(cls.fake_mrjob_tgz_path)
 
     def setUp(self):
-        self.make_mrjob_conf()
+        super(MockEMRAndS3TestCase, self).setUp()
         self.sandbox_boto()
 
         def simple_patch(obj, attr, side_effect=None, autospec=False):
@@ -117,22 +120,6 @@ class MockEMRAndS3TestCase(unittest.TestCase):
 
     def tearDown(self):
         self.unsandbox_boto()
-        self.rm_mrjob_conf()
-
-    def mrjob_conf_contents(self):
-        return {'runners': {'emr': {
-                'check_emr_status_every': 0.00,
-                's3_sync_wait_time': 0.00,
-                'bootstrap_mrjob': False,
-            }}}
-
-    def make_mrjob_conf(self):
-        _, self.mrjob_conf_path = tempfile.mkstemp(prefix='mrjob.conf.')
-        with open(self.mrjob_conf_path, 'w') as f:
-            dump_mrjob_conf(self.mrjob_conf_contents(), f)
-
-    def rm_mrjob_conf(self):
-        os.unlink(self.mrjob_conf_path)
 
     def sandbox_boto(self):
         self.mock_s3_fs = {}
@@ -227,28 +214,12 @@ class MockEMRAndS3TestCase(unittest.TestCase):
 
 class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
-    def setUp(self):
-        super(EMRJobRunnerEndToEndTestCase, self).setUp()
-        self.make_tmp_dir()
-        self.put_additional_emr_info_in_mrjob_conf()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-        super(EMRJobRunnerEndToEndTestCase, self).tearDown()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
-    def put_additional_emr_info_in_mrjob_conf(self):
-        with open(self.mrjob_conf_path, 'w') as f:
-            dump_mrjob_conf({'runners': {'emr': {
-                'check_emr_status_every': 0.00,
-                's3_sync_wait_time': 0.00,
-                'additional_emr_info': {'key': 'value'},
-            }}}, f)
+    MRJOB_CONF_CONTENTS = {'runners': {'emr': {
+        'check_emr_status_every': 0.00,
+        's3_sync_wait_time': 0.00,
+        'boostrap_mrjob': False,
+        'additional_emr_info': {'key': 'value'}
+    }}}
 
     def test_end_to_end(self):
         # read from STDIN, a local file, and a remote file
@@ -266,7 +237,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             '1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n']}
 
         mr_job = MRHadoopFormatJob(['-r', 'emr', '-v',
-                                    '-c', self.mrjob_conf_path,
                                     '-', local_input_path, remote_input_path])
         mr_job.sandbox(stdin=stdin)
 
@@ -347,8 +317,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.assertEqual(job_flow.state, 'TERMINATED')
 
     def test_failed_job(self):
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path])
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v'])
         mr_job.sandbox()
 
         self.add_mock_s3_data({'walrus': {}})
@@ -389,7 +358,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         stdin = StringIO('foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path,
                                '--s3-log-uri', 's3://walrus/logs',
                                '-', '--cleanup', mode])
         mr_job.sandbox(stdin=stdin)
@@ -445,8 +413,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         stdin = StringIO('foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--hadoop-version=0.18',
-                               '-c', self.mrjob_conf_path])
+                               '--hadoop-version=0.18'])
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
@@ -464,8 +431,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         stdin = StringIO('foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--hadoop-version=0.20',
-                               '-c', self.mrjob_conf_path])
+                               '--hadoop-version=0.20'])
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
@@ -480,9 +446,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         # Test regression from #338 where _wait_for_job_flow_termination
         # would raise an IndexError whenever the job flow wasn't already
         # finished
-        mr_job = MRTwoStepJob(['-r', 'emr',
-                               '-c', self.mrjob_conf_path,
-                               '--check-emr-status-every=0'])
+        mr_job = MRTwoStepJob(['-r', 'emr'])
         mr_job.sandbox()
         with mr_job.make_runner() as runner:
             runner._launch_emr_job()
@@ -532,8 +496,9 @@ class BootstrapFilesTestCase(MockEMRAndS3TestCase):
     def test_bootstrap_files_only_get_uploaded_once(self):
         # just a regression test for Issue #8
 
-        # use self.mrjob_conf_path because it's easier than making a new file
-        bootstrap_file = self.mrjob_conf_path
+        # use self.fake_mrjob_tgz_path because it's easier than making a new
+        # file
+        bootstrap_file = self.fake_mrjob_tgz_path
 
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_files=[bootstrap_file])
@@ -558,7 +523,6 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
             '1\t"bar"\n1\t"foo"\n2\tnull\n']}
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path,
                                '--emr-job-flow-id', emr_job_flow_id])
         mr_job.sandbox(stdin=stdin)
 
@@ -586,7 +550,6 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
             keep_alive=True)
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path,
                                '--emr-job-flow-id', emr_job_flow_id])
         mr_job.sandbox()
 
@@ -622,7 +585,7 @@ class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
     def run_and_get_job_flow(self, *args):
         stdin = StringIO('foo\nbar\n')
         mr_job = MRTwoStepJob(
-            ['-r', 'emr', '-v', '-c', self.mrjob_conf_path] + list(args))
+            ['-r', 'emr', '-v'] + list(args))
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
@@ -692,22 +655,16 @@ class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
 
 class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
 
-    def setUp(self):
-        super(AvailabilityZoneTestCase, self).setUp()
-        self.put_availability_zone_in_mrjob_conf()
-
-    def put_availability_zone_in_mrjob_conf(self):
-        dump_mrjob_conf({'runners': {'emr': {
-            'check_emr_status_every': 0.00,
-            's3_sync_wait_time': 0.00,
-            'aws_availability_zone': 'PUPPYLAND',
-        }}}, open(self.mrjob_conf_path, 'w'))
+    MRJOB_CONF_CONTENTS = {'runners': {'emr': {
+        'check_emr_status_every': 0.00,
+        's3_sync_wait_time': 0.00,
+        'aws_availability_zone': 'PUPPYLAND',
+    }}}
 
     def test_availability_zone_config(self):
         # Confirm that the mrjob.conf option 'aws_availability_zone' was
         #   propagated through to the job flow
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path])
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -719,9 +676,7 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
             self.assertEqual(job_flow.availabilityzone, 'PUPPYLAND')
 
     def test_debugging_works(self):
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                           '-c', self.mrjob_conf_path,
-                           '--enable-emr-debugging'])
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--enable-emr-debugging'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -897,7 +852,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
 
         <role>=(num_instances, instance_type, bid_price)
         """
-        runner = EMRJobRunner(conf_path=self.mrjob_conf_path, **opts)
+        runner = EMRJobRunner(**opts)
 
         job_flow_id = runner.make_persistent_job_flow()
         job_flow = runner.make_emr_conn().describe_jobflow(job_flow_id)
@@ -947,11 +902,11 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self.assertEqual(expected_instance_count, job_flow.instancecount)
 
     def set_in_mrjob_conf(self, **kwargs):
-        emr_opts = {'check_emr_status_every': 0.00,
-                    's3_sync_wait_time': 0.00}
-        emr_opts.update(kwargs)
-        with open(self.mrjob_conf_path, 'w') as f:
-            dump_mrjob_conf({'runners': {'emr': emr_opts}}, f)
+        emr_opts = copy.deepcopy(self.MRJOB_CONF_CONTENTS)
+        emr_opts['runners']['emr'].update(kwargs)
+        patcher = mrjob_conf_patcher(emr_opts)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_defaults(self):
         self._test_instance_groups(
@@ -1992,7 +1947,6 @@ class EMRNoMapperTest(MockEMRAndS3TestCase):
             '1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n']}
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path,
                                '-', local_input_path, remote_input_path])
         mr_job.sandbox(stdin=stdin)
 
@@ -2009,38 +1963,13 @@ class EMRNoMapperTest(MockEMRAndS3TestCase):
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
 
-class PoolingTestCase(MockEMRAndS3TestCase):
-
-    def setUp(self):
-        super(PoolingTestCase, self).setUp()
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        super(PoolingTestCase, self).tearDown()
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        try:
-            shutil.rmtree(self.tmp_dir)
-            self.teardown_ssh()
-        except (OSError, AttributeError):
-            pass  # didn't set up SSH
-
-    def mrjob_conf_contents(self):
-        return {'runners': {'emr': {
-                'check_emr_status_every': 0.00,
-                's3_sync_wait_time': 0.00,
-            }}}
+class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
     def make_pooled_job_flow(self, name=None, minutes_ago=0, **kwargs):
         """Returns ``(runner, job_flow_id)``. Set minutes_ago to set
         ``jobflow.startdatetime`` to seconds before
         ``datetime.datetime.now()``."""
-        runner = EMRJobRunner(conf_path=self.mrjob_conf_path,
-                              pool_emr_job_flows=True,
+        runner = EMRJobRunner(pool_emr_job_flows=True,
                               emr_job_flow_pool_name=name,
                               **kwargs)
         job_flow_id = runner.make_persistent_job_flow()
@@ -2050,49 +1979,26 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         jf.startdatetime = start.strftime(boto.utils.ISO8601)
         return runner, job_flow_id
 
-    def get_job_flow_and_results(self, job_args, mock_output=(),
-                                 job_class=MRTwoStepJob):
+    def get_job_flow(self, job_args, job_class=MRTwoStepJob):
         mr_job = job_class(job_args)
         mr_job.sandbox()
 
-        results = []
         with mr_job.make_runner() as runner:
             self.prepare_runner_for_ssh(runner)
             runner.run()
 
             job_flow_id = runner.get_emr_job_flow_id()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+        return job_flow_id
 
-        return job_flow_id, sorted(results)
-
-    def assertJoins(self, job_flow_id, job_args, job_class=MRTwoStepJob,
-                    check_output=True):
-
-        if check_output:
-            mock_output = ['1\t"bar"\n1\t"foo"\n2\tnull\n']
-
-            steps_in_jf = len(self.mock_emr_job_flows[job_flow_id].steps)
-            steps_in_job = len(job_class(job_args).steps())
-            step_num = steps_in_jf + steps_in_job - 1
-
-            self.mock_emr_output[(job_flow_id, step_num)] = mock_output
-
-        actual_job_flow_id, results = self.get_job_flow_and_results(
-            job_args, job_class=job_class, mock_output=mock_output)
+    def assertJoins(self, job_flow_id, job_args, job_class=MRTwoStepJob):
+        actual_job_flow_id = self.get_job_flow(job_args, job_class=job_class)
 
         self.assertEqual(actual_job_flow_id, job_flow_id)
 
-        if check_output:
-            self.assertEqual(results,
-                             [(1, 'bar'), (1, 'foo'), (2, None)])
-
     def assertDoesNotJoin(self, job_flow_id, job_args, job_class=MRTwoStepJob):
 
-        actual_job_flow_id, _ = self.get_job_flow_and_results(
-            job_args, job_class=job_class)
+        actual_job_flow_id = self.get_job_flow(job_args, job_class=job_class)
 
         self.assertNotEqual(actual_job_flow_id, job_flow_id)
 
@@ -2105,8 +2011,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         """Make an EMRJobRunner that is ready to try to find a pool to join"""
         mr_job = MRTwoStepJob([
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--pool-name', pool_name,
-            '-c', self.mrjob_conf_path])
+            '--pool-name', pool_name])
         mr_job.sandbox()
         runner = mr_job.make_runner()
         self.prepare_runner_for_ssh(runner)
@@ -2114,8 +2019,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         return runner
 
     def test_make_new_pooled_job_flow(self):
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool-emr-job-flows',
-                               '-c', self.mrjob_conf_path])
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool-emr-job-flows'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -2135,48 +2039,42 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         _, job_flow_id = self.make_pooled_job_flow()
 
         self.assertJoins(job_flow_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '-c', self.mrjob_conf_path])
+            '-r', 'emr', '-v', '--pool-emr-job-flows'])
 
     def test_join_named_pool(self):
         _, job_flow_id = self.make_pooled_job_flow('pool1')
 
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--pool-name', 'pool1',
-            '-c', self.mrjob_conf_path])
+            '--pool-name', 'pool1'])
 
     def test_pooling_with_hadoop_version(self):
         _, job_flow_id = self.make_pooled_job_flow(hadoop_version='0.18')
 
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--hadoop-version', '0.18',
-            '-c', self.mrjob_conf_path])
+            '--hadoop-version', '0.18'])
 
     def test_dont_join_pool_with_wrong_hadoop_version(self):
         _, job_flow_id = self.make_pooled_job_flow(hadoop_version='0.18')
 
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--hadoop-version', '0.20',
-            '-c', self.mrjob_conf_path])
+            '--hadoop-version', '0.20'])
 
     def test_pooling_with_ami_version(self):
         _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0')
 
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--ami-version', '2.0',
-            '-c', self.mrjob_conf_path])
+            '--ami-version', '2.0'])
 
     def test_dont_join_pool_with_wrong_ami_version(self):
         _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0')
 
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--ami-version', '1.0',
-            '-c', self.mrjob_conf_path])
+            '--ami-version', '1.0'])
 
     def test_pooling_with_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
@@ -2185,8 +2083,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--additional-emr-info', info,
-            '-c', self.mrjob_conf_path])
+            '--additional-emr-info', info])
 
     def test_dont_join_pool_with_wrong_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
@@ -2194,8 +2091,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--additional-emr-info', info,
-            '-c', self.mrjob_conf_path])
+            '--additional-emr-info', info])
 
     def test_join_pool_with_same_instance_type_and_count(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2205,8 +2101,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ec2-instance-type', 'm2.4xlarge',
-            '--num-ec2-instances', '20',
-            '-c', self.mrjob_conf_path])
+            '--num-ec2-instances', '20'])
 
     def test_join_pool_with_more_of_same_instance_type(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2216,8 +2111,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ec2-instance-type', 'm2.4xlarge',
-            '--num-ec2-instances', '5',
-            '-c', self.mrjob_conf_path])
+            '--num-ec2-instances', '5'])
 
     def test_join_job_flow_with_bigger_instances(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2227,8 +2121,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ec2-instance-type', 'm1.small',
-            '--num-ec2-instances', '20',
-            '-c', self.mrjob_conf_path])
+            '--num-ec2-instances', '20'])
 
     def test_join_job_flow_with_enough_cpu_and_memory(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2240,8 +2133,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ec2-instance-type', 'm1.small',
-            '--num-ec2-instances', '10',
-            '-c', self.mrjob_conf_path])
+            '--num-ec2-instances', '10'])
 
     def test_dont_join_job_flow_with_instances_with_too_little_memory(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2251,8 +2143,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ec2-instance-type', 'm2.4xlarge',
-            '--num-ec2-instances', '2',
-            '-c', self.mrjob_conf_path])
+            '--num-ec2-instances', '2'])
 
     def test_master_instance_has_to_be_big_enough(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2265,8 +2156,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ec2-instance-type', 'c1.xlarge',
-            '--num-ec2-instances', '1',
-            '-c', self.mrjob_conf_path])
+            '--num-ec2-instances', '1'])
 
     def test_unknown_instance_type_against_matching_pool(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2276,8 +2166,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ec2-instance-type', 'a1.sauce',
-            '--num-ec2-instances', '10',
-            '-c', self.mrjob_conf_path])
+            '--num-ec2-instances', '10'])
 
     def test_unknown_instance_type_against_pool_with_more_instances(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2287,8 +2176,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ec2-instance-type', 'a1.sauce',
-            '--num-ec2-instances', '10',
-            '-c', self.mrjob_conf_path])
+            '--num-ec2-instances', '10'])
 
     def test_unknown_instance_type_against_pool_with_less_instances(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2298,8 +2186,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ec2-instance-type', 'a1.sauce',
-            '--num-ec2-instances', '10',
-            '-c', self.mrjob_conf_path])
+            '--num-ec2-instances', '10'])
 
     def test_unknown_instance_type_against_other_instance_types(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2311,8 +2198,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ec2-instance-type', 'a1.sauce',
-            '--num-ec2-instances', '2',
-            '-c', self.mrjob_conf_path])
+            '--num-ec2-instances', '2'])
 
     def test_can_join_job_flow_with_same_bid_price(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2320,8 +2206,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--ec2-master-instance-bid-price', '0.25',
-            '-c', self.mrjob_conf_path])
+            '--ec2-master-instance-bid-price', '0.25'])
 
     def test_can_join_job_flow_with_higher_bid_price(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2329,8 +2214,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--ec2-master-instance-bid-price', '0.25',
-            '-c', self.mrjob_conf_path])
+            '--ec2-master-instance-bid-price', '0.25'])
 
     def test_cant_join_job_flow_with_lower_bid_price(self):
         _, job_flow_id = self.make_pooled_job_flow(
@@ -2339,24 +2223,21 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--ec2-master-instance-bid-price', '25.00',
-            '-c', self.mrjob_conf_path])
+            '--ec2-master-instance-bid-price', '25.00'])
 
     def test_on_demand_satisfies_any_bid_price(self):
         _, job_flow_id = self.make_pooled_job_flow()
 
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--ec2-master-instance-bid-price', '25.00',
-            '-c', self.mrjob_conf_path])
+            '--ec2-master-instance-bid-price', '25.00'])
 
     def test_no_bid_price_satisfies_on_demand(self):
         _, job_flow_id = self.make_pooled_job_flow(
             ec2_master_instance_bid_price='25.00')
 
         self.assertDoesNotJoin(job_flow_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '-c', self.mrjob_conf_path])
+            '-r', 'emr', '-v', '--pool-emr-job-flows'])
 
     def test_core_and_task_instance_types(self):
         # a tricky test that mixes and matches different criteria
@@ -2373,30 +2254,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             '--num-ec2-task-instances', '10',  # more instances, but smaller
             '--ec2-core-instance-bid-price', '0.10',
             '--ec2-master-instance-bid-price', '77.77',
-            '--ec2-task-instance-bid-price', '22.00',
-            '-c', self.mrjob_conf_path])
-
-    def test_can_turn_off_pooling_from_cmd_line(self):
-        # turn on pooling in mrjob.conf
-        with open(self.mrjob_conf_path, 'w') as f:
-            dump_mrjob_conf({'runners': {'emr': {
-                'check_emr_status_every': 0.00,
-                's3_sync_wait_time': 0.00,
-                'pool_emr_job_flows': True,
-            }}}, f)
-
-        mr_job = MRTwoStepJob([
-            '-r', 'emr', '-v', '--no-pool-emr-job-flows',
-            '-c', self.mrjob_conf_path])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            self.prepare_runner_for_ssh(runner)
-            runner.run()
-
-            job_flow_id = runner.get_emr_job_flow_id()
-            jf = runner.make_emr_conn().describe_jobflow(job_flow_id)
-            self.assertEqual(jf.keepjobflowalivewhennosteps, 'false')
+            '--ec2-task-instance-bid-price', '22.00'])
 
     def test_dont_join_full_job_flow(self):
         dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
@@ -2412,8 +2270,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         # a two-step job shouldn't fit
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--pool-name', 'pool1',
-            '-c', self.mrjob_conf_path],
+            '--pool-name', 'pool1'],
             job_class=MRTwoStepJob)
 
     def test_join_almost_full_job_flow(self):
@@ -2431,8 +2288,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         # a one-step job should fit
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--pool-name', 'pool1',
-            '-c', self.mrjob_conf_path],
+            '--pool-name', 'pool1'],
             job_class=MRWordCount)
 
     def test_dont_join_idle_with_steps(self):
@@ -2447,8 +2303,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--pool-name', 'pool1',
-            '-c', self.mrjob_conf_path],
+            '--pool-name', 'pool1'],
             job_class=MRWordCount)
 
     def test_dont_join_wrong_named_pool(self):
@@ -2456,8 +2311,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--pool-name', 'not_pool1',
-            '-c', self.mrjob_conf_path])
+            '--pool-name', 'not_pool1'])
 
     def test_dont_join_wrong_mrjob_version(self):
         _, job_flow_id = self.make_pooled_job_flow('pool1')
@@ -2469,8 +2323,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
             self.assertDoesNotJoin(job_flow_id, [
                 '-r', 'emr', '-v', '--pool-emr-job-flows',
-                '--pool-name', 'not_pool1',
-                '-c', self.mrjob_conf_path])
+                '--pool-name', 'not_pool1'])
         finally:
             mrjob.__version__ = old_version
 
@@ -2484,8 +2337,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--bootstrap-file', local_input_path,
-            '-c', self.mrjob_conf_path])
+            '--bootstrap-file', local_input_path])
 
     def test_dont_join_differently_bootstrapped_pool(self):
         local_input_path = os.path.join(self.tmp_dir, 'input')
@@ -2496,8 +2348,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--bootstrap-file', local_input_path,
-            '-c', self.mrjob_conf_path])
+            '--bootstrap-file', local_input_path])
 
     def test_dont_join_differently_bootstrapped_pool_2(self):
         local_input_path = os.path.join(self.tmp_dir, 'input')
@@ -2512,8 +2363,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--bootstrap-action', bootstrap_path + ' a b c',
-            '-c', self.mrjob_conf_path])
+            '--bootstrap-action', bootstrap_path + ' a b c'])
 
     def test_pool_contention(self):
         _, job_flow_id = self.make_pooled_job_flow('robert_downey_jr')
@@ -2521,8 +2371,7 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         def runner_plz():
             mr_job = MRTwoStepJob([
                 '-r', 'emr', '-v', '--pool-emr-job-flows',
-                '--pool-name', 'robert_downey_jr',
-                '-c', self.mrjob_conf_path])
+                '--pool-name', 'robert_downey_jr'])
             mr_job.sandbox()
             runner = mr_job.make_runner()
             runner._prepare_for_launch()
@@ -2572,7 +2421,6 @@ class PoolingTestCase(MockEMRAndS3TestCase):
     def test_dont_destroy_own_pooled_job_flow_on_failure(self):
         # Issue 242: job failure shouldn't kill the pooled job flows
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path,
                                '--pool-emr-job-flow'])
         mr_job.sandbox()
 
@@ -2608,7 +2456,6 @@ class PoolingTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {(job_flow_id, 0): None}
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-c', self.mrjob_conf_path,
                                '--pool-emr-job-flow'])
         mr_job.sandbox()
 
@@ -2637,6 +2484,27 @@ class PoolingTestCase(MockEMRAndS3TestCase):
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
         self.assertEqual(job_flow.state, 'WAITING')
+
+
+class PoolingDisablingTestCase(MockEMRAndS3TestCase):
+
+    MRJOB_CONF_CONTENTS = {'runners': {'emr': {
+        'check_emr_status_every': 0.00,
+        's3_sync_wait_time': 0.00,
+        'pool_emr_job_flows': True,
+    }}}
+
+    def test_can_turn_off_pooling_from_cmd_line(self):
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--no-pool-emr-job-flows'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            self.prepare_runner_for_ssh(runner)
+            runner.run()
+
+            job_flow_id = runner.get_emr_job_flow_id()
+            jf = runner.make_emr_conn().describe_jobflow(job_flow_id)
+            self.assertEqual(jf.keepjobflowalivewhennosteps, 'false')
 
 
 class S3LockTestCase(MockEMRAndS3TestCase):

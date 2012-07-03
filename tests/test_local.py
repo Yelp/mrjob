@@ -35,7 +35,6 @@ from mock import patch
 
 import mrjob
 from mrjob import local
-from mrjob.conf import dump_mrjob_conf
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import cmd_line
 from mrjob.util import read_file
@@ -47,24 +46,12 @@ from tests.mr_word_count import MRWordCount
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import mrjob_conf_patcher
+from tests.sandbox import EmptyMrjobConfTestCase
+from tests.sandbox import SandboxedTestCase
 
 
-class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
-
-    def setUp(self):
-        self.make_tmp_dir_and_mrjob_conf()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-
-    def make_tmp_dir_and_mrjob_conf(self):
-        self.tmp_dir = tempfile.mkdtemp()
-        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'local': {}}},
-                        open(self.mrjob_conf_path, 'w'))
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
+class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
     def test_end_to_end(self):
         # read from STDIN, a regular file, and a .gz
@@ -80,9 +67,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
         input_gz.write('foo\n')
         input_gz.close()
 
-        mr_job = MRTwoStepJob(['-c', self.mrjob_conf_path,
-                               '-r', 'local',
-                               '-', input_path, input_gz_glob])
+        mr_job = MRTwoStepJob(['-r', 'local', '-', input_path, input_gz_glob])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
@@ -119,8 +104,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
         input_gz.write('foo\n')
         input_gz.close()
 
-        mr_job = MRTwoStepJob(['-c', self.mrjob_conf_path,
-                               '-r', 'local',
+        mr_job = MRTwoStepJob(['-r', 'local',
                                '--jobconf=mapred.map.tasks=2',
                                 '--jobconf=mapred.reduce.tasks=2',
                                '-', input_path, input_gz_path])
@@ -248,8 +232,7 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
     def test_multi_step_counters(self):
         stdin = StringIO('foo\nbar\n')
 
-        mr_job = MRCountingJob(['-c', self.mrjob_conf_path, '-r', 'local',
-                                '-'])
+        mr_job = MRCountingJob(['-r', 'local', '-'])
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
@@ -370,7 +353,7 @@ class ExitWithoutExceptionTestCase(unittest.TestCase):
         self.fail()
 
 
-class PythonBinTestCase(unittest.TestCase):
+class PythonBinTestCase(EmptyMrjobConfTestCase):
 
     def test_echo_as_python_bin(self):
         # "echo" is a pretty poor substitute for Python, but it
@@ -419,7 +402,7 @@ class StepsPythonBinTestCase(unittest.TestCase):
         with mr_job.make_runner() as runner:
             assert isinstance(runner, LocalMRJobRunner)
             try:
-                # make_runner() populates _steps in the runner, so un-populate
+                # MRTwoStepJob populates _steps in the runner, so un-populate
                 # it here so that the runner actually tries to get the steps
                 # via subprocess
                 runner._steps = None
@@ -453,24 +436,25 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
         # and the script loads from the .pyc compiled from that .py file.
         our_mrjob_dir = os.path.dirname(os.path.realpath(mrjob.__file__))
 
-        mr_job = MRJobWhereAreYou(['--no-conf', '-r', 'local'])
-        mr_job.sandbox()
+        with mrjob_conf_patcher():
+            mr_job = MRJobWhereAreYou(['-r', 'local'])
+            mr_job.sandbox()
 
-        with mr_job.make_runner() as runner:
-            # sanity check
-            self.assertEqual(runner.get_opts()['bootstrap_mrjob'], True)
-            local_tmp_dir = os.path.realpath(runner._get_local_tmp_dir())
+            with mr_job.make_runner() as runner:
+                # sanity check
+                self.assertEqual(runner.get_opts()['bootstrap_mrjob'], True)
+                local_tmp_dir = os.path.realpath(runner._get_local_tmp_dir())
 
-            runner.run()
+                runner.run()
 
-            output = list(runner.stream_output())
-            self.assertEqual(len(output), 1)
+                output = list(runner.stream_output())
+                self.assertEqual(len(output), 1)
 
-            # script should load mrjob from its working dir
-            _, script_mrjob_dir = mr_job.parse_output_line(output[0])
+                # script should load mrjob from its working dir
+                _, script_mrjob_dir = mr_job.parse_output_line(output[0])
 
-            self.assertNotEqual(our_mrjob_dir, script_mrjob_dir)
-            assert script_mrjob_dir.startswith(local_tmp_dir)
+                self.assertNotEqual(our_mrjob_dir, script_mrjob_dir)
+                assert script_mrjob_dir.startswith(local_tmp_dir)
 
     def test_can_turn_off_bootstrap_mrjob(self):
         # track the dir we're loading mrjob from rather than the full path
@@ -478,43 +462,27 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
         # and the script loads from the .pyc compiled from that .py file.
         our_mrjob_dir = os.path.dirname(os.path.realpath(mrjob.__file__))
 
-        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'local': {'bootstrap_mrjob': False}}},
-                        open(self.mrjob_conf_path, 'w'))
+        with mrjob_conf_patcher(
+            {'runners': {'local': {'bootstrap_mrjob': False}}}):
 
-        mr_job = MRJobWhereAreYou(['-c', self.mrjob_conf_path, '-r', 'local'])
-        mr_job.sandbox()
+            mr_job = MRJobWhereAreYou(['-r', 'local'])
+            mr_job.sandbox()
 
-        with mr_job.make_runner() as runner:
-            # sanity check
-            self.assertEqual(runner.get_opts()['bootstrap_mrjob'], False)
-            runner.run()
+            with mr_job.make_runner() as runner:
+                # sanity check
+                self.assertEqual(runner.get_opts()['bootstrap_mrjob'], False)
+                runner.run()
 
-            output = list(runner.stream_output())
+                output = list(runner.stream_output())
 
-            self.assertEqual(len(output), 1)
+                self.assertEqual(len(output), 1)
 
-            # script should load mrjob from the same place our test does
-            _, script_mrjob_dir = mr_job.parse_output_line(output[0])
-            self.assertEqual(our_mrjob_dir, script_mrjob_dir)
+                # script should load mrjob from the same place our test does
+                _, script_mrjob_dir = mr_job.parse_output_line(output[0])
+                self.assertEqual(our_mrjob_dir, script_mrjob_dir)
 
 
-class LocalMRJobRunnerTestJobConfCase(unittest.TestCase):
-
-    def setUp(self):
-        self.make_tmp_dir_and_mrjob_conf()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-
-    def make_tmp_dir_and_mrjob_conf(self):
-        self.tmp_dir = tempfile.mkdtemp()
-        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'local': {}}},
-                        open(self.mrjob_conf_path, 'w'))
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
+class LocalMRJobRunnerTestJobConfCase(SandboxedTestCase):
 
     def test_input_file(self):
         input_path = os.path.join(self.tmp_dir, 'input')
@@ -526,8 +494,7 @@ class LocalMRJobRunnerTestJobConfCase(unittest.TestCase):
         input_gz.write('foo\n')
         input_gz.close()
 
-        mr_job = MRWordCount(['-c', self.mrjob_conf_path,
-                              '-r', 'local',
+        mr_job = MRWordCount(['-r', 'local',
                               '--jobconf=mapred.map.tasks=2',
                               '--jobconf=mapred.reduce.tasks=2',
                               input_path, input_gz_path])
@@ -552,8 +519,7 @@ class LocalMRJobRunnerTestJobConfCase(unittest.TestCase):
         with open(input_path, 'w') as input_file:
             input_file.write('foo\n')
 
-        mr_job = MRTestJobConf(['-c', self.mrjob_conf_path,
-                                '-r', 'local',
+        mr_job = MRTestJobConf(['-r', 'local',
                                 '--jobconf=user.defined=something',
                                input_path])
         mr_job.sandbox()
@@ -586,7 +552,7 @@ class LocalMRJobRunnerTestJobConfCase(unittest.TestCase):
         self.assertEqual(results['user.defined'], 'something')
 
 
-class CompatTestCase(unittest.TestCase):
+class CompatTestCase(EmptyMrjobConfTestCase):
 
     def test_environment_variables_018(self):
         runner = LocalMRJobRunner(hadoop_version='0.18', conf_paths=[])
@@ -606,7 +572,7 @@ class CompatTestCase(unittest.TestCase):
                           runner._subprocess_env('M', 0, 0).keys())
 
 
-class TestHadoopConfArgs(unittest.TestCase):
+class TestHadoopConfArgs(EmptyMrjobConfTestCase):
 
     def test_empty(self):
         runner = LocalMRJobRunner(conf_paths=[])

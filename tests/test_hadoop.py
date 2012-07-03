@@ -201,20 +201,3 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
     def test_end_to_end_with_explicit_hadoop_bin(self):
         self._test_end_to_end(['--hadoop-bin', self.hadoop_bin])
-
-
-class TestURIs(MockHadoopTestCase):
-
-    def test_uris(self):
-        runner = HadoopJobRunner(conf_paths=[])
-        list(runner.ls('hdfs://tmp/waffles'))
-        list(runner.ls('leggo://my/eggo'))
-        list(runner.ls('/tmp'))
-
-        with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
-            hadoop_cmd_args = [shlex.split(line) for line in mock_log]
-
-        self.assertEqual(hadoop_cmd_args, [
-            ['fs', '-lsr', 'hdfs://tmp/waffles'],
-            ['fs', '-lsr', 'leggo://my/eggo'],
-        ])

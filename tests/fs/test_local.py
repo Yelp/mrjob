@@ -19,10 +19,10 @@ import os
 
 from mrjob.fs.local import LocalFilesystem
 
-from tests.fs import TempdirTestCase
+from tests.sandbox import SandboxedTestCase
 
 
-class LocalFSTestCase(TempdirTestCase):
+class LocalFSTestCase(SandboxedTestCase):
 
     def setUp(self):
         super(LocalFSTestCase, self).setUp()
@@ -35,21 +35,21 @@ class LocalFSTestCase(TempdirTestCase):
         self.assertEqual(self.fs.can_handle_path('http://yelp.com/'), False)
 
     def test_ls_empty(self):
-        self.assertEqual(list(self.fs.ls(self.root)), [])
+        self.assertEqual(list(self.fs.ls(self.tmp_dir)), [])
 
     def test_ls_basic(self):
         self.makefile('f', 'contents')
-        self.assertEqual(list(self.fs.ls(self.root)), self.abs_paths('f'))
+        self.assertEqual(list(self.fs.ls(self.tmp_dir)), self.abs_paths('f'))
 
     def test_ls_basic_2(self):
         self.makefile('f', 'contents')
         self.makefile('f2', 'contents')
-        self.assertEqual(list(self.fs.ls(self.root)), self.abs_paths('f', 'f2'))
+        self.assertEqual(list(self.fs.ls(self.tmp_dir)), self.abs_paths('f', 'f2'))
 
     def test_ls_recurse(self):
         self.makefile('f', 'contents')
         self.makefile('d/f2', 'contents')
-        self.assertEqual(list(self.fs.ls(self.root)),
+        self.assertEqual(list(self.fs.ls(self.tmp_dir)),
                          self.abs_paths('f', 'd/f2'))
 
     def test_cat_uncompressed(self):
@@ -57,14 +57,14 @@ class LocalFSTestCase(TempdirTestCase):
         self.assertEqual(list(self.fs._cat_file(path)), ['bar\n', 'foo\n'])
 
     def test_cat_gz(self):
-        input_gz_path = os.path.join(self.root, 'input.gz')
+        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
         with gzip.GzipFile(input_gz_path, 'w') as input_gz:
             input_gz.write('foo\nbar\n')
 
         self.assertEqual(list(self.fs._cat_file(input_gz_path)), ['foo\n', 'bar\n'])
 
     def test_cat_bz2(self):
-        input_bz2_path = os.path.join(self.root, 'input.bz2')
+        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
         with bz2.BZ2File(input_bz2_path, 'w') as input_bz2:
             input_bz2.write('bar\nbar\nfoo\n')
 
@@ -75,17 +75,17 @@ class LocalFSTestCase(TempdirTestCase):
         data_path_1 = self.makefile('data1', 'abcd')
         data_path_2 = self.makefile('more/data2', 'defg')
 
-        self.assertEqual(self.fs.du(self.root), 8)
+        self.assertEqual(self.fs.du(self.tmp_dir), 8)
         self.assertEqual(self.fs.du(data_path_1), 4)
         self.assertEqual(self.fs.du(data_path_2), 4)
 
     def test_mkdir(self):
-        path = os.path.join(self.root, 'dir')
+        path = os.path.join(self.tmp_dir, 'dir')
         self.fs.mkdir(path)
         self.assertEqual(os.path.isdir(path), True)
 
     def test_path_exists_no(self):
-        path = os.path.join(self.root, 'f')
+        path = os.path.join(self.tmp_dir, 'f')
         self.assertEqual(self.fs.path_exists(path), False)
 
     def test_path_exists_yes(self):
@@ -93,7 +93,7 @@ class LocalFSTestCase(TempdirTestCase):
         self.assertEqual(self.fs.path_exists(path), True)
 
     def test_touchz(self):
-        path = os.path.join(self.root, 'f')
+        path = os.path.join(self.tmp_dir, 'f')
         self.fs.touchz(path)
         self.fs.touchz(path)
         with open(path, 'w') as f:

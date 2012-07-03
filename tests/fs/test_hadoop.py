@@ -94,7 +94,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
 
     def test_mkdir(self):
         self.fs.mkdir('hdfs:///d')
-        local_path = os.path.join(self.root, 'mock_hdfs_root', 'd')
+        local_path = os.path.join(self.tmp_dir, 'mock_hdfs_root', 'd')
         self.assertEqual(os.path.isdir(local_path), True)
 
     def test_rm(self):

@@ -14,11 +14,6 @@
 import os
 
 try:
-    from unittest2 import TestCase
-except ImportError:
-    from unittest import TestCase
-
-try:
     import boto
 except ImportError:
     boto = None
@@ -27,9 +22,10 @@ from mrjob.fs.s3 import S3Filesystem
 
 from tests.mockboto import MockS3Connection
 from tests.mockboto import add_mock_s3_data
+from tests.sandbox import SandboxedTestCase
 
 
-class S3FSTestCase(TestCase):
+class S3FSTestCase(SandboxedTestCase):
 
     def setUp(self):
         self.sandbox_boto()

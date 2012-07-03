@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 from tempfile import mkdtemp
 from shutil import rmtree
 
@@ -63,3 +64,19 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
         super(SandboxedTestCase, self).setUp()
         self.tmp_dir = mkdtemp()
         self.addCleanup(rmtree, self.tmp_dir)
+
+    def makedirs(self, path):
+        abs_path = os.path.join(self.tmp_dir, path)
+        if not os.path.isdir(abs_path):
+            os.makedirs(abs_path)
+        return abs_path
+
+    def makefile(self, path, contents):
+        self.makedirs(os.path.split(path)[0])
+        abs_path = os.path.join(self.tmp_dir, path)
+        with open(abs_path, 'w') as f:
+            f.write(contents)
+        return abs_path
+
+    def abs_paths(self, *paths):
+        return [os.path.join(self.tmp_dir, path) for path in paths]

@@ -39,14 +39,6 @@ from mrjob.local import LocalMRJobRunner
 from tests.quiet import no_handlers_for_logger
 
 
-class RunnerStub(Mock):
-
-    def __init__(self, *args, **kwargs):
-        super(RunnerStub, self).__init__(*args, **kwargs)
-        self._args = args
-        self._kwargs = kwargs
-
-
 def _mock_context_mgr(m, return_value):
     m.return_value.__enter__.return_value = return_value
 
@@ -110,7 +102,7 @@ class NoOutputTestCase(unittest.TestCase):
         launcher = MRJobLauncher(args=['--no-conf', '--no-output', ''])
         launcher.sandbox()
         with patch.object(launcher, 'make_runner') as m_make_runner:
-            runner = RunnerStub()
+            runner = Mock()
             _mock_context_mgr(m_make_runner, runner)
             runner.stream_output.return_value = ['a line']
             launcher.run_job()

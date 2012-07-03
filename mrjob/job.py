@@ -781,6 +781,9 @@ class MRJob(MRJobLauncher):
         objects. Default behavior is to return an instance of
         :py:attr:`INPUT_PROTOCOL`.
         """
+        if not isinstance(self.INPUT_PROTOCOL, type):
+            log.warn('INPUT_PROTOCOL should be a class, not %s' %
+                     self.INPUT_PROTOCOL)
         return self.INPUT_PROTOCOL()
 
     def internal_protocol(self):
@@ -788,6 +791,9 @@ class MRJob(MRJobLauncher):
         Default behavior is to return an instance of
         :py:attr:`INTERNAL_PROTOCOL`.
         """
+        if not isinstance(self.INTERNAL_PROTOCOL, type):
+            log.warn('INTERNAL_PROTOCOL should be a class, not %s' %
+                     self.INTERNAL_PROTOCOL)
         return self.INTERNAL_PROTOCOL()
 
     def output_protocol(self):
@@ -795,6 +801,9 @@ class MRJob(MRJobLauncher):
         lines. Default behavior is to return an instance of
         :py:attr:`OUTPUT_PROTOCOL`.
         """
+        if not isinstance(self.OUTPUT_PROTOCOL, type):
+            log.warn('OUTPUT_PROTOCOL should be a class, not %s' %
+                     self.OUTPUT_PROTOCOL)
         return self.OUTPUT_PROTOCOL()
 
     #: Protocol for reading input to the first mapper in your job.

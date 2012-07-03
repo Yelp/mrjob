@@ -38,6 +38,8 @@ EMPTY_MRJOB_CONF = {'runners': {
     },
     'hadoop': {
     },
+    'inline': {
+    },
 }}
 
 

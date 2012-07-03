@@ -17,14 +17,14 @@
 from __future__ import with_statement
 
 import os
-import shutil
-import tempfile
 
 try:
     import unittest2 as unittest
     unittest  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import unittest
+
+from mock import patch
 
 import mrjob.conf
 from mrjob.conf import combine_cmd_lists
@@ -46,6 +46,7 @@ from mrjob.conf import real_mrjob_conf_path
 from tests.quiet import log_to_buffer
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import SandboxedTestCase
 
 
 def load_mrjob_conf(conf_path=None):
@@ -56,48 +57,25 @@ def load_mrjob_conf(conf_path=None):
     return conf_object_at_path(conf_path)
 
 
-class MRJobConfTestCase(unittest.TestCase):
+class MRJobConfTestCase(SandboxedTestCase):
+
+    MRJOB_CONF_CONTENTS = None
 
     def setUp(self):
-        self.patch_os_path_exists()
-        self.setup_tmp_dir()
-        self.blank_out_environment()
+        super(MRJobConfTestCase, self).setUp()
 
-    def tearDown(self):
-        self.restore_environment()
-        self.rm_tmp_dir()
-        self.unpatch_os_path_exists()
-
-    def patch_os_path_exists(self):
         self._existing_paths = None
-        self._real_os_path_exists = os.path.exists
+        real_path_exists = os.path.exists
 
-        def os_path_exists_wrapper(path):
+        def os_path_exists_stub(path):
             if self._existing_paths is None:
-                return self._real_os_path_exists(path)
+                return real_path_exists(path)
             else:
                 return path in self._existing_paths
 
-        os.path.exists = os_path_exists_wrapper
-
-    def unpatch_os_path_exists(self):
-        os.path.exists = self._real_os_path_exists
-
-    def setup_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
-    def blank_out_environment(self):
-        self._old_environ = os.environ.copy()
-        # don't do os.environ = {}! This won't actually set environment
-        # variables; it just monkey-patches os.environ
-        os.environ.clear()
-
-    def restore_environment(self):
-        os.environ.clear()
-        os.environ.update(self._old_environ)
+        p = patch('os.path.exists', side_effect=os_path_exists_stub)
+        p.start()
+        self.addCleanup(p.stop)
 
 
 class MRJobBasicConfTestCase(MRJobConfTestCase):
@@ -474,42 +452,15 @@ class CombineOptsTestCase(unittest.TestCase):
             {'foo': ['bar', 'baz'], 'baz': ['quux'], 'bar': 'garply'})
 
 
-class CombineAndExpandPathsTestCase(unittest.TestCase):
+class CombineAndExpandPathsTestCase(SandboxedTestCase):
 
     def setUp(self):
-        self.setup_tmp_dir()
-
-    @classmethod
-    def setUpClass(cls):
-        cls.set_environment_vars()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.restore_environment_vars()
-
-    @classmethod
-    def set_environment_vars(self):
-        self._old_environ = os.environ.copy()
-        os.environ.clear()
+        super(CombineAndExpandPathsTestCase, self).setUp()
         os.environ.update({
             'HOME': '/home/foo',
             'USER': 'foo',
             'BAR': 'bar',
         })
-
-    @classmethod
-    def restore_environment_vars(self):
-        os.environ.clear()
-        os.environ.update(self._old_environ)
-
-    def setup_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
 
     def test_expand_paths_empty(self):
         self.assertEqual(expand_path(None), None)

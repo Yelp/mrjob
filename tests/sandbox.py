@@ -55,13 +55,16 @@ def mrjob_conf_patcher(substitute_conf=EMPTY_MRJOB_CONF):
 
 class EmptyMrjobConfTestCase(unittest.TestCase):
 
+    # set to None if you don't want load_opts_from_mrjob_confs patched
     MRJOB_CONF_CONTENTS = EMPTY_MRJOB_CONF
 
     def setUp(self):
         super(EmptyMrjobConfTestCase, self).setUp()
-        patcher = mrjob_conf_patcher(self.MRJOB_CONF_CONTENTS)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+
+        if self.MRJOB_CONF_CONTENTS is not None:
+            patcher = mrjob_conf_patcher(self.MRJOB_CONF_CONTENTS)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
 
 class SandboxedTestCase(EmptyMrjobConfTestCase):

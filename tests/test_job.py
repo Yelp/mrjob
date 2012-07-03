@@ -18,12 +18,10 @@
 from __future__ import with_statement
 
 import os
-import shutil
 from subprocess import Popen
 from subprocess import PIPE
 from StringIO import StringIO
 import sys
-import tempfile
 import time
 
 try:
@@ -49,6 +47,8 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_nomapper_multistep import MRNoMapper
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import EmptyMrjobConfTestCase
+from tests.sandbox import SandboxedTestCase
 
 
 def stepdict(mapper=_IDENTITY_MAPPER, reducer=None, combiner=None,
@@ -157,35 +157,6 @@ class MRInvisibleCombinerJob(MRTestingJob):
         yield None, self.things
 
 
-class MRCustomBoringJob(MRBoringJob):
-
-    def configure_options(self):
-        super(MRCustomBoringJob, self).configure_options()
-
-        self.add_passthrough_option(
-            '--foo-size', '-F', type='int', dest='foo_size', default=5)
-        self.add_passthrough_option(
-            '--bar-name', '-B', type='string', dest='bar_name', default=None)
-        self.add_passthrough_option(
-            '--enable-baz-mode', '-M', action='store_true', dest='baz_mode',
-            default=False)
-        self.add_passthrough_option(
-            '--disable-quuxing', '-Q', action='store_false', dest='quuxing',
-            default=True)
-        self.add_passthrough_option(
-            '--pill-type', '-T', type='choice', choices=(['red', 'blue']),
-            default='blue')
-        self.add_passthrough_option(
-            '--planck-constant', '-C', type='float', default=6.626068e-34)
-        self.add_passthrough_option(
-            '--extra-special-arg', '-S', action='append',
-            dest='extra_special_args', default=[])
-
-        self.add_file_option('--foo-config', dest='foo_config', default=None)
-        self.add_file_option('--accordian-file', dest='accordian_files',
-                             action='append', default=[])
-
-
 ### Test cases ###
 
 class MRTestCase(unittest.TestCase):
@@ -263,7 +234,7 @@ class MRTestCase(unittest.TestCase):
                          stepdict(reducer_final=reducer_final))
 
 
-class MRInitTestCase(unittest.TestCase):
+class MRInitTestCase(EmptyMrjobConfTestCase):
 
     def test_mapper(self):
         j = MRInitJob()
@@ -273,7 +244,7 @@ class MRInitTestCase(unittest.TestCase):
     def test_init_funcs(self):
         num_inputs = 2
         stdin = StringIO("x\n" * num_inputs)
-        mr_job = MRInitJob(['-r', 'inline', '--no-conf', '-'])
+        mr_job = MRInitJob(['-r', 'inline', '-'])
         mr_job.sandbox(stdin=stdin)
 
         results = []
@@ -856,32 +827,7 @@ class StepNumTestCase(unittest.TestCase):
         self.assertRaises(ValueError, mr_job.run_reducer, -1)
 
 
-class FileOptionsTestCase(unittest.TestCase):
-
-    def setUp(self):
-        self.make_tmp_dir()
-        self.blank_out_environment()
-
-    def tearDown(self):
-        self.restore_environment()
-        self.rm_tmp_dir()
-    # make sure custom file options work with --steps (Issue #45)
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
-    def blank_out_environment(self):
-        self._old_environ = os.environ.copy()
-        # don't do os.environ = {}! This won't actually set environment
-        # variables; it just monkey-patches os.environ
-        os.environ.clear()
-
-    def restore_environment(self):
-        os.environ.clear()
-        os.environ.update(self._old_environ)
+class FileOptionsTestCase(SandboxedTestCase):
 
     def test_end_to_end(self):
         n_file_path = os.path.join(self.tmp_dir, 'n_file')
@@ -895,7 +841,7 @@ class FileOptionsTestCase(unittest.TestCase):
 
         # use local runner so that the file is actually sent somewhere
         mr_job = MRTowerOfPowers(
-            ['--no-conf', '-v', '--cleanup=NONE', '--n-file', n_file_path,
+            ['-v', '--cleanup=NONE', '--n-file', n_file_path,
              '--runner=local'])
         self.assertEqual(len(mr_job.steps()), 3)
 
@@ -941,20 +887,7 @@ class ParseOutputTestCase(unittest.TestCase):
         self.assertEqual(mr_job.stdout.getvalue(), output)
 
 
-class RunJobTestCase(unittest.TestCase):
-
-    def setUp(self):
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-    # test invoking a job as a script
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
+class RunJobTestCase(SandboxedTestCase):
 
     def run_job(self, args=()):
         args = ([sys.executable, MRTwoStepJob.mr_job_script()] +
@@ -1039,7 +972,7 @@ class ProtocolTypeTestCase(unittest.TestCase):
         with no_handlers_for_logger('mrjob.job'):
             stderr = StringIO()
             log_to_stream('mrjob.job', stderr)
-            job = self.StrangeJob(args=['--no-conf'])
+            job = self.StrangeJob()
             self.assertIsInstance(job.input_protocol(), JSONProtocol)
             self.assertIsInstance(job.internal_protocol(), JSONProtocol)
             self.assertIsInstance(job.output_protocol(), JSONProtocol)

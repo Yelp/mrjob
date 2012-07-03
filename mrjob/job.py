@@ -86,7 +86,7 @@ class MRJob(MRJobLauncher):
         to parse args from ``sys.argv``, call :py:meth:`MRJob.run`).
 
         For a full list of command-line arguments, run:
-        ``python -m mrjob.run --help``
+        ``python -m mrjob.job --help``
         """
         super(MRJob, self).__init__(self.mr_job_script(), args)
 

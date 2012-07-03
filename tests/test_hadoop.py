@@ -22,6 +22,8 @@ import os
 import shlex
 from subprocess import check_call
 
+from mock import patch
+
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
 
@@ -50,28 +52,19 @@ class TestHadoopHomeRegression(SandboxedTestCase):
 class TestFindHadoopStreamingJar(SandboxedTestCase):
 
     def test_find_hadoop_streaming_jar(self):
-        # shouldn't find anything if nothing's there
-        self.assertEqual(find_hadoop_streaming_jar(self.tmp_dir), None)
-
-        jar_dir = os.path.join(self.tmp_dir, 'a', 'b', 'c')
-        os.makedirs(jar_dir)
-        empty_dir = os.path.join(self.tmp_dir, 'empty')
-        os.makedirs(empty_dir)
-
         # not just any jar will do
-        mason_jar_path = os.path.join(jar_dir, 'mason.jar')
-        open(mason_jar_path, 'w').close()
-        self.assertEqual(find_hadoop_streaming_jar(self.tmp_dir), None)
+        with patch.object(os, 'walk', return_value=[
+            ('/some_dir', None, 'mason.jar')]):
+            self.assertEqual(find_hadoop_streaming_jar('/some_dir'), None)
 
         # should match streaming jar
-        streaming_jar_path = os.path.join(
-            jar_dir, 'hadoop-0.20.2-streaming.jar')
-        open(streaming_jar_path, 'w').close()
-        self.assertEqual(find_hadoop_streaming_jar(self.tmp_dir),
-                         streaming_jar_path)
+        with patch.object(os, 'walk', return_value=[
+            ('/some_dir', None, 'hadoop-0.20.2-streaming.jar')]):
+            self.assertEqual(find_hadoop_streaming_jar('/some_dir'), None)
 
-        # shouldn't find anything if we look in the wrong dir
-        self.assertEqual(find_hadoop_streaming_jar(empty_dir), None)
+        # shouldn't find anything in an empty dir
+        with patch.object(os, 'walk', return_value=[]):
+            self.assertEqual(find_hadoop_streaming_jar('/some_dir'), None)
 
 
 class MockHadoopTestCase(SandboxedTestCase):

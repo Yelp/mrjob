@@ -35,7 +35,9 @@ EMPTY_MRJOB_CONF = {'runners': {
         'check_emr_status_every': 0.00,
         's3_sync_wait_time': 0.00,
         'boostrap_mrjob': False,
-    }
+    },
+    'hadoop': {
+    },
 }}
 
 
@@ -59,11 +61,23 @@ class EmptyMrjobConfTestCase(unittest.TestCase):
 
 
 class SandboxedTestCase(EmptyMrjobConfTestCase):
+    """Patch mrjob.conf, create a temp directory, and save the environment for
+    each test
+    """
 
     def setUp(self):
         super(SandboxedTestCase, self).setUp()
+
+        # tmp dir
         self.tmp_dir = mkdtemp()
         self.addCleanup(rmtree, self.tmp_dir)
+
+        # environment
+        self._old_environ = os.environ.copy()
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self._old_environ)
 
     def makedirs(self, path):
         abs_path = os.path.join(self.tmp_dir, path)

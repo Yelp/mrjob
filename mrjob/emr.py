@@ -81,6 +81,7 @@ from mrjob.runner import RunnerOptionStore
 from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.ssh import ssh_slave_addresses
+from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.util import cmd_line
@@ -1067,11 +1068,7 @@ class EMRJobRunner(MRJobRunner):
 
         try:
             addr = self._address_of_master()
-        except:
-            # no job flow to terminate, and the exception hierarchy for really
-            # dealing with this will be completely bonkers until 0.4.
-            # That function can raise AttributeError, LogFetchError,
-            # IOError...blech.
+        except IOError:
             return
 
         if not self._ran_job:
@@ -1085,7 +1082,8 @@ class EMRJobRunner(MRJobRunner):
                     log.info("Succeeded in terminating job")
                 else:
                     log.info("Job appears to have already been terminated")
-
+            except SSHException:
+                log.info(error_msg)
             except IOError:
                 log.info(error_msg)
 
@@ -2364,11 +2362,16 @@ class EMRJobRunner(MRJobRunner):
         try:
             jobflow = self._describe_jobflow(emr_conn)
             if jobflow.state not in ('WAITING', 'RUNNING'):
-                raise LogFetchError(
+                raise IOError(
                     'Cannot ssh to master; job flow is not waiting or running')
         except boto.exception.S3ResponseError:
-            # This error is raised by mockboto when the jobflow doesn't exist
-            raise LogFetchError('Could not get job flow information')
+            # This error is raised by some versions of boto when the jobflow
+            # doesn't exist
+            raise IOError('Could not get job flow information')
+        except boto.exception.EmrResponseError:
+            # This error is raised by other version of boto when the jobflow
+            # doesn't exist (some time before 2.4)
+            raise IOError('Could not get job flow information')
 
         self._address = jobflow.masterpublicdnsname
         return self._address

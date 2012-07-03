@@ -36,17 +36,15 @@ from tests.sandbox import SandboxedTestCase
 class TestHadoopHomeRegression(SandboxedTestCase):
 
     def test_hadoop_home_regression(self):
-        mason_jar_path = os.path.join(
-            self.tmp_dir, 'hadoop-0.20.20-streaming.jar')
-        open(mason_jar_path, 'w').close()
-
         # kill $HADOOP_HOME if it exists
         try:
             del os.environ['HADOOP_HOME']
         except KeyError:
             pass
 
-        HadoopJobRunner(hadoop_home=self.tmp_dir, conf_path=False)
+        with patch('mrjob.hadoop.find_hadoop_streaming_jar',
+                   return_value='some.jar'):
+            HadoopJobRunner(hadoop_home=self.tmp_dir, conf_path=False)
 
 
 class TestFindHadoopStreamingJar(SandboxedTestCase):

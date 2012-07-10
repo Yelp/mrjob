@@ -94,6 +94,7 @@ Option                          Default                        Combined by      
 *num_ec2_instances*             ``1``                          :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-instances`
 *num_ec2_task_instances*        ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-task-instances`
 *pool_emr_job_flows*            ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--pool-emr-job-flows`, :option:`--no-pool-emr-job-flows`
+*max_wait_for_pool*             ``0``                          :py:func:`~mrjob.conf.combine_values`     :option:`--pool-wait-minutes`
 *s3_endpoint*                   (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-endpoint`
 *s3_log_uri*                    (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-log-uri`
 *s3_scratch_uri*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--s3-scratch-uri`

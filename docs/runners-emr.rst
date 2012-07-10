@@ -160,6 +160,8 @@ Pooled jobs will also only use job flows with the same **pool name**, so you can
 
 Pooling is flexible about instance type and number of instances; it will attempt to select the most powerful job flow available as long as the job flow's instances provide at least as much memory and at least as much CPU as your job requests. If there is a tie, it picks job flows that are closest to the end of a full hour, to minimize wasted instance hours.
 
+If a job is currently running on a pool and you want a job you are starting up to use that job pool, you can use :option: `--pool-wait-minutes=MINUTES_TO_WAIT`. This will do the same as :option:`--pool-emr-job-flows` except will wait the specified amount of minutes before creating a new pool, and will continuously try to locate a pool in that time. If a pool can't be found in that time, a new pool is allocated.
+
 Amazon limits job flows to 256 steps total; pooling respects this and won't try to use pooled job flows that are "full." :py:mod:`mrjob` also uses an S3-based "locking" mechanism to prevent two jobs from simultaneously joining the same job flow. This is somewhat ugly but works in practice, and avoids :py:mod:`mrjob` depending on Amazon services other than EMR and S3.
 
 .. warning::

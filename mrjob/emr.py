@@ -1317,32 +1317,27 @@ class EMRJobRunner(MRJobRunner):
         else:
             return 'TERMINATE_JOB_FLOW'
 
-    def _filter_args(self, arg_list, step_num):
-        def filter_arg(arg):
-            if arg.lower() == '%prog':
-                for item in self._script_args():
-                    yield item
-            elif arg.lower() == '%step_num':
-                yield str(step_num)
+    def _substep_cmd_line(self, substep_dict, step_num, mrc_arg):
+        if substep_dict['type'] == 'command':
+            cmd = "%s %s" % (
+                substep_dict['command'], cmd_line(self._mr_job_extra_args()))
+            # never wrap custom hadoop streaming commands in bash
+            return cmd, False
 
-        return list(itertools.chain(filter_arg(arg) for arg in arg_list))
-
-    def _replace_args(self, arg_string, step_num):
-        arg_string = _SCRIPT_PATH_RE.sub(self._script['name'], arg_string)
-        arg_string = _STEP_NUM_RE.sub(str(step_num), arg_string)
-        return arg_string
-
-    def _step_cmd_line(self, cmd_str_or_arg_list, step_num):
-        if isinstance(cmd_str_or_arg_list, basestring):
-            # if a string, do regex replace and tack on file upload args
-            return "%s %s" % (
-                self._replace_args(cmd_str_or_arg_list, step_num),
-                cmd_line(self._mr_job_extra_args()))
-        elif isinstance(cmd_str_or_arg_list, list):
-            # if a list, do exact match and append file upload args
-            return cmd_line(
-                self._filter_args(cmd_str_or_arg_list, step_num) +
+        elif substep_dict['type'] == 'script':
+            cmd = cmd_line(
+                self._script_args() +
+                ['--step-num=%d' % step_num, mrc_arg] +
                 self._mr_job_extra_args())
+
+            # filter input and pipe for great speed, if user asks
+            # but we have to wrap the command in bash
+            if 'filter' in substep_dict:
+                return '%s | %s' % (substep_dict['filter'], cmd), True
+            else:
+                return cmd, False
+        else:
+            raise ValueError("Invalid step: %r" % substep_dict)
 
     def _build_streaming_step(self, step, step_num, num_steps):
         # EMR-specific stuff
@@ -1352,19 +1347,25 @@ class EMRJobRunner(MRJobRunner):
 
         # Hadoop streaming stuff
         if 'mapper' in step:
-            mapper = self._step_cmd_line(step['mapper'], step_num)
+            mapper, bash_wrap_mapper = self._substep_cmd_line(
+                step['mapper'], step_num, '--mapper')
         else:  # we have an identity mapper
             mapper = 'cat'
+            bash_wrap_mapper = False
 
         if 'combiner' in step:
-            combiner = self._step_cmd_line(step['combiner'], step_num)
+            combiner, bash_wrap_combiner = self._substep_cmd_line(
+                step['combiner'], step_num, '--combiner')
         else:
             combiner = None
+            bash_wrap_combiner = False
 
         if 'reducer' in step:  # i.e. if there is a reducer:
-            reducer = self._step_cmd_line(step['reducer'], step_num)
+            reducer, bash_wrap_reducer = self._substep_cmd_line(
+                step['reducer'], step_num, '--reducer')
         else:
             reducer = None
+            bash_wrap_reducer = False
 
         input = self._s3_step_input_uris(step_num)
         output = self._s3_step_output_uri(step_num)\
@@ -1378,7 +1379,17 @@ class EMRJobRunner(MRJobRunner):
             if compat.supports_combiners_in_hadoop_streaming(version):
                 step_args.extend(['-combiner', combiner])
             else:
-                mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
+                bash_wrap_mapper = True
+                mapper = "%s | sort | %s" % (mapper, combiner)
+
+        if bash_wrap_mapper:
+            mapper = "bash -c '%s'" % mapper
+
+        if bash_wrap_reducer:
+            reducer = "bash -c '%s'" % reducer
+
+        if bash_wrap_combiner:
+            combiner = "bash -c '%s'" % combiner
 
         return boto.emr.StreamingStep(
             name=name, mapper=mapper, reducer=reducer,

@@ -44,152 +44,16 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
+from mrjob.steps import MRJobStep
+from mrjob.steps import _JOB_STEP_PARAMS
 from mrjob.util import read_input
 
 
 log = logging.getLogger('mrjob.job')
 
 
-_MAPPER_FUNCS = ('mapper', 'mapper_init', 'mapper_final')
-_COMBINER_FUNCS = ('combiner', 'combiner_init', 'combiner_final')
-_REDUCER_FUNCS = ('reducer', 'reducer_init', 'reducer_final')
-
-_JOB_STEP_PARAMS = _MAPPER_FUNCS + _COMBINER_FUNCS + _REDUCER_FUNCS
-
-
-# used by mr() below, to fake no mapper
-def _IDENTITY_MAPPER(key, value):
-    yield key, value
-
-
 class UsageError(Exception):
     pass
-
-
-class StreamingStep(object):
-
-    def render_mapper(self, step_num):
-        return ['cat']
-
-    def render_combiner(self, step_num):
-        return ['cat']
-
-    def render_reducer(self, step_num):
-        return ['cat']
-
-    def description(self, step_num):
-        substep_descs = {'type': 'streaming'}
-        values = {
-            'mapper': self.render_mapper(),
-            'combiner': self.render_combiner(),
-            'reducer': self.render_reducer(),
-        }
-        for key, value in values.iteritems():
-            if value:
-                substep_descs['key'] = value
-        substep_descs.setdefault('mapper', ['cat'])
-        return substep_descs
-
-
-class MRJobStep(object):
-
-    def __init__(self, mapper=None, reducer=None, **kwargs):
-        # limit which keyword args can be specified
-        bad_kwargs = sorted(set(kwargs) - set(_JOB_STEP_PARAMS))
-        if bad_kwargs:
-            raise TypeError(
-                'mr() got an unexpected keyword argument %r' % bad_kwargs[0])
-
-        if not (any(kwargs.itervalues()) or mapper or reducer):
-            raise Exception("Step has no mappers and no reducers")
-
-        steps = dict((f, None) for f in _JOB_STEP_PARAMS)
-        if mapper:
-            steps['mapper'] = mapper
-        if reducer:
-            steps['reducer'] = reducer
-        steps.update(kwargs)
-
-        self._steps = steps
-
-    def __getitem__(self, key):
-        # easy access to functions stored in self._steps
-        if key == 'mapper' and self._steps['mapper'] is None:
-            return _IDENTITY_MAPPER
-        return self._steps[key]
-
-    @property
-    def has_explicit_mapper(self):
-        return any(name in self._kwargs for name in _MAPPER_FUNCS)
-
-    @property
-    def has_explicit_combiner(self):
-        return any(name in self._kwargs for name in _COMBINER_FUNCS)
-
-    @property
-    def has_explicit_reducer(self):
-        return any(name in self._kwargs for name in _REDUCER_FUNCS)
-
-    def render_mapper(self, step_num):
-        # if user specifies a string instead of a function, just return the
-        # string
-        if isinstance(self._steps.get('mapper', None), basestring):
-            return self._steps['mapper']
-
-        # otherwise keep control in mrjob
-        return ['%prog', '--step-num', str(step_num), '--mapper']
-
-    def render_combiner(self, step_num):
-        # if user specifies a string instead of a function, just return the
-        # string
-        if isinstance(self._steps.get('combiner', None), basestring):
-            return self._steps['combiner']
-
-        # otherwise keep control in mrjob
-        return ['%prog', '--step-num', str(step_num), '--combiner']
-
-    def render_reducer(self, step_num):
-        # if user specifies a string instead of a function, just return the
-        # string
-        if isinstance(self._steps.get('reducer', None), basestring):
-            return self._steps['reducer']
-
-        # otherwise keep control in mrjob
-        return ['%prog', '--step-num', str(step_num), '--reducer']
-
-    def description(self, step_num):
-        substep_descs = {'type': 'streaming'}
-        # Use a mapper if:
-        #   - the user writes one
-        #   - it is the first step and we don't want to mess up protocols
-        #   - there are only combiners
-        if (step_num == 0 or
-            self.has_explicit_mapper or
-            self.has_explicit_reducer):
-            substep_descs['mapper'] = self.render_mapper(step_num)
-        if self.has_explicit_combiner:
-            substep_descs['combiner'] = self.render_cominber(step_num)
-        if self.has_explicit_reducer:
-            substep_descs['reducer'] = self.render_reducer(step_num)
-        return substep_descs
-
-
-class JarStep(object):
-
-    def __init__(self, name, jar, main_class=None, step_args=None):
-        self.name = name
-        self.jar = jar
-        self.main_class = main_class
-        self.step_args = step_args
-
-    def description(self, step_num):
-        return {
-            'type': 'jar',
-            'name': self.name,
-            'jar': self.jar,
-            'main_class': self.main_class,
-            'step_args': self.step_args,
-        }
 
 
 class MRJob(MRJobLauncher):

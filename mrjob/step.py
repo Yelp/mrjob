@@ -25,7 +25,7 @@ _REDUCER_FUNCS = ('reducer', 'reducer_init', 'reducer_final', 'reducer_cmd',
 
 _JOB_STEP_PARAMS = _MAPPER_FUNCS + _COMBINER_FUNCS + _REDUCER_FUNCS
 
-STEP_TYPES = ('script', 'streaming', 'jar')
+STEP_TYPES = ('streaming', 'jar')
 
 log = logging.getLogger('mrjob.step')
 
@@ -49,6 +49,12 @@ class MRJobStep(object):
         self.has_explicit_mapper = any(
             name for name in kwargs if name in _MAPPER_FUNCS)
 
+        self.has_explicit_combiner = any(
+            name for name in kwargs if name in _COMBINER_FUNCS)
+
+        self.has_explicit_reducer = any(
+            name for name in kwargs if name in _REDUCER_FUNCS)
+
         steps = dict((f, None) for f in _JOB_STEP_PARAMS)
 
         if mapper:
@@ -57,6 +63,7 @@ class MRJobStep(object):
 
         if reducer:
             steps['reducer'] = reducer
+            self.has_explicit_reducer = True
 
         steps.update(kwargs)
 
@@ -79,14 +86,6 @@ class MRJobStep(object):
         if key == 'mapper' and self._steps['mapper'] is None:
             return _IDENTITY_MAPPER
         return self._steps[key]
-
-    @property
-    def has_explicit_combiner(self):
-        return any(name in self._steps for name in _COMBINER_FUNCS)
-
-    @property
-    def has_explicit_reducer(self):
-        return any(name in self._steps for name in _REDUCER_FUNCS)
 
     def _render_substep(self, cmd_key, filter_key):
         if self._steps[cmd_key]:

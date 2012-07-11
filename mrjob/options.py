@@ -444,7 +444,7 @@ def add_emr_opts(opt_group):
                  ' job flows left idle can quickly become expensive!'),
 
         opt_group.add_option(
-            '--pool-wait-minutes', dest='max_wait_for_pool', default=0,
+            '--pool-wait-minutes', dest='pool_wait_minutes', default=0,
             type=int,
             help=('Wait for a number of minutes for a job flow to finish'
                   ' if a job finishes, pick up their job flow. Otherwise'

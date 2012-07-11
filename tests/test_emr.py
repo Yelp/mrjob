@@ -101,22 +101,22 @@ class MockEMRAndS3TestCase(unittest.TestCase):
         self.make_mrjob_conf()
         self.sandbox_boto()
 
-        def simple_patch(obj, attr, side_effect=None, autospec=False):
-            patcher = patch.object(obj, attr, side_effect=side_effect,
-                                   autospec=autospec)
-            patcher.start()
-            self.addCleanup(patcher.stop)
-
         def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
             mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
             return self.fake_mrjob_tgz_path
 
-        simple_patch(EMRJobRunner, '_create_mrjob_tar_gz',
+        self.simple_patch(EMRJobRunner, '_create_mrjob_tar_gz',
                      fake_create_mrjob_tar_gz, autospec=True)
 
-        simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
-        simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
-        simple_patch(time, 'sleep')
+        self.simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
+        self.simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
+        self.simple_patch(time, 'sleep')
+
+    def simple_patch(self, obj, attr, side_effect=None, autospec=False):
+        patcher = patch.object(obj, attr, side_effect=side_effect,
+                               autospec=autospec)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def tearDown(self):
         self.unsandbox_boto()
@@ -2895,34 +2895,39 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
     'j-epic-fail-lock': False
     }
 
-    JOBS = []
-    FUTURE_JOBS = []
-
     def setUp(self):
         super(JobWaitTestCase, self).setUp()
+        self.future_jobs = []
+        self.jobs = []
 
-        def simple_patch(obj, attr, side_effect=None, autospec=False,
-                         return_value=None):
-            if return_value:
-                patcher = patch.object(obj, attr, side_effect=side_effect,
-                                   autospec=autospec,
-                                   return_value=return_value)
-            else:
-                patcher = patch.object(obj, attr, side_effect=side_effect,
-                                   autospec=autospec)
-            patcher.start()
-            self.addCleanup(patcher.stop)
+        def side_effect_lock_uri(*args):
+            return args[0]  # Return the only arg given to it.
 
-        simple_patch(EMRJobRunner, 'make_emr_conn')
-        simple_patch(EMRJobRunner, 'make_s3_conn')
-        simple_patch(EMRJobRunner, 'usable_job_flows',
-            side_effect=self.side_effect_usable_job_flows,
-            return_value=[])
-        simple_patch(EMRJobRunner, '_lock_uri',
-            side_effect=self.side_effect_lock_uri)
+        def side_effect_acquire_lock(*args):
+            job_id = args[1].jobflowid
+            return self.JOB_ID_LOCKS[job_id]
+
+        def side_effect_usable_job_flows(*args, **kwargs):
+            return_jobs = []
+            for job in self.jobs:
+                if job.jobflowid not in kwargs['exclude']:
+                    return_jobs.append(job)
+            return return_jobs
+
+        def side_effect_time_sleep(*args):
+            if len(self.future_jobs) > 0:
+                future_job = self.future_jobs.pop(0)
+                self.jobs.append(future_job)
+
+        self.simple_patch(EMRJobRunner, 'make_emr_conn')
+        self.simple_patch(EMRJobRunner, 'make_s3_conn')
+        self.simple_patch(EMRJobRunner, 'usable_job_flows',
+            side_effect=side_effect_usable_job_flows)
+        self.simple_patch(EMRJobRunner, '_lock_uri',
+            side_effect=side_effect_lock_uri)
         a = patch('mrjob.emr.attempt_to_acquire_lock',
-            side_effect=self.side_effect_acquire_lock)
-        t = patch('time.sleep', side_effect=self.side_effect_time_sleep)
+            side_effect=side_effect_acquire_lock)
+        t = patch('time.sleep', side_effect=side_effect_time_sleep)
         a.start()
         t.start()
         self.addCleanup(a.stop)
@@ -2930,9 +2935,8 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
 
     def tearDown(self):
         super(JobWaitTestCase, self).tearDown()
-         # Remove unused jobs for later tests.
-        [self.JOBS.pop() for i in range(len(self.JOBS))]
-        [self.FUTURE_JOBS.pop() for i in range(len(self.FUTURE_JOBS))]
+        self.jobs = []
+        self.future_jobs = []
 
     def add_job_flow(self, job_names, job_list):
         """Puts a fake job flow into a list of jobs for testing."""
@@ -2942,58 +2946,39 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
             jf.jobflowid = name
             job_list.append(jf)
 
-    def side_effect_lock_uri(*args):
-        return args[1]  # Return the only arg given to it.
-
-    def side_effect_acquire_lock(*args):
-        job_id = args[2].jobflowid
-        return JobWaitTestCase.JOB_ID_LOCKS[job_id]
-
-    def side_effect_usable_job_flows(*args, **kwargs):
-        return_jobs = []
-        for job in JobWaitTestCase.JOBS:
-            if job.jobflowid not in kwargs['exclude']:
-                return_jobs.append(job)
-        return return_jobs
-
-    def side_effect_time_sleep(*args):
-        if len(JobWaitTestCase.FUTURE_JOBS) > 0:
-            future_job = JobWaitTestCase.FUTURE_JOBS.pop()
-            JobWaitTestCase.JOBS.append(future_job)
-
     def test_no_waiting_for_job_pool_fail(self):
-        self.add_job_flow(['j-fail-lock'], self.JOBS)
+        self.add_job_flow(['j-fail-lock'], self.jobs)
         runner = EMRJobRunner(conf_path=None)
-        runner._opts['max_wait_for_pool'] = 0
+        runner._opts['pool_wait_minutes'] = 0
         result = runner.find_job_flow()
         self.assertEqual(result, None)
 
     def test_no_waiting_for_job_pool_success(self):
-        self.add_job_flow(['j-fail-lock'], self.JOBS)
+        self.add_job_flow(['j-fail-lock'], self.jobs)
         runner = EMRJobRunner(conf_path=None)
-        runner._opts['max_wait_for_pool'] = 0
+        runner._opts['pool_wait_minutes'] = 0
         result = runner.find_job_flow()
         self.assertEqual(result, None)
 
     def test_acquire_lock_on_first_attempt(self):
-        self.add_job_flow(['j-successful-lock'], self.JOBS)
+        self.add_job_flow(['j-successful-lock'], self.jobs)
         runner = EMRJobRunner(conf_path=None)
-        runner._opts['max_wait_for_pool'] = 1
+        runner._opts['pool_wait_minutes'] = 1
         result = runner.find_job_flow()
         self.assertEqual(result.jobflowid, 'j-successful-lock')
 
     def test_sleep_then_acquire_lock(self):
-        self.add_job_flow(['j-fail-lock'], self.JOBS)
-        self.add_job_flow(['j-successful-lock'], self.FUTURE_JOBS)
+        self.add_job_flow(['j-fail-lock'], self.jobs)
+        self.add_job_flow(['j-successful-lock'], self.future_jobs)
         runner = EMRJobRunner(conf_path=None)
-        runner._opts['max_wait_for_pool'] = 1
+        runner._opts['pool_wait_minutes'] = 1
         result = runner.find_job_flow()
         self.assertEqual(result.jobflowid, 'j-successful-lock')
 
     def test_timeout_waiting_for_job_flow(self):
-        self.add_job_flow(['j-fail-lock'], self.JOBS)
-        self.add_job_flow(['j-epic-fail-lock'], self.FUTURE_JOBS)
+        self.add_job_flow(['j-fail-lock'], self.jobs)
+        self.add_job_flow(['j-epic-fail-lock'], self.future_jobs)
         runner = EMRJobRunner(conf_path=None)
-        runner._opts['max_wait_for_pool'] = 1
+        runner._opts['pool_wait_minutes'] = 1
         result = runner.find_job_flow()
         self.assertEqual(result, None)

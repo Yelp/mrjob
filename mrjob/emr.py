@@ -378,7 +378,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
         'num_ec2_core_instances',
-        'max_wait_for_pool',
+        'pool_wait_minutes',
         'num_ec2_instances',
         'num_ec2_task_instances',
         'pool_emr_job_flows',
@@ -760,8 +760,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         :py:mod:`mrjob.tools.emr.terminate.idle_job_flows`
                                    in your crontab; job flows left idle can
                                    quickly become expensive!
-        :type max_wait_for_pool: int
-        :param max_wait_for_pool: Does the same as *pool_emr_job_flows* except
+        :type pool_wait_minutes: int
+        :param pool_wait_minutes: Does the same as *pool_emr_job_flows* except
                               this waits the amount of minutes specified before
                               creating a new job flow.
         :type s3_endpoint: str
@@ -1642,7 +1642,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         # try to find a job flow from the pool. basically auto-fill
         # 'emr_job_flow_id' if possible and then follow normal behavior.
-        if self._opts['pool_emr_job_flows'] or self._opts['max_wait_for_pool']:
+        if self._opts['pool_emr_job_flows'] or self._opts['pool_wait_minutes']:
             job_flow = self.find_job_flow(num_steps=len(steps))
             if job_flow:
                 self._emr_job_flow_id = job_flow.jobflowid
@@ -2423,7 +2423,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         exclude = set()
         emr_conn = self.make_emr_conn()
         s3_conn = self.make_s3_conn()
-        max_wait_time = self._opts['max_wait_for_pool']
+        max_wait_time = self._opts['pool_wait_minutes']
         now = datetime.now()
         end_time = now + timedelta(minutes=max_wait_time)
         time_sleep = timedelta(seconds=JOB_FLOW_SLEEP_INTERVAL)

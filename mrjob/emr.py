@@ -1322,8 +1322,7 @@ class EMRJobRunner(MRJobRunner):
 
         elif step[mrc]['type'] == 'script':
             cmd = cmd_line(
-                self._script_args() +
-                ['--step-num=%d' % step_num, '--%s' % mrc] +
+                self._script_args_for_step(step_num, mrc) +
                 self._mr_job_extra_args())
 
             # filter input and pipe for great speed, if user asks

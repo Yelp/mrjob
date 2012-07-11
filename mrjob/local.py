@@ -168,46 +168,34 @@ class LocalMRJobRunner(MRJobRunner):
         jobconf = self._opts['jobconf']
         self._process_jobconf_args(jobconf)
 
-        assert self._script  # shouldn't be able to run if no script
-
-        wrapper_args = self._opts['python_bin']
-        if self._wrapper_script:
-            wrapper_args = (self._opts['python_bin'] +
-                            [self._wrapper_script['name']] +
-                            wrapper_args)
-
         # run mapper, combiner, sort, reducer for each step
-        for i, step in enumerate(self._get_steps()):
+        for step_num, step in enumerate(self._get_steps()):
             self._counters.append({})
             # run the mapper
-            mapper_args = (wrapper_args + [self._script['name'],
-                            '--step-num=%d' % i, '--mapper'] +
-                           self._mr_job_extra_args())
+            mapper_args = self._script_args_for_step(step_num, 'mapper')
             combiner_args = []
-            if 'C' in step:
-                combiner_args = (wrapper_args + [self._script['name'],
-                                 '--step-num=%d' % i, '--combiner'] +
-                                 self._mr_job_extra_args())
+            if 'combiner' in step:
+                combiner_args = self._script_args_for_step(
+                    step_num, 'combiner')
 
-            self._invoke_step(mapper_args, 'step-%d-mapper' % i,
-                              step_num=i, step_type='M',
+            self._invoke_step(mapper_args, 'step-%d-mapper' % step_num,
+                              step_num=step_num, step_type='mapper',
                               num_tasks=self._map_tasks,
                               combiner_args=combiner_args)
 
-            if 'R' in step:
+            if 'reducer' in step:
                 # sort the output. Treat this as a mini-step for the purpose
                 # of self._prev_outfiles
                 sort_output_path = os.path.join(
-                    self._get_local_tmp_dir(), 'step-%d-mapper-sorted' % i)
+                    self._get_local_tmp_dir(),
+                    'step-%d-mapper-sorted' % step_num)
                 self._invoke_sort(self._step_input_paths(), sort_output_path)
                 self._prev_outfiles = [sort_output_path]
 
                 # run the reducer
-                reducer_args = (wrapper_args + [self._script['name'],
-                                 '--step-num=%d' % i, '--reducer'] +
-                                self._mr_job_extra_args())
-                self._invoke_step(reducer_args, 'step-%d-reducer' % i,
-                                  step_num=i, step_type='R',
+                reducer_args = self._script_args_for_step(step_num, 'reducer')
+                self._invoke_step(reducer_args, 'step-%d-reducer' % step_num,
+                                  step_num=step_num, step_type='reducer',
                                   num_tasks=self._reduce_tasks)
 
         # move final output to output directory
@@ -432,8 +420,8 @@ class LocalMRJobRunner(MRJobRunner):
                     input_paths.append(path)
             return input_paths
 
-    def _invoke_step(self, args, outfile_name, step_num=0, num_tasks=1,
-                     step_type='M', combiner_args=None):
+    def _invoke_step(self, args, outfile_name, step_num,
+                     step_type, combiner_args=None, num_tasks=1):
         """Run the given command, outputting into outfile, and reading
         from the previous outfile (or, for the first step, from our
         original output files).
@@ -449,7 +437,7 @@ class LocalMRJobRunner(MRJobRunner):
         """
 
         # get file splits for mappers and reducers
-        keep_sorted = (step_type == 'R')
+        keep_sorted = (step_type == 'reducer')
         file_splits = self._get_file_splits(
             self._step_input_paths(), num_tasks, keep_sorted=keep_sorted)
 
@@ -468,7 +456,7 @@ class LocalMRJobRunner(MRJobRunner):
         for task_num, file_name in file_tasks:
 
             # setup environment variables
-            if step_type == 'M':
+            if step_type == 'mapper':
                 env = self._subprocess_env(
                     step_type, step_num, task_num,
                     # mappers have extra file split info
@@ -588,7 +576,8 @@ class LocalMRJobRunner(MRJobRunner):
 
         # not actually sure what's correct for combiners here. It'll definitely
         # be true if we're just using pipes to simulate a combiner though
-        j['mapreduce.task.ismap'] = str(step_type in ('M', 'C')).lower()
+        j['mapreduce.task.ismap'] = str(
+            step_type in ('mapper', 'combiner')).lower()
 
         j['mapreduce.task.partition'] = str(task_num)
 

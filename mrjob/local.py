@@ -317,11 +317,12 @@ class LocalMRJobRunner(MRJobRunner):
             for path in self.ls(input_path):
                 if path.endswith('.gz'):
                     # do not split compressed files
-                    file_names[path] = {
-                        'orig_name': path,
+                    absolute_path = os.path.abspath(path)
+                    file_names[absolute_path] = {
+                        'orig_name': absolute_path,
                         'start': 0,
                         'task_num': len(file_names),
-                        'length': os.stat(path)[stat.ST_SIZE],
+                        'length': os.stat(absolute_path)[stat.ST_SIZE],
                     }
                     # this counts as "one split"
                     num_splits -= 1

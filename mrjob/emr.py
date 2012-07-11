@@ -2426,6 +2426,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         max_wait_time = self._opts['max_wait_for_pool']
         now = datetime.now()
         end_time = now + timedelta(minutes=max_wait_time)
+        time_sleep = timedelta(seconds=JOB_FLOW_SLEEP_INTERVAL)
         log.info("Attempting to find an available job flow..")
         while now <= end_time:
             sorted_tagged_job_flows = self.usable_job_flows(
@@ -2450,7 +2451,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 log.info("Didn't find any job flow pool, checking again in"
                     " 30 seconds...")
                 time.sleep(JOB_FLOW_SLEEP_INTERVAL)
-                now = datetime.now()
+                now += time_sleep
         return None
 
     def _lock_uri(self, job_flow):

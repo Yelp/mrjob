@@ -1317,86 +1317,97 @@ class EMRJobRunner(MRJobRunner):
         else:
             return 'TERMINATE_JOB_FLOW'
 
-    def _substep_cmd_line(self, substep_dict, step_num, mrc_arg):
-        if substep_dict['type'] == 'command':
+    def _substep_cmd_line(self, step, step_num, mrc):
+        if step[mrc]['type'] == 'command':
             cmd = "%s %s" % (
-                substep_dict['command'], cmd_line(self._mr_job_extra_args()))
+                step[mrc]['command'], cmd_line(self._mr_job_extra_args()))
             # never wrap custom hadoop streaming commands in bash
             return cmd, False
 
-        elif substep_dict['type'] == 'script':
+        elif step[mrc]['type'] == 'script':
             cmd = cmd_line(
                 self._script_args() +
-                ['--step-num=%d' % step_num, mrc_arg] +
+                ['--step-num=%d' % step_num, '--%s' % mrc] +
                 self._mr_job_extra_args())
 
             # filter input and pipe for great speed, if user asks
             # but we have to wrap the command in bash
-            if 'filter' in substep_dict:
-                return '%s | %s' % (substep_dict['filter'], cmd), True
+            if 'filter' in step[mrc]:
+                return '%s | %s' % (step[mrc]['filter'], cmd), True
             else:
                 return cmd, False
         else:
-            raise ValueError("Invalid step: %r" % substep_dict)
+            raise ValueError("Invalid %s step %d: %r" % (
+                mrc, step_num, step[mrc]))
+
+    def _render_substep(self, step, step_num, mrc):
+        if mrc in step:
+            return self._substep_cmd_line(
+                step[mrc], step_num, mrc)
+        else:
+            if mrc == 'mapper':
+                return 'cat', False
+            else:
+                return None, False
+
 
     def _build_streaming_step(self, step, step_num, num_steps):
         # EMR-specific stuff
-        name = '%s: Step %d of %d' % (self._job_name, step_num + 1, num_steps)
 
         version = self.get_hadoop_version()
 
         # Hadoop streaming stuff
-        if 'mapper' in step:
-            mapper, bash_wrap_mapper = self._substep_cmd_line(
-                step['mapper'], step_num, '--mapper')
-        else:  # we have an identity mapper
-            mapper = 'cat'
-            bash_wrap_mapper = False
+        mapper, bash_wrap_mapper = self._render_substep(
+            step, step_num, 'mapper')
 
-        if 'combiner' in step:
-            combiner, bash_wrap_combiner = self._substep_cmd_line(
-                step['combiner'], step_num, '--combiner')
-        else:
+        combiner, bash_wrap_combiner = self._render_substep(
+            step, step_num, 'combiner')
+
+        reducer, bash_wrap_reducer = self._render_substep(
+            step, step_num, 'reducer')
+
+        # we can go ahead and wrap the reducer now. nothing depends on it.
+        if bash_wrap_reducer:
+            reducer = "bash -c '%s'" % reducer
+
+        streaming_step_kwargs = {
+            'name': '%s: Step %d of %d' % (
+                self._job_name, step_num + 1, num_steps),
+            'input': self._s3_step_input_uris(step_num),
+            'output': self._s3_step_output_uri(step_num),
+            'jar': self.get_jar(),
+            'action_on_failure': self._action_on_failure,
+            'reducer': reducer,
+        }
+
+        streaming_step_kwargs.update(self._cache_kwargs())
+
+        streaming_step_kwargs['step_args'].extend(
+            self._hadoop_conf_args(step_num, num_steps))
+
+        if (combiner is not None and
+            not compat.supports_combiners_in_hadoop_streaming(version)):
+
+            # krazy hack to support combiners on hadoop <0.20
+            bash_wrap_mapper = True
+            mapper = "%s | sort | %s" % (mapper, combiner)
+
+            # take the combiner away, hadoop will just be confused
             combiner = None
             bash_wrap_combiner = False
-
-        if 'reducer' in step:  # i.e. if there is a reducer:
-            reducer, bash_wrap_reducer = self._substep_cmd_line(
-                step['reducer'], step_num, '--reducer')
-        else:
-            reducer = None
-            bash_wrap_reducer = False
-
-        input = self._s3_step_input_uris(step_num)
-        output = self._s3_step_output_uri(step_num)
-
-        step_args, cache_files, cache_archives = self._cache_args()
-
-        step_args.extend(self._hadoop_conf_args(step_num, num_steps))
-        jar = self._get_jar()
-
-        if combiner is not None:
-            if compat.supports_combiners_in_hadoop_streaming(version):
-                step_args.extend(['-combiner', combiner])
-            else:
-                bash_wrap_mapper = True
-                mapper = "%s | sort | %s" % (mapper, combiner)
 
         if bash_wrap_mapper:
             mapper = "bash -c '%s'" % mapper
 
-        if bash_wrap_reducer:
-            reducer = "bash -c '%s'" % reducer
-
         if bash_wrap_combiner:
             combiner = "bash -c '%s'" % combiner
 
-        return boto.emr.StreamingStep(
-            name=name, mapper=mapper, reducer=reducer,
-            action_on_failure=self._action_on_failure,
-            cache_files=cache_files, cache_archives=cache_archives,
-            step_args=step_args, input=input, output=output,
-            jar=jar)
+        streaming_step_kwargs['mapper'] = mapper
+
+        if combiner:
+            streaming_step_kwargs['combiner'] = combiner
+
+        return boto.emr.StreamingStep(**streaming_step_kwargs)
 
     def _build_jar_step(self, step):
         return boto.emr.JarStep(
@@ -1406,9 +1417,11 @@ class EMRJobRunner(MRJobRunner):
             step_args=step['step_args'],
             action_on_failure=self._action_on_failure)
 
-    def _cache_args(self):
-        """Returns ``(step_args, cache_files, cache_archives)``, populating
-        each according to the correct behavior for the current Hadoop version.
+    def _cache_kwargs(self):
+        """Returns
+        ``{'step_args': [..], 'cache_files': [..], 'cache_archives': [..])``,
+        populating each according to the correct behavior for the current
+        Hadoop version.
 
         For < 0.20, populate cache_files and cache_archives.
         For >= 0.20, populate step_args.
@@ -1456,7 +1469,11 @@ class EMRJobRunner(MRJobRunner):
                     cache_archives.append(
                         '%s#%s' % (file_dict['s3_uri'], file_dict['name']))
 
-        return step_args, cache_files, cache_archives
+        return {
+            'step_args': step_args,
+            'cache_files': cache_files,
+            'cache_archives': cache_archives,
+        }
 
     def _get_jar(self):
         self._name_files()

@@ -144,9 +144,6 @@ class MockEMRAndS3TestCase(SandboxedTestCase):
         self._real_boto_EmrConnection = boto.emr.connection.EmrConnection
         boto.emr.connection.EmrConnection = mock_boto_emr_EmrConnection
 
-        # copy the old environment just to be polite
-        self._old_environ = os.environ.copy()
-
     def unsandbox_boto(self):
         boto.connect_s3 = self._real_boto_connect_s3
         boto.emr.connection.EmrConnection = self._real_boto_EmrConnection
@@ -160,7 +157,6 @@ class MockEMRAndS3TestCase(SandboxedTestCase):
         # TODO: Refactor this abomination of a test harness
 
         # Set up environment variables
-        self._old_environ = os.environ.copy()
         os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
 
         # Create temporary directories and add them to MOCK_SSH_ROOTS
@@ -205,8 +201,6 @@ class MockEMRAndS3TestCase(SandboxedTestCase):
                                          % (slave_num, new_dir))
 
     def teardown_ssh(self):
-        os.environ.clear()
-        os.environ.update(self._old_environ)
         shutil.rmtree(self.master_ssh_root)
         for path in self.slave_ssh_roots:
             shutil.rmtree(path)
@@ -1485,23 +1479,15 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
 
     def setUp(self):
         super(LogFetchingFallbackTestCase, self).setUp()
-        self.make_runner()
-
-    def tearDown(self):
-        super(LogFetchingFallbackTestCase, self).tearDown()
-        self.cleanup_runner()
-
-    # Make sure that SSH and S3 are accessed when we expect them to be
-    def make_runner(self):
+        # Make sure that SSH and S3 are accessed when we expect them to be
         self.add_mock_s3_data({'walrus': {}})
 
-        self.runner = EMRJobRunner(s3_sync_wait_time=0,
-                                   s3_scratch_uri='s3://walrus/tmp',
-                                   conf_paths=[])
+        self.runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp')
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
         self.prepare_runner_for_ssh(self.runner)
 
-    def cleanup_runner(self):
+    def tearDown(self):
+        super(LogFetchingFallbackTestCase, self).tearDown()
         """This method assumes ``prepare_runner_for_ssh()`` was called. That
         method isn't a "proper" setup method because it requires different
         arguments for different tests.

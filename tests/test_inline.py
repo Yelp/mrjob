@@ -18,39 +18,17 @@ from __future__ import with_statement
 from StringIO import StringIO
 import gzip
 import os
-import shutil
-import tempfile
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-from mrjob.conf import dump_mrjob_conf
 from mrjob.inline import InlineMRJobRunner
 from mrjob.protocol import JSONValueProtocol
 from tests.mr_test_cmdenv import MRTestCmdenv
 from tests.mr_testing_job import MRTestingJob
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.sandbox import EmptyMrjobConfTestCase
+from tests.sandbox import SandboxedTestCase
 
 
-class InlineMRJobRunnerEndToEndTestCase(unittest.TestCase):
-
-    def setUp(self):
-        self.make_tmp_dir_and_mrjob_conf()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-
-    def make_tmp_dir_and_mrjob_conf(self):
-        self.tmp_dir = tempfile.mkdtemp()
-        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'inline': {}}},
-                        open(self.mrjob_conf_path, 'w'))
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
+class InlineMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
     def test_end_to_end(self):
         # read from STDIN, a regular file, and a .gz
@@ -66,8 +44,7 @@ class InlineMRJobRunnerEndToEndTestCase(unittest.TestCase):
         input_gz.close()
 
         mr_job = MRTwoStepJob(
-            ['--runner', 'inline', '-c', self.mrjob_conf_path,
-             '-', input_path, input_gz_path])
+            ['--runner', 'inline', '-', input_path, input_gz_path])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
@@ -91,36 +68,17 @@ class InlineMRJobRunnerEndToEndTestCase(unittest.TestCase):
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
 
-class InlineMRJobRunnerCmdenvTest(unittest.TestCase):
-
-    def setUp(self):
-        self.make_tmp_dir_and_mrjob_conf()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-
-    def make_tmp_dir_and_mrjob_conf(self):
-        self.tmp_dir = tempfile.mkdtemp()
-        self.mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        dump_mrjob_conf({'runners': {'inline': {}}},
-                         open(self.mrjob_conf_path, 'w'))
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
+class InlineMRJobRunnerCmdenvTest(EmptyMrjobConfTestCase):
 
     def test_cmdenv(self):
-        input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as input_file:
-            input_file.write('foo\n')
-
+        import logging
+        logging.basicConfig()
         # make sure previous environment is preserved
         os.environ['SOMETHING'] = 'foofoofoo'
         old_env = os.environ.copy()
 
-        mr_job = MRTestCmdenv(['--runner', 'inline',
-                               '-c', self.mrjob_conf_path,
-                               '--cmdenv=FOO=bar', input_path])
-        mr_job.sandbox()
+        mr_job = MRTestCmdenv(['--runner', 'inline', '--cmdenv=FOO=bar'])
+        mr_job.sandbox(stdin=StringIO('foo\n'))
 
         results = []
 
@@ -158,14 +116,12 @@ class MRIncrementerJob(MRTestingJob):
         return [self.mr(self.mapper)] * self.options.times
 
 
-class InlineRunnerStepsTestCase(unittest.TestCase):
+class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
     # make sure file options get passed to --steps in inline mode
 
     def test_adding_2(self):
-        stdin = ['0\n', '1\n', '2\n']
-        mr_job = MRIncrementerJob(
-            ['--no-conf', '-r', 'inline', '--times', '2'])
-        mr_job.sandbox(stdin=stdin)
+        mr_job = MRIncrementerJob(['-r', 'inline', '--times', '2'])
+        mr_job.sandbox(stdin=StringIO('0\n1\n2\n'))
 
         self.assertEqual(len(mr_job.steps()), 2)
 

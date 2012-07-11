@@ -444,17 +444,17 @@ def add_emr_opts(opt_group):
                  ' job flows left idle can quickly become expensive!'),
 
         opt_group.add_option(
+            '--pool-name', dest='emr_job_flow_pool_name', action='store',
+            default=None,
+            help=('Specify a pool name to join. Set to "default" if not'
+                  ' specified.')),
+
+        opt_group.add_option(
             '--pool-wait-minutes', dest='pool_wait_minutes', default=0,
             type=int,
             help=('Wait for a number of minutes for a job flow to finish'
                   ' if a job finishes, pick up their job flow. Otherwise'
                   ' create a new one.')),
-
-        opt_group.add_option(
-            '--pool-name', dest='emr_job_flow_pool_name', action='store',
-            default=None,
-            help=('Specify a pool name to join. Set to "default" if not'
-                  ' specified.')),
 
         opt_group.add_option(
             '--s3-endpoint', dest='s3_endpoint', default=None,

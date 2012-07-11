@@ -16,10 +16,6 @@ import logging
 from mrjob.util import cmd_line
 
 
-# used by MRJobStep below, to fake no mapper
-def _IDENTITY_MAPPER(key, value):
-    yield key, value
-
 _MAPPER_FUNCS = ('mapper', 'mapper_init', 'mapper_final', 'mapper_cmd',
                  'mapper_filter')
 _COMBINER_FUNCS = ('combiner', 'combiner_init', 'combiner_final',
@@ -29,7 +25,13 @@ _REDUCER_FUNCS = ('reducer', 'reducer_init', 'reducer_final', 'reducer_cmd',
 
 _JOB_STEP_PARAMS = _MAPPER_FUNCS + _COMBINER_FUNCS + _REDUCER_FUNCS
 
+STEP_TYPES = ('script', 'streaming', 'jar')
+
 log = logging.getLogger('mrjob.step')
+
+# used by MRJobStep below, to fake no mapper
+def _IDENTITY_MAPPER(key, value):
+    yield key, value
 
 
 class MRJobStep(object):

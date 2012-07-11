@@ -53,6 +53,7 @@ from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.local import LocalFilesystem
+from mrjob.step import STEP_TYPES
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
 from mrjob.util import tar_and_gzip
@@ -75,8 +76,6 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #:   ``cleanup_on_failure``.
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
                    'SCRATCH']
-
-_STEP_RE = re.compile(r'^M?C?R?$')
 
 # buffer for piping files into sort on Windows
 _BUFFER_SIZE = 4096
@@ -803,14 +802,30 @@ class MRJobRunner(object):
                 if not steps or not stdout:
                     raise ValueError('step description is empty!')
                 for step in steps:
-                    if len(step) < 1 or not _STEP_RE.match(step):
+                    if step['type'] not in STEP_TYPES:
                         raise ValueError(
                             'unexpected step type %r in steps %r' %
-                                         (step, stdout))
+                                         (step['type'], stdout))
 
                 self._steps = steps
 
         return self._steps
+
+    def _script_args_for_step(self, step_num, mrc):
+        assert self._script
+
+        args = self._opts['python_bin'] + [
+            self._script['name'],
+            '--step-num=%d' % step_num,
+            '--%s' % mrc,
+        ] + self._mr_job_extra_args()
+        if self._wrapper_script:
+            return (
+                self._opts['python_bin'] +
+                [self._wrapper_script['name']] +
+                args)
+        else:
+            return args
 
     def _mr_job_extra_args(self, local=False):
         """Return arguments to add to every invocation of MRJob.

@@ -36,6 +36,12 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+try:
+    import simplejson as json
+    json
+except:
+    import json
+
 from mrjob import compat
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -791,7 +797,7 @@ class MRJobRunner(object):
                     raise Exception(
                         'error getting step information: %s', stderr)
 
-                steps = stdout.strip().split(' ')
+                steps = json.loads(stdout)
 
                 # verify that this is a proper step description
                 if not steps or not stdout:

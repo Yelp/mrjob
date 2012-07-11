@@ -248,7 +248,6 @@ class LocalMRJobRunnerEndToEndTestCase(unittest.TestCase):
         self.gz_test(self.tmp_dir)
 
     def test_relative_gz_path(self):
-        # `cd` into /temp dir
         current_directory = os.getcwd()
 
         def change_back_directory():

@@ -44,15 +44,22 @@ class MRJobStep(object):
         if not (any(kwargs.itervalues()) or mapper or reducer):
             raise Exception("Step has no mappers and no reducers")
 
+        self.has_explicit_mapper = any(
+            name for name in kwargs if name in _MAPPER_FUNCS)
+
         steps = dict((f, None) for f in _JOB_STEP_PARAMS)
+
         if mapper:
             steps['mapper'] = mapper
+            self.has_explicit_mapper = True
+
         if reducer:
             steps['reducer'] = reducer
+
         steps.update(kwargs)
 
         def _prefix_set(prefix):
-            return set(k for k in steps if k.startswith(prefix))
+            return set(k for k in steps if k.startswith(prefix) and steps[k])
 
         def _check_cmd(cmd, prefix_set):
             if len(prefix_set) > 1 and cmd in prefix_set:
@@ -72,19 +79,15 @@ class MRJobStep(object):
         return self._steps[key]
 
     @property
-    def has_explicit_mapper(self):
-        return any(name in self._kwargs for name in _MAPPER_FUNCS)
-
-    @property
     def has_explicit_combiner(self):
-        return any(name in self._kwargs for name in _COMBINER_FUNCS)
+        return any(name in self._steps for name in _COMBINER_FUNCS)
 
     @property
     def has_explicit_reducer(self):
-        return any(name in self._kwargs for name in _REDUCER_FUNCS)
+        return any(name in self._steps for name in _REDUCER_FUNCS)
 
     def _render_substep(self, cmd_key, filter_key):
-        if cmd_key in self._steps:
+        if self._steps[cmd_key]:
             cmd = self._steps[cmd_key]
             if not isinstance(cmd, basestring):
                 cmd = cmd_line(cmd)
@@ -113,11 +116,11 @@ class MRJobStep(object):
         if (step_num == 0 or
             self.has_explicit_mapper or
             self.has_explicit_reducer):
-            substep_descs['mapper'] = self.render_mapper(step_num)
+            substep_descs['mapper'] = self.render_mapper()
         if self.has_explicit_combiner:
-            substep_descs['combiner'] = self.render_cominber(step_num)
+            substep_descs['combiner'] = self.render_combiner()
         if self.has_explicit_reducer:
-            substep_descs['reducer'] = self.render_reducer(step_num)
+            substep_descs['reducer'] = self.render_reducer()
         return substep_descs
 
 

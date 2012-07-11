@@ -1368,7 +1368,7 @@ class EMRJobRunner(MRJobRunner):
             bash_wrap_reducer = False
 
         input = self._s3_step_input_uris(step_num)
-        output = self._s3_step_output_uri(step_num)\
+        output = self._s3_step_output_uri(step_num)
 
         step_args, cache_files, cache_archives = self._cache_args()
 

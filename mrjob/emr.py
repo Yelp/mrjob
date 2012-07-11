@@ -16,7 +16,6 @@ from __future__ import with_statement
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
-import itertools
 import logging
 import os
 import random
@@ -93,9 +92,6 @@ from mrjob.util import hash_object
 log = logging.getLogger('mrjob.emr')
 
 JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
-
-_SCRIPT_PATH_RE = re.compile('\b%prog\b', flags=re.IGNORECASE)
-_STEP_NUM_RE = re.compile('\b%step_num\b', flags=re.IGNORECASE)
 
 # the port to tunnel to
 EMR_JOB_TRACKER_PORT = 9100

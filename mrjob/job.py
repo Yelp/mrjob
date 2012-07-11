@@ -44,8 +44,8 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
-from mrjob.steps import MRJobStep
-from mrjob.steps import _JOB_STEP_PARAMS
+from mrjob.step import MRJobStep
+from mrjob.step import _JOB_STEP_PARAMS
 from mrjob.util import read_input
 
 
@@ -165,6 +165,12 @@ class MRJob(MRJobLauncher):
         """
         raise NotImplementedError
 
+    def mapper_cmd(self):
+        raise NotImplementedError
+
+    def mapper_filter(self):
+        raise NotImplementedError
+
     def reducer_init(self):
         """Re-define this to define an action to run before the reducer
         processes any input.
@@ -190,6 +196,12 @@ class MRJob(MRJobLauncher):
         """
         raise NotImplementedError
 
+    def reducer_cmd(self):
+        raise NotImplementedError
+
+    def reducer_filter(self):
+        raise NotImplementedError
+
     def combiner_init(self):
         """Re-define this to define an action to run before the combiner
         processes any input.
@@ -213,6 +225,12 @@ class MRJob(MRJobLauncher):
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
         re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
         """
+        raise NotImplementedError
+
+    def combiner_cmd(self):
+        raise NotImplementedError
+
+    def combiner_filter(self):
         raise NotImplementedError
 
     ### Defining multi-step jobs ###
@@ -428,7 +446,7 @@ class MRJob(MRJobLauncher):
         mapper_final = step['mapper_final']
 
         # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, 'M')
+        read_lines, write_line = self._wrap_protocols(step_num, 'mapper')
 
         if mapper_init:
             for out_key, out_value in mapper_init() or ():
@@ -468,7 +486,7 @@ class MRJob(MRJobLauncher):
             raise ValueError('No reducer in step %d' % step_num)
 
         # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, 'R')
+        read_lines, write_line = self._wrap_protocols(step_num, 'reducer')
 
         if reducer_init:
             for out_key, out_value in reducer_init() or ():
@@ -513,7 +531,7 @@ class MRJob(MRJobLauncher):
             raise ValueError('No combiner in step %d' % step_num)
 
         # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, 'C')
+        read_lines, write_line = self._wrap_protocols(step_num, 'combiner')
 
         if combiner_init:
             for out_key, out_value in combiner_init() or ():
@@ -617,6 +635,20 @@ class MRJob(MRJobLauncher):
 
         return read_lines, write_line
 
+    def _first_step_type(self):
+        steps_desc = self._steps_desc()
+        if 'mapper' in steps_desc[0]:
+            return 'mapper'
+        if 'reducer' in steps_desc[0]:
+            return 'reducer'
+
+    def _last_step_type(self):
+        steps_desc = self._steps_desc()
+        if 'reducer' in steps_desc[-1]:
+            return 'reducer'
+        if 'mapper' in steps_desc[-1]:
+            return 'mapper'
+
     def pick_protocols(self, step_num, step_type):
         """Pick the protocol classes to use for reading and writing
         for the given step.
@@ -642,12 +674,13 @@ class MRJob(MRJobLauncher):
 
         # pick input protocol
 
-        if step_num == 0 and step_type == steps_desc[0][0]:
+        if step_num == 0 and step_type == self._first_step_type():
             read = self.input_protocol().read
         else:
             read = self.internal_protocol().read
 
-        if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
+        if (step_num == len(steps_desc) - 1 and
+            step_type == self._last_step_type()):
             write = self.output_protocol().write
         else:
             write = self.internal_protocol().write

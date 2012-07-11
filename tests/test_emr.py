@@ -2891,14 +2891,17 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
     # A list of job ids that hold booleans of whether or not the job can
     # acquire a lock. Helps simulate mrjob.emr.attempt_to_acquire_lock.
     JOB_ID_LOCKS = {
-    'j-fail-lock': False, 'j-successful-lock': True, 'j-brown': True,
-    'j-epic-fail-lock': False
+        'j-fail-lock': False,
+        'j-successful-lock': True,
+        'j-brown': True,
+        'j-epic-fail-lock': False
     }
 
     def setUp(self):
         super(JobWaitTestCase, self).setUp()
         self.future_jobs = []
         self.jobs = []
+        self.sleep_counter = 0
 
         def side_effect_lock_uri(*args):
             return args[0]  # Return the only arg given to it.
@@ -2915,6 +2918,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
             return return_jobs
 
         def side_effect_time_sleep(*args):
+            self.sleep_counter += 1
             if len(self.future_jobs) > 0:
                 future_job = self.future_jobs.pop(0)
                 self.jobs.append(future_job)
@@ -2925,13 +2929,10 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
             side_effect=side_effect_usable_job_flows)
         self.simple_patch(EMRJobRunner, '_lock_uri',
             side_effect=side_effect_lock_uri)
-        a = patch('mrjob.emr.attempt_to_acquire_lock',
+        self.simple_patch(mrjob.emr, 'attempt_to_acquire_lock',
             side_effect=side_effect_acquire_lock)
-        t = patch('time.sleep', side_effect=side_effect_time_sleep)
-        a.start()
-        t.start()
-        self.addCleanup(a.stop)
-        self.addCleanup(t.stop)
+        self.simple_patch(time, 'sleep',
+            side_effect=side_effect_time_sleep)
 
     def tearDown(self):
         super(JobWaitTestCase, self).tearDown()
@@ -2952,6 +2953,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
         runner._opts['pool_wait_minutes'] = 0
         result = runner.find_job_flow()
         self.assertEqual(result, None)
+        self.assertEqual(self.sleep_counter, 0)
 
     def test_no_waiting_for_job_pool_success(self):
         self.add_job_flow(['j-fail-lock'], self.jobs)
@@ -2966,6 +2968,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
         runner._opts['pool_wait_minutes'] = 1
         result = runner.find_job_flow()
         self.assertEqual(result.jobflowid, 'j-successful-lock')
+        self.assertEqual(self.sleep_counter, 0)
 
     def test_sleep_then_acquire_lock(self):
         self.add_job_flow(['j-fail-lock'], self.jobs)
@@ -2974,6 +2977,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
         runner._opts['pool_wait_minutes'] = 1
         result = runner.find_job_flow()
         self.assertEqual(result.jobflowid, 'j-successful-lock')
+        self.assertEqual(self.sleep_counter, 1)
 
     def test_timeout_waiting_for_job_flow(self):
         self.add_job_flow(['j-fail-lock'], self.jobs)
@@ -2982,3 +2986,4 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
         runner._opts['pool_wait_minutes'] = 1
         result = runner.find_job_flow()
         self.assertEqual(result, None)
+        self.assertEqual(self.sleep_counter, 2)

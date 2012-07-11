@@ -53,6 +53,7 @@ from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.local import LocalFilesystem
+from mrjob.step import SCRIPT_SUBSTEP
 from mrjob.step import STEP_TYPES
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
@@ -813,6 +814,7 @@ class MRJobRunner(object):
 
     def _script_args_for_step(self, step_num, mrc):
         assert self._script
+        assert mrc['type'] == SCRIPT_SUBSTEP
 
         args = self._opts['python_bin'] + [
             self._script['name'],

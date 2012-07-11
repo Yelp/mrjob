@@ -16,6 +16,23 @@ import logging
 from mrjob.util import cmd_line
 
 
+# Constants for --steps data structure, not to be used for anything else (like
+# function names, hence the explicit 'mapper', etc. in _MAPPER_FUNCS)
+MAPPER = 'mapper'
+
+COMBINER = 'combiner'
+
+REDUCER = 'reducer'
+
+STREAMING_STEP = 'streaming'
+
+JAR_STEP = 'jar'
+
+SCRIPT_SUBSTEP = 'script'
+
+COMMAND_SUBSTEP = 'command'
+
+# Function names mapping to mapper, reducer, and combiner operations
 _MAPPER_FUNCS = ('mapper', 'mapper_init', 'mapper_final', 'mapper_cmd',
                  'mapper_filter')
 _COMBINER_FUNCS = ('combiner', 'combiner_init', 'combiner_final',
@@ -23,9 +40,9 @@ _COMBINER_FUNCS = ('combiner', 'combiner_init', 'combiner_final',
 _REDUCER_FUNCS = ('reducer', 'reducer_init', 'reducer_final', 'reducer_cmd',
                   'reducer_filter')
 
+# All allowable step keyword arguments, also happens to be all function names
+# for jobs whose step objects are created automatically
 _JOB_STEP_PARAMS = _MAPPER_FUNCS + _COMBINER_FUNCS + _REDUCER_FUNCS
-
-STEP_TYPES = ('streaming', 'jar')
 
 log = logging.getLogger('mrjob.step')
 
@@ -92,9 +109,9 @@ class MRJobStep(object):
             cmd = self._steps[cmd_key]
             if not isinstance(cmd, basestring):
                 cmd = cmd_line(cmd)
-            return {'type': 'streaming', 'command': cmd}
+            return {'type': COMMAND_SUBSTEP, 'command': cmd}
         else:
-            substep = {'type': 'script'}
+            substep = {'type': SCRIPT_SUBSTEP}
             if filter_key in self._steps:
                 substep['filter'] = self._steps[filter_key]
             return substep
@@ -109,7 +126,7 @@ class MRJobStep(object):
         return self._render_substep('reducer_cmd', 'reducer_filter')
 
     def description(self, step_num):
-        substep_descs = {'type': 'streaming'}
+        substep_descs = {'type': STREAMING_STEP}
         # Use a mapper if:
         #   - the user writes one
         #   - it is the first step and we don't want to mess up protocols
@@ -117,11 +134,11 @@ class MRJobStep(object):
         if (step_num == 0 or
             self.has_explicit_mapper or
             self.has_explicit_reducer):
-            substep_descs['mapper'] = self.render_mapper()
+            substep_descs[MAPPER] = self.render_mapper()
         if self.has_explicit_combiner:
-            substep_descs['combiner'] = self.render_combiner()
+            substep_descs[COMBINER] = self.render_combiner()
         if self.has_explicit_reducer:
-            substep_descs['reducer'] = self.render_reducer()
+            substep_descs[REDUCER] = self.render_reducer()
         return substep_descs
 
 

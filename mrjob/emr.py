@@ -84,6 +84,13 @@ from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_LOG_ROOT
+from mrjob.step import COMBINER
+from mrjob.step import COMMAND_SUBSTEP
+from mrjob.step import JAR_STEP
+from mrjob.step import MAPPER
+from mrjob.step import REDUCER
+from mrjob.step import SCRIPT_SUBSTEP
+from mrjob.step import STREAMING_STEP
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import hash_object
@@ -1295,10 +1302,10 @@ class EMRJobRunner(MRJobRunner):
         step_list = []
 
         for step_num, step in enumerate(steps):
-            if step['type'] == 'streaming':
+            if step['type'] == STREAMING_STEP:
                 step_list.append(
                     self._build_streaming_step(step, step_num, len(steps)))
-            elif step['type'] == 'jar':
+            elif step['type'] == JAR_STEP:
                 step_list.append(
                     self._build_jar_step(step, step_num, len(steps)))
 
@@ -1314,16 +1321,14 @@ class EMRJobRunner(MRJobRunner):
             return 'TERMINATE_JOB_FLOW'
 
     def _substep_cmd_line(self, step, step_num, mrc):
-        if step[mrc]['type'] == 'command':
+        if step[mrc]['type'] == COMMAND_SUBSTEP:
             cmd = "%s %s" % (
                 step[mrc]['command'], cmd_line(self._mr_job_extra_args()))
             # never wrap custom hadoop streaming commands in bash
             return cmd, False
 
-        elif step[mrc]['type'] == 'script':
-            cmd = cmd_line(
-                self._script_args_for_step(step_num, mrc) +
-                self._mr_job_extra_args())
+        elif step[mrc]['type'] == SCRIPT_SUBSTEP:
+            cmd = cmd_line(self._script_args_for_step(step_num, mrc))
 
             # filter input and pipe for great speed, if user asks
             # but we have to wrap the command in bash
@@ -1340,7 +1345,7 @@ class EMRJobRunner(MRJobRunner):
             return self._substep_cmd_line(
                 step[mrc], step_num, mrc)
         else:
-            if mrc == 'mapper':
+            if mrc == MAPPER:
                 return 'cat', False
             else:
                 return None, False
@@ -1353,13 +1358,13 @@ class EMRJobRunner(MRJobRunner):
 
         # Hadoop streaming stuff
         mapper, bash_wrap_mapper = self._render_substep(
-            step, step_num, 'mapper')
+            step, step_num, MAPPER)
 
         combiner, bash_wrap_combiner = self._render_substep(
-            step, step_num, 'combiner')
+            step, step_num, COMBINER)
 
         reducer, bash_wrap_reducer = self._render_substep(
-            step, step_num, 'reducer')
+            step, step_num, REDUCER)
 
         # we can go ahead and wrap the reducer now. nothing depends on it.
         if bash_wrap_reducer:
@@ -1372,7 +1377,7 @@ class EMRJobRunner(MRJobRunner):
             'output': self._s3_step_output_uri(step_num),
             'jar': self.get_jar(),
             'action_on_failure': self._action_on_failure,
-            'reducer': reducer,
+            REDUCER: reducer,
         }
 
         streaming_step_kwargs.update(self._cache_kwargs())
@@ -1397,10 +1402,10 @@ class EMRJobRunner(MRJobRunner):
         if bash_wrap_combiner:
             combiner = "bash -c '%s'" % combiner
 
-        streaming_step_kwargs['mapper'] = mapper
+        streaming_step_kwargs[MAPPER] = mapper
 
         if combiner:
-            streaming_step_kwargs['combiner'] = combiner
+            streaming_step_kwargs[COMBINER] = combiner
 
         return boto.emr.StreamingStep(**streaming_step_kwargs)
 

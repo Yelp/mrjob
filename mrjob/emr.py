@@ -2450,8 +2450,10 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 # Reset the exclusion set since it is possible to reclaim a
                 # lock that was previously unavailable.
                 exclude = set()
-                log.info("Didn't find any job flow pool, checking again in"
-                    " 30 seconds...")
+                log.info("No job flows available in pool '%s'. Checking again"
+                         " in %d seconds." % (
+                             self._opts['emr_job_flow_pool_name'],
+                             int(JOB_FLOW_SLEEP_INTERVAL)))
                 time.sleep(JOB_FLOW_SLEEP_INTERVAL)
                 now += time_sleep
         return None

@@ -44,7 +44,7 @@ class TestHadoopHomeRegression(SandboxedTestCase):
 
         with patch('mrjob.hadoop.find_hadoop_streaming_jar',
                    return_value='some.jar'):
-            HadoopJobRunner(hadoop_home=self.tmp_dir, conf_path=False)
+            HadoopJobRunner(hadoop_home=self.tmp_dir, conf_paths=[])
 
 
 class TestFindHadoopStreamingJar(SandboxedTestCase):

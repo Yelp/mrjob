@@ -26,8 +26,14 @@ import sys
 import tempfile
 
 try:
+    from simplejson import JSONDecodeError
+    JSONDecodeError  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    from json import JSONDecodeError
+
+try:
     import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
+    unittest
 except ImportError:
     import unittest
 
@@ -401,19 +407,11 @@ class StepsPythonBinTestCase(unittest.TestCase):
 
         with mr_job.make_runner() as runner:
             assert isinstance(runner, LocalMRJobRunner)
-            try:
-                # MRTwoStepJob populates _steps in the runner, so un-populate
-                # it here so that the runner actually tries to get the steps
-                # via subprocess
-                runner._steps = None
-                runner._get_steps()
-                assert False, 'Should throw exception'
-            except ValueError, ex:
-                output = str(ex)
-                # the output should basically be the command used to
-                # run the steps command
-                self.assertIn('mr_two_step_job.py', output)
-                self.assertIn('--steps', output)
+            # MRTwoStepJob populates _steps in the runner, so un-populate
+            # it here so that the runner actually tries to get the steps
+            # via subprocess
+            runner._steps = None
+            self.assertRaises(JSONDecodeError, runner._get_steps)
 
 
 class LocalBootstrapMrjobTestCase(unittest.TestCase):
@@ -542,9 +540,9 @@ class LocalMRJobRunnerTestJobConfCase(SandboxedTestCase):
         self.assertEqual(results['mapreduce.map.input.length'], '4')
         self.assertEqual(results['mapreduce.map.input.start'], '0')
         self.assertEqual(results['mapreduce.task.attempt.id'],
-                       'attempt_%s_m_000000_0' % runner._job_name)
+                       'attempt_%s_mapper_000000_0' % runner._job_name)
         self.assertEqual(results['mapreduce.task.id'],
-                       'task_%s_m_000000' % runner._job_name)
+                       'task_%s_mapper_000000' % runner._job_name)
         self.assertEqual(results['mapreduce.task.ismap'], 'true')
         self.assertEqual(results['mapreduce.task.output.dir'],
                          runner._output_dir)

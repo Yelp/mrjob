@@ -121,9 +121,13 @@ class InlineMRJobRunner(MRJobRunner):
         for key in (MAPPER, REDUCER, COMBINER):
             if key in step_dict:
                 substep = step_dict[key]
-                if substep['type'] != 'script':
+                if substep['type'] != SCRIPT_SUBSTEP:
                     raise Exception(
-                        "InlineMRJobRunner can only run mrjob steps.")
+                        "InlineMRJobRunner cannot run %s steps." %
+                        substep['type'])
+                if 'filter' in substep:
+                    raise Exception(
+                        "InlineMRJobRunner cannot run filters.")
 
     def _run(self):
         self._setup_output_dir()

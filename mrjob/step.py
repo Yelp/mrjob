@@ -28,6 +28,8 @@ STREAMING_STEP = 'streaming'
 
 JAR_STEP = 'jar'
 
+STEP_TYPES = (STREAMING_STEP, JAR_STEP)
+
 SCRIPT_SUBSTEP = 'script'
 
 COMMAND_SUBSTEP = 'command'
@@ -36,7 +38,7 @@ COMMAND_SUBSTEP = 'command'
 _MAPPER_FUNCS = ('mapper', 'mapper_init', 'mapper_final', 'mapper_cmd',
                  'mapper_filter')
 _COMBINER_FUNCS = ('combiner', 'combiner_init', 'combiner_final',
-                   'combiner_cmd', 'combiner_filter')
+                   'combiner_cmd')
 _REDUCER_FUNCS = ('reducer', 'reducer_init', 'reducer_final', 'reducer_cmd',
                   'reducer_filter')
 
@@ -104,15 +106,20 @@ class MRJobStep(object):
             return _IDENTITY_MAPPER
         return self._steps[key]
 
-    def _render_substep(self, cmd_key, filter_key):
+    def _render_substep(self, cmd_key, filter_key=None):
         if self._steps[cmd_key]:
             cmd = self._steps[cmd_key]
             if not isinstance(cmd, basestring):
                 cmd = cmd_line(cmd)
+            if filter_key and filter_key in self._steps:
+                raise ValueError('Cannot specify both %s and %s' % (
+                    cmd_key, filter_key))
             return {'type': COMMAND_SUBSTEP, 'command': cmd}
         else:
             substep = {'type': SCRIPT_SUBSTEP}
-            if filter_key in self._steps:
+            if (filter_key and
+                filter_key in self._steps and
+                self._steps[filter_key]):
                 substep['filter'] = self._steps[filter_key]
             return substep
 
@@ -120,7 +127,8 @@ class MRJobStep(object):
         return self._render_substep('mapper_cmd', 'mapper_filter')
 
     def render_combiner(self):
-        return self._render_substep('combiner_cmd', 'combiner_filter')
+        # combiners can't have filters
+        return self._render_substep('combiner_cmd')
 
     def render_reducer(self):
         return self._render_substep('reducer_cmd', 'reducer_filter')

@@ -814,7 +814,6 @@ class MRJobRunner(object):
 
     def _script_args_for_step(self, step_num, mrc):
         assert self._script
-        assert mrc['type'] == SCRIPT_SUBSTEP
 
         args = self._opts['python_bin'] + [
             self._script['name'],

@@ -230,9 +230,6 @@ class MRJob(MRJobLauncher):
     def combiner_cmd(self):
         raise NotImplementedError
 
-    def combiner_filter(self):
-        raise NotImplementedError
-
     ### Defining multi-step jobs ###
 
     def steps(self):

@@ -18,6 +18,7 @@ from __future__ import with_statement
 import itertools
 import logging
 import os
+import shlex
 import shutil
 import stat
 from subprocess import Popen
@@ -33,7 +34,6 @@ from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.step import COMBINER
 from mrjob.step import COMMAND_SUBSTEP
-from mrjob.step import JAR_STEP
 from mrjob.step import MAPPER
 from mrjob.step import REDUCER
 from mrjob.step import SCRIPT_SUBSTEP
@@ -48,6 +48,33 @@ log = logging.getLogger('mrjob.local')
 
 DEFAULT_MAP_TASKS = 2
 DEFAULT_REDUCE_TASKS = 2
+
+
+def _chain_procs(procs_args, **kwargs):
+    last_stdout = None
+
+    procs = []
+    for i, args in enumerate(procs_args):
+        proc_kwargs = kwargs.copy()
+
+        # first proc shouldn't override any kwargs
+        # other procs should get stdin from last proc's stdout
+        if i > 0:
+            proc_kwargs['stdin'] = last_stdout
+
+        # last proc shouldn't override stdout
+        # other procs should have stdout sent to next proc
+        if i < len(procs_args) - 1:
+            proc_kwargs['stdout'] = PIPE
+
+        proc = Popen(args, **proc_kwargs)
+        last_stdout = proc.stdout
+        procs.append({
+            'proc': proc,
+            'args': args,
+        })
+
+    return procs
 
 
 class LocalRunnerOptionStore(RunnerOptionStore):
@@ -178,17 +205,10 @@ class LocalMRJobRunner(MRJobRunner):
         # run mapper, combiner, sort, reducer for each step
         for step_num, step in enumerate(self._get_steps()):
             self._counters.append({})
-            # run the mapper
-            mapper_args = self._script_args_for_step(step_num, MAPPER)
-            combiner_args = []
-            if COMBINER in step:
-                combiner_args = self._script_args_for_step(
-                    step_num, COMBINER)
 
-            self._invoke_step(mapper_args, 'step-%d-mapper' % step_num,
-                              step_num=step_num, step_type=MAPPER,
-                              num_tasks=self._map_tasks,
-                              combiner_args=combiner_args)
+            self._invoke_step(
+                step, 'step-%d-mapper' % step_num, step_num, MAPPER,
+                num_tasks=self._map_tasks)
 
             if REDUCER in step:
                 # sort the output. Treat this as a mini-step for the purpose
@@ -200,10 +220,9 @@ class LocalMRJobRunner(MRJobRunner):
                 self._prev_outfiles = [sort_output_path]
 
                 # run the reducer
-                reducer_args = self._script_args_for_step(step_num, REDUCER)
-                self._invoke_step(reducer_args, 'step-%d-reducer' % step_num,
-                                  step_num=step_num, step_type=REDUCER,
-                                  num_tasks=self._reduce_tasks)
+                self._invoke_step(
+                    step, 'step-%d-reducer' % step_num, step_num, REDUCER,
+                    num_tasks=self._reduce_tasks)
 
         # move final output to output directory
         for i, outfile in enumerate(self._prev_outfiles):
@@ -427,8 +446,8 @@ class LocalMRJobRunner(MRJobRunner):
                     input_paths.append(path)
             return input_paths
 
-    def _invoke_step(self, args, outfile_name, step_num,
-                     step_type, combiner_args=None, num_tasks=1):
+    def _invoke_step(self, step_dict, outfile_name, step_num, step_type,
+                     num_tasks=1):
         """Run the given command, outputting into outfile, and reading
         from the previous outfile (or, for the first step, from our
         original output files).
@@ -442,6 +461,10 @@ class LocalMRJobRunner(MRJobRunner):
                               some extra shell wrangling, so pass the combiner
                               arguments in separately.
         """
+
+        if step_dict['type'] != STREAMING_STEP:
+            raise Exception("LocalMRJobRunner cannot run %s steps" %
+                            step_dict['type'])
 
         # get file splits for mappers and reducers
         keep_sorted = (step_type == REDUCER)
@@ -475,15 +498,65 @@ class LocalMRJobRunner(MRJobRunner):
 
             task_outfile = outfile_name + '_part-%05d' % task_num
 
-            proc_dicts = self._invoke_process(args + [file_name], task_outfile,
-                                              env=env,
-                                              combiner_args=combiner_args)
+            if step_type == MAPPER:
+                procs_args = self._mapper_arg_chain(
+                    step_dict, step_num, file_name)
+            elif step_type == REDUCER:
+                procs_args = self._reducer_arg_chain(
+                    step_dict, step_num, file_name)
+
+            proc_dicts = self._invoke_processes(
+                procs_args, task_outfile, env=env)
             all_proc_dicts.extend(proc_dicts)
 
         for proc_dict in all_proc_dicts:
             self._wait_for_process(proc_dict, step_num)
 
         self.print_counters([step_num + 1])
+
+    def _filter_if_any(self, substep_dict):
+        if substep_dict['type'] == SCRIPT_SUBSTEP:
+            if 'filter' in substep_dict:
+                return shlex.split(substep_dict['filter'])
+        return None
+
+    def _mapper_arg_chain(self, step_dict, step_num, input_file):
+        procs_args = []
+
+        filter_args = self._filter_if_any(step_dict[MAPPER])
+        if filter_args:
+            procs_args.append(filter_args)
+
+        procs_args.append(
+            self._substep_args(step_dict, step_num, MAPPER) + [input_file])
+
+        if COMBINER in step_dict:
+            procs_args.append(['sort'])
+            procs_args.append(self._substep_args(
+                step_dict, step_num, COMBINER))
+
+        return procs_args
+
+    def _reducer_arg_chain(self, step_dict, step_num, input_file):
+        procs_args = []
+
+        filter_args = self._filter_if_any(step_dict[REDUCER])
+        if filter_args:
+            procs_args.append(filter_args)
+
+        procs_args.append(
+            self._substep_args(step_dict, step_num, REDUCER) + [input_file])
+
+        return procs_args
+
+    def _substep_args(self, step_dict, step_num, mrc):
+        if step_dict['type'] != 'streaming':
+            raise Exception("LocalMRJobRunner cannot run %s steps." %
+                            step_dict['type'])
+        if step_dict[mrc]['type'] == COMMAND_SUBSTEP:
+            return shlex.split(str(step_dict[mrc]['command']))
+        if step_dict[mrc]['type'] == SCRIPT_SUBSTEP:
+            return self._script_args_for_step(step_num, mrc)
 
     def _subprocess_env(self, step_type, step_num, task_num, input_file=None,
                         input_start=None, input_length=None):
@@ -597,7 +670,7 @@ class LocalMRJobRunner(MRJobRunner):
 
         return j
 
-    def _invoke_process(self, args, outfile_name, env, combiner_args=None):
+    def _invoke_processes(self, procs_args, outfile_name, env):
         """invoke the process described by *args* and write to *outfile_name*
 
         :param combiner_args: If this mapper has a combiner, we need to do
@@ -606,11 +679,7 @@ class LocalMRJobRunner(MRJobRunner):
 
         :return: dict(proc=Popen, args=[process args], write_to=file)
         """
-        if combiner_args:
-            log.info('> %s | sort | %s' %
-                     (cmd_line(args), cmd_line(combiner_args)))
-        else:
-            log.info('> %s' % cmd_line(args))
+        log.info('> %s' % ' | '.join(cmd_line(args) for args in procs_args))
 
         # set up outfile
         outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
@@ -619,33 +688,8 @@ class LocalMRJobRunner(MRJobRunner):
         self._prev_outfiles.append(outfile)
 
         with open(outfile, 'w') as write_to:
-            if combiner_args:
-                # set up a pipeline: mapper | sort | combiner
-                mapper_proc = Popen(args, stdout=PIPE, stderr=PIPE,
-                                    cwd=self._working_dir, env=env)
-
-                sort_proc = Popen(['sort'], stdin=mapper_proc.stdout,
-                                  stdout=PIPE, stderr=PIPE,
-                                  cwd=self._working_dir, env=env)
-
-                combiner_proc = Popen(combiner_args, stdin=sort_proc.stdout,
-                                      stdout=write_to, stderr=PIPE,
-                                      cwd=self._working_dir, env=env)
-
-                # this process shouldn't read from the pipes
-                mapper_proc.stdout.close()
-                sort_proc.stdout.close()
-
-                return [
-                    {'proc': mapper_proc, 'args': args},
-                    {'proc': sort_proc, 'args': ['sort']},
-                    {'proc': combiner_proc, 'args': combiner_args},
-                ]
-            else:
-                # just run the mapper process
-                proc = Popen(args, stdout=write_to, stderr=PIPE,
-                             cwd=self._working_dir, env=env)
-                return [{'proc': proc, 'args': args}]
+            return _chain_procs(procs_args, stdout=write_to, stderr=PIPE,
+                                cwd=self._working_dir, env=env)
 
     def _wait_for_process(self, proc_dict, step_num):
         # handle counters, status msgs, and other stuff on stderr

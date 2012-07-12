@@ -63,7 +63,7 @@ class MRJobStep(object):
                 'mr() got an unexpected keyword argument %r' % bad_kwargs[0])
 
         if not (any(kwargs.itervalues()) or mapper or reducer):
-            raise Exception("Step has no mappers and no reducers")
+            raise ValueError("Step has no mappers and no reducers")
 
         self.has_explicit_mapper = any(
             name for name in kwargs if name in _MAPPER_FUNCS)

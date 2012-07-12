@@ -110,7 +110,9 @@ MAX_SSH_RETRIES = 20
 # ssh should fail right away if it can't bind a port
 WAIT_FOR_SSH_TO_FAIL = 1.0
 
+# amount of time to wait between checks for available pooled job flows
 JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
+
 # sometimes AWS gives us seconds as a decimal, which we can't parse
 # with boto.utils.ISO8601
 SUBSECOND_RE = re.compile('\.[0-9]+')
@@ -2427,7 +2429,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         now = datetime.now()
         end_time = now + timedelta(minutes=max_wait_time)
         time_sleep = timedelta(seconds=JOB_FLOW_SLEEP_INTERVAL)
-        log.info("Attempting to find an available job flow..")
+        log.info("Attempting to find an available job flow...")
         while now <= end_time:
             sorted_tagged_job_flows = self.usable_job_flows(
                 emr_conn=emr_conn,

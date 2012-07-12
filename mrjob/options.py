@@ -451,10 +451,10 @@ def add_emr_opts(opt_group):
 
         opt_group.add_option(
             '--pool-wait-minutes', dest='pool_wait_minutes', default=0,
-            type=int,
+            type='int',
             help=('Wait for a number of minutes for a job flow to finish'
                   ' if a job finishes, pick up their job flow. Otherwise'
-                  ' create a new one.')),
+                  ' create a new one. (default 0)')),
 
         opt_group.add_option(
             '--s3-endpoint', dest='s3_endpoint', default=None,

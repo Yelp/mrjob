@@ -525,10 +525,13 @@ class LocalMRJobRunner(MRJobRunner):
 
         filter_args = self._filter_if_any(step_dict[MAPPER])
         if filter_args:
+            procs_args.append(['cat', input_file])
             procs_args.append(filter_args)
-
-        procs_args.append(
-            self._substep_args(step_dict, step_num, MAPPER) + [input_file])
+            procs_args.append(
+                self._substep_args(step_dict, step_num, MAPPER) + ['-'])
+        else:
+            procs_args.append(
+                self._substep_args(step_dict, step_num, MAPPER) + [input_file])
 
         if COMBINER in step_dict:
             procs_args.append(['sort'])
@@ -542,10 +545,15 @@ class LocalMRJobRunner(MRJobRunner):
 
         filter_args = self._filter_if_any(step_dict[REDUCER])
         if filter_args:
+            procs_args.append(['cat', input_file])
             procs_args.append(filter_args)
-
-        procs_args.append(
-            self._substep_args(step_dict, step_num, REDUCER) + [input_file])
+            procs_args.append(
+                self._substep_args(
+                    step_dict, step_num, REDUCER) + ['-'])
+        else:
+            procs_args.append(
+                self._substep_args(
+                    step_dict, step_num, REDUCER) + [input_file])
 
         return procs_args
 

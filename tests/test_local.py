@@ -45,9 +45,10 @@ from mrjob.local import LocalMRJobRunner
 from mrjob.step import MAPPER
 from mrjob.util import cmd_line
 from mrjob.util import read_file
-from tests.mr_cmd_jobs import CmdJob
+from tests.mr_cmd_job import CmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
+from tests.mr_filter_job import FilterJob
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_word_count import MRWordCount
@@ -688,6 +689,29 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
             self.assertEqual(''.join(r.stream_output()), data)
 
+    def test_uniq_combiner(self):
+        data = 'x\nx\nx\nx\nx\nx\n'
+        job = CmdJob(['--combiner-cmd=uniq', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    },
+                    'combiner': {
+                        'type': 'command',
+                        'command': 'uniq'}}])
+
+            r.run()
+
+            # there are 2 map tasks, each of which has 1 combiner, and all rows
+            # are the same, so we should end up with just 2 values
+
+            self.assertEqual(''.join(r.stream_output()), 'x\nx\n')
+
     def test_echo_reducer(self):
         data = 'x\ny\nz\n'
         job = CmdJob(['--reducer-cmd=echo', '--runner=local'])
@@ -706,5 +730,49 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
             r.run()
 
-            self.assertTrue(
-                ''.join(r.stream_output()).endswith('input_part-00000\n'))
+            lines = list(r.stream_output())
+            self.assertTrue(lines[0].endswith('input_part-00000\n'))
+
+
+class FilterTestCase(SandboxedTestCase):
+
+    def test_mapper_filter(self):
+        data = 'x\ny\nz\n'
+        job = FilterJob(['--mapper-filter', 'cat -e', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                        'filter': 'cat -e'}}])
+
+            r.run()
+
+            self.assertEqual(
+                ''.join(r.stream_output()),
+                'x$\ny$\nz$\n')
+
+    def test_reducer_filter(self):
+        data = 'x\ny\nz\n'
+        job = FilterJob(['--reducer-filter', 'cat -e', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    },
+                    'reducer': {
+                        'type': 'script',
+                        'filter': 'cat -e'}}])
+
+            r.run()
+
+            self.assertEqual(
+                ''.join(r.stream_output()),
+                'x$\ny$\nz$\n')

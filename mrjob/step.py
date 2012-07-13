@@ -52,6 +52,11 @@ log = logging.getLogger('mrjob.step')
 def _IDENTITY_MAPPER(key, value):
     yield key, value
 
+# used by MRJobStep below, to fake no reducer
+def _IDENTITY_REDUCER(key, values):
+    for value in values:
+        yield key, value
+
 
 class MRJobStep(object):
 
@@ -101,9 +106,15 @@ class MRJobStep(object):
         self._steps = steps
 
     def __getitem__(self, key):
-        # easy access to functions stored in self._steps
+        # always be prepared to run a mapper, since Hadoop Streaming requires
+        # it
         if key == 'mapper' and self._steps['mapper'] is None:
             return _IDENTITY_MAPPER
+        # identity reducer should only show up if you specified 'reducer_init',
+        # 'reducer_final', or 'reducer_filter', but not 'reducer' itself
+        if (key == 'reducer' and self._steps['reducer'] is None and
+            self.has_explicit_reducer):
+            return _IDENTITY_REDUCER
         return self._steps[key]
 
     def _render_substep(self, cmd_key, filter_key=None):
@@ -111,15 +122,13 @@ class MRJobStep(object):
             cmd = self._steps[cmd_key]
             if not isinstance(cmd, basestring):
                 cmd = cmd_line(cmd)
-            if (filter_key and filter_key in self._steps and
-                self._steps[filter_key]):
+            if (filter_key and self._steps[filter_key]):
                 raise ValueError('Cannot specify both %s and %s' % (
                     cmd_key, filter_key))
             return {'type': COMMAND_SUBSTEP, 'command': cmd}
         else:
             substep = {'type': SCRIPT_SUBSTEP}
             if (filter_key and
-                filter_key in self._steps and
                 self._steps[filter_key]):
                 substep['filter'] = self._steps[filter_key]
             return substep

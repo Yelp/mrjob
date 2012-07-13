@@ -1,7 +1,14 @@
 from mrjob.job import MRJob
+from mrjob.protocol import RawValueProtocol
 
 
 class CmdJob(MRJob):
+
+    INPUT_PROTOCOL = RawValueProtocol
+
+    INTERNAL_PROTOCOL = RawValueProtocol
+
+    OUTPUT_PROTOCOL = RawValueProtocol
 
     def configure_options(self):
         super(CmdJob, self).configure_options()

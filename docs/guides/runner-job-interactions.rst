@@ -17,6 +17,9 @@ All interactions between job and runner are through command line arguments. For
 example, to find out what mappers, reducers, and combiners a job has and what
 their order is, :py:mod:`~mrjob.runner.MRJobRunner` calls the job script.
 
+.. warning:: This information is **experimentally public** and subject to
+    change.
+
 Job Interface
 -------------
 

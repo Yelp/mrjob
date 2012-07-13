@@ -69,10 +69,11 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #: * ``'REMOTE_SCRATCH'``: delete remote scratch only
 #: * ``'SCRATCH'``: delete local and remote scratch, but not logs
 #: * ``'JOB'``: stop job if running on EMR and job flow is not to be terminated
+#: * ``'JOB_FLOW'``: terminate the job flow on EMR
 #: * ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL``. Not supported for
 #:   ``cleanup_on_failure``.
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
-                   'SCRATCH', 'JOB', 'IF_SUCCESSFUL']
+                   'SCRATCH', 'JOB', 'IF_SUCCESSFUL', 'JOB_FLOW']
 
 #: .. deprecated:: 0.3.0
 #:
@@ -558,6 +559,10 @@ class MRJobRunner(object):
         """Stop any jobs that we created that are still running."""
         pass  # this only happens on EMR
 
+    def _cleanup_job_flow(self):
+        """Terminate the job flow if there is one."""
+        pass  # this only happens on EMR
+
     def cleanup(self, mode=None):
         """Clean up running jobs, scratch dirs, and logs, subject to the
         *cleanup* option passed to the constructor.
@@ -580,6 +585,9 @@ class MRJobRunner(object):
 
         if mode_has('ALL', 'JOB'):
             self._cleanup_job()
+
+        if mode_has('JOB_FLOW'):
+            self._cleanup_job_flow()
 
         if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH', 'IF_SUCCESSFUL'):
             self._cleanup_local_scratch()

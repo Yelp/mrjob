@@ -2799,7 +2799,8 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             patch.object(r, '_cleanup_local_scratch'),
             patch.object(r, '_cleanup_remote_scratch'),
             patch.object(r, '_cleanup_logs'),
-            patch.object(r, '_cleanup_job')) as mocks:
+            patch.object(r, '_cleanup_job'),
+            patch.object(r, '_cleanup_job_flow')) as mocks:
             r.cleanup(mode=mode)
             yield mocks
 
@@ -2815,7 +2816,9 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
                 m_local_scratch,
                 m_remote_scratch,
                 m_logs,
-                m_jobs):
+                m_jobs,
+                m_job_flows):
+            self.assertFalse(m_job_flows.called)
             self.assertTrue(m_local_scratch.called)
             self.assertTrue(m_remote_scratch.called)
             self.assertTrue(m_logs.called)
@@ -2826,10 +2829,12 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
                 m_local_scratch,
                 m_remote_scratch,
                 m_logs,
-                m_jobs):
+                m_jobs,
+                m_job_flows):
             self.assertFalse(m_local_scratch.called)
             self.assertFalse(m_remote_scratch.called)
             self.assertFalse(m_logs.called)
+            self.assertFalse(m_job_flows.called)
             self.assertTrue(m_jobs.called)
 
     def test_cleanup_none(self):
@@ -2837,11 +2842,13 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
                 m_local_scratch,
                 m_remote_scratch,
                 m_logs,
-                m_jobs):
+                m_jobs,
+                m_job_flows):
             self.assertFalse(m_local_scratch.called)
             self.assertFalse(m_remote_scratch.called)
             self.assertFalse(m_logs.called)
             self.assertFalse(m_jobs.called)
+            self.assertFalse(m_job_flows.called)
 
     def test_job_cleanup_mechanics_succeed(self):
         with no_handlers_for_logger():
@@ -2884,6 +2891,33 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
                 r._ran_job = True
                 r._cleanup_job()
                 m.assert_not_called()
+
+    def test_kill_job_flow(self):
+        with no_handlers_for_logger('mrjob.emr'):
+            r = self._quick_runner()
+            with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
+                r._cleanup_job_flow()
+                self.assertTrue(m.called)
+
+    def test_kill_job_flow_if_successful(self):
+        # If they are setting up the cleanup to kill the job flow, mrjob should
+        # kill the job flow independent of job success.
+        with no_handlers_for_logger('mrjob.emr'):
+            r = self._quick_runner()
+            with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
+                r._ran_job = True
+                r._opts['cleanup'] = ['JOB_FLOW']
+                r._cleanup_job_flow()
+                self.assertTrue(m.called)
+
+    def test_kill_persistent_job_flow(self):
+        with no_handlers_for_logger('mrjob.emr'):
+            r = self._quick_runner()
+            with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
+                r._opts['cleanup'] = ['JOB_FLOW']
+                r._opts['emr_job_flow_id'] = 'j-MOCKJOBFLOW0'
+                r._cleanup_job_flow()
+                self.assertTrue(m.called)
 
 
 class JobWaitTestCase(MockEMRAndS3TestCase):

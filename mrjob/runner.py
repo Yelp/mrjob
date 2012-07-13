@@ -769,15 +769,12 @@ class MRJobRunner(object):
             now.strftime('%Y%m%d.%H%M%S'), now.microsecond)
 
     def _get_steps(self):
-        """Call the mr_job to find out how many steps it has, and whether
+        """Call the job script to find out how many steps it has, and whether
         there are mappers and reducers for each step. Validate its
         output.
 
-        Returns output like ['MR', 'M']
-        (two steps, second only has a mapper)
-
-        We'll cache the result (so you can call _get_steps() as many times
-        as you want)
+        Returns output as described in :doc:`steps-format`. Results are cached
+        to avoid round trips to a subprocess.
         """
         if self._steps is None:
             if not self._script:

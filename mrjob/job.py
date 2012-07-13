@@ -596,15 +596,16 @@ class MRJob(MRJobLauncher):
         trigger a counter rather than an exception unless --strict-protocols
         is set.
 
-        Returns a tuple of read_lines, write_line
-        read_lines() is a function that reads lines from input, decodes them,
-            and yields key, value pairs
-        write_line() is a function that takes key and value as args, encodes
-            them, and writes a line to output.
+        Returns a tuple of ``(read_lines, write_line)``
 
-        Args:
-        step_num -- which step to run (e.g. 0)
-        step_type -- 'M' for mapper, 'C' for combiner, 'R' for reducer
+        ``read_lines()`` is a function that reads lines from input, decodes
+            them, and yields key, value pairs.
+        ``write_line()`` is a function that takes key and value as args,
+            encodes them, and writes a line to output.
+
+        :param step_num: which step to run (e.g. 0)
+        :param step_type: ``MAPPER``, ``REDUCER``, or ``COMBINER`` from
+                          :py:mod:`mrjob.step`
         """
         read, write = self.pick_protocols(step_num, step_type)
 
@@ -647,14 +648,15 @@ class MRJob(MRJobLauncher):
             return 'mapper'
 
     def pick_protocols(self, step_num, step_type):
-        """Pick the protocol classes to use for reading and writing
-        for the given step.
+        """Pick the protocol classes to use for reading and writing for the
+        given step.
 
         :type step_num: int
         :param step_num: which step to run (e.g. ``0`` for the first step)
         :type step_type: str
-        :param step_type: ``'M'`` for mapper, ``'C'`` for combiner, ``'R'``
-                          for reducer
+        :param step_type: one of :py:data:`mrjob.step.MAPPER`,
+                          :py:data:`mrjob.step.COMBINER`, or
+                          :py:data:`mrjob.step.REDUCER`
         :return: (read_function, write_function)
 
         By default, we use one protocol for reading input, one

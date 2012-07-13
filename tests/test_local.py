@@ -42,6 +42,7 @@ from mock import patch
 import mrjob
 from mrjob import local
 from mrjob.local import LocalMRJobRunner
+from mrjob.step import MAPPER
 from mrjob.util import cmd_line
 from mrjob.util import read_file
 from tests.mr_counting_job import MRCountingJob
@@ -560,14 +561,14 @@ class CompatTestCase(EmptyMrjobConfTestCase):
         with runner as runner:
             runner._setup_working_dir()
             self.assertIn('mapred_cache_localArchives',
-                          runner._subprocess_env('M', 0, 0).keys())
+                          runner._subprocess_env(MAPPER, 0, 0).keys())
 
     def test_environment_variables_021(self):
         runner = LocalMRJobRunner(hadoop_version='0.21', conf_paths=[])
         with runner as runner:
             runner._setup_working_dir()
             self.assertIn('mapreduce_job_cache_local_archives',
-                          runner._subprocess_env('M', 0, 0).keys())
+                          runner._subprocess_env(MAPPER, 0, 0).keys())
 
 
 class TestHadoopConfArgs(EmptyMrjobConfTestCase):
@@ -658,11 +659,11 @@ class TestIronPythonEnvironment(unittest.TestCase):
 
     def test_env_ironpython(self):
         with patch.object(local, 'is_ironpython', True):
-            environment = self.runner._subprocess_env('M', 0, 0)
+            environment = self.runner._subprocess_env(MAPPER, 0, 0)
             self.assertIn('IRONPYTHONPATH', environment)
 
     def test_env_no_ironpython(self):
         with patch.object(local, 'is_ironpython', False):
-            environment = self.runner._subprocess_env('M', 0, 0)
+            environment = self.runner._subprocess_env(MAPPER, 0, 0)
             self.assertNotIn('IRONPYTHONPATH', environment)
 

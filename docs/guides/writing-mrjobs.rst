@@ -285,8 +285,11 @@ assignment, you can override :py:meth:`mrjob.job.MRJob.pick_protocols`::
     class WhatIsThisIDontEvenProtocolJob(MRJob):
 
         def pick_protocols(self, step_num, step_type):
-            # step_type is 'M', 'C', or 'R'
             return random.choice([Protocololol, ROFLcol, Trolltocol, Locotorp])
+
+
+See :py:meth:`~mrjob.job.MRJob.pick_protocols` for details.
+
 
 .. _writing-protocols:
 

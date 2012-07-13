@@ -133,14 +133,12 @@ class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
                     'type': 'streaming',
                     MAPPER: {
                         'type': 'script',
-                        'filter': None,
                     }
                 },
                 {
                     'type': 'streaming',
                     MAPPER: {
                         'type': 'script',
-                        'filter': None,
                     }
                 },
             ])

@@ -14,10 +14,11 @@ The general process for working on mrjob is:
 * Submit a pull request against ``master`` on Github
 * Wait for code review!
 
-It would also help to discuss your ideas on the
-[mailing list](http://groups.google.com/group/mrjob) so we can warn you of
-possible merge conflicts with ongoing work or offer suggestions for where to
-put code.
+It would also help to discuss your ideas on the `mailing list`_ so we can warn
+you of possible merge conflicts with ongoing work or offer suggestions for
+where to put code.
+
+.. _`mailing list`: http://groups.google.com/group/mrjob
 
 Things that will make your branch more likely to be pulled:
 

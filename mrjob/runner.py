@@ -773,8 +773,8 @@ class MRJobRunner(object):
         there are mappers and reducers for each step. Validate its
         output.
 
-        Returns output as described in :doc:`steps-format`. Results are cached
-        to avoid round trips to a subprocess.
+        Returns output as described in :ref:`steps-format`. Results are
+        cached to avoid round trips to a subprocess.
         """
         if self._steps is None:
             if not self._script:

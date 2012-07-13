@@ -1343,7 +1343,7 @@ class EMRJobRunner(MRJobRunner):
     def _render_substep(self, step, step_num, mrc):
         if mrc in step:
             return self._substep_cmd_line(
-                step[mrc], step_num, mrc)
+                step, step_num, mrc)
         else:
             if mrc == MAPPER:
                 return 'cat', False
@@ -1375,7 +1375,7 @@ class EMRJobRunner(MRJobRunner):
                 self._job_name, step_num + 1, num_steps),
             'input': self._s3_step_input_uris(step_num),
             'output': self._s3_step_output_uri(step_num),
-            'jar': self.get_jar(),
+            'jar': self._get_jar(),
             'action_on_failure': self._action_on_failure,
             REDUCER: reducer,
         }

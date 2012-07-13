@@ -712,9 +712,9 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
             self.assertEqual(''.join(r.stream_output()), 'x\nx\n')
 
-    def test_echo_reducer(self):
+    def test_cat_reducer(self):
         data = 'x\ny\nz\n'
-        job = CmdJob(['--reducer-cmd=echo', '--runner=local'])
+        job = CmdJob(['--reducer-cmd', 'cat -e', '--runner=local'])
         job.sandbox(stdin=StringIO(data))
         with job.make_runner() as r:
             self.assertEqual(
@@ -726,12 +726,36 @@ class CommandSubstepTestCase(SandboxedTestCase):
                     },
                     'reducer': {
                         'type': 'command',
-                        'command': 'echo'}}])
+                        'command': 'cat -e'}}])
 
             r.run()
 
             lines = list(r.stream_output())
-            self.assertTrue(lines[0].endswith('input_part-00000\n'))
+            self.assertEqual(lines, ['x$\n', 'y$\n', 'z$\n'])
+
+    def test_multiple(self):
+        data = 'x\nx\nx\nx\nx\nx\n'
+        mapper_cmd = 'cat -e'
+        reducer_cmd = 'wc -l | tr -Cd "[:digit:]"'
+        job = CmdJob([
+            '--runner', 'local',
+            '--mapper-cmd', mapper_cmd,
+            '--combiner-cmd', 'uniq',
+            '--reducer-cmd', reducer_cmd])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {'type': 'command', 'command': mapper_cmd},
+                    'combiner': {'type': 'command', 'command': 'uniq'},
+                    'reducer': {'type': 'command', 'command': reducer_cmd},
+                }])
+
+            r.run()
+
+            self.assertEqual(list(r.stream_output()), ['2'])
 
 
 class FilterTestCase(SandboxedTestCase):

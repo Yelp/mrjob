@@ -67,7 +67,7 @@ def _chain_procs(procs_args, **kwargs):
         if i < len(procs_args) - 1:
             proc_kwargs['stdout'] = PIPE
 
-        proc = Popen(args, **proc_kwargs)
+        proc = Popen(args, shell=(isinstance(args, basestring)), **proc_kwargs)
         last_stdout = proc.stdout
         procs.append({
             'proc': proc,
@@ -528,10 +528,10 @@ class LocalMRJobRunner(MRJobRunner):
             procs_args.append(['cat', input_file])
             procs_args.append(filter_args)
             procs_args.append(
-                self._substep_args(step_dict, step_num, MAPPER) + ['-'])
+                self._substep_args(step_dict, step_num, MAPPER))
         else:
             procs_args.append(
-                self._substep_args(step_dict, step_num, MAPPER) + [input_file])
+                self._substep_args(step_dict, step_num, MAPPER, input_file))
 
         if COMBINER in step_dict:
             procs_args.append(['sort'])
@@ -548,23 +548,28 @@ class LocalMRJobRunner(MRJobRunner):
             procs_args.append(['cat', input_file])
             procs_args.append(filter_args)
             procs_args.append(
-                self._substep_args(
-                    step_dict, step_num, REDUCER) + ['-'])
+                self._substep_args(step_dict, step_num, REDUCER))
         else:
             procs_args.append(
-                self._substep_args(
-                    step_dict, step_num, REDUCER) + [input_file])
+                self._substep_args(step_dict, step_num, REDUCER, input_file))
 
         return procs_args
 
-    def _substep_args(self, step_dict, step_num, mrc):
+    def _substep_args(self, step_dict, step_num, mrc, input_path=None):
         if step_dict['type'] != 'streaming':
             raise Exception("LocalMRJobRunner cannot run %s steps." %
                             step_dict['type'])
         if step_dict[mrc]['type'] == COMMAND_SUBSTEP:
-            return shlex.split(str(step_dict[mrc]['command']))
+            if input_path is None:
+                return step_dict[mrc]['command']
+            else:
+                return 'cat %s | %s' % (input_path, step_dict[mrc]['command'])
         if step_dict[mrc]['type'] == SCRIPT_SUBSTEP:
-            return self._script_args_for_step(step_num, mrc)
+            args = self._script_args_for_step(step_num, mrc)
+            if input_path is None:
+                return args
+            else:
+                return args + [input_path]
 
     def _subprocess_env(self, step_type, step_num, task_num, input_file=None,
                         input_start=None, input_length=None):
@@ -687,7 +692,9 @@ class LocalMRJobRunner(MRJobRunner):
 
         :return: dict(proc=Popen, args=[process args], write_to=file)
         """
-        log.info('> %s' % ' | '.join(cmd_line(args) for args in procs_args))
+        log.info('> %s' % ' | '.join(
+            args if isinstance(args, basestring) else cmd_line(args)
+            for args in procs_args))
 
         # set up outfile
         outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)

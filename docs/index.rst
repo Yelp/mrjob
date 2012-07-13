@@ -59,6 +59,12 @@ Guides
 * :ref:`picking-job-flow-config`
 * :doc:`guides/emr-advanced`
 
+
+**Working on mrjob**
+
+* :doc:`guides/contributing.rst`
+* :doc:`guides/steps-format.rst`
+
 Reference
 =========
 

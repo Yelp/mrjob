@@ -676,12 +676,35 @@ class CommandSubstepTestCase(SandboxedTestCase):
         job = CmdJob(['--mapper-cmd=cat', '--runner=local'])
         job.sandbox(stdin=StringIO(data))
         with job.make_runner() as r:
-            self.assertEqual(r._get_steps(), [{
-                'type': 'streaming', 'mapper': {
-                    'type': 'command',
-                    'command': 'cat',
-                }}])
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'command',
+                        'command': 'cat'}}])
 
             r.run()
 
             self.assertEqual(''.join(r.stream_output()), data)
+
+    def test_echo_reducer(self):
+        data = 'x\ny\nz\n'
+        job = CmdJob(['--reducer-cmd=echo', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    },
+                    'reducer': {
+                        'type': 'command',
+                        'command': 'echo'}}])
+
+            r.run()
+
+            self.assertTrue(
+                ''.join(r.stream_output()).endswith('input_part-00000\n'))

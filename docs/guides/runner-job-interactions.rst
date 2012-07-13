@@ -1,6 +1,9 @@
 Interactions between runner and job
 ===================================
 
+.. warning:: This information is **experimentally public** and subject to
+    change.
+
 Starting with version 0.4, mrjob is moving toward supporting arbitrary
 scripting languages for writing jobs. Jobs that don't use the
 :py:class:`~mrjob.job.MRJob` Python class will need to support a simple
@@ -16,9 +19,6 @@ and invocation, and ``<interpreter`` will be ``python``.
 All interactions between job and runner are through command line arguments. For
 example, to find out what mappers, reducers, and combiners a job has and what
 their order is, :py:mod:`~mrjob.runner.MRJobRunner` calls the job script.
-
-.. warning:: This information is **experimentally public** and subject to
-    change.
 
 Job Interface
 -------------

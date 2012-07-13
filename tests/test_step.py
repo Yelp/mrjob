@@ -148,7 +148,9 @@ class MRJobStepGetItemTestCase(TestCase):
 class MRJobStepDescriptionTestCase(TestCase):
 
     def test_render_mapper(self):
-        self.assertEqual(MRJobStep(mapper=identity_mapper).description(0), {
+        self.assertEqual(
+            MRJobStep(mapper=identity_mapper).description(0),
+            {
             'type': 'streaming',
             'mapper': {
                 'type': 'script',
@@ -173,9 +175,6 @@ class MRJobStepDescriptionTestCase(TestCase):
             reducer=identity_reducer).description(1),
             {
                 'type': 'streaming',
-                'mapper': {
-                    'type': 'script',
-                },
                 'reducer': {
                     'type': 'script',
                 },
@@ -186,7 +185,34 @@ class MRJobStepDescriptionTestCase(TestCase):
             MRJobStep(combiner=identity_reducer).description(1),
             {
                 'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                },
                 'combiner': {
                     'type': 'script',
+                },
+            })
+
+    def test_render_mapper_filter(self):
+        self.assertEqual(
+            MRJobStep(
+                mapper=identity_mapper, mapper_filter='cat').description(0),
+            {
+            'type': 'streaming',
+            'mapper': {
+                'type': 'script',
+                'filter': 'cat',
+            },
+        })
+
+    def test_render_reducer_filter(self):
+        self.assertEqual(
+            MRJobStep(
+                reducer=identity_reducer, reducer_filter='cat').description(1),
+            {
+                'type': 'streaming',
+                'reducer': {
+                    'type': 'script',
+                    'filter': 'cat',
                 },
             })

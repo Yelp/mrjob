@@ -138,7 +138,7 @@ class MRJobStep(object):
         # Use a mapper if:
         #   - the user writes one
         #   - it is the first step and we don't want to mess up protocols
-        #   - there are only combiners
+        #   - there are only combiners and we don't want to mess up protocols
         if (step_num == 0 or
             self.has_explicit_mapper or
             self.has_explicit_combiner):

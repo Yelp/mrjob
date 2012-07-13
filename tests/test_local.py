@@ -45,6 +45,7 @@ from mrjob.local import LocalMRJobRunner
 from mrjob.step import MAPPER
 from mrjob.util import cmd_line
 from mrjob.util import read_file
+from tests.mr_cmd_jobs import CmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_job_where_are_you import MRJobWhereAreYou
@@ -571,7 +572,7 @@ class CompatTestCase(EmptyMrjobConfTestCase):
                           runner._subprocess_env(MAPPER, 0, 0).keys())
 
 
-class TestHadoopConfArgs(EmptyMrjobConfTestCase):
+class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
 
     def test_empty(self):
         runner = LocalMRJobRunner(conf_paths=[])
@@ -651,7 +652,7 @@ class TestHadoopConfArgs(EmptyMrjobConfTestCase):
         self.assertEqual(len(conf_args), 12)
 
 
-class TestIronPythonEnvironment(unittest.TestCase):
+class IronPythonEnvironmentTestCase(unittest.TestCase):
 
     def setUp(self):
         self.runner = LocalMRJobRunner(conf_paths=[])
@@ -667,3 +668,20 @@ class TestIronPythonEnvironment(unittest.TestCase):
             environment = self.runner._subprocess_env(MAPPER, 0, 0)
             self.assertNotIn('IRONPYTHONPATH', environment)
 
+
+class CommandSubstepTestCase(SandboxedTestCase):
+
+    def test_cat_mapper(self):
+        data = 'x\ny\nz\n'
+        job = CmdJob(['--mapper-cmd=cat', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(r._get_steps(), [{
+                'type': 'streaming', 'mapper': {
+                    'type': 'command',
+                    'command': 'cat',
+                }}])
+
+            r.run()
+
+            self.assertEqual(''.join(r.stream_output()), data)

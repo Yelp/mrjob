@@ -38,6 +38,8 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
+from mrjob.step import MAPPER
+from mrjob.step import REDUCER
 from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_testing_job import MRTestingJob
@@ -224,30 +226,30 @@ class ProtocolsTestCase(unittest.TestCase):
 
     def test_default_protocols(self):
         mr_job = MRBoringJob()
-        self.assertEqual(mr_job.pick_protocols(0, 'M'),
+        self.assertEqual(mr_job.pick_protocols(0, MAPPER),
                          (RawValueProtocol.read, JSONProtocol.write))
-        self.assertEqual(mr_job.pick_protocols(0, 'R'),
+        self.assertEqual(mr_job.pick_protocols(0, REDUCER),
                          (JSONProtocol.read, JSONProtocol.write))
 
     def test_explicit_default_protocols(self):
         mr_job2 = self.MRBoringJob2().sandbox()
-        self.assertEqual(mr_job2.pick_protocols(0, 'M'),
+        self.assertEqual(mr_job2.pick_protocols(0, MAPPER),
                          (JSONProtocol.read, PickleProtocol.write))
-        self.assertEqual(mr_job2.pick_protocols(0, 'R'),
+        self.assertEqual(mr_job2.pick_protocols(0, REDUCER),
                          (PickleProtocol.read, ReprProtocol.write))
 
         mr_job3 = self.MRBoringJob3()
-        self.assertEqual(mr_job3.pick_protocols(0, 'M'),
+        self.assertEqual(mr_job3.pick_protocols(0, MAPPER),
                          (RawValueProtocol.read, ReprProtocol.write))
         # output protocol should default to JSON
-        self.assertEqual(mr_job3.pick_protocols(0, 'R'),
+        self.assertEqual(mr_job3.pick_protocols(0, REDUCER),
                          (ReprProtocol.read, JSONProtocol.write))
 
         mr_job4 = self.MRBoringJob4()
-        self.assertEqual(mr_job4.pick_protocols(0, 'M'),
+        self.assertEqual(mr_job4.pick_protocols(0, MAPPER),
                          (RawValueProtocol.read, ReprProtocol.write))
         # output protocol should default to JSON
-        self.assertEqual(mr_job4.pick_protocols(0, 'R'),
+        self.assertEqual(mr_job4.pick_protocols(0, REDUCER),
                          (ReprProtocol.read, JSONProtocol.write))
 
     def test_mapper_raw_value_to_json(self):

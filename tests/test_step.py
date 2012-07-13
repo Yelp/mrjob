@@ -34,6 +34,19 @@ class JarStepTestCase(TestCase):
         expected['type'] = 'jar'
         self.assertEqual(JarStep(**kwargs).description(0), expected)
 
+    def test_some(self):
+        kwargs = {
+            'name': 'step_name',
+            'jar': 'binks.jar.jar',
+        }
+        expected = kwargs.copy()
+        expected.update({
+            'type': 'jar',
+            'main_class': None,
+            'step_args': None,
+        })
+        self.assertEqual(JarStep(**kwargs).description(0), expected)
+
 
 class MRJobStepInitTestCase(TestCase):
 
@@ -133,4 +146,47 @@ class MRJobStepGetItemTestCase(TestCase):
 
 
 class MRJobStepRenderTestCase(TestCase):
-    pass
+
+    def test_render_mapper(self):
+        self.assertEqual(MRJobStep(mapper=identity_mapper).description(0), {
+            'type': 'streaming',
+            'mapper': {
+                'type': 'script',
+            },
+        })
+
+    def test_render_reducer_first_mapper_implied(self):
+        self.assertEqual(
+            MRJobStep(reducer=identity_reducer).description(0),
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                },
+                'reducer': {
+                    'type': 'script',
+                },
+            })
+
+    def test_render_reducer_first_mapper_not_implied(self):
+        self.assertEqual(MRJobStep(
+            reducer=identity_reducer).description(1),
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                },
+                'reducer': {
+                    'type': 'script',
+                },
+            })
+
+    def test_render_combiner_first_mapper_not_implied(self):
+        self.assertEqual(
+            MRJobStep(combiner=identity_reducer).description(1),
+            {
+                'type': 'streaming',
+                'combiner': {
+                    'type': 'script',
+                },
+            })

@@ -145,7 +145,7 @@ class MRJobStepGetItemTestCase(TestCase):
                          identity_mapper)
 
 
-class MRJobStepRenderTestCase(TestCase):
+class MRJobStepDescriptionTestCase(TestCase):
 
     def test_render_mapper(self):
         self.assertEqual(MRJobStep(mapper=identity_mapper).description(0), {
@@ -181,7 +181,7 @@ class MRJobStepRenderTestCase(TestCase):
                 },
             })
 
-    def test_render_combiner_first_mapper_not_implied(self):
+    def test_render_combiner_mapper_not_implied(self):
         self.assertEqual(
             MRJobStep(combiner=identity_reducer).description(1),
             {

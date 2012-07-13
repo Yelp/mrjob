@@ -141,7 +141,7 @@ class MRJobStep(object):
         #   - there are only combiners
         if (step_num == 0 or
             self.has_explicit_mapper or
-            self.has_explicit_reducer):
+            self.has_explicit_combiner):
             substep_descs[MAPPER] = self.render_mapper()
         if self.has_explicit_combiner:
             substep_descs[COMBINER] = self.render_combiner()

@@ -180,7 +180,7 @@ class MRJobStepDescriptionTestCase(TestCase):
                 },
             })
 
-    def test_render_combiner_mapper_not_implied(self):
+    def test_render_combiner(self):
         self.assertEqual(
             MRJobStep(combiner=identity_reducer).description(1),
             {
@@ -198,10 +198,10 @@ class MRJobStepDescriptionTestCase(TestCase):
             MRJobStep(
                 mapper=identity_mapper, mapper_filter='cat').description(0),
             {
-            'type': 'streaming',
-            'mapper': {
-                'type': 'script',
-                'filter': 'cat',
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'filter': 'cat',
             },
         })
 
@@ -214,5 +214,55 @@ class MRJobStepDescriptionTestCase(TestCase):
                 'reducer': {
                     'type': 'script',
                     'filter': 'cat',
+                },
+            })
+
+    def test_render_mapper_cmd(self):
+        self.assertEqual(
+            MRJobStep(mapper_cmd='cat').description(0),
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'command',
+                    'command': 'cat',
+            },
+        })
+
+    def test_render_reducer_cmd_first_mapper_implied(self):
+        self.assertEqual(
+            MRJobStep(reducer_cmd='cat').description(0),
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                },
+                'reducer': {
+                    'type': 'command',
+                    'command': 'cat',
+                },
+            })
+
+    def test_render_reducer_cmd_first_mapper_not_implied(self):
+        self.assertEqual(
+            MRJobStep(reducer_cmd='cat').description(1),
+            {
+                'type': 'streaming',
+                'reducer': {
+                    'type': 'command',
+                    'command': 'cat',
+                },
+            })
+
+    def test_render_combiner_cmd(self):
+        self.assertEqual(
+            MRJobStep(combiner_cmd='cat').description(1),
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                },
+                'combiner': {
+                    'type': 'command',
+                    'command': 'cat',
                 },
             })

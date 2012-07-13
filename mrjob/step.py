@@ -111,7 +111,8 @@ class MRJobStep(object):
             cmd = self._steps[cmd_key]
             if not isinstance(cmd, basestring):
                 cmd = cmd_line(cmd)
-            if filter_key and filter_key in self._steps:
+            if (filter_key and filter_key in self._steps and
+                self._steps[filter_key]):
                 raise ValueError('Cannot specify both %s and %s' % (
                     cmd_key, filter_key))
             return {'type': COMMAND_SUBSTEP, 'command': cmd}

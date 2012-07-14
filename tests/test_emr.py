@@ -2897,7 +2897,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             r = self._quick_runner()
             with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
                 r._cleanup_job_flow()
-                self.assertTrue(m.called)
+                self.assertTrue(m().terminate_job_flow.called)
 
     def test_kill_job_flow_if_successful(self):
         # If they are setting up the cleanup to kill the job flow, mrjob should
@@ -2908,7 +2908,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
                 r._ran_job = True
                 r._opts['cleanup'] = ['JOB_FLOW']
                 r._cleanup_job_flow()
-                self.assertTrue(m.called)
+                self.assertTrue(m().terminate_job_flow.called)
 
     def test_kill_persistent_job_flow(self):
         with no_handlers_for_logger('mrjob.emr'):
@@ -2917,7 +2917,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
                 r._opts['cleanup'] = ['JOB_FLOW']
                 r._opts['emr_job_flow_id'] = 'j-MOCKJOBFLOW0'
                 r._cleanup_job_flow()
-                self.assertTrue(m.called)
+                self.assertTrue(m().terminate_job_flow.called)
 
 
 class JobWaitTestCase(MockEMRAndS3TestCase):

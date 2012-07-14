@@ -583,11 +583,11 @@ class MRJobRunner(object):
         def mode_has(*args):
             return any((choice in mode) for choice in args)
 
-        if mode_has('ALL', 'JOB'):
-            self._cleanup_job()
-
         if mode_has('JOB_FLOW'):
             self._cleanup_job_flow()
+
+        if mode_has('ALL', 'JOB'):
+            self._cleanup_job()
 
         if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH', 'IF_SUCCESSFUL'):
             self._cleanup_local_scratch()

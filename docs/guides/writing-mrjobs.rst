@@ -410,3 +410,12 @@ custom :py:class:`Option` class, you'll need to set the
 
 .. _`extending optparse`:
     http://docs.python.org/library/optparse.html#extending-optparse
+
+
+.. _cmd-steps:
+
+
+Specifying mappers, combiners, and reducers as shell commands
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+

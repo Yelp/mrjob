@@ -115,6 +115,9 @@ Hadoop Streaming arguments::
 mrjob does not try to intelligently handle quotes in the contents of filters,
 so avoid using single quotes. It also does not support filters on combiners.
 
+Hadoop Streaming requires that all steps have a mapper, so if the job doesn't
+specify a mapper, mrjob will use ``cat``.
+
 **Command substeps**
 
 The format for a command substep is very simple.

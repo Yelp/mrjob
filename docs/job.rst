@@ -22,6 +22,9 @@ One-step jobs
 .. automethod:: MRJob.reducer_final
 .. automethod:: MRJob.combiner_init
 .. automethod:: MRJob.combiner_final
+.. automethod:: MRJob.mapper_cmd
+.. automethod:: MRJob.reducer_cmd
+.. automethod:: MRJob.combiner_cmd
 
 .. _writing-multi-step-jobs:
 

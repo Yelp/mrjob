@@ -166,9 +166,28 @@ class MRJob(MRJobLauncher):
         raise NotImplementedError
 
     def mapper_cmd(self):
+        """Re-define this to define the mapper for a one-step job **as a shell
+        command.** If you define your mapper this way, the command will be
+        passed unchanged to Hadoop Streaming, with some minor exceptions. For
+        important specifics, see :ref:`cmd-steps`.
+
+        Basic example::
+
+            def mapper_cmd(self):
+                return 'cat'
+        """
         raise NotImplementedError
 
     def mapper_filter(self):
+        """Re-define this to specify a shell command to filter the mapper's
+        input before it gets to your job's mapper in a one-step job. For
+        important specifics, see :ref:`cmd-steps`.
+
+        Basic example::
+
+            def mapper_filter(self):
+                return 'grep "ponies"'
+        """
         raise NotImplementedError
 
     def reducer_init(self):
@@ -197,9 +216,28 @@ class MRJob(MRJobLauncher):
         raise NotImplementedError
 
     def reducer_cmd(self):
+        """Re-define this to define the reducer for a one-step job **as a shell
+        command.** If you define your mapper this way, the command will be
+        passed unchanged to Hadoop Streaming, with some minor exceptions. For
+        specifics, see :ref:`cmd-steps`.
+
+        Basic example::
+
+            def reducer_cmd(self):
+                return 'cat'
+        """
         raise NotImplementedError
 
     def reducer_filter(self):
+        """Re-define this to specify a shell command to filter the reducer's
+        input before it gets to your job's reducer in a one-step job. For
+        important specifics, see :ref:`cmd-steps`.
+
+        Basic example::
+
+            def mapper_filter(self):
+                return 'grep "ponies"'
+        """
         raise NotImplementedError
 
     def combiner_init(self):
@@ -228,6 +266,16 @@ class MRJob(MRJobLauncher):
         raise NotImplementedError
 
     def combiner_cmd(self):
+        """Re-define this to define the combiner for a one-step job **as a
+        shell command.** If you define your mapper this way, the command will
+        be passed unchanged to Hadoop Streaming, with some minor exceptions.
+        For specifics, see :ref:`cmd-steps`.
+
+        Basic example::
+
+            def combiner_cmd(self):
+                return 'cat'
+        """
         raise NotImplementedError
 
     ### Defining multi-step jobs ###

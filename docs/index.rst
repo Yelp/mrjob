@@ -29,6 +29,8 @@ Guides
 * :ref:`job-protocols`
 * :ref:`writing-protocols`
 * :ref:`writing-cl-opts`
+* :ref:`cmd-filters`
+* :ref:`cmd-steps`
 
 **Running jobs**
 

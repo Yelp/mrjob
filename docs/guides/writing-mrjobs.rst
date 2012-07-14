@@ -412,6 +412,16 @@ custom :py:class:`Option` class, you'll need to set the
     http://docs.python.org/library/optparse.html#extending-optparse
 
 
+.. _cmd-filters:
+
+
+Filtering input with shell commands
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can specify a command to filter a task's input before it reaches your
+mapper or reducer using the ``mapper_filter`` and ``reducer_filter`` arguments
+to :py:meth:`~mrjob.job.MRJob.mr`.
+
 .. _cmd-steps:
 
 

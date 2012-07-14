@@ -411,16 +411,41 @@ custom :py:class:`Option` class, you'll need to set the
 .. _`extending optparse`:
     http://docs.python.org/library/optparse.html#extending-optparse
 
-
 .. _cmd-filters:
 
-
-Filtering input with shell commands
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Filtering task input with shell commands
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You can specify a command to filter a task's input before it reaches your
 mapper or reducer using the ``mapper_filter`` and ``reducer_filter`` arguments
-to :py:meth:`~mrjob.job.MRJob.mr`.
+to :py:meth:`~mrjob.job.MRJob.mr` or methods on :py:class:`~mrjob.job.MRJob`.
+Doing so will cause mrjob to pipe input through that comand before it reaches
+your mapper.
+
+You may not use pipes or other shell syntax in a filter.
+
+For example, to filter input with :command:`grep` before your first mapper::
+
+    def steps(self):
+        return [self.mr(mapper_filter='grep "some_string"', ...), ...]
+
+When you use the ``local`` runner, mrjob will invoke :command:`grep` for each
+map task and send its output to the task. When you use the ``hadoop`` or
+``emr`` runners, mrjob will wrap the call to your mapper with ``bash -c
+'<filter> | python my_job.py --mapper --step-num=<step num>'``, so you should
+either avoid single quotes or escape them like this::
+
+    def steps(self):
+        return [self.mr(mapper_filter=r"grep '\''some_string'\''", ...), ...]
+
+Note the use of a raw string ``r""`` to avoid needing to escape the
+backslashes.
+
+The reducer filter is called the same way. mrjob does not currently support
+filters on combiners.
+
+
+**The ``inline`` runner does not support filters.**
 
 .. _cmd-steps:
 

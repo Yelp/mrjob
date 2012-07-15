@@ -38,6 +38,7 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
+from mrjob.step import COMBINER
 from mrjob.step import JarStep
 from mrjob.step import MAPPER
 from mrjob.step import MRJobStep
@@ -350,6 +351,44 @@ class ProtocolsTestCase(unittest.TestCase):
 
         # make sure it raises an exception
         self.assertRaises(Exception, mr_job.run_mapper)
+
+
+class PickProtocolsTestCase(unittest.TestCase):
+
+    def _yield_none(self, *args, **kwargs):
+        yield None
+
+    def _make_job(self, steps_desc):
+
+        class CustomJob(MRJob):
+
+            def _steps_desc(self):
+                return steps_desc
+
+        return CustomJob(['--no-conf'])
+
+    def _assert_script_protocols(self, steps_desc, expected_protocols):
+        j = self._make_job(steps_desc)
+        for i, step in enumerate(steps_desc):
+            for substep_key in (MAPPER, COMBINER, REDUCER):
+                if substep_key in step:
+                    expect_read, expect_write = expected_protocols.pop(0)
+                    actual_read, actual_write = j._pick_protocol_instances(
+                        i, substep_key)
+                    self.assertIsInstance(actual_read, expect_read)
+                    self.assertIsInstance(actual_write, expect_write)
+
+    def _streaming_step(self, n, *args, **kwargs):
+        return MRJobStep(*args, **kwargs).description(n)
+
+    def _jar_step(self, n, *args, **kwargs):
+        return JarStep(*args, **kwargs).description(n)
+
+    def test_single_mapper(self):
+        self._assert_script_protocols(
+            [self._streaming_step(0, mapper=self._yield_none)],
+            [(RawValueProtocol, JSONProtocol)]
+        )
 
 
 class JobConfTestCase(unittest.TestCase):

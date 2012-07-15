@@ -728,6 +728,46 @@ class MRJob(MRJobLauncher):
             # mapper is not a script substep, so protocols don't apply at all
             return RawValueProtocol()
 
+    def _pick_protocol_instances(self, step_num, step_type):
+        steps_desc = self._steps_desc()
+
+        step_map = self._script_step_mapping(steps_desc)
+
+        # pick input protocol
+
+        if step_type == COMBINER:
+            # Combiners read and write the mapper's output protocol because
+            # they have to be able to run 0-inf times without changing the
+            # format of the data.
+            # Combiners for non-script substeps can't use protocols, so this
+            # function will just give us RawValueProtocol() in tha case.
+            previous_mapper_output = self._mapper_output_protocol(
+                step_num, step_map)
+            return previous_mapper_output, previous_mapper_output
+        else:
+            step_key = self._step_key(step_num, step_type)
+
+            if step_key not in step_map:
+                # what? how are we here? probably a test case.
+                if self.options.strict_protocols:
+                    raise ValueError(
+                        "Can't pick a protocol for a non-script step")
+                else:
+                    p = RawValueProtocol()
+                    return p, p
+
+            real_num = step_map[step_key]
+            if real_num == (len(step_map) - 1):
+                write = self.output_protocol()
+            else:
+                write = self.internal_protocol()
+
+            if real_num == 0:
+                read = self.input_protocol()
+            else:
+                read =  self.internal_protocol()
+            return read, write
+
     def pick_protocols(self, step_num, step_type):
         """Pick the protocol classes to use for reading and writing for the
         given step.
@@ -750,34 +790,11 @@ class MRJob(MRJobLauncher):
         Re-define this if you need fine control over which protocols
         are used by which steps.
         """
-        steps_desc = self._steps_desc()
 
-        step_map = self._script_step_mapping(steps_desc)
+        # wrapping functionality like this makes testing much simpler
+        p_read, p_write = self._pick_protocol_instances(step_num, step_type)
 
-        # pick input protocol
-
-        if step_type == COMBINER:
-            # Combiners read and write the mapper's output protocol because
-            # they have to be able to run 0-inf times without changing the
-            # format of the data.
-            # Combiners for non-script substeps can't use protocols, so this
-            # function will just give us RawValueProtocol() in tha case.
-            previous_mapper_output = self._mapper_output_protocol(
-                step_num, step_map)
-            return previous_mapper_output.read, previous_mapper_output.write
-        else:
-            real_num = step_map[self._step_key(step_num, step_type)]
-            if real_num == (len(step_map) - 1):
-                write = self.output_protocol().write
-            else:
-                write = self.internal_protocol().write
-
-            if real_num == 0:
-                read = self.input_protocol().read
-            else:
-                read=  self.internal_protocol().read
-
-            return read, write
+        return p_read.read, p_write.write
 
     ### Command-line arguments ###
 

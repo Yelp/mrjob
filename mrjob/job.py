@@ -44,6 +44,7 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
+from mrjob.step import JarStep
 from mrjob.step import MRJobStep
 from mrjob.step import _JOB_STEP_PARAMS
 from mrjob.util import read_input
@@ -181,7 +182,7 @@ class MRJob(MRJobLauncher):
     def mapper_filter(self):
         """Re-define this to specify a shell command to filter the mapper's
         input before it gets to your job's mapper in a one-step job. For
-        important specifics, see :ref:`cmd-steps`.
+        important specifics, see :ref:`cmd-filters`.
 
         Basic example::
 
@@ -231,7 +232,7 @@ class MRJob(MRJobLauncher):
     def reducer_filter(self):
         """Re-define this to specify a shell command to filter the reducer's
         input before it gets to your job's reducer in a one-step job. For
-        important specifics, see :ref:`cmd-steps`.
+        important specifics, see :ref:`cmd-filters`.
 
         Basic example::
 
@@ -344,6 +345,22 @@ class MRJob(MRJobLauncher):
         it to change in future versions of ``mrjob``.
         """
         return MRJobStep(mapper, reducer, **kwargs)
+
+    @classmethod
+    def jar(cls, name, jar, main_class=None, step_args=None):
+        """Define a jar step for your job.
+
+        Used by :py:meth:`steps`. (Don't re-define this, just call it!)
+
+        :param name: Name to give the job for display in Hadoop
+        :param jar: Hadoop-accessible path to the jar file to run
+        :param main_class: Path of the main class in the jar if not default
+        :param step_args: Extra arguments to pass the jar when running it
+
+        Please consider the way we represent steps to be opaque, and expect
+        it to change in future versions of ``mrjob``.
+        """
+        return JarStep(name, jar, main_class=main_class, step_args=step_args)
 
     def increment_counter(self, group, counter, amount=1):
         """Increment a counter in Hadoop streaming by printing to stderr. If

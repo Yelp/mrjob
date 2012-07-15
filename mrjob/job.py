@@ -708,18 +708,22 @@ class MRJob(MRJobLauncher):
     def _script_step_mapping(self, steps_desc):
         """Return a mapping of ``self._step_key(step_num, step_type)`` ->
         (place in sort order of all *script* steps), for the purposes of
-        choosing which protocols to use for input and output
+        choosing which protocols to use for input and output.
+
+        Non-script steps do not appear in the mapping.
         """
         mapping = {}
         script_step_num = 0
         for i, step in enumerate(steps_desc):
             if MAPPER in step:
                 if step[MAPPER]['type'] == SCRIPT_SUBSTEP:
-                    mapping[self._step_key(i, MAPPER)] = script_step_num
+                    k = self._step_key(i, MAPPER)
+                    mapping[k] = script_step_num
                     script_step_num += 1
             if REDUCER in step:
                 if step[REDUCER]['type'] == SCRIPT_SUBSTEP:
-                    mapping[self._step_key(i, REDUCER)] = script_step_num
+                    k = self._step_key(i, REDUCER)
+                    mapping[k] = script_step_num
                     script_step_num += 1
 
         return mapping

@@ -1322,10 +1322,8 @@ class EMRJobRunner(MRJobRunner):
 
     def _substep_cmd_line(self, step, step_num, mrc):
         if step[mrc]['type'] == COMMAND_SUBSTEP:
-            cmd = "%s %s" % (
-                step[mrc]['command'], cmd_line(self._mr_job_extra_args()))
             # never wrap custom hadoop streaming commands in bash
-            return cmd, False
+            return step[mrc]['command'], False
 
         elif step[mrc]['type'] == SCRIPT_SUBSTEP:
             cmd = cmd_line(self._script_args_for_step(step_num, mrc))

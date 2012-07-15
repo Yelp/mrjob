@@ -38,7 +38,9 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
+from mrjob.step import JarStep
 from mrjob.step import MAPPER
+from mrjob.step import MRJobStep
 from mrjob.step import REDUCER
 from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
@@ -746,3 +748,26 @@ class ProtocolTypeTestCase(unittest.TestCase):
             self.assertIn('INPUT_PROTOCOL should be a class', logs)
             self.assertIn('INTERNAL_PROTOCOL should be a class', logs)
             self.assertIn('OUTPUT_PROTOCOL should be a class', logs)
+
+
+class StepsTestCase(unittest.TestCase):
+
+    class SteppyJob(MRJob):
+
+        def _yield_none(self, *args, **kwargs):
+            yield None
+
+        def steps(self):
+            return [
+                self.mr(mapper_init=self._yield_none, mapper_filter='cat',
+                        reducer_cmd='wc -l'),
+                self.jar(name='oh my jar', jar='s3://bookat/binks_jar.jar')]
+
+    def test_steps(self):
+        j = self.SteppyJob(['--no-conf'])
+        self.assertEqual(j.steps()[0],
+                         MRJobStep(mapper_init=j._yield_none,
+                                   mapper_filter='cat',
+                                   reducer_cmd='wc -l'))
+        self.assertEqual(j.steps()[1],
+                         JarStep('oh my jar', 's3://bookat/binks_jar.jar'))

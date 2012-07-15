@@ -768,11 +768,16 @@ class MRJob(MRJobLauncher):
         else:
             real_num = step_map[self._step_key(step_num, step_type)]
             if real_num == (len(step_map) - 1):
-                return (self.internal_protocol().read,
-                        self.output_protocol().write)
+                write = self.output_protocol().write
             else:
-                return (self.internal_protocol().read,
-                        self.internal_protocol().write)
+                write = self.internal_protocol().write
+
+            if real_num == 0:
+                read = self.input_protocol().read
+            else:
+                read=  self.internal_protocol().read
+
+            return read, write
 
     ### Command-line arguments ###
 

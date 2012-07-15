@@ -44,8 +44,11 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
+from mrjob.step import COMBINER
 from mrjob.step import JarStep
+from mrjob.step import MAPPER
 from mrjob.step import MRJobStep
+from mrjob.step import REDUCER
 from mrjob.step import _JOB_STEP_PARAMS
 from mrjob.util import read_input
 
@@ -698,19 +701,32 @@ class MRJob(MRJobLauncher):
 
         return read_lines, write_line
 
-    def _first_step_type(self):
-        steps_desc = self._steps_desc()
-        if 'mapper' in steps_desc[0]:
-            return 'mapper'
-        if 'reducer' in steps_desc[0]:
-            return 'reducer'
+    def _step_key(self, step_num, step_type):
+        return '%d-%s' % (step_num, step_type)
 
-    def _last_step_type(self):
-        steps_desc = self._steps_desc()
-        if 'reducer' in steps_desc[-1]:
-            return 'reducer'
-        if 'mapper' in steps_desc[-1]:
-            return 'mapper'
+    def _script_step_mapping(self, steps_desc):
+        mapping = {}
+        script_step_num = 0
+        for i, step in enumerate(steps_desc):
+            if MAPPER in step:
+                mapping[self._step_key(i, MAPPER)] = script_step_num
+                script_step_num += 1
+            if REDUCER in step:
+                mapping[self._step_key(i, REDUCER)] = script_step_num
+                script_step_num += 1
+
+        return mapping
+
+    def _mapper_output_protocol(self, step_num, step_map):
+        map_key = self._step_key(step_num, MAPPER)
+        if map_key in step_map:
+            if step_map[map_key] < (len(step_map) - 1):
+                return self.output_protocol()
+            else:
+                return self.internal_protocol()
+        else:
+            # mapper is not a script substep, so protocols don't apply at all
+            return RawValueProtocol()
 
     def pick_protocols(self, step_num, step_type):
         """Pick the protocol classes to use for reading and writing for the
@@ -736,20 +752,27 @@ class MRJob(MRJobLauncher):
         """
         steps_desc = self._steps_desc()
 
+        step_map = self._script_step_mapping(steps_desc)
+
         # pick input protocol
 
-        if step_num == 0 and step_type == self._first_step_type():
-            read = self.input_protocol().read
+        if step_type == COMBINER:
+            # Combiners read and write the mapper's output protocol because
+            # they have to be able to run 0-inf times without changing the
+            # format of the data.
+            # Combiners for non-script substeps can't use protocols, so this
+            # function will just give us RawValueProtocol() in tha case.
+            previous_mapper_output = self._mapper_output_protocol(
+                step_num, step_map)
+            return previous_mapper_output.read, previous_mapper_output.write
         else:
-            read = self.internal_protocol().read
-
-        if (step_num == len(steps_desc) - 1 and
-            step_type == self._last_step_type()):
-            write = self.output_protocol().write
-        else:
-            write = self.internal_protocol().write
-
-        return read, write
+            real_num = step_map[self._step_key(step_num, step_type)]
+            if real_num == (len(step_map) - 1):
+                return (self.internal_protocol().read,
+                        self.output_protocol().write)
+            else:
+                return (self.internal_protocol().read,
+                        self.internal_protocol().write)
 
     ### Command-line arguments ###
 

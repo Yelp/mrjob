@@ -720,7 +720,7 @@ class MRJob(MRJobLauncher):
     def _mapper_output_protocol(self, step_num, step_map):
         map_key = self._step_key(step_num, MAPPER)
         if map_key in step_map:
-            if step_map[map_key] < (len(step_map) - 1):
+            if step_map[map_key] >= (len(step_map) - 1):
                 return self.output_protocol()
             else:
                 return self.internal_protocol()

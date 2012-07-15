@@ -35,6 +35,7 @@ from mrjob.job import MRJob
 from mrjob.job import UsageError
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
+from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
@@ -362,6 +363,10 @@ class PickProtocolsTestCase(unittest.TestCase):
 
         class CustomJob(MRJob):
 
+            INPUT_PROTOCOL = RawValueProtocol
+            INTERNAL_PROTOCOL = JSONProtocol
+            OUTPUT_PROTOCOL = JSONValueProtocol
+
             def _steps_desc(self):
                 return steps_desc
 
@@ -387,7 +392,33 @@ class PickProtocolsTestCase(unittest.TestCase):
     def test_single_mapper(self):
         self._assert_script_protocols(
             [self._streaming_step(0, mapper=self._yield_none)],
-            [(RawValueProtocol, JSONProtocol)]
+            [(RawValueProtocol, JSONValueProtocol)]
+        )
+
+    def test_single_reducer(self):
+        # MRJobStep transparently adds mapper
+        self._assert_script_protocols(
+            [self._streaming_step(0, reducer=self._yield_none)],
+            [(RawValueProtocol, JSONProtocol),
+             (JSONProtocol, JSONValueProtocol)]
+        )
+
+    def test_mapper_combiner(self):
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper=self._yield_none, combiner=self._yield_none)],
+            [(RawValueProtocol, JSONValueProtocol),
+             (JSONValueProtocol, JSONValueProtocol)]
+        )
+
+    def test_mapper_combiner_reducer(self):
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper=self._yield_none, combiner=self._yield_none,
+                reducer=self._yield_none)],
+            [(RawValueProtocol, JSONProtocol),
+             (JSONProtocol, JSONProtocol),
+             (JSONProtocol, JSONValueProtocol)]
         )
 
 

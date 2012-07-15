@@ -105,6 +105,9 @@ class MRJobStep(object):
 
         self._steps = steps
 
+    def __eq__(self, other):
+        return (isinstance(other, MRJobStep) and self._steps == other._steps)
+
     def __getitem__(self, key):
         # always be prepared to run a mapper, since Hadoop Streaming requires
         # it
@@ -167,6 +170,13 @@ class JarStep(object):
         self.jar = jar
         self.main_class = main_class
         self.step_args = step_args
+
+    def __eq__(self, other):
+        return (isinstance(other, JarStep) and
+                self.name == other.name and
+                self.jar == other.jar and
+                self.main_class == other.main_class and
+                self.step_args == other.step_args)
 
     def description(self, step_num):
         return {

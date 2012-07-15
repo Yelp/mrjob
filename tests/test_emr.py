@@ -99,29 +99,8 @@ class MockEMRAndS3TestCase(SandboxedTestCase):
 
     def setUp(self):
         super(MockEMRAndS3TestCase, self).setUp()
-        self.sandbox_boto()
 
-        def simple_patch(obj, attr, side_effect=None, autospec=False):
-            patcher = patch.object(obj, attr, side_effect=side_effect,
-                                   autospec=autospec)
-            patcher.start()
-            self.addCleanup(patcher.stop)
-
-        def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
-            mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
-            return self.fake_mrjob_tgz_path
-
-        simple_patch(EMRJobRunner, '_create_mrjob_tar_gz',
-                     fake_create_mrjob_tar_gz, autospec=True)
-
-        simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
-        simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
-        simple_patch(time, 'sleep')
-
-    def tearDown(self):
-        self.unsandbox_boto()
-
-    def sandbox_boto(self):
+        # patch boto
         self.mock_s3_fs = {}
         self.mock_emr_job_flows = {}
         self.mock_emr_failures = {}
@@ -138,15 +117,32 @@ class MockEMRAndS3TestCase(SandboxedTestCase):
             kwargs['mock_emr_output'] = self.mock_emr_output
             return MockEmrConnection(*args, **kwargs)
 
-        self._real_boto_connect_s3 = boto.connect_s3
-        boto.connect_s3 = mock_boto_connect_s3
+        p_s3 = patch.object(boto, 'connect_s3', mock_boto_connect_s3)
+        self.addCleanup(p_s3.stop)
+        p_s3.start()
 
-        self._real_boto_EmrConnection = boto.emr.connection.EmrConnection
-        boto.emr.connection.EmrConnection = mock_boto_emr_EmrConnection
+        p_emr = patch.object(
+            boto.emr.connection, 'EmrConnection', mock_boto_emr_EmrConnection)
+        self.addCleanup(p_emr.stop)
+        p_emr.start()
 
-    def unsandbox_boto(self):
-        boto.connect_s3 = self._real_boto_connect_s3
-        boto.emr.connection.EmrConnection = self._real_boto_EmrConnection
+        # patch slow things
+        def simple_patch(obj, attr, side_effect=None, autospec=False):
+            patcher = patch.object(obj, attr, side_effect=side_effect,
+                                   autospec=autospec)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
+            mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
+            return self.fake_mrjob_tgz_path
+
+        simple_patch(EMRJobRunner, '_create_mrjob_tar_gz',
+                     fake_create_mrjob_tar_gz, autospec=True)
+
+        simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
+        simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
+        simple_patch(time, 'sleep')
 
     def add_mock_s3_data(self, data, time_modified=None):
         """Update self.mock_s3_fs with a map from bucket name

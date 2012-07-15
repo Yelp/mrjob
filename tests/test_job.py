@@ -359,29 +359,50 @@ class PickProtocolsTestCase(unittest.TestCase):
     def _yield_none(self, *args, **kwargs):
         yield None
 
-    def _make_job(self, steps_desc):
+    def _make_job(self, steps_desc, strict_protocols=False):
 
         class CustomJob(MRJob):
 
-            INPUT_PROTOCOL = RawValueProtocol
+            INPUT_PROTOCOL = PickleProtocol
             INTERNAL_PROTOCOL = JSONProtocol
             OUTPUT_PROTOCOL = JSONValueProtocol
 
             def _steps_desc(self):
                 return steps_desc
 
-        return CustomJob(['--no-conf'])
+        args = ['--no-conf']
 
-    def _assert_script_protocols(self, steps_desc, expected_protocols):
-        j = self._make_job(steps_desc)
+        # tests that only use script steps should use strict_protocols so bad
+        # internal behavior causes exceptions
+        if strict_protocols:
+            args.append('--strict-protocols')
+
+        return CustomJob(args)
+
+    def _assert_script_protocols(self, steps_desc, expected_protocols,
+                                 strict_protocols=False):
+        """Given a list of (read_protocol_class, write_protocol_class) tuples
+        for *each substep*, assert that the given _steps_desc() output for each
+        substep matches the protocols in order
+        """
+        j = self._make_job(steps_desc, strict_protocols)
         for i, step in enumerate(steps_desc):
-            for substep_key in (MAPPER, COMBINER, REDUCER):
-                if substep_key in step:
-                    expect_read, expect_write = expected_protocols.pop(0)
-                    actual_read, actual_write = j._pick_protocol_instances(
-                        i, substep_key)
-                    self.assertIsInstance(actual_read, expect_read)
-                    self.assertIsInstance(actual_write, expect_write)
+            if step['type'] == 'jar':
+                expect_read, expect_write = expected_protocols.pop(0)
+                # step_type for a non-script step is undefined, and in general
+                # these values should just be RawValueProtocol instances, but
+                # we'll leave those checks to the actual tests.
+                actual_read, actual_write = j._pick_protocol_instances(i, '?')
+                self.assertIsInstance(actual_read, expect_read)
+                self.assertIsInstance(actual_write, expect_write)
+            else:
+                for substep_key in (MAPPER, COMBINER, REDUCER):
+                    if substep_key in step:
+                        expect_read, expect_write = expected_protocols.pop(0)
+                        actual_read, actual_write = j._pick_protocol_instances(
+                            i, substep_key)
+                        self.assertIsInstance(actual_read, expect_read)
+                        self.assertIsInstance(actual_write, expect_write)
 
     def _streaming_step(self, n, *args, **kwargs):
         return MRJobStep(*args, **kwargs).description(n)
@@ -392,34 +413,101 @@ class PickProtocolsTestCase(unittest.TestCase):
     def test_single_mapper(self):
         self._assert_script_protocols(
             [self._streaming_step(0, mapper=self._yield_none)],
-            [(RawValueProtocol, JSONValueProtocol)]
-        )
+            [(PickleProtocol, JSONValueProtocol)],
+            strict_protocols=True)
 
     def test_single_reducer(self):
         # MRJobStep transparently adds mapper
         self._assert_script_protocols(
             [self._streaming_step(0, reducer=self._yield_none)],
-            [(RawValueProtocol, JSONProtocol),
-             (JSONProtocol, JSONValueProtocol)]
-        )
+            [(PickleProtocol, JSONProtocol),
+             (JSONProtocol, JSONValueProtocol)],
+            strict_protocols=True)
 
     def test_mapper_combiner(self):
         self._assert_script_protocols(
             [self._streaming_step(
                 0, mapper=self._yield_none, combiner=self._yield_none)],
-            [(RawValueProtocol, JSONValueProtocol),
-             (JSONValueProtocol, JSONValueProtocol)]
-        )
+            [(PickleProtocol, JSONValueProtocol),
+             (JSONValueProtocol, JSONValueProtocol)],
+            strict_protocols=True)
 
     def test_mapper_combiner_reducer(self):
         self._assert_script_protocols(
             [self._streaming_step(
                 0, mapper=self._yield_none, combiner=self._yield_none,
                 reducer=self._yield_none)],
-            [(RawValueProtocol, JSONProtocol),
+            [(PickleProtocol, JSONProtocol),
              (JSONProtocol, JSONProtocol),
-             (JSONProtocol, JSONValueProtocol)]
-        )
+             (JSONProtocol, JSONValueProtocol)],
+            strict_protocols=True)
+
+    def test_begin_jar_step(self):
+        self._assert_script_protocols(
+            [self._jar_step(0, 'blah', 'binks_jar.jar'),
+             self._streaming_step(
+                1, mapper=self._yield_none, combiner=self._yield_none,
+                reducer=self._yield_none)],
+            [(RawValueProtocol, RawValueProtocol),
+             (PickleProtocol, JSONProtocol),
+             (JSONProtocol, JSONProtocol),
+             (JSONProtocol, JSONValueProtocol)])
+
+    def test_end_jar_step(self):
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper=self._yield_none, combiner=self._yield_none,
+                reducer=self._yield_none),
+             self._jar_step(1, 'blah', 'binks_jar.jar')],
+            [(PickleProtocol, JSONProtocol),
+             (JSONProtocol, JSONProtocol),
+             (JSONProtocol, JSONValueProtocol),
+             (RawValueProtocol, RawValueProtocol)])
+
+    def test_middle_jar_step(self):
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper=self._yield_none, combiner=self._yield_none),
+             self._jar_step(1, 'blah', 'binks_jar.jar'),
+             self._streaming_step(2, reducer=self._yield_none)],
+            [(PickleProtocol, JSONProtocol),
+             (JSONProtocol, JSONProtocol),
+             (RawValueProtocol, RawValueProtocol),
+             (JSONProtocol, JSONValueProtocol)])
+
+    def test_single_mapper_cmd(self):
+        self._assert_script_protocols(
+            [self._streaming_step(0, mapper_cmd='cat')],
+            [(RawValueProtocol, RawValueProtocol)])
+
+    def test_single_mapper_cmd_with_script_combiner(self):
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper_cmd='cat', combiner=self._yield_none)],
+            [(RawValueProtocol, RawValueProtocol),
+             (RawValueProtocol, RawValueProtocol)])
+
+    def test_single_mapper_cmd_with_script_reducer(self):
+        # reducer is only script step so it uses INPUT_PROTOCOL and
+        # OUTPUT_PROTOCOL
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper_cmd='cat', reducer=self._yield_none)],
+            [(RawValueProtocol, RawValueProtocol),
+             (PickleProtocol, JSONValueProtocol)])
+
+    def test_multistep(self):
+        # reducer is only script step so it uses INPUT_PROTOCOL and
+        # OUTPUT_PROTOCOL
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper_cmd='cat', reducer=self._yield_none),
+             self._jar_step(1, 'blah', 'binks_jar.jar'),
+             self._streaming_step(2, mapper=self._yield_none)],
+            [(RawValueProtocol, RawValueProtocol),
+             (PickleProtocol, JSONProtocol),
+             (RawValueProtocol, RawValueProtocol),
+             (JSONProtocol, JSONValueProtocol)])
 
 
 class JobConfTestCase(unittest.TestCase):

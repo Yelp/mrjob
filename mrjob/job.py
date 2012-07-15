@@ -49,6 +49,7 @@ from mrjob.step import JarStep
 from mrjob.step import MAPPER
 from mrjob.step import MRJobStep
 from mrjob.step import REDUCER
+from mrjob.step import SCRIPT_SUBSTEP
 from mrjob.step import _JOB_STEP_PARAMS
 from mrjob.util import read_input
 
@@ -705,15 +706,21 @@ class MRJob(MRJobLauncher):
         return '%d-%s' % (step_num, step_type)
 
     def _script_step_mapping(self, steps_desc):
+        """Return a mapping of ``self._step_key(step_num, step_type)`` ->
+        (place in sort order of all *script* steps), for the purposes of
+        choosing which protocols to use for input and output
+        """
         mapping = {}
         script_step_num = 0
         for i, step in enumerate(steps_desc):
             if MAPPER in step:
-                mapping[self._step_key(i, MAPPER)] = script_step_num
-                script_step_num += 1
+                if step[MAPPER]['type'] == SCRIPT_SUBSTEP:
+                    mapping[self._step_key(i, MAPPER)] = script_step_num
+                    script_step_num += 1
             if REDUCER in step:
-                mapping[self._step_key(i, REDUCER)] = script_step_num
-                script_step_num += 1
+                if step[REDUCER]['type'] == SCRIPT_SUBSTEP:
+                    mapping[self._step_key(i, REDUCER)] = script_step_num
+                    script_step_num += 1
 
         return mapping
 
@@ -748,7 +755,12 @@ class MRJob(MRJobLauncher):
             step_key = self._step_key(step_num, step_type)
 
             if step_key not in step_map:
-                # what? how are we here? probably a test case.
+                # It's unlikely that we will encounter this logic in real life,
+                # but if asked what the protocol of a non-script step is, we
+                # should just say RawValueProtocol because we have no idea what
+                # the jars or commands are doing with our precious data.
+                # If --strict-protocols, though, we won't stand for these
+                # shenanigans!
                 if self.options.strict_protocols:
                     raise ValueError(
                         "Can't pick a protocol for a non-script step")

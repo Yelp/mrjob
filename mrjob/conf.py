@@ -82,7 +82,7 @@ class OptionStore(dict):
         self._opt_priority = calculate_opt_priority(self, self.cascading_dicts)
 
     def is_default(self, key):
-        return self._opt_priority[key] >= 2
+        return self._opt_priority[key] < 2
 
     def __getitem__(self, key):
         if key in self.ALLOWED_KEYS:

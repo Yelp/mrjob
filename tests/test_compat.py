@@ -23,6 +23,8 @@ try:
 except ImportError:
     import unittest
 
+from mock import patch
+
 from mrjob.compat import get_jobconf_value
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import translate_jobconf
@@ -32,11 +34,9 @@ from mrjob.compat import uses_generic_jobconf
 class EnvVarTestCase(unittest.TestCase):
 
     def setUp(self):
-        self._old_env = os.environ.copy()
-
-    def tearDown(self):
-        os.environ.clear()
-        os.environ.update(self._old_env)
+        p = patch.object(os, 'environ', {})
+        p.start()
+        self.addCleanup(p.stop)
 
     def test_get_jobconf_value_1(self):
         os.environ['user_name'] = 'Edsger W. Dijkstra'

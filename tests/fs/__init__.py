@@ -13,41 +13,12 @@
 # limitations under the License.
 from __future__ import with_statement
 
-import os
-from shutil import rmtree
 from StringIO import StringIO
-from tempfile import mkdtemp
 
-try:
-    from unittest2 import TestCase
-except ImportError:
-    from unittest2 import TestCase
+from tests.sandbox import SandboxedTestCase
 
 
-class TempdirTestCase(TestCase):
-
-    def setUp(self):
-        self.root = mkdtemp()
-        self.addCleanup(rmtree, self.root)
-
-    def makedirs(self, path):
-        abs_path = os.path.join(self.root, path)
-        if not os.path.isdir(abs_path):
-            os.makedirs(abs_path)
-        return abs_path
-
-    def makefile(self, path, contents):
-        self.makedirs(os.path.split(path)[0])
-        abs_path = os.path.join(self.root, path)
-        with open(abs_path, 'w') as f:
-            f.write(contents)
-        return abs_path
-
-    def abs_paths(self, *paths):
-        return [os.path.join(self.root, path) for path in paths]
-
-
-class MockSubprocessTestCase(TempdirTestCase):
+class MockSubprocessTestCase(SandboxedTestCase):
 
     def mock_popen(self, module, main_func, env):
         """Main func should take the arguments

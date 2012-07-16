@@ -44,8 +44,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         )
 
         self.env['MOCK_HDFS_ROOT'] = self.makedirs('mock_hdfs_root')
-        self.env['MOCK_HADOOP_OUTPUT'] = self.makedirs(
-                                                    'mock_hadoop_output')
+        self.env['MOCK_HADOOP_OUTPUT'] = self.makedirs('mock_hadoop_output')
         self.env['USER'] = 'mrjob_tests'
         # don't set MOCK_HADOOP_LOG, we get command history other ways
 
@@ -94,7 +93,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
 
     def test_mkdir(self):
         self.fs.mkdir('hdfs:///d')
-        local_path = os.path.join(self.root, 'mock_hdfs_root', 'd')
+        local_path = os.path.join(self.tmp_dir, 'mock_hdfs_root', 'd')
         self.assertEqual(os.path.isdir(local_path), True)
 
     def test_rm(self):

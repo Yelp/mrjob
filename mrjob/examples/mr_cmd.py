@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,19 +25,9 @@ unpredictable keys and you may not get a single number as output.
 from optparse import OptionValueError
 
 from mrjob.job import MRJob
-from mrjob.protocol import RawValueProtocol
-
-
-MAPPER = 'mapper'
-COMBINER = 'combiner'
-REDUCER = 'reducer'
 
 
 class CmdJob(MRJob):
-
-    INPUT_PROTOCOL = RawValueProtocol
-    INTERNAL_PROTOCOL = RawValueProtocol
-    OUTPUT_PROTOCOL = RawValueProtocol
 
     def configure_options(self):
         super(CmdJob, self).configure_options()

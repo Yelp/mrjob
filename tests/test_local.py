@@ -759,13 +759,12 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
     def test_multiple_2(self):
         data = 'x\ny\nz\n'
-        job = CmdJob(['--mapper-cmd=cat', '--reducer-cmd-2', '"wc -l"',
-                      '--runner=local'])
+        job = CmdJob(['--mapper-cmd=cat', '--reducer-cmd-2', 'wc -l',
+                      '--runner=local', '--no-conf'])
         job.sandbox(stdin=StringIO(data))
         with job.make_runner() as r:
             r.run()
-            print list(r.stream_output())
-            self.assertEqual(''.join(r.stream_output()), '3\n')
+            self.assertEqual(sum(int(l) for l in r.stream_output()), 3)
 
 
 

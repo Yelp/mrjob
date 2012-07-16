@@ -110,6 +110,9 @@ MAX_SSH_RETRIES = 20
 # ssh should fail right away if it can't bind a port
 WAIT_FOR_SSH_TO_FAIL = 1.0
 
+# amount of time to wait between checks for available pooled job flows
+JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
+
 # sometimes AWS gives us seconds as a decimal, which we can't parse
 # with boto.utils.ISO8601
 SUBSECOND_RE = re.compile('\.[0-9]+')
@@ -377,6 +380,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
         'num_ec2_core_instances',
+        'pool_wait_minutes',
         'num_ec2_instances',
         'num_ec2_task_instances',
         'pool_emr_job_flows',
@@ -758,6 +762,10 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         :py:mod:`mrjob.tools.emr.terminate.idle_job_flows`
                                    in your crontab; job flows left idle can
                                    quickly become expensive!
+        :type pool_wait_minutes: int
+        :param pool_wait_minutes: Does the same as *pool_emr_job_flows* except
+                              this waits the amount of minutes specified before
+                              creating a new job flow.
         :type s3_endpoint: str
         :param s3_endpoint: Host to connect to when communicating with S3 (e.g.
                             ``s3-us-west-1.amazonaws.com``). Default is to
@@ -2414,11 +2422,15 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         compute units. Break ties by choosing flow with longest idle time.
         Return ``None`` if no suitable flows exist.
         """
-        chosen_job_flow = None
         exclude = set()
         emr_conn = self.make_emr_conn()
         s3_conn = self.make_s3_conn()
-        while chosen_job_flow is None:
+        max_wait_time = self._opts['pool_wait_minutes']
+        now = datetime.now()
+        end_time = now + timedelta(minutes=max_wait_time)
+        time_sleep = timedelta(seconds=JOB_FLOW_SLEEP_INTERVAL)
+        log.info("Attempting to find an available job flow...")
+        while now <= end_time:
             sorted_tagged_job_flows = self.usable_job_flows(
                 emr_conn=emr_conn,
                 exclude=exclude,
@@ -2432,8 +2444,19 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                     return sorted_tagged_job_flows[-1]
                 else:
                     exclude.add(job_flow.jobflowid)
-            else:
+            elif max_wait_time == 0:
                 return None
+            else:
+                # Reset the exclusion set since it is possible to reclaim a
+                # lock that was previously unavailable.
+                exclude = set()
+                log.info("No job flows available in pool '%s'. Checking again"
+                         " in %d seconds." % (
+                             self._opts['emr_job_flow_pool_name'],
+                             int(JOB_FLOW_SLEEP_INTERVAL)))
+                time.sleep(JOB_FLOW_SLEEP_INTERVAL)
+                now += time_sleep
+        return None
 
     def _lock_uri(self, job_flow):
         return make_lock_uri(self._opts['s3_scratch_uri'],

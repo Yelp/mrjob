@@ -47,7 +47,12 @@ class NullHandler(logging.Handler):
 
 
 def bash_wrap(cmd_str):
-    """Escape a shell command string and wrap it with ``bash -c "<string>"``
+    """Escape single quotes in a shell command string and wrap it with ``bash
+    -c '<string>'``.
+
+    This low-tech replacement works because we control the surrounding string
+    and single quotes are the only character in a single-quote string that
+    needs escaping.
     """
     return "bash -c '%s'"  % cmd_str.replace("'", "'\\''")
 

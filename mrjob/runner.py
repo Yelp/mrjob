@@ -794,7 +794,10 @@ class MRJobRunner(object):
                     raise Exception(
                         'error getting step information: %s', stderr)
 
-                steps = json.loads(stdout)
+                try:
+                    steps = json.loads(stdout)
+                except json.JSONDecodeError:
+                    raise ValueError("Bad --steps response: \n%s" % stdout)
 
                 # verify that this is a proper step description
                 if not steps or not stdout:

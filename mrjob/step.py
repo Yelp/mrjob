@@ -96,6 +96,7 @@ class MRJobStep(object):
 
         def _check_cmd(cmd, prefix_set):
             if len(prefix_set) > 1 and cmd in prefix_set:
+                prefix_set.remove(cmd)
                 raise ValueError("Can't specify both %s and %s" % (
                     cmd, prefix_set))
 

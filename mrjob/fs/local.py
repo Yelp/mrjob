@@ -45,8 +45,7 @@ class LocalFilesystem(Filesystem):
                 yield path
 
     def _cat_file(self, filename):
-        for line in read_file(filename):
-            yield line
+        return read_file(filename)
 
     def mkdir(self, path):
         if not os.path.isdir(path):

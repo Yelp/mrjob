@@ -16,7 +16,6 @@
 
 from __future__ import with_statement
 
-from collections import namedtuple
 from optparse import OptionError
 
 from mrjob.emr import EMRJobRunner
@@ -29,9 +28,16 @@ from mrjob.tools.emr.fetch_logs import runner_kwargs
 from tests.tools.emr import ToolTestCase
 
 
-Args = namedtuple('Args', ['step_num', 'list_relevant', 'list_all',
-                           'cat_relevant', 'cat_all', 'get_counters',
-                           'find_failure'])
+class Args(object):
+
+    ATTRS = (
+        'step_num', 'list_relevant', 'list_all', 'cat_relevant', 'cat_all',
+        'get_counters', 'find_failure')
+
+    def __init__(self, *args):
+        for attr, arg in zip(self.ATTRS, args):
+            setattr(self, attr, arg)
+
 
 def make_args(step_num=1, list_relevant=False, list_all=False,
               cat_relevant=False, cat_all=True, get_counters=False,

@@ -58,15 +58,17 @@ class LocalFSTestCase(SandboxedTestCase):
 
     def test_cat_gz(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        with gzip.GzipFile(input_gz_path, 'w') as input_gz:
-            input_gz.write('foo\nbar\n')
+        input_gz = gzip.GzipFile(input_gz_path, 'w')
+        self.addCleanup(input_gz.close)
+        input_gz.write('foo\nbar\n')
 
         self.assertEqual(list(self.fs._cat_file(input_gz_path)), ['foo\n', 'bar\n'])
 
     def test_cat_bz2(self):
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
-        with bz2.BZ2File(input_bz2_path, 'w') as input_bz2:
-            input_bz2.write('bar\nbar\nfoo\n')
+        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
+        self.addCleanup(input_bz2.close)
+        input_bz2.write('bar\nbar\nfoo\n')
 
         self.assertEqual(list(self.fs._cat_file(input_bz2_path)),
                          ['bar\n', 'bar\n', 'foo\n'])

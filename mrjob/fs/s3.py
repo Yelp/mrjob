@@ -27,45 +27,18 @@ except ImportError:
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
-from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
 from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import read_file
 
 
 log = logging.getLogger('mrjob.fs.s3')
-
-# if EMR throttles us, how long to wait (in seconds) before trying again?
-EMR_BACKOFF = 20
-EMR_BACKOFF_MULTIPLIER = 1.5
-EMR_MAX_TRIES = 20  # this takes about a day before we run out of tries
+MAX_S3_RETRIES = 10
 
 
 def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
-
-
-def wrap_aws_conn(raw_conn):
-    """Wrap a given boto Connection object so that it can retry when
-    throttled."""
-    def retry_if(ex):
-        """Retry if we get a server error indicating throttling. Also
-        handle spurious 505s that are thought to be part of a load
-        balancer issue inside AWS."""
-        return ((isinstance(ex, boto.exception.BotoServerError) and
-                 ('Throttling' in ex.body or
-                  'RequestExpired' in ex.body or
-                  ex.status == 505)) or
-                (isinstance(ex, socket.error) and
-                 ex.args in ((104, 'Connection reset by peer'),
-                             (110, 'Connection timed out'))))
-
-    return RetryWrapper(raw_conn,
-                        retry_if=retry_if,
-                        backoff=EMR_BACKOFF,
-                        multiplier=EMR_BACKOFF_MULTIPLIER,
-                        max_tries=EMR_MAX_TRIES)
 
 
 class S3Filesystem(Filesystem):
@@ -199,8 +172,7 @@ class S3Filesystem(Filesystem):
     def make_s3_conn(self):
         """Create a connection to S3.
 
-        :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a
-                 :py:class:`mrjob.retry.RetryWrapper`
+        :return: a :py:class:`boto.s3.connection.S3Connection`
         """
         # give a non-cryptic error message if boto isn't installed
         if boto is None:
@@ -208,11 +180,12 @@ class S3Filesystem(Filesystem):
 
         log.debug('creating S3 connection (to %s)' % self._s3_endpoint)
 
-        raw_s3_conn = boto.connect_s3(
+        s3_conn = boto.connect_s3(
             aws_access_key_id=self._aws_access_key_id,
             aws_secret_access_key=self._aws_secret_access_key,
             host=self._s3_endpoint)
-        return wrap_aws_conn(raw_s3_conn)
+        s3_conn.num_retries = MAX_S3_RETRIES
+        return s3_conn
 
     def get_s3_key(self, uri, s3_conn=None):
         """Get the boto Key object matching the given S3 uri, or

@@ -521,6 +521,17 @@ class LocalMRJobRunner(MRJobRunner):
         return None
 
     def _mapper_arg_chain(self, step_dict, step_num, input_file):
+        # sometimes the mapper isn't actually there, so if it isn't, use cat
+        if MAPPER not in step_dict:
+            new_step_dict = {
+                'mapper': {
+                    'type': 'command',
+                    'command': 'cat',
+                }
+            }
+            new_step_dict.update(step_dict)
+            step_dict = new_step_dict
+
         procs_args = []
 
         filter_args = self._filter_if_any(step_dict[MAPPER])

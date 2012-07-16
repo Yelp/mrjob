@@ -25,6 +25,7 @@ unpredictable keys and you may not get a single number as output.
 from optparse import OptionValueError
 
 from mrjob.job import MRJob
+from mrjob.util import bash_wrap
 
 
 class CmdJob(MRJob):
@@ -57,11 +58,11 @@ class CmdJob(MRJob):
         for step in self.options.steps:
             step_kwargs = {}
             if 'm' in step:
-                step_kwargs['mapper_cmd'] = step['m']
+                step_kwargs['mapper_cmd'] = bash_wrap(step['m'])
             if 'c' in step:
-                step_kwargs['combiner_cmd'] = step['c']
+                step_kwargs['combiner_cmd'] = bash_wrap(step['c'])
             if 'r' in step:
-                step_kwargs['reducer_cmd'] = step['r']
+                step_kwargs['reducer_cmd'] = bash_wrap(step['r'])
             steps.append(self.mr(**step_kwargs))
         return steps
 

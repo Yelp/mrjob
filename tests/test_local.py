@@ -767,7 +767,6 @@ class CommandSubstepTestCase(SandboxedTestCase):
             self.assertEqual(sum(int(l) for l in r.stream_output()), 3)
 
 
-
 class FilterTestCase(SandboxedTestCase):
 
     def test_mapper_filter(self):

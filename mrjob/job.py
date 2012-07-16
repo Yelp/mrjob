@@ -308,6 +308,15 @@ class MRJob(MRJobLauncher):
                       if (getattr(self, func_name).im_func is not
                           getattr(MRJob, func_name).im_func))
 
+        # MRJobStep takes commands as strings, but the user defines them in the
+        # class as functions that return strings, so call the functions.
+        updates = {}
+        for k, v in kwargs.iteritems():
+            if k.endswith('_cmd'):
+                updates[k] = v()
+
+        kwargs.update(updates)
+
         return [self.mr(**kwargs)]
 
     @classmethod

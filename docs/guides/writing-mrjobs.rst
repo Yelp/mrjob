@@ -466,7 +466,18 @@ in a shell call like this::
     class MyMRJob(MRJob):
 
         def mapper_cmd(self):
-            return "bash -c 'grep blah | wc -l'"
+            return r'bash -c "grep \'blah blah\' | wc -l"'
+
+There is a convenience function :py:func:`mrjob.util.bash_wrap()` which
+automatically escapes quotes in a command string and wraps it in a call to
+``bash``, so the same job could be written as::
+
+    from mrjob.util import bash_wrap
+
+    class MyMRJob(MRJob):
+
+        def mapper_cmd(self):
+            return bash_wrap("grep 'blah blah' | wc -l")
 
 You may mix command and script steps at will. This job will count the number of
 lines containing the string "kitty"::

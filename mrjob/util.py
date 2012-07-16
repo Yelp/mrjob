@@ -49,7 +49,7 @@ class NullHandler(logging.Handler):
 def bash_wrap(cmd_str):
     """Escape a shell command string and wrap it with ``bash -c "<string>"``
     """
-    return 'bash -c "%s"'  % pipes.quote(cmd_str)
+    return "bash -c '%s'"  % cmd_str.replace("'", "'\\''")
 
 
 def buffer_iterator_to_line_iterator(iterator):

@@ -64,7 +64,6 @@ from mrjob.conf import combine_path_lists
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.s3 import S3Filesystem
-from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
@@ -102,6 +101,8 @@ MAX_SSH_RETRIES = 20
 # ssh should fail right away if it can't bind a port
 WAIT_FOR_SSH_TO_FAIL = 1.0
 
+# Max amount of retries for EMR and S3
+MAX_EMR_RETRIES = 10
 # amount of time to wait between checks for available pooled job flows
 JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 
@@ -2306,8 +2307,7 @@ class EMRJobRunner(MRJobRunner):
     def make_emr_conn(self):
         """Create a connection to EMR.
 
-        :return: a :py:class:`boto.emr.connection.EmrConnection`,
-                 wrapped in a :py:class:`mrjob.retry.RetryWrapper`
+        :return: a :py:class:`boto.emr.connection.EmrConnection`
         """
         # ...which is then wrapped in bacon! Mmmmm!
 
@@ -2318,11 +2318,12 @@ class EMRJobRunner(MRJobRunner):
         region = self._get_region_info_for_emr_conn()
         log.debug('creating EMR connection (to %s)' % region.endpoint)
 
-        raw_emr_conn = boto.emr.connection.EmrConnection(
+        emr_conn = boto.emr.connection.EmrConnection(
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             region=region)
-        return wrap_aws_conn(raw_emr_conn)
+        emr_conn.num_tries = MAX_EMR_RETRIES
+        return emr_conn
 
     def _get_region_info_for_emr_conn(self):
         """Get a :py:class:`boto.ec2.regioninfo.RegionInfo` object to

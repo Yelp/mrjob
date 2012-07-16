@@ -26,7 +26,7 @@ import sys
 
 try:
     from cStringIO import StringIO
-    StringIO  # silence, pyflakes!
+    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     from StringIO import StringIO
 
@@ -521,7 +521,7 @@ class MRJob(MRJobLauncher):
         mapper_final = step['mapper_final']
 
         # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, 'mapper')
+        read_lines, write_line = self._wrap_protocols(step_num, MAPPER)
 
         if mapper_init:
             for out_key, out_value in mapper_init() or ():
@@ -561,7 +561,7 @@ class MRJob(MRJobLauncher):
             raise ValueError('No reducer in step %d' % step_num)
 
         # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, 'reducer')
+        read_lines, write_line = self._wrap_protocols(step_num, REDUCER)
 
         if reducer_init:
             for out_key, out_value in reducer_init() or ():
@@ -606,7 +606,7 @@ class MRJob(MRJobLauncher):
             raise ValueError('No combiner in step %d' % step_num)
 
         # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, 'combiner')
+        read_lines, write_line = self._wrap_protocols(step_num, COMBINER)
 
         if combiner_init:
             for out_key, out_value in combiner_init() or ():

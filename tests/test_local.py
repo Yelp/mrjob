@@ -757,6 +757,17 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
             self.assertEqual(list(r.stream_output()), ['2'])
 
+    def test_multiple_2(self):
+        data = 'x\ny\nz\n'
+        job = CmdJob(['--mapper-cmd=cat', '--reducer-cmd-2="wc -l"',
+                      '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            r.run()
+            print list(r.stream_output())
+            self.assertEqual(''.join(r.stream_output()), '3\n')
+
+
 
 class FilterTestCase(SandboxedTestCase):
 

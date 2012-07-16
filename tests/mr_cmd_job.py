@@ -15,6 +15,7 @@ class CmdJob(MRJob):
         self.add_passthrough_option('--mapper-cmd', default=None)
         self.add_passthrough_option('--combiner-cmd', default=None)
         self.add_passthrough_option('--reducer-cmd', default=None)
+        self.add_passthrough_option('--reducer-cmd-2', default=None)
 
     def steps(self):
         kwargs = {}
@@ -24,7 +25,12 @@ class CmdJob(MRJob):
             kwargs['combiner_cmd'] = self.options.combiner_cmd
         if self.options.reducer_cmd:
             kwargs['reducer_cmd'] = self.options.reducer_cmd
-        return [self.mr(**kwargs)]
+        steps = [self.mr(**kwargs)]
+
+        if self.options.reducer_cmd_2:
+            steps.append(self.mr(reducer_cmd=self.options.reducer_cmd_2))
+
+        return steps
 
 
 if __name__ == '__main__':

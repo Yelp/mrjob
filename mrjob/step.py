@@ -105,6 +105,11 @@ class MRJobStep(object):
 
         self._steps = steps
 
+    def __repr__(self):
+        not_none = dict((k, v) for k, v in self._steps.iteritems()
+                        if v is not None)
+        return 'MRJobStep(**%r)' % not_none
+
     def __eq__(self, other):
         return (isinstance(other, MRJobStep) and self._steps == other._steps)
 
@@ -170,6 +175,11 @@ class JarStep(object):
         self.jar = jar
         self.main_class = main_class
         self.step_args = step_args
+
+    def __repr__(self):
+        return 'JarStep(**%r)' % repr(
+            dict(name=self.name, jar=self.jar, main_class=self.main_class,
+                 step_args=self.step_args))
 
     def __eq__(self, other):
         return (isinstance(other, JarStep) and

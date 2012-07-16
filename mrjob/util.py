@@ -46,6 +46,12 @@ class NullHandler(logging.Handler):
         pass
 
 
+def bash_wrap(cmd_str):
+    """Escape a shell command string and wrap it with ``bash -c "<string>"``
+    """
+    return 'bash -c "%s"'  % pipes.quote(cmd_str)
+
+
 def buffer_iterator_to_line_iterator(iterator):
     """boto's file iterator splits by buffer size instead of by newline. This
     wrapper puts them back into lines.

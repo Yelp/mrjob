@@ -934,12 +934,14 @@ class StepsTestCase(unittest.TestCase):
 
     def test_steps(self):
         j = self.SteppyJob(['--no-conf'])
-        self.assertEqual(j.steps()[0],
-                         MRJobStep(mapper_init=j._yield_none,
-                                   mapper_filter='cat',
-                                   reducer_cmd='wc -l'))
-        self.assertEqual(j.steps()[1],
-                         JarStep('oh my jar', 's3://bookat/binks_jar.jar'))
+        self.assertEqual(
+            j.steps()[0],
+            MRJobStep(
+                mapper_init=j._yield_none,
+                mapper_filter='cat',
+                reducer_cmd='wc -l'))
+        self.assertEqual(
+            j.steps()[1], JarStep('oh my jar', 's3://bookat/binks_jar.jar'))
 
     def test_cmd_steps(self):
         j = self.SingleSteppyCommandJob(['--no-conf'])

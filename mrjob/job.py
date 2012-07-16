@@ -760,7 +760,7 @@ class MRJob(MRJobLauncher):
             # they have to be able to run 0-inf times without changing the
             # format of the data.
             # Combiners for non-script substeps can't use protocols, so this
-            # function will just give us RawValueProtocol() in tha case.
+            # function will just give us RawValueProtocol() in that case.
             previous_mapper_output = self._mapper_output_protocol(
                 step_num, step_map)
             return previous_mapper_output, previous_mapper_output

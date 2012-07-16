@@ -42,6 +42,7 @@ except ImportError:
 
 import mrjob
 import mrjob.emr
+from mrjob.fs.s3 import S3Filesystem
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import describe_all_job_flows
@@ -2715,7 +2716,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
                 self.jobs.append(future_job)
 
         self.simple_patch(EMRJobRunner, 'make_emr_conn')
-        self.simple_patch(EMRJobRunner, 'make_s3_conn')
+        self.simple_patch(S3Filesystem, 'make_s3_conn')
         self.simple_patch(EMRJobRunner, 'usable_job_flows',
             side_effect=side_effect_usable_job_flows)
         self.simple_patch(EMRJobRunner, '_lock_uri',

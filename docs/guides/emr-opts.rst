@@ -185,6 +185,11 @@ Choosing/creating a job flow to join
     :py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job
     flows left idle can quickly become expensive!
 
+**pool_wait_minutes** (:option:`--pool-wait-minutes`)
+    If pooling is enabled and no job flow is available, retry finding a job
+    flow every 30 seconds until this many minutes have passed, then start a new
+    job flow instead of joinig one.
+
 S3 paths and options
 --------------------
 

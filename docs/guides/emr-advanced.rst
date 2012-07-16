@@ -82,6 +82,11 @@ job flow. This is somewhat ugly but works in practice, and avoids
     consistency (i.e. every region except US Standard) should not experience
     these issues.
 
+You can allow jobs to wait for an available job flow instead of immediately
+starting a new one by specifying a value for `--pool-wait-minutes`. mrjob will
+try to find a job flow every 30 seconds for **pool_wait_minutes**. If none is
+found during that time, mrjob will start a new one.
+
 .. _spot-instances:
 
 Spot Instances

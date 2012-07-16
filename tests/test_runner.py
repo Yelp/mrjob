@@ -25,13 +25,12 @@ from subprocess import CalledProcessError
 import sys
 import tarfile
 import tempfile
-
 try:
     import unittest2 as unittest
     unittest  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import unittest
-
+from mock import patch
 from mrjob.conf import dump_mrjob_conf
 from mrjob.inline import InlineMRJobRunner
 from mrjob.parse import JOB_NAME_RE
@@ -372,6 +371,19 @@ sys.exit(13)
 
         self.use_alternate_sort(script_contents)
 
+    def environment_variable_checks(self, runner, environment_check_list):
+        environment_vars = {}
+
+        def check_call_se(*args, **kwargs):
+            for key in kwargs['env'].keys():
+                environment_vars[key] = kwargs['env'][key]
+
+        with patch('mrjob.runner.check_call', side_effect=check_call_se):
+            runner._invoke_sort([self.a], self.out)
+            for key in environment_check_list:
+                self.assertEqual(environment_vars.get(key, None),
+                                 runner._opts['base_tmp_dir'])
+
     def test_no_files(self):
         runner = MRJobRunner(conf_paths=[])
         self.assertRaises(ValueError,
@@ -413,6 +425,15 @@ sys.exit(13)
         with no_handlers_for_logger():
             self.assertRaises(CalledProcessError,
                               runner._invoke_sort, [self.a, self.b], self.out)
+
+    def test_environment_variables_non_windows(self):
+        runner = MRJobRunner(conf_path=False)
+        self.environment_variable_checks(runner, ['TEMP', 'TMPDIR'])
+
+    def test_environment_variables_windows(self):
+        runner = MRJobRunner(conf_path=False)
+        runner._sort_is_windows_sort = True
+        self.environment_variable_checks(runner, ['TMP'])
 
 
 class ConfigFilesTestCase(unittest.TestCase):

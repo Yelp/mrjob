@@ -18,7 +18,8 @@ and invocation, and ``<interpreter`` will be ``python``.
 
 All interactions between job and runner are through command line arguments. For
 example, to find out what mappers, reducers, and combiners a job has and what
-their order is, :py:mod:`~mrjob.runner.MRJobRunner` calls the job script.
+their order is, :py:mod:`~mrjob.runner.MRJobRunner` calls the job script with
+the :option:`--steps` argument.
 
 Job Interface
 -------------

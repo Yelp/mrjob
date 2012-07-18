@@ -1181,7 +1181,8 @@ class CommandLineArgsTest(unittest.TestCase):
             '-v',
             '--foo-size=9',
             '--bar-name', 'Alembic',
-            '--enable-baz-mode', '--disable-quuxing',
+            '--enable-baz-mode',
+            '--disable-quuxing',
             '--pill-type', 'red',
             '--planck-constant', '1',
             '--planck-constant', '42',
@@ -1203,15 +1204,15 @@ class CommandLineArgsTest(unittest.TestCase):
         self.assertEqual(mr_job.options.strict_protocols, True)
         self.assertEqual(mr_job.generate_passthrough_arguments(),
                      [
+                      '--foo-size', '9',
                       '--bar-name', 'Alembic',
                       '--enable-baz-mode',
-                      '--extra-special-arg', 'you',
-                      '--extra-special-arg', 'me',
-                      '--foo-size', '9',
+                      '--disable-quuxing',
                       '--pill-type', 'red',
                       '--planck-constant', '1',
                       '--planck-constant', '42',
-                      '--disable-quuxing',
+                      '--extra-special-arg', 'you',
+                      '--extra-special-arg', 'me',
                       '--strict-protocols',
                       ])
 
@@ -1237,15 +1238,15 @@ class CommandLineArgsTest(unittest.TestCase):
         self.assertEqual(mr_job.options.strict_protocols, True)
         self.assertEqual(mr_job.generate_passthrough_arguments(),
                      [
-                        '-B', 'Alembic',
-                        '-M',
-                         '--extra-special-arg', 'you',
-                         '--extra-special-arg', 'me',
                          '-F', '9',
+                         '-B', 'Alembic',
+                         '-M',
+                         '-Q',
                          '-T', 'red',
                          '-C', '1',
                          '-C', '42',
-                         '-Q',
+                         '--extra-special-arg', 'you',
+                         '--extra-special-arg', 'me',
                          '--strict-protocols'
                      ])
 

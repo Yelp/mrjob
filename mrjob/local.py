@@ -51,6 +51,23 @@ DEFAULT_REDUCE_TASKS = 2
 
 
 def _chain_procs(procs_args, **kwargs):
+    """Input: List of lists of command line arguments.
+
+    These arg lists will be turned into Popen objects with the keyword
+    arguments specified as kwargs to this function. For procs X, Y, and Z, X
+    stdout will go to Y stdin and Y stdout will go to Z stdin. So for
+    P[i < |procs|-1], stdout is replaced with a pipe to the next process. For
+    P[i > 0], stdin is replaced with a pipe from the previous process.
+    Otherwise, the kwargs are passed through to the Popen constructor without
+    modification, so you can specify stdin/stdout/stderr file objects and have
+    them behave as expected.
+
+    The return value is a list of Popen objects created, in the same order as
+    *procs_args*.
+
+    In most ways, this function makes several processes that act as one in
+    terms of input and output.
+    """
     last_stdout = None
 
     procs = []
@@ -69,10 +86,7 @@ def _chain_procs(procs_args, **kwargs):
 
         proc = Popen(args, shell=(isinstance(args, basestring)), **proc_kwargs)
         last_stdout = proc.stdout
-        procs.append({
-            'proc': proc,
-            'args': args,
-        })
+        procs.append(proc)
 
     return procs
 
@@ -715,8 +729,10 @@ class LocalMRJobRunner(MRJobRunner):
         self._prev_outfiles.append(outfile)
 
         with open(outfile, 'w') as write_to:
-            return _chain_procs(procs_args, stdout=write_to, stderr=PIPE,
+            procs = _chain_procs(procs_args, stdout=write_to, stderr=PIPE,
                                 cwd=self._working_dir, env=env)
+            return [{'args': args, 'proc': proc, 'write_to': write_to}
+                    for args, proc in zip(procs_args, procs)]
 
     def _wait_for_process(self, proc_dict, step_num):
         # handle counters, status msgs, and other stuff on stderr

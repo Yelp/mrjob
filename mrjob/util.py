@@ -161,7 +161,7 @@ def log_to_stream(name=None, stream=None, format=None, level=None,
     logger.addHandler(handler)
 
 
-def _process_long_opt(option_parser, arg_map, rargs, values):
+def _process_long_opt(option_parser, rargs, values, dests):
     """Mimic function of the same name in ``OptionParser``, capturing the
     arguments consumed in *arg_map*
     """
@@ -193,13 +193,14 @@ def _process_long_opt(option_parser, arg_map, rargs, values):
 
     option.process(opt, value, values, option_parser)
 
-    # Measure rargs before and after processing. Store difference in arg_map.
-    length_difference = len(rargs_before_processing) - len(rargs)
-    list_difference = [opt] + rargs_before_processing[:length_difference]
-    arg_map[option.dest].extend(list_difference)
+    if dests is None or option.dest in dests:
+        # Measure rargs before and after processing. Yield difference.
+        length_difference = len(rargs_before_processing) - len(rargs)
+        for item in [opt] + rargs_before_processing[:length_difference]:
+            yield option.dest, item
 
 
-def _process_short_opts(option_parser, arg_map, rargs, values):
+def _process_short_opts(option_parser, rargs, values, dests):
     """Mimic function of the same name in ``OptionParser``, capturing the
     arguments consumed in *arg_map*
     """
@@ -238,24 +239,22 @@ def _process_short_opts(option_parser, arg_map, rargs, values):
 
         option.process(opt, value, values, option_parser)
 
-        # Measure rargs before and after processing. Store difference in
-        # arg_map.
-        length_difference = len(rargs_before_processing) - len(rargs)
-        list_difference = ([opt] +
-                           args_from_smashed_short_opt +
-                           rargs_before_processing[:length_difference])
-        arg_map[option.dest].extend(list_difference)
+        if dests is None or option.dest in dests:
+            # Measure rargs before and after processing. Yield difference.
+            length_difference = len(rargs_before_processing) - len(rargs)
+            for item in ([opt] + args_from_smashed_short_opt +
+                         rargs_before_processing[:length_difference]):
+                yield option.dest, item
 
         if stop:
             break
 
 
-def parse_and_save_options(option_parser, args):
-    """Duplicate behavior of OptionParser, but capture the strings required
-    to reproduce the same values. Ref. optparse.py lines 1414-1548 (python
-    2.6.5)
+def _args_for_opt_dest_subset(option_parser, args, dests=None):
+    """See docs for :py:func:`args_for_opt_dest_subset()`. This function allows
+    us to write a compatibility wrapper for the old API
+    (:py:func:`parse_and_save_options()`).
     """
-    arg_map = defaultdict(list)
     values = deepcopy(option_parser.get_default_values())
     rargs = [x for x in args]
     option_parser.rargs = rargs
@@ -263,13 +262,38 @@ def parse_and_save_options(option_parser, args):
         arg = rargs[0]
         if arg == '--':
             del rargs[0]
-            return arg_map
+            return
         elif arg[0:2] == '--':
-            _process_long_opt(option_parser, arg_map, rargs, values)
+            for item in _process_long_opt(option_parser, rargs, values, dests):
+                yield item
         elif arg[:1] == '-' and len(arg) > 1:
-            _process_short_opts(option_parser, arg_map, rargs, values)
+            for item in _process_short_opts(option_parser, rargs, values,
+                                            dests):
+                yield item
         else:
             del rargs[0]
+
+
+def args_for_opt_dest_subset(option_parser, args, dests=None):
+    """For the given :py:class:`OptionParser` and list of command line
+    arguments *args*, yield values in *args* that correspond to option
+    destinations in the set of strings *dests*. If *dests* is None, return
+    *args* as parsed by :py:class:`OptionParser`.
+    """
+    for dest, value in _args_for_opt_dest_subset(option_parser, args, dests):
+        yield value
+
+
+def parse_and_save_options(option_parser, args):
+    """DEPRECATED. To be removed in v0.5.
+
+    Duplicate behavior of :py:class:`OptionParser`, but capture the strings
+    required to reproduce the same values. Ref. optparse.py lines 1414-1548
+    (python 2.6.5)
+    """
+    arg_map = defaultdict(list)
+    for dest, value in _args_for_opt_dest_subset(option_parser, args, None):
+        arg_map[dest].append(value)
     return arg_map
 
 

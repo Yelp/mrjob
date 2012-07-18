@@ -457,20 +457,12 @@ You can forego scripts entirely for a step by specifying it as shell a command.
 To do so, use ``mapper_cmd``, ``combiner_cmd``, or ``reducer_cmd`` as arguments
 to :py:meth:`~mrjob.job.MRJob.mr()` or methods on :py:class:`~mrjob.job.MRJob`.
 
-The ``local`` runner will use a shell to invoke command tasks as subprocesses.
-The ``hadoop`` and ``emr`` runners will pass the command string raw to Hadoop
-Streaming [#cmd_018]_. This behavior may cause discrepancies across runners if
-you use pipes or other shell features unless you explicitly wrap your command
-in a shell call like this::
+The command you specify will not be run in a shell, so by default you can't use
+things like pipe syntax. If you want to use shell features, you can use
+:py:func:`~mrjob.util.bash_wrap()` to wrap your command in a call to the
+``bash`` shell, automatically escaping quotes.
 
-    class MyMRJob(MRJob):
-
-        def mapper_cmd(self):
-            return r'bash -c "grep \'blah blah\' | wc -l"'
-
-There is a convenience function :py:func:`mrjob.util.bash_wrap()` which
-automatically escapes quotes in a command string and wraps it in a call to
-``bash``, so the same job could be written as::
+::
 
     from mrjob.util import bash_wrap
 
@@ -492,19 +484,11 @@ lines containing the string "kitty"::
         def reducer(self, key, values):
             yield None, sum(1 for _ in values)
 
-.. warning:: TODO: provide ``mrjob.util.wrap_bash()`` to do ``return 'bash -c
-    "%s"' % pipes.quote(s)``
-
 .. note:: You may not use ``cmd`` with any other options for a task such as
     ``filter``, ``init``, ``final``, or a regular mapper/combiner/reducer
     function.
 
 .. rubric:: Footnotes
-
-.. [#cmd_018] There is one very specific exception to this behavior. If you run
-    your job on EMR using AMI 1.0 and Hadoop 0.18 with a combiner, then mrjob
-    will wrap your command in ``bash -c '<your command'>`` without escaping
-    anything. **TODO: escape it.**
 
 Non-Hadoop Streaming jar steps
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

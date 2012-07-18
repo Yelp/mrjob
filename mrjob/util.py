@@ -161,7 +161,7 @@ def log_to_stream(name=None, stream=None, format=None, level=None,
     logger.addHandler(handler)
 
 
-def _process_long_opt(option_parser, rargs, values, counter, dests):
+def _process_long_opt(option_parser, rargs, values, dests):
     """Mimic function of the same name in ``OptionParser``, capturing the
     arguments consumed in *arg_map*
     """
@@ -200,7 +200,7 @@ def _process_long_opt(option_parser, rargs, values, counter, dests):
             yield option.dest, item
 
 
-def _process_short_opts(option_parser, rargs, values, counter, dests):
+def _process_short_opts(option_parser, rargs, values, dests):
     """Mimic function of the same name in ``OptionParser``, capturing the
     arguments consumed in *arg_map*
     """
@@ -255,7 +255,6 @@ def _args_for_opt_dest_subset(option_parser, args, dests=None):
     us to write a compatibility wrapper for the old API
     (:py:func:`parse_and_save_options()`).
     """
-    counter = itertools.count()
     values = deepcopy(option_parser.get_default_values())
     rargs = [x for x in args]
     option_parser.rargs = rargs
@@ -265,12 +264,11 @@ def _args_for_opt_dest_subset(option_parser, args, dests=None):
             del rargs[0]
             return
         elif arg[0:2] == '--':
-            for item in _process_long_opt(option_parser, rargs,
-                                          values, counter, dests):
+            for item in _process_long_opt(option_parser, rargs, values, dests):
                 yield item
         elif arg[:1] == '-' and len(arg) > 1:
-            for item in _process_short_opts(option_parser, rargs,
-                                            values, counter, dests):
+            for item in _process_short_opts(option_parser, rargs, values,
+                                            dests):
                 yield item
         else:
             del rargs[0]

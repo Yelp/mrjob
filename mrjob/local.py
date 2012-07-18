@@ -59,6 +59,9 @@ def _chain_procs(procs_args, **kwargs):
     The return value is a list of Popen objects created, in the same order as
     *procs_args*.
 
+    If an item in *procs_args* is a string instead of a list,, it is run with
+    shell=True.
+
     In most ways, this function makes several processes that act as one in
     terms of input and output.
     """
@@ -547,15 +550,18 @@ class LocalMRJobRunner(MRJobRunner):
         if filter_args:
             procs_args.append(['cat', input_file])
             procs_args.append(filter_args)
-            procs_args.append(
+            # _substep_args may return more than one process
+            procs_args.extend(
                 self._substep_args(step_dict, step_num, 'mapper'))
         else:
-            procs_args.append(
+            # _substep_args may return more than one process
+            procs_args.extend(
                 self._substep_args(step_dict, step_num, 'mapper', input_file))
 
         if 'combiner' in step_dict:
             procs_args.append(['sort'])
-            procs_args.append(self._substep_args(
+            # _substep_args may return more than one process
+            procs_args.extend(self._substep_args(
                 step_dict, step_num, 'combiner'))
 
         return procs_args
@@ -567,10 +573,12 @@ class LocalMRJobRunner(MRJobRunner):
         if filter_args:
             procs_args.append(['cat', input_file])
             procs_args.append(filter_args)
-            procs_args.append(
+            # _substep_args may return more than one process
+            procs_args.extend(
                 self._substep_args(step_dict, step_num, 'reducer'))
         else:
-            procs_args.append(
+            # _substep_args may return more than one process
+            procs_args.extend(
                 self._substep_args(step_dict, step_num, 'reducer', input_file))
 
         return procs_args
@@ -581,15 +589,17 @@ class LocalMRJobRunner(MRJobRunner):
                             step_dict['type'])
         if step_dict[mrc]['type'] == 'command':
             if input_path is None:
-                return step_dict[mrc]['command']
+                return [shlex.split(step_dict[mrc]['command'])]
             else:
-                return 'cat %s | %s' % (input_path, step_dict[mrc]['command'])
+                return [
+                    ['cat', input_path],
+                    shlex.split(step_dict[mrc]['command'])]
         if step_dict[mrc]['type'] == 'script':
             args = self._script_args_for_step(step_num, mrc)
             if input_path is None:
-                return args
+                return [args]
             else:
-                return args + [input_path]
+                return [args + [input_path]]
 
     def _subprocess_env(self, step_type, step_num, task_num, input_file=None,
                         input_start=None, input_length=None):

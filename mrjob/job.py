@@ -133,7 +133,7 @@ from mrjob.protocol import RawValueProtocol
 from mrjob.runner import CLEANUP_CHOICES
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
-from mrjob.util import parse_and_save_options
+from mrjob.util import args_for_opt_dest_subset
 from mrjob.util import read_input
 
 
@@ -1340,15 +1340,9 @@ class MRJob(object):
         These are passed to :py:meth:`mrjob.runner.MRJobRunner.__init__`
         as *extra_args*.
         """
-        arg_map = parse_and_save_options(self.option_parser, self._cl_args)
-        output_args = []
-
-        passthrough_dests = sorted(set(option.dest for option \
-                                       in self._passthrough_options))
-        for option_dest in passthrough_dests:
-            output_args.extend(arg_map.get(option_dest, []))
-
-        return output_args
+        return list(args_for_opt_dest_subset(
+            self.option_parser, self._cl_args,
+            set(option.dest for option in self._passthrough_options)))
 
     def generate_file_upload_args(self):
         """Figure out file upload args to pass through to the job runner.

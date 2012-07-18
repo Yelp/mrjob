@@ -21,7 +21,6 @@ import os
 
 from mrjob.inline import InlineMRJobRunner
 from mrjob.protocol import JSONValueProtocol
-from mrjob.step import MAPPER
 from tests.mr_test_cmdenv import MRTestCmdenv
 from tests.mr_testing_job import MRTestingJob
 from tests.mr_two_step_job import MRTwoStepJob
@@ -131,13 +130,13 @@ class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
             self.assertEqual(runner._get_steps(), [
                 {
                     'type': 'streaming',
-                    MAPPER: {
+                    'mapper': {
                         'type': 'script',
                     }
                 },
                 {
                     'type': 'streaming',
-                    MAPPER: {
+                    'mapper': {
                         'type': 'script',
                     }
                 },

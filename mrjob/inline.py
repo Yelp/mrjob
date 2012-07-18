@@ -35,13 +35,6 @@ from mrjob.conf import combine_local_envs
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.job import MRJob
-from mrjob.step import COMBINER
-from mrjob.step import COMMAND_SUBSTEP
-from mrjob.step import JAR_STEP
-from mrjob.step import MAPPER
-from mrjob.step import REDUCER
-from mrjob.step import SCRIPT_SUBSTEP
-from mrjob.step import STREAMING_STEP
 from mrjob.util import save_current_environment
 
 log = logging.getLogger('mrjob.inline')
@@ -118,10 +111,10 @@ class InlineMRJobRunner(MRJobRunner):
     ]
 
     def _check_step_is_mrjob_only(self, step_dict):
-        for key in (MAPPER, REDUCER, COMBINER):
+        for key in ('mapper', 'combiner', 'reducer'):
             if key in step_dict:
                 substep = step_dict[key]
-                if substep['type'] != SCRIPT_SUBSTEP:
+                if substep['type'] != 'script':
                     raise Exception(
                         "InlineMRJobRunner cannot run %s steps." %
                         substep['type'])
@@ -167,9 +160,9 @@ class InlineMRJobRunner(MRJobRunner):
 
                 self._invoke_inline_mrjob(
                     step_number, step_dict, 'step-%d-mapper' % step_number,
-                    MAPPER)
+                    'mapper')
 
-                if REDUCER in step_dict:
+                if 'reducer' in step_dict:
                     mapper_output_path = self._prev_outfile
                     sorted_mapper_output_path = self._decide_output_path(
                         'step-%d-mapper-sorted' % step_number)
@@ -182,7 +175,7 @@ class InlineMRJobRunner(MRJobRunner):
                     # This'll read from sorted_mapper_output_path
                     self._invoke_inline_mrjob(
                         step_number, step_dict,
-                        'step-%d-reducer' % step_number, REDUCER)
+                        'step-%d-reducer' % step_number, 'reducer')
 
         # move final output to output directory
         self._final_outfile = os.path.join(self._output_dir, 'part-00000')
@@ -201,18 +194,18 @@ class InlineMRJobRunner(MRJobRunner):
         common_args = (['--step-num=%d' % step_number] +
                        self._mr_job_extra_args(local=True))
 
-        if substep_to_run == MAPPER:
+        if substep_to_run == 'mapper':
             child_args = (
                 ['--mapper'] + self._decide_input_paths() + common_args)
-        elif substep_to_run == REDUCER:
+        elif substep_to_run == 'reducer':
             child_args = (
                 ['--reducer'] + self._decide_input_paths() + common_args)
-        elif substep_to_run == COMBINER:
+        elif substep_to_run == 'combiner':
             child_args = ['--combiner'] + common_args + ['-']
 
         child_instance = self._mrjob_cls(args=child_args)
 
-        has_combiner = (substep_to_run == MAPPER and COMBINER in step_dict)
+        has_combiner = (substep_to_run == 'mapper' and 'combiner' in step_dict)
 
         # Use custom stdin
         if has_combiner:
@@ -239,7 +232,7 @@ class InlineMRJobRunner(MRJobRunner):
 
         if has_combiner:
             self._invoke_inline_mrjob(step_number, step_dict, outfile_name,
-                                      COMBINER, child_stdin=combiner_stdin)
+                                      'combiner', child_stdin=combiner_stdin)
             combiner_stdin.close()
 
     def counters(self):

@@ -32,12 +32,6 @@ from mrjob.parse import find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
-from mrjob.step import COMBINER
-from mrjob.step import COMMAND_SUBSTEP
-from mrjob.step import MAPPER
-from mrjob.step import REDUCER
-from mrjob.step import SCRIPT_SUBSTEP
-from mrjob.step import STREAMING_STEP
 from mrjob.util import cmd_line
 from mrjob.util import read_input
 from mrjob.util import unarchive
@@ -221,10 +215,10 @@ class LocalMRJobRunner(MRJobRunner):
             self._counters.append({})
 
             self._invoke_step(
-                step, 'step-%d-mapper' % step_num, step_num, MAPPER,
+                step, 'step-%d-mapper' % step_num, step_num, 'mapper',
                 num_tasks=self._map_tasks)
 
-            if REDUCER in step:
+            if 'reducer' in step:
                 # sort the output. Treat this as a mini-step for the purpose
                 # of self._prev_outfiles
                 sort_output_path = os.path.join(
@@ -235,7 +229,7 @@ class LocalMRJobRunner(MRJobRunner):
 
                 # run the reducer
                 self._invoke_step(
-                    step, 'step-%d-reducer' % step_num, step_num, REDUCER,
+                    step, 'step-%d-reducer' % step_num, step_num, 'reducer',
                     num_tasks=self._reduce_tasks)
 
         # move final output to output directory
@@ -477,12 +471,12 @@ class LocalMRJobRunner(MRJobRunner):
                               arguments in separately.
         """
 
-        if step_dict['type'] != STREAMING_STEP:
+        if step_dict['type'] != 'streaming':
             raise Exception("LocalMRJobRunner cannot run %s steps" %
                             step_dict['type'])
 
         # get file splits for mappers and reducers
-        keep_sorted = (step_type == REDUCER)
+        keep_sorted = (step_type == 'reducer')
         file_splits = self._get_file_splits(
             self._step_input_paths(), num_tasks, keep_sorted=keep_sorted)
 
@@ -501,7 +495,7 @@ class LocalMRJobRunner(MRJobRunner):
         for task_num, file_name in file_tasks:
 
             # setup environment variables
-            if step_type == MAPPER:
+            if step_type == 'mapper':
                 env = self._subprocess_env(
                     step_type, step_num, task_num,
                     # mappers have extra file split info
@@ -513,10 +507,10 @@ class LocalMRJobRunner(MRJobRunner):
 
             task_outfile = outfile_name + '_part-%05d' % task_num
 
-            if step_type == MAPPER:
+            if step_type == 'mapper':
                 procs_args = self._mapper_arg_chain(
                     step_dict, step_num, file_name)
-            elif step_type == REDUCER:
+            elif step_type == 'reducer':
                 procs_args = self._reducer_arg_chain(
                     step_dict, step_num, file_name)
 
@@ -530,14 +524,14 @@ class LocalMRJobRunner(MRJobRunner):
         self.print_counters([step_num + 1])
 
     def _filter_if_any(self, substep_dict):
-        if substep_dict['type'] == SCRIPT_SUBSTEP:
+        if substep_dict['type'] == 'script':
             if 'filter' in substep_dict:
                 return shlex.split(substep_dict['filter'])
         return None
 
     def _mapper_arg_chain(self, step_dict, step_num, input_file):
         # sometimes the mapper isn't actually there, so if it isn't, use cat
-        if MAPPER not in step_dict:
+        if 'mapper' not in step_dict:
             new_step_dict = {
                 'mapper': {
                     'type': 'command',
@@ -549,35 +543,35 @@ class LocalMRJobRunner(MRJobRunner):
 
         procs_args = []
 
-        filter_args = self._filter_if_any(step_dict[MAPPER])
+        filter_args = self._filter_if_any(step_dict['mapper'])
         if filter_args:
             procs_args.append(['cat', input_file])
             procs_args.append(filter_args)
             procs_args.append(
-                self._substep_args(step_dict, step_num, MAPPER))
+                self._substep_args(step_dict, step_num, 'mapper'))
         else:
             procs_args.append(
-                self._substep_args(step_dict, step_num, MAPPER, input_file))
+                self._substep_args(step_dict, step_num, 'mapper', input_file))
 
-        if COMBINER in step_dict:
+        if 'combiner' in step_dict:
             procs_args.append(['sort'])
             procs_args.append(self._substep_args(
-                step_dict, step_num, COMBINER))
+                step_dict, step_num, 'combiner'))
 
         return procs_args
 
     def _reducer_arg_chain(self, step_dict, step_num, input_file):
         procs_args = []
 
-        filter_args = self._filter_if_any(step_dict[REDUCER])
+        filter_args = self._filter_if_any(step_dict['reducer'])
         if filter_args:
             procs_args.append(['cat', input_file])
             procs_args.append(filter_args)
             procs_args.append(
-                self._substep_args(step_dict, step_num, REDUCER))
+                self._substep_args(step_dict, step_num, 'reducer'))
         else:
             procs_args.append(
-                self._substep_args(step_dict, step_num, REDUCER, input_file))
+                self._substep_args(step_dict, step_num, 'reducer', input_file))
 
         return procs_args
 
@@ -585,12 +579,12 @@ class LocalMRJobRunner(MRJobRunner):
         if step_dict['type'] != 'streaming':
             raise Exception("LocalMRJobRunner cannot run %s steps." %
                             step_dict['type'])
-        if step_dict[mrc]['type'] == COMMAND_SUBSTEP:
+        if step_dict[mrc]['type'] == 'command':
             if input_path is None:
                 return step_dict[mrc]['command']
             else:
                 return 'cat %s | %s' % (input_path, step_dict[mrc]['command'])
-        if step_dict[mrc]['type'] == SCRIPT_SUBSTEP:
+        if step_dict[mrc]['type'] == 'script':
             args = self._script_args_for_step(step_num, mrc)
             if input_path is None:
                 return args
@@ -696,7 +690,7 @@ class LocalMRJobRunner(MRJobRunner):
         # not actually sure what's correct for combiners here. It'll definitely
         # be true if we're just using pipes to simulate a combiner though
         j['mapreduce.task.ismap'] = str(
-            step_type in (MAPPER, COMBINER)).lower()
+            step_type in ('mapper', 'combiner')).lower()
 
         j['mapreduce.task.partition'] = str(task_num)
 

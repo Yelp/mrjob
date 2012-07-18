@@ -53,7 +53,6 @@ from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.local import LocalFilesystem
-from mrjob.step import SCRIPT_SUBSTEP
 from mrjob.step import STEP_TYPES
 from mrjob.util import cmd_line
 from mrjob.util import file_ext

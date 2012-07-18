@@ -44,12 +44,8 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
-from mrjob.step import COMBINER
 from mrjob.step import JarStep
-from mrjob.step import MAPPER
 from mrjob.step import MRJobStep
-from mrjob.step import REDUCER
-from mrjob.step import SCRIPT_SUBSTEP
 from mrjob.step import _JOB_STEP_PARAMS
 from mrjob.util import read_input
 
@@ -521,7 +517,7 @@ class MRJob(MRJobLauncher):
         mapper_final = step['mapper_final']
 
         # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, MAPPER)
+        read_lines, write_line = self._wrap_protocols(step_num, 'mapper')
 
         if mapper_init:
             for out_key, out_value in mapper_init() or ():
@@ -561,7 +557,7 @@ class MRJob(MRJobLauncher):
             raise ValueError('No reducer in step %d' % step_num)
 
         # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, REDUCER)
+        read_lines, write_line = self._wrap_protocols(step_num, 'reducer')
 
         if reducer_init:
             for out_key, out_value in reducer_init() or ():
@@ -606,7 +602,7 @@ class MRJob(MRJobLauncher):
             raise ValueError('No combiner in step %d' % step_num)
 
         # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, COMBINER)
+        read_lines, write_line = self._wrap_protocols(step_num, 'combiner')
 
         if combiner_init:
             for out_key, out_value in combiner_init() or ():
@@ -682,7 +678,7 @@ class MRJob(MRJobLauncher):
             encodes them, and writes a line to output.
 
         :param step_num: which step to run (e.g. 0)
-        :param step_type: ``MAPPER``, ``REDUCER``, or ``COMBINER`` from
+        :param step_type: ``'mapper'``, ``'reducer'``, or ``'combiner'`` from
                           :py:mod:`mrjob.step`
         """
         read, write = self.pick_protocols(step_num, step_type)
@@ -724,21 +720,21 @@ class MRJob(MRJobLauncher):
         mapping = {}
         script_step_num = 0
         for i, step in enumerate(steps_desc):
-            if MAPPER in step:
-                if step[MAPPER]['type'] == SCRIPT_SUBSTEP:
-                    k = self._step_key(i, MAPPER)
+            if 'mapper' in step:
+                if step['mapper']['type'] == 'script':
+                    k = self._step_key(i, 'mapper')
                     mapping[k] = script_step_num
                     script_step_num += 1
-            if REDUCER in step:
-                if step[REDUCER]['type'] == SCRIPT_SUBSTEP:
-                    k = self._step_key(i, REDUCER)
+            if 'reducer' in step:
+                if step['reducer']['type'] == 'script':
+                    k = self._step_key(i, 'reducer')
                     mapping[k] = script_step_num
                     script_step_num += 1
 
         return mapping
 
     def _mapper_output_protocol(self, step_num, step_map):
-        map_key = self._step_key(step_num, MAPPER)
+        map_key = self._step_key(step_num, 'mapper')
         if map_key in step_map:
             if step_map[map_key] >= (len(step_map) - 1):
                 return self.output_protocol()
@@ -755,7 +751,7 @@ class MRJob(MRJobLauncher):
 
         # pick input protocol
 
-        if step_type == COMBINER:
+        if step_type == 'combiner':
             # Combiners read and write the mapper's output protocol because
             # they have to be able to run 0-inf times without changing the
             # format of the data.
@@ -800,9 +796,9 @@ class MRJob(MRJobLauncher):
         :type step_num: int
         :param step_num: which step to run (e.g. ``0`` for the first step)
         :type step_type: str
-        :param step_type: one of :py:data:`mrjob.step.MAPPER`,
-                          :py:data:`mrjob.step.COMBINER`, or
-                          :py:data:`mrjob.step.REDUCER`
+        :param step_type: one of :py:data:`mrjob.step.'mapper'`,
+                          :py:data:`mrjob.step.'combiner'`, or
+                          :py:data:`mrjob.step.'reducer'`
         :return: (read_function, write_function)
 
         By default, we use one protocol for reading input, one

@@ -426,7 +426,7 @@ class StepsPythonBinTestCase(unittest.TestCase):
             # it here so that the runner actually tries to get the steps
             # via subprocess
             runner._steps = None
-            self.assertRaises(JSONDecodeError, runner._get_steps)
+            self.assertRaises(ValueError, runner._get_steps)
 
 
 class LocalBootstrapMrjobTestCase(unittest.TestCase):

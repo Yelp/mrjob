@@ -490,7 +490,7 @@ lines containing the string "kitty"::
             return "grep kitty"
 
         def reducer(self, key, values):
-            return sum(values)
+            yield None, sum(1 for _ in values)
 
 .. warning:: TODO: provide ``mrjob.util.wrap_bash()`` to do ``return 'bash -c
     "%s"' % pipes.quote(s)``

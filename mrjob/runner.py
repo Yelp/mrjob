@@ -1251,6 +1251,12 @@ class MRJobRunner(object):
         env = os.environ.copy()
         env['LC_ALL'] = 'C'
 
+        # Make sure that the base tmp dir environment variables are changed if
+        # the default is changed.
+        env['TMP'] = self._opts['base_tmp_dir']
+        env['TMPDIR'] = self._opts['base_tmp_dir']
+        env['TEMP'] = self._opts['base_tmp_dir']
+
         log.info('writing to %s' % output_path)
 
         err_path = os.path.join(self._get_local_tmp_dir(), 'sort-stderr')

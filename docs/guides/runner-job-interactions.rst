@@ -21,6 +21,9 @@ example, to find out what mappers, reducers, and combiners a job has and what
 their order is, :py:mod:`~mrjob.runner.MRJobRunner` calls the job script with
 the :option:`--steps` argument.
 
+Examples of job input/output are given at the end of this document in
+:ref:`job-interface-examples`.
+
 Job Interface
 -------------
 
@@ -47,6 +50,9 @@ Job Interface
 :option:`--step-num`, :option:`--mapper`, :option:`--combiner`, and
 :option:`--reducer` are only necessary for ``script`` steps (see
 :ref:`steps-format` below).
+
+When running a mapper, combiner, or reducer, the non-option arguments are input
+files, where no args or ``-`` means read from standard input.
 
 .. _steps-format:
 
@@ -161,3 +167,39 @@ required arguments and two optional arguments.
 
 Further information on jar steps should be sought for in the Hadoop
 documentation. Pull requests containing relevant links would be appreciated.
+
+.. _job-interface-examples:
+
+Examples
+^^^^^^^^
+
+**Getting steps**
+
+Job with a script mapper and command reducer for the first step and a jar for
+the second step::
+
+    > <interpreter> my_script.lang --steps
+    [
+        {
+            'type': 'streaming',
+            'mapper': {
+                'type': 'script'
+            },
+            'reducer': {
+                'type': 'command',
+                'command': 'some_shell_command --arg --arg'
+            }
+        },
+        {
+            'type': 'jar',
+            'name': 'my_cool_jar_step',
+            'jar': 's3://bucket/jar_jar.jar'
+        }
+    ]
+
+**Running a step**
+
+::
+
+    > <interpreter> my_script.lang --mapper --step-num=0 input.txt -
+    [script iterates over stdin and input.txt, writing output rows to stdout]

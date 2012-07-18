@@ -32,10 +32,10 @@ except ImportError:
     import unittest
 
 from mock import patch
-
 import mrjob
 from mrjob import local
 from mrjob.local import LocalMRJobRunner
+from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import read_file
 from tests.mr_cmd_job import CmdJob
@@ -741,7 +741,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
     def test_multiple(self):
         data = 'x\nx\nx\nx\nx\nx\n'
         mapper_cmd = 'cat -e'
-        reducer_cmd = 'wc -l | tr -Cd "[:digit:]"'
+        reducer_cmd = bash_wrap('wc -l | tr -Cd "[:digit:]"')
         job = CmdJob([
             '--runner', 'local',
             '--mapper-cmd', mapper_cmd,

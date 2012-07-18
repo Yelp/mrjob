@@ -22,8 +22,6 @@ goes to the same reducer. Otherwise, lines will be interpreted as having
 unpredictable keys and you may not get a single number as output.
 
 """
-from optparse import OptionValueError
-
 from mrjob.job import MRJob
 from mrjob.util import bash_wrap
 
@@ -33,36 +31,47 @@ class CmdJob(MRJob):
     def configure_options(self):
         super(CmdJob, self).configure_options()
 
-        def register_substep(option, opt, value, parser):
-            if (len(value) > 3 or
-                not all(c in 'mcr' for c in value) or
-                len(set(value)) != len(value)):
-                raise OptionValueError(
-                    "First argument to --step must be of the form m?c?r?")
+        def register_substep(option, opt, value, parser, mrc):
+            def last_step_has(*args):
+                return any(arg in parser.values.steps[-1] for arg in args)
+            # always add a new step if no steps
+            # or new substep is a mapper
+            # or new substep is a combiner and we already have a combiner or
+            #   reducer
+            # or new substep is a reducer and we already have a reducer
+            if (len(parser.values.steps) == 0 or
+                mrc == 'mapper' or
+                (mrc == 'combiner' and last_step_has('combiner', 'reducer')) or
+                (mrc == 'reducer' and last_step_has('reducer'))):
+                parser.values.steps.append({})
 
-            d = dict((c, parser.rargs.pop(0)) for c in value)
-
-            parser.values.steps.append(d)
+            parser.values.steps[-1][mrc] = value
 
         self.add_passthrough_option(
-            '-s', '--step', dest='steps', action='callback', type='str',
-            callback=register_substep, default=[],
-            help=(
-                'First argument is any subset of the string "mcr", where each '
-                ' letter represents a mapper, combiner, or reducer for the'
-                ' step. Pass one additional argument for each specified'
-                ' substep. Example: "-s mr [mapper cmd] [reducer cmd]".'))
+            '-M', dest='steps', action='callback', type='str',
+            callback=register_substep, default=[], callback_args=('mapper',),
+            help='Define a map step')
+
+        self.add_passthrough_option(
+            '-C', dest='steps', action='callback', type='str',
+            callback=register_substep, callback_args=('combiner',),
+            help='Define a combine step')
+
+        self.add_passthrough_option(
+            '-R', dest='steps', action='callback', type='str',
+            callback=register_substep, callback_args=('reducer',),
+            help='Define a reduce step')
 
     def steps(self):
         steps = []
         for step in self.options.steps:
             step_kwargs = {}
-            if 'm' in step:
-                step_kwargs['mapper_cmd'] = bash_wrap(step['m'])
-            if 'c' in step:
-                step_kwargs['combiner_cmd'] = bash_wrap(step['c'])
-            if 'r' in step:
-                step_kwargs['reducer_cmd'] = bash_wrap(step['r'])
+            if 'mapper' in step:
+                step_kwargs['mapper_cmd'] = bash_wrap(step['mapper'])
+            if 'combiner' in step:
+                step_kwargs['combiner_cmd'] = bash_wrap(step['combiner'])
+            if 'reducer' in step:
+                step_kwargs['reducer_cmd'] = bash_wrap(step['reducer'])
             steps.append(self.mr(**step_kwargs))
         return steps
 

@@ -59,9 +59,6 @@ def _chain_procs(procs_args, **kwargs):
     The return value is a list of Popen objects created, in the same order as
     *procs_args*.
 
-    If an item in *procs_args* is a string instead of a list,, it is run with
-    shell=True.
-
     In most ways, this function makes several processes that act as one in
     terms of input and output.
     """
@@ -81,7 +78,7 @@ def _chain_procs(procs_args, **kwargs):
         if i < len(procs_args) - 1:
             proc_kwargs['stdout'] = PIPE
 
-        proc = Popen(args, shell=(isinstance(args, basestring)), **proc_kwargs)
+        proc = Popen(args, **proc_kwargs)
         last_stdout = proc.stdout
         procs.append(proc)
 

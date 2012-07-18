@@ -2819,10 +2819,10 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
                 m_jobs,
                 m_job_flows):
             self.assertFalse(m_job_flows.called)
+            self.assertFalse(m_jobs.called)
             self.assertTrue(m_local_scratch.called)
             self.assertTrue(m_remote_scratch.called)
             self.assertTrue(m_logs.called)
-            self.assertTrue(m_jobs.called)
 
     def test_cleanup_job(self):
         with self._test_mode('JOB') as (
@@ -2835,7 +2835,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             self.assertFalse(m_remote_scratch.called)
             self.assertFalse(m_logs.called)
             self.assertFalse(m_job_flows.called)
-            self.assertTrue(m_jobs.called)
+            self.assertFalse(m_jobs.called)  # Only will trigger on failure
 
     def test_cleanup_none(self):
         with self._test_mode('NONE') as (

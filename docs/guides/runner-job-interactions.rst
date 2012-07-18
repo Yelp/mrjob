@@ -202,4 +202,7 @@ the second step::
 ::
 
     > <interpreter> my_script.lang --mapper --step-num=0 input.txt -
-    [script iterates over stdin and input.txt, writing output rows to stdout]
+    [script iterates over stdin and input.txt]
+    key_1	value_1
+    key_2	value_2
+    ...

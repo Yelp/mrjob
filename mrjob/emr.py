@@ -84,6 +84,7 @@ from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_LOG_ROOT
+from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import hash_object
@@ -1363,7 +1364,7 @@ class EMRJobRunner(MRJobRunner):
 
         # we can go ahead and wrap the reducer now. nothing depends on it.
         if bash_wrap_reducer:
-            reducer = "bash -c '%s'" % reducer
+            reducer = bash_wrap(reducer)
 
         streaming_step_kwargs = {
             'name': '%s: Step %d of %d' % (
@@ -1392,10 +1393,10 @@ class EMRJobRunner(MRJobRunner):
             bash_wrap_combiner = False
 
         if bash_wrap_mapper:
-            mapper = "bash -c '%s'" % mapper
+            mapper = bash_wrap(mapper)
 
         if bash_wrap_combiner:
-            combiner = "bash -c '%s'" % combiner
+            combiner = bash_wrap(combiner)
 
         streaming_step_kwargs['mapper'] = mapper
 

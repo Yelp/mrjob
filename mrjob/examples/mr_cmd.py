@@ -26,10 +26,10 @@ from mrjob.job import MRJob
 from mrjob.util import bash_wrap
 
 
-class CmdJob(MRJob):
+class MRGrepJob(MRJob):
 
     def configure_options(self):
-        super(CmdJob, self).configure_options()
+        super(MRGrepJob, self).configure_options()
 
         def register_substep(option, opt, value, parser, mrc):
             def last_step_has(*args):
@@ -77,4 +77,4 @@ class CmdJob(MRJob):
 
 
 if __name__ == '__main__':
-    CmdJob().run()
+    MRGrepJob().run()

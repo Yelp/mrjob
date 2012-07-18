@@ -15,8 +15,8 @@
 from mrjob.job import MRJob
 from mrjob.util import cmd_line
 
-class CmdJob(MRJob):
 
+class CmdJob(MRJob):
 
     def configure_options(self):
         super(CmdJob, self).configure_options()

@@ -2981,7 +2981,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
 
     def test_no_waiting_for_job_pool_fail(self):
         self.add_job_flow(['j-fail-lock'], self.jobs)
-        runner = EMRJobRunner(conf_path=None)
+        runner = EMRJobRunner(conf_path=False)
         runner._opts['pool_wait_minutes'] = 0
         result = runner.find_job_flow()
         self.assertEqual(result, None)
@@ -2989,14 +2989,14 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
 
     def test_no_waiting_for_job_pool_success(self):
         self.add_job_flow(['j-fail-lock'], self.jobs)
-        runner = EMRJobRunner(conf_path=None)
+        runner = EMRJobRunner(conf_path=False)
         runner._opts['pool_wait_minutes'] = 0
         result = runner.find_job_flow()
         self.assertEqual(result, None)
 
     def test_acquire_lock_on_first_attempt(self):
         self.add_job_flow(['j-successful-lock'], self.jobs)
-        runner = EMRJobRunner(conf_path=None)
+        runner = EMRJobRunner(conf_path=False)
         runner._opts['pool_wait_minutes'] = 1
         result = runner.find_job_flow()
         self.assertEqual(result.jobflowid, 'j-successful-lock')
@@ -3005,7 +3005,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
     def test_sleep_then_acquire_lock(self):
         self.add_job_flow(['j-fail-lock'], self.jobs)
         self.add_job_flow(['j-successful-lock'], self.future_jobs)
-        runner = EMRJobRunner(conf_path=None)
+        runner = EMRJobRunner(conf_path=False)
         runner._opts['pool_wait_minutes'] = 1
         result = runner.find_job_flow()
         self.assertEqual(result.jobflowid, 'j-successful-lock')
@@ -3014,7 +3014,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
     def test_timeout_waiting_for_job_flow(self):
         self.add_job_flow(['j-fail-lock'], self.jobs)
         self.add_job_flow(['j-epic-fail-lock'], self.future_jobs)
-        runner = EMRJobRunner(conf_path=None)
+        runner = EMRJobRunner(conf_path=False)
         runner._opts['pool_wait_minutes'] = 1
         result = runner.find_job_flow()
         self.assertEqual(result, None)

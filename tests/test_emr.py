@@ -2816,7 +2816,7 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
                 'type': 'streaming',
                 'mapper': {
                     'type': 'script',
-                }
+                },
             },
             mapper="python my_job.py --step-num=0 --mapper",
             reducer=None,
@@ -2828,8 +2828,26 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
                 'type': 'streaming',
                 'reducer': {
                     'type': 'script',
-                }
+                },
             },
             mapper="cat",
             reducer="python my_job.py --step-num=0 --reducer",
+        )
+
+    def test_combiner_018(self):
+        self.runner._inferred_hadoop_version = '0.18'
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'command',
+                    'command': 'cat',
+                },
+                'combiner': {
+                    'type': 'script',
+                },
+            },
+            mapper=("bash -c 'cat | sort | python my_job.py --step-num=0"
+                    " --combiner'"),
+            reducer=None,
         )

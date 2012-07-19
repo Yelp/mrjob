@@ -914,7 +914,7 @@ class StepsTestCase(unittest.TestCase):
 
         def steps(self):
             return [
-                self.mr(mapper_init=self._yield_none, mapper_filter='cat',
+                self.mr(mapper_init=self._yield_none, mapper_pre_filter='cat',
                         reducer_cmd='wc -l'),
                 self.jar(name='oh my jar', jar='s3://bookat/binks_jar.jar')]
 
@@ -935,7 +935,7 @@ class StepsTestCase(unittest.TestCase):
             j.steps()[0],
             MRJobStep(
                 mapper_init=j._yield_none,
-                mapper_filter='cat',
+                mapper_pre_filter='cat',
                 reducer_cmd='wc -l'))
         self.assertEqual(
             j.steps()[1], JarStep('oh my jar', 's3://bookat/binks_jar.jar'))

@@ -525,60 +525,9 @@ class LocalMRJobRunner(MRJobRunner):
 
     def _filter_if_any(self, substep_dict):
         if substep_dict['type'] == 'script':
-            if 'filter' in substep_dict:
-                return shlex.split(substep_dict['filter'])
+            if 'pre_filter' in substep_dict:
+                return shlex.split(substep_dict['pre_filter'])
         return None
-
-    def _mapper_arg_chain(self, step_dict, step_num, input_file):
-        # sometimes the mapper isn't actually there, so if it isn't, use cat
-        if 'mapper' not in step_dict:
-            new_step_dict = {
-                'mapper': {
-                    'type': 'command',
-                    'command': 'cat',
-                }
-            }
-            new_step_dict.update(step_dict)
-            step_dict = new_step_dict
-
-        procs_args = []
-
-        filter_args = self._filter_if_any(step_dict['mapper'])
-        if filter_args:
-            procs_args.append(['cat', input_file])
-            procs_args.append(filter_args)
-            # _substep_args may return more than one process
-            procs_args.extend(
-                self._substep_args(step_dict, step_num, 'mapper'))
-        else:
-            # _substep_args may return more than one process
-            procs_args.extend(
-                self._substep_args(step_dict, step_num, 'mapper', input_file))
-
-        if 'combiner' in step_dict:
-            procs_args.append(['sort'])
-            # _substep_args may return more than one process
-            procs_args.extend(self._substep_args(
-                step_dict, step_num, 'combiner'))
-
-        return procs_args
-
-    def _reducer_arg_chain(self, step_dict, step_num, input_file):
-        procs_args = []
-
-        filter_args = self._filter_if_any(step_dict['reducer'])
-        if filter_args:
-            procs_args.append(['cat', input_file])
-            procs_args.append(filter_args)
-            # _substep_args may return more than one process
-            procs_args.extend(
-                self._substep_args(step_dict, step_num, 'reducer'))
-        else:
-            # _substep_args may return more than one process
-            procs_args.extend(
-                self._substep_args(step_dict, step_num, 'reducer', input_file))
-
-        return procs_args
 
     def _substep_args(self, step_dict, step_num, mrc, input_path=None):
         if step_dict['type'] != 'streaming':
@@ -597,6 +546,61 @@ class LocalMRJobRunner(MRJobRunner):
                 return [args]
             else:
                 return [args + [input_path]]
+
+    def _substep_arg_chain(self, mrc, step_dict, step_num, input_file):
+        procs_args = []
+
+        filter_args = self._filter_if_any(step_dict[mrc])
+        if filter_args:
+            procs_args.append(['cat', input_file])
+            procs_args.append(filter_args)
+            # _substep_args may return more than one process
+            procs_args.extend(
+                self._substep_args(step_dict, step_num, mrc))
+        else:
+            # _substep_args may return more than one process
+            procs_args.extend(
+                self._substep_args(step_dict, step_num, mrc, input_file))
+        return procs_args
+
+    def _mapper_arg_chain(self, step_dict, step_num, input_file):
+        # sometimes the mapper isn't actually there, so if it isn't, use cat
+        if 'mapper' not in step_dict:
+            new_step_dict = {
+                'mapper': {
+                    'type': 'command',
+                    'command': 'cat',
+                }
+            }
+            new_step_dict.update(step_dict)
+            step_dict = new_step_dict
+
+        procs_args = self._substep_arg_chain(
+            'mapper', step_dict, step_num, input_file)
+
+        if 'combiner' in step_dict:
+            procs_args.append(['sort'])
+            # _substep_args may return more than one process
+            procs_args.extend(self._combiner_arg_chain(step_dict, step_num))
+
+        return procs_args
+
+    def _combiner_arg_chain(self, step_dict, step_num):
+        # simpler than mapper or reducer arg logic because it never takes an
+        # input file, always reads from stdin
+        procs_args = []
+
+        filter_args = self._filter_if_any(step_dict['combiner'])
+        if filter_args:
+            procs_args.append(filter_args)
+        # _substep_args may return more than one process
+        procs_args.extend(
+            self._substep_args(step_dict, step_num, 'combiner'))
+        return procs_args
+
+    def _reducer_arg_chain(self, step_dict, step_num, input_file):
+        return self._substep_arg_chain(
+            'reducer', step_dict, step_num, input_file)
 
     def _subprocess_env(self, step_type, step_num, task_num, input_file=None,
                         input_start=None, input_length=None):

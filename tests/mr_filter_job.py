@@ -13,14 +13,17 @@ class FilterJob(MRJob):
     def configure_options(self):
         super(FilterJob, self).configure_options()
         self.add_passthrough_option('--mapper-filter', default=None)
+        self.add_passthrough_option('--combiner-filter', default=None)
         self.add_passthrough_option('--reducer-filter', default=None)
 
     def steps(self):
         kwargs = {}
         if self.options.mapper_filter:
-            kwargs['mapper_filter'] = self.options.mapper_filter
+            kwargs['mapper_pre_filter'] = self.options.mapper_filter
+        if self.options.combiner_filter:
+            kwargs['combiner_pre_filter'] = self.options.combiner_filter
         if self.options.reducer_filter:
-            kwargs['reducer_filter'] = self.options.reducer_filter
+            kwargs['reducer_pre_filter'] = self.options.reducer_filter
         return [self.mr(**kwargs)]
 
 

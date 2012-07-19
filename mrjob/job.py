@@ -179,14 +179,14 @@ class MRJob(MRJobLauncher):
         """
         raise NotImplementedError
 
-    def mapper_filter(self):
+    def mapper_pre_filter(self):
         """Re-define this to specify a shell command to filter the mapper's
         input before it gets to your job's mapper in a one-step job. For
         important specifics, see :ref:`cmd-filters`.
 
         Basic example::
 
-            def mapper_filter(self):
+            def mapper_pre_filter(self):
                 return 'grep "ponies"'
         """
         raise NotImplementedError
@@ -229,14 +229,14 @@ class MRJob(MRJobLauncher):
         """
         raise NotImplementedError
 
-    def reducer_filter(self):
+    def reducer_pre_filter(self):
         """Re-define this to specify a shell command to filter the reducer's
         input before it gets to your job's reducer in a one-step job. For
         important specifics, see :ref:`cmd-filters`.
 
         Basic example::
 
-            def mapper_filter(self):
+            def reducer_pre_filter(self):
                 return 'grep "ponies"'
         """
         raise NotImplementedError
@@ -276,6 +276,18 @@ class MRJob(MRJobLauncher):
 
             def combiner_cmd(self):
                 return 'cat'
+        """
+        raise NotImplementedError
+
+    def combiner_pre_filter(self):
+        """Re-define this to specify a shell command to filter the combiner's
+        input before it gets to your job's combiner in a one-step job. For
+        important specifics, see :ref:`cmd-filters`.
+
+        Basic example::
+
+            def combiner_pre_filter(self):
+                return 'grep "ponies"'
         """
         raise NotImplementedError
 

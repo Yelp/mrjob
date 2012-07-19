@@ -1328,8 +1328,8 @@ class EMRJobRunner(MRJobRunner):
 
             # filter input and pipe for great speed, if user asks
             # but we have to wrap the command in bash
-            if 'filter' in step[mrc]:
-                return '%s | %s' % (step[mrc]['filter'], cmd), True
+            if 'pre_filter' in step[mrc]:
+                return '%s | %s' % (step[mrc]['pre_filter'], cmd), True
             else:
                 return cmd, False
         else:

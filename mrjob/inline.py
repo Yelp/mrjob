@@ -118,7 +118,7 @@ class InlineMRJobRunner(MRJobRunner):
                     raise Exception(
                         "InlineMRJobRunner cannot run %s steps." %
                         substep['type'])
-                if 'filter' in substep:
+                if 'pre_filter' in substep:
                     raise Exception(
                         "InlineMRJobRunner cannot run filters.")
 

@@ -774,7 +774,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
 class FilterTestCase(SandboxedTestCase):
 
-    def test_mapper_filter(self):
+    def test_mapper_pre_filter(self):
         data = 'x\ny\nz\n'
         job = FilterJob(['--mapper-filter', 'cat -e', '--runner=local'])
         job.sandbox(stdin=StringIO(data))
@@ -785,7 +785,7 @@ class FilterTestCase(SandboxedTestCase):
                     'type': 'streaming',
                     'mapper': {
                         'type': 'script',
-                        'filter': 'cat -e'}}])
+                        'pre_filter': 'cat -e'}}])
 
             r.run()
 
@@ -793,7 +793,30 @@ class FilterTestCase(SandboxedTestCase):
                 ''.join(r.stream_output()),
                 'x$\ny$\nz$\n')
 
-    def test_reducer_filter(self):
+    def test_combiner_pre_filter(self):
+        data = 'x\ny\nz\n'
+        job = FilterJob(['--combiner-filter', 'cat -e', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    },
+                    'combiner': {
+                        'type': 'script',
+                        'pre_filter': 'cat -e',
+                    }}])
+
+            r.run()
+
+            self.assertEqual(
+                ''.join(r.stream_output()),
+                'x$\ny$\nz$\n')
+
+    def test_reducer_pre_filter(self):
         data = 'x\ny\nz\n'
         job = FilterJob(['--reducer-filter', 'cat -e', '--runner=local'])
         job.sandbox(stdin=StringIO(data))
@@ -807,7 +830,7 @@ class FilterTestCase(SandboxedTestCase):
                     },
                     'reducer': {
                         'type': 'script',
-                        'filter': 'cat -e'}}])
+                        'pre_filter': 'cat -e'}}])
 
             r.run()
 

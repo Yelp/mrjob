@@ -119,17 +119,16 @@ class MRJobStepInitTestCase(TestCase):
     def test_explicit_reducer_cmd(self):
         self._test_explicit(reducer_cmd='cat', r=True)
 
-    # filter
+    # pre-filter
 
-    def test_explicit_mapper_filter(self):
-        self._test_explicit(mapper_filter='cat', m=True)
+    def test_explicit_mapper_pre_filter(self):
+        self._test_explicit(mapper_pre_filter='cat', m=True)
 
-    def test_explicit_combiner_filter(self):
-        # combiners aren't currently allowed to have filters
-        self.assertRaises(TypeError, MRJobStep, combiner_filter='cat')
+    def test_explicit_combiner_pre_filter(self):
+        self._test_explicit(combiner_pre_filter='cat', c=True)
 
-    def test_explicit_reducer_filter(self):
-        self._test_explicit(reducer_filter='cat', r=True)
+    def test_explicit_reducer_pre_filter(self):
+        self._test_explicit(reducer_pre_filter='cat', r=True)
 
     ### Conflicts ###
 
@@ -207,27 +206,29 @@ class MRJobStepDescriptionTestCase(TestCase):
                 },
             })
 
-    def test_render_mapper_filter(self):
+    def test_render_mapper_pre_filter(self):
         self.assertEqual(
             MRJobStep(
-                mapper=identity_mapper, mapper_filter='cat').description(0),
+                mapper=identity_mapper,
+                mapper_pre_filter='cat').description(0),
             {
                 'type': 'streaming',
                 'mapper': {
                     'type': 'script',
-                    'filter': 'cat',
+                    'pre_filter': 'cat',
             },
         })
 
-    def test_render_reducer_filter(self):
+    def test_render_reducer_pre_filter(self):
         self.assertEqual(
             MRJobStep(
-                reducer=identity_reducer, reducer_filter='cat').description(1),
+                reducer=identity_reducer,
+                reducer_pre_filter='cat').description(1),
             {
                 'type': 'streaming',
                 'reducer': {
                     'type': 'script',
-                    'filter': 'cat',
+                    'pre_filter': 'cat',
                 },
             })
 

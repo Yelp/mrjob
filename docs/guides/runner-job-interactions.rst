@@ -94,16 +94,16 @@ The runners would then invoke Hadoop Streaming with::
 
     -mapper 'mapper_job.py --mapper --step-num=0'
 
-Script steps may have **filters**, which are just UNIX commands that sit in
+Script steps may have **pre-filters**, which are just UNIX commands that sit in
 front of the script when running the step, used to efficiently filter output
 with ``grep`` or otherwise filter and transform data. Filters are specified
-using a ``filter`` key in the substep dictionary::
+using a ``pre_filter`` key in the substep dictionary::
 
     {
         'type': 'streaming',
         'mapper': {
             'type': 'script',
-            'filter': 'grep "specific data"'
+            'pre_filter': 'grep "specific data"'
         }
     }
 
@@ -113,14 +113,14 @@ using a ``filter`` key in the substep dictionary::
 
         def steps(self):
             return [self.mr(mapper=self.my_mapper,
-                            mapper_filter='grep "specific data"')]
+                            mapper_pre_filter='grep "specific data"')]
 
 Hadoop Streaming arguments::
 
 -mapper 'bash -c '\''grep "specific data" | mapper_job.py --mapper --step-num=0'\'''
 
 mrjob does not try to intelligently handle quotes in the contents of filters,
-so avoid using single quotes. It also does not support filters on combiners.
+so avoid using single quotes.
 
 Hadoop Streaming requires that all steps have a mapper, so if the job doesn't
 specify a mapper, mrjob will use ``cat``.

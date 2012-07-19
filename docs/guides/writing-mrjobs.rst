@@ -417,8 +417,8 @@ Filtering task input with shell commands
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 If your job is being run on a UNIX system (including EMR), you can specify a
-command to filter a task's input before it reaches your mapper or reducer using
-the ``mapper_filter`` and ``reducer_filter`` arguments to
+command to filter a task's input before it reaches your task using
+the ``mapper_pre_filter`` and ``reducer_pre_filter`` arguments to
 :py:meth:`~mrjob.job.MRJob.mr()` or methods on :py:class:`~mrjob.job.MRJob`.
 Doing so will cause mrjob to pipe input through that comand before it reaches
 your mapper.
@@ -428,7 +428,7 @@ You may not use pipes or other shell syntax in a filter.
 For example, to filter input with :command:`grep` before your first mapper::
 
     def steps(self):
-        return [self.mr(mapper_filter='grep "some_string"', ...), ...]
+        return [self.mr(mapper_pre_filter='grep "some_string"', ...), ...]
 
 When you use the ``local`` runner, mrjob will invoke :command:`grep` for each
 map task and send its output to the task. When you use the ``hadoop`` or
@@ -437,14 +437,12 @@ map task and send its output to the task. When you use the ``hadoop`` or
 either avoid single quotes or escape them like this::
 
     def steps(self):
-        return [self.mr(mapper_filter=r"grep '\''some_string'\''", ...), ...]
+        return [self.mr(mapper_pre_filter=r"grep '\''some_string'\''", ...), ...]
 
 Note the use of a raw string ``r""`` to avoid needing to escape the
 backslashes.
 
-The reducer filter is called the same way. mrjob does not currently support
-filters on combiners.
-
+The combiner and reducer filters are called the same way.
 
 **The** ``inline`` **runner does not support filters.**
 

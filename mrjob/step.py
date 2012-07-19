@@ -20,11 +20,11 @@ STEP_TYPES = ('streaming', 'jar')
 
 # Function names mapping to mapper, reducer, and combiner operations
 _MAPPER_FUNCS = ('mapper', 'mapper_init', 'mapper_final', 'mapper_cmd',
-                 'mapper_filter')
+                 'mapper_pre_filter')
 _COMBINER_FUNCS = ('combiner', 'combiner_init', 'combiner_final',
-                   'combiner_cmd')
+                   'combiner_cmd', 'combiner_pre_filter')
 _REDUCER_FUNCS = ('reducer', 'reducer_init', 'reducer_final', 'reducer_cmd',
-                  'reducer_filter')
+                  'reducer_pre_filter')
 
 # All allowable step keyword arguments, also happens to be all function names
 # for jobs whose step objects are created automatically
@@ -104,37 +104,36 @@ class MRJobStep(object):
         if key == 'mapper' and self._steps['mapper'] is None:
             return _IDENTITY_MAPPER
         # identity reducer should only show up if you specified 'reducer_init',
-        # 'reducer_final', or 'reducer_filter', but not 'reducer' itself
+        # 'reducer_final', or 'reducer_pre_filter', but not 'reducer' itself
         if (key == 'reducer' and self._steps['reducer'] is None and
             self.has_explicit_reducer):
             return _IDENTITY_REDUCER
         return self._steps[key]
 
-    def _render_substep(self, cmd_key, filter_key=None):
+    def _render_substep(self, cmd_key, pre_filter_key=None):
         if self._steps[cmd_key]:
             cmd = self._steps[cmd_key]
             if not isinstance(cmd, basestring):
                 cmd = cmd_line(cmd)
-            if (filter_key and self._steps[filter_key]):
+            if (pre_filter_key and self._steps[pre_filter_key]):
                 raise ValueError('Cannot specify both %s and %s' % (
-                    cmd_key, filter_key))
+                    cmd_key, pre_filter_key))
             return {'type': 'command', 'command': cmd}
         else:
             substep = {'type': 'script'}
-            if (filter_key and
-                self._steps[filter_key]):
-                substep['filter'] = self._steps[filter_key]
+            if (pre_filter_key and
+                self._steps[pre_filter_key]):
+                substep['pre_filter'] = self._steps[pre_filter_key]
             return substep
 
     def render_mapper(self):
-        return self._render_substep('mapper_cmd', 'mapper_filter')
+        return self._render_substep('mapper_cmd', 'mapper_pre_filter')
 
     def render_combiner(self):
-        # combiners can't have filters
-        return self._render_substep('combiner_cmd')
+        return self._render_substep('combiner_cmd', 'combiner_pre_filter')
 
     def render_reducer(self):
-        return self._render_substep('reducer_cmd', 'reducer_filter')
+        return self._render_substep('reducer_cmd', 'reducer_pre_filter')
 
     def description(self, step_num):
         substep_descs = {'type': 'streaming'}

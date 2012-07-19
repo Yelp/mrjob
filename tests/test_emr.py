@@ -54,6 +54,7 @@ from mrjob.pool import pool_hash_and_name
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSHException
+from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
@@ -2834,6 +2835,31 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
             reducer="python my_job.py --step-num=0 --reducer",
         )
 
+    def test_pre_filters(self):
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'pre_filter': 'grep anything',
+                },
+                'combiner': {
+                    'type': 'script',
+                    'pre_filter': 'grep nothing',
+                },
+                'reducer': {
+                    'type': 'script',
+                    'pre_filter': 'grep something',
+                },
+            },
+            mapper=("bash -c 'grep anything | python my_job.py --step-num=0"
+                    " --mapper'"),
+            combiner=("bash -c 'grep nothing | python my_job.py --step-num=0"
+                    " --combiner'"),
+            reducer=("bash -c 'grep something | python my_job.py --step-num=0"
+                    " --reducer'"),
+        )
+
     def test_combiner_018(self):
         self.runner._inferred_hadoop_version = '0.18'
         self._assert_streaming_step(
@@ -2850,4 +2876,44 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
             mapper=("bash -c 'cat | sort | python my_job.py --step-num=0"
                     " --combiner'"),
             reducer=None,
+        )
+
+    def test_pre_filters_018(self):
+        self.runner._inferred_hadoop_version = '0.18'
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'pre_filter': 'grep anything',
+                },
+                'combiner': {
+                    'type': 'script',
+                    'pre_filter': 'grep nothing',
+                },
+                'reducer': {
+                    'type': 'script',
+                    'pre_filter': 'grep something',
+                },
+            },
+            mapper=("bash -c 'grep anything | python my_job.py --step-num=0"
+                    " --mapper | sort | grep nothing | python my_job.py"
+                    " --step-num=0 --combiner'"),
+            reducer=("bash -c 'grep something | python my_job.py --step-num=0"
+                    " --reducer'"),
+        )
+
+    def test_pre_filter_escaping(self):
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'pre_filter': bash_wrap("grep 'anything'"),
+                },
+            },
+            mapper=(
+                "bash -c 'bash -c '\\''grep"
+                " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' |"
+                " python my_job.py --step-num=0 --mapper'"),
         )

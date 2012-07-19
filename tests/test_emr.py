@@ -2904,6 +2904,7 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
         )
 
     def test_pre_filter_escaping(self):
+        # ESCAPE ALL THE THINGS!!!
         self._assert_streaming_step(
             {
                 'type': 'streaming',

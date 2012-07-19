@@ -16,10 +16,10 @@ from mrjob.job import MRJob
 from mrjob.util import cmd_line
 
 
-class CmdJob(MRJob):
+class MRGrepJob(MRJob):
 
     def configure_options(self):
-        super(CmdJob, self).configure_options()
+        super(MRGrepJob, self).configure_options()
 
         self.add_passthrough_option(
             '-e', '--expression', type='str', default=None,
@@ -32,5 +32,5 @@ class CmdJob(MRJob):
 
 
 if __name__ == '__main__':
-    CmdJob().run()
+    MRGrepJob().run()
 

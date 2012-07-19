@@ -26,7 +26,7 @@ from mrjob.job import MRJob
 from mrjob.util import bash_wrap
 
 
-class MRGrepJob(MRJob):
+class MRCmdJob(MRJob):
 
     def configure_options(self):
         super(MRGrepJob, self).configure_options()

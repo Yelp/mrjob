@@ -37,7 +37,6 @@ try:
     StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     from StringIO import StringIO
-
 from mrjob import compat
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -61,15 +60,16 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 #: cleanup options:
 #:
-#: * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job if
-#:   running on EMR and job flow is not to be terminated
+#: * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job flow
+#:   running on EMR if the job hasn't finished.
 #: * ``'LOCAL_SCRATCH'``: delete local scratch only
 #: * ``'LOGS'``: delete logs only
 #: * ``'NONE'``: delete nothing
 #: * ``'REMOTE_SCRATCH'``: delete remote scratch only
 #: * ``'SCRATCH'``: delete local and remote scratch, but not logs
-#: * ``'JOB'``: stop job if running on EMR and job flow is not to be terminated
-#: * ``'JOB_FLOW'``: terminate the job flow on EMR
+#: * ``'JOB'``: stop job if running on EMR if it isn't done running
+#:    and job flow is not to be terminated.
+#: * ``'JOB_FLOW'``: terminate the job flow if the job is not done.
 #: * ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL``. Not supported for
 #:   ``cleanup_on_failure``.
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',

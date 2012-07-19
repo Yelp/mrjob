@@ -54,6 +54,7 @@ from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.local import LocalFilesystem
 from mrjob.step import STEP_TYPES
+from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
 from mrjob.util import tar_and_gzip
@@ -826,6 +827,69 @@ class MRJobRunner(object):
                 args)
         else:
             return args
+
+    def _substep_cmd_line(self, step, step_num, mrc):
+        if step[mrc]['type'] == 'command':
+            # never wrap custom hadoop streaming commands in bash
+            return step[mrc]['command'], False
+
+        elif step[mrc]['type'] == 'script':
+            cmd = cmd_line(self._script_args_for_step(step_num, mrc))
+
+            # filter input and pipe for great speed, if user asks
+            # but we have to wrap the command in bash
+            if 'pre_filter' in step[mrc]:
+                return '%s | %s' % (step[mrc]['pre_filter'], cmd), True
+            else:
+                return cmd, False
+        else:
+            raise ValueError("Invalid %s step %d: %r" % (
+                mrc, step_num, step[mrc]))
+
+    def _render_substep(self, step, step_num, mrc):
+        if mrc in step:
+            return self._substep_cmd_line(
+                step, step_num, mrc)
+        else:
+            if mrc == 'mapper':
+                return 'cat', False
+            else:
+                return None, False
+
+    def _hadoop_streaming_commands(self, step, step_num):
+        version = self.get_hadoop_version()
+
+        # Hadoop streaming stuff
+        mapper, bash_wrap_mapper = self._render_substep(
+            step, step_num, 'mapper')
+
+        combiner, bash_wrap_combiner = self._render_substep(
+            step, step_num, 'combiner')
+
+        reducer, bash_wrap_reducer = self._render_substep(
+            step, step_num, 'reducer')
+
+        if (combiner is not None and
+            not compat.supports_combiners_in_hadoop_streaming(version)):
+
+            # krazy hack to support combiners on hadoop <0.20
+            bash_wrap_mapper = True
+            mapper = "%s | sort | %s" % (mapper, combiner)
+
+            # take the combiner away, hadoop will just be confused
+            combiner = None
+            bash_wrap_combiner = False
+
+        if bash_wrap_mapper:
+            mapper = bash_wrap(mapper)
+
+        if bash_wrap_combiner:
+            combiner = bash_wrap(combiner)
+
+        if bash_wrap_reducer:
+            reducer = bash_wrap(reducer)
+
+        return mapper, reducer, combiner
 
     def _mr_job_extra_args(self, local=False):
         """Return arguments to add to every invocation of MRJob.

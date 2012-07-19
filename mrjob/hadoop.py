@@ -357,23 +357,8 @@ class HadoopJobRunner(MRJobRunner):
                 # set up uploading from HDFS to the working dir
                 streaming_args.extend(self._upload_args())
 
-            # set up mapper and reducer
-            if 'M' not in step:
-                mapper = 'cat'
-            else:
-                mapper = cmd_line(self._mapper_args(step_num))
-
-            if 'C' in step:
-                combiner_cmd = cmd_line(self._combiner_args(step_num))
-                version = self.get_hadoop_version()
-                if compat.supports_combiners_in_hadoop_streaming(version):
-                    combiner = combiner_cmd
-                else:
-                    mapper = ("bash -c '%s | sort | %s'" %
-                              (mapper, combiner_cmd))
-                    combiner = None
-            else:
-                combiner = None
+            mapper, combiner, reducer = (
+                self._hadoop_streaming_commands(step, step_num))
 
             streaming_args.append('-mapper')
             streaming_args.append(mapper)
@@ -384,7 +369,7 @@ class HadoopJobRunner(MRJobRunner):
 
             if 'R' in step:
                 streaming_args.append('-reducer')
-                streaming_args.append(cmd_line(self._reducer_args(step_num)))
+                streaming_args.append(reducer)
             else:
                 streaming_args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
 
@@ -462,33 +447,6 @@ class HadoopJobRunner(MRJobRunner):
         else:
             return posixpath.join(
                 self._hdfs_tmp_dir, 'step-output', str(step_num + 1))
-
-    def _script_args(self):
-        """How to invoke the script inside Hadoop"""
-        assert self._script  # shouldn't be able to run if no script
-
-        args = self._opts['python_bin'] + [self._script['name']]
-        if self._wrapper_script:
-            args = (self._opts['python_bin'] +
-                    [self._wrapper_script['name']]
-                    + args)
-
-        return args
-
-    def _mapper_args(self, step_num):
-        return (self._script_args() +
-                ['--step-num=%d' % step_num, '--mapper'] +
-                self._mr_job_extra_args())
-
-    def _combiner_args(self, step_num):
-        return (self._script_args() +
-                ['--step-num=%d' % step_num, '--combiner'] +
-                self._mr_job_extra_args())
-
-    def _reducer_args(self, step_num):
-        return (self._script_args() +
-                ['--step-num=%d' % step_num, '--reducer'] +
-                self._mr_job_extra_args())
 
     def _upload_args(self):
         """Args to upload files from HDFS to the hadoop nodes."""

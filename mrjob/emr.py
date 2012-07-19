@@ -84,7 +84,6 @@ from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_LOG_ROOT
-from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import hash_object
@@ -1318,54 +1317,7 @@ class EMRJobRunner(MRJobRunner):
         else:
             return 'TERMINATE_JOB_FLOW'
 
-    def _substep_cmd_line(self, step, step_num, mrc):
-        if step[mrc]['type'] == 'command':
-            # never wrap custom hadoop streaming commands in bash
-            return step[mrc]['command'], False
-
-        elif step[mrc]['type'] == 'script':
-            cmd = cmd_line(self._script_args_for_step(step_num, mrc))
-
-            # filter input and pipe for great speed, if user asks
-            # but we have to wrap the command in bash
-            if 'pre_filter' in step[mrc]:
-                return '%s | %s' % (step[mrc]['pre_filter'], cmd), True
-            else:
-                return cmd, False
-        else:
-            raise ValueError("Invalid %s step %d: %r" % (
-                mrc, step_num, step[mrc]))
-
-    def _render_substep(self, step, step_num, mrc):
-        if mrc in step:
-            return self._substep_cmd_line(
-                step, step_num, mrc)
-        else:
-            if mrc == 'mapper':
-                return 'cat', False
-            else:
-                return None, False
-
-
     def _build_streaming_step(self, step, step_num, num_steps):
-        # EMR-specific stuff
-
-        version = self.get_hadoop_version()
-
-        # Hadoop streaming stuff
-        mapper, bash_wrap_mapper = self._render_substep(
-            step, step_num, 'mapper')
-
-        combiner, bash_wrap_combiner = self._render_substep(
-            step, step_num, 'combiner')
-
-        reducer, bash_wrap_reducer = self._render_substep(
-            step, step_num, 'reducer')
-
-        # we can go ahead and wrap the reducer now. nothing depends on it.
-        if bash_wrap_reducer:
-            reducer = bash_wrap(reducer)
-
         streaming_step_kwargs = {
             'name': '%s: Step %d of %d' % (
                 self._job_name, step_num + 1, num_steps),
@@ -1373,7 +1325,6 @@ class EMRJobRunner(MRJobRunner):
             'output': self._s3_step_output_uri(step_num),
             'jar': self._get_jar(),
             'action_on_failure': self._action_on_failure,
-            'reducer': reducer,
         }
 
         streaming_step_kwargs.update(self._cache_kwargs())
@@ -1381,27 +1332,15 @@ class EMRJobRunner(MRJobRunner):
         streaming_step_kwargs['step_args'].extend(
             self._hadoop_conf_args(step_num, num_steps))
 
-        if (combiner is not None and
-            not compat.supports_combiners_in_hadoop_streaming(version)):
-
-            # krazy hack to support combiners on hadoop <0.20
-            bash_wrap_mapper = True
-            mapper = "%s | sort | %s" % (mapper, combiner)
-
-            # take the combiner away, hadoop will just be confused
-            combiner = None
-            bash_wrap_combiner = False
-
-        if bash_wrap_mapper:
-            mapper = bash_wrap(mapper)
-
-        if bash_wrap_combiner:
-            combiner = bash_wrap(combiner)
+        mapper, reducer, combiner = (
+            self._hadoop_streaming_commands(step, step_num))
 
         streaming_step_kwargs['mapper'] = mapper
 
         if combiner:
             streaming_step_kwargs['combiner'] = combiner
+
+        streaming_step_kwargs['reducer'] = reducer
 
         return boto.emr.StreamingStep(**streaming_step_kwargs)
 

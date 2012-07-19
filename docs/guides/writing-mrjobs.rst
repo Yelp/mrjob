@@ -430,11 +430,10 @@ For example, to filter input with :command:`grep` before your first mapper::
     def steps(self):
         return [self.mr(mapper_pre_filter='grep "some_string"', ...), ...]
 
-When you use the ``local`` runner, mrjob will invoke :command:`grep` for each
-map task and send its output to the task. When you use the ``hadoop`` or
-``emr`` runners, mrjob will wrap the call to your mapper with ``bash -c
-'<filter> | python my_job.py --mapper --step-num=<step num>'``, so you should
-either avoid single quotes or escape them like this::
+The command you specify will not be run in a shell, so by default you can't use
+things like pipe syntax. If you want to use shell features, you can use
+:py:func:`~mrjob.util.bash_wrap()` to wrap your command in a call to the
+``bash`` shell, automatically escaping quotes.
 
     def steps(self):
         return [self.mr(mapper_pre_filter=r"grep '\''some_string'\''", ...), ...]
@@ -455,10 +454,9 @@ You can forego scripts entirely for a step by specifying it as shell a command.
 To do so, use ``mapper_cmd``, ``combiner_cmd``, or ``reducer_cmd`` as arguments
 to :py:meth:`~mrjob.job.MRJob.mr()` or methods on :py:class:`~mrjob.job.MRJob`.
 
-The command you specify will not be run in a shell, so by default you can't use
-things like pipe syntax. If you want to use shell features, you can use
-:py:func:`~mrjob.util.bash_wrap()` to wrap your command in a call to the
-``bash`` shell, automatically escaping quotes.
+Like filter commands, step commands are run without a shell by default, and you
+can use :py:func:`~mrjob.util.bash_wrap()` to wrap your command in a call to
+``bash``.
 
 ::
 

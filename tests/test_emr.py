@@ -2797,8 +2797,6 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
             self.runner, '_s3_step_output_uri', return_value=['output'])
         self.simple_patch(
             self.runner, '_get_jar', return_value=['streaming.jar'])
-        self.simple_patch(
-            self.runner, '_get_jar', return_value=['streaming.jar'])
 
         p = patch.object(self.runner, '_script', {'name': 'my_job.py'})
         self.addCleanup(p.stop)

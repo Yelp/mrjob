@@ -108,6 +108,12 @@ class MRJobStep(object):
         if (key == 'reducer' and self._steps['reducer'] is None and
             self.has_explicit_reducer):
             return _IDENTITY_REDUCER
+        # identity combiner should only show up if you specified
+        # 'combiner_init', 'combiner_final', or 'combiner_pre_filter', but not
+        # 'combiner' itself
+        if (key == 'combiner' and self._steps['combiner'] is None and
+            self.has_explicit_combiner):
+            return _IDENTITY_REDUCER
         return self._steps[key]
 
     def _render_substep(self, cmd_key, pre_filter_key=None):

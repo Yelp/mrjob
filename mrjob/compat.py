@@ -513,7 +513,7 @@ def supports_new_distributed_cache_options(version):
     """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
     ``-cacheArchive``
     """
-    return version_gte(version, '0.20')
+    return version_gte(version, '0.20.203')
 
 def uses_020_counters(version):
     return version_gte(version, '0.20')

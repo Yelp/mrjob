@@ -312,53 +312,6 @@ class HadoopJobRunner(MRJobRunner):
 
         return stdin_path
 
-    def _streaming_args(self, step, step_num, num_steps):
-        version = self.get_hadoop_version()
-
-        streaming_args = (self._opts['hadoop_bin'] +
-                          ['jar', self._opts['hadoop_streaming_jar']])
-
-        # -files/-archives (generic options, new-style)
-        if compat.supports_new_distributed_cache_options(version):
-            # set up uploading from HDFS to the working dir
-            streaming_args.extend(self._new_upload_args())
-
-        # Add extra hadoop args first as hadoop args could be a hadoop
-        # specific argument (e.g. -libjar) which must come before job
-        # specific args.
-        streaming_args.extend(self._hadoop_conf_args(step_num, num_steps))
-
-        # set up input
-        for input_uri in self._hdfs_step_input_files(step_num):
-            streaming_args.extend(['-input', input_uri])
-
-        # set up output
-        streaming_args.append('-output')
-        streaming_args.append(self._hdfs_step_output_dir(step_num))
-
-        # -cacheFile/-cacheArchive (streaming options, old-style)
-        if not compat.supports_new_distributed_cache_options(version):
-            # set up uploading from HDFS to the working dir
-            streaming_args.extend(self._old_upload_args())
-
-        mapper, combiner, reducer = (
-            self._hadoop_streaming_commands(step, step_num))
-
-        streaming_args.append('-mapper')
-        streaming_args.append(mapper)
-
-        if combiner:
-            streaming_args.append('-combiner')
-            streaming_args.append(combiner)
-
-        if 'R' in step:
-            streaming_args.append('-reducer')
-            streaming_args.append(reducer)
-        else:
-            streaming_args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
-
-        return streaming_args
-
     def _run_job_in_hadoop(self):
         # figure out local names for our files
         self._name_files()
@@ -436,6 +389,53 @@ class HadoopJobRunner(MRJobRunner):
             if m and self._job_timestamp is None:
                 self._job_timestamp = m.group('timestamp')
                 self._start_step_num = int(m.group('step_num'))
+
+    def _streaming_args(self, step, step_num, num_steps):
+        version = self.get_hadoop_version()
+
+        streaming_args = (self._opts['hadoop_bin'] +
+                          ['jar', self._opts['hadoop_streaming_jar']])
+
+        # -files/-archives (generic options, new-style)
+        if compat.supports_new_distributed_cache_options(version):
+            # set up uploading from HDFS to the working dir
+            streaming_args.extend(self._new_upload_args())
+
+        # Add extra hadoop args first as hadoop args could be a hadoop
+        # specific argument (e.g. -libjar) which must come before job
+        # specific args.
+        streaming_args.extend(self._hadoop_conf_args(step_num, num_steps))
+
+        # set up input
+        for input_uri in self._hdfs_step_input_files(step_num):
+            streaming_args.extend(['-input', input_uri])
+
+        # set up output
+        streaming_args.append('-output')
+        streaming_args.append(self._hdfs_step_output_dir(step_num))
+
+        # -cacheFile/-cacheArchive (streaming options, old-style)
+        if not compat.supports_new_distributed_cache_options(version):
+            # set up uploading from HDFS to the working dir
+            streaming_args.extend(self._old_upload_args())
+
+        mapper, combiner, reducer = (
+            self._hadoop_streaming_commands(step, step_num))
+
+        streaming_args.append('-mapper')
+        streaming_args.append(mapper)
+
+        if combiner:
+            streaming_args.append('-combiner')
+            streaming_args.append(combiner)
+
+        if reducer:
+            streaming_args.append('-reducer')
+            streaming_args.append(reducer)
+        else:
+            streaming_args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
+
+        return streaming_args
 
     def _hdfs_step_input_files(self, step_num):
         """Get the hdfs:// URI for input for the given step."""

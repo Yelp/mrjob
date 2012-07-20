@@ -889,7 +889,7 @@ class MRJobRunner(object):
         if bash_wrap_reducer:
             reducer = bash_wrap(reducer)
 
-        return mapper, reducer, combiner
+        return mapper, combiner, reducer
 
     def _mr_job_extra_args(self, local=False):
         """Return arguments to add to every invocation of MRJob.

@@ -89,6 +89,9 @@ def _filter_sort(logs, exprs, sort_key_func):
     return sorted(relevant, reverse=True, key=sort_key_wrapper)
 
 
+### Helpers to sort different kinds of logs
+
+
 def _sorted_task_attempts(logs):
     return _filter_sort(
         logs,
@@ -114,29 +117,38 @@ def _sorted_jobs(logs):
         lambda info: (info['timestamp'], info['step_num']))
 
 
+### Helpers for log parsing logic
+
+
 def _parsed_error(fs, path, parse_func):
+    """If log lines at *path* (as downloaded by *fs*, which in 0.3.5 is a
+    runner object but in 0.4+ will be a filesystem object) are matched by
+    *parse_func*, return the relevant lines. Otherwise, return None.
+    """
     lines = fs.cat(path)
     if not lines:
         return None
-    parsed_lines = parse_func(lines)
-    if parsed_lines is None:
-        return None
-    else:
-        return {
-            'lines': parsed_lines,
-            'log_file_uri': path,
-            'input_uri': None,
-        }
+    return parse_func(lines)
 
 
 def _parse_simple_logs(fs, logs, parse_func):
+    """Return the relevant lines of the first error in the files at *logs*, or
+    None if none found.
+    """
     for _, path in logs:
-        val = _parsed_error(fs, path, parse_func)
-        if val:
-            return val
+        lines = _parsed_error(fs, path, parse_func)
+        if lines:
+            return {
+                'lines': lines,
+                'log_file_uri': path,
+                'input_uri': None,
+            }
 
 
 def _parse_task_attempts(fs, logs):
+    """Like :py:func:`_parse_simple_logs()`, but with lots of special cases for
+    task attempt logs
+    """
     tasks_seen = set()
     for info, path in logs:
         task_info = (info['step_num'], info['node_type'],
@@ -148,15 +160,21 @@ def _parse_task_attempts(fs, logs):
         # Python tracebacks should win in a single file, but Java tracebacks
         # should win for later attempts
         if path.endswith('stderr'):
-            val = (_parsed_error(fs, path, find_python_traceback) or
-                   _parsed_error(fs, path, find_hadoop_java_stack_trace))
+            lines = (_parsed_error(fs, path, find_python_traceback) or
+                     _parsed_error(fs, path, find_hadoop_java_stack_trace))
         else:
-            val = _parsed_error(fs, path, find_hadoop_java_stack_trace)
+            lines = _parsed_error(fs, path, find_hadoop_java_stack_trace)
 
-        if val:
+        if lines:
             if info.get('node_type', None) == 'm':
-                val['input_uri'] = _scan_for_input_uri(path, fs)
-            return val
+                input_uri = _scan_for_input_uri(path, fs)
+            else:
+                input_uri = None
+            return {
+                'lines': lines,
+                'log_file_uri': path,
+                'input_uri': input_uri,
+            }
 
 
 def _scan_for_input_uri(log_file_uri, runner):

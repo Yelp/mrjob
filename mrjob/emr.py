@@ -66,8 +66,8 @@ from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
 from mrjob.logparsers import NODE_LOG_URI_RE
+from mrjob.logparsers import best_error_from_logs
 from mrjob.logparsers import scan_for_counters_in_files
-from mrjob.logparsers import scan_logs_in_order
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
@@ -375,7 +375,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_endpoint',
         'emr_job_flow_id',
         'emr_job_flow_pool_name',
-        'enable_emr_debugging',
         'enable_emr_debugging',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
@@ -1550,7 +1549,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 reducer = None
 
             input = self._s3_step_input_uris(step_num)
-            output = self._s3_step_output_uri(step_num)\
+            output = self._s3_step_output_uri(step_num)
 
             step_args, cache_files, cache_archives = self._cache_args()
 
@@ -2042,10 +2041,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         step_logs = self.ls_step_logs_ssh(step_nums)
         job_logs = self.ls_job_logs_ssh(step_nums)
         log.info('Scanning SSH logs for probable cause of failure')
-        return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
-                                  step_logs=step_logs,
-                                  job_logs=job_logs,
-                                  runner=self)
+        return best_error_from_logs(self, task_attempt_logs, step_logs,
+                                    job_logs)
 
     def _find_probable_cause_of_failure_s3(self, step_nums):
         log.info('Scanning S3 logs for probable cause of failure')
@@ -2055,10 +2052,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         task_attempt_logs = self.ls_task_attempt_logs_s3(step_nums)
         step_logs = self.ls_step_logs_s3(step_nums)
         job_logs = self.ls_job_logs_s3(step_nums)
-        return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
-                                  step_logs=step_logs,
-                                  job_logs=job_logs,
-                                  runner=self)
+        return best_error_from_logs(self, task_attempt_logs, step_logs,
+                                    job_logs)
 
     ### Bootstrapping ###
 

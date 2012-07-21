@@ -1643,7 +1643,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         # try to find a job flow from the pool. basically auto-fill
         # 'emr_job_flow_id' if possible and then follow normal behavior.
-        if self._opts['pool_emr_job_flows']:
+        if self._opts['pool_emr_job_flows'] and not self._emr_job_flow_id:
             job_flow = self.find_job_flow(num_steps=len(steps))
             if job_flow:
                 self._emr_job_flow_id = job_flow.jobflowid

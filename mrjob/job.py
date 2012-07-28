@@ -371,6 +371,10 @@ class MRJob(MRJobLauncher):
         if reducer:
             kwargs['reducer'] = reducer
 
+        if mapper or reducer:
+            log.warning('Using positional arguments to MRJob.mr() is'
+                        ' deprecated.')
+
         return MRJobStep(**kwargs)
 
     @classmethod

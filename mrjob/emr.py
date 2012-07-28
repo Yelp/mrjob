@@ -1298,64 +1298,65 @@ class EMRJobRunner(MRJobRunner):
         steps = self._get_steps()
         step_list = []
 
-        version = self.get_hadoop_version()
-
         for step_num, step in enumerate(steps):
-            # EMR-specific stuff
-            name = '%s: Step %d of %d' % (
-                self._job_name, step_num + 1, len(steps))
-
-            # don't terminate other people's job flows
-            if (self._opts['emr_job_flow_id'] or
-                self._opts['pool_emr_job_flows']):
-                action_on_failure = 'CANCEL_AND_WAIT'
-            else:
-                action_on_failure = 'TERMINATE_JOB_FLOW'
-
-            # Hadoop streaming stuff
-            if 'M' not in step:  # if we have an identity mapper
-                mapper = 'cat'
-            else:
-                mapper = cmd_line(self._mapper_args(step_num))
-
-            if 'C' in step:
-                combiner = cmd_line(self._combiner_args(step_num))
-            else:
-                combiner = None
-
-            if 'R' in step:  # i.e. if there is a reducer:
-                reducer = cmd_line(self._reducer_args(step_num))
-            else:
-                reducer = None
-
-            input = self._s3_step_input_uris(step_num)
-            output = self._s3_step_output_uri(step_num)\
-
-            step_args, cache_files, cache_archives = self._cache_args()
-
-            step_args.extend(self._hadoop_conf_args(step_num, len(steps)))
-            jar = self._get_jar()
-
-            if combiner is not None:
-                if compat.supports_combiners_in_hadoop_streaming(version):
-                    step_args.extend(['-combiner', combiner])
-                else:
-                    mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
-
-            streaming_step = boto.emr.StreamingStep(
-                name=name, mapper=mapper, reducer=reducer,
-                action_on_failure=action_on_failure,
-                cache_files=cache_files, cache_archives=cache_archives,
-                step_args=step_args, input=input, output=output,
-                jar=jar)
-
-            step_list.append(streaming_step)
+            if step['type'] == 'streaming':
+                step_list.append(
+                    self._build_streaming_step(step, step_num, len(steps)))
+            elif step['type'] == 'jar':
+                step_list.append(
+                    self._build_jar_step(step, step_num, len(steps)))
 
         return step_list
 
-    def _cache_args(self):
-        """Returns ``(step_args, cache_files, cache_archives)``, populating
-        each according to the correct behavior for the current Hadoop version.
+    @property
+    def _action_on_failure(self):
+        # don't terminate other people's job flows
+        if (self._opts['emr_job_flow_id'] or
+            self._opts['pool_emr_job_flows']):
+            return 'CANCEL_AND_WAIT'
+        else:
+            return 'TERMINATE_JOB_FLOW'
+
+    def _build_streaming_step(self, step, step_num, num_steps):
+        streaming_step_kwargs = {
+            'name': '%s: Step %d of %d' % (
+                self._job_name, step_num + 1, num_steps),
+            'input': self._s3_step_input_uris(step_num),
+            'output': self._s3_step_output_uri(step_num),
+            'jar': self._get_jar(),
+            'action_on_failure': self._action_on_failure,
+        }
+
+        streaming_step_kwargs.update(self._cache_kwargs())
+
+        streaming_step_kwargs['step_args'].extend(
+            self._hadoop_conf_args(step_num, num_steps))
+
+        mapper, combiner, reducer = (
+            self._hadoop_streaming_commands(step, step_num))
+
+        streaming_step_kwargs['mapper'] = mapper
+
+        if combiner:
+            streaming_step_kwargs['combiner'] = combiner
+
+        streaming_step_kwargs['reducer'] = reducer
+
+        return boto.emr.StreamingStep(**streaming_step_kwargs)
+
+    def _build_jar_step(self, step):
+        return boto.emr.JarStep(
+            name=step['name'],
+            jar=step['jar'],
+            main_class=step['main_class'],
+            step_args=step['step_args'],
+            action_on_failure=self._action_on_failure)
+
+    def _cache_kwargs(self):
+        """Returns
+        ``{'step_args': [..], 'cache_files': [..], 'cache_archives': [..])``,
+        populating each according to the correct behavior for the current
+        Hadoop version.
 
         For < 0.20, populate cache_files and cache_archives.
         For >= 0.20, populate step_args.
@@ -1403,7 +1404,11 @@ class EMRJobRunner(MRJobRunner):
                     cache_archives.append(
                         '%s#%s' % (file_dict['s3_uri'], file_dict['name']))
 
-        return step_args, cache_files, cache_archives
+        return {
+            'step_args': step_args,
+            'cache_files': cache_files,
+            'cache_archives': cache_archives,
+        }
 
     def _get_jar(self):
         self._name_files()
@@ -1585,21 +1590,6 @@ class EMRJobRunner(MRJobRunner):
                     args)
 
         return args
-
-    def _mapper_args(self, step_num):
-        return (self._script_args() +
-                ['--step-num=%d' % step_num, '--mapper'] +
-                self._mr_job_extra_args())
-
-    def _reducer_args(self, step_num):
-        return (self._script_args() +
-                ['--step-num=%d' % step_num, '--reducer'] +
-                self._mr_job_extra_args())
-
-    def _combiner_args(self, step_num):
-        return (self._script_args() +
-                ['--step-num=%d' % step_num, '--combiner'] +
-                self._mr_job_extra_args())
 
     def _s3_step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""

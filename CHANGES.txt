@@ -1,9 +1,21 @@
-v0.4, 2012-06-?? -- Slouching toward nirvana
- * Changed default runner from 'local' to 'inline' (#423)
- * Filesystem functionality moved out of MRJobRunner into into 'fs' objects
- * Requires boto 2.2.0 or later
- * Fixed some incorrect warnings about ignored options in 'inline' runner
- * Removed deprecated functionality
+v0.4, 2012-08-?? -- Slouching toward nirvana
+ * Changes:
+     * Changed default runner from 'local' to 'inline' (#423)
+     * Requires boto 2.2.0 or later
+     * Filesystem functionality moved out of MRJobRunner into into 'fs' objects
+       but forwarded from runners for backward compatibility
+     * Changed exception hierarchy of mrjob.ssh (which is private but
+       important)
+ * New features:
+     * Support for non-Hadoop Streaming jar steps (#499)
+     * Support for arbitrary commands as Hadoop Streaming
+       mappers/combiners/reducers
+     * mapper_pre_filter, combiner_pre_filter, and reducer_pre_filter allow
+       running of a UNIX command in front of tasks to filter input outside of
+       the interpreter
+ * Bug fixes:
+   * Silenced some incorrect warnings about ignored options in 'inline' runner
+ * Removed deprecated functionality:
    * --hadoop-*-format
    * --*-protocol switches
    * MRJob.DEFAULT_*_PROTOCOL

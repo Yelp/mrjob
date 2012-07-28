@@ -36,6 +36,12 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+try:
+    import simplejson as json
+    json
+except:
+    import json
+
 from mrjob import compat
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -47,6 +53,8 @@ from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.local import LocalFilesystem
+from mrjob.step import STEP_TYPES
+from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
 from mrjob.util import tar_and_gzip
@@ -69,8 +77,6 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #:   ``cleanup_on_failure``.
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
                    'SCRATCH']
-
-_STEP_RE = re.compile(r'^M?C?R?$')
 
 # buffer for piping files into sort on Windows
 _BUFFER_SIZE = 4096
@@ -763,15 +769,12 @@ class MRJobRunner(object):
             now.strftime('%Y%m%d.%H%M%S'), now.microsecond)
 
     def _get_steps(self):
-        """Call the mr_job to find out how many steps it has, and whether
+        """Call the job script to find out how many steps it has, and whether
         there are mappers and reducers for each step. Validate its
         output.
 
-        Returns output like ['MR', 'M']
-        (two steps, second only has a mapper)
-
-        We'll cache the result (so you can call _get_steps() as many times
-        as you want)
+        Returns output as described in :ref:`steps-format`. Results are
+        cached to avoid round trips to a subprocess.
         """
         if self._steps is None:
             if not self._script:
@@ -791,20 +794,102 @@ class MRJobRunner(object):
                     raise Exception(
                         'error getting step information: %s', stderr)
 
-                steps = stdout.strip().split(' ')
+                try:
+                    steps = json.loads(stdout)
+                except json.JSONDecodeError:
+                    raise ValueError("Bad --steps response: \n%s" % stdout)
 
                 # verify that this is a proper step description
                 if not steps or not stdout:
                     raise ValueError('step description is empty!')
                 for step in steps:
-                    if len(step) < 1 or not _STEP_RE.match(step):
+                    if step['type'] not in STEP_TYPES:
                         raise ValueError(
                             'unexpected step type %r in steps %r' %
-                                         (step, stdout))
+                                         (step['type'], stdout))
 
                 self._steps = steps
 
         return self._steps
+
+    def _script_args_for_step(self, step_num, mrc):
+        assert self._script
+
+        args = self._opts['python_bin'] + [
+            self._script['name'],
+            '--step-num=%d' % step_num,
+            '--%s' % mrc,
+        ] + self._mr_job_extra_args()
+        if self._wrapper_script:
+            return (
+                self._opts['python_bin'] +
+                [self._wrapper_script['name']] +
+                args)
+        else:
+            return args
+
+    def _substep_cmd_line(self, step, step_num, mrc):
+        if step[mrc]['type'] == 'command':
+            # never wrap custom hadoop streaming commands in bash
+            return step[mrc]['command'], False
+
+        elif step[mrc]['type'] == 'script':
+            cmd = cmd_line(self._script_args_for_step(step_num, mrc))
+
+            # filter input and pipe for great speed, if user asks
+            # but we have to wrap the command in bash
+            if 'pre_filter' in step[mrc]:
+                return '%s | %s' % (step[mrc]['pre_filter'], cmd), True
+            else:
+                return cmd, False
+        else:
+            raise ValueError("Invalid %s step %d: %r" % (
+                mrc, step_num, step[mrc]))
+
+    def _render_substep(self, step, step_num, mrc):
+        if mrc in step:
+            return self._substep_cmd_line(
+                step, step_num, mrc)
+        else:
+            if mrc == 'mapper':
+                return 'cat', False
+            else:
+                return None, False
+
+    def _hadoop_streaming_commands(self, step, step_num):
+        version = self.get_hadoop_version()
+
+        # Hadoop streaming stuff
+        mapper, bash_wrap_mapper = self._render_substep(
+            step, step_num, 'mapper')
+
+        combiner, bash_wrap_combiner = self._render_substep(
+            step, step_num, 'combiner')
+
+        reducer, bash_wrap_reducer = self._render_substep(
+            step, step_num, 'reducer')
+
+        if (combiner is not None and
+            not compat.supports_combiners_in_hadoop_streaming(version)):
+
+            # krazy hack to support combiners on hadoop <0.20
+            bash_wrap_mapper = True
+            mapper = "%s | sort | %s" % (mapper, combiner)
+
+            # take the combiner away, hadoop will just be confused
+            combiner = None
+            bash_wrap_combiner = False
+
+        if bash_wrap_mapper:
+            mapper = bash_wrap(mapper)
+
+        if bash_wrap_combiner:
+            combiner = bash_wrap(combiner)
+
+        if bash_wrap_reducer:
+            reducer = bash_wrap(reducer)
+
+        return mapper, combiner, reducer
 
     def _mr_job_extra_args(self, local=False):
         """Return arguments to add to every invocation of MRJob.

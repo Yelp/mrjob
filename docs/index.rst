@@ -29,6 +29,8 @@ Guides
 * :ref:`job-protocols`
 * :ref:`writing-protocols`
 * :ref:`writing-cl-opts`
+* :ref:`cmd-filters`
+* :ref:`cmd-steps`
 
 **Running jobs**
 
@@ -58,6 +60,11 @@ Guides
 * :doc:`guides/emr-troubleshooting`
 * :ref:`picking-job-flow-config`
 * :doc:`guides/emr-advanced`
+
+**Working on mrjob**
+
+* :doc:`guides/contributing`
+* :doc:`guides/runner-job-interactions`
 
 Reference
 =========

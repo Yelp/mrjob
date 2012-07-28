@@ -32,14 +32,16 @@ except ImportError:
     import unittest
 
 from mock import patch
-
 import mrjob
 from mrjob import local
 from mrjob.local import LocalMRJobRunner
+from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import read_file
+from tests.mr_cmd_job import CmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
+from tests.mr_filter_job import FilterJob
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_word_count import MRWordCount
@@ -413,19 +415,11 @@ class StepsPythonBinTestCase(unittest.TestCase):
 
         with mr_job.make_runner() as runner:
             assert isinstance(runner, LocalMRJobRunner)
-            try:
-                # MRTwoStepJob populates _steps in the runner, so un-populate
-                # it here so that the runner actually tries to get the steps
-                # via subprocess
-                runner._steps = None
-                runner._get_steps()
-                assert False, 'Should throw exception'
-            except ValueError, ex:
-                output = str(ex)
-                # the output should basically be the command used to
-                # run the steps command
-                self.assertIn('mr_two_step_job.py', output)
-                self.assertIn('--steps', output)
+            # MRTwoStepJob populates _steps in the runner, so un-populate
+            # it here so that the runner actually tries to get the steps
+            # via subprocess
+            runner._steps = None
+            self.assertRaises(ValueError, runner._get_steps)
 
 
 class LocalBootstrapMrjobTestCase(unittest.TestCase):
@@ -554,9 +548,9 @@ class LocalMRJobRunnerTestJobConfCase(SandboxedTestCase):
         self.assertEqual(results['mapreduce.map.input.length'], '4')
         self.assertEqual(results['mapreduce.map.input.start'], '0')
         self.assertEqual(results['mapreduce.task.attempt.id'],
-                       'attempt_%s_m_000000_0' % runner._job_name)
+                       'attempt_%s_mapper_000000_0' % runner._job_name)
         self.assertEqual(results['mapreduce.task.id'],
-                       'task_%s_m_000000' % runner._job_name)
+                       'task_%s_mapper_000000' % runner._job_name)
         self.assertEqual(results['mapreduce.task.ismap'], 'true')
         self.assertEqual(results['mapreduce.task.output.dir'],
                          runner._output_dir)
@@ -574,17 +568,17 @@ class CompatTestCase(EmptyMrjobConfTestCase):
         with runner as runner:
             runner._setup_working_dir()
             self.assertIn('mapred_cache_localArchives',
-                          runner._subprocess_env('M', 0, 0).keys())
+                          runner._subprocess_env('mapper', 0, 0).keys())
 
     def test_environment_variables_021(self):
         runner = LocalMRJobRunner(hadoop_version='0.21', conf_paths=[])
         with runner as runner:
             runner._setup_working_dir()
             self.assertIn('mapreduce_job_cache_local_archives',
-                          runner._subprocess_env('M', 0, 0).keys())
+                          runner._subprocess_env('mapper', 0, 0).keys())
 
 
-class TestHadoopConfArgs(EmptyMrjobConfTestCase):
+class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
 
     def test_empty(self):
         runner = LocalMRJobRunner(conf_paths=[])
@@ -664,7 +658,7 @@ class TestHadoopConfArgs(EmptyMrjobConfTestCase):
         self.assertEqual(len(conf_args), 12)
 
 
-class TestIronPythonEnvironment(unittest.TestCase):
+class IronPythonEnvironmentTestCase(unittest.TestCase):
 
     def setUp(self):
         self.runner = LocalMRJobRunner(conf_paths=[])
@@ -672,11 +666,174 @@ class TestIronPythonEnvironment(unittest.TestCase):
 
     def test_env_ironpython(self):
         with patch.object(local, 'is_ironpython', True):
-            environment = self.runner._subprocess_env('M', 0, 0)
+            environment = self.runner._subprocess_env('mapper', 0, 0)
             self.assertIn('IRONPYTHONPATH', environment)
 
     def test_env_no_ironpython(self):
         with patch.object(local, 'is_ironpython', False):
-            environment = self.runner._subprocess_env('M', 0, 0)
+            environment = self.runner._subprocess_env('mapper', 0, 0)
             self.assertNotIn('IRONPYTHONPATH', environment)
 
+
+class CommandSubstepTestCase(SandboxedTestCase):
+
+    def test_cat_mapper(self):
+        data = 'x\ny\nz\n'
+        job = CmdJob(['--mapper-cmd=cat', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'command',
+                        'command': 'cat'}}])
+
+            r.run()
+
+            self.assertEqual(''.join(r.stream_output()), data)
+
+    def test_uniq_combiner(self):
+        data = 'x\nx\nx\nx\nx\nx\n'
+        job = CmdJob(['--combiner-cmd=uniq', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    },
+                    'combiner': {
+                        'type': 'command',
+                        'command': 'uniq'}}])
+
+            r.run()
+
+            # there are 2 map tasks, each of which has 1 combiner, and all rows
+            # are the same, so we should end up with just 2 values
+
+            self.assertEqual(''.join(r.stream_output()), 'x\nx\n')
+
+    def test_cat_reducer(self):
+        data = 'x\ny\nz\n'
+        job = CmdJob(['--reducer-cmd', 'cat -e', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    },
+                    'reducer': {
+                        'type': 'command',
+                        'command': 'cat -e'}}])
+
+            r.run()
+
+            lines = list(r.stream_output())
+            self.assertEqual(lines, ['x$\n', 'y$\n', 'z$\n'])
+
+    def test_multiple(self):
+        data = 'x\nx\nx\nx\nx\nx\n'
+        mapper_cmd = 'cat -e'
+        reducer_cmd = bash_wrap('wc -l | tr -Cd "[:digit:]"')
+        job = CmdJob([
+            '--runner', 'local',
+            '--mapper-cmd', mapper_cmd,
+            '--combiner-cmd', 'uniq',
+            '--reducer-cmd', reducer_cmd])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {'type': 'command', 'command': mapper_cmd},
+                    'combiner': {'type': 'command', 'command': 'uniq'},
+                    'reducer': {'type': 'command', 'command': reducer_cmd},
+                }])
+
+            r.run()
+
+            self.assertEqual(list(r.stream_output()), ['2'])
+
+    def test_multiple_2(self):
+        data = 'x\ny\nz\n'
+        job = CmdJob(['--mapper-cmd=cat', '--reducer-cmd-2', 'wc -l',
+                      '--runner=local', '--no-conf'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            r.run()
+            self.assertEqual(sum(int(l) for l in r.stream_output()), 3)
+
+
+class FilterTestCase(SandboxedTestCase):
+
+    def test_mapper_pre_filter(self):
+        data = 'x\ny\nz\n'
+        job = FilterJob(['--mapper-filter', 'cat -e', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                        'pre_filter': 'cat -e'}}])
+
+            r.run()
+
+            self.assertEqual(
+                ''.join(r.stream_output()),
+                'x$\ny$\nz$\n')
+
+    def test_combiner_pre_filter(self):
+        data = 'x\ny\nz\n'
+        job = FilterJob(['--combiner-filter', 'cat -e', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    },
+                    'combiner': {
+                        'type': 'script',
+                        'pre_filter': 'cat -e',
+                    }}])
+
+            r.run()
+
+            self.assertEqual(
+                ''.join(r.stream_output()),
+                'x$\ny$\nz$\n')
+
+    def test_reducer_pre_filter(self):
+        data = 'x\ny\nz\n'
+        job = FilterJob(['--reducer-filter', 'cat -e', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    },
+                    'reducer': {
+                        'type': 'script',
+                        'pre_filter': 'cat -e'}}])
+
+            r.run()
+
+            self.assertEqual(
+                ''.join(r.stream_output()),
+                'x$\ny$\nz$\n')

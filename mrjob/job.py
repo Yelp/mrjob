@@ -328,7 +328,7 @@ class MRJob(MRJobLauncher):
         return [self.mr(**kwargs)]
 
     @classmethod
-    def mr(cls, mapper=None, reducer=None, **kwargs):
+    def mr(cls, *args, **kwargs):
         """Define a Python step (mapper, reducer, and/or any combination of
         mapper_init, reducer_final, etc.) for your job.
 
@@ -365,15 +365,18 @@ class MRJob(MRJobLauncher):
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.
         """
-        if mapper:
-            kwargs['mapper'] = mapper
-
-        if reducer:
-            kwargs['reducer'] = reducer
-
-        if mapper or reducer:
+        if args:
             log.warning('Using positional arguments to MRJob.mr() is'
                         ' deprecated.')
+
+        if len(args) > 0:
+            kwargs['mapper'] = args[0]
+
+        if len(args) > 1:
+            kwargs['reducer'] = args[1]
+
+        if len(args) > 2:
+            raise ValueError('mr() can take at most two positional arguments.')
 
         return MRJobStep(**kwargs)
 

@@ -32,44 +32,25 @@ except ImportError:
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
-from mrjob.job import _IDENTITY_MAPPER
 from mrjob.job import UsageError
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
+from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
+from mrjob.step import JarStep
+from mrjob.step import MRJobStep
 from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_testing_job import MRTestingJob
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.mr_nomapper_multistep import MRNoMapper
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
-
-def stepdict(mapper=_IDENTITY_MAPPER, reducer=None, combiner=None,
-             mapper_init=None, mapper_final=None,
-             reducer_init=None, reducer_final=None,
-             combiner_init=None, combiner_final=None,
-             **kwargs):
-    d = dict(mapper=mapper,
-             mapper_init=mapper_init,
-             mapper_final=mapper_final,
-             reducer=reducer,
-             reducer_init=reducer_init,
-             reducer_final=reducer_final,
-             combiner=combiner,
-             combiner_init=combiner_init,
-             combiner_final=combiner_final)
-    d.update(kwargs)
-    return d
-
-
-### Test classes ###
 
 # These can't be invoked as a separate script, but they don't need to be
 
@@ -80,15 +61,6 @@ class MRBoringJob(MRTestingJob):
 
     def reducer(self, key, values):
         yield(key, list(values))
-
-
-class MRFinalBoringJob(MRBoringJob):
-    def __init__(self, args=None):
-        super(MRFinalBoringJob, self).__init__(args=args)
-        self.num_lines = 0
-
-    def mapper_final(self):
-        yield('num_lines', self.num_lines)
 
 
 class MRInitJob(MRTestingJob):
@@ -118,120 +90,7 @@ class MRInitJob(MRTestingJob):
         yield(None, sum(values) * self.combiner_multiplier)
 
 
-class MRInvisibleMapperJob(MRTestingJob):
-
-    def mapper_init(self):
-        self.things = 0
-
-    def mapper(self, key, value):
-        self.things += 1
-
-    def mapper_final(self):
-        yield None, self.things
-
-
-class MRInvisibleReducerJob(MRTestingJob):
-
-    def reducer_init(self):
-        self.things = 0
-
-    def reducer(self, key, values):
-        self.things += len(list(values))
-
-    def reducer_final(self):
-        yield None, self.things
-
-
-class MRInvisibleCombinerJob(MRTestingJob):
-
-    def mapper(self, key, value):
-        yield key, 1
-
-    def combiner_init(self):
-        self.things = 0
-
-    def combiner(self, key, values):
-        self.things += len(list(values))
-
-    def combiner_final(self):
-        yield None, self.things
-
-
 ### Test cases ###
-
-class MRTestCase(unittest.TestCase):
-    # some basic testing for the mr() function
-    def test_mr(self):
-
-        def mapper(k, v):
-            pass
-
-        def mapper_init():
-            pass
-
-        def mapper_final():
-            pass
-
-        def reducer(k, vs):
-            pass
-
-        def reducer_init():
-            pass
-
-        def reducer_final():
-            pass
-
-        # make sure it returns the format we currently expect
-        self.assertEqual(MRJob.mr(mapper, reducer),
-                         stepdict(mapper, reducer))
-        self.assertEqual(MRJob.mr(mapper, reducer,
-                                  mapper_init=mapper_init,
-                                  mapper_final=mapper_final,
-                                  reducer_init=reducer_init,
-                                  reducer_final=reducer_final),
-                         stepdict(mapper, reducer,
-                                  mapper_init=mapper_init,
-                                  mapper_final=mapper_final,
-                                  reducer_init=reducer_init,
-                                  reducer_final=reducer_final))
-        self.assertEqual(MRJob.mr(mapper),
-                         stepdict(mapper))
-
-    def test_no_mapper(self):
-
-        def mapper_init():
-            pass
-
-        def mapper_final():
-            pass
-
-        def reducer(k, vs):
-            pass
-
-        self.assertRaises(Exception, MRJob.mr)
-        self.assertEqual(MRJob.mr(reducer=reducer),
-                         stepdict(reducer=reducer))
-        self.assertEqual(MRJob.mr(reducer=reducer,
-                                  mapper_final=mapper_final),
-                         stepdict(reducer=reducer,
-                                  mapper_final=mapper_final))
-        self.assertEqual(MRJob.mr(reducer=reducer,
-                                  mapper_init=mapper_init),
-                         stepdict(reducer=reducer,
-                                  mapper_init=mapper_init))
-
-    def test_no_reducer(self):
-
-        def reducer_init():
-            pass
-
-        def reducer_final():
-            pass
-
-        self.assertEqual(MRJob.mr(reducer_init=reducer_init),
-                         stepdict(reducer_init=reducer_init))
-        self.assertEqual(MRJob.mr(reducer_final=reducer_final),
-                         stepdict(reducer_final=reducer_final))
 
 
 class MRInitTestCase(EmptyMrjobConfTestCase):
@@ -368,30 +227,30 @@ class ProtocolsTestCase(unittest.TestCase):
 
     def test_default_protocols(self):
         mr_job = MRBoringJob()
-        self.assertEqual(mr_job.pick_protocols(0, 'M'),
+        self.assertEqual(mr_job.pick_protocols(0, 'mapper'),
                          (RawValueProtocol.read, JSONProtocol.write))
-        self.assertEqual(mr_job.pick_protocols(0, 'R'),
+        self.assertEqual(mr_job.pick_protocols(0, 'reducer'),
                          (JSONProtocol.read, JSONProtocol.write))
 
     def test_explicit_default_protocols(self):
         mr_job2 = self.MRBoringJob2().sandbox()
-        self.assertEqual(mr_job2.pick_protocols(0, 'M'),
+        self.assertEqual(mr_job2.pick_protocols(0, 'mapper'),
                          (JSONProtocol.read, PickleProtocol.write))
-        self.assertEqual(mr_job2.pick_protocols(0, 'R'),
+        self.assertEqual(mr_job2.pick_protocols(0, 'reducer'),
                          (PickleProtocol.read, ReprProtocol.write))
 
         mr_job3 = self.MRBoringJob3()
-        self.assertEqual(mr_job3.pick_protocols(0, 'M'),
+        self.assertEqual(mr_job3.pick_protocols(0, 'mapper'),
                          (RawValueProtocol.read, ReprProtocol.write))
         # output protocol should default to JSON
-        self.assertEqual(mr_job3.pick_protocols(0, 'R'),
+        self.assertEqual(mr_job3.pick_protocols(0, 'reducer'),
                          (ReprProtocol.read, JSONProtocol.write))
 
         mr_job4 = self.MRBoringJob4()
-        self.assertEqual(mr_job4.pick_protocols(0, 'M'),
+        self.assertEqual(mr_job4.pick_protocols(0, 'mapper'),
                          (RawValueProtocol.read, ReprProtocol.write))
         # output protocol should default to JSON
-        self.assertEqual(mr_job4.pick_protocols(0, 'R'),
+        self.assertEqual(mr_job4.pick_protocols(0, 'reducer'),
                          (ReprProtocol.read, JSONProtocol.write))
 
     def test_mapper_raw_value_to_json(self):
@@ -490,6 +349,162 @@ class ProtocolsTestCase(unittest.TestCase):
 
         # make sure it raises an exception
         self.assertRaises(Exception, mr_job.run_mapper)
+
+
+class PickProtocolsTestCase(unittest.TestCase):
+
+    def _yield_none(self, *args, **kwargs):
+        yield None
+
+    def _make_job(self, steps_desc, strict_protocols=False):
+
+        class CustomJob(MRJob):
+
+            INPUT_PROTOCOL = PickleProtocol
+            INTERNAL_PROTOCOL = JSONProtocol
+            OUTPUT_PROTOCOL = JSONValueProtocol
+
+            def _steps_desc(self):
+                return steps_desc
+
+        args = ['--no-conf']
+
+        # tests that only use script steps should use strict_protocols so bad
+        # internal behavior causes exceptions
+        if strict_protocols:
+            args.append('--strict-protocols')
+
+        return CustomJob(args)
+
+    def _assert_script_protocols(self, steps_desc, expected_protocols,
+                                 strict_protocols=False):
+        """Given a list of (read_protocol_class, write_protocol_class) tuples
+        for *each substep*, assert that the given _steps_desc() output for each
+        substep matches the protocols in order
+        """
+        j = self._make_job(steps_desc, strict_protocols)
+        for i, step in enumerate(steps_desc):
+            if step['type'] == 'jar':
+                expect_read, expect_write = expected_protocols.pop(0)
+                # step_type for a non-script step is undefined, and in general
+                # these values should just be RawValueProtocol instances, but
+                # we'll leave those checks to the actual tests.
+                actual_read, actual_write = j._pick_protocol_instances(i, '?')
+                self.assertIsInstance(actual_read, expect_read)
+                self.assertIsInstance(actual_write, expect_write)
+            else:
+                for substep_key in ('mapper', 'combiner', 'reducer'):
+                    if substep_key in step:
+                        expect_read, expect_write = expected_protocols.pop(0)
+                        actual_read, actual_write = j._pick_protocol_instances(
+                            i, substep_key)
+                        self.assertIsInstance(actual_read, expect_read)
+                        self.assertIsInstance(actual_write, expect_write)
+
+    def _streaming_step(self, n, *args, **kwargs):
+        return MRJobStep(*args, **kwargs).description(n)
+
+    def _jar_step(self, n, *args, **kwargs):
+        return JarStep(*args, **kwargs).description(n)
+
+    def test_single_mapper(self):
+        self._assert_script_protocols(
+            [self._streaming_step(0, mapper=self._yield_none)],
+            [(PickleProtocol, JSONValueProtocol)],
+            strict_protocols=True)
+
+    def test_single_reducer(self):
+        # MRJobStep transparently adds mapper
+        self._assert_script_protocols(
+            [self._streaming_step(0, reducer=self._yield_none)],
+            [(PickleProtocol, JSONProtocol),
+             (JSONProtocol, JSONValueProtocol)],
+            strict_protocols=True)
+
+    def test_mapper_combiner(self):
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper=self._yield_none, combiner=self._yield_none)],
+            [(PickleProtocol, JSONValueProtocol),
+             (JSONValueProtocol, JSONValueProtocol)],
+            strict_protocols=True)
+
+    def test_mapper_combiner_reducer(self):
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper=self._yield_none, combiner=self._yield_none,
+                reducer=self._yield_none)],
+            [(PickleProtocol, JSONProtocol),
+             (JSONProtocol, JSONProtocol),
+             (JSONProtocol, JSONValueProtocol)],
+            strict_protocols=True)
+
+    def test_begin_jar_step(self):
+        self._assert_script_protocols(
+            [self._jar_step(0, 'blah', 'binks_jar.jar'),
+             self._streaming_step(
+                1, mapper=self._yield_none, combiner=self._yield_none,
+                reducer=self._yield_none)],
+            [(RawValueProtocol, RawValueProtocol),
+             (PickleProtocol, JSONProtocol),
+             (JSONProtocol, JSONProtocol),
+             (JSONProtocol, JSONValueProtocol)])
+
+    def test_end_jar_step(self):
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper=self._yield_none, combiner=self._yield_none,
+                reducer=self._yield_none),
+             self._jar_step(1, 'blah', 'binks_jar.jar')],
+            [(PickleProtocol, JSONProtocol),
+             (JSONProtocol, JSONProtocol),
+             (JSONProtocol, JSONValueProtocol),
+             (RawValueProtocol, RawValueProtocol)])
+
+    def test_middle_jar_step(self):
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper=self._yield_none, combiner=self._yield_none),
+             self._jar_step(1, 'blah', 'binks_jar.jar'),
+             self._streaming_step(2, reducer=self._yield_none)],
+            [(PickleProtocol, JSONProtocol),
+             (JSONProtocol, JSONProtocol),
+             (RawValueProtocol, RawValueProtocol),
+             (JSONProtocol, JSONValueProtocol)])
+
+    def test_single_mapper_cmd(self):
+        self._assert_script_protocols(
+            [self._streaming_step(0, mapper_cmd='cat')],
+            [(RawValueProtocol, RawValueProtocol)])
+
+    def test_single_mapper_cmd_with_script_combiner(self):
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper_cmd='cat', combiner=self._yield_none)],
+            [(RawValueProtocol, RawValueProtocol),
+             (RawValueProtocol, RawValueProtocol)])
+
+    def test_single_mapper_cmd_with_script_reducer(self):
+        # reducer is only script step so it uses INPUT_PROTOCOL and
+        # OUTPUT_PROTOCOL
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper_cmd='cat', reducer=self._yield_none)],
+            [(RawValueProtocol, RawValueProtocol),
+             (PickleProtocol, JSONValueProtocol)])
+
+    def test_multistep(self):
+        # reducer is only script step so it uses INPUT_PROTOCOL and
+        # OUTPUT_PROTOCOL
+        self._assert_script_protocols(
+            [self._streaming_step(
+                0, mapper_cmd='cat', reducer=self._yield_none),
+             self._jar_step(1, 'blah', 'binks_jar.jar'),
+             self._streaming_step(2, mapper=self._yield_none)],
+            [(RawValueProtocol, RawValueProtocol),
+             (PickleProtocol, JSONProtocol),
+             (RawValueProtocol, RawValueProtocol),
+             (JSONProtocol, JSONValueProtocol)])
 
 
 class JobConfTestCase(unittest.TestCase):
@@ -674,98 +689,6 @@ class IsMapperOrReducerTestCase(unittest.TestCase):
         self.assertEqual(MRJob(['--reducer']).is_mapper_or_reducer(), True)
         self.assertEqual(MRJob(['--combiner']).is_mapper_or_reducer(), True)
         self.assertEqual(MRJob(['--steps']).is_mapper_or_reducer(), False)
-
-
-class StepsTestCase(unittest.TestCase):
-
-    def test_auto_build_steps(self):
-        mrbj = MRBoringJob()
-        self.assertEqual(mrbj.steps(),
-                         [stepdict(mapper=mrbj.mapper,
-                                   reducer=mrbj.reducer)])
-
-        mrfbj = MRFinalBoringJob()
-        self.assertEqual(mrfbj.steps(),
-                         [stepdict(mapper=mrfbj.mapper,
-                                   mapper_final=mrfbj.mapper_final,
-                                   reducer=mrfbj.reducer)])
-
-    def test_show_steps(self):
-        mr_boring_job = MRBoringJob(['--steps'])
-        mr_boring_job.sandbox()
-        mr_boring_job.show_steps()
-        self.assertEqual(mr_boring_job.stdout.getvalue(), 'MR\n')
-
-        # final mappers don't show up in the step description
-        mr_final_boring_job = MRFinalBoringJob(['--steps'])
-        mr_final_boring_job.sandbox()
-        mr_final_boring_job.show_steps()
-        self.assertEqual(mr_final_boring_job.stdout.getvalue(), 'MR\n')
-
-        mr_two_step_job = MRTwoStepJob(['--steps'])
-        mr_two_step_job.sandbox()
-        mr_two_step_job.show_steps()
-        self.assertEqual(mr_two_step_job.stdout.getvalue(), 'MCR M\n')
-
-        mr_no_mapper = MRNoMapper(['--steps'])
-        mr_no_mapper.sandbox()
-        mr_no_mapper.show_steps()
-        self.assertEqual(mr_no_mapper.stdout.getvalue(), 'MR R\n')
-
-    def test_mapper_and_reducer_as_positional_args(self):
-        def mapper(k, v):
-            pass
-
-        def reducer(k, v):
-            pass
-
-        def combiner(k, v):
-            pass
-
-        self.assertEqual(MRJob.mr(mapper), MRJob.mr(mapper=mapper))
-
-        self.assertEqual(MRJob.mr(mapper, reducer),
-                         MRJob.mr(mapper=mapper, reducer=reducer))
-
-        self.assertEqual(MRJob.mr(mapper, reducer=reducer),
-                         MRJob.mr(mapper=mapper, reducer=reducer))
-
-        self.assertEqual(MRJob.mr(mapper, reducer, combiner=combiner),
-                         MRJob.mr(mapper=mapper, reducer=reducer,
-                                  combiner=combiner))
-
-        # can't specify something as a positional and keyword arg
-        self.assertRaises(TypeError,
-                          MRJob.mr, mapper, mapper=mapper)
-        self.assertRaises(TypeError,
-                          MRJob.mr, mapper, reducer, reducer=reducer)
-
-    def test_deprecated_mapper_final_positional_arg(self):
-        def mapper(k, v):
-            pass
-
-        def reducer(k, v):
-            pass
-
-        def mapper_final():
-            pass
-
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.job', stderr)
-            step = MRJob.mr(mapper, reducer, mapper_final)
-
-        # should be allowed to specify mapper_final as a positional arg,
-        # but we log a warning
-        self.assertEqual(step, MRJob.mr(mapper=mapper,
-                                        reducer=reducer,
-                                        mapper_final=mapper_final))
-        self.assertIn('mapper_final should be specified', stderr.getvalue())
-
-        # can't specify mapper_final as a positional and keyword arg
-        self.assertRaises(
-            TypeError,
-            MRJob.mr, mapper, reducer, mapper_final, mapper_final=mapper_final)
 
 
 class StepNumTestCase(unittest.TestCase):
@@ -980,3 +903,49 @@ class ProtocolTypeTestCase(unittest.TestCase):
             self.assertIn('INPUT_PROTOCOL should be a class', logs)
             self.assertIn('INTERNAL_PROTOCOL should be a class', logs)
             self.assertIn('OUTPUT_PROTOCOL should be a class', logs)
+
+
+class StepsTestCase(unittest.TestCase):
+
+    class SteppyJob(MRJob):
+
+        def _yield_none(self, *args, **kwargs):
+            yield None
+
+        def steps(self):
+            return [
+                self.mr(mapper_init=self._yield_none, mapper_pre_filter='cat',
+                        reducer_cmd='wc -l'),
+                self.jar(name='oh my jar', jar='s3://bookat/binks_jar.jar')]
+
+    class SingleSteppyCommandJob(MRJob):
+
+        def mapper_cmd(self):
+            return 'cat'
+
+        def combiner_cmd(self):
+            return 'cat'
+
+        def reducer_cmd(self):
+            return 'wc -l'
+
+    def test_steps(self):
+        j = self.SteppyJob(['--no-conf'])
+        self.assertEqual(
+            j.steps()[0],
+            MRJobStep(
+                mapper_init=j._yield_none,
+                mapper_pre_filter='cat',
+                reducer_cmd='wc -l'))
+        self.assertEqual(
+            j.steps()[1], JarStep('oh my jar', 's3://bookat/binks_jar.jar'))
+
+    def test_cmd_steps(self):
+        j = self.SingleSteppyCommandJob(['--no-conf'])
+        self.assertEqual(
+            j._steps_desc(),
+            [{
+                'type': 'streaming',
+                'mapper': {'type': 'command', 'command': 'cat'},
+                'combiner': {'type': 'command', 'command': 'cat'},
+                'reducer': {'type': 'command', 'command': 'wc -l'}}])

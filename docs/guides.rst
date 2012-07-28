@@ -20,3 +20,5 @@ Guides
     guides/emr-tools.rst
     guides/emr-troubleshooting.rst
     guides/emr-advanced.rst
+    guides/contributing.rst
+    guides/runner-job-interactions.rst

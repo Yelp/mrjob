@@ -54,6 +54,7 @@ from mrjob.pool import pool_hash_and_name
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSHException
+from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
@@ -85,7 +86,7 @@ except ImportError:
     boto = None
 
 
-class MockEMRAndS3TestCase(SandboxedTestCase):
+class FastEMRTestCase(SandboxedTestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -100,9 +101,9 @@ class MockEMRAndS3TestCase(SandboxedTestCase):
             os.remove(cls.fake_mrjob_tgz_path)
 
     def setUp(self):
-        super(MockEMRAndS3TestCase, self).setUp()
-        self.sandbox_boto()
+        super(FastEMRTestCase, self).setUp()
 
+        # patch slow things
         def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
             mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
             return self.fake_mrjob_tgz_path
@@ -114,41 +115,45 @@ class MockEMRAndS3TestCase(SandboxedTestCase):
         self.simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
         self.simple_patch(time, 'sleep')
 
-    def simple_patch(self, obj, attr, side_effect=None, autospec=False):
+    def simple_patch(self, obj, attr, side_effect=None, autospec=False,
+                     return_value=None):
         patcher = patch.object(obj, attr, side_effect=side_effect,
-                               autospec=autospec)
+                               autospec=autospec, return_value=return_value)
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def tearDown(self):
-        self.unsandbox_boto()
 
-    def sandbox_boto(self):
+class MockEMRAndS3TestCase(FastEMRTestCase):
+
+    def _mock_boto_connect_s3(self, *args, **kwargs):
+        kwargs['mock_s3_fs'] = self.mock_s3_fs
+        return MockS3Connection(*args, **kwargs)
+
+    def _mock_boto_emr_EmrConnection(self, *args, **kwargs):
+        kwargs['mock_s3_fs'] = self.mock_s3_fs
+        kwargs['mock_emr_job_flows'] = self.mock_emr_job_flows
+        kwargs['mock_emr_failures'] = self.mock_emr_failures
+        kwargs['mock_emr_output'] = self.mock_emr_output
+        return MockEmrConnection(*args, **kwargs)
+
+    def setUp(self):
+        # patch boto
         self.mock_s3_fs = {}
         self.mock_emr_job_flows = {}
         self.mock_emr_failures = {}
         self.mock_emr_output = {}
 
-        def mock_boto_connect_s3(*args, **kwargs):
-            kwargs['mock_s3_fs'] = self.mock_s3_fs
-            return MockS3Connection(*args, **kwargs)
+        p_s3 = patch.object(boto, 'connect_s3', self._mock_boto_connect_s3)
+        self.addCleanup(p_s3.stop)
+        p_s3.start()
 
-        def mock_boto_emr_EmrConnection(*args, **kwargs):
-            kwargs['mock_s3_fs'] = self.mock_s3_fs
-            kwargs['mock_emr_job_flows'] = self.mock_emr_job_flows
-            kwargs['mock_emr_failures'] = self.mock_emr_failures
-            kwargs['mock_emr_output'] = self.mock_emr_output
-            return MockEmrConnection(*args, **kwargs)
+        p_emr = patch.object(
+            boto.emr.connection, 'EmrConnection',
+            self._mock_boto_emr_EmrConnection)
+        self.addCleanup(p_emr.stop)
+        p_emr.start()
 
-        self._real_boto_connect_s3 = boto.connect_s3
-        boto.connect_s3 = mock_boto_connect_s3
-
-        self._real_boto_EmrConnection = boto.emr.connection.EmrConnection
-        boto.emr.connection.EmrConnection = mock_boto_emr_EmrConnection
-
-    def unsandbox_boto(self):
-        boto.connect_s3 = self._real_boto_connect_s3
-        boto.emr.connection.EmrConnection = self._real_boto_EmrConnection
+        super(MockEMRAndS3TestCase, self).setUp()
 
     def add_mock_s3_data(self, data, time_modified=None):
         """Update self.mock_s3_fs with a map from bucket name
@@ -213,7 +218,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
         'check_emr_status_every': 0.00,
         's3_sync_wait_time': 0.00,
-        'boostrap_mrjob': False,
         'additional_emr_info': {'key': 'value'}
     }}}
 
@@ -2716,7 +2720,8 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
                 self.jobs.append(future_job)
 
         self.simple_patch(EMRJobRunner, 'make_emr_conn')
-        self.simple_patch(S3Filesystem, 'make_s3_conn')
+        self.simple_patch(S3Filesystem, 'make_s3_conn',
+                          side_effect=self._mock_boto_connect_s3)
         self.simple_patch(EMRJobRunner, 'usable_job_flows',
             side_effect=side_effect_usable_job_flows)
         self.simple_patch(EMRJobRunner, '_lock_uri',
@@ -2779,3 +2784,132 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
         result = runner.find_job_flow()
         self.assertEqual(result, None)
         self.assertEqual(self.sleep_counter, 2)
+
+
+class BuildStreamingStepTestCase(FastEMRTestCase):
+
+    def setUp(self):
+        super(BuildStreamingStepTestCase, self).setUp()
+        self.runner = EMRJobRunner(conf_paths=[])
+        self.simple_patch(
+            self.runner, '_s3_step_input_uris', return_value=['input'])
+        self.simple_patch(
+            self.runner, '_s3_step_output_uri', return_value=['output'])
+        self.simple_patch(
+            self.runner, '_get_jar', return_value=['streaming.jar'])
+        self.runner._script = {'name': 'my_job.py'}
+
+        self.simple_patch(boto.emr, 'StreamingStep', dict)
+
+    def _assert_streaming_step(self, step, step_num=0, num_steps=1, **kwargs):
+        d = self.runner._build_streaming_step(step, step_num, num_steps)
+        for k, v in kwargs.iteritems():
+            self.assertEqual(d[k], v)
+
+    def test_basic_mapper(self):
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                },
+            },
+            mapper="python my_job.py --step-num=0 --mapper",
+            reducer=None,
+        )
+
+    def test_basic_reducer(self):
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'reducer': {
+                    'type': 'script',
+                },
+            },
+            mapper="cat",
+            reducer="python my_job.py --step-num=0 --reducer",
+        )
+
+    def test_pre_filters(self):
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'pre_filter': 'grep anything',
+                },
+                'combiner': {
+                    'type': 'script',
+                    'pre_filter': 'grep nothing',
+                },
+                'reducer': {
+                    'type': 'script',
+                    'pre_filter': 'grep something',
+                },
+            },
+            mapper=("bash -c 'grep anything | python my_job.py --step-num=0"
+                    " --mapper'"),
+            combiner=("bash -c 'grep nothing | python my_job.py --step-num=0"
+                    " --combiner'"),
+            reducer=("bash -c 'grep something | python my_job.py --step-num=0"
+                    " --reducer'"),
+        )
+
+    def test_combiner_018(self):
+        self.runner._inferred_hadoop_version = '0.18'
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'command',
+                    'command': 'cat',
+                },
+                'combiner': {
+                    'type': 'script',
+                },
+            },
+            mapper=("bash -c 'cat | sort | python my_job.py --step-num=0"
+                    " --combiner'"),
+            reducer=None,
+        )
+
+    def test_pre_filters_018(self):
+        self.runner._inferred_hadoop_version = '0.18'
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'pre_filter': 'grep anything',
+                },
+                'combiner': {
+                    'type': 'script',
+                    'pre_filter': 'grep nothing',
+                },
+                'reducer': {
+                    'type': 'script',
+                    'pre_filter': 'grep something',
+                },
+            },
+            mapper=("bash -c 'grep anything | python my_job.py --step-num=0"
+                    " --mapper | sort | grep nothing | python my_job.py"
+                    " --step-num=0 --combiner'"),
+            reducer=("bash -c 'grep something | python my_job.py --step-num=0"
+                    " --reducer'"),
+        )
+
+    def test_pre_filter_escaping(self):
+        # ESCAPE ALL THE THINGS!!!
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'pre_filter': bash_wrap("grep 'anything'"),
+                },
+            },
+            mapper=(
+                "bash -c 'bash -c '\\''grep"
+                " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' |"
+                " python my_job.py --step-num=0 --mapper'"),
+        )

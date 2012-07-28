@@ -127,7 +127,20 @@ class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
 
         with mr_job.make_runner() as runner:
             assert isinstance(runner, InlineMRJobRunner)
-            self.assertEqual(runner._get_steps(), ['M', 'M'])
+            self.assertEqual(runner._get_steps(), [
+                {
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    }
+                },
+                {
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    }
+                },
+            ])
 
             runner.run()
 

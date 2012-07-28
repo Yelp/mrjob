@@ -36,7 +36,6 @@ EMPTY_MRJOB_CONF = {'runners': {
     'emr': {
         'check_emr_status_every': 0.00,
         's3_sync_wait_time': 0.00,
-        'boostrap_mrjob': False,
     },
     'hadoop': {
         'label': 'test_job'

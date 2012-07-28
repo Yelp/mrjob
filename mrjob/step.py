@@ -30,11 +30,14 @@ _REDUCER_FUNCS = ('reducer', 'reducer_init', 'reducer_final', 'reducer_cmd',
 # for jobs whose step objects are created automatically
 _JOB_STEP_PARAMS = _MAPPER_FUNCS + _COMBINER_FUNCS + _REDUCER_FUNCS
 
+
 log = logging.getLogger('mrjob.step')
+
 
 # used by MRJobStep below, to fake no mapper
 def _IDENTITY_MAPPER(key, value):
     yield key, value
+
 
 # used by MRJobStep below, to fake no reducer
 def _IDENTITY_REDUCER(key, values):
@@ -44,14 +47,14 @@ def _IDENTITY_REDUCER(key, values):
 
 class MRJobStep(object):
 
-    def __init__(self, mapper=None, reducer=None, **kwargs):
+    def __init__(self, **kwargs):
         # limit which keyword args can be specified
         bad_kwargs = sorted(set(kwargs) - set(_JOB_STEP_PARAMS))
         if bad_kwargs:
             raise TypeError(
                 'mr() got an unexpected keyword argument %r' % bad_kwargs[0])
 
-        if not (any(kwargs.itervalues()) or mapper or reducer):
+        if not any(kwargs.itervalues()):
             raise ValueError("Step has no mappers and no reducers")
 
         self.has_explicit_mapper = any(
@@ -64,14 +67,6 @@ class MRJobStep(object):
             name for name in kwargs if name in _REDUCER_FUNCS)
 
         steps = dict((f, None) for f in _JOB_STEP_PARAMS)
-
-        if mapper:
-            steps['mapper'] = mapper
-            self.has_explicit_mapper = True
-
-        if reducer:
-            steps['reducer'] = reducer
-            self.has_explicit_reducer = True
 
         steps.update(kwargs)
 

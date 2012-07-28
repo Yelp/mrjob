@@ -358,4 +358,5 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
             ['-mapper',
              "bash -c 'bash -c '\\''grep"
                  " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' |"
-                 " python my_job.py --step-num=0 --mapper'"])
+                 " python my_job.py --step-num=0 --mapper'",
+             '-jobconf', 'mapred.reduce.tasks=0'])

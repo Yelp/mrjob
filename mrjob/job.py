@@ -365,7 +365,13 @@ class MRJob(MRJobLauncher):
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.
         """
-        return MRJobStep(mapper, reducer, **kwargs)
+        if mapper:
+            kwargs['mapper'] = mapper
+
+        if reducer:
+            kwargs['reducer'] = reducer
+
+        return MRJobStep(**kwargs)
 
     @classmethod
     def jar(cls, name, jar, main_class=None, step_args=None):

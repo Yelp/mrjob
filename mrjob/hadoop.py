@@ -35,7 +35,7 @@ from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
 from mrjob.logparsers import HADOOP_JOB_LOG_URI_RE
 from mrjob.logparsers import scan_for_counters_in_files
-from mrjob.logparsers import scan_logs_in_order
+from mrjob.logparsers import best_error_from_logs
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_uri
 from mrjob.parse import urlparse
@@ -670,10 +670,8 @@ class HadoopJobRunner(MRJobRunner):
                                              HADOOP_JOB_LOG_URI_RE,
                                              step_nums)
         log.info('Scanning logs for probable cause of failure')
-        return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
-                                  step_logs=step_logs,
-                                  job_logs=job_logs,
-                                  runner=self)
+        return best_error_from_logs(self, task_attempt_logs, step_logs,
+                                    job_logs)
 
     ### FILESYSTEM STUFF ###
 

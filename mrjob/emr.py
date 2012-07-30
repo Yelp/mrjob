@@ -1718,7 +1718,6 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 step_nums.append(i + 1)
                 if LOG_GENERATING_STEP_NAME_RE.match(
                     posixpath.basename(step.jar)):
-                    log.info('%d -> %d' % (i + 1, latest_lg_step_num))
                     lg_step_num_mapping[i + 1] = latest_lg_step_num
 
                 step.state = step.state
@@ -1990,18 +1989,21 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # parameter
         if lg_step_num_mapping is None:
             lg_step_num_mapping = dict((n, n) for n in step_nums)
+        lg_step_nums = sorted(lg_step_num_mapping.values())
 
         self._counters = []
         new_counters = {}
         if self._opts['ec2_key_pair_file']:
             try:
-                new_counters = self._fetch_counters_ssh(step_nums)
+                new_counters = self._fetch_counters_ssh(lg_step_nums)
             except LogFetchError:
-                new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
+                new_counters = self._fetch_counters_s3(
+                    lg_step_nums, skip_s3_wait)
             except IOError:
                 # Can get 'file not found' if test suite was lazy or Hadoop
                 # logs moved. We shouldn't crash in either case.
-                new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
+                new_counters = self._fetch_counters_s3(
+                    lg_step_nums, skip_s3_wait)
         else:
             log.info('ec2_key_pair_file not specified, going to S3')
             new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)

@@ -1702,19 +1702,24 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             running_step_name = ''
             total_step_time = 0.0
             step_nums = []  # step numbers belonging to us. 1-indexed
-            log_generating_step_nums = []
+            lg_step_num_mapping = {}
 
             steps = job_flow.steps or []
             latest_lg_step_num = 0
             for i, step in enumerate(steps):
+                if LOG_GENERATING_STEP_NAME_RE.match(
+                    posixpath.basename(step.jar)):
+                    latest_lg_step_num += 1
+
                 # ignore steps belonging to other jobs
                 if not step.name.startswith(self._job_name):
                     continue
 
                 step_nums.append(i + 1)
-                if LOG_GENERATING_STEP_NAME_RE.match(step.name):
-                    log_generating_step_nums.append(latest_lg_step_num)
-                    latest_lg_step_num += 1
+                if LOG_GENERATING_STEP_NAME_RE.match(
+                    posixpath.basename(step.jar)):
+                    log.info('%d -> %d' % (i + 1, latest_lg_step_num))
+                    lg_step_num_mapping[i + 1] = latest_lg_step_num
 
                 step.state = step.state
                 step_states.append(step.state)
@@ -1781,7 +1786,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             log.info('Job completed.')
             log.info('Running time was %.1fs (not counting time spent waiting'
                      ' for the EC2 instances)' % total_step_time)
-            self._fetch_counters(step_nums)
+            self._fetch_counters(step_nums, lg_step_num_mapping)
             self.print_counters(range(1, len(step_nums) + 1))
         else:
             msg = 'Job on job flow %s failed with status %s: %s' % (
@@ -1791,7 +1796,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                 log.info('Logs are in %s' % self._s3_job_log_uri)
             # look for a Python traceback
             cause = self._find_probable_cause_of_failure(
-                step_nums, log_generating_step_nums)
+                step_nums, sorted(lg_step_num_mapping.values()))
             if cause:
                 # log cause, and put it in exception
                 cause_msg = []  # lines to log and put in exception
@@ -1973,13 +1978,19 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     ## LOG PARSING ##
 
-    def _fetch_counters(self, step_nums, skip_s3_wait=False):
+    def _fetch_counters(self, step_nums, lg_step_num_mapping=None,
+                        skip_s3_wait=False):
         """Read Hadoop counters from S3.
 
         Args:
         step_nums -- the steps belonging to us, so that we can ignore counters
                      from other jobs when sharing a job flow
         """
+        # empty list is a valid value for lg_step_nums, but it is an optional
+        # parameter
+        if lg_step_num_mapping is None:
+            lg_step_num_mapping = dict((n, n) for n in step_nums)
+
         self._counters = []
         new_counters = {}
         if self._opts['ec2_key_pair_file']:
@@ -1998,7 +2009,11 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # step_nums is relative to the start of the job flow
         # we only want them relative to the job
         for step_num in step_nums:
-            self._counters.append(new_counters.get(step_num, {}))
+            if step_num in lg_step_num_mapping:
+                self._counters.append(
+                    new_counters.get(lg_step_num_mapping[step_num], {}))
+            else:
+                self._counters.append({})
 
     def _fetch_counters_ssh(self, step_nums):
         uris = list(self.ls_job_logs_ssh(step_nums))

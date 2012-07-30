@@ -38,6 +38,7 @@ __credits__ = [
     'Julian Krause <juliank@yelp.com>',
     'Robert Leftwich <rl.0x0@eml.cc>',
     'Tetsuya Morimoto <tetsuya.morimoto@gmail.com>',
+    'Pavel Repin <prepin@gmail.com>',
     'Wahbeh Qardaji <wqardaji@yelp.com>',
     'Jimmy Retzlaff <jretz@yelp.com>',
     'Ned Rockson <ned@tellapart.com>',

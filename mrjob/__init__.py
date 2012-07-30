@@ -26,10 +26,12 @@ __credits__ = [
     'Kevin Burke <kevin@twilio.com>',
     'David Dehghan <ddehghan@gmail.com>',
     'Adam Derewecki <derewecki@gmail.com>',
+    'Dan Frank <danielhfrank@gmail.com>',
     'Benjamin Goldenberg <benjamin@yelp.com',
     'Peter Harrington <peter.b.harrington@gmail.com>',
     'Brandon Haynes <bhaynes@fas.harvard.edu>',
     'Brett Hoerner <brett@bretthoerner.com>',
+    'Tom Janofsky <tjanofsky@monetate.com>',
     'Stephen Johnson <sjohnson@yelp.com>',
     'Matt Jones <mattj@yelp.com>',
     'Nikolaos Koutsopoulos <nhk@mochimedia.com>',
@@ -40,10 +42,12 @@ __credits__ = [
     'Jimmy Retzlaff <jretz@yelp.com>',
     'Ned Rockson <ned@tellapart.com>',
     'Paul Scott <paul@duedil.com>',
+    'Jesse Shieh <jesse@adku.com>',
     'Steve Spencer <steve@bigfrog.net>',
     'Jyry Suvilehto <jyry.suvilehto@iki.fi>',
     'Matthew Tai <mtai@adku.com>',
     'Paul Wais <pwais@yelp.com>',
+    'Derek Wilson <jderekwilson@gmail.com>',
 ]
 
 __version__ = '0.3.4.1'

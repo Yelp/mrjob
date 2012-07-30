@@ -2073,7 +2073,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         if lg_step_nums is None:
             lg_step_nums = step_nums
         task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
-        step_logs = self.ls_step_logs_ssh(step_nums)
+        step_logs = self.ls_step_logs_ssh(lg_step_nums)
         job_logs = self.ls_job_logs_ssh(step_nums)
         log.info('Scanning SSH logs for probable cause of failure')
         return best_error_from_logs(self, task_attempt_logs, step_logs,
@@ -2088,9 +2088,9 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         self._wait_for_s3_eventual_consistency()
         self._wait_for_job_flow_termination()
 
-        task_attempt_logs = self.ls_task_attempt_logs_s3(lg_step_nums)
+        task_attempt_logs = self.ls_task_attempt_logs_s3(step_nums)
         step_logs = self.ls_step_logs_s3(step_nums)
-        job_logs = self.ls_job_logs_s3(step_nums)
+        job_logs = self.ls_job_logs_s3(lg_step_nums)
         return best_error_from_logs(self, task_attempt_logs, step_logs,
                                     job_logs)
 

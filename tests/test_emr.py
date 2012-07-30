@@ -461,7 +461,8 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         stdin = StringIO('foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--hadoop-version=0.20',
+                               '--ami-version=2.0',
+                               '--hadoop-version=0.20.205',
                                '-c', self.mrjob_conf_path])
         mr_job.sandbox(stdin=stdin)
 
@@ -1646,29 +1647,30 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
     def test_eu(self):
         runner = EMRJobRunner(conf_path=False, aws_region='EU')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'eu-west-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.eu-west-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-eu-west-1.amazonaws.com')
 
     def test_us_east_1(self):
         runner = EMRJobRunner(conf_path=False, aws_region='us-east-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'us-east-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.us-east-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3.amazonaws.com')
 
     def test_us_west_1(self):
         runner = EMRJobRunner(conf_path=False, aws_region='us-west-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'us-west-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.us-west-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-us-west-1.amazonaws.com')
 
     def test_ap_southeast_1(self):
         runner = EMRJobRunner(conf_path=False, aws_region='ap-southeast-1')
+        self.assertEqual(runner.make_emr_conn().endpoint,
+                         'elasticmapreduce.ap-southeast-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-ap-southeast-1.amazonaws.com')
-        self.assertRaises(Exception, runner.make_emr_conn)
 
     def test_bad_region(self):
         # should fail in the constructor because the constructor connects to S3

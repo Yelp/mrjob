@@ -1989,7 +1989,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         # parameter
         if lg_step_num_mapping is None:
             lg_step_num_mapping = dict((n, n) for n in step_nums)
-        lg_step_nums = sorted(lg_step_num_mapping.values())
+        lg_step_nums = list(sorted(lg_step_num_mapping[k] for k in step_nums))
 
         self._counters = []
         new_counters = {}
@@ -2006,7 +2006,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
                     lg_step_nums, skip_s3_wait)
         else:
             log.info('ec2_key_pair_file not specified, going to S3')
-            new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
+            new_counters = self._fetch_counters_s3(lg_step_nums, skip_s3_wait)
 
         # step_nums is relative to the start of the job flow
         # we only want them relative to the job

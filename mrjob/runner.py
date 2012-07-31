@@ -93,6 +93,7 @@ class RunnerOptionStore(OptionStore):
         'hadoop_extra_args',
         'hadoop_streaming_jar',
         'hadoop_version',
+        'interpreter',
         'jobconf',
         'label',
         'owner',
@@ -109,6 +110,7 @@ class RunnerOptionStore(OptionStore):
         'base_tmp_dir': combine_paths,
         'cmdenv': combine_envs,
         'hadoop_extra_args': combine_lists,
+        'interpreter': combine_cmds,
         'jobconf': combine_dicts,
         'python_archives': combine_path_lists,
         'python_bin': combine_cmds,
@@ -143,7 +145,8 @@ class RunnerOptionStore(OptionStore):
         self.cascading_dicts.append(opts)
 
         if (len(self.cascading_dicts) > 2 and
-            all(len(d) == 0 for d in self.cascading_dicts[2:-1])):
+            all(len(d) == 0 for d in self.cascading_dicts[2:-1]) and
+            len(conf_paths) > 0):
             log.warning('No configs specified for %s runner' % alias)
 
         self.populate_values_from_cascading_dicts()
@@ -193,6 +196,16 @@ class RunnerOptionStore(OptionStore):
             ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_failure_error,
                          self['cleanup_on_failure'])
+
+    def __getitem__(self, key):
+        if key == 'interpreter':
+            val = super(RunnerOptionStore, self).__getitem__(key)
+            if val is None:
+                return self['python_bin']
+            else:
+                return val
+        else:
+            return super(RunnerOptionStore, self).__getitem__(key)
 
 
 class MRJobRunner(object):
@@ -815,7 +828,7 @@ class MRJobRunner(object):
     def _script_args_for_step(self, step_num, mrc):
         assert self._script
 
-        args = self._opts['python_bin'] + [
+        args = self._opts['interpreter'] + [
             self._script['name'],
             '--step-num=%d' % step_num,
             '--%s' % mrc,

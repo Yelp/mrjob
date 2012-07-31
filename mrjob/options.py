@@ -109,6 +109,10 @@ def add_runner_opts(opt_group):
                   ' use --file multiple times.')),
 
         opt_group.add_option(
+            '--interpreter', dest='interpreter', default=None,
+            help=("Interpreter to run your script, e.g. python or ruby.")),
+
+        opt_group.add_option(
             '--no-bootstrap-mrjob', dest='bootstrap_mrjob',
             action='store_false', default=None,
             help=("Don't automatically tar up the mrjob library and install it"
@@ -135,9 +139,9 @@ def add_runner_opts(opt_group):
 
         opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
-            help=("Name/path of alternate python binary for mappers/reducers."
-                  " You can include arguments, e.g. --python-bin 'python"
-                  " -v'")),
+            help=("Name/path of alternate python binary for wrapper script and"
+                  " Python mappers/reducers. You can include arguments, e.g."
+                  " --python-bin 'python -v'")),
 
         opt_group.add_option(
             '-r', '--runner', dest='runner', default='inline',

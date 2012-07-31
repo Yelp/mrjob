@@ -124,6 +124,10 @@ class RunnerOptionStore(OptionStore):
         'upload_files': combine_path_lists,
     })
 
+    DEFAULT_ALIASES = {
+        'interpreter': 'python_bin',
+    }
+
     def __init__(self, alias, opts, conf_paths):
         """
         :param alias: Runner alias (e.g. ``'local'``)
@@ -199,16 +203,6 @@ class RunnerOptionStore(OptionStore):
             ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_failure_error,
                          self['cleanup_on_failure'])
-
-    def __getitem__(self, key):
-        if key == 'interpreter':
-            val = super(RunnerOptionStore, self).__getitem__(key)
-            if val is None:
-                return self['python_bin']
-            else:
-                return val
-        else:
-            return super(RunnerOptionStore, self).__getitem__(key)
 
 
 class MRJobRunner(object):

@@ -67,7 +67,7 @@ def add_basic_opts(opt_group):
     ]
 
 
-def add_runner_opts(opt_group):
+def add_runner_opts(opt_group, default_runner='local'):
     """Options for all runners."""
     return [
         opt_group.add_option(
@@ -144,12 +144,12 @@ def add_runner_opts(opt_group):
                   " --python-bin 'python -v'")),
 
         opt_group.add_option(
-            '-r', '--runner', dest='runner', default='inline',
+            '-r', '--runner', dest='runner', default=default_runner,
             choices=('local', 'hadoop', 'emr', 'inline'),
             help=('Where to run the job: local to run locally, hadoop to run'
                   ' on your Hadoop cluster, emr to run on Amazon'
                   ' ElasticMapReduce, and inline for local debugging. Default'
-                  ' is local.')),
+                  ' is %s.' % default_runner)),
 
         opt_group.add_option(
             '--setup-cmd', dest='setup_cmds', action='append',

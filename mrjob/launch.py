@@ -64,6 +64,8 @@ class MRJobLauncher(object):
     #: :py:class:`optparse.OptionParser` instance.
     OPTION_CLASS = Option
 
+    _DEFAULT_RUNNER = 'local'
+
     def __init__(self, script_path=None, args=None):
         if script_path is not None:
             script_path = os.path.abspath(script_path)
@@ -244,7 +246,7 @@ class MRJobLauncher(object):
             self.option_parser, 'Running the entire job')
         self.option_parser.add_option_group(self.runner_opt_group)
 
-        add_runner_opts(self.runner_opt_group)
+        add_runner_opts(self.runner_opt_group, self._DEFAULT_RUNNER)
         add_basic_opts(self.runner_opt_group)
 
         self.hadoop_opts_opt_group = OptionGroup(

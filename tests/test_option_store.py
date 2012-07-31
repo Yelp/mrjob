@@ -39,6 +39,7 @@ except ImportError:
 from mrjob.conf import dump_mrjob_conf
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import log_to_stream
+from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 
@@ -274,3 +275,27 @@ class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
         opts = RunnerOptionStore('inline', {}, [path_left, path_right])
         self.assertEqual(opts['jobconf'],
                          dict(from_left=1, from_both=2, from_right=2))
+
+
+class TestExtraKwargs(ConfigFilesTestCase):
+
+    CONFIG = {'runners': {'inline': {
+        'qux': 'quux',
+        'setup_cmds': ['echo foo']}}}
+
+    def setUp(self):
+        super(TestExtraKwargs, self).setUp()
+        self.path = self.save_conf('config', self.CONFIG)
+
+    def test_extra_kwargs_in_mrjob_conf_okay(self):
+        with logger_disabled('mrjob.runner'):
+            opts = RunnerOptionStore('inline', {}, [self.path])
+            self.assertEqual(opts['setup_cmds'], ['echo foo'])
+            self.assertNotIn('qux', opts)
+
+    def test_extra_kwargs_passed_in_directly_okay(self):
+        with logger_disabled('mrjob.runner'):
+            opts = RunnerOptionStore(
+                'inline', {'base_tmp_dir': '/var/tmp', 'foo': 'bar'}, [])
+            self.assertEqual(opts['base_tmp_dir'], '/var/tmp')
+            self.assertNotIn('bar', opts)

@@ -30,12 +30,10 @@ try:
 except ImportError:
     import unittest
 from mock import patch
-from mrjob.conf import dump_mrjob_conf
 from mrjob.inline import InlineMRJobRunner
 from mrjob.parse import JOB_NAME_RE
 from mrjob.runner import MRJobRunner
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 
 
@@ -87,39 +85,6 @@ class WithStatementTestCase(unittest.TestCase):
 
     def test_double_none_okay(self):
         self._test_cleanup_after_with_statement(['NONE', 'NONE'], True)
-
-
-class TestExtraKwargs(unittest.TestCase):
-
-    def setUp(self):
-        self.make_mrjob_conf()
-
-    def tearDown(self):
-        self.delete_mrjob_conf()
-
-    def make_mrjob_conf(self):
-        _, self.mrjob_conf_path = tempfile.mkstemp(prefix='mrjob.conf.')
-        # include one fake kwarg, and one real one
-        conf = {'runners': {'inline': {'qux': 'quux',
-                                       'setup_cmds': ['echo foo']}}}
-        with open(self.mrjob_conf_path, 'w') as conf_file:
-            self.mrjob_conf = dump_mrjob_conf(conf, conf_file)
-
-    def delete_mrjob_conf(self):
-        os.unlink(self.mrjob_conf_path)
-
-    def test_extra_kwargs_in_mrjob_conf_okay(self):
-        with logger_disabled('mrjob.runner'):
-            with InlineMRJobRunner(conf_path=self.mrjob_conf_path) as runner:
-                self.assertEqual(runner._opts['setup_cmds'], ['echo foo'])
-                self.assertNotIn('qux', runner._opts)
-
-    def test_extra_kwargs_passed_in_directly_okay(self):
-        with logger_disabled('mrjob.runner'):
-            with InlineMRJobRunner(
-                conf_paths=[], base_tmp_dir='/var/tmp', foo='bar') as runner:
-                self.assertEqual(runner._opts['base_tmp_dir'], '/var/tmp')
-                self.assertNotIn('bar', runner._opts)
 
 
 class TestJobName(unittest.TestCase):

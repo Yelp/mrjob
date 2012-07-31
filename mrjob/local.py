@@ -529,6 +529,14 @@ class LocalMRJobRunner(MRJobRunner):
                 return shlex.split(substep_dict['pre_filter'])
         return None
 
+    def _executable(self):
+        # detect executable files so we can discard the explicit interpreter if
+        # possible
+        if os.access(self._script['path'], os.X_OK):
+            return [os.path.join(self._working_dir, self._script['name'])]
+        else:
+            return self._opts['interpreter'] + [self._script['name']]
+
     def _substep_args(self, step_dict, step_num, mrc, input_path=None):
         if step_dict['type'] != 'streaming':
             raise Exception("LocalMRJobRunner cannot run %s steps." %

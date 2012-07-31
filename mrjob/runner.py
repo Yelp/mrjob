@@ -828,11 +828,16 @@ class MRJobRunner(object):
 
         return self._steps
 
+    def _executable(self):
+        # default behavior is to always use an interpreter. local, emr, and
+        # hadoop runners check for executable script paths and prepend the
+        # working_dir, discarding the interpreter if possible.
+        return self._opts['interpreter'] + [self._script['name']]
+
     def _script_args_for_step(self, step_num, mrc):
         assert self._script
 
-        args = self._opts['interpreter'] + [
-            self._script['name'],
+        args = self._executable() + [
             '--step-num=%d' % step_num,
             '--%s' % mrc,
         ] + self._mr_job_extra_args()

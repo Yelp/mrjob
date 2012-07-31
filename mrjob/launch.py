@@ -112,7 +112,7 @@ class MRJobLauncher(object):
         return "usage: %prog [job_to_run|--help] [options] [input files]"
 
     @classmethod
-    def run(cls):
+    def run(cls, args=_READ_ARGS_FROM_SYS_ARGV):
         """Entry point for running job from the command-line.
 
         This is also the entry point when a mapper or reducer is run
@@ -127,7 +127,7 @@ class MRJobLauncher(object):
         * Run the entire job. See :py:meth:`run_job`
         """
         # load options from the command line
-        launcher = cls(args=_READ_ARGS_FROM_SYS_ARGV)
+        launcher = cls(args=args)
         launcher.run_job()
 
     def execute(self):

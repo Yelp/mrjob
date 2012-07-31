@@ -84,6 +84,9 @@ _BUFFER_SIZE = 4096
 
 class RunnerOptionStore(OptionStore):
 
+    # Test cases for this class live in tests.test_option_store rather than
+    # tests.test_runner.
+
     ALLOWED_KEYS = OptionStore.ALLOWED_KEYS.union(set([
         'base_tmp_dir',
         'bootstrap_mrjob',

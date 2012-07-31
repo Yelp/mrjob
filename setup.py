@@ -42,6 +42,7 @@ setup(
               'mrjob.examples',
               'mrjob.tools',
               'mrjob.tools.emr'],
+    scripts=['bin/mrjob'],
     url='http://github.com/Yelp/mrjob',
     version=mrjob.__version__,
     **setuptools_kwargs

@@ -40,6 +40,7 @@ setup(
     name='mrjob',
     packages=['mrjob',
               'mrjob.examples',
+              'mrjob.fs',
               'mrjob.tools',
               'mrjob.tools.emr'],
     scripts=['bin/mrjob'],

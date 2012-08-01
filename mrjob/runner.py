@@ -84,6 +84,9 @@ _BUFFER_SIZE = 4096
 
 class RunnerOptionStore(OptionStore):
 
+    # Test cases for this class live in tests.test_option_store rather than
+    # tests.test_runner.
+
     ALLOWED_KEYS = OptionStore.ALLOWED_KEYS.union(set([
         'base_tmp_dir',
         'bootstrap_mrjob',
@@ -93,6 +96,7 @@ class RunnerOptionStore(OptionStore):
         'hadoop_extra_args',
         'hadoop_streaming_jar',
         'hadoop_version',
+        'interpreter',
         'jobconf',
         'label',
         'owner',
@@ -109,6 +113,7 @@ class RunnerOptionStore(OptionStore):
         'base_tmp_dir': combine_paths,
         'cmdenv': combine_envs,
         'hadoop_extra_args': combine_lists,
+        'interpreter': combine_cmds,
         'jobconf': combine_dicts,
         'python_archives': combine_path_lists,
         'python_bin': combine_cmds,
@@ -118,6 +123,10 @@ class RunnerOptionStore(OptionStore):
         'upload_archives': combine_path_lists,
         'upload_files': combine_path_lists,
     })
+
+    DEFAULT_ALIASES = {
+        'interpreter': 'python_bin',
+    }
 
     def __init__(self, alias, opts, conf_paths):
         """
@@ -143,7 +152,8 @@ class RunnerOptionStore(OptionStore):
         self.cascading_dicts.append(opts)
 
         if (len(self.cascading_dicts) > 2 and
-            all(len(d) == 0 for d in self.cascading_dicts[2:-1])):
+            all(len(d) == 0 for d in self.cascading_dicts[2:-1]) and
+            (len(conf_paths) > 0 or len(opts) == 0)):
             log.warning('No configs specified for %s runner' % alias)
 
         self.populate_values_from_cascading_dicts()
@@ -812,11 +822,16 @@ class MRJobRunner(object):
 
         return self._steps
 
+    def _executable(self):
+        # default behavior is to always use an interpreter. local, emr, and
+        # hadoop runners check for executable script paths and prepend the
+        # working_dir, discarding the interpreter if possible.
+        return self._opts['interpreter'] + [self._script['name']]
+
     def _script_args_for_step(self, step_num, mrc):
         assert self._script
 
-        args = self._opts['python_bin'] + [
-            self._script['name'],
+        args = self._executable() + [
             '--step-num=%d' % step_num,
             '--%s' % mrc,
         ] + self._mr_job_extra_args()

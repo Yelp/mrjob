@@ -80,9 +80,15 @@ Job execution context
 **cmdenv** (:option:`--cmdenv`)
     Environment variables to pass to the job inside Hadoop streaming
 
+**interpreter** (:option:`--interpreter`)
+    Interpreter to launch your script with. Defaults to the value of
+    **python_bin**. Change this if you're using a language besides Python
+    2.5-2.7 or if you're running using :py:mod:`virtualenv`.
+
 **python_bin** (:option:`--python-bin`)
-    Name/path of alternate python binary for mappers/reducers (e.g. for use
-    with :py:mod:`virtualenv`). Defaults to ``'python'``.
+    Name/path of alternate Python binary for wrapper scripts and
+    mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to
+    ``'python'``.
 
 **setup_cmds** (:option:`--setup-cmd`)
     A list of commands to run before each mapper/reducer step (e.g.  ``['cd

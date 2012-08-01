@@ -1,0 +1,10 @@
+#!/usr/bin/python
+
+import sys
+
+if __name__ == '__main__':
+    if not sys.argv[1:] or sys.argv[1] != 'run':
+        print >> sys.stderr, "Usage: mrjob run (path to script) [args]"
+
+    from mrjob.launch import MRJobLauncher
+    MRJobLauncher.run(args=sys.argv[2:])

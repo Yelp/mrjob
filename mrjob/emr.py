@@ -1575,22 +1575,6 @@ class EMRJobRunner(MRJobRunner):
 
             raise Exception(msg)
 
-    def _script_args(self):
-        """How to invoke the script inside EMR"""
-        # We can invoke the script by its S3 URL, but we don't really
-        # gain anything from that, and EMR is touchy about distinguishing
-        # python scripts from shell scripts
-
-        assert self._script  # shouldn't call _script_args() if no script
-
-        args = self._opts['python_bin'] + [self._script['name']]
-        if self._wrapper_script:
-            args = (self._opts['python_bin'] +
-                    [self._wrapper_script['name']] +
-                    args)
-
-        return args
-
     def _s3_step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""
         if step_num == 0:

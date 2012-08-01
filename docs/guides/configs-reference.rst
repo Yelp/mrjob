@@ -31,6 +31,7 @@ Option                 Default                        Combined by               
 *cmdenv*               ``{}``                         :py:func:`~mrjob.conf.combine_envs`       :option:`--cmdenv`
 *hadoop_extra_args*    ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--hadoop-arg`
 *hadoop_streaming_jar* (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-streaming-jar`
+*interpreter*          (value of *python_bin*)        :py:func:`~mrjob.conf.combine_cmds`       :option:`--interpreter`
 *jobconf*              ``{}``                         :py:func:`~mrjob.conf.combine_dicts`      :option:`--jobconf` (see also :py:meth:`~mrjob.job.MRJob.jobconf`)
 *label*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--label`
 *owner*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--owner`

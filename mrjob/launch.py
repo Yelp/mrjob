@@ -64,6 +64,8 @@ class MRJobLauncher(object):
     #: :py:class:`optparse.OptionParser` instance.
     OPTION_CLASS = Option
 
+    _DEFAULT_RUNNER = 'local'
+
     def __init__(self, script_path=None, args=None):
         if script_path is not None:
             script_path = os.path.abspath(script_path)
@@ -110,7 +112,7 @@ class MRJobLauncher(object):
         return "usage: %prog [job_to_run|--help] [options] [input files]"
 
     @classmethod
-    def run(cls):
+    def run(cls, args=_READ_ARGS_FROM_SYS_ARGV):
         """Entry point for running job from the command-line.
 
         This is also the entry point when a mapper or reducer is run
@@ -125,7 +127,7 @@ class MRJobLauncher(object):
         * Run the entire job. See :py:meth:`run_job`
         """
         # load options from the command line
-        launcher = cls(args=_READ_ARGS_FROM_SYS_ARGV)
+        launcher = cls(args=args)
         launcher.run_job()
 
     def execute(self):
@@ -244,7 +246,7 @@ class MRJobLauncher(object):
             self.option_parser, 'Running the entire job')
         self.option_parser.add_option_group(self.runner_opt_group)
 
-        add_runner_opts(self.runner_opt_group)
+        add_runner_opts(self.runner_opt_group, self._DEFAULT_RUNNER)
         add_basic_opts(self.runner_opt_group)
 
         self.hadoop_opts_opt_group = OptionGroup(

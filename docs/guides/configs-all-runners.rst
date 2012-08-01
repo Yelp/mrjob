@@ -74,6 +74,10 @@ Temp files and cleanup
     this path does not need to be fully qualified with ``hdfs://`` URIs
     because it's understood that it has to be on HDFS.
 
+**no_output** (:option:`--output-dir`)
+    Don't stream output to STDOUT after job completion.  This is often used in
+    conjunction with ``--output-dir`` to store output only in HDFS or S3.
+
 Job execution context
 ---------------------
 

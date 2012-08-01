@@ -16,9 +16,19 @@
 from __future__ import with_statement
 
 from StringIO import StringIO
+
 import gzip
 import os
 
+try:
+    from unittest2 import TestCase
+    TestCase  # silence pyflakes warning
+except ImportError:
+    from unittest import TestCase
+
+from mock import patch
+
+from mrjob import conf
 from mrjob.inline import InlineMRJobRunner
 from mrjob.protocol import JSONValueProtocol
 from tests.mr_test_cmdenv import MRTestCmdenv
@@ -148,3 +158,17 @@ class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
                             for line in runner.stream_output())
 
             self.assertEqual(output, [2, 3, 4])
+
+
+class NoMRJobConfTestCase(TestCase):
+
+    def test_no_mrjob_confs(self):
+        with patch.object(conf, 'real_mrjob_conf_path', return_value=None):
+            mr_job = MRIncrementerJob(['-r', 'inline', '--times', '2'])
+            mr_job.sandbox(stdin=StringIO('0\n1\n2\n'))
+
+            with mr_job.make_runner() as runner:
+                runner.run()
+                output = sorted(mr_job.parse_output_line(line)[1]
+                                for line in runner.stream_output())
+                self.assertEqual(output, [2, 3, 4])

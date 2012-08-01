@@ -1321,7 +1321,7 @@ class EMRJobRunner(MRJobRunner):
         # detect executable files so we can discard the explicit interpreter if
         # possible
         if os.access(self._script['path'], os.X_OK):
-            return [self._script['name']]
+            return ['./' + self._script['name']]
         else:
             return self._opts['interpreter'] + [self._script['name']]
 

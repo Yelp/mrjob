@@ -205,17 +205,17 @@ class RunnerOptionStore(OptionStore):
                          self['cleanup_on_failure'])
 
     def _fix_interp_options(self):
-        if self['python_bin'] and not self['steps_python_bin']:
+        if not self['steps_python_bin']:
             self['steps_python_bin'] = self['python_bin']
 
-        if self['python_bin'] and not self['interpreter']:
+        if not self['steps_interpreter']:
+            if self['interpreter']:
+                self['steps_interpreter'] = self['interpreter']
+            else:
+                self['steps_interpreter'] = self['steps_python_bin']
+
+        if not self['interpreter']:
             self['interpreter'] = self['python_bin']
-
-        if self['steps_python_bin'] and not self['steps_interpreter']:
-            self['steps_interpreter'] = self['steps_python_bin']
-
-        if self['interpreter'] and not self['steps_interpreter']:
-            self['steps_interpreter'] = self['interpreter']
 
 
 class MRJobRunner(object):

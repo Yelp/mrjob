@@ -39,10 +39,6 @@ HADOOP_JOB_LIST_INFO_RE = re.compile(r'(\S+)\s+\d+\s+\d+\s+hadoop\s+\w+\s+\w+')
 log = logging.getLogger('mrjob.ssh')
 
 
-class SSHException(Exception):
-    pass
-
-
 def _ssh_args(ssh_bin, address, ec2_key_pair_file):
     """Helper method for :py:func:`ssh_run` to build an argument list for
     ``subprocess``. Specifies an identity, disables strict host key checking,
@@ -58,13 +54,12 @@ def _ssh_args(ssh_bin, address, ec2_key_pair_file):
 
 def check_output(out, err):
     if err:
-        if 'No such file or directory' in err:
+        if (('No such file or directory' in err)
+                or ('Warning: Permanently added' not in err)):
             raise IOError(err)
-        elif 'Warning: Permanently added' not in err:
-            raise SSHException(err)
 
     if 'Permission denied' in out:
-        raise SSHException(out)
+        raise IOError(out)
 
     return out
 
@@ -150,7 +145,7 @@ def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
 
 def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     """Return the file at ``path`` as a string. Raises ``IOError`` if the
-    file doesn't exist or ``SSHException if SSH access fails.
+    file doesn't exist or SSH access fails.
 
     :param ssh_bin: Path to ``ssh`` binary
     :param address: Address of your job's master node (obtained via
@@ -171,7 +166,7 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
 def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     """Recursively list files under ``path`` on the specified SSH host.
     Return the file at ``path`` as a string. Raises ``IOError`` if the
-    path doesn't exist or ``SSHException if SSH access fails.
+    path doesn't exist or SSH access fails.
 
     :param ssh_bin: Path to ``ssh`` binary
     :param address: Address of your job's master node (obtained via

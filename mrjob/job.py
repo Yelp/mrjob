@@ -815,7 +815,7 @@ class MRJob(MRJobLauncher):
             if real_num == 0:
                 read = self.input_protocol()
             else:
-                read =  self.internal_protocol()
+                read = self.internal_protocol()
             return read, write
 
     def pick_protocols(self, step_num, step_type):
@@ -1071,7 +1071,6 @@ class MRJob(MRJobLauncher):
             else:
                 # e.g. 0.18 or 0.20
                 return '%.2f' % v_float
-
 
         for key in unfiltered_jobconf:
             unfiltered_val = unfiltered_jobconf[key]

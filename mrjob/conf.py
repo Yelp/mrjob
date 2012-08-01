@@ -54,10 +54,6 @@ class OptionStore(dict):
     #: augment, etc. Leave blank for :py:func:`combine_values()`.
     COMBINERS = dict()
 
-    #: Mapping of key to another key to read if the first key has not been set
-    #: to anything.
-    DEFAULT_ALIASES = dict()
-
     def __init__(self):
         super(OptionStore, self).__init__()
         self.cascading_dicts = [
@@ -90,11 +86,7 @@ class OptionStore(dict):
 
     def __getitem__(self, key):
         if key in self.ALLOWED_KEYS:
-            val = super(OptionStore, self).__getitem__(key)
-            if val is None and key in self.DEFAULT_ALIASES:
-                return self[self.DEFAULT_ALIASES[key]]
-            else:
-                return val
+            return super(OptionStore, self).__getitem__(key)
         else:
             raise KeyError(key)
 

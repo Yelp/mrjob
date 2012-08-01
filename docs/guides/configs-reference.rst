@@ -13,6 +13,7 @@ Option                 Default                                                 S
 *hadoop_input_format*  ``None``                                                (see :py:meth:`~mrjob.job.MRJob.hadoop_input_format`)
 *hadoop_output_format* ``None``                                                (see :py:meth:`~mrjob.job.MRJob.hadoop_output_format`)
 *output_dir*           (automatic)                                             :option:`-o`, :option:`--output-dir`
+*no_output*            ``False``                                               :option:`--no-output`
 *partitioner*          ``None``                                                :option:`--partitioner` (see also :py:meth:`~mrjob.job.MRJob.partitioner`)
 ====================== ======================================================= ==========================================================================
 

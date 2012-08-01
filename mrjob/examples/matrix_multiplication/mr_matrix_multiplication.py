@@ -6,19 +6,30 @@ Reference :
 
 The input is 2 matrices which are represented
 in the sparse format [i,j] = cell_value
-eg:
+eg: 2 sample matrices
+
+[0,1]	2
+[1,0]	3
+[1,1]	4
+[0,0]	2
+
+and
+
 [0,1]	2
 [1,0]	2
-[1,1]	2
 [0,0]	2
 
 USAGE:
-    python mr_matrix_multiplication.py sample_files/1.matrix sample_files/2.matrix -r local --m1-rowcount 2
-    --m2-colcount 2 --matrix1 sample_files/1.matrix --matrix2 sample_files/2.matrix
+    python mr_matrix_multiplication.py sample_files/1.matrix sample_files/2.matrix -r local --m1-rowcount 2 \
+    --m2-colcount 2 -m1-colcount 2 --matrix1 sample_files/1.matrix --matrix2 sample_files/2.matrix
+
+Example Output(will also be a sparse matrix) :
+[0, 0]	8
+[0, 1]	4.0
+[1, 0]	14
+[1, 1]	6.0
 
 """
-
-import json
 from optparse import OptionError
 import os
 from mrjob.job import MRJob
@@ -27,20 +38,22 @@ from mrjob.protocol import JSONProtocol
 class MRMatrixMultiplication(MRJob):
 
     INPUT_PROTOCOL = JSONProtocol
-
     def configure_options(self):
         super(MRMatrixMultiplication, self).configure_options()
         self.add_passthrough_option('--m1-rowcount', help="Row count of Matrix1")
+        self.add_passthrough_option('--m1-colcount', help="Column count of Matrix1")
         self.add_passthrough_option('--m2-colcount', help="Column count of Matrix2")
         self.add_passthrough_option('--matrix1', help="Matrix1 Filename")
         self.add_passthrough_option('--matrix2', help="Matrix2 Filename")
 
     def load_options(self, args):
         super(MRMatrixMultiplication, self).load_options(args=args)
-        if not self.options.m1_rowcount or not self.options.m2_colcount or not self.options.matrix1 or not self.options.matrix2:
+        if not self.options.m1_rowcount or not self.options.m2_colcount or not self.options.matrix1 \
+           or not self.options.matrix2 or not self.options.m1_colcount:
             raise OptionError("All Options must be present")
 
-    def cell_mapper(self, key, value):
+
+    def cell_mapper(self, coordinates, value):
         """
         We have 2 matrices m1 and m2
 
@@ -52,7 +65,6 @@ class MRMatrixMultiplication(MRJob):
             emit [i,k],(m2, j, m2(i,j))
 
         """
-        coordinates = json.loads(str(key))
         i,j = coordinates
         filename = os.environ['map_input_file']
 
@@ -61,7 +73,9 @@ class MRMatrixMultiplication(MRJob):
                 yield [i,k], ['m1', j, value]
         elif filename == self.options.matrix2:
             for k in xrange(int(self.options.m1_rowcount)):
-                yield [i,k], ['m2', j, value]
+                yield [k,j], ['m2', i, value]
+
+
 
     def multiply_reducer(self, key, values):
         """
@@ -69,19 +83,18 @@ class MRMatrixMultiplication(MRJob):
         sum(m1(j)*m2(j))
         """
         product = 0
-        m1_vector = []
-        m2_vector = []
+        # for huge rows/columns having both of the row/col vectors as a dict helps in reducing
+        # time complexity to join both vectors(which now becomes O(k) from O(k^2));
+        m1_vector = {}
+        m2_vector = {}
         for vector in values:
-            if vector[0] == "m1":
-                m1_vector.append(vector)
+            if vector[0] == 'm1':
+                m1_vector[vector[1]] = vector[2]
             else:
-                m2_vector.append(vector)
+                m2_vector[vector[1]] = vector[2]
 
-        for m1 in m1_vector:
-            for m2 in m2_vector:
-                if m1[1] is m2[1]:
-                    product+= m1[2]*m2[2]
-
+        for k in xrange(int(self.options.m1_colcount)):
+            product += (m1_vector.get(k, 0.0) * m2_vector.get(k, 0.0))
         yield key, product
 
 

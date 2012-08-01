@@ -104,6 +104,7 @@ class RunnerOptionStore(OptionStore):
         'python_bin',
         'setup_cmds',
         'setup_scripts',
+        'steps_interpreter',
         'steps_python_bin',
         'upload_archives',
         'upload_files',
@@ -119,14 +120,11 @@ class RunnerOptionStore(OptionStore):
         'python_bin': combine_cmds,
         'setup_cmds': combine_lists,
         'setup_scripts': combine_path_lists,
+        'steps_interpreter': combine_cmds,
         'steps_python_bin': combine_cmds,
         'upload_archives': combine_path_lists,
         'upload_files': combine_path_lists,
     })
-
-    DEFAULT_ALIASES = {
-        'interpreter': 'python_bin',
-    }
 
     def __init__(self, alias, opts, conf_paths):
         """
@@ -159,6 +157,8 @@ class RunnerOptionStore(OptionStore):
         self.populate_values_from_cascading_dicts()
 
         self._validate_cleanup()
+
+        self._fix_interp_options()
 
     def default_options(self):
         super_opts = super(RunnerOptionStore, self).default_options()
@@ -203,6 +203,19 @@ class RunnerOptionStore(OptionStore):
             ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_failure_error,
                          self['cleanup_on_failure'])
+
+    def _fix_interp_options(self):
+        if self['python_bin'] and not self['steps_python_bin']:
+            self['steps_python_bin'] = self['python_bin']
+
+        if self['python_bin'] and not self['interpreter']:
+            self['interpreter'] = self['python_bin']
+
+        if self['steps_python_bin'] and not self['steps_interpreter']:
+            self['steps_interpreter'] = self['steps_python_bin']
+
+        if self['interpreter'] and not self['steps_interpreter']:
+            self['steps_interpreter'] = self['interpreter']
 
 
 class MRJobRunner(object):
@@ -790,7 +803,7 @@ class MRJobRunner(object):
             if not self._script:
                 self._steps = []
             else:
-                args = (self._executable() + ['--steps'] +
+                args = (self._executable(True) + ['--steps'] +
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))
                 # add . to PYTHONPATH (in case mrjob isn't actually installed)
@@ -821,11 +834,14 @@ class MRJobRunner(object):
 
         return self._steps
 
-    def _executable(self):
+    def _executable(self, steps=False):
         # default behavior is to always use an interpreter. local, emr, and
         # hadoop runners check for executable script paths and prepend the
         # working_dir, discarding the interpreter if possible.
-        return self._opts['interpreter'] + [self._script['name']]
+        if steps:
+            return self._opts['steps_interpreter'] + [self._script['path']]
+        else:
+            return self._opts['interpreter'] + [self._script['name']]
 
     def _script_args_for_step(self, step_num, mrc):
         assert self._script

@@ -79,8 +79,13 @@ class NameUniqueTestCase(unittest.TestCase):
                 '', names_taken=['_']),
             '_-1')
 
-    def test_dont_start_auto_names_with_hyphen(self):
+    def test_initial_dot_isnt_extension(self):
         self.assertEqual(
             name_uniquely(
                 '.emacs', names_taken=['.emacs']),
-            '1.emacs')  # not '-1.emacs'
+            '.emacs-1')  # not '-1.emacs'
+
+        self.assertEqual(
+            name_uniquely(
+                '.mrjob.conf', names_taken=['.mrjob.conf']),
+            '.mrjob-1.conf')  # not '-1.mrjob.conf'

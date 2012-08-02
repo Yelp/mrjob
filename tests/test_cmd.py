@@ -20,6 +20,7 @@ except ImportError:
     import unittest
 
 from mrjob.cmd import name_uniquely
+from mrjob.cmd import UploadDir
 
 
 class NameUniqueTestCase(unittest.TestCase):
@@ -89,3 +90,51 @@ class NameUniqueTestCase(unittest.TestCase):
             name_uniquely(
                 '.mrjob.conf', names_taken=['.mrjob.conf']),
             '.mrjob-1.conf')  # not '-1.mrjob.conf'
+
+
+class UploadDirTestCase(unittest.TestCase):
+
+    def test_empty(self):
+        ud = UploadDir('hdfs:///')
+        self.assertEqual(ud.path_to_uri(), {})
+
+    def test_simple(self):
+        ud = UploadDir('hdfs:///')
+        ud.add('foo/bar.py')
+        self.assertEqual(ud.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
+
+    def test_name_collision(self):
+        ud = UploadDir('hdfs:///')
+        ud.add('foo/bar.py')
+        ud.add('bar.py')
+        self.assertEqual(ud.path_to_uri(),
+                         {'foo/bar.py': 'hdfs:///bar.py',
+                          'bar.py': 'hdfs:///bar-1.py'})
+
+    def test_add_is_idempotent(self):
+        ud = UploadDir('hdfs:///')
+        ud.add('foo/bar.py')
+        self.assertEqual(ud.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
+        ud.add('foo/bar.py')
+        self.assertEqual(ud.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
+
+    def test_uri(self):
+        ud = UploadDir('hdfs:///')
+        ud.add('foo/bar.py')
+        self.assertEqual(ud.uri('foo/bar.py'), 'hdfs:///bar.py')
+
+    def test_unknown_uri(self):
+        ud = UploadDir('hdfs:///')
+        ud.add('foo/bar.py')
+        self.assertEqual(ud.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
+        self.assertEqual(ud.uri('hdfs://host/path/to/bar.py'),
+                         'hdfs://host/path/to/bar.py')
+        # checking unknown URIs doesn't add them
+        self.assertEqual(ud.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
+
+    def uri_adds_trailing_slash(self):
+        ud = UploadDir('s3://bucket/dir')
+        ud.add('foo/bar.py')
+        self.assertEqual(ud.uri('foo/bar.py'), 's3://bucket/dir/bar.py')
+        self.assertEqual(ud.path_to_uri(),
+                         {'foo/bar.py': 's3://bucket/dir/bar.py'})

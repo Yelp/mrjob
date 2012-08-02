@@ -21,7 +21,7 @@ import os.path
 import posixpath
 
 
-def name_uniquely(path, names_taken, proposed_name=None):
+def name_uniquely(path, names_taken=(), proposed_name=None):
     """Come up with a unique name for *path*.
 
     :param names_taken: a dictionary or set of names not to use.
@@ -42,12 +42,14 @@ def name_uniquely(path, names_taken, proposed_name=None):
 
     dot_idx = proposed_name.find('.')
     if dot_idx == -1:
-        prefix, suffix = proposed_name, ''
+        prefix, suffix = proposed_name + '-', ''
+    elif dot_idx == 0:
+        prefix, suffix = '', proposed_name
     else:
-        prefix, suffix = proposed_name[:dot_idx], proposed_name[dot_idx:]
+        prefix, suffix = proposed_name[:dot_idx] + '-', proposed_name[dot_idx:]
 
     for i in itertools.count(1):
-        name = '%s-%d%s' % (prefix, i, suffix)
+        name = '%s%d%s' % (prefix, i, suffix)
         if name not in names_taken:
             return name
 

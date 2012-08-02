@@ -95,7 +95,8 @@ class UploadDir(object):
             return path
 
     def path_to_uri(self):
-        """Get a map from path to URI for all paths that were added."""
+        """Get a map from path to URI for all paths that were added,
+        so we can figure out which files we need to upload."""
         return dict((path, self.uri(path))
                     for path in self._path_to_name)
 
@@ -106,7 +107,7 @@ class SetupDir(object):
 
     To support Hadoop's distributed cache, paths can be for ordinary
     files, or for archives (which are automatically uncompressed into
-    a directory).
+    a directory by Hadoop).
 
     When adding a file, you may optionally assign it a name; if you don't;
     we'll lazily assign it a name as needed. Name collisions are not allowed,
@@ -162,7 +163,7 @@ class SetupDir(object):
         """Get the name for a path previously added to this
         :py:class:`SetupDir`. If we haven't chosen a name yet, assign one.
 
-        :param type: Either either ``'archive'` or `'file'`
+        :param type: either ``'archive'` or `'file'`
         :param path: path/URI
         """
         self._check_type(type)
@@ -180,9 +181,11 @@ class SetupDir(object):
 
     def name_to_path(self, type):
         """Get a map from name (in the setup directory) to path for
-        all known files/archives.
+        all known files/archives, so we can build :option:`-file` and
+        :option:`-archive` options to Hadoop (or fake them in a bootstrap
+        script).
 
-        :param type: Either either ``'archive'` or `'file'`
+        :param type: either ``'archive'` or `'file'`
         """
         self._check_type(type)
 
@@ -196,7 +199,7 @@ class SetupDir(object):
                     if typed_path[0] == type)
 
     def _check_name(self, name):
-        if not isinstance(name, (basestring, type(None))):
+        if not (name is None or isinstance(name, basestring)):
             raise TypeError('name must be a string or None: %r' % (name,))
 
         if '/' in name:

@@ -52,15 +52,15 @@ def name_uniquely(path, names_taken=(), proposed_name=None):
             return name
 
 
-class UploadDir(object):
+class ScratchDir(object):
     """Represents a directory on HDFS or S3 where we want to park files
     for consumption by Hadoop.
 
-    :py:class:`UploadDir` tries to give files the same name as their filename
+    :py:class:`ScratchDir` tries to give files the same name as their filename
     in the path (for ease of debugging), but handles collisions gracefully.
     """
     def __init__(self, prefix):
-        """Make an :py:class`UploadDir`.
+        """Make an :py:class`ScratchDir`.
 
         :param string prefix: The URI for the directory (e.g.
                               `s3://bucket/dir/`). It doesn't matter if
@@ -101,7 +101,7 @@ class UploadDir(object):
                     for path in self._path_to_name)
 
 
-class SetupDir(object):
+class WorkingDir(object):
     """Represents the working directory of hadoop tasks (or bootstrap
     commands on EMR).
 
@@ -161,7 +161,7 @@ class SetupDir(object):
 
     def name(self, type, path):
         """Get the name for a path previously added to this
-        :py:class:`SetupDir`. If we haven't chosen a name yet, assign one.
+        :py:class:`WorkingDir`. If we haven't chosen a name yet, assign one.
 
         :param type: either ``'archive'` or `'file'`
         :param path: path/URI

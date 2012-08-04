@@ -14,6 +14,15 @@
 
 # NOTE: this code is in cmd.py because it's part of an effort to integrate
 # file uploads into command lines. See Issue #206.
+"""Utilities for processing command line and automatically uploading
+files.
+
+This module provides two utility classes for keeping track of uploads.
+Typically, you'll want to use ScratchDir to manage uploading files from
+a local machine to a place where Hadoop can see them (HDFS or S3) and
+WorkingDir to manage placing these files within your tasks' working
+directories (i.e. to help interface with Hadoop's DistributedCache system).
+"""
 from __future__ import with_statement
 
 import itertools
@@ -119,8 +128,8 @@ class WorkingDir(object):
     _SUPPORTED_TYPES = ('archive', 'file')
 
     def __init__(self):
-        self._typed_paths = set()
-        self._typed_path_to_default_name = {}
+        # map from paths added without a name to None or lazily chosen name
+        self._typed_path_to_auto_name = {}
         self._name_to_typed_path = {}
 
     def add(self, type, path, name=None):
@@ -129,55 +138,65 @@ class WorkingDir(object):
 
         :param type: either ``'archive'` or `'file'`
         :param path: path/URI to add
-        :param name: optional name that this path *must* be assigned. If
-                     the name is already taken, raise an exception. Setting
-                     name to ``''`` is the same as setting it to ``None``
-                     (we don't allow empty names).
+        :param name: optional name that this path *must* be assigned, or
+                     None to assign this file a name later.
         """
         self._check_name(name)
         self._check_type(type)
 
-        # register this file/archive
-        self._typed_paths.add((type, path))
+        # stop name collisions
+        if name in self._name_to_typed_path:
+            current_type, current_path = self._name_to_typed_path[name]
 
-        if name:
-            if name in self._name_to_typed_path:
-                # Name is taken! Check that it belongs to this file/archive
-                current_type, current_path = self._name_to_typed_path[name]
-
-                if (type, path) != (current_type, current_path):
-                    raise ValueError(
-                        "%s won't work because we already have %" % (
-                            self._desc(type, path, name),
-                            self._desc(current_type, current_path, name)))
+            if (type, path) == (current_type, current_path):
+                return  # already added
             else:
-                # Name is not taken! Reserve it
-                self._name_to_typed_path[(type, path)] = name
-                # currently, we don't update _typed_path_to_default_name
-                # on the theory that it might cause surprises. For example,
-                # if someone uploads foo.py#bar.py and foo.py#, and deletes
-                # bar.py with a setup script, the copy we expect to use
-                # for foo.py# should still be there.
+                raise ValueError(
+                    "%s won't work because we already have %" % (
+                        self._desc(type, path, name),
+                        self._desc(current_type, current_path, name)))
 
-    def name(self, type, path):
+        # if a name was specified, reserve it
+        if name:
+            self._name_to_typed_path[name] = (type, path)
+        # otherwise, get ready to auto-name the file
+        else:
+            self._typed_path_to_auto_name.setdefault((type, path), None)
+
+    def name(self, type, path, name=None):
         """Get the name for a path previously added to this
-        :py:class:`WorkingDir`. If we haven't chosen a name yet, assign one.
+        :py:class:`WorkingDir`, assigning one as needed.
+
+        This is primarily for getting the name of auto-named files. If
+        the file was added with an assigned name, you must include it
+        (and we'll just return *name*).
+
+        We won't ever give an auto-name that's the same an assigned name
+        (even for the same path and type).
 
         :param type: either ``'archive'` or `'file'`
         :param path: path/URI
+        :param name: known name of the file
         """
+        self._check_name(name)
         self._check_type(type)
 
-        if (type, path) not in self._typed_path:
-            raise ValueError('%s was never added!' % self._desc(type, path))
+        if name:
+            if name not in self._name_to_typed_path:
+                raise ValueError('unknown name: %r' % name)
 
-        if (type, path) not in self._typed_path_to_default_name:
+            return name
+
+        if (type, path) not in self._typed_path_to_auto_name:
+            raise ValueError('%s was never added without a name!' %
+                             self._desc(type, path))
+
+        if not self._typed_path_to_auto_name[(type, path)]:
             name = name_uniquely(path, names_taken=self._name_to_typed_path)
             self._name_to_typed_path[name] = (type, path)
+            self._typed_path_to_auto_name[(type, path)] = name
 
-            self._typed_path_to_default_name[(type, path)] = name
-
-        return self._typed_path_to_default_name[(type, path)]
+        return self._typed_path_to_auto_name[(type, path)]
 
     def name_to_path(self, type):
         """Get a map from name (in the setup directory) to path for
@@ -189,17 +208,20 @@ class WorkingDir(object):
         """
         self._check_type(type)
 
-        for path_type, path in self._typed_paths:
+        for path_type, path in self._typed_path_to_auto_name:
             if path_type == type:
                 self.name(type, path)
 
-        return dict((name, typed_path)
+        return dict((name, typed_path[1])
                     for name, typed_path
                     in self._name_to_typed_path.iteritems()
                     if typed_path[0] == type)
 
     def _check_name(self, name):
-        if not (name is None or isinstance(name, basestring)):
+        if name is None:
+            return
+
+        if not isinstance(name, basestring):
             raise TypeError('name must be a string or None: %r' % (name,))
 
         if '/' in name:

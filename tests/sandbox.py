@@ -31,17 +31,17 @@ from mrjob import runner
 # simple config that also silences 'no config options for runner' logging
 EMPTY_MRJOB_CONF = {'runners': {
     'local': {
-        'label': 'test_job'
+        'label': 'test_job',
     },
     'emr': {
         'check_emr_status_every': 0.00,
         's3_sync_wait_time': 0.00,
     },
     'hadoop': {
-        'label': 'test_job'
+        'label': 'test_job',
     },
     'inline': {
-        'label': 'test_job'
+        'label': 'test_job',
     },
 }}
 

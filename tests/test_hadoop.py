@@ -207,6 +207,11 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
 class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 
+    MRJOB_CONF_CONTENTS = {'runners': {'hadoop': {
+        'hadoop_home': 'kansas',
+        'hadoop_streaming_jar': 'binks.jar.jar',
+    }}}
+
     def setUp(self):
         super(StreamingArgsTestCase, self).setUp()
         self.runner = HadoopJobRunner(

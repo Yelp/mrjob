@@ -436,6 +436,11 @@ JOBCONF_DICT_LIST = [
      '0.21': 'mapreduce.job.user.name'},
 ]
 
+# Issue #534: 1.x is the new 0.20, 2.x is the new 0.21+
+for jobconf_dict in JOBCONF_DICT_LIST:
+    jobconf_dict['1.0'] = jobconf_dict['0.18']
+    jobconf_dict['2.0'] = jobconf_dict['0.21']
+
 
 def _dict_list_to_compat_map(dict_list):
     # compat_map = {

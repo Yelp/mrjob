@@ -70,7 +70,7 @@ def parse_hash_path(hash_path):
     return {'path': path, 'name': name, 'type': type}
 
 
-def parse_legacy_hash_path(self, type, path, must_name=None):
+def parse_legacy_hash_path(type, path, must_name=None):
     """Parse hash paths from old setup/bootstrap options.
 
     This is similar to :py:func:`parse_hash_path` except that we pass in

@@ -1806,14 +1806,11 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['emr_job_flow_id']:
             return
 
-        # Also don't bother if we're not pooling (and therefore don't need
-        # to have a bootstrap script to attach to) and we're not bootstrapping
-        # anything else
-        if not (self._opts['pool_emr_job_flows'] or
-            any(key.startswith('bootstrap_') and
-                key != 'bootstrap_actions' and  # these are separate scripts
-                value
-                for (key, value) in self._opts.iteritems())):
+        # Also don't bother if we're not bootstrapping
+        if any(key.startswith('bootstrap_') and
+               key != 'bootstrap_actions' and  # these are separate scripts
+               value
+               for (key, value) in self._opts.iteritems()):
             return
 
         path = os.path.join(self._get_local_tmp_dir(), dest)
@@ -2180,43 +2177,26 @@ class EMRJobRunner(MRJobRunner):
         match jobs and job flows. This first argument passed to the bootstrap
         script will be ``'pool-'`` plus this hash.
         """
-        def should_include_file(info):
-            # Bootstrap scripts will always have a different checksum
-            if 'name' in info and info['name'] in ('b.py', 'wrapper.py'):
-                return False
+        def bootstrap_file_paths():
+            for path in self._b_mgr.name_to_path('file').itervalues():
+                # master bootstrap script is defined by other opts.
+                # would be nice if we could avoid creating it when
+                # joining a pooled job flow.
+                if path == self._master_bootstrap_script_path:
+                    continue
 
-            # Also do not include script used to spin up job
-            if self._script and info['path'] == self._script['path']:
-                return False
+                # mrjob.tar.gz is different every time (different timestamps)
+                if path == self._mrjob_tar_gz_path:
+                    continue
 
-            # Only include bootstrap files
-            if 'bootstrap' not in info:
-                return False
-
-            # mrjob.tar.gz is covered by the bootstrap_mrjob variable.
-            # also, it seems to be different every time, causing an
-            # undesirable hash mismatch.
-            if (self._opts['bootstrap_mrjob']
-                and info is self._mrjob_tar_gz_file):
-                return False
-
-            # Ignore job-specific files
-            if info['path'] in self._input_paths:
-                return False
-
-            return True
-
-        # strip unique s3 URI if there is one
-        cleaned_bootstrap_actions = [dict(path=fd['path'], args=fd['args'])
-                                     for fd in self._bootstrap_actions]
+                yield path
 
         things_to_hash = [
-            [self.md5sum(fd['path'])
-             for fd in self._files if should_include_file(fd)],
+            [self.md5sum(path) for path in bootstrap_file_paths()],
             self._opts['additional_emr_info'],
             self._opts['bootstrap_mrjob'],
             self._opts['bootstrap_cmds'],
-            cleaned_bootstrap_actions,
+            self._bootstrap_actions,
         ]
         if self._opts['bootstrap_mrjob']:
             things_to_hash.append(mrjob.__version__)

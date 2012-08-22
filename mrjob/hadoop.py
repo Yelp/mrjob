@@ -422,7 +422,6 @@ class HadoopJobRunner(MRJobRunner):
         """
         args = []
 
-
         # TODO: does Hadoop have a way of coping with paths that have
         # commas in their names?
 

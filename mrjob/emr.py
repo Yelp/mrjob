@@ -70,8 +70,8 @@ from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
 from mrjob.logparsers import NODE_LOG_URI_RE
+from mrjob.logparsers import best_error_from_logs
 from mrjob.logparsers import scan_for_counters_in_files
-from mrjob.logparsers import scan_logs_in_order
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
@@ -110,21 +110,30 @@ JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 SUBSECOND_RE = re.compile('\.[0-9]+')
 
 # map from AWS region to EMR endpoint. See
-# http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?ConceptsRequestEndpoints.html
+# http://docs.amazonwebservices.com/general/latest/gr/rande.html#emr_region
 REGION_TO_EMR_ENDPOINT = {
-    'EU': 'eu-west-1.elasticmapreduce.amazonaws.com',
-    'us-east-1': 'us-east-1.elasticmapreduce.amazonaws.com',
-    'us-west-1': 'us-west-1.elasticmapreduce.amazonaws.com',
+    'us-east-1': 'elasticmapreduce.us-east-1.amazonaws.com',
+    'us-west-1': 'elasticmapreduce.us-west-1.amazonaws.com',
+    'us-west-2': 'elasticmapreduce.us-west-2.amazonaws.com',
+    'EU': 'elasticmapreduce.eu-west-1.amazonaws.com',  # for compatibility
+    'eu-west-1': 'elasticmapreduce.eu-west-1.amazonaws.com',
+    'ap-southeast-1': 'elasticmapreduce.ap-southeast-1.amazonaws.com',
+    'ap-northeast-1': 'elasticmapreduce.ap-northeast-1.amazonaws.com',
+    'sa-east-1': 'elasticmapreduce.sa-east-1.amazonaws.com',
     '': 'elasticmapreduce.amazonaws.com',  # when no region specified
 }
 
 # map from AWS region to S3 endpoint. See
-# http://docs.amazonwebservices.com/AmazonS3/latest/dev/MakingRequests.html#RequestEndpoints
+# http://docs.amazonwebservices.com/general/latest/gr/rande.html#s3_region
 REGION_TO_S3_ENDPOINT = {
-    'EU': 's3-eu-west-1.amazonaws.com',
     'us-east-1': 's3.amazonaws.com',  # no region-specific endpoint
     'us-west-1': 's3-us-west-1.amazonaws.com',
-    'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com',  # no EMR endpoint yet
+    'us-west-2': 's3-us-west-2.amazonaws.com',
+    'EU': 's3-eu-west-1.amazonaws.com',
+    'eu-west-1': 's3-eu-west-1.amazonaws.com',
+    'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com',
+    'ap-northeast-1': 's3-ap-northeast-1.amazonaws.com',
+    'sa-east-1': 's3-sa-east-1.amazonaws.com',
     '': 's3.amazonaws.com',
 }
 
@@ -367,7 +376,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_endpoint',
         'emr_job_flow_id',
         'emr_job_flow_pool_name',
-        'enable_emr_debugging',
         'enable_emr_debugging',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
@@ -1428,7 +1436,7 @@ class EMRJobRunner(MRJobRunner):
 
         # try to find a job flow from the pool. basically auto-fill
         # 'emr_job_flow_id' if possible and then follow normal behavior.
-        if self._opts['pool_emr_job_flows']:
+        if self._opts['pool_emr_job_flows'] and not self._emr_job_flow_id:
             job_flow = self.find_job_flow(num_steps=len(steps))
             if job_flow:
                 self._emr_job_flow_id = job_flow.jobflowid
@@ -1807,10 +1815,8 @@ class EMRJobRunner(MRJobRunner):
         step_logs = self.ls_step_logs_ssh(step_nums)
         job_logs = self.ls_job_logs_ssh(step_nums)
         log.info('Scanning SSH logs for probable cause of failure')
-        return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
-                                  step_logs=step_logs,
-                                  job_logs=job_logs,
-                                  runner=self)
+        return best_error_from_logs(self, task_attempt_logs, step_logs,
+                                    job_logs)
 
     def _find_probable_cause_of_failure_s3(self, step_nums):
         log.info('Scanning S3 logs for probable cause of failure')
@@ -1820,10 +1826,8 @@ class EMRJobRunner(MRJobRunner):
         task_attempt_logs = self.ls_task_attempt_logs_s3(step_nums)
         step_logs = self.ls_step_logs_s3(step_nums)
         job_logs = self.ls_job_logs_s3(step_nums)
-        return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
-                                  step_logs=step_logs,
-                                  job_logs=job_logs,
-                                  runner=self)
+        return best_error_from_logs(self, task_attempt_logs, step_logs,
+                                    job_logs)
 
     ### Bootstrapping ###
 

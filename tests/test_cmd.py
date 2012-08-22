@@ -20,7 +20,7 @@ except ImportError:
     import unittest
 
 from mrjob.cmd import name_uniquely
-from mrjob.cmd import ScratchDirManager
+from mrjob.cmd import UploadDirManager
 from mrjob.cmd import WorkingDirManager
 
 
@@ -93,19 +93,19 @@ class NameUniqueTestCase(unittest.TestCase):
             '.mrjob-1.conf')  # not '-1.mrjob.conf'
 
 
-class ScratchDirManagerTestCase(unittest.TestCase):
+class UploadDirManagerTestCase(unittest.TestCase):
 
     def test_empty(self):
-        sd = ScratchDirManager('hdfs:///')
+        sd = UploadDirManager('hdfs:///')
         self.assertEqual(sd.path_to_uri(), {})
 
     def test_simple(self):
-        sd = ScratchDirManager('hdfs:///')
+        sd = UploadDirManager('hdfs:///')
         sd.add('foo/bar.py')
         self.assertEqual(sd.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
 
     def test_name_collision(self):
-        sd = ScratchDirManager('hdfs:///')
+        sd = UploadDirManager('hdfs:///')
         sd.add('foo/bar.py')
         sd.add('bar.py')
         self.assertEqual(sd.path_to_uri(),
@@ -113,19 +113,19 @@ class ScratchDirManagerTestCase(unittest.TestCase):
                           'bar.py': 'hdfs:///bar-1.py'})
 
     def test_add_is_idempotent(self):
-        sd = ScratchDirManager('hdfs:///')
+        sd = UploadDirManager('hdfs:///')
         sd.add('foo/bar.py')
         self.assertEqual(sd.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
         sd.add('foo/bar.py')
         self.assertEqual(sd.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
 
     def test_uri(self):
-        sd = ScratchDirManager('hdfs:///')
+        sd = UploadDirManager('hdfs:///')
         sd.add('foo/bar.py')
         self.assertEqual(sd.uri('foo/bar.py'), 'hdfs:///bar.py')
 
     def test_unknown_uri(self):
-        sd = ScratchDirManager('hdfs:///')
+        sd = UploadDirManager('hdfs:///')
         sd.add('foo/bar.py')
         self.assertEqual(sd.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
         self.assertEqual(sd.uri('hdfs://host/path/to/bar.py'),
@@ -134,7 +134,7 @@ class ScratchDirManagerTestCase(unittest.TestCase):
         self.assertEqual(sd.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
 
     def uri_adds_trailing_slash(self):
-        sd = ScratchDirManager('s3://bucket/dir')
+        sd = UploadDirManager('s3://bucket/dir')
         sd.add('foo/bar.py')
         self.assertEqual(sd.uri('foo/bar.py'), 's3://bucket/dir/bar.py')
         self.assertEqual(sd.path_to_uri(),

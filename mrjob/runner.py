@@ -42,7 +42,7 @@ except:
     import json
 
 from mrjob.cmd import WorkingDirManager
-from mrjob.cmd import parse_hash_path
+from mrjob.cmd import parse_legacy_hash_path
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import uses_generic_jobconf
 from mrjob.conf import combine_cmds
@@ -325,21 +325,19 @@ class MRJobRunner(object):
 
         self._wd_mgr = WorkingDirManager()
 
-        if mr_job_script:
-            self._script = parse_hash_path(mr_job_script, type='file')
-            self._wd_mgr.add(**self._script)
-        else:
-            self._script = None
+        self._script_path = mr_job_script
+        if self._script_path:
+            self._wd_mgr.add('file', self._script_path)
 
         # setup cmds and wrapper script
         self._setup_scripts = []
-        for hash_path in self._opts['setup_scripts']:
-            setup_script = parse_hash_path(hash_path, type='file')
+        for path in self._opts['setup_scripts']:
+            setup_script = parse_legacy_hash_path('file', path)
             self._setup_scripts.append(setup_script)
             self._wd_mgr.add(**setup_script)
 
         # we'll create the wrapper script later
-        self._wrapper_script = None
+        self._wrapper_script_path = None
 
         # extra args to our job
         self._extra_args = list(extra_args) if extra_args else []
@@ -348,22 +346,22 @@ class MRJobRunner(object):
         self._file_upload_args = []
         if file_upload_args:
             for arg, path in file_upload_args:
-                arg_file = parse_hash_path(path, type='file')
+                arg_file = parse_legacy_hash_path('file', path)
                 self._wd_mgr.add(**arg_file)
                 self._file_upload_args.append((arg, arg_file))
 
         # set up uploading
-        for hash_path in self._opts['upload_archives']:
-            self._wd_mgr.add(**parse_hash_path(
-                path, type='archive', name_if_no_hash=True))
-        for hash_path in self._opts['upload_files']:
-            self._wd_mgr.add(**parse_hash_path(
-                path, type='file', name_if_no_hash=True))
+        for path in self._opts['upload_files']:
+            self._wd_mgr.add(**parse_legacy_hash_path(
+                'file', path, must_name='upload_files'))
+        for path in self._opts['upload_archives']:
+            self._wd_mgr.add(**parse_legacy_hash_path(
+                'archive', path, must_name='upload_archives'))
 
         # set up python archives
         self._python_archives = []
-        for hash_path in self._opts['python_archives']:
-            self._add_python_archive(hash_path)
+        for path in self._opts['python_archives']:
+            self._add_python_archive(path)
 
         # Where to read input from (log files, etc.)
         self._input_paths = input_paths or ['-']  # by default read from stdin
@@ -425,7 +423,7 @@ class MRJobRunner(object):
 
         Raise an exception if there are any problems.
         """
-        if not self._script:
+        if not self._script_path:
             raise AssertionError("No script to run!")
 
         if self._ran_job:
@@ -438,7 +436,8 @@ class MRJobRunner(object):
         """Stream raw lines from the job's output. You can parse these
         using the read() method of the appropriate HadoopStreamingProtocol
         class."""
-        assert self._ran_job
+        if not self._ran_job:
+            raise AssertionError('Run the job before streaming output')
 
         output_dir = self.get_output_dir()
         log.info('Streaming final output from %s' % output_dir)
@@ -624,8 +623,8 @@ class MRJobRunner(object):
 
     ### internal utilities for implementing MRJobRunners ###
 
-    def _add_python_archive(self, hash_path):
-        python_archive = parse_hash_path(hash_path, type='archive')
+    def _add_python_archive(self, path):
+        python_archive = parse_legacy_hash_path('archive', path)
         self._wd_mgr.add(**python_archive)
         self._python_archives.append(python_archive)
 
@@ -663,9 +662,8 @@ class MRJobRunner(object):
         # use the name of the script if one wasn't explicitly
         # specified
         if not label:
-            if self._script:
-                label = os.path.basename(
-                    self._script['path']).split('.')[0]
+            if self._script_path:
+                label = os.path.basename(self._script_path).split('.')[0]
             else:
                 label = 'no_script'
 
@@ -686,7 +684,7 @@ class MRJobRunner(object):
         cached to avoid round trips to a subprocess.
         """
         if self._steps is None:
-            if not self._script:
+            if not self._script_path:
                 self._steps = []
             else:
                 args = (self._executable(True) + ['--steps'] +
@@ -725,22 +723,22 @@ class MRJobRunner(object):
         # hadoop runners check for executable script paths and prepend the
         # working_dir, discarding the interpreter if possible.
         if steps:
-            return self._opts['steps_interpreter'] + [self._script['path']]
+            return self._opts['steps_interpreter'] + [self._script_path]
         else:
             return (self._opts['interpreter'] +
-                    [self._wd_mgr.name(**self._script)])
+                    [self._wd_mgr.name('file', self._script_path)])
 
     def _script_args_for_step(self, step_num, mrc):
-        assert self._script
+        assert self._script_path
 
         args = self._executable() + [
             '--step-num=%d' % step_num,
             '--%s' % mrc,
         ] + self._mr_job_extra_args()
-        if self._wrapper_script:
+        if self._wrapper_script_path:
             return (
                 self._opts['python_bin'] +
-                [self._wd_mgr.name(**self._wrapper_script)] +
+                [self._wd_mgr.name('file', self._wrapper_script_path)] +
                 args)
         else:
             return args
@@ -826,12 +824,12 @@ class MRJobRunner(object):
             the path they'll have inside Hadoop streaming
         """
         args = []
-        for arg, arg_file in self._file_upload_args:
+        for arg, path_dict in self._file_upload_args:
             args.append(arg)
             if local:
-                args.append(arg_file['path'])
+                args.append(path_dict['path'])
             else:
-                args.append(self._wd_mgr.name(**arg_file))
+                args.append(self._wd_mgr.name(**path_dict))
         return args
 
     def _wrapper_script_content(self):
@@ -889,7 +887,7 @@ class MRJobRunner(object):
         """Create the wrapper script, and write it into our local temp
         directory (by default, to a file named wrapper.py).
 
-        This will set self._wrapper_script, and add it to self._wd_mgr
+        This will set self._wrapper_script_path, and add it to self._wd_mgr
 
         This will do nothing if setup_cmds and setup_scripts are
         empty, or _create_wrapper_script() has already been called.
@@ -897,7 +895,7 @@ class MRJobRunner(object):
         if not (self._opts['setup_cmds'] or self._setup_scripts):
             return
 
-        if self._wrapper_script:
+        if self._wrapper_script_path:
             return
 
         path = os.path.join(self._get_local_tmp_dir(), dest)
@@ -911,8 +909,8 @@ class MRJobRunner(object):
         f.write(contents)
         f.close()
 
-        self._wrapper_script = parse_hash_path(path, type='file')
-        self._wd_mgr.add(**self._wrapper_script)
+        self._wrapper_script_path = path
+        self._wd_mgr.add('file', self._wrapper_script_path)
 
     def _get_input_paths(self):
         """Get the paths to input files, dumping STDIN to a local
@@ -1018,6 +1016,42 @@ class MRJobRunner(object):
         if not uses_generic_jobconf(version):
             for key, value in sorted(self._opts['jobconf'].iteritems()):
                 args.extend(['-jobconf', '%s=%s' % (key, value)])
+
+        return args
+    def _arg_hash_paths(self, type, upload_mgr):
+        """Helper function for the *distributed_cache_args methods."""
+        for name, path in self._wd_mgr.name_to_path(type).iteritems():
+            uri = self._upload_mgr.uri(path)
+            yield '%s#%s' % (uri, name)
+
+    def _new_distributed_cache_args(self, upload_mgr):
+        args = []
+
+        # TODO: does Hadoop have a way of coping with paths that have
+        # commas in their names?
+
+        file_hash_paths = list(self._arg_hash_paths('file', upload_mgr))
+        if file_hash_paths:
+            args.append('-files')
+            args.append(','.join(file_hash_paths))
+
+        archive_hash_paths = list(self._arg_hash_paths('archive', upload_mgr))
+        if archive_hash_paths:
+            args.append('-archives')
+            args.append(','.join(archive_hash_paths))
+
+        return args
+
+    def _old_distributed_cache_args(self, upload_mgr):
+        args = []
+
+        for file_hash in self._upload_hash_paths('file', upload_mgr):
+            args.append('-cacheFile')
+            args.append(file_hash)
+
+        for archive_hash in self._upload_hash_paths('archive', upload_mgr):
+            args.append('-cacheArchive')
+            args.append(archive_hash)
 
         return args
 

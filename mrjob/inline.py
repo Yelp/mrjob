@@ -125,8 +125,6 @@ class InlineMRJobRunner(MRJobRunner):
     def _run(self):
         self._setup_output_dir()
 
-        assert self._script  # shouldn't be able to run if no script
-
         for ignored_opt in self.IGNORED_HADOOP_OPTS:
             if ((not self._opts.is_default(ignored_opt)) and
                 self._opts[ignored_opt]):

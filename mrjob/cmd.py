@@ -18,7 +18,7 @@
 files.
 
 This module provides two utility classes for keeping track of uploads.
-Typically, you'll want to use ScratchDirManager to manage uploading files from
+Typically, you'll want to use UploadDirManager to manage uploading files from
 a local machine to a place where Hadoop can see them (HDFS or S3) and
 WorkingDir to manage placing these files within your tasks' working
 directories (i.e. to help interface with Hadoop's DistributedCache system).
@@ -30,63 +30,87 @@ import logging
 import os.path
 import posixpath
 
+from mrjob.parse import is_uri
+
 
 log = logging.getLogger(__name__)
 
 
-def parse_hash_path(hash_path, type=None, name_if_no_hash=False):
+def parse_hash_path(hash_path):
     """Parse Hadoop Distributed Cache-style paths into a dictionary.
 
     For example:
     >>> parse_hash_path('/foo/bar.py#baz.py')
     {'path': '/foo/bar.py', 'name': 'baz.py', 'type': 'file'}
 
-    *path* is the actual path of the file, *name* is the name of the symlink
-    to it in the task's working directory, and *type* is either ``'file'``
-    (an ordinary file) or ``'archive'`` (a file that Hadoop automatically
-    unarchives into a directory).
-
     A slash at the end of the name indicates an archive:
     >>> parse_hash_path('/foo/bar.tar.gz#baz/')
     {'path': '/foo/bar.py', 'name': 'baz.py', 'type': 'archive'}
 
-    You can also explicitly specify *type*, to support options which
-    always take files or archives (e.g. ``mr_job_script``, ``python_archive``).
-
     An empty name (e.g. ``'/foo/bar.py#'``) indicates any name is acceptable.
-
-    If there's no hash at all (e.g. ``'/foo/bar.py'``) we also assume any
-    name is acceptable unless *name_if_no_hash* is set, in which case
-    we attempt to match the path's filename.
     """
-    inferred_type = 'file'
-    if '#' in hash_path:
-        path, name = hash_path.split('#', 1)
+    if not '#' in hash_path:
+        raise ValueError('Bad hash path %r, must contain #' % (hash_path,))
 
-        if name.endswith('/'):
-            inferred_type = 'archive'
-            name = name[:-1]
+    path, name = hash_path.split('#', 1)
 
-        if '/' in name or '#' in name:
-            raise ValueError('Bad name %r; must not contain # or /' % name)
-
-        # empty names are okay
-        if not name:
-            name = None
+    if name.endswith('/'):
+        type = 'archive'
+        name = name[:-1]
     else:
-        path = hash_path
-        name = name_uniquely(hash_path)
+        type = 'file'
 
-    if type:
-        if type == 'file' and inferred_type == 'archive':
-            log.warn("names for files shouldn't end with '/': %r" % hash_path)
-        # don't require archives to have '/' at the end of their names;
-        # this is new in v0.4.0
-    else:
-        type = inferred_type
+    if '/' in name or '#' in name:
+        raise ValueError('Bad path %r; name must not contain # or /' % (path,))
+
+    # use None for no name
+    if not name:
+        name = None
 
     return {'path': path, 'name': name, 'type': type}
 
+
+def parse_legacy_hash_path(self, type, path, must_name=None):
+    """Parse hash paths from old setup/bootstrap options.
+
+    This is similar to :py:func:`parse_hash_path` except that we pass in
+    path type explicitly, and we don't always require the hash.
+
+    :param type: Type of the path (``'archive'`` or ``'file'``)
+    :param path: Path to parse, possibly with a ``#``
+    :param must_name: If set, use *path*'s filename as its name if there
+                      is no ``'#'`` in *path*, and raise an exception
+                      if there is just a ``'#'`` with no name. Set *must_name*
+                      to the name of the relevant option so we can print
+                      a useful error message. This is intended for options
+                      like ``upload_files`` that merely upload a file
+                      without tracking it.
+    """
+    if '#' in path:
+        path, name = path.split('#', 1)
+
+        # allow a slash after the name of an archive because that's
+        # the new-way of specifying archive paths
+        if name.endswith('/') and type == 'archive':
+            name = name[:-1]
+
+        if '/' in name or '#' in name:
+            raise ValueError(
+                'Bad path %r; name must not contain # or /' % (path,))
+
+        if not name:
+            if must_name:
+                raise ValueError(
+                    'Empty name makes no sense for %s: %r' % (must_name, path))
+        else:
+            name = None
+    else:
+        if must_name:
+            name = os.path.basename(path)
+        else:
+            name = None
+
+    return {'path': path, 'name': name, 'type': type}
 
 
 def name_uniquely(path, names_taken=(), proposed_name=None):
@@ -120,16 +144,19 @@ def name_uniquely(path, names_taken=(), proposed_name=None):
             return name
 
 
-class ScratchDirManager(object):
-    """Represents a directory on HDFS or S3 where we want to park files
-    for consumption by Hadoop.
+class UploadDirManager(object):
+    """Represents a directory on HDFS or S3 where we want to upload
+    local files for consumption by Hadoop.
 
-    :py:class:`ScratchDirManager` tries to give files the same name as their
+    :py:class:`UploadDirManager` tries to give files the same name as their
     filename in the path (for ease of debugging), but handles collisions
     gracefully.
+
+    :py:class:`UploadDirManager` assumes URIs to not need to be uploaded
+    and thus does not store them. :py:meth:`uri` maps URIs to themselves.
     """
     def __init__(self, prefix):
-        """Make an :py:class`ScratchDirManager`.
+        """Make an :py:class`UploadDirManager`.
 
         :param string prefix: The URI for the directory (e.g.
                               `s3://bucket/dir/`). It doesn't matter if
@@ -143,8 +170,12 @@ class ScratchDirManager(object):
 
     def add(self, path):
         """Add a path. If *path* hasn't been added before, assign it a name.
+                       If *path* is a URI don't add it; just return the URI.
 
         :return: the URI assigned to the path"""
+        if is_uri(path):
+            return path
+
         if path not in self._path_to_name:
             name = name_uniquely(path, names_taken=self._names_taken)
             self._names_taken.add(name)
@@ -153,15 +184,15 @@ class ScratchDirManager(object):
         return self.uri(path)
 
     def uri(self, path):
-        """Get the URI for the given path. If it's a path we don't know
-        about, just return *path*.
-
-        (This makes it simpler to skip uploading URIs.)
+        """Get the URI for the given path. If *path* is a URI, just return it.
         """
+        if is_uri(path):
+            return path
+
         if path in self._path_to_name:
             return posixpath.join(self.prefix, self._path_to_name[path])
         else:
-            return path
+            raise ValueError('%r is not a URI or a known local file')
 
     def path_to_uri(self):
         """Get a map from path to URI for all paths that were added,
@@ -307,3 +338,10 @@ class WorkingDirManager(object):
         """
         # this will almost certainly get broken out into another function
         return '%s#%s%s' % (path, name, '/' if type == 'archive' else '')
+
+
+class BootstrapWorkingDirManager(WorkingDirManager):
+    """Manage the working dir for the master bootstrap script. Identical
+    to :py:class:`WorkingDirManager` except that it doesn't support archives.
+    """
+    _SUPPORTED_TYPES = ('file',)

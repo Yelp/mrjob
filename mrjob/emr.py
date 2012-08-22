@@ -55,7 +55,10 @@ except ImportError:
     boto = None
 
 import mrjob
-from mrjob import compat
+from mrjob.cmd import BootstrapWorkingDirManager
+from mrjob.cmd import UploadDirManager
+from mrjob.cmd import parse_legacy_hash_path
+from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
@@ -72,6 +75,7 @@ from mrjob.logparsers import EMR_JOB_LOG_URI_RE
 from mrjob.logparsers import NODE_LOG_URI_RE
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import scan_logs_in_order
+from mrjob.parse import is_uri
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
@@ -576,6 +580,14 @@ class EMRJobRunner(MRJobRunner):
         else:
             self._output_dir = self._s3_tmp_uri + 'output/'
 
+        # manage working dir for bootstrap script
+        self._b_mgr = BootstrapWorkingDirManager()
+
+        # manage local files that we want to upload to S3. We'll add them
+        # to this manager just before we need them.
+        s3_files_dir = self._s3_tmp_uri + 'files/'
+        self._upload_mgr = UploadDirManager(s3_files_dir)
+
         # add the bootstrap files to a list of files to upload
         self._bootstrap_actions = []
         for action in self._opts['bootstrap_actions']:
@@ -583,41 +595,35 @@ class EMRJobRunner(MRJobRunner):
             if not args:
                 raise ValueError('bad bootstrap action: %r' % (action,))
             # don't use _add_bootstrap_file() because this is a raw bootstrap
-            # action, not part of mrjob's bootstrap utilities
-            file_dict = self._add_file(args[0])
-            file_dict['args'] = args[1:]
-            self._bootstrap_actions.append(file_dict)
+            self._bootstrap_actions.append({
+                'path': args[0],
+                'args': args[1:],
+            })
 
         for path in self._opts['bootstrap_files']:
-            self._add_bootstrap_file(path)
+            self._b_mgr.add(**parse_legacy_hash_path(
+                'file', path, must_name='bootstrap_files'))
 
         self._bootstrap_scripts = []
         for path in self._opts['bootstrap_scripts']:
-            file_dict = self._add_bootstrap_file(path)
-            self._bootstrap_scripts.append(file_dict)
+            bootstrap_script = parse_legacy_hash_path('file', path)
+            self._bootstrap_scripts.append(bootstrap_script)
+            self._b_mgr.add(**bootstrap_script)
 
         self._bootstrap_python_packages = []
         for path in self._opts['bootstrap_python_packages']:
-            name, path = self._split_path(path)
-            if not path.endswith('.tar.gz'):
+            bpp = parse_legacy_hash_path('file', path)
+
+            if not bpp['path'].endswith('.tar.gz'):
                 raise ValueError(
                     'bootstrap_python_packages only accepts .tar.gz files!')
-            file_dict = self._add_bootstrap_file(path)
-            self._bootstrap_python_packages.append(file_dict)
-
-        self._streaming_jar = None
-        if self._opts.get('hadoop_streaming_jar'):
-            self._streaming_jar = self._add_file_for_upload(
-                self._opts['hadoop_streaming_jar'])
+            self._bootstrap_python_packages.append(bpp)
+            self._b_mgr.add(**bpp)
 
         if not (isinstance(self._opts['additional_emr_info'], basestring)
                 or self._opts['additional_emr_info'] is None):
             self._opts['additional_emr_info'] = json.dumps(
                 self._opts['additional_emr_info'])
-
-        # if we're bootstrapping mrjob, keep track of the file_dict
-        # for mrjob.tar.gz
-        self._mrjob_tar_gz_file = None
 
         # where our own logs ended up (we'll find this out once we run the job)
         self._s3_job_log_uri = None
@@ -627,7 +633,7 @@ class EMRJobRunner(MRJobRunner):
         self._s3_input_uris = None
 
         # we'll create the script later
-        self._master_bootstrap_script = None
+        self._master_bootstrap_script_path = None
 
         # the ID assigned by EMR to this job (might be None)
         self._emr_job_flow_id = self._opts['emr_job_flow_id']
@@ -820,89 +826,76 @@ class EMRJobRunner(MRJobRunner):
         self._wait_for_job_to_complete()
 
     def _prepare_for_launch(self):
-        self._setup_input()
+        self._check_input_exists()
         self._create_wrapper_script()
-        self._create_master_bootstrap_script()
-        self._upload_non_input_files()
+        self._add_bootstrap_files_for_upload()
+        self._add_job_files_for_upload()
+        self._upload_local_files_to_s3()
 
-    def _setup_input(self):
-        """Copy local input files (if any) to a special directory on S3.
-
-        Set self._s3_input_uris
-        Helper for _run
+    def _check_input_exists(self):
+        """Make sure all input exists before continuing with our job.
         """
-        self._create_s3_temp_bucket_if_needed()
-        # winnow out s3 files from local ones
-        self._s3_input_uris = []
-        local_input_paths = []
         for path in self._input_paths:
-            if is_s3_uri(path):
-                # Don't even bother running the job if the input isn't there,
-                # since it's costly to spin up instances.
-                if not self.path_exists(path):
-                    raise AssertionError(
-                        'Input path %s does not exist!' % (path,))
-                self._s3_input_uris.append(path)
-            else:
-                local_input_paths.append(path)
+            if path == '-':
+                continue  # STDIN always exists
 
-        # copy local files into an input directory, with names like
-        # 00000-actual_name.ext
-        if local_input_paths:
-            s3_input_dir = self._s3_tmp_uri + 'input/'
-            log.info('Uploading input to %s' % s3_input_dir)
+            if is_uri(path) and not is_s3_uri(path):
+                continue  # can't check non-S3 URIs, hope for the best
 
-            s3_conn = self.make_s3_conn()
-            for file_num, path in enumerate(local_input_paths):
-                if path == '-':
-                    path = self._dump_stdin_to_local_file()
+            if not self.path_exists(path):
+                raise AssertionError(
+                    'Input path %s does not exist!' % (path,))
 
-                target = '%s%05d-%s' % (
-                    s3_input_dir, file_num, os.path.basename(path))
-                log.debug('uploading %s -> %s' % (path, target))
-                s3_key = self.make_s3_key(target, s3_conn)
-                s3_key.set_contents_from_filename(path)
+    def _add_bootstrap_files_for_upload(self):
+        """Add files needed by the bootstrap script to self._upload_mgr.
 
-            self._s3_input_uris.append(s3_input_dir)
+        Tar up mrjob if bootstrap_mrjob is True.
 
-    def _add_bootstrap_file(self, path):
-        name, path = self._split_path(path)
-        file_dict = {'path': path, 'name': name, 'bootstrap': 'file'}
-        self._files.append(file_dict)
-        return file_dict
-
-    def _pick_s3_uris_for_files(self):
-        """Decide where each file will be uploaded on S3.
-
-        Okay to call this multiple times.
+        Create the master bootstrap script if necessary.
         """
-        self._assign_unique_names_to_files(
-            's3_uri', prefix=self._s3_tmp_uri + 'files/',
-            match=is_s3_uri)
+        # lazlily create mrjob.tar.gz
+        if self._opts['bootstrap_mrjob']:
+            self._create_mrjob_tar_gz()
+            self._b_mgr.add('file', self._mrjob_tar_gz_path)
 
-    def _upload_non_input_files(self):
-        """Copy files to S3
+        # all other files needed by the script are already in _b_mgr
+        for path in self._b_mgr.paths():
+            self._upload_mgr.add(path)
 
-        Pick S3 URIs for them if we haven't already."""
+        # now that we know where the above files live, we can create
+        # the master bootstrap script
+        self._create_master_bootstrap_script_if_needed()
+        if self._master_bootstrap_script_path:
+            self._upload_mgr.add(self._master_bootstrap_script_path)
+
+        # finally, make sure bootstrap action scripts are on S3
+        for bootstrap_action in self._bootstrap_actions:
+            self._upload_mgr.add(bootstrap_action['path'])
+
+    def _add_job_files_for_upload(self):
+        """Add files needed for running the job (setup and input)
+        to self._upload_mgr."""
+        for path in self._get_input_paths():
+            self._upload_mgr.add(path)
+
+        for path in self._wd_mgr.paths():
+            self._upload_mgr.add(path)
+
+        if self._opts['hadoop_streaming_jar']:
+            self._upload_mgr.add(path)
+
+    def _upload_local_files_to_s3(self):
+        """Copy local files tracked by self._upload_mgr to S3."""
         self._create_s3_temp_bucket_if_needed()
-        self._pick_s3_uris_for_files()
 
-        s3_files_dir = self._s3_tmp_uri + 'files/'
-        log.info('Copying non-input files into %s' % s3_files_dir)
+        log.info('Copying non-input files into %s' % self._upload_mgr.prefix)
 
         s3_conn = self.make_s3_conn()
-        for file_dict in self._files:
-            path = file_dict['path']
 
-            # don't bother with files that are already on s3
-            if is_s3_uri(path):
-                continue
-
-            s3_uri = file_dict['s3_uri']
-
+        for path, s3_uri in self._upload_mgr.path_to_uri().iteritems():
             log.debug('uploading %s -> %s' % (path, s3_uri))
             s3_key = self.make_s3_key(s3_uri, s3_conn)
-            s3_key.set_contents_from_filename(file_dict['path'])
+            s3_key.set_contents_from_filename(path)
 
     def setup_ssh_tunnel_to_job_tracker(self, host):
         """setup the ssh tunnel to the job tracker, if it's not currently
@@ -1164,10 +1157,6 @@ class EMRJobRunner(MRJobRunner):
         # make sure we can see the files we copied to S3
         self._wait_for_s3_eventual_consistency()
 
-        # figure out local names and S3 URIs for our bootstrap actions, if any
-        self._name_files()
-        self._pick_s3_uris_for_files()
-
         log.info('Creating Elastic MapReduce job flow')
         args = self._job_flow_args(persistent, steps)
 
@@ -1238,15 +1227,13 @@ class EMRJobRunner(MRJobRunner):
         # bootstrap actions
         bootstrap_action_args = []
 
-        for file_dict in self._bootstrap_actions:
-            # file_dict is not populated the same way by tools and real job
-            # runs, so use s3_uri or path as appropriate
-            s3_uri = file_dict.get('s3_uri', None) or file_dict['path']
+        for i, bootstrap_action in enumerate(self._bootstrap_actions):
+            s3_uri = self._upload_mgr.uri(bootstrap_action['path'])
             bootstrap_action_args.append(
                 boto.emr.BootstrapAction(
-                file_dict['name'], s3_uri, file_dict['args']))
+                'action %d' % i, s3_uri, bootstrap_action['args']))
 
-        if self._master_bootstrap_script:
+        if self._master_bootstrap_script_path:
             master_bootstrap_script_args = []
             if self._opts['pool_emr_job_flows']:
                 master_bootstrap_script_args = [
@@ -1281,18 +1268,6 @@ class EMRJobRunner(MRJobRunner):
     def _build_steps(self):
         """Return a list of boto Step objects corresponding to the
         steps we want to run."""
-        assert self._script  # can't build steps if no script!
-
-        # figure out local names for our files
-        self._name_files()
-        self._pick_s3_uris_for_files()
-
-        # we're going to instruct EMR to upload the MR script and the
-        # wrapper script (if any) to the job's local directory
-        self._script['upload'] = 'file'
-        if self._wrapper_script:
-            self._wrapper_script['upload'] = 'file'
-
         # quick, add the other steps before the job spins up and
         # then shuts itself down (in practice this takes several minutes)
         steps = self._get_steps()
@@ -1352,6 +1327,12 @@ class EMRJobRunner(MRJobRunner):
             step_args=step['step_args'],
             action_on_failure=self._action_on_failure)
 
+
+    def _upload_hash_paths(self, type):
+        for name, path in self._wd_mgr.name_to_path(type).iteritems():
+            uri = self._upload_mgr.uri(path)
+            yield '%s#%s' % (uri, name)
+
     def _cache_kwargs(self):
         """Returns
         ``{'step_args': [..], 'cache_files': [..], 'cache_archives': [..])``,
@@ -1373,36 +1354,16 @@ class EMRJobRunner(MRJobRunner):
         cache_files = []
         cache_archives = []
 
-        if compat.supports_new_distributed_cache_options(version):
+        if supports_new_distributed_cache_options(version):
             # boto doesn't support non-deprecated 0.20 options, so insert
             # them ourselves
-
-            def escaped_paths(file_dicts):
-                # return list of strings to join with commas and pass to the
-                # hadoop binary
-                return ["%s#%s" % (fd['s3_uri'], fd['name'])
-                        for fd in file_dicts]
-
-            # index by type
-            all_files = {}
-            for fd in self._files:
-                all_files.setdefault(fd.get('upload'), []).append(fd)
-
-            if 'file' in all_files:
-                step_args.append('-files')
-                step_args.append(','.join(escaped_paths(all_files['file'])))
-
-            if 'archive' in all_files:
-                step_args.append('-archives')
-                step_args.append(','.join(escaped_paths(all_files['archive'])))
+            step_args.append(
+                self._new_distributed_cache_args(self._upload_mgr))
         else:
-            for file_dict in self._files:
-                if file_dict.get('upload') == 'file':
-                    cache_files.append(
-                        '%s#%s' % (file_dict['s3_uri'], file_dict['name']))
-                elif file_dict.get('upload') == 'archive':
-                    cache_archives.append(
-                        '%s#%s' % (file_dict['s3_uri'], file_dict['name']))
+            cache_files.extend(
+                self._arg_hash_paths('file', self._upload_mgr))
+            cache_archives.extend(
+                self._arg_hash_paths('archive', self._upload_mgr))
 
         return {
             'step_args': step_args,
@@ -1411,11 +1372,8 @@ class EMRJobRunner(MRJobRunner):
         }
 
     def _get_jar(self):
-        self._name_files()
-        self._pick_s3_uris_for_files()
-
-        if self._streaming_jar:
-            return self._streaming_jar['s3_uri']
+        if self._opts['hadoop_streaming_jar']:
+            return self._upload_mgr.uri(self._opts['hadoop_streaming_jar'])
         else:
             return self._opts['hadoop_streaming_jar_on_emr']
 
@@ -1827,14 +1785,18 @@ class EMRJobRunner(MRJobRunner):
 
     ### Bootstrapping ###
 
-    def _create_master_bootstrap_script(self, dest='b.py'):
+    def _create_master_bootstrap_script_if_needed(self, dest='b.py'):
         """Create the master bootstrap script and write it into our local
-        temp directory.
+        temp directory. Set self._master_bootstrap_script_path.
 
         This will do nothing if there are no bootstrap scripts or commands,
-        or if _create_master_bootstrap_script() has already been called."""
+        or if it has already been called."""
+
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
+
+        if self._master_bootstrap_script_path:
+            return
 
         if not any(key.startswith('bootstrap_') and value
                    for (key, value) in self._opts.iteritems()):
@@ -1854,15 +1816,6 @@ class EMRJobRunner(MRJobRunner):
                 for (key, value) in self._opts.iteritems())):
             return
 
-        if self._opts['bootstrap_mrjob']:
-            if self._mrjob_tar_gz_file is None:
-                self._mrjob_tar_gz_file = self._add_bootstrap_file(
-                    self._create_mrjob_tar_gz() + '#')
-
-        # need to know what files are called
-        self._name_files()
-        self._pick_s3_uris_for_files()
-
         path = os.path.join(self._get_local_tmp_dir(), dest)
         log.info('writing master bootstrap script to %s' % path)
 
@@ -1874,21 +1827,15 @@ class EMRJobRunner(MRJobRunner):
         f.write(contents)
         f.close()
 
-        name, _ = self._split_path(path)
-        self._master_bootstrap_script = {'path': path, 'name': name}
-        self._files.append(self._master_bootstrap_script)
+        self._master_bootstrap_script_path = path
 
     def _master_bootstrap_script_content(self):
         """Create the contents of the master bootstrap script.
-
-        This will give names and S3 URIs to files that don't already have them.
-
-        This function does NOT pick S3 URIs for files or anything like
-        that; _create_master_bootstrap_script() is responsible for that.
         """
         out = StringIO()
 
-        python_bin_in_list = ', '.join(repr(opt) for opt in self._opts['python_bin'])
+        python_bin_in_list = ', '.join(
+            repr(arg) for arg in self._opts['python_bin'])
 
         def writeln(line=''):
             out.write(line + '\n')
@@ -1910,28 +1857,29 @@ class EMRJobRunner(MRJobRunner):
 
         # download files using hadoop fs
         writeln('# download files using hadoop fs -copyToLocal')
-        for file_dict in self._files:
-            if file_dict.get('bootstrap'):
-                writeln(
-                    "check_call(['hadoop', 'fs', '-copyToLocal', %r, %r])" %
-                    (file_dict['s3_uri'], file_dict['name']))
+        for name, path in self._b_mgr.name_to_path('file').iteritems():
+            s3_uri = self._upload_mgr.uri(path)
+            writeln(
+                "check_call(['hadoop', 'fs', '-copyToLocal', %r, %r])" %
+                (s3_uri, name))
         writeln()
 
         # make scripts executable
         if self._bootstrap_scripts:
             writeln('# make bootstrap scripts executable')
-            for file_dict in self._bootstrap_scripts:
+            for path_dict in self._bootstrap_scripts:
                 writeln("check_call(['chmod', 'a+rx', %r])" %
-                        file_dict['name'])
+                        path_dict['name'])
             writeln()
 
         # bootstrap mrjob
         if self._opts['bootstrap_mrjob']:
+            name = self._b_mgr.name('file', self._mrjob_tar_gz_path)
             writeln('# bootstrap mrjob')
             writeln("site_packages = distutils.sysconfig.get_python_lib()")
             writeln(
                 "check_call(['sudo', 'tar', 'xfz', %r, '-C', site_packages])" %
-                self._mrjob_tar_gz_file['name'])
+                name)
             # re-compile pyc files now, since mappers/reducers can't
             # write to this directory. Don't fail if there is extra
             # un-compileable crud in the tarball.
@@ -1944,12 +1892,11 @@ class EMRJobRunner(MRJobRunner):
         # install our python modules
         if self._bootstrap_python_packages:
             writeln('# install python modules:')
-            for file_dict in self._bootstrap_python_packages:
-                writeln("check_call(['tar', 'xfz', %r])" %
-                        file_dict['name'])
+            for path_dict in self._bootstrap_python_packages:
+                writeln("check_call(['tar', 'xfz', %r])" % path_dict['name'])
                 # figure out name of dir to CD into
-                assert file_dict['path'].endswith('.tar.gz')
-                cd_into = extract_dir_for_tar(file_dict['path'])
+                assert path_dict['path'].endswith('.tar.gz')
+                cd_into = extract_dir_for_tar(path_dict['path'])
                 # install the module
                 writeln("check_call(["
                         "'sudo', %s, 'setup.py', 'install'], cwd=%r)" %
@@ -1968,9 +1915,9 @@ class EMRJobRunner(MRJobRunner):
         # run our scripts
         if self._bootstrap_scripts:
             writeln('# run bootstrap scripts:')
-            for file_dict in self._bootstrap_scripts:
+            for path_dict in self._bootstrap_scripts:
                 writeln('check_call(%r)' % (
-                    ['./' + file_dict['name']],))
+                    ['./' + path_dict['name']],))
             writeln()
 
         return out.getvalue()
@@ -1990,8 +1937,8 @@ class EMRJobRunner(MRJobRunner):
 
         log.info('Creating persistent job flow to run several jobs in...')
 
-        self._create_master_bootstrap_script()
-        self._upload_non_input_files()
+        self._add_bootstrap_files_for_upload()
+        self._upload_local_files_to_s3()
 
         # don't allow user to call run()
         self._ran_job = True

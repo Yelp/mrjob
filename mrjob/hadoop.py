@@ -21,7 +21,7 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
 
-from mrjob.cmd import ScratchDirManager
+from mrjob.cmd import UploadDirManager
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -35,7 +35,6 @@ from mrjob.logparsers import HADOOP_JOB_LOG_URI_RE
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import scan_logs_in_order
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
-from mrjob.parse import is_uri
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import cmd_line
@@ -174,9 +173,10 @@ class HadoopJobRunner(MRJobRunner):
             posixpath.join(
             self._opts['hdfs_scratch_dir'], self._job_name))
 
-        # Keep track of local files uploaded to Hadoop. This is filled
-        # by _upload_local_files_to_hdfs()
-        self._upload_mgr = None
+        # Keep track of local files to upload to HDFS. We'll add them
+        # to this manager just before we need them.
+        hdfs_files_dir = posixpath.join(self._hdfs_scratch_dir, 'files', '')
+        self._upload_mgr = UploadDirManager(hdfs_files_dir)
 
         # Set output dir if it wasn't set explicitly
         self._output_dir = fully_qualify_hdfs_path(
@@ -225,6 +225,7 @@ class HadoopJobRunner(MRJobRunner):
             self._add_python_archive(self._create_mrjob_tar_gz())
 
         self._check_input_exists()
+        self._create_wrapper_script()
         self._upload_local_files_to_hdfs()
         self._run_job_in_hadoop()
 
@@ -233,28 +234,22 @@ class HadoopJobRunner(MRJobRunner):
         """
         for path in self._input_paths:
             if path == '-':
-                continue
+                continue  # STDIN always exists
 
-            # Don't even bother running the job if the input isn't there.
-            if not self.ls(path):
+            if not self.path_exists(path):
                 raise AssertionError(
                     'Input path %s does not exist!' % (path,))
 
     def _upload_local_files_to_hdfs(self):
         """Copy files to HDFS, and set the 'hdfs_uri' field for each file.
         """
-        assert not self._upload_mgr
+        # choose paths to upload
+        for path in self._get_input_paths() + list(self._wd_mgr.paths()):
+            self._upload_mgr.add(path)
 
-        hdfs_files_dir = posixpath.join(self._hdfs_scratch_dir, 'files', '')
-        self._mkdir_on_hdfs(hdfs_files_dir)
-        self._upload_mgr = ScratchDirManager(hdfs_files_dir)
+        self._mkdir_on_hdfs(self._upload_mgr.prefix)
 
-        for path_dict in self._get_input_paths() + list(self._wd_mgr.paths()):
-            path = path_dict['path']
-            if not is_uri(path):
-                self._upload_mgr.add(path)
-
-        log.info('Copying local files into %s' % hdfs_files_dir)
+        log.info('Copying local files into %s' % self._upload_mgr.prefix)
         for path, uri in self._upload_mgr.path_to_uri().iteritems():
             self._upload_to_hdfs(path, uri)
 
@@ -357,7 +352,8 @@ class HadoopJobRunner(MRJobRunner):
         # -files/-archives (generic options, new-style)
         if supports_new_distributed_cache_options(version):
             # set up uploading from HDFS to the working dir
-            streaming_args.extend(self._new_upload_args())
+            streaming_args.extend(
+                self._new_distributed_cache_args(self._upload_mgr))
 
         # Add extra hadoop args first as hadoop args could be a hadoop
         # specific argument (e.g. -libjar) which must come before job
@@ -375,7 +371,8 @@ class HadoopJobRunner(MRJobRunner):
         # -cacheFile/-cacheArchive (streaming options, old-style)
         if not supports_new_distributed_cache_options(version):
             # set up uploading from HDFS to the working dir
-            streaming_args.extend(self._old_upload_args())
+            streaming_args.extend(
+                self._old_distributed_cache_args(self._upload_mgr))
 
         mapper, combiner, reducer = (
             self._hadoop_streaming_commands(step, step_num))
@@ -410,48 +407,6 @@ class HadoopJobRunner(MRJobRunner):
         else:
             return posixpath.join(
                 self._hdfs_scratch_dir, 'step-output', str(step_num + 1))
-
-    def _upload_hash_paths(self, type):
-        for name, path in self._wd_mgr.name_to_path(type).iteritems():
-            uri = self._upload_mgr.uri(path)
-            yield '%s#%s' % (uri, name)
-
-    def _new_upload_args(self):
-        """Args to upload files from HDFS to the hadoop nodes using new
-        distributed cache options.
-        """
-        args = []
-
-        # TODO: does Hadoop have a way of coping with paths that have
-        # commas in their names?
-
-        file_hash_paths = list(self._upload_hash_paths('file'))
-        if file_hash_paths:
-            args.append('-files')
-            args.append(','.join(file_hash_paths))
-
-        archive_hash_paths = list(self._upload_hash_paths('archive'))
-        if archive_hash_paths:
-            args.append('-archives')
-            args.append(','.join(archive_hash_paths))
-
-        return args
-
-    def _old_upload_args(self):
-        """Args to upload files from HDFS to the hadoop nodes using old cache
-        options.
-        """
-        args = []
-
-        for file_hash in self._upload_hash_paths('file'):
-            args.append('-cacheFile')
-            args.append(file_hash)
-
-        for archive_hash in self._upload_hash_paths('archive'):
-            args.append('-cacheArchive')
-            args.append(archive_hash)
-
-        return args
 
     def _cleanup_local_scratch(self):
         super(HadoopJobRunner, self)._cleanup_local_scratch()

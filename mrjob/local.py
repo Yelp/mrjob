@@ -517,9 +517,9 @@ class LocalMRJobRunner(MRJobRunner):
     def _executable(self, steps=False):
         # detect executable files so we can discard the explicit interpreter if
         # possible
-        if os.access(self._script['path'], os.X_OK):
+        if os.access(self._script_path, os.X_OK):
             return [os.path.join(self._working_dir,
-                                 self._wd_mgr.name(**self._script))]
+                                 self._wd_mgr.name('file', self._script_path))]
         else:
             return super(LocalMRJobRunner, self)._executable(steps)
 

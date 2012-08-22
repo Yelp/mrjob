@@ -1327,10 +1327,13 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
         emr_conn = self.make_emr_conn()
         try:
+            log.info("Attempting to terminate job flow")
             emr_conn.terminate_jobflow(self._emr_job_flow_id)
         except Exception, e:
             # Something happened with boto and the user should know.
             log.exception(e)
+            return
+        log.info('Job flow %s successfully terminated' % self._emr_job_flow_id)
 
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.

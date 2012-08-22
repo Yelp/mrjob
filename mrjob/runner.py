@@ -61,14 +61,15 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #: cleanup options:
 #:
 #: * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job flow
-#:   if the job is not done when cleanup is run.
+#:   if on EMR and the job is not done when cleanup is run.
 #: * ``'LOCAL_SCRATCH'``: delete local scratch only
 #: * ``'LOGS'``: delete logs only
 #: * ``'NONE'``: delete nothing
 #: * ``'REMOTE_SCRATCH'``: delete remote scratch only
 #: * ``'SCRATCH'``: delete local and remote scratch, but not logs
-#: * ``'JOB'``: stop job if the job is not done when cleanup runs.
-#: * ``'JOB_FLOW'``: terminate the job flow if the job is not done on cleanup
+#: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
+#: * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
+#:    on cleanup
 #: * ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL``. Not supported for
 #:   ``cleanup_on_failure``.
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',

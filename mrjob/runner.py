@@ -37,7 +37,6 @@ try:
     StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     from StringIO import StringIO
-
 from mrjob import compat
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -61,18 +60,19 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 #: cleanup options:
 #:
-#: * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job if
-#:   running on EMR and job flow is not to be terminated
+#: * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job flow
+#:   if the job is not done when cleanup is run.
 #: * ``'LOCAL_SCRATCH'``: delete local scratch only
 #: * ``'LOGS'``: delete logs only
 #: * ``'NONE'``: delete nothing
 #: * ``'REMOTE_SCRATCH'``: delete remote scratch only
 #: * ``'SCRATCH'``: delete local and remote scratch, but not logs
-#: * ``'JOB'``: stop job if running on EMR and job flow is not to be terminated
+#: * ``'JOB'``: stop job if the job is not done when cleanup runs.
+#: * ``'JOB_FLOW'``: terminate the job flow if the job is not done on cleanup
 #: * ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL``. Not supported for
 #:   ``cleanup_on_failure``.
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
-                   'SCRATCH', 'JOB', 'IF_SUCCESSFUL']
+                   'SCRATCH', 'JOB', 'IF_SUCCESSFUL', 'JOB_FLOW']
 
 #: .. deprecated:: 0.3.0
 #:
@@ -558,6 +558,10 @@ class MRJobRunner(object):
         """Stop any jobs that we created that are still running."""
         pass  # this only happens on EMR
 
+    def _cleanup_job_flow(self):
+        """Terminate the job flow if there is one."""
+        pass  # this only happens on EMR
+
     def cleanup(self, mode=None):
         """Clean up running jobs, scratch dirs, and logs, subject to the
         *cleanup* option passed to the constructor.
@@ -578,7 +582,10 @@ class MRJobRunner(object):
         def mode_has(*args):
             return any((choice in mode) for choice in args)
 
-        if mode_has('ALL', 'JOB'):
+        if mode_has('JOB_FLOW', 'ALL') and not self._ran_job:
+            self._cleanup_job_flow()
+
+        if mode_has('JOB', 'ALL') and not self._ran_job:
             self._cleanup_job()
 
         if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH', 'IF_SUCCESSFUL'):

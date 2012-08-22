@@ -1320,6 +1320,18 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             except IOError:
                 log.info(error_msg)
 
+    def _cleanup_job_flow(self):
+        if not self._emr_job_flow_id:
+            # If we don't have a job flow, then we can't terminate it.
+            return
+
+        emr_conn = self.make_emr_conn()
+        try:
+            emr_conn.terminate_jobflow(self._emr_job_flow_id)
+        except Exception, e:
+            # Something happened with boto and the user should know.
+            log.exception(e)
+
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.
         """

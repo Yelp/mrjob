@@ -18,7 +18,7 @@
 files.
 
 This module provides two utility classes for keeping track of uploads.
-Typically, you'll want to use ScratchDir to manage uploading files from
+Typically, you'll want to use ScratchDirManager to manage uploading files from
 a local machine to a place where Hadoop can see them (HDFS or S3) and
 WorkingDir to manage placing these files within your tasks' working
 directories (i.e. to help interface with Hadoop's DistributedCache system).
@@ -26,8 +26,67 @@ directories (i.e. to help interface with Hadoop's DistributedCache system).
 from __future__ import with_statement
 
 import itertools
+import logging
 import os.path
 import posixpath
+
+
+log = logging.getLogger(__name__)
+
+
+def parse_hash_path(hash_path, type=None, name_if_no_hash=False):
+    """Parse Hadoop Distributed Cache-style paths into a dictionary.
+
+    For example:
+    >>> parse_hash_path('/foo/bar.py#baz.py')
+    {'path': '/foo/bar.py', 'name': 'baz.py', 'type': 'file'}
+
+    *path* is the actual path of the file, *name* is the name of the symlink
+    to it in the task's working directory, and *type* is either ``'file'``
+    (an ordinary file) or ``'archive'`` (a file that Hadoop automatically
+    unarchives into a directory).
+
+    A slash at the end of the name indicates an archive:
+    >>> parse_hash_path('/foo/bar.tar.gz#baz/')
+    {'path': '/foo/bar.py', 'name': 'baz.py', 'type': 'archive'}
+
+    You can also explicitly specify *type*, to support options which
+    always take files or archives (e.g. ``mr_job_script``, ``python_archive``).
+
+    An empty name (e.g. ``'/foo/bar.py#'``) indicates any name is acceptable.
+
+    If there's no hash at all (e.g. ``'/foo/bar.py'``) we also assume any
+    name is acceptable unless *name_if_no_hash* is set, in which case
+    we attempt to match the path's filename.
+    """
+    inferred_type = 'file'
+    if '#' in hash_path:
+        path, name = hash_path.split('#', 1)
+
+        if name.endswith('/'):
+            inferred_type = 'archive'
+            name = name[:-1]
+
+        if '/' in name or '#' in name:
+            raise ValueError('Bad name %r; must not contain # or /' % name)
+
+        # empty names are okay
+        if not name:
+            name = None
+    else:
+        path = hash_path
+        name = name_uniquely(hash_path)
+
+    if type:
+        if type == 'file' and inferred_type == 'archive':
+            log.warn("names for files shouldn't end with '/': %r" % hash_path)
+        # don't require archives to have '/' at the end of their names;
+        # this is new in v0.4.0
+    else:
+        type = inferred_type
+
+    return {'path': path, 'name': name, 'type': type}
+
 
 
 def name_uniquely(path, names_taken=(), proposed_name=None):
@@ -61,15 +120,16 @@ def name_uniquely(path, names_taken=(), proposed_name=None):
             return name
 
 
-class ScratchDir(object):
+class ScratchDirManager(object):
     """Represents a directory on HDFS or S3 where we want to park files
     for consumption by Hadoop.
 
-    :py:class:`ScratchDir` tries to give files the same name as their filename
-    in the path (for ease of debugging), but handles collisions gracefully.
+    :py:class:`ScratchDirManager` tries to give files the same name as their
+    filename in the path (for ease of debugging), but handles collisions
+    gracefully.
     """
     def __init__(self, prefix):
-        """Make an :py:class`ScratchDir`.
+        """Make an :py:class`ScratchDirManager`.
 
         :param string prefix: The URI for the directory (e.g.
                               `s3://bucket/dir/`). It doesn't matter if
@@ -110,7 +170,7 @@ class ScratchDir(object):
                     for path in self._path_to_name)
 
 
-class WorkingDir(object):
+class WorkingDirManager(object):
     """Represents the working directory of hadoop tasks (or bootstrap
     commands on EMR).
 
@@ -165,7 +225,7 @@ class WorkingDir(object):
 
     def name(self, type, path, name=None):
         """Get the name for a path previously added to this
-        :py:class:`WorkingDir`, assigning one as needed.
+        :py:class:`WorkingDirManager`, assigning one as needed.
 
         This is primarily for getting the name of auto-named files. If
         the file was added with an assigned name, you must include it
@@ -216,6 +276,15 @@ class WorkingDir(object):
                     for name, typed_path
                     in self._name_to_typed_path.iteritems()
                     if typed_path[0] == type)
+
+    def paths(self):
+        """Get a set of all paths tracked by this WorkingDirManager."""
+        paths = set()
+
+        paths.update(p for (t, p) in self._typed_path_to_auto_name)
+        paths.update(p for (t, p) in self._name_to_typed_path.itervalues())
+
+        return paths
 
     def _check_name(self, name):
         if name is None:

@@ -38,7 +38,7 @@ from mrjob.util import unarchive
 from mrjob.util import is_ironpython
 
 
-log = logging.getLogger('mrjob.local')
+log = logging.getLogger(__name__)
 
 DEFAULT_MAP_TASKS = 2
 DEFAULT_REDUCE_TASKS = 2
@@ -188,7 +188,7 @@ class LocalMRJobRunner(MRJobRunner):
 
     def _run(self):
         if self._opts['bootstrap_mrjob']:
-            self._add_python_archive(self._create_mrjob_tar_gz() + '#')
+            self._add_python_archive(self._create_mrjob_tar_gz())
 
         for ignored_opt in self.IGNORED_HADOOP_OPTS:
             if self._opts[ignored_opt]:
@@ -263,12 +263,6 @@ class LocalMRJobRunner(MRJobRunner):
     def _setup_working_dir(self):
         """Make a working directory with symlinks to our script and
         external files. Return name of the script"""
-        # specify that we want to upload our script along with other files
-        if self._script:
-            self._script['upload'] = 'file'
-        if self._wrapper_script:
-            self._wrapper_script['upload'] = 'file'
-
         # create the working directory
         if not self._working_dir:
             self._working_dir = os.path.join(
@@ -276,17 +270,14 @@ class LocalMRJobRunner(MRJobRunner):
             self.mkdir(self._working_dir)
 
         # give all our files names, and symlink or unarchive them
-        self._name_files()
-        for file_dict in self._files:
-            path = file_dict['path']
-            name = file_dict['name']
+        for name, path in self._wd_mgr.name_to_path('file').iteritems():
             dest = os.path.join(self._working_dir, name)
+            self._symlink_to_file_or_copy(path, dest)
 
-            if file_dict.get('upload') == 'file':
-                self._symlink_to_file_or_copy(path, dest)
-            elif file_dict.get('upload') == 'archive':
-                log.debug('unarchiving %s -> %s' % (path, dest))
-                unarchive(path, dest)
+        for name, path in self._wd_mgr.name_to_path('archive').iteritems():
+            dest = os.path.join(self._working_dir, name)
+            log.debug('unarchiving %s -> %s' % (path, dest))
+            unarchive(path, dest)
 
     def _setup_output_dir(self):
         if not self._output_dir:
@@ -447,13 +438,7 @@ class LocalMRJobRunner(MRJobRunner):
         if self._prev_outfiles:
             return self._prev_outfiles
         else:
-            input_paths = []
-            for path in self._input_paths:
-                if path == '-':
-                    input_paths.append(self._dump_stdin_to_local_file())
-                else:
-                    input_paths.append(path)
-            return input_paths
+            return self._get_input_paths()
 
     def _invoke_step(self, step_dict, outfile_name, step_num, step_type,
                      num_tasks=1):
@@ -533,7 +518,8 @@ class LocalMRJobRunner(MRJobRunner):
         # detect executable files so we can discard the explicit interpreter if
         # possible
         if os.access(self._script['path'], os.X_OK):
-            return [os.path.join(self._working_dir, self._script['name'])]
+            return [os.path.join(self._working_dir,
+                                 self._wd_mgr.name(**self._script))]
         else:
             return super(LocalMRJobRunner, self)._executable(steps)
 
@@ -677,18 +663,13 @@ class LocalMRJobRunner(MRJobRunner):
         cache_local_archives = []
         cache_local_files = []
 
-        for file_dict in self._files:
-            path = file_dict['path']
-            name = file_dict['name']
-            dest = os.path.join(self._working_dir, name)
+        for name, path in self._wd_mgr.name_to_path('file').iteritems():
+            cache_files.append('%s#%s' % (path, name))
+            cache_local_files.append(os.path.join(self._working_dir, name))
 
-            if file_dict.get('upload') == 'file':
-                cache_files.append('%s#%s' % (path, name))
-                cache_local_files.append(dest)
-
-            elif file_dict.get('upload') == 'archive':
-                cache_archives.append('%s#%s' % (path, name))
-                cache_local_archives.append(dest)
+        for name, path in self._wd_mgr.name_to_path('archive').iteritems():
+            cache_archives.append('%s#%s' % (path, name))
+            cache_local_archives.append(os.path.join(self._working_dir, name))
 
         # could add mtime info here too (e.g.
         # mapreduce.job.cache.archives.timestamps) here too, though we should

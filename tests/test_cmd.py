@@ -20,8 +20,8 @@ except ImportError:
     import unittest
 
 from mrjob.cmd import name_uniquely
-from mrjob.cmd import ScratchDir
-from mrjob.cmd import WorkingDir
+from mrjob.cmd import ScratchDirManager
+from mrjob.cmd import WorkingDirManager
 
 
 class NameUniqueTestCase(unittest.TestCase):
@@ -93,19 +93,19 @@ class NameUniqueTestCase(unittest.TestCase):
             '.mrjob-1.conf')  # not '-1.mrjob.conf'
 
 
-class ScratchDirTestCase(unittest.TestCase):
+class ScratchDirManagerTestCase(unittest.TestCase):
 
     def test_empty(self):
-        sd = ScratchDir('hdfs:///')
+        sd = ScratchDirManager('hdfs:///')
         self.assertEqual(sd.path_to_uri(), {})
 
     def test_simple(self):
-        sd = ScratchDir('hdfs:///')
+        sd = ScratchDirManager('hdfs:///')
         sd.add('foo/bar.py')
         self.assertEqual(sd.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
 
     def test_name_collision(self):
-        sd = ScratchDir('hdfs:///')
+        sd = ScratchDirManager('hdfs:///')
         sd.add('foo/bar.py')
         sd.add('bar.py')
         self.assertEqual(sd.path_to_uri(),
@@ -113,19 +113,19 @@ class ScratchDirTestCase(unittest.TestCase):
                           'bar.py': 'hdfs:///bar-1.py'})
 
     def test_add_is_idempotent(self):
-        sd = ScratchDir('hdfs:///')
+        sd = ScratchDirManager('hdfs:///')
         sd.add('foo/bar.py')
         self.assertEqual(sd.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
         sd.add('foo/bar.py')
         self.assertEqual(sd.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
 
     def test_uri(self):
-        sd = ScratchDir('hdfs:///')
+        sd = ScratchDirManager('hdfs:///')
         sd.add('foo/bar.py')
         self.assertEqual(sd.uri('foo/bar.py'), 'hdfs:///bar.py')
 
     def test_unknown_uri(self):
-        sd = ScratchDir('hdfs:///')
+        sd = ScratchDirManager('hdfs:///')
         sd.add('foo/bar.py')
         self.assertEqual(sd.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
         self.assertEqual(sd.uri('hdfs://host/path/to/bar.py'),
@@ -134,22 +134,22 @@ class ScratchDirTestCase(unittest.TestCase):
         self.assertEqual(sd.path_to_uri(), {'foo/bar.py': 'hdfs:///bar.py'})
 
     def uri_adds_trailing_slash(self):
-        sd = ScratchDir('s3://bucket/dir')
+        sd = ScratchDirManager('s3://bucket/dir')
         sd.add('foo/bar.py')
         self.assertEqual(sd.uri('foo/bar.py'), 's3://bucket/dir/bar.py')
         self.assertEqual(sd.path_to_uri(),
                          {'foo/bar.py': 's3://bucket/dir/bar.py'})
 
 
-class WorkingDirTestCase(unittest.TestCase):
+class WorkingDirManagerTestCase(unittest.TestCase):
 
     def test_empty(self):
-        wd = WorkingDir()
+        wd = WorkingDirManager()
         self.assertEqual(wd.name_to_path('archive'), {})
         self.assertEqual(wd.name_to_path('file'), {})
 
     def test_simple(self):
-        wd = WorkingDir()
+        wd = WorkingDirManager()
         wd.add('archive', 's3://bucket/path/to/baz.tar.gz')
         wd.add('file', 'foo/bar.py')
         self.assertEqual(wd.name_to_path('file'),
@@ -158,19 +158,19 @@ class WorkingDirTestCase(unittest.TestCase):
                          {'baz.tar.gz': 's3://bucket/path/to/baz.tar.gz'})
 
     def test_explicit_name_collision(self):
-        wd = WorkingDir()
+        wd = WorkingDirManager()
         wd.add('file', 'foo.py', name='qux.py')
         self.assertRaises(ValueError, wd.add, 'file', 'bar.py', name='qux.py')
 
     def test_okay_to_give_same_path_same_name(self):
-        wd = WorkingDir()
+        wd = WorkingDirManager()
         wd.add('file', 'foo/bar.py', name='qux.py')
         wd.add('file', 'foo/bar.py', name='qux.py')
         self.assertEqual(wd.name_to_path('file'),
                          {'qux.py': 'foo/bar.py'})
 
     def test_auto_names_are_different_from_assigned_names(self):
-        wd = WorkingDir()
+        wd = WorkingDirManager()
         wd.add('file', 'foo/bar.py', name='qux.py')
         wd.add('file', 'foo/bar.py')  # use default name bar.py
         self.assertEqual(wd.name_to_path('file'),
@@ -178,38 +178,38 @@ class WorkingDirTestCase(unittest.TestCase):
                           'bar.py': 'foo/bar.py'})
 
     def test_cant_give_same_path_different_types(self):
-        wd = WorkingDir()
+        wd = WorkingDirManager()
         wd.add('archive', 'foo/bar.py', name='qux.py')
         self.assertRaises(ValueError,
                           wd.add, 'file', 'foo/bar.py', name='qux.py')
 
     def test_lazy_naming(self):
-        wd = WorkingDir()
+        wd = WorkingDirManager()
         wd.add('file', 'qux.py')  # qux.py by default
         wd.add('file', 'bar.py', name='qux.py')
         self.assertEqual(wd.name_to_path('file'),
                          {'qux.py': 'bar.py', 'qux-1.py': 'qux.py'})
 
     def test_eager_naming(self):
-        wd = WorkingDir()
+        wd = WorkingDirManager()
         wd.add('file', 'qux.py')  # qux.py by default
         self.assertEqual(wd.name('file', 'qux.py'), 'qux.py')
         # whoops, picked that name too soon!
         self.assertRaises(ValueError, wd.add, 'file', 'bar.py', name='qux.py')
 
     def test_bad_path_type(self):
-        wd = WorkingDir()
+        wd = WorkingDirManager()
         self.assertRaises(TypeError, wd.add, 'dir', 'foo.py')
         self.assertRaises(TypeError, wd.name_to_path, 'dir')
         self.assertRaises(TypeError, wd.name, 'dir', 'foo.py')
 
     def test_cant_name_unknown_paths(self):
-        wd = WorkingDir()
+        wd = WorkingDirManager()
         self.assertRaises(ValueError, wd.name, 'file', 'bar.py')
         self.assertRaises(ValueError, wd.name, 'file', 'bar.py', name='qux.py')
 
     def test_cant_auto_name_unless_added_as_auto(self):
-        wd = WorkingDir()
+        wd = WorkingDirManager()
         wd.add('file', 'bar.py', name='qux.py')
         self.assertEqual(wd.name('file', 'bar.py', 'qux.py'), 'qux.py')
         self.assertRaises(ValueError,

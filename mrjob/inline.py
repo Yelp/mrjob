@@ -241,16 +241,9 @@ class InlineMRJobRunner(MRJobRunner):
     def _decide_input_paths(self):
         # decide where to get input
         if self._prev_outfile is not None:
-            input_paths = [self._prev_outfile]
+            return [self._prev_outfile]
         else:
-            input_paths = []
-            for path in self._input_paths:
-                if path == '-':
-                    input_paths.append(self._dump_stdin_to_local_file())
-                else:
-                    input_paths.append(path)
-
-        return input_paths
+            return self._get_input_paths()
 
     def _decide_output_path(self, outfile_name):
         # run the mapper

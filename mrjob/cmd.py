@@ -192,7 +192,7 @@ class UploadDirManager(object):
         if path in self._path_to_name:
             return posixpath.join(self.prefix, self._path_to_name[path])
         else:
-            raise ValueError('%r is not a URI or a known local file')
+            raise ValueError('%r is not a URI or a known local file' % (path,))
 
     def path_to_uri(self):
         """Get a map from path to URI for all paths that were added,

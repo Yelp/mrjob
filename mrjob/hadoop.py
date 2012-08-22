@@ -353,7 +353,7 @@ class HadoopJobRunner(MRJobRunner):
         if supports_new_distributed_cache_options(version):
             # set up uploading from HDFS to the working dir
             streaming_args.extend(
-                self._new_distributed_cache_args(self._upload_mgr))
+                self._new_upload_args(self._upload_mgr))
 
         # Add extra hadoop args first as hadoop args could be a hadoop
         # specific argument (e.g. -libjar) which must come before job
@@ -372,7 +372,7 @@ class HadoopJobRunner(MRJobRunner):
         if not supports_new_distributed_cache_options(version):
             # set up uploading from HDFS to the working dir
             streaming_args.extend(
-                self._old_distributed_cache_args(self._upload_mgr))
+                self._old_upload_args(self._upload_mgr))
 
         mapper, combiner, reducer = (
             self._hadoop_streaming_commands(step, step_num))

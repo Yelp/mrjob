@@ -1018,13 +1018,14 @@ class MRJobRunner(object):
                 args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         return args
+
     def _arg_hash_paths(self, type, upload_mgr):
-        """Helper function for the *distributed_cache_args methods."""
+        """Helper function for the *upload_args methods."""
         for name, path in self._wd_mgr.name_to_path(type).iteritems():
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 
-    def _new_distributed_cache_args(self, upload_mgr):
+    def _new_upload_args(self, upload_mgr):
         args = []
 
         # TODO: does Hadoop have a way of coping with paths that have
@@ -1042,7 +1043,7 @@ class MRJobRunner(object):
 
         return args
 
-    def _old_distributed_cache_args(self, upload_mgr):
+    def _old_upload_args(self, upload_mgr):
         args = []
 
         for file_hash in self._upload_hash_paths('file', upload_mgr):

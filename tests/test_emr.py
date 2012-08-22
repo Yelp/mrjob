@@ -2226,6 +2226,15 @@ class PoolingTestCase(MockEMRAndS3TestCase):
             '--hadoop-version', '0.20',
             '-c', self.mrjob_conf_path])
 
+    def test_join_anyway_if_i_say_so(self):
+        _, job_flow_id = self.make_pooled_job_flow(hadoop_version='0.18')
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--emr-job-flow-id', job_flow_id,
+            '--hadoop-version', '0.20',
+            '-c', self.mrjob_conf_path])
+
     def test_pooling_with_ami_version(self):
         _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0')
 

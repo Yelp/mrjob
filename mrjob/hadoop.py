@@ -176,7 +176,7 @@ class HadoopJobRunner(MRJobRunner):
 
         # Keep track of local files uploaded to Hadoop. This is filled
         # by _upload_local_files_to_hdfs()
-        self._hdfs_files_mgr = None
+        self._upload_mgr = None
 
         # Set output dir if it wasn't set explicitly
         self._output_dir = fully_qualify_hdfs_path(
@@ -243,19 +243,19 @@ class HadoopJobRunner(MRJobRunner):
     def _upload_local_files_to_hdfs(self):
         """Copy files to HDFS, and set the 'hdfs_uri' field for each file.
         """
-        assert not self._hdfs_files_mgr
+        assert not self._upload_mgr
 
         hdfs_files_dir = posixpath.join(self._hdfs_scratch_dir, 'files', '')
         self._mkdir_on_hdfs(hdfs_files_dir)
-        self._hdfs_files_mgr = ScratchDirManager(hdfs_files_dir)
+        self._upload_mgr = ScratchDirManager(hdfs_files_dir)
 
         for path_dict in self._get_input_paths() + list(self._wd_mgr.paths()):
             path = path_dict['path']
             if not is_uri(path):
-                self._hdfs_files_mgr.add(path)
+                self._upload_mgr.add(path)
 
         log.info('Copying local files into %s' % hdfs_files_dir)
-        for path, uri in self._hdfs_files_mgr.path_to_uri().iteritems():
+        for path, uri in self._upload_mgr.path_to_uri().iteritems():
             self._upload_to_hdfs(path, uri)
 
     def _mkdir_on_hdfs(self, path):
@@ -398,7 +398,7 @@ class HadoopJobRunner(MRJobRunner):
     def _hdfs_step_input_files(self, step_num):
         """Get the hdfs:// URI for input for the given step."""
         if step_num == 0:
-            return [self._hdfs_files_mgr.uri(p)
+            return [self._upload_mgr.uri(p)
                     for p in self._get_input_paths()]
         else:
             return [posixpath.join(
@@ -413,7 +413,7 @@ class HadoopJobRunner(MRJobRunner):
 
     def _upload_hash_paths(self, type):
         for name, path in self._wd_mgr.name_to_path(type).iteritems():
-            uri = self._hdfs_files_mgr.uri(path)
+            uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 
     def _new_upload_args(self):

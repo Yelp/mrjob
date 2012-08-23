@@ -421,13 +421,12 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             self.assertNotIn('-combiner',
                              runner._describe_jobflow().steps[0].args())
 
-    def test_args_version_020(self):
+    def test_args_version_020_205(self):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
         # read from STDIN, a local file, and a remote file
         stdin = StringIO('foo\nbar\n')
 
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--hadoop-version=0.20'])
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--ami-version=2.0'])
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
@@ -1592,29 +1591,30 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
     def test_eu(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='EU')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'eu-west-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.eu-west-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-eu-west-1.amazonaws.com')
 
     def test_us_east_1(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='us-east-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'us-east-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.us-east-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3.amazonaws.com')
 
     def test_us_west_1(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='us-west-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'us-west-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.us-west-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-us-west-1.amazonaws.com')
 
     def test_ap_southeast_1(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='ap-southeast-1')
+        self.assertEqual(runner.make_emr_conn().endpoint,
+                         'elasticmapreduce.ap-southeast-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-ap-southeast-1.amazonaws.com')
-        self.assertRaises(Exception, runner.make_emr_conn)
 
     def test_bad_region(self):
         # should fail in the constructor because the constructor connects to S3
@@ -2048,6 +2048,14 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--hadoop-version', '0.20'])
+
+    def test_join_anyway_if_i_say_so(self):
+        _, job_flow_id = self.make_pooled_job_flow(hadoop_version='0.18')
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--emr-job-flow-id', job_flow_id,
             '--hadoop-version', '0.20'])
 
     def test_pooling_with_ami_version(self):
@@ -2586,7 +2594,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
 
     @contextmanager
     def _test_mode(self, mode):
-        r = EMRJobRunner(conf_path=False)
+        r = EMRJobRunner(conf_paths=[])
         with nested(
             patch.object(r, '_cleanup_local_scratch'),
             patch.object(r, '_cleanup_remote_scratch'),
@@ -2596,7 +2604,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             yield mocks
 
     def _quick_runner(self):
-        r = EMRJobRunner(conf_path=False)
+        r = EMRJobRunner(conf_paths=[])
         r._emr_job_flow_id = 'j-ESSEOWENS'
         r._address = 'Albuquerque, NM'
         r._ran_job = False
@@ -2742,7 +2750,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
 
     def test_no_waiting_for_job_pool_fail(self):
         self.add_job_flow(['j-fail-lock'], self.jobs)
-        runner = EMRJobRunner(conf_path=None)
+        runner = EMRJobRunner(conf_paths=[])
         runner._opts['pool_wait_minutes'] = 0
         result = runner.find_job_flow()
         self.assertEqual(result, None)
@@ -2750,14 +2758,14 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
 
     def test_no_waiting_for_job_pool_success(self):
         self.add_job_flow(['j-fail-lock'], self.jobs)
-        runner = EMRJobRunner(conf_path=None)
+        runner = EMRJobRunner(conf_paths=[])
         runner._opts['pool_wait_minutes'] = 0
         result = runner.find_job_flow()
         self.assertEqual(result, None)
 
     def test_acquire_lock_on_first_attempt(self):
         self.add_job_flow(['j-successful-lock'], self.jobs)
-        runner = EMRJobRunner(conf_path=None)
+        runner = EMRJobRunner(conf_paths=[])
         runner._opts['pool_wait_minutes'] = 1
         result = runner.find_job_flow()
         self.assertEqual(result.jobflowid, 'j-successful-lock')
@@ -2766,7 +2774,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
     def test_sleep_then_acquire_lock(self):
         self.add_job_flow(['j-fail-lock'], self.jobs)
         self.add_job_flow(['j-successful-lock'], self.future_jobs)
-        runner = EMRJobRunner(conf_path=None)
+        runner = EMRJobRunner(conf_paths=[])
         runner._opts['pool_wait_minutes'] = 1
         result = runner.find_job_flow()
         self.assertEqual(result.jobflowid, 'j-successful-lock')
@@ -2775,7 +2783,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
     def test_timeout_waiting_for_job_flow(self):
         self.add_job_flow(['j-fail-lock'], self.jobs)
         self.add_job_flow(['j-epic-fail-lock'], self.future_jobs)
-        runner = EMRJobRunner(conf_path=None)
+        runner = EMRJobRunner(conf_paths=[])
         runner._opts['pool_wait_minutes'] = 1
         result = runner.find_job_flow()
         self.assertEqual(result, None)

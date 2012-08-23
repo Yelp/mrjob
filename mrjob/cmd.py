@@ -243,9 +243,8 @@ class WorkingDirManager(object):
                 return  # already added
             else:
                 raise ValueError(
-                    "%s won't work because we already have %" % (
-                        self._desc(type, path, name),
-                        self._desc(current_type, current_path, name)))
+                    "%s %s#%s won't work because we already have %s %s#%s" % (
+                        type, path, name, current_type, current_path, name))
 
         # if a name was specified, reserve it
         if name:

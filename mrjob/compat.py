@@ -513,7 +513,12 @@ def supports_new_distributed_cache_options(version):
     """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
     ``-cacheArchive``
     """
-    return version_gte(version, '0.20')
+    # Although Hadoop 0.20 supports these options, that support is buggy:
+    # https://issues.apache.org/jira/browse/MAPREDUCE-2361
+    # https://issues.apache.org/jira/browse/HADOOP-6334
+    # The bug was fixed in Hadoop 0.20.203.0:
+    # http://hadoop.apache.org/common/docs/r0.20.203.0/releasenotes.html
+    return version_gte(version, '0.20.203')
 
 def uses_020_counters(version):
     return version_gte(version, '0.20')

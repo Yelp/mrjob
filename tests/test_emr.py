@@ -2837,7 +2837,10 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
             self.runner, '_s3_step_output_uri', return_value=['output'])
         self.simple_patch(
             self.runner, '_get_jar', return_value=['streaming.jar'])
-        self.runner._script = {'name': 'my_job.py'}
+        self.runner._script = {
+            'name': 'my_job.py',
+            'path': os.path.abspath('tests/mr_testing_job.py'),
+        }
 
         self.simple_patch(boto.emr, 'StreamingStep', dict)
 

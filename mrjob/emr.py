@@ -185,7 +185,10 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
 # The reason we don't just create a job flow and then query its Hadoop version
 # is that for most jobs, we create the steps and the job flow at the same time.
 AMI_VERSION_TO_HADOOP_VERSION = {
-    None: '0.20.205',
+    None: '0.20.205',  # The default is 'latest' now, but you can still pass
+                       # None in the runner kwargs, and that should default us
+                       # to 'latest' in boto. But we really can't know, so
+                       # caveat programmor.
     '1.0': '0.18',
     '2.0': '0.20.205',
     'latest': '0.20.205',

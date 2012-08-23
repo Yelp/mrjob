@@ -82,7 +82,20 @@ Job execution context
 ---------------------
 
 **cmdenv** (:option:`--cmdenv`)
-    Environment variables to pass to the job inside Hadoop streaming
+    Dictionary of environment variables to pass to the job inside Hadoop
+    streaming.
+
+    In the config file::
+
+        runners:
+            inline:
+                cmdenv:
+                    PYTHONPATH: $HOME/stuff
+                    TZ: America/Los_Angeles
+
+    On the command line::
+
+        --cmdenv PYTHONPATH=$HOME/stuff,TZ=America/Los_Angeles
 
 **interpreter** (:option:`--interpreter`)
     Interpreter to launch your script with. Defaults to the value of

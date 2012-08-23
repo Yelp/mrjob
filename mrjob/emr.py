@@ -1374,7 +1374,7 @@ class EMRJobRunner(MRJobRunner):
         if supports_new_distributed_cache_options(version):
             # boto doesn't support non-deprecated 0.20 options, so insert
             # them ourselves
-            step_args.append(self._new_upload_args(self._upload_mgr))
+            step_args.extend(self._new_upload_args(self._upload_mgr))
         else:
             cache_files.extend(
                 self._arg_hash_paths('file', self._upload_mgr))

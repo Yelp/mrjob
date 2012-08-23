@@ -293,7 +293,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             # shouldn't be in PYTHONPATH (we dump it directly in site-packages)
             pythonpath = runner._get_cmdenv().get('PYTHONPATH') or ''
             self.assertNotIn(
-                runner._b_mgr.name('file', self._mrjob_tar_gz_path),
+                runner._b_mgr.name('file', runner._mrjob_tar_gz_path),
                 pythonpath.split(':'))
 
         self.assertEqual(sorted(results),
@@ -350,7 +350,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
     def _test_remote_scratch_cleanup(self, mode, scratch_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
-        # read from STDIN, a local file, and a remote file
         stdin = StringIO('foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
@@ -386,13 +385,13 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self._test_remote_scratch_cleanup('REMOTE_SCRATCH', 0, 1)
 
     def test_cleanup_local(self):
-        self._test_remote_scratch_cleanup('LOCAL_SCRATCH', 5, 1)
+        self._test_remote_scratch_cleanup('LOCAL_SCRATCH', 4, 1)
 
     def test_cleanup_logs(self):
-        self._test_remote_scratch_cleanup('LOGS', 5, 0)
+        self._test_remote_scratch_cleanup('LOGS', 4, 0)
 
     def test_cleanup_none(self):
-        self._test_remote_scratch_cleanup('NONE', 5, 1)
+        self._test_remote_scratch_cleanup('NONE', 4, 1)
 
     def test_cleanup_combine(self):
         self._test_remote_scratch_cleanup('LOGS,REMOTE_SCRATCH', 0, 0)
@@ -444,6 +443,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         mr_job = MRTwoStepJob(['-r', 'emr'])
         mr_job.sandbox()
         with mr_job.make_runner() as runner:
+            runner._add_job_files_for_upload()
             runner._launch_emr_job()
             jf = runner._describe_jobflow()
             jf.keepjobflowalivewhennosteps = 'false'

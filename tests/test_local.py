@@ -31,9 +31,7 @@ try:
 except ImportError:
     import unittest
 
-from mock import patch
 import mrjob
-from mrjob import local
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
@@ -672,23 +670,6 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
         conf_args = runner._hadoop_conf_args(0, 1)
         self.assertEqual(conf_args[:2], ['-libjar', 'qux.jar'])
         self.assertEqual(len(conf_args), 12)
-
-
-class IronPythonEnvironmentTestCase(unittest.TestCase):
-
-    def setUp(self):
-        self.runner = LocalMRJobRunner(conf_paths=[])
-        self.runner._setup_working_dir()
-
-    def test_env_ironpython(self):
-        with patch.object(local, 'is_ironpython', True):
-            environment = self.runner._subprocess_env('mapper', 0, 0)
-            self.assertIn('IRONPYTHONPATH', environment)
-
-    def test_env_no_ironpython(self):
-        with patch.object(local, 'is_ironpython', False):
-            environment = self.runner._subprocess_env('mapper', 0, 0)
-            self.assertNotIn('IRONPYTHONPATH', environment)
 
 
 class CommandSubstepTestCase(SandboxedTestCase):

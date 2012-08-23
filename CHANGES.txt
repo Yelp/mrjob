@@ -1,18 +1,20 @@
 v0.4, 2012-08-?? -- Slouching toward nirvana
  * Changes:
-     * Changed default runner from 'local' to 'inline' (#423)
-     * Requires boto 2.2.0 or later
-     * Filesystem functionality moved out of MRJobRunner into into 'fs' objects
-       but forwarded from runners for backward compatibility
-     * Changed exception hierarchy of mrjob.ssh (which is private but
-       important)
+   * Changed default runner from 'local' to 'inline' (#423)
+   * Local runner no longer adds working directory to PYTHONPATH of
+     subprocesses; use inline runner instead (#424)
+   * Requires boto 2.2.0 or later
+   * Filesystem functionality moved out of MRJobRunner into into 'fs' objects
+     but forwarded from runners for backward compatibility
+   * Changed exception hierarchy of mrjob.ssh (which is private but
+     important)
  * New features:
-     * Support for non-Hadoop Streaming jar steps (#499)
-     * Support for arbitrary commands as Hadoop Streaming
-       mappers/combiners/reducers
-     * mapper_pre_filter, combiner_pre_filter, and reducer_pre_filter allow
-       running of a UNIX command in front of tasks to filter input outside of
-       the interpreter
+   * Support for non-Hadoop Streaming jar steps (#499)
+   * Support for arbitrary commands as Hadoop Streaming
+     mappers/combiners/reducers
+   * mapper_pre_filter, combiner_pre_filter, and reducer_pre_filter allow
+     running of a UNIX command in front of tasks to filter input outside of
+     the interpreter
  * Bug fixes:
    * Silenced some incorrect warnings about ignored options in 'inline' runner
  * Removed deprecated functionality:
@@ -24,6 +26,27 @@ v0.4, 2012-08-?? -- Slouching toward nirvana
    * PROTOCOL_DICT
    * IF_SUCCESSFUL
    * DEFAULT_CLEANUP
+
+v0.3.5, 2012-08-21 -- The Last Ride of v0.3.x[?]
+ * EMR:
+   * --pool-wait-minutes option lets you wait up to X minutes before creating a
+     job flow (#455)
+   * Job flow ID included in error messages on failure (#452)
+   * JOB and JOB_FLOW cleanup options (#485, #455)
+ * EMR and Hadoop:
+   * Compatibility fixes related to deprecated options and Hadoop's bizarre
+     non-sequential version numbers (#489, #534)
+ * Other:
+   * Warn when *_PROTOCOL is not a class (#490)
+ * Bug fixes:
+   * Unicode strings can be used when specifying interpreters (#431)
+   * --enable-emr-logging no longer causes the wrong counters/logs to be parsed
+     (#446)
+   * TMP_DIR inserted into 'sort' environment variables (#477)
+   * Setting hadoop_home in mrjob.conf works again
+   * Gzipped input files work when specified with relative paths (#494)
+   * Passthrough options are not re-ordered when sent to Hadoop Streaming
+     (#509)
 
 v0.3.4.1, 2012-06-12 -- The test suite doesn't catch everything...
  * Local mode doesn't try to send multiple mappers to the same output file

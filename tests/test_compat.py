@@ -27,6 +27,7 @@ from mock import patch
 
 from mrjob.compat import get_jobconf_value
 from mrjob.compat import supports_combiners_in_hadoop_streaming
+from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_generic_jobconf
 
@@ -68,6 +69,11 @@ class CompatTestCase(unittest.TestCase):
         self.assertEqual(translate_jobconf('user.name', '0.21'),
                          'mapreduce.job.user.name')
 
+        self.assertEqual(translate_jobconf('user.name', '1.0'),
+                         'user.name')
+        self.assertEqual(translate_jobconf('user.name', '2.0'),
+                         'mapreduce.job.user.name')
+
     def test_supports_combiners(self):
         self.assertEqual(supports_combiners_in_hadoop_streaming('0.19'),
                          False)
@@ -82,3 +88,9 @@ class CompatTestCase(unittest.TestCase):
         self.assertEqual(uses_generic_jobconf('0.18'), False)
         self.assertEqual(uses_generic_jobconf('0.20'), True)
         self.assertEqual(uses_generic_jobconf('0.21'), True)
+
+    def test_cache_opts(self):
+        self.assertEqual(supports_new_distributed_cache_options('0.18'), False)
+        self.assertEqual(supports_new_distributed_cache_options('0.20'), False)
+        self.assertEqual(
+            supports_new_distributed_cache_options('0.20.203'), True)

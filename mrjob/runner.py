@@ -83,11 +83,6 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
                    'SCRATCH', 'JOB', 'IF_SUCCESSFUL', 'JOB_FLOW']
 
-#: .. deprecated:: 0.3.0
-#:
-#: the default cleanup-on-success option: ``'IF_SUCCESSFUL'``
-CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
-
 _STEP_RE = re.compile(r'^M?C?R?$')
 
 # buffer for piping files into sort on Windows

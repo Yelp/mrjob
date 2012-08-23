@@ -20,6 +20,7 @@ import datetime
 import getpass
 import logging
 import os
+import pprint
 import random
 import re
 import shutil
@@ -171,6 +172,9 @@ class RunnerOptionStore(OptionStore):
 
         self._fix_interp_options()
 
+        log.debug('Active configuration:')
+        log.debug(pprint.pformat(self))
+
     def default_options(self):
         super_opts = super(RunnerOptionStore, self).default_options()
 
@@ -186,8 +190,6 @@ class RunnerOptionStore(OptionStore):
             'cleanup_on_failure': ['NONE'],
             'hadoop_version': '0.20',
             'owner': owner,
-            'python_bin': ['python'],
-            'steps_python_bin': [sys.executable or 'python'],
         })
 
     def _validate_cleanup(self):
@@ -217,7 +219,13 @@ class RunnerOptionStore(OptionStore):
 
     def _fix_interp_options(self):
         if not self['steps_python_bin']:
-            self['steps_python_bin'] = self['python_bin']
+            self['steps_python_bin'] = (
+                self['python_bin'] or
+                sys.executable or
+                ['python'])
+
+        if not self['python_bin']:
+            self['python_bin'] = ['python']
 
         if not self['steps_interpreter']:
             if self['interpreter']:

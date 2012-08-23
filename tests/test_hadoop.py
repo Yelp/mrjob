@@ -215,7 +215,10 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
     def setUp(self):
         super(StreamingArgsTestCase, self).setUp()
         self.runner = HadoopJobRunner(
-            hadoop_bin='hadoop', hadoop_streaming_jar='streaming.jar')
+            hadoop_bin='hadoop', hadoop_streaming_jar='streaming.jar',
+            mr_job_script='my_job.py', stdin=StringIO())
+        self.runner._add_job_files_for_upload()
+
         self.runner._hadoop_version='0.20.204'
         self.simple_patch(self.runner, '_new_upload_args',
                           return_value=['new_upload_args'])
@@ -227,7 +230,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                           return_value=['hdfs_step_input_files'])
         self.simple_patch(self.runner, '_hdfs_step_output_dir',
                           return_value='hdfs_step_output_dir')
-        self.runner._script = {'name': 'my_job.py'}
+        self.runner._script_path = 'my_job.py'
 
         self._new_basic_args = [
             'hadoop', 'jar', 'streaming.jar',

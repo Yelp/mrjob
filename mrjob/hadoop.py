@@ -226,6 +226,7 @@ class HadoopJobRunner(MRJobRunner):
 
         self._check_input_exists()
         self._create_wrapper_script()
+        self._add_job_files_for_upload()
         self._upload_local_files_to_hdfs()
         self._run_job_in_hadoop()
 
@@ -240,13 +241,18 @@ class HadoopJobRunner(MRJobRunner):
                 raise AssertionError(
                     'Input path %s does not exist!' % (path,))
 
-    def _upload_local_files_to_hdfs(self):
-        """Copy files to HDFS, and set the 'hdfs_uri' field for each file.
-        """
-        # choose paths to upload
-        for path in self._get_input_paths() + list(self._wd_mgr.paths()):
+    def _add_job_files_for_upload(self):
+        """Add files needed for running the job (setup and input)
+        to self._upload_mgr."""
+        for path in self._get_input_paths():
             self._upload_mgr.add(path)
 
+        for path in self._wd_mgr.paths():
+            self._upload_mgr.add(path)
+
+    def _upload_local_files_to_hdfs(self):
+        """Copy files managed by self._upload_mgr to HDFS
+        """
         self._mkdir_on_hdfs(self._upload_mgr.prefix)
 
         log.info('Copying local files into %s' % self._upload_mgr.prefix)

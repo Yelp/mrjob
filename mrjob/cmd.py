@@ -279,8 +279,12 @@ class WorkingDirManager(object):
             return name
 
         if (type, path) not in self._typed_path_to_auto_name:
-            raise ValueError('%s was never added without a name!' %
-                             self._desc(type, path))
+            # print useful error message
+            if (type, path) in self._name_to_typed_path.itervalues():
+                raise ValueError('%s %r was never added without a name!' %
+                                 (type, path))
+            else:
+                raise ValueError('%s %r was never added!' % (type, path))
 
         if not self._typed_path_to_auto_name[(type, path)]:
             name = name_uniquely(path, names_taken=self._name_to_typed_path)
@@ -331,13 +335,6 @@ class WorkingDirManager(object):
         if not type in self._SUPPORTED_TYPES:
             raise TypeError('bad path type %r, must be one of %s' % (
                 type, ', '.join(sorted(self._SUPPORTED_TYPES))))
-
-    def _desc(self, type, path, name=''):
-        """Display upload params in mrjob's DistributedCache-like syntax
-        (appending a / to indicate archives).
-        """
-        # this will almost certainly get broken out into another function
-        return '%s#%s%s' % (path, name, '/' if type == 'archive' else '')
 
 
 class BootstrapWorkingDirManager(WorkingDirManager):

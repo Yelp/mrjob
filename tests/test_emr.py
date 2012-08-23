@@ -53,7 +53,6 @@ from mrjob.parse import parse_s3_uri
 from mrjob.pool import pool_hash_and_name
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
-from mrjob.ssh import SSHException
 from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
@@ -2664,7 +2663,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
 
     def test_job_cleanup_mechanics_ssh_fail(self):
         def die_ssh(*args, **kwargs):
-            raise SSHException
+            raise IOError
 
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()

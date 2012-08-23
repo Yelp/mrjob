@@ -1766,7 +1766,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
                               bootstrap_python_packages=[yelpy_tar_gz_path],
                               bootstrap_scripts=['speedups.sh', '/tmp/s.sh'])
         script_path = os.path.join(self.tmp_dir, 'b.py')
-        runner._create_master_bootstrap_script(dest=script_path)
+        runner._create_master_bootstrap_script_if_needed(dest=script_path)
 
         self.assertTrue(os.path.exists(script_path))
         py_compile.compile(script_path)

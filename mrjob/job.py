@@ -898,6 +898,14 @@ class MRJob(MRJobLauncher):
         """
         self.args = args
 
+    def _help_main(self):
+        self.option_parser.option_groups = [
+            self.mux_opt_group,
+            self.proto_opt_group,
+        ]
+        self.option_parser.print_help()
+        sys.exit(0)
+
     ### protocols ###
 
     def input_protocol(self):

@@ -75,9 +75,9 @@ DEBUG_JAR_RE = re.compile(
     r's3n://.*\.elasticmapreduce/libs/state-pusher/[^/]+/fetch')
 
 
-def main():
+def main(cl_args=None):
     option_parser = make_option_parser()
-    options, args = option_parser.parse_args()
+    options, args = option_parser.parse_args(cl_args)
 
     if args:
         option_parser.error('takes no arguments')

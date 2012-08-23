@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+#r Copyright 2009-2010 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,7 +38,6 @@ from datetime import timedelta
 import math
 import logging
 from optparse import OptionParser
-import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
@@ -768,4 +767,4 @@ def percent(x, total, default=0.0):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    main(None)

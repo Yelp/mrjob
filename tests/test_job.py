@@ -772,9 +772,8 @@ class FileOptionsTestCase(SandboxedTestCase):
 
         with logger_disabled('mrjob.local'):
             with mr_job.make_runner() as runner:
-                # make sure our file gets "uploaded"
-                assert [fd for fd in runner._files
-                        if fd['path'] == n_file_path]
+                # make sure our file gets placed in the working dir
+                self.assertIn(n_file_path, runner._wd_mgr.paths())
 
                 runner.run()
                 output = set()

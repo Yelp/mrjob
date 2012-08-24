@@ -44,6 +44,11 @@ class CommandTestCase(TestCase):
         p.start()
         self.addCleanup(p.stop)
 
+    def _test_main_call(self, module, cmd_name):
+        with patch.object(module, 'main') as m_main:
+            cmd.main(args=['mrjob', cmd_name])
+            m_main.assert_called_once_with([])
+
     def test_run(self):
         with patch.object(launch, 'MRJobLauncher') as m_launcher:
             cmd.main(args=['mrjob', 'run', 'script.py'])
@@ -51,36 +56,23 @@ class CommandTestCase(TestCase):
                 args=['script.py'], from_cl=True)
 
     def test_audit_usage(self):
-        with patch.object(audit_usage, 'main') as m_main:
-            cmd.main(args=['mrjob', 'audit-emr-usage'])
-            m_main.assert_called_once_with([])
+        self._test_main_call(audit_usage, 'audit-emr-usage')
 
     def test_create_job_flow(self):
-        with patch.object(create_job_flow, 'main') as m_main:
-            cmd.main(args=['mrjob', 'create-job-flow'])
-            m_main.assert_called_once_with([])
+        self._test_main_call(create_job_flow, 'create-job-flow')
 
     def test_fetch_logs(self):
-        with patch.object(fetch_logs, 'main') as m_main:
-            cmd.main(args=['mrjob', 'fetch-logs'])
-            m_main.assert_called_once_with([])
+        self._test_main_call(fetch_logs, 'fetch-logs')
 
     def test_report_long_jobs(self):
-        with patch.object(report_long_jobs, 'main') as m_main:
-            cmd.main(args=['mrjob', 'report-long-jobs'])
-            m_main.assert_called_once_with([])
+        self._test_main_call(report_long_jobs, 'report-long-jobs')
 
     def test_s3_tmpwatch(self):
-        with patch.object(s3_tmpwatch, 'main') as m_main:
-            cmd.main(args=['mrjob', 's3-tmpwatch'])
-            m_main.assert_called_once_with([])
+        self._test_main_call(s3_tmpwatch, 's3-tmpwatch')
 
     def test_terminate_idle_job_flows(self):
-        with patch.object(terminate_idle_job_flows, 'main') as m_main:
-            cmd.main(args=['mrjob', 'terminate-idle-job-flows'])
-            m_main.assert_called_once_with([])
+        self._test_main_call(terminate_idle_job_flows,
+                             'terminate-idle-job-flows')
 
     def test_terminate_job_flow(self):
-        with patch.object(terminate_job_flow, 'main') as m_main:
-            cmd.main(args=['mrjob', 'terminate-job-flow'])
-            m_main.assert_called_once_with([])
+        self._test_main_call(terminate_job_flow, 'terminate-job-flow')

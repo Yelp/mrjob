@@ -1797,21 +1797,13 @@ class EMRJobRunner(MRJobRunner):
 
     ### Bootstrapping ###
 
-    def _create_master_bootstrap_script_if_needed(self, dest='b.py'):
+    def _create_master_bootstrap_script_if_needed(self):
         """Create the master bootstrap script and write it into our local
         temp directory. Set self._master_bootstrap_script_path.
 
         This will do nothing if there are no bootstrap scripts or commands,
         or if it has already been called."""
-
-        # we call the script b.py because there's a character limit on
-        # bootstrap script names (or there was at one time, anyway)
-
         if self._master_bootstrap_script_path:
-            return
-
-        if not any(key.startswith('bootstrap_') and value
-                   for (key, value) in self._opts.iteritems()):
             return
 
         # don't bother if we're not starting a job flow
@@ -1825,16 +1817,17 @@ class EMRJobRunner(MRJobRunner):
                for (key, value) in self._opts.iteritems()):
             return
 
-        path = os.path.join(self._get_local_tmp_dir(), dest)
+        # we call the script b.py because there's a character limit on
+        # bootstrap script names (or there was at one time, anyway)
+        path = os.path.join(self._get_local_tmp_dir(), 'b.py')
         log.info('writing master bootstrap script to %s' % path)
 
         contents = self._master_bootstrap_script_content()
         for line in StringIO(contents):
             log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
-        f = open(path, 'w')
-        f.write(contents)
-        f.close()
+        with open(path, 'w') as f:
+            f.write(contents)
 
         self._master_bootstrap_script_path = path
 
@@ -2192,8 +2185,9 @@ class EMRJobRunner(MRJobRunner):
         def bootstrap_file_paths():
             for path in self._b_mgr.name_to_path('file').itervalues():
                 # master bootstrap script is defined by other opts.
-                # would be nice if we could avoid creating it when
-                # joining a pooled job flow.
+
+                # TODO: when pooling, avoid creating it until we know
+                # there are no job flows available
                 if path == self._master_bootstrap_script_path:
                     continue
 

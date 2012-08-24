@@ -1748,43 +1748,36 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
                               bootstrap_mrjob=True,
                               bootstrap_python_packages=[yelpy_tar_gz_path],
                               bootstrap_scripts=['speedups.sh', '/tmp/s.sh'])
-        script_path = os.path.join(self.tmp_dir, 'b.py')
-        runner._create_master_bootstrap_script_if_needed(dest=script_path)
 
-        self.assertTrue(os.path.exists(script_path))
-        py_compile.compile(script_path)
+        runner._create_master_bootstrap_script_if_needed()
+
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
+        py_compile.compile(runner._master_bootstrap_script_path)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False)
         script_path = os.path.join(self.tmp_dir, 'b.py')
 
-        runner._create_master_bootstrap_script_if_needed(dest=script_path)
-        self.assertFalse(os.path.exists(script_path))
+        runner._create_master_bootstrap_script_if_needed()
+        self.assertIsNone(runner._master_bootstrap_script_path)
 
         # bootstrap actions don't figure into the master bootstrap script
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_mrjob=False,
                               bootstrap_actions=['foo', 'bar baz'],
                               pool_emr_job_flows=False)
-        runner._create_master_bootstrap_script_if_needed(dest=script_path)
 
-        self.assertFalse(os.path.exists(script_path))
+        runner._create_master_bootstrap_script_if_needed()
+        self.assertIsNone(runner._master_bootstrap_script_path)
 
-    def test_bootstrap_script_if_needed_for_pooling(self):
-        runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False)
-        script_path = os.path.join(self.tmp_dir, 'b.py')
-
-        runner._create_master_bootstrap_script_if_needed(dest=script_path)
-        self.assertFalse(os.path.exists(script_path))
-
-        # bootstrap actions don't figure into the master bootstrap script
+        # using pooling doesn't require us to create a bootstrap script
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_mrjob=False,
-                              bootstrap_actions=['foo', 'bar baz'],
                               pool_emr_job_flows=True)
-        runner._create_master_bootstrap_script_if_needed(dest=script_path)
 
-        self.assertTrue(os.path.exists(script_path))
+        runner._create_master_bootstrap_script_if_needed()
+        self.assertIsNone(runner._master_bootstrap_script_path)
 
     def test_bootstrap_actions_get_added(self):
         bootstrap_actions = [
@@ -1842,12 +1835,17 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
                               bootstrap_python_packages=[yelpy_tar_gz_path],
                               bootstrap_scripts=['speedups.sh', '/tmp/s.sh'],
                               python_bin=['anaconda'])
-        script_path = os.path.join(self.tmp_dir, 'b.py')
-        runner._create_master_bootstrap_script_if_needed(dest=script_path)
-        with open(script_path, 'r') as f:
+
+        runner._create_master_bootstrap_script_if_needed()
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        with open(runner._master_bootstrap_script_path, 'r') as f:
             content = f.read()
-            self.assertIn("call(['sudo', 'anaconda', '-m', 'compileall', '-f', mrjob_dir]", content)
-            self.assertIn("check_call(['sudo', 'anaconda', 'setup.py', 'install']", content)
+
+        self.assertIn(
+            "call(['sudo', 'anaconda', '-m', 'compileall', '-f',"" mrjob_dir]",
+            content)
+        self.assertIn(
+            "check_call(['sudo', 'anaconda', 'setup.py', 'install']", content)
 
     def test_local_bootstrap_action(self):
         # make sure that local bootstrap action scripts get uploaded to S3

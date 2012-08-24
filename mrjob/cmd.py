@@ -69,7 +69,7 @@ def audit_usage(args):
     main(args)
 
 
-@command('create-emr-job-flow', 'Create an EMR job flow')
+@command('create-job-flow', 'Create an EMR job flow')
 def create_jf(args):
     from mrjob.tools.emr.create_job_flow import main
     main(args)

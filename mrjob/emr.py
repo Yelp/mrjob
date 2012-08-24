@@ -68,6 +68,7 @@ from mrjob.logparsers import EMR_JOB_LOG_URI_RE
 from mrjob.logparsers import NODE_LOG_URI_RE
 from mrjob.logparsers import best_error_from_logs
 from mrjob.logparsers import scan_for_counters_in_files
+from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
@@ -94,7 +95,11 @@ from mrjob.util import read_file
 
 log = logging.getLogger('mrjob.emr')
 
-JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
+JOB_TRACKER_RE = re.compile(r'(\d{1,3}\.\d{2})%')
+
+# not all steps generate task attempt logs. for now, conservatively check for
+# streaming steps, which always generate them.
+LOG_GENERATING_STEP_NAME_RE = HADOOP_STREAMING_JAR_RE
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?
 EMR_BACKOFF = 20
@@ -1712,14 +1717,23 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             running_step_name = ''
             total_step_time = 0.0
             step_nums = []  # step numbers belonging to us. 1-indexed
+            lg_step_num_mapping = {}
 
             steps = job_flow.steps or []
+            latest_lg_step_num = 0
             for i, step in enumerate(steps):
+                if LOG_GENERATING_STEP_NAME_RE.match(
+                    posixpath.basename(step.jar)):
+                    latest_lg_step_num += 1
+
                 # ignore steps belonging to other jobs
                 if not step.name.startswith(self._job_name):
                     continue
 
                 step_nums.append(i + 1)
+                if LOG_GENERATING_STEP_NAME_RE.match(
+                    posixpath.basename(step.jar)):
+                    lg_step_num_mapping[i + 1] = latest_lg_step_num
 
                 step.state = step.state
                 step_states.append(step.state)
@@ -1786,7 +1800,7 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             log.info('Job completed.')
             log.info('Running time was %.1fs (not counting time spent waiting'
                      ' for the EC2 instances)' % total_step_time)
-            self._fetch_counters(step_nums)
+            self._fetch_counters(step_nums, lg_step_num_mapping)
             self.print_counters(range(1, len(step_nums) + 1))
         else:
             msg = 'Job on job flow %s failed with status %s: %s' % (
@@ -1795,7 +1809,8 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
             if self._s3_job_log_uri:
                 log.info('Logs are in %s' % self._s3_job_log_uri)
             # look for a Python traceback
-            cause = self._find_probable_cause_of_failure(step_nums)
+            cause = self._find_probable_cause_of_failure(
+                step_nums, sorted(lg_step_num_mapping.values()))
             if cause:
                 # log cause, and put it in exception
                 cause_msg = []  # lines to log and put in exception
@@ -1977,32 +1992,45 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
 
     ## LOG PARSING ##
 
-    def _fetch_counters(self, step_nums, skip_s3_wait=False):
+    def _fetch_counters(self, step_nums, lg_step_num_mapping=None,
+                        skip_s3_wait=False):
         """Read Hadoop counters from S3.
 
         Args:
         step_nums -- the steps belonging to us, so that we can ignore counters
                      from other jobs when sharing a job flow
         """
+        # empty list is a valid value for lg_step_nums, but it is an optional
+        # parameter
+        if lg_step_num_mapping is None:
+            lg_step_num_mapping = dict((n, n) for n in step_nums)
+        lg_step_nums = list(sorted(lg_step_num_mapping[k] for k in step_nums))
+
         self._counters = []
         new_counters = {}
         if self._opts['ec2_key_pair_file']:
             try:
-                new_counters = self._fetch_counters_ssh(step_nums)
+                new_counters = self._fetch_counters_ssh(lg_step_nums)
             except LogFetchError:
-                new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
+                new_counters = self._fetch_counters_s3(
+                    lg_step_nums, skip_s3_wait)
             except IOError:
                 # Can get 'file not found' if test suite was lazy or Hadoop
                 # logs moved. We shouldn't crash in either case.
-                new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
+                new_counters = self._fetch_counters_s3(
+                    lg_step_nums, skip_s3_wait)
         else:
             log.info('ec2_key_pair_file not specified, going to S3')
-            new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
+            new_counters = self._fetch_counters_s3(lg_step_nums, skip_s3_wait)
 
         # step_nums is relative to the start of the job flow
         # we only want them relative to the job
         for step_num in step_nums:
-            self._counters.append(new_counters.get(step_num, {}))
+            if step_num in lg_step_num_mapping:
+                self._counters.append(
+                    new_counters.get(lg_step_num_mapping[step_num], {}))
+            else:
+                self._counters.append({})
 
     def _fetch_counters_ssh(self, step_nums):
         uris = list(self.ls_job_logs_ssh(step_nums))
@@ -2036,12 +2064,19 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
     def counters(self):
         return self._counters
 
-    def _find_probable_cause_of_failure(self, step_nums):
+    def _find_probable_cause_of_failure(self, step_nums, lg_step_nums=None):
         """Scan logs for Python exception tracebacks.
 
-        Args:
-        step_nums -- the numbers of steps belonging to us, so that we
-            can ignore errors from other jobs when sharing a job flow
+        :param step_nums: the numbers of steps belonging to us, so that we
+                          can ignore errors from other jobs when sharing a job
+                          flow
+        :param lg_step_nums: "Log generating step numbers" - list of
+                             (job flow step num, hadoop job num) mapping a job
+                             flow step number to the number hadoop sees.
+                             Necessary because not all steps generate task
+                             attempt logs, and when there are steps that don't,
+                             the number in the log path differs from the job
+                             flow step number.
 
         Returns:
         None (nothing found) or a dictionary containing:
@@ -2053,29 +2088,41 @@ http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuideindex.ht
         """
         if self._opts['ec2_key_pair_file']:
             try:
-                return self._find_probable_cause_of_failure_ssh(step_nums)
+                return self._find_probable_cause_of_failure_ssh(
+                    step_nums, lg_step_nums)
             except LogFetchError:
-                return self._find_probable_cause_of_failure_s3(step_nums)
+                return self._find_probable_cause_of_failure_s3(
+                    step_nums, lg_step_nums)
         else:
             log.info('ec2_key_pair_file not specified, going to S3')
-            return self._find_probable_cause_of_failure_s3(step_nums)
+            return self._find_probable_cause_of_failure_s3(
+                step_nums, lg_step_nums)
 
-    def _find_probable_cause_of_failure_ssh(self, step_nums):
+    def _find_probable_cause_of_failure_ssh(self, step_nums,
+                                            lg_step_nums=None):
+        # empty list is a valid value for lg_step_nums, but it is an optional
+        # parameter
+        if lg_step_nums is None:
+            lg_step_nums = step_nums
         task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
-        step_logs = self.ls_step_logs_ssh(step_nums)
+        step_logs = self.ls_step_logs_ssh(lg_step_nums)
         job_logs = self.ls_job_logs_ssh(step_nums)
         log.info('Scanning SSH logs for probable cause of failure')
         return best_error_from_logs(self, task_attempt_logs, step_logs,
                                     job_logs)
 
-    def _find_probable_cause_of_failure_s3(self, step_nums):
+    def _find_probable_cause_of_failure_s3(self, step_nums, lg_step_nums):
+        # empty list is a valid value for lg_step_nums, but it is an optional
+        # parameter
+        if lg_step_nums is None:
+            lg_step_nums = step_nums
         log.info('Scanning S3 logs for probable cause of failure')
         self._wait_for_s3_eventual_consistency()
         self._wait_for_job_flow_termination()
 
         task_attempt_logs = self.ls_task_attempt_logs_s3(step_nums)
         step_logs = self.ls_step_logs_s3(step_nums)
-        job_logs = self.ls_job_logs_s3(step_nums)
+        job_logs = self.ls_job_logs_s3(lg_step_nums)
         return best_error_from_logs(self, task_attempt_logs, step_logs,
                                     job_logs)
 

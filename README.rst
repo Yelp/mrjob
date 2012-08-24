@@ -109,15 +109,26 @@ See `the mrjob.conf documentation
 <http://packages.python.org/mrjob/configs-conf.html>`_ for more information.
 
 
-Links
------
+Project Links
+-------------
 
-* source: <http://github.com/Yelp/mrjob>
-* documentation: <http://packages.python.org/mrjob/>
-* discussion group: <http://groups.google.com/group/mrjob>
-* Hadoop MapReduce: <http://hadoop.apache.org/mapreduce/>
-* Elastic MapReduce: <http://aws.amazon.com/documentation/elasticmapreduce/>
-* PyCon 2011 mrjob overview: <http://blip.tv/pycon-us-videos-2009-2010-2011/pycon-2011-mrjob-distributed-computing-for-everyone-4898987/>
+* `Source code <http://github.com/Yelp/mrjob>`_
+* `Documentation <http://packages.python.org/mrjob/>`_
+* `Discussion group <http://groups.google.com/group/mrjob>`_
+
+Reference
+---------
+
+* `Hadoop MapReduce <http://hadoop.apache.org/mapreduce/>`_
+* `Elastic MapReduce <http://aws.amazon.com/documentation/elasticmapreduce/>`_
+
+More Information
+----------------
+
+* `PyCon 2011 mrjob overview <http://blip.tv/pycon-us-videos-2009-2010-2011/pycon-2011-mrjob-distributed-computing-for-everyone-4898987/>`_
+* `Introduction to Recommendations and MapReduce with mrjob <http://aimotion.blogspot.com/2012/08/introduction-to-recommendations-with.html>`_
+  (`source code <https://github.com/marcelcaraciolo/recsys-mapreduce-mrjob>`_)
+* `Social Graph Analysis Using Elastic MapReduce and PyPy <http://postneo.com/2011/05/04/social-graph-analysis-using-elastic-mapreduce-and-pypy>`_
 
 Thanks to `Greg Killion <mailto:greg@blind-works.net>`_
 (`blind-works.net <http://www.blind-works.net/>`_) for the logo.

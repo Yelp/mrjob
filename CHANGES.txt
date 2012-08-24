@@ -1,5 +1,6 @@
 v0.4, 2012-08-?? -- Slouching toward nirvana
  * Changes:
+   * 'mrjob' command (#225)
    * Changed default runner from 'local' to 'inline' (#423)
    * Local runner no longer adds working directory to PYTHONPATH of
      subprocesses; use inline runner instead (#424)

@@ -1312,14 +1312,13 @@ class EMRJobRunner(MRJobRunner):
         else:
             return 'TERMINATE_JOB_FLOW'
 
-    def _executable(self):
+    def _executable(self, steps=False):
         # detect executable files so we can discard the explicit interpreter if
         # possible
         if os.access(self._script_path, os.X_OK):
             return ['./' + self._wd_mgr.name('file', self._script_path)]
         else:
-            return (self._opts['interpreter'] +
-                    [self._wd_mgr.name('file', self._script_path)])
+            return super(EMRJobRunner, self)._executable(steps)
 
     def _build_streaming_step(self, step, step_num, num_steps):
         streaming_step_kwargs = {

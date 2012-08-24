@@ -20,10 +20,10 @@ from __future__ import with_statement
 import os
 
 from mrjob.protocol import JSONValueProtocol
-from tests.mr_testing_job import MRTestingJob
+from mrjob.job import MRJob
 
 
-class MRTowerOfPowers(MRTestingJob):
+class MRTowerOfPowers(MRJob):
 
     INPUT_PROTOCOL = JSONValueProtocol
     OUTPUT_PROTOCOL = JSONValueProtocol

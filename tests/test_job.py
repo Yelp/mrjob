@@ -43,7 +43,7 @@ from mrjob.step import JarStep
 from mrjob.step import MRJobStep
 from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
-from tests.mr_testing_job import MRTestingJob
+from mrjob.job import MRJob
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled
@@ -54,7 +54,7 @@ from tests.sandbox import SandboxedTestCase
 
 # These can't be invoked as a separate script, but they don't need to be
 
-class MRBoringJob(MRTestingJob):
+class MRBoringJob(MRJob):
     """It's a boring job, but somebody had to do it."""
     def mapper(self, key, value):
         yield(key, value)
@@ -63,7 +63,7 @@ class MRBoringJob(MRTestingJob):
         yield(key, list(values))
 
 
-class MRInitJob(MRTestingJob):
+class MRInitJob(MRJob):
 
     def __init__(self, *args, **kwargs):
         super(MRInitJob, self).__init__(*args, **kwargs)
@@ -219,7 +219,7 @@ class ProtocolsTestCase(unittest.TestCase):
     class MRBoringJob4(MRBoringJob):
         INTERNAL_PROTOCOL = ReprProtocol
 
-    class MRTrivialJob(MRTestingJob):
+    class MRTrivialJob(MRJob):
         OUTPUT_PROTOCOL = ReprProtocol
 
         def mapper(self, key, value):
@@ -509,11 +509,11 @@ class PickProtocolsTestCase(unittest.TestCase):
 
 class JobConfTestCase(unittest.TestCase):
 
-    class MRJobConfJob(MRTestingJob):
+    class MRJobConfJob(MRJob):
         JOBCONF = {'mapred.foo': 'garply',
                    'mapred.bar.bar.baz': 'foo'}
 
-    class MRJobConfMethodJob(MRTestingJob):
+    class MRJobConfMethodJob(MRJob):
         def jobconf(self):
             return {'mapred.baz': 'bar'}
 
@@ -609,7 +609,7 @@ class HadoopFormatTestCase(unittest.TestCase):
 
     # MRHadoopFormatJob is imported above
 
-    class MRHadoopFormatMethodJob(MRTestingJob):
+    class MRHadoopFormatMethodJob(MRJob):
 
         def hadoop_input_format(self):
             return 'mapred.ReasonableInputFormat'
@@ -645,7 +645,7 @@ class HadoopFormatTestCase(unittest.TestCase):
 
 class PartitionerTestCase(unittest.TestCase):
 
-    class MRPartitionerJob(MRTestingJob):
+    class MRPartitionerJob(MRJob):
         PARTITIONER = 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
 
     def test_empty(self):

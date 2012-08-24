@@ -15,10 +15,10 @@
 """We use this to test jobs that emit a large amount of stderr."""
 import sys
 
-from tests.mr_testing_job import MRTestingJob
+from mrjob.job import MRJob
 
 
-class MRVerboseJob(MRTestingJob):
+class MRVerboseJob(MRJob):
 
     def mapper_final(self):
         # the UNIX pipe buffer can hold 65536 bytes, so this should

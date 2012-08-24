@@ -22,7 +22,7 @@ commands = {}
 
 descriptions = {}
 
-usage = """usage: mrjob {subcommand} [args]"
+usage = """usage: mrjob {subcommand|--help}"
 
 subcommands:"""
 

@@ -486,23 +486,6 @@ class S3ScratchURITestCase(MockEMRAndS3TestCase):
         self.assertEqual(runner2._opts['s3_scratch_uri'], s3_scratch_uri)
 
 
-class BootstrapFilesTestCase(MockEMRAndS3TestCase):
-
-    def test_bootstrap_files_only_get_uploaded_once(self):
-        # just a regression test for Issue #8
-
-        # use self.fake_mrjob_tgz_path because it's easier than making a new
-        # file
-        bootstrap_file = self.fake_mrjob_tgz_path
-
-        runner = EMRJobRunner(conf_paths=[],
-                              bootstrap_files=[bootstrap_file])
-
-        matching_file_dicts = [fd for fd in runner._files
-                               if fd['path'] == bootstrap_file]
-        self.assertEqual(len(matching_file_dicts), 1)
-
-
 class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
     def test_attach_to_existing_job_flow(self):
@@ -527,7 +510,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
             # Issue 182: don't create the bootstrap script when
             # attaching to another job flow
-            self.assertEqual(runner._master_bootstrap_script, None)
+            self.assertIsNone(runner._master_bootstrap_script_path)
 
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)

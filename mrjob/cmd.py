@@ -51,10 +51,12 @@ def command(name, description):
 
 def main(args=None):
     args = args or argv
-    if not argv[1:] or argv[1] not in commands:
+    if not args[1:]:
         error()
+    elif args[1] not in commands:
+        error('"%s" is not a command' % args[1])
     else:
-        commands[argv[1]](argv[2:])
+        commands[args[1]](args[2:])
 
 
 @command('run', 'Run a job')

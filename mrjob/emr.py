@@ -2194,24 +2194,22 @@ class EMRJobRunner(MRJobRunner):
         """Generate a hash of the bootstrap configuration so it can be used to
         match jobs and job flows. This first argument passed to the bootstrap
         script will be ``'pool-'`` plus this hash.
+
+        The way the hash is calculated may vary between point releases
+        (pooling requires the exact same version of :py:mod:`mrjob` anyway).
         """
-        def bootstrap_file_paths():
-            for path in self._b_mgr.name_to_path('file').itervalues():
-                # master bootstrap script is defined by other opts.
-
-                # TODO: when pooling, avoid creating it until we know
-                # there are no job flows available
-                if path == self._master_bootstrap_script_path:
-                    continue
-
-                # mrjob.tar.gz is different every time (different timestamps)
-                if path == self._mrjob_tar_gz_path:
-                    continue
-
-                yield path
+        def maybe_md5sum(path):
+            # Don't hash the contents of the mrjob tarball because it's
+            # different every time (timestamps). Instead we look at
+            # version, below
+            if path == self._mrjob_tar_gz_path:
+                return 0
+            else:
+                return self.md5sum(path)
 
         things_to_hash = [
-            [self.md5sum(path) for path in bootstrap_file_paths()],
+            dict((name, maybe_md5sum(path)) for name, path
+                 in self._b_mgr.name_to_path('file').iteritems()),
             self._opts['additional_emr_info'],
             self._opts['bootstrap_mrjob'],
             self._opts['bootstrap_cmds'],

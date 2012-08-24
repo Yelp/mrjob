@@ -1262,7 +1262,8 @@ class EMRJobRunner(MRJobRunner):
                 ]
             bootstrap_action_args.append(
                 boto.emr.BootstrapAction(
-                    'master', self._master_bootstrap_script['s3_uri'],
+                    'master',
+                    self._upload_mgr.uri(self._master_bootstrap_script_path),
                     master_bootstrap_script_args))
 
         if bootstrap_action_args:
@@ -1822,7 +1823,7 @@ class EMRJobRunner(MRJobRunner):
             return
 
         # Also don't bother if we're not bootstrapping
-        if any(key.startswith('bootstrap_') and
+        if not any(key.startswith('bootstrap_') and
                key != 'bootstrap_actions' and  # these are separate scripts
                value
                for (key, value) in self._opts.iteritems()):
@@ -1906,7 +1907,8 @@ class EMRJobRunner(MRJobRunner):
         if self._bootstrap_python_packages:
             writeln('# install python modules:')
             for path_dict in self._bootstrap_python_packages:
-                writeln("check_call(['tar', 'xfz', %r])" % path_dict['name'])
+                writeln("check_call(['tar', 'xfz', %r])" %
+                        self._b_mgr.name(**path_dict))
                 # figure out name of dir to CD into
                 assert path_dict['path'].endswith('.tar.gz')
                 cd_into = extract_dir_for_tar(path_dict['path'])
@@ -1930,7 +1932,7 @@ class EMRJobRunner(MRJobRunner):
             writeln('# run bootstrap scripts:')
             for path_dict in self._bootstrap_scripts:
                 writeln('check_call(%r)' % (
-                    ['./' + path_dict['name']],))
+                    ['./' + self._b_mgr.name(**path_dict)],))
             writeln()
 
         return out.getvalue()

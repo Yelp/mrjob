@@ -1748,7 +1748,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
                               bootstrap_python_packages=[yelpy_tar_gz_path],
                               bootstrap_scripts=['speedups.sh', '/tmp/s.sh'])
 
-        runner._create_master_bootstrap_script_if_needed()
+        runner._add_bootstrap_files_for_upload()
 
         self.assertIsNotNone(runner._master_bootstrap_script_path)
         self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
@@ -1758,7 +1758,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False)
         script_path = os.path.join(self.tmp_dir, 'b.py')
 
-        runner._create_master_bootstrap_script_if_needed()
+        runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
 
         # bootstrap actions don't figure into the master bootstrap script
@@ -1767,7 +1767,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
                               bootstrap_actions=['foo', 'bar baz'],
                               pool_emr_job_flows=False)
 
-        runner._create_master_bootstrap_script_if_needed()
+        runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
 
         # using pooling doesn't require us to create a bootstrap script
@@ -1775,14 +1775,14 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
                               bootstrap_mrjob=False,
                               pool_emr_job_flows=True)
 
-        runner._create_master_bootstrap_script_if_needed()
+        runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
 
     def test_bootstrap_actions_get_added(self):
         bootstrap_actions = [
             ('s3://elasticmapreduce/bootstrap-actions/configure-hadoop'
              ' -m,mapred.tasktracker.map.tasks.maximum=1'),
-            's3://foo/bar#xyzzy',  # use alternate name for script
+            's3://foo/bar',
         ]
 
         runner = EMRJobRunner(conf_paths=[],
@@ -1803,11 +1803,11 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         self.assertEqual(
             actions[0].args[0].value,
             '-m,mapred.tasktracker.map.tasks.maximum=1')
-        self.assertEqual(actions[0].name, 'configure-hadoop')
+        self.assertEqual(actions[0].name, 'action 0')
 
         self.assertEqual(actions[1].path, 's3://foo/bar')
         self.assertEqual(actions[1].args, [])
-        self.assertEqual(actions[1].name, 'xyzzy')
+        self.assertEqual(actions[1].name, 'action 1')
 
         # check for master bootstrap script
         self.assertTrue(actions[2].path.startswith('s3://mrjob-'))
@@ -1835,7 +1835,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
                               bootstrap_scripts=['speedups.sh', '/tmp/s.sh'],
                               python_bin=['anaconda'])
 
-        runner._create_master_bootstrap_script_if_needed()
+        runner._add_bootstrap_files_for_upload()
         self.assertIsNotNone(runner._master_bootstrap_script_path)
         with open(runner._master_bootstrap_script_path, 'r') as f:
             content = f.read()
@@ -1869,7 +1869,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
         self.assertTrue(actions[0].path.startswith('s3://mrjob-'))
         self.assertTrue(actions[0].path.endswith('/apt-install.sh'))
-        self.assertEqual(actions[0].name, 'apt-install.sh')
+        self.assertEqual(actions[0].name, 'action 0')
         self.assertEqual(actions[0].args[0].value, 'python-scipy')
         self.assertEqual(actions[0].args[1].value, 'mysql-server')
 

@@ -384,13 +384,13 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self._test_remote_scratch_cleanup('REMOTE_SCRATCH', 0, 1)
 
     def test_cleanup_local(self):
-        self._test_remote_scratch_cleanup('LOCAL_SCRATCH', 4, 1)
+        self._test_remote_scratch_cleanup('LOCAL_SCRATCH', 5, 1)
 
     def test_cleanup_logs(self):
-        self._test_remote_scratch_cleanup('LOGS', 4, 0)
+        self._test_remote_scratch_cleanup('LOGS', 5, 0)
 
     def test_cleanup_none(self):
-        self._test_remote_scratch_cleanup('NONE', 4, 1)
+        self._test_remote_scratch_cleanup('NONE', 5, 1)
 
     def test_cleanup_combine(self):
         self._test_remote_scratch_cleanup('LOGS,REMOTE_SCRATCH', 0, 0)

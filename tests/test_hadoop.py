@@ -153,19 +153,14 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             self.assertEqual(runner._opts['hadoop_extra_args'],
                              ['-libjar', 'containsJars.jar'])
 
-            # make sure mrjob.tar.gz is uploaded and in PYTHONPATH
-            assert runner._mrjob_tar_gz_path
-            mrjob_tar_gz_file_dicts = [
-                file_dict for file_dict in runner._files
-                if file_dict['path'] == runner._mrjob_tar_gz_path]
-            self.assertEqual(len(mrjob_tar_gz_file_dicts), 1)
+            # make sure mrjob.tar.gz is was uploaded and added to PYTHONPATH
+            self.assertIsNotNone(runner._mrjob_tar_gz_path)
+            self.assertIn(runner._mrjob_tar_gz_path,
+                          runner._upload_mgr.path_to_uri())
 
-            mrjob_tar_gz_file_dict = mrjob_tar_gz_file_dicts[0]
-            assert mrjob_tar_gz_file_dict['name']
-
+            name = runner._wd_mgr.name('archive', runner._mrjob_tar_gz_path)
             pythonpath = runner._get_cmdenv()['PYTHONPATH']
-            self.assertIn(mrjob_tar_gz_file_dict['name'],
-                          pythonpath.split(':'))
+            self.assertIn(name, pythonpath.split(':'))
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])

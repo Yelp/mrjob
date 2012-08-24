@@ -666,9 +666,8 @@ class LocalMRJobRunner(MRJobRunner):
             cache_archives.append('%s#%s' % (path, name))
             cache_local_archives.append(os.path.join(self._working_dir, name))
 
-        # could add mtime info here too (e.g.
-        # mapreduce.job.cache.archives.timestamps) here too, though we should
-        # probably cache that in self._files
+        # TODO: could add mtime info here too (e.g.
+        # mapreduce.job.cache.archives.timestamps) here too
         j['mapreduce.job.cache.files'] = (','.join(cache_files))
         j['mapreduce.job.cache.local.files'] = (','.join(cache_local_files))
         j['mapreduce.job.cache.archives'] = (','.join(cache_archives))

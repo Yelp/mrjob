@@ -627,14 +627,9 @@ class LocalMRJobRunner(MRJobRunner):
             (translate_jobconf(k, version).replace('.', '_'), str(v))
             for (k, v) in internal_jobconf.iteritems())
 
-        ironpython_env = {'IRONPYTHONPATH': os.getcwd()} if is_ironpython \
-                         else {}
-
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
-        return combine_local_envs({'PYTHONPATH': os.getcwd()},
-                                  ironpython_env,
-                                  os.environ,
+        return combine_local_envs(os.environ,
                                   jobconf_env,
                                   internal_jobconf_env,
                                   self._get_cmdenv())

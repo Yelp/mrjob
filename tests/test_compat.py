@@ -69,6 +69,11 @@ class CompatTestCase(unittest.TestCase):
         self.assertEqual(translate_jobconf('user.name', '0.21'),
                          'mapreduce.job.user.name')
 
+        self.assertEqual(translate_jobconf('user.name', '1.0'),
+                         'user.name')
+        self.assertEqual(translate_jobconf('user.name', '2.0'),
+                         'mapreduce.job.user.name')
+
     def test_supports_combiners(self):
         self.assertEqual(supports_combiners_in_hadoop_streaming('0.19'),
                          False)

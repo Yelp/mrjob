@@ -85,7 +85,6 @@ from mrjob.runner import RunnerOptionStore
 from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.ssh import ssh_slave_addresses
-from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.util import cmd_line
@@ -1087,10 +1086,23 @@ class EMRJobRunner(MRJobRunner):
                     log.info("Succeeded in terminating job")
                 else:
                     log.info("Job appears to have already been terminated")
-            except SSHException:
-                log.info(error_msg)
             except IOError:
                 log.info(error_msg)
+
+    def _cleanup_job_flow(self):
+        if not self._emr_job_flow_id:
+            # If we don't have a job flow, then we can't terminate it.
+            return
+
+        emr_conn = self.make_emr_conn()
+        try:
+            log.info("Attempting to terminate job flow")
+            emr_conn.terminate_jobflow(self._emr_job_flow_id)
+        except Exception, e:
+            # Something happened with boto and the user should know.
+            log.exception(e)
+            return
+        log.info('Job flow %s successfully terminated' % self._emr_job_flow_id)
 
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.

@@ -447,10 +447,10 @@ class MRJobRunner(object):
         """Stream raw lines from the job's output. You can parse these
         using the read() method of the appropriate HadoopStreamingProtocol
         class."""
-        if not self._ran_job:
+        output_dir = self.get_output_dir()
+        if output_dir is None:
             raise AssertionError('Run the job before streaming output')
 
-        output_dir = self.get_output_dir()
         log.info('Streaming final output from %s' % output_dir)
 
         def split_path(path):
@@ -612,7 +612,7 @@ class MRJobRunner(object):
     def get_output_dir(self):
         """Find the directory containing the job output. If the job hasn't
         run yet, returns None"""
-        if not self._ran_job:
+        if self._script_path and not self._ran_job:
             return None
 
         return self._output_dir

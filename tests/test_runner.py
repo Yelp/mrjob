@@ -246,8 +246,7 @@ class TestStreamingOutput(unittest.TestCase):
         with open(y_file_path, 'w') as f:
             f.write('I win')
 
-        runner = InlineMRJobRunner(conf_paths=[])
-        runner._output_dir = self.tmp_dir
+        runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
         self.assertEqual(sorted(runner.stream_output()),
                          ['A', 'B', 'C'])
 

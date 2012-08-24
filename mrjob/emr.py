@@ -860,7 +860,7 @@ class EMRJobRunner(MRJobRunner):
 
         Create the master bootstrap script if necessary.
         """
-        # lazlily create mrjob.tar.gz
+        # lazily create mrjob.tar.gz
         if self._opts['bootstrap_mrjob']:
             self._create_mrjob_tar_gz()
             self._b_mgr.add('file', self._mrjob_tar_gz_path)
@@ -2198,23 +2198,19 @@ class EMRJobRunner(MRJobRunner):
         The way the hash is calculated may vary between point releases
         (pooling requires the exact same version of :py:mod:`mrjob` anyway).
         """
-        def maybe_md5sum(path):
-            # Don't hash the contents of the mrjob tarball because it's
-            # different every time (timestamps). Instead we look at
-            # version, below
-            if path == self._mrjob_tar_gz_path:
-                return 0
-            else:
-                return self.md5sum(path)
-
         things_to_hash = [
-            dict((name, maybe_md5sum(path)) for name, path
-                 in self._b_mgr.name_to_path('file').iteritems()),
+            # exclude mrjob.tar.gz because it's only created if the
+            # job starts its own job flow (also, its hash changes every time
+            # since the tarball contains different timestamps)
+            dict((name,self.md5sum(path)) for name, path
+                 in self._b_mgr.name_to_path('file').iteritems()
+                 if not path == self._mrjob_tar_gz_path),
             self._opts['additional_emr_info'],
             self._opts['bootstrap_mrjob'],
             self._opts['bootstrap_cmds'],
             self._bootstrap_actions,
         ]
+
         if self._opts['bootstrap_mrjob']:
             things_to_hash.append(mrjob.__version__)
         return hash_object(things_to_hash)

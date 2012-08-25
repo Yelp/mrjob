@@ -15,6 +15,7 @@ import os
 
 try:
     import boto
+    boto  # pyflakes
 except ImportError:
     boto = None
 

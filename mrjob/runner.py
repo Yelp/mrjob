@@ -473,10 +473,10 @@ class MRJobRunner(object):
 
     def _cleanup_mode(self, mode=None):
         """Actual cleanup action to take based on various options"""
-        if self._ran_job:
-            return mode or self._opts['cleanup']
-        else:
+        if self._script_path and not self._ran_job:
             return mode or self._opts['cleanup_on_failure']
+        else:
+            return mode or self._opts['cleanup']
 
     def _cleanup_local_scratch(self):
         """Cleanup any files/directories on the local machine we created while

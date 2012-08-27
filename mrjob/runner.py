@@ -20,6 +20,8 @@ import datetime
 import getpass
 import logging
 import os
+import os.path
+import pprint
 import re
 import shutil
 import sys
@@ -84,11 +86,6 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #:   ``cleanup_on_failure``.
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
                    'SCRATCH', 'JOB', 'IF_SUCCESSFUL', 'JOB_FLOW']
-
-#: .. deprecated:: 0.3.0
-#:
-#: the default cleanup-on-success option: ``'IF_SUCCESSFUL'``
-CLEANUP_DEFAULT = 'IF_SUCCESSFUL'
 
 _STEP_RE = re.compile(r'^M?C?R?$')
 
@@ -174,6 +171,9 @@ class RunnerOptionStore(OptionStore):
 
         self._fix_interp_options()
 
+        log.debug('Active configuration:')
+        log.debug(pprint.pformat(self))
+
     def default_options(self):
         super_opts = super(RunnerOptionStore, self).default_options()
 
@@ -189,8 +189,6 @@ class RunnerOptionStore(OptionStore):
             'cleanup_on_failure': ['NONE'],
             'hadoop_version': '0.20',
             'owner': owner,
-            'python_bin': ['python'],
-            'steps_python_bin': [sys.executable or 'python'],
         })
 
     def _validate_cleanup(self):
@@ -220,7 +218,13 @@ class RunnerOptionStore(OptionStore):
 
     def _fix_interp_options(self):
         if not self['steps_python_bin']:
-            self['steps_python_bin'] = self['python_bin']
+            self['steps_python_bin'] = (
+                self['python_bin'] or
+                [sys.executable] or
+                ['python'])
+
+        if not self['python_bin']:
+            self['python_bin'] = ['python']
 
         if not self['steps_interpreter']:
             if self['interpreter']:

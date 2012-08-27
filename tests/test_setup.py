@@ -19,9 +19,9 @@ try:
 except ImportError:
     import unittest
 
-from mrjob.cmd import name_uniquely
-from mrjob.cmd import UploadDirManager
-from mrjob.cmd import WorkingDirManager
+from mrjob.setup import name_uniquely
+from mrjob.setup import UploadDirManager
+from mrjob.setup import WorkingDirManager
 
 
 class NameUniqueTestCase(unittest.TestCase):

@@ -55,9 +55,9 @@ except ImportError:
     boto = None
 
 import mrjob
-from mrjob.cmd import BootstrapWorkingDirManager
-from mrjob.cmd import UploadDirManager
-from mrjob.cmd import parse_legacy_hash_path
+from mrjob.setup import BootstrapWorkingDirManager
+from mrjob.setup import UploadDirManager
+from mrjob.setup import parse_legacy_hash_path
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts

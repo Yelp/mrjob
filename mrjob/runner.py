@@ -41,8 +41,8 @@ try:
 except:
     import json
 
-from mrjob.cmd import WorkingDirManager
-from mrjob.cmd import parse_legacy_hash_path
+from mrjob.setup import WorkingDirManager
+from mrjob.setup import parse_legacy_hash_path
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import uses_generic_jobconf
 from mrjob.conf import combine_cmds

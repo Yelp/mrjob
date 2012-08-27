@@ -7,9 +7,9 @@ For a complete list of changes, see `CHANGES.txt
 0.3.5
 -----
 
-The *pool_wait_minutes* (:opt:`--pool-wait-minutes`) option lets your job delay
-itself in case a job flow becomes available. Reference:
-:doc:`configs-reference`
+The *pool_wait_minutes* (:option:`--pool-wait-minutes`) option lets your job
+delay itself in case a job flow becomes available. Reference:
+:doc:`guides/configs-reference`
 
 The ``JOB`` and ``JOB_FLOW`` cleanup options tell mrjob to clean up the job
 and/or the job flow on failure (including Ctrl+C). See
@@ -43,7 +43,7 @@ The new :py:mod:`~mrjob.tools.emr.report_long_jobs` tool alerts on jobs that
 have run for more than X hours.
 
 0.3
------
+---
 
 Features
 ^^^^^^^^

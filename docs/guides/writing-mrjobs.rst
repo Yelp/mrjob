@@ -1,5 +1,5 @@
-Writing jobs
-============
+Writing jobs in Python
+======================
 
 .. _writing-basics:
 

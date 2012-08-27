@@ -27,6 +27,7 @@ v0.4, 2012-08-?? -- Slouching toward nirvana
    * PROTOCOL_DICT
    * IF_SUCCESSFUL
    * DEFAULT_CLEANUP
+   * S3Filesystem.get_s3_folder_keys()
 
 v0.3.5, 2012-08-21 -- The Last Ride of v0.3.x[?]
  * EMR:

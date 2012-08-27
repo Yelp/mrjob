@@ -286,6 +286,22 @@ def hadoop_fs_put(*args):
         shutil.copy(src, real_dst)
 
 
+def hadoop_fs_test(*args):
+    """Implements hadoop fs -test.
+
+    We currently only support hadoop fs -test -e <src>
+    """
+    if len(args) != 2 or args[0] != '-e':
+        sys.stderr.write('Usage: java FsShell -test -e <src>')
+        sys.exit(-1)
+
+    real_path_glob = hdfs_path_to_real_path(args[1])
+
+    # return 0 if it exists, 1 if it doesn't
+    return_code = int(not glob.glob(real_path_glob))
+    sys.exit(return_code)
+
+
 def hadoop_fs_rmr(*args):
     """Implements hadoop fs -rmr."""
     if len(args) < 1:

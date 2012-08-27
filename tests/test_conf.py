@@ -267,7 +267,7 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         try:
             load_mrjob_conf(conf_path)
             assert False
-        except mrjob.conf.json.JSONDecodeError, e:
+        except mrjob.conf.JSONDecodeError, e:
             self.assertIn('If your mrjob.conf is in YAML', e.msg)
 
 

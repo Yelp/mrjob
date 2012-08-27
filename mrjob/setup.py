@@ -25,6 +25,9 @@ names to unnamed paths (e.g. ``/path/to/file#``).
 
 If you need to upload files from the local filesystem to a place where
 Hadoop can see them (HDFS or S3), we provide :py:class:`UploadDirManager`.
+
+Path dictionaries are meant to be immutable; all state is handled by
+manager classes.
 """
 from __future__ import with_statement
 
@@ -44,8 +47,9 @@ _SUPPORTED_TYPES = ('archive', 'file')
 
 # TODO: This is a model for how we expect to handle "new" hash paths to work.
 # This may not need to exist as a separate function because our final
-# goal is to parse these expressions out of a command-line with a regex
-# (in which case most of the parsing work will already be done).
+# goal is to parse these expressions out of a command-line with a regex,
+# in which case most of the parsing work will already be done, and many
+# of the error cases will be impossible.
 def parse_hash_path(hash_path):
     """Parse Hadoop Distributed Cache-style paths into a dictionary.
 

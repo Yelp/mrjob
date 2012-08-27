@@ -97,11 +97,8 @@ html_theme = 'nature'
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-_yelp_red = "#C41200"
-_yelp_gray = "#555"
-_yelp_yellow = "#FFFED7"
-_yelp_yellow_2 = "#FFF0D1"
-_yelp_link = "#66C"
+html_theme_options = {
+}
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = []

@@ -1070,11 +1070,11 @@ class MRJobRunner(object):
     def _old_upload_args(self, upload_mgr):
         args = []
 
-        for file_hash in self._upload_hash_paths('file', upload_mgr):
+        for file_hash in self._arg_hash_paths('file', upload_mgr):
             args.append('-cacheFile')
             args.append(file_hash)
 
-        for archive_hash in self._upload_hash_paths('archive', upload_mgr):
+        for archive_hash in self._arg_hash_paths('archive', upload_mgr):
             args.append('-cacheArchive')
             args.append(archive_hash)
 

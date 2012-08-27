@@ -1368,11 +1368,6 @@ class EMRJobRunner(MRJobRunner):
             step_args=step['step_args'],
             action_on_failure=self._action_on_failure)
 
-    def _upload_hash_paths(self, type):
-        for name, path in self._working_dir_mgr.name_to_path(type).iteritems():
-            uri = self._upload_mgr.uri(path)
-            yield '%s#%s' % (uri, name)
-
     def _cache_kwargs(self):
         """Returns
         ``{'step_args': [..], 'cache_files': [..], 'cache_archives': [..])``,

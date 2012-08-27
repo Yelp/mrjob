@@ -1,3 +1,4 @@
+import sys
 try:
     from setuptools import setup
     setup  # quiet "redefinition of unused ..." warning from pyflakes
@@ -6,8 +7,7 @@ try:
         'install_requires': [
             'boto>=2.0',
             'PyYAML',
-            'simplejson>=2.0.9',
-        ],
+        ] + (['simplejson>=2.0.9'] if sys.version_info < (2, 6) else []),
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',
         'tests_require': ['unittest2', 'mock'],

@@ -412,7 +412,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         stdin = StringIO('foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--hadoop-version=0.18'])
+                               '--hadoop-version=0.18', '--ami-version=1.0'])
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
@@ -593,18 +593,20 @@ class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
             return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
 
     def test_defaults(self):
-        job_flow = self.run_and_get_job_flow()
-        self.assertFalse(hasattr(job_flow, 'amiversion'))
-        self.assertEqual(job_flow.hadoopversion, '0.20')
+        job_flow = self.run_and_get_job_flow('--ami-version=1.0')
+        self.assertEqual(job_flow.amiversion, '1.0')
+        self.assertEqual(job_flow.hadoopversion, '0.18')
 
     def test_hadoop_version_0_18(self):
-        job_flow = self.run_and_get_job_flow('--hadoop-version', '0.18')
-        self.assertFalse(hasattr(job_flow, 'amiversion'))
+        job_flow = self.run_and_get_job_flow(
+            '--hadoop-version=0.18', '--ami-version=1.0')
+        self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.18')
 
     def test_hadoop_version_0_20(self):
-        job_flow = self.run_and_get_job_flow('--hadoop-version', '0.20')
-        self.assertFalse(hasattr(job_flow, 'amiversion'))
+        job_flow = self.run_and_get_job_flow(
+            '--hadoop-version=0.20', '--ami-version=1.0')
+        self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.20')
 
     def test_bad_hadoop_version(self):
@@ -2040,26 +2042,29 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
             '--pool-name', 'pool1'])
 
     def test_pooling_with_hadoop_version(self):
-        _, job_flow_id = self.make_pooled_job_flow(hadoop_version='0.18')
+        _, job_flow_id = self.make_pooled_job_flow(
+            ami_version='1.0', hadoop_version='0.18')
 
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--hadoop-version', '0.18'])
+            '--hadoop-version', '0.18', '--ami-version', '1.0'])
 
     def test_dont_join_pool_with_wrong_hadoop_version(self):
-        _, job_flow_id = self.make_pooled_job_flow(hadoop_version='0.18')
+        _, job_flow_id = self.make_pooled_job_flow(
+            ami_version='1.0', hadoop_version='0.18')
 
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--hadoop-version', '0.20'])
+            '--hadoop-version', '0.20', '--ami-version', '1.0'])
 
     def test_join_anyway_if_i_say_so(self):
-        _, job_flow_id = self.make_pooled_job_flow(hadoop_version='0.18')
+        _, job_flow_id = self.make_pooled_job_flow(
+            ami_version='1.0', hadoop_version='0.18')
 
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--emr-job-flow-id', job_flow_id,
-            '--hadoop-version', '0.20'])
+            '--hadoop-version', '0.20', '--ami-version', '1.0'])
 
     def test_pooling_with_ami_version(self):
         _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0')

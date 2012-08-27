@@ -1754,8 +1754,9 @@ class EMRJobRunner(MRJobRunner):
             if not results:
                 job_flow = self._describe_jobflow()
                 if not self._job_flow_is_done(job_flow):
-                    log.info("Counters may not have been uploaded to S3 yet. Try"
-                             " again in 5 minutes with 'python -m"
+                    # TODO: refer to mrjob binary instead
+                    log.info("Counters may not have been uploaded to S3 yet."
+                             " Try again in 5 minutes with 'python -m"
                              " mrjob.tools.emr.fetch_logs --counters %s'." %
                              job_flow.jobflowid)
             return results

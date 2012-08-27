@@ -36,6 +36,7 @@ Guides
 
 * :doc:`guides/runners`
 * :ref:`runners-programmatically`
+* :doc:`guides/cmd`
 * :doc:`guides/testing`
 
 **Configuration**

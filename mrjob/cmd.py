@@ -51,7 +51,7 @@ def command(name, description):
 
 def main(args=None):
     args = args or argv
-    if not args[1:]:
+    if not args[1:] or args[1] in ('-h', '--help'):
         error()
     elif args[1] not in commands:
         error('"%s" is not a command' % args[1])

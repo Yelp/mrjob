@@ -375,6 +375,19 @@ class TestFilesystem(MockHadoopTestCase):
         self.assertEqual(runner.du(remote_data_1), 4)
         self.assertEqual(runner.du(remote_data_2), 4)
 
+    def test_path_exists(self):
+        root = os.environ['MOCK_HDFS_ROOT']
+
+        data_path_1 = os.path.join(root, 'data1')
+        with open(data_path_1, 'w') as f:
+            pass
+        remote_data_1 = 'hdfs:///data1'
+
+        runner = HadoopJobRunner(conf_path=False)
+        self.assertTrue(runner.path_exists('hdfs:///data1'))
+        self.assertTrue(runner.path_exists('hdfs:///data*'))
+        self.assertFalse(runner.path_exists('hdfs:///data2'))
+
 
 class TestURIs(MockHadoopTestCase):
 

@@ -758,8 +758,9 @@ class HadoopJobRunner(MRJobRunner):
         if not is_uri(path_glob):
             return super(HadoopJobRunner, self).path_exists(path_glob)
 
-        return bool(self._invoke_hadoop(['fs', '-test', '-e', path_glob],
-                                        ok_returncodes=(0, 1)))
+        return_code = self._invoke_hadoop(['fs', '-test', '-e', path_glob],
+                                          ok_returncodes=(0, 1))
+        return (return_code == 0)
 
     def path_join(self, dirname, filename):
         if is_uri(dirname):

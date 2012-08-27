@@ -370,8 +370,9 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
     def test_echo_as_python_bin(self):
         # "echo" is a pretty poor substitute for Python, but it
         # should be available on most systems
-        mr_job = MRTwoStepJob(['--python-bin', 'echo', '--no-conf',
-                               '-r', 'local'])
+        mr_job = MRTwoStepJob(
+            ['--python-bin', 'echo', '--steps-python-bin', sys.executable,
+             '--no-conf', '-r', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:

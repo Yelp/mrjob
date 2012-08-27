@@ -516,11 +516,10 @@ class LocalMRJobRunner(MRJobRunner):
     def _executable(self, steps=False):
         # detect executable files so we can discard the explicit interpreter if
         # possible
-
-        # TODO: checking for executability is a hack; use file extension
         if os.access(self._script_path, os.X_OK):
-            return [os.path.join(self._working_dir,
-                                 self._working_dir_mgr.name('file', self._script_path))]
+            return [os.path.join(
+                self._working_dir,
+                self._working_dir_mgr.name('file', self._script_path))]
         else:
             return super(LocalMRJobRunner, self)._executable(steps)
 

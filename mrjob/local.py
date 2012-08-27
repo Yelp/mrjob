@@ -18,7 +18,6 @@ from __future__ import with_statement
 import itertools
 import logging
 import os
-import shlex
 import shutil
 import stat
 from subprocess import Popen
@@ -35,7 +34,7 @@ from mrjob.runner import RunnerOptionStore
 from mrjob.util import cmd_line
 from mrjob.util import read_input
 from mrjob.util import unarchive
-from mrjob.util import is_ironpython
+from mrjob.util import shlex_split
 
 
 log = logging.getLogger('mrjob.local')
@@ -526,7 +525,7 @@ class LocalMRJobRunner(MRJobRunner):
     def _filter_if_any(self, substep_dict):
         if substep_dict['type'] == 'script':
             if 'pre_filter' in substep_dict:
-                return shlex.split(substep_dict['pre_filter'])
+                return shlex_split(substep_dict['pre_filter'])
         return None
 
     def _executable(self, steps=False):
@@ -543,11 +542,11 @@ class LocalMRJobRunner(MRJobRunner):
                             step_dict['type'])
         if step_dict[mrc]['type'] == 'command':
             if input_path is None:
-                return [shlex.split(step_dict[mrc]['command'])]
+                return [shlex_split(step_dict[mrc]['command'])]
             else:
                 return [
                     ['cat', input_path],
-                    shlex.split(step_dict[mrc]['command'])]
+                    shlex_split(step_dict[mrc]['command'])]
         if step_dict[mrc]['type'] == 'script':
             args = self._script_args_for_step(step_num, mrc)
             if input_path is None:

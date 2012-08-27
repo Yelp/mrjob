@@ -18,7 +18,6 @@ import os
 import posixpath
 import random
 import re
-import shlex
 import signal
 import socket
 import time
@@ -88,6 +87,7 @@ from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import hash_object
+from mrjob.util import shlex_split
 
 
 log = logging.getLogger('mrjob.emr')
@@ -592,7 +592,7 @@ class EMRJobRunner(MRJobRunner):
         # add the bootstrap files to a list of files to upload
         self._bootstrap_actions = []
         for action in self._opts['bootstrap_actions']:
-            args = shlex.split(action)
+            args = shlex_split(action)
             if not args:
                 raise ValueError('bad bootstrap action: %r' % (action,))
             # don't use _add_bootstrap_file() because this is a raw bootstrap

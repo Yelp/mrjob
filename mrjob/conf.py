@@ -22,7 +22,6 @@ import glob
 from itertools import chain
 import logging
 import os
-import shlex
 
 from mrjob.util import expand_path
 
@@ -39,6 +38,9 @@ try:
     yaml  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     yaml = None
+
+
+from mrjob.util import shlex_split
 
 
 log = logging.getLogger('mrjob.conf')
@@ -315,7 +317,7 @@ def combine_cmds(*cmds):
     if cmd is None:
         return None
     elif isinstance(cmd, basestring):
-        return shlex.split(str(cmd))
+        return shlex_split(cmd)
     else:
         return list(cmd)
 

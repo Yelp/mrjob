@@ -22,15 +22,15 @@ import glob
 from itertools import chain
 import logging
 import os
-import shlex
 
 from mrjob.util import expand_path
 
 try:
     import simplejson as json  # preferred because of C speedups
-    json  # quiet "redefinition of unused ..." warning from pyflakes
+    JSONDecodeError = json.JSONDecodeError
 except ImportError:
     import json  # built in to Python 2.6 and later
+    JSONDecodeError = ValueError
 
 # yaml is nice to have, but we can fall back on JSON if need be
 try:
@@ -38,6 +38,9 @@ try:
     yaml  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     yaml = None
+
+
+from mrjob.util import shlex_split
 
 
 log = logging.getLogger('mrjob.conf')
@@ -165,7 +168,7 @@ def conf_object_at_path(conf_path):
         else:
             try:
                 return json.load(f)
-            except json.JSONDecodeError, e:
+            except JSONDecodeError, e:
                 msg = ('If your mrjob.conf is in YAML, you need to install'
                        ' yaml; see http://pypi.python.org/pypi/PyYAML/')
                 # JSONDecodeError currently has a msg attr, but it may not in
@@ -314,7 +317,7 @@ def combine_cmds(*cmds):
     if cmd is None:
         return None
     elif isinstance(cmd, basestring):
-        return shlex.split(str(cmd))
+        return shlex_split(cmd)
     else:
         return list(cmd)
 

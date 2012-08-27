@@ -42,6 +42,8 @@ from mrjob.parse import parse_s3_uri
 DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
 DEFAULT_MAX_DAYS_AGO = 61
 
+DEFAULT_JAR = '/stuff/hadoop-streaming.jar'
+
 # Size of each chunk returned by the MockKey iterator
 SIMULATED_BUFFER_SIZE = 256
 
@@ -596,6 +598,7 @@ class MockEmrConnection(object):
                 name=step.name,
                 actiononfailure=step.action_on_failure,
                 args=step.args,
+                jar=DEFAULT_JAR,
             )
 
             job_flow.steps.append(step_object)

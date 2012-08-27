@@ -19,7 +19,6 @@ from __future__ import with_statement
 from StringIO import StringIO
 import getpass
 import os
-import shlex
 from subprocess import check_call
 
 from mock import patch
@@ -27,6 +26,7 @@ from mock import patch
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
 from mrjob.util import bash_wrap
+from mrjob.util import shlex_split
 
 from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import add_mock_hadoop_output
@@ -172,7 +172,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         # make sure we called hadoop the way we expected
         with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
-            hadoop_cmd_args = [shlex.split(line) for line in mock_log]
+            hadoop_cmd_args = [shlex_split(line) for line in mock_log]
 
         jar_cmd_args = [args for args in hadoop_cmd_args
                         if args[:1] == ['jar']]

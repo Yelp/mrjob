@@ -18,6 +18,7 @@ from datetime import datetime
 from datetime import timedelta
 import logging
 import os
+import os.path
 import random
 import re
 import shlex
@@ -634,10 +635,6 @@ class EMRJobRunner(MRJobRunner):
 
         # where our own logs ended up (we'll find this out once we run the job)
         self._s3_job_log_uri = None
-
-        # where to get input from. We'll fill this later. Once filled,
-        # this must be a list (not some other sort of container)
-        self._s3_input_uris = None
 
         # we'll create the script later
         self._master_bootstrap_script_path = None
@@ -1316,8 +1313,13 @@ class EMRJobRunner(MRJobRunner):
     def _executable(self, steps=False):
         # detect executable files so we can discard the explicit interpreter if
         # possible
+
+        # TODO: checking for executability is a hack; use file extension
         if os.access(self._script_path, os.X_OK):
-            return ['./' + self._wd_mgr.name('file', self._script_path)]
+            if steps:
+                return [os.path.abspath(self._script_path)]
+            else:
+                return ['./' + self._wd_mgr.name('file', self._script_path)]
         else:
             return super(EMRJobRunner, self)._executable(steps)
 
@@ -1564,7 +1566,8 @@ class EMRJobRunner(MRJobRunner):
     def _s3_step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""
         if step_num == 0:
-            return self._s3_input_uris
+            return [self._upload_mgr.uri(path)
+                    for path in self._get_input_paths()]
         else:
             # put intermediate data in HDFS
             return ['hdfs:///tmp/mrjob/%s/step-output/%s/' % (

@@ -33,13 +33,13 @@ from __future__ import with_statement
 
 from optparse import OptionParser
 import os
-import shlex
 import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.ssh import ssh_run_with_recursion
 from mrjob.util import scrape_options_into_new_groups
+from mrjob.util import shlex_split
 
 
 def main():
@@ -75,7 +75,7 @@ def main():
         sys.exit(1)
 
     job_flow_id, cmd_string = args[:2]
-    cmd_args = shlex.split(cmd_string)
+    cmd_args = shlex_split(cmd_string)
 
     output_dir = os.path.abspath(options.output_dir or job_flow_id)
 

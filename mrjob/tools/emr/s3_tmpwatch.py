@@ -59,9 +59,9 @@ from mrjob.parse import parse_s3_uri
 log = logging.getLogger('mrjob.tools.emr.s3_tmpwatch')
 
 
-def main():
+def main(cl_args=None):
     option_parser = make_option_parser()
-    options, args = option_parser.parse_args()
+    options, args = option_parser.parse_args(cl_args)
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 

@@ -41,10 +41,10 @@ from mrjob.options import add_basic_opts
 log = logging.getLogger('mrjob.tools.emr.terminate_job_flow')
 
 
-def main():
+def main(cl_args=None):
     # parser command-line args
     option_parser = make_option_parser()
-    options, args = option_parser.parse_args()
+    options, args = option_parser.parse_args(cl_args)
 
     if len(args) != 1:
         option_parser.error('This tool takes exactly one argument.')

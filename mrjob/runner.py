@@ -37,9 +37,10 @@ except ImportError:
 
 try:
     import simplejson as json
-    json
+    JSONDecodeError = json.JSONDecodeError
 except:
     import json
+    JSONDecodeError = ValueError
 
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_legacy_hash_path
@@ -721,7 +722,7 @@ class MRJobRunner(object):
 
                 try:
                     steps = json.loads(stdout)
-                except json.JSONDecodeError:
+                except JSONDecodeError:
                     raise ValueError("Bad --steps response: \n%s" % stdout)
 
                 # verify that this is a proper step description

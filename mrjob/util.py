@@ -29,6 +29,7 @@ import itertools
 import logging
 import os
 import pipes
+import shlex
 import sys
 import tarfile
 import zipfile
@@ -39,6 +40,7 @@ try:
 except ImportError:
     bz2 = None
 
+#: .. deprecated:: 0.4
 is_ironpython = "IronPython" in sys.version
 
 class NullHandler(logging.Handler):
@@ -505,6 +507,16 @@ def safeeval(expr, globals=None, locals=None):
         safe_globals.update(globals)
 
     return eval(expr, safe_globals, locals)
+
+
+def shlex_split(s):
+    """Wrapper around shlex.split(), but convert to str if Python version <
+    2.7.3 when unicode support was added.
+    """
+    if sys.version_info < (2, 7, 3):
+        return shlex.split(str(s))
+    else:
+        return shlex.split(s)
 
 
 def strip_microseconds(delta):

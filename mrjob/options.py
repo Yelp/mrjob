@@ -252,7 +252,8 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--ami-version', dest='ami_version', default=None,
             help=(
-                'AMI Version to use (currently 1.0, 2.0, or latest).')),
+                'AMI Version to use (currently 1.0, 2.0, or latest, default'
+                ' latest).')),
 
         opt_group.add_option(
             '--aws-availability-zone', dest='aws_availability_zone',

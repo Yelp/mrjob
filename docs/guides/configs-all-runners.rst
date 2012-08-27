@@ -20,15 +20,25 @@ data files, etc. This section covers options available to all runners that
 mrjob uses to upload files to your job's execution environments.
 
 
-**bootstrap_mrjob** (:option:`--bootstrap-mrjob`, :option:`--bootstrap-mrjob`)
+**bootstrap_mrjob** (:option:`--bootstrap-mrjob`, :option:`--no-bootstrap-mrjob`)
     Should we automatically tar up the mrjob library and install it when we run
     job?  Set this to ``False`` if you've already installed ``mrjob`` on your
     Hadoop cluster or install it by some other method.
 
 **upload_files** (:option:`--file`)
-    A list of files to copy to the local directory of the mr_job script when it
-    runs. You can set the local name of the dir we unpack into by appending
+    Files to copy to the local directory of the mr_job script when it runs. You
+    can set the local name of the dir we unpack into by appending
     ``#localname`` to the path; otherwise we just use the name of the file.
+
+    In the config file::
+
+        upload_files:
+          - file_1.txt
+          - file_2.sqlite
+
+    On the command line::
+
+        --file file_1.txt --file file_2.sqlite
 
 **upload_archives** (:option:`--archive`)
 
@@ -54,12 +64,26 @@ Temp files and cleanup
     List of which kinds of directories to delete when a job succeeds. Valid
     choices are:
 
-    * ``ALL``: delete local scratch, remote scratch, and logs
-    * ``LOCAL_SCRATCH``: delete local scratch only
-    * ``LOGS``: delete logs only
-    * ``NONE``: delete nothing
-    * ``REMOTE_SCRATCH``: delete remote scratch only
-    * ``SCRATCH``: delete local and remote scratch, but not logs
+    * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job flow
+        if on EMR and the job is not done when cleanup is run.
+    * ``'LOCAL_SCRATCH'``: delete local scratch only
+    * ``'LOGS'``: delete logs only
+    * ``'NONE'``: delete nothing
+    * ``'REMOTE_SCRATCH'``: delete remote scratch only
+    * ``'SCRATCH'``: delete local and remote scratch, but not logs
+    * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
+    * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
+        on cleanup
+    * ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL``. Not supported for
+        ``cleanup_on_failure``.
+
+    In the config file::
+
+        cleanup: [LOGS, JOB]
+
+    On the command line::
+
+        --cleanup=LOGS,JOB
 
 **cleanup_on_failure** (:option:`--cleanup-on-failure`)
     Which kinds of directories to clean up when a job fails. Valid choices are
@@ -82,7 +106,18 @@ Job execution context
 ---------------------
 
 **cmdenv** (:option:`--cmdenv`)
-    Environment variables to pass to the job inside Hadoop streaming
+    Dictionary of environment variables to pass to the job inside Hadoop
+    streaming.
+
+    In the config file::
+
+        cmdenv:
+            PYTHONPATH: $HOME/stuff
+            TZ: America/Los_Angeles
+
+    On the command line::
+
+        --cmdenv PYTHONPATH=$HOME/stuff,TZ=America/Los_Angeles
 
 **interpreter** (:option:`--interpreter`)
     Interpreter to launch your script with. Defaults to the value of
@@ -108,6 +143,10 @@ Job execution context
     locking to keep multiple mappers/reducers on the same node from running
     *setup_scripts* simultaneously.
 
+**steps_python_bin** (:option:`--steps-python-bin`)
+    Name/path of alternate python binary to use to query the job about its
+    steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults
+    to ``sys.executable`` (the current Python interpreter).
 
 Other
 -----
@@ -137,13 +176,6 @@ Other
     ``--no-conf`` nullifies ``-c left.conf``::
 
         python my_job.py -c left.conf --no-conf -c right.conf
-
-
-
-**steps_python_bin** (:option:`--steps-python-bin`)
-    Name/path of alternate python binary to use to query the job about its
-    steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults
-    to ``sys.executable`` (the current Python interpreter).
 
 Options ignored by the inline runner
 ------------------------------------

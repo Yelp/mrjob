@@ -13,16 +13,19 @@ runner to create. Then it creates the runner, which reads your configuration
 files and command line args and starts your job running in whatever context
 you chose.
 
-Most of the time, you won't have any reason to construct a runner directly;
-it's more like a utility that allows an :py:class:`~mrjob.job.MRJob`
-to run itself. Normally things work something like this:
+Most of the time, you won't have any reason to construct a runner directly.
+Instead you'll invoke your Python script on the command line and it will make a
+runner automatically, you'll call ``mrjob run my_script`` to have the ``mrjob``
+command build a runner for your script (which may or may not be Python), or
+you'll write some sort of wrapper that calls ``my_job.make_runner()``.
 
-* Get a runner by calling :py:meth:`~mrjob.job.MRJob.make_runner` on your
-  job
+Internally, the general order of operations is:
+
+* Get a runner by calling :py:meth:`~mrjob.job.MRJob.make_runner` on your job
 * Call :py:meth:`~mrjob.runner.MRJobRunner.run` on your runner. This will:
 
-  * Run your job with :option:`--steps` to find out how many
-    mappers/reducers to run
+  * Run your job with :option:`--steps` to find out how many mappers/reducers
+    to run
   * Copy your job and supporting files to Hadoop
   * Instruct Hadoop to run your job with the appropriate
     :option:`--mapper`, :option:`--combiner`, :option:`--reducer`, and

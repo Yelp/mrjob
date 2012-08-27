@@ -261,9 +261,11 @@ class S3Filesystem(Filesystem):
             yield key
 
     def get_s3_folder_keys(self, uri, s3_conn=None):
-        """Background: S3 is even less of a filesystem than HDFS in that it
-        doesn't have directories. EMR fakes directories by creating special
-        ``*_$folder$`` keys in S3.
+        """.. deprecated:: 0.4.0
+
+        Background: EMR used to fake directories on S3 by creating special
+        ``*_$folder$`` keys in S3. That is no longer true, so this method is
+        deprecated.
 
         For example if your job outputs ``s3://walrus/tmp/output/part-00000``,
         EMR will also create these keys:

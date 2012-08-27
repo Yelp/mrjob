@@ -287,12 +287,12 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             self.assertIn(runner._mrjob_tar_gz_path,
                           runner._upload_mgr.path_to_uri())
             self.assertIn(runner._mrjob_tar_gz_path,
-                          runner._b_mgr.paths())
+                          runner._bootstrap_dir_mgr.paths())
 
             # shouldn't be in PYTHONPATH (we dump it directly in site-packages)
             pythonpath = runner._get_cmdenv().get('PYTHONPATH') or ''
             self.assertNotIn(
-                runner._b_mgr.name('file', runner._mrjob_tar_gz_path),
+                runner._bootstrap_dir_mgr.name('file', runner._mrjob_tar_gz_path),
                 pythonpath.split(':'))
 
         self.assertEqual(sorted(results),

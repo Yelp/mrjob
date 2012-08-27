@@ -339,18 +339,18 @@ class MRJobRunner(object):
         self._opts = self.OPTION_STORE_CLASS(self.alias, opts, conf_paths)
         self._fs = None
 
-        self._wd_mgr = WorkingDirManager()
+        self._working_dir_mgr = WorkingDirManager()
 
         self._script_path = mr_job_script
         if self._script_path:
-            self._wd_mgr.add('file', self._script_path)
+            self._working_dir_mgr.add('file', self._script_path)
 
         # setup cmds and wrapper script
         self._setup_scripts = []
         for path in self._opts['setup_scripts']:
             setup_script = parse_legacy_hash_path('file', path)
             self._setup_scripts.append(setup_script)
-            self._wd_mgr.add(**setup_script)
+            self._working_dir_mgr.add(**setup_script)
 
         # we'll create the wrapper script later
         self._wrapper_script_path = None
@@ -363,15 +363,15 @@ class MRJobRunner(object):
         if file_upload_args:
             for arg, path in file_upload_args:
                 arg_file = parse_legacy_hash_path('file', path)
-                self._wd_mgr.add(**arg_file)
+                self._working_dir_mgr.add(**arg_file)
                 self._file_upload_args.append((arg, arg_file))
 
         # set up uploading
         for path in self._opts['upload_files']:
-            self._wd_mgr.add(**parse_legacy_hash_path(
+            self._working_dir_mgr.add(**parse_legacy_hash_path(
                 'file', path, must_name='upload_files'))
         for path in self._opts['upload_archives']:
-            self._wd_mgr.add(**parse_legacy_hash_path(
+            self._working_dir_mgr.add(**parse_legacy_hash_path(
                 'archive', path, must_name='upload_archives'))
 
         # set up python archives
@@ -649,7 +649,7 @@ class MRJobRunner(object):
 
     def _add_python_archive(self, path):
         python_archive = parse_legacy_hash_path('archive', path)
-        self._wd_mgr.add(**python_archive)
+        self._working_dir_mgr.add(**python_archive)
         self._python_archives.append(python_archive)
 
     def _get_cmdenv(self):
@@ -661,7 +661,7 @@ class MRJobRunner(object):
         # on Windows, PYTHONPATH should be separated by ;, not :
         # so LocalJobRunner and EMRJobRunner use different combiners for cmdenv
         cmdenv_combiner = self.OPTION_STORE_CLASS.COMBINERS['cmdenv']
-        envs_to_combine = ([{'PYTHONPATH': self._wd_mgr.name(**a)}
+        envs_to_combine = ([{'PYTHONPATH': self._working_dir_mgr.name(**a)}
                             for a in self._python_archives] +
                            [self._opts['cmdenv']])
 
@@ -750,7 +750,7 @@ class MRJobRunner(object):
             return self._opts['steps_interpreter'] + [self._script_path]
         else:
             return (self._opts['interpreter'] +
-                    [self._wd_mgr.name('file', self._script_path)])
+                    [self._working_dir_mgr.name('file', self._script_path)])
 
     def _script_args_for_step(self, step_num, mrc):
         assert self._script_path
@@ -762,7 +762,7 @@ class MRJobRunner(object):
         if self._wrapper_script_path:
             return (
                 self._opts['python_bin'] +
-                [self._wd_mgr.name('file', self._wrapper_script_path)] +
+                [self._working_dir_mgr.name('file', self._wrapper_script_path)] +
                 args)
         else:
             return args
@@ -853,7 +853,7 @@ class MRJobRunner(object):
             if local:
                 args.append(path_dict['path'])
             else:
-                args.append(self._wd_mgr.name(**path_dict))
+                args.append(self._working_dir_mgr.name(**path_dict))
         return args
 
     def _wrapper_script_content(self):
@@ -894,7 +894,7 @@ class MRJobRunner(object):
             writeln('# run setup scripts:')
             for setup_script in self._setup_scripts:
                 writeln("check_call(%r, stdout=open('/dev/null', 'w'))" % (
-                    ['./' + self._wd_mgr.name(**setup_script)],))
+                    ['./' + self._working_dir_mgr.name(**setup_script)],))
             writeln()
 
         # unlock the lock file
@@ -911,7 +911,7 @@ class MRJobRunner(object):
         """Create the wrapper script, and write it into our local temp
         directory (by default, to a file named wrapper.py).
 
-        This will set self._wrapper_script_path, and add it to self._wd_mgr
+        This will set self._wrapper_script_path, and add it to self._working_dir_mgr
 
         This will do nothing if setup_cmds and setup_scripts are
         empty, or _create_wrapper_script() has already been called.
@@ -934,7 +934,7 @@ class MRJobRunner(object):
         f.close()
 
         self._wrapper_script_path = path
-        self._wd_mgr.add('file', self._wrapper_script_path)
+        self._working_dir_mgr.add('file', self._wrapper_script_path)
 
     def _get_input_paths(self):
         """Get the paths to input files, dumping STDIN to a local
@@ -1045,7 +1045,7 @@ class MRJobRunner(object):
 
     def _arg_hash_paths(self, type, upload_mgr):
         """Helper function for the *upload_args methods."""
-        for name, path in self._wd_mgr.name_to_path(type).iteritems():
+        for name, path in self._working_dir_mgr.name_to_path(type).iteritems():
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 

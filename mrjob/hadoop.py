@@ -247,7 +247,7 @@ class HadoopJobRunner(MRJobRunner):
         for path in self._get_input_paths():
             self._upload_mgr.add(path)
 
-        for path in self._wd_mgr.paths():
+        for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
 
     def _upload_local_files_to_hdfs(self):

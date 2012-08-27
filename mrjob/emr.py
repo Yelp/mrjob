@@ -599,7 +599,7 @@ class EMRJobRunner(MRJobRunner):
             self._output_dir = self._s3_tmp_uri + 'output/'
 
         # manage working dir for bootstrap script
-        self._b_mgr = BootstrapWorkingDirManager()
+        self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
 
         # manage local files that we want to upload to S3. We'll add them
         # to this manager just before we need them.
@@ -619,14 +619,14 @@ class EMRJobRunner(MRJobRunner):
             })
 
         for path in self._opts['bootstrap_files']:
-            self._b_mgr.add(**parse_legacy_hash_path(
+            self._bootstrap_dir_mgr.add(**parse_legacy_hash_path(
                 'file', path, must_name='bootstrap_files'))
 
         self._bootstrap_scripts = []
         for path in self._opts['bootstrap_scripts']:
             bootstrap_script = parse_legacy_hash_path('file', path)
             self._bootstrap_scripts.append(bootstrap_script)
-            self._b_mgr.add(**bootstrap_script)
+            self._bootstrap_dir_mgr.add(**bootstrap_script)
 
         self._bootstrap_python_packages = []
         for path in self._opts['bootstrap_python_packages']:
@@ -636,7 +636,7 @@ class EMRJobRunner(MRJobRunner):
                 raise ValueError(
                     'bootstrap_python_packages only accepts .tar.gz files!')
             self._bootstrap_python_packages.append(bpp)
-            self._b_mgr.add(**bpp)
+            self._bootstrap_dir_mgr.add(**bpp)
 
         if not (isinstance(self._opts['additional_emr_info'], basestring)
                 or self._opts['additional_emr_info'] is None):
@@ -870,10 +870,10 @@ class EMRJobRunner(MRJobRunner):
         # lazily create mrjob.tar.gz
         if self._opts['bootstrap_mrjob']:
             self._create_mrjob_tar_gz()
-            self._b_mgr.add('file', self._mrjob_tar_gz_path)
+            self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path)
 
-        # all other files needed by the script are already in _b_mgr
-        for path in self._b_mgr.paths():
+        # all other files needed by the script are already in _bootstrap_dir_mgr
+        for path in self._bootstrap_dir_mgr.paths():
             self._upload_mgr.add(path)
 
         # now that we know where the above files live, we can create
@@ -892,7 +892,7 @@ class EMRJobRunner(MRJobRunner):
         for path in self._get_input_paths():
             self._upload_mgr.add(path)
 
-        for path in self._wd_mgr.paths():
+        for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
 
         if self._opts['hadoop_streaming_jar']:
@@ -1329,7 +1329,7 @@ class EMRJobRunner(MRJobRunner):
             if steps:
                 return [os.path.abspath(self._script_path)]
             else:
-                return ['./' + self._wd_mgr.name('file', self._script_path)]
+                return ['./' + self._working_dir_mgr.name('file', self._script_path)]
         else:
             return super(EMRJobRunner, self)._executable(steps)
 
@@ -1368,9 +1368,8 @@ class EMRJobRunner(MRJobRunner):
             step_args=step['step_args'],
             action_on_failure=self._action_on_failure)
 
-
     def _upload_hash_paths(self, type):
-        for name, path in self._wd_mgr.name_to_path(type).iteritems():
+        for name, path in self._working_dir_mgr.name_to_path(type).iteritems():
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 
@@ -1927,7 +1926,7 @@ class EMRJobRunner(MRJobRunner):
 
         # download files using hadoop fs
         writeln('# download files using hadoop fs -copyToLocal')
-        for name, path in self._b_mgr.name_to_path('file').iteritems():
+        for name, path in self._bootstrap_dir_mgr.name_to_path('file').iteritems():
             s3_uri = self._upload_mgr.uri(path)
             writeln(
                 "check_call(['hadoop', 'fs', '-copyToLocal', %r, %r])" %
@@ -1944,7 +1943,7 @@ class EMRJobRunner(MRJobRunner):
 
         # bootstrap mrjob
         if self._opts['bootstrap_mrjob']:
-            name = self._b_mgr.name('file', self._mrjob_tar_gz_path)
+            name = self._bootstrap_dir_mgr.name('file', self._mrjob_tar_gz_path)
             writeln('# bootstrap mrjob')
             writeln("site_packages = distutils.sysconfig.get_python_lib()")
             writeln(
@@ -1964,7 +1963,7 @@ class EMRJobRunner(MRJobRunner):
             writeln('# install python modules:')
             for path_dict in self._bootstrap_python_packages:
                 writeln("check_call(['tar', 'xfz', %r])" %
-                        self._b_mgr.name(**path_dict))
+                        self._bootstrap_dir_mgr.name(**path_dict))
                 # figure out name of dir to CD into
                 assert path_dict['path'].endswith('.tar.gz')
                 cd_into = extract_dir_for_tar(path_dict['path'])
@@ -1988,7 +1987,7 @@ class EMRJobRunner(MRJobRunner):
             writeln('# run bootstrap scripts:')
             for path_dict in self._bootstrap_scripts:
                 writeln('check_call(%r)' % (
-                    ['./' + self._b_mgr.name(**path_dict)],))
+                    ['./' + self._bootstrap_dir_mgr.name(**path_dict)],))
             writeln()
 
         return out.getvalue()
@@ -2258,8 +2257,8 @@ class EMRJobRunner(MRJobRunner):
             # exclude mrjob.tar.gz because it's only created if the
             # job starts its own job flow (also, its hash changes every time
             # since the tarball contains different timestamps)
-            dict((name,self.md5sum(path)) for name, path
-                 in self._b_mgr.name_to_path('file').iteritems()
+            dict((name, self.md5sum(path)) for name, path
+                 in self._bootstrap_dir_mgr.name_to_path('file').iteritems()
                  if not path == self._mrjob_tar_gz_path),
             self._opts['additional_emr_info'],
             self._opts['bootstrap_mrjob'],

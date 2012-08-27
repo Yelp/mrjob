@@ -269,11 +269,11 @@ class LocalMRJobRunner(MRJobRunner):
             self.mkdir(self._working_dir)
 
         # give all our files names, and symlink or unarchive them
-        for name, path in self._wd_mgr.name_to_path('file').iteritems():
+        for name, path in self._working_dir_mgr.name_to_path('file').iteritems():
             dest = os.path.join(self._working_dir, name)
             self._symlink_to_file_or_copy(path, dest)
 
-        for name, path in self._wd_mgr.name_to_path('archive').iteritems():
+        for name, path in self._working_dir_mgr.name_to_path('archive').iteritems():
             dest = os.path.join(self._working_dir, name)
             log.debug('unarchiving %s -> %s' % (path, dest))
             unarchive(path, dest)
@@ -520,7 +520,7 @@ class LocalMRJobRunner(MRJobRunner):
         # TODO: checking for executability is a hack; use file extension
         if os.access(self._script_path, os.X_OK):
             return [os.path.join(self._working_dir,
-                                 self._wd_mgr.name('file', self._script_path))]
+                                 self._working_dir_mgr.name('file', self._script_path))]
         else:
             return super(LocalMRJobRunner, self)._executable(steps)
 
@@ -659,11 +659,11 @@ class LocalMRJobRunner(MRJobRunner):
         cache_local_archives = []
         cache_local_files = []
 
-        for name, path in self._wd_mgr.name_to_path('file').iteritems():
+        for name, path in self._working_dir_mgr.name_to_path('file').iteritems():
             cache_files.append('%s#%s' % (path, name))
             cache_local_files.append(os.path.join(self._working_dir, name))
 
-        for name, path in self._wd_mgr.name_to_path('archive').iteritems():
+        for name, path in self._working_dir_mgr.name_to_path('archive').iteritems():
             cache_archives.append('%s#%s' % (path, name))
             cache_local_archives.append(os.path.join(self._working_dir, name))
 

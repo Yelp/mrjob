@@ -40,6 +40,7 @@ try:
 except ImportError:
     bz2 = None
 
+#: .. deprecated:: 0.4
 is_ironpython = "IronPython" in sys.version
 
 class NullHandler(logging.Handler):

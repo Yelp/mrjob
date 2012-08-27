@@ -28,10 +28,12 @@ class LocalFSTestCase(SandboxedTestCase):
         super(LocalFSTestCase, self).setUp()
         self.fs = LocalFilesystem()
 
-    def test_can_handle_path_match(self):
+    def test_can_handle_local_paths(self):
         self.assertEqual(self.fs.can_handle_path('/dem/bitties'), True)
+        # relative paths
+        self.assertEqual(self.fs.can_handle_path('garden'), True)
 
-    def test_can_handle_path_nomatch(self):
+    def test_cant_handle_uris(self):
         self.assertEqual(self.fs.can_handle_path('http://yelp.com/'), False)
 
     def test_ls_empty(self):
@@ -44,7 +46,8 @@ class LocalFSTestCase(SandboxedTestCase):
     def test_ls_basic_2(self):
         self.makefile('f', 'contents')
         self.makefile('f2', 'contents')
-        self.assertEqual(list(self.fs.ls(self.tmp_dir)), self.abs_paths('f', 'f2'))
+        self.assertEqual(list(self.fs.ls(self.tmp_dir)),
+                         self.abs_paths('f', 'f2'))
 
     def test_ls_recurse(self):
         self.makefile('f', 'contents')
@@ -62,7 +65,8 @@ class LocalFSTestCase(SandboxedTestCase):
         input_gz.write('foo\nbar\n')
         input_gz.close()
 
-        self.assertEqual(list(self.fs._cat_file(input_gz_path)), ['foo\n', 'bar\n'])
+        self.assertEqual(list(self.fs._cat_file(input_gz_path)),
+                         ['foo\n', 'bar\n'])
 
     def test_cat_bz2(self):
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')

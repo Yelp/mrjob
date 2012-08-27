@@ -11,17 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Utilities for setting up the environment jobs run in by uploading files
+and running setup scripts.
 
-# NOTE: this code is in cmd.py because it's part of an effort to integrate
-# file uploads into command lines. See Issue #206.
-"""Utilities for processing command line and automatically uploading
-files.
+The general idea is to use Hadoop DistributedCache-like syntax to find and
+parse expressions like ``/path/to/file#name_in_working_dir`` into "path
+dictionaries" like
+``{'type': 'file', 'path': '/path/to/file', 'name': 'name_in_working_dir'}}``.
 
-This module provides two utility classes for keeping track of uploads.
-Typically, you'll want to use UploadDirManager to manage uploading files from
-a local machine to a place where Hadoop can see them (HDFS or S3) and
-WorkingDir to manage placing these files within your tasks' working
-directories (i.e. to help interface with Hadoop's DistributedCache system).
+You can then pass these into a :py:class:`WorkingDirManager` to keep
+track of which files need to be uploaded, catch name collisions, and assign
+names to unnamed paths (e.g. ``/path/to/file#``).
+
+If you need to upload files from the local filesystem to a place where
+Hadoop can see them (HDFS or S3), we provide :py:class:`UploadDirManager`.
 """
 from __future__ import with_statement
 
@@ -36,6 +39,13 @@ from mrjob.parse import is_uri
 log = logging.getLogger(__name__)
 
 
+_SUPPORTED_TYPES = ('archive', 'file')
+
+
+# TODO: This is a model for how we expect to handle "new" hash paths to work.
+# This may not need to exist as a separate function because our final
+# goal is to parse these expressions out of a command-line with a regex
+# (in which case most of the parsing work will already be done).
 def parse_hash_path(hash_path):
     """Parse Hadoop Distributed Cache-style paths into a dictionary.
 
@@ -50,7 +60,7 @@ def parse_hash_path(hash_path):
     An empty name (e.g. ``'/foo/bar.py#'``) indicates any name is acceptable.
     """
     if not '#' in hash_path:
-        raise ValueError('Bad hash path %r, must contain #' % (hash_path,))
+        raise ValueError('bad hash path %r, must contain #' % (hash_path,))
 
     path, name = hash_path.split('#', 1)
 
@@ -60,8 +70,11 @@ def parse_hash_path(hash_path):
     else:
         type = 'file'
 
+    if not path:
+        raise ValueError('Path may not be empty!')
+
     if '/' in name or '#' in name:
-        raise ValueError('Bad path %r; name must not contain # or /' % (path,))
+        raise ValueError('bad path %r; name must not contain # or /' % (path,))
 
     # use None for no name
     if not name:
@@ -86,6 +99,10 @@ def parse_legacy_hash_path(type, path, must_name=None):
                       like ``upload_files`` that merely upload a file
                       without tracking it.
     """
+    if type not in _SUPPORTED_TYPES:
+        raise ValueError('bad path type %r, must be one of %s' % (
+            type, ', '.join(sorted(_SUPPORTED_TYPES))))
+
     if '#' in path:
         path, name = path.split('#', 1)
 
@@ -97,16 +114,19 @@ def parse_legacy_hash_path(type, path, must_name=None):
         if '/' in name or '#' in name:
             raise ValueError(
                 'Bad path %r; name must not contain # or /' % (path,))
-
-        if not name:
-            if must_name:
-                raise ValueError(
-                    'Empty name makes no sense for %s: %r' % (must_name, path))
-        else:
-            name = None
     else:
         if must_name:
             name = os.path.basename(path)
+        else:
+            name = None
+
+    if not path:
+        raise ValueError('Path may not be empty!')
+
+    if not name:
+        if must_name:
+            raise ValueError(
+                'Empty name makes no sense for %s: %r' % (must_name, path))
         else:
             name = None
 
@@ -216,7 +236,7 @@ class WorkingDirManager(object):
     If you wish, you may assign multiple names to the same file, or add
     a path as both a file and an archive (though not mapped to the same name).
     """
-    _SUPPORTED_TYPES = ('archive', 'file')
+    _SUPPORTED_TYPES = _SUPPORTED_TYPES
 
     def __init__(self):
         # map from paths added without a name to None or lazily chosen name
@@ -332,7 +352,7 @@ class WorkingDirManager(object):
 
     def _check_type(self, type):
         if not type in self._SUPPORTED_TYPES:
-            raise TypeError('bad path type %r, must be one of %s' % (
+            raise ValueError('bad path type %r, must be one of %s' % (
                 type, ', '.join(sorted(self._SUPPORTED_TYPES))))
 
 

@@ -21,7 +21,9 @@ dictionaries" like
 
 You can then pass these into a :py:class:`WorkingDirManager` to keep
 track of which files need to be uploaded, catch name collisions, and assign
-names to unnamed paths (e.g. ``/path/to/file#``).
+names to unnamed paths (e.g. ``/path/to/file#``). Note that
+:py:meth:`WorkingDirManager.name` can take a path dictionary as keyword
+arguments.
 
 If you need to upload files from the local filesystem to a place where
 Hadoop can see them (HDFS or S3), we provide :py:class:`UploadDirManager`.

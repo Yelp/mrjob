@@ -169,19 +169,19 @@ class HadoopJobRunner(MRJobRunner):
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 
-        self._hdfs_scratch_dir = fully_qualify_hdfs_path(
+        self._hdfs_tmp_dir = fully_qualify_hdfs_path(
             posixpath.join(
             self._opts['hdfs_scratch_dir'], self._job_name))
 
         # Keep track of local files to upload to HDFS. We'll add them
         # to this manager just before we need them.
-        hdfs_files_dir = posixpath.join(self._hdfs_scratch_dir, 'files', '')
+        hdfs_files_dir = posixpath.join(self._hdfs_tmp_dir, 'files', '')
         self._upload_mgr = UploadDirManager(hdfs_files_dir)
 
         # Set output dir if it wasn't set explicitly
         self._output_dir = fully_qualify_hdfs_path(
             self._output_dir or
-            posixpath.join(self._hdfs_scratch_dir, 'output'))
+            posixpath.join(self._hdfs_tmp_dir, 'output'))
 
         self._hadoop_log_dir = hadoop_log_dir(self._opts['hadoop_home'])
 
@@ -405,23 +405,23 @@ class HadoopJobRunner(MRJobRunner):
                     for p in self._get_input_paths()]
         else:
             return [posixpath.join(
-                self._hdfs_scratch_dir, 'step-output', str(step_num))]
+                self._hdfs_tmp_dir, 'step-output', str(step_num))]
 
     def _hdfs_step_output_dir(self, step_num):
         if step_num == len(self._get_steps()) - 1:
             return self._output_dir
         else:
             return posixpath.join(
-                self._hdfs_scratch_dir, 'step-output', str(step_num + 1))
+                self._hdfs_tmp_dir, 'step-output', str(step_num + 1))
 
     def _cleanup_local_scratch(self):
         super(HadoopJobRunner, self)._cleanup_local_scratch()
 
-        if self._hdfs_scratch_dir:
-            log.info('deleting %s from HDFS' % self._hdfs_scratch_dir)
+        if self._hdfs_tmp_dir:
+            log.info('deleting %s from HDFS' % self._hdfs_tmp_dir)
 
             try:
-                self.invoke_hadoop(['fs', '-rmr', self._hdfs_scratch_dir])
+                self.invoke_hadoop(['fs', '-rmr', self._hdfs_tmp_dir])
             except Exception, e:
                 log.exception(e)
 

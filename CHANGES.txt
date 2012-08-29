@@ -18,6 +18,8 @@ v0.3.5, 2012-08-21 -- The Last Ride of v0.3.x[?]
    * Gzipped input files work when specified with relative paths (#494)
    * Passthrough options are not re-ordered when sent to Hadoop Streaming
      (#509)
+   * json module is supported again if simplejson doesn't exist (#544)
+   * HadoopJobRunner.path_exists() is no longer backwards (#549)
 
 v0.3.4.1, 2012-06-12 -- The test suite doesn't catch everything...
  * Local mode doesn't try to send multiple mappers to the same output file

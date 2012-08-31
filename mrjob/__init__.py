@@ -31,6 +31,7 @@ __credits__ = [
     'Peter Harrington <peter.b.harrington@gmail.com>',
     'Brandon Haynes <bhaynes@fas.harvard.edu>',
     'Brett Hoerner <brett@bretthoerner.com>',
+    'Evan Klitzke <evan@eklitzke.org>',
     'Tom Janofsky <tjanofsky@monetate.com>',
     'Stephen Johnson <sjohnson@yelp.com>',
     'Matt Jones <mattj@yelp.com>',

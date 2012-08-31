@@ -21,10 +21,10 @@ if os.environ.get('PYTHONPATH'):
     warnings.simplefilter('ignore')
 
 import mrjob
-from tests.mr_testing_job import MRTestingJob
+from mrjob.job import MRJob
 
 
-class MRJobWhereAreYou(MRTestingJob):
+class MRJobWhereAreYou(MRJob):
     """Output what directory the mrjob library is in."""
 
     def mapper_final(self):

@@ -21,7 +21,8 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
 
-from mrjob import compat
+from mrjob.setup import UploadDirManager
+from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_paths
@@ -34,13 +35,12 @@ from mrjob.logparsers import HADOOP_JOB_LOG_URI_RE
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import best_error_from_logs
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
-from mrjob.parse import is_uri
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import cmd_line
 
 
-log = logging.getLogger('mrjob.hadoop')
+log = logging.getLogger(__name__)
 
 # to filter out the log4j stuff that hadoop streaming prints out
 HADOOP_STREAMING_OUTPUT_RE = re.compile(r'^(\S+ \S+ \S+ \S+: )?(.*)$')
@@ -173,15 +173,15 @@ class HadoopJobRunner(MRJobRunner):
             posixpath.join(
             self._opts['hdfs_scratch_dir'], self._job_name))
 
+        # Keep track of local files to upload to HDFS. We'll add them
+        # to this manager just before we need them.
+        hdfs_files_dir = posixpath.join(self._hdfs_tmp_dir, 'files', '')
+        self._upload_mgr = UploadDirManager(hdfs_files_dir)
+
         # Set output dir if it wasn't set explicitly
         self._output_dir = fully_qualify_hdfs_path(
             self._output_dir or
             posixpath.join(self._hdfs_tmp_dir, 'output'))
-
-        # we'll set this up later
-        self._hdfs_input_files = None
-        # temp dir for input
-        self._hdfs_input_dir = None
 
         self._hadoop_log_dir = hadoop_log_dir(self._opts['hadoop_home'])
 
@@ -222,74 +222,42 @@ class HadoopJobRunner(MRJobRunner):
 
     def _run(self):
         if self._opts['bootstrap_mrjob']:
-            self._add_python_archive(self._create_mrjob_tar_gz() + '#')
+            self._add_python_archive(self._create_mrjob_tar_gz())
 
-        self._setup_input()
-        self._upload_non_input_files()
+        self._check_input_exists()
+        self._create_wrapper_script()
+        self._add_job_files_for_upload()
+        self._upload_local_files_to_hdfs()
         self._run_job_in_hadoop()
 
-    def _setup_input(self):
-        """Copy local input files (if any) to a special directory on HDFS.
-
-        Set self._hdfs_input_files
+    def _check_input_exists(self):
+        """Make sure all input exists before continuing with our job.
         """
-        # winnow out HDFS files from local ones
-        self._hdfs_input_files = []
-        local_input_files = []
-
         for path in self._input_paths:
-            if is_uri(path):
-                # Don't even bother running the job if the input isn't there.
-                if not self.ls(path):
-                    raise AssertionError(
-                        'Input path %s does not exist!' % (path,))
-                self._hdfs_input_files.append(path)
-            else:
-                local_input_files.append(path)
+            if path == '-':
+                continue  # STDIN always exists
 
-        # copy local files into an input directory, with names like
-        # 00000-actual_name.ext
-        if local_input_files:
-            hdfs_input_dir = posixpath.join(self._hdfs_tmp_dir, 'input')
-            log.info('Uploading input to %s' % hdfs_input_dir)
-            self._mkdir_on_hdfs(hdfs_input_dir)
+            if not self.path_exists(path):
+                raise AssertionError(
+                    'Input path %s does not exist!' % (path,))
 
-            for i, path in enumerate(local_input_files):
-                if path == '-':
-                    path = self._dump_stdin_to_local_file()
+    def _add_job_files_for_upload(self):
+        """Add files needed for running the job (setup and input)
+        to self._upload_mgr."""
+        for path in self._get_input_paths():
+            self._upload_mgr.add(path)
 
-                target = '%s/%05i-%s' % (
-                    hdfs_input_dir, i, os.path.basename(path))
-                self._upload_to_hdfs(path, target)
+        for path in self._working_dir_mgr.paths():
+            self._upload_mgr.add(path)
 
-            self._hdfs_input_files.append(hdfs_input_dir)
-
-    def _pick_hdfs_uris_for_files(self):
-        """Decide where each file will be uploaded on S3.
-
-        Okay to call this multiple times.
+    def _upload_local_files_to_hdfs(self):
+        """Copy files managed by self._upload_mgr to HDFS
         """
-        hdfs_files_dir = posixpath.join(self._hdfs_tmp_dir, 'files', '')
-        self._assign_unique_names_to_files(
-            'hdfs_uri', prefix=hdfs_files_dir, match=is_uri)
+        self._mkdir_on_hdfs(self._upload_mgr.prefix)
 
-    def _upload_non_input_files(self):
-        """Copy files to HDFS, and set the 'hdfs_uri' field for each file.
-        """
-        self._pick_hdfs_uris_for_files()
-
-        hdfs_files_dir = posixpath.join(self._hdfs_tmp_dir, 'files', '')
-        self._mkdir_on_hdfs(hdfs_files_dir)
-        log.info('Copying non-input files into %s' % hdfs_files_dir)
-
-        for file_dict in self._files:
-            path = file_dict['path']
-
-            # don't bother with files already in HDFS
-            if is_uri(path):
-                continue
-
-            self._upload_to_hdfs(path, file_dict['hdfs_uri'])
+        log.info('Copying local files into %s' % self._upload_mgr.prefix)
+        for path, uri in self._upload_mgr.path_to_uri().iteritems():
+            self._upload_to_hdfs(path, uri)
 
     def _mkdir_on_hdfs(self, path):
         log.debug('Making directory %s on HDFS' % path)
@@ -313,15 +281,6 @@ class HadoopJobRunner(MRJobRunner):
         return stdin_path
 
     def _run_job_in_hadoop(self):
-        # figure out local names for our files
-        self._name_files()
-
-        # send script and wrapper script (if any) to working dir
-        assert self._script  # shouldn't be able to run if no script
-        self._script['upload'] = 'file'
-        if self._wrapper_script:
-            self._wrapper_script['upload'] = 'file'
-
         self._counters = []
         steps = self._get_steps()
 
@@ -397,9 +356,10 @@ class HadoopJobRunner(MRJobRunner):
                           ['jar', self._opts['hadoop_streaming_jar']])
 
         # -files/-archives (generic options, new-style)
-        if compat.supports_new_distributed_cache_options(version):
+        if supports_new_distributed_cache_options(version):
             # set up uploading from HDFS to the working dir
-            streaming_args.extend(self._new_upload_args())
+            streaming_args.extend(
+                self._new_upload_args(self._upload_mgr))
 
         # Add extra hadoop args first as hadoop args could be a hadoop
         # specific argument (e.g. -libjar) which must come before job
@@ -415,9 +375,10 @@ class HadoopJobRunner(MRJobRunner):
         streaming_args.append(self._hdfs_step_output_dir(step_num))
 
         # -cacheFile/-cacheArchive (streaming options, old-style)
-        if not compat.supports_new_distributed_cache_options(version):
+        if not supports_new_distributed_cache_options(version):
             # set up uploading from HDFS to the working dir
-            streaming_args.extend(self._old_upload_args())
+            streaming_args.extend(
+                self._old_upload_args(self._upload_mgr))
 
         mapper, combiner, reducer = (
             self._hadoop_streaming_commands(step, step_num))
@@ -440,7 +401,8 @@ class HadoopJobRunner(MRJobRunner):
     def _hdfs_step_input_files(self, step_num):
         """Get the hdfs:// URI for input for the given step."""
         if step_num == 0:
-            return self._hdfs_input_files
+            return [self._upload_mgr.uri(p)
+                    for p in self._get_input_paths()]
         else:
             return [posixpath.join(
                 self._hdfs_tmp_dir, 'step-output', str(step_num))]
@@ -451,52 +413,6 @@ class HadoopJobRunner(MRJobRunner):
         else:
             return posixpath.join(
                 self._hdfs_tmp_dir, 'step-output', str(step_num + 1))
-
-    def _new_upload_args(self):
-        """Args to upload files from HDFS to the hadoop nodes using new
-        distributed cache options.
-        """
-        args = []
-
-        # return list of strings ready for comma-joining for passing to the
-        # hadoop binary
-        def escaped_paths(file_dicts):
-            return ["%s#%s" % (fd['hdfs_uri'], fd['name'])
-                    for fd in file_dicts]
-
-        # index by type
-        all_files = {}
-        for fd in self._files:
-            all_files.setdefault(fd.get('upload'), []).append(fd)
-
-        if 'file' in all_files:
-            args.append('-files')
-            args.append(','.join(escaped_paths(all_files['file'])))
-
-        if 'archive' in all_files:
-            args.append('-archives')
-            args.append(','.join(escaped_paths(all_files['archive'])))
-
-        return args
-
-    def _old_upload_args(self):
-        """Args to upload files from HDFS to the hadoop nodes using old cache
-        options.
-        """
-        args = []
-
-        for file_dict in self._files:
-            if file_dict.get('upload') == 'file':
-                args.append('-cacheFile')
-                args.append(
-                    '%s#%s' % (file_dict['hdfs_uri'], file_dict['name']))
-
-            elif file_dict.get('upload') == 'archive':
-                args.append('-cacheArchive')
-                args.append(
-                    '%s#%s' % (file_dict['hdfs_uri'], file_dict['name']))
-
-        return args
 
     def _cleanup_local_scratch(self):
         super(HadoopJobRunner, self)._cleanup_local_scratch()

@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Trivial multi-step job for testing counter behavior"""
-from tests.mr_testing_job import MRTestingJob
+from mrjob.job import MRJob
 
 
-class MRCountingJob(MRTestingJob):
+class MRCountingJob(MRJob):
 
     def steps(self):
         return [self.mr(self.mapper),

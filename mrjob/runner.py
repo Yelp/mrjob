@@ -20,8 +20,8 @@ import datetime
 import getpass
 import logging
 import os
+import os.path
 import pprint
-import random
 import re
 import shutil
 import sys
@@ -44,7 +44,10 @@ except:
     import json
     JSONDecodeError = ValueError
 
-from mrjob import compat
+from mrjob.setup import WorkingDirManager
+from mrjob.setup import parse_legacy_hash_path
+from mrjob.compat import supports_combiners_in_hadoop_streaming
+from mrjob.compat import uses_generic_jobconf
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
@@ -217,7 +220,7 @@ class RunnerOptionStore(OptionStore):
         if not self['steps_python_bin']:
             self['steps_python_bin'] = (
                 self['python_bin'] or
-                sys.executable or
+                [sys.executable] or
                 ['python'])
 
         if not self['python_bin']:
@@ -321,6 +324,8 @@ class MRJobRunner(object):
                       your lines are missing newlines, we'll add them;
                       this makes it easier to write automated tests.
         """
+        self._ran_job = False
+
         if conf_path is not None:
             if conf_paths is not None:
                 raise ValueError("Can't specify both conf_path and conf_paths")
@@ -334,34 +339,21 @@ class MRJobRunner(object):
         self._opts = self.OPTION_STORE_CLASS(self.alias, opts, conf_paths)
         self._fs = None
 
-        # we potentially have a lot of files to copy, so we keep track
-        # of them as a list of dictionaries, with the following keys:
-        #
-        # 'path': the path to the file on the local system
-        # 'name': a unique name for the file when we copy it into HDFS etc.
-        # if this is blank, we'll pick one
-        # 'cache': if 'file', copy into mr_job_script's working directory
-        # on the Hadoop nodes. If 'archive', uncompress the file
-        self._files = []
+        self._working_dir_mgr = WorkingDirManager()
 
-        # add the script to our list of files (don't actually commit to
-        # uploading it)
-        if mr_job_script:
-            self._script = {'path': mr_job_script}
-            self._files.append(self._script)
-            self._ran_job = False
-        else:
-            self._script = None
-            self._ran_job = True  # don't allow user to call run()
+        self._script_path = mr_job_script
+        if self._script_path:
+            self._working_dir_mgr.add('file', self._script_path)
 
         # setup cmds and wrapper script
         self._setup_scripts = []
         for path in self._opts['setup_scripts']:
-            file_dict = self._add_file_for_upload(path)
-            self._setup_scripts.append(file_dict)
+            setup_script = parse_legacy_hash_path('file', path)
+            self._setup_scripts.append(setup_script)
+            self._working_dir_mgr.add(**setup_script)
 
         # we'll create the wrapper script later
-        self._wrapper_script = None
+        self._wrapper_script_path = None
 
         # extra args to our job
         self._extra_args = list(extra_args) if extra_args else []
@@ -370,21 +362,24 @@ class MRJobRunner(object):
         self._file_upload_args = []
         if file_upload_args:
             for arg, path in file_upload_args:
-                file_dict = self._add_file_for_upload(path)
-                self._file_upload_args.append((arg, file_dict))
+                arg_file = parse_legacy_hash_path('file', path)
+                self._working_dir_mgr.add(**arg_file)
+                self._file_upload_args.append((arg, arg_file))
 
         # set up uploading
-        for path in self._opts['upload_archives']:
-            self._add_archive_for_upload(path)
         for path in self._opts['upload_files']:
-            self._add_file_for_upload(path)
+            self._working_dir_mgr.add(**parse_legacy_hash_path(
+                'file', path, must_name='upload_files'))
+        for path in self._opts['upload_archives']:
+            self._working_dir_mgr.add(**parse_legacy_hash_path(
+                'archive', path, must_name='upload_archives'))
 
         # set up python archives
         self._python_archives = []
         for path in self._opts['python_archives']:
             self._add_python_archive(path)
 
-        # where to read input from (log files, etc.)
+        # Where to read input from (log files, etc.)
         self._input_paths = input_paths or ['-']  # by default read from stdin
         self._stdin = stdin or sys.stdin
         self._stdin_path = None  # temp file containing dump from stdin
@@ -444,7 +439,12 @@ class MRJobRunner(object):
 
         Raise an exception if there are any problems.
         """
-        assert not self._ran_job
+        if not self._script_path:
+            raise AssertionError("No script to run!")
+
+        if self._ran_job:
+            raise AssertionError("Job already ran!")
+
         self._run()
         self._ran_job = True
 
@@ -452,9 +452,10 @@ class MRJobRunner(object):
         """Stream raw lines from the job's output. You can parse these
         using the read() method of the appropriate HadoopStreamingProtocol
         class."""
-        assert self._ran_job
-
         output_dir = self.get_output_dir()
+        if output_dir is None:
+            raise AssertionError('Run the job before streaming output')
+
         log.info('Streaming final output from %s' % output_dir)
 
         def split_path(path):
@@ -477,10 +478,10 @@ class MRJobRunner(object):
 
     def _cleanup_mode(self, mode=None):
         """Actual cleanup action to take based on various options"""
-        if self._ran_job:
-            return mode or self._opts['cleanup']
-        else:
+        if self._script_path and not self._ran_job:
             return mode or self._opts['cleanup_on_failure']
+        else:
+            return mode or self._opts['cleanup']
 
     def _cleanup_local_scratch(self):
         """Cleanup any files/directories on the local machine we created while
@@ -541,11 +542,12 @@ class MRJobRunner(object):
         def mode_has(*args):
             return any((choice in mode) for choice in args)
 
-        if mode_has('JOB_FLOW', 'ALL') and not self._ran_job:
-            self._cleanup_job_flow()
+        if self._script_path and not self._ran_job:
+            if mode_has('JOB_FLOW', 'ALL'):
+                self._cleanup_job_flow()
 
-        if mode_has('JOB', 'ALL') and not self._ran_job:
-            self._cleanup_job()
+            if mode_has('JOB', 'ALL'):
+                self._cleanup_job()
 
         if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH'):
             self._cleanup_local_scratch()
@@ -616,7 +618,7 @@ class MRJobRunner(object):
     def get_output_dir(self):
         """Find the directory containing the job output. If the job hasn't
         run yet, returns None"""
-        if not self._ran_job:
+        if self._script_path and not self._ran_job:
             return None
 
         return self._output_dir
@@ -645,140 +647,25 @@ class MRJobRunner(object):
 
     ### internal utilities for implementing MRJobRunners ###
 
-    def _split_path(self, path):
-        """Split a path like /foo/bar.py#baz.py into (path, name)
-        (in this case: '/foo/bar.py', 'baz.py').
-
-        It's valid to specify no name with something like '/foo/bar.py#'
-        In practice this means that we'll pick a name.
-        """
-        if '#' in path:
-            path, name = path.split('#', 1)
-            if '/' in name or '#' in name:
-                raise ValueError('Bad name %r; must not contain # or /' % name)
-            # empty names are okay
-        else:
-            name = os.path.basename(path)
-
-        return name, path
-
-    def _add_file(self, path):
-        """Add a file that's uploaded, but not added to the working
-        dir for *mr_job_script*.
-
-        You probably want _add_for_upload() in most cases
-        """
-        name, path = self._split_path(path)
-        file_dict = {'path': path, 'name': name}
-        self._files.append(file_dict)
-        return file_dict
-
-    def _add_for_upload(self, path, what):
-        """Add a file to our list of files to copy into the working
-        dir for *mr_job_script*.
-
-        path -- path to the file on the local filesystem. Normally
-            we just use the file's name as it's remote name. You can
-            use a  # character to pick a different name for the file:
-
-            /foo/bar#baz -> upload /foo/bar as baz
-            /foo/bar# -> upload /foo/bar, pick any name for it
-
-        upload -- either 'file' (just copy) or 'archive' (uncompress)
-
-        Returns:
-        The internal dictionary representing the file (in case we
-        want to point to it).
-        """
-        name, path = self._split_path(path)
-
-        file_dict = {'path': path, 'name': name, 'upload': what}
-        self._files.append(file_dict)
-
-        return file_dict
-
-    def _add_file_for_upload(self, path):
-        return self._add_for_upload(path, 'file')
-
-    def _add_archive_for_upload(self, path):
-        return self._add_for_upload(path, 'archive')
-
     def _add_python_archive(self, path):
-        file_dict = self._add_archive_for_upload(path)
-        self._python_archives.append(file_dict)
+        python_archive = parse_legacy_hash_path('archive', path)
+        self._working_dir_mgr.add(**python_archive)
+        self._python_archives.append(python_archive)
 
     def _get_cmdenv(self):
         """Get the environment variables to use inside Hadoop.
 
         These should be `self._opts['cmdenv']` combined with python
         archives added to :envvar:`PYTHONPATH`.
-
-        This function calls :py:meth:`MRJobRunner._name_files`
-        (since we need to know where each python archive ends up in the job's
-        working dir)
         """
-        self._name_files()
         # on Windows, PYTHONPATH should be separated by ;, not :
         # so LocalJobRunner and EMRJobRunner use different combiners for cmdenv
         cmdenv_combiner = self.OPTION_STORE_CLASS.COMBINERS['cmdenv']
-        envs_to_combine = ([{'PYTHONPATH': file_dict['name']}
-                            for file_dict in self._python_archives] +
+        envs_to_combine = ([{'PYTHONPATH': self._working_dir_mgr.name(**a)}
+                            for a in self._python_archives] +
                            [self._opts['cmdenv']])
 
         return cmdenv_combiner(*envs_to_combine)
-
-    def _assign_unique_names_to_files(self, name_field, prefix='', match=None):
-        """Go through self._files, and fill in name_field for all files where
-        it's not already filled, so that every file has a unique value for
-        name_field. We'll try to give the file the same name as its local path
-        (and we'll definitely keep the extension the same).
-
-        Args:
-        name_field -- field to fill in (e.g. 'name', 's3_uri', hdfs_uri')
-        prefix -- prefix to prepend to each name (e.g. a path to a tmp dir)
-        match -- a function that returns a true value if the path should
-            just be copied verbatim to the name (for example if we're
-            assigning HDFS uris and the path starts with 'hdfs://').
-        """
-        # handle files that are already on S3, HDFS, etc.
-        if match:
-            for file_dict in self._files:
-                path = file_dict['path']
-                if match(path) and not file_dict.get(name_field):
-                    file_dict[name_field] = path
-
-        # check for name collisions
-        name_to_path = {}
-
-        for file_dict in self._files:
-            name = file_dict.get(name_field)
-            if name:
-                path = file_dict['path']
-                if name in name_to_path and path != name_to_path[name]:
-                    raise ValueError("Can't copy both %s and %s to %s" %
-                                     (path, name_to_path[name], name))
-                name_to_path[name] = path
-
-        # give names to files that don't have them
-        for file_dict in self._files:
-            if not file_dict.get(name_field):
-                path = file_dict['path']
-                basename = os.path.basename(path)
-                name = prefix + basename
-                # if name is taken, prepend some random stuff to it
-                while name in name_to_path:
-                    name = prefix + '%08x-%s' % (
-                        random.randint(0, 2 ** 32 - 1), basename)
-                file_dict[name_field] = name
-                name_to_path[name] = path  # reserve this name
-
-    def _name_files(self):
-        """Fill in the 'name' field for every file in self._files so
-        that they all have unique names.
-
-        It's safe to run this method as many times as you want.
-        """
-        self._assign_unique_names_to_files('name')
 
     def _get_local_tmp_dir(self):
         """Create a tmp directory on the local filesystem that will be
@@ -799,9 +686,8 @@ class MRJobRunner(object):
         # use the name of the script if one wasn't explicitly
         # specified
         if not label:
-            if self._script:
-                label = os.path.basename(
-                    self._script['path']).split('.')[0]
+            if self._script_path:
+                label = os.path.basename(self._script_path).split('.')[0]
             else:
                 label = 'no_script'
 
@@ -822,7 +708,7 @@ class MRJobRunner(object):
         cached to avoid round trips to a subprocess.
         """
         if self._steps is None:
-            if not self._script:
+            if not self._script_path:
                 self._steps = []
             else:
                 args = (self._executable(True) + ['--steps'] +
@@ -861,21 +747,22 @@ class MRJobRunner(object):
         # hadoop runners check for executable script paths and prepend the
         # working_dir, discarding the interpreter if possible.
         if steps:
-            return self._opts['steps_interpreter'] + [self._script['path']]
+            return self._opts['steps_interpreter'] + [self._script_path]
         else:
-            return self._opts['interpreter'] + [self._script['name']]
+            return (self._opts['interpreter'] +
+                    [self._working_dir_mgr.name('file', self._script_path)])
 
     def _script_args_for_step(self, step_num, mrc):
-        assert self._script
+        assert self._script_path
 
         args = self._executable() + [
             '--step-num=%d' % step_num,
             '--%s' % mrc,
         ] + self._mr_job_extra_args()
-        if self._wrapper_script:
+        if self._wrapper_script_path:
             return (
                 self._opts['python_bin'] +
-                [self._wrapper_script['name']] +
+                [self._working_dir_mgr.name('file', self._wrapper_script_path)] +
                 args)
         else:
             return args
@@ -922,7 +809,7 @@ class MRJobRunner(object):
             step, step_num, 'reducer')
 
         if (combiner is not None and
-            not compat.supports_combiners_in_hadoop_streaming(version)):
+            not supports_combiners_in_hadoop_streaming(version)):
 
             # krazy hack to support combiners on hadoop <0.20
             bash_wrap_mapper = True
@@ -961,22 +848,18 @@ class MRJobRunner(object):
             the path they'll have inside Hadoop streaming
         """
         args = []
-        for arg, file_dict in self._file_upload_args:
+        for arg, path_dict in self._file_upload_args:
             args.append(arg)
             if local:
-                args.append(file_dict['path'])
+                args.append(path_dict['path'])
             else:
-                args.append(file_dict['name'])
+                args.append(self._working_dir_mgr.name(**path_dict))
         return args
 
     def _wrapper_script_content(self):
         """Output a python script to the given file descriptor that runs
         setup_cmds and setup_scripts, and then runs its arguments.
-
-        This will give names to our files if they don't already have names.
         """
-        self._name_files()
-
         out = StringIO()
 
         def writeln(line=''):
@@ -1009,9 +892,9 @@ class MRJobRunner(object):
         # run setup scripts
         if self._setup_scripts:
             writeln('# run setup scripts:')
-            for file_dict in self._setup_scripts:
+            for setup_script in self._setup_scripts:
                 writeln("check_call(%r, stdout=open('/dev/null', 'w'))" % (
-                    ['./' + file_dict['name']],))
+                    ['./' + self._working_dir_mgr.name(**setup_script)],))
             writeln()
 
         # unlock the lock file
@@ -1028,7 +911,7 @@ class MRJobRunner(object):
         """Create the wrapper script, and write it into our local temp
         directory (by default, to a file named wrapper.py).
 
-        This will set self._wrapper_script, and append it to self._files
+        This will set self._wrapper_script_path, and add it to self._working_dir_mgr
 
         This will do nothing if setup_cmds and setup_scripts are
         empty, or _create_wrapper_script() has already been called.
@@ -1036,7 +919,7 @@ class MRJobRunner(object):
         if not (self._opts['setup_cmds'] or self._setup_scripts):
             return
 
-        if self._wrapper_script:
+        if self._wrapper_script_path:
             return
 
         path = os.path.join(self._get_local_tmp_dir(), dest)
@@ -1050,32 +933,30 @@ class MRJobRunner(object):
         f.write(contents)
         f.close()
 
-        self._wrapper_script = {'path': path}
-        self._files.append(self._wrapper_script)
+        self._wrapper_script_path = path
+        self._working_dir_mgr.add('file', self._wrapper_script_path)
 
-    def _dump_stdin_to_local_file(self):
-        """Dump STDIN to a file in our local dir, and set _stdin_path
-        to point at it.
+    def _get_input_paths(self):
+        """Get the paths to input files, dumping STDIN to a local
+        file if need be."""
+        if '-' in self._input_paths:
+            if self._stdin_path is None:
+                # prompt user, so they don't think the process has stalled
+                log.info('reading from STDIN')
 
-        You can safely call this multiple times; it'll only read from
-        stdin once.
-        """
-        if self._stdin_path is None:
-            # prompt user, so they don't think the process has stalled
-            log.info('reading from STDIN')
+                stdin_path = os.path.join(self._get_local_tmp_dir(), 'STDIN')
+                log.debug('dumping stdin to local file %s' % stdin_path)
+                with open(stdin_path, 'w') as stdin_file:
+                    for line in self._stdin:
+                        # catch missing newlines (often happens with test data)
+                        if not line.endswith('\n'):
+                            line += '\n'
+                        stdin_file.write(line)
 
-            stdin_path = os.path.join(self._get_local_tmp_dir(), 'STDIN')
-            log.debug('dumping stdin to local file %s' % stdin_path)
-            with open(stdin_path, 'w') as stdin_file:
-                for line in self._stdin:
-                    # catch missing newlines (this often happens with test data)
-                    if not line.endswith('\n'):
-                        line += '\n'
-                    stdin_file.write(line)
+                self._stdin_path = stdin_path
 
-            self._stdin_path = stdin_path
-
-        return self._stdin_path
+        return [self._stdin_path if p == '-' else p
+                for p in self._input_paths]
 
     def _create_mrjob_tar_gz(self):
         """Make a tarball of the mrjob library, without .pyc or .pyo files,
@@ -1134,7 +1015,7 @@ class MRJobRunner(object):
 
         # new-style jobconf
         version = self.get_hadoop_version()
-        if compat.uses_generic_jobconf(version):
+        if uses_generic_jobconf(version):
             for key, value in sorted(self._opts['jobconf'].iteritems()):
                 args.extend(['-D', '%s=%s' % (key, value)])
 
@@ -1156,9 +1037,46 @@ class MRJobRunner(object):
             args.extend(['-outputformat', self._hadoop_output_format])
 
         # old-style jobconf
-        if not compat.uses_generic_jobconf(version):
+        if not uses_generic_jobconf(version):
             for key, value in sorted(self._opts['jobconf'].iteritems()):
                 args.extend(['-jobconf', '%s=%s' % (key, value)])
+
+        return args
+
+    def _arg_hash_paths(self, type, upload_mgr):
+        """Helper function for the *upload_args methods."""
+        for name, path in self._working_dir_mgr.name_to_path(type).iteritems():
+            uri = self._upload_mgr.uri(path)
+            yield '%s#%s' % (uri, name)
+
+    def _new_upload_args(self, upload_mgr):
+        args = []
+
+        # TODO: does Hadoop have a way of coping with paths that have
+        # commas in their names?
+
+        file_hash_paths = list(self._arg_hash_paths('file', upload_mgr))
+        if file_hash_paths:
+            args.append('-files')
+            args.append(','.join(file_hash_paths))
+
+        archive_hash_paths = list(self._arg_hash_paths('archive', upload_mgr))
+        if archive_hash_paths:
+            args.append('-archives')
+            args.append(','.join(archive_hash_paths))
+
+        return args
+
+    def _old_upload_args(self, upload_mgr):
+        args = []
+
+        for file_hash in self._arg_hash_paths('file', upload_mgr):
+            args.append('-cacheFile')
+            args.append(file_hash)
+
+        for archive_hash in self._arg_hash_paths('archive', upload_mgr):
+            args.append('-cacheArchive')
+            args.append(archive_hash)
 
         return args
 

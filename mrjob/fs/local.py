@@ -18,6 +18,7 @@ import os
 import shutil
 
 from mrjob.fs.base import Filesystem
+from mrjob.parse import is_uri
 from mrjob.util import read_file
 
 
@@ -28,9 +29,8 @@ class LocalFilesystem(Filesystem):
     """Filesystem for local files. Typically you will get one of these via
     ``MRJobRunner().fs``.
     """
-
     def can_handle_path(self, path):
-        return path.startswith('/')
+        return not is_uri(path)
 
     def du(self, path_glob):
         return sum(os.path.getsize(path) for path in self.ls(path_glob))

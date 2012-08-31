@@ -153,19 +153,14 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             self.assertEqual(runner._opts['hadoop_extra_args'],
                              ['-libjar', 'containsJars.jar'])
 
-            # make sure mrjob.tar.gz is uploaded and in PYTHONPATH
-            assert runner._mrjob_tar_gz_path
-            mrjob_tar_gz_file_dicts = [
-                file_dict for file_dict in runner._files
-                if file_dict['path'] == runner._mrjob_tar_gz_path]
-            self.assertEqual(len(mrjob_tar_gz_file_dicts), 1)
+            # make sure mrjob.tar.gz is was uploaded and added to PYTHONPATH
+            self.assertIsNotNone(runner._mrjob_tar_gz_path)
+            self.assertIn(runner._mrjob_tar_gz_path,
+                          runner._upload_mgr.path_to_uri())
 
-            mrjob_tar_gz_file_dict = mrjob_tar_gz_file_dicts[0]
-            assert mrjob_tar_gz_file_dict['name']
-
+            name = runner._working_dir_mgr.name('archive', runner._mrjob_tar_gz_path)
             pythonpath = runner._get_cmdenv()['PYTHONPATH']
-            self.assertIn(mrjob_tar_gz_file_dict['name'],
-                          pythonpath.split(':'))
+            self.assertIn(name, pythonpath.split(':'))
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
@@ -215,7 +210,10 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
     def setUp(self):
         super(StreamingArgsTestCase, self).setUp()
         self.runner = HadoopJobRunner(
-            hadoop_bin='hadoop', hadoop_streaming_jar='streaming.jar')
+            hadoop_bin='hadoop', hadoop_streaming_jar='streaming.jar',
+            mr_job_script='my_job.py', stdin=StringIO())
+        self.runner._add_job_files_for_upload()
+
         self.runner._hadoop_version='0.20.204'
         self.simple_patch(self.runner, '_new_upload_args',
                           return_value=['new_upload_args'])
@@ -227,7 +225,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                           return_value=['hdfs_step_input_files'])
         self.simple_patch(self.runner, '_hdfs_step_output_dir',
                           return_value='hdfs_step_output_dir')
-        self.runner._script = {'name': 'my_job.py'}
+        self.runner._script_path = 'my_job.py'
 
         self._new_basic_args = [
             'hadoop', 'jar', 'streaming.jar',

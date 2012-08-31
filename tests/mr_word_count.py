@@ -16,12 +16,12 @@
 import re
 
 from mrjob.compat import get_jobconf_value
-from tests.mr_testing_job import MRTestingJob
+from mrjob.job import MRJob
 
 WORD_RE = re.compile(r"[\w']+")
 
 
-class MRWordCount(MRTestingJob):
+class MRWordCount(MRJob):
     """ Trivial Job that returns the number of words in each input file
     """
     def mapper(self, _, line):

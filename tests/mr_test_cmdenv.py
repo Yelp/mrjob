@@ -13,10 +13,10 @@
 # limitations under the License.
 import os
 
-from tests.mr_testing_job import MRTestingJob
+from mrjob.job import MRJob
 
 
-class MRTestCmdenv(MRTestingJob):
+class MRTestCmdenv(MRJob):
     """cmdenv test."""
     def mapper(self, key, value):
         # try adding something

@@ -40,15 +40,9 @@ from tests.quiet import no_handlers_for_logger
 class WithStatementTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.setup_ivars()
-
-    def tearDown(self):
-        self.delete_tmpdir()
-
-    def setup_ivars(self):
         self.local_tmp_dir = None
 
-    def delete_tmpdir(self):
+    def tearDown(self):
         if self.local_tmp_dir:
             shutil.rmtree(self.local_tmp_dir)
             self.local_tmp_dir = None
@@ -56,7 +50,7 @@ class WithStatementTestCase(unittest.TestCase):
     def _test_cleanup_after_with_statement(self, mode, should_exist):
         with InlineMRJobRunner(cleanup=mode, conf_paths=[]) as runner:
             self.local_tmp_dir = runner._get_local_tmp_dir()
-            assert os.path.exists(self.local_tmp_dir)
+            self.assertTrue(os.path.exists(self.local_tmp_dir))
 
         self.assertEqual(os.path.exists(self.local_tmp_dir), should_exist)
         if not should_exist:
@@ -246,8 +240,7 @@ class TestStreamingOutput(unittest.TestCase):
         with open(y_file_path, 'w') as f:
             f.write('I win')
 
-        runner = InlineMRJobRunner(conf_paths=[])
-        runner._output_dir = self.tmp_dir
+        runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
         self.assertEqual(sorted(runner.stream_output()),
                          ['A', 'B', 'C'])
 

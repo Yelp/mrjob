@@ -84,10 +84,13 @@ class MakeRunnerTestCase(unittest.TestCase):
                 self.assertIsInstance(runner, LocalMRJobRunner)
 
     def test_hadoop_runner(self):
-        launcher = MRJobLauncher(args=['--no-conf', '-r', 'hadoop', ''])
+        # you can't instantiate a HadoopJobRunner without Hadoop installed
+        launcher = MRJobLauncher(args=['--no-conf', '-r', 'hadoop', '',
+                                       '--hadoop-streaming-jar', 'HUNNY'])
         with no_handlers_for_logger('mrjob.runner'):
-            with launcher.make_runner() as runner:
-                self.assertIsInstance(runner, HadoopJobRunner)
+            with patch.dict(os.environ, {'HADOOP_HOME': '100-Acre Wood'}):
+                with launcher.make_runner() as runner:
+                    self.assertIsInstance(runner, HadoopJobRunner)
 
     def test_emr_runner(self):
         launcher = MRJobLauncher(args=['--no-conf', '-r', 'emr', ''])

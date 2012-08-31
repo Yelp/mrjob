@@ -370,8 +370,9 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
     def test_echo_as_python_bin(self):
         # "echo" is a pretty poor substitute for Python, but it
         # should be available on most systems
-        mr_job = MRTwoStepJob(['--python-bin', 'echo', '--no-conf',
-                               '-r', 'local'])
+        mr_job = MRTwoStepJob(
+            ['--python-bin', 'echo', '--steps-python-bin', sys.executable,
+             '--no-conf', '-r', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -474,14 +475,9 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
                 _, script_mrjob_dir = mr_job.parse_output_line(output[0])
 
                 self.assertNotEqual(our_mrjob_dir, script_mrjob_dir)
-                assert script_mrjob_dir.startswith(local_tmp_dir)
+                self.assertTrue(script_mrjob_dir.startswith(local_tmp_dir))
 
     def test_can_turn_off_bootstrap_mrjob(self):
-        # track the dir we're loading mrjob from rather than the full path
-        # to deal with edge cases where we load from the .py file,
-        # and the script loads from the .pyc compiled from that .py file.
-        our_mrjob_dir = os.path.dirname(os.path.realpath(mrjob.__file__))
-
         with mrjob_conf_patcher(
             {'runners': {'local': {'bootstrap_mrjob': False}}}):
 
@@ -491,15 +487,21 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
             with mr_job.make_runner() as runner:
                 # sanity check
                 self.assertEqual(runner.get_opts()['bootstrap_mrjob'], False)
-                runner.run()
+                try:
+                    with no_handlers_for_logger():
+                        runner.run()
+                except Exception, e:
+                    # if mrjob is not installed, script won't be able to run
+                    self.assertIn('ImportError', str(e))
+                    return
 
                 output = list(runner.stream_output())
 
                 self.assertEqual(len(output), 1)
 
-                # script should load mrjob from the same place our test does
+                # script should not load mrjob from local_tmp_dir
                 _, script_mrjob_dir = mr_job.parse_output_line(output[0])
-                self.assertEqual(our_mrjob_dir, script_mrjob_dir)
+                self.assertFalse(script_mrjob_dir.startswith(local_tmp_dir))
 
 
 class LocalMRJobRunnerTestJobConfCase(SandboxedTestCase):

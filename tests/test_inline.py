@@ -32,7 +32,7 @@ from mrjob import conf
 from mrjob.inline import InlineMRJobRunner
 from mrjob.protocol import JSONValueProtocol
 from tests.mr_test_cmdenv import MRTestCmdenv
-from tests.mr_testing_job import MRTestingJob
+from mrjob.job import MRJob
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
@@ -108,7 +108,7 @@ class InlineMRJobRunnerCmdenvTest(EmptyMrjobConfTestCase):
 
 
 # this doesn't need to be in its own file because it'll be run inline
-class MRIncrementerJob(MRTestingJob):
+class MRIncrementerJob(MRJob):
     """A terribly silly way to add a positive integer to values."""
 
     INPUT_PROTOCOL = JSONValueProtocol

@@ -245,7 +245,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         mock_s3_fs_snapshot = copy.deepcopy(self.mock_s3_fs)
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, EMRJobRunner)
+            self.assertIsInstance(runner, EMRJobRunner)
 
             # make sure that initializing the runner doesn't affect S3
             # (Issue #50)
@@ -264,8 +264,8 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             local_tmp_dir = runner._get_local_tmp_dir()
             # make sure cleanup hasn't happened yet
-            assert os.path.exists(local_tmp_dir)
-            assert any(runner.ls(runner.get_output_dir()))
+            self.assertTrue(os.path.exists(local_tmp_dir))
+            self.assertTrue(any(runner.ls(runner.get_output_dir())))
 
             emr_conn = runner.make_emr_conn()
             job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
@@ -283,28 +283,24 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             # make sure mrjob.tar.gz is created and uploaded as
             # a bootstrap file
-            assert runner._mrjob_tar_gz_path
-            mrjob_tar_gz_file_dicts = [
-                file_dict for file_dict in runner._files
-                if file_dict['path'] == runner._mrjob_tar_gz_path]
-
-            self.assertEqual(len(mrjob_tar_gz_file_dicts), 1)
-
-            mrjob_tar_gz_file_dict = mrjob_tar_gz_file_dicts[0]
-            assert mrjob_tar_gz_file_dict['name']
-            self.assertEqual(mrjob_tar_gz_file_dict.get('bootstrap'), 'file')
+            self.assertTrue(runner._mrjob_tar_gz_path)
+            self.assertIn(runner._mrjob_tar_gz_path,
+                          runner._upload_mgr.path_to_uri())
+            self.assertIn(runner._mrjob_tar_gz_path,
+                          runner._bootstrap_dir_mgr.paths())
 
             # shouldn't be in PYTHONPATH (we dump it directly in site-packages)
             pythonpath = runner._get_cmdenv().get('PYTHONPATH') or ''
-            self.assertNotIn(mrjob_tar_gz_file_dict['name'],
-                             pythonpath.split(':'))
+            self.assertNotIn(
+                runner._bootstrap_dir_mgr.name('file', runner._mrjob_tar_gz_path),
+                pythonpath.split(':'))
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
         # make sure cleanup happens
-        assert not os.path.exists(local_tmp_dir)
-        assert not any(runner.ls(runner.get_output_dir()))
+        self.assertFalse(os.path.exists(local_tmp_dir))
+        self.assertFalse(any(runner.ls(runner.get_output_dir())))
 
         # job should get terminated
         emr_conn = runner.make_emr_conn()
@@ -327,7 +323,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             log_to_stream('mrjob.emr', stderr)
 
             with mr_job.make_runner() as runner:
-                assert isinstance(runner, EMRJobRunner)
+                self.assertIsInstance(runner, EMRJobRunner)
 
                 self.assertRaises(Exception, runner.run)
                 # make sure job flow ID printed in error string
@@ -353,7 +349,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
     def _test_remote_scratch_cleanup(self, mode, scratch_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
-        # read from STDIN, a local file, and a remote file
         stdin = StringIO('foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
@@ -447,6 +442,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         mr_job = MRTwoStepJob(['-r', 'emr'])
         mr_job.sandbox()
         with mr_job.make_runner() as runner:
+            runner._add_job_files_for_upload()
             runner._launch_emr_job()
             jf = runner._describe_jobflow()
             jf.keepjobflowalivewhennosteps = 'false'
@@ -489,23 +485,6 @@ class S3ScratchURITestCase(MockEMRAndS3TestCase):
         self.assertEqual(runner2._opts['s3_scratch_uri'], s3_scratch_uri)
 
 
-class BootstrapFilesTestCase(MockEMRAndS3TestCase):
-
-    def test_bootstrap_files_only_get_uploaded_once(self):
-        # just a regression test for Issue #8
-
-        # use self.fake_mrjob_tgz_path because it's easier than making a new
-        # file
-        bootstrap_file = self.fake_mrjob_tgz_path
-
-        runner = EMRJobRunner(conf_paths=[],
-                              bootstrap_files=[bootstrap_file])
-
-        matching_file_dicts = [fd for fd in runner._files
-                               if fd['path'] == bootstrap_file]
-        self.assertEqual(len(matching_file_dicts), 1)
-
-
 class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
     def test_attach_to_existing_job_flow(self):
@@ -530,7 +509,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
             # Issue 182: don't create the bootstrap script when
             # attaching to another job flow
-            self.assertEqual(runner._master_bootstrap_script, None)
+            self.assertIsNone(runner._master_bootstrap_script_path)
 
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
@@ -555,7 +534,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, EMRJobRunner)
+            self.assertIsInstance(runner, EMRJobRunner)
 
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
@@ -1778,49 +1757,42 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
                               bootstrap_mrjob=True,
                               bootstrap_python_packages=[yelpy_tar_gz_path],
                               bootstrap_scripts=['speedups.sh', '/tmp/s.sh'])
-        script_path = os.path.join(self.tmp_dir, 'b.py')
-        runner._create_master_bootstrap_script(dest=script_path)
 
-        assert os.path.exists(script_path)
-        py_compile.compile(script_path)
+        runner._add_bootstrap_files_for_upload()
+
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
+        py_compile.compile(runner._master_bootstrap_script_path)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False)
         script_path = os.path.join(self.tmp_dir, 'b.py')
 
-        runner._create_master_bootstrap_script(dest=script_path)
-        assert not os.path.exists(script_path)
+        runner._add_bootstrap_files_for_upload()
+        self.assertIsNone(runner._master_bootstrap_script_path)
 
         # bootstrap actions don't figure into the master bootstrap script
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_mrjob=False,
                               bootstrap_actions=['foo', 'bar baz'],
                               pool_emr_job_flows=False)
-        runner._create_master_bootstrap_script(dest=script_path)
 
-        assert not os.path.exists(script_path)
+        runner._add_bootstrap_files_for_upload()
+        self.assertIsNone(runner._master_bootstrap_script_path)
 
-    def test_bootstrap_script_if_needed_for_pooling(self):
-        runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False)
-        script_path = os.path.join(self.tmp_dir, 'b.py')
-
-        runner._create_master_bootstrap_script(dest=script_path)
-        assert not os.path.exists(script_path)
-
-        # bootstrap actions don't figure into the master bootstrap script
+        # using pooling doesn't require us to create a bootstrap script
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_mrjob=False,
-                              bootstrap_actions=['foo', 'bar baz'],
                               pool_emr_job_flows=True)
-        runner._create_master_bootstrap_script(dest=script_path)
 
-        assert os.path.exists(script_path)
+        runner._add_bootstrap_files_for_upload()
+        self.assertIsNone(runner._master_bootstrap_script_path)
 
     def test_bootstrap_actions_get_added(self):
         bootstrap_actions = [
             ('s3://elasticmapreduce/bootstrap-actions/configure-hadoop'
              ' -m,mapred.tasktracker.map.tasks.maximum=1'),
-            's3://foo/bar#xyzzy',  # use alternate name for script
+            's3://foo/bar',
         ]
 
         runner = EMRJobRunner(conf_paths=[],
@@ -1841,20 +1813,20 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         self.assertEqual(
             actions[0].args[0].value,
             '-m,mapred.tasktracker.map.tasks.maximum=1')
-        self.assertEqual(actions[0].name, 'configure-hadoop')
+        self.assertEqual(actions[0].name, 'action 0')
 
         self.assertEqual(actions[1].path, 's3://foo/bar')
         self.assertEqual(actions[1].args, [])
-        self.assertEqual(actions[1].name, 'xyzzy')
+        self.assertEqual(actions[1].name, 'action 1')
 
         # check for master bootstrap script
-        assert actions[2].path.startswith('s3://mrjob-')
-        assert actions[2].path.endswith('b.py')
+        self.assertTrue(actions[2].path.startswith('s3://mrjob-'))
+        self.assertTrue(actions[2].path.endswith('b.py'))
         self.assertEqual(actions[2].args, [])
         self.assertEqual(actions[2].name, 'master')
 
         # make sure master bootstrap script is on S3
-        assert runner.path_exists(actions[2].path)
+        self.assertTrue(runner.path_exists(actions[2].path))
 
     def test_bootstrap_script_uses_python_bin(self):
         # create a fake src tarball
@@ -1872,12 +1844,17 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
                               bootstrap_python_packages=[yelpy_tar_gz_path],
                               bootstrap_scripts=['speedups.sh', '/tmp/s.sh'],
                               python_bin=['anaconda'])
-        script_path = os.path.join(self.tmp_dir, 'b.py')
-        runner._create_master_bootstrap_script(dest=script_path)
-        with open(script_path, 'r') as f:
+
+        runner._add_bootstrap_files_for_upload()
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        with open(runner._master_bootstrap_script_path, 'r') as f:
             content = f.read()
-            self.assertIn("call(['sudo', 'anaconda', '-m', 'compileall', '-f', mrjob_dir]", content)
-            self.assertIn("check_call(['sudo', 'anaconda', 'setup.py', 'install']", content)
+
+        self.assertIn(
+            "call(['sudo', 'anaconda', '-m', 'compileall', '-f',"" mrjob_dir]",
+            content)
+        self.assertIn(
+            "check_call(['sudo', 'anaconda', 'setup.py', 'install']", content)
 
     def test_local_bootstrap_action(self):
         # make sure that local bootstrap action scripts get uploaded to S3
@@ -1900,20 +1877,20 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
         self.assertEqual(len(actions), 2)
 
-        assert actions[0].path.startswith('s3://mrjob-')
-        assert actions[0].path.endswith('/apt-install.sh')
-        self.assertEqual(actions[0].name, 'apt-install.sh')
+        self.assertTrue(actions[0].path.startswith('s3://mrjob-'))
+        self.assertTrue(actions[0].path.endswith('/apt-install.sh'))
+        self.assertEqual(actions[0].name, 'action 0')
         self.assertEqual(actions[0].args[0].value, 'python-scipy')
         self.assertEqual(actions[0].args[1].value, 'mysql-server')
 
         # check for master boostrap script
-        assert actions[1].path.startswith('s3://mrjob-')
-        assert actions[1].path.endswith('b.py')
+        self.assertTrue(actions[1].path.startswith('s3://mrjob-'))
+        self.assertTrue(actions[1].path.endswith('b.py'))
         self.assertEqual(actions[1].args, [])
         self.assertEqual(actions[1].name, 'master')
 
         # make sure master bootstrap script is on S3
-        assert runner.path_exists(actions[1].path)
+        self.assertTrue(runner.path_exists(actions[1].path))
 
 
 class EMRNoMapperTest(MockEMRAndS3TestCase):
@@ -2440,7 +2417,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, EMRJobRunner)
+            self.assertIsInstance(runner, EMRJobRunner)
 
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
@@ -2475,7 +2452,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with mr_job.make_runner() as runner:
-            assert isinstance(runner, EMRJobRunner)
+            self.assertIsInstance(runner, EMRJobRunner)
 
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
@@ -2579,7 +2556,7 @@ class S3LockTestCase(MockEMRAndS3TestCase):
         # and take the lock!
         key2.set_contents_from_string('jf2')
 
-        assert not _lock_acquire_step_2(key, 'jf1'), 'Lock should fail'
+        self.assertFalse(_lock_acquire_step_2(key, 'jf1'), 'Lock should fail')
 
 
 class TestCatFallback(MockEMRAndS3TestCase):
@@ -2843,17 +2820,16 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
 
     def setUp(self):
         super(BuildStreamingStepTestCase, self).setUp()
-        self.runner = EMRJobRunner(conf_paths=[])
+        self.runner = EMRJobRunner(
+            mr_job_script='my_job.py', conf_paths=[], stdin=StringIO())
+        self.runner._add_job_files_for_upload()
+
         self.simple_patch(
             self.runner, '_s3_step_input_uris', return_value=['input'])
         self.simple_patch(
             self.runner, '_s3_step_output_uri', return_value=['output'])
         self.simple_patch(
             self.runner, '_get_jar', return_value=['streaming.jar'])
-        self.runner._script = {
-            'name': 'my_job.py',
-            'path': os.path.abspath('tests/mr_testing_job.py'),
-        }
 
         self.simple_patch(boto.emr, 'StreamingStep', dict)
 

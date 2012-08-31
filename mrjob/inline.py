@@ -125,8 +125,6 @@ class InlineMRJobRunner(MRJobRunner):
     def _run(self):
         self._setup_output_dir()
 
-        assert self._script  # shouldn't be able to run if no script
-
         for ignored_opt in self.IGNORED_HADOOP_OPTS:
             if ((not self._opts.is_default(ignored_opt)) and
                 self._opts[ignored_opt]):
@@ -241,16 +239,9 @@ class InlineMRJobRunner(MRJobRunner):
     def _decide_input_paths(self):
         # decide where to get input
         if self._prev_outfile is not None:
-            input_paths = [self._prev_outfile]
+            return [self._prev_outfile]
         else:
-            input_paths = []
-            for path in self._input_paths:
-                if path == '-':
-                    input_paths.append(self._dump_stdin_to_local_file())
-                else:
-                    input_paths.append(path)
-
-        return input_paths
+            return self._get_input_paths()
 
     def _decide_output_path(self, outfile_name):
         # run the mapper

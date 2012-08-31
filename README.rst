@@ -48,7 +48,7 @@ A Simple Map Reduce Job
 
 Code for this example and more live in ``mrjob/examples``.
 
-::
+.. code:: python
 
    """The classic MapReduce job: count the frequency of words. 
    """

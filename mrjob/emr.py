@@ -366,6 +366,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'additional_emr_info',
         'ami_version',
+        'api_params',
         'aws_access_key_id',
         'aws_availability_zone',
         'aws_region',
@@ -1206,6 +1207,7 @@ class EMRJobRunner(MRJobRunner):
 
         args['ami_version'] = self._opts['ami_version']
         args['hadoop_version'] = self._opts['hadoop_version']
+        args['api_params'] = self._opts['api_params']
 
         if self._opts['aws_availability_zone']:
             args['availability_zone'] = self._opts['aws_availability_zone']

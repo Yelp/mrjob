@@ -328,14 +328,14 @@ def hadoop_fs_rmr(stdout, stderr, environ, *args):
 
 
 def hadoop_fs_test(stdout, stderr, environ, *args):
-    """Implements hadoop fs -rmr."""
+    """Implements hadoop fs -test."""
     if len(args) < 1:
         stderr.write('Usage: java FsShell [-test -[ezd] <src>]')
 
     if os.path.exists(hdfs_path_to_real_path(args[1], environ)):
         return 0
     else:
-        return -1
+        return 1
 
 
 def hadoop_jar(stdout, stderr, environ, *args):

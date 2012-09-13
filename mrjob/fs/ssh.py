@@ -111,7 +111,12 @@ class SSHFilesystem(Filesystem):
 
     def path_exists(self, path_glob):
         # just fall back on ls(); it's smart
-        return any(self.ls(path_glob))
+        paths = self.ls(path_glob)
+        try:
+            path_exists = any(paths)
+        except IOError, e:
+            path_exists = False
+        return path_exists
 
     def path_join(self, dirname, filename):
         return posixpath.join(dirname, filename)

@@ -94,3 +94,18 @@ class S3FSTestCase(SandboxedTestCase):
         self.assertEqual(self.fs.du('s3://walrus/'), 8)
         self.assertEqual(self.fs.du(paths[0]), 4)
         self.assertEqual(self.fs.du(paths[1]), 4)
+
+    def test_path_exists_no(self):
+        path = os.path.join('s3://walrus/data/foo')
+        self.assertEqual(self.fs.path_exists(path), False)
+
+    def test_path_exists_yes(self):
+        path = self.add_mock_s3_data('walrus', 'data/foo', 'abcd')
+        self.assertEqual(self.fs.path_exists(path), True)
+
+    def test_rm(self):
+        path = self.add_mock_s3_data('walrus', 'data/foo', 'abcd')
+        self.assertEqual(self.fs.path_exists(path), True)
+
+        self.fs.rm(path)
+        self.assertEqual(self.fs.path_exists(path), False)

@@ -96,6 +96,15 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         local_path = os.path.join(self.tmp_dir, 'mock_hdfs_root', 'd')
         self.assertEqual(os.path.isdir(local_path), True)
 
+    def test_path_exists_no(self):
+        path = 'hdfs:///f'
+        self.assertEqual(self.fs.path_exists(path), False)
+
+    def test_path_exists_yes(self):
+        self.make_hdfs_file('f', 'contents')
+        path = 'hdfs:///f'
+        self.assertEqual(self.fs.path_exists(path), True)
+
     def test_rm(self):
         local_path = self.make_hdfs_file('f', 'contents')
         self.assertEqual(os.path.exists(local_path), True)

@@ -159,7 +159,11 @@ class S3Filesystem(Filesystem):
         any files starting with that path.
         """
         # just fall back on ls(); it's smart
-        return any(self.ls(path_glob))
+        try:
+            paths = self.ls(path_glob)
+        except boto.exception.S3ResponseError, e:
+            paths = []
+        return any(paths)
 
     def path_join(self, dirname, filename):
         return posixpath.join(dirname, filename)
@@ -227,7 +231,16 @@ class S3Filesystem(Filesystem):
             s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        return s3_conn.get_bucket(bucket_name).get_key(key_name)
+        try:
+            bucket = s3_conn.get_bucket(bucket_name)
+        except boto.exception.S3ResponseError, e:
+            if e.status != 404:
+                raise e
+            key = None
+        else:
+            key = bucket.get_key(key_name)
+
+        return key
 
     def make_s3_key(self, uri, s3_conn=None):
         """Create the given S3 key, and return the corresponding

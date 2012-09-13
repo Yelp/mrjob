@@ -115,6 +115,15 @@ class SSHFSTestCase(MockSubprocessTestCase):
         # not implemented
         self.assertRaises(IOError, self.fs.mkdir, 'ssh://testmaster/d')
 
+    def test_path_exists_no(self):
+        path = 'ssh://testmaster/f'
+        self.assertEqual(self.fs.path_exists(path), False)
+
+    def test_path_exists_yes(self):
+        self.make_master_file('f', 'contents')
+        path = 'ssh://testmaster/f'
+        self.assertEqual(self.fs.path_exists(path), True)
+
     def test_rm(self):
         self.make_master_file('f', 'contents')
         # not implemented

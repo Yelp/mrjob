@@ -37,6 +37,7 @@ from mrjob.hadoop import HadoopJobRunner
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import patch_fs_s3
 
 
 def _mock_context_mgr(m, return_value):
@@ -94,9 +95,10 @@ class MakeRunnerTestCase(unittest.TestCase):
 
     def test_emr_runner(self):
         launcher = MRJobLauncher(args=['--no-conf', '-r', 'emr', ''])
-        with no_handlers_for_logger('mrjob.runner'):
-            with launcher.make_runner() as runner:
-                self.assertIsInstance(runner, EMRJobRunner)
+        with no_handlers_for_logger('mrjob'):
+            with patch_fs_s3():
+                with launcher.make_runner() as runner:
+                    self.assertIsInstance(runner, EMRJobRunner)
 
 
 class NoOutputTestCase(unittest.TestCase):

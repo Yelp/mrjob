@@ -23,6 +23,7 @@ try:
 except ImportError:
     import unittest
 
+from mock import MagicMock
 from mock import patch
 
 from mrjob import runner
@@ -44,6 +45,13 @@ EMPTY_MRJOB_CONF = {'runners': {
         'label': 'test_job',
     },
 }}
+
+
+def patch_fs_s3():
+    m_boto = MagicMock()
+    m_s3 = m_boto.connect_s3()
+    m_s3.get_all_buckets.__name__ = 'get_all_buckets'
+    return patch('mrjob.fs.s3.boto', m_boto)
 
 
 def mrjob_conf_patcher(substitute_conf=EMPTY_MRJOB_CONF):

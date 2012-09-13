@@ -73,6 +73,7 @@ from tests.quiet import log_to_buffer
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
+from tests.sandbox import patch_fs_s3
 from tests.sandbox import SandboxedTestCase
 
 try:
@@ -2820,8 +2821,9 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
 
     def setUp(self):
         super(BuildStreamingStepTestCase, self).setUp()
-        self.runner = EMRJobRunner(
-            mr_job_script='my_job.py', conf_paths=[], stdin=StringIO())
+        with patch_fs_s3():
+            self.runner = EMRJobRunner(
+                mr_job_script='my_job.py', conf_paths=[], stdin=StringIO())
         self.runner._add_job_files_for_upload()
 
         self.simple_patch(

@@ -708,14 +708,14 @@ class HadoopJobRunner(MRJobRunner):
             # expect lines like below for s3n:
             # -rwxrwxrwx   1          0 2012-01-01 14:00 /foo/bar
             if (components.scheme == "hdfs"):
-                if len(fields) < 8):
+                if len(fields) < 8:
                     raise Exception('unexpected ls line from hadoop hdfs: %r' % line)
                 # ignore directories
                 if fields[0].startswith('d'):
                     continue
                 # not sure if you can have spaces in filenames; just to be safe
                 path = ' '.join(fields[7:])
-            else if (components.scheme == "s3n"):
+            elif (components.scheme == "s3n"):
                 if len(fields) < 6:
                     raise Exception('unexpected ls line from hadoop s3n: %r' % line)
                 path = ' '.join(fields[5:])

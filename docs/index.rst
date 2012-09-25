@@ -56,10 +56,11 @@ Guides
 
 * :ref:`amazon-setup`
 * :ref:`ssh-tunneling`
+* :ref:`running-an-emr-job`
+* :ref:`picking-job-flow-config`
 * :doc:`guides/emr-opts`
 * :doc:`guides/emr-tools`
 * :doc:`guides/emr-troubleshooting`
-* :ref:`picking-job-flow-config`
 * :doc:`guides/emr-advanced`
 
 **Working on mrjob**

@@ -15,8 +15,7 @@ Guides
     guides/configs-reference.rst
     guides/cookbook.rst
     guides/testing.rst
-    guides/emr-concepts.rst
-    guides/emr-config.rst
+    guides/emr-quickstart.rst
     guides/emr-opts.rst
     guides/emr-tools.rst
     guides/emr-troubleshooting.rst

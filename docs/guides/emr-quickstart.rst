@@ -1,5 +1,95 @@
-Concepts
-========
+Elastic MapReduce Quickstart
+============================
+
+.. _amazon-setup:
+
+Configuring AWS credentials
+---------------------------
+
+Configuring your AWS credentials allows mrjob to run your jobs on Elastic
+MapReduce and use S3.
+
+* Create an `Amazon Web Services account <http://aws.amazon.com/>`_
+* Sign up for `Elastic MapReduce <http://aws.amazon.com/elasticmapreduce/>`_
+* Get your access and secret keys (click "Security Credentials" on `your
+  account page <http://aws.amazon.com/account/>`_)
+
+Now you can either set the environment variables :envvar:`AWS_ACCESS_KEY_ID`
+and :envvar:`AWS_SECRET_ACCESS_KEY`, or set **aws_access_key_id** and
+**aws_secret_access_key** in your ``mrjob.conf`` file like this::
+
+    runners:
+      emr:
+        aws_access_key_id: <your key ID>
+        aws_secret_access_key: <your secret>
+
+.. _ssh-tunneling:
+
+Configuring SSH credentials
+---------------------------
+
+Configuring your SSH credentials lets mrjob open an SSH tunnel to your jobs'
+master nodes to view live progress, see the job tracker in your browser, and
+fetch error logs quickly.
+
+* Go to https://console.aws.amazon.com/ec2/home
+* Make sure the **Region** dropdown (upper left) matches the region you want 
+  to run jobs in (usually "US East").
+* Click on **Key Pairs** (lower left)
+* Click on **Create Key Pair** (center).
+* Name your key pair ``EMR`` (any name will work but that's what we're using 
+  in this example)
+* Save :file:`EMR.pem` wherever you like (``~/.ssh`` is a good place)
+* Run ``chmod og-rwx /path/to/EMR.pem`` so that ``ssh`` will be happy
+* Add the following entries to your :py:mod:`mrjob.conf`::
+
+    runners:
+      emr:
+        ec2_key_pair: EMR
+        ec2_key_pair_file: /path/to/EMR.pem # ~/ and $ENV_VARS allowed here
+        ssh_tunnel_to_job_tracker: true
+
+.. _running-an-emr-job:
+
+Running an EMR Job
+------------------
+
+Running a job on EMR is just like running it locally or on your own Hadoop
+cluster, with the following changes:
+
+* The job and related files are uploaded to S3 before being run
+* The job is run on EMR (of course)
+* Output is written to S3 before mrjob streams it to stdout locally
+* The Hadoop version is specified by the EMR AMI version
+
+This the output of this command should be identical to the output shown in
+:doc:`quickstart`, but it should take much longer:
+
+    > python word_count.py -r emr README.txt
+    "chars" 3654
+    "lines" 123
+    "words" 417
+
+Sending Output to a Specific Place
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you'd rather have your output go to somewhere deterministic on S3, which you
+probably do, use :option:`--output-dir`::
+
+    > python word_count.py -r emr README.rst \
+    >   --output-dir=s3://my-bucket/wc_out/
+
+It's also likely that since you know where your output is on S3, you don't want
+output streamed back to your local machine. For that, use
+:option:`-no-output`::
+
+    > python word_count.py -r emr README.rst \
+    >   --output-dir=s3://my-bucket/wc_out/ \
+    >   --no-output
+
+There are many other ins and outs of effectively using mrjob with EMR. See
+:doc:`emr-advanced` for some of the ins, but the outs are left as an exercise
+for the reader. This is a strictly no-outs body of documentation!
 
 .. _picking-job-flow-config:
 

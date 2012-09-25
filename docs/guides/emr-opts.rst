@@ -7,7 +7,8 @@ are available to the emr runner.
 Amazon credentials
 ------------------
 
-See :doc:`emr-config` for specific instructions about setting these options.
+See :ref:`amazon-setup` and :ref:`ssh-tunneling` for specific instructions
+about setting these options.
 
 **aws_access_key_id** (:option:`--aws-access-key-id`)
     "username" for Amazon web services.

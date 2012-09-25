@@ -70,14 +70,18 @@ This the output of this command should be identical to the output shown in
     "lines" 123
     "words" 417
 
+Sending Output to a Specific Place
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 If you'd rather have your output go to somewhere deterministic on S3, which you
-probably do, use ``--output-dir``::
+probably do, use :option:`--output-dir`::
 
     > python word_count.py -r emr README.rst \
     >   --output-dir=s3://my-bucket/wc_out/
 
-It's also likely that you usually won't want output streamed back to your local
-machine. For that, use ``-no-output``::
+It's also likely that since you know where your output is on S3, you don't want
+output streamed back to your local machine. For that, use
+:option:`-no-output`::
 
     > python word_count.py -r emr README.rst \
     >   --output-dir=s3://my-bucket/wc_out/ \

@@ -87,7 +87,8 @@ By default, your job will run in a single process::
 You can use ``-r local`` to run your job in a subprocess with a few Hadoop
 features simulated. If you have configured mrjob to use Hadoop, you can use
 ``-r hadoop`` to run your job on the Hadoop cluster. If you have configured AWS
-credentials, you can use ``-r emr`` to run your job on EMR.
+credentials, you can use ``-r emr`` to run your job on EMR (see
+:doc:`emr-quickstart` for more information).
 
 If your code spans multiple files, see :ref:`cookbook-src-tree-pythonpath`.
 

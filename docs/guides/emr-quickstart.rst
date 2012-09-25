@@ -54,7 +54,38 @@ fetch error logs quickly.
 Running an EMR Job
 ------------------
 
+Running a job on EMR is just like running it locally or on your own Hadoop
+cluster, with the following changes:
 
+* The job and related files are uploaded to S3 before being run
+* The job is run on EMR (of course)
+* Output is written to S3 before mrjob streams it to stdout locally
+* The Hadoop version is specified by the EMR AMI version
+
+This the output of this command should be identical to the output shown in
+:doc:`quickstart`, but it should take much longer:
+
+    > python word_count.py -r emr README.txt
+    "chars" 3654
+    "lines" 123
+    "words" 417
+
+If you'd rather have your output go to somewhere deterministic on S3, which you
+probably do, use ``--output-dir``::
+
+    > python word_count.py -r emr README.rst \
+    >   --output-dir=s3://my-bucket/wc_out/
+
+It's also likely that you usually won't want output streamed back to your local
+machine. For that, use ``-no-output``::
+
+    > python word_count.py -r emr README.rst \
+    >   --output-dir=s3://my-bucket/wc_out/ \
+    >   --no-output
+
+There are many other ins and outs of effectively using mrjob with EMR. See
+:doc:`emr-advanced` for some of the ins, but the outs are left as an exercise
+for the reader. This is a strictly no-outs body of documentation!
 
 .. _picking-job-flow-config:
 

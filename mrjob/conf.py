@@ -27,10 +27,8 @@ from mrjob.util import expand_path
 
 try:
     import simplejson as json  # preferred because of C speedups
-    JSONDecodeError = json.JSONDecodeError
 except ImportError:
     import json  # built in to Python 2.6 and later
-    JSONDecodeError = ValueError
 
 # yaml is nice to have, but we can fall back on JSON if need be
 try:
@@ -168,11 +166,10 @@ def conf_object_at_path(conf_path):
         else:
             try:
                 return json.load(f)
-            except JSONDecodeError, e:
+            except ValueError, e:
                 msg = ('If your mrjob.conf is in YAML, you need to install'
                        ' yaml; see http://pypi.python.org/pypi/PyYAML/')
-                # JSONDecodeError currently has a msg attr, but it may not in
-                # the future
+                # Use msg attr if it's set
                 if hasattr(e, 'msg'):
                     e.msg = '%s (%s)' % (e.msg, msg)
                 else:

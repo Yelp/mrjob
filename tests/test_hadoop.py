@@ -363,3 +363,76 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                  " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' |"
                  " python my_job.py --step-num=0 --mapper'",
              '-jobconf', 'mapred.reduce.tasks=0'])
+
+        self.assertEqual(output, ['foo\n', 'bar\n'])
+
+        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
+        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
+        input_bz2.write('bar\nbar\nfoo\n')
+        input_bz2.close()
+
+        with HadoopJobRunner(cleanup=['NONE'], conf_path=False) as runner:
+            output = []
+            for line in runner.cat(input_bz2_path):
+                output.append(line)
+
+        self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
+
+    def test_du(self):
+        root = os.environ['MOCK_HDFS_ROOT']
+        data_path_1 = os.path.join(root, 'data1')
+        with open(data_path_1, 'w') as f:
+            f.write("abcd")
+        remote_data_1 = 'hdfs:///data1'
+
+        data_dir = os.path.join(root, 'more')
+        os.mkdir(data_dir)
+        remote_dir = 'hdfs:///more'
+
+        data_path_2 = os.path.join(data_dir, 'data2')
+        with open(data_path_2, 'w') as f:
+            f.write("defg")
+        remote_data_2 = 'hdfs:///more/data2'
+
+        data_path_3 = os.path.join(data_dir, 'data3')
+        with open(data_path_3, 'w') as f:
+            f.write("hijk")
+        remote_data_2 = 'hdfs:///more/data3'
+
+        runner = HadoopJobRunner(conf_path=False)
+        self.assertEqual(runner.du(root), 12)
+        self.assertEqual(runner.du(remote_dir), 8)
+        self.assertEqual(runner.du(remote_dir + '/*'), 8)
+        self.assertEqual(runner.du(remote_data_1), 4)
+        self.assertEqual(runner.du(remote_data_2), 4)
+
+    def test_path_exists(self):
+        root = os.environ['MOCK_HDFS_ROOT']
+
+        data_path_1 = os.path.join(root, 'data1')
+        with open(data_path_1, 'w') as f:
+            pass
+        remote_data_1 = 'hdfs:///data1'
+
+        runner = HadoopJobRunner(conf_path=False)
+        self.assertTrue(runner.path_exists('hdfs:///data1'))
+        self.assertTrue(runner.path_exists('hdfs:///data*'))
+        self.assertFalse(runner.path_exists('hdfs:///data2'))
+
+
+class TestURIs(MockHadoopTestCase):
+
+    def test_uris(self):
+        runner = HadoopJobRunner(conf_path=False)
+        list(runner.ls('hdfs://tmp/waffles'))
+        list(runner.ls('leggo://my/eggo'))
+        list(runner.ls('/tmp'))
+
+        with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
+            hadoop_cmd_args = [shlex.split(line) for line in mock_log]
+
+        self.assertEqual(hadoop_cmd_args, [
+            ['fs', '-lsr', 'hdfs://tmp/waffles'],
+            ['fs', '-lsr', 'leggo://my/eggo'],
+        ])
+

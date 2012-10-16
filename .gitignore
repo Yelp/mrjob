@@ -7,3 +7,5 @@
 build
 dist
 mrjob.egg-info
+.project
+.pydevproject

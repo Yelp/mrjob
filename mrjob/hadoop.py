@@ -488,3 +488,121 @@ class HadoopJobRunner(MRJobRunner):
         log.info('Scanning logs for probable cause of failure')
         return best_error_from_logs(self, task_attempt_logs, step_logs,
                                     job_logs)
+
+    ### FILESYSTEM STUFF ###
+
+    def du(self, path_glob):
+        """Get the size of a file, or None if it's not a file or doesn't
+        exist."""
+        if not is_uri(path_glob):
+            return super(HadoopJobRunner, self).du(path_glob)
+
+        stdout = self._invoke_hadoop(['fs', '-dus', path_glob],
+                                     return_stdout=True)
+
+        try:
+            return sum(int(line.split()[1])
+                       for line in stdout.split('\n')
+                       if line.strip())
+        except (ValueError, TypeError, IndexError):
+            raise Exception(
+                'Unexpected output from hadoop fs -du: %r' % stdout)
+
+    def ls(self, path_glob):
+        if not is_uri(path_glob):
+            for path in super(HadoopJobRunner, self).ls(path_glob):
+                yield path
+            return
+
+        components = urlparse(path_glob)
+        hdfs_prefix = '%s://%s' % (components.scheme, components.netloc)
+
+        stdout = self._invoke_hadoop(
+            ['fs', '-lsr', path_glob],
+            return_stdout=True,
+            ok_stderr=[HADOOP_LSR_NO_SUCH_FILE])
+
+        for line in StringIO(stdout):
+            fields = line.rstrip('\r\n').split()
+            # expect lines like:
+            # -rw-r--r--   3 dave users       3276 2010-01-13 14:00 /foo/bar
+            if len(fields) < 8:
+                raise Exception('unexpected ls line from hadoop: %r' % line)
+            # ignore directories
+            if fields[0].startswith('d'):
+                continue
+            # not sure if you can have spaces in filenames; just to be safe
+            path = ' '.join(fields[7:])
+            yield hdfs_prefix + path
+
+    def _cat_file(self, filename):
+        if is_uri(filename):
+            # stream from HDFS
+            cat_args = self._opts['hadoop_bin'] + ['fs', '-cat', filename]
+            log.debug('> %s' % cmd_line(cat_args))
+
+            cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
+
+            def stream():
+                for line in cat_proc.stdout:
+                    yield line
+
+                # there shouldn't be any stderr
+                for line in cat_proc.stderr:
+                    log.error('STDERR: ' + line)
+
+                returncode = cat_proc.wait()
+
+                if returncode != 0:
+                    raise CalledProcessError(returncode, cat_args)
+
+            return read_file(filename, stream())
+        else:
+            # read from local filesystem
+            return super(HadoopJobRunner, self)._cat_file(filename)
+
+    def mkdir(self, path):
+        self._invoke_hadoop(
+            ['fs', '-mkdir', path], ok_stderr=[HADOOP_FILE_EXISTS_RE])
+
+    def path_exists(self, path_glob):
+        """Does the given path exist?
+
+        If dest is a directory (ends with a "/"), we check if there are
+        any files starting with that path.
+        """
+        if not is_uri(path_glob):
+            return super(HadoopJobRunner, self).path_exists(path_glob)
+
+        return_code = self._invoke_hadoop(['fs', '-test', '-e', path_glob],
+                                          ok_returncodes=(0, 1))
+        return (return_code == 0)
+
+    def path_join(self, dirname, filename):
+        if is_uri(dirname):
+            return posixpath.join(dirname, filename)
+        else:
+            return os.path.join(dirname, filename)
+
+    def rm(self, path_glob):
+        if not is_uri(path_glob):
+            super(HadoopJobRunner, self).rm(path_glob)
+
+        if self.path_exists(path_glob):
+            # hadoop fs -rmr will print something like:
+            # Moved to trash: hdfs://hdnamenode:54310/user/dave/asdf
+            # to STDOUT, which we don't care about.
+            #
+            # if we ask to delete a path that doesn't exist, it prints
+            # to STDERR something like:
+            # rmr: <path>
+            # which we can safely ignore
+            self._invoke_hadoop(
+                ['fs', '-rmr', path_glob],
+                return_stdout=True, ok_stderr=[HADOOP_RMR_NO_SUCH_FILE])
+
+    def touchz(self, dest):
+        if not is_uri(dest):
+            super(HadoopJobRunner, self).touchz(dest)
+
+        self._invoke_hadoop(['fs', '-touchz', dest])

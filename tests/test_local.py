@@ -691,8 +691,8 @@ class CommandSubstepTestCase(SandboxedTestCase):
                         'command': 'cat'}}])
 
             r.run()
-
-            self.assertEqual(''.join(r.stream_output()), data)
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertItemsEqual(lines, data.split())
 
     def test_uniq_combiner(self):
         data = 'x\nx\nx\nx\nx\nx\n'
@@ -736,7 +736,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
             r.run()
 
             lines = list(r.stream_output())
-            self.assertEqual(lines, ['x$\n', 'y$\n', 'z$\n'])
+            self.assertItemsEqual(lines, ['x$\n', 'y$\n', 'z$\n'])
 
     def test_multiple(self):
         data = 'x\nx\nx\nx\nx\nx\n'
@@ -789,9 +789,10 @@ class FilterTestCase(SandboxedTestCase):
 
             r.run()
 
-            self.assertEqual(
-                ''.join(r.stream_output()),
-                'x$\ny$\nz$\n')
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertItemsEqual(
+                                  lines,
+                'x$\ny$\nz$\n'.split())
 
     def test_combiner_pre_filter(self):
         data = 'x\ny\nz\n'
@@ -811,10 +812,10 @@ class FilterTestCase(SandboxedTestCase):
                     }}])
 
             r.run()
-
-            self.assertEqual(
-                ''.join(r.stream_output()),
-                'x$\ny$\nz$\n')
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertItemsEqual(
+                lines,
+                'x$\ny$\nz$\n'.split())
 
     def test_reducer_pre_filter(self):
         data = 'x\ny\nz\n'
@@ -834,6 +835,7 @@ class FilterTestCase(SandboxedTestCase):
 
             r.run()
 
-            self.assertEqual(
-                ''.join(r.stream_output()),
-                'x$\ny$\nz$\n')
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertItemsEqual(
+                lines,
+                'x$\ny$\nz$\n'.split())

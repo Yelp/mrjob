@@ -19,15 +19,14 @@ for :py:mod:`mrjob`.
 from __future__ import with_statement
 
 import glob
+from itertools import chain
 import logging
 import os
-import shlex
 
 from mrjob.util import expand_path
 
 try:
     import simplejson as json  # preferred because of C speedups
-    json  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import json  # built in to Python 2.6 and later
 
@@ -37,6 +36,9 @@ try:
     yaml  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     yaml = None
+
+
+from mrjob.util import shlex_split
 
 
 log = logging.getLogger('mrjob.conf')
@@ -81,7 +83,7 @@ class OptionStore(dict):
         self._opt_priority = calculate_opt_priority(self, self.cascading_dicts)
 
     def is_default(self, key):
-        return self._opt_priority[key] >= 2
+        return self._opt_priority[key] < 2
 
     def __getitem__(self, key):
         if key in self.ALLOWED_KEYS:
@@ -164,11 +166,10 @@ def conf_object_at_path(conf_path):
         else:
             try:
                 return json.load(f)
-            except json.JSONDecodeError, e:
+            except ValueError, e:
                 msg = ('If your mrjob.conf is in YAML, you need to install'
                        ' yaml; see http://pypi.python.org/pypi/PyYAML/')
-                # JSONDecodeError currently has a msg attr, but it may not in
-                # the future
+                # Use msg attr if it's set
                 if hasattr(e, 'msg'):
                     e.msg = '%s (%s)' % (e.msg, msg)
                 else:
@@ -176,52 +177,21 @@ def conf_object_at_path(conf_path):
                 raise e
 
 
-# TODO 0.4: move to tests.test_conf
-def load_mrjob_conf(conf_path=None):
-    """.. deprecated:: 0.3.3
-
-    Load the entire data structure in :file:`mrjob.conf`, which should
-    look something like this::
-
-        {'runners':
-            'emr': {'OPTION': VALUE, ...},
-            'hadoop: {'OPTION': VALUE, ...},
-            'inline': {'OPTION': VALUE, ...},
-            'local': {'OPTION': VALUE, ...},
-        }
-
-    Returns ``None`` if we can't find :file:`mrjob.conf`.
-
-    :type conf_path: str
-    :param conf_path: an alternate place to look for mrjob.conf. If this is
-                      ``False``, we'll always return ``None``.
-    """
-    # Only used by mrjob tests and possibly third parties.
-    log.warn('mrjob.conf.load_mrjob_conf is deprecated.')
-    conf_path = real_mrjob_conf_path(conf_path)
-    return conf_object_at_path(conf_path)
-
-
 def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
                               already_loaded=None):
     """Load a list of dictionaries representing the options in a given
-    mrjob.conf for a specific runner. Returns ``[(path, values)]``. If conf_path
-    is not found, return [(None, {})].
+    mrjob.conf for a specific runner. Returns ``[(path, values)]``. If
+    conf_path is not found, return [(None, {})].
 
     :type runner_alias: str
     :param runner_alias: String identifier of the runner type, e.g. ``emr``,
                          ``local``, etc.
     :type conf_path: str
-    :param conf_path: an alternate place to look for mrjob.conf. If this is
-                      ``False``, we'll always return ``{}``.
+    :param conf_path: location of the file to load
     :type already_loaded: list
     :param already_loaded: list of :file:`mrjob.conf` paths that have already
                            been loaded
     """
-    # Used to use load_mrjob_conf() here, but we need both the 'real' path and
-    # the conf object, which we can't get cleanly from load_mrjob_conf.  This
-    # means load_mrjob_conf() is basically useless now except for in tests,
-    # but it's exposed in the API, so we shouldn't kill it until 0.4 at least.
     conf_path = real_mrjob_conf_path(conf_path)
     conf = conf_object_at_path(conf_path)
 
@@ -236,8 +206,6 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
     try:
         values = conf['runners'][runner_alias] or {}
     except (KeyError, TypeError, ValueError):
-        log.warning('no configs for runner type %r in %s; returning {}' %
-                    (runner_alias, conf_path))
         values = {}
 
     inherited = []
@@ -255,6 +223,27 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
                 inherited.extend(load_opts_from_mrjob_conf(
                                     runner_alias, include, already_loaded))
     return inherited + [(conf_path, values)]
+
+
+def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
+    """Load a list of dictionaries representing the options in a given
+    list of mrjob config files for a specific runner. Returns
+    ``[(path, values)]``. If a path is not found, use (None, {}) as its value.
+    If *conf_paths* is ``None``, look for a config file in the default
+    locations.
+
+    :type runner_alias: str
+    :param runner_alias: String identifier of the runner type, e.g. ``emr``,
+                         ``local``, etc.
+    :type conf_paths: list or ``None``
+    :param conf_path: locations of the files to load
+    """
+    if conf_paths is None:
+        return load_opts_from_mrjob_conf(runner_alias, find_mrjob_conf())
+    else:
+        return chain(*[
+            load_opts_from_mrjob_conf(runner_alias, path)
+            for path in conf_paths])
 
 
 def dump_mrjob_conf(conf, f):
@@ -315,7 +304,8 @@ def combine_cmds(*cmds):
     """Take zero or more commands to run on the command line, and return
     the last one that is not ``None``. Each command should either be a list
     containing the command plus switches, or a string, which will be parsed
-    with :py:func:`shlex.split`
+    with :py:func:`shlex.split`. The string must either be a byte string or a
+    unicode string containing no non-ASCII characters.
 
     Returns either ``None`` or a list containing the command plus arguments.
     """
@@ -324,7 +314,7 @@ def combine_cmds(*cmds):
     if cmd is None:
         return None
     elif isinstance(cmd, basestring):
-        return shlex.split(cmd)
+        return shlex_split(cmd)
     else:
         return list(cmd)
 

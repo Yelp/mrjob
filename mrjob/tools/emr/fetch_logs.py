@@ -55,10 +55,10 @@ from mrjob.logparsers import NODE_LOGS
 from mrjob.util import scrape_options_into_new_groups
 
 
-def main():
+def main(args=None):
     option_parser = make_option_parser()
     try:
-        options = parse_args(option_parser)
+        options = parse_args(option_parser, args)
     except OptionError:
         option_parser.error('This tool takes exactly one argument.')
 
@@ -100,9 +100,9 @@ def perform_actions(options, runner):
         find_failure(runner, options.step_num)
 
 
-def parse_args(option_parser):
+def parse_args(option_parser, cl_args=None):
     option_parser = make_option_parser()
-    options, args = option_parser.parse_args()
+    options, args = option_parser.parse_args(cl_args)
 
     # should be one argument, the job flow ID
     if len(args) != 1:
@@ -166,8 +166,8 @@ def make_option_parser():
                              help='Show counters from the job flow')
 
     assignments = {
-        option_parser: ('conf_path', 'quiet', 'verbose',
-                        'ec2_key_pair_file')
+        option_parser: ('conf_paths', 'quiet', 'verbose',
+                        'ec2_key_pair_file', 's3_sync_wait_time')
     }
 
     mr_job = MRJob()
@@ -205,8 +205,7 @@ def list_relevant(runner, step_nums):
             NODE_LOGS: runner.ls_node_logs_ssh(),
         }
         _prettyprint_relevant(logs)
-    except LogFetchError, e:
-        print 'SSH error:', e
+    except LogFetchError:
         logs = {
             TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_s3(step_nums),
             STEP_LOGS: runner.ls_step_logs_s3(step_nums),
@@ -219,8 +218,7 @@ def list_relevant(runner, step_nums):
 def list_all(runner):
     try:
         prettyprint_paths(runner.ls_all_logs_ssh())
-    except LogFetchError, e:
-        print 'SSH error:', e
+    except LogFetchError:
         prettyprint_paths(runner.ls_all_logs_s3())
 
 
@@ -252,8 +250,7 @@ def cat_relevant(runner, step_nums):
             NODE_LOGS: runner.ls_node_logs_ssh(),
         }
         _cat_from_relevant(runner, logs)
-    except LogFetchError, e:
-        print 'SSH error:', e
+    except LogFetchError:
         logs = {
             TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_s3(step_nums),
             STEP_LOGS: runner.ls_step_logs_s3(step_nums),
@@ -266,8 +263,7 @@ def cat_relevant(runner, step_nums):
 def cat_all(runner):
     try:
         cat_from_list(runner, runner.ls_all_logs_ssh())
-    except LogFetchError, e:
-        print 'SSH error:', e
+    except LogFetchError:
         cat_from_list(runner, runner.ls_all_logs_s3())
 
 

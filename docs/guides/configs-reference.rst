@@ -1,5 +1,5 @@
-Quick Reference
-===============
+Configuration quick reference
+=============================
 
 Options that can't be set from mrjob.conf (all runners)
 -------------------------------------------------------
@@ -13,6 +13,7 @@ Option                 Default                                                 S
 *hadoop_input_format*  ``None``                                                (see :py:meth:`~mrjob.job.MRJob.hadoop_input_format`)
 *hadoop_output_format* ``None``                                                (see :py:meth:`~mrjob.job.MRJob.hadoop_output_format`)
 *output_dir*           (automatic)                                             :option:`-o`, :option:`--output-dir`
+*no_output*            ``False``                                               :option:`--no-output`
 *partitioner*          ``None``                                                :option:`--partitioner` (see also :py:meth:`~mrjob.job.MRJob.partitioner`)
 ====================== ======================================================= ==========================================================================
 
@@ -31,6 +32,7 @@ Option                 Default                        Combined by               
 *cmdenv*               ``{}``                         :py:func:`~mrjob.conf.combine_envs`       :option:`--cmdenv`
 *hadoop_extra_args*    ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--hadoop-arg`
 *hadoop_streaming_jar* (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-streaming-jar`
+*interpreter*          (value of *python_bin*)        :py:func:`~mrjob.conf.combine_cmds`       :option:`--interpreter`
 *jobconf*              ``{}``                         :py:func:`~mrjob.conf.combine_dicts`      :option:`--jobconf` (see also :py:meth:`~mrjob.job.MRJob.jobconf`)
 *label*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--label`
 *owner*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--owner`
@@ -94,6 +96,7 @@ Option                          Default                        Combined by      
 *num_ec2_instances*             ``1``                          :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-instances`
 *num_ec2_task_instances*        ``None``                       :py:func:`~mrjob.conf.combine_values`     :option:`--num-ec2-task-instances`
 *pool_emr_job_flows*            ``False``                      :py:func:`~mrjob.conf.combine_values`     :option:`--pool-emr-job-flows`, :option:`--no-pool-emr-job-flows`
+*pool_wait_minutes*             ``0``                          :py:func:`~mrjob.conf.combine_values`     :option:`--pool-wait-minutes`
 *s3_endpoint*                   (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-endpoint`
 *s3_log_uri*                    (automatic)                    :py:func:`~mrjob.conf.combine_paths`      :option:`--s3-log-uri`
 *s3_scratch_uri*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--s3-scratch-uri`

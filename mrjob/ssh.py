@@ -30,12 +30,13 @@ SSH_LOG_ROOT = '/mnt/var/log/hadoop'
 SSH_URI_RE = re.compile(
     r'^%s(?P<hostname>[^/]+)?(?P<filesystem_path>/.*)$' % (SSH_PREFIX,))
 
+HADOOP_JOB_LIST_NUM_RE = re.compile(r'(\d+) jobs currently running')
+# Fields: JobId, State, StartTime, UserName (hadoop), Priority, SchedulingInfo
+# We only care about JobId.
+HADOOP_JOB_LIST_INFO_RE = re.compile(r'(\S+)\s+\d+\s+\d+\s+hadoop\s+\w+\s+\w+')
+
 
 log = logging.getLogger('mrjob.ssh')
-
-
-class SSHException(Exception):
-    pass
 
 
 def _ssh_args(ssh_bin, address, ec2_key_pair_file):
@@ -53,13 +54,12 @@ def _ssh_args(ssh_bin, address, ec2_key_pair_file):
 
 def check_output(out, err):
     if err:
-        if 'No such file or directory' in err:
+        if (('No such file or directory' in err)
+                or ('Warning: Permanently added' not in err)):
             raise IOError(err)
-        elif 'Warning: Permanently added' not in err:
-            raise SSHException(err)
 
     if 'Permission denied' in out:
-        raise SSHException(out)
+        raise IOError(out)
 
     return out
 
@@ -97,6 +97,8 @@ def ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file,
     the ``keyfile`` argument must be the same as was passed to that function.
     """
     if '!' in address:
+        if keyfile is None:
+            raise ValueError('SSH key file path cannot be None')
         host1, host2 = address.split('!')
         more_args = [
            'ssh', '-i', keyfile,
@@ -143,7 +145,7 @@ def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
 
 def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     """Return the file at ``path`` as a string. Raises ``IOError`` if the
-    file doesn't exist or ``SSHException if SSH access fails.
+    file doesn't exist or SSH access fails.
 
     :param ssh_bin: Path to ``ssh`` binary
     :param address: Address of your job's master node (obtained via
@@ -164,7 +166,7 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
 def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     """Recursively list files under ``path`` on the specified SSH host.
     Return the file at ``path`` as a string. Raises ``IOError`` if the
-    path doesn't exist or ``SSHException if SSH access fails.
+    path doesn't exist or SSH access fails.
 
     :param ssh_bin: Path to ``ssh`` binary
     :param address: Address of your job's master node (obtained via
@@ -180,3 +182,45 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     if 'No such file or directory' in out:
         raise IOError("No such file or directory: %s" % path)
     return out.split('\n')
+
+
+def ssh_terminate_single_job(ssh_bin, address, ec2_key_pair_file):
+    """Terminate the only job running the Hadoop cluster with master node
+    *address* using 'hadoop job -kill JOB_ID'. Return string output of command
+    or None if there was no job to termiante. Raise :py:class:`IOError` if some
+    other error occurred.
+
+    :param ssh_bin: Path to ``ssh`` binary
+    :param address: Address of your job's master node (obtained via
+                    :py:meth:`boto.emr.EmrConnection.describe_jobflow`)
+    :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
+
+    :return: ``True`` if successful, ``False`` if no job was running
+    """
+    job_list_out = check_output(*ssh_run(
+        ssh_bin, address, ec2_key_pair_file, ['hadoop', 'job', '-list']))
+    job_list_lines = job_list_out.splitlines()
+
+    def job_list_output_error():
+        raise IOError('Could not read results of "hadoop job -list" and so'
+                      ' could not terminate job:\n%s' % job_list_out)
+
+    num_jobs_match = HADOOP_JOB_LIST_NUM_RE.match(job_list_lines[0])
+    if not num_jobs_match:
+        job_list_output_error()
+    if int(num_jobs_match.group(1)) > 1:
+        raise IOError('More than one job is running; unclear which one to'
+                      ' terminate, so not terminating any jobs')
+    if int(num_jobs_match.group(1)) == 0:
+        return None
+
+    job_info_match = HADOOP_JOB_LIST_INFO_RE.match(job_list_lines[2])
+    if not job_info_match:
+        job_list_output_error()
+    job_id = job_info_match.group(1)
+
+    job_kill_out = check_output(*ssh_run(
+        ssh_bin, address, ec2_key_pair_file,
+        ['hadoop', 'job', '-kill', job_id]))
+
+    return job_kill_out

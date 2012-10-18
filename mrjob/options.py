@@ -22,32 +22,19 @@ from optparse import SUPPRESS_USAGE
 from mrjob.runner import CLEANUP_CHOICES
 
 
-def add_protocol_opts(opt_group, protocol_choices, default_output_protocol):
-    """Add options related to choosing protocols. These are all deprecated
-    except for :opt:`--strict-protocols` and must be made available as
-    passthrough options so the job picks it up under Hadoop Streaming.
+def _append_to_conf_paths(option, opt_str, value, parser):
+    """conf_paths is None by default, but --no-conf or --conf-path should make
+    it a list.
+    """
+    if parser.values.conf_paths is None:
+        parser.values.conf_paths = []
+    parser.values.conf_paths.append(value)
+
+
+def add_protocol_opts(opt_group):
+    """Add options related to choosing protocols.
     """
     return [
-        opt_group.add_option(
-            '--input-protocol', dest='input_protocol',
-            default=None, choices=protocol_choices,
-            help=('DEPRECATED: protocol to read input with (default:'
-                  ' raw_value)')),
-
-        opt_group.add_option(
-            '--output-protocol', dest='output_protocol',
-            default=default_output_protocol,
-            choices=protocol_choices,
-             help='DEPRECATED: protocol for final output (default: %s)' % (
-            'same as --protocol' if default_output_protocol is None
-            else '%default')),
-
-        opt_group.add_option(
-            '-p', '--protocol', dest='protocol',
-            default=None, choices=protocol_choices,
-            help=('DEPRECATED: output protocol for mappers/reducers. Choices:'
-                  ' %s (default: json)' % ', '.join(protocol_choices))),
-
         opt_group.add_option(
             '--strict-protocols', dest='strict_protocols', default=None,
             action='store_true', help='If something violates an input/output '
@@ -55,7 +42,32 @@ def add_protocol_opts(opt_group, protocol_choices, default_output_protocol):
     ]
 
 
-def add_runner_opts(opt_group):
+def add_basic_opts(opt_group):
+    """Options for all command line tools"""
+
+    return [
+        opt_group.add_option(
+            '-c', '--conf-path', dest='conf_paths', action='callback',
+            callback=_append_to_conf_paths, default=None, nargs=1,
+            type='string',
+            help='Path to alternate mrjob.conf file to read from'),
+
+        opt_group.add_option(
+            '--no-conf', dest='conf_paths', action='store_const', const=[],
+            help="Don't load mrjob.conf even if it's available"),
+
+        opt_group.add_option(
+            '-q', '--quiet', dest='quiet', default=None,
+            action='store_true',
+            help="Don't print anything to stderr"),
+
+        opt_group.add_option(
+            '-v', '--verbose', dest='verbose', default=None,
+            action='store_true', help='print more messages to stderr'),
+    ]
+
+
+def add_runner_opts(opt_group, default_runner='local'):
     """Options for all runners."""
     return [
         opt_group.add_option(
@@ -71,10 +83,6 @@ def add_runner_opts(opt_group):
                   " we run the mrjob. This is the default. Use"
                   " --no-bootstrap-mrjob if you've already installed mrjob on"
                   " your Hadoop cluster.")),
-
-        opt_group.add_option(
-            '-c', '--conf-path', dest='conf_path', default=None,
-            help='Path to alternate mrjob.conf file to read from'),
 
         opt_group.add_option(
             '--cleanup', dest='cleanup', default=None,
@@ -101,15 +109,15 @@ def add_runner_opts(opt_group):
                   ' use --file multiple times.')),
 
         opt_group.add_option(
+            '--interpreter', dest='interpreter', default=None,
+            help=("Interpreter to run your script, e.g. python or ruby.")),
+
+        opt_group.add_option(
             '--no-bootstrap-mrjob', dest='bootstrap_mrjob',
             action='store_false', default=None,
             help=("Don't automatically tar up the mrjob library and install it"
                   " when we run this job. Use this if you've already installed"
                   " mrjob on your Hadoop cluster.")),
-
-        opt_group.add_option(
-            '--no-conf', dest='conf_path', action='store_false', default=None,
-            help="Don't load mrjob.conf even if it's available"),
 
         opt_group.add_option(
             '--no-output', dest='no_output',
@@ -123,12 +131,6 @@ def add_runner_opts(opt_group):
             'and must be empty'),
 
         opt_group.add_option(
-            '--partitioner', dest='partitioner', default=None,
-            help=('Hadoop partitioner class to use to determine how mapper'
-                  ' output should be sorted and distributed to reducers. For'
-                  ' example: org.apache.hadoop.mapred.lib.HashPartitioner')),
-
-        opt_group.add_option(
             '--python-archive', dest='python_archives', default=[],
             action='append',
             help=('Archive to unpack and add to the PYTHONPATH of the mr_job'
@@ -137,22 +139,17 @@ def add_runner_opts(opt_group):
 
         opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
-            help=("Name/path of alternate python binary for mappers/reducers."
-                  " You can include arguments, e.g. --python-bin 'python"
-                  " -v'")),
+            help=("Deprecated. Name/path of alternate python binary for"
+                  " wrapper script and Python mappers/reducers. You can"
+                  " include arguments, e.g. --python-bin 'python -v'")),
 
         opt_group.add_option(
-            '-q', '--quiet', dest='quiet', default=None,
-            action='store_true',
-            help="Don't print anything to stderr"),
-
-        opt_group.add_option(
-            '-r', '--runner', dest='runner', default='local',
+            '-r', '--runner', dest='runner', default=default_runner,
             choices=('local', 'hadoop', 'emr', 'inline'),
             help=('Where to run the job: local to run locally, hadoop to run'
                   ' on your Hadoop cluster, emr to run on Amazon'
                   ' ElasticMapReduce, and inline for local debugging. Default'
-                  ' is local.')),
+                  ' is %s.' % default_runner)),
 
         opt_group.add_option(
             '--setup-cmd', dest='setup_cmds', action='append',
@@ -170,14 +167,16 @@ def add_runner_opts(opt_group):
                   ' These are run after setup_cmds.')),
 
         opt_group.add_option(
-            '--steps-python-bin', dest='steps_python_bin', default=None,
-            help='Name/path of alternate python binary to use to query the '
-            'job about its steps, if different from the current Python '
-            'interpreter. Rarely needed.'),
+            '--steps-interpreter', dest='steps_interpreter', default=None,
+            help=("Name/path of alternate interpreter binary to use to query"
+                  " the job about its steps, if different from --interpreter."
+                  " Rarely needed.")),
 
         opt_group.add_option(
-            '-v', '--verbose', dest='verbose', default=None,
-            action='store_true', help='print more messages to stderr'),
+            '--steps-python-bin', dest='steps_python_bin', default=None,
+            help=('Deprecated. Name/path of alternate python binary to use to'
+                  ' query the job about its steps, if different from the'
+                  ' current Python interpreter. Rarely needed.')),
     ]
 
 
@@ -208,25 +207,6 @@ def add_hadoop_emr_opts(opt_group):
             'streaming. You can use --hadoop-arg multiple times.'),
 
         opt_group.add_option(
-            '--hadoop-input-format', dest='hadoop_input_format', default=None,
-            help=('DEPRECATED: the hadoop InputFormat class used by the first'
-                  ' step of your job to read data. Custom formats must be'
-                  ' included in your hadoop streaming jar (see'
-                  ' --hadoop-streaming-jar). Current best practice is to'
-                  ' redefine HADOOP_INPUT_FORMAT or hadoop_input_format()'
-                  ' in your job.')),
-
-        opt_group.add_option(
-            '--hadoop-output-format', dest='hadoop_output_format',
-            default=None,
-            help=('DEPRECATED: the hadoop OutputFormat class used by the first'
-                  ' step of your job to read data. Custom formats must be'
-                  ' included in your hadoop streaming jar (see'
-                  ' --hadoop-streaming-jar). Current best practice is to'
-                  ' redefine HADOOP_OUTPUT_FORMAT or hadoop_output_format()'
-                  ' in your job.')),
-
-        opt_group.add_option(
             '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
             default=None,
             help='Path of your hadoop streaming jar (locally, or on S3/HDFS)'),
@@ -239,6 +219,12 @@ def add_hadoop_emr_opts(opt_group):
             '--owner', dest='owner', default=None,
             help='custom username to use, to help us identify who ran the'
             ' job'),
+
+        opt_group.add_option(
+            '--partitioner', dest='partitioner', default=None,
+            help=('Hadoop partitioner class to use to determine how mapper'
+                  ' output should be sorted and distributed to reducers. For'
+                  ' example: org.apache.hadoop.mapred.lib.HashPartitioner')),
     ]
 
 
@@ -266,7 +252,8 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--ami-version', dest='ami_version', default=None,
             help=(
-                'AMI Version to use (currently 1.0, 2.0, or latest).')),
+                'AMI Version to use (currently 1.0, 2.0, or latest, default'
+                ' latest).')),
 
         opt_group.add_option(
             '--aws-availability-zone', dest='aws_availability_zone',
@@ -448,6 +435,13 @@ def add_emr_opts(opt_group):
             default=None,
             help=('Specify a pool name to join. Set to "default" if not'
                   ' specified.')),
+
+        opt_group.add_option(
+            '--pool-wait-minutes', dest='pool_wait_minutes', default=0,
+            type='int',
+            help=('Wait for a number of minutes for a job flow to finish'
+                  ' if a job finishes, pick up their job flow. Otherwise'
+                  ' create a new one. (default 0)')),
 
         opt_group.add_option(
             '--s3-endpoint', dest='s3_endpoint', default=None,

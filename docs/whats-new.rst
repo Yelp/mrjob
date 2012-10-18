@@ -4,6 +4,17 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+0.3.5
+-----
+
+The *pool_wait_minutes* (:option:`--pool-wait-minutes`) option lets your job
+delay itself in case a job flow becomes available. Reference:
+:doc:`guides/configs-reference`
+
+The ``JOB`` and ``JOB_FLOW`` cleanup options tell mrjob to clean up the job
+and/or the job flow on failure (including Ctrl+C). See
+:py:data:`~mrjob.runner.CLEANUP_CHOICES` for more information.
+
 0.3.3
 -----
 
@@ -32,7 +43,7 @@ The new :py:mod:`~mrjob.tools.emr.report_long_jobs` tool alerts on jobs that
 have run for more than X hours.
 
 0.3
------
+---
 
 Features
 ^^^^^^^^
@@ -172,11 +183,11 @@ Changes and Deprecations
         All ``*_bin`` configuration options (``hadoop_bin``, ``python_bin``,
         and ``ssh_bin``) take lists instead of strings so you can add
         arguments (like ``['python', '-v']``).  More info:
-        :doc:`configs-reference`
+        :doc:`guides/configs-reference`
 
         Cleanup options have been split into ``cleanup`` and
         ``cleanup_on_failure``. There are more granular values for both of
-        these options. More info: :doc:`configs-runners`
+        these options.
 
         Most limitations have been lifted from passthrough options, including
         the former inability to use custom types and actions. More info:

@@ -51,11 +51,11 @@ class InlineMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` without invoking the job as
     a subprocess, so it's easy to attach a debugger.
 
-    This is NOT the default way of testing jobs; to more accurately
-    simulate your environment prior to running on Hadoop/EMR, use ``-r local``.
+    This is the default way of testing jobs; We assume you'll spend some time
+    debugging your job before you're ready to run it on EMR or Hadoop.
 
-    It's rare to need to instantiate this class directly (see
-    :py:meth:`~InlineMRJobRunner.__init__` for details).
+    To more accurately simulate your environment prior to running on
+    Hadoop/EMR, use ``-r local``.
     """
 
     alias = 'inline'
@@ -110,13 +110,24 @@ class InlineMRJobRunner(MRJobRunner):
         'upload_files',
     ]
 
+    def _check_step_is_mrjob_only(self, step_dict):
+        for key in ('mapper', 'combiner', 'reducer'):
+            if key in step_dict:
+                substep = step_dict[key]
+                if substep['type'] != 'script':
+                    raise Exception(
+                        "InlineMRJobRunner cannot run %s steps." %
+                        substep['type'])
+                if 'pre_filter' in substep:
+                    raise Exception(
+                        "InlineMRJobRunner cannot run filters.")
+
     def _run(self):
         self._setup_output_dir()
 
-        assert self._script  # shouldn't be able to run if no script
-
         for ignored_opt in self.IGNORED_HADOOP_OPTS:
-            if self._opts.is_default(ignored_opt):
+            if ((not self._opts.is_default(ignored_opt)) and
+                self._opts[ignored_opt]):
                 log.warning('ignoring %s option (requires real Hadoop): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 
@@ -128,7 +139,8 @@ class InlineMRJobRunner(MRJobRunner):
                     (ignored_attr[1:], value))
 
         for ignored_opt in self.IGNORED_LOCAL_OPTS:
-            if self._opts.is_default(ignored_opt):
+            if ((not self._opts.is_default(ignored_opt)) and
+                self._opts[ignored_opt]):
                 log.warning('ignoring %s option (use -r local instead): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 
@@ -136,13 +148,19 @@ class InlineMRJobRunner(MRJobRunner):
             # set cmdenv variables
             os.environ.update(self._get_cmdenv())
 
-            # run mapper, sort, reducer for each step
-            for step_number, step_name in enumerate(self._get_steps()):
-                self._invoke_inline_mrjob(step_number, 'step-%d-mapper' %
-                                          step_number, is_mapper=True,
-                                          has_combiner=('C' in step_name))
+            steps = self._get_steps()
 
-                if 'R' in step_name:
+            for step_dict in steps:
+                self._check_step_is_mrjob_only(step_dict)
+
+            # run mapper, sort, reducer for each step
+            for step_number, step_dict in enumerate(steps):
+
+                self._invoke_inline_mrjob(
+                    step_number, step_dict, 'step-%d-mapper' % step_number,
+                    'mapper')
+
+                if 'reducer' in step_dict:
                     mapper_output_path = self._prev_outfile
                     sorted_mapper_output_path = self._decide_output_path(
                         'step-%d-mapper-sorted' % step_number)
@@ -153,8 +171,9 @@ class InlineMRJobRunner(MRJobRunner):
                     proc.wait()
 
                     # This'll read from sorted_mapper_output_path
-                    self._invoke_inline_mrjob(step_number, 'step-%d-reducer' %
-                                              step_number, is_reducer=True)
+                    self._invoke_inline_mrjob(
+                        step_number, step_dict,
+                        'step-%d-reducer' % step_number, 'reducer')
 
         # move final output to output directory
         self._final_outfile = os.path.join(self._output_dir, 'part-00000')
@@ -167,22 +186,24 @@ class InlineMRJobRunner(MRJobRunner):
         job_args = ['--steps'] + self._mr_job_extra_args(local=True)
         return self._mrjob_cls(args=job_args)._steps_desc()
 
-    def _invoke_inline_mrjob(self, step_number, outfile_name, is_mapper=False,
-                             is_reducer=False, is_combiner=False,
-                             has_combiner=False, child_stdin=None):
+    def _invoke_inline_mrjob(self, step_number, step_dict, outfile_name,
+                             substep_to_run, child_stdin=None):
         child_stdin = child_stdin or sys.stdin
         common_args = (['--step-num=%d' % step_number] +
                        self._mr_job_extra_args(local=True))
-        if is_mapper:
+
+        if substep_to_run == 'mapper':
             child_args = (
                 ['--mapper'] + self._decide_input_paths() + common_args)
-        elif is_reducer:
+        elif substep_to_run == 'reducer':
             child_args = (
                 ['--reducer'] + self._decide_input_paths() + common_args)
-        elif is_combiner:
+        elif substep_to_run == 'combiner':
             child_args = ['--combiner'] + common_args + ['-']
 
         child_instance = self._mrjob_cls(args=child_args)
+
+        has_combiner = (substep_to_run == 'mapper' and 'combiner' in step_dict)
 
         # Use custom stdin
         if has_combiner:
@@ -208,9 +229,8 @@ class InlineMRJobRunner(MRJobRunner):
         self.print_counters([step_number + 1])
 
         if has_combiner:
-            self._invoke_inline_mrjob(step_number, outfile_name,
-                                      is_combiner=True,
-                                      child_stdin=combiner_stdin)
+            self._invoke_inline_mrjob(step_number, step_dict, outfile_name,
+                                      'combiner', child_stdin=combiner_stdin)
             combiner_stdin.close()
 
     def counters(self):
@@ -219,16 +239,9 @@ class InlineMRJobRunner(MRJobRunner):
     def _decide_input_paths(self):
         # decide where to get input
         if self._prev_outfile is not None:
-            input_paths = [self._prev_outfile]
+            return [self._prev_outfile]
         else:
-            input_paths = []
-            for path in self._input_paths:
-                if path == '-':
-                    input_paths.append(self._dump_stdin_to_local_file())
-                else:
-                    input_paths.append(path)
-
-        return input_paths
+            return self._get_input_paths()
 
     def _decide_output_path(self, outfile_name):
         # run the mapper

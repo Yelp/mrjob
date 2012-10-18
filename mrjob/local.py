@@ -34,12 +34,54 @@ from mrjob.runner import RunnerOptionStore
 from mrjob.util import cmd_line
 from mrjob.util import read_input
 from mrjob.util import unarchive
+from mrjob.util import shlex_split
 
 
-log = logging.getLogger('mrjob.local')
+log = logging.getLogger(__name__)
 
 DEFAULT_MAP_TASKS = 2
 DEFAULT_REDUCE_TASKS = 2
+
+
+def _chain_procs(procs_args, **kwargs):
+    """Input: List of lists of command line arguments.
+
+    These arg lists will be turned into Popen objects with the keyword
+    arguments specified as kwargs to this function. For procs X, Y, and Z, X
+    stdout will go to Y stdin and Y stdout will go to Z stdin. So for
+    P[i < |procs|-1], stdout is replaced with a pipe to the next process. For
+    P[i > 0], stdin is replaced with a pipe from the previous process.
+    Otherwise, the kwargs are passed through to the Popen constructor without
+    modification, so you can specify stdin/stdout/stderr file objects and have
+    them behave as expected.
+
+    The return value is a list of Popen objects created, in the same order as
+    *procs_args*.
+
+    In most ways, this function makes several processes that act as one in
+    terms of input and output.
+    """
+    last_stdout = None
+
+    procs = []
+    for i, args in enumerate(procs_args):
+        proc_kwargs = kwargs.copy()
+
+        # first proc shouldn't override any kwargs
+        # other procs should get stdin from last proc's stdout
+        if i > 0:
+            proc_kwargs['stdin'] = last_stdout
+
+        # last proc shouldn't override stdout
+        # other procs should have stdout sent to next proc
+        if i < len(procs_args) - 1:
+            proc_kwargs['stdout'] = PIPE
+
+        proc = Popen(args, **proc_kwargs)
+        last_stdout = proc.stdout
+        procs.append(proc)
+
+    return procs
 
 
 class LocalRunnerOptionStore(RunnerOptionStore):
@@ -57,12 +99,10 @@ class LocalRunnerOptionStore(RunnerOptionStore):
 
 
 class LocalMRJobRunner(MRJobRunner):
-    """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing
-    purposes.
+    """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing purposes.
 
-    This is the default way of running jobs; we assume you'll spend some
-    time debugging your job before you're ready to run it on EMR or
-    Hadoop.
+    This is NOT the default way of running jobs; we assume you'll spend some
+    time debugging your job before you're ready to run it on EMR or Hadoop.
 
     It's rare to need to instantiate this class directly (see
     :py:meth:`~LocalMRJobRunner.__init__` for details).
@@ -83,6 +123,10 @@ class LocalMRJobRunner(MRJobRunner):
     * ``mapreduce.task.ismap``
     * ``mapreduce.task.output.dir``
     * ``mapreduce.task.partition``
+
+    If you specify *hadoop_version* <= 0.18, the simulated environment
+    variables will change to use the names corresponding with the older Hadoop
+    version.
 
     :py:class:`LocalMRJobRunner` adds the current working directory to the
     subprocesses' :envvar:`PYTHONPATH`, so if you're using it to test an EMR
@@ -143,7 +187,7 @@ class LocalMRJobRunner(MRJobRunner):
 
     def _run(self):
         if self._opts['bootstrap_mrjob']:
-            self._add_python_archive(self._create_mrjob_tar_gz() + '#')
+            self._add_python_archive(self._create_mrjob_tar_gz())
 
         for ignored_opt in self.IGNORED_HADOOP_OPTS:
             if self._opts[ignored_opt]:
@@ -165,47 +209,27 @@ class LocalMRJobRunner(MRJobRunner):
         jobconf = self._opts['jobconf']
         self._process_jobconf_args(jobconf)
 
-        assert self._script  # shouldn't be able to run if no script
-
-        wrapper_args = self._opts['python_bin']
-        if self._wrapper_script:
-            wrapper_args = (self._opts['python_bin'] +
-                            [self._wrapper_script['name']] +
-                            wrapper_args)
-
         # run mapper, combiner, sort, reducer for each step
-        for i, step in enumerate(self._get_steps()):
+        for step_num, step in enumerate(self._get_steps()):
             self._counters.append({})
-            # run the mapper
-            mapper_args = (wrapper_args + [self._script['name'],
-                            '--step-num=%d' % i, '--mapper'] +
-                           self._mr_job_extra_args())
-            combiner_args = []
-            if 'C' in step:
-                combiner_args = (wrapper_args + [self._script['name'],
-                                 '--step-num=%d' % i, '--combiner'] +
-                                 self._mr_job_extra_args())
 
-            self._invoke_step(mapper_args, 'step-%d-mapper' % i,
-                              step_num=i, step_type='M',
-                              num_tasks=self._map_tasks,
-                              combiner_args=combiner_args)
+            self._invoke_step(
+                step, 'step-%d-mapper' % step_num, step_num, 'mapper',
+                num_tasks=self._map_tasks)
 
-            if 'R' in step:
+            if 'reducer' in step:
                 # sort the output. Treat this as a mini-step for the purpose
                 # of self._prev_outfiles
                 sort_output_path = os.path.join(
-                    self._get_local_tmp_dir(), 'step-%d-mapper-sorted' % i)
+                    self._get_local_tmp_dir(),
+                    'step-%d-mapper-sorted' % step_num)
                 self._invoke_sort(self._step_input_paths(), sort_output_path)
                 self._prev_outfiles = [sort_output_path]
 
                 # run the reducer
-                reducer_args = (wrapper_args + [self._script['name'],
-                                 '--step-num=%d' % i, '--reducer'] +
-                                self._mr_job_extra_args())
-                self._invoke_step(reducer_args, 'step-%d-reducer' % i,
-                                  step_num=i, step_type='R',
-                                  num_tasks=self._reduce_tasks)
+                self._invoke_step(
+                    step, 'step-%d-reducer' % step_num, step_num, 'reducer',
+                    num_tasks=self._reduce_tasks)
 
         # move final output to output directory
         for i, outfile in enumerate(self._prev_outfiles):
@@ -238,12 +262,6 @@ class LocalMRJobRunner(MRJobRunner):
     def _setup_working_dir(self):
         """Make a working directory with symlinks to our script and
         external files. Return name of the script"""
-        # specify that we want to upload our script along with other files
-        if self._script:
-            self._script['upload'] = 'file'
-        if self._wrapper_script:
-            self._wrapper_script['upload'] = 'file'
-
         # create the working directory
         if not self._working_dir:
             self._working_dir = os.path.join(
@@ -251,17 +269,14 @@ class LocalMRJobRunner(MRJobRunner):
             self.mkdir(self._working_dir)
 
         # give all our files names, and symlink or unarchive them
-        self._name_files()
-        for file_dict in self._files:
-            path = file_dict['path']
-            name = file_dict['name']
+        for name, path in self._working_dir_mgr.name_to_path('file').iteritems():
             dest = os.path.join(self._working_dir, name)
+            self._symlink_to_file_or_copy(path, dest)
 
-            if file_dict.get('upload') == 'file':
-                self._symlink_to_file_or_copy(path, dest)
-            elif file_dict.get('upload') == 'archive':
-                log.debug('unarchiving %s -> %s' % (path, dest))
-                unarchive(path, dest)
+        for name, path in self._working_dir_mgr.name_to_path('archive').iteritems():
+            dest = os.path.join(self._working_dir, name)
+            log.debug('unarchiving %s -> %s' % (path, dest))
+            unarchive(path, dest)
 
     def _setup_output_dir(self):
         if not self._output_dir:
@@ -306,15 +321,22 @@ class LocalMRJobRunner(MRJobRunner):
         file_names = {}
         input_paths_to_split = []
 
+        # Each file is assigned a 'task number' as if coming from some previous
+        # task. The task number is used to choose the split file name, and
+        # sometimes the file name of the sorted split. This is done so that
+        # when the output files are combined after the final step, they are in
+        # sorted order due to already being lexicographically sorted.
+
         for input_path in input_paths:
             for path in self.ls(input_path):
                 if path.endswith('.gz'):
                     # do not split compressed files
-                    file_names[path] = {
-                        'orig_name': path,
+                    absolute_path = os.path.abspath(path)
+                    file_names[absolute_path] = {
+                        'orig_name': absolute_path,
                         'start': 0,
-                        'task_num': 0,
-                        'length': os.stat(path)[stat.ST_SIZE],
+                        'task_num': len(file_names),
+                        'length': os.stat(absolute_path)[stat.ST_SIZE],
                     }
                     # this counts as "one split"
                     num_splits -= 1
@@ -383,7 +405,7 @@ class LocalMRJobRunner(MRJobRunner):
 
             try:
                 outfile = open(outfile_name, 'w')
-                
+
                 # write each line to a file as long as we are within the limit
                 # (split_size)
                 for line_group in line_group_generator(path):
@@ -415,16 +437,10 @@ class LocalMRJobRunner(MRJobRunner):
         if self._prev_outfiles:
             return self._prev_outfiles
         else:
-            input_paths = []
-            for path in self._input_paths:
-                if path == '-':
-                    input_paths.append(self._dump_stdin_to_local_file())
-                else:
-                    input_paths.append(path)
-            return input_paths
+            return self._get_input_paths()
 
-    def _invoke_step(self, args, outfile_name, step_num=0, num_tasks=1,
-                     step_type='M', combiner_args=None):
+    def _invoke_step(self, step_dict, outfile_name, step_num, step_type,
+                     num_tasks=1):
         """Run the given command, outputting into outfile, and reading
         from the previous outfile (or, for the first step, from our
         original output files).
@@ -439,8 +455,12 @@ class LocalMRJobRunner(MRJobRunner):
                               arguments in separately.
         """
 
+        if step_dict['type'] != 'streaming':
+            raise Exception("LocalMRJobRunner cannot run %s steps" %
+                            step_dict['type'])
+
         # get file splits for mappers and reducers
-        keep_sorted = (step_type == 'R')
+        keep_sorted = (step_type == 'reducer')
         file_splits = self._get_file_splits(
             self._step_input_paths(), num_tasks, keep_sorted=keep_sorted)
 
@@ -452,13 +472,14 @@ class LocalMRJobRunner(MRJobRunner):
         self._prev_outfiles = []
 
         # The correctly-ordered list of task_num, file_name pairs
-        file_tasks = sorted([(t.get('task_num', 0), file_name) for file_name, t in
-                            file_splits.items()], key=lambda t: t[0])
-        
+        file_tasks = sorted([
+            (t['task_num'], file_name) for file_name, t
+            in file_splits.items()], key=lambda t: t[0])
+
         for task_num, file_name in file_tasks:
 
             # setup environment variables
-            if step_type == 'M':
+            if step_type == 'mapper':
                 env = self._subprocess_env(
                     step_type, step_num, task_num,
                     # mappers have extra file split info
@@ -470,15 +491,110 @@ class LocalMRJobRunner(MRJobRunner):
 
             task_outfile = outfile_name + '_part-%05d' % task_num
 
-            proc_dicts = self._invoke_process(args + [file_name], task_outfile,
-                                              env=env,
-                                              combiner_args=combiner_args)
+            if step_type == 'mapper':
+                procs_args = self._mapper_arg_chain(
+                    step_dict, step_num, file_name)
+            elif step_type == 'reducer':
+                procs_args = self._reducer_arg_chain(
+                    step_dict, step_num, file_name)
+
+            proc_dicts = self._invoke_processes(
+                procs_args, task_outfile, env=env)
             all_proc_dicts.extend(proc_dicts)
 
         for proc_dict in all_proc_dicts:
             self._wait_for_process(proc_dict, step_num)
 
         self.print_counters([step_num + 1])
+
+    def _filter_if_any(self, substep_dict):
+        if substep_dict['type'] == 'script':
+            if 'pre_filter' in substep_dict:
+                return shlex_split(substep_dict['pre_filter'])
+        return None
+
+    def _executable(self, steps=False):
+        # detect executable files so we can discard the explicit interpreter if
+        # possible
+        if os.access(self._script_path, os.X_OK):
+            return [os.path.join(
+                self._working_dir,
+                self._working_dir_mgr.name('file', self._script_path))]
+        else:
+            return super(LocalMRJobRunner, self)._executable(steps)
+
+    def _substep_args(self, step_dict, step_num, mrc, input_path=None):
+        if step_dict['type'] != 'streaming':
+            raise Exception("LocalMRJobRunner cannot run %s steps." %
+                            step_dict['type'])
+        if step_dict[mrc]['type'] == 'command':
+            if input_path is None:
+                return [shlex_split(step_dict[mrc]['command'])]
+            else:
+                return [
+                    ['cat', input_path],
+                    shlex_split(step_dict[mrc]['command'])]
+        if step_dict[mrc]['type'] == 'script':
+            args = self._script_args_for_step(step_num, mrc)
+            if input_path is None:
+                return [args]
+            else:
+                return [args + [input_path]]
+
+    def _substep_arg_chain(self, mrc, step_dict, step_num, input_file):
+        procs_args = []
+
+        filter_args = self._filter_if_any(step_dict[mrc])
+        if filter_args:
+            procs_args.append(['cat', input_file])
+            procs_args.append(filter_args)
+            # _substep_args may return more than one process
+            procs_args.extend(
+                self._substep_args(step_dict, step_num, mrc))
+        else:
+            # _substep_args may return more than one process
+            procs_args.extend(
+                self._substep_args(step_dict, step_num, mrc, input_file))
+        return procs_args
+
+    def _mapper_arg_chain(self, step_dict, step_num, input_file):
+        # sometimes the mapper isn't actually there, so if it isn't, use cat
+        if 'mapper' not in step_dict:
+            new_step_dict = {
+                'mapper': {
+                    'type': 'command',
+                    'command': 'cat',
+                }
+            }
+            new_step_dict.update(step_dict)
+            step_dict = new_step_dict
+
+        procs_args = self._substep_arg_chain(
+            'mapper', step_dict, step_num, input_file)
+
+        if 'combiner' in step_dict:
+            procs_args.append(['sort'])
+            # _substep_args may return more than one process
+            procs_args.extend(self._combiner_arg_chain(step_dict, step_num))
+
+        return procs_args
+
+    def _combiner_arg_chain(self, step_dict, step_num):
+        # simpler than mapper or reducer arg logic because it never takes an
+        # input file, always reads from stdin
+        procs_args = []
+
+        filter_args = self._filter_if_any(step_dict['combiner'])
+        if filter_args:
+            procs_args.append(filter_args)
+        # _substep_args may return more than one process
+        procs_args.extend(
+            self._substep_args(step_dict, step_num, 'combiner'))
+        return procs_args
+
+    def _reducer_arg_chain(self, step_dict, step_num, input_file):
+        return self._substep_arg_chain(
+            'reducer', step_dict, step_num, input_file)
 
     def _subprocess_env(self, step_type, step_num, task_num, input_file=None,
                         input_start=None, input_length=None):
@@ -513,8 +629,7 @@ class LocalMRJobRunner(MRJobRunner):
 
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
-        return combine_local_envs({'PYTHONPATH': os.getcwd()},
-                                  os.environ,
+        return combine_local_envs(os.environ,
                                   jobconf_env,
                                   internal_jobconf_env,
                                   self._get_cmdenv())
@@ -543,22 +658,16 @@ class LocalMRJobRunner(MRJobRunner):
         cache_local_archives = []
         cache_local_files = []
 
-        for file_dict in self._files:
-            path = file_dict['path']
-            name = file_dict['name']
-            dest = os.path.join(self._working_dir, name)
+        for name, path in self._working_dir_mgr.name_to_path('file').iteritems():
+            cache_files.append('%s#%s' % (path, name))
+            cache_local_files.append(os.path.join(self._working_dir, name))
 
-            if file_dict.get('upload') == 'file':
-                cache_files.append('%s#%s' % (path, name))
-                cache_local_files.append(dest)
+        for name, path in self._working_dir_mgr.name_to_path('archive').iteritems():
+            cache_archives.append('%s#%s' % (path, name))
+            cache_local_archives.append(os.path.join(self._working_dir, name))
 
-            elif file_dict.get('upload') == 'archive':
-                cache_archives.append('%s#%s' % (path, name))
-                cache_local_archives.append(dest)
-
-        # could add mtime info here too (e.g.
-        # mapreduce.job.cache.archives.timestamps) here too, though we should
-        # probably cache that in self._files
+        # TODO: could add mtime info here too (e.g.
+        # mapreduce.job.cache.archives.timestamps) here too
         j['mapreduce.job.cache.files'] = (','.join(cache_files))
         j['mapreduce.job.cache.local.files'] = (','.join(cache_local_files))
         j['mapreduce.job.cache.archives'] = (','.join(cache_archives))
@@ -574,7 +683,8 @@ class LocalMRJobRunner(MRJobRunner):
 
         # not actually sure what's correct for combiners here. It'll definitely
         # be true if we're just using pipes to simulate a combiner though
-        j['mapreduce.task.ismap'] = str(step_type in ('M', 'C')).lower()
+        j['mapreduce.task.ismap'] = str(
+            step_type in ('mapper', 'combiner')).lower()
 
         j['mapreduce.task.partition'] = str(task_num)
 
@@ -587,7 +697,7 @@ class LocalMRJobRunner(MRJobRunner):
 
         return j
 
-    def _invoke_process(self, args, outfile_name, env, combiner_args=None):
+    def _invoke_processes(self, procs_args, outfile_name, env):
         """invoke the process described by *args* and write to *outfile_name*
 
         :param combiner_args: If this mapper has a combiner, we need to do
@@ -596,11 +706,9 @@ class LocalMRJobRunner(MRJobRunner):
 
         :return: dict(proc=Popen, args=[process args], write_to=file)
         """
-        if combiner_args:
-            log.info('> %s | sort | %s' %
-                     (cmd_line(args), cmd_line(combiner_args)))
-        else:
-            log.info('> %s' % cmd_line(args))
+        log.info('> %s' % ' | '.join(
+            args if isinstance(args, basestring) else cmd_line(args)
+            for args in procs_args))
 
         # set up outfile
         outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
@@ -609,33 +717,10 @@ class LocalMRJobRunner(MRJobRunner):
         self._prev_outfiles.append(outfile)
 
         with open(outfile, 'w') as write_to:
-            if combiner_args:
-                # set up a pipeline: mapper | sort | combiner
-                mapper_proc = Popen(args, stdout=PIPE, stderr=PIPE,
-                                    cwd=self._working_dir, env=env)
-
-                sort_proc = Popen(['sort'], stdin=mapper_proc.stdout,
-                                  stdout=PIPE, stderr=PIPE,
-                                  cwd=self._working_dir, env=env)
-
-                combiner_proc = Popen(combiner_args, stdin=sort_proc.stdout,
-                                      stdout=write_to, stderr=PIPE,
-                                      cwd=self._working_dir, env=env)
-
-                # this process shouldn't read from the pipes
-                mapper_proc.stdout.close()
-                sort_proc.stdout.close()
-
-                return [
-                    {'proc': mapper_proc, 'args': args},
-                    {'proc': sort_proc, 'args': ['sort']},
-                    {'proc': combiner_proc, 'args': combiner_args},
-                ]
-            else:
-                # just run the mapper process
-                proc = Popen(args, stdout=write_to, stderr=PIPE,
-                             cwd=self._working_dir, env=env)
-                return [{'proc': proc, 'args': args}]
+            procs = _chain_procs(procs_args, stdout=write_to, stderr=PIPE,
+                                cwd=self._working_dir, env=env)
+            return [{'args': args, 'proc': proc, 'write_to': write_to}
+                    for args, proc in zip(procs_args, procs)]
 
     def _wait_for_process(self, proc_dict, step_num):
         # handle counters, status msgs, and other stuff on stderr

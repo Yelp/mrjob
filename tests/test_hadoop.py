@@ -17,82 +17,62 @@
 from __future__ import with_statement
 
 from StringIO import StringIO
-import bz2
 import getpass
-import gzip
 import os
-import shlex
-import shutil
 from subprocess import check_call
-import tempfile
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-from tests.mockhadoop import create_mock_hadoop_script
-from tests.mockhadoop import add_mock_hadoop_output
-from tests.mr_two_step_job import MRTwoStepJob
-from tests.quiet import logger_disabled
+from mock import patch
 
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
+from mrjob.util import bash_wrap
+from mrjob.util import shlex_split
+
+from tests.mockhadoop import create_mock_hadoop_script
+from tests.mockhadoop import add_mock_hadoop_output
+from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
+from tests.sandbox import EmptyMrjobConfTestCase
+from tests.sandbox import SandboxedTestCase
 
 
-class TestFindHadoopStreamingJar(unittest.TestCase):
+class TestHadoopHomeRegression(SandboxedTestCase):
 
-    def setUp(self):
-        self.setup_tmp_dir()
+    def test_hadoop_home_regression(self):
+        # kill $HADOOP_HOME if it exists
+        try:
+            del os.environ['HADOOP_HOME']
+        except KeyError:
+            pass
 
-    def tearDown(self):
-        self.rm_tmp_dir()
+        with patch('mrjob.hadoop.find_hadoop_streaming_jar',
+                   return_value='some.jar'):
+            HadoopJobRunner(hadoop_home=self.tmp_dir, conf_paths=[])
 
-    def setup_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
 
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
+class TestFindHadoopStreamingJar(SandboxedTestCase):
 
     def test_find_hadoop_streaming_jar(self):
-        # shouldn't find anything if nothing's there
-        self.assertEqual(find_hadoop_streaming_jar(self.tmp_dir), None)
-
-        jar_dir = os.path.join(self.tmp_dir, 'a', 'b', 'c')
-        os.makedirs(jar_dir)
-        empty_dir = os.path.join(self.tmp_dir, 'empty')
-        os.makedirs(empty_dir)
-
         # not just any jar will do
-        mason_jar_path = os.path.join(jar_dir, 'mason.jar')
-        open(mason_jar_path, 'w').close()
-        self.assertEqual(find_hadoop_streaming_jar(self.tmp_dir), None)
+        with patch.object(os, 'walk', return_value=[
+            ('/some_dir', None, 'mason.jar')]):
+            self.assertEqual(find_hadoop_streaming_jar('/some_dir'), None)
 
         # should match streaming jar
-        streaming_jar_path = os.path.join(
-            jar_dir, 'hadoop-0.20.2-streaming.jar')
-        open(streaming_jar_path, 'w').close()
-        self.assertEqual(find_hadoop_streaming_jar(self.tmp_dir),
-                         streaming_jar_path)
+        with patch.object(os, 'walk', return_value=[
+            ('/some_dir', None, 'hadoop-0.20.2-streaming.jar')]):
+            self.assertEqual(find_hadoop_streaming_jar('/some_dir'), None)
 
-        # shouldn't find anything if we look in the wrong dir
-        self.assertEqual(find_hadoop_streaming_jar(empty_dir), None)
+        # shouldn't find anything in an empty dir
+        with patch.object(os, 'walk', return_value=[]):
+            self.assertEqual(find_hadoop_streaming_jar('/some_dir'), None)
 
 
-class MockHadoopTestCase(unittest.TestCase):
+class MockHadoopTestCase(SandboxedTestCase):
 
     def setUp(self):
-        self.setup_hadoop_home_and_environment_vars()
-
-    def tearDown(self):
-        self.delete_hadoop_home_and_restore_environment_vars()
-
-    def setup_hadoop_home_and_environment_vars(self):
-        self._old_environ = os.environ.copy()
-
+        super(MockHadoopTestCase, self).setUp()
         # setup fake hadoop home
-        hadoop_home = tempfile.mkdtemp(prefix='mock_hadoop_home.')
+        hadoop_home = self.makedirs('mock_hadoop_home')
         os.environ['HADOOP_HOME'] = hadoop_home
 
         # make fake hadoop binary
@@ -107,45 +87,19 @@ class MockHadoopTestCase(unittest.TestCase):
         open(streaming_jar_path, 'w').close()
 
         # set up fake HDFS
-        mock_hdfs_root = tempfile.mkdtemp(prefix='mock_hdfs.')
+        mock_hdfs_root = self.makedirs('mock_hdfs_root')
         os.environ['MOCK_HDFS_ROOT'] = mock_hdfs_root
 
         # make fake output dir
-        mock_output_dir = tempfile.mkdtemp(prefix='mock_hadoop_output.')
+        mock_output_dir = self.makedirs('mock_hadoop_output')
         os.environ['MOCK_HADOOP_OUTPUT'] = mock_output_dir
 
         # set up cmd log
-        _, mock_log_path = tempfile.mkstemp(prefix='mockhadoop.log')
+        mock_log_path = self.makefile('mock_hadoop_logs', '')
         os.environ['MOCK_HADOOP_LOG'] = mock_log_path
-
-    def delete_hadoop_home_and_restore_environment_vars(self):
-        mock_hdfs_root = os.environ['MOCK_HDFS_ROOT']
-        mock_output_dir = os.environ['MOCK_HADOOP_OUTPUT']
-        mock_log_path = os.environ['MOCK_HADOOP_LOG']
-
-        os.environ.clear()
-        os.environ.update(self._old_environ)
-
-        shutil.rmtree(mock_hdfs_root)
-        shutil.rmtree(mock_output_dir)
-        os.unlink(mock_log_path)
 
 
 class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
-
-    def setUp(self):
-        super(HadoopJobRunnerEndToEndTestCase, self).setUp()
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-        super(HadoopJobRunnerEndToEndTestCase, self).tearDown()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
 
     def _test_end_to_end(self, args=()):
         # read from STDIN, a local file, and a remote file
@@ -170,19 +124,13 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
                                '--no-conf', '--hadoop-arg', '-libjar',
                                '--hadoop-arg', 'containsJars.jar'] + list(args)
                               + ['-', local_input_path, remote_input_path]
-                              + ['--hadoop-input-format', 'FooFormat']
-                              + ['--hadoop-output-format', 'BarFormat']
                               + ['--jobconf', 'x=y'])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
         results = []
 
-        # don't care that --hadoop-*-format is deprecated
-        with logger_disabled('mrjob.job'):
-            runner = mr_job.make_runner()
-
-        with runner as runner:  # i.e. call cleanup when we're done
+        with mr_job.make_runner() as runner:
             assert isinstance(runner, HadoopJobRunner)
             runner.run()
 
@@ -205,26 +153,21 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             self.assertEqual(runner._opts['hadoop_extra_args'],
                              ['-libjar', 'containsJars.jar'])
 
-            # make sure mrjob.tar.gz is uploaded and in PYTHONPATH
-            assert runner._mrjob_tar_gz_path
-            mrjob_tar_gz_file_dicts = [
-                file_dict for file_dict in runner._files
-                if file_dict['path'] == runner._mrjob_tar_gz_path]
-            self.assertEqual(len(mrjob_tar_gz_file_dicts), 1)
+            # make sure mrjob.tar.gz is was uploaded and added to PYTHONPATH
+            self.assertIsNotNone(runner._mrjob_tar_gz_path)
+            self.assertIn(runner._mrjob_tar_gz_path,
+                          runner._upload_mgr.path_to_uri())
 
-            mrjob_tar_gz_file_dict = mrjob_tar_gz_file_dicts[0]
-            assert mrjob_tar_gz_file_dict['name']
-
+            name = runner._working_dir_mgr.name('archive', runner._mrjob_tar_gz_path)
             pythonpath = runner._get_cmdenv()['PYTHONPATH']
-            self.assertIn(mrjob_tar_gz_file_dict['name'],
-                          pythonpath.split(':'))
+            self.assertIn(name, pythonpath.split(':'))
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
         # make sure we called hadoop the way we expected
         with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
-            hadoop_cmd_args = [shlex.split(line) for line in mock_log]
+            hadoop_cmd_args = [shlex_split(line) for line in mock_log]
 
         jar_cmd_args = [args for args in hadoop_cmd_args
                         if args[:1] == ['jar']]
@@ -257,112 +200,166 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         self._test_end_to_end(['--hadoop-bin', self.hadoop_bin])
 
 
-class TestFilesystem(MockHadoopTestCase):
+class StreamingArgsTestCase(EmptyMrjobConfTestCase):
+
+    MRJOB_CONF_CONTENTS = {'runners': {'hadoop': {
+        'hadoop_home': 'kansas',
+        'hadoop_streaming_jar': 'binks.jar.jar',
+    }}}
 
     def setUp(self):
-        super(TestFilesystem, self).setUp()
-        self.make_tmp_dir()
+        super(StreamingArgsTestCase, self).setUp()
+        self.runner = HadoopJobRunner(
+            hadoop_bin='hadoop', hadoop_streaming_jar='streaming.jar',
+            mr_job_script='my_job.py', stdin=StringIO())
+        self.runner._add_job_files_for_upload()
 
-    def tearDown(self):
-        self.rm_tmp_dir()
-        super(TestFilesystem, self).tearDown()
+        self.runner._hadoop_version='0.20.204'
+        self.simple_patch(self.runner, '_new_upload_args',
+                          return_value=['new_upload_args'])
+        self.simple_patch(self.runner, '_old_upload_args',
+                          return_value=['old_upload_args'])
+        self.simple_patch(self.runner, '_hadoop_conf_args',
+                          return_value=['hadoop_conf_args'])
+        self.simple_patch(self.runner, '_hdfs_step_input_files',
+                          return_value=['hdfs_step_input_files'])
+        self.simple_patch(self.runner, '_hdfs_step_output_dir',
+                          return_value='hdfs_step_output_dir')
+        self.runner._script_path = 'my_job.py'
 
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
+        self._new_basic_args = [
+            'hadoop', 'jar', 'streaming.jar',
+             'new_upload_args', 'hadoop_conf_args',
+             '-input', 'hdfs_step_input_files',
+             '-output', 'hdfs_step_output_dir']
 
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
+        self._old_basic_args = [
+            'hadoop', 'jar', 'streaming.jar',
+             'hadoop_conf_args',
+             '-input', 'hdfs_step_input_files',
+             '-output', 'hdfs_step_output_dir',
+             'old_upload_args']
 
-    def test_cat_uncompressed(self):
-        local_input_path = os.path.join(self.tmp_dir, 'input')
-        with open(local_input_path, 'w') as input_file:
-            input_file.write('bar\nfoo\n')
+    def simple_patch(self, obj, attr, side_effect=None, return_value=None):
+        patcher = patch.object(obj, attr, side_effect=side_effect,
+                               return_value=return_value)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
-        input_to_upload = os.path.join(self.tmp_dir, 'remote_input')
-        with open(input_to_upload, 'w') as input_to_upload_file:
-            input_to_upload_file.write('foo\nfoo\n')
-        remote_input_path = 'hdfs:///data/foo'
-        check_call([self.hadoop_bin,
-                    'fs', '-put', input_to_upload, remote_input_path])
+    def _assert_streaming_step(self, step, args, step_num=0, num_steps=1):
+        self.assertEqual(
+            self.runner._streaming_args(step, step_num, num_steps),
+            self._new_basic_args + args)
 
-        with HadoopJobRunner(cleanup=['NONE'], conf_path=False) as runner:
-            local_output = []
-            for line in runner.cat(local_input_path):
-                local_output.append(line)
+    def _assert_streaming_step_old(self, step, args, step_num=0, num_steps=1):
+        self.runner._hadoop_version = '0.18'
+        self.assertEqual(
+            self._old_basic_args + args,
+            self.runner._streaming_args(step, step_num, num_steps))
 
-            remote_output = []
-            for line in runner.cat(remote_input_path):
-                remote_output.append(line)
+    def test_basic_mapper(self):
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                },
+            },
+            ['-mapper', 'python my_job.py --step-num=0 --mapper',
+             '-jobconf', 'mapred.reduce.tasks=0'])
 
-        self.assertEqual(local_output, ['bar\n', 'foo\n'])
-        self.assertEqual(remote_output, ['foo\n', 'foo\n'])
+    def test_basic_reducer(self):
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'reducer': {
+                    'type': 'script',
+                },
+            },
+            ['-mapper', 'cat',
+             '-reducer', 'python my_job.py --step-num=0 --reducer'])
 
-    def test_cat_compressed(self):
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\nbar\n')
-        input_gz.close()
+    def test_pre_filters(self):
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'pre_filter': 'grep anything',
+                },
+                'combiner': {
+                    'type': 'script',
+                    'pre_filter': 'grep nothing',
+                },
+                'reducer': {
+                    'type': 'script',
+                    'pre_filter': 'grep something',
+                },
+            },
+            ["-mapper",
+             "bash -c 'grep anything | python my_job.py --step-num=0"
+                 " --mapper'",
+             "-combiner",
+             "bash -c 'grep nothing | python my_job.py --step-num=0"
+                 " --combiner'",
+             "-reducer",
+             "bash -c 'grep something | python my_job.py --step-num=0"
+                 " --reducer'"])
 
-        with HadoopJobRunner(cleanup=['NONE'], conf_path=False) as runner:
-            output = []
-            for line in runner.cat(input_gz_path):
-                output.append(line)
+    def test_combiner_018(self):
+        self._assert_streaming_step_old(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'command',
+                    'command': 'cat',
+                },
+                'combiner': {
+                    'type': 'script',
+                },
+            },
+            ["-mapper",
+             "bash -c 'cat | sort | python my_job.py --step-num=0"
+                " --combiner'",
+             '-jobconf', 'mapred.reduce.tasks=0'])
 
-        self.assertEqual(output, ['foo\n', 'bar\n'])
+    def test_pre_filters_018(self):
+        self._assert_streaming_step_old(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'pre_filter': 'grep anything',
+                },
+                'combiner': {
+                    'type': 'script',
+                    'pre_filter': 'grep nothing',
+                },
+                'reducer': {
+                    'type': 'script',
+                    'pre_filter': 'grep something',
+                },
+            },
+            ['-mapper',
+             "bash -c 'grep anything | python my_job.py --step-num=0"
+                " --mapper | sort | grep nothing | python my_job.py"
+                " --step-num=0 --combiner'",
+             '-reducer',
+             "bash -c 'grep something | python my_job.py --step-num=0"
+                " --reducer'"])
 
-        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
-        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
-        input_bz2.write('bar\nbar\nfoo\n')
-        input_bz2.close()
-
-        with HadoopJobRunner(cleanup=['NONE'], conf_path=False) as runner:
-            output = []
-            for line in runner.cat(input_bz2_path):
-                output.append(line)
-
-        self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
-
-    def test_du(self):
-        root = os.environ['MOCK_HDFS_ROOT']
-        data_path_1 = os.path.join(root, 'data1')
-        with open(data_path_1, 'w') as f:
-            f.write("abcd")
-        remote_data_1 = 'hdfs:///data1'
-
-        data_dir = os.path.join(root, 'more')
-        os.mkdir(data_dir)
-        remote_dir = 'hdfs:///more'
-
-        data_path_2 = os.path.join(data_dir, 'data2')
-        with open(data_path_2, 'w') as f:
-            f.write("defg")
-        remote_data_2 = 'hdfs:///more/data2'
-
-        data_path_3 = os.path.join(data_dir, 'data3')
-        with open(data_path_3, 'w') as f:
-            f.write("hijk")
-        remote_data_2 = 'hdfs:///more/data3'
-
-        runner = HadoopJobRunner(conf_path=False)
-        self.assertEqual(runner.du(root), 12)
-        self.assertEqual(runner.du(remote_dir), 8)
-        self.assertEqual(runner.du(remote_dir + '/*'), 8)
-        self.assertEqual(runner.du(remote_data_1), 4)
-        self.assertEqual(runner.du(remote_data_2), 4)
-
-
-class TestURIs(MockHadoopTestCase):
-
-    def test_uris(self):
-        runner = HadoopJobRunner(conf_path=False)
-        list(runner.ls('hdfs://tmp/waffles'))
-        list(runner.ls('leggo://my/eggo'))
-        list(runner.ls('/tmp'))
-
-        with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
-            hadoop_cmd_args = [shlex.split(line) for line in mock_log]
-
-        self.assertEqual(hadoop_cmd_args, [
-            ['fs', '-lsr', 'hdfs://tmp/waffles'],
-            ['fs', '-lsr', 'leggo://my/eggo'],
-        ])
+    def test_pre_filter_escaping(self):
+        # ESCAPE ALL THE THINGS!!!
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'pre_filter': bash_wrap("grep 'anything'"),
+                },
+            },
+            ['-mapper',
+             "bash -c 'bash -c '\\''grep"
+                 " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' |"
+                 " python my_job.py --step-num=0 --mapper'",
+             '-jobconf', 'mapred.reduce.tasks=0'])

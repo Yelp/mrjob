@@ -13,9 +13,10 @@
 # limitations under the License.
 """Tests for JobConf Environment Variables
 """
-from mrjob.job import MRJob
 import re
+
 from mrjob.compat import get_jobconf_value
+from mrjob.job import MRJob
 
 WORD_RE = re.compile(r"[\w']+")
 

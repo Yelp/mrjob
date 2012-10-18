@@ -1,3 +1,73 @@
+v0.4, 2012-08-?? -- Slouching toward nirvana
+ * Changes:
+   * 'mrjob' command (#225)
+   * Changed default runner from 'local' to 'inline' (#423)
+   * Local runner no longer adds working directory to PYTHONPATH of
+     subprocesses; use inline runner instead (#424)
+   * Requires boto 2.2.0 or later
+   * Filesystem functionality moved out of MRJobRunner into into 'fs' objects
+     but forwarded from runners for backward compatibility
+   * Changed exception hierarchy of mrjob.ssh (which is private but
+     important)
+ * New features:
+   * Support for non-Hadoop Streaming jar steps (#499)
+   * Support for arbitrary commands as Hadoop Streaming
+     mappers/combiners/reducers
+   * mapper_pre_filter, combiner_pre_filter, and reducer_pre_filter allow
+     running of a UNIX command in front of tasks to filter input outside of
+     the interpreter
+ * Bug fixes:
+   * Silenced some incorrect warnings about ignored options in 'inline' runner
+ * Removed deprecated functionality:
+   * --hadoop-*-format
+   * --*-protocol switches
+   * MRJob.DEFAULT_*_PROTOCOL
+   * MRJob.get_default_opts()
+   * MRJob.protocols()
+   * PROTOCOL_DICT
+   * IF_SUCCESSFUL
+   * DEFAULT_CLEANUP
+   * S3Filesystem.get_s3_folder_keys()
+
+v0.3.5, 2012-08-21 -- The Last Ride of v0.3.x[?]
+ * EMR:
+   * --pool-wait-minutes option lets you wait up to X minutes before creating a
+     job flow (#455)
+   * Job flow ID included in error messages on failure (#452)
+   * JOB and JOB_FLOW cleanup options (#485, #455)
+ * EMR and Hadoop:
+   * Compatibility fixes related to deprecated options and Hadoop's bizarre
+     non-sequential version numbers (#489, #534)
+ * Other:
+   * Warn when *_PROTOCOL is not a class (#490)
+ * Bug fixes:
+   * Unicode strings can be used when specifying interpreters (#431)
+   * --enable-emr-logging no longer causes the wrong counters/logs to be parsed
+     (#446)
+   * TMP_DIR inserted into 'sort' environment variables (#477)
+   * Setting hadoop_home in mrjob.conf works again
+   * Gzipped input files work when specified with relative paths (#494)
+   * Passthrough options are not re-ordered when sent to Hadoop Streaming
+     (#509)
+
+v0.3.4.1, 2012-06-12 -- The test suite doesn't catch everything...
+ * Local mode doesn't try to send multiple mappers to the same output file
+   when using multiple compressed files as input
+
+v0.3.4, 2012-06-11 -- We are friendly people.
+ * Experimental support for IronPython in the local and inline runners
+ * set_status() and increment_counter() will encode messages/names of type
+   'unicode' as UTF-8 when writing to Hadoop Streaming
+ * EMR and Hadoop counter parsing is more correct
+ * mrjob.tools.emr.fetch_logs fetches logs from S3 when asked instead of
+   incorrectly refusing to do so
+ * jobconf values can be booleans in mrjob.conf as well as 'true' and 'false'
+   strings
+ * hadoop_version can be a float in mrjob.conf, but a warning is printed to the
+   console
+ * Command line help is split across several --help-* commands
+ * Local runner sorts output consistently
+
 v0.3.3.2, 2012-04-10 -- It's a race [condition]!
  * Option parsing no longer dies when -- is used as an argument (#435)
  * Fixed race condition where two jobs can join same job flow thinking it is
@@ -6,8 +76,8 @@ v0.3.3.2, 2012-04-10 -- It's a race [condition]!
    runner (#433)
 
 v0.3.3.1, 2012-04-02 -- Hothothothothothothotfix
- * Fixed S3 locking mechanism parsing of last modified time to work around a
-   bug in boto
+ * Fixed S3 locking mechanism parsing of last modified time to work around an
+   inconsistency in the EMR API
 
 v0.3.3, 2012-03-29 -- Bug...bug...bug...bug...bug...FEATURE!
  * EMR:

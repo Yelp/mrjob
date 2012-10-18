@@ -68,8 +68,10 @@ class MRTwoStepJob(MRJob):
         yield value, key
 
     def steps(self):
-        return [self.mr(self.mapper, self.reducer, combiner=self.combiner),
-                self.mr(self.mapper2)]
+        return [self.mr(mapper=self.mapper, reducer=self.reducer,
+                        combiner=self.combiner),
+                self.mr(mapper=self.mapper2)]
+
 
 if __name__ == '__main__':
     MRTwoStepJob.run()

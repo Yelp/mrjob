@@ -26,8 +26,8 @@
 # limitations under the License.
 """Tests for JobConf Environment Variables
 """
-from mrjob.job import MRJob
 from mrjob.compat import get_jobconf_value
+from mrjob.job import MRJob
 
 JOBCONF_LIST = [
     'mapreduce.job.id',

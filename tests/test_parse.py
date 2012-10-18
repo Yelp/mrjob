@@ -343,7 +343,10 @@ class FindMiscTestCase(unittest.TestCase):
             '[(COMBINE_INPUT_RECORDS)(Combine input records)(0)]',
             '[(REDUCE_INPUT_RECORDS)(Reduce input records)(336)]}'
         ]
-        line = r'Job JOBID="job_201106132124_0001" FINISH_TIME="1308000435810" JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1" FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="%s" .' % ''.join(counter_bits)
+        line = (r'Job JOBID="job_201106132124_0001" '
+                r'FINISH_TIME="1308000435810" JOB_STATUS="SUCCESS" '
+                r'FINISHED_MAPS="2" FINISHED_REDUCES="1" FAILED_MAPS="0" '
+                r'FAILED_REDUCES="0" COUNTERS="%s" .' % ''.join(counter_bits))
         counters, step_num = parse_hadoop_counters_from_line(
                                 line, hadoop_version='0.20')
 
@@ -396,7 +399,9 @@ class FindMiscTestCase(unittest.TestCase):
                           stderr.getvalue())
     def test_freaky_counter_names(self):
         freaky_name = r'\\\\\{\}\(\)\[\]\.\\\\'
-        counter_string = r'Job JOBID="_001" FAILED_REDUCES="0" COUNTERS="{(%s)(%s)[(a)(a)(1)]}"' % (freaky_name, freaky_name)
+        counter_string = (r'Job JOBID="_001" FAILED_REDUCES="0" '
+                          r'COUNTERS="{(%s)(%s)[(a)(a)(1)]}"' %
+                            (freaky_name, freaky_name))
         self.assertIn('\\{}()[].\\',
                       parse_hadoop_counters_from_line(counter_string)[0])
 
@@ -414,9 +419,23 @@ class FindMiscTestCase(unittest.TestCase):
             ('\\(\\[\\{\\[\\[\\(\\{\\}\\(\\{', '([{[[({}({'),
             ('\\(\\{\\(\\{\\[\\{\\(\\{\\}\\}', '({({[{({}}')]
         for in_str, out_str in freakquences:
-            counter_string = r'Job JOBID="_001" FAILED_REDUCES="0" COUNTERS="{(%s)(%s)[(a)(a)(1)]}"' % (in_str, in_str)
+            counter_string = (r'Job JOBID="_001" FAILED_REDUCES="0" '
+                              r'COUNTERS="{(%s)(%s)[(a)(a)(1)]}"' %
+                                 (in_str, in_str))
             self.assertIn(out_str,
                       parse_hadoop_counters_from_line(counter_string)[0])
+
+    def test_correct_counters_parsed(self):
+
+        map_counters = '{(map_counters)(map_counters)[(a)(a)(1)]}'
+        reduce_counters = '{(red_counters)(red_counters)[(b)(b)(1)]}'
+        all_counters = '{(all_counters)(all_counters)[(c)(c)(1)]}'
+        tricksy_line = (
+            'Job JOBID="job_201106092314_0001" '
+            'MAP_COUNTERS="%s" REDUCE_COUNTERS="%s" COUNTERS="%s"' %
+                (map_counters, reduce_counters, all_counters))
+        counters = parse_hadoop_counters_from_line(tricksy_line, '0.20')[0]
+        self.assertEqual(counters, {'all_counters': {'c': 1}})
 
 
 class ParseMRJobStderr(unittest.TestCase):

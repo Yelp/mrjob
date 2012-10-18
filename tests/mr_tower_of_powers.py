@@ -19,8 +19,8 @@ from __future__ import with_statement
 
 import os
 
-from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
+from mrjob.job import MRJob
 
 
 class MRTowerOfPowers(MRJob):

@@ -32,21 +32,21 @@ from mrjob.job import MRJob
 from mrjob.util import scrape_options_into_new_groups
 
 
-def main():
+def main(args=None):
     """Run the create_job_flow tool with arguments from ``sys.argv`` and
     printing to ``sys.stdout``."""
-    runner = EMRJobRunner(**runner_kwargs())
+    runner = EMRJobRunner(**runner_kwargs(args))
     emr_job_flow_id = runner.make_persistent_job_flow()
     print emr_job_flow_id
 
 
-def runner_kwargs():
+def runner_kwargs(cl_args=None):
     """Parse command line arguments into arguments for
     :py:class:`EMRJobRunner`
     """
     # parser command-line args
     option_parser = make_option_parser()
-    options, args = option_parser.parse_args()
+    options, args = option_parser.parse_args(cl_args)
 
     if args:
         option_parser.error('takes no arguments')
@@ -84,7 +84,7 @@ def make_option_parser():
     assignments = {
         runner_group: (
             'bootstrap_mrjob',
-            'conf_path',
+            'conf_paths',
             'quiet',
             'verbose'
         ),

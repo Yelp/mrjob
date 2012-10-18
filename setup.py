@@ -4,13 +4,13 @@ try:
     # arguments that distutils doesn't understand
     setuptools_kwargs = {
         'install_requires': [
-            'boto>=2.0',
+            'boto>=2.2.0',
             'PyYAML',
             'simplejson>=2.0.9',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',
-        'tests_require': ['unittest2'],
+        'tests_require': ['unittest2', 'mock'],
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 except ImportError:
@@ -40,8 +40,10 @@ setup(
     name='mrjob',
     packages=['mrjob',
               'mrjob.examples',
+              'mrjob.fs',
               'mrjob.tools',
               'mrjob.tools.emr'],
+    scripts=['bin/mrjob'],
     url='http://github.com/Yelp/mrjob',
     version=mrjob.__version__,
     **setuptools_kwargs

@@ -139,15 +139,18 @@ class HadoopFilesystem(Filesystem):
 
         for line in StringIO(stdout):
             fields = line.rstrip('\r\n').split()
+
             # expect lines like:
-            # -rw-r--r--   3 dave users       3276 2010-01-13 14:00 /foo/bar
+            # -rw-r--r--   3 dave users       3276 2010-01-13 14:00 /foo/bar # HDFS
+            # -rwxrwxrwx   1          3276 010-01-13 14:00 /foo/bar # S3
+            location = 7
             if len(fields) < 8:
-                raise Exception('unexpected ls line from hadoop: %r' % line)
+                location = 5
             # ignore directories
             if fields[0].startswith('d'):
                 continue
             # not sure if you can have spaces in filenames; just to be safe
-            path = ' '.join(fields[7:])
+            path = ' '.join(fields[location:])
             yield hdfs_prefix + path
 
     def _cat_file(self, filename):

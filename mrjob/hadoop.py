@@ -76,12 +76,13 @@ def find_hadoop_streaming_jar(path):
 
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
-    if path.startswith('hdfs://') or path.startswith('s3n:/'):
-        return path
-    elif path.startswith('/'):
+    url = urlparse(path)
+    if not url.scheme and path.startswith('/'):
         return 'hdfs://' + path
-    else:
+    elif not url.scheme:
         return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
+    else:
+        return path
 
 
 def hadoop_log_dir(hadoop_home=None):

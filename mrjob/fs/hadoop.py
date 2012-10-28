@@ -137,20 +137,26 @@ class HadoopFilesystem(Filesystem):
         except CalledProcessError:
             raise IOError("Could not ls %s" % path_glob)
 
+        path_index = None
         for line in StringIO(stdout):
             fields = line.rstrip('\r\n').split()
 
-            # expect lines like:
-            # -rw-r--r--   3 dave users       3276 2010-01-13 14:00 /foo/bar # HDFS
-            # -rwxrwxrwx   1          3276 010-01-13 14:00 /foo/bar # S3
-            location = 7
-            if len(fields) < 8:
-                location = 5
-            # ignore directories
+            # Throw out directories
             if fields[0].startswith('d'):
                 continue
-            # not sure if you can have spaces in filenames; just to be safe
-            path = ' '.join(fields[location:])
+
+            # Try to figure out which part of the line is the path
+            # Expected lines:
+            # -rw-r--r--   3 dave users       3276 2010-01-13 14:00 /foo/bar # HDFS
+            # -rwxrwxrwx   1          3276 010-01-13 14:00 /foo/bar # S3
+            if not path_index:
+                for index, field in enumerate(fields):
+                    if len(field) == 5 and field[2] == ':':
+                        path_index = (index + 1)
+                if not path_index:
+                    raise IOError("Could not locate path in string '%s'" % line)
+
+            path = ' '.join(fields[path_index:])
             yield hdfs_prefix + path
 
     def _cat_file(self, filename):

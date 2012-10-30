@@ -790,9 +790,7 @@ class FilterTestCase(SandboxedTestCase):
             r.run()
 
             lines = [line.strip() for line in list(r.stream_output())]
-            self.assertItemsEqual(
-                                  lines,
-                'x$\ny$\nz$\n'.split())
+            self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
 
     def test_combiner_pre_filter(self):
         data = 'x\ny\nz\n'
@@ -813,9 +811,7 @@ class FilterTestCase(SandboxedTestCase):
 
             r.run()
             lines = [line.strip() for line in list(r.stream_output())]
-            self.assertItemsEqual(
-                lines,
-                'x$\ny$\nz$\n'.split())
+            self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
 
     def test_reducer_pre_filter(self):
         data = 'x\ny\nz\n'
@@ -836,6 +832,4 @@ class FilterTestCase(SandboxedTestCase):
             r.run()
 
             lines = [line.strip() for line in list(r.stream_output())]
-            self.assertItemsEqual(
-                lines,
-                'x$\ny$\nz$\n'.split())
+            self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])

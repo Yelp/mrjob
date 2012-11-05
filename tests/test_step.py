@@ -69,6 +69,10 @@ class MRJobStepInitTestCase(TestCase):
     def test_nothing_specified(self):
         self.assertRaises(ValueError, MRJobStep)
 
+    def test_only_hadoop_opts(self):
+        self.assertRaises(ValueError, MRJobStep,
+                          jobconf={'dfs.block.size': '134217728'})
+
     def _test_explicit(self, m=False, c=False, r=False, **kwargs):
         s = MRJobStep(**kwargs)
         self.assertEqual(s.has_explicit_mapper, m)
@@ -281,3 +285,19 @@ class MRJobStepDescriptionTestCase(TestCase):
                     'command': 'cat',
                 },
             })
+
+    def test_render_jobconf(self):
+        step = MRJobStep(mapper=identity_mapper,
+                         jobconf={'dfs.block.size': '134217728'})
+
+        self.assertEqual(
+            step.description(0),
+            {
+            'type': 'streaming',
+            'mapper': {
+                'type': 'script',
+            },
+            'jobconf': {
+                'dfs.block.size': '134217728',
+            }
+        })

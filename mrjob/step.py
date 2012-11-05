@@ -25,10 +25,12 @@ _COMBINER_FUNCS = ('combiner', 'combiner_init', 'combiner_final',
                    'combiner_cmd', 'combiner_pre_filter')
 _REDUCER_FUNCS = ('reducer', 'reducer_init', 'reducer_final', 'reducer_cmd',
                   'reducer_pre_filter')
+_HADOOP_OPTS = ('jobconf',)
 
-# All allowable step keyword arguments, also happens to be all function names
-# for jobs whose step objects are created automatically
-_JOB_STEP_PARAMS = _MAPPER_FUNCS + _COMBINER_FUNCS + _REDUCER_FUNCS
+# params to specify how to run the step. need at least one of these
+_JOB_STEP_FUNC_PARAMS = _MAPPER_FUNCS + _COMBINER_FUNCS + _REDUCER_FUNCS
+# all allowable step params
+_JOB_STEP_PARAMS = _JOB_STEP_FUNC_PARAMS + _HADOOP_OPTS
 
 
 log = logging.getLogger('mrjob.step')
@@ -54,7 +56,7 @@ class MRJobStep(object):
             raise TypeError(
                 'mr() got an unexpected keyword argument %r' % bad_kwargs[0])
 
-        if not any(kwargs.itervalues()):
+        if not set(kwargs) & set(_JOB_STEP_FUNC_PARAMS):
             raise ValueError("Step has no mappers and no reducers")
 
         self.has_explicit_mapper = any(
@@ -88,7 +90,9 @@ class MRJobStep(object):
     def __repr__(self):
         not_none = dict((k, v) for k, v in self._steps.iteritems()
                         if v is not None)
-        return 'MRJobStep(**%r)' % not_none
+        return '%s(%s)' % (
+            self.__class__.__name__,
+            ', '.join('%s=%r' % (k, v) for k, v in not_none.iteritems()))
 
     def __eq__(self, other):
         return (isinstance(other, MRJobStep) and self._steps == other._steps)
@@ -150,6 +154,9 @@ class MRJobStep(object):
             substep_descs['combiner'] = self.render_combiner()
         if self.has_explicit_reducer:
             substep_descs['reducer'] = self.render_reducer()
+        # TODO: verify this is a dict, convert booleans to strings
+        if self._steps['jobconf']:
+            substep_descs['jobconf'] = self._steps['jobconf']
         return substep_descs
 
 

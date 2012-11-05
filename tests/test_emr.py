@@ -237,7 +237,8 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             '1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n']}
 
         mr_job = MRHadoopFormatJob(['-r', 'emr', '-v',
-                                    '-', local_input_path, remote_input_path])
+                                    '-', local_input_path, remote_input_path,
+                                    '--jobconf', 'x=y'])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
@@ -282,6 +283,13 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             self.assertNotIn('-inputformat', job_flow.steps[1].args())
             self.assertIn('-outputformat', job_flow.steps[1].args())
 
+            # make sure jobconf got through
+            self.assertIn('-D', job_flow.steps[0].args())
+            self.assertIn('x=y', job_flow.steps[0].args())
+            self.assertIn('-D', job_flow.steps[1].args())
+            # job overrides jobconf in step 1
+            self.assertIn('x=z', job_flow.steps[1].args())
+
             # make sure mrjob.tar.gz is created and uploaded as
             # a bootstrap file
             self.assertTrue(runner._mrjob_tar_gz_path)
@@ -293,7 +301,8 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             # shouldn't be in PYTHONPATH (we dump it directly in site-packages)
             pythonpath = runner._get_cmdenv().get('PYTHONPATH') or ''
             self.assertNotIn(
-                runner._bootstrap_dir_mgr.name('file', runner._mrjob_tar_gz_path),
+                runner._bootstrap_dir_mgr.name(
+                    'file', runner._mrjob_tar_gz_path),
                 pythonpath.split(':'))
 
         self.assertEqual(sorted(results),

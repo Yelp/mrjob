@@ -188,6 +188,10 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         # make sure -jobconf made it through
         self.assertIn('-D', step_0_args)
+        self.assertIn('x=y', step_0_args)
+        self.assertIn('-D', step_1_args)
+        # job overrides jobconf in step 1
+        self.assertIn('x=z', step_1_args)
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)

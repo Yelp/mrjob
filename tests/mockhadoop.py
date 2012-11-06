@@ -39,6 +39,8 @@ import shutil
 import stat
 import sys
 
+from mrjob.parse import urlparse
+
 
 def create_mock_hadoop_script(path):
     """Dump a wrapper script to the given file object that runs this
@@ -85,16 +87,18 @@ def get_mock_hadoop_output():
 
 
 def hdfs_path_to_real_path(hdfs_path, environ):
-    if hdfs_path.startswith('hdfs:///'):
-        hdfs_path = hdfs_path[7:]  # keep one slash
+    components = urlparse(hdfs_path)
 
-    if not hdfs_path.startswith('/'):
-        hdfs_path = '/user/%s/%s' % (environ['USER'], hdfs_path)
+    scheme = components.scheme
+    path = components.path
 
-    return os.path.join(environ['MOCK_HDFS_ROOT'], hdfs_path.lstrip('/'))
+    if not scheme and not path.startswith('/'):
+        path = '/user/%s/%s' % (environ['USER'], path)
+
+    return os.path.join(environ['MOCK_HDFS_ROOT'], path.lstrip('/'))
 
 
-def real_path_to_hdfs_path(real_path, environ=None):
+def real_path_to_hdfs_path(real_path, environ):
     if environ is None: # user may have passed empty dict
         environ = os.environ
     hdfs_root = environ['MOCK_HDFS_ROOT']
@@ -102,6 +106,7 @@ def real_path_to_hdfs_path(real_path, environ=None):
     if not real_path.startswith(hdfs_root):
         raise ValueError('path %s is not in %s' % (real_path, hdfs_root))
 
+    # janky version of os.path.relpath() (Python 2.6):
     hdfs_path = real_path[len(hdfs_root):]
     if not hdfs_path.startswith('/'):
         hdfs_path = '/' + hdfs_path

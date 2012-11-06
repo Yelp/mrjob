@@ -997,7 +997,7 @@ class MRJobRunner(object):
 
         return self._mrjob_tar_gz_path
 
-    def _hadoop_conf_args(self, step_num, num_steps):
+    def _hadoop_conf_args(self, step, step_num, num_steps):
         """Build a list of extra arguments to the hadoop binary.
 
         This handles *cmdenv*, *hadoop_extra_args*, *hadoop_input_format*,
@@ -1010,13 +1010,15 @@ class MRJobRunner(object):
 
         args = []
 
+        jobconf = combine_dicts(self._opts['jobconf'], step.get('jobconf'))
+
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])
 
         # new-style jobconf
         version = self.get_hadoop_version()
         if uses_generic_jobconf(version):
-            for key, value in sorted(self._opts['jobconf'].iteritems()):
+            for key, value in sorted(jobconf.iteritems()):
                 args.extend(['-D', '%s=%s' % (key, value)])
 
         # partitioner
@@ -1038,7 +1040,7 @@ class MRJobRunner(object):
 
         # old-style jobconf
         if not uses_generic_jobconf(version):
-            for key, value in sorted(self._opts['jobconf'].iteritems()):
+            for key, value in sorted(jobconf.iteritems()):
                 args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         return args

@@ -595,86 +595,6 @@ class CompatTestCase(EmptyMrjobConfTestCase):
                           runner._subprocess_env('mapper', 0, 0).keys())
 
 
-class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
-
-    def test_empty(self):
-        runner = LocalMRJobRunner(conf_paths=[])
-        self.assertEqual(runner._hadoop_conf_args(0, 1), [])
-
-    def test_hadoop_extra_args(self):
-        extra_args = ['-foo', 'bar']
-        runner = LocalMRJobRunner(conf_paths=[],
-                                  hadoop_extra_args=extra_args)
-        self.assertEqual(runner._hadoop_conf_args(0, 1), extra_args)
-
-    def test_cmdenv(self):
-        cmdenv = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
-        runner = LocalMRJobRunner(conf_paths=[], cmdenv=cmdenv)
-        self.assertEqual(runner._hadoop_conf_args(0, 1),
-                         ['-cmdenv', 'BAX=Arnold',
-                          '-cmdenv', 'BAZ=qux',
-                          '-cmdenv', 'FOO=bar',
-                          ])
-
-    def test_hadoop_input_format(self):
-        format = 'org.apache.hadoop.mapred.SequenceFileInputFormat'
-        runner = LocalMRJobRunner(conf_paths=[], hadoop_input_format=format)
-        self.assertEqual(runner._hadoop_conf_args(0, 1),
-                         ['-inputformat', format])
-        # test multi-step job
-        self.assertEqual(runner._hadoop_conf_args(0, 2),
-                         ['-inputformat', format])
-        self.assertEqual(runner._hadoop_conf_args(1, 2), [])
-
-    def test_hadoop_output_format(self):
-        format = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
-        runner = LocalMRJobRunner(conf_paths=[], hadoop_output_format=format)
-        self.assertEqual(runner._hadoop_conf_args(0, 1),
-                         ['-outputformat', format])
-        # test multi-step job
-        self.assertEqual(runner._hadoop_conf_args(0, 2), [])
-        self.assertEqual(runner._hadoop_conf_args(1, 2),
-                     ['-outputformat', format])
-
-    def test_jobconf(self):
-        jobconf = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
-        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf)
-        self.assertEqual(runner._hadoop_conf_args(0, 1),
-                         ['-D', 'BAX=Arnold',
-                          '-D', 'BAZ=qux',
-                          '-D', 'FOO=bar',
-                          ])
-        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf,
-                                  hadoop_version='0.18')
-        self.assertEqual(runner._hadoop_conf_args(0, 1),
-                         ['-jobconf', 'BAX=Arnold',
-                          '-jobconf', 'BAZ=qux',
-                          '-jobconf', 'FOO=bar',
-                          ])
-
-    def test_partitioner(self):
-        partitioner = 'org.apache.hadoop.mapreduce.Partitioner'
-
-        runner = LocalMRJobRunner(conf_paths=[], partitioner=partitioner)
-        self.assertEqual(runner._hadoop_conf_args(0, 1),
-                         ['-partitioner', partitioner])
-
-    def test_hadoop_extra_args_comes_first(self):
-        runner = LocalMRJobRunner(
-            cmdenv={'FOO': 'bar'},
-            conf_paths=[],
-            hadoop_extra_args=['-libjar', 'qux.jar'],
-            hadoop_input_format='FooInputFormat',
-            hadoop_output_format='BarOutputFormat',
-            jobconf={'baz': 'quz'},
-            partitioner='java.lang.Object',
-        )
-        # hadoop_extra_args should come first
-        conf_args = runner._hadoop_conf_args(0, 1)
-        self.assertEqual(conf_args[:2], ['-libjar', 'qux.jar'])
-        self.assertEqual(len(conf_args), 12)
-
-
 class CommandSubstepTestCase(SandboxedTestCase):
 
     def test_cat_mapper(self):
@@ -691,8 +611,8 @@ class CommandSubstepTestCase(SandboxedTestCase):
                         'command': 'cat'}}])
 
             r.run()
-
-            self.assertEqual(''.join(r.stream_output()), data)
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertItemsEqual(lines, data.split())
 
     def test_uniq_combiner(self):
         data = 'x\nx\nx\nx\nx\nx\n'
@@ -736,7 +656,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
             r.run()
 
             lines = list(r.stream_output())
-            self.assertEqual(lines, ['x$\n', 'y$\n', 'z$\n'])
+            self.assertItemsEqual(lines, ['x$\n', 'y$\n', 'z$\n'])
 
     def test_multiple(self):
         data = 'x\nx\nx\nx\nx\nx\n'
@@ -789,9 +709,8 @@ class FilterTestCase(SandboxedTestCase):
 
             r.run()
 
-            self.assertEqual(
-                ''.join(r.stream_output()),
-                'x$\ny$\nz$\n')
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
 
     def test_combiner_pre_filter(self):
         data = 'x\ny\nz\n'
@@ -811,10 +730,8 @@ class FilterTestCase(SandboxedTestCase):
                     }}])
 
             r.run()
-
-            self.assertEqual(
-                ''.join(r.stream_output()),
-                'x$\ny$\nz$\n')
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
 
     def test_reducer_pre_filter(self):
         data = 'x\ny\nz\n'
@@ -834,6 +751,5 @@ class FilterTestCase(SandboxedTestCase):
 
             r.run()
 
-            self.assertEqual(
-                ''.join(r.stream_output()),
-                'x$\ny$\nz$\n')
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])

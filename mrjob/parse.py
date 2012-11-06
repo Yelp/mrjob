@@ -81,8 +81,8 @@ def parse_s3_uri(uri):
 @wraps(urlparse_buggy)
 def urlparse(*args, **kwargs):
     """A wrapper for :py:func:`urlparse.urlparse` that handles buckets in S3
-    URIs correctly. (:py:func:`~urlparse.urlparse` does this correctly on its
-    own in Python 2.6+; this is just a patch for Python 2.5.)"""
+    URIs correctly. (:py:func:`~urlparse.urlparse` does this correctly sometime
+    after 2.6.1; this is just a patch for older Python versions.)"""
     components = urlparse_buggy(*args, **kwargs)
     if components.netloc == '' and components.path.startswith('//'):
         m = NETLOC_RE.match(components.path)

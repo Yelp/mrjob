@@ -16,7 +16,8 @@
 filesystem. This imitates only things that mrjob actually uses.
 
 Relies on these environment variables:
-MOCK_HDFS_ROOT -- root dir for our fake HDFS filesystem
+MOCK_HDFS_ROOT -- root dir for our fake filesystem(s). Used regardless of
+URI scheme or host (so this is also the root of every S3 bucket).
 MOCK_HADOOP_OUTPUT -- a directory containing directories containing
 fake job output (to add output, use add_mock_output())
 MOCK_HADOOP_CMD_LOG -- optional: if this is set, append arguments passed
@@ -197,17 +198,29 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
     """Implements hadoop fs -lsr."""
     hdfs_path_globs = args or ['']
 
-    def ls_line(real_path):
+    def ls_line(real_path, scheme):
         hdfs_path = real_path_to_hdfs_path(real_path, environ)
         # we could actually implement ls here, but mrjob only cares about
         # the path
-        path_is_dir = os.path.isdir(real_path)
+        if os.path.isdir(real_path):
+            file_type = 'd'
+        else:
+            file_type = '-'
+
+        if scheme in ('s3', 's3n'):
+            # no user and group on S3 (see Pull Request #573)
+            user_and_group = ''
+        else:
+            user_and_group = 'dave supergroup'
+
         return (
-            '%srwxrwxrwx - dave supergroup      18321 2010-10-01 15:16 %s' %
-            ('d' if path_is_dir else '-', hdfs_path))
+            '%srwxrwxrwx - %s      18321 2010-10-01 15:16 %s' %
+            (file_type, user_and_group, hdfs_path))
 
     failed = False
     for hdfs_path_glob in hdfs_path_globs:
+        scheme = urlparse(hdfs_path_glob).scheme
+
         real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
         real_paths = glob.glob(real_path_glob)
         if not real_paths:
@@ -219,12 +232,12 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
             for real_path in real_paths:
                 if os.path.isdir(real_path):
                     for dirpath, dirnames, filenames in os.walk(real_path):
-                        print >> stdout, ls_line(dirpath)
+                        print >> stdout, ls_line(dirpath, scheme)
                         for filename in filenames:
-                            print >> stdout, ls_line(os.path.join(dirpath,
-                                                                  filename))
+                            path = os.path.join(dirpath, filename)
+                            print >> stdout, ls_line(path, scheme)
                 else:
-                    print >> stdout, ls_line(real_path)
+                    print >> stdout, ls_line(real_path, scheme)
 
     if failed:
         return -1

@@ -126,7 +126,7 @@ class MockS3Connection(object):
             self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': ''}
 
 
-class MockBucket:
+class MockBucket(object):
     """Mock out boto.s3.Bucket
     """
     def __init__(self, connection=None, name=None, location=None):

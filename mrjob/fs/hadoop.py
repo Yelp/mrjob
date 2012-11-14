@@ -157,7 +157,7 @@ class HadoopFilesystem(Filesystem):
                     raise IOError("Could not locate path in string '%s'" % line)
 
             path = ' '.join(fields[path_index:])
-            yield hdfs_prefix + path
+            yield (hdfs_prefix if not path.startswith(hdfs_prefix) else '') + path
 
     def _cat_file(self, filename):
         # stream from HDFS

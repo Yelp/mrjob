@@ -139,7 +139,8 @@ class HadoopFilesystem(Filesystem):
 
         path_index = None
         for line in StringIO(stdout):
-            fields = line.rstrip('\r\n').split()
+            line = line.rstrip('\r\n')
+            fields = line.split(' ')
 
             # Throw out directories
             if fields[0].startswith('d'):
@@ -156,7 +157,7 @@ class HadoopFilesystem(Filesystem):
                 if not path_index:
                     raise IOError("Could not locate path in string '%s'" % line)
 
-            path = ' '.join(fields[path_index:])
+            path = line.split(' ', path_index)[-1]
             # handle fully qualified URIs from newer versions of Hadoop ls
             # (see Pull Request #577)
             if is_uri(path):

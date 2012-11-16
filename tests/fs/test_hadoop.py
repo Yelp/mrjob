@@ -75,9 +75,13 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.assertEqual(list(self.fs.ls('s3n://bucket/')),
                          ['s3n://bucket/f'])
 
-    def test_spaces(self):
+    def test_single_space(self):
         self.make_mock_file('foo bar')
         self.assertEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///foo bar'])
+
+    def test_double_space(self):
+        self.make_mock_file('foo  bar')
+        self.assertEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///foo  bar'])
 
     def test_cat_uncompressed(self):
         # mockhadoop doesn't support compressed files, so we won't test for it.
@@ -124,3 +128,11 @@ class HadoopFSTestCase(MockSubprocessTestCase):
     def test_touchz(self):
         # mockhadoop doesn't implement this.
         pass
+
+
+class NewerHadoopFSTestCase(HadoopFSTestCase):
+
+    def set_up_mock_hadoop(self):
+        super(NewerHadoopFSTestCase, self).set_up_mock_hadoop()
+
+        self.env['MOCK_HADOOP_LS_RETURNS_FULL_URIS'] = '1'

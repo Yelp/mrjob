@@ -107,6 +107,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         'hadoop_bin',
         'hadoop_home',
         'hdfs_scratch_dir',
+        'check_input'
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -149,6 +150,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         return combine_dicts(super_opts, {
             'hadoop_home': os.environ.get('HADOOP_HOME'),
             'hdfs_scratch_dir': 'tmp/mrjob',
+            'check_input': True
         })
 
 
@@ -237,9 +239,10 @@ class HadoopJobRunner(MRJobRunner):
             if path == '-':
                 continue  # STDIN always exists
 
-            if not self.path_exists(path):
-                raise AssertionError(
-                    'Input path %s does not exist!' % (path,))
+            if self._opts['check_input']:
+                if not self.path_exists(path):
+                    raise AssertionError(
+                        'Input path %s does not exist!' % (path,))
 
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)

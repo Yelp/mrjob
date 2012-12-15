@@ -27,5 +27,12 @@ Things that will make your branch more likely to be pulled:
 * Reference relevant issue numbers in the tracker
 * API backward compatibility
 
+If you add a new configuration option, please try to do all of these things:
+
+* Make its name unambiguous in the context of multiple runners (e.g.
+  ``ec2_task_instance_type`` instead of ``instance_type``)
+* Add command line switches that allow full control over the option
+* Document the option and its switches in the appropriate file under ``docs``
+
 .. Copied from docs/guides/contributing.rst, which is the canonical text. This
    version exists only for Github.

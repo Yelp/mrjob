@@ -239,6 +239,11 @@ def add_hadoop_opts(opt_group):
             '--hdfs-scratch-dir', dest='hdfs_scratch_dir',
             default=None,
             help='Scratch space on HDFS (default is tmp/)'),
+
+        opt_group.add_option(
+            '--skip-hadoop-input-check', dest='check_hadoop_input_paths',
+            default=True, action='store_false',
+            help='Skip the checks to ensure all input paths exist'),
     ]
 
 

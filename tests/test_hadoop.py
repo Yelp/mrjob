@@ -240,6 +240,9 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
     def test_end_to_end_with_explicit_hadoop_bin(self):
         self._test_end_to_end(['--hadoop-bin', self.hadoop_bin])
 
+    def test_end_to_end_with_disabled_input_path_check(self):
+        self._test_end_to_end(['--skip-hadoop-input-check'])
+
 
 class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 

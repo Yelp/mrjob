@@ -108,7 +108,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         'hadoop_bin',
         'hadoop_home',
         'hdfs_scratch_dir',
-        'check_input'
+        'check_hadoop_input_paths'
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -151,7 +151,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         return combine_dicts(super_opts, {
             'hadoop_home': os.environ.get('HADOOP_HOME'),
             'hdfs_scratch_dir': 'tmp/mrjob',
-            'check_input': True
+            'check_hadoop_input_paths': True
         })
 
 
@@ -240,7 +240,7 @@ class HadoopJobRunner(MRJobRunner):
             if path == '-':
                 continue  # STDIN always exists
 
-            if self._opts['check_input']:
+            if self._opts['check_hadoop_input_paths']:
                 if not self.path_exists(path):
                     raise AssertionError(
                         'Input path %s does not exist!' % (path,))

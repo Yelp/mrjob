@@ -73,7 +73,7 @@ class MRTwoStepJob(MRJob):
     def steps(self):
         return [self.mr(mapper=self.mapper, reducer=self.reducer,
                         combiner=self.combiner),
-                self.mr(mapper=self.mapper2)]
+                self.mr(mapper=self.mapper2, jobconf={'x': 'z'})]
 
 if __name__ == '__main__':
     MRTwoStepJob.run()

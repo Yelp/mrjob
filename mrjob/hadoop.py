@@ -35,6 +35,7 @@ from mrjob.logparsers import HADOOP_JOB_LOG_URI_RE
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import best_error_from_logs
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
+from mrjob.parse import is_uri
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import cmd_line
@@ -76,7 +77,7 @@ def find_hadoop_streaming_jar(path):
 
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
-    if path.startswith('hdfs://') or path.startswith('s3n:/'):
+    if is_uri(path):
         return path
     elif path.startswith('/'):
         return 'hdfs://' + path
@@ -367,7 +368,8 @@ class HadoopJobRunner(MRJobRunner):
         # Add extra hadoop args first as hadoop args could be a hadoop
         # specific argument (e.g. -libjar) which must come before job
         # specific args.
-        streaming_args.extend(self._hadoop_conf_args(step_num, num_steps))
+        streaming_args.extend(
+            self._hadoop_conf_args(step, step_num, num_steps))
 
         # set up input
         for input_uri in self._hdfs_step_input_files(step_num):

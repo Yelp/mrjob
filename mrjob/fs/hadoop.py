@@ -137,7 +137,6 @@ class HadoopFilesystem(Filesystem):
         except CalledProcessError:
             raise IOError("Could not ls %s" % path_glob)
 
-        path_index = None
         for line in StringIO(stdout):
             line = line.rstrip('\r\n')
             fields = line.split(' ')
@@ -150,12 +149,12 @@ class HadoopFilesystem(Filesystem):
             # Expected lines:
             # -rw-r--r--   3 dave users       3276 2010-01-13 14:00 /foo/bar # HDFS
             # -rwxrwxrwx   1          3276 010-01-13 14:00 /foo/bar # S3
+            path_index = None
+            for index, field in enumerate(fields):
+                if len(field) == 5 and field[2] == ':':
+                    path_index = (index + 1)
             if not path_index:
-                for index, field in enumerate(fields):
-                    if len(field) == 5 and field[2] == ':':
-                        path_index = (index + 1)
-                if not path_index:
-                    raise IOError("Could not locate path in string '%s'" % line)
+                raise IOError("Could not locate path in string '%s'" % line)
 
             path = line.split(' ', path_index)[-1]
             # handle fully qualified URIs from newer versions of Hadoop ls

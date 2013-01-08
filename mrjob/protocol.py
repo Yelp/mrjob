@@ -23,10 +23,14 @@ import cPickle
 from mrjob.util import safeeval
 
 try:
-    import simplejson as json  # preferred because of C speedups
-    json  # quiet "redefinition of unused ..." warning from pyflakes
+    import ujson as json  #faster than simplejson
+    json
 except ImportError:
-    import json  # built in to Python 2.6 and later
+    try:
+        import simplejson as json  # preferred because of C speedups
+        json  # quiet "redefinition of unused ..." warning from pyflakes
+    except ImportError:
+        import json  # built in to Python 2.6 and later
 
 
 # DEPRECATED: Abstract base class for all protocols. Now just an alias for

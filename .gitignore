@@ -3,7 +3,8 @@
 *.pyc
 *~
 *.swp
-
+.project
+.pydevproject
 build
 dist
 mrjob.egg-info

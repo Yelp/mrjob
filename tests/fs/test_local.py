@@ -54,13 +54,13 @@ class LocalFSTestCase(SandboxedTestCase):
     def test_ls_basic_2(self):
         self.makefile('f', 'contents')
         self.makefile('f2', 'contents')
-        self.assertEqual(list(self.fs.ls(self.tmp_dir)),
+        self.assertItemsEqual(list(self.fs.ls(self.tmp_dir)),
                          self.abs_paths('f', 'f2'))
 
     def test_ls_recurse(self):
         self.makefile('f', 'contents')
         self.makefile('d/f2', 'contents')
-        self.assertEqual(list(self.fs.ls(self.tmp_dir)),
+        self.assertItemsEqual(list(self.fs.ls(self.tmp_dir)),
                          self.abs_paths('f', 'd/f2'))
 
     def test_cat_uncompressed(self):

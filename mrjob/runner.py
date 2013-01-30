@@ -44,6 +44,7 @@ except:
     import json
     JSONDecodeError = ValueError
 
+from mrjob.compat import translate_jobconf
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.compat import supports_combiners_in_hadoop_streaming
@@ -997,6 +998,36 @@ class MRJobRunner(object):
 
         return self._mrjob_tar_gz_path
 
+    def translate_jobconf_for_hadoop_version(self, jobconf, hadoop_version):
+        """ Translates the configuration property names to match those that
+        are accepted in hadoop_version. Prints a warning message if any
+        configuration property name does not match the name in the hadoop
+        version
+
+        :return: a map of configuration name to their values where all
+        the configuration names are recognized by the hadoop_version
+        """
+        translated_jobconf = {}
+        mismatch_key_to_translated_key = {}
+        for key, value in jobconf.iteritems():
+            new_key = translate_jobconf(key, hadoop_version)
+            if key != new_key:
+                translated_jobconf[new_key] = value
+                mismatch_key_to_translated_key[key] = new_key
+            else:
+                translated_jobconf[key] = value
+
+        if mismatch_key_to_translated_key:
+            log.warning("Detected hadoop configuration property names that"
+                        " do not match hadoop version %s:"
+                        "\nThe have been translated as follows\n %s",
+                        hadoop_version,
+                        '\n'.join(["%s:%s" % (key, value) for key, value
+                                 in mismatch_key_to_translated_key.iteritems()])
+                    )
+
+        return translated_jobconf
+
     def _hadoop_conf_args(self, step, step_num, num_steps):
         """Build a list of extra arguments to the hadoop binary.
 
@@ -1017,9 +1048,19 @@ class MRJobRunner(object):
 
         # new-style jobconf
         version = self.get_hadoop_version()
+
+        # translate the jobconf configuration names to match
+        # the hadoop version
+        jobconf = self.translate_jobconf_for_hadoop_version(jobconf,
+                                                            version)
         if uses_generic_jobconf(version):
             for key, value in sorted(jobconf.iteritems()):
                 args.extend(['-D', '%s=%s' % (key, value)])
+        # old-style jobconf
+        else:
+            for key, value in sorted(jobconf.iteritems()):
+                args.extend(['-jobconf', '%s=%s' % (key, value)])
+
 
         # partitioner
         if self._partitioner:
@@ -1037,11 +1078,6 @@ class MRJobRunner(object):
         # hadoop_output_format
         if (step_num == num_steps - 1 and self._hadoop_output_format):
             args.extend(['-outputformat', self._hadoop_output_format])
-
-        # old-style jobconf
-        if not uses_generic_jobconf(version):
-            for key, value in sorted(jobconf.iteritems()):
-                args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         return args
 

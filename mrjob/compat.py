@@ -645,3 +645,34 @@ def version_gte(version, cmp_version_str):
         raise TypeError('%r is not a string' % cmp_version_str)
 
     return LooseVersion(version) >= LooseVersion(cmp_version_str)
+
+
+def translate_jobconf_for_hadoop_version(jobconf, hadoop_version):
+    """ Translates the configuration property names to match those that
+    are accepted in hadoop_version. Prints a warning message if any
+    configuration property name does not match the name in the hadoop
+    version
+
+    :return: a map of configuration name to their values where all
+    the configuration names are recognized by the hadoop_version
+    """
+    translated_jobconf = {}
+    mismatch_key_to_translated_key = {}
+    for key, value in jobconf.iteritems():
+        new_key = translate_jobconf(key, hadoop_version)
+        if key != new_key:
+            translated_jobconf[new_key] = value
+            mismatch_key_to_translated_key[key] = new_key
+        else:
+            translated_jobconf[key] = value
+
+        if mismatch_key_to_translated_key:
+            log.warning("Detected hadoop configuration property names that"
+                        " do not match hadoop version %s:"
+                        "\nThe have been translated as follows\n %s",
+                        hadoop_version,
+                        '\n'.join(["%s:%s" % (key, value) for key, value
+                                   in mismatch_key_to_translated_key.iteritems()])
+            )
+
+    return translated_jobconf

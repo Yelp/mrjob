@@ -44,7 +44,7 @@ except:
     import json
     JSONDecodeError = ValueError
 
-from mrjob.compat import translate_jobconf_for_hadoop_version
+from mrjob.compat import add_translated_jobconf_for_hadoop_version
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.compat import supports_combiners_in_hadoop_streaming
@@ -1021,7 +1021,7 @@ class MRJobRunner(object):
 
         # translate the jobconf configuration names to match
         # the hadoop version
-        jobconf = translate_jobconf_for_hadoop_version(jobconf,
+        jobconf = add_translated_jobconf_for_hadoop_version(jobconf,
                                                             version)
         if uses_generic_jobconf(version):
             for key, value in sorted(jobconf.iteritems()):

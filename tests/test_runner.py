@@ -453,6 +453,16 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
                           '-jobconf', 'FOO=bar',
                           ])
 
+    def test_configuration_translation(self):
+        jobconf = {'mapred.jobtracker.maxtasks.per.job': 1}
+        with no_handlers_for_logger('mrjob.compat'):
+            runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf,
+                                  hadoop_version='0.21')
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
+                         ['-D', 'mapred.jobtracker.maxtasks.per.job=1',
+                          '-D', 'mapreduce.jobtracker.maxtasks.perjob=1'
+                          ])
+
     def test_jobconf_from_step(self):
         jobconf = {'FOO': 'bar', 'BAZ': 'qux'}
         runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf)

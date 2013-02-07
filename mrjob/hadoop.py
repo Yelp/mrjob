@@ -15,6 +15,8 @@
 import getpass
 import logging
 import os
+import pty
+import select
 import posixpath
 import re
 from subprocess import Popen
@@ -291,11 +293,16 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args = self._streaming_args(step, step_num, len(steps))
 
             log.debug('> %s' % cmd_line(streaming_args))
-            step_proc = Popen(streaming_args, stdout=PIPE, stderr=PIPE)
 
-            # TODO: use a pty or something so that the hadoop binary
-            # won't buffer the status messages
-            self._process_stderr_from_streaming(step_proc.stderr)
+            master, slave = pty.openpty()
+
+            step_proc = Popen(streaming_args, stdout=PIPE, stderr=slave)
+
+            stderr = os.fdopen(master)
+
+            self._process_stderr_from_streaming(step_proc, stderr)
+
+            stderr.close()
 
             # there shouldn't be much output to STDOUT
             for line in step_proc.stdout:
@@ -334,8 +341,20 @@ class HadoopJobRunner(MRJobRunner):
                 raise Exception(msg)
                 raise CalledProcessError(step_proc.returncode, streaming_args)
 
-    def _process_stderr_from_streaming(self, stderr):
-        for line in stderr:
+    def _process_stderr_from_streaming(self, proc, stderr):
+        q = select.poll()
+        q.register(stderr,select.POLLIN)
+
+        while proc.poll() is None:
+            l = q.poll(1000)
+            if not l:
+                #log.info("No data %s" % str(proc.poll()))
+                continue
+
+            line = stderr.readline()
+            if not line:
+                break
+
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
             log.info('HADOOP: ' + line)
 

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2011 Matthew Tai
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,7 +34,9 @@ from mrjob.inline import InlineMRJobRunner
 from mrjob.protocol import JSONValueProtocol
 from tests.mr_test_cmdenv import MRTestCmdenv
 from mrjob.job import MRJob
+from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.mr_word_count import MRWordCount
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
@@ -172,3 +175,71 @@ class NoMRJobConfTestCase(TestCase):
                 output = sorted(mr_job.parse_output_line(line)[1]
                                 for line in runner.stream_output())
                 self.assertEqual(output, [2, 3, 4])
+
+
+class InlineMRJobRunnerTestJobConfCase(SandboxedTestCase):
+
+    def test_input_file(self):
+        input_path = os.path.join(self.tmp_dir, 'input')
+        with open(input_path, 'w') as input_file:
+            input_file.write('bar\nqux\nfoo\n')
+
+        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz = gzip.GzipFile(input_gz_path, 'w')
+        input_gz.write('foo\n')
+        input_gz.close()
+
+        mr_job = MRWordCount(['-r', 'inline',
+                              '--jobconf=mapred.map.tasks=2',
+                              '--jobconf=mapred.reduce.tasks=2',
+                              input_path, input_gz_path])
+        mr_job.sandbox()
+
+        results = []
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results.append((key, value))
+
+            self.assertEqual(runner.counters()[0]['count']['combiners'], 2)
+
+        self.assertEqual(sorted(results),
+                         [(input_path, 3), (input_gz_path, 1)])
+
+    def test_others(self):
+        input_path = os.path.join(self.tmp_dir, 'input')
+        with open(input_path, 'w') as input_file:
+            input_file.write('foo\n')
+
+        mr_job = MRTestJobConf(['-r', 'inline',
+                                '--jobconf=user.defined=something',
+                               input_path])
+        mr_job.sandbox()
+
+        results = {}
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results[key] = value
+
+        self.assertEqual(results['mapreduce.job.id'], runner._job_name)
+        self.assertEqual(results['mapreduce.job.local.dir'],
+                         runner._working_dir)
+        self.assertEqual(results['mapreduce.map.input.file'], input_path)
+        self.assertEqual(results['mapreduce.map.input.length'], '4')
+        self.assertEqual(results['mapreduce.map.input.start'], '0')
+        self.assertEqual(results['mapreduce.task.attempt.id'],
+                       'attempt_%s_mapper_000000_0' % runner._job_name)
+        self.assertEqual(results['mapreduce.task.id'],
+                       'task_%s_mapper_000000' % runner._job_name)
+        self.assertEqual(results['mapreduce.task.ismap'], 'true')
+        self.assertEqual(results['mapreduce.task.output.dir'],
+                         runner._output_dir)
+        self.assertEqual(results['mapreduce.task.partition'], '0')
+        self.assertEqual(results['user.defined'], 'something')

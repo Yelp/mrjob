@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -787,6 +788,11 @@ class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
                     now - timedelta(minutes=i)),
                 jobflowid=job_flow_id)
 
+        # add a mock object without the jobflowid attribute
+        mock_job_flow_id = 5555
+        self.mock_emr_job_flows[mock_job_flow_id] = MockEmrObject(
+                        creationdatetime=to_iso8601(now))
+
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
 
         # ordinary describe_jobflows() hits the limit on number of job flows
@@ -1455,7 +1461,8 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
 
     def test_present_counters_running_job(self):
         self.add_mock_s3_data({'walrus': {
-            'logs/j-MOCKJOBFLOW0/jobs/job_0_1_hadoop_streamjob1.jar': self.COUNTER_LINE}})
+            'logs/j-MOCKJOBFLOW0/jobs/job_0_1_hadoop_streamjob1.jar':
+            self.COUNTER_LINE}})
         self.runner._describe_jobflow().state = 'RUNNING'
         self.runner._fetch_counters([1], skip_s3_wait=True)
         self.assertEqual(self.runner.counters(),
@@ -1463,7 +1470,8 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
 
     def test_present_counters_terminated_job(self):
         self.add_mock_s3_data({'walrus': {
-            'logs/j-MOCKJOBFLOW0/jobs/job_0_1_hadoop_streamjob1.jar': self.COUNTER_LINE}})
+            'logs/j-MOCKJOBFLOW0/jobs/job_0_1_hadoop_streamjob1.jar':
+            self.COUNTER_LINE}})
         self.runner._describe_jobflow().state = 'TERMINATED'
         self.runner._fetch_counters([1], skip_s3_wait=True)
         self.assertEqual(self.runner.counters(),
@@ -1471,7 +1479,8 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
 
     def test_present_counters_step_mismatch(self):
         self.add_mock_s3_data({'walrus': {
-            'logs/j-MOCKJOBFLOW0/jobs/job_0_1_hadoop_streamjob1.jar': self.COUNTER_LINE}})
+            'logs/j-MOCKJOBFLOW0/jobs/job_0_1_hadoop_streamjob1.jar':
+            self.COUNTER_LINE}})
         self.runner._describe_jobflow().state = 'RUNNING'
         self.runner._fetch_counters([2], {2: 1}, skip_s3_wait=True)
         self.assertEqual(self.runner.counters(),
@@ -1776,7 +1785,6 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False)
-        script_path = os.path.join(self.tmp_dir, 'b.py')
 
         runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
@@ -2593,6 +2601,7 @@ class TestCatFallback(MockEMRAndS3TestCase):
         self.assertRaises(
             IOError, list,
             runner.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
+
 
 class CleanUpJobTestCase(MockEMRAndS3TestCase):
 

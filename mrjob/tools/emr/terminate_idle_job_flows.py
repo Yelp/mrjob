@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -86,7 +87,7 @@ def main(cl_args=None):
                          verbose=options.verbose)
 
     inspect_and_maybe_terminate_job_flows(
-        conf_paths=[options.conf_path],
+        conf_paths=[options.conf_paths],
         dry_run=options.dry_run,
         max_hours_idle=options.max_hours_idle,
         mins_to_end_of_hour=options.mins_to_end_of_hour,

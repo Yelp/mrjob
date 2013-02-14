@@ -24,7 +24,7 @@ from subprocess import PIPE
 import sys
 
 from mrjob.conf import combine_dicts
-from mrjob.dev_runner import DevMRJobRunner
+from mrjob.sim import SimMRJobRunner
 from mrjob.dev_runner import DevRunnerOptionStore
 from mrjob.parse import find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
@@ -90,7 +90,7 @@ class LocalRunnerOptionStore(DevRunnerOptionStore):
         })
 
 
-class LocalMRJobRunner(DevMRJobRunner):
+class LocalMRJobRunner(SimMRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing purposes.
 
     This is NOT the default way of running jobs; we assume you'll spend some

@@ -41,13 +41,14 @@ class DevRunnerOptionStore(RunnerOptionStore):
     })
 
 
-class DevMRJobRunner(MRJobRunner):
+class SimMRJobRunner(MRJobRunner):
     """Abstract base class for runners for testing jobs in development
 
     The inline and local runners inherit from this class so functionality
-    common to them has been moved here.
+    common to them has been moved here.:py:method: run_step must be overriden
+    by classes that extend SimMRJobRunner
 
-    :py:class:`LocalMRJobRunner` and :py:class:`InlineMRJobRunner` simulates
+    :py:class:`LocalMRJobRunner` and :py:class:`InlineMRJobRunner` simulate
     the following jobconf variables:
 
     * ``mapreduce.job.cache.archives``
@@ -65,7 +66,7 @@ class DevMRJobRunner(MRJobRunner):
     * ``mapreduce.task.output.dir``
     * ``mapreduce.task.partition``
 
-    If you specify *hadoop_version* <= 0.18, the simulated environment
+    If you specify *hadoop_version* <= 0.21, the simulated environment
     variables will change to use the names corresponding with the older Hadoop
     version.
 
@@ -87,7 +88,7 @@ class DevMRJobRunner(MRJobRunner):
     ]
 
     def __init__(self, **kwargs):
-        super(DevMRJobRunner, self).__init__(**kwargs)
+        super(SimMRJobRunner, self).__init__(**kwargs)
         self._working_dir = None
         self._prev_outfiles = []
         self._counters = []
@@ -111,9 +112,6 @@ class DevMRJobRunner(MRJobRunner):
                 log.warning(
                     'ignoring %s keyword arg (requires real Hadoop): %r' %
                     (ignored_attr[1:], value))
-
-    def _create_wrapper_script(self):
-        pass
 
     def _symlink_to_file_or_copy(self, path, dest):
         """Symlink from *dest* to the absolute version of *path*.
@@ -278,7 +276,7 @@ class DevMRJobRunner(MRJobRunner):
         """ Runner specific per step method
         Inline and local runners override this method
         """
-        pass
+        raise NotImplementedError("Subclass must implement this method")
 
     def per_step_runner_finish(self, step_num):
         """ Runner specific method to be executed to mark the step completion.

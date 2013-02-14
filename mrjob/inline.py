@@ -29,7 +29,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from mrjob.dev_runner import DevMRJobRunner
+from mrjob.sim import SimMRJobRunner
 from mrjob.dev_runner import DevRunnerOptionStore
 from mrjob.job import MRJob
 from mrjob.util import save_current_environment
@@ -40,7 +40,7 @@ DEFAULT_MAP_TASKS = 1
 DEFAULT_REDUCE_TASKS = 1
 
 
-class InlineMRJobRunner(DevMRJobRunner):
+class InlineMRJobRunner(SimMRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` without invoking the job as
     a subprocess, so it's easy to attach a debugger.
 

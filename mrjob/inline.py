@@ -30,7 +30,7 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob.sim import SimMRJobRunner
-from mrjob.dev_runner import DevRunnerOptionStore
+from mrjob.sim import SimRunnerOptionStore
 from mrjob.job import MRJob
 from mrjob.util import save_current_environment
 
@@ -53,7 +53,7 @@ class InlineMRJobRunner(SimMRJobRunner):
 
     alias = 'inline'
 
-    OPTION_STORE_CLASS = DevRunnerOptionStore
+    OPTION_STORE_CLASS = SimRunnerOptionStore
 
     def __init__(self, mrjob_cls=None, **kwargs):
         """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword

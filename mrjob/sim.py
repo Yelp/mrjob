@@ -34,7 +34,7 @@ from mrjob.util import unarchive
 log = logging.getLogger(__name__)
 
 
-class DevRunnerOptionStore(RunnerOptionStore):
+class SimRunnerOptionStore(RunnerOptionStore):
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
         'cmdenv': combine_local_envs,

@@ -25,7 +25,7 @@ import sys
 
 from mrjob.conf import combine_dicts
 from mrjob.sim import SimMRJobRunner
-from mrjob.dev_runner import DevRunnerOptionStore
+from mrjob.sim import SimRunnerOptionStore
 from mrjob.parse import find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.util import cmd_line
@@ -80,7 +80,7 @@ def _chain_procs(procs_args, **kwargs):
     return procs
 
 
-class LocalRunnerOptionStore(DevRunnerOptionStore):
+class LocalRunnerOptionStore(SimRunnerOptionStore):
 
     def default_options(self):
         super_opts = super(LocalRunnerOptionStore, self).default_options()

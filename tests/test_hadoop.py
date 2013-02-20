@@ -23,8 +23,15 @@ from subprocess import check_call
 
 from mock import patch
 
+try:
+    import unittest2 as unittest
+    unittest  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    import unittest
+
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
+from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.util import bash_wrap
 from mrjob.util import shlex_split
 
@@ -33,6 +40,36 @@ from tests.mockhadoop import add_mock_hadoop_output
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+
+
+class TestFullyQualifyHDFSPath(unittest.TestCase):
+
+    def test_empty(self):
+        with patch('getpass.getuser') as getuser:
+            getuser.return_value = 'dave'
+            self.assertEqual(fully_qualify_hdfs_path(''), 'hdfs:///user/dave/')
+
+    def test_relative_path(self):
+        with patch('getpass.getuser') as getuser:
+            getuser.return_value = 'dave'
+            self.assertEqual(fully_qualify_hdfs_path('path/to/chocolate'),
+                             'hdfs:///user/dave/path/to/chocolate')
+
+    def test_absolute_path(self):
+        self.assertEqual(fully_qualify_hdfs_path('/path/to/cheese'),
+                         'hdfs:///path/to/cheese')
+
+    def test_hdfs_uri(self):
+        self.assertEqual(fully_qualify_hdfs_path('hdfs://host/path/'),
+                         'hdfs://host/path/')
+
+    def test_s3n_uri(self):
+        self.assertEqual(fully_qualify_hdfs_path('s3n://bucket/oh/noes'),
+                         's3n://bucket/oh/noes')
+
+    def test_other_uri(self):
+        self.assertEqual(fully_qualify_hdfs_path('foo://bar/baz'),
+                         'foo://bar/baz')
 
 
 class TestHadoopHomeRegression(SandboxedTestCase):
@@ -188,6 +225,10 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         # make sure -jobconf made it through
         self.assertIn('-D', step_0_args)
+        self.assertIn('x=y', step_0_args)
+        self.assertIn('-D', step_1_args)
+        # job overrides jobconf in step 1
+        self.assertIn('x=z', step_1_args)
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)

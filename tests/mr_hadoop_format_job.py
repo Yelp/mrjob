@@ -38,7 +38,7 @@ class MRHadoopFormatJob(MRJob):
 
     def steps(self):
         return [self.mr(self.mapper, self.reducer, combiner=self.combiner),
-                self.mr(self.mapper2)]
+                self.mr(self.mapper2, jobconf={'x': 'z'})]
 
 
 if __name__ == '__main__':

@@ -48,41 +48,55 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.env['USER'] = 'mrjob_tests'
         # don't set MOCK_HADOOP_LOG, we get command history other ways
 
-    def make_hdfs_file(self, name, contents):
+    def make_mock_file(self, name, contents='contents'):
         return self.makefile(os.path.join('mock_hdfs_root', name), contents)
 
     def test_ls_empty(self):
         self.assertEqual(list(self.fs.ls('hdfs:///')), [])
 
     def test_ls_basic(self):
-        self.make_hdfs_file('f', 'contents')
+        self.make_mock_file('f')
         self.assertEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///f'])
 
     def test_ls_basic_2(self):
-        self.make_hdfs_file('f', 'contents')
-        self.make_hdfs_file('f2', 'contents')
-        self.assertEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///f',
+        self.make_mock_file('f')
+        self.make_mock_file('f2')
+        self.assertItemsEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///f',
                                                         'hdfs:///f2'])
-
     def test_ls_recurse(self):
-        self.make_hdfs_file('f', 'contents')
-        self.make_hdfs_file('d/f2', 'contents')
-        self.assertEqual(list(self.fs.ls('hdfs:///')),
+        self.make_mock_file('f')
+        self.make_mock_file('d/f2')
+        self.assertItemsEqual(list(self.fs.ls('hdfs:///')),
                          ['hdfs:///f', 'hdfs:///d/f2'])
+
+    def test_ls_s3n(self):
+        # hadoop fs -lsr doesn't have user and group info when reading from s3
+        self.make_mock_file('f')
+        self.assertItemsEqual(list(self.fs.ls('s3n://bucket/')),
+                         ['s3n://bucket/f'])
+
+    def test_single_space(self):
+        self.make_mock_file('foo bar')
+        self.assertItemsEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///foo bar'])
+
+    def test_double_space(self):
+        self.make_mock_file('foo  bar')
+        self.assertItemsEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///foo  bar'])
 
     def test_cat_uncompressed(self):
         # mockhadoop doesn't support compressed files, so we won't test for it.
         # this is only a sanity check anyway.
-        self.makefile(os.path.join('mock_hdfs_root', 'data', 'foo'), 'foo\nfoo\n')
+        self.make_mock_file('data/foo', 'foo\nfoo\n')
+
         remote_path = self.fs.path_join('hdfs:///data', 'foo')
 
-        self.assertEqual(list(self.fs._cat_file(remote_path)), ['foo\n', 'foo\n'])
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n', 'foo\n'])
 
     def test_du(self):
-        self.makefile(os.path.join('mock_hdfs_root', 'data1'), 'abcd')
-        self.makedirs('mock_hdfs_root/more')
-        self.makefile(os.path.join('mock_hdfs_root', 'more', 'data2'), 'defg')
-        self.makefile(os.path.join('mock_hdfs_root', 'more', 'data3'), 'hijk')
+        self.make_mock_file('data1', 'abcd')
+        self.make_mock_file('more/data2', 'defg')
+        self.make_mock_file('more/data3', 'hijk')
 
         self.assertEqual(self.fs.du('hdfs:///'), 12)
         self.assertEqual(self.fs.du('hdfs:///data1'), 4)
@@ -101,12 +115,12 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.assertEqual(self.fs.path_exists(path), False)
 
     def test_path_exists_yes(self):
-        self.make_hdfs_file('f', 'contents')
+        self.make_mock_file('f')
         path = 'hdfs:///f'
         self.assertEqual(self.fs.path_exists(path), True)
 
     def test_rm(self):
-        local_path = self.make_hdfs_file('f', 'contents')
+        local_path = self.make_mock_file('f')
         self.assertEqual(os.path.exists(local_path), True)
         self.fs.rm('hdfs:///f')
         self.assertEqual(os.path.exists(local_path), False)
@@ -114,3 +128,11 @@ class HadoopFSTestCase(MockSubprocessTestCase):
     def test_touchz(self):
         # mockhadoop doesn't implement this.
         pass
+
+
+class NewerHadoopFSTestCase(HadoopFSTestCase):
+
+    def set_up_mock_hadoop(self):
+        super(NewerHadoopFSTestCase, self).set_up_mock_hadoop()
+
+        self.env['MOCK_HADOOP_LS_RETURNS_FULL_URIS'] = '1'

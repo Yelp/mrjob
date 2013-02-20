@@ -44,6 +44,7 @@ except:
     import json
     JSONDecodeError = ValueError
 
+from mrjob.compat import add_translated_jobconf_for_hadoop_version
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.compat import supports_combiners_in_hadoop_streaming
@@ -997,7 +998,7 @@ class MRJobRunner(object):
 
         return self._mrjob_tar_gz_path
 
-    def _hadoop_conf_args(self, step_num, num_steps):
+    def _hadoop_conf_args(self, step, step_num, num_steps):
         """Build a list of extra arguments to the hadoop binary.
 
         This handles *cmdenv*, *hadoop_extra_args*, *hadoop_input_format*,
@@ -1010,14 +1011,26 @@ class MRJobRunner(object):
 
         args = []
 
+        jobconf = combine_dicts(self._opts['jobconf'], step.get('jobconf'))
+
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])
 
         # new-style jobconf
         version = self.get_hadoop_version()
+
+        # translate the jobconf configuration names to match
+        # the hadoop version
+        jobconf = add_translated_jobconf_for_hadoop_version(jobconf,
+                                                            version)
         if uses_generic_jobconf(version):
-            for key, value in sorted(self._opts['jobconf'].iteritems()):
+            for key, value in sorted(jobconf.iteritems()):
                 args.extend(['-D', '%s=%s' % (key, value)])
+        # old-style jobconf
+        else:
+            for key, value in sorted(jobconf.iteritems()):
+                args.extend(['-jobconf', '%s=%s' % (key, value)])
+
 
         # partitioner
         if self._partitioner:
@@ -1035,11 +1048,6 @@ class MRJobRunner(object):
         # hadoop_output_format
         if (step_num == num_steps - 1 and self._hadoop_output_format):
             args.extend(['-outputformat', self._hadoop_output_format])
-
-        # old-style jobconf
-        if not uses_generic_jobconf(version):
-            for key, value in sorted(self._opts['jobconf'].iteritems()):
-                args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         return args
 

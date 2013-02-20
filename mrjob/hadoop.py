@@ -16,7 +16,6 @@ import getpass
 import logging
 import os
 import pty
-import select
 import posixpath
 import re
 from subprocess import Popen
@@ -294,21 +293,32 @@ class HadoopJobRunner(MRJobRunner):
 
             log.debug('> %s' % cmd_line(streaming_args))
 
-            master, slave = pty.openpty()
+            # try to use a PTY if it's available
+            try:
+                pid, master_fd = pty.fork()
+            except (AttributeError, OSError):
+                # no PTYs, just use Popen
+                step_proc = Popen(streaming_args, stdout=PIPE, stderr=PIPE)
 
-            step_proc = Popen(streaming_args, stdout=PIPE, stderr=slave)
+                self._process_stderr_from_streaming(step_proc.stderr)
 
-            stderr = os.fdopen(master)
+                # there shouldn't be much output to STDOUT
+                for line in step_proc.stdout:
+                    log.error('STDOUT: ' + line.strip('\n'))
 
-            self._process_stderr_from_streaming(step_proc, stderr)
+                returncode = step_proc.wait()
+            else:
+                # we have PTYs
+                if pid == 0:  # we are the child process
+                    os.execvp(streaming_args[0], streaming_args)
+                else:
+                    master = os.fdopen(master_fd)
+                    # reading from master gives us the subprocess's
+                    # stderr and stdout (it's a fake terminal)
+                    self._process_stderr_from_streaming(master)
+                    _, returncode = os.waitpid(pid, 0)
+                    master.close()
 
-            stderr.close()
-
-            # there shouldn't be much output to STDOUT
-            for line in step_proc.stdout:
-                log.error('STDOUT: ' + line.strip('\n'))
-
-            returncode = step_proc.wait()
             if returncode == 0:
                 # parsing needs step number for whole job
                 self._fetch_counters([step_num + self._start_step_num])
@@ -341,20 +351,8 @@ class HadoopJobRunner(MRJobRunner):
                 raise Exception(msg)
                 raise CalledProcessError(step_proc.returncode, streaming_args)
 
-    def _process_stderr_from_streaming(self, proc, stderr):
-        q = select.poll()
-        q.register(stderr,select.POLLIN)
-
-        while proc.poll() is None:
-            l = q.poll(1000)
-            if not l:
-                #log.info("No data %s" % str(proc.poll()))
-                continue
-
-            line = stderr.readline()
-            if not line:
-                break
-
+    def _process_stderr_from_streaming(self, stderr):
+        for line in stderr:
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
             log.info('HADOOP: ' + line)
 

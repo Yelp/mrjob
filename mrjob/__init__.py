@@ -26,6 +26,7 @@ __credits__ = [
     'Reno Bowen <renobowen@gmail.com>',
     'James Brown <jbrown@yelp.com>',
     'Kevin Burke <kevin@twilio.com>',
+    'Jordan Christensen <jc@kobo.com>',
     'David Dehghan <ddehghan@gmail.com>',
     'Adam Derewecki <derewecki@gmail.com>',
     'Tom Dooner <tomdooner@gmail.com>',

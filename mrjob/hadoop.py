@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import errno
 import getpass
 import logging
 import os
@@ -352,7 +352,20 @@ class HadoopJobRunner(MRJobRunner):
                 raise CalledProcessError(step_proc.returncode, streaming_args)
 
     def _process_stderr_from_streaming(self, stderr):
-        for line in stderr:
+
+        def treat_io_error_as_eof(iter):
+            # on Linux, the PTY gives us a specific IOError when the
+            # when the child process exits, rather than EOF.
+            while True:
+                try:
+                    yield iter.next()  # okay for StopIteration to bubble up
+                except IOError, e:
+                    if e.errno == errno.EIO:
+                        return
+                    else:
+                        raise
+
+        for line in treat_io_error_as_eof(stderr):
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
             log.info('HADOOP: ' + line)
 

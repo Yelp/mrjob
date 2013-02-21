@@ -353,7 +353,7 @@ class HadoopJobRunner(MRJobRunner):
 
     def _process_stderr_from_streaming(self, stderr):
 
-        def treat_io_error_as_eof(iter):
+        def treat_eio_as_eof(iter):
             # on Linux, the PTY gives us a specific IOError when the
             # when the child process exits, rather than EOF.
             while True:
@@ -365,7 +365,7 @@ class HadoopJobRunner(MRJobRunner):
                     else:
                         raise
 
-        for line in treat_io_error_as_eof(stderr):
+        for line in treat_eio_as_eof(stderr):
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
             log.info('HADOOP: ' + line)
 

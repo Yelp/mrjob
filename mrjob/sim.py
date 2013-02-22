@@ -45,7 +45,7 @@ class SimMRJobRunner(MRJobRunner):
     """Abstract base class for runners for testing jobs in development
 
     The inline and local runners inherit from this class so functionality
-    common to them has been moved here.:py:method: run_step must be overriden
+    common to them has been moved here.:py:method:`run_step` must be overriden
     by classes that extend SimMRJobRunner
 
     :py:class:`LocalMRJobRunner` and :py:class:`InlineMRJobRunner` simulate

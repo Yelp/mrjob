@@ -22,7 +22,6 @@ except ImportError:
 from mrjob.setup import UploadDirManager
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import name_uniquely
-from mrjob.setup import parse_hash_path
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 
@@ -116,44 +115,6 @@ class ParseSetupCmdTestCase(unittest.TestCase):
     def test_missing_escaped_character(self):
         self.assertRaises(
             ValueError, parse_setup_cmd, 'foo\\')
-
-
-class ParseHashPathTestCase(unittest.TestCase):
-
-    def test_empty(self):
-        self.assertRaises(ValueError, parse_hash_path, '')
-        self.assertRaises(TypeError, parse_hash_path, None)
-
-    def test_basic(self):
-        self.assertEqual(
-            parse_hash_path('foo#bar'),
-            {'type': 'file', 'path': 'foo', 'name': 'bar'})
-        self.assertEqual(
-            parse_hash_path('/dir/foo#bar'),
-            {'type': 'file', 'path': '/dir/foo', 'name': 'bar'})
-        self.assertEqual(
-            parse_hash_path('foo#bar/'),
-            {'type': 'archive', 'path': 'foo', 'name': 'bar'})
-        self.assertEqual(
-            parse_hash_path('/dir/foo#bar/'),
-            {'type': 'archive', 'path': '/dir/foo', 'name': 'bar'})
-
-    def test_no_path(self):
-        self.assertRaises(ValueError, parse_hash_path, '#bar')
-
-    def test_no_name(self):
-        self.assertEqual(parse_hash_path('foo#'),
-                         {'type': 'file', 'path': 'foo', 'name': None})
-        self.assertEqual(parse_hash_path('foo#/'),
-                         {'type': 'archive', 'path': 'foo', 'name': None})
-
-    def test_no_hash(self):
-        self.assertRaises(ValueError, parse_hash_path, 'foo')
-
-    def test_bad_name(self):
-        self.assertRaises(ValueError, parse_hash_path, 'foo#bar#baz')
-        # can't place files in subdirectories
-        self.assertRaises(ValueError, parse_hash_path, 'foo#bar/baz')
 
 
 class ParseLegacyHashPathTestCase(unittest.TestCase):

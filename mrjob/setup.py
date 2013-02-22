@@ -100,53 +100,12 @@ def parse_setup_cmd(cmd):
     return tokens
 
 
-# TODO: This is a model for how we expect to handle "new" hash paths to work.
-# This may not need to exist as a separate function because our final
-# goal is to parse these expressions out of a command-line with a regex,
-# in which case most of the parsing work will already be done, and many
-# of the error cases will be impossible.
-def parse_hash_path(hash_path):
-    """Parse Hadoop Distributed Cache-style paths into a dictionary.
-
-    For example:
-    >>> parse_hash_path('/foo/bar.py#baz.py')
-    {'path': '/foo/bar.py', 'name': 'baz.py', 'type': 'file'}
-
-    A slash at the end of the name indicates an archive:
-    >>> parse_hash_path('/foo/bar.tar.gz#baz/')
-    {'path': '/foo/bar.py', 'name': 'baz.py', 'type': 'archive'}
-
-    An empty name (e.g. ``'/foo/bar.py#'``) indicates any name is acceptable.
-    """
-    if not '#' in hash_path:
-        raise ValueError('bad hash path %r, must contain #' % (hash_path,))
-
-    path, name = hash_path.split('#', 1)
-
-    if name.endswith('/'):
-        type = 'archive'
-        name = name[:-1]
-    else:
-        type = 'file'
-
-    if not path:
-        raise ValueError('Path may not be empty!')
-
-    if '/' in name or '#' in name:
-        raise ValueError('bad path %r; name must not contain # or /' % (path,))
-
-    # use None for no name
-    if not name:
-        name = None
-
-    return {'path': path, 'name': name, 'type': type}
-
-
 def parse_legacy_hash_path(type, path, must_name=None):
     """Parse hash paths from old setup/bootstrap options.
 
-    This is similar to :py:func:`parse_hash_path` except that we pass in
-    path type explicitly, and we don't always require the hash.
+    This is similar to parsing hash paths out of shell commands (see
+    :py:func:`parse_setup_cmd`) except that we pass in
+    path type explicitly, and we don't always require the ``#`` character.
 
     :param type: Type of the path (``'archive'`` or ``'file'``)
     :param path: Path to parse, possibly with a ``#``

@@ -53,12 +53,12 @@ SETUP_CMD_RE = re.compile(
     r'(?P<double_quoted>"([^"\\]|\\.)*")|'
     r'(?P<hash_path>'
         r'(?P<path>([A-Za-z][A-Za-z0-9\.-]*://([^\'"\s\\]|\\.)+)|'
-            r'([^\'":\s\\]|\\.)+)'
-        r'#(?P<name>([^\'":/#\s\\]|\\.)*)'
+            r'([^\'":=\s\\]|\\.)+)'
+        r'#(?P<name>([^\'":;><|=/#\s\\]|\\.)*)'
             r'(?P<name_slash>/)?)|'
-    r'(?P<unquoted>([^\'":\s\\]|\\.)+)|'
+    r'(?P<unquoted>([^\'":=\s\\]|\\.)+)|'
+    r'(?P<colon_or_equals>[:=])|'  # hash path could come next; stop capturing
     r'(?P<whitespace>\s+)|'
-    r'(?P<colon>:)|'
     r'(?P<error>.+))')
 
 
@@ -78,7 +78,7 @@ def parse_setup_cmd(cmd):
                       or m.group('double_quoted')
                       or m.group('unquoted')
                       or m.group('whitespace')
-                      or m.group('colon'))
+                      or m.group('colon_or_equals'))
 
         if keep_as_is:
             if tokens and isinstance(tokens[-1], basestring):

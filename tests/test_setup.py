@@ -61,14 +61,38 @@ class ParseSetupCmdTestCase(unittest.TestCase):
         self.assertEqual(parse_setup_cmd('foo'), ['foo'])
 
     def test_double_hash(self):
-        self.assertEquals(parse_setup_cmd('foo#bar#baz'),
-                          [{'type': 'file', 'path': 'foo#bar', 'name': 'baz'}])
+        self.assertEqual(parse_setup_cmd('foo#bar#baz'),
+                         [{'type': 'file', 'path': 'foo#bar', 'name': 'baz'}])
 
-    def test_split_paths_on_colon(self):
+    def test_shell_punctuation_after_name(self):
+        self.assertEqual(
+        parse_setup_cmd('touch foo#; cat bar#>baz; cat qux#|grep quux'),
+            ['touch ',
+             {'type': 'file', 'path': 'foo', 'name': None},
+             '; cat ',
+             {'type': 'file', 'path': 'bar', 'name': None},
+             '>baz; cat ',
+             {'type': 'file', 'path': 'qux', 'name': None},
+             '|grep quux'])
+
+    def test_colon_after_name(self):
+        self.assertEqual(
+            parse_setup_cmd('echo foo.egg#:$PYTHONPATH'),
+            ['echo ',
+             {'type': 'file', 'path': 'foo.egg', 'name': None},
+             ':$PYTHONPATH'])
+
+    def test_start_path_after_colon(self):
         self.assertEqual(
             parse_setup_cmd('export PYTHONPATH=$PYTHONPATH:foo.tar.gz#/'),
             ['export PYTHONPATH=$PYTHONPATH:',
              {'type': 'archive', 'path': 'foo.tar.gz', 'name': None}])
+
+    def test_start_path_after_equals(self):
+        self.assertEqual(
+            parse_setup_cmd('export PYTHONPATH=foo.egg#'),
+            ['export PYTHONPATH=',
+             {'type': 'file', 'path': 'foo.egg', 'name': None}])
 
     def test_allow_colons_in_uris(self):
         self.assertEqual(

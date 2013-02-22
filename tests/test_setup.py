@@ -30,7 +30,8 @@ from mrjob.setup import parse_setup_cmd
 class ParseSetupCmdTestCase(unittest.TestCase):
 
     def test_empty(self):
-        self.assertEqual(parse_setup_cmd(''), [''])
+        self.assertEqual(parse_setup_cmd(''), [])
+        self.assertEqual(parse_setup_cmd(' '), [' '])
         self.assertRaises(TypeError, parse_setup_cmd, None)
 
     def test_hash_path_alone(self):
@@ -60,11 +61,12 @@ class ParseSetupCmdTestCase(unittest.TestCase):
         self.assertEqual(parse_setup_cmd('foo'), ['foo'])
 
     def test_double_hash(self):
-        self.assertRaises(ValueError, parse_setup_cmd, 'foo#bar#baz')
+        self.assertEquals(parse_setup_cmd('foo#bar#baz'),
+                          [{'type': 'file', 'path': 'foo#bar', 'name': 'baz'}])
 
     def test_split_paths_on_colon(self):
         self.assertEqual(
-            parse_setup_cmd('export PYTHONPATH=$PYTHONPATH:foo.tar.gz#/')
+            parse_setup_cmd('export PYTHONPATH=$PYTHONPATH:foo.tar.gz#/'),
             ['export PYTHONPATH=$PYTHONPATH:',
              {'type': 'archive', 'path': 'foo.tar.gz', 'name': None}])
 
@@ -74,7 +76,7 @@ class ParseSetupCmdTestCase(unittest.TestCase):
             ['export PATH=$PATH:',
              {'type': 'file', 'path': 's3://foo/script.sh', 'name': None}])
 
-    def test_dont_look_inside_quotes(self):
+    def test_dont_parse_hash_path_inside_quotes(self):
         self.assertEqual(
             parse_setup_cmd('"foo#bar"'), ['"foo#bar"'])
 

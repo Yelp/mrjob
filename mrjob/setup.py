@@ -37,6 +37,7 @@ import itertools
 import logging
 import os.path
 import posixpath
+import re
 
 from mrjob.parse import is_uri
 
@@ -47,6 +48,21 @@ log = logging.getLogger(__name__)
 _SUPPORTED_TYPES = ('archive', 'file')
 
 
+SETUP_CMD_RE = re.compile(
+    r"((?P<single_quoted>'[^']*')|"
+    r'(?P<double_quoted>"([^"\\]|\\.)*")|'
+    r'(?P<hash_path>'
+        r'(?P<path>([A-Za-z][A-Za-z0-9\.-]*://([^\'"\s\\]|\\.)+)|'
+            r'([^\'":\s\\]|\\.)+)'
+        r'#(?P<name>([^\'":/#\s\\]|\\.)*)'
+            r'(?P<name_slash>/)?)|'
+    r'(?P<unquoted>([^\'":\s\\]|\\.)+)|'
+    r'(?P<whitespace>\s+)|'
+    r'(?P<colon>:)|'
+    r'(?P<error>.+))')
+
+
+
 def parse_setup_cmd(cmd):
     """Parse a setup/bootstrap command, finding and pulling out Hadoop
     Distributed Cache-style paths ("hash paths").
@@ -55,7 +71,33 @@ def parse_setup_cmd(cmd):
     :return: a list containing dictionaries (parsed hash paths) and strings
              (parts of the original command, left unparsed)
     """
-    raise NotImplementedError
+    tokens = []
+
+    for m in SETUP_CMD_RE.finditer(cmd):
+        keep_as_is = (m.group('single_quoted')
+                      or m.group('double_quoted')
+                      or m.group('unquoted')
+                      or m.group('whitespace')
+                      or m.group('colon'))
+
+        if keep_as_is:
+            if tokens and isinstance(tokens[-1], basestring):
+                tokens[-1] += keep_as_is
+            else:
+                tokens.append(keep_as_is)
+        elif m.group('hash_path'):
+            tokens.append({
+                'path': m.group('path'),
+                'name': m.group('name') or None,
+                'type': 'archive' if m.group('name_slash') else 'file'})
+        elif m.group('error'):
+            # these match the error messages from shlex.split()
+            if m.group('error').startswith('\\'):
+                raise ValueError('No escaped character')
+            else:
+                raise ValueError('No closing quotation')
+
+    return tokens
 
 
 # TODO: This is a model for how we expect to handle "new" hash paths to work.

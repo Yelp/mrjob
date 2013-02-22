@@ -19,11 +19,77 @@ try:
 except ImportError:
     import unittest
 
+from mrjob.setup import UploadDirManager
+from mrjob.setup import WorkingDirManager
 from mrjob.setup import name_uniquely
 from mrjob.setup import parse_hash_path
 from mrjob.setup import parse_legacy_hash_path
-from mrjob.setup import UploadDirManager
-from mrjob.setup import WorkingDirManager
+from mrjob.setup import parse_setup_cmd
+
+
+class ParseSetupCmdTestCase(unittest.TestCase):
+
+    def test_empty(self):
+        self.assertEqual(parse_setup_cmd(''), [''])
+        self.assertRaises(TypeError, parse_setup_cmd, None)
+
+    def test_hash_path_alone(self):
+        self.assertEqual(
+            parse_setup_cmd('foo#bar'),
+            [{'type': 'file', 'path': 'foo', 'name': 'bar'}])
+        self.assertEqual(
+            parse_setup_cmd('/dir/foo#bar'),
+            [{'type': 'file', 'path': '/dir/foo', 'name': 'bar'}])
+        self.assertEqual(
+            parse_setup_cmd('foo#bar/'),
+            [{'type': 'archive', 'path': 'foo', 'name': 'bar'}])
+        self.assertEqual(
+            parse_setup_cmd('/dir/foo#bar/'),
+            [{'type': 'archive', 'path': '/dir/foo', 'name': 'bar'}])
+
+    def test_no_path(self):
+        self.assertEqual(parse_setup_cmd('#bar'), ['#bar'])
+
+    def test_no_name(self):
+        self.assertEqual(parse_setup_cmd('foo#'),
+                         [{'type': 'file', 'path': 'foo', 'name': None}])
+        self.assertEqual(parse_setup_cmd('foo#/'),
+                         [{'type': 'archive', 'path': 'foo', 'name': None}])
+
+    def test_no_hash(self):
+        self.assertEqual(parse_setup_cmd('foo'), ['foo'])
+
+    def test_double_hash(self):
+        self.assertRaises(ValueError, parse_setup_cmd, 'foo#bar#baz')
+
+    def test_split_paths_on_colon(self):
+        self.assertEqual(
+            parse_setup_cmd('export PYTHONPATH=$PYTHONPATH:foo.tar.gz#/')
+            ['export PYTHONPATH=$PYTHONPATH:',
+             {'type': 'archive', 'path': 'foo.tar.gz', 'name': None}])
+
+    def test_allow_colons_in_uris(self):
+        self.assertEqual(
+            parse_setup_cmd('export PATH=$PATH:s3://foo/script.sh#'),
+            ['export PATH=$PATH:',
+             {'type': 'file', 'path': 's3://foo/script.sh', 'name': None}])
+
+    def test_dont_look_inside_quotes(self):
+        self.assertEqual(
+            parse_setup_cmd('"foo#bar"'), ['"foo#bar"'])
+
+        self.assertEqual(
+            parse_setup_cmd("'foo#bar'"), ["'foo#bar'"])
+
+    def test_missing_closing_quotation(self):
+        self.assertRaises(
+            ValueError, parse_setup_cmd, '"foo')
+        self.assertRaises(
+            ValueError, parse_setup_cmd, 'foo#bar "baz')
+
+    def test_missing_escaped_character(self):
+        self.assertRaises(
+            ValueError, parse_setup_cmd, 'foo\\')
 
 
 class ParseHashPathTestCase(unittest.TestCase):

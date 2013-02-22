@@ -47,6 +47,17 @@ log = logging.getLogger(__name__)
 _SUPPORTED_TYPES = ('archive', 'file')
 
 
+def parse_setup_cmd(cmd):
+    """Parse a setup/bootstrap command, finding and pulling out Hadoop
+    Distributed Cache-style paths ("hash paths").
+
+    :param string cmd: shell command to parse
+    :return: a list containing dictionaries (parsed hash paths) and strings
+             (parts of the original command, left unparsed)
+    """
+    raise NotImplementedError
+
+
 # TODO: This is a model for how we expect to handle "new" hash paths to work.
 # This may not need to exist as a separate function because our final
 # goal is to parse these expressions out of a command-line with a regex,

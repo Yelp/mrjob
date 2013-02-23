@@ -78,9 +78,12 @@ def parse_setup_cmd(cmd):
     Hash paths look like ``path#name``, where *path* is either a local path
     or a URI pointing to something we want to upload to Hadoop/EMR, and *name*
     is the name we want it to have when we upload it; *name* is optional
-    (no name means to pick a unique one). If *name* is followed by a trailing
-    slash, that indicates *path* is an archive (e.g. a tarball), and should
-    be unarchived into a directory on the remote system.
+    (no name means to pick a unique one).
+
+    If *name* is followed by a trailing slash, that indicates *path* is an
+    archive (e.g. a tarball), and should be unarchived into a directory on the
+    remote system. The trailing slash will *also* be kept as part of the
+    original command.
 
     Parsed hash paths are dicitionaries with the keys ``path``, ``name``, and
     ``type`` (either ``'file'`` or ``'archive'``).
@@ -127,6 +130,8 @@ def parse_setup_cmd(cmd):
                 'path': _resolve_path(m.group('path')),
                 'name': m.group('name') or None,
                 'type': 'archive' if m.group('name_slash') else 'file'})
+            if m.group('name_slash'):
+                tokens.append('/')
         elif m.group('error'):
             # these match the error messages from shlex.split()
             if m.group('error').startswith('\\'):

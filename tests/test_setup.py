@@ -69,6 +69,13 @@ class ParseSetupCmdTestCase(unittest.TestCase):
         self.assertEqual(parse_setup_cmd('foo#bar#baz'),
                          [{'type': 'file', 'path': 'foo#bar', 'name': 'baz'}])
 
+    def test_name_slash_included_in_command(self):
+        self.assertEqual(
+            parse_setup_cmd('sudo dpkg -i my_pkgs.tar#/fooify.deb'),
+            ['sudo dpkg -i ',
+             {'type': 'archive', 'path': 'my_pkgs.tar', 'name': None},
+             '/fooify.deb'])
+
     def test_shell_punctuation_after_name(self):
         self.assertEqual(
         parse_setup_cmd('touch foo#; cat bar#>baz; cat qux#|grep quux'),

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -222,6 +223,7 @@ def s3_key_to_uri(s3_key):
 # Thu, 29 Mar 2012 04:55:44 GMT
 RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
 
+
 def iso8601_to_timestamp(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
     try:
@@ -285,7 +287,9 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
                 raise
 
         # don't count the same job flow twice
-        job_flows = [jf for jf in results if jf.jobflowid not in ids_seen]
+        job_flows = [jf for jf in results
+                     if getattr(jf, "jobflowid", None) and
+                     jf.jobflowid not in ids_seen]
         log.debug('  got %d results (%d new)' % (len(results), len(job_flows)))
 
         all_job_flows.extend(job_flows)
@@ -872,7 +876,8 @@ class EMRJobRunner(MRJobRunner):
             self._create_mrjob_tar_gz()
             self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path)
 
-        # all other files needed by the script are already in _bootstrap_dir_mgr
+        # all other files needed by the script are already in
+        # _bootstrap_dir_mgr
         for path in self._bootstrap_dir_mgr.paths():
             self._upload_mgr.add(path)
 
@@ -1612,7 +1617,8 @@ class EMRJobRunner(MRJobRunner):
     ## SSH LOG FETCHING
 
     def _ssh_path(self, relative):
-        return SSH_PREFIX + self._address_of_master() + SSH_LOG_ROOT + '/' + relative
+        return SSH_PREFIX + self._address_of_master() + SSH_LOG_ROOT + \
+        '/' + relative
 
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
@@ -1919,7 +1925,8 @@ class EMRJobRunner(MRJobRunner):
 
         # download files using hadoop fs
         writeln('# download files using hadoop fs -copyToLocal')
-        for name, path in self._bootstrap_dir_mgr.name_to_path('file').iteritems():
+        files = self._bootstrap_dir_mgr.name_to_path('file').iteritems()
+        for name, path in files:
             s3_uri = self._upload_mgr.uri(path)
             writeln(
                 "check_call(['hadoop', 'fs', '-copyToLocal', %r, %r])" %
@@ -1936,7 +1943,8 @@ class EMRJobRunner(MRJobRunner):
 
         # bootstrap mrjob
         if self._opts['bootstrap_mrjob']:
-            name = self._bootstrap_dir_mgr.name('file', self._mrjob_tar_gz_path)
+            name = self._bootstrap_dir_mgr.name('file',
+                                                self._mrjob_tar_gz_path)
             writeln('# bootstrap mrjob')
             writeln("site_packages = distutils.sysconfig.get_python_lib()")
             writeln(

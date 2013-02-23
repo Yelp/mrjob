@@ -46,19 +46,21 @@ class ParseSetupCmdTestCase(unittest.TestCase):
             [{'type': 'file', 'path': '/dir/foo', 'name': 'bar'}])
         self.assertEqual(
             parse_setup_cmd('foo#bar/'),
-            [{'type': 'archive', 'path': 'foo', 'name': 'bar'}])
+            [{'type': 'archive', 'path': 'foo', 'name': 'bar'}, '/'])
         self.assertEqual(
             parse_setup_cmd('/dir/foo#bar/'),
-            [{'type': 'archive', 'path': '/dir/foo', 'name': 'bar'}])
+            [{'type': 'archive', 'path': '/dir/foo', 'name': 'bar'}, '/'])
 
     def test_no_path(self):
         self.assertEqual(parse_setup_cmd('#bar'), ['#bar'])
 
     def test_no_name(self):
-        self.assertEqual(parse_setup_cmd('foo#'),
-                         [{'type': 'file', 'path': 'foo', 'name': None}])
-        self.assertEqual(parse_setup_cmd('foo#/'),
-                         [{'type': 'archive', 'path': 'foo', 'name': None}])
+        self.assertEqual(
+            parse_setup_cmd('foo#'),
+            [{'type': 'file', 'path': 'foo', 'name': None}])
+        self.assertEqual(
+            parse_setup_cmd('foo#/'),
+            [{'type': 'archive', 'path': 'foo', 'name': None}, '/'])
 
     def test_no_hash(self):
         self.assertEqual(parse_setup_cmd('foo'), ['foo'])
@@ -89,7 +91,8 @@ class ParseSetupCmdTestCase(unittest.TestCase):
         self.assertEqual(
             parse_setup_cmd('export PYTHONPATH=$PYTHONPATH:foo.tar.gz#/'),
             ['export PYTHONPATH=$PYTHONPATH:',
-             {'type': 'archive', 'path': 'foo.tar.gz', 'name': None}])
+             {'type': 'archive', 'path': 'foo.tar.gz', 'name': None},
+             '/'])
 
     def test_start_path_after_equals(self):
         self.assertEqual(

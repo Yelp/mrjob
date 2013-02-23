@@ -11,10 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import errno
 import getpass
 import logging
 import os
+import pty
 import posixpath
 import re
 from subprocess import Popen
@@ -291,17 +292,33 @@ class HadoopJobRunner(MRJobRunner):
             streaming_args = self._streaming_args(step, step_num, len(steps))
 
             log.debug('> %s' % cmd_line(streaming_args))
-            step_proc = Popen(streaming_args, stdout=PIPE, stderr=PIPE)
 
-            # TODO: use a pty or something so that the hadoop binary
-            # won't buffer the status messages
-            self._process_stderr_from_streaming(step_proc.stderr)
+            # try to use a PTY if it's available
+            try:
+                pid, master_fd = pty.fork()
+            except (AttributeError, OSError):
+                # no PTYs, just use Popen
+                step_proc = Popen(streaming_args, stdout=PIPE, stderr=PIPE)
 
-            # there shouldn't be much output to STDOUT
-            for line in step_proc.stdout:
-                log.error('STDOUT: ' + line.strip('\n'))
+                self._process_stderr_from_streaming(step_proc.stderr)
 
-            returncode = step_proc.wait()
+                # there shouldn't be much output to STDOUT
+                for line in step_proc.stdout:
+                    log.error('STDOUT: ' + line.strip('\n'))
+
+                returncode = step_proc.wait()
+            else:
+                # we have PTYs
+                if pid == 0:  # we are the child process
+                    os.execvp(streaming_args[0], streaming_args)
+                else:
+                    master = os.fdopen(master_fd)
+                    # reading from master gives us the subprocess's
+                    # stderr and stdout (it's a fake terminal)
+                    self._process_stderr_from_streaming(master)
+                    _, returncode = os.waitpid(pid, 0)
+                    master.close()
+
             if returncode == 0:
                 # parsing needs step number for whole job
                 self._fetch_counters([step_num + self._start_step_num])
@@ -335,7 +352,20 @@ class HadoopJobRunner(MRJobRunner):
                 raise CalledProcessError(step_proc.returncode, streaming_args)
 
     def _process_stderr_from_streaming(self, stderr):
-        for line in stderr:
+
+        def treat_eio_as_eof(iter):
+            # on Linux, the PTY gives us a specific IOError when the
+            # when the child process exits, rather than EOF.
+            while True:
+                try:
+                    yield iter.next()  # okay for StopIteration to bubble up
+                except IOError, e:
+                    if e.errno == errno.EIO:
+                        return
+                    else:
+                        raise
+
+        for line in treat_eio_as_eof(stderr):
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
             log.info('HADOOP: ' + line)
 

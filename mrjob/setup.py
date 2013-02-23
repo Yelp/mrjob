@@ -40,6 +40,7 @@ import posixpath
 import re
 
 from mrjob.parse import is_uri
+from mrjob.util import expand_path
 
 
 log = logging.getLogger(__name__)
@@ -61,6 +62,9 @@ SETUP_CMD_RE = re.compile(
     r'(?P<whitespace>\s+)|'
     r'(?P<error>.+))')
 
+
+ESCAPE_RE = re.compile(
+    r'(\\(?P<escaped>.)|(?P<unescaped>[^\\]+)|(?P<error>.+))')
 
 
 def parse_setup_cmd(cmd):
@@ -87,7 +91,7 @@ def parse_setup_cmd(cmd):
                 tokens.append(keep_as_is)
         elif m.group('hash_path'):
             tokens.append({
-                'path': m.group('path'),
+                'path': _resolve_path(m.group('path')),
                 'name': m.group('name') or None,
                 'type': 'archive' if m.group('name_slash') else 'file'})
         elif m.group('error'):
@@ -98,6 +102,24 @@ def parse_setup_cmd(cmd):
                 raise ValueError('No closing quotation')
 
     return tokens
+
+
+def _resolve_path(path):
+    """Helper for :py:func:`parse_setup_cmd`.
+
+    Resolve ``~`` (home dir) and environment variables in the
+    given path, and unescape backslashes."""
+    result = ''
+
+    for m in ESCAPE_RE.finditer(path):
+        if m.group('escaped'):
+            result += m.group('escaped')
+        elif m.group('unescaped'):
+            result += expand_path(m.group('unescaped'))
+        else:
+            raise ValueError('No escaped character')
+
+    return result
 
 
 def parse_legacy_hash_path(type, path, must_name=None):

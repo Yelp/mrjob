@@ -13,6 +13,10 @@
 # limitations under the License.
 from __future__ import with_statement
 
+import os
+
+from mock import patch
+
 try:
     import unittest2 as unittest
     unittest  # quiet "redefinition of unused ..." warning from pyflakes
@@ -99,6 +103,17 @@ class ParseSetupCmdTestCase(unittest.TestCase):
             ['export PATH=$PATH:',
              {'type': 'file', 'path': 's3://foo/script.sh', 'name': None}])
 
+    def test_resolve_path_but_not_name(self):
+        with patch.dict(os.environ, {'HOME': '/home/foo',
+                                     'USER': 'foo',
+                                     'BAR': 'bar'}, clear=True):
+            self.assertEqual(
+                parse_setup_cmd(r'. ~/tmp/$USER/\$BAR.sh#$USER.sh'),
+                ['. ',
+                 {'path': '/home/foo/tmp/foo/$BAR.sh',
+                  'name': '$USER.sh',
+                  'type': 'file'}])
+
     def test_dont_parse_hash_path_inside_quotes(self):
         self.assertEqual(
             parse_setup_cmd('"foo#bar"'), ['"foo#bar"'])
@@ -115,6 +130,9 @@ class ParseSetupCmdTestCase(unittest.TestCase):
     def test_missing_escaped_character(self):
         self.assertRaises(
             ValueError, parse_setup_cmd, 'foo\\')
+
+
+
 
 
 class ParseLegacyHashPathTestCase(unittest.TestCase):

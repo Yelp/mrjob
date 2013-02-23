@@ -74,6 +74,39 @@ def parse_setup_cmd(cmd):
     :param string cmd: shell command to parse
     :return: a list containing dictionaries (parsed hash paths) and strings
              (parts of the original command, left unparsed)
+
+    Hash paths look like ``path#name``, where *path* is either a local path
+    or a URI pointing to something we want to upload to Hadoop/EMR, and *name*
+    is the name we want it to have when we upload it; *name* is optional
+    (no name means to pick a unique one). If *name* is followed by a trailing
+    slash, that indicates *path* is an archive (e.g. a tarball), and should
+    be unarchived into a directory on the remote system.
+
+    Parsed hash paths are dicitionaries with the keys ``path``, ``name``, and
+    ``type`` (either ``'file'`` or ``'archive'``).
+
+    Most of the time, this function will just do what you expect. Rules for
+    finding hash paths:
+
+    * we only look for hash paths outside of quoted strings
+    * *path* may not contain quotes or whitespace
+    * *path* may not contain `:` or `=` unless it is a URI (starts with
+      ``<scheme>://``); this allows you to do stuff like
+      ``export PYTHONPATH=$PYTHONPATH:foo.egg#``.
+    * *name* may not contain whitespace or any of the following characters:
+      ``'":;><|=/#``, so you can do stuff like
+      ``sudo dpkg -i fooify.deb#; fooify bar``
+
+    If you really want to include forbidden characters, you may use backslash
+    escape sequences in *path* and *name*. (We can't guarantee Hadoop/EMR
+    will accept them though!). Also, remember that shell syntax allows you
+    to concatenate strings ``like""this``.
+
+    Environment variables and ``~`` (home dir) in *path* will be resolved
+    (use backslash escapes to stop this). We don't resolve *name* because it
+    doesn't make sense. Environment variables and ``~`` elsewhere in the
+    command are considered to be part of the script and will be resolved
+    on the remote system.
     """
     tokens = []
 

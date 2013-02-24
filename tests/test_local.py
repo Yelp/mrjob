@@ -43,7 +43,6 @@ from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_filter_job import FilterJob
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_os_walk_job import MROSWalkJob
-from tests.mr_os_walk_and_import_foo_job import MROSWalkAndImportFooJob
 from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob

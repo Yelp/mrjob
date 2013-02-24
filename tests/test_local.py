@@ -43,6 +43,7 @@ from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_filter_job import FilterJob
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_os_walk_job import MROSWalkJob
+from tests.mr_os_walk_and_import_foo_job import MROSWalkAndImportFooJob
 from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
@@ -766,20 +767,30 @@ class LocalRunnerSetupTestCase(SandboxedTestCase):
 
         self.foo_py = os.path.join(self.tmp_dir, 'foo', 'foo.py')
 
+        # if our job can import foo, getsize will return 2x as many bytes
         with open(self.foo_py, 'w') as foo_py:
-            print >> foo_py, 'def bar():'
-            print >> foo_py, '    pass'
+            foo_py.write('import os.path\n'
+                         'from os.path import getsize as _real_getsize\n'
+                         'os.path.getsize = lambda p: _real_getsize(p) * 2')
+
+        self.foo_sh = os.path.join(self.tmp_dir, 'foo', 'foo.sh')
+
+        with open(self.foo_sh, 'w') as foo_sh:
+            foo_sh.write('#!/bin/sh\n'
+                         'touch foo.sh-made-this\n')
+        os.chmod(self.foo_sh, stat.S_IRWXU)
 
         self.foo_tar_gz = os.path.join(self.tmp_dir, 'foo.tar.gz')
         tar_and_gzip(os.path.join(self.tmp_dir, 'foo'), self.foo_tar_gz)
 
         self.foo_py_size = os.path.getsize(self.foo_py)
+        self.foo_sh_size = os.path.getsize(self.foo_sh)
         self.foo_tar_gz_size = os.path.getsize(self.foo_tar_gz)
 
     def test_file_upload(self):
         job = MROSWalkJob(['--runner=local', '--no-bootstrap-mrjob',
-                           '--file', self.foo_py,
-                           '--file', self.foo_py + '#bar.py',
+                           '--file', self.foo_sh,
+                           '--file', self.foo_sh + '#bar.sh',
                            ])
         job.sandbox()
 
@@ -789,9 +800,67 @@ class LocalRunnerSetupTestCase(SandboxedTestCase):
             path_to_size = dict(job.parse_output_line(line)
                                 for line in r.stream_output())
 
-        self.assertItemsEqual(path_to_size,
-                              ['./bar.py',
-                               './foo.py',
-                               './mr_os_walk_job.py'])
-        self.assertEqual(path_to_size['./foo.py'], self.foo_py_size)
-        self.assertEqual(path_to_size['./bar.py'], self.foo_py_size)
+        self.assertEqual(path_to_size['./foo.sh'], self.foo_sh_size)
+        self.assertEqual(path_to_size['./bar.sh'], self.foo_sh_size)
+
+    def test_archive_upload(self):
+        job = MROSWalkJob(['--runner=local', '--no-bootstrap-mrjob',
+                           '--archive', self.foo_tar_gz,
+                           '--archive', self.foo_tar_gz + '#foo',
+                           ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        self.assertEqual(path_to_size['./foo.tar.gz/foo.py'], self.foo_py_size)
+        self.assertEqual(path_to_size['./foo/foo.py'], self.foo_py_size)
+
+    def test_python_archive(self):
+        job = MROSWalkJob(
+            ['--runner=local', '--no-bootstrap-mrjob',
+             '--python-archive', self.foo_tar_gz])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        # foo.py should be there, and getsize() should be patched to return
+        # double the number of bytes
+        self.assertEqual(path_to_size['./foo.tar.gz/foo.py'],
+                         self.foo_py_size * 2)
+
+    def test_setup_cmd(self):
+        job = MROSWalkJob(
+            ['--runner=local', '--no-bootstrap-mrjob',
+             '--setup-cmd', 'touch bar'])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        self.assertIn('./bar', path_to_size)
+
+    def test_setup_script(self):
+        job = MROSWalkJob(
+            ['--runner=local', '--no-bootstrap-mrjob',
+             '--setup-script', self.foo_sh])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+            self.assertEqual(path_to_size['./foo.sh'], self.foo_sh_size)
+            self.assertIn('./foo.sh-made-this', path_to_size)

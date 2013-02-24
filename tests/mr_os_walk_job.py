@@ -1,4 +1,4 @@
-# Copyright 2011 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,12 @@ class MROSWalkJob(MRJob):
     """Recursively return the name and size of each file in the current dir."""
 
     def mapper_final(self):
+        # hook for test_local.LocalRunnerSetupTestCase.test_python_archive()
+        try:
+            import foo
+        except ImportError:
+            pass
+
         for dirpath, _, filenames in os.walk('.'):
             for filename in filenames:
                 path = os.path.join(dirpath, filename)

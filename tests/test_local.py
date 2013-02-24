@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,15 +36,17 @@ from mrjob.local import LocalMRJobRunner
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import read_file
+from mrjob.util import tar_and_gzip
 from tests.mr_cmd_job import CmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_filter_job import FilterJob
 from tests.mr_job_where_are_you import MRJobWhereAreYou
+from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_test_jobconf import MRTestJobConf
-from tests.mr_word_count import MRWordCount
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
+from tests.mr_word_count import MRWordCount
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -753,3 +755,43 @@ class FilterTestCase(SandboxedTestCase):
 
             lines = [line.strip() for line in list(r.stream_output())]
             self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
+
+
+class LocalRunnerSetupTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(LocalRunnerSetupTestCase, self).setUp()
+
+        os.mkdir(os.path.join(self.tmp_dir, 'foo'))
+
+        self.foo_py = os.path.join(self.tmp_dir, 'foo', 'foo.py')
+
+        with open(self.foo_py, 'w') as foo_py:
+            print >> foo_py, 'def bar():'
+            print >> foo_py, '    pass'
+
+        self.foo_tar_gz = os.path.join(self.tmp_dir, 'foo.tar.gz')
+        tar_and_gzip(os.path.join(self.tmp_dir, 'foo'), self.foo_tar_gz)
+
+        self.foo_py_size = os.path.getsize(self.foo_py)
+        self.foo_tar_gz_size = os.path.getsize(self.foo_tar_gz)
+
+    def test_file_upload(self):
+        job = MROSWalkJob(['--runner=local', '--no-bootstrap-mrjob',
+                           '--file', self.foo_py,
+                           '--file', self.foo_py + '#bar.py',
+                           ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        self.assertItemsEqual(path_to_size,
+                              ['./bar.py',
+                               './foo.py',
+                               './mr_os_walk_job.py'])
+        self.assertEqual(path_to_size['./foo.py'], self.foo_py_size)
+        self.assertEqual(path_to_size['./bar.py'], self.foo_py_size)

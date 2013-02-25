@@ -411,6 +411,9 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_tunnel_to_job_tracker',
     ]))
 
+    # on EMR, bootstrapping mrjob happens in the bootstrap script
+    BOOTSTRAP_MRJOB_IN_SETUP = False
+
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
         'bootstrap_actions': combine_lists,
         'bootstrap_cmds': combine_lists,
@@ -845,7 +848,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _prepare_for_launch(self):
         self._check_input_exists()
-        self._create_wrapper_script()
+        self._create_setup_wrapper_script()
         self._add_bootstrap_files_for_upload()
         self._add_job_files_for_upload()
         self._upload_local_files_to_s3()
@@ -874,7 +877,7 @@ class EMRJobRunner(MRJobRunner):
         # lazily create mrjob.tar.gz
         if self._opts['bootstrap_mrjob']:
             self._create_mrjob_tar_gz()
-            self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path)
+            self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path())
 
         # all other files needed by the script are already in
         # _bootstrap_dir_mgr
@@ -1944,7 +1947,7 @@ class EMRJobRunner(MRJobRunner):
         # bootstrap mrjob
         if self._opts['bootstrap_mrjob']:
             name = self._bootstrap_dir_mgr.name('file',
-                                                self._mrjob_tar_gz_path)
+                                                self._mrjob_tar_gz_path())
             writeln('# bootstrap mrjob')
             writeln("site_packages = distutils.sysconfig.get_python_lib()")
             writeln(
@@ -2260,7 +2263,7 @@ class EMRJobRunner(MRJobRunner):
             # since the tarball contains different timestamps)
             dict((name, self.md5sum(path)) for name, path
                  in self._bootstrap_dir_mgr.name_to_path('file').iteritems()
-                 if not path == self._mrjob_tar_gz_path),
+                 if not path == self._mrjob_tar_gz_path()),
             self._opts['additional_emr_info'],
             self._opts['bootstrap_mrjob'],
             self._opts['bootstrap_cmds'],

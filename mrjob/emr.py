@@ -877,7 +877,7 @@ class EMRJobRunner(MRJobRunner):
         # lazily create mrjob.tar.gz
         if self._opts['bootstrap_mrjob']:
             self._create_mrjob_tar_gz()
-            self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path())
+            self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path)
 
         # all other files needed by the script are already in
         # _bootstrap_dir_mgr
@@ -1947,7 +1947,7 @@ class EMRJobRunner(MRJobRunner):
         # bootstrap mrjob
         if self._opts['bootstrap_mrjob']:
             name = self._bootstrap_dir_mgr.name('file',
-                                                self._mrjob_tar_gz_path())
+                                                self._mrjob_tar_gz_path)
             writeln('# bootstrap mrjob')
             writeln("site_packages = distutils.sysconfig.get_python_lib()")
             writeln(
@@ -2263,7 +2263,7 @@ class EMRJobRunner(MRJobRunner):
             # since the tarball contains different timestamps)
             dict((name, self.md5sum(path)) for name, path
                  in self._bootstrap_dir_mgr.name_to_path('file').iteritems()
-                 if not path == self._mrjob_tar_gz_path()),
+                 if not path == self._mrjob_tar_gz_path),
             self._opts['additional_emr_info'],
             self._opts['bootstrap_mrjob'],
             self._opts['bootstrap_cmds'],

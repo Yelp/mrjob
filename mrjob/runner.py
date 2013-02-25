@@ -116,7 +116,7 @@ class RunnerOptionStore(OptionStore):
         'owner',
         'python_archives',
         'python_bin',
-        'setup'
+        'setup',
         'setup_cmds',
         'setup_scripts',
         'sh_bin',
@@ -137,6 +137,7 @@ class RunnerOptionStore(OptionStore):
         'setup': combine_lists,
         'setup_cmds': combine_lists,
         'setup_scripts': combine_path_lists,
+        'sh_bin': combine_cmds,
         'steps_interpreter': combine_cmds,
         'steps_python_bin': combine_cmds,
         'upload_archives': combine_path_lists,
@@ -195,7 +196,7 @@ class RunnerOptionStore(OptionStore):
             'cleanup_on_failure': ['NONE'],
             'hadoop_version': '0.20',
             'owner': owner,
-            'sh_bin': 'sh',
+            'sh_bin': ['sh'],
         })
 
     def _validate_cleanup(self):
@@ -868,10 +869,9 @@ class MRJobRunner(object):
 
         mrjob_tar_gz_name = None
         if bootstrap_mrjob_in_setup:
-            self._create_mrjob_tar_gz()
-            self._working_dir_mgr.add('archive', self._mrjob_tar_gz_path())
-            mrjob_tar_gz_name = self._working_dir_mgr.name(
-                'archive', self._mrjob_tar_gz_path())
+            path = self._create_mrjob_tar_gz()
+            self._working_dir_mgr.add('archive', path)
+            mrjob_tar_gz_name = self._working_dir_mgr.name('archive', path)
 
         path = os.path.join(self._get_local_tmp_dir(), dest)
         log.info('writing wrapper script to %s' % path)
@@ -906,7 +906,7 @@ class MRJobRunner(object):
         # python_archives
         for path in self._opts['python_archives']:
             path_dict = parse_legacy_hash_path('archive', path)
-            setup.append['export PYTHONPATH=', path_dict, ':$PYTHONPATH']
+            setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
 
         # setup
         for cmd in self._opts['setup']:
@@ -970,11 +970,11 @@ class MRJobRunner(object):
             for token in cmd:
                 if isinstance(token, dict):
                     # it's a path dictionary
-                    line.append('$__mrjob_PWD/%s' % (
-                        pipes.quote(self._working_dir_mgr.name(**token))))
+                    line += '$__mrjob_PWD/'
+                    line += pipes.quote(self._working_dir_mgr.name(**token))
                 else:
                     # it's raw script
-                    line.append(token)
+                    line += token
             writeln('line')
         writeln()
 
@@ -1010,20 +1010,17 @@ class MRJobRunner(object):
         return [self._stdin_path if p == '-' else p
                 for p in self._input_paths]
 
-    def _mrjob_tar_gz_path(self):
-        """Where in our temp dir we should keep a tarball of the mrjob
-        source, if we create one."""
-        return os.path.join(self._local_tmp_dir_path(), 'mrjob.tar.gz')
-
     def _create_mrjob_tar_gz(self):
         """Make a tarball of the mrjob library, without .pyc or .pyo files,
-        and return its path. Typically called from
+        This will also set ``self._mrjob_tar_gz_path`` and return it.
+
+        Typically called from
         :py:meth:`_create_setup_wrapper_script`.
 
         It's safe to call this method multiple times (we'll only create
         the tarball once.)
         """
-        if not os.path.exists(self._mrjob_tar_gz_path()):
+        if not self._mrjob_tar_gz_path:
             # find mrjob library
             import mrjob
 
@@ -1034,7 +1031,8 @@ class MRJobRunner(object):
 
             mrjob_dir = os.path.dirname(mrjob.__file__) or '.'
 
-            tar_gz_path = self._mrjob_tar_gz_path()
+            tar_gz_path = os.path.join(self._local_tmp_dir_path(),
+                                       'mrjob.tar.gz')
 
             def filter_path(path):
                 filename = os.path.basename(path)
@@ -1050,6 +1048,10 @@ class MRJobRunner(object):
                 mrjob_dir, tar_gz_path, os.path.join('mrjob', '')))
             tar_and_gzip(
                 mrjob_dir, tar_gz_path, filter=filter_path, prefix='mrjob')
+
+            self._mrjob_tar_gz_path = tar_gz_path
+
+        return self._mrjob_tar_gz_path
 
     def _hadoop_conf_args(self, step, step_num, num_steps):
         """Build a list of extra arguments to the hadoop binary.

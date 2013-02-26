@@ -799,8 +799,8 @@ class LocalRunnerSetupTestCase(SandboxedTestCase):
             path_to_size = dict(job.parse_output_line(line)
                                 for line in r.stream_output())
 
-        self.assertEqual(path_to_size['./foo.sh'], self.foo_sh_size)
-        self.assertEqual(path_to_size['./bar.sh'], self.foo_sh_size)
+        self.assertEqual(path_to_size.get('./foo.sh'), self.foo_sh_size)
+        self.assertEqual(path_to_size.get('./bar.sh'), self.foo_sh_size)
 
     def test_archive_upload(self):
         job = MROSWalkJob(['--runner=local', '--no-bootstrap-mrjob',
@@ -815,8 +815,10 @@ class LocalRunnerSetupTestCase(SandboxedTestCase):
             path_to_size = dict(job.parse_output_line(line)
                                 for line in r.stream_output())
 
-        self.assertEqual(path_to_size['./foo.tar.gz/foo.py'], self.foo_py_size)
-        self.assertEqual(path_to_size['./foo/foo.py'], self.foo_py_size)
+        self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
+                         self.foo_py_size)
+        self.assertEqual(path_to_size.get('./foo/foo.py'),
+                         self.foo_py_size)
 
     def test_python_archive(self):
         job = MROSWalkJob(
@@ -832,7 +834,7 @@ class LocalRunnerSetupTestCase(SandboxedTestCase):
 
         # foo.py should be there, and getsize() should be patched to return
         # double the number of bytes
-        self.assertEqual(path_to_size['./foo.tar.gz/foo.py'],
+        self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
                          self.foo_py_size * 2)
 
     def test_setup_cmd(self):
@@ -861,5 +863,5 @@ class LocalRunnerSetupTestCase(SandboxedTestCase):
             path_to_size = dict(job.parse_output_line(line)
                                 for line in r.stream_output())
 
-            self.assertEqual(path_to_size['./foo.sh'], self.foo_sh_size)
+            self.assertEqual(path_to_size.get('./foo.sh'), self.foo_sh_size)
             self.assertIn('./foo.sh-made-this', path_to_size)

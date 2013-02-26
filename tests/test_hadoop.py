@@ -192,12 +192,12 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
                              ['-libjar', 'containsJars.jar'])
 
             # make sure mrjob.tar.gz is was uploaded and added to PYTHONPATH
-            self.assertTrue(os.path.exists(runner._mrjob_tar_gz_path()))
-            self.assertIn(runner._mrjob_tar_gz_path(),
+            self.assertTrue(os.path.exists(runner._mrjob_tar_gz_path))
+            self.assertIn(runner._mrjob_tar_gz_path,
                           runner._upload_mgr.path_to_uri())
 
             name = runner._working_dir_mgr.name(
-                'archive', runner._mrjob_tar_gz_path())
+                'archive', runner._mrjob_tar_gz_path)
             pythonpath = runner._get_cmdenv()['PYTHONPATH']
             self.assertIn(name, pythonpath.split(':'))
 

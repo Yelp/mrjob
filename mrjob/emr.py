@@ -411,9 +411,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_tunnel_to_job_tracker',
     ]))
 
-    # on EMR, bootstrapping mrjob happens in the bootstrap script
-    BOOTSTRAP_MRJOB_IN_SETUP = False
-
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
         'bootstrap_actions': combine_lists,
         'bootstrap_cmds': combine_lists,
@@ -567,6 +564,10 @@ class EMRJobRunner(MRJobRunner):
         ...
     """
     alias = 'emr'
+
+    # Don't need to bootstrap mrjob in the setup wrapper; that's what
+    # the bootstrap script is for!
+    BOOTSTRAP_MRJOB_IN_SETUP = False
 
     OPTION_STORE_CLASS = EMRRunnerOptionStore
 

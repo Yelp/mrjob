@@ -559,7 +559,7 @@ class LocalMRJobRunnerTestJobConfCase(SandboxedTestCase):
                 results[key] = value
 
         self.assertEqual(results['mapreduce.job.cache.archives'],
-                         runner._mrjob_tar_gz_path() + '#mrjob.tar.gz')
+                         runner._mrjob_tar_gz_path + '#mrjob.tar.gz')
         self.assertEqual(results['mapreduce.job.id'], runner._job_name)
         self.assertEqual(results['mapreduce.job.local.dir'],
                          runner._working_dir)

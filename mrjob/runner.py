@@ -357,6 +357,10 @@ class MRJobRunner(object):
         if self._script_path:
             self._working_dir_mgr.add('file', self._script_path)
 
+        # give this job a unique name
+        self._job_name = self._make_unique_job_name(
+            label=self._opts['label'], owner=self._opts['owner'])
+
         # we'll create the wrapper script later
         self._setup_wrapper_script_path = None
 
@@ -405,10 +409,6 @@ class MRJobRunner(object):
         # store hadoop input and output formats
         self._hadoop_input_format = hadoop_input_format
         self._hadoop_output_format = hadoop_output_format
-
-        # give this job a unique name
-        self._job_name = self._make_unique_job_name(
-            label=self._opts['label'], owner=self._opts['owner'])
 
         # a local tmp directory that will be cleaned up when we're done
         # access/make this using self._get_local_tmp_dir()
@@ -656,14 +656,11 @@ class MRJobRunner(object):
 
     ### internal utilities for implementing MRJobRunners ###
 
-    def _local_tmp_dir_path(self):
-        return os.path.join(self._opts['base_tmp_dir'], self._job_name)
-
     def _get_local_tmp_dir(self):
         """Create a tmp directory on the local filesystem that will be
         cleaned up by self.cleanup()"""
         if not self._local_tmp_dir:
-            path = self._local_tmp_dir_path()
+            path = os.path.join(self._opts['base_tmp_dir'], self._job_name)
             log.info('creating tmp directory %s' % path)
             os.makedirs(path)
             self._local_tmp_dir = path
@@ -1032,7 +1029,7 @@ class MRJobRunner(object):
 
             mrjob_dir = os.path.dirname(mrjob.__file__) or '.'
 
-            tar_gz_path = os.path.join(self._local_tmp_dir_path(),
+            tar_gz_path = os.path.join(self._get_local_tmp_dir(),
                                        'mrjob.tar.gz')
 
             def filter_path(path):

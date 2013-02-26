@@ -859,23 +859,22 @@ class MRJobRunner(object):
         if self._setup_wrapper_script_path:
             return
 
-        bootstrap_mrjob_in_setup = (self._opts['bootstrap_mrjob'] and
-                                    self.BOOTSTRAP_MRJOB_IN_SETUP)
+        setup = self._setup
 
-        if not (self._setup or bootstrap_mrjob_in_setup):
+        if self._opts['bootstrap_mrjob'] and self.BOOTSTRAP_MRJOB_IN_SETUP:
+            # patch setup to add mrjob.tar.gz to PYTYHONPATH
+            mrjob_tar_gz = self._create_mrjob_tar_gz()
+            path_dict = {'type': 'archive', 'name': None, 'path': mrjob_tar_gz}
+            self._working_dir_mgr.add(**path_dict)
+            setup = [['export PYTHONPATH=', path_dict, ':$PYTHONPATH']] + setup
+
+        if not setup:
             return
-
-        mrjob_tar_gz_name = None
-        if bootstrap_mrjob_in_setup:
-            path = self._create_mrjob_tar_gz()
-            self._working_dir_mgr.add('archive', path)
-            mrjob_tar_gz_name = self._working_dir_mgr.name('archive', path)
 
         path = os.path.join(self._get_local_tmp_dir(), dest)
         log.info('writing wrapper script to %s' % path)
 
-        contents = self._setup_wrapper_script_content(self._setup,
-                                                      mrjob_tar_gz_name)
+        contents = self._setup_wrapper_script_content(setup)
         for line in StringIO(contents):
             log.debug('WRAPPER: ' + line.rstrip('\r\n'))
 
@@ -956,11 +955,6 @@ class MRJobRunner(object):
         writeln()
 
         writeln('# setup commands')
-        # bootstrap mrjob here
-        if mrjob_tar_gz_name:
-            writeln('export PYTHONPATH=$__mrjob_PWD/%s:$PYTHONPATH' %
-                    pipes.quote(mrjob_tar_gz_name))
-
         for cmd in setup:
             # reconstruct the command line, substituting $__mrjob_PWD/<name>
             # for path dicts

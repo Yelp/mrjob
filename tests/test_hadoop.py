@@ -198,7 +198,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
             name = runner._working_dir_mgr.name(
                 'archive', runner._mrjob_tar_gz_path)
-            pythonpath = runner._get_cmdenv()['PYTHONPATH']
+            pythonpath = runner._opts['cmdenv']['PYTHONPATH']
             self.assertIn(name, pythonpath.split(':'))
 
         self.assertEqual(sorted(results),

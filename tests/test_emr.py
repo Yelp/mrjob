@@ -300,7 +300,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
                           runner._bootstrap_dir_mgr.paths())
 
             # shouldn't be in PYTHONPATH (we dump it directly in site-packages)
-            pythonpath = runner._get_cmdenv().get('PYTHONPATH') or ''
+            pythonpath = runner._opts['cmdenv'].get('PYTHONPATH') or ''
             self.assertNotIn(
                 runner._bootstrap_dir_mgr.name(
                     'file', runner._mrjob_tar_gz_path),

@@ -751,6 +751,7 @@ class MRJobRunner(object):
             '--step-num=%d' % step_num,
             '--%s' % mrc,
         ] + self._mr_job_extra_args()
+
         if self._setup_wrapper_script_path:
             return (self._opts['sh_bin'] +
                     [self._working_dir_mgr.name(
@@ -921,7 +922,7 @@ class MRJobRunner(object):
         # setup_scripts
         for path in self._opts['setup_scripts']:
             path_dict = parse_legacy_hash_path('file', path)
-            setup.append(path_dict)
+            setup.append([path_dict])
 
         return setup
 
@@ -975,7 +976,7 @@ class MRJobRunner(object):
                 else:
                     # it's raw script
                     line += token
-            writeln('line')
+            writeln(line)
         writeln()
 
         writeln('# release exclusive file lock')

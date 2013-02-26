@@ -1176,7 +1176,7 @@ class MRJobRunner(object):
             with open(output_path, 'w') as output:
                 with open(err_path, 'w') as err:
                     args = ['sort'] + list(input_paths)
-                    log.info('>  %s' % cmd_line(args))
+                    log.info('> %s' % cmd_line(args))
                     try:
                         check_call(args, stdout=output, stderr=err, env=env)
                         return

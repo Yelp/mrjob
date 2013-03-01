@@ -460,7 +460,7 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
         our_mrjob_dir = os.path.dirname(os.path.realpath(mrjob.__file__))
 
         with mrjob_conf_patcher():
-            mr_job = MRJobWhereAreYou(['-r', 'local'])
+            mr_job = MRJobWhereAreYou(['-r', 'local', '--bootstrap-mrjob'])
             mr_job.sandbox()
 
             with mr_job.make_runner() as runner:
@@ -546,6 +546,7 @@ class LocalMRJobRunnerTestJobConfCase(SandboxedTestCase):
 
         mr_job = MRTestJobConf(['-r', 'local',
                                 '--jobconf=user.defined=something',
+                                '--bootstrap-mrjob',
                                input_path])
         mr_job.sandbox()
 

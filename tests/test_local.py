@@ -788,7 +788,7 @@ class LocalRunnerSetupTestCase(SandboxedTestCase):
         self.foo_tar_gz_size = os.path.getsize(self.foo_tar_gz)
 
     def test_file_upload(self):
-        job = MROSWalkJob(['--runner=local', '--no-bootstrap-mrjob',
+        job = MROSWalkJob(['--runner=local',
                            '--file', self.foo_sh,
                            '--file', self.foo_sh + '#bar.sh',
                            ])
@@ -804,7 +804,7 @@ class LocalRunnerSetupTestCase(SandboxedTestCase):
         self.assertEqual(path_to_size.get('./bar.sh'), self.foo_sh_size)
 
     def test_archive_upload(self):
-        job = MROSWalkJob(['--runner=local', '--no-bootstrap-mrjob',
+        job = MROSWalkJob(['--runner=local',
                            '--archive', self.foo_tar_gz,
                            '--archive', self.foo_tar_gz + '#foo',
                            ])
@@ -823,7 +823,7 @@ class LocalRunnerSetupTestCase(SandboxedTestCase):
 
     def test_python_archive(self):
         job = MROSWalkJob(
-            ['--runner=local', '--no-bootstrap-mrjob',
+            ['--runner=local',
              '--python-archive', self.foo_tar_gz])
         job.sandbox()
 
@@ -840,7 +840,7 @@ class LocalRunnerSetupTestCase(SandboxedTestCase):
 
     def test_setup_cmd(self):
         job = MROSWalkJob(
-            ['--runner=local', '--no-bootstrap-mrjob',
+            ['--runner=local',
              '--setup-cmd', 'touch bar'])
         job.sandbox()
 
@@ -854,7 +854,7 @@ class LocalRunnerSetupTestCase(SandboxedTestCase):
 
     def test_setup_script(self):
         job = MROSWalkJob(
-            ['--runner=local', '--no-bootstrap-mrjob',
+            ['--runner=local',
              '--setup-script', self.foo_sh])
         job.sandbox()
 

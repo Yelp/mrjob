@@ -78,6 +78,7 @@ class InlineMRJobRunner(SimMRJobRunner):
 
     # options that we ignore because they involve running subprocesses
     IGNORED_LOCAL_OPTS = [
+        'bootstrap_mrjob',
         'python_bin',
         'setup_cmds',
         'setup_scripts',

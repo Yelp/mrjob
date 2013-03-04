@@ -1,7 +1,7 @@
 PYTHON=python
-PYTHONPATH=.
+PYTHONPATH=$(CURDIR)
 
-all: test install
+all: test
 
 .PHONY: test
 test:

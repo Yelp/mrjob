@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # Copyright 2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,6 +38,7 @@ from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import patch_fs_s3
+from tests.sandbox import SandboxedTestCase
 
 
 def _mock_context_mgr(m, return_value):
@@ -115,6 +116,18 @@ class NoOutputTestCase(unittest.TestCase):
             self.assertEqual(launcher.stderr.getvalue(), '')
 
 
+class CommandLineConfTestCase(SandboxedTestCase):
+
+    @patch('mrjob.options._append_to_conf_paths')
+    def test_conf_not_duplicated(self, mock1):
+        launcher = MRJobLauncher(args=['-c', 'no-such.conf',
+                                       '-r', 'local', ''])
+        with no_handlers_for_logger('mrjob.runner'):
+            with launcher.make_runner() as runner:
+                self.assertIsInstance(runner, LocalMRJobRunner)
+                mock1.assert_called_once_with('no-such.conf')
+
+
 class CommandLineArgsTestCase(unittest.TestCase):
 
     def test_shouldnt_exit_when_invoked_as_object(self):
@@ -136,7 +149,7 @@ class CommandLineArgsTestCase(unittest.TestCase):
         self.assertEqual(mr_job.options.cmdenv, {'FOO': 'bar'})
 
         # trickier example
-        mr_job = MRJobLauncher(args= [
+        mr_job = MRJobLauncher(args=[
             '',
             '--cmdenv', 'FOO=bar',
             '--cmdenv', 'FOO=baz',

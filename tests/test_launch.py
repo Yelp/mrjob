@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # Copyright 2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -136,7 +136,7 @@ class CommandLineArgsTestCase(unittest.TestCase):
         self.assertEqual(mr_job.options.cmdenv, {'FOO': 'bar'})
 
         # trickier example
-        mr_job = MRJobLauncher(args= [
+        mr_job = MRJobLauncher(args=[
             '',
             '--cmdenv', 'FOO=bar',
             '--cmdenv', 'FOO=baz',

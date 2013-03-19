@@ -2093,11 +2093,17 @@ class EMRJobRunner(MRJobRunner):
                 if job_flow.hadoopversion != self._opts['hadoop_version']:
                     return
 
-            if self._opts['ami_version']:
+            if self._opts['ami_version'] != 'latest':
                 # match AMI version
                 job_flow_ami_version = getattr(job_flow, 'amiversion', None)
                 if job_flow_ami_version != self._opts['ami_version']:
                     return
+            else:
+                log.warning(
+                    "When AMI version is set to 'latest', job flow pooling "
+                    "can result in the job being added to a pool using an "
+                    "older AMI version"
+                )
 
             # there is a hard limit of 256 steps per job flow
             if len(job_flow.steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:

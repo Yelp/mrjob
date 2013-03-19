@@ -57,24 +57,21 @@ except ImportError:
     boto = None
 
 import mrjob
-from mrjob.setup import BootstrapWorkingDirManager
-from mrjob.setup import UploadDirManager
-from mrjob.setup import parse_legacy_hash_path
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
-from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
-from mrjob.fs.local import LocalFilesystem
+from mrjob.conf import combine_paths
 from mrjob.fs.composite import CompositeFilesystem
+from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
-from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
-from mrjob.logparsers import STEP_LOG_URI_RE
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
 from mrjob.logparsers import NODE_LOG_URI_RE
+from mrjob.logparsers import STEP_LOG_URI_RE
+from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import best_error_from_logs
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
@@ -85,11 +82,15 @@ from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
-from mrjob.ssh import ssh_copy_key
-from mrjob.ssh import ssh_terminate_single_job
-from mrjob.ssh import ssh_slave_addresses
-from mrjob.ssh import SSH_PREFIX
+from mrjob.setup import BootstrapWorkingDirManager
+from mrjob.setup import UploadDirManager
+from mrjob.setup import parse_legacy_hash_path
+from mrjob.setup import parse_setup_cmd
 from mrjob.ssh import SSH_LOG_ROOT
+from mrjob.ssh import SSH_PREFIX
+from mrjob.ssh import ssh_copy_key
+from mrjob.ssh import ssh_slave_addresses
+from mrjob.ssh import ssh_terminate_single_job
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import hash_object
@@ -1904,6 +1905,42 @@ class EMRJobRunner(MRJobRunner):
             f.write(contents)
 
         self._master_bootstrap_script_path = path
+
+    def _parse_bootstrap(self):
+        """Parse the *bootstrap* option with
+        :py:func:`mrjob.setup.parse_setup_cmd()`.
+        """
+        return [parse_setup_cmd(cmd) for cmd in self._opts['bootstrap']]
+
+    def _parse_legacy_bootstrap(self):
+        """Parse the deprecated
+        options *bootstrap_python_packages*, and *bootstrap_cmds*
+        *bootstrap_scripts* as bootstrap commands, in that order.
+        """
+        bootstrap = []
+
+        # bootstrap_python_packages
+        if self._opts['bootstrap_python_packages']:
+            bootstrap.append(['sudo apt-get install python-pip'])
+
+        for path in self._opts['bootstrap_python_packages']:
+            path_dict = parse_legacy_hash_path('file', path)
+            # don't worry about inspecting the tarball; pip is smart
+            # enough to deal with that
+            bootstrap.append(['sudo pip install', path_dict])
+
+        # setup_cmds
+        for cmd in self._opts['bootstrap_cmds']:
+            if not isinstance(cmd, basestring):
+                cmd = cmd_line(cmd)
+            bootstrap.append([cmd])
+
+        # bootstrap_scripts
+        for path in self._opts['bootstrap_scripts']:
+            path_dict = parse_legacy_hash_path('file', path)
+            bootstrap.append([path_dict])
+
+        return bootstrap
 
     def _master_bootstrap_script_content(self):
         """Create the contents of the master bootstrap script.

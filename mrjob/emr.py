@@ -1895,10 +1895,11 @@ class EMRJobRunner(MRJobRunner):
             path_dict = {
                 'type': 'file', 'name': None, 'path': self._mrjob_tar_gz_path}
             self._bootstrap_dir_mgr.add(**path_dict)
+
             # find out where python keeps its libraries
             mrjob_bootstrap.append([
                 "__mrjob_PYTHON_LIB=$(%s -c "
-                "'from distutils.sysconfig import get_python_lib();"
+                "'from distutils.sysconfig import get_python_lib;"
                 " print get_python_lib()')" %
                 cmd_line(self._opts['python_bin'])])
             # un-tar mrjob.tar.gz
@@ -1985,14 +1986,14 @@ class EMRJobRunner(MRJobRunner):
         writeln()
 
         # download files using hadoop fs
-        writeln('# download files using hadoop fs -copyToLocal')
+        writeln('# download files and mark them executable')
         for name, path in sorted(
                 self._bootstrap_dir_mgr.name_to_path('file').iteritems()):
             uri = self._upload_mgr.uri(path)
-            writeln('hadoop fs -copyToLocal %s %s' %
+            writeln('hadoop fs -copyToLocal %s $__mrjob_PWD/%s' %
                     (pipes.quote(uri), pipes.quote(name)))
             # make everything executable, like Hadoop Distributed Cache
-            writeln('chmod a+x %s' % pipes.quote(name))
+            writeln('chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
         writeln()
 
         # run bootstrap commands

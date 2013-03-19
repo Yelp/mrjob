@@ -600,7 +600,7 @@ class MockEmrConnection(object):
                 args=step.args,
                 jar=DEFAULT_JAR,
             )
-
+            job_flow.state = 'PENDING'
             job_flow.steps.append(step_object)
 
     def terminate_jobflow(self, jobflow_id):
@@ -670,6 +670,7 @@ class MockEmrConnection(object):
 
         # if a step is currently running, advance it
         steps = getattr(job_flow, 'steps', None) or []
+
         for step_num, step in enumerate(steps):
             # skip steps that are already done
             if step.state in ('COMPLETED', 'FAILED', 'CANCELLED'):

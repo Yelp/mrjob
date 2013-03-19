@@ -2852,6 +2852,7 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
             self.runner, '_get_jar', return_value=['streaming.jar'])
 
         self.simple_patch(boto.emr, 'StreamingStep', dict)
+        self.runner._inferred_hadoop_version = '0.20'
 
     def _assert_streaming_step(self, step, step_num=0, num_steps=1, **kwargs):
         d = self.runner._build_streaming_step(step, step_num, num_steps)

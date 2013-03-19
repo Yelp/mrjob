@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -258,6 +259,7 @@ def to_iso8601(when):
     """Convert a datetime to ISO8601 format.
     """
     return when.strftime(boto.utils.ISO8601)
+
 
 def to_rfc1123(when):
     """Convert a datetime to RFC1123 format.
@@ -600,7 +602,7 @@ class MockEmrConnection(object):
                 args=step.args,
                 jar=DEFAULT_JAR,
             )
-
+            job_flow.state = 'PENDING'
             job_flow.steps.append(step_object)
 
     def terminate_jobflow(self, jobflow_id):
@@ -670,6 +672,7 @@ class MockEmrConnection(object):
 
         # if a step is currently running, advance it
         steps = getattr(job_flow, 'steps', None) or []
+
         for step_num, step in enumerate(steps):
             # skip steps that are already done
             if step.state in ('COMPLETED', 'FAILED', 'CANCELLED'):

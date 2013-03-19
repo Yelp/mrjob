@@ -158,6 +158,14 @@ def add_runner_opts(opt_group, default_runner='local'):
                   ' is %s.' % default_runner)),
 
         opt_group.add_option(
+            '--setup', dest='setup', action='append',
+            help=('A command to run before each mapper/reducer step in the'
+                  ' shell ("touch foo"). You may interpolate files'
+                  ' available via URL or on your local filesystem using'
+                  ' Hadoop Distributed Cache syntax (". setup.sh#"). To'
+                  ' interpolate archives, use #/: "cd foo.tar.gz#/; make')),
+
+        opt_group.add_option(
             '--setup-cmd', dest='setup_cmds', action='append',
             default=[],
             help=('A command to run before each mapper/reducer step in the'

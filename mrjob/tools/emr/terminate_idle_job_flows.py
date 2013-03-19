@@ -87,7 +87,7 @@ def main(cl_args=None):
                          verbose=options.verbose)
 
     inspect_and_maybe_terminate_job_flows(
-        conf_paths=[options.conf_paths],
+        conf_paths=options.conf_paths,
         dry_run=options.dry_run,
         max_hours_idle=options.max_hours_idle,
         mins_to_end_of_hour=options.mins_to_end_of_hour,
@@ -101,7 +101,7 @@ def main(cl_args=None):
 
 
 def inspect_and_maybe_terminate_job_flows(
-    conf_path=None,
+    conf_paths=None,
     dry_run=False,
     max_hours_idle=None,
     mins_to_end_of_hour=None,
@@ -121,7 +121,7 @@ def inspect_and_maybe_terminate_job_flows(
     if max_hours_idle is None and mins_to_end_of_hour is None:
         max_hours_idle = DEFAULT_MAX_HOURS_IDLE
 
-    runner = EMRJobRunner(conf_path=conf_path, **kwargs)
+    runner = EMRJobRunner(conf_paths=conf_paths, **kwargs)
     emr_conn = runner.make_emr_conn()
 
     log.info(

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -1030,7 +1031,6 @@ class MRJobRunner(object):
         else:
             for key, value in sorted(jobconf.iteritems()):
                 args.extend(['-jobconf', '%s=%s' % (key, value)])
-
 
         # partitioner
         if self._partitioner:

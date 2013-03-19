@@ -375,6 +375,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'aws_availability_zone',
         'aws_region',
         'aws_secret_access_key',
+        'bootstrap',
         'bootstrap_actions',
         'bootstrap_cmds',
         'bootstrap_files',
@@ -413,6 +414,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
+        'bootstrap': combine_lists,
         'bootstrap_actions': combine_lists,
         'bootstrap_cmds': combine_lists,
         'bootstrap_files': combine_path_lists,
@@ -634,7 +636,7 @@ class EMRJobRunner(MRJobRunner):
         self._bootstrap = self._parse_bootstrap()
         self._legacy_bootstrap = self._parse_legacy_bootstrap()
 
-        for cmd in self._bootstrap + self._legacy_bootstrap():
+        for cmd in self._bootstrap + self._legacy_bootstrap:
             for maybe_path_dict in cmd:
                 if isinstance(maybe_path_dict, dict):
                     self._bootstrap_dir_mgr.add(**maybe_path_dict)
@@ -1907,7 +1909,8 @@ class EMRJobRunner(MRJobRunner):
             # un-compileable crud in the tarball (this would matter if
             # sh_bin were 'sh -e')
             mrjob_bootstrap.append(
-                ['sudo %s -m compileall -f $__mrjob_PYTHON_LIB/mrjob && true'])
+                ['sudo %s -m compileall -f $__mrjob_PYTHON_LIB/mrjob && true' %
+                 cmd_line(self._opts['python_bin'])])
 
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
@@ -1984,10 +1987,10 @@ class EMRJobRunner(MRJobRunner):
         # download files using hadoop fs
         writeln('# download files using hadoop fs -copyToLocal')
         for name, path in sorted(
-                self._bootstrap_dir_mgr.name_to_path().iteritems()):
+                self._bootstrap_dir_mgr.name_to_path('file').iteritems()):
             uri = self._upload_mgr.uri(path)
             writeln('hadoop fs -copyToLocal %s %s' %
-                    pipes.quote(uri), pipes.quote(name))
+                    (pipes.quote(uri), pipes.quote(name)))
             # make everything executable, like Hadoop Distributed Cache
             writeln('chmod a+x %s' % pipes.quote(name))
         writeln()

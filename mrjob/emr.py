@@ -17,6 +17,7 @@ from __future__ import with_statement
 import logging
 import os
 import os.path
+import pipes
 import posixpath
 import random
 import re
@@ -92,7 +93,6 @@ from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.util import cmd_line
-from mrjob.util import extract_dir_for_tar
 from mrjob.util import hash_object
 from mrjob.util import shlex_split
 
@@ -631,21 +631,13 @@ class EMRJobRunner(MRJobRunner):
             self._bootstrap_dir_mgr.add(**parse_legacy_hash_path(
                 'file', path, must_name='bootstrap_files'))
 
-        self._bootstrap_scripts = []
-        for path in self._opts['bootstrap_scripts']:
-            bootstrap_script = parse_legacy_hash_path('file', path)
-            self._bootstrap_scripts.append(bootstrap_script)
-            self._bootstrap_dir_mgr.add(**bootstrap_script)
+        self._bootstrap = self._parse_bootstrap()
+        self._legacy_bootstrap = self._parse_legacy_bootstrap()
 
-        self._bootstrap_python_packages = []
-        for path in self._opts['bootstrap_python_packages']:
-            bpp = parse_legacy_hash_path('file', path)
-
-            if not bpp['path'].endswith('.tar.gz'):
-                raise ValueError(
-                    'bootstrap_python_packages only accepts .tar.gz files!')
-            self._bootstrap_python_packages.append(bpp)
-            self._bootstrap_dir_mgr.add(**bpp)
+        for cmd in self._bootstrap + self._legacy_bootstrap():
+            for maybe_path_dict in cmd:
+                if isinstance(maybe_path_dict, dict):
+                    self._bootstrap_dir_mgr.add(**maybe_path_dict)
 
         if not (isinstance(self._opts['additional_emr_info'], basestring)
                 or self._opts['additional_emr_info'] is None):
@@ -1873,7 +1865,9 @@ class EMRJobRunner(MRJobRunner):
     ### Bootstrapping ###
 
     def _create_master_bootstrap_script_if_needed(self):
-        """Create the master bootstrap script and write it into our local
+        """Helper for :py:meth:`_add_bootstrap_files_for_upload`.
+
+        Create the master bootstrap script and write it into our local
         temp directory. Set self._master_bootstrap_script_path.
 
         This will do nothing if there are no bootstrap scripts or commands,
@@ -1886,18 +1880,42 @@ class EMRJobRunner(MRJobRunner):
             return
 
         # Also don't bother if we're not bootstrapping
-        if not any(key.startswith('bootstrap_') and
-               key != 'bootstrap_actions' and  # these are separate scripts
-               value
-               for (key, value) in self._opts.iteritems()):
+        if not (self._bootstrap or self._legacy_bootstrap or
+                self._opts['bootstrap_files']
+                or self._opts['bootstrap_mrjob']):
             return
+
+        # create mrjob.tar.gz if we need it, and add commands to install it
+        mrjob_bootstrap = []
+        if self._opts['bootstrap_mrjob']:
+            # _add_bootstrap_files_for_upload() should have done this
+            assert self._mrjob_tar_gz_path
+            path_dict = {
+                'type': 'file', 'name': None, 'path': self._mrjob_tar_gz_path}
+            self._bootstrap_dir_mgr.add(**path_dict)
+            # find out where python keeps its libraries
+            mrjob_bootstrap.append([
+                "__mrjob_PYTHON_LIB=$(%s -c "
+                "'from distutils.sysconfig import get_python_lib();"
+                " print get_python_lib()')" %
+                cmd_line(self._opts['python_bin'])])
+            # un-tar mrjob.tar.gz
+            mrjob_bootstrap.append(
+                ['sudo tar xfz ', path_dict, ' -C $__mrjob_PYTHON_LIB'])
+            # re-compile pyc files now, since mappers/reducers can't
+            # write to this directory. Don't fail if there is extra
+            # un-compileable crud in the tarball (this would matter if
+            # sh_bin were 'sh -e')
+            mrjob_bootstrap.append(
+                ['sudo %s -m compileall -f $__mrjob_PYTHON_LIB/mrjob && true'])
 
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
         path = os.path.join(self._get_local_tmp_dir(), 'b.py')
         log.info('writing master bootstrap script to %s' % path)
 
-        contents = self._master_bootstrap_script_content()
+        contents = self._master_bootstrap_script_content(
+            self._bootstrap + mrjob_bootstrap + self._legacy_bootstrap)
         for line in StringIO(contents):
             log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
@@ -1916,6 +1934,10 @@ class EMRJobRunner(MRJobRunner):
         """Parse the deprecated
         options *bootstrap_python_packages*, and *bootstrap_cmds*
         *bootstrap_scripts* as bootstrap commands, in that order.
+
+        This is a separate method from _parse_bootstrap() because bootstrapping
+        mrjob happens after the new bootstrap commands (so you can upgrade
+        Python) but before the legacy commands (for backwards compatibility).
         """
         bootstrap = []
 
@@ -1942,99 +1964,50 @@ class EMRJobRunner(MRJobRunner):
 
         return bootstrap
 
-    def _master_bootstrap_script_content(self):
+    def _master_bootstrap_script_content(self, bootstrap):
         """Create the contents of the master bootstrap script.
         """
         out = StringIO()
-
-        python_bin_in_list = ', '.join(
-            repr(arg) for arg in self._opts['python_bin'])
 
         def writeln(line=''):
             out.write(line + '\n')
 
         # shebang
-        writeln('#!/usr/bin/python')
+        writeln('#!/usr/bin/env %s' % cmd_line(self._opts['sh_bin']))
         writeln()
 
-        # imports
-        writeln('from __future__ import with_statement')
-        writeln()
-        writeln('import distutils.sysconfig')
-        writeln('import os')
-        writeln('import stat')
-        writeln('from subprocess import call, check_call')
-        writeln('from tempfile import mkstemp')
-        writeln('from xml.etree.ElementTree import ElementTree')
+        # store $PWD
+        writeln('# store $PWD')
+        writeln('__mrjob_PWD=$PWD')
         writeln()
 
         # download files using hadoop fs
         writeln('# download files using hadoop fs -copyToLocal')
-        files = self._bootstrap_dir_mgr.name_to_path('file').iteritems()
-        for name, path in files:
-            s3_uri = self._upload_mgr.uri(path)
-            writeln(
-                "check_call(['hadoop', 'fs', '-copyToLocal', %r, %r])" %
-                (s3_uri, name))
+        for name, path in sorted(
+                self._bootstrap_dir_mgr.name_to_path().iteritems()):
+            uri = self._upload_mgr.uri(path)
+            writeln('hadoop fs -copyToLocal %s %s' %
+                    pipes.quote(uri), pipes.quote(name))
+            # make everything executable, like Hadoop Distributed Cache
+            writeln('chmod a+x %s' % pipes.quote(name))
         writeln()
 
-        # make scripts executable
-        if self._bootstrap_scripts:
-            writeln('# make bootstrap scripts executable')
-            for path_dict in self._bootstrap_scripts:
-                writeln("check_call(['chmod', 'a+rx', %r])" %
-                        path_dict['name'])
-            writeln()
-
-        # bootstrap mrjob
-        if self._opts['bootstrap_mrjob']:
-            name = self._bootstrap_dir_mgr.name('file',
-                                                self._mrjob_tar_gz_path)
-            writeln('# bootstrap mrjob')
-            writeln("site_packages = distutils.sysconfig.get_python_lib()")
-            writeln(
-                "check_call(['sudo', 'tar', 'xfz', %r, '-C', site_packages])" %
-                name)
-            # re-compile pyc files now, since mappers/reducers can't
-            # write to this directory. Don't fail if there is extra
-            # un-compileable crud in the tarball.
-            writeln("mrjob_dir = os.path.join(site_packages, 'mrjob')")
-            writeln("call(["
-                    "'sudo', %s, '-m', 'compileall', '-f', mrjob_dir])" %
-                    python_bin_in_list)
-            writeln()
-
-        # install our python modules
-        if self._bootstrap_python_packages:
-            writeln('# install python modules:')
-            for path_dict in self._bootstrap_python_packages:
-                writeln("check_call(['tar', 'xfz', %r])" %
-                        self._bootstrap_dir_mgr.name(**path_dict))
-                # figure out name of dir to CD into
-                assert path_dict['path'].endswith('.tar.gz')
-                cd_into = extract_dir_for_tar(path_dict['path'])
-                # install the module
-                writeln("check_call(["
-                        "'sudo', %s, 'setup.py', 'install'], cwd=%r)" %
-                        (python_bin_in_list, cd_into))
-
-        # run our commands
-        if self._opts['bootstrap_cmds']:
-            writeln('# run bootstrap cmds:')
-            for cmd in self._opts['bootstrap_cmds']:
-                if isinstance(cmd, basestring):
-                    writeln('check_call(%r, shell=True)' % cmd)
+        # run bootstrap commands
+        writeln('# bootstrap commands')
+        for cmd in bootstrap:
+            # reconstruct the command line, substituting $__mrjob_PWD/<name>
+            # for path dicts
+            line = ''
+            for token in cmd:
+                if isinstance(token, dict):
+                    # it's a path dictionary
+                    line += '$__mrjob_PWD/'
+                    line += pipes.quote(self._bootstrap_dir_mgr.name(**token))
                 else:
-                    writeln('check_call(%r)' % cmd)
-            writeln()
-
-        # run our scripts
-        if self._bootstrap_scripts:
-            writeln('# run bootstrap scripts:')
-            for path_dict in self._bootstrap_scripts:
-                writeln('check_call(%r)' % (
-                    ['./' + self._bootstrap_dir_mgr.name(**path_dict)],))
-            writeln()
+                    # it's raw script
+                    line += token
+            writeln(line)
+        writeln()
 
         return out.getvalue()
 

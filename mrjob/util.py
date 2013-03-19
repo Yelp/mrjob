@@ -86,7 +86,9 @@ def cmd_line(args):
 
 
 def extract_dir_for_tar(archive_path, compression='gz'):
-    """Get the name of the directory the tar at *archive_path* extracts into.
+    """.. deprecated:: 0.4.0
+
+    Get the name of the directory the tar at *archive_path* extracts into.
 
     :type archive_path: str
     :param archive_path: path to archive file

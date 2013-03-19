@@ -938,7 +938,7 @@ class MRJobRunner(object):
 
         writeln('# store $PWD')
         writeln('__mrjob_PWD=$PWD')
-        writeln('')
+        writeln()
 
         writeln('# obtain exclusive file lock')
         # Basically, we're going to tie file descriptor 9 to our lockfile,

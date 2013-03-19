@@ -1842,7 +1842,11 @@ class EMRJobRunner(MRJobRunner):
         # parameter
         if lg_step_nums is None:
             lg_step_nums = step_nums
-        self._enable_slave_ssh_access()
+
+        try:
+            self._enable_slave_ssh_access()
+        except IOError, e:
+            raise LogFetchError(e)
         task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
         step_logs = self.ls_step_logs_ssh(lg_step_nums)
         job_logs = self.ls_job_logs_ssh(step_nums)

@@ -40,6 +40,13 @@ class SimRunnerOptionStore(RunnerOptionStore):
         'cmdenv': combine_local_envs,
     })
 
+    def default_options(self):
+        # don't bootstrap mrjob by default when running locally
+        super_opts = super(SimRunnerOptionStore, self).default_options()
+        return combine_dicts(super_opts, {
+            'bootstrap_mrjob': False,
+        })
+
 
 class SimMRJobRunner(MRJobRunner):
     """Abstract base class for runners for testing jobs in development

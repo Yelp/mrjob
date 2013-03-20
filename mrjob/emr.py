@@ -2284,9 +2284,10 @@ class EMRJobRunner(MRJobRunner):
                  in self._bootstrap_dir_mgr.name_to_path('file').iteritems()
                  if not path == self._mrjob_tar_gz_path),
             self._opts['additional_emr_info'],
-            self._opts['bootstrap_mrjob'],
-            self._opts['bootstrap_cmds'],
+            self._bootstrap,
             self._bootstrap_actions,
+            self._opts['bootstrap_cmds'],
+            self._opts['bootstrap_mrjob'],
         ]
 
         if self._opts['bootstrap_mrjob']:

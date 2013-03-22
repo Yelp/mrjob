@@ -60,6 +60,8 @@ Temp files and cleanup
     Path to put local temp dirs inside. By default we just call
     :py:func:`tempfile.gettempdir`
 
+.. _configs-all-runners-cleanup:
+
 **cleanup** (:option:`--cleanup`)
     List of which kinds of directories to delete when a job succeeds. Valid
     choices are:

@@ -3,13 +3,14 @@
 The ``mrjob`` command
 =====================
 
-You can use the ``mrjob`` command to run jobs written in any language or
-perform various Elastic MapReduce-related tasks.
+The ``mrjob`` command has two purposes:
 
-``mrjob run (path to script or executable) [options]``
-    Run a job. Takes same options as invoking a Python job. See
-    :doc:`configs-all-runners`, :doc:`configs-hadoopy-runners`, and
-    :doc:`emr-opts`.
+1. To provide easy access to EMR tools
+2. To eventually let you run Hadoop Streaming jobs written in languages other
+   than Python
+
+EMR tools
+---------
 
 ``mrjob audit-emr-usage [options]``
     Audit EMR usage over the past 2 weeks, sorted by job flow name and user.
@@ -50,3 +51,12 @@ perform various Elastic MapReduce-related tasks.
     Terminate an existing EMR job flow.
 
     Alias for :py:mod:`mrjob.tools.emr.terminate_job_flow`.
+
+Running jobs
+------------
+
+``mrjob run (path to script or executable) [options]``
+    Run a job. Takes same options as invoking a Python job. See
+    :doc:`configs-all-runners`, :doc:`configs-hadoopy-runners`, and
+    :doc:`emr-opts`. While you can use this command to invoke your jobs, you
+    can just as easily call ``python my_job.py [options]``.

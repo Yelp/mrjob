@@ -17,6 +17,8 @@ message or for inspecting jobs whose output has been lost.
 
 Usage::
 
+    mrjob fetch-logs -[l|L|a|A|--counters] [-s STEP_NUM]\
+ JOB_FLOW_ID
     python -m mrjob.tools.emr.fetch_logs -[l|L|a|A|--counters] [-s STEP_NUM]\
  JOB_FLOW_ID
 

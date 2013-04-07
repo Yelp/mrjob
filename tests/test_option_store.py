@@ -235,6 +235,48 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
                 "No configs specified for inline runner\n",
                 stderr.getvalue())
 
+    def test_conf_contain_only_include_file(self):
+        """If a config file only include other configuration files
+        no warnings are thrown as long as the included files are
+        not empty.
+        """
+
+        # dummy configuration for include file 1
+        conf = {
+            'runners': {
+                'inline': {
+                    'base_tmp_dir': "include_file1_base_tmp_dir"
+                }
+            }
+        }
+
+        include_file_1 = self.save_conf('include_file_1', conf)
+
+        # dummy configuration for include file 2
+        conf = {
+            'runners': {
+                'inline': {
+                    'base_tmp_dir': "include_file2_base_tmp_dir"
+                }
+            }
+        }
+
+        include_file_2 = self.save_conf('include_file_2', conf)
+
+        # test configuration
+        conf = {
+            'include': [include_file_1, include_file_2]
+        }
+        path = self.save_conf('twoincludefiles', conf)
+
+        stderr = StringIO()
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.runner', stderr)
+            RunnerOptionStore('inline', {}, [path])
+            self.assertEqual(
+                "",
+                stderr.getvalue())
+
 
 class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
 

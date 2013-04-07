@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,6 +45,7 @@ except:
     import json
     JSONDecodeError = ValueError
 
+from mrjob.compat import add_translated_jobconf_for_hadoop_version
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.compat import supports_combiners_in_hadoop_streaming
@@ -1017,9 +1019,18 @@ class MRJobRunner(object):
 
         # new-style jobconf
         version = self.get_hadoop_version()
+
+        # translate the jobconf configuration names to match
+        # the hadoop version
+        jobconf = add_translated_jobconf_for_hadoop_version(jobconf,
+                                                            version)
         if uses_generic_jobconf(version):
             for key, value in sorted(jobconf.iteritems()):
                 args.extend(['-D', '%s=%s' % (key, value)])
+        # old-style jobconf
+        else:
+            for key, value in sorted(jobconf.iteritems()):
+                args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         # partitioner
         if self._partitioner:
@@ -1037,11 +1048,6 @@ class MRJobRunner(object):
         # hadoop_output_format
         if (step_num == num_steps - 1 and self._hadoop_output_format):
             args.extend(['-outputformat', self._hadoop_output_format])
-
-        # old-style jobconf
-        if not uses_generic_jobconf(version):
-            for key, value in sorted(jobconf.iteritems()):
-                args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         return args
 

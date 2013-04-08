@@ -71,9 +71,10 @@ class HadoopFSTestCase(MockSubprocessTestCase):
 
     def test_ls_s3n(self):
         # hadoop fs -lsr doesn't have user and group info when reading from s3
-        self.make_mock_file('f')
+        self.make_mock_file('f', 'foo')
+        self.make_mock_file('f3 win', 'foo' * 10)
         self.assertItemsEqual(list(self.fs.ls('s3n://bucket/')),
-                         ['s3n://bucket/f'])
+                         ['s3n://bucket/f', 's3n://bucket/f3 win'])
 
     def test_single_space(self):
         self.make_mock_file('foo bar')

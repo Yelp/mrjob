@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,9 +27,14 @@ def _append_to_conf_paths(option, opt_str, value, parser):
     """conf_paths is None by default, but --no-conf or --conf-path should make
     it a list.
     """
+
     if parser.values.conf_paths is None:
         parser.values.conf_paths = []
-    parser.values.conf_paths.append(value)
+
+    # this method is also called during generate_passthrough_arguments
+    # the check below is to ensure that conf_paths are not duplicated
+    if value not in parser.values.conf_paths:
+        parser.values.conf_paths.append(value)
 
 
 def add_protocol_opts(opt_group):

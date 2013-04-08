@@ -15,6 +15,7 @@
 
 Usage::
 
+    mrjob audit-emr-usage > report
     python -m mrjob.tools.emr.audit_usage > report
 
 Options::

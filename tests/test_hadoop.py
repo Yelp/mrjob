@@ -19,6 +19,7 @@ from __future__ import with_statement
 from StringIO import StringIO
 import getpass
 import os
+import pty
 from subprocess import check_call
 
 from mock import patch
@@ -239,6 +240,10 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
     def test_end_to_end_with_explicit_hadoop_bin(self):
         self._test_end_to_end(['--hadoop-bin', self.hadoop_bin])
+
+    def test_end_to_end_without_pty_fork(self):
+        with patch.object(pty, 'fork', side_effect=OSError()):
+            self._test_end_to_end()
 
     def test_end_to_end_with_disabled_input_path_check(self):
         self._test_end_to_end(['--skip-hadoop-input-check'])

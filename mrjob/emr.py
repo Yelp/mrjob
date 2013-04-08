@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -188,23 +189,6 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
     'cg1.4xlarge': 22,
 }
 
-# Use this to figure out which hadoop version we're using if it's not
-# explicitly specified, so we can keep from passing deprecated command-line
-# options to Hadoop. If we encounter an AMI version we don't recognize,
-# we use whatever version matches 'latest'.
-#
-# The reason we don't just create a job flow and then query its Hadoop version
-# is that for most jobs, we create the steps and the job flow at the same time.
-AMI_VERSION_TO_HADOOP_VERSION = {
-    None: '0.20.205',  # The default is 'latest' now, but you can still pass
-                       # None in the runner kwargs, and that should default us
-                       # to 'latest' in boto. But we really can't know, so
-                       # caveat programmor.
-    '1.0': '0.18',
-    '2.0': '0.20.205',
-    'latest': '0.20.205',
-}
-
 # EMR's hard limit on number of steps in a job flow
 MAX_STEPS_PER_JOB_FLOW = 256
 
@@ -221,6 +205,7 @@ def s3_key_to_uri(s3_key):
 
 # Thu, 29 Mar 2012 04:55:44 GMT
 RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
+
 
 def iso8601_to_timestamp(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
@@ -285,7 +270,9 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
                 raise
 
         # don't count the same job flow twice
-        job_flows = [jf for jf in results if jf.jobflowid not in ids_seen]
+        job_flows = [jf for jf in results
+                     if getattr(jf, "jobflowid", None) and
+                     jf.jobflowid not in ids_seen]
         log.debug('  got %d results (%d new)' % (len(results), len(job_flows)))
 
         all_job_flows.extend(job_flows)
@@ -671,10 +658,6 @@ class EMRJobRunner(MRJobRunner):
         # turn off tracker progress until tunnel is up
         self._show_tracker_progress = False
 
-        # default requested hadoop version if AMI version is not set
-        if not (self._opts['ami_version'] or self._opts['hadoop_version']):
-            self._opts['hadoop_version'] = '0.20'
-
         # init hadoop version cache
         self._inferred_hadoop_version = None
 
@@ -872,7 +855,8 @@ class EMRJobRunner(MRJobRunner):
             self._create_mrjob_tar_gz()
             self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path)
 
-        # all other files needed by the script are already in _bootstrap_dir_mgr
+        # all other files needed by the script are already in
+        # _bootstrap_dir_mgr
         for path in self._bootstrap_dir_mgr.paths():
             self._upload_mgr.add(path)
 
@@ -1414,26 +1398,30 @@ class EMRJobRunner(MRJobRunner):
         """Create an empty jobflow on EMR, and set self._emr_job_flow_id to
         the ID for that job."""
         self._create_s3_temp_bucket_if_needed()
-        # define out steps
-        steps = self._build_steps()
+        emr_conn = self.make_emr_conn()
 
         # try to find a job flow from the pool. basically auto-fill
         # 'emr_job_flow_id' if possible and then follow normal behavior.
         if self._opts['pool_emr_job_flows'] and not self._emr_job_flow_id:
-            job_flow = self.find_job_flow(num_steps=len(steps))
+            job_flow = self.find_job_flow(num_steps=len(self._get_steps()))
             if job_flow:
                 self._emr_job_flow_id = job_flow.jobflowid
 
         # create a job flow if we're not already using an existing one
         if not self._emr_job_flow_id:
             self._emr_job_flow_id = self._create_job_flow(
-                persistent=False, steps=steps)
+                persistent=False)
+            log.info('Created new job flow %s' %
+                     self._emr_job_flow_id)
         else:
-            emr_conn = self.make_emr_conn()
-            log.info('Adding our job to job flow %s' % self._emr_job_flow_id)
-            log.debug('Calling add_jobflow_steps(%r, %r)' % (
+            log.info('Adding our job to existing job flow %s' %
+                     self._emr_job_flow_id)
+
+        # define out steps
+        steps = self._build_steps()
+        log.debug('Calling add_jobflow_steps(%r, %r)' % (
                 self._emr_job_flow_id, steps))
-            emr_conn.add_jobflow_steps(self._emr_job_flow_id, steps)
+        emr_conn.add_jobflow_steps(self._emr_job_flow_id, steps)
 
         # keep track of when we launched our job
         self._emr_job_start = time.time()
@@ -1612,7 +1600,8 @@ class EMRJobRunner(MRJobRunner):
     ## SSH LOG FETCHING
 
     def _ssh_path(self, relative):
-        return SSH_PREFIX + self._address_of_master() + SSH_LOG_ROOT + '/' + relative
+        return SSH_PREFIX + self._address_of_master() + SSH_LOG_ROOT + \
+        '/' + relative
 
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
@@ -1832,7 +1821,11 @@ class EMRJobRunner(MRJobRunner):
         # parameter
         if lg_step_nums is None:
             lg_step_nums = step_nums
-        self._enable_slave_ssh_access()
+
+        try:
+            self._enable_slave_ssh_access()
+        except IOError, e:
+            raise LogFetchError(e)
         task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
         step_logs = self.ls_step_logs_ssh(lg_step_nums)
         job_logs = self.ls_job_logs_ssh(step_nums)
@@ -1919,7 +1912,8 @@ class EMRJobRunner(MRJobRunner):
 
         # download files using hadoop fs
         writeln('# download files using hadoop fs -copyToLocal')
-        for name, path in self._bootstrap_dir_mgr.name_to_path('file').iteritems():
+        files = self._bootstrap_dir_mgr.name_to_path('file').iteritems()
+        for name, path in files:
             s3_uri = self._upload_mgr.uri(path)
             writeln(
                 "check_call(['hadoop', 'fs', '-copyToLocal', %r, %r])" %
@@ -1936,7 +1930,8 @@ class EMRJobRunner(MRJobRunner):
 
         # bootstrap mrjob
         if self._opts['bootstrap_mrjob']:
-            name = self._bootstrap_dir_mgr.name('file', self._mrjob_tar_gz_path)
+            name = self._bootstrap_dir_mgr.name('file',
+                                                self._mrjob_tar_gz_path)
             writeln('# bootstrap mrjob')
             writeln("site_packages = distutils.sysconfig.get_python_lib()")
             writeln(
@@ -2093,14 +2088,22 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['emr_job_flow_pool_name'] != name:
                 return
 
-            # match hadoop version
-            if job_flow.hadoopversion != self.get_hadoop_version():
-                return
+            if self._opts['hadoop_version']:
+                # match hadoop version
+                if job_flow.hadoopversion != self._opts['hadoop_version']:
+                    return
 
-            # match AMI version
-            job_flow_ami_version = getattr(job_flow, 'amiversion', None)
-            if job_flow_ami_version != self._opts['ami_version']:
-                return
+            if self._opts['ami_version'] != 'latest':
+                # match AMI version
+                job_flow_ami_version = getattr(job_flow, 'amiversion', None)
+                if job_flow_ami_version != self._opts['ami_version']:
+                    return
+            else:
+                log.warning(
+                    "When AMI version is set to 'latest', job flow pooling "
+                    "can result in the job being added to a pool using an "
+                    "older AMI version"
+                )
 
             # there is a hard limit of 256 steps per job flow
             if len(job_flow.steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
@@ -2313,23 +2316,24 @@ class EMRJobRunner(MRJobRunner):
 
     def get_hadoop_version(self):
         if not self._inferred_hadoop_version:
-            if self._emr_job_flow_id:
-                # if joining a job flow, infer the version
-                self._inferred_hadoop_version = (
-                    self._describe_jobflow().hadoopversion)
-            else:
-                # otherwise, read it from hadoop_version/ami_version
-                hadoop_version = self._opts['hadoop_version']
-                if hadoop_version:
-                    self._inferred_hadoop_version = hadoop_version
-                else:
-                    ami_version = self._opts['ami_version']
-                    # don't explode if we see an AMI version that's
-                    # newer than what we know about.
-                    self._inferred_hadoop_version = (
-                        AMI_VERSION_TO_HADOOP_VERSION.get(ami_version) or
-                        AMI_VERSION_TO_HADOOP_VERSION['latest'])
+            if not self._emr_job_flow_id:
+                raise AssertionError(
+                    "We infer the hadoop version from the job flow. "
+                    "The job flow must created before the hadoop version "
+                    "can be inferred"
+                )
 
+            # infer the version from the job flow
+            self._inferred_hadoop_version = (
+                    self._describe_jobflow().hadoopversion)
+            # warn if the hadoop version specified does not match the
+            # inferred hadoop_version
+            hadoop_version = self._opts['hadoop_version']
+            if hadoop_version and \
+               hadoop_version != self._inferred_hadoop_version:
+                log.warning("Specified hadoop version (%s) does not match "
+                "job flow hadoop version (%s)" % (hadoop_version,
+                                              self._inferred_hadoop_version))
         return self._inferred_hadoop_version
 
     def _address_of_master(self, emr_conn=None):

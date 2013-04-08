@@ -1,6 +1,9 @@
 EMR job flow management tools
 =============================
 
+Each tool can be invoked two ways: from the ``mrjob`` command, or by running
+the Python module directly. Both ways are given in each example.
+
 audit_usage
 -----------
 

@@ -16,6 +16,7 @@ configs from :py:mod:`mrjob.conf`, and print the job flow ID to stdout.
 
 Usage::
 
+    mrjob create-job-flow
     python -m mrjob.tools.emr.create_job_flow
 
 **WARNING**: do not run this without having

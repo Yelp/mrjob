@@ -11,6 +11,10 @@ v0.4, 2013-03-22 -- Slouching toward nirvana
      important)
    * Inline and local runners now inherit from the SimMRJobRunner class and thus share most
      of their implementation
+   * Internal data structure for representing a step is much richer, allowing
+     many cool future features (#479)
+   * mrjob detects Hadoop version from EMR based on API responses instead of
+     what's in the config (#611)
  * New features:
    * Support for non-Hadoop Streaming jar steps (#499)
    * Support for arbitrary commands as Hadoop Streaming
@@ -20,6 +24,9 @@ v0.4, 2013-03-22 -- Slouching toward nirvana
      the interpreter
    * Hadoop runner uses PTY to print output from the Hadoop sub process to the
      console (#580)
+   * mrjob knows how to terminate the job on cleanup (Ctrl+C closes the job).
+     (#353)
+   * Allow use of multiple -c flags on the command line (#420)
  * Bug fixes:
    * Silenced some incorrect warnings about ignored options in 'inline' runner
    * terminate_idle_job_flows uses the default configuration to terminate idle jobs (#559)

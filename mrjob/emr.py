@@ -429,6 +429,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ssh_bind_ports': range(40001, 40841),
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
+            'cleanup_on_failure': ['JOB'],
         })
 
     def _fix_ec2_instance_opts(self):

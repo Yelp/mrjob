@@ -546,7 +546,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
-
+            self.prepare_runner_for_ssh(runner)
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
 
@@ -2436,7 +2436,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
-
+            self.prepare_runner_for_ssh(runner)
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
 
@@ -2471,7 +2471,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
-
+            self.prepare_runner_for_ssh(runner)
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
 

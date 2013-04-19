@@ -15,12 +15,17 @@ import errno
 import getpass
 import logging
 import os
-import pty
 import posixpath
 import re
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
+
+try:
+    import pty
+    pty  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    pty = None
 
 from mrjob.setup import UploadDirManager
 from mrjob.compat import supports_new_distributed_cache_options

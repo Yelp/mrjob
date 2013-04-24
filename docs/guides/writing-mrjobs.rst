@@ -486,6 +486,8 @@ lines containing the string "kitty"::
 
 .. rubric:: Footnotes
 
+.. _non-hadoop-streaming-jar-steps:
+
 Non-Hadoop Streaming jar steps
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

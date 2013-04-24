@@ -331,7 +331,7 @@ class HadoopJobRunner(MRJobRunner):
                 self.print_counters([step_num + 1])
             else:
                 msg = ('Job failed with return code %d: %s' %
-                       (step_proc.returncode, streaming_args))
+                       (returncode, streaming_args))
                 log.error(msg)
                 # look for a Python traceback
                 cause = self._find_probable_cause_of_failure(

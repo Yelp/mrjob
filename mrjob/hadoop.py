@@ -353,8 +353,7 @@ class HadoopJobRunner(MRJobRunner):
                     # add cause_msg to exception message
                     msg += '\n' + '\n'.join(cause_msg) + '\n'
 
-                raise Exception(msg)
-                raise CalledProcessError(step_proc.returncode, streaming_args)
+                raise CalledProcessError(returncode, streaming_args)
 
     def _process_stderr_from_streaming(self, stderr):
 

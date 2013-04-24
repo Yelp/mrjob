@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -629,6 +630,7 @@ def supports_new_distributed_cache_options(version):
     # http://hadoop.apache.org/common/docs/r0.20.203.0/releasenotes.html
     return version_gte(version, '0.20.203')
 
+
 def uses_020_counters(version):
     return version_gte(version, '0.20')
 
@@ -651,7 +653,7 @@ def version_gte(version, cmp_version_str):
 
 
 def add_translated_jobconf_for_hadoop_version(jobconf, hadoop_version):
-    """ Translates the configuration property names to match those that
+    """Translates the configuration property name to match those that
     are accepted in hadoop_version. Prints a warning message if any
     configuration property name does not match the name in the hadoop
     version. Combines the original jobconf with the translated jobconf.

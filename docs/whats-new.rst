@@ -19,7 +19,7 @@ Job steps are much richer now:
 * In fact, you can use arbitrary UNIX commands as your whole step (mapper/reducer/combiner). :ref:`More info <cmd-steps>`
 
 If you Ctrl+C from the command line, your job will be terminated if you give it time.
-If you're running on EMR, that should prevent most accidental runaway jobs. :ref: `More info <configs-all-runners-cleanup>`
+If you're running on EMR, that should prevent most accidental runaway jobs. :ref:`More info <configs-all-runners-cleanup>`
 
 mrjob v0.4 requires boto 2.2.
 

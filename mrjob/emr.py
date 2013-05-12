@@ -1344,9 +1344,10 @@ class EMRJobRunner(MRJobRunner):
 
         return boto.emr.StreamingStep(**streaming_step_kwargs)
 
-    def _build_jar_step(self, step):
+    def _build_jar_step(self, step, step_num, num_steps):
         return boto.emr.JarStep(
-            name=step['name'],
+            name='%s: Step %d of %d' % (
+                self._job_name, step_num + 1, num_steps),
             jar=step['jar'],
             main_class=step['main_class'],
             step_args=step['step_args'],
@@ -1720,7 +1721,7 @@ class EMRJobRunner(MRJobRunner):
         """
         # empty list is a valid value for lg_step_nums, but it is an optional
         # parameter
-        if lg_step_num_mapping is None:
+        if lg_step_num_mapping is None or len(lg_step_num_mapping) == 0:
             lg_step_num_mapping = dict((n, n) for n in step_nums)
         lg_step_nums = list(sorted(lg_step_num_mapping[k] for k in step_nums))
 

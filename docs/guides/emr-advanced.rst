@@ -1,6 +1,15 @@
 Advanced EMR usage
 ==================
 
+.. _visible_to_all_users:
+
+Making Job Flows Visible To All Users
+-------------------------------------
+
+You can make job flow visible to all IAM users with the :option:`--visible-to-all-users`.
+If you won't specify this option created job flow will be visible only for IAM user that
+created the job flow. 
+
 .. _reusing-job-flows:
 
 Reusing Job Flows

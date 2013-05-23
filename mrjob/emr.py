@@ -392,6 +392,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_bind_ports',
         'ssh_tunnel_is_open',
         'ssh_tunnel_to_job_tracker',
+        'visible_to_all_users'
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -430,6 +431,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
             'cleanup_on_failure': ['JOB'],
+            'visible_to_all_users': False
         })
 
     def _fix_ec2_instance_opts(self):
@@ -1269,6 +1271,9 @@ class EMRJobRunner(MRJobRunner):
 
         if self._opts['additional_emr_info']:
             args['additional_info'] = self._opts['additional_emr_info']
+
+        if self._opts['visible_to_all_users']:
+            args['visible_to_all_users'] = True
 
         if persistent or self._opts['pool_emr_job_flows']:
             args['keep_alive'] = True

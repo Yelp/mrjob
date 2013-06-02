@@ -245,6 +245,9 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         with patch.object(pty, 'fork', side_effect=OSError()):
             self._test_end_to_end()
 
+    def test_end_to_end_with_disabled_input_path_check(self):
+        self._test_end_to_end(['--skip-hadoop-input-check'])
+
 
 class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 

@@ -584,7 +584,7 @@ class MRJobRunner(object):
         for step_num, step_counters in enumerate(self.counters()):
             step_num = step_num + 1
             if limit_to_steps is None or step_num in limit_to_steps:
-                log.info('Counters from step %d:' % step_num)
+                log.info('Counters from step %d:' % (step_num + 1))
                 if step_counters.keys():
                     for group_name in sorted(step_counters.keys()):
                         log.info('  %s:' % group_name)

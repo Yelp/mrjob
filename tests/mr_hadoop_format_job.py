@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Trivial two-step job which sets hadoop input and output format."""
-from tests.mr_testing_job import MRTestingJob
+from mrjob.job import MRJob
 
 
-class MRHadoopFormatJob(MRTestingJob):
+class MRHadoopFormatJob(MRJob):
 
     HADOOP_INPUT_FORMAT = 'mapred.FooInputFormat'
     HADOOP_OUTPUT_FORMAT = 'mapred.BarOutputFormat'
@@ -38,7 +38,7 @@ class MRHadoopFormatJob(MRTestingJob):
 
     def steps(self):
         return [self.mr(self.mapper, self.reducer, combiner=self.combiner),
-                self.mr(self.mapper2)]
+                self.mr(self.mapper2, jobconf={'x': 'z'})]
 
 
 if __name__ == '__main__':

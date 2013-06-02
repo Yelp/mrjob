@@ -38,6 +38,7 @@ try:
 except ImportError:
     import json
 
+
 def map_int_to_tour(num_nodes, i, start_node):
     """Gets a unique tour through a graph given an integer and starting node.
 
@@ -46,7 +47,7 @@ def map_int_to_tour(num_nodes, i, start_node):
     i -- the integer to be mapped to the set of tours for the graph
     start_node -- the node index to begin and end the tour on
     """
-    nodes_remaining = range(0,start_node) + range(start_node + 1, num_nodes)
+    nodes_remaining = range(0, start_node) + range(start_node + 1, num_nodes)
     tour = []
 
     while len(nodes_remaining) > 0:
@@ -59,6 +60,7 @@ def map_int_to_tour(num_nodes, i, start_node):
     tour = [start_node] + tour + [start_node]
     return tour
 
+
 def cost_tour(graph, tour):
     """Calculates the travel cost of given tour through a given graph.
 
@@ -69,8 +71,9 @@ def cost_tour(graph, tour):
             entry is the index of a node on the graph.
     """
     steps = zip(tour[0:-1], tour[1:])
-    cost = sum([ graph[step_from,step_to] for step_from, step_to in steps])
+    cost = sum([graph[step_from, step_to] for step_from, step_to in steps])
     return cost
+
 
 class MRSalesman(MRJob):
 
@@ -179,12 +182,10 @@ class MRSalesman(MRJob):
         each key/category.
         """
         if key == "shortest":
-            yield (key ,min(winners))
+            yield (key, min(winners))
         if key == "longest":
-            yield (key ,max(winners))
+            yield (key, max(winners))
 
 
 if __name__ == '__main__':
     MRSalesman.run()
-
-

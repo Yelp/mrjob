@@ -13,6 +13,7 @@ Option                 Default                                                 S
 *hadoop_input_format*  ``None``                                                (see :py:meth:`~mrjob.job.MRJob.hadoop_input_format`)
 *hadoop_output_format* ``None``                                                (see :py:meth:`~mrjob.job.MRJob.hadoop_output_format`)
 *output_dir*           (automatic)                                             :option:`-o`, :option:`--output-dir`
+*no_output*            ``False``                                               :option:`--no-output`
 *partitioner*          ``None``                                                :option:`--partitioner` (see also :py:meth:`~mrjob.job.MRJob.partitioner`)
 ====================== ======================================================= ==========================================================================
 
@@ -31,6 +32,7 @@ Option                 Default                        Combined by               
 *cmdenv*               ``{}``                         :py:func:`~mrjob.conf.combine_envs`       :option:`--cmdenv`
 *hadoop_extra_args*    ``[]``                         :py:func:`~mrjob.conf.combine_lists`      :option:`--hadoop-arg`
 *hadoop_streaming_jar* (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--hadoop-streaming-jar`
+*interpreter*          (value of *python_bin*)        :py:func:`~mrjob.conf.combine_cmds`       :option:`--interpreter`
 *jobconf*              ``{}``                         :py:func:`~mrjob.conf.combine_dicts`      :option:`--jobconf` (see also :py:meth:`~mrjob.job.MRJob.jobconf`)
 *label*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--label`
 *owner*                (automatic)                    :py:func:`~mrjob.conf.combine_values`     :option:`--owner`
@@ -47,13 +49,14 @@ See :py:meth:`mrjob.runner.MRJobRunner.__init__` for details.
 
 :py:class:`~mrjob.local.LocalMRJobRunner` takes no additional options, but:
 
+* *bootstrap_mrjob* is ``False`` by default
 * *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs`
 * *python_bin* defaults to the current Python interpreter
 
 In addition, it ignores *hadoop_input_format*, *hadoop_output_format*, *hadoop_streaming_jar*, and *jobconf*
 
-:py:class:`~mrjob.inline.InlineMRJobRunner` works like :py:class:`~mrjob.local.LocalMRJobRunner`, only it also ignores 
-*cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*, *steps_python_bin*, *upload_archives*, and *upload_files*.
+:py:class:`~mrjob.inline.InlineMRJobRunner` works like :py:class:`~mrjob.local.LocalMRJobRunner`, only it also ignores
+*bootstrap_mrjob*, *cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*, *steps_python_bin*, *upload_archives*, and *upload_files*.
 
 
 Additional options for :py:class:`~mrjob.emr.EMRJobRunner`

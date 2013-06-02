@@ -1,4 +1,5 @@
-# Copyright 2012 Yelp and Contributors
+#!/usr/bin/env python
+# Copyright 2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,13 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mrjob.job import MRJob
-
-
-class MRTestingJob(MRJob):
-    """Simple optimization to make our test cases run faster"""
-
-    def make_runner(self, *args, **kwargs):
-        runner = super(MRTestingJob, self).make_runner(*args, **kwargs)
-        runner._steps = self._steps_desc()
-        return runner
+if __name__ == '__main__':
+    from mrjob.cmd import main
+    main()

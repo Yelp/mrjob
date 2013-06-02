@@ -29,6 +29,8 @@ Guides
 * :ref:`job-protocols`
 * :ref:`writing-protocols`
 * :ref:`writing-cl-opts`
+* :ref:`cmd-filters`
+* :ref:`cmd-steps`
 
 **Running jobs**
 
@@ -53,11 +55,18 @@ Guides
 
 * :ref:`amazon-setup`
 * :ref:`ssh-tunneling`
+* :ref:`running-an-emr-job`
+* :ref:`picking-job-flow-config`
 * :doc:`guides/emr-opts`
 * :doc:`guides/emr-tools`
+* :doc:`guides/cmd`
 * :doc:`guides/emr-troubleshooting`
-* :ref:`picking-job-flow-config`
 * :doc:`guides/emr-advanced`
+
+**Working on mrjob**
+
+* :doc:`guides/contributing`
+* :doc:`guides/runner-job-interactions`
 
 Reference
 =========

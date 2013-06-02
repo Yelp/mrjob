@@ -19,18 +19,58 @@ from __future__ import with_statement
 from StringIO import StringIO
 import getpass
 import os
-import shlex
+import pty
 from subprocess import check_call
 
 from mock import patch
 
+try:
+    import unittest2 as unittest
+    unittest  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    import unittest
+
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
+from mrjob.hadoop import fully_qualify_hdfs_path
+from mrjob.util import bash_wrap
+from mrjob.util import shlex_split
 
 from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import add_mock_hadoop_output
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
+from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+
+
+class TestFullyQualifyHDFSPath(unittest.TestCase):
+
+    def test_empty(self):
+        with patch('getpass.getuser') as getuser:
+            getuser.return_value = 'dave'
+            self.assertEqual(fully_qualify_hdfs_path(''), 'hdfs:///user/dave/')
+
+    def test_relative_path(self):
+        with patch('getpass.getuser') as getuser:
+            getuser.return_value = 'dave'
+            self.assertEqual(fully_qualify_hdfs_path('path/to/chocolate'),
+                             'hdfs:///user/dave/path/to/chocolate')
+
+    def test_absolute_path(self):
+        self.assertEqual(fully_qualify_hdfs_path('/path/to/cheese'),
+                         'hdfs:///path/to/cheese')
+
+    def test_hdfs_uri(self):
+        self.assertEqual(fully_qualify_hdfs_path('hdfs://host/path/'),
+                         'hdfs://host/path/')
+
+    def test_s3n_uri(self):
+        self.assertEqual(fully_qualify_hdfs_path('s3n://bucket/oh/noes'),
+                         's3n://bucket/oh/noes')
+
+    def test_other_uri(self):
+        self.assertEqual(fully_qualify_hdfs_path('foo://bar/baz'),
+                         'foo://bar/baz')
 
 
 class TestHadoopHomeRegression(SandboxedTestCase):
@@ -151,26 +191,21 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             self.assertEqual(runner._opts['hadoop_extra_args'],
                              ['-libjar', 'containsJars.jar'])
 
-            # make sure mrjob.tar.gz is uploaded and in PYTHONPATH
-            assert runner._mrjob_tar_gz_path
-            mrjob_tar_gz_file_dicts = [
-                file_dict for file_dict in runner._files
-                if file_dict['path'] == runner._mrjob_tar_gz_path]
-            self.assertEqual(len(mrjob_tar_gz_file_dicts), 1)
+            # make sure mrjob.tar.gz is was uploaded and added to PYTHONPATH
+            self.assertIsNotNone(runner._mrjob_tar_gz_path)
+            self.assertIn(runner._mrjob_tar_gz_path,
+                          runner._upload_mgr.path_to_uri())
 
-            mrjob_tar_gz_file_dict = mrjob_tar_gz_file_dicts[0]
-            assert mrjob_tar_gz_file_dict['name']
-
+            name = runner._working_dir_mgr.name('archive', runner._mrjob_tar_gz_path)
             pythonpath = runner._get_cmdenv()['PYTHONPATH']
-            self.assertIn(mrjob_tar_gz_file_dict['name'],
-                          pythonpath.split(':'))
+            self.assertIn(name, pythonpath.split(':'))
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
         # make sure we called hadoop the way we expected
         with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
-            hadoop_cmd_args = [shlex.split(line) for line in mock_log]
+            hadoop_cmd_args = [shlex_split(line) for line in mock_log]
 
         jar_cmd_args = [args for args in hadoop_cmd_args
                         if args[:1] == ['jar']]
@@ -191,6 +226,10 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         # make sure -jobconf made it through
         self.assertIn('-D', step_0_args)
+        self.assertIn('x=y', step_0_args)
+        self.assertIn('-D', step_1_args)
+        # job overrides jobconf in step 1
+        self.assertIn('x=z', step_1_args)
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)
@@ -201,3 +240,172 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
     def test_end_to_end_with_explicit_hadoop_bin(self):
         self._test_end_to_end(['--hadoop-bin', self.hadoop_bin])
+
+    def test_end_to_end_without_pty_fork(self):
+        with patch.object(pty, 'fork', side_effect=OSError()):
+            self._test_end_to_end()
+
+
+class StreamingArgsTestCase(EmptyMrjobConfTestCase):
+
+    MRJOB_CONF_CONTENTS = {'runners': {'hadoop': {
+        'hadoop_home': 'kansas',
+        'hadoop_streaming_jar': 'binks.jar.jar',
+    }}}
+
+    def setUp(self):
+        super(StreamingArgsTestCase, self).setUp()
+        self.runner = HadoopJobRunner(
+            hadoop_bin='hadoop', hadoop_streaming_jar='streaming.jar',
+            mr_job_script='my_job.py', stdin=StringIO())
+        self.runner._add_job_files_for_upload()
+
+        self.runner._hadoop_version='0.20.204'
+        self.simple_patch(self.runner, '_new_upload_args',
+                          return_value=['new_upload_args'])
+        self.simple_patch(self.runner, '_old_upload_args',
+                          return_value=['old_upload_args'])
+        self.simple_patch(self.runner, '_hadoop_conf_args',
+                          return_value=['hadoop_conf_args'])
+        self.simple_patch(self.runner, '_hdfs_step_input_files',
+                          return_value=['hdfs_step_input_files'])
+        self.simple_patch(self.runner, '_hdfs_step_output_dir',
+                          return_value='hdfs_step_output_dir')
+        self.runner._script_path = 'my_job.py'
+
+        self._new_basic_args = [
+            'hadoop', 'jar', 'streaming.jar',
+             'new_upload_args', 'hadoop_conf_args',
+             '-input', 'hdfs_step_input_files',
+             '-output', 'hdfs_step_output_dir']
+
+        self._old_basic_args = [
+            'hadoop', 'jar', 'streaming.jar',
+             'hadoop_conf_args',
+             '-input', 'hdfs_step_input_files',
+             '-output', 'hdfs_step_output_dir',
+             'old_upload_args']
+
+    def simple_patch(self, obj, attr, side_effect=None, return_value=None):
+        patcher = patch.object(obj, attr, side_effect=side_effect,
+                               return_value=return_value)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _assert_streaming_step(self, step, args, step_num=0, num_steps=1):
+        self.assertEqual(
+            self.runner._streaming_args(step, step_num, num_steps),
+            self._new_basic_args + args)
+
+    def _assert_streaming_step_old(self, step, args, step_num=0, num_steps=1):
+        self.runner._hadoop_version = '0.18'
+        self.assertEqual(
+            self._old_basic_args + args,
+            self.runner._streaming_args(step, step_num, num_steps))
+
+    def test_basic_mapper(self):
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                },
+            },
+            ['-mapper', 'python my_job.py --step-num=0 --mapper',
+             '-jobconf', 'mapred.reduce.tasks=0'])
+
+    def test_basic_reducer(self):
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'reducer': {
+                    'type': 'script',
+                },
+            },
+            ['-mapper', 'cat',
+             '-reducer', 'python my_job.py --step-num=0 --reducer'])
+
+    def test_pre_filters(self):
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'pre_filter': 'grep anything',
+                },
+                'combiner': {
+                    'type': 'script',
+                    'pre_filter': 'grep nothing',
+                },
+                'reducer': {
+                    'type': 'script',
+                    'pre_filter': 'grep something',
+                },
+            },
+            ["-mapper",
+             "bash -c 'grep anything | python my_job.py --step-num=0"
+                 " --mapper'",
+             "-combiner",
+             "bash -c 'grep nothing | python my_job.py --step-num=0"
+                 " --combiner'",
+             "-reducer",
+             "bash -c 'grep something | python my_job.py --step-num=0"
+                 " --reducer'"])
+
+    def test_combiner_018(self):
+        self._assert_streaming_step_old(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'command',
+                    'command': 'cat',
+                },
+                'combiner': {
+                    'type': 'script',
+                },
+            },
+            ["-mapper",
+             "bash -c 'cat | sort | python my_job.py --step-num=0"
+                " --combiner'",
+             '-jobconf', 'mapred.reduce.tasks=0'])
+
+    def test_pre_filters_018(self):
+        self._assert_streaming_step_old(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'pre_filter': 'grep anything',
+                },
+                'combiner': {
+                    'type': 'script',
+                    'pre_filter': 'grep nothing',
+                },
+                'reducer': {
+                    'type': 'script',
+                    'pre_filter': 'grep something',
+                },
+            },
+            ['-mapper',
+             "bash -c 'grep anything | python my_job.py --step-num=0"
+                " --mapper | sort | grep nothing | python my_job.py"
+                " --step-num=0 --combiner'",
+             '-reducer',
+             "bash -c 'grep something | python my_job.py --step-num=0"
+                " --reducer'"])
+
+    def test_pre_filter_escaping(self):
+        # ESCAPE ALL THE THINGS!!!
+        self._assert_streaming_step(
+            {
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                    'pre_filter': bash_wrap("grep 'anything'"),
+                },
+            },
+            ['-mapper',
+             "bash -c 'bash -c '\\''grep"
+                 " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' |"
+                 " python my_job.py --step-num=0 --mapper'",
+             '-jobconf', 'mapred.reduce.tasks=0'])

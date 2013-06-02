@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,22 +15,96 @@
 
 """Utility functions for compatibility with different version of hadoop."""
 from distutils.version import LooseVersion
+import logging
 import os
-
-# keep a mapping for all the names of old/new jobconf env variables
-# http://hadoop.apache.org/mapreduce/docs/current/mapred-default.html
 
 # lists alternative names for jobconf variables
 # full listing thanks to translation table in
-# http://pydoop.sourceforge.net/docs/examples/intro.html#hadoop-0-21-0-notes
+# http://hadoop.apache.org/common/docs/current/hadoop-project-dist/hadoop-common/DeprecatedProperties.html
+
+log = logging.getLogger('mrjob.compat')
 
 JOBCONF_DICT_LIST = [
+    {'0.18': 'StorageId',
+     '0.21': 'dfs.datanode.StorageId'},
     {'0.18': 'create.empty.dir.if.nonexist',
      '0.21': 'mapreduce.jobcontrol.createdir.ifnotexist'},
+    {'0.18': 'dfs.access.time.precision',
+     '0.21': 'dfs.namenode.accesstime.precision'},
+    {'0.18': 'dfs.backup.address',
+     '0.21': 'dfs.namenode.backup.address'},
+    {'0.18': 'dfs.backup.http.address',
+     '0.21': 'dfs.namenode.backup.http-address'},
+    {'0.18': 'dfs.balance.bandwidthPerSec',
+     '0.21': 'dfs.datanode.balance.bandwidthPerSec'},
+    {'0.18': 'dfs.block.size',
+     '0.21': 'dfs.blocksize'},
+    {'0.18': 'dfs.client.buffer.dir',
+     '0.21': 'fs.client.buffer.dir'},
+    {'0.18': 'dfs.data.dir',
+     '0.21': 'dfs.datanode.data.dir'},
+    {'0.18': 'dfs.datanode.max.xcievers',
+     '0.21': 'dfs.datanode.max.transfer.threads'},
+    {'0.18': 'dfs.df.interval',
+     '0.21': 'fs.df.interval'},
+    {'0.18': 'dfs.http.address',
+     '0.21': 'dfs.namenode.http-address'},
+    {'0.18': 'dfs.https.address',
+     '0.21': 'dfs.namenode.https-address'},
+    {'0.18': 'dfs.https.client.keystore.resource',
+     '0.21': 'dfs.client.https.keystore.resource'},
+    {'0.18': 'dfs.https.need.client.auth',
+     '0.21': 'dfs.client.https.need-auth'},
+    {'0.18': 'dfs.max-repl-streams',
+     '0.21': 'dfs.namenode.replication.max-streams'},
+    {'0.18': 'dfs.max.objects',
+     '0.21': 'dfs.namenode.max.objects'},
+    {'0.18': 'dfs.name.dir',
+     '0.21': 'dfs.namenode.name.dir'},
+    {'0.18': 'dfs.name.dir.restore',
+     '0.21': 'dfs.namenode.name.dir.restore'},
+    {'0.18': 'dfs.name.edits.dir',
+     '0.21': 'dfs.namenode.edits.dir'},
+    {'0.18': 'dfs.permissions',
+     '0.21': 'dfs.permissions.enabled'},
+    {'0.18': 'dfs.permissions.supergroup',
+     '0.21': 'dfs.permissions.superusergroup'},
+    {'0.18': 'dfs.read.prefetch.size',
+     '0.21': 'dfs.client.read.prefetch.size'},
+    {'0.18': 'dfs.replication.considerLoad',
+     '0.21': 'dfs.namenode.replication.considerLoad'},
+    {'0.18': 'dfs.replication.interval',
+     '0.21': 'dfs.namenode.replication.interval'},
+    {'0.18': 'dfs.replication.min',
+     '0.21': 'dfs.namenode.replication.min'},
+    {'0.18': 'dfs.replication.pending.timeout.sec',
+     '0.21': 'dfs.namenode.replication.pending.timeout-sec'},
+    {'0.18': 'dfs.safemode.extension',
+     '0.21': 'dfs.namenode.safemode.extension'},
+    {'0.18': 'dfs.safemode.threshold.pct',
+     '0.21': 'dfs.namenode.safemode.threshold-pct'},
+    {'0.18': 'dfs.secondary.http.address',
+     '0.21': 'dfs.namenode.secondary.http-address'},
+    {'0.18': 'dfs.socket.timeout',
+     '0.21': 'dfs.client.socket-timeout'},
+    {'0.18': 'dfs.upgrade.permission',
+     '0.21': 'dfs.namenode.upgrade.permission'},
+    {'0.18': 'dfs.write.packet.size',
+     '0.21': 'dfs.client-write-packet-size'},
+    {'0.18': 'fs.checkpoint.dir',
+     '0.21': 'dfs.namenode.checkpoint.dir'},
+    {'0.18': 'fs.checkpoint.edits.dir',
+     '0.21': 'dfs.namenode.checkpoint.edits.dir'},
+    {'0.18': 'fs.checkpoint.period',
+     '0.21': 'dfs.namenode.checkpoint.period'},
+    {'0.18': 'fs.default.name',
+     '0.21': 'fs.defaultFS'},
+    {'0.18': 'hadoop.configured.node.mapping',
+     '0.21': 'net.topology.configured.node.mapping'},
     {'0.18': 'hadoop.job.history.location',
      '0.21': 'mapreduce.jobtracker.jobhistory.location'},
-    {'0.18': 'hadoop.job.history.user.location',
-     '0.21': 'mapreduce.job.userhistorylocation'},
+    {'0.18': 'hadoop.native.lib',
+     '0.21': 'io.native.lib.available'},
     {'0.18': 'hadoop.net.static.resolutions',
      '0.21': 'mapreduce.tasktracker.net.static.resolutions'},
     {'0.18': 'hadoop.pipes.command-file.keep',
@@ -48,6 +123,10 @@ JOBCONF_DICT_LIST = [
      '0.21': 'mapreduce.pipes.isjavareducer'},
     {'0.18': 'hadoop.pipes.partitioner',
      '0.21': 'mapreduce.pipes.partitioner'},
+    {'0.18': 'heartbeat.recheck.interval',
+     '0.21': 'dfs.namenode.heartbeat.recheck-interval'},
+    {'0.18': 'io.bytes.per.checksum',
+     '0.21': 'dfs.bytes-per-checksum'},
     {'0.18': 'io.sort.factor',
      '0.21': 'mapreduce.task.io.sort.factor'},
     {'0.18': 'io.sort.mb',
@@ -86,6 +165,8 @@ JOBCONF_DICT_LIST = [
      '0.21': 'mapreduce.map.output.key.field.separator'},
     {'0.18': 'map.output.key.value.fields.spec',
      '0.21': 'mapreduce.fieldsel.map.output.key.value.fields.spec'},
+    {'0.18': 'mapred.acls.enabled',
+     '0.21': 'mapreduce.cluster.acls.enabled'},
     {'0.18': 'mapred.binary.partitioner.left.offset',
      '0.21': 'mapreduce.partition.binarypartitioner.left.offset'},
     {'0.18': 'mapred.binary.partitioner.right.offset',
@@ -182,6 +263,8 @@ JOBCONF_DICT_LIST = [
      '0.21': 'mapreduce.jobtracker.address'},
     {'0.18': 'mapred.job.tracker.handler.count',
      '0.21': 'mapreduce.jobtracker.handler.count'},
+    {'0.18': 'mapred.job.tracker.history.completed.location',
+     '0.21': 'mapreduce.jobtracker.jobhistory.completed.location'},
     {'0.18': 'mapred.job.tracker.http.address',
      '0.21': 'mapreduce.jobtracker.http.address'},
     {'0.18': 'mapred.job.tracker.jobhistory.lru.cache.size',
@@ -208,6 +291,8 @@ JOBCONF_DICT_LIST = [
      '0.21': 'mapreduce.jobtracker.restart.recover'},
     {'0.18': 'mapred.jobtracker.taskScheduler',
      '0.21': 'mapreduce.jobtracker.taskscheduler'},
+    {'0.18': 'mapred.jobtracker.taskScheduler.maxRunningTasksPerJob',
+     '0.21': 'mapreduce.jobtracker.taskscheduler.maxrunningtasks.perjob'},
     {'0.18': 'mapred.jobtracker.taskalloc.capacitypad',
      '0.21': 'mapreduce.jobtracker.taskscheduler.taskalloc.capacitypad'},
     {'0.18': 'mapred.join.expr',
@@ -232,8 +317,6 @@ JOBCONF_DICT_LIST = [
      '0.21': 'mapreduce.map.java.opts'},
     {'0.18': 'mapred.map.child.log.level',
      '0.21': 'mapreduce.map.log.level'},
-    {'0.18': 'mapred.map.child.ulimit',
-     '0.21': 'mapreduce.map.ulimit'},
     {'0.18': 'mapred.map.max.attempts',
      '0.21': 'mapreduce.map.maxattempts'},
     {'0.18': 'mapred.map.output.compression.codec',
@@ -296,8 +379,6 @@ JOBCONF_DICT_LIST = [
      '0.21': 'mapreduce.reduce.java.opts'},
     {'0.18': 'mapred.reduce.child.log.level',
      '0.21': 'mapreduce.reduce.log.level'},
-    {'0.18': 'mapred.reduce.child.ulimit',
-     '0.21': 'mapreduce.reduce.ulimit'},
     {'0.18': 'mapred.reduce.max.attempts',
      '0.21': 'mapreduce.reduce.maxattempts'},
     {'0.18': 'mapred.reduce.parallel.copies',
@@ -332,6 +413,10 @@ JOBCONF_DICT_LIST = [
      '0.21': 'mapreduce.reduce.skip.proc-count.auto-incr'},
     {'0.18': 'mapred.skip.reduce.max.skip.groups',
      '0.21': 'mapreduce.reduce.skip.maxgroups'},
+    {'0.18': 'mapred.speculative.execution.slowNodeThreshold',
+     '0.21': 'mapreduce.job.speculative.slownodethreshold'},
+    {'0.18': 'mapred.speculative.execution.slowTaskThreshold',
+     '0.21': 'mapreduce.job.speculative.slowtaskthreshold'},
     {'0.18': 'mapred.speculative.execution.speculativeCap',
      '0.21': 'mapreduce.job.speculative.speculativecap'},
     {'0.18': 'mapred.submit.replication',
@@ -382,6 +467,10 @@ JOBCONF_DICT_LIST = [
      '0.21': 'mapreduce.tasktracker.resourcecalculatorplugin'},
     {'0.18': 'mapred.tasktracker.reduce.tasks.maximum',
      '0.21': 'mapreduce.tasktracker.reduce.tasks.maximum'},
+    {'0.18': 'mapred.tasktracker.taskmemorymanager.monitoring-interval',
+     '0.21': 'mapreduce.tasktracker.taskmemorymanager.monitoringinterval'},
+    {'0.18': 'mapred.tasktracker.tasks.sleeptime-before-sigkill',
+     '0.21': 'mapreduce.tasktracker.tasks.sleeptimebeforesigkill'},
     {'0.18': 'mapred.temp.dir',
      '0.21': 'mapreduce.cluster.temp.dir'},
     {'0.18': 'mapred.text.key.comparator.options',
@@ -420,21 +509,42 @@ JOBCONF_DICT_LIST = [
      '0.21': 'mapreduce.map.combine.minspills'},
     {'0.18': 'reduce.output.key.value.fields.spec',
      '0.21': 'mapreduce.fieldsel.reduce.output.key.value.fields.spec'},
+    {'0.18': 'security.job.submission.protocol.acl',
+     '0.21': 'security.job.client.protocol.acl'},
+    {'0.18': 'security.task.umbilical.protocol.acl',
+     '0.21': 'security.job.task.protocol.acl'},
     {'0.18': 'sequencefile.filter.class',
      '0.21': 'mapreduce.input.sequencefileinputfilter.class'},
     {'0.18': 'sequencefile.filter.frequency',
      '0.21': 'mapreduce.input.sequencefileinputfilter.frequency'},
     {'0.18': 'sequencefile.filter.regex',
      '0.21': 'mapreduce.input.sequencefileinputfilter.regex'},
+    {'0.18': 'session.id',
+     '0.21': 'dfs.metrics.session-id'},
+    {'0.18': 'slave.host.name',
+     '0.21': 'dfs.datanode.hostname'},
     {'0.18': 'slave.host.name',
      '0.21': 'mapreduce.tasktracker.host.name'},
     {'0.18': 'tasktracker.contention.tracking',
      '0.21': 'mapreduce.tasktracker.contention.tracking'},
     {'0.18': 'tasktracker.http.threads',
      '0.21': 'mapreduce.tasktracker.http.threads'},
+    {'0.18': 'topology.node.switch.mapping.impl',
+     '0.21': 'net.topology.node.switch.mapping.impl'},
+    {'0.18': 'topology.script.file.name',
+     '0.21': 'net.topology.script.file.name'},
+    {'0.18': 'topology.script.number.args',
+     '0.21': 'net.topology.script.number.args'},
     {'0.18': 'user.name',
      '0.21': 'mapreduce.job.user.name'},
+    {'0.18': 'webinterface.private.actions',
+     '0.21': 'mapreduce.jobtracker.webinterface.trusted'},
 ]
+
+# Issue #534: 1.x is the new 0.20, 2.x is the new 0.21+
+for jobconf_dict in JOBCONF_DICT_LIST:
+    jobconf_dict['1.0'] = jobconf_dict['0.18']
+    jobconf_dict['2.0'] = jobconf_dict['0.21']
 
 
 def _dict_list_to_compat_map(dict_list):
@@ -513,7 +623,13 @@ def supports_new_distributed_cache_options(version):
     """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
     ``-cacheArchive``
     """
-    return version_gte(version, '0.20')
+    # Although Hadoop 0.20 supports these options, that support is buggy:
+    # https://issues.apache.org/jira/browse/MAPREDUCE-2361
+    # https://issues.apache.org/jira/browse/HADOOP-6334
+    # The bug was fixed in Hadoop 0.20.203.0:
+    # http://hadoop.apache.org/common/docs/r0.20.203.0/releasenotes.html
+    return version_gte(version, '0.20.203')
+
 
 def uses_020_counters(version):
     return version_gte(version, '0.20')
@@ -534,3 +650,33 @@ def version_gte(version, cmp_version_str):
         raise TypeError('%r is not a string' % cmp_version_str)
 
     return LooseVersion(version) >= LooseVersion(cmp_version_str)
+
+
+def add_translated_jobconf_for_hadoop_version(jobconf, hadoop_version):
+    """Translates the configuration property name to match those that
+    are accepted in hadoop_version. Prints a warning message if any
+    configuration property name does not match the name in the hadoop
+    version. Combines the original jobconf with the translated jobconf.
+
+    :return: a map consisting of the original and translated configuration
+    property names and values.
+    """
+    translated_jobconf = {}
+    mismatch_key_to_translated_key = {}
+    for key, value in jobconf.iteritems():
+        new_key = translate_jobconf(key, hadoop_version)
+        if key != new_key:
+            translated_jobconf[new_key] = value
+            mismatch_key_to_translated_key[key] = new_key
+
+    if mismatch_key_to_translated_key:
+        log.warning("Detected hadoop configuration property names that"
+                    " do not match hadoop version %s:"
+                    "\nThe have been translated as follows\n %s",
+                    hadoop_version,
+                    '\n'.join(["%s: %s" % (key, value) for key, value
+                               in mismatch_key_to_translated_key.iteritems()])
+        )
+
+    translated_jobconf.update(jobconf)
+    return translated_jobconf

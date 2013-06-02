@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,20 +31,22 @@ try:
 except ImportError:
     import unittest
 
-from mock import patch
-
 import mrjob
-from mrjob import local
 from mrjob.local import LocalMRJobRunner
+from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import read_file
+from mrjob.util import tar_and_gzip
+from tests.mr_cmd_job import CmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
+from tests.mr_filter_job import FilterJob
 from tests.mr_job_where_are_you import MRJobWhereAreYou
+from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_test_jobconf import MRTestJobConf
-from tests.mr_word_count import MRWordCount
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
+from tests.mr_word_count import MRWordCount
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -370,8 +372,9 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
     def test_echo_as_python_bin(self):
         # "echo" is a pretty poor substitute for Python, but it
         # should be available on most systems
-        mr_job = MRTwoStepJob(['--python-bin', 'echo', '--no-conf',
-                               '-r', 'local'])
+        mr_job = MRTwoStepJob(
+            ['--python-bin', 'echo', '--steps-python-bin', sys.executable,
+             '--no-conf', '-r', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -413,19 +416,27 @@ class StepsPythonBinTestCase(unittest.TestCase):
 
         with mr_job.make_runner() as runner:
             assert isinstance(runner, LocalMRJobRunner)
-            try:
-                # MRTwoStepJob populates _steps in the runner, so un-populate
-                # it here so that the runner actually tries to get the steps
-                # via subprocess
-                runner._steps = None
-                runner._get_steps()
-                assert False, 'Should throw exception'
-            except ValueError, ex:
-                output = str(ex)
-                # the output should basically be the command used to
-                # run the steps command
-                self.assertIn('mr_two_step_job.py', output)
-                self.assertIn('--steps', output)
+            # MRTwoStepJob populates _steps in the runner, so un-populate
+            # it here so that the runner actually tries to get the steps
+            # via subprocess
+            runner._steps = None
+            self.assertRaises(ValueError, runner._get_steps)
+
+    def test_echo_as_steps_interpreter(self):
+        import logging
+        logging.basicConfig()
+        mr_job = MRTwoStepJob(
+            ['--steps', '--steps-interpreter', 'echo', '--no-conf', '-r',
+             'local'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            assert isinstance(runner, LocalMRJobRunner)
+            # MRTwoStepJob populates _steps in the runner, so un-populate
+            # it here so that the runner actually tries to get the steps
+            # via subprocess
+            runner._steps = None
+            self.assertRaises(ValueError, runner._get_steps)
 
 
 class LocalBootstrapMrjobTestCase(unittest.TestCase):
@@ -449,7 +460,7 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
         our_mrjob_dir = os.path.dirname(os.path.realpath(mrjob.__file__))
 
         with mrjob_conf_patcher():
-            mr_job = MRJobWhereAreYou(['-r', 'local'])
+            mr_job = MRJobWhereAreYou(['-r', 'local', '--bootstrap-mrjob'])
             mr_job.sandbox()
 
             with mr_job.make_runner() as runner:
@@ -466,14 +477,9 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
                 _, script_mrjob_dir = mr_job.parse_output_line(output[0])
 
                 self.assertNotEqual(our_mrjob_dir, script_mrjob_dir)
-                assert script_mrjob_dir.startswith(local_tmp_dir)
+                self.assertTrue(script_mrjob_dir.startswith(local_tmp_dir))
 
     def test_can_turn_off_bootstrap_mrjob(self):
-        # track the dir we're loading mrjob from rather than the full path
-        # to deal with edge cases where we load from the .py file,
-        # and the script loads from the .pyc compiled from that .py file.
-        our_mrjob_dir = os.path.dirname(os.path.realpath(mrjob.__file__))
-
         with mrjob_conf_patcher(
             {'runners': {'local': {'bootstrap_mrjob': False}}}):
 
@@ -483,15 +489,22 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
             with mr_job.make_runner() as runner:
                 # sanity check
                 self.assertEqual(runner.get_opts()['bootstrap_mrjob'], False)
-                runner.run()
+                local_tmp_dir = os.path.realpath(runner._get_local_tmp_dir())
+                try:
+                    with no_handlers_for_logger():
+                        runner.run()
+                except Exception, e:
+                    # if mrjob is not installed, script won't be able to run
+                    self.assertIn('ImportError', str(e))
+                    return
 
                 output = list(runner.stream_output())
 
                 self.assertEqual(len(output), 1)
 
-                # script should load mrjob from the same place our test does
+                # script should not load mrjob from local_tmp_dir
                 _, script_mrjob_dir = mr_job.parse_output_line(output[0])
-                self.assertEqual(our_mrjob_dir, script_mrjob_dir)
+                self.assertFalse(script_mrjob_dir.startswith(local_tmp_dir))
 
 
 class LocalMRJobRunnerTestJobConfCase(SandboxedTestCase):
@@ -533,6 +546,7 @@ class LocalMRJobRunnerTestJobConfCase(SandboxedTestCase):
 
         mr_job = MRTestJobConf(['-r', 'local',
                                 '--jobconf=user.defined=something',
+                                '--bootstrap-mrjob',
                                input_path])
         mr_job.sandbox()
 
@@ -554,9 +568,9 @@ class LocalMRJobRunnerTestJobConfCase(SandboxedTestCase):
         self.assertEqual(results['mapreduce.map.input.length'], '4')
         self.assertEqual(results['mapreduce.map.input.start'], '0')
         self.assertEqual(results['mapreduce.task.attempt.id'],
-                       'attempt_%s_m_000000_0' % runner._job_name)
+                       'attempt_%s_mapper_000000_0' % runner._job_name)
         self.assertEqual(results['mapreduce.task.id'],
-                       'task_%s_m_000000' % runner._job_name)
+                       'task_%s_mapper_000000' % runner._job_name)
         self.assertEqual(results['mapreduce.task.ismap'], 'true')
         self.assertEqual(results['mapreduce.task.output.dir'],
                          runner._output_dir)
@@ -574,109 +588,281 @@ class CompatTestCase(EmptyMrjobConfTestCase):
         with runner as runner:
             runner._setup_working_dir()
             self.assertIn('mapred_cache_localArchives',
-                          runner._subprocess_env('M', 0, 0).keys())
+                          runner._subprocess_env('mapper', 0, 0).keys())
 
     def test_environment_variables_021(self):
         runner = LocalMRJobRunner(hadoop_version='0.21', conf_paths=[])
         with runner as runner:
             runner._setup_working_dir()
             self.assertIn('mapreduce_job_cache_local_archives',
-                          runner._subprocess_env('M', 0, 0).keys())
+                          runner._subprocess_env('mapper', 0, 0).keys())
 
 
-class TestHadoopConfArgs(EmptyMrjobConfTestCase):
+class CommandSubstepTestCase(SandboxedTestCase):
 
-    def test_empty(self):
-        runner = LocalMRJobRunner(conf_paths=[])
-        self.assertEqual(runner._hadoop_conf_args(0, 1), [])
+    def test_cat_mapper(self):
+        data = 'x\ny\nz\n'
+        job = CmdJob(['--mapper-cmd=cat', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'command',
+                        'command': 'cat'}}])
 
-    def test_hadoop_extra_args(self):
-        extra_args = ['-foo', 'bar']
-        runner = LocalMRJobRunner(conf_paths=[],
-                                  hadoop_extra_args=extra_args)
-        self.assertEqual(runner._hadoop_conf_args(0, 1), extra_args)
+            r.run()
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertItemsEqual(lines, data.split())
 
-    def test_cmdenv(self):
-        cmdenv = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
-        runner = LocalMRJobRunner(conf_paths=[], cmdenv=cmdenv)
-        self.assertEqual(runner._hadoop_conf_args(0, 1),
-                         ['-cmdenv', 'BAX=Arnold',
-                          '-cmdenv', 'BAZ=qux',
-                          '-cmdenv', 'FOO=bar',
-                          ])
+    def test_uniq_combiner(self):
+        data = 'x\nx\nx\nx\nx\nx\n'
+        job = CmdJob(['--combiner-cmd=uniq', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    },
+                    'combiner': {
+                        'type': 'command',
+                        'command': 'uniq'}}])
 
-    def test_hadoop_input_format(self):
-        format = 'org.apache.hadoop.mapred.SequenceFileInputFormat'
-        runner = LocalMRJobRunner(conf_paths=[], hadoop_input_format=format)
-        self.assertEqual(runner._hadoop_conf_args(0, 1),
-                         ['-inputformat', format])
-        # test multi-step job
-        self.assertEqual(runner._hadoop_conf_args(0, 2),
-                         ['-inputformat', format])
-        self.assertEqual(runner._hadoop_conf_args(1, 2), [])
+            r.run()
 
-    def test_hadoop_output_format(self):
-        format = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
-        runner = LocalMRJobRunner(conf_paths=[], hadoop_output_format=format)
-        self.assertEqual(runner._hadoop_conf_args(0, 1),
-                         ['-outputformat', format])
-        # test multi-step job
-        self.assertEqual(runner._hadoop_conf_args(0, 2), [])
-        self.assertEqual(runner._hadoop_conf_args(1, 2),
-                     ['-outputformat', format])
+            # there are 2 map tasks, each of which has 1 combiner, and all rows
+            # are the same, so we should end up with just 2 values
 
-    def test_jobconf(self):
-        jobconf = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
-        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf)
-        self.assertEqual(runner._hadoop_conf_args(0, 1),
-                         ['-D', 'BAX=Arnold',
-                          '-D', 'BAZ=qux',
-                          '-D', 'FOO=bar',
-                          ])
-        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf,
-                                  hadoop_version='0.18')
-        self.assertEqual(runner._hadoop_conf_args(0, 1),
-                         ['-jobconf', 'BAX=Arnold',
-                          '-jobconf', 'BAZ=qux',
-                          '-jobconf', 'FOO=bar',
-                          ])
+            self.assertEqual(''.join(r.stream_output()), 'x\nx\n')
 
-    def test_partitioner(self):
-        partitioner = 'org.apache.hadoop.mapreduce.Partitioner'
+    def test_cat_reducer(self):
+        data = 'x\ny\nz\n'
+        job = CmdJob(['--reducer-cmd', 'cat -e', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    },
+                    'reducer': {
+                        'type': 'command',
+                        'command': 'cat -e'}}])
 
-        runner = LocalMRJobRunner(conf_paths=[], partitioner=partitioner)
-        self.assertEqual(runner._hadoop_conf_args(0, 1),
-                         ['-partitioner', partitioner])
+            r.run()
 
-    def test_hadoop_extra_args_comes_first(self):
-        runner = LocalMRJobRunner(
-            cmdenv={'FOO': 'bar'},
-            conf_paths=[],
-            hadoop_extra_args=['-libjar', 'qux.jar'],
-            hadoop_input_format='FooInputFormat',
-            hadoop_output_format='BarOutputFormat',
-            jobconf={'baz': 'quz'},
-            partitioner='java.lang.Object',
-        )
-        # hadoop_extra_args should come first
-        conf_args = runner._hadoop_conf_args(0, 1)
-        self.assertEqual(conf_args[:2], ['-libjar', 'qux.jar'])
-        self.assertEqual(len(conf_args), 12)
+            lines = list(r.stream_output())
+            self.assertItemsEqual(lines, ['x$\n', 'y$\n', 'z$\n'])
+
+    def test_multiple(self):
+        data = 'x\nx\nx\nx\nx\nx\n'
+        mapper_cmd = 'cat -e'
+        reducer_cmd = bash_wrap('wc -l | tr -Cd "[:digit:]"')
+        job = CmdJob([
+            '--runner', 'local',
+            '--mapper-cmd', mapper_cmd,
+            '--combiner-cmd', 'uniq',
+            '--reducer-cmd', reducer_cmd])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {'type': 'command', 'command': mapper_cmd},
+                    'combiner': {'type': 'command', 'command': 'uniq'},
+                    'reducer': {'type': 'command', 'command': reducer_cmd},
+                }])
+
+            r.run()
+
+            self.assertEqual(list(r.stream_output()), ['2'])
+
+    def test_multiple_2(self):
+        data = 'x\ny\nz\n'
+        job = CmdJob(['--mapper-cmd=cat', '--reducer-cmd-2', 'wc -l',
+                      '--runner=local', '--no-conf'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            r.run()
+            self.assertEqual(sum(int(l) for l in r.stream_output()), 3)
 
 
-class TestIronPythonEnvironment(unittest.TestCase):
+class FilterTestCase(SandboxedTestCase):
+
+    def test_mapper_pre_filter(self):
+        data = 'x\ny\nz\n'
+        job = FilterJob(['--mapper-filter', 'cat -e', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                        'pre_filter': 'cat -e'}}])
+
+            r.run()
+
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
+
+    def test_combiner_pre_filter(self):
+        data = 'x\ny\nz\n'
+        job = FilterJob(['--combiner-filter', 'cat -e', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    },
+                    'combiner': {
+                        'type': 'script',
+                        'pre_filter': 'cat -e',
+                    }}])
+
+            r.run()
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
+
+    def test_reducer_pre_filter(self):
+        data = 'x\ny\nz\n'
+        job = FilterJob(['--reducer-filter', 'cat -e', '--runner=local'])
+        job.sandbox(stdin=StringIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                    },
+                    'reducer': {
+                        'type': 'script',
+                        'pre_filter': 'cat -e'}}])
+
+            r.run()
+
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
+
+
+class LocalRunnerSetupTestCase(SandboxedTestCase):
 
     def setUp(self):
-        self.runner = LocalMRJobRunner(conf_paths=[])
-        self.runner._setup_working_dir()
+        super(LocalRunnerSetupTestCase, self).setUp()
 
-    def test_env_ironpython(self):
-        with patch.object(local, 'is_ironpython', True):
-            environment = self.runner._subprocess_env('M', 0, 0)
-            self.assertIn('IRONPYTHONPATH', environment)
+        os.mkdir(os.path.join(self.tmp_dir, 'foo'))
 
-    def test_env_no_ironpython(self):
-        with patch.object(local, 'is_ironpython', False):
-            environment = self.runner._subprocess_env('M', 0, 0)
-            self.assertNotIn('IRONPYTHONPATH', environment)
+        self.foo_py = os.path.join(self.tmp_dir, 'foo', 'foo.py')
 
+        # if our job can import foo, getsize will return 2x as many bytes
+        with open(self.foo_py, 'w') as foo_py:
+            foo_py.write('import os.path\n'
+                         'from os.path import getsize as _real_getsize\n'
+                         'os.path.getsize = lambda p: _real_getsize(p) * 2')
+
+        self.foo_sh = os.path.join(self.tmp_dir, 'foo', 'foo.sh')
+
+        with open(self.foo_sh, 'w') as foo_sh:
+            foo_sh.write('#!/bin/sh\n'
+                         'touch foo.sh-made-this\n')
+        os.chmod(self.foo_sh, stat.S_IRWXU)
+
+        self.foo_tar_gz = os.path.join(self.tmp_dir, 'foo.tar.gz')
+        tar_and_gzip(os.path.join(self.tmp_dir, 'foo'), self.foo_tar_gz)
+
+        self.foo_py_size = os.path.getsize(self.foo_py)
+        self.foo_sh_size = os.path.getsize(self.foo_sh)
+        self.foo_tar_gz_size = os.path.getsize(self.foo_tar_gz)
+
+    def test_file_upload(self):
+        job = MROSWalkJob(['--runner=local',
+                           '--file', self.foo_sh,
+                           '--file', self.foo_sh + '#bar.sh',
+                           ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        self.assertEqual(path_to_size.get('./foo.sh'), self.foo_sh_size)
+        self.assertEqual(path_to_size.get('./bar.sh'), self.foo_sh_size)
+
+    def test_archive_upload(self):
+        job = MROSWalkJob(['--runner=local',
+                           '--archive', self.foo_tar_gz,
+                           '--archive', self.foo_tar_gz + '#foo',
+                           ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
+                         self.foo_py_size)
+        self.assertEqual(path_to_size.get('./foo/foo.py'),
+                         self.foo_py_size)
+
+    def test_python_archive(self):
+        job = MROSWalkJob(
+            ['--runner=local',
+             '--python-archive', self.foo_tar_gz])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        # foo.py should be there, and getsize() should be patched to return
+        # double the number of bytes
+        self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
+                         self.foo_py_size * 2)
+
+    def test_setup_cmd(self):
+        job = MROSWalkJob(
+            ['--runner=local',
+             '--setup-cmd', 'touch bar'])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        self.assertIn('./bar', path_to_size)
+
+    def test_setup_script(self):
+        job = MROSWalkJob(
+            ['--runner=local',
+             '--setup-script', self.foo_sh])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+            self.assertEqual(path_to_size.get('./foo.sh'), self.foo_sh_size)
+            self.assertIn('./foo.sh-made-this', path_to_size)

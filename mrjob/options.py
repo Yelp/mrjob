@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,9 +27,14 @@ def _append_to_conf_paths(option, opt_str, value, parser):
     """conf_paths is None by default, but --no-conf or --conf-path should make
     it a list.
     """
+
     if parser.values.conf_paths is None:
         parser.values.conf_paths = []
-    parser.values.conf_paths.append(value)
+
+    # this method is also called during generate_passthrough_arguments
+    # the check below is to ensure that conf_paths are not duplicated
+    if value not in parser.values.conf_paths:
+        parser.values.conf_paths.append(value)
 
 
 def add_protocol_opts(opt_group):
@@ -67,7 +73,7 @@ def add_basic_opts(opt_group):
     ]
 
 
-def add_runner_opts(opt_group):
+def add_runner_opts(opt_group, default_runner='local'):
     """Options for all runners."""
     return [
         opt_group.add_option(
@@ -109,6 +115,10 @@ def add_runner_opts(opt_group):
                   ' use --file multiple times.')),
 
         opt_group.add_option(
+            '--interpreter', dest='interpreter', default=None,
+            help=("Interpreter to run your script, e.g. python or ruby.")),
+
+        opt_group.add_option(
             '--no-bootstrap-mrjob', dest='bootstrap_mrjob',
             action='store_false', default=None,
             help=("Don't automatically tar up the mrjob library and install it"
@@ -135,17 +145,17 @@ def add_runner_opts(opt_group):
 
         opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
-            help=("Name/path of alternate python binary for mappers/reducers."
-                  " You can include arguments, e.g. --python-bin 'python"
-                  " -v'")),
+            help=("Deprecated. Name/path of alternate python binary for"
+                  " wrapper script and Python mappers/reducers. You can"
+                  " include arguments, e.g. --python-bin 'python -v'")),
 
         opt_group.add_option(
-            '-r', '--runner', dest='runner', default='inline',
+            '-r', '--runner', dest='runner', default=default_runner,
             choices=('local', 'hadoop', 'emr', 'inline'),
             help=('Where to run the job: local to run locally, hadoop to run'
                   ' on your Hadoop cluster, emr to run on Amazon'
                   ' ElasticMapReduce, and inline for local debugging. Default'
-                  ' is local.')),
+                  ' is %s.' % default_runner)),
 
         opt_group.add_option(
             '--setup-cmd', dest='setup_cmds', action='append',
@@ -163,10 +173,16 @@ def add_runner_opts(opt_group):
                   ' These are run after setup_cmds.')),
 
         opt_group.add_option(
+            '--steps-interpreter', dest='steps_interpreter', default=None,
+            help=("Name/path of alternate interpreter binary to use to query"
+                  " the job about its steps, if different from --interpreter."
+                  " Rarely needed.")),
+
+        opt_group.add_option(
             '--steps-python-bin', dest='steps_python_bin', default=None,
-            help='Name/path of alternate python binary to use to query the '
-            'job about its steps, if different from the current Python '
-            'interpreter. Rarely needed.'),
+            help=('Deprecated. Name/path of alternate python binary to use to'
+                  ' query the job about its steps, if different from the'
+                  ' current Python interpreter. Rarely needed.')),
     ]
 
 
@@ -242,7 +258,8 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--ami-version', dest='ami_version', default=None,
             help=(
-                'AMI Version to use (currently 1.0, 2.0, or latest).')),
+                'AMI Version to use (currently 1.0, 2.0, or latest, default'
+                ' latest).')),
 
         opt_group.add_option(
             '--aws-availability-zone', dest='aws_availability_zone',

@@ -4,6 +4,50 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+0.4.0
+-----
+The default runner is now `inline` instead of `local`. This change will speed
+up debugging for many users. Use `local` if you need to simulate more features
+of Hadoop.
+
+The EMR tools can now be accessed more easily via the `mrjob` command. Learn more [here].
+
+Job steps are much richer now:
+
+* You can now use mrjob to run jar steps other than Hadoop Streaming. :ref:`More info <non-hadoop-streaming-jar-steps>`
+* You can filter step input with UNIX commands. :ref:`More info <cmd-filters>`
+* In fact, you can use arbitrary UNIX commands as your whole step (mapper/reducer/combiner). :ref:`More info <cmd-steps>`
+
+If you Ctrl+C from the command line, your job will be terminated if you give it time.
+If you're running on EMR, that should prevent most accidental runaway jobs. :ref:`More info <configs-all-runners-cleanup>`
+
+mrjob v0.4 requires boto 2.2.
+
+We removed all deprecated functionality from v0.2:
+
+* --hadoop-\*-format
+* --\*-protocol switches
+* MRJob.DEFAULT_*_PROTOCOL
+* MRJob.get_default_opts()
+* MRJob.protocols()
+* PROTOCOL_DICT
+* IF_SUCCESSFUL
+* DEFAULT_CLEANUP
+* S3Filesystem.get_s3_folder_keys()
+
+We love contributions, so we wrote some :doc:`guidelines<guides/contributing>` to help you help us. See you on Github!
+
+0.3.5
+-----
+
+The *pool_wait_minutes* (:option:`--pool-wait-minutes`) option lets your job
+delay itself in case a job flow becomes available. Reference:
+:doc:`guides/configs-reference`
+
+The ``JOB`` and ``JOB_FLOW`` cleanup options tell mrjob to clean up the job
+and/or the job flow on failure (including Ctrl+C). See
+:py:data:`~mrjob.runner.CLEANUP_CHOICES` for more information.
+
 0.3.3
 -----
 
@@ -24,7 +68,7 @@ The EMR instance type/number options have changed to support spot instances:
 * *ec2_task_instance_type*
 
 There is also a new *ami_version* option to change the AMI your job flow uses
-for its nodes. 
+for its nodes.
 
 For more information, see :py:meth:`mrjob.emr.EMRJobRunner.__init__`.
 
@@ -32,7 +76,7 @@ The new :py:mod:`~mrjob.tools.emr.report_long_jobs` tool alerts on jobs that
 have run for more than X hours.
 
 0.3
------
+---
 
 Features
 ^^^^^^^^

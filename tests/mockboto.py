@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,6 +42,8 @@ from mrjob.parse import parse_s3_uri
 
 DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
 DEFAULT_MAX_DAYS_AGO = 61
+
+DEFAULT_JAR = '/stuff/hadoop-streaming.jar'
 
 # Size of each chunk returned by the MockKey iterator
 SIMULATED_BUFFER_SIZE = 256
@@ -124,7 +127,7 @@ class MockS3Connection(object):
             self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': ''}
 
 
-class MockBucket:
+class MockBucket(object):
     """Mock out boto.s3.Bucket
     """
     def __init__(self, connection=None, name=None, location=None):
@@ -256,6 +259,7 @@ def to_iso8601(when):
     """Convert a datetime to ISO8601 format.
     """
     return when.strftime(boto.utils.ISO8601)
+
 
 def to_rfc1123(when):
     """Convert a datetime to RFC1123 format.
@@ -596,8 +600,9 @@ class MockEmrConnection(object):
                 name=step.name,
                 actiononfailure=step.action_on_failure,
                 args=step.args,
+                jar=DEFAULT_JAR,
             )
-
+            job_flow.state = 'PENDING'
             job_flow.steps.append(step_object)
 
     def terminate_jobflow(self, jobflow_id):
@@ -667,6 +672,7 @@ class MockEmrConnection(object):
 
         # if a step is currently running, advance it
         steps = getattr(job_flow, 'steps', None) or []
+
         for step_num, step in enumerate(steps):
             # skip steps that are already done
             if step.state in ('COMPLETED', 'FAILED', 'CANCELLED'):

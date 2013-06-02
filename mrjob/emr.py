@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,20 +14,21 @@
 # limitations under the License.
 from __future__ import with_statement
 
+import logging
+import os
+import os.path
+import posixpath
+import random
+import re
+import signal
+import socket
+import time
+import urllib2
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
-import logging
-import os
-import random
-import re
-import shlex
-import signal
-import socket
 from subprocess import Popen
 from subprocess import PIPE
-import time
-import urllib2
 
 try:
     from cStringIO import StringIO
@@ -55,7 +57,10 @@ except ImportError:
     boto = None
 
 import mrjob
-from mrjob import compat
+from mrjob.setup import BootstrapWorkingDirManager
+from mrjob.setup import UploadDirManager
+from mrjob.setup import parse_legacy_hash_path
+from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
@@ -70,9 +75,11 @@ from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
 from mrjob.logparsers import NODE_LOG_URI_RE
+from mrjob.logparsers import best_error_from_logs
 from mrjob.logparsers import scan_for_counters_in_files
-from mrjob.logparsers import scan_logs_in_order
+from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_s3_uri
+from mrjob.parse import is_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
@@ -81,17 +88,21 @@ from mrjob.runner import RunnerOptionStore
 from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.ssh import ssh_slave_addresses
-from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import hash_object
+from mrjob.util import shlex_split
 
 
 log = logging.getLogger('mrjob.emr')
 
-JOB_TRACKER_RE = re.compile('(\d{1,3}\.\d{2})%')
+JOB_TRACKER_RE = re.compile(r'(\d{1,3}\.\d{2})%')
+
+# not all steps generate task attempt logs. for now, conservatively check for
+# streaming steps, which always generate them.
+LOG_GENERATING_STEP_NAME_RE = HADOOP_STREAMING_JAR_RE
 
 # the port to tunnel to
 EMR_JOB_TRACKER_PORT = 9100
@@ -110,21 +121,30 @@ JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 SUBSECOND_RE = re.compile('\.[0-9]+')
 
 # map from AWS region to EMR endpoint. See
-# http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?ConceptsRequestEndpoints.html
+# http://docs.amazonwebservices.com/general/latest/gr/rande.html#emr_region
 REGION_TO_EMR_ENDPOINT = {
-    'EU': 'eu-west-1.elasticmapreduce.amazonaws.com',
-    'us-east-1': 'us-east-1.elasticmapreduce.amazonaws.com',
-    'us-west-1': 'us-west-1.elasticmapreduce.amazonaws.com',
+    'us-east-1': 'elasticmapreduce.us-east-1.amazonaws.com',
+    'us-west-1': 'elasticmapreduce.us-west-1.amazonaws.com',
+    'us-west-2': 'elasticmapreduce.us-west-2.amazonaws.com',
+    'EU': 'elasticmapreduce.eu-west-1.amazonaws.com',  # for compatibility
+    'eu-west-1': 'elasticmapreduce.eu-west-1.amazonaws.com',
+    'ap-southeast-1': 'elasticmapreduce.ap-southeast-1.amazonaws.com',
+    'ap-northeast-1': 'elasticmapreduce.ap-northeast-1.amazonaws.com',
+    'sa-east-1': 'elasticmapreduce.sa-east-1.amazonaws.com',
     '': 'elasticmapreduce.amazonaws.com',  # when no region specified
 }
 
 # map from AWS region to S3 endpoint. See
-# http://docs.amazonwebservices.com/AmazonS3/latest/dev/MakingRequests.html#RequestEndpoints
+# http://docs.amazonwebservices.com/general/latest/gr/rande.html#s3_region
 REGION_TO_S3_ENDPOINT = {
-    'EU': 's3-eu-west-1.amazonaws.com',
     'us-east-1': 's3.amazonaws.com',  # no region-specific endpoint
     'us-west-1': 's3-us-west-1.amazonaws.com',
-    'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com',  # no EMR endpoint yet
+    'us-west-2': 's3-us-west-2.amazonaws.com',
+    'EU': 's3-eu-west-1.amazonaws.com',
+    'eu-west-1': 's3-eu-west-1.amazonaws.com',
+    'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com',
+    'ap-northeast-1': 's3-ap-northeast-1.amazonaws.com',
+    'sa-east-1': 's3-sa-east-1.amazonaws.com',
     '': 's3.amazonaws.com',
 }
 
@@ -169,20 +189,6 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
     'cg1.4xlarge': 22,
 }
 
-# Use this to figure out which hadoop version we're using if it's not
-# explicitly specified, so we can keep from passing deprecated command-line
-# options to Hadoop. If we encounter an AMI version we don't recognize,
-# we use whatever version matches 'latest'.
-#
-# The reason we don't just create a job flow and then query its Hadoop version
-# is that for most jobs, we create the steps and the job flow at the same time.
-AMI_VERSION_TO_HADOOP_VERSION = {
-    None: '0.18',  # ami_version not specified means version 1.0
-    '1.0': '0.18',
-    '2.0': '0.20.205',
-    'latest': '0.20.205',
-}
-
 # EMR's hard limit on number of steps in a job flow
 MAX_STEPS_PER_JOB_FLOW = 256
 
@@ -199,6 +205,7 @@ def s3_key_to_uri(s3_key):
 
 # Thu, 29 Mar 2012 04:55:44 GMT
 RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
+
 
 def iso8601_to_timestamp(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
@@ -263,7 +270,9 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
                 raise
 
         # don't count the same job flow twice
-        job_flows = [jf for jf in results if jf.jobflowid not in ids_seen]
+        job_flows = [jf for jf in results
+                     if getattr(jf, "jobflowid", None) and
+                     jf.jobflowid not in ids_seen]
         log.debug('  got %d results (%d new)' % (len(results), len(job_flows)))
 
         all_job_flows.extend(job_flows)
@@ -368,7 +377,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_job_flow_id',
         'emr_job_flow_pool_name',
         'enable_emr_debugging',
-        'enable_emr_debugging',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
         'num_ec2_core_instances',
@@ -405,6 +413,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
+            'ami_version': 'latest',
             'check_emr_status_every': 30,
             'ec2_core_instance_type': 'm1.small',
             'ec2_master_instance_type': 'm1.small',
@@ -420,6 +429,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ssh_bind_ports': range(40001, 40841),
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
+            'cleanup_on_failure': ['JOB'],
         })
 
     def _fix_ec2_instance_opts(self):
@@ -576,58 +586,56 @@ class EMRJobRunner(MRJobRunner):
         else:
             self._output_dir = self._s3_tmp_uri + 'output/'
 
+        # manage working dir for bootstrap script
+        self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
+
+        # manage local files that we want to upload to S3. We'll add them
+        # to this manager just before we need them.
+        s3_files_dir = self._s3_tmp_uri + 'files/'
+        self._upload_mgr = UploadDirManager(s3_files_dir)
+
         # add the bootstrap files to a list of files to upload
         self._bootstrap_actions = []
         for action in self._opts['bootstrap_actions']:
-            args = shlex.split(action)
+            args = shlex_split(action)
             if not args:
                 raise ValueError('bad bootstrap action: %r' % (action,))
             # don't use _add_bootstrap_file() because this is a raw bootstrap
-            # action, not part of mrjob's bootstrap utilities
-            file_dict = self._add_file(args[0])
-            file_dict['args'] = args[1:]
-            self._bootstrap_actions.append(file_dict)
+            self._bootstrap_actions.append({
+                'path': args[0],
+                'args': args[1:],
+            })
 
         for path in self._opts['bootstrap_files']:
-            self._add_bootstrap_file(path)
+            self._bootstrap_dir_mgr.add(**parse_legacy_hash_path(
+                'file', path, must_name='bootstrap_files'))
 
         self._bootstrap_scripts = []
         for path in self._opts['bootstrap_scripts']:
-            file_dict = self._add_bootstrap_file(path)
-            self._bootstrap_scripts.append(file_dict)
+            bootstrap_script = parse_legacy_hash_path('file', path)
+            self._bootstrap_scripts.append(bootstrap_script)
+            self._bootstrap_dir_mgr.add(**bootstrap_script)
 
         self._bootstrap_python_packages = []
         for path in self._opts['bootstrap_python_packages']:
-            name, path = self._split_path(path)
-            if not path.endswith('.tar.gz'):
+            bpp = parse_legacy_hash_path('file', path)
+
+            if not bpp['path'].endswith('.tar.gz'):
                 raise ValueError(
                     'bootstrap_python_packages only accepts .tar.gz files!')
-            file_dict = self._add_bootstrap_file(path)
-            self._bootstrap_python_packages.append(file_dict)
-
-        self._streaming_jar = None
-        if self._opts.get('hadoop_streaming_jar'):
-            self._streaming_jar = self._add_file_for_upload(
-                self._opts['hadoop_streaming_jar'])
+            self._bootstrap_python_packages.append(bpp)
+            self._bootstrap_dir_mgr.add(**bpp)
 
         if not (isinstance(self._opts['additional_emr_info'], basestring)
                 or self._opts['additional_emr_info'] is None):
             self._opts['additional_emr_info'] = json.dumps(
                 self._opts['additional_emr_info'])
 
-        # if we're bootstrapping mrjob, keep track of the file_dict
-        # for mrjob.tar.gz
-        self._mrjob_tar_gz_file = None
-
         # where our own logs ended up (we'll find this out once we run the job)
         self._s3_job_log_uri = None
 
-        # where to get input from. We'll fill this later. Once filled,
-        # this must be a list (not some other sort of container)
-        self._s3_input_uris = None
-
         # we'll create the script later
-        self._master_bootstrap_script = None
+        self._master_bootstrap_script_path = None
 
         # the ID assigned by EMR to this job (might be None)
         self._emr_job_flow_id = self._opts['emr_job_flow_id']
@@ -650,10 +658,6 @@ class EMRJobRunner(MRJobRunner):
 
         # turn off tracker progress until tunnel is up
         self._show_tracker_progress = False
-
-        # default requested hadoop version if AMI version is not set
-        if not (self._opts['ami_version'] or self._opts['hadoop_version']):
-            self._opts['hadoop_version'] = '0.20'
 
         # init hadoop version cache
         self._inferred_hadoop_version = None
@@ -820,89 +824,77 @@ class EMRJobRunner(MRJobRunner):
         self._wait_for_job_to_complete()
 
     def _prepare_for_launch(self):
-        self._setup_input()
+        self._check_input_exists()
         self._create_wrapper_script()
-        self._create_master_bootstrap_script()
-        self._upload_non_input_files()
+        self._add_bootstrap_files_for_upload()
+        self._add_job_files_for_upload()
+        self._upload_local_files_to_s3()
 
-    def _setup_input(self):
-        """Copy local input files (if any) to a special directory on S3.
-
-        Set self._s3_input_uris
-        Helper for _run
+    def _check_input_exists(self):
+        """Make sure all input exists before continuing with our job.
         """
-        self._create_s3_temp_bucket_if_needed()
-        # winnow out s3 files from local ones
-        self._s3_input_uris = []
-        local_input_paths = []
         for path in self._input_paths:
-            if is_s3_uri(path):
-                # Don't even bother running the job if the input isn't there,
-                # since it's costly to spin up instances.
-                if not self.path_exists(path):
-                    raise AssertionError(
-                        'Input path %s does not exist!' % (path,))
-                self._s3_input_uris.append(path)
-            else:
-                local_input_paths.append(path)
+            if path == '-':
+                continue  # STDIN always exists
 
-        # copy local files into an input directory, with names like
-        # 00000-actual_name.ext
-        if local_input_paths:
-            s3_input_dir = self._s3_tmp_uri + 'input/'
-            log.info('Uploading input to %s' % s3_input_dir)
+            if is_uri(path) and not is_s3_uri(path):
+                continue  # can't check non-S3 URIs, hope for the best
 
-            s3_conn = self.make_s3_conn()
-            for file_num, path in enumerate(local_input_paths):
-                if path == '-':
-                    path = self._dump_stdin_to_local_file()
+            if not self.path_exists(path):
+                raise AssertionError(
+                    'Input path %s does not exist!' % (path,))
 
-                target = '%s%05d-%s' % (
-                    s3_input_dir, file_num, os.path.basename(path))
-                log.debug('uploading %s -> %s' % (path, target))
-                s3_key = self.make_s3_key(target, s3_conn)
-                s3_key.set_contents_from_filename(path)
+    def _add_bootstrap_files_for_upload(self):
+        """Add files needed by the bootstrap script to self._upload_mgr.
 
-            self._s3_input_uris.append(s3_input_dir)
+        Tar up mrjob if bootstrap_mrjob is True.
 
-    def _add_bootstrap_file(self, path):
-        name, path = self._split_path(path)
-        file_dict = {'path': path, 'name': name, 'bootstrap': 'file'}
-        self._files.append(file_dict)
-        return file_dict
-
-    def _pick_s3_uris_for_files(self):
-        """Decide where each file will be uploaded on S3.
-
-        Okay to call this multiple times.
+        Create the master bootstrap script if necessary.
         """
-        self._assign_unique_names_to_files(
-            's3_uri', prefix=self._s3_tmp_uri + 'files/',
-            match=is_s3_uri)
+        # lazily create mrjob.tar.gz
+        if self._opts['bootstrap_mrjob']:
+            self._create_mrjob_tar_gz()
+            self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path)
 
-    def _upload_non_input_files(self):
-        """Copy files to S3
+        # all other files needed by the script are already in
+        # _bootstrap_dir_mgr
+        for path in self._bootstrap_dir_mgr.paths():
+            self._upload_mgr.add(path)
 
-        Pick S3 URIs for them if we haven't already."""
+        # now that we know where the above files live, we can create
+        # the master bootstrap script
+        self._create_master_bootstrap_script_if_needed()
+        if self._master_bootstrap_script_path:
+            self._upload_mgr.add(self._master_bootstrap_script_path)
+
+        # finally, make sure bootstrap action scripts are on S3
+        for bootstrap_action in self._bootstrap_actions:
+            self._upload_mgr.add(bootstrap_action['path'])
+
+    def _add_job_files_for_upload(self):
+        """Add files needed for running the job (setup and input)
+        to self._upload_mgr."""
+        for path in self._get_input_paths():
+            self._upload_mgr.add(path)
+
+        for path in self._working_dir_mgr.paths():
+            self._upload_mgr.add(path)
+
+        if self._opts['hadoop_streaming_jar']:
+            self._upload_mgr.add(path)
+
+    def _upload_local_files_to_s3(self):
+        """Copy local files tracked by self._upload_mgr to S3."""
         self._create_s3_temp_bucket_if_needed()
-        self._pick_s3_uris_for_files()
 
-        s3_files_dir = self._s3_tmp_uri + 'files/'
-        log.info('Copying non-input files into %s' % s3_files_dir)
+        log.info('Copying non-input files into %s' % self._upload_mgr.prefix)
 
         s3_conn = self.make_s3_conn()
-        for file_dict in self._files:
-            path = file_dict['path']
 
-            # don't bother with files that are already on s3
-            if is_s3_uri(path):
-                continue
-
-            s3_uri = file_dict['s3_uri']
-
+        for path, s3_uri in self._upload_mgr.path_to_uri().iteritems():
             log.debug('uploading %s -> %s' % (path, s3_uri))
             s3_key = self.make_s3_key(s3_uri, s3_conn)
-            s3_key.set_contents_from_filename(file_dict['path'])
+            s3_key.set_contents_from_filename(path)
 
     def setup_ssh_tunnel_to_job_tracker(self, host):
         """setup the ssh tunnel to the job tracker, if it's not currently
@@ -1086,10 +1078,23 @@ class EMRJobRunner(MRJobRunner):
                     log.info("Succeeded in terminating job")
                 else:
                     log.info("Job appears to have already been terminated")
-            except SSHException:
-                log.info(error_msg)
             except IOError:
                 log.info(error_msg)
+
+    def _cleanup_job_flow(self):
+        if not self._emr_job_flow_id:
+            # If we don't have a job flow, then we can't terminate it.
+            return
+
+        emr_conn = self.make_emr_conn()
+        try:
+            log.info("Attempting to terminate job flow")
+            emr_conn.terminate_jobflow(self._emr_job_flow_id)
+        except Exception, e:
+            # Something happened with boto and the user should know.
+            log.exception(e)
+            return
+        log.info('Job flow %s successfully terminated' % self._emr_job_flow_id)
 
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.
@@ -1164,10 +1169,6 @@ class EMRJobRunner(MRJobRunner):
         # make sure we can see the files we copied to S3
         self._wait_for_s3_eventual_consistency()
 
-        # figure out local names and S3 URIs for our bootstrap actions, if any
-        self._name_files()
-        self._pick_s3_uris_for_files()
-
         log.info('Creating Elastic MapReduce job flow')
         args = self._job_flow_args(persistent, steps)
 
@@ -1238,15 +1239,13 @@ class EMRJobRunner(MRJobRunner):
         # bootstrap actions
         bootstrap_action_args = []
 
-        for file_dict in self._bootstrap_actions:
-            # file_dict is not populated the same way by tools and real job
-            # runs, so use s3_uri or path as appropriate
-            s3_uri = file_dict.get('s3_uri', None) or file_dict['path']
+        for i, bootstrap_action in enumerate(self._bootstrap_actions):
+            s3_uri = self._upload_mgr.uri(bootstrap_action['path'])
             bootstrap_action_args.append(
                 boto.emr.BootstrapAction(
-                file_dict['name'], s3_uri, file_dict['args']))
+                'action %d' % i, s3_uri, bootstrap_action['args']))
 
-        if self._master_bootstrap_script:
+        if self._master_bootstrap_script_path:
             master_bootstrap_script_args = []
             if self._opts['pool_emr_job_flows']:
                 master_bootstrap_script_args = [
@@ -1255,7 +1254,8 @@ class EMRJobRunner(MRJobRunner):
                 ]
             bootstrap_action_args.append(
                 boto.emr.BootstrapAction(
-                    'master', self._master_bootstrap_script['s3_uri'],
+                    'master',
+                    self._upload_mgr.uri(self._master_bootstrap_script_path),
                     master_bootstrap_script_args))
 
         if bootstrap_action_args:
@@ -1281,81 +1281,82 @@ class EMRJobRunner(MRJobRunner):
     def _build_steps(self):
         """Return a list of boto Step objects corresponding to the
         steps we want to run."""
-        assert self._script  # can't build steps if no script!
-
-        # figure out local names for our files
-        self._name_files()
-        self._pick_s3_uris_for_files()
-
-        # we're going to instruct EMR to upload the MR script and the
-        # wrapper script (if any) to the job's local directory
-        self._script['upload'] = 'file'
-        if self._wrapper_script:
-            self._wrapper_script['upload'] = 'file'
-
         # quick, add the other steps before the job spins up and
         # then shuts itself down (in practice this takes several minutes)
         steps = self._get_steps()
         step_list = []
 
-        version = self.get_hadoop_version()
-
         for step_num, step in enumerate(steps):
-            # EMR-specific stuff
-            name = '%s: Step %d of %d' % (
-                self._job_name, step_num + 1, len(steps))
-
-            # don't terminate other people's job flows
-            if (self._opts['emr_job_flow_id'] or
-                self._opts['pool_emr_job_flows']):
-                action_on_failure = 'CANCEL_AND_WAIT'
-            else:
-                action_on_failure = 'TERMINATE_JOB_FLOW'
-
-            # Hadoop streaming stuff
-            if 'M' not in step:  # if we have an identity mapper
-                mapper = 'cat'
-            else:
-                mapper = cmd_line(self._mapper_args(step_num))
-
-            if 'C' in step:
-                combiner = cmd_line(self._combiner_args(step_num))
-            else:
-                combiner = None
-
-            if 'R' in step:  # i.e. if there is a reducer:
-                reducer = cmd_line(self._reducer_args(step_num))
-            else:
-                reducer = None
-
-            input = self._s3_step_input_uris(step_num)
-            output = self._s3_step_output_uri(step_num)\
-
-            step_args, cache_files, cache_archives = self._cache_args()
-
-            step_args.extend(self._hadoop_conf_args(step_num, len(steps)))
-            jar = self._get_jar()
-
-            if combiner is not None:
-                if compat.supports_combiners_in_hadoop_streaming(version):
-                    step_args.extend(['-combiner', combiner])
-                else:
-                    mapper = "bash -c '%s | sort | %s'" % (mapper, combiner)
-
-            streaming_step = boto.emr.StreamingStep(
-                name=name, mapper=mapper, reducer=reducer,
-                action_on_failure=action_on_failure,
-                cache_files=cache_files, cache_archives=cache_archives,
-                step_args=step_args, input=input, output=output,
-                jar=jar)
-
-            step_list.append(streaming_step)
+            if step['type'] == 'streaming':
+                step_list.append(
+                    self._build_streaming_step(step, step_num, len(steps)))
+            elif step['type'] == 'jar':
+                step_list.append(
+                    self._build_jar_step(step, step_num, len(steps)))
 
         return step_list
 
-    def _cache_args(self):
-        """Returns ``(step_args, cache_files, cache_archives)``, populating
-        each according to the correct behavior for the current Hadoop version.
+    @property
+    def _action_on_failure(self):
+        # don't terminate other people's job flows
+        if (self._opts['emr_job_flow_id'] or
+            self._opts['pool_emr_job_flows']):
+            return 'CANCEL_AND_WAIT'
+        else:
+            return 'TERMINATE_JOB_FLOW'
+
+    def _executable(self, steps=False):
+        # detect executable files so we can discard the explicit interpreter if
+        # possible
+        if os.access(self._script_path, os.X_OK):
+            if steps:
+                return [os.path.abspath(self._script_path)]
+            else:
+                return ['./' +
+                        self._working_dir_mgr.name('file', self._script_path)]
+        else:
+            return super(EMRJobRunner, self)._executable(steps)
+
+    def _build_streaming_step(self, step, step_num, num_steps):
+        streaming_step_kwargs = {
+            'name': '%s: Step %d of %d' % (
+                self._job_name, step_num + 1, num_steps),
+            'input': self._s3_step_input_uris(step_num),
+            'output': self._s3_step_output_uri(step_num),
+            'jar': self._get_jar(),
+            'action_on_failure': self._action_on_failure,
+        }
+
+        streaming_step_kwargs.update(self._cache_kwargs())
+
+        streaming_step_kwargs['step_args'].extend(
+            self._hadoop_conf_args(step, step_num, num_steps))
+
+        mapper, combiner, reducer = (
+            self._hadoop_streaming_commands(step, step_num))
+
+        streaming_step_kwargs['mapper'] = mapper
+
+        if combiner:
+            streaming_step_kwargs['combiner'] = combiner
+
+        streaming_step_kwargs['reducer'] = reducer
+
+        return boto.emr.StreamingStep(**streaming_step_kwargs)
+
+    def _build_jar_step(self, step):
+        return boto.emr.JarStep(
+            name=step['name'],
+            jar=step['jar'],
+            main_class=step['main_class'],
+            step_args=step['step_args'],
+            action_on_failure=self._action_on_failure)
+
+    def _cache_kwargs(self):
+        """Returns
+        ``{'step_args': [..], 'cache_files': [..], 'cache_archives': [..])``,
+        populating each according to the correct behavior for the current
+        Hadoop version.
 
         For < 0.20, populate cache_files and cache_archives.
         For >= 0.20, populate step_args.
@@ -1372,45 +1373,25 @@ class EMRJobRunner(MRJobRunner):
         cache_files = []
         cache_archives = []
 
-        if compat.supports_new_distributed_cache_options(version):
+        if supports_new_distributed_cache_options(version):
             # boto doesn't support non-deprecated 0.20 options, so insert
             # them ourselves
-
-            def escaped_paths(file_dicts):
-                # return list of strings to join with commas and pass to the
-                # hadoop binary
-                return ["%s#%s" % (fd['s3_uri'], fd['name'])
-                        for fd in file_dicts]
-
-            # index by type
-            all_files = {}
-            for fd in self._files:
-                all_files.setdefault(fd.get('upload'), []).append(fd)
-
-            if 'file' in all_files:
-                step_args.append('-files')
-                step_args.append(','.join(escaped_paths(all_files['file'])))
-
-            if 'archive' in all_files:
-                step_args.append('-archives')
-                step_args.append(','.join(escaped_paths(all_files['archive'])))
+            step_args.extend(self._new_upload_args(self._upload_mgr))
         else:
-            for file_dict in self._files:
-                if file_dict.get('upload') == 'file':
-                    cache_files.append(
-                        '%s#%s' % (file_dict['s3_uri'], file_dict['name']))
-                elif file_dict.get('upload') == 'archive':
-                    cache_archives.append(
-                        '%s#%s' % (file_dict['s3_uri'], file_dict['name']))
+            cache_files.extend(
+                self._arg_hash_paths('file', self._upload_mgr))
+            cache_archives.extend(
+                self._arg_hash_paths('archive', self._upload_mgr))
 
-        return step_args, cache_files, cache_archives
+        return {
+            'step_args': step_args,
+            'cache_files': cache_files,
+            'cache_archives': cache_archives,
+        }
 
     def _get_jar(self):
-        self._name_files()
-        self._pick_s3_uris_for_files()
-
-        if self._streaming_jar:
-            return self._streaming_jar['s3_uri']
+        if self._opts['hadoop_streaming_jar']:
+            return self._upload_mgr.uri(self._opts['hadoop_streaming_jar'])
         else:
             return self._opts['hadoop_streaming_jar_on_emr']
 
@@ -1418,26 +1399,30 @@ class EMRJobRunner(MRJobRunner):
         """Create an empty jobflow on EMR, and set self._emr_job_flow_id to
         the ID for that job."""
         self._create_s3_temp_bucket_if_needed()
-        # define out steps
-        steps = self._build_steps()
+        emr_conn = self.make_emr_conn()
 
         # try to find a job flow from the pool. basically auto-fill
         # 'emr_job_flow_id' if possible and then follow normal behavior.
-        if self._opts['pool_emr_job_flows']:
-            job_flow = self.find_job_flow(num_steps=len(steps))
+        if self._opts['pool_emr_job_flows'] and not self._emr_job_flow_id:
+            job_flow = self.find_job_flow(num_steps=len(self._get_steps()))
             if job_flow:
                 self._emr_job_flow_id = job_flow.jobflowid
 
         # create a job flow if we're not already using an existing one
         if not self._emr_job_flow_id:
             self._emr_job_flow_id = self._create_job_flow(
-                persistent=False, steps=steps)
+                persistent=False)
+            log.info('Created new job flow %s' %
+                     self._emr_job_flow_id)
         else:
-            emr_conn = self.make_emr_conn()
-            log.info('Adding our job to job flow %s' % self._emr_job_flow_id)
-            log.debug('Calling add_jobflow_steps(%r, %r)' % (
+            log.info('Adding our job to existing job flow %s' %
+                     self._emr_job_flow_id)
+
+        # define out steps
+        steps = self._build_steps()
+        log.debug('Calling add_jobflow_steps(%r, %r)' % (
                 self._emr_job_flow_id, steps))
-            emr_conn.add_jobflow_steps(self._emr_job_flow_id, steps)
+        emr_conn.add_jobflow_steps(self._emr_job_flow_id, steps)
 
         # keep track of when we launched our job
         self._emr_job_start = time.time()
@@ -1468,14 +1453,23 @@ class EMRJobRunner(MRJobRunner):
             running_step_name = ''
             total_step_time = 0.0
             step_nums = []  # step numbers belonging to us. 1-indexed
+            lg_step_num_mapping = {}
 
             steps = job_flow.steps or []
+            latest_lg_step_num = 0
             for i, step in enumerate(steps):
+                if LOG_GENERATING_STEP_NAME_RE.match(
+                    posixpath.basename(step.jar)):
+                    latest_lg_step_num += 1
+
                 # ignore steps belonging to other jobs
                 if not step.name.startswith(self._job_name):
                     continue
 
                 step_nums.append(i + 1)
+                if LOG_GENERATING_STEP_NAME_RE.match(
+                    posixpath.basename(step.jar)):
+                    lg_step_num_mapping[i + 1] = latest_lg_step_num
 
                 step.state = step.state
                 step_states.append(step.state)
@@ -1542,7 +1536,7 @@ class EMRJobRunner(MRJobRunner):
             log.info('Job completed.')
             log.info('Running time was %.1fs (not counting time spent waiting'
                      ' for the EC2 instances)' % total_step_time)
-            self._fetch_counters(step_nums)
+            self._fetch_counters(step_nums, lg_step_num_mapping)
             self.print_counters(range(1, len(step_nums) + 1))
         else:
             msg = 'Job on job flow %s failed with status %s: %s' % (
@@ -1551,7 +1545,8 @@ class EMRJobRunner(MRJobRunner):
             if self._s3_job_log_uri:
                 log.info('Logs are in %s' % self._s3_job_log_uri)
             # look for a Python traceback
-            cause = self._find_probable_cause_of_failure(step_nums)
+            cause = self._find_probable_cause_of_failure(
+                step_nums, sorted(lg_step_num_mapping.values()))
             if cause:
                 # log cause, and put it in exception
                 cause_msg = []  # lines to log and put in exception
@@ -1570,41 +1565,11 @@ class EMRJobRunner(MRJobRunner):
 
             raise Exception(msg)
 
-    def _script_args(self):
-        """How to invoke the script inside EMR"""
-        # We can invoke the script by its S3 URL, but we don't really
-        # gain anything from that, and EMR is touchy about distinguishing
-        # python scripts from shell scripts
-
-        assert self._script  # shouldn't call _script_args() if no script
-
-        args = self._opts['python_bin'] + [self._script['name']]
-        if self._wrapper_script:
-            args = (self._opts['python_bin'] +
-                    [self._wrapper_script['name']] +
-                    args)
-
-        return args
-
-    def _mapper_args(self, step_num):
-        return (self._script_args() +
-                ['--step-num=%d' % step_num, '--mapper'] +
-                self._mr_job_extra_args())
-
-    def _reducer_args(self, step_num):
-        return (self._script_args() +
-                ['--step-num=%d' % step_num, '--reducer'] +
-                self._mr_job_extra_args())
-
-    def _combiner_args(self, step_num):
-        return (self._script_args() +
-                ['--step-num=%d' % step_num, '--combiner'] +
-                self._mr_job_extra_args())
-
     def _s3_step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""
         if step_num == 0:
-            return self._s3_input_uris
+            return [self._upload_mgr.uri(path)
+                    for path in self._get_input_paths()]
         else:
             # put intermediate data in HDFS
             return ['hdfs:///tmp/mrjob/%s/step-output/%s/' % (
@@ -1636,7 +1601,8 @@ class EMRJobRunner(MRJobRunner):
     ## SSH LOG FETCHING
 
     def _ssh_path(self, relative):
-        return SSH_PREFIX + self._address_of_master() + SSH_LOG_ROOT + '/' + relative
+        return SSH_PREFIX + self._address_of_master() + SSH_LOG_ROOT + \
+        '/' + relative
 
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
@@ -1744,32 +1710,45 @@ class EMRJobRunner(MRJobRunner):
 
     ## LOG PARSING ##
 
-    def _fetch_counters(self, step_nums, skip_s3_wait=False):
+    def _fetch_counters(self, step_nums, lg_step_num_mapping=None,
+                        skip_s3_wait=False):
         """Read Hadoop counters from S3.
 
         Args:
         step_nums -- the steps belonging to us, so that we can ignore counters
                      from other jobs when sharing a job flow
         """
+        # empty list is a valid value for lg_step_nums, but it is an optional
+        # parameter
+        if lg_step_num_mapping is None:
+            lg_step_num_mapping = dict((n, n) for n in step_nums)
+        lg_step_nums = list(sorted(lg_step_num_mapping[k] for k in step_nums))
+
         self._counters = []
         new_counters = {}
         if self._opts['ec2_key_pair_file']:
             try:
-                new_counters = self._fetch_counters_ssh(step_nums)
+                new_counters = self._fetch_counters_ssh(lg_step_nums)
             except LogFetchError:
-                new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
+                new_counters = self._fetch_counters_s3(
+                    lg_step_nums, skip_s3_wait)
             except IOError:
                 # Can get 'file not found' if test suite was lazy or Hadoop
                 # logs moved. We shouldn't crash in either case.
-                new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
+                new_counters = self._fetch_counters_s3(
+                    lg_step_nums, skip_s3_wait)
         else:
             log.info('ec2_key_pair_file not specified, going to S3')
-            new_counters = self._fetch_counters_s3(step_nums, skip_s3_wait)
+            new_counters = self._fetch_counters_s3(lg_step_nums, skip_s3_wait)
 
         # step_nums is relative to the start of the job flow
         # we only want them relative to the job
         for step_num in step_nums:
-            self._counters.append(new_counters.get(step_num, {}))
+            if step_num in lg_step_num_mapping:
+                self._counters.append(
+                    new_counters.get(lg_step_num_mapping[step_num], {}))
+            else:
+                self._counters.append({})
 
     def _fetch_counters_ssh(self, step_nums):
         uris = list(self.ls_job_logs_ssh(step_nums))
@@ -1791,9 +1770,9 @@ class EMRJobRunner(MRJobRunner):
             if not results:
                 job_flow = self._describe_jobflow()
                 if not self._job_flow_is_done(job_flow):
-                    log.info("Counters may not have been uploaded to S3 yet. Try"
-                             " again in 5 minutes with 'python -m"
-                             " mrjob.tools.emr.fetch_logs --counters %s'." %
+                    log.info("Counters may not have been uploaded to S3 yet."
+                             " Try again in 5 minutes with:"
+                             " mrjob fetch-logs --counters %s" %
                              job_flow.jobflowid)
             return results
         except LogFetchError, e:
@@ -1803,12 +1782,19 @@ class EMRJobRunner(MRJobRunner):
     def counters(self):
         return self._counters
 
-    def _find_probable_cause_of_failure(self, step_nums):
+    def _find_probable_cause_of_failure(self, step_nums, lg_step_nums=None):
         """Scan logs for Python exception tracebacks.
 
-        Args:
-        step_nums -- the numbers of steps belonging to us, so that we
-            can ignore errors from other jobs when sharing a job flow
+        :param step_nums: the numbers of steps belonging to us, so that we
+                          can ignore errors from other jobs when sharing a job
+                          flow
+        :param lg_step_nums: "Log generating step numbers" - list of
+                             (job flow step num, hadoop job num) mapping a job
+                             flow step number to the number hadoop sees.
+                             Necessary because not all steps generate task
+                             attempt logs, and when there are steps that don't,
+                             the number in the log path differs from the job
+                             flow step number.
 
         Returns:
         None (nothing found) or a dictionary containing:
@@ -1820,101 +1806,92 @@ class EMRJobRunner(MRJobRunner):
         """
         if self._opts['ec2_key_pair_file']:
             try:
-                return self._find_probable_cause_of_failure_ssh(step_nums)
+                return self._find_probable_cause_of_failure_ssh(
+                    step_nums, lg_step_nums)
             except LogFetchError:
-                return self._find_probable_cause_of_failure_s3(step_nums)
+                return self._find_probable_cause_of_failure_s3(
+                    step_nums, lg_step_nums)
         else:
             log.info('ec2_key_pair_file not specified, going to S3')
-            return self._find_probable_cause_of_failure_s3(step_nums)
+            return self._find_probable_cause_of_failure_s3(
+                step_nums, lg_step_nums)
 
-    def _find_probable_cause_of_failure_ssh(self, step_nums):
-        self._enable_slave_ssh_access()
+    def _find_probable_cause_of_failure_ssh(self, step_nums,
+                                            lg_step_nums=None):
+        # empty list is a valid value for lg_step_nums, but it is an optional
+        # parameter
+        if lg_step_nums is None:
+            lg_step_nums = step_nums
+
+        try:
+            self._enable_slave_ssh_access()
+        except IOError, e:
+            raise LogFetchError(e)
         task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
-        step_logs = self.ls_step_logs_ssh(step_nums)
+        step_logs = self.ls_step_logs_ssh(lg_step_nums)
         job_logs = self.ls_job_logs_ssh(step_nums)
         log.info('Scanning SSH logs for probable cause of failure')
-        return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
-                                  step_logs=step_logs,
-                                  job_logs=job_logs,
-                                  runner=self)
+        return best_error_from_logs(self, task_attempt_logs, step_logs,
+                                    job_logs)
 
-    def _find_probable_cause_of_failure_s3(self, step_nums):
+    def _find_probable_cause_of_failure_s3(self, step_nums, lg_step_nums):
+        # empty list is a valid value for lg_step_nums, but it is an optional
+        # parameter
+        if lg_step_nums is None:
+            lg_step_nums = step_nums
         log.info('Scanning S3 logs for probable cause of failure')
         self._wait_for_s3_eventual_consistency()
         self._wait_for_job_flow_termination()
 
         task_attempt_logs = self.ls_task_attempt_logs_s3(step_nums)
         step_logs = self.ls_step_logs_s3(step_nums)
-        job_logs = self.ls_job_logs_s3(step_nums)
-        return scan_logs_in_order(task_attempt_logs=task_attempt_logs,
-                                  step_logs=step_logs,
-                                  job_logs=job_logs,
-                                  runner=self)
+        job_logs = self.ls_job_logs_s3(lg_step_nums)
+        return best_error_from_logs(self, task_attempt_logs, step_logs,
+                                    job_logs)
 
     ### Bootstrapping ###
 
-    def _create_master_bootstrap_script(self, dest='b.py'):
+    def _create_master_bootstrap_script_if_needed(self):
         """Create the master bootstrap script and write it into our local
-        temp directory.
+        temp directory. Set self._master_bootstrap_script_path.
 
         This will do nothing if there are no bootstrap scripts or commands,
-        or if _create_master_bootstrap_script() has already been called."""
-        # we call the script b.py because there's a character limit on
-        # bootstrap script names (or there was at one time, anyway)
-
-        if not any(key.startswith('bootstrap_') and value
-                   for (key, value) in self._opts.iteritems()):
+        or if it has already been called."""
+        if self._master_bootstrap_script_path:
             return
 
         # don't bother if we're not starting a job flow
         if self._opts['emr_job_flow_id']:
             return
 
-        # Also don't bother if we're not pooling (and therefore don't need
-        # to have a bootstrap script to attach to) and we're not bootstrapping
-        # anything else
-        if not (self._opts['pool_emr_job_flows'] or
-            any(key.startswith('bootstrap_') and
-                key != 'bootstrap_actions' and  # these are separate scripts
-                value
-                for (key, value) in self._opts.iteritems())):
+        # Also don't bother if we're not bootstrapping
+        if not any(key.startswith('bootstrap_') and
+               key != 'bootstrap_actions' and  # these are separate scripts
+               value
+               for (key, value) in self._opts.iteritems()):
             return
 
-        if self._opts['bootstrap_mrjob']:
-            if self._mrjob_tar_gz_file is None:
-                self._mrjob_tar_gz_file = self._add_bootstrap_file(
-                    self._create_mrjob_tar_gz() + '#')
-
-        # need to know what files are called
-        self._name_files()
-        self._pick_s3_uris_for_files()
-
-        path = os.path.join(self._get_local_tmp_dir(), dest)
+        # we call the script b.py because there's a character limit on
+        # bootstrap script names (or there was at one time, anyway)
+        path = os.path.join(self._get_local_tmp_dir(), 'b.py')
         log.info('writing master bootstrap script to %s' % path)
 
         contents = self._master_bootstrap_script_content()
         for line in StringIO(contents):
             log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
-        f = open(path, 'w')
-        f.write(contents)
-        f.close()
+        with open(path, 'w') as f:
+            f.write(contents)
 
-        name, _ = self._split_path(path)
-        self._master_bootstrap_script = {'path': path, 'name': name}
-        self._files.append(self._master_bootstrap_script)
+        self._master_bootstrap_script_path = path
 
     def _master_bootstrap_script_content(self):
         """Create the contents of the master bootstrap script.
-
-        This will give names and S3 URIs to files that don't already have them.
-
-        This function does NOT pick S3 URIs for files or anything like
-        that; _create_master_bootstrap_script() is responsible for that.
         """
         out = StringIO()
 
-        python_bin_in_list = ', '.join(repr(opt) for opt in self._opts['python_bin'])
+        python_bin_in_list = ', '.join(
+            repr(arg) for arg in self._opts['python_bin'])
 
         def writeln(line=''):
             out.write(line + '\n')
@@ -1936,28 +1913,31 @@ class EMRJobRunner(MRJobRunner):
 
         # download files using hadoop fs
         writeln('# download files using hadoop fs -copyToLocal')
-        for file_dict in self._files:
-            if file_dict.get('bootstrap'):
-                writeln(
-                    "check_call(['hadoop', 'fs', '-copyToLocal', %r, %r])" %
-                    (file_dict['s3_uri'], file_dict['name']))
+        files = self._bootstrap_dir_mgr.name_to_path('file').iteritems()
+        for name, path in files:
+            s3_uri = self._upload_mgr.uri(path)
+            writeln(
+                "check_call(['hadoop', 'fs', '-copyToLocal', %r, %r])" %
+                (s3_uri, name))
         writeln()
 
         # make scripts executable
         if self._bootstrap_scripts:
             writeln('# make bootstrap scripts executable')
-            for file_dict in self._bootstrap_scripts:
+            for path_dict in self._bootstrap_scripts:
                 writeln("check_call(['chmod', 'a+rx', %r])" %
-                        file_dict['name'])
+                        path_dict['name'])
             writeln()
 
         # bootstrap mrjob
         if self._opts['bootstrap_mrjob']:
+            name = self._bootstrap_dir_mgr.name('file',
+                                                self._mrjob_tar_gz_path)
             writeln('# bootstrap mrjob')
             writeln("site_packages = distutils.sysconfig.get_python_lib()")
             writeln(
                 "check_call(['sudo', 'tar', 'xfz', %r, '-C', site_packages])" %
-                self._mrjob_tar_gz_file['name'])
+                name)
             # re-compile pyc files now, since mappers/reducers can't
             # write to this directory. Don't fail if there is extra
             # un-compileable crud in the tarball.
@@ -1970,12 +1950,12 @@ class EMRJobRunner(MRJobRunner):
         # install our python modules
         if self._bootstrap_python_packages:
             writeln('# install python modules:')
-            for file_dict in self._bootstrap_python_packages:
+            for path_dict in self._bootstrap_python_packages:
                 writeln("check_call(['tar', 'xfz', %r])" %
-                        file_dict['name'])
+                        self._bootstrap_dir_mgr.name(**path_dict))
                 # figure out name of dir to CD into
-                assert file_dict['path'].endswith('.tar.gz')
-                cd_into = extract_dir_for_tar(file_dict['path'])
+                assert path_dict['path'].endswith('.tar.gz')
+                cd_into = extract_dir_for_tar(path_dict['path'])
                 # install the module
                 writeln("check_call(["
                         "'sudo', %s, 'setup.py', 'install'], cwd=%r)" %
@@ -1994,9 +1974,9 @@ class EMRJobRunner(MRJobRunner):
         # run our scripts
         if self._bootstrap_scripts:
             writeln('# run bootstrap scripts:')
-            for file_dict in self._bootstrap_scripts:
+            for path_dict in self._bootstrap_scripts:
                 writeln('check_call(%r)' % (
-                    ['./' + file_dict['name']],))
+                    ['./' + self._bootstrap_dir_mgr.name(**path_dict)],))
             writeln()
 
         return out.getvalue()
@@ -2016,8 +1996,8 @@ class EMRJobRunner(MRJobRunner):
 
         log.info('Creating persistent job flow to run several jobs in...')
 
-        self._create_master_bootstrap_script()
-        self._upload_non_input_files()
+        self._add_bootstrap_files_for_upload()
+        self._upload_local_files_to_s3()
 
         # don't allow user to call run()
         self._ran_job = True
@@ -2109,14 +2089,22 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['emr_job_flow_pool_name'] != name:
                 return
 
-            # match hadoop version
-            if job_flow.hadoopversion != self.get_hadoop_version():
-                return
+            if self._opts['hadoop_version']:
+                # match hadoop version
+                if job_flow.hadoopversion != self._opts['hadoop_version']:
+                    return
 
-            # match AMI version
-            job_flow_ami_version = getattr(job_flow, 'amiversion', None)
-            if job_flow_ami_version != self._opts['ami_version']:
-                return
+            if self._opts['ami_version'] != 'latest':
+                # match AMI version
+                job_flow_ami_version = getattr(job_flow, 'amiversion', None)
+                if job_flow_ami_version != self._opts['ami_version']:
+                    return
+            else:
+                log.warning(
+                    "When AMI version is set to 'latest', job flow pooling "
+                    "can result in the job being added to a pool using an "
+                    "older AMI version"
+                )
 
             # there is a hard limit of 256 steps per job flow
             if len(job_flow.steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
@@ -2258,45 +2246,23 @@ class EMRJobRunner(MRJobRunner):
         """Generate a hash of the bootstrap configuration so it can be used to
         match jobs and job flows. This first argument passed to the bootstrap
         script will be ``'pool-'`` plus this hash.
+
+        The way the hash is calculated may vary between point releases
+        (pooling requires the exact same version of :py:mod:`mrjob` anyway).
         """
-        def should_include_file(info):
-            # Bootstrap scripts will always have a different checksum
-            if 'name' in info and info['name'] in ('b.py', 'wrapper.py'):
-                return False
-
-            # Also do not include script used to spin up job
-            if self._script and info['path'] == self._script['path']:
-                return False
-
-            # Only include bootstrap files
-            if 'bootstrap' not in info:
-                return False
-
-            # mrjob.tar.gz is covered by the bootstrap_mrjob variable.
-            # also, it seems to be different every time, causing an
-            # undesirable hash mismatch.
-            if (self._opts['bootstrap_mrjob']
-                and info is self._mrjob_tar_gz_file):
-                return False
-
-            # Ignore job-specific files
-            if info['path'] in self._input_paths:
-                return False
-
-            return True
-
-        # strip unique s3 URI if there is one
-        cleaned_bootstrap_actions = [dict(path=fd['path'], args=fd['args'])
-                                     for fd in self._bootstrap_actions]
-
         things_to_hash = [
-            [self.md5sum(fd['path'])
-             for fd in self._files if should_include_file(fd)],
+            # exclude mrjob.tar.gz because it's only created if the
+            # job starts its own job flow (also, its hash changes every time
+            # since the tarball contains different timestamps)
+            dict((name, self.md5sum(path)) for name, path
+                 in self._bootstrap_dir_mgr.name_to_path('file').iteritems()
+                 if not path == self._mrjob_tar_gz_path),
             self._opts['additional_emr_info'],
             self._opts['bootstrap_mrjob'],
             self._opts['bootstrap_cmds'],
-            cleaned_bootstrap_actions,
+            self._bootstrap_actions,
         ]
+
         if self._opts['bootstrap_mrjob']:
             things_to_hash.append(mrjob.__version__)
         return hash_object(things_to_hash)
@@ -2351,23 +2317,24 @@ class EMRJobRunner(MRJobRunner):
 
     def get_hadoop_version(self):
         if not self._inferred_hadoop_version:
-            if self._emr_job_flow_id:
-                # if joining a job flow, infer the version
-                self._inferred_hadoop_version = (
-                    self._describe_jobflow().hadoopversion)
-            else:
-                # otherwise, read it from hadoop_version/ami_version
-                hadoop_version = self._opts['hadoop_version']
-                if hadoop_version:
-                    self._inferred_hadoop_version = hadoop_version
-                else:
-                    ami_version = self._opts['ami_version']
-                    # don't explode if we see an AMI version that's
-                    # newer than what we know about.
-                    self._inferred_hadoop_version = (
-                        AMI_VERSION_TO_HADOOP_VERSION.get(ami_version) or
-                        AMI_VERSION_TO_HADOOP_VERSION['latest'])
+            if not self._emr_job_flow_id:
+                raise AssertionError(
+                    "We infer the hadoop version from the job flow. "
+                    "The job flow must created before the hadoop version "
+                    "can be inferred"
+                )
 
+            # infer the version from the job flow
+            self._inferred_hadoop_version = (
+                    self._describe_jobflow().hadoopversion)
+            # warn if the hadoop version specified does not match the
+            # inferred hadoop_version
+            hadoop_version = self._opts['hadoop_version']
+            if hadoop_version and \
+               hadoop_version != self._inferred_hadoop_version:
+                log.warning("Specified hadoop version (%s) does not match "
+                "job flow hadoop version (%s)" % (hadoop_version,
+                                              self._inferred_hadoop_version))
         return self._inferred_hadoop_version
 
     def _address_of_master(self, emr_conn=None):

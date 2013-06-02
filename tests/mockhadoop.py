@@ -16,11 +16,14 @@
 filesystem. This imitates only things that mrjob actually uses.
 
 Relies on these environment variables:
-MOCK_HDFS_ROOT -- root dir for our fake HDFS filesystem
+MOCK_HDFS_ROOT -- root dir for our fake filesystem(s). Used regardless of
+URI scheme or host (so this is also the root of every S3 bucket).
 MOCK_HADOOP_OUTPUT -- a directory containing directories containing
 fake job output (to add output, use add_mock_output())
 MOCK_HADOOP_CMD_LOG -- optional: if this is set, append arguments passed
 to the fake hadoop binary to this script, one line per invocation
+MOCK_HADOOP_LS_RETURNS_FULL_URIS -- optional: if true, ls returns full URIs
+when passed URIs.
 
 This is designed to run as: python -m tests.mockhadoop <hadoop args>
 
@@ -38,6 +41,9 @@ import pipes
 import shutil
 import stat
 import sys
+
+from mrjob.compat import version_gte
+from mrjob.parse import urlparse
 
 
 def create_mock_hadoop_script(path):
@@ -85,16 +91,18 @@ def get_mock_hadoop_output():
 
 
 def hdfs_path_to_real_path(hdfs_path, environ):
-    if hdfs_path.startswith('hdfs:///'):
-        hdfs_path = hdfs_path[7:]  # keep one slash
+    components = urlparse(hdfs_path)
 
-    if not hdfs_path.startswith('/'):
-        hdfs_path = '/user/%s/%s' % (environ['USER'], hdfs_path)
+    scheme = components.scheme
+    path = components.path
 
-    return os.path.join(environ['MOCK_HDFS_ROOT'], hdfs_path.lstrip('/'))
+    if not scheme and not path.startswith('/'):
+        path = '/user/%s/%s' % (environ['USER'], path)
+
+    return os.path.join(environ['MOCK_HDFS_ROOT'], path.lstrip('/'))
 
 
-def real_path_to_hdfs_path(real_path, environ=None):
+def real_path_to_hdfs_path(real_path, environ):
     if environ is None: # user may have passed empty dict
         environ = os.environ
     hdfs_root = environ['MOCK_HDFS_ROOT']
@@ -102,6 +110,7 @@ def real_path_to_hdfs_path(real_path, environ=None):
     if not real_path.startswith(hdfs_root):
         raise ValueError('path %s is not in %s' % (real_path, hdfs_root))
 
+    # janky version of os.path.relpath() (Python 2.6):
     hdfs_path = real_path[len(hdfs_root):]
     if not hdfs_path.startswith('/'):
         hdfs_path = '/' + hdfs_path
@@ -192,19 +201,45 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
     """Implements hadoop fs -lsr."""
     hdfs_path_globs = args or ['']
 
-    def ls_line(real_path):
+    def ls_line(real_path, scheme, netloc, size=0, max_size=0):
         hdfs_path = real_path_to_hdfs_path(real_path, environ)
+
         # we could actually implement ls here, but mrjob only cares about
         # the path
-        path_is_dir = os.path.isdir(real_path)
+        if os.path.isdir(real_path):
+            file_type = 'd'
+        else:
+            file_type = '-'
+
+        if scheme in ('s3', 's3n'):
+            # no user and group on S3 (see Pull Request #573)
+            user_and_group = ''
+        else:
+            user_and_group = 'dave supergroup'
+
+        # newer Hadoop returns fully qualified URIs (see Pull Request #577)
+        if scheme and environ.get('MOCK_HADOOP_LS_RETURNS_FULL_URIS'):
+            hdfs_path = '%s://%s%s' % (scheme, netloc, hdfs_path)
+
+        # figure out the padding
+        size = str(size).rjust(len(str(max_size)))
+
         return (
-            '%srwxrwxrwx - dave supergroup      18321 2010-10-01 15:16 %s' %
-            ('d' if path_is_dir else '-', hdfs_path))
+            '%srwxrwxrwx - %s %s 2010-10-01 15:16 %s' %
+            (file_type, user_and_group, size, hdfs_path))
 
     failed = False
     for hdfs_path_glob in hdfs_path_globs:
+        parsed = urlparse(hdfs_path_glob)
+        scheme = parsed.scheme
+        netloc = parsed.netloc
+
         real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
         real_paths = glob.glob(real_path_glob)
+
+        paths = []
+        max_size = 0
+
         if not real_paths:
             print >> stderr, (
                 'lsr: Cannot access %s: No such file or directory.' %
@@ -214,12 +249,17 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
             for real_path in real_paths:
                 if os.path.isdir(real_path):
                     for dirpath, dirnames, filenames in os.walk(real_path):
-                        print >> stdout, ls_line(dirpath)
+                        paths.append((dirpath, scheme, netloc, 0))
                         for filename in filenames:
-                            print >> stdout, ls_line(os.path.join(dirpath,
-                                                                  filename))
+                            path = os.path.join(dirpath, filename)
+                            size = os.path.getsize(path)
+                            max_size = size if size > max_size else max_size
+                            paths.append((path, scheme, netloc, size))
                 else:
-                    print >> stdout, ls_line(real_path)
+                    paths.append((real_path, scheme, netloc, 0))
+
+        for path in paths:
+            print >> stdout, ls_line(*path + (max_size,))
 
     if failed:
         return -1
@@ -328,14 +368,14 @@ def hadoop_fs_rmr(stdout, stderr, environ, *args):
 
 
 def hadoop_fs_test(stdout, stderr, environ, *args):
-    """Implements hadoop fs -rmr."""
+    """Implements hadoop fs -test."""
     if len(args) < 1:
         stderr.write('Usage: java FsShell [-test -[ezd] <src>]')
 
     if os.path.exists(hdfs_path_to_real_path(args[1], environ)):
         return 0
     else:
-        return -1
+        return 1
 
 
 def hadoop_jar(stdout, stderr, environ, *args):

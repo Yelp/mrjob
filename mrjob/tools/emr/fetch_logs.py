@@ -17,6 +17,8 @@ message or for inspecting jobs whose output has been lost.
 
 Usage::
 
+    mrjob fetch-logs -[l|L|a|A|--counters] [-s STEP_NUM]\
+ JOB_FLOW_ID
     python -m mrjob.tools.emr.fetch_logs -[l|L|a|A|--counters] [-s STEP_NUM]\
  JOB_FLOW_ID
 
@@ -55,10 +57,10 @@ from mrjob.logparsers import NODE_LOGS
 from mrjob.util import scrape_options_into_new_groups
 
 
-def main():
+def main(args=None):
     option_parser = make_option_parser()
     try:
-        options = parse_args(option_parser)
+        options = parse_args(option_parser, args)
     except OptionError:
         option_parser.error('This tool takes exactly one argument.')
 
@@ -100,9 +102,9 @@ def perform_actions(options, runner):
         find_failure(runner, options.step_num)
 
 
-def parse_args(option_parser):
+def parse_args(option_parser, cl_args=None):
     option_parser = make_option_parser()
-    options, args = option_parser.parse_args()
+    options, args = option_parser.parse_args(cl_args)
 
     # should be one argument, the job flow ID
     if len(args) != 1:

@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # Copyright 2012 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,6 +37,7 @@ from mrjob.hadoop import HadoopJobRunner
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import patch_fs_s3
 
 
 def _mock_context_mgr(m, return_value):
@@ -84,16 +85,20 @@ class MakeRunnerTestCase(unittest.TestCase):
                 self.assertIsInstance(runner, LocalMRJobRunner)
 
     def test_hadoop_runner(self):
-        launcher = MRJobLauncher(args=['--no-conf', '-r', 'hadoop', ''])
+        # you can't instantiate a HadoopJobRunner without Hadoop installed
+        launcher = MRJobLauncher(args=['--no-conf', '-r', 'hadoop', '',
+                                       '--hadoop-streaming-jar', 'HUNNY'])
         with no_handlers_for_logger('mrjob.runner'):
-            with launcher.make_runner() as runner:
-                self.assertIsInstance(runner, HadoopJobRunner)
+            with patch.dict(os.environ, {'HADOOP_HOME': '100-Acre Wood'}):
+                with launcher.make_runner() as runner:
+                    self.assertIsInstance(runner, HadoopJobRunner)
 
     def test_emr_runner(self):
         launcher = MRJobLauncher(args=['--no-conf', '-r', 'emr', ''])
-        with no_handlers_for_logger('mrjob.runner'):
-            with launcher.make_runner() as runner:
-                self.assertIsInstance(runner, EMRJobRunner)
+        with no_handlers_for_logger('mrjob'):
+            with patch_fs_s3():
+                with launcher.make_runner() as runner:
+                    self.assertIsInstance(runner, EMRJobRunner)
 
 
 class NoOutputTestCase(unittest.TestCase):
@@ -131,7 +136,7 @@ class CommandLineArgsTestCase(unittest.TestCase):
         self.assertEqual(mr_job.options.cmdenv, {'FOO': 'bar'})
 
         # trickier example
-        mr_job = MRJobLauncher(args= [
+        mr_job = MRJobLauncher(args=[
             '',
             '--cmdenv', 'FOO=bar',
             '--cmdenv', 'FOO=baz',

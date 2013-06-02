@@ -30,6 +30,12 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+try:
+    import simplejson as json
+    json  # silence, pyflakes!
+except ImportError:
+    import json
+
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
 
@@ -38,29 +44,13 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
+from mrjob.step import JarStep
+from mrjob.step import MRJobStep
+from mrjob.step import _JOB_STEP_PARAMS
 from mrjob.util import read_input
 
 
 log = logging.getLogger('mrjob.job')
-
-
-# all the parameters you can specify when definining a job step
-_JOB_STEP_PARAMS = (
-    'combiner',
-    'combiner_init',
-    'combiner_final',
-    'mapper',
-    'mapper_init',
-    'mapper_final',
-    'reducer',
-    'reducer_init',
-    'reducer_final',
-)
-
-
-# used by mr() below, to fake no mapper
-def _IDENTITY_MAPPER(key, value):
-    yield key, value
 
 
 class UsageError(Exception):
@@ -70,6 +60,10 @@ class UsageError(Exception):
 class MRJob(MRJobLauncher):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
     for details."""
+
+    # inline can be the default because we have the class object in the same
+    # process as the launcher
+    _DEFAULT_RUNNER = 'inline'
 
     def __init__(self, args=None):
         """Entry point for running your job from other Python code.
@@ -176,6 +170,31 @@ class MRJob(MRJobLauncher):
         """
         raise NotImplementedError
 
+    def mapper_cmd(self):
+        """Re-define this to define the mapper for a one-step job **as a shell
+        command.** If you define your mapper this way, the command will be
+        passed unchanged to Hadoop Streaming, with some minor exceptions. For
+        important specifics, see :ref:`cmd-steps`.
+
+        Basic example::
+
+            def mapper_cmd(self):
+                return 'cat'
+        """
+        raise NotImplementedError
+
+    def mapper_pre_filter(self):
+        """Re-define this to specify a shell command to filter the mapper's
+        input before it gets to your job's mapper in a one-step job. For
+        important specifics, see :ref:`cmd-filters`.
+
+        Basic example::
+
+            def mapper_pre_filter(self):
+                return 'grep "ponies"'
+        """
+        raise NotImplementedError
+
     def reducer_init(self):
         """Re-define this to define an action to run before the reducer
         processes any input.
@@ -198,6 +217,31 @@ class MRJob(MRJobLauncher):
 
         By default, ``out_key`` and ``out_value`` must be JSON-encodable;
         re-define :py:attr:`INTERNAL_PROTOCOL` to change this.
+        """
+        raise NotImplementedError
+
+    def reducer_cmd(self):
+        """Re-define this to define the reducer for a one-step job **as a shell
+        command.** If you define your mapper this way, the command will be
+        passed unchanged to Hadoop Streaming, with some minor exceptions. For
+        specifics, see :ref:`cmd-steps`.
+
+        Basic example::
+
+            def reducer_cmd(self):
+                return 'cat'
+        """
+        raise NotImplementedError
+
+    def reducer_pre_filter(self):
+        """Re-define this to specify a shell command to filter the reducer's
+        input before it gets to your job's reducer in a one-step job. For
+        important specifics, see :ref:`cmd-filters`.
+
+        Basic example::
+
+            def reducer_pre_filter(self):
+                return 'grep "ponies"'
         """
         raise NotImplementedError
 
@@ -226,6 +270,31 @@ class MRJob(MRJobLauncher):
         """
         raise NotImplementedError
 
+    def combiner_cmd(self):
+        """Re-define this to define the combiner for a one-step job **as a
+        shell command.** If you define your mapper this way, the command will
+        be passed unchanged to Hadoop Streaming, with some minor exceptions.
+        For specifics, see :ref:`cmd-steps`.
+
+        Basic example::
+
+            def combiner_cmd(self):
+                return 'cat'
+        """
+        raise NotImplementedError
+
+    def combiner_pre_filter(self):
+        """Re-define this to specify a shell command to filter the combiner's
+        input before it gets to your job's combiner in a one-step job. For
+        important specifics, see :ref:`cmd-filters`.
+
+        Basic example::
+
+            def combiner_pre_filter(self):
+                return 'grep "ponies"'
+        """
+        raise NotImplementedError
+
     ### Defining multi-step jobs ###
 
     def steps(self):
@@ -251,11 +320,20 @@ class MRJob(MRJobLauncher):
                       if (getattr(self, func_name).im_func is not
                           getattr(MRJob, func_name).im_func))
 
+        # MRJobStep takes commands as strings, but the user defines them in the
+        # class as functions that return strings, so call the functions.
+        updates = {}
+        for k, v in kwargs.iteritems():
+            if k.endswith('_cmd'):
+                updates[k] = v()
+
+        kwargs.update(updates)
+
         return [self.mr(**kwargs)]
 
     @classmethod
-    def mr(cls, mapper=None, reducer=None, _mapper_final=None, **kwargs):
-        """Define a step (mapper, reducer, and/or any combination of
+    def mr(cls, *args, **kwargs):
+        """Define a Python step (mapper, reducer, and/or any combination of
         mapper_init, reducer_final, etc.) for your job.
 
         Used by :py:meth:`steps`. (Don't re-define this, just call it!)
@@ -291,37 +369,36 @@ class MRJob(MRJobLauncher):
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.
         """
-        # limit which keyword args can be specified
-        bad_kwargs = sorted(set(kwargs) - set(_JOB_STEP_PARAMS))
-        if bad_kwargs:
-            raise TypeError(
-                'mr() got an unexpected keyword argument %r' % bad_kwargs[0])
+        if args:
+            log.warning('Using positional arguments to MRJob.mr() is'
+                        ' deprecated.')
 
-        # handle incorrect usage of positional args. This was wrong in mrjob
-        # v0.2 as well, but we didn't issue a warning.
-        if _mapper_final is not None:
-            if 'mapper_final' in kwargs:
-                raise TypeError("mr() got multiple values for keyword argument"
-                                " 'mapper_final'")
-            else:
-                log.warn(
-                    'mapper_final should be specified as a keyword argument to'
-                    ' mr(), not a positional argument. This will be required'
-                    ' in mrjob 0.4.')
-                kwargs['mapper_final'] = _mapper_final
+        if len(args) > 0:
+            kwargs['mapper'] = args[0]
 
-        step = dict((f, None) for f in _JOB_STEP_PARAMS)
-        step['mapper'] = mapper
-        step['reducer'] = reducer
-        step.update(kwargs)
+        if len(args) > 1:
+            kwargs['reducer'] = args[1]
 
-        if not any(step.itervalues()):
-            raise Exception("Step has no mappers and no reducers")
+        if len(args) > 2:
+            raise ValueError('mr() can take at most two positional arguments.')
 
-        # Hadoop streaming requires a mapper, so patch in _IDENTITY_MAPPER
-        step['mapper'] = step['mapper'] or _IDENTITY_MAPPER
+        return MRJobStep(**kwargs)
 
-        return step
+    @classmethod
+    def jar(cls, name, jar, main_class=None, step_args=None):
+        """Define a jar step for your job.
+
+        Used by :py:meth:`steps`. (Don't re-define this, just call it!)
+
+        :param name: Name to give the job for display in Hadoop
+        :param jar: Hadoop-accessible path to the jar file to run
+        :param main_class: Path of the main class in the jar if not default
+        :param step_args: Extra arguments to pass the jar when running it
+
+        Please consider the way we represent steps to be opaque, and expect
+        it to change in future versions of ``mrjob``.
+        """
+        return JarStep(name, jar, main_class=main_class, step_args=step_args)
 
     def increment_counter(self, group, counter, amount=1):
         """Increment a counter in Hadoop streaming by printing to stderr. If
@@ -469,7 +546,7 @@ class MRJob(MRJobLauncher):
         mapper_final = step['mapper_final']
 
         # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, 'M')
+        read_lines, write_line = self._wrap_protocols(step_num, 'mapper')
 
         if mapper_init:
             for out_key, out_value in mapper_init() or ():
@@ -509,7 +586,7 @@ class MRJob(MRJobLauncher):
             raise ValueError('No reducer in step %d' % step_num)
 
         # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, 'R')
+        read_lines, write_line = self._wrap_protocols(step_num, 'reducer')
 
         if reducer_init:
             for out_key, out_value in reducer_init() or ():
@@ -554,7 +631,7 @@ class MRJob(MRJobLauncher):
             raise ValueError('No combiner in step %d' % step_num)
 
         # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, 'C')
+        read_lines, write_line = self._wrap_protocols(step_num, 'combiner')
 
         if combiner_init:
             for out_key, out_value in combiner_init() or ():
@@ -586,40 +663,13 @@ class MRJob(MRJobLauncher):
         We currently output something like ``MR M R``, but expect this to
         change!
         """
-        print >> self.stdout, ' '.join(self._steps_desc())
+        print >> self.stdout, json.dumps(self._steps_desc())
 
     def _steps_desc(self):
-        res = []
+        step_descs = []
         for step_num, step in enumerate(self.steps()):
-            mapper_funcs = ('mapper_init', 'mapper_final')
-            reducer_funcs = ('reducer', 'reducer_init', 'reducer_final')
-            combiner_funcs = ('combiner', 'combiner_init', 'combiner_final')
-
-            has_explicit_mapper = (step['mapper'] != _IDENTITY_MAPPER or
-                                   any(step[k] for k in mapper_funcs))
-            has_explicit_reducer = any(step[k] for k in reducer_funcs)
-            has_explicit_combiner = any(step[k] for k in combiner_funcs)
-
-            func_strs = []
-
-            # Print a mapper if:
-            # - The user specifies one
-            # - Different input and output protocols are used (infer from
-            #   step number)
-            # - We don't have anything else to print (excluding combiners)
-            if has_explicit_mapper \
-               or step_num == 0 \
-               or not has_explicit_reducer:
-                func_strs.append('M')
-
-            if has_explicit_combiner:
-                func_strs.append('C')
-
-            if has_explicit_reducer:
-                func_strs.append('R')
-
-            res.append(''.join(func_strs))
-        return res
+            step_descs.append(step.description(step_num))
+        return step_descs
 
     @classmethod
     def mr_job_script(cls):
@@ -649,15 +699,16 @@ class MRJob(MRJobLauncher):
         trigger a counter rather than an exception unless --strict-protocols
         is set.
 
-        Returns a tuple of read_lines, write_line
-        read_lines() is a function that reads lines from input, decodes them,
-            and yields key, value pairs
-        write_line() is a function that takes key and value as args, encodes
-            them, and writes a line to output.
+        Returns a tuple of ``(read_lines, write_line)``
 
-        Args:
-        step_num -- which step to run (e.g. 0)
-        step_type -- 'M' for mapper, 'C' for combiner, 'R' for reducer
+        ``read_lines()`` is a function that reads lines from input, decodes
+            them, and yields key, value pairs.
+        ``write_line()`` is a function that takes key and value as args,
+            encodes them, and writes a line to output.
+
+        :param step_num: which step to run (e.g. 0)
+        :param step_type: ``'mapper'``, ``'reducer'``, or ``'combiner'`` from
+                          :py:mod:`mrjob.step`
         """
         read, write = self.pick_protocols(step_num, step_type)
 
@@ -685,15 +736,98 @@ class MRJob(MRJobLauncher):
 
         return read_lines, write_line
 
+    def _step_key(self, step_num, step_type):
+        return '%d-%s' % (step_num, step_type)
+
+    def _script_step_mapping(self, steps_desc):
+        """Return a mapping of ``self._step_key(step_num, step_type)`` ->
+        (place in sort order of all *script* steps), for the purposes of
+        choosing which protocols to use for input and output.
+
+        Non-script steps do not appear in the mapping.
+        """
+        mapping = {}
+        script_step_num = 0
+        for i, step in enumerate(steps_desc):
+            if 'mapper' in step:
+                if step['mapper']['type'] == 'script':
+                    k = self._step_key(i, 'mapper')
+                    mapping[k] = script_step_num
+                    script_step_num += 1
+            if 'reducer' in step:
+                if step['reducer']['type'] == 'script':
+                    k = self._step_key(i, 'reducer')
+                    mapping[k] = script_step_num
+                    script_step_num += 1
+
+        return mapping
+
+    def _mapper_output_protocol(self, step_num, step_map):
+        map_key = self._step_key(step_num, 'mapper')
+        if map_key in step_map:
+            if step_map[map_key] >= (len(step_map) - 1):
+                return self.output_protocol()
+            else:
+                return self.internal_protocol()
+        else:
+            # mapper is not a script substep, so protocols don't apply at all
+            return RawValueProtocol()
+
+    def _pick_protocol_instances(self, step_num, step_type):
+        steps_desc = self._steps_desc()
+
+        step_map = self._script_step_mapping(steps_desc)
+
+        # pick input protocol
+
+        if step_type == 'combiner':
+            # Combiners read and write the mapper's output protocol because
+            # they have to be able to run 0-inf times without changing the
+            # format of the data.
+            # Combiners for non-script substeps can't use protocols, so this
+            # function will just give us RawValueProtocol() in that case.
+            previous_mapper_output = self._mapper_output_protocol(
+                step_num, step_map)
+            return previous_mapper_output, previous_mapper_output
+        else:
+            step_key = self._step_key(step_num, step_type)
+
+            if step_key not in step_map:
+                # It's unlikely that we will encounter this logic in real life,
+                # but if asked what the protocol of a non-script step is, we
+                # should just say RawValueProtocol because we have no idea what
+                # the jars or commands are doing with our precious data.
+                # If --strict-protocols, though, we won't stand for these
+                # shenanigans!
+                if self.options.strict_protocols:
+                    raise ValueError(
+                        "Can't pick a protocol for a non-script step")
+                else:
+                    p = RawValueProtocol()
+                    return p, p
+
+            real_num = step_map[step_key]
+            if real_num == (len(step_map) - 1):
+                write = self.output_protocol()
+            else:
+                write = self.internal_protocol()
+
+            if real_num == 0:
+                read = self.input_protocol()
+            else:
+                read = self.internal_protocol()
+            return read, write
+
     def pick_protocols(self, step_num, step_type):
-        """Pick the protocol classes to use for reading and writing
-        for the given step.
+        """Pick the protocol classes to use for reading and writing for the
+        given step.
 
         :type step_num: int
         :param step_num: which step to run (e.g. ``0`` for the first step)
         :type step_type: str
-        :param step_type: ``'M'`` for mapper, ``'C'`` for combiner, ``'R'``
-                          for reducer
+        :param step_type: one of :py:data:`mrjob.step.'mapper'`,
+                          :py:data:`mrjob.step.'combiner'`, or
+                          :py:data:`mrjob.step.'reducer'`
         :return: (read_function, write_function)
 
         By default, we use one protocol for reading input, one
@@ -706,21 +840,11 @@ class MRJob(MRJobLauncher):
         Re-define this if you need fine control over which protocols
         are used by which steps.
         """
-        steps_desc = self._steps_desc()
 
-        # pick input protocol
+        # wrapping functionality like this makes testing much simpler
+        p_read, p_write = self._pick_protocol_instances(step_num, step_type)
 
-        if step_num == 0 and step_type == steps_desc[0][0]:
-            read = self.input_protocol().read
-        else:
-            read = self.internal_protocol().read
-
-        if step_num == len(steps_desc) - 1 and step_type == steps_desc[-1][-1]:
-            write = self.output_protocol().write
-        else:
-            write = self.internal_protocol().write
-
-        return read, write
+        return p_read.read, p_write.write
 
     ### Command-line arguments ###
 
@@ -773,6 +897,14 @@ class MRJob(MRJobLauncher):
         MRJob uses all args as input files.
         """
         self.args = args
+
+    def _help_main(self):
+        self.option_parser.option_groups = [
+            self.mux_opt_group,
+            self.proto_opt_group,
+        ]
+        self.option_parser.print_help()
+        sys.exit(0)
 
     ### protocols ###
 
@@ -947,7 +1079,6 @@ class MRJob(MRJobLauncher):
             else:
                 # e.g. 0.18 or 0.20
                 return '%.2f' % v_float
-
 
         for key in unfiltered_jobconf:
             unfiltered_val = unfiltered_jobconf[key]

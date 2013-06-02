@@ -23,7 +23,6 @@ except ImportError:
 from mrjob.fs.base import Filesystem
 from mrjob.ssh import ssh_cat
 from mrjob.ssh import ssh_ls
-from mrjob.ssh import SSHException
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_URI_RE
 from mrjob.util import read_file
@@ -70,55 +69,54 @@ class SSHFilesystem(Filesystem):
     def _ssh_ls(self, uri):
         """Helper for ls(); obeys globbing"""
         m = SSH_URI_RE.match(uri)
-        try:
-            addr = m.group('hostname')
-            if not addr:
-                raise ValueError
+        addr = m.group('hostname')
+        if not addr:
+            raise ValueError
 
-            if '!' in addr and self.ssh_key_name is None:
-                raise ValueError('ssh_key_name must not be None')
+        if '!' in addr and self.ssh_key_name is None:
+            raise ValueError('ssh_key_name must not be None')
 
-            output = ssh_ls(
-                self._ssh_bin,
-                addr,
-                self._ec2_key_pair_file,
-                m.group('filesystem_path'),
-                self.ssh_key_name,
-            )
+        output = ssh_ls(
+            self._ssh_bin,
+            addr,
+            self._ec2_key_pair_file,
+            m.group('filesystem_path'),
+            self.ssh_key_name,
+        )
 
-            for line in output:
-                # skip directories, we only want to return downloadable files
-                if line and not line.endswith('/'):
-                    yield SSH_PREFIX + addr + line
-        except SSHException, e:
-            raise IOError(e)
+        for line in output:
+            # skip directories, we only want to return downloadable files
+            if line and not line.endswith('/'):
+                yield SSH_PREFIX + addr + line
 
     def md5sum(self, path, s3_conn=None):
         raise IOError() # not implemented
 
     def _cat_file(self, filename):
         ssh_match = SSH_URI_RE.match(filename)
-        try:
-            addr = ssh_match.group('hostname') or self._address_of_master()
-            if '!' in addr and self.ssh_key_name is None:
-                raise ValueError('ssh_key_name must not be None')
-            output = ssh_cat(
-                self._ssh_bin,
-                addr,
-                self._ec2_key_pair_file,
-                ssh_match.group('filesystem_path'),
-                self.ssh_key_name,
-            )
-            return read_file(filename, fileobj=StringIO(output))
-        except SSHException, e:
-            raise IOError(e)
+        addr = ssh_match.group('hostname') or self._address_of_master()
+        if '!' in addr and self.ssh_key_name is None:
+            raise ValueError('ssh_key_name must not be None')
+        output = ssh_cat(
+            self._ssh_bin,
+            addr,
+            self._ec2_key_pair_file,
+            ssh_match.group('filesystem_path'),
+            self.ssh_key_name,
+        )
+        return read_file(filename, fileobj=StringIO(output))
 
     def mkdir(self, dest):
         raise IOError() # not implemented
 
     def path_exists(self, path_glob):
         # just fall back on ls(); it's smart
-        return any(self.ls(path_glob))
+        paths = self.ls(path_glob)
+        try:
+            path_exists = any(paths)
+        except IOError, e:
+            path_exists = False
+        return path_exists
 
     def path_join(self, dirname, filename):
         return posixpath.join(dirname, filename)

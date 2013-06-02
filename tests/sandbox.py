@@ -23,6 +23,7 @@ try:
 except ImportError:
     import unittest
 
+from mock import MagicMock
 from mock import patch
 
 from mrjob import runner
@@ -31,20 +32,26 @@ from mrjob import runner
 # simple config that also silences 'no config options for runner' logging
 EMPTY_MRJOB_CONF = {'runners': {
     'local': {
-        'label': 'test_job'
+        'label': 'test_job',
     },
     'emr': {
         'check_emr_status_every': 0.00,
         's3_sync_wait_time': 0.00,
-        'boostrap_mrjob': False,
     },
     'hadoop': {
-        'label': 'test_job'
+        'label': 'test_job',
     },
     'inline': {
-        'label': 'test_job'
+        'label': 'test_job',
     },
 }}
+
+
+def patch_fs_s3():
+    m_boto = MagicMock()
+    m_s3 = m_boto.connect_s3()
+    m_s3.get_all_buckets.__name__ = 'get_all_buckets'
+    return patch('mrjob.fs.s3.boto', m_boto)
 
 
 def mrjob_conf_patcher(substitute_conf=EMPTY_MRJOB_CONF):

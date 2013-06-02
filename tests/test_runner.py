@@ -15,7 +15,6 @@
 
 from __future__ import with_statement
 
-from StringIO import StringIO
 import datetime
 import getpass
 import os
@@ -31,28 +30,21 @@ try:
 except ImportError:
     import unittest
 from mock import patch
-from mrjob.conf import dump_mrjob_conf
 from mrjob.inline import InlineMRJobRunner
+from mrjob.local import LocalMRJobRunner
 from mrjob.parse import JOB_NAME_RE
 from mrjob.runner import MRJobRunner
-from mrjob.util import log_to_stream
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import EmptyMrjobConfTestCase
 
 
 class WithStatementTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.setup_ivars()
-
-    def tearDown(self):
-        self.delete_tmpdir()
-
-    def setup_ivars(self):
         self.local_tmp_dir = None
 
-    def delete_tmpdir(self):
+    def tearDown(self):
         if self.local_tmp_dir:
             shutil.rmtree(self.local_tmp_dir)
             self.local_tmp_dir = None
@@ -60,7 +52,7 @@ class WithStatementTestCase(unittest.TestCase):
     def _test_cleanup_after_with_statement(self, mode, should_exist):
         with InlineMRJobRunner(cleanup=mode, conf_paths=[]) as runner:
             self.local_tmp_dir = runner._get_local_tmp_dir()
-            assert os.path.exists(self.local_tmp_dir)
+            self.assertTrue(os.path.exists(self.local_tmp_dir))
 
         self.assertEqual(os.path.exists(self.local_tmp_dir), should_exist)
         if not should_exist:
@@ -89,39 +81,6 @@ class WithStatementTestCase(unittest.TestCase):
 
     def test_double_none_okay(self):
         self._test_cleanup_after_with_statement(['NONE', 'NONE'], True)
-
-
-class TestExtraKwargs(unittest.TestCase):
-
-    def setUp(self):
-        self.make_mrjob_conf()
-
-    def tearDown(self):
-        self.delete_mrjob_conf()
-
-    def make_mrjob_conf(self):
-        _, self.mrjob_conf_path = tempfile.mkstemp(prefix='mrjob.conf.')
-        # include one fake kwarg, and one real one
-        conf = {'runners': {'inline': {'qux': 'quux',
-                                       'setup_cmds': ['echo foo']}}}
-        with open(self.mrjob_conf_path, 'w') as conf_file:
-            self.mrjob_conf = dump_mrjob_conf(conf, conf_file)
-
-    def delete_mrjob_conf(self):
-        os.unlink(self.mrjob_conf_path)
-
-    def test_extra_kwargs_in_mrjob_conf_okay(self):
-        with logger_disabled('mrjob.runner'):
-            with InlineMRJobRunner(conf_path=self.mrjob_conf_path) as runner:
-                self.assertEqual(runner._opts['setup_cmds'], ['echo foo'])
-                self.assertNotIn('qux', runner._opts)
-
-    def test_extra_kwargs_passed_in_directly_okay(self):
-        with logger_disabled('mrjob.runner'):
-            with InlineMRJobRunner(
-                conf_paths=[], base_tmp_dir='/var/tmp', foo='bar') as runner:
-                self.assertEqual(runner._opts['base_tmp_dir'], '/var/tmp')
-                self.assertNotIn('bar', runner._opts)
 
 
 class TestJobName(unittest.TestCase):
@@ -283,8 +242,7 @@ class TestStreamingOutput(unittest.TestCase):
         with open(y_file_path, 'w') as f:
             f.write('I win')
 
-        runner = InlineMRJobRunner(conf_paths=[])
-        runner._output_dir = self.tmp_dir
+        runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
         self.assertEqual(sorted(runner.stream_output()),
                          ['A', 'B', 'C'])
 
@@ -436,197 +394,103 @@ sys.exit(13)
         self.environment_variable_checks(runner, ['TMP'])
 
 
-class ConfigFilesTestCase(unittest.TestCase):
+class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
+    # can't use InlineMRJobRunner to test this because it doesn't
+    # support get_hadoop_version()
 
-    def setUp(self):
-        super(ConfigFilesTestCase, self).setUp()
-        self.make_tmp_dir()
+    def test_empty(self):
+        runner = LocalMRJobRunner(conf_paths=[])
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1), [])
 
-    def tearDown(self):
-        super(ConfigFilesTestCase, self).tearDown()
-        self.rm_tmp_dir()
+    def test_hadoop_extra_args(self):
+        extra_args = ['-foo', 'bar']
+        runner = LocalMRJobRunner(conf_paths=[],
+                                  hadoop_extra_args=extra_args)
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1), extra_args)
 
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
+    def test_cmdenv(self):
+        cmdenv = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
+        runner = LocalMRJobRunner(conf_paths=[], cmdenv=cmdenv)
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
+                         ['-cmdenv', 'BAX=Arnold',
+                          '-cmdenv', 'BAZ=qux',
+                          '-cmdenv', 'FOO=bar',
+                          ])
 
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
+    def test_hadoop_input_format(self):
+        format = 'org.apache.hadoop.mapred.SequenceFileInputFormat'
+        runner = LocalMRJobRunner(conf_paths=[], hadoop_input_format=format)
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
+                         ['-inputformat', format])
+        # test multi-step job
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 2),
+                         ['-inputformat', format])
+        self.assertEqual(runner._hadoop_conf_args({}, 1, 2), [])
 
-    def save_conf(self, name, conf):
-        conf_path = os.path.join(self.tmp_dir, name)
-        with open(conf_path, 'w') as f:
-            dump_mrjob_conf(conf, f)
-        return conf_path
+    def test_hadoop_output_format(self):
+        format = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
+        runner = LocalMRJobRunner(conf_paths=[], hadoop_output_format=format)
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
+                         ['-outputformat', format])
+        # test multi-step job
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 2), [])
+        self.assertEqual(runner._hadoop_conf_args({}, 1, 2),
+                     ['-outputformat', format])
 
-    def opts_for_conf(self, name, conf):
-        conf_path = self.save_conf(name, conf)
-        runner = InlineMRJobRunner(conf_path=conf_path)
-        return runner._opts
+    def test_jobconf(self):
+        jobconf = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
+        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf)
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
+                         ['-D', 'BAX=Arnold',
+                          '-D', 'BAZ=qux',
+                          '-D', 'FOO=bar',
+                          ])
+        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf,
+                                  hadoop_version='0.18')
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
+                         ['-jobconf', 'BAX=Arnold',
+                          '-jobconf', 'BAZ=qux',
+                          '-jobconf', 'FOO=bar',
+                          ])
 
+    def test_configuration_translation(self):
+        jobconf = {'mapred.jobtracker.maxtasks.per.job': 1}
+        with no_handlers_for_logger('mrjob.compat'):
+            runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf,
+                                  hadoop_version='0.21')
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
+                         ['-D', 'mapred.jobtracker.maxtasks.per.job=1',
+                          '-D', 'mapreduce.jobtracker.maxtasks.perjob=1'
+                          ])
 
-class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
+    def test_jobconf_from_step(self):
+        jobconf = {'FOO': 'bar', 'BAZ': 'qux'}
+        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf)
+        step = {'jobconf': {'BAZ': 'quux', 'BAX': 'Arnold'}}
+        self.assertEqual(runner._hadoop_conf_args(step, 0, 1),
+                         ['-D', 'BAX=Arnold',
+                          '-D', 'BAZ=quux',
+                          '-D', 'FOO=bar',
+                          ])
 
-    BASIC_CONF = {
-        'runners': {
-            'inline': {
-                'base_tmp_dir': '/tmp',
-                'cmdenv': {
-                    'A_PATH': 'A',
-                    'SOMETHING': 'X',
-                },
-                'hadoop_extra_args': [
-                    'thing1',
-                ],
-                'hadoop_streaming_jar': 'monkey.jar',
-                'jobconf': {
-                    'lorax_speaks_for': 'trees',
-                },
-                'python_bin': 'py3k',
-                'setup_scripts': ['/myscript.py'],
-            }
-        }
-    }
+    def test_partitioner(self):
+        partitioner = 'org.apache.hadoop.mapreduce.Partitioner'
 
-    def larger_conf(self):
-        return {
-            'include': os.path.join(self.tmp_dir, 'mrjob.conf'),
-            'runners': {
-                'inline': {
-                    'base_tmp_dir': '/var/tmp',
-                    'bootstrap_mrjob': False,
-                    'cmdenv': {
-                        'A_PATH': 'B',
-                        'SOMETHING': 'Y',
-                        'SOMETHING_ELSE': 'Z',
-                    },
-                    'hadoop_extra_args': [
-                        'thing2',
-                    ],
-                    'hadoop_streaming_jar': 'banana.jar',
-                    'jobconf': {
-                        'lorax_speaks_for': 'mazda',
-                        'dr_seuss_is': 'awesome',
-                    },
-                    'python_bin': 'py4k',
-                    'setup_scripts': ['/yourscript.py'],
-                }
-            }
-        }
+        runner = LocalMRJobRunner(conf_paths=[], partitioner=partitioner)
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
+                         ['-partitioner', partitioner])
 
-    def setUp(self):
-        super(MultipleConfigFilesValuesTestCase, self).setUp()
-        self.opts_1 = self.opts_for_conf('mrjob.conf',
-                                         self.BASIC_CONF)
-        self.opts_2 = self.opts_for_conf('mrjob.larger.conf',
-                                         self.larger_conf())
-
-    def test_combine_cmds(self):
-        self.assertEqual(self.opts_1['python_bin'], ['py3k'])
-        self.assertEqual(self.opts_2['python_bin'], ['py4k'])
-
-    def test_combine_dicts(self):
-        self.assertEqual(self.opts_1['jobconf'], {
-            'lorax_speaks_for': 'trees',
-        })
-        self.assertEqual(self.opts_2['jobconf'], {
-            'lorax_speaks_for': 'mazda',
-            'dr_seuss_is': 'awesome',
-        })
-
-    def test_combine_envs(self):
-        self.assertEqual(self.opts_1['cmdenv'], {
-            'A_PATH': 'A',
-            'SOMETHING': 'X',
-        })
-        self.assertEqual(self.opts_2['cmdenv'], {
-            'A_PATH': 'B:A',
-            'SOMETHING': 'Y',
-            'SOMETHING_ELSE': 'Z',
-        })
-
-    def test_combine_lists(self):
-        self.assertEqual(self.opts_1['hadoop_extra_args'], ['thing1'])
-        self.assertEqual(self.opts_2['hadoop_extra_args'],
-                         ['thing1', 'thing2'])
-
-    def test_combine_paths(self):
-        self.assertEqual(self.opts_1['base_tmp_dir'], '/tmp')
-        self.assertEqual(self.opts_2['base_tmp_dir'], '/var/tmp')
-
-    def test_combine_path_lists(self):
-        self.assertEqual(self.opts_1['setup_scripts'], ['/myscript.py'])
-        self.assertEqual(self.opts_2['setup_scripts'],
-                         ['/myscript.py', '/yourscript.py'])
-
-    def test_combine_values(self):
-        self.assertEqual(self.opts_1['hadoop_streaming_jar'], 'monkey.jar')
-        self.assertEqual(self.opts_2['hadoop_streaming_jar'], 'banana.jar')
-
-
-class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
-
-    def test_recurse(self):
-        path = os.path.join(self.tmp_dir, 'LOL.conf')
-        recurse_conf = dict(include=path)
-        with open(path, 'w') as f:
-            dump_mrjob_conf(recurse_conf, f)
-
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.conf', stderr)
-            InlineMRJobRunner(conf_path=path)
-            self.assertIn('%s tries to recursively include %s!' % (path, path),
-                          stderr.getvalue())
-
-    def test_empty_runner_error(self):
-        conf = dict(runner=dict(local=dict(base_tmp_dir='/tmp')))
-        path = self.save_conf('basic', conf)
-
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.runner', stderr)
-            InlineMRJobRunner(conf_paths=[path])
-            self.assertEqual(
-                "No configs specified for inline runner\n",
-                stderr.getvalue())
-
-
-class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
-
-    BASE_CONFIG_LEFT = {
-        'runners': {
-            'inline': {
-                'jobconf': dict(from_left=1, from_both=1),
-                'label': 'i_dont_like_to_be_labelled',
-            }
-        }
-    }
-
-    BASE_CONFIG_RIGHT = {
-        'runners': {
-            'inline': {
-                'jobconf': dict(from_right=2, from_both=2),
-                'owner': 'ownership_is_against_my_principles'
-            }
-        }
-    }
-
-    def test_mrjob_has_multiple_inheritance_next_lets_add_generics(self):
-        path_left = self.save_conf('left.conf', self.BASE_CONFIG_LEFT)
-        path_right = self.save_conf('right.conf', self.BASE_CONFIG_RIGHT)
-        opts_both = self.opts_for_conf('both.conf',
-                                       dict(include=[path_left, path_right]))
-
-        self.assertEqual(opts_both['jobconf'],
-                         dict(from_left=1, from_both=2, from_right=2))
-        self.assertEqual(opts_both['label'],
-                         'i_dont_like_to_be_labelled')
-        self.assertEqual(opts_both['owner'],
-                         'ownership_is_against_my_principles')
-
-    def test_multiple_configs_via_runner_args(self):
-        path_left = self.save_conf('left.conf', self.BASE_CONFIG_LEFT)
-        path_right = self.save_conf('right.conf', self.BASE_CONFIG_RIGHT)
-        runner = InlineMRJobRunner(conf_paths=[path_left, path_right])
-        self.assertEqual(runner._opts['jobconf'],
-                         dict(from_left=1, from_both=2, from_right=2))
+    def test_hadoop_extra_args_comes_first(self):
+        runner = LocalMRJobRunner(
+            cmdenv={'FOO': 'bar'},
+            conf_paths=[],
+            hadoop_extra_args=['-libjar', 'qux.jar'],
+            hadoop_input_format='FooInputFormat',
+            hadoop_output_format='BarOutputFormat',
+            jobconf={'baz': 'quz'},
+            partitioner='java.lang.Object',
+        )
+        # hadoop_extra_args should come first
+        conf_args = runner._hadoop_conf_args({}, 0, 1)
+        self.assertEqual(conf_args[:2], ['-libjar', 'qux.jar'])
+        self.assertEqual(len(conf_args), 12)

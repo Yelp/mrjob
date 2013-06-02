@@ -64,7 +64,18 @@ class MRJobLauncher(object):
     #: :py:class:`optparse.OptionParser` instance.
     OPTION_CLASS = Option
 
-    def __init__(self, script_path=None, args=None):
+    _DEFAULT_RUNNER = 'local'
+
+    def __init__(self, script_path=None, args=None, from_cl=False):
+        """
+        :param script_path: Path to script unless it's the first item of *args*
+        :param args: Command line arguments
+        :param from_cl: If not using sys.argv but still comming from the
+                        command line (as opposed to a script, e.g. from
+                        mrjob.cmd), don't override the option parser error
+                        function (exit instead of throwing ValueError).
+        """
+
         if script_path is not None:
             script_path = os.path.abspath(script_path)
         self._script_path = script_path
@@ -94,7 +105,8 @@ class MRJobLauncher(object):
             def error(msg):
                 raise ValueError(msg)
 
-            self.option_parser.error = error
+            if not from_cl:
+                self.option_parser.error = error
 
         self.load_options(self._cl_args)
 
@@ -107,10 +119,11 @@ class MRJobLauncher(object):
     @classmethod
     def _usage(cls):
         """Command line usage string for this class"""
-        return "usage: %prog [job_to_run|--help] [options] [input files]"
+        return ("usage: mrjob run [script path|executable path|--help]"
+                " [options] [input files]")
 
     @classmethod
-    def run(cls):
+    def run(cls, args=_READ_ARGS_FROM_SYS_ARGV):
         """Entry point for running job from the command-line.
 
         This is also the entry point when a mapper or reducer is run
@@ -125,7 +138,7 @@ class MRJobLauncher(object):
         * Run the entire job. See :py:meth:`run_job`
         """
         # load options from the command line
-        launcher = cls(args=_READ_ARGS_FROM_SYS_ARGV)
+        launcher = cls(args=args)
         launcher.run_job()
 
     def execute(self):
@@ -244,7 +257,7 @@ class MRJobLauncher(object):
             self.option_parser, 'Running the entire job')
         self.option_parser.add_option_group(self.runner_opt_group)
 
-        add_runner_opts(self.runner_opt_group)
+        add_runner_opts(self.runner_opt_group, self._DEFAULT_RUNNER)
         add_basic_opts(self.runner_opt_group)
 
         self.hadoop_opts_opt_group = OptionGroup(
@@ -355,11 +368,17 @@ class MRJobLauncher(object):
         uses all args as input files. This method determines the behavior:
         MRJobLauncher takes off the first arg as the script path.
         """
-        if len(args) < 1:
+        if self._script_path:
+            self._script_path = os.path.abspath(args[0])
+        elif len(args) < 1:
             self.option_parser.error('Must supply script path')
 
-        self._script_path = os.path.abspath(args[0])
         self.args = args[1:]
+
+    def _help_main(self):
+        self.option_parser.option_groups = []
+        self.option_parser.print_help()
+        sys.exit(0)
 
     def load_options(self, args):
         """Load command-line options into ``self.options``.
@@ -379,15 +398,9 @@ class MRJobLauncher(object):
                 ...
         """
         self.options, args = self.option_parser.parse_args(args)
-        self._process_args(args)
 
         if self.options.help_main:
-            self.option_parser.option_groups = [
-                self.mux_opt_group,
-                self.proto_opt_group,
-            ]
-            self.option_parser.print_help()
-            sys.exit(0)
+            self._help_main()
 
         if self.options.help_emr:
             print_help_for_groups(self.hadoop_emr_opt_group,
@@ -402,6 +415,8 @@ class MRJobLauncher(object):
         if self.options.help_runner:
             print_help_for_groups(self.runner_opt_group)
             sys.exit(0)
+
+        self._process_args(args)
 
         # parse custom options here to avoid setting a custom Option subclass
         # and confusing users
@@ -472,6 +487,7 @@ class MRJobLauncher(object):
             'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
             'hadoop_version': self.options.hadoop_version,
             'input_paths': self.args,
+            'interpreter': self.options.interpreter,
             'jobconf': self.jobconf(),
             'mr_job_script': self._script_path,
             'label': self.options.label,
@@ -483,6 +499,7 @@ class MRJobLauncher(object):
             'setup_cmds': self.options.setup_cmds,
             'setup_scripts': self.options.setup_scripts,
             'stdin': self.stdin,
+            'steps_interpreter': self.options.steps_interpreter,
             'steps_python_bin': self.options.steps_python_bin,
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,

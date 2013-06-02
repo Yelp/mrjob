@@ -42,7 +42,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'mrjob'
-copyright = u'2009-2012, Yelp'
+copyright = u'2009-2013, Yelp'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -92,34 +92,12 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'default'
+html_theme = 'nature'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-_yelp_red = "#C41200"
-_yelp_gray = "#555"
-_yelp_yellow = "#FFFED7"
-_yelp_yellow_2 = "#FFF0D1"
-_yelp_link = "#66C"
-_header_border = "#CCC"
 html_theme_options = {
-    "rightsidebar": False,
-    "relbarbgcolor": _yelp_red,
-    "footerbgcolor": "white",
-    "footertextcolor": _yelp_gray,
-    "sidebarbgcolor": "white",
-    "sidebarlinkcolor": _yelp_link,
-    "sidebartextcolor": _yelp_gray,
-    "headbgcolor": _yelp_yellow_2,
-    "headlinkcolor": _yelp_link,
-    "headtextcolor": _yelp_gray,
-    "headfont": "arial,'Lucida Grande','Bitstream Vera Sans',verdana,sans-serif",
-    "bodyfont": "arial,'Lucida Grande','Bitstream Vera Sans',verdana,sans-serif",
-    "linkcolor": _yelp_link,
-    "visitedlinkcolor": _yelp_link,
-    "textcolor": _yelp_gray,
-    "codebgcolor": _yelp_yellow,
 }
 
 # Add any paths that contain custom themes here, relative to this directory.

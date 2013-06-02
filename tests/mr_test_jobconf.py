@@ -27,7 +27,7 @@
 """Tests for JobConf Environment Variables
 """
 from mrjob.compat import get_jobconf_value
-from tests.mr_testing_job import MRTestingJob
+from mrjob.job import MRJob
 
 JOBCONF_LIST = [
     'mapreduce.job.id',
@@ -45,7 +45,7 @@ JOBCONF_LIST = [
 ]
 
 
-class MRTestJobConf(MRTestingJob):
+class MRTestJobConf(MRJob):
 
     def mapper(self, _, line):
         for jobconf in JOBCONF_LIST:

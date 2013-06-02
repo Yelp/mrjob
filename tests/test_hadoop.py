@@ -231,8 +231,6 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         # job overrides jobconf in step 1
         self.assertIn('x=z', step_1_args)
 
-        print step_0_args, step_1_args
-
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)
         assert not any(runner.ls(runner.get_output_dir()))

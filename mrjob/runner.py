@@ -1021,7 +1021,9 @@ class MRJobRunner(object):
 
         # Add the step into the job name
         if num_steps > 1:
-            jobconf['mapred.job.name'] = "%s (step %s of %s)" % (job_name, step_num + 1, num_steps)
+            job_name = "%s (step %s of %s)" % (job_name, step_num + 1, num_steps)
+
+        jobconf['mapred.job.name'] = job_name
 
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])

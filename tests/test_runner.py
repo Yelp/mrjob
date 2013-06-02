@@ -424,8 +424,11 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
                          ['-inputformat', format])
         # test multi-step job
         self.assertEqual(runner._hadoop_conf_args({}, 0, 2),
-                         ['-inputformat', format])
-        self.assertEqual(runner._hadoop_conf_args({}, 1, 2), [])
+                         ['-D', 'mapred.job.name=None > None (step 1 of 2)',
+                          '-inputformat', format
+                          ])
+        self.assertEqual(runner._hadoop_conf_args({}, 1, 2),
+                         ['-D', 'mapred.job.name=None > None (step 2 of 2)'])
 
     def test_hadoop_output_format(self):
         format = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
@@ -433,9 +436,12 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
         self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
                          ['-outputformat', format])
         # test multi-step job
-        self.assertEqual(runner._hadoop_conf_args({}, 0, 2), [])
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 2),
+                         ['-D', 'mapred.job.name=None > None (step 1 of 2)'])
         self.assertEqual(runner._hadoop_conf_args({}, 1, 2),
-                     ['-outputformat', format])
+                         ['-D', 'mapred.job.name=None > None (step 2 of 2)',
+                          '-outputformat', format
+                          ])
 
     def test_jobconf(self):
         jobconf = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
@@ -453,6 +459,21 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
                           '-jobconf', 'FOO=bar',
                           ])
 
+    def test_jobconf_job_name_default(self):
+        runner = LocalMRJobRunner(conf_paths=[], hadoop_version='0.18')
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
+                         ['-jobconf', 'mapred.job.name=None > None'
+                          ])
+
+    def test_jobconf_job_name_custom(self):
+        jobconf = {'BAX': 'Arnold', 'mapred.job.name': 'Foo'}
+        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf,
+                                  hadoop_version='0.18')
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
+                         ['-jobconf', 'BAX=Arnold',
+                          '-jobconf', 'mapred.job.name=Foo'
+                          ])
+
     def test_configuration_translation(self):
         jobconf = {'mapred.jobtracker.maxtasks.per.job': 1}
         with no_handlers_for_logger('mrjob.compat'):
@@ -464,13 +485,14 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
                           ])
 
     def test_jobconf_from_step(self):
-        jobconf = {'FOO': 'bar', 'BAZ': 'qux'}
+        jobconf = {'FOO': 'bar', 'BAZ': 'qux', 'mapred.job.name': 'Foo'}
         runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf)
         step = {'jobconf': {'BAZ': 'quux', 'BAX': 'Arnold'}}
-        self.assertEqual(runner._hadoop_conf_args(step, 0, 1),
+        self.assertEqual(runner._hadoop_conf_args(step, 0, 2),
                          ['-D', 'BAX=Arnold',
                           '-D', 'BAZ=quux',
                           '-D', 'FOO=bar',
+                          '-D', 'mapred.job.name=Foo (step 1 of 2)',
                           ])
 
     def test_partitioner(self):

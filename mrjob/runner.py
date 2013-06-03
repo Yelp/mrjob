@@ -1013,6 +1013,17 @@ class MRJobRunner(object):
         args = []
 
         jobconf = combine_dicts(self._opts['jobconf'], step.get('jobconf'))
+        job_name = jobconf.get('mapred.job.name', None)
+
+        # Set a default job name
+        if not job_name:
+            job_name = "%s > %s" % (self._script_path, self._output_dir)
+
+        # Add the step into the job name
+        if num_steps > 1:
+            job_name = "%s (step %s of %s)" % (job_name, step_num + 1, num_steps)
+
+        jobconf['mapred.job.name'] = job_name
 
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])

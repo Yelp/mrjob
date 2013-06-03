@@ -15,6 +15,7 @@ import fnmatch
 import logging
 import posixpath
 import socket
+from urlparse import urlparse
 
 try:
     import boto
@@ -103,6 +104,11 @@ class S3Filesystem(Filesystem):
         To list a directory, path_glob must end with a trailing
         slash (foo and foo/ are different on S3)
         """
+
+        # clean up the  base uri to ensure we have an equal uri to boto (s3://)
+        # just incase we get passed s3n://
+        scheme = urlparse(path_glob).scheme
+
         # support globs
         glob_match = GLOB_RE.match(path_glob)
 
@@ -121,6 +127,8 @@ class S3Filesystem(Filesystem):
             base_uri = path_glob
 
         for uri in self._s3_ls(base_uri):
+            uri = "%s://%s/%s" % ((scheme,) + parse_s3_uri(uri))
+
             # enforce globbing
             if glob_match and not fnmatch.fnmatchcase(uri, path_glob):
                 continue

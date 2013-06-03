@@ -58,8 +58,8 @@ EMR_JOB_LOG_URI_RE = re.compile(
     r'(_\d+)?'  # sometimes there is a number here.
     r'_hadoop_streamjob(\d+).jar$')
 HADOOP_JOB_LOG_URI_RE = re.compile(
-    r'^.*?/job_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<mystery_string_1>\d+)'
-    r'_(?P<user>.*?)_streamjob(?P<mystery_string_2>\d+).jar$')
+    r'^.*?job_(?P<timestamp>\d+)_(?P<step_num>\d+)'
+    r'_(?P<user>.*?)_(?P<job_name>.*)')
 
 # regex for matching slave log URIs
 NODE_LOG_URI_RE = re.compile(

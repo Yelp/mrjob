@@ -25,7 +25,7 @@ python BashWordcount.py -c MRJOBCONF_FILE -r local --file wordcount.sh INPUT_FIL
 To test this example on EMR run the following command after replacing OUTPUT_PATH with 
 the location on S3 where you want the output to be saved, MRJOBCONF_FILE with the 
 configuration file location:
-python BashLinecount.py -c MRJOBCONF_FILE -r emr --file linecount.sh \
+python BashWordcount.py -c MRJOBCONF_FILE -r emr --file wordcount.sh \
 --no-output --output-dir 'OUTPUT_PATH' 's3://elasticmapreduce/samples/wordcount/input/*'
 """
 

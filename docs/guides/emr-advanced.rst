@@ -159,6 +159,15 @@ number of mappers and reducers to one per node::
     -m mapred.tasktracker.map.tasks.maximum=1 \
     -m mapred.tasktracker.reduce.tasks.maximum=1"
 
+.. _visible_to_all_users:
+
+Making Job Flows Visible To All Users
+-------------------------------------
+
+You can make job flow visible to all IAM users with the :option:`--visible-to-all-users`.
+If you won't specify this option created job flow will be visible only for IAM user that
+created the job flow. 
+
 Setting up Ganglia
 ------------------
 

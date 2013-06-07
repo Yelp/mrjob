@@ -343,7 +343,8 @@ class MockEmrConnection(object):
                     instance_groups=None,
                     additional_info=None,
                     ami_version=None,
-                    now=None):
+                    now=None,
+                    visible_to_all_users=False):
         """Mock of run_jobflow().
 
         If you set log_uri to None, you can get a jobflow with no loguri
@@ -503,6 +504,7 @@ class MockEmrConnection(object):
             normalizedinstancehours='9999',  # just need this filled in for now
             state='STARTING',
             steps=[],
+            visible_to_all_users=visible_to_all_users
         )
 
         if slave_instance_type is not None:

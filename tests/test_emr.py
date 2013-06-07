@@ -578,17 +578,17 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-
             emr_conn = runner.make_emr_conn()
             return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
 
     def test_defaults(self):
-	job_flow = self.run_and_get_job_flow()
+        job_flow = self.run_and_get_job_flow()
         self.assertFalse(job_flow.visible_to_all_users)
 
     def test_visible(self):
         job_flow = self.run_and_get_job_flow('--visible-to-all-users')
         self.assertTrue(job_flow.visible_to_all_users)
+
 
 class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
 

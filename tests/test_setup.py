@@ -13,55 +13,136 @@
 # limitations under the License.
 from __future__ import with_statement
 
+import os
+
+from mock import patch
+
 try:
     import unittest2 as unittest
     unittest  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import unittest
 
-from mrjob.setup import name_uniquely
-from mrjob.setup import parse_hash_path
-from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import UploadDirManager
 from mrjob.setup import WorkingDirManager
+from mrjob.setup import name_uniquely
+from mrjob.setup import parse_legacy_hash_path
+from mrjob.setup import parse_setup_cmd
 
 
-class ParseHashPathTestCase(unittest.TestCase):
+class ParseSetupCmdTestCase(unittest.TestCase):
 
     def test_empty(self):
-        self.assertRaises(ValueError, parse_hash_path, '')
-        self.assertRaises(TypeError, parse_hash_path, None)
+        self.assertEqual(parse_setup_cmd(''), [])
+        self.assertEqual(parse_setup_cmd(' '), [' '])
+        self.assertRaises(TypeError, parse_setup_cmd, None)
 
-    def test_basic(self):
+    def test_hash_path_alone(self):
         self.assertEqual(
-            parse_hash_path('foo#bar'),
-            {'type': 'file', 'path': 'foo', 'name': 'bar'})
+            parse_setup_cmd('foo#bar'),
+            [{'type': 'file', 'path': 'foo', 'name': 'bar'}])
         self.assertEqual(
-            parse_hash_path('/dir/foo#bar'),
-            {'type': 'file', 'path': '/dir/foo', 'name': 'bar'})
+            parse_setup_cmd('/dir/foo#bar'),
+            [{'type': 'file', 'path': '/dir/foo', 'name': 'bar'}])
         self.assertEqual(
-            parse_hash_path('foo#bar/'),
-            {'type': 'archive', 'path': 'foo', 'name': 'bar'})
+            parse_setup_cmd('foo#bar/'),
+            [{'type': 'archive', 'path': 'foo', 'name': 'bar'}, '/'])
         self.assertEqual(
-            parse_hash_path('/dir/foo#bar/'),
-            {'type': 'archive', 'path': '/dir/foo', 'name': 'bar'})
+            parse_setup_cmd('/dir/foo#bar/'),
+            [{'type': 'archive', 'path': '/dir/foo', 'name': 'bar'}, '/'])
 
     def test_no_path(self):
-        self.assertRaises(ValueError, parse_hash_path, '#bar')
+        self.assertEqual(parse_setup_cmd('#bar'), ['#bar'])
 
     def test_no_name(self):
-        self.assertEqual(parse_hash_path('foo#'),
-                         {'type': 'file', 'path': 'foo', 'name': None})
-        self.assertEqual(parse_hash_path('foo#/'),
-                         {'type': 'archive', 'path': 'foo', 'name': None})
+        self.assertEqual(
+            parse_setup_cmd('foo#'),
+            [{'type': 'file', 'path': 'foo', 'name': None}])
+        self.assertEqual(
+            parse_setup_cmd('foo#/'),
+            [{'type': 'archive', 'path': 'foo', 'name': None}, '/'])
 
     def test_no_hash(self):
-        self.assertRaises(ValueError, parse_hash_path, 'foo')
+        self.assertEqual(parse_setup_cmd('foo'), ['foo'])
 
-    def test_bad_name(self):
-        self.assertRaises(ValueError, parse_hash_path, 'foo#bar#baz')
-        # can't place files in subdirectories
-        self.assertRaises(ValueError, parse_hash_path, 'foo#bar/baz')
+    def test_double_hash(self):
+        self.assertEqual(parse_setup_cmd('foo#bar#baz'),
+                         [{'type': 'file', 'path': 'foo#bar', 'name': 'baz'}])
+
+    def test_name_slash_included_in_command(self):
+        self.assertEqual(
+            parse_setup_cmd('sudo dpkg -i my_pkgs.tar#/fooify.deb'),
+            ['sudo dpkg -i ',
+             {'type': 'archive', 'path': 'my_pkgs.tar', 'name': None},
+             '/fooify.deb'])
+
+    def test_shell_punctuation_after_name(self):
+        self.assertEqual(
+        parse_setup_cmd('touch foo#; cat bar#>baz; cat qux#|grep quux'),
+            ['touch ',
+             {'type': 'file', 'path': 'foo', 'name': None},
+             '; cat ',
+             {'type': 'file', 'path': 'bar', 'name': None},
+             '>baz; cat ',
+             {'type': 'file', 'path': 'qux', 'name': None},
+             '|grep quux'])
+
+    def test_colon_after_name(self):
+        self.assertEqual(
+            parse_setup_cmd('echo foo.egg#:$PYTHONPATH'),
+            ['echo ',
+             {'type': 'file', 'path': 'foo.egg', 'name': None},
+             ':$PYTHONPATH'])
+
+    def test_start_path_after_colon(self):
+        self.assertEqual(
+            parse_setup_cmd('export PYTHONPATH=$PYTHONPATH:foo.tar.gz#/'),
+            ['export PYTHONPATH=$PYTHONPATH:',
+             {'type': 'archive', 'path': 'foo.tar.gz', 'name': None},
+             '/'])
+
+    def test_start_path_after_equals(self):
+        self.assertEqual(
+            parse_setup_cmd('export PYTHONPATH=foo.egg#'),
+            ['export PYTHONPATH=',
+             {'type': 'file', 'path': 'foo.egg', 'name': None}])
+
+    def test_allow_colons_in_uris(self):
+        self.assertEqual(
+            parse_setup_cmd('export PATH=$PATH:s3://foo/script.sh#'),
+            ['export PATH=$PATH:',
+             {'type': 'file', 'path': 's3://foo/script.sh', 'name': None}])
+
+    def test_resolve_path_but_not_name(self):
+        with patch.dict(os.environ, {'HOME': '/home/foo',
+                                     'USER': 'foo',
+                                     'BAR': 'bar'}, clear=True):
+            self.assertEqual(
+                parse_setup_cmd(r'. ~/tmp/$USER/\$BAR.sh#$USER.sh'),
+                ['. ',
+                 {'path': '/home/foo/tmp/foo/$BAR.sh',
+                  'name': '$USER.sh',
+                  'type': 'file'}])
+
+    def test_dont_parse_hash_path_inside_quotes(self):
+        self.assertEqual(
+            parse_setup_cmd('"foo#bar"'), ['"foo#bar"'])
+
+        self.assertEqual(
+            parse_setup_cmd("'foo#bar'"), ["'foo#bar'"])
+
+    def test_missing_closing_quotation(self):
+        self.assertRaises(
+            ValueError, parse_setup_cmd, '"foo')
+        self.assertRaises(
+            ValueError, parse_setup_cmd, 'foo#bar "baz')
+
+    def test_missing_escaped_character(self):
+        self.assertRaises(
+            ValueError, parse_setup_cmd, 'foo\\')
+
+
+
 
 
 class ParseLegacyHashPathTestCase(unittest.TestCase):

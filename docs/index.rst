@@ -50,6 +50,7 @@ Guides
 * :ref:`cookbook-src-tree-pythonpath`
 * :ref:`cookbook-task-timeout`
 * :ref:`cookbook-compressed-output`
+* :ref:`cookbook-sequence-file-input`
 
 **Running jobs on Elastic MapReduce**
 

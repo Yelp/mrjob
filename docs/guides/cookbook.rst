@@ -63,3 +63,23 @@ example uses the Hadoop 0.21+ version::
                # "true" must be a string argument, not a boolean! (#323)
                mapreduce.output.compress: "true"
                mapreduce.output.compression.codec: org.apache.hadoop.io.compress.GzipCodec
+
+.. _cookbook-sequence-file-input:
+
+Consuming Sequence Files
+------------------------
+
+In addition to storing and moving data as text Hadoop supports a format called
+`SequenceFile
+<https://hadoop.apache.org/docs/current/api/org/apache/hadoop/io/SequenceFile.html>`_
+These are useful for storing and consuming compressed data. To consume a file in
+this format from python with mrjob use the following configuration::
+
+    runners:
+        hadoop:
+            hadoop_extra_args: [
+                -inputformat,
+                SequenceFileAsTextInputFormat
+            ]
+
+

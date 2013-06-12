@@ -551,6 +551,10 @@ class EMRJobRunner(MRJobRunner):
     """
     alias = 'emr'
 
+    # Don't need to bootstrap mrjob in the setup wrapper; that's what
+    # the bootstrap script is for!
+    BOOTSTRAP_MRJOB_IN_SETUP = False
+
     OPTION_STORE_CLASS = EMRRunnerOptionStore
 
     def __init__(self, **kwargs):
@@ -827,7 +831,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _prepare_for_launch(self):
         self._check_input_exists()
-        self._create_wrapper_script()
+        self._create_setup_wrapper_script()
         self._add_bootstrap_files_for_upload()
         self._add_job_files_for_upload()
         self._upload_local_files_to_s3()

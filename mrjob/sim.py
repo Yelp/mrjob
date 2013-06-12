@@ -100,10 +100,6 @@ class SimMRJobRunner(MRJobRunner):
         self._prev_outfiles = []
         self._counters = []
 
-    def bootstrap_mrjob(self):
-        """Adds the mrjob package to the PYTHONPATH """
-        pass
-
     def warn_ignored_opts(self):
         """ If the user has provided options that are not supported
         by the dev runners log warnings for each of the ignored options
@@ -171,9 +167,8 @@ class SimMRJobRunner(MRJobRunner):
 
     def _run(self):
 
-        self.bootstrap_mrjob()
         self.warn_ignored_opts()
-        self._create_wrapper_script()
+        self._create_setup_wrapper_script()
         self._setup_working_dir()
         self._setup_output_dir()
 
@@ -481,7 +476,7 @@ class SimMRJobRunner(MRJobRunner):
         return combine_local_envs(os.environ,
                                   jobconf_env,
                                   internal_jobconf_env,
-                                  self._get_cmdenv())
+                                  self._opts['cmdenv'])
 
     def _simulate_jobconf_for_step(self, step_type, step_num, task_num,
         input_file=None, input_start=None, input_length=None):

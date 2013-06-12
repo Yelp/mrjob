@@ -16,6 +16,7 @@
 
 Suggested usage: run this as a daily cron job with the ``-q`` option::
 
+    0 0 * * * mrjob report-long-jobs
     0 0 * * * python -m mrjob.tools.emr.report_long_jobs -q
 
 Options::

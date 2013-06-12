@@ -539,7 +539,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
-
+            self.prepare_runner_for_ssh(runner)
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
 
@@ -559,6 +559,28 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
         self.assertEqual(job_flow.state, 'WAITING')
+
+
+class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
+
+    def run_and_get_job_flow(self, *args):
+        stdin = StringIO('foo\nbar\n')
+        mr_job = MRTwoStepJob(
+            ['-r', 'emr', '-v'] + list(args))
+        mr_job.sandbox(stdin=stdin)
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            emr_conn = runner.make_emr_conn()
+            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+
+    def test_defaults(self):
+        job_flow = self.run_and_get_job_flow()
+        self.assertFalse(job_flow.visible_to_all_users)
+
+    def test_visible(self):
+        job_flow = self.run_and_get_job_flow('--visible-to-all-users')
+        self.assertTrue(job_flow.visible_to_all_users)
 
 
 class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
@@ -2424,7 +2446,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
-
+            self.prepare_runner_for_ssh(runner)
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
 
@@ -2459,7 +2481,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
-
+            self.prepare_runner_for_ssh(runner)
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
 

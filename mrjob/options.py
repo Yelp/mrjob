@@ -512,6 +512,15 @@ def add_emr_opts(opt_group):
             '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
             default=None, action='store_true',
             help='Open up an SSH tunnel to the Hadoop job tracker'),
+        opt_group.add_option(
+            '--visible-to-all-users', dest='visible_to_all_users',
+            default=None, action='store_true',
+            help='Whether the job flow is visible to all IAM users of the AWS' 
+                 ' account associated with the job flow. If this value is set'
+                 ' to True, all IAM users of that AWS account can view and'
+                 ' (if they have the proper policy permissions set) manage'
+                 ' the job flow. If it is set to False, only the IAM user'
+                 ' that created the job flow can view and manage it.'),
     ]
 
 

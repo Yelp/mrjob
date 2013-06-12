@@ -43,6 +43,7 @@ except ImportError:
 #: .. deprecated:: 0.4
 is_ironpython = "IronPython" in sys.version
 
+
 class NullHandler(logging.Handler):
     def emit(self, record):
         pass
@@ -56,7 +57,7 @@ def bash_wrap(cmd_str):
     and single quotes are the only character in a single-quote string that
     needs escaping.
     """
-    return "bash -c '%s'"  % cmd_str.replace("'", "'\\''")
+    return "bash -c '%s'" % cmd_str.replace("'", "'\\''")
 
 
 def buffer_iterator_to_line_iterator(iterator):

@@ -15,12 +15,17 @@ import errno
 import getpass
 import logging
 import os
-import pty
 import posixpath
 import re
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
+
+try:
+    import pty
+    pty  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    pty = None
 
 from mrjob.setup import UploadDirManager
 from mrjob.compat import supports_new_distributed_cache_options
@@ -323,7 +328,7 @@ class HadoopJobRunner(MRJobRunner):
                 self.print_counters([step_num + 1])
             else:
                 msg = ('Job failed with return code %d: %s' %
-                       (step_proc.returncode, streaming_args))
+                       (returncode, streaming_args))
                 log.error(msg)
                 # look for a Python traceback
                 cause = self._find_probable_cause_of_failure(
@@ -345,8 +350,7 @@ class HadoopJobRunner(MRJobRunner):
                     # add cause_msg to exception message
                     msg += '\n' + '\n'.join(cause_msg) + '\n'
 
-                raise Exception(msg)
-                raise CalledProcessError(step_proc.returncode, streaming_args)
+                raise CalledProcessError(returncode, streaming_args)
 
     def _process_stderr_from_streaming(self, stderr):
 

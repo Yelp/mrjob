@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -259,6 +260,7 @@ def to_iso8601(when):
     """
     return when.strftime(boto.utils.ISO8601)
 
+
 def to_rfc1123(when):
     """Convert a datetime to RFC1123 format.
     """
@@ -341,7 +343,8 @@ class MockEmrConnection(object):
                     instance_groups=None,
                     additional_info=None,
                     ami_version=None,
-                    now=None):
+                    now=None,
+                    visible_to_all_users=False):
         """Mock of run_jobflow().
 
         If you set log_uri to None, you can get a jobflow with no loguri
@@ -501,6 +504,7 @@ class MockEmrConnection(object):
             normalizedinstancehours='9999',  # just need this filled in for now
             state='STARTING',
             steps=[],
+            visible_to_all_users=visible_to_all_users
         )
 
         if slave_instance_type is not None:
@@ -600,7 +604,7 @@ class MockEmrConnection(object):
                 args=step.args,
                 jar=DEFAULT_JAR,
             )
-
+            job_flow.state = 'PENDING'
             job_flow.steps.append(step_object)
 
     def terminate_jobflow(self, jobflow_id):
@@ -670,6 +674,7 @@ class MockEmrConnection(object):
 
         # if a step is currently running, advance it
         steps = getattr(job_flow, 'steps', None) or []
+
         for step_num, step in enumerate(steps):
             # skip steps that are already done
             if step.state in ('COMPLETED', 'FAILED', 'CANCELLED'):

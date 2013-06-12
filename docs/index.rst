@@ -36,7 +36,6 @@ Guides
 
 * :doc:`guides/runners`
 * :ref:`runners-programmatically`
-* :doc:`guides/cmd`
 * :doc:`guides/testing`
 
 **Configuration**
@@ -60,6 +59,7 @@ Guides
 * :ref:`picking-job-flow-config`
 * :doc:`guides/emr-opts`
 * :doc:`guides/emr-tools`
+* :doc:`guides/cmd`
 * :doc:`guides/emr-troubleshooting`
 * :doc:`guides/emr-advanced`
 

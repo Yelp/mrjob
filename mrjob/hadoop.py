@@ -329,7 +329,7 @@ class HadoopJobRunner(MRJobRunner):
                 # parsing needs step number for whole job
                 self._fetch_counters(step_num)
                 # printing needs step number relevant to this run of mrjob
-                self.print_counters([step_num])
+                self.print_counters([step_num + 1])
             else:
                 msg = ('Job failed with return code %d: %s' %
                        (returncode, streaming_args))

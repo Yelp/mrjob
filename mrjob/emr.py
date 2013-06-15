@@ -1513,6 +1513,7 @@ class EMRJobRunner(MRJobRunner):
             if running_step_name:
                 log.info('Job launched %.1fs ago, status %s: %s (%s)' %
                          (running_time, job_state, reason, running_step_name))
+
                 if self._show_tracker_progress:
                     try:
                         tracker_handle = urllib2.urlopen(self._tracker_url)
@@ -1730,9 +1731,10 @@ class EMRJobRunner(MRJobRunner):
         """
         # empty list is a valid value for lg_step_nums, but it is an optional
         # parameter
-        if lg_step_num_mapping is None or len(lg_step_num_mapping) == 0:
+        if lg_step_num_mapping is None:
             lg_step_num_mapping = dict((n, n) for n in step_nums)
-        lg_step_nums = list(sorted(lg_step_num_mapping[k] for k in step_nums))
+        lg_step_nums = sorted(lg_step_num_mapping[k] for k in step_nums
+                               if k in lg_step_num_mapping)
 
         self._counters = []
         new_counters = {}

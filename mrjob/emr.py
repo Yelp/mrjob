@@ -1353,9 +1353,10 @@ class EMRJobRunner(MRJobRunner):
 
         return boto.emr.StreamingStep(**streaming_step_kwargs)
 
-    def _build_jar_step(self, step):
+    def _build_jar_step(self, step, step_num, num_steps):
         return boto.emr.JarStep(
-            name=step['name'],
+            name='%s: Step %d of %d' % (
+                self._job_name, step_num + 1, num_steps),
             jar=step['jar'],
             main_class=step['main_class'],
             step_args=step['step_args'],
@@ -1512,6 +1513,7 @@ class EMRJobRunner(MRJobRunner):
             if running_step_name:
                 log.info('Job launched %.1fs ago, status %s: %s (%s)' %
                          (running_time, job_state, reason, running_step_name))
+
                 if self._show_tracker_progress:
                     try:
                         tracker_handle = urllib2.urlopen(self._tracker_url)
@@ -1731,7 +1733,8 @@ class EMRJobRunner(MRJobRunner):
         # parameter
         if lg_step_num_mapping is None:
             lg_step_num_mapping = dict((n, n) for n in step_nums)
-        lg_step_nums = list(sorted(lg_step_num_mapping[k] for k in step_nums))
+        lg_step_nums = sorted(lg_step_num_mapping[k] for k in step_nums
+                               if k in lg_step_num_mapping)
 
         self._counters = []
         new_counters = {}

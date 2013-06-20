@@ -1501,6 +1501,44 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
         self.assertEqual(self.runner.counters(),
                          [{'Job Counters ': {'Launched reduce tasks': 1}}])
 
+    def test_zero_log_generating_steps(self):
+        mock_steps = [
+            MockEmrObject(jar='x.jar',
+                          name=self.runner._job_name,
+                          state='COMPLETED'),
+            MockEmrObject(jar='x.jar',
+                          name=self.runner._job_name,
+                          state='COMPLETED'),
+        ]
+        mock_jobflow = MockEmrObject(state='COMPLETED',
+                                    steps=mock_steps)
+        self.runner._describe_jobflow = Mock(return_value=mock_jobflow)
+        self.runner._fetch_counters_s3 = Mock(return_value={})
+        self.runner._wait_for_job_to_complete()
+        self.runner._fetch_counters_s3.assert_called_with([], False)
+
+    def test_interleaved_log_generating_steps(self):
+        mock_steps = [
+            MockEmrObject(jar='x.jar',
+                          name=self.runner._job_name,
+                          state='COMPLETED'),
+            MockEmrObject(jar='hadoop.streaming.jar',
+                          name=self.runner._job_name,
+                          state='COMPLETED'),
+            MockEmrObject(jar='x.jar',
+                          name=self.runner._job_name,
+                          state='COMPLETED'),
+            MockEmrObject(jar='hadoop.streaming.jar',
+                          name=self.runner._job_name,
+                          state='COMPLETED'),
+        ]
+        mock_jobflow = MockEmrObject(state='COMPLETED',
+                                    steps=mock_steps)
+        self.runner._describe_jobflow = Mock(return_value=mock_jobflow)
+        self.runner._fetch_counters_s3 = Mock(return_value={})
+        self.runner._wait_for_job_to_complete()
+        self.runner._fetch_counters_s3.assert_called_with([1, 2], False)
+
 
 class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
 

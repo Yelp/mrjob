@@ -145,99 +145,10 @@ Option                                          Switches                        
 :ref:`hdfs_scratch_dir <opt_hdfs_scratch_dir>`  :option:`--hdfs-scratch-dir`     ``tmp/mrjob`` (in HDFS)     |dt-path|
 =============================================== ================================ =========================== =====================================
 
-Option data types
------------------
-
-The same option may be specified multiple times and be one of several data
-types. For example, the AWS region may be specified in ``mrjob.conf``, in the
-arguments to ``EMRJobRunner``, and on the command line. These are the rules
-used to determine what value to use at runtime.
-
-Values specified "later" refer to an option being specified at a higher
-priority. For example, a value in ``mrjob.conf`` is specified "earlier" than a
-value passed on the command line.
-
-Simple data types
-^^^^^^^^^^^^^^^^^
-
-When these are specified more than once, the last non-``None`` value is used.
-
-.. _data-type-string:
-
-**String**
-    Simple, unchanged string.
-
-.. _data-type-command:
-
-**Command**
-    String containing all ASCII characters to be parsed with
-    :py:func:`shlex.split`, or list of command + arguments.
-
-.. _data-type-path:
-
-**Path**
-    Local path with ``~`` and environment variables (e.g. ``$TMPDIR``)
-    resolved.
-
-List data types
-^^^^^^^^^^^^^^^
-
-.. _data-type-string-list:
-.. _data-type-command-list:
-.. _data-type-path-list:
-
-The values of these options are specified as lists. When specified more than
-once, the lists are concatenated together.
-
-See :ref:`String <data-type-string>`, :ref:`Command <data-type-command>`, and
-:ref:`Path <data-type-path>` for specifics about the data types contained in
-the specific type of list you are concerned with (string list, command list, or
-path list).
-
-Dict data types
-^^^^^^^^^^^^^^^
-
-The values of these options are specified as dictionaries. When specified more
-than once, each has custom behavior described below.
-
-.. _data-type-plain-dict:
-
-**Plain dict**
-    Values specified later override values specified earlier.
-
-.. _data-type-env-dict:
-
-**Environment variable dict**
-    Values specified later override values specified earlier, **except for
-    those with keys ending in ``PATH``**, in which values are concatenated and
-    separated by a colon (``:``) rather than overwritten. The later value comes
-    first.
-
-    For example, this config:
-
-    .. code-block:: yaml
-
-        runners: {emr: {cmdenv: {PATH: "/usr/bin"}}}
-
-    when run with this command::
-
-        python my_job.py --cmdenv PATH=/usr/local/bin
-
-    will result in the following value of ``cmdenv``:
-
-        ``/usr/local/bin:/usr/bin``
-
-    **The one exception** to this behavior is in the ``local`` runner, which
-    uses the local system separator (on Windows ``;``, on everything else still
-    ``:``) instead of always using ``:``.
-
-.. Define substitutions for the above items so tables are shorter
-
 .. |dt-string|          replace:: :ref:`string <data-type-string>`
 .. |dt-command|         replace:: :ref:`command <data-type-command>`
 .. |dt-path|            replace:: :ref:`path <data-type-path-list>`
 .. |dt-string-list|     replace:: :ref:`string list <data-type-string-list>`
-.. |dt-command-list|    replace:: :ref:`command list <data-type-command-list>`
 .. |dt-path-list|       replace:: :ref:`path list <data-type-path-list>`
 .. |dt-plain-dict|      replace:: :ref:`plain dict <data-type-plain-dict>`
 .. |dt-env-dict|        replace:: :ref:`environment variable dict <data-type-env-dict>`

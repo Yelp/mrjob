@@ -1,6 +1,23 @@
 Configuration quick reference
 =============================
 
+You can set an option by:
+
+* Passing it on the command line with the switch version (like
+  ``--some-option``)
+* Passing it as a keyword argument to the runner constructor, if you are
+  creating the runner programmatically
+* Putting it in one of the included config files under a runner name, like
+  this:
+
+  .. code-block:: yaml
+
+    runners:
+        local:
+            python_bin: python2.6  # only used in local runner
+        emr:
+            python_bin: python2.5  # only used in Elastic MapReduce runner
+
 Options that can't be set from mrjob.conf (all runners)
 -------------------------------------------------------
 

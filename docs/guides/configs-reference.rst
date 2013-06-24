@@ -26,6 +26,12 @@ You can set an option by:
 Options that can't be set from mrjob.conf (all runners)
 -------------------------------------------------------
 
+For some options, it doesn't make sense to be able to set them in the config
+file. These can only be specified when calling the constructor of
+:py:class:`~mrjob.runner.MRJobRunner`, as command line options, or sometimes by
+overriding some attribute or method of your :py:class:`~mrjob.job.MRJob`
+subclass.
+
 See :py:meth:`mrjob.runner.MRJobRunner.__init__` for documentation about
 options below that do not link elsewhere.
 

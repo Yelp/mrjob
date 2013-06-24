@@ -1345,12 +1345,23 @@ class EMRJobRunner(MRJobRunner):
         return boto.emr.StreamingStep(**streaming_step_kwargs)
 
     def _build_jar_step(self, step, step_num, num_steps):
+        input_paths = self._s3_step_input_uris(step_num)
+        output_path = self._s3_step_output_uri(step_num)
+        step_args = step['step_args']
+        io = step['io']
+        input_loc = step_args.index(io['input_marker'])
+        del step_args[input_loc]
+        for i, path in enumerate(input_paths):
+            step_args.insert(input_loc + i, io['input_format'] % path)
+        output_loc = step_args.index(io['output_marker'])
+        del step_args[output_loc]
+        step_args.insert(output_loc, io['output_format'] % output_path)
         return boto.emr.JarStep(
             name='%s: Step %d of %d' % (
                 self._job_name, step_num + 1, num_steps),
             jar=step['jar'],
             main_class=step['main_class'],
-            step_args=step['step_args'],
+            step_args=step_args,
             action_on_failure=self._action_on_failure)
 
     def _cache_kwargs(self):

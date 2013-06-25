@@ -51,6 +51,9 @@ Option                                  Switches                                
 Other options for all runners
 -----------------------------
 
+These options can be passed to any runner without an error, though some runners
+may ignore some options. See the text after the table for specifics.
+
 .. RST TABLES SUCK SO MUCH
 
 ======================================================= ================================================================== ============================== ================

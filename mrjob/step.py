@@ -178,11 +178,6 @@ class JarStep(object):
           'output_format': output_format,
         }
 
-        if input_marker not in self.step_args:
-            self.step_args.append(input_marker)
-        if output_marker not in self.step_args:
-            self.step_args.append(output_marker)
-
     def __repr__(self):
         return 'JarStep(**%r)' % repr(
             dict(name=self.name, jar=self.jar, main_class=self.main_class,

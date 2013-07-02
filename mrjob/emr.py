@@ -1349,13 +1349,26 @@ class EMRJobRunner(MRJobRunner):
         output_path = self._s3_step_output_uri(step_num)
         step_args = step['step_args']
         io = step['io']
-        input_loc = step_args.index(io['input_marker'])
-        del step_args[input_loc]
-        for i, path in enumerate(input_paths):
-            step_args.insert(input_loc + i, io['input_format'] % path)
-        output_loc = step_args.index(io['output_marker'])
-        del step_args[output_loc]
-        step_args.insert(output_loc, io['output_format'] % output_path)
+
+        if io['input_marker'] in step_args:
+            input_loc = step_args.index(io['input_marker'])
+            del step_args[input_loc]
+            i = input_loc
+            for path in input_paths:
+                inn = (io['input_format'] % path).split(' ')
+                for part in inn:
+                    step_args.insert(i, part)
+                    i += 1
+
+        if io['output_marker'] in step_args:
+            output_loc = step_args.index(io['output_marker'])
+            del step_args[output_loc]
+            i = output_loc
+            out = (io['output_format'] % output_path).split(' ')
+            for part in out:
+                step_args.insert(i, part)
+                i += 1
+
         return boto.emr.JarStep(
             name='%s: Step %d of %d' % (
                 self._job_name, step_num + 1, num_steps),

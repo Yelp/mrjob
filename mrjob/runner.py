@@ -999,6 +999,12 @@ class MRJobRunner(object):
 
         return self._mrjob_tar_gz_path
 
+    def _termination_condition(self):
+        
+        if self._counters:
+            return 'termination' in self._counters[-1] and ( self._counters[-1].get('termination',{}).get('finish_counts') > 0 or not self._counters[-1].get('termination',{}).get('necessary_counts') )
+        return False
+    
     def _hadoop_conf_args(self, step, step_num, num_steps):
         """Build a list of extra arguments to the hadoop binary.
 

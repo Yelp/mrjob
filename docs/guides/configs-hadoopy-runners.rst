@@ -64,3 +64,8 @@ Options available to hadoop runner only
     Scratch space on HDFS (default is ``tmp/``). This path does not need to be
     fully qualified with ``hdfs://`` URIs because it's understood that it has
     to be on HDFS.
+
+**check_hadoop_input_paths** (:option:`--skip-hadoop-input-check`)
+    Option to skip the input path check. With this option all input paths
+    to the runner will be passed straight through, without their existence
+    being validated.

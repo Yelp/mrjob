@@ -154,8 +154,7 @@ class MRJobStep(object):
             substep_descs['combiner'] = self.render_combiner()
         if self.has_explicit_reducer:
             substep_descs['reducer'] = self.render_reducer()
-        # TODO: verify this is a dict, convert booleans to strings
-        if self._steps['jobconf']:
+        if isinstance(self._steps['jobconf'], dict):
             substep_descs['jobconf'] = self._steps['jobconf']
         return substep_descs
 

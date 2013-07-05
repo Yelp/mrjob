@@ -1046,6 +1046,12 @@ class MRJobRunner(object):
 
         return self._mrjob_tar_gz_path
 
+    def _termination_condition(self):
+        
+        if self._counters:
+            return 'termination' in self._counters[-1] and ( self._counters[-1].get('termination',{}).get('finish_counts') > 0 or not self._counters[-1].get('termination',{}).get('necessary_counts') )
+        return False
+    
     def _hadoop_conf_args(self, step, step_num, num_steps):
         """Build a list of extra arguments to the hadoop binary.
 
@@ -1060,6 +1066,17 @@ class MRJobRunner(object):
         args = []
 
         jobconf = combine_dicts(self._opts['jobconf'], step.get('jobconf'))
+        job_name = jobconf.get('mapred.job.name', None)
+
+        # Set a default job name
+        if not job_name:
+            job_name = "%s > %s" % (self._script_path, self._output_dir)
+
+        # Add the step into the job name
+        if num_steps > 1:
+            job_name = "%s (step %s of %s)" % (job_name, step_num + 1, num_steps)
+
+        jobconf['mapred.job.name'] = job_name
 
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])

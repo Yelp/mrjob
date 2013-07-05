@@ -365,6 +365,8 @@ class MRJob(MRJobLauncher):
         :param combiner_final: function with same function signature as
                                :py:meth:`combiner_final`, or ``None`` for no
                                final combiner action.
+        :param jobconf: dictionary with custom jobconf arguments to pass to
+                        hadoop.
 
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.

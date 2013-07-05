@@ -200,6 +200,7 @@ class HadoopJobRunner(MRJobRunner):
         # init hadoop version cache
         self._hadoop_version = None
 
+
     @property
     def fs(self):
         """:py:class:`mrjob.fs.base.Filesystem` object for HDFS and the local
@@ -277,7 +278,7 @@ class HadoopJobRunner(MRJobRunner):
     def _dump_stdin_to_local_file(self):
         """Dump sys.stdin to a local file, and return the path to it."""
         stdin_path = os.path.join(self._get_local_tmp_dir(), 'STDIN')
-         # prompt user, so they don't think the process has stalled
+        # prompt user, so they don't think the process has stalled
         log.info('reading from STDIN')
 
         log.debug('dumping stdin to local file %s' % stdin_path)
@@ -291,7 +292,7 @@ class HadoopJobRunner(MRJobRunner):
         steps = self._get_steps()
         self._counters = []
         self._step_ids = [None] * len(steps)
-
+        
         for step_num, step in enumerate(steps):
             log.debug('running step %d of %d' % (step_num + 1, len(steps)))
 
@@ -330,6 +331,10 @@ class HadoopJobRunner(MRJobRunner):
                 self._fetch_counters(step_num)
                 # printing needs step number relevant to this run of mrjob
                 self.print_counters([step_num + 1])
+                if self._termination_condition():
+                    log.info('termination criteria satisifed, terminating steps at step %d'%(step_num+1))
+                    self._output_dir  = self._hdfs_step_output_dir(step_num)
+                    break
             else:
                 msg = ('Job failed with return code %d: %s' %
                        (returncode, streaming_args))
@@ -354,7 +359,7 @@ class HadoopJobRunner(MRJobRunner):
                     msg += '\n' + '\n'.join(cause_msg) + '\n'
 
                 raise CalledProcessError(returncode, streaming_args)
-
+    
     def _process_stderr_from_streaming(self, stderr, step_num):
 
         def treat_eio_as_eof(iter):
@@ -448,7 +453,7 @@ class HadoopJobRunner(MRJobRunner):
         else:
             return posixpath.join(
                 self._hdfs_tmp_dir, 'step-output', str(step_num + 1))
-
+        
     def _cleanup_local_scratch(self):
         super(HadoopJobRunner, self)._cleanup_local_scratch()
 

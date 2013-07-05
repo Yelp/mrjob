@@ -17,7 +17,7 @@ class BreadthFirstSearchJob(MRJob):
     #2 = expanded
     
     #purpose of this test is to show that the code will terminate on a total of 4 steps, because nodes in graph.rst have a max distance of 2 from the starting node ( node 0), 
-    #and hence the breadth first search process can be completed before the 11 steps allocated provisionally
+    #and hence the breadth first search process can be completed before the 11 steps allocated provisionally 
 
     def steps(self):
         

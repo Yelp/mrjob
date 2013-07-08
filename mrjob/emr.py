@@ -889,6 +889,10 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['hadoop_streaming_jar']:
             self._upload_mgr.add(path)
 
+        for step in self._get_steps():
+            if step['type'] == 'jar':
+                self._upload_mgr.add(step['jar'])
+
     def _upload_local_files_to_s3(self):
         """Copy local files tracked by self._upload_mgr to S3."""
         self._create_s3_temp_bucket_if_needed()
@@ -1354,12 +1358,36 @@ class EMRJobRunner(MRJobRunner):
         return boto.emr.StreamingStep(**streaming_step_kwargs)
 
     def _build_jar_step(self, step, step_num, num_steps):
+        input_paths = self._s3_step_input_uris(step_num)
+        output_path = self._s3_step_output_uri(step_num)
+        step_args = step['step_args']
+        io = step['io']
+
+        if io['input_marker'] in step_args:
+            input_loc = step_args.index(io['input_marker'])
+            del step_args[input_loc]
+            i = input_loc
+            for path in input_paths:
+                inn = (io['input_format'] % path).split(' ')
+                for part in inn:
+                    step_args.insert(i, part)
+                    i += 1
+
+        if io['output_marker'] in step_args:
+            output_loc = step_args.index(io['output_marker'])
+            del step_args[output_loc]
+            i = output_loc
+            out = (io['output_format'] % output_path).split(' ')
+            for part in out:
+                step_args.insert(i, part)
+                i += 1
+
         return boto.emr.JarStep(
             name='%s: Step %d of %d' % (
                 self._job_name, step_num + 1, num_steps),
-            jar=step['jar'],
+            jar=self._upload_mgr.uri(step['jar']),
             main_class=step['main_class'],
-            step_args=step['step_args'],
+            step_args=step_args,
             action_on_failure=self._action_on_failure)
 
     def _cache_kwargs(self):

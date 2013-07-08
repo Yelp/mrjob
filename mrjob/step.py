@@ -159,14 +159,24 @@ class MRJobStep(object):
             substep_descs['jobconf'] = self._steps['jobconf']
         return substep_descs
 
+INPUT_MARKER = "<<INPUT>>"
+OUTPUT_MARKER = "<<OUTPUT>>"
 
 class JarStep(object):
 
-    def __init__(self, name, jar, main_class=None, step_args=None):
+    def __init__(self, name, jar, main_class=None, step_args=None,
+          input_format="%s", output_format="%s",
+          input_marker=INPUT_MARKER, output_marker=OUTPUT_MARKER):
         self.name = name
         self.jar = jar
         self.main_class = main_class
         self.step_args = step_args
+        self.io = {
+          'input_marker': input_marker,
+          'input_format': input_format,
+          'output_marker': output_marker,
+          'output_format': output_format,
+        }
 
     def __repr__(self):
         return 'JarStep(**%r)' % repr(
@@ -187,4 +197,6 @@ class JarStep(object):
             'jar': self.jar,
             'main_class': self.main_class,
             'step_args': self.step_args,
+            'io': self.io,
         }
+

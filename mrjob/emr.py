@@ -885,6 +885,10 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['hadoop_streaming_jar']:
             self._upload_mgr.add(path)
 
+        for step in self._get_steps():
+            if step['type'] == 'jar':
+                self._upload_mgr.add(step['jar'])
+
     def _upload_local_files_to_s3(self):
         """Copy local files tracked by self._upload_mgr to S3."""
         self._create_s3_temp_bucket_if_needed()
@@ -1351,8 +1355,9 @@ class EMRJobRunner(MRJobRunner):
 
     def _build_jar_step(self, step):
         return boto.emr.JarStep(
-            name=step['name'],
-            jar=step['jar'],
+            name='%s: Step %d of %d' % (
+                self._job_name, step_num + 1, num_steps),
+            jar=self._upload_mgr.uri(step['jar']),
             main_class=step['main_class'],
             step_args=step['step_args'],
             action_on_failure=self._action_on_failure)

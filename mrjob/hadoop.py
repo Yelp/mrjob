@@ -86,9 +86,9 @@ def fully_qualify_hdfs_path(path):
     if is_uri(path):
         return path
     elif path.startswith('/'):
-        return 'hdfs://' + path
+        return self._opts['hadoop_uri_protocol'] + '://' + path
     else:
-        return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
+        return self._opts['hadoop_uri_protocol'] + ':///user/%s/%s' % (getpass.getuser(), path)
 
 
 def hadoop_log_dir(hadoop_home=None):
@@ -113,6 +113,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'hadoop_bin',
         'hadoop_home',
+        'hadoop_uri_protocol',
         'hdfs_scratch_dir',
     ]))
 
@@ -156,6 +157,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         return combine_dicts(super_opts, {
             'hadoop_home': os.environ.get('HADOOP_HOME'),
             'hdfs_scratch_dir': 'tmp/mrjob',
+            'hadoop_uri_protocol' : 'hdfs',
         })
 
 

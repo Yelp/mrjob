@@ -16,6 +16,7 @@ import logging
 import posixpath
 import socket
 from urlparse import urlparse
+from StringIO import StringIO
 
 try:
     import boto
@@ -151,7 +152,13 @@ class S3Filesystem(Filesystem):
     def _cat_file(self, filename):
         # stream lines from the s3 key
         s3_key = self.get_s3_key(filename)
-        buffer_iterator = read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+
+        # stream the key to a fileobj
+        stream = StringIO()
+        s3_key.get_file(stream)
+        stream.seek(0)
+
+        buffer_iterator = read_file(s3_key_to_uri(s3_key), fileobj=stream)
         return buffer_iterator_to_line_iterator(buffer_iterator)
 
     def mkdir(self, dest):

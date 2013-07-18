@@ -132,7 +132,6 @@ class RunnerOptionStore(OptionStore):
         'base_tmp_dir': combine_paths,
         'cmdenv': combine_envs,
         'hadoop_extra_args': combine_lists,
-        'hadoop_uri_protocol': combine_values,
         'interpreter': combine_cmds,
         'jobconf': combine_dicts,
         'python_archives': combine_path_lists,

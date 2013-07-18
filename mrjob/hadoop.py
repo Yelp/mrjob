@@ -103,7 +103,6 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'hadoop_bin',
         'hadoop_home',
-        'hadoop_uri_protocol',
         'hdfs_scratch_dir',
     ]))
 
@@ -147,7 +146,6 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         return combine_dicts(super_opts, {
             'hadoop_home': os.environ.get('HADOOP_HOME'),
             'hdfs_scratch_dir': 'tmp/mrjob',
-            'hadoop_uri_protocol' : 'hdfs',
         })
 
 

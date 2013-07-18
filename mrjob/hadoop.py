@@ -81,16 +81,6 @@ def find_hadoop_streaming_jar(path):
         return None
 
 
-def fully_qualify_hdfs_path(path):
-    """If path isn't an ``hdfs://`` URL, turn it into one."""
-    if is_uri(path):
-        return path
-    elif path.startswith('/'):
-        return self._opts['hadoop_uri_protocol'] + '://' + path
-    else:
-        return self._opts['hadoop_uri_protocol'] + ':///user/%s/%s' % (getpass.getuser(), path)
-
-
 def hadoop_log_dir(hadoop_home=None):
     """Return the path where Hadoop stores logs.
 
@@ -178,7 +168,7 @@ class HadoopJobRunner(MRJobRunner):
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 
-        self._hdfs_tmp_dir = fully_qualify_hdfs_path(
+        self._hdfs_tmp_dir = self.fully_qualify_hdfs_path(
             posixpath.join(
             self._opts['hdfs_scratch_dir'], self._job_name))
 
@@ -188,7 +178,7 @@ class HadoopJobRunner(MRJobRunner):
         self._upload_mgr = UploadDirManager(hdfs_files_dir)
 
         # Set output dir if it wasn't set explicitly
-        self._output_dir = fully_qualify_hdfs_path(
+        self._output_dir = self.fully_qualify_hdfs_path(
             self._output_dir or
             posixpath.join(self._hdfs_tmp_dir, 'output'))
 
@@ -202,6 +192,15 @@ class HadoopJobRunner(MRJobRunner):
 
         # init hadoop version cache
         self._hadoop_version = None
+
+    def fully_qualify_hdfs_path(self, path):
+        """If path isn't an ``hdfs://`` URL, turn it into one."""
+        if is_uri(path):
+            return path
+        elif path.startswith('/'):
+            return self._opts['hadoop_uri_protocol'] + '://' + path
+        else:
+            return self._opts['hadoop_uri_protocol'] + ':///user/%s/%s' % (getpass.getuser(), path)
 
     @property
     def fs(self):

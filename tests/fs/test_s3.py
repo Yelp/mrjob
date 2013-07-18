@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from StringIO import StringIO
 import os
+import gzip
 
 try:
     import boto
@@ -60,6 +62,18 @@ class S3FSTestCase(SandboxedTestCase):
     def test_cat_uncompressed(self):
         remote_path = self.add_mock_s3_data('walrus', 'data/foo', 'foo\nfoo\n')
         self.assertEqual(list(self.fs._cat_file(remote_path)), ['foo\n', 'foo\n'])
+
+    def test_cat_gz(self):
+        input = StringIO()
+        input_gz = gzip.GzipFile(fileobj=input, mode="w")
+        input_gz.write('foo\nfoo\n')
+        input_gz.close()
+
+        input.seek(0)
+        remote_path = self.add_mock_s3_data('walrus', 'data/foo.gz', input.read())
+
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n', 'foo\n'])
 
     def test_ls_basic(self):
         remote_path = self.add_mock_s3_data('walrus', 'data/foo', 'foo\nfoo\n')

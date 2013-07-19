@@ -265,7 +265,7 @@ class MRJobRunner(object):
                  extra_args=None, file_upload_args=None,
                  hadoop_input_format=None, hadoop_output_format=None,
                  input_paths=None, output_dir=None, partitioner=None,
-                 stdin=None, conf_paths=None, **opts):
+                 sort_values=False, stdin=None, conf_paths=None, **opts):
         """All runners take the following keyword arguments:
 
         :type mr_job_script: str
@@ -330,6 +330,11 @@ class MRJobRunner(object):
                             Hadoop streaming will use this to determine how
                             mapper output should be sorted and distributed
                             to reducers.
+        :type sort_values: bool
+        :param sort_values: If this is true, sort lines passed to the reducers,
+                            so that the encoded representations of the values
+                            associated with any key will appear in sorted
+                            order.
         :param stdin: an iterable (can be a ``StringIO`` or even a list) to use
                       as stdin. This is a hook for testing; if you set
                       ``stdin`` via :py:meth:`~mrjob.job.MRJob.sandbox`, it'll
@@ -404,8 +409,9 @@ class MRJobRunner(object):
         # store output_dir
         self._output_dir = output_dir
 
-        # store partitioner
+        # store partitioner and sort_values
         self._partitioner = partitioner
+        self._sort_values = sort_values
 
         # store hadoop input and output formats
         self._hadoop_input_format = hadoop_input_format
@@ -1050,7 +1056,7 @@ class MRJobRunner(object):
         """Build a list of extra arguments to the hadoop binary.
 
         This handles *cmdenv*, *hadoop_extra_args*, *hadoop_input_format*,
-        *hadoop_output_format*, *jobconf*, and *partitioner*.
+        *hadoop_output_format*, *jobconf*, *partitioner*, and *sort_values*.
 
         This doesn't handle input, output, mappers, reducers, or uploading
         files.
@@ -1063,6 +1069,15 @@ class MRJobRunner(object):
 
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])
+
+        # patch in jobconf values we need to make sort_values work
+        jobconf = self._opts['jobconf']
+
+        if self._sort_values:
+            jobconf = combine_dicts(jobconf, {
+                'stream.num.map.output.key.fields': '2',
+                'num.key.fields.for.partition': '2',
+            })
 
         # new-style jobconf
         version = self.get_hadoop_version()
@@ -1080,7 +1095,11 @@ class MRJobRunner(object):
                 args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         # partitioner
-        if self._partitioner:
+        if self._sort_values:
+            args.extend([
+                '-partitioner',
+                'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'])
+        elif self._partitioner:
             args.extend(['-partitioner', self._partitioner])
 
         # cmdenv

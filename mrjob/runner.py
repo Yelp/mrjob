@@ -48,7 +48,6 @@ except:
 
 from mrjob.compat import add_translated_jobconf_for_hadoop_version
 from mrjob.compat import supports_combiners_in_hadoop_streaming
-from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_generic_jobconf
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -96,18 +95,6 @@ _STEP_RE = re.compile(r'^M?C?R?$')
 
 # buffer for piping files into sort on Windows
 _BUFFER_SIZE = 4096
-
-# jobconf options for implementing sort_values
-_SORT_VALUES_JOBCONF = {
-    'stream.num.map.output.key.fields': 2,
-    'mapred.text.key.partitioner.options': '-k1,1',
-}
-
-# partitioner for sort_values
-_SORT_VALUES_PARTITIONER = \
-    'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
-
-
 
 
 class RunnerOptionStore(OptionStore):
@@ -278,7 +265,7 @@ class MRJobRunner(object):
                  extra_args=None, file_upload_args=None,
                  hadoop_input_format=None, hadoop_output_format=None,
                  input_paths=None, output_dir=None, partitioner=None,
-                 sort_values=False, stdin=None, conf_paths=None, **opts):
+                 stdin=None, conf_paths=None, **opts):
         """All runners take the following keyword arguments:
 
         :type mr_job_script: str
@@ -343,11 +330,6 @@ class MRJobRunner(object):
                             Hadoop streaming will use this to determine how
                             mapper output should be sorted and distributed
                             to reducers.
-        :type sort_values: bool
-        :param sort_values: If this is true, sort lines passed to the reducers,
-                            so that the encoded representations of the values
-                            associated with any key will appear in sorted
-                            order.
         :param stdin: an iterable (can be a ``StringIO`` or even a list) to use
                       as stdin. This is a hook for testing; if you set
                       ``stdin`` via :py:meth:`~mrjob.job.MRJob.sandbox`, it'll
@@ -422,9 +404,8 @@ class MRJobRunner(object):
         # store output_dir
         self._output_dir = output_dir
 
-        # store partitioner and sort_values
+        # store partitioner
         self._partitioner = partitioner
-        self._sort_values = sort_values
 
         # store hadoop input and output formats
         self._hadoop_input_format = hadoop_input_format
@@ -1069,7 +1050,7 @@ class MRJobRunner(object):
         """Build a list of extra arguments to the hadoop binary.
 
         This handles *cmdenv*, *hadoop_extra_args*, *hadoop_input_format*,
-        *hadoop_output_format*, *jobconf*, *partitioner*, and *sort_values*.
+        *hadoop_output_format*, *jobconf*, and *partitioner*.
 
         This doesn't handle input, output, mappers, reducers, or uploading
         files.
@@ -1083,9 +1064,6 @@ class MRJobRunner(object):
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])
 
-        # patch in jobconf values we need to make sort_values work
-        jobconf = self._opts['jobconf']
-
         # new-style jobconf
         version = self.get_hadoop_version()
 
@@ -1093,35 +1071,18 @@ class MRJobRunner(object):
         # the hadoop version
         jobconf = add_translated_jobconf_for_hadoop_version(jobconf,
                                                             version)
-
-        # add in jobconf for sort_values
-        if self._sort_values:
-            sort_values_jobconf = dict(
-                (translate_jobconf(k, version), v)
-                for (k, v) in _SORT_VALUES_JOBCONF.iteritems())
-
-            # check for conflicts
-            for k, v in sorted(sort_values_jobconf.iteritems()):
-                if k in jobconf and jobconf[k] != v:
-                    log.warn('sort_values overrides jobconf key %s' % k)
-
-            jobconf.update(sort_values_jobconf)
-
         if uses_generic_jobconf(version):
             for key, value in sorted(jobconf.iteritems()):
-                args.extend(['-D', '%s=%s' % (key, value)])
+                if value is not None:
+                    args.extend(['-D', '%s=%s' % (key, value)])
         # old-style jobconf
         else:
             for key, value in sorted(jobconf.iteritems()):
-                args.extend(['-jobconf', '%s=%s' % (key, value)])
+                if value is not None:
+                    args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         # partitioner
-        if self._sort_values:
-            args.extend(['-partitioner', _SORT_VALUES_PARTITIONER])
-            if (self._partitioner and
-                self._partitioner != _SORT_VALUES_PARTITIONER):
-                log.warn('sort_values overrides partitioner')
-        elif self._partitioner:
+        if self._partitioner:
             args.extend(['-partitioner', self._partitioner])
 
         # cmdenv

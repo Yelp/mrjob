@@ -53,6 +53,26 @@ from mrjob.util import read_input
 log = logging.getLogger('mrjob.job')
 
 
+# partitioner for SORT_VALUES
+_SORT_VALUES_PARTITIONER = \
+    'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
+
+# jobconf options for implementing SORT_VALUES
+_SORT_VALUES_JOBCONF = {
+    'stream.num.map.output.key.fields': 2,
+    'mapred.text.key.partitioner.options': '-k1,1',
+    # Hadoop's defaults for these actually work fine; we just want to
+    # prevent interference from mrjob.conf.
+    'mapred.output.key.comparator.class': None,
+    'mapred.text.key.comparator.options': None,
+}
+
+# partitioner for sort_values
+_SORT_VALUES_PARTITIONER = \
+    'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
+
+
+
 class UsageError(Exception):
     pass
 
@@ -1030,7 +1050,7 @@ class MRJob(MRJobLauncher):
 
     #: Set this to ``True`` if you would like reducers to receive the values
     #: associated with any key in sorted order (sorted by their *encoded*
-    #: value).
+    #: value). Also known as secondary sort.
     #:
     #: This can be useful if you expect more values than you can fit in memory
     #: to be associated with one key, but you want to apply information in
@@ -1043,16 +1063,29 @@ class MRJob(MRJobLauncher):
     #: ``['A', <total>]``, ``['B', <count_name>, <count>]``, and the value
     #: containing the total should come first regardless of what protocol
     #: you're using.
+    #:
+    #: Setting this affects :py:meth:`jobconf()` and :py:meth:`partitioner()`.
+    #:
+    #: This just does the bare minimum, equivalent to::
+    #:
+    #:   --partitioner org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner
+    #:   --jobconf stream.num.map.output.key.fields=2
+    #:   --jobconf mapred.text.key.partitioner.options=k1,1
+    #:
+    #: We also blank out ``mapred.output.key.comparator.class``
+    #: and ``mapred.text.key.comparator.options`` to prevent interference
+    #: from :file:`mrjob.conf`. You can still set them through ``JOBCONF``.
+    #: For example, if you know your values are numbers, and want to sort
+    #: them in reverse, you could do::
+    #:
+    #:    SORT_VALUES = True
+    #:
+    #:    JOBCONF = {
+    #:        'mapred.output.key.comparator.class':
+    #:            'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
+    #:        'mapred.text.key.comparator.options': '-k1 -k2nr',
+    #:    }
     SORT_VALUES = None
-
-    def sort_values(self):
-        """True if reducers to receive the values associated with any key in
-        sorted order.
-
-        This just returns :py:attr:`SORT_VALUES`. You probably don't need to
-        re-define this function; it's just here for consistency.
-        """
-        return self.SORT_VALUES
 
     #: Optional Hadoop partitioner class to use to determine how mapper
     #: output should be sorted and distributed to reducers. For example:
@@ -1066,12 +1099,17 @@ class MRJob(MRJobLauncher):
         output should be sorted and distributed to reducers.
 
         By default, returns whatever is passed to :option:`--partitioner`,
-        or if that option isn't used, :py:attr:`PARTITIONER`.
+        or if that option isn't used, :py:attr:`PARTITIONER`, or if that
+        isn't set, and :py:attr:`SORT_VALUES` is true, it's set to
+        ``'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'``.
 
         You probably don't need to re-define this; it's just here for
         completeness.
         """
-        return self.options.partitioner or self.PARTITIONER
+        return (self.options.partitioner or
+                self.PARTITIONER or
+                ('org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner' if
+                 self.SORT_VALUES else None))
 
     ### Jobconf ###
 
@@ -1092,6 +1130,10 @@ class MRJob(MRJobLauncher):
         By default, this combines :option:`jobconf` options from the command
         lines with :py:attr:`JOBCONF`, with command line arguments taking
         precedence.
+
+        If :py:attr:`SORT_VALUES` is set, we add some additional jobconf
+        options. These have *lower* precedence than either :py:attr`JOBCONF`
+        or the command line.
 
         If you want to re-define this, it's strongly recommended that do
         something like this, so as not to inadvertently disable
@@ -1134,6 +1176,10 @@ class MRJob(MRJobLauncher):
                          unfiltered_val)
                 filtered_val = format_hadoop_version(unfiltered_val)
             filtered_jobconf[key] = filtered_val
+
+        if self.SORT_VALUES:
+            filtered_jobconf = combine_dicts(
+                _SORT_VALUES_JOBCONF, filtered_jobconf)
 
         return filtered_jobconf
 

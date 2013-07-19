@@ -101,8 +101,6 @@ _BUFFER_SIZE = 4096
 _SORT_VALUES_JOBCONF = {
     'stream.num.map.output.key.fields': 2,
     'mapred.text.key.partitioner.options': '-k1,1',
-    'mapred.output.key.comparator.class':
-        'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
 }
 
 # partitioner for sort_values

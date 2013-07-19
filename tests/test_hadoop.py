@@ -117,7 +117,7 @@ class TestFullyQualifyHDFSPath(MockHadoopTestCase):
 
     def test_empty(self, args=()):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-uri-protocol','maprfs'] 
+                               '--no-conf'] 
                                + list(args))
         with mr_job.make_runner() as runner:
             with patch('getpass.getuser') as getuser:
@@ -126,7 +126,7 @@ class TestFullyQualifyHDFSPath(MockHadoopTestCase):
 
     def test_relative_path(self,args=()):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-uri-protocol','maprfs'] 
+                               '--no-conf'] 
                                + list(args))
         with mr_job.make_runner() as runner:
             with patch('getpass.getuser') as getuser:
@@ -136,7 +136,7 @@ class TestFullyQualifyHDFSPath(MockHadoopTestCase):
 
     def test_absolute_path(self,args=()):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-uri-protocol','maprfs'] 
+                               '--no-conf'] 
                                + list(args))
         with mr_job.make_runner() as runner:
             self.assertEqual(runner.fully_qualify_hdfs_path('/path/to/cheese'),
@@ -144,7 +144,7 @@ class TestFullyQualifyHDFSPath(MockHadoopTestCase):
 
     def test_hdfs_uri(self,args=()):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-uri-protocol','maprfs'] 
+                               '--no-conf'] 
                                + list(args) )
         with mr_job.make_runner() as runner:
             self.assertEqual(runner.fully_qualify_hdfs_path('hdfs://host/path/'),
@@ -152,7 +152,7 @@ class TestFullyQualifyHDFSPath(MockHadoopTestCase):
 
     def test_s3n_uri(self,args=()): 
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-uri-protocol','maprfs'] 
+                               '--no-conf'] 
                                + list(args))
         with mr_job.make_runner() as runner:
             self.assertEqual(runner.fully_qualify_hdfs_path('s3n://bucket/oh/noes'),
@@ -160,7 +160,7 @@ class TestFullyQualifyHDFSPath(MockHadoopTestCase):
 
     def test_other_uri(self,args=()):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-uri-protocol','maprfs']
+                               '--no-conf']
                                + list(args))
         with mr_job.make_runner() as runner:
             self.assertEqual(runner.fully_qualify_hdfs_path('foo://bar/baz'),

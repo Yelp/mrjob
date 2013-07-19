@@ -68,6 +68,13 @@ class ProtocolTestCase(unittest.TestCase):
         self.assertEqual((key, value),
                          protocol.read(protocol.write(key, value)))
 
+    def assertRoundTripWithTrailingTabOK(self, protocol, key, value):
+        """Assert that we can encode the given key and value, add a
+        trailing tab (which Hadoop sometimes does), and decode it
+        to get the same key and value we started with."""
+        self.assertEqual((key, value),
+                         protocol.read(protocol.write(key, value) + '\t'))
+
     def assertCantEncode(self, protocol, key, value):
         self.assertRaises(Exception, protocol.write, key, value)
 

@@ -59,7 +59,7 @@ class _ClassBasedKeyCachingProtocol(object):
 
         :return: A tuple of ``(key, value)``."""
 
-        raw_key, raw_value = line.split('\t')
+        raw_key, raw_value = line.split('\t', 1)
 
         if raw_key != cls._last_key_encoded:
             cls._last_key_encoded = raw_key

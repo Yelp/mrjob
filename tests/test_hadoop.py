@@ -42,14 +42,12 @@ from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
 
-class TestFullyQualifyHDFSPath(unittest.TestCase):
+class TestFullyQualifyHDFSPath(MockHadoopTestCase):
 
     def test_mapr_default(self, args=()):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-arg', '-libjar',
-                               '--hadoop-arg', 'containsJars.jar', '--hadoop-uri-protocol','maprfs'] + list(args)
-                              + ['-', '/', '/']
-                              + ['--jobconf', 'x=y'])
+                               '--no-conf', '--hadoop-uri-protocol','maprfs'] 
+                               + list(args))
         with mr_job.make_runner() as runner:
             with patch('getpass.getuser') as getuser:
                 getuser.return_value = 'dave'
@@ -57,10 +55,8 @@ class TestFullyQualifyHDFSPath(unittest.TestCase):
 
     def test_empty(self, args=()):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-arg', '-libjar',
-                               '--hadoop-arg', 'containsJars.jar'] + list(args)
-                              + ['-', '/', '/']
-                              + ['--jobconf', 'x=y'])
+                               '--no-conf', '--hadoop-uri-protocol','maprfs'] 
+                               + list(args))
         with mr_job.make_runner() as runner:
             with patch('getpass.getuser') as getuser:
                 getuser.return_value = 'dave'
@@ -68,10 +64,8 @@ class TestFullyQualifyHDFSPath(unittest.TestCase):
 
     def test_relative_path(self,args=()):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-arg', '-libjar',
-                               '--hadoop-arg', 'containsJars.jar'] + list(args)
-                              + ['-', '/', '/']
-                              + ['--jobconf', 'x=y'])
+                               '--no-conf', '--hadoop-uri-protocol','maprfs'] 
+                               + list(args))
         with mr_job.make_runner() as runner:
             with patch('getpass.getuser') as getuser:
                 getuser.return_value = 'dave'
@@ -80,40 +74,32 @@ class TestFullyQualifyHDFSPath(unittest.TestCase):
 
     def test_absolute_path(self,args=()):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-arg', '-libjar',
-                               '--hadoop-arg', 'containsJars.jar'] + list(args)
-                              + ['-', '/', '/']
-                              + ['--jobconf', 'x=y'])
+                               '--no-conf', '--hadoop-uri-protocol','maprfs'] 
+                               + list(args))
         with mr_job.make_runner() as runner:
             self.assertEqual(runner.fully_qualify_hdfs_path('/path/to/cheese'),
                              'hdfs:///path/to/cheese')
 
     def test_hdfs_uri(self,args=()):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-arg', '-libjar',
-                               '--hadoop-arg', 'containsJars.jar'] + list(args)
-                              + ['-', '/', '/']
-                              + ['--jobconf', 'x=y'])
+                               '--no-conf', '--hadoop-uri-protocol','maprfs'] 
+                               + list(args) )
         with mr_job.make_runner() as runner:
             self.assertEqual(runner.fully_qualify_hdfs_path('hdfs://host/path/'),
                              'hdfs://host/path/')
 
     def test_s3n_uri(self,args=()): 
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-arg', '-libjar',
-                               '--hadoop-arg', 'containsJars.jar'] + list(args)
-                              + ['-', '/', '/']
-                              + ['--jobconf', 'x=y'])
+                               '--no-conf', '--hadoop-uri-protocol','maprfs'] 
+                               + list(args))
         with mr_job.make_runner() as runner:
             self.assertEqual(runner.fully_qualify_hdfs_path('s3n://bucket/oh/noes'),
                              's3n://bucket/oh/noes')
 
     def test_other_uri(self,args=()):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-arg', '-libjar',
-                               '--hadoop-arg', 'containsJars.jar'] + list(args)
-                              + ['-', '/', '/']
-                              + ['--jobconf', 'x=y'])
+                               '--no-conf', '--hadoop-uri-protocol','maprfs']
+                               + list(args))
         with mr_job.make_runner() as runner:
             self.assertEqual(runner.fully_qualify_hdfs_path('foo://bar/baz'),
                              'foo://bar/baz')

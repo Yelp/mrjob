@@ -228,7 +228,7 @@ def add_hadoop_emr_opts(opt_group):
         opt_group.add_option(
             '--hadoop-uri-protocol', dest='hadoop_uri_protocol',
             default='hdfs',
-            help='protocol to use to fully qualify paths on Hadoop'),
+            help='Protocol to use to fully qualify paths on Hadoop'),
 
         opt_group.add_option(
             '--label', dest='label', default=None,

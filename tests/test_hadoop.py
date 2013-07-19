@@ -106,7 +106,7 @@ class MockHadoopTestCase(SandboxedTestCase):
 
 class TestFullyQualifyHDFSPath(MockHadoopTestCase):
 
-    def test_mapr_default(self, args=()):
+    def test_mapr_default(self):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
                                '--no-conf', '--hadoop-uri-protocol','maprfs'])
         with mr_job.make_runner() as runner:
@@ -114,7 +114,7 @@ class TestFullyQualifyHDFSPath(MockHadoopTestCase):
                 getuser.return_value = 'dave'
                 self.assertEqual(runner.fully_qualify_hdfs_path(''), 'maprfs:///user/dave/')
 
-    def test_empty(self, args=()):
+    def test_empty(self):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v', '--no-conf'] )
         with mr_job.make_runner() as runner:
             with patch('getpass.getuser') as getuser:

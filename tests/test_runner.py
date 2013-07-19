@@ -453,6 +453,14 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
                           '-jobconf', 'FOO=bar',
                           ])
 
+    def test_empty_jobconf_values(self):
+        # value of None means to omit that jobconf
+        jobconf = {'foo': '', 'bar': None}
+        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf)
+
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
+                         ['-D', 'foo='])
+
     def test_configuration_translation(self):
         jobconf = {'mapred.jobtracker.maxtasks.per.job': 1}
         with no_handlers_for_logger('mrjob.compat'):

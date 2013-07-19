@@ -993,6 +993,10 @@ class MRJob(MRJobLauncher):
     #:
     #: Passed to Hadoop with the *first* step of this job with the
     #: ``-inputformat`` option.
+    #:
+    #: If you require more sophisticated behavior, try
+    #: :py:meth:`hadoop_input_format` or the *hadoop_input_format* argument to
+    #: :py:meth:`mrjob.runner.MRJobRunner.__init__`.
     HADOOP_INPUT_FORMAT = None
 
     def hadoop_input_format(self):
@@ -1009,6 +1013,10 @@ class MRJob(MRJobLauncher):
     #:
     #: Passed to Hadoop with the *last* step of this job with the
     #: ``-outputformat`` option.
+    #:
+    #: If you require more sophisticated behavior, try
+    #: :py:meth:`hadoop_output_format` or the *hadoop_output_format* argument
+    #: to :py:meth:`mrjob.runner.MRJobRunner.__init__`.
     HADOOP_OUTPUT_FORMAT = None
 
     def hadoop_output_format(self):
@@ -1025,6 +1033,8 @@ class MRJob(MRJobLauncher):
     #: Optional Hadoop partitioner class to use to determine how mapper
     #: output should be sorted and distributed to reducers. For example:
     #: ``'org.apache.hadoop.mapred.lib.HashPartitioner'``.
+    #:
+    #: If you require more sophisticated behavior, try :py:meth:`partitioner`.
     PARTITIONER = None
 
     def partitioner(self):
@@ -1032,7 +1042,7 @@ class MRJob(MRJobLauncher):
         output should be sorted and distributed to reducers.
 
         By default, returns whatever is passed to :option:`--partitioner`,
-        of if that option isn't used, :py:attr:`PARTITIONER`.
+        or if that option isn't used, :py:attr:`PARTITIONER`.
 
         You probably don't need to re-define this; it's just here for
         completeness.

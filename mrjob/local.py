@@ -138,10 +138,6 @@ class LocalMRJobRunner(SimMRJobRunner):
         # running the job)
         self._internal_jobconf = {}
 
-    def bootstrap_mrjob(self):
-        if self._opts['bootstrap_mrjob']:
-            self._add_python_archive(self._create_mrjob_tar_gz())
-
     def run_step(self, step_dict, input_file,
                  outfile_name, step_num, step_type, env):
 

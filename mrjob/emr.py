@@ -392,6 +392,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_bind_ports',
         'ssh_tunnel_is_open',
         'ssh_tunnel_to_job_tracker',
+        'visible_to_all_users'
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -430,6 +431,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
             'cleanup_on_failure': ['JOB'],
+            'visible_to_all_users': False
         })
 
     def _fix_ec2_instance_opts(self):
@@ -548,6 +550,10 @@ class EMRJobRunner(MRJobRunner):
         ...
     """
     alias = 'emr'
+
+    # Don't need to bootstrap mrjob in the setup wrapper; that's what
+    # the bootstrap script is for!
+    BOOTSTRAP_MRJOB_IN_SETUP = False
 
     OPTION_STORE_CLASS = EMRRunnerOptionStore
 
@@ -825,7 +831,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _prepare_for_launch(self):
         self._check_input_exists()
-        self._create_wrapper_script()
+        self._create_setup_wrapper_script()
         self._add_bootstrap_files_for_upload()
         self._add_job_files_for_upload()
         self._upload_local_files_to_s3()
@@ -1270,6 +1276,9 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['additional_emr_info']:
             args['additional_info'] = self._opts['additional_emr_info']
 
+        if self._opts['visible_to_all_users']:
+            args['visible_to_all_users'] = True
+
         if persistent or self._opts['pool_emr_job_flows']:
             args['keep_alive'] = True
 
@@ -1344,9 +1353,10 @@ class EMRJobRunner(MRJobRunner):
 
         return boto.emr.StreamingStep(**streaming_step_kwargs)
 
-    def _build_jar_step(self, step):
+    def _build_jar_step(self, step, step_num, num_steps):
         return boto.emr.JarStep(
-            name=step['name'],
+            name='%s: Step %d of %d' % (
+                self._job_name, step_num + 1, num_steps),
             jar=step['jar'],
             main_class=step['main_class'],
             step_args=step['step_args'],
@@ -1503,6 +1513,7 @@ class EMRJobRunner(MRJobRunner):
             if running_step_name:
                 log.info('Job launched %.1fs ago, status %s: %s (%s)' %
                          (running_time, job_state, reason, running_step_name))
+
                 if self._show_tracker_progress:
                     try:
                         tracker_handle = urllib2.urlopen(self._tracker_url)
@@ -1722,7 +1733,8 @@ class EMRJobRunner(MRJobRunner):
         # parameter
         if lg_step_num_mapping is None:
             lg_step_num_mapping = dict((n, n) for n in step_nums)
-        lg_step_nums = list(sorted(lg_step_num_mapping[k] for k in step_nums))
+        lg_step_nums = sorted(lg_step_num_mapping[k] for k in step_nums
+                               if k in lg_step_num_mapping)
 
         self._counters = []
         new_counters = {}

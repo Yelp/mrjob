@@ -227,11 +227,8 @@ class HadoopJobRunner(MRJobRunner):
         return self._hadoop_version
 
     def _run(self):
-        if self._opts['bootstrap_mrjob']:
-            self._add_python_archive(self._create_mrjob_tar_gz())
-
         self._check_input_exists()
-        self._create_wrapper_script()
+        self._create_setup_wrapper_script()
         self._add_job_files_for_upload()
         self._upload_local_files_to_hdfs()
         self._run_job_in_hadoop()

@@ -63,6 +63,11 @@ Setting protocols
 .. automethod:: MRJob.internal_protocol
 .. automethod:: MRJob.output_protocol
 
+Secondary Sort
+--------------
+
+.. autoattribute:: MRJob.SORT_VALUES
+
 Command-line options
 --------------------
 

@@ -1046,46 +1046,7 @@ class MRJob(MRJobLauncher):
         """
         return self.HADOOP_OUTPUT_FORMAT
 
-    ### Sorting and Partitioning ###
-
-    #: Set this to ``True`` if you would like reducers to receive the values
-    #: associated with any key in sorted order (sorted by their *encoded*
-    #: value). Also known as secondary sort.
-    #:
-    #: This can be useful if you expect more values than you can fit in memory
-    #: to be associated with one key, but you want to apply information in
-    #: a small subset of these values to information in the other values.
-    #: For example, you may want to convert counts to percentages, and to do
-    #: this you first need to know the total count.
-    #:
-    #: Even though values are sorted by their encoded value, most encodings
-    #: will sort strings in order. For example, you could have values like:
-    #: ``['A', <total>]``, ``['B', <count_name>, <count>]``, and the value
-    #: containing the total should come first regardless of what protocol
-    #: you're using.
-    #:
-    #: Setting this affects :py:meth:`jobconf()` and :py:meth:`partitioner()`.
-    #:
-    #: This just does the bare minimum, equivalent to::
-    #:
-    #:   --partitioner org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner
-    #:   --jobconf stream.num.map.output.key.fields=2
-    #:   --jobconf mapred.text.key.partitioner.options=k1,1
-    #:
-    #: We also blank out ``mapred.output.key.comparator.class``
-    #: and ``mapred.text.key.comparator.options`` to prevent interference
-    #: from :file:`mrjob.conf`. You can still set them through ``JOBCONF``.
-    #: For example, if you know your values are numbers, and want to sort
-    #: them in reverse, you could do::
-    #:
-    #:    SORT_VALUES = True
-    #:
-    #:    JOBCONF = {
-    #:        'mapred.output.key.comparator.class':
-    #:            'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
-    #:        'mapred.text.key.comparator.options': '-k1 -k2nr',
-    #:    }
-    SORT_VALUES = None
+    ### Partitioning ###
 
     #: Optional Hadoop partitioner class to use to determine how mapper
     #: output should be sorted and distributed to reducers. For example:
@@ -1131,9 +1092,28 @@ class MRJob(MRJobLauncher):
         lines with :py:attr:`JOBCONF`, with command line arguments taking
         precedence.
 
-        If :py:attr:`SORT_VALUES` is set, we add some additional jobconf
-        options. These have *lower* precedence than either :py:attr`JOBCONF`
-        or the command line.
+        If :py:attr:`SORT_VALUES` is set, we also set these jobconf values::
+
+            stream.num.map.output.key.fields=2
+            mapred.text.key.partitioner.options=k1,1
+
+        We also blank out ``mapred.output.key.comparator.class``
+        and ``mapred.text.key.comparator.options`` to prevent interference
+        from :file:`mrjob.conf`.
+
+        :py:attr:`SORT_VALUES` *can* be overridden by :py:attr:`JOBCONF`, the
+        command line, and step-specific ``jobconf`` values.
+
+        For example, if you know your values are numbers, and want to sort
+        them in reverse, you could do::
+
+            SORT_VALUES = True
+
+            JOBCONF = {
+              'mapred.output.key.comparator.class':
+                  'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
+              'mapred.text.key.comparator.options': '-k1 -k2nr',
+            }
 
         If you want to re-define this, it's strongly recommended that do
         something like this, so as not to inadvertently disable
@@ -1182,6 +1162,28 @@ class MRJob(MRJobLauncher):
                 _SORT_VALUES_JOBCONF, filtered_jobconf)
 
         return filtered_jobconf
+
+    ### Secondary Sort ###
+
+    #: Set this to ``True`` if you would like reducers to receive the values
+    #: associated with any key in sorted order (sorted by their *encoded*
+    #: value). Also known as secondary sort.
+    #:
+    #: This can be useful if you expect more values than you can fit in memory
+    #: to be associated with one key, but you want to apply information in
+    #: a small subset of these values to information in the other values.
+    #: For example, you may want to convert counts to percentages, and to do
+    #: this you first need to know the total count.
+    #:
+    #: Even though values are sorted by their encoded value, most encodings
+    #: will sort strings in order. For example, you could have values like:
+    #: ``['A', <total>]``, ``['B', <count_name>, <count>]``, and the value
+    #: containing the total should come first regardless of what protocol
+    #: you're using.
+    #:
+    #: See :py:meth:`jobconf()` and :py:meth:`partitioner()` for more about
+    #: how this works.
+    SORT_VALUES = None
 
     ### Testing ###
 

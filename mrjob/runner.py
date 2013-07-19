@@ -103,7 +103,6 @@ _SORT_VALUES_JOBCONF = {
     'mapred.text.key.partitioner.options': '-k1,1',
     'mapred.output.key.comparator.class':
         'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
-    'mapred.text.key.comparator.options': '-k1,2',
 }
 
 # partitioner for sort_values

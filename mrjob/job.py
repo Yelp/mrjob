@@ -53,10 +53,6 @@ from mrjob.util import read_input
 log = logging.getLogger('mrjob.job')
 
 
-# partitioner for SORT_VALUES
-_SORT_VALUES_PARTITIONER = \
-    'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
-
 # jobconf options for implementing SORT_VALUES
 _SORT_VALUES_JOBCONF = {
     'stream.num.map.output.key.fields': 2,
@@ -70,7 +66,6 @@ _SORT_VALUES_JOBCONF = {
 # partitioner for sort_values
 _SORT_VALUES_PARTITIONER = \
     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
-
 
 
 class UsageError(Exception):

@@ -63,7 +63,7 @@ Setting protocols
 .. automethod:: MRJob.internal_protocol
 .. automethod:: MRJob.output_protocol
 
-Secondary Sort
+Secondary sort
 --------------
 
 .. autoattribute:: MRJob.SORT_VALUES
@@ -105,7 +105,7 @@ Running specific parts of jobs
 
 .. _hadoop-config:
 
-Hadoop Configuration
+Hadoop configuration
 --------------------
 .. autoattribute:: MRJob.HADOOP_INPUT_FORMAT
 .. automethod:: MRJob.hadoop_input_format

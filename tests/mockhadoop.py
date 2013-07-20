@@ -196,37 +196,36 @@ def hadoop_fs_cat(stdout, stderr, environ, *args):
     else:
         return 0
 
+def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
+    hdfs_path = real_path_to_hdfs_path(real_path, environ)
+
+    # we could actually implement ls here, but mrjob only cares about
+    # the path
+    if os.path.isdir(real_path):
+        file_type = 'd'
+    else:
+        file_type = '-'
+
+    if scheme in ('s3', 's3n'):
+        # no user and group on S3 (see Pull Request #573)
+        user_and_group = ''
+    else:
+        user_and_group = 'dave supergroup'
+
+    # newer Hadoop returns fully qualified URIs (see Pull Request #577)
+    if scheme and environ.get('MOCK_HADOOP_LS_RETURNS_FULL_URIS'):
+        hdfs_path = '%s://%s%s' % (scheme, netloc, hdfs_path)
+
+    # figure out the padding
+    size = str(size).rjust(len(str(max_size)))
+
+    return (
+        '%srwxrwxrwx - %s %s 2010-10-01 15:16 %s' %
+        (file_type, user_and_group, size, hdfs_path))
 
 def hadoop_fs_lsr(stdout, stderr, environ, *args):
     """Implements hadoop fs -lsr."""
     hdfs_path_globs = args or ['']
-
-    def ls_line(real_path, scheme, netloc, size=0, max_size=0):
-        hdfs_path = real_path_to_hdfs_path(real_path, environ)
-
-        # we could actually implement ls here, but mrjob only cares about
-        # the path
-        if os.path.isdir(real_path):
-            file_type = 'd'
-        else:
-            file_type = '-'
-
-        if scheme in ('s3', 's3n'):
-            # no user and group on S3 (see Pull Request #573)
-            user_and_group = ''
-        else:
-            user_and_group = 'dave supergroup'
-
-        # newer Hadoop returns fully qualified URIs (see Pull Request #577)
-        if scheme and environ.get('MOCK_HADOOP_LS_RETURNS_FULL_URIS'):
-            hdfs_path = '%s://%s%s' % (scheme, netloc, hdfs_path)
-
-        # figure out the padding
-        size = str(size).rjust(len(str(max_size)))
-
-        return (
-            '%srwxrwxrwx - %s %s 2010-10-01 15:16 %s' %
-            (file_type, user_and_group, size, hdfs_path))
 
     failed = False
     for hdfs_path_glob in hdfs_path_globs:
@@ -259,7 +258,41 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
                     paths.append((real_path, scheme, netloc, 0))
 
         for path in paths:
-            print >> stdout, ls_line(*path + (max_size,))
+            print >> stdout, _hadoop_ls_line(*path + (max_size, environ))
+
+    if failed:
+        return -1
+    else:
+        return 0
+
+
+def hadoop_fs_ls(stdout, stderr, environ, *args):
+    """Implements hadoop fs -ls."""
+    hdfs_path_globs = args or ['']
+
+    failed = False
+    for hdfs_path_glob in hdfs_path_globs:
+        parsed = urlparse(hdfs_path_glob)
+        scheme = parsed.scheme
+        netloc = parsed.netloc
+
+        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
+        real_paths = glob.glob(real_path_glob)
+
+        paths = []
+        max_size = 0
+
+        if not real_paths:
+            print >> stderr, (
+                'ls: Cannot access %s: No such file or directory.' %
+                hdfs_path_glob)
+            failed = True
+        else:
+            for real_path in real_paths:
+                paths.append((real_path, scheme, netloc, 0))
+
+        for path in paths:
+            print >> stdout, _hadoop_ls_line(*path + (max_size, environ))
 
     if failed:
         return -1

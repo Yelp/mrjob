@@ -261,7 +261,7 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
             print >> stdout, _hadoop_ls_line(*path + (max_size, environ))
 
     if failed:
-        return 255
+        return -1
     else:
         return 0
 
@@ -295,7 +295,7 @@ def hadoop_fs_ls(stdout, stderr, environ, *args):
             print >> stdout, _hadoop_ls_line(*path + (max_size, environ))
 
     if failed:
-        return 255
+        return -1
     else:
         return 0
 

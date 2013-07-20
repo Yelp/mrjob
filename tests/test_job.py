@@ -678,7 +678,7 @@ class SortValuesRunnerTestCase(SandboxedTestCase):
         'foo': 'bar',
     }}}}
 
-    def test_cant_override_sort_values_from_cmd_line(self):
+    def test_cant_override_sort_values_from_mrjob_conf(self):
         runner = MRSortValuesJob(['-r', 'local']).make_runner()
 
         self.assertEqual(

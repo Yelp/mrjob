@@ -1,4 +1,4 @@
-v0.4, 2012-08-?? -- Slouching toward nirvana
+v0.4, 2013-04-30 -- Slouching toward nirvana
  * Changes:
    * 'mrjob' command (#225)
    * Changed default runner from 'local' to 'inline' (#423)
@@ -9,6 +9,8 @@ v0.4, 2012-08-?? -- Slouching toward nirvana
      but forwarded from runners for backward compatibility
    * Changed exception hierarchy of mrjob.ssh (which is private but
      important)
+   * Inline and local runners now inherit from the SimMRJobRunner class and thus share most
+     of their implementation
    * Internal data structure for representing a step is much richer, allowing
      many cool future features (#479)
    * mrjob detects Hadoop version from EMR based on API responses instead of
@@ -20,11 +22,14 @@ v0.4, 2012-08-?? -- Slouching toward nirvana
    * mapper_pre_filter, combiner_pre_filter, and reducer_pre_filter allow
      running of a UNIX command in front of tasks to filter input outside of
      the interpreter
+   * Hadoop runner uses PTY to print output from the Hadoop sub process to the
+     console (#580)
    * mrjob knows how to terminate the job on cleanup (Ctrl+C closes the job).
      (#353)
    * Allow use of multiple -c flags on the command line (#420)
  * Bug fixes:
    * Silenced some incorrect warnings about ignored options in 'inline' runner
+   * terminate_idle_job_flows uses the default configuration to terminate idle jobs (#559)
  * Removed deprecated functionality:
    * --hadoop-*-format
    * --*-protocol switches
@@ -229,7 +234,7 @@ v0.2.6, 2011-05-24 -- Hadoop 0.20 in EMR, inline runner, and more
  * New inline runner, for testing locally with a debugger
  * New --strict-protocols option, to catch unencodable data (Issue #76)
  * Added steps_python_bin option (for use with virtualenv)
- * mrjob no longer chokes when asked to run on an EMR job flow running 
+ * mrjob no longer chokes when asked to run on an EMR job flow running
    Hadoop 0.20 (Issue #110)
  * mrjob no longer chokes on job flows with no LogUri (Issue #112)
 
@@ -264,18 +269,18 @@ v0.2.1, 2010-11-17 -- laststatechangereason bugfix
 
 v0.2.0, 2010-11-15 -- Many bugfixes, Windows support
  * New Features/Changes:
-   * EMRJobRunner now prints % of mappers and reducers completed when you 
+   * EMRJobRunner now prints % of mappers and reducers completed when you
      enable the SSH tunnel.
    * Added mr_page_rank example
    * Added mrjob.tools.emr.audit_usage script (Issue #21)
-   * You can specify alternate job owners with the "owner" option. Useful for 
+   * You can specify alternate job owners with the "owner" option. Useful for
      auditing usage. (Issue #59)
-   * The job_name_prefix option has been renamed to label (the old name still 
+   * The job_name_prefix option has been renamed to label (the old name still
      works but is deprecated)
    * bootstrap_cmds and bootstrap_scripts no longer automatically invoke sudo
  * Bugs Fixed/Cleanup:
    * bootstrap files no longer get uploaded to S3 twice (Issue #8)
-   * When using add_file_option(), show_steps() can now see the local version 
+   * When using add_file_option(), show_steps() can now see the local version
      of the file (Issue #45)
    * Now works on Windows (Issue #46)
    * No longer requires external jar, tar, or zip binaries (Issue #47)

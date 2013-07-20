@@ -293,18 +293,11 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             # make sure mrjob.tar.gz is created and uploaded as
             # a bootstrap file
-            self.assertTrue(runner._mrjob_tar_gz_path)
+            self.assertTrue(os.path.exists(runner._mrjob_tar_gz_path))
             self.assertIn(runner._mrjob_tar_gz_path,
                           runner._upload_mgr.path_to_uri())
             self.assertIn(runner._mrjob_tar_gz_path,
                           runner._bootstrap_dir_mgr.paths())
-
-            # shouldn't be in PYTHONPATH (we dump it directly in site-packages)
-            pythonpath = runner._get_cmdenv().get('PYTHONPATH') or ''
-            self.assertNotIn(
-                runner._bootstrap_dir_mgr.name(
-                    'file', runner._mrjob_tar_gz_path),
-                pythonpath.split(':'))
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
@@ -546,7 +539,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
-
+            self.prepare_runner_for_ssh(runner)
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
 
@@ -566,6 +559,28 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
         self.assertEqual(job_flow.state, 'WAITING')
+
+
+class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
+
+    def run_and_get_job_flow(self, *args):
+        stdin = StringIO('foo\nbar\n')
+        mr_job = MRTwoStepJob(
+            ['-r', 'emr', '-v'] + list(args))
+        mr_job.sandbox(stdin=stdin)
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            emr_conn = runner.make_emr_conn()
+            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+
+    def test_defaults(self):
+        job_flow = self.run_and_get_job_flow()
+        self.assertFalse(job_flow.visible_to_all_users)
+
+    def test_visible(self):
+        job_flow = self.run_and_get_job_flow('--visible-to-all-users')
+        self.assertTrue(job_flow.visible_to_all_users)
 
 
 class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
@@ -1485,6 +1500,44 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
         self.runner._fetch_counters([2], {2: 1}, skip_s3_wait=True)
         self.assertEqual(self.runner.counters(),
                          [{'Job Counters ': {'Launched reduce tasks': 1}}])
+
+    def test_zero_log_generating_steps(self):
+        mock_steps = [
+            MockEmrObject(jar='x.jar',
+                          name=self.runner._job_name,
+                          state='COMPLETED'),
+            MockEmrObject(jar='x.jar',
+                          name=self.runner._job_name,
+                          state='COMPLETED'),
+        ]
+        mock_jobflow = MockEmrObject(state='COMPLETED',
+                                    steps=mock_steps)
+        self.runner._describe_jobflow = Mock(return_value=mock_jobflow)
+        self.runner._fetch_counters_s3 = Mock(return_value={})
+        self.runner._wait_for_job_to_complete()
+        self.runner._fetch_counters_s3.assert_called_with([], False)
+
+    def test_interleaved_log_generating_steps(self):
+        mock_steps = [
+            MockEmrObject(jar='x.jar',
+                          name=self.runner._job_name,
+                          state='COMPLETED'),
+            MockEmrObject(jar='hadoop.streaming.jar',
+                          name=self.runner._job_name,
+                          state='COMPLETED'),
+            MockEmrObject(jar='x.jar',
+                          name=self.runner._job_name,
+                          state='COMPLETED'),
+            MockEmrObject(jar='hadoop.streaming.jar',
+                          name=self.runner._job_name,
+                          state='COMPLETED'),
+        ]
+        mock_jobflow = MockEmrObject(state='COMPLETED',
+                                    steps=mock_steps)
+        self.runner._describe_jobflow = Mock(return_value=mock_jobflow)
+        self.runner._fetch_counters_s3 = Mock(return_value={})
+        self.runner._wait_for_job_to_complete()
+        self.runner._fetch_counters_s3.assert_called_with([1, 2], False)
 
 
 class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
@@ -2436,7 +2489,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
-
+            self.prepare_runner_for_ssh(runner)
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
 
@@ -2471,7 +2524,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
-
+            self.prepare_runner_for_ssh(runner)
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
 

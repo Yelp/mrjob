@@ -15,7 +15,6 @@ import fnmatch
 import logging
 import posixpath
 import socket
-from urlparse import urlparse
 
 try:
     import boto
@@ -28,6 +27,7 @@ except ImportError:
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
+from urlparse import urlparse
 from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
 from mrjob.util import buffer_iterator_to_line_iterator

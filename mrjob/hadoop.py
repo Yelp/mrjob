@@ -81,8 +81,15 @@ def find_hadoop_streaming_jar(path):
         return None
 
 
-def fully_qualify_hdfs_path(path, scheme='hdfs'):
-    """If path isn't an ``hdfs://`` URL, turn it into one.
+def fully_qualify_hdfs_path(path):
+    """.. deprecated:: 0.4.1
+          Use :py:func:`fully_qualify_hadoop_path` instead.
+    """
+    return fully_qualify_hadoop_path(path, 'hdfs')
+
+
+def fully_qualify_hadoop_path(path, scheme='hdfs'):
+    """If path isn't a URL, turn it into one.
 
     :param scheme: Scheme to use if *path* doesn't specify one (e.g.
                      ``'maprfs'``).
@@ -182,7 +189,7 @@ class HadoopJobRunner(MRJobRunner):
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 
-        self._hdfs_tmp_dir = fully_qualify_hdfs_path(
+        self._hdfs_tmp_dir = fully_qualify_hadoop_path(
             posixpath.join(
             self._opts['hdfs_scratch_dir'], self._job_name),
             scheme=self._opts['hadoop_uri_scheme'])
@@ -193,7 +200,7 @@ class HadoopJobRunner(MRJobRunner):
         self._upload_mgr = UploadDirManager(hdfs_files_dir)
 
         # Set output dir if it wasn't set explicitly
-        self._output_dir = fully_qualify_hdfs_path(
+        self._output_dir = fully_qualify_hadoop_path(
             self._output_dir or
             posixpath.join(self._hdfs_tmp_dir, 'output'),
             scheme=self._opts['hadoop_uri_scheme'])

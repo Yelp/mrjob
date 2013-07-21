@@ -151,7 +151,7 @@ class TestHadoopUriScheme(MockHadoopTestCase):
 
         with mr_job.make_runner() as runner:
             self.assertTrue(
-                runner._hdfs_tmp_dir.startswith('hdfs:///user/'))
+                runner._hadoop_tmp_dir.startswith('hdfs:///user/'))
 
     def test_maprfs_uri_scheme(self):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
@@ -159,7 +159,7 @@ class TestHadoopUriScheme(MockHadoopTestCase):
 
         with mr_job.make_runner() as runner:
             self.assertTrue(
-                runner._hdfs_tmp_dir.startswith('maprfs:///user/'))
+                runner._hadoop_tmp_dir.startswith('maprfs:///user/'))
 
 
 class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):

@@ -44,9 +44,9 @@ Options available to hadoop and emr runners
     runner, which will search for it in :envvar:`HADOOP_HOME`. The emr runner
     can take a path either local to your machine or on S3.
 
-.. _opt_hadoop_uri_protocol:
+.. _opt_hadoop_uri_scheme:
 
-**hadoop_uri_protocol** (:option:`--hadoop-uri-protocol`)
+**hadoop_uri_scheme** (:option:`--hadoop-uri-scheme`)
     The protocol to append to fully qualify URIs (ie. hdfs, maprfs, s3). 
     Defaults to hdfs if none is specified.
 

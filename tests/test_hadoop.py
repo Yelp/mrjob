@@ -108,7 +108,7 @@ class TestFullyQualifyHDFSPath(MockHadoopTestCase):
 
     def test_mapr_default(self):
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-uri-protocol','maprfs'])
+                               '--no-conf', '--hadoop-uri-scheme','maprfs'])
         with mr_job.make_runner() as runner:
             with patch('getpass.getuser') as getuser:
                 getuser.return_value = 'dave'

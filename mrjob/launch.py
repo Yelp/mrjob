@@ -485,7 +485,7 @@ class MRJobLauncher(object):
             'hadoop_input_format': self.hadoop_input_format(),
             'hadoop_output_format': self.hadoop_output_format(),
             'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
-            'hadoop_uri_protocol': self.options.hadoop_uri_protocol,
+            'hadoop_uri_scheme': self.options.hadoop_uri_scheme,
             'hadoop_version': self.options.hadoop_version,
             'input_paths': self.args,
             'interpreter': self.options.interpreter,

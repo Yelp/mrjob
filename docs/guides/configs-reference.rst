@@ -66,7 +66,7 @@ Option                                                  Switches                
 :ref:`cmdenv <opt_cmdenv>`                              :option:`--cmdenv`                                                 ``{}``                         |dt-env-dict|
 :ref:`hadoop_extra_args <opt_hadoop_extra_args>`        :option:`--hadoop-arg`                                             ``[]``                         |dt-string-list|
 :ref:`hadoop_streaming_jar <opt_hadoop_streaming_jar>`  :option:`--hadoop-streaming-jar`                                   (automatic)                    |dt-string|
-:ref:`hadoop_uri_protocol <opt_hadoop_uri_protocol>`    :option:`--hadoop-uri-protocol`                                    (automatic)                    |dt-string|
+:ref:`hadoop_uri_scheme <opt_hadoop_uri_scheme>`        :option:`--hadoop-uri-scheme`                                      (automatic)                    |dt-string|
 :ref:`interpreter <opt_interpreter>`                    :option:`--interpreter`                                            (value of *python_bin*)        |dt-command|
 :ref:`jobconf <opt_jobconf>`                            :option:`--jobconf` (see also :py:meth:`~mrjob.job.MRJob.jobconf`) ``{}``                         |dt-plain-dict|
 :ref:`label <opt_label>`                                :option:`--label`                                                  (automatic)                    |dt-string|

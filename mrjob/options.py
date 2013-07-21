@@ -226,7 +226,7 @@ def add_hadoop_emr_opts(opt_group):
             help='Path of your hadoop streaming jar (locally, or on S3/HDFS)'),
 
         opt_group.add_option(
-            '--hadoop-uri-protocol', dest='hadoop_uri_protocol',
+            '--hadoop-uri-scheme', dest='hadoop_uri_scheme',
             default='hdfs',
             help='Protocol to use to fully qualify paths on Hadoop'),
 

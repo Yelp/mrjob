@@ -226,6 +226,11 @@ def add_hadoop_emr_opts(opt_group):
             help='Path of your hadoop streaming jar (locally, or on S3/HDFS)'),
 
         opt_group.add_option(
+            '--hadoop-uri-protocol', dest='hadoop_uri_protocol',
+            default='hdfs',
+            help='Protocol to use to fully qualify paths on Hadoop'),
+
+        opt_group.add_option(
             '--label', dest='label', default=None,
             help='custom prefix for job name, to help us identify the job'),
 

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-# Copyright 2009-2012 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,7 +43,6 @@ from mrjob.step import JarStep
 from mrjob.step import MRJobStep
 from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
-from mrjob.job import MRJob
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled
@@ -603,6 +602,94 @@ class JobConfTestCase(unittest.TestCase):
         # --jobconf is ignored because that's the way we defined jobconf()
         self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
                          {'mapred.baz': 'bar'})
+
+
+class MRSortValuesJob(MRJob):
+    SORT_VALUES = True
+
+
+class MRSortValuesAndMoreJob(MRSortValuesJob):
+    PARTITIONER = 'org.apache.hadoop.mapred.lib.HashPartitioner'
+
+    JOBCONF = {
+        'stream.num.map.output.key.fields': 3,
+        'mapred.output.key.comparator.class':
+            'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
+        'mapred.text.key.comparator.options': '-k1 -k2nr',
+    }
+
+
+class SortValuesTestCase(unittest.TestCase):
+
+    def test_sort_values_sets_partitioner(self):
+        mr_job = MRSortValuesJob()
+
+        self.assertEqual(
+            mr_job.partitioner(),
+            'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
+
+    def test_sort_values_sets_jobconf(self):
+        mr_job = MRSortValuesJob()
+
+        self.assertEqual(
+            mr_job.jobconf(),
+            {'stream.num.map.output.key.fields': 2,
+             'mapred.text.key.partitioner.options': '-k1,1',
+             'mapred.output.key.comparator.class': None,
+             'mapred.text.key.comparator.options': None})
+
+    def test_can_override_sort_values_from_job(self):
+        mr_job = MRSortValuesAndMoreJob()
+
+        self.assertEqual(
+            mr_job.partitioner(),
+            'org.apache.hadoop.mapred.lib.HashPartitioner')
+
+        self.assertEqual(
+            mr_job.jobconf(),
+            {'stream.num.map.output.key.fields': 3,
+             'mapred.text.key.partitioner.options': '-k1,1',
+             'mapred.output.key.comparator.class':
+                'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
+             'mapred.text.key.comparator.options': '-k1 -k2nr'})
+
+    def test_can_override_sort_values_from_cmd_line(self):
+        mr_job = MRSortValuesJob(
+            ['--partitioner', 'org.pants.FancyPantsPartitioner',
+             '--jobconf', 'stream.num.map.output.key.fields=lots'])
+
+        self.assertEqual(
+            mr_job.partitioner(),
+            'org.pants.FancyPantsPartitioner')
+
+        self.assertEqual(
+            mr_job.jobconf(),
+            {'stream.num.map.output.key.fields': 'lots',
+             'mapred.text.key.partitioner.options': '-k1,1',
+             'mapred.output.key.comparator.class': None,
+             'mapred.text.key.comparator.options': None})
+
+
+class SortValuesRunnerTestCase(SandboxedTestCase):
+
+    MRJOB_CONF_CONTENTS = {'runners': {'local': {'jobconf': {
+        'mapred.text.key.partitioner.options': '-k1,1',
+        'mapred.output.key.comparator.class': 'egypt.god.Anubis',
+        'foo': 'bar',
+    }}}}
+
+    def test_cant_override_sort_values_from_mrjob_conf(self):
+        runner = MRSortValuesJob(['-r', 'local']).make_runner()
+
+        self.assertEqual(
+            runner._hadoop_conf_args({}, 0, 1),
+            # foo=bar is included, but the other options from mrjob.conf are
+            # blanked out so as not to mess up SORT_VALUES
+            ['-D', 'foo=bar',
+             '-D', 'mapred.text.key.partitioner.options=-k1,1',
+             '-D', 'stream.num.map.output.key.fields=2',
+             '-partitioner',
+                'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'])
 
 
 class HadoopFormatTestCase(unittest.TestCase):

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,9 +47,6 @@ except:
     JSONDecodeError = ValueError
 
 from mrjob.compat import add_translated_jobconf_for_hadoop_version
-from mrjob.setup import WorkingDirManager
-from mrjob.setup import parse_legacy_hash_path
-from mrjob.setup import parse_setup_cmd
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import uses_generic_jobconf
 from mrjob.conf import combine_cmds
@@ -62,6 +59,9 @@ from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.local import LocalFilesystem
+from mrjob.setup import WorkingDirManager
+from mrjob.setup import parse_legacy_hash_path
+from mrjob.setup import parse_setup_cmd
 from mrjob.step import STEP_TYPES
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
@@ -1073,11 +1073,13 @@ class MRJobRunner(object):
                                                             version)
         if uses_generic_jobconf(version):
             for key, value in sorted(jobconf.iteritems()):
-                args.extend(['-D', '%s=%s' % (key, value)])
+                if value is not None:
+                    args.extend(['-D', '%s=%s' % (key, value)])
         # old-style jobconf
         else:
             for key, value in sorted(jobconf.iteritems()):
-                args.extend(['-jobconf', '%s=%s' % (key, value)])
+                if value is not None:
+                    args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         # partitioner
         if self._partitioner:

@@ -85,7 +85,7 @@ def find_hadoop_streaming_jar(path):
 
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
-    process = Popen(HADOOP_FETCH_URI_PROTOCOL, shell=True, stdout=PIPE)
+    process = Popen(HADOOP_FETCH_URI_PROTOCOL, shell=True, stdout=PIPE, stderr='/dev/null')
     proto_uri = process.communicate()[0]
     if process.returncode != 0:
        proto_uri='hdfs://'

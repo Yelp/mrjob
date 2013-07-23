@@ -18,7 +18,7 @@ import os
 import posixpath
 import re
 from subprocess import Popen
-from subprocess import PIPE
+from subprocess import PIPE, STDOUT
 from subprocess import CalledProcessError
 
 try:
@@ -85,7 +85,7 @@ def find_hadoop_streaming_jar(path):
 
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
-    process = Popen(HADOOP_FETCH_URI_PROTOCOL, shell=True, stdout=PIPE, stderr='/dev/null')
+    process = Popen(HADOOP_FETCH_URI_PROTOCOL, shell=True, stdout=PIPE, stderr=STDOUT)
     proto_uri = process.communicate()[0]
     if process.returncode != 0:
        proto_uri='hdfs://'

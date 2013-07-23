@@ -32,7 +32,7 @@ except ImportError:
 
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
-from mrjob.hadoop import fully_qualify_hdfs_path
+from mrjob.hadoop import fully_qualify_hadoop_path
 from mrjob.util import bash_wrap
 from mrjob.util import shlex_split
 
@@ -48,28 +48,28 @@ class TestFullyQualifyHDFSPath(unittest.TestCase):
     def test_empty(self):
         with patch('getpass.getuser') as getuser:
             getuser.return_value = 'dave'
-            self.assertEqual(fully_qualify_hdfs_path(''), 'hdfs:///user/dave/')
+            self.assertEqual(fully_qualify_hadoop_path(''), 'hdfs:///user/dave/')
 
     def test_relative_path(self):
         with patch('getpass.getuser') as getuser:
             getuser.return_value = 'dave'
-            self.assertEqual(fully_qualify_hdfs_path('path/to/chocolate'),
+            self.assertEqual(fully_qualify_hadoop_path('path/to/chocolate'),
                              'hdfs:///user/dave/path/to/chocolate')
 
     def test_absolute_path(self):
-        self.assertEqual(fully_qualify_hdfs_path('/path/to/cheese'),
+        self.assertEqual(fully_qualify_hadoop_path('/path/to/cheese'),
                          'hdfs:///path/to/cheese')
 
     def test_hdfs_uri(self):
-        self.assertEqual(fully_qualify_hdfs_path('hdfs://host/path/'),
+        self.assertEqual(fully_qualify_hadoop_path('hdfs://host/path/'),
                          'hdfs://host/path/')
 
     def test_s3n_uri(self):
-        self.assertEqual(fully_qualify_hdfs_path('s3n://bucket/oh/noes'),
+        self.assertEqual(fully_qualify_hadoop_path('s3n://bucket/oh/noes'),
                          's3n://bucket/oh/noes')
 
     def test_other_uri(self):
-        self.assertEqual(fully_qualify_hdfs_path('foo://bar/baz'),
+        self.assertEqual(fully_qualify_hadoop_path('foo://bar/baz'),
                          'foo://bar/baz')
 
 

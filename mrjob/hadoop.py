@@ -69,6 +69,8 @@ HADOOP_JOB_TIMESTAMP_RE = re.compile(
 # find version string in "Hadoop 0.20.203" etc.
 HADOOP_VERSION_RE = re.compile(r'^.*?(?P<version>(\d|\.)+).*?$')
 
+HADOOP_FETCH_URI_PROTOCOL = "hadoop conf -key fs.default.name"
+HADOOP_FETCH_URI_CLEANUP = re.compile(r'///\n')
 
 def find_hadoop_streaming_jar(path):
     """Return the path of the hadoop streaming jar inside the given
@@ -83,12 +85,18 @@ def find_hadoop_streaming_jar(path):
 
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
+    process = Popen(HADOOP_FETCH_URI_PROTOCOL, shell=True, stdout=PIPE)
+    proto_uri = process.communicate()[0]
+    if process.returncode != 0:
+       proto_uri='hdfs://'
+    else:
+       proto_uri = HADOOP_FETCH_URI_CLEANUP.sub('//', proto_uri)
     if is_uri(path):
         return path
     elif path.startswith('/'):
-        return 'hdfs://' + path
+        return proto_uri + path
     else:
-        return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
+        return '%s/user/%s/%s' % (proto_uri, getpass.getuser(), path)
 
 
 def hadoop_log_dir(hadoop_home=None):

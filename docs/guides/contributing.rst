@@ -6,7 +6,7 @@ code is reviewed in pull requests.
 
 The general process for working on mrjob is:
 
-* Fork the project on Github
+* `Fork the project on Github`_
 * Clone your fork to your local machine
 * Create a feature branch from master (e.g. ``git branch delete_all_the_code``)
 * Write code, commit often
@@ -19,6 +19,7 @@ you of possible merge conflicts with ongoing work or offer suggestions for
 where to put code.
 
 .. _`mailing list`: http://groups.google.com/group/mrjob
+.. _`Fork the project on Github`: http://www.github.com/Yelp/mrjob
 
 Things that will make your branch more likely to be pulled:
 

@@ -29,6 +29,7 @@ __credits__ = [
     'Jordan Christensen <jc@kobo.com>',
     'David Dehghan <ddehghan@gmail.com>',
     'Adam Derewecki <derewecki@gmail.com>',
+    'Nick Dimiduk <ndimiduk@gmail.com>',
     'Tom Dooner <tomdooner@gmail.com>',
     'Dan Frank <danielhfrank@gmail.com>',
     'Benjamin Goldenberg <benjamin@yelp.com',

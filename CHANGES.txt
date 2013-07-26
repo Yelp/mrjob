@@ -1,3 +1,6 @@
+v0.4.1-dev
+ * EMR runner throws IOError if output path already exists (#634)
+
 v0.4, 2013-04-30 -- Slouching toward nirvana
  * Changes:
    * 'mrjob' command (#225)

@@ -831,6 +831,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _prepare_for_launch(self):
         self._check_input_exists()
+        self._check_output_not_exists()
         self._create_setup_wrapper_script()
         self._add_bootstrap_files_for_upload()
         self._add_job_files_for_upload()
@@ -849,6 +850,17 @@ class EMRJobRunner(MRJobRunner):
             if not self.path_exists(path):
                 raise AssertionError(
                     'Input path %s does not exist!' % (path,))
+
+    def _check_output_not_exists(self):
+        """Verify the output path does not already exist. This avoids
+        provisioning a cluster only to have Hadoop refuse to launch.
+        """
+        try:
+            if self.fs.path_exists(self._output_dir):
+                raise IOError(
+                    'Output path %s already exists!' % (self._output_dir,))
+        except boto.exception.S3ResponseError:
+            pass
 
     def _add_bootstrap_files_for_upload(self):
         """Add files needed by the bootstrap script to self._upload_mgr.

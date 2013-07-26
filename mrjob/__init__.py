@@ -16,7 +16,7 @@
 Hadoop cluster.
 """
 
-__author__ = 'David Marin <dave@yelp.com>'
+__author__ = 'David Marin <dm@davidmarin.org>'
 
 __credits__ = [
     'Jordan Andersen <jordandandersen@gmail.com>',

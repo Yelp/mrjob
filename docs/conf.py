@@ -14,6 +14,8 @@
 import sys, os
 import mrjob
 
+READ_THE_DOCS = os.environ.get('READTHEDOCS', None) == 'True'
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -99,6 +101,17 @@ html_theme = 'theme'
 # documentation.
 html_theme_options = {
 }
+
+html_context = {
+}
+
+if READ_THE_DOCS:
+    html_context['ga_ua'] = 'UA-42793220-1'
+    html_context['ga_domain'] = 'readthedocs.org'
+else:
+    html_context['ga_ua'] = 'STUB GA UA'
+    html_context['ga_domain'] = 'STUB GA DOMAIN'
+
 
 # Add any paths that contain custom themes here, relative to this directory.
 html_theme_path = ['.']

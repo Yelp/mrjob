@@ -1350,10 +1350,20 @@ class EMRJobRunner(MRJobRunner):
         step_args = step['step_args']
         io = step['io']
 
+        ## The input_marker specifies where in the command
+        ## the input files should be specified. The input_format
+        ## specifies the way it should be formated. If there are spaces
+        ## in the format it is assumed that they should be viewed as seperate 
+        ## shell arguments.
+        ## The same is true for the output specification.
         if io['input_marker'] in step_args:
             input_loc = step_args.index(io['input_marker'])
-            del step_args[input_loc]
+            del step_args[input_loc] ## we delete the marker
             i = input_loc
+            ## Then for each path we insert the input
+            ## Since each input specifier may be multiple shell arguments
+            ## we have to increment i manually.
+            ## this holds for inserting the output as well.
             for path in input_paths:
                 inn = (io['input_format'] % path).split(' ')
                 for part in inn:

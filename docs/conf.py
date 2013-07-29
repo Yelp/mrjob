@@ -109,8 +109,8 @@ if READ_THE_DOCS:
     html_context['ga_ua'] = 'UA-42793220-1'
     html_context['ga_domain'] = 'readthedocs.org'
 else:
-    html_context['ga_ua'] = 'STUB GA UA'
-    html_context['ga_domain'] = 'STUB GA DOMAIN'
+    html_context['ga_ua'] = 'UA-42793220-2'
+    html_context['ga_domain'] = 'pythonhosted.org'
 
 
 # Add any paths that contain custom themes here, relative to this directory.

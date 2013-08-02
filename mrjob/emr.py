@@ -15,6 +15,7 @@
 from __future__ import with_statement
 
 import logging
+import math
 import os
 import os.path
 import posixpath
@@ -45,6 +46,8 @@ except ImportError:
 try:
     import boto
     import boto.ec2
+    import boto.ec2.cloudwatch
+    import boto.ec2.cloudwatch.alarm
     import boto.emr
     import boto.emr.connection
     import boto.emr.instance_group
@@ -57,10 +60,11 @@ except ImportError:
     boto = None
 
 import mrjob
+from mrjob.aws import CLOUDWATCH_DEFAULT_PERIOD
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
-from mrjob.aws import region_to_cloudwatch_ec2_action_prefix
+from mrjob.aws import cloudwatch_ec2_action_arn
 from mrjob.aws import region_to_cloudwatch_endpoint
 from mrjob.aws import region_to_emr_endpoint
 from mrjob.aws import region_to_s3_endpoint
@@ -1993,6 +1997,12 @@ class EMRJobRunner(MRJobRunner):
 
         self._emr_job_flow_id = self._create_job_flow(persistent=True)
 
+        if self._opts['max_hours_idle']:
+            self._create_cloudwatch_idle_alarm()
+
+
+
+
         return self._emr_job_flow_id
 
     def get_emr_job_flow_id(self):
@@ -2256,7 +2266,70 @@ class EMRJobRunner(MRJobRunner):
             things_to_hash.append(mrjob.__version__)
         return hash_object(things_to_hash)
 
-    ### EMR-specific STUFF ###
+    ### CloudWatch-specific Stuff ###
+
+    def make_cloudwatch_conn(self):
+        """Create a connection to CLOUDWATCH.
+
+        :return: a :py:class:`boto.ec2.cloudwatch.CloudWatchConnection`,
+                 wrapped in a :py:class:`mrjob.retry.RetryWrapper`
+        """
+        # give a non-cryptic error message if boto isn't installed
+        if boto is None:
+            raise ImportError('You must install boto to connect to CloudWatch')
+
+        region = self._get_region_info_for_cloudwatch_conn()
+        log.debug('creating CloudWatch connection (to %s)' % region.endpoint)
+
+        raw_cloudwatch_conn = boto.ec2.cloudwatch.CloudWatchConnection(
+            aws_access_key_id=self._opts['aws_access_key_id'],
+            aws_secret_access_key=self._opts['aws_secret_access_key'],
+            region=region)
+        return wrap_aws_conn(raw_cloudwatch_conn)
+
+    def _get_region_info_for_cloudwatch_conn(self):
+        """Get a :py:class:`boto.ec2.regioninfo.RegionInfo` object to
+        initialize CLOUDWATCH connections with.
+
+        This is kind of silly because all
+        :py:class:`boto.ec2.cloudwatch.CloudWatchConnection` ever does with
+        this object is extract the hostname, but that's how boto rolls.
+        """
+        #if self._opts['cloudwatch_endpoint']:
+        if False:  # cloudwatch_endpoint doesn't exist yet
+            endpoint = self._opts['cloudwatch_endpoint']
+        else:
+            endpoint = region_to_cloudwatch_endpoint(self._aws_region)
+
+        return boto.ec2.regioninfo.RegionInfo(None, self._aws_region, endpoint)
+
+    def _create_cloudwatch_idle_alarm(self):
+        cloudwatch_conn = self.make_cloudwatch_conn()
+
+        unique_alarm_name = self._job_name + '-idle'
+
+        period = CLOUDWATCH_DEFAULT_PERIOD
+        # round up to the nearest full number of periods
+        max_secs_idle = self._opts['max_hours_idle'] * 3600
+        evaluation_periods = int(math.ceil(1.0 * max_secs_idle / period))
+
+        action = cloudwatch_ec2_action_arn(self._aws_region, 'terminate')
+
+        idle_alarm = boto.ec2.cloudwatch.alarm.MetricAlarm(
+            name=unique_alarm_name,
+            metric='IsIdle',
+            namespace='AWS/ElasticMapReduce',
+            statistic='Minimum',
+            comparison='>=',
+            threshold=1,
+            period=period,
+            evaluation_periods=evaluation_periods,
+            dimensions=[{'JobFlowId': self._emr_job_flow_id}],
+            alarm_actions=[action])
+
+        cloudwatch_conn.create_alarm(idle_alarm)
+
+    ### EMR-specific Stuff ###
 
     def make_emr_conn(self):
         """Create a connection to EMR.

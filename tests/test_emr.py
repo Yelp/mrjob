@@ -1655,41 +1655,51 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
     def test_eu(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='EU')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'elasticmapreduce.eu-west-1.amazonaws.com')
+                         'eu-west-1.elasticmapreduce.amazonaws.com')
+        self.assertEqual(runner.make_s3_conn().endpoint,
+                         's3-eu-west-1.amazonaws.com')
+
+    def test_eu_case_insensitive(self):
+        runner = EMRJobRunner(conf_paths=[], aws_region='eu')
+        self.assertEqual(runner.make_emr_conn().endpoint,
+                         'eu-west-1.elasticmapreduce.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-eu-west-1.amazonaws.com')
 
     def test_us_east_1(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='us-east-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'elasticmapreduce.us-east-1.amazonaws.com')
+                         'us-east-1.elasticmapreduce.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3.amazonaws.com')
 
     def test_us_west_1(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='us-west-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'elasticmapreduce.us-west-1.amazonaws.com')
+                         'us-west-1.elasticmapreduce.amazonaws.com')
+        self.assertEqual(runner.make_s3_conn().endpoint,
+                         's3-us-west-1.amazonaws.com')
+
+    def test_us_west_1_case_insensitive(self):
+        runner = EMRJobRunner(conf_paths=[], aws_region='US-West-1')
+        self.assertEqual(runner.make_emr_conn().endpoint,
+                         'us-west-1.elasticmapreduce.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-us-west-1.amazonaws.com')
 
     def test_ap_southeast_1(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='ap-southeast-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'elasticmapreduce.ap-southeast-1.amazonaws.com')
+                         'ap-southeast-1.elasticmapreduce.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-ap-southeast-1.amazonaws.com')
 
-    def test_bad_region(self):
-        # should fail in the constructor because the constructor connects to S3
-        self.assertRaises(Exception, EMRJobRunner,
-                          conf_paths=[], aws_region='the-moooooooon-1')
-
-    def test_case_sensitive(self):
-        self.assertRaises(Exception, EMRJobRunner,
-                          conf_paths=[], aws_region='eu')
-        self.assertRaises(Exception, EMRJobRunner,
-                          conf_paths=[], aws_region='US-WEST-1')
+    def test_previously_unknown_region(self):
+        runner = EMRJobRunner(conf_paths=[], aws_region='lolcatnia-1')
+        self.assertEqual(runner.make_emr_conn().endpoint,
+                         'lolcatnia-1.elasticmapreduce.amazonaws.com')
+        self.assertEqual(runner.make_s3_conn().endpoint,
+                         's3-lolcatnia-1.amazonaws.com')
 
     def test_explicit_endpoints(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='EU',

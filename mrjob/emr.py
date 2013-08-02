@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -57,9 +57,14 @@ except ImportError:
     boto = None
 
 import mrjob
-from mrjob.setup import BootstrapWorkingDirManager
-from mrjob.setup import UploadDirManager
-from mrjob.setup import parse_legacy_hash_path
+from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
+from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
+from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
+from mrjob.aws import region_to_cloudwatch_ec2_action_prefix
+from mrjob.aws import region_to_cloudwatch_endpoint
+from mrjob.aws import region_to_emr_endpoint
+from mrjob.aws import region_to_s3_endpoint
+from mrjob.aws import region_to_s3_location_constraint
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -85,6 +90,9 @@ from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
+from mrjob.setup import BootstrapWorkingDirManager
+from mrjob.setup import UploadDirManager
+from mrjob.setup import parse_legacy_hash_path
 from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.ssh import ssh_slave_addresses
@@ -120,8 +128,8 @@ JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 # with boto.utils.ISO8601
 SUBSECOND_RE = re.compile('\.[0-9]+')
 
-# map from AWS region to EMR endpoint. See
-# http://docs.amazonwebservices.com/general/latest/gr/rande.html#emr_region
+# Deprecated as of v0.4.1 (will be removed in v0.5).
+# Use mrjob.aws.region_to_emr_endpoint() instead
 REGION_TO_EMR_ENDPOINT = {
     'us-east-1': 'elasticmapreduce.us-east-1.amazonaws.com',
     'us-west-1': 'elasticmapreduce.us-west-1.amazonaws.com',
@@ -134,8 +142,8 @@ REGION_TO_EMR_ENDPOINT = {
     '': 'elasticmapreduce.amazonaws.com',  # when no region specified
 }
 
-# map from AWS region to S3 endpoint. See
-# http://docs.amazonwebservices.com/general/latest/gr/rande.html#s3_region
+# Deprecated as of v0.4.1 (will be removed in v0.5).
+# Use mrjob.aws.region_to_s3_endpoint() instead
 REGION_TO_S3_ENDPOINT = {
     'us-east-1': 's3.amazonaws.com',  # no region-specific endpoint
     'us-west-1': 's3-us-west-1.amazonaws.com',
@@ -148,55 +156,11 @@ REGION_TO_S3_ENDPOINT = {
     '': 's3.amazonaws.com',
 }
 
-# map from AWS region to S3 LocationConstraint parameter for regions whose
-# location constraints differ from their AWS regions. See
-# http://docs.amazonwebservices.com/AmazonS3/latest/API/index.html?RESTBucketPUT.html
+# Deprecated as of v0.4.1 (will be removed in v0.5).
+# Use mrjob.aws.region_to_s3_location_constraint() instead
 REGION_TO_S3_LOCATION_CONSTRAINT = {
     'us-east-1': '',
 }
-
-
-# map from instance type to number of compute units
-# from http://aws.amazon.com/ec2/instance-types/
-EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS = {
-    't1.micro': 2,
-    'm1.small': 1,
-    'm1.large': 4,
-    'm1.xlarge': 8,
-    'm2.xlarge': 6.5,
-    'm2.2xlarge': 13,
-    'm2.4xlarge': 26,
-    'c1.medium': 5,
-    'c1.xlarge': 20,
-    'cc1.4xlarge': 33.5,
-    'cg1.4xlarge': 33.5,
-}
-
-
-# map from instance type to GB of memory
-# from http://aws.amazon.com/ec2/instance-types/
-EC2_INSTANCE_TYPE_TO_MEMORY = {
-    't1.micro': 0.6,
-    'm1.small': 1.7,
-    'm1.large': 7.5,
-    'm1.xlarge': 15,
-    'm2.xlarge': 17.5,
-    'm2.2xlarge': 34.2,
-    'm2.4xlarge': 68.4,
-    'c1.medium': 1.7,
-    'c1.xlarge': 7,
-    'cc1.4xlarge': 23,
-    'cg1.4xlarge': 22,
-}
-
-# EMR's hard limit on number of steps in a job flow
-MAX_STEPS_PER_JOB_FLOW = 256
-
-# Region to use for Cloudwatch if self._aws_region is 0
-_DEFAULT_CLOUDWATCH_REGION = 'us-east-1'
-
-# How often Cloudwatch checks metrics, in seconds
-_CLOUDWATCH_PERIOD = 300
 
 
 def s3_key_to_uri(s3_key):
@@ -779,10 +743,9 @@ class EMRJobRunner(MRJobRunner):
             s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as scratch space' %
                      self._s3_temp_bucket_to_create)
-            location = REGION_TO_S3_LOCATION_CONSTRAINT.get(
-                self._aws_region, self._aws_region)
-            s3_conn.create_bucket(self._s3_temp_bucket_to_create,
-                                  location=(location or ''))
+            location = region_to_s3_location_constraint(self._aws_region)
+            s3_conn.create_bucket(
+                self._s3_temp_bucket_to_create, location=location)
             self._s3_temp_bucket_to_create = None
 
     def _check_and_fix_s3_dir(self, s3_uri):
@@ -807,14 +770,7 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['s3_endpoint']:
                 s3_endpoint = self._opts['s3_endpoint']
             else:
-                # look it up in our table
-                try:
-                    s3_endpoint = REGION_TO_S3_ENDPOINT[self._aws_region]
-                except KeyError:
-                    raise Exception(
-                        "Don't know the S3 endpoint for %s;"
-                        " try setting s3_endpoint explicitly" % (
-                            self._aws_region))
+                s3_endpoint = region_to_s3_endpoint(self._aws_region)
 
             self._s3_fs = S3Filesystem(self._opts['aws_access_key_id'],
                                        self._opts['aws_secret_access_key'],
@@ -2334,13 +2290,7 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['emr_endpoint']:
             endpoint = self._opts['emr_endpoint']
         else:
-            # look up endpoint in our table
-            try:
-                endpoint = REGION_TO_EMR_ENDPOINT[self._aws_region]
-            except KeyError:
-                raise Exception(
-                    "Don't know the EMR endpoint for %s;"
-                    " try setting emr_endpoint explicitly" % self._aws_region)
+            endpoint = region_to_emr_endpoint(self._aws_region)
 
         return boto.ec2.regioninfo.RegionInfo(None, self._aws_region, endpoint)
 

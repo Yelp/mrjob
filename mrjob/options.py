@@ -413,6 +413,13 @@ def add_emr_opts(opt_group):
                   ' Rarely necessary.')),
 
         opt_group.add_option(
+            '--max-hours-idle', dest='max_hours_idle',
+            default=None, type='float',
+            help=("If we create a persistent job flow, have Amazon Cloudwatch"
+                  " terminate it automatically after it's been idle this many"
+                  " hours.")),
+
+        opt_group.add_option(
             '--no-pool-emr-job-flows', dest='pool_emr_job_flows',
             action='store_false',
             help="Don't try to run our job on a pooled job flow."),
@@ -513,7 +520,7 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--visible-to-all-users', dest='visible_to_all_users',
             default=None, action='store_true',
-            help='Whether the job flow is visible to all IAM users of the AWS' 
+            help='Whether the job flow is visible to all IAM users of the AWS'
                  ' account associated with the job flow. If this value is set'
                  ' to True, all IAM users of that AWS account can view and'
                  ' (if they have the proper policy permissions set) manage'

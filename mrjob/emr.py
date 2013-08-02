@@ -192,6 +192,12 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
 # EMR's hard limit on number of steps in a job flow
 MAX_STEPS_PER_JOB_FLOW = 256
 
+# Region to use for Cloudwatch if self._aws_region is 0
+_DEFAULT_CLOUDWATCH_REGION = 'us-east-1'
+
+# How often Cloudwatch checks metrics, in seconds
+_CLOUDWATCH_PERIOD = 300
+
 
 def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
@@ -350,6 +356,8 @@ class LogFetchError(Exception):
 
 class EMRRunnerOptionStore(RunnerOptionStore):
 
+    # documentation of these options is in docs/guides/emr-opts.rst
+
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'additional_emr_info',
         'ami_version',
@@ -379,6 +387,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'enable_emr_debugging',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
+        'max_hours_idle',
         'num_ec2_core_instances',
         'pool_wait_minutes',
         'num_ec2_instances',

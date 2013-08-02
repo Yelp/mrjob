@@ -77,6 +77,12 @@ Job flow creation and configuration
     instance, rather than to a local file or one on S3. Rarely necessary to
     set this by hand.
 
+.. _opt_max_hours_idle:
+
+**max_hours_idle** (:option:`--max-hours-idle`)
+    If we create a persistent job flow, have Amazon Cloudwatch terminate it
+    automatically after it's been idle this many hours.
+
 Bootstrapping
 -------------
 

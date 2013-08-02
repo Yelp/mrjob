@@ -128,6 +128,7 @@ Option                                                                      Swit
 :ref:`enable_emr_debugging <opt_enable_emr_debugging>`                      :option:`--enable-emr-debugging`, :option:`--disable-emr-debugging` ``False``                      |dt-string|
 :ref:`hadoop_streaming_jar_on_emr <opt_hadoop_streaming_jar_on_emr>`        :option:`--hadoop-streaming-jar-on-emr`                             ``None``                       |dt-string|
 :ref:`hadoop_version <opt_hadoop_version>`                                  :option:`--hadoop-version`                                          ``'0.20'``                     |dt-string|
+:ref:`max_hours_idle <opt_max_hours_idle>`                                  :option:`--max-hours-idle`                                          ``None``                       |dt-string|
 :ref:`num_ec2_core_instances <opt_num_ec2_core_instances>`                  :option:`--num-ec2-core-instances`                                  ``None``                       |dt-string|
 :ref:`num_ec2_instances <opt_num_ec2_instances>`                            :option:`--num-ec2-instances`                                       ``1``                          |dt-string|
 :ref:`num_ec2_task_instances <opt_num_ec2_task_instances>`                  :option:`--num-ec2-task-instances`                                  ``None``                       |dt-string|

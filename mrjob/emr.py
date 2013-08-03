@@ -551,6 +551,10 @@ class EMRJobRunner(MRJobRunner):
     """
     alias = 'emr'
 
+    # Don't need to bootstrap mrjob in the setup wrapper; that's what
+    # the bootstrap script is for!
+    BOOTSTRAP_MRJOB_IN_SETUP = False
+
     OPTION_STORE_CLASS = EMRRunnerOptionStore
 
     def __init__(self, **kwargs):
@@ -827,7 +831,8 @@ class EMRJobRunner(MRJobRunner):
 
     def _prepare_for_launch(self):
         self._check_input_exists()
-        self._create_wrapper_script()
+        self._check_output_not_exists()
+        self._create_setup_wrapper_script()
         self._add_bootstrap_files_for_upload()
         self._add_job_files_for_upload()
         self._upload_local_files_to_s3()
@@ -845,6 +850,17 @@ class EMRJobRunner(MRJobRunner):
             if not self.path_exists(path):
                 raise AssertionError(
                     'Input path %s does not exist!' % (path,))
+
+    def _check_output_not_exists(self):
+        """Verify the output path does not already exist. This avoids
+        provisioning a cluster only to have Hadoop refuse to launch.
+        """
+        try:
+            if self.fs.path_exists(self._output_dir):
+                raise IOError(
+                    'Output path %s already exists!' % (self._output_dir,))
+        except boto.exception.S3ResponseError:
+            pass
 
     def _add_bootstrap_files_for_upload(self):
         """Add files needed by the bootstrap script to self._upload_mgr.
@@ -1353,7 +1369,7 @@ class EMRJobRunner(MRJobRunner):
 
         return boto.emr.StreamingStep(**streaming_step_kwargs)
 
-    def _build_jar_step(self, step):
+    def _build_jar_step(self, step, step_num, num_steps):
         return boto.emr.JarStep(
             name='%s: Step %d of %d' % (
                 self._job_name, step_num + 1, num_steps),
@@ -1513,6 +1529,7 @@ class EMRJobRunner(MRJobRunner):
             if running_step_name:
                 log.info('Job launched %.1fs ago, status %s: %s (%s)' %
                          (running_time, job_state, reason, running_step_name))
+
                 if self._show_tracker_progress:
                     try:
                         tracker_handle = urllib2.urlopen(self._tracker_url)
@@ -1732,7 +1749,8 @@ class EMRJobRunner(MRJobRunner):
         # parameter
         if lg_step_num_mapping is None:
             lg_step_num_mapping = dict((n, n) for n in step_nums)
-        lg_step_nums = list(sorted(lg_step_num_mapping[k] for k in step_nums))
+        lg_step_nums = sorted(lg_step_num_mapping[k] for k in step_nums
+                               if k in lg_step_num_mapping)
 
         self._counters = []
         new_counters = {}

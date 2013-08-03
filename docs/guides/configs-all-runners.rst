@@ -20,10 +20,14 @@ data files, etc. This section covers options available to all runners that
 mrjob uses to upload files to your job's execution environments.
 
 
+.. _opt_bootstrap_mrjob:
+
 **bootstrap_mrjob** (:option:`--bootstrap-mrjob`, :option:`--no-bootstrap-mrjob`)
     Should we automatically tar up the mrjob library and install it when we run
     job?  Set this to ``False`` if you've already installed ``mrjob`` on your
     Hadoop cluster or install it by some other method.
+
+.. _opt_upload_files:
 
 **upload_files** (:option:`--file`)
     Files to copy to the local directory of the mr_job script when it runs. You
@@ -40,6 +44,8 @@ mrjob uses to upload files to your job's execution environments.
 
         --file file_1.txt --file file_2.sqlite
 
+.. _opt_upload_archives:
+
 **upload_archives** (:option:`--archive`)
 
     A list of archives (e.g. tarballs) to unpack in the local directory of the
@@ -49,6 +55,8 @@ mrjob uses to upload files to your job's execution environments.
     ``foo.tar.gz/``, and ``foo.tar.gz#stuff`` is unpacked to the directory
     ``stuff/``).
 
+.. _opt_python_archives:
+
 **python_archives** (:option:`--python-archive`)
     Same as upload_archives, except they get added to the job's
     :envvar:`PYTHONPATH`.
@@ -56,11 +64,14 @@ mrjob uses to upload files to your job's execution environments.
 Temp files and cleanup
 ----------------------
 
+.. _opt_base_tmp_dir:
+
 **base_tmp_dir** (:option:`--base-tmp-dir`)
     Path to put local temp dirs inside. By default we just call
     :py:func:`tempfile.gettempdir`
 
 .. _configs-all-runners-cleanup:
+.. _opt_cleanup:
 
 **cleanup** (:option:`--cleanup`)
     List of which kinds of directories to delete when a job succeeds. Valid
@@ -87,9 +98,13 @@ Temp files and cleanup
 
         --cleanup=LOGS,JOB
 
+.. _opt_cleanup_on_failure:
+
 **cleanup_on_failure** (:option:`--cleanup-on-failure`)
     Which kinds of directories to clean up when a job fails. Valid choices are
     the same as **cleanup**.
+
+.. _opt_output_dir:
 
 **output_dir** (:option:`-o`, :option:`--output-dir`)
     An empty/non-existent directory where Hadoop streaming should put the
@@ -100,12 +115,16 @@ Temp files and cleanup
     this path does not need to be fully qualified with ``hdfs://`` URIs
     because it's understood that it has to be on HDFS.
 
+.. _opt_no_output:
+
 **no_output** (:option:`--no-output`)
     Don't stream output to STDOUT after job completion.  This is often used in
     conjunction with ``--output-dir`` to store output only in HDFS or S3.
 
 Job execution context
 ---------------------
+
+.. _opt_cmdenv:
 
 **cmdenv** (:option:`--cmdenv`)
     Dictionary of environment variables to pass to the job inside Hadoop
@@ -121,15 +140,21 @@ Job execution context
 
         --cmdenv PYTHONPATH=$HOME/stuff,TZ=America/Los_Angeles
 
+.. _opt_interpreter:
+
 **interpreter** (:option:`--interpreter`)
     Interpreter to launch your script with. Defaults to the value of
     **python_bin**. Change this if you're using a language besides Python
     2.5-2.7 or if you're running using :py:mod:`virtualenv`.
 
+.. _opt_python_bin:
+
 **python_bin** (:option:`--python-bin`)
     Name/path of alternate Python binary for wrapper scripts and
     mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to
     ``'python'``.
+
+.. _opt_setup_cmds:
 
 **setup_cmds** (:option:`--setup-cmd`)
     A list of commands to run before each mapper/reducer step (e.g.  ``['cd
@@ -139,11 +164,15 @@ Job execution context
     mappers/reducers running on the same node won't run *setup_cmds*
     simultaneously (it's safe to run ``make``).
 
+.. _opt_setup_scripts:
+
 **setup_scripts** (:option:`--setup-script`)
     files that will be copied into the local working directory and then run.
     These are run after *setup_cmds*. Like with *setup_cmds*, we use file
     locking to keep multiple mappers/reducers on the same node from running
     *setup_scripts* simultaneously.
+
+.. _opt_steps_python_bin:
 
 **steps_python_bin** (:option:`--steps-python-bin`)
     Name/path of alternate python binary to use to query the job about its
@@ -152,6 +181,8 @@ Job execution context
 
 Other
 -----
+
+.. _opt_conf_paths:
 
 **conf_paths** (:option:`-c`, :option:`--conf-path`, :option:`--no-conf`)
     List of paths to configuration files. This option cannot be used in
@@ -184,20 +215,20 @@ Options ignored by the inline runner
 
 These options are ignored because they require a real instance of Hadoop:
 
-* *hadoop_extra_args*
-* *hadoop_input_format*
-* *hadoop_output_format*,
-* *hadoop_streaming_jar*
-* *jobconf*
-* *partitioner*
+* :ref:`hadoop_extra_args <opt_hadoop_extra_args>`
+* :py:meth:`hadoop_input_format <mrjob.runner.MRJobRunner.__init__>`
+* :py:meth:`hadoop_output_format <mrjob.runner.MRJobRunner.__init__>`,
+* :ref:`hadoop_streaming_jar <opt_hadoop_streaming_jar>`
+* :ref:`jobconf <opt_jobconf>`
+* :ref:`partitioner <opt_partitioner>`
 
 These options are ignored because the ``inline`` runner does not invoke the job
 as a subprocess or run it in its own directory:
 
-* *cmdenv*
-* *python_bin*
-* *setup_cmds*
-* *setup_scripts*
-* *steps_python_bin*
-* *upload_archives*
-* *upload_files*
+* :ref:`cmdenv <opt_cmdenv>`
+* :ref:`python_bin <opt_python_bin>`
+* :ref:`setup_cmds <opt_setup_cmds>`
+* :ref:`setup_scripts <opt_setup_scripts>`
+* :ref:`steps_python_bin <opt_steps_python_bin>`
+* :ref:`upload_archives <opt_upload_archives>`
+* :ref:`upload_files <opt_upload_files>`

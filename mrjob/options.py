@@ -158,6 +158,14 @@ def add_runner_opts(opt_group, default_runner='local'):
                   ' is %s.' % default_runner)),
 
         opt_group.add_option(
+            '--setup', dest='setup', action='append',
+            help=('A command to run before each mapper/reducer step in the'
+                  ' shell ("touch foo"). You may interpolate files'
+                  ' available via URL or on your local filesystem using'
+                  ' Hadoop Distributed Cache syntax (". setup.sh#"). To'
+                  ' interpolate archives, use #/: "cd foo.tar.gz#/; make')),
+
+        opt_group.add_option(
             '--setup-cmd', dest='setup_cmds', action='append',
             default=[],
             help=('A command to run before each mapper/reducer step in the'
@@ -245,6 +253,11 @@ def add_hadoop_opts(opt_group):
             '--hdfs-scratch-dir', dest='hdfs_scratch_dir',
             default=None,
             help='Scratch space on HDFS (default is tmp/)'),
+
+        opt_group.add_option(
+            '--skip-hadoop-input-check', dest='check_hadoop_input_paths',
+            default=True, action='store_false',
+            help='Skip the checks to ensure all input paths exist'),
     ]
 
 

@@ -99,7 +99,7 @@ class InlineMRJobRunner(SimMRJobRunner):
                     raise Exception(
                         "InlineMRJobRunner cannot run filters.")
 
-    def _create_wrapper_script(self):
+    def _create_setup_wrapper_script(self):
         # Inline mode does not use a wrapper script
         pass
 

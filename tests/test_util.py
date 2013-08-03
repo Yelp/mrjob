@@ -79,7 +79,7 @@ class CmdLineTestCase(unittest.TestCase):
                        'grep -e \'# DON\'"\'"\'T USE$\''))
 
 
-# expand_path() is tested by tests.conf.CombineAndExpandPathsTestCase
+# expand_path() is tested by tests.test_conf.CombineAndExpandPathsTestCase
 
 
 class FileExtTestCase(unittest.TestCase):

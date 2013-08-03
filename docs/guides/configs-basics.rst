@@ -115,6 +115,101 @@ of them.
 See :doc:`configs-reference` for the entire dizzying array of configurable
 options.
 
+Option data types
+-----------------
+
+The same option may be specified multiple times and be one of several data
+types. For example, the AWS region may be specified in ``mrjob.conf``, in the
+arguments to ``EMRJobRunner``, and on the command line. These are the rules
+used to determine what value to use at runtime.
+
+Values specified "later" refer to an option being specified at a higher
+priority. For example, a value in ``mrjob.conf`` is specified "earlier" than a
+value passed on the command line.
+
+When there are multiple values, they are "combined with" a *combiner function*.
+The combiner function for each data type is listed in its description.
+
+Simple data types
+^^^^^^^^^^^^^^^^^
+
+When these are specified more than once, the last non-``None`` value is used.
+
+.. _data-type-string:
+
+**String**
+    Simple, unchanged string. Combined with
+    :py:func:`~mrjob.conf.combine_values`.
+
+.. _data-type-command:
+
+**Command**
+    String containing all ASCII characters to be parsed with
+    :py:func:`shlex.split`, or list of command + arguments. Combined with
+    :py:func:`~mrjob.conf.combine_cmds`.
+
+
+.. _data-type-path:
+
+**Path**
+    Local path with ``~`` and environment variables (e.g. ``$TMPDIR``)
+    resolved. Combined with :py:func:`~mrjob.conf.combine_paths`.
+
+List data types
+^^^^^^^^^^^^^^^
+
+The values of these options are specified as lists. When specified more than
+once, the lists are concatenated together.
+
+.. _data-type-string-list:
+
+**String list**
+    List of :ref:`strings <data-type-string>`. Combined with
+    :py:func:`~mrjob.conf.combine_lists`.
+
+.. _data-type-path-list:
+
+**Path list**
+    List of :ref:`paths <data-type-path>`. Combined with
+    :py:func:`~mrjob.conf.combine_path_lists`.
+
+Dict data types
+^^^^^^^^^^^^^^^
+
+The values of these options are specified as dictionaries. When specified more
+than once, each has custom behavior described below.
+
+.. _data-type-plain-dict:
+
+**Plain dict**
+    Values specified later override values specified earlier.
+
+.. _data-type-env-dict:
+
+**Environment variable dict**
+    Values specified later override values specified earlier, **except for
+    those with keys ending in ``PATH``**, in which values are concatenated and
+    separated by a colon (``:``) rather than overwritten. The later value comes
+    first.
+
+    For example, this config:
+
+    .. code-block:: yaml
+
+        runners: {emr: {cmdenv: {PATH: "/usr/bin"}}}
+
+    when run with this command::
+
+        python my_job.py --cmdenv PATH=/usr/local/bin
+
+    will result in the following value of ``cmdenv``:
+
+        ``/usr/local/bin:/usr/bin``
+
+    **The one exception** to this behavior is in the ``local`` runner, which
+    uses the local system separator (on Windows ``;``, on everything else still
+    ``:``) instead of always using ``:``.
+
 .. _multiple-config-files:
 
 Using multiple config files

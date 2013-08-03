@@ -27,7 +27,7 @@ except ImportError:
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
-from urlparse import urlparse
+from mrjob.parse import urlparse
 from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
 from mrjob.util import buffer_iterator_to_line_iterator
@@ -169,7 +169,7 @@ class S3Filesystem(Filesystem):
         # just fall back on ls(); it's smart
         try:
             paths = self.ls(path_glob)
-        except boto.exception.S3ResponseError, e:
+        except boto.exception.S3ResponseError:
             paths = []
         return any(paths)
 

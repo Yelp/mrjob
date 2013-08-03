@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import getpass
 import logging
 import os
 import os.path
+import pipes
 import pprint
 import re
 import shutil
@@ -46,8 +47,6 @@ except:
     JSONDecodeError = ValueError
 
 from mrjob.compat import add_translated_jobconf_for_hadoop_version
-from mrjob.setup import WorkingDirManager
-from mrjob.setup import parse_legacy_hash_path
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import uses_generic_jobconf
 from mrjob.conf import combine_cmds
@@ -60,6 +59,9 @@ from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.local import LocalFilesystem
+from mrjob.setup import WorkingDirManager
+from mrjob.setup import parse_legacy_hash_path
+from mrjob.setup import parse_setup_cmd
 from mrjob.step import STEP_TYPES
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
@@ -115,8 +117,10 @@ class RunnerOptionStore(OptionStore):
         'owner',
         'python_archives',
         'python_bin',
+        'setup',
         'setup_cmds',
         'setup_scripts',
+        'sh_bin',
         'steps_interpreter',
         'steps_python_bin',
         'upload_archives',
@@ -131,8 +135,10 @@ class RunnerOptionStore(OptionStore):
         'jobconf': combine_dicts,
         'python_archives': combine_path_lists,
         'python_bin': combine_cmds,
+        'setup': combine_lists,
         'setup_cmds': combine_lists,
         'setup_scripts': combine_path_lists,
+        'sh_bin': combine_cmds,
         'steps_interpreter': combine_cmds,
         'steps_python_bin': combine_cmds,
         'upload_archives': combine_path_lists,
@@ -191,6 +197,7 @@ class RunnerOptionStore(OptionStore):
             'cleanup_on_failure': ['NONE'],
             'hadoop_version': '0.20',
             'owner': owner,
+            'sh_bin': ['sh'],
         })
 
     def _validate_cleanup(self):
@@ -245,6 +252,10 @@ class MRJobRunner(object):
     #: :py:mod:``mrjob.conf`` to load one of ``'local'``, ``'emr'``,
     #: or ``'hadoop'``
     alias = None
+
+    # if this is true, when bootstrap_mrjob is true, add it through the
+    # setup script
+    BOOTSTRAP_MRJOB_IN_SETUP = True
 
     OPTION_STORE_CLASS = RunnerOptionStore
 
@@ -347,15 +358,12 @@ class MRJobRunner(object):
         if self._script_path:
             self._working_dir_mgr.add('file', self._script_path)
 
-        # setup cmds and wrapper script
-        self._setup_scripts = []
-        for path in self._opts['setup_scripts']:
-            setup_script = parse_legacy_hash_path('file', path)
-            self._setup_scripts.append(setup_script)
-            self._working_dir_mgr.add(**setup_script)
+        # give this job a unique name
+        self._job_name = self._make_unique_job_name(
+            label=self._opts['label'], owner=self._opts['owner'])
 
         # we'll create the wrapper script later
-        self._wrapper_script_path = None
+        self._setup_wrapper_script_path = None
 
         # extra args to our job
         self._extra_args = list(extra_args) if extra_args else []
@@ -376,10 +384,14 @@ class MRJobRunner(object):
             self._working_dir_mgr.add(**parse_legacy_hash_path(
                 'archive', path, must_name='upload_archives'))
 
-        # set up python archives
-        self._python_archives = []
-        for path in self._opts['python_archives']:
-            self._add_python_archive(path)
+        # python_archives, setup, setup_cmds, and setup_scripts
+        # self._setup is a list of shell commands with path dicts
+        # interleaved; see mrjob.setup.parse_setup_cmds() for details
+        self._setup = self._parse_setup()
+        for cmd in self._setup:
+            for maybe_path_dict in cmd:
+                if isinstance(maybe_path_dict, dict):
+                    self._working_dir_mgr.add(**maybe_path_dict)
 
         # Where to read input from (log files, etc.)
         self._input_paths = input_paths or ['-']  # by default read from stdin
@@ -398,10 +410,6 @@ class MRJobRunner(object):
         # store hadoop input and output formats
         self._hadoop_input_format = hadoop_input_format
         self._hadoop_output_format = hadoop_output_format
-
-        # give this job a unique name
-        self._job_name = self._make_unique_job_name(
-            label=self._opts['label'], owner=self._opts['owner'])
 
         # a local tmp directory that will be cleaned up when we're done
         # access/make this using self._get_local_tmp_dir()
@@ -649,26 +657,6 @@ class MRJobRunner(object):
 
     ### internal utilities for implementing MRJobRunners ###
 
-    def _add_python_archive(self, path):
-        python_archive = parse_legacy_hash_path('archive', path)
-        self._working_dir_mgr.add(**python_archive)
-        self._python_archives.append(python_archive)
-
-    def _get_cmdenv(self):
-        """Get the environment variables to use inside Hadoop.
-
-        These should be `self._opts['cmdenv']` combined with python
-        archives added to :envvar:`PYTHONPATH`.
-        """
-        # on Windows, PYTHONPATH should be separated by ;, not :
-        # so LocalJobRunner and EMRJobRunner use different combiners for cmdenv
-        cmdenv_combiner = self.OPTION_STORE_CLASS.COMBINERS['cmdenv']
-        envs_to_combine = ([{'PYTHONPATH': self._working_dir_mgr.name(**a)}
-                            for a in self._python_archives] +
-                           [self._opts['cmdenv']])
-
-        return cmdenv_combiner(*envs_to_combine)
-
     def _get_local_tmp_dir(self):
         """Create a tmp directory on the local filesystem that will be
         cleaned up by self.cleanup()"""
@@ -761,11 +749,12 @@ class MRJobRunner(object):
             '--step-num=%d' % step_num,
             '--%s' % mrc,
         ] + self._mr_job_extra_args()
-        if self._wrapper_script_path:
-            return (
-                self._opts['python_bin'] +
-                [self._working_dir_mgr.name('file', self._wrapper_script_path)] +
-                args)
+
+        if self._setup_wrapper_script_path:
+            return (self._opts['sh_bin'] +
+                    [self._working_dir_mgr.name(
+                        'file', self._setup_wrapper_script_path)] +
+                    args)
         else:
             return args
 
@@ -858,85 +847,139 @@ class MRJobRunner(object):
                 args.append(self._working_dir_mgr.name(**path_dict))
         return args
 
-    def _wrapper_script_content(self):
-        """Output a python script to the given file descriptor that runs
-        setup_cmds and setup_scripts, and then runs its arguments.
+    def _create_setup_wrapper_script(self, dest='setup-wrapper.sh'):
+        """Create the wrapper script, and write it into our local temp
+        directory (by default, to a file named wrapper.sh).
+
+        This will set ``self._setup_wrapper_script_path``, and add it to
+        ``self._working_dir_mgr``
+
+        This will do nothing if ``self._setup`` is empty or
+        this method has already been called.
+        """
+        if self._setup_wrapper_script_path:
+            return
+
+        setup = self._setup
+
+        if self._opts['bootstrap_mrjob'] and self.BOOTSTRAP_MRJOB_IN_SETUP:
+            # patch setup to add mrjob.tar.gz to PYTYHONPATH
+            mrjob_tar_gz = self._create_mrjob_tar_gz()
+            path_dict = {'type': 'archive', 'name': None, 'path': mrjob_tar_gz}
+            self._working_dir_mgr.add(**path_dict)
+            setup = [['export PYTHONPATH=', path_dict, ':$PYTHONPATH']] + setup
+
+        if not setup:
+            return
+
+        path = os.path.join(self._get_local_tmp_dir(), dest)
+        log.info('writing wrapper script to %s' % path)
+
+        contents = self._setup_wrapper_script_content(setup)
+        for line in StringIO(contents):
+            log.debug('WRAPPER: ' + line.rstrip('\r\n'))
+
+        with open(path, 'w') as f:
+            f.write(contents)
+
+        self._setup_wrapper_script_path = path
+        self._working_dir_mgr.add('file', self._setup_wrapper_script_path)
+
+    def _parse_setup(self):
+        """Helper for :py:meth:`_create_setup_wrapper_script`.
+
+        Parse the *setup* option with
+        :py:func:`mrjob.setup.parse_setup_cmd()`.
+
+        If *bootstrap_mrjob* and ``self.BOOTSTRAP_MRJOB_IN_SETUP`` are both
+        true, create mrjob.tar.gz (if it doesn't exist already) and
+        prepend a setup command that adds it to PYTHONPATH.
+
+        Also patch in the deprecated
+        options *python_archives*, *setup_cmd*, and *setup_script*
+        as setup commands.
+        """
+        setup = []
+
+        # python_archives
+        for path in self._opts['python_archives']:
+            path_dict = parse_legacy_hash_path('archive', path)
+            setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
+
+        # setup
+        for cmd in self._opts['setup']:
+            setup.append(parse_setup_cmd(cmd))
+
+        # setup_cmds
+        for cmd in self._opts['setup_cmds']:
+            if not isinstance(cmd, basestring):
+                cmd = cmd_line(cmd)
+            setup.append([cmd])
+
+        # setup_scripts
+        for path in self._opts['setup_scripts']:
+            path_dict = parse_legacy_hash_path('file', path)
+            setup.append([path_dict])
+
+        return setup
+
+    def _setup_wrapper_script_content(self, setup, mrjob_tar_gz_name=None):
+        """Return a (Bourne) shell script that runs the setup commands and then
+        executes whatever is passed to it (this will be our mapper/reducer).
+
+        We obtain a file lock so that two copies of the setup commands
+        cannot run simultaneously on the same machine (this helps for running
+        :command:`make` on a shared source code archive, for example).
         """
         out = StringIO()
 
         def writeln(line=''):
             out.write(line + '\n')
 
-        # imports
-        writeln('from fcntl import flock, LOCK_EX, LOCK_UN')
-        writeln('from subprocess import check_call, PIPE')
-        writeln('import sys')
+        # we're always going to execute this script as an argument to
+        # sh, so there's no need to add a shebang (e.g. #!/bin/sh)
+
+        writeln('# store $PWD')
+        writeln('__mrjob_PWD=$PWD')
+        writeln('')
+
+        writeln('# obtain exclusive file lock')
+        # Basically, we're going to tie file descriptor 9 to our lockfile,
+        # use a subprocess to obtain a lock (which we somehow inherit too),
+        # and then release the lock by closing the file descriptor.
+        # File descriptors 10 and higher are used internally by the shell,
+        # so 9 is as out-of-the-way as we can get.
+        writeln('exec 9>/tmp/wrapper.lock.%s' % self._job_name)
+        # would use flock(1), but it's not always available
+        writeln("%s -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'" %
+                cmd_line(self._opts['python_bin']))
         writeln()
 
-        # make lock file and lock it
-        writeln("lock_file = open('/tmp/wrapper.lock.%s', 'a')" %
-                self._job_name)
-        writeln('flock(lock_file, LOCK_EX)')
+        writeln('# setup commands')
+        for cmd in setup:
+            # reconstruct the command line, substituting $__mrjob_PWD/<name>
+            # for path dicts
+            line = ''
+            for token in cmd:
+                if isinstance(token, dict):
+                    # it's a path dictionary
+                    line += '$__mrjob_PWD/'
+                    line += pipes.quote(self._working_dir_mgr.name(**token))
+                else:
+                    # it's raw script
+                    line += token
+            writeln(line)
         writeln()
 
-        # run setup cmds
-        if self._opts['setup_cmds']:
-            writeln('# run setup cmds:')
-            for cmd in self._opts['setup_cmds']:
-                # only use the shell for strings, not for lists of arguments
-                # redir stdout to /dev/null so that it won't get confused
-                # with the mapper/reducer's output
-                writeln(
-                    "check_call(%r, shell=%r, stdout=open('/dev/null', 'w'))"
-                    % (cmd, bool(isinstance(cmd, basestring))))
-            writeln()
-
-        # run setup scripts
-        if self._setup_scripts:
-            writeln('# run setup scripts:')
-            for setup_script in self._setup_scripts:
-                writeln("check_call(%r, stdout=open('/dev/null', 'w'))" % (
-                    ['./' + self._working_dir_mgr.name(**setup_script)],))
-            writeln()
-
-        # unlock the lock file
-        writeln('flock(lock_file, LOCK_UN)')
+        writeln('# release exclusive file lock')
+        writeln('exec 9>&-')
         writeln()
 
-        # run the real script
-        writeln('# run the real mapper/reducer')
-        writeln('check_call(sys.argv[1:])')
+        writeln('# run job from the original working directory')
+        writeln('cd $__mrjob_PWD')
+        writeln('"$@"')
 
         return out.getvalue()
-
-    def _create_wrapper_script(self, dest='wrapper.py'):
-        """Create the wrapper script, and write it into our local temp
-        directory (by default, to a file named wrapper.py).
-
-        This will set self._wrapper_script_path, and add it to self._working_dir_mgr
-
-        This will do nothing if setup_cmds and setup_scripts are
-        empty, or _create_wrapper_script() has already been called.
-        """
-        if not (self._opts['setup_cmds'] or self._setup_scripts):
-            return
-
-        if self._wrapper_script_path:
-            return
-
-        path = os.path.join(self._get_local_tmp_dir(), dest)
-        log.info('writing wrapper script to %s' % path)
-
-        contents = self._wrapper_script_content()
-        for line in StringIO(contents):
-            log.debug('WRAPPER: ' + line.rstrip('\r\n'))
-
-        f = open(path, 'w')
-        f.write(contents)
-        f.close()
-
-        self._wrapper_script_path = path
-        self._working_dir_mgr.add('file', self._wrapper_script_path)
 
     def _get_input_paths(self):
         """Get the paths to input files, dumping STDIN to a local
@@ -962,12 +1005,15 @@ class MRJobRunner(object):
 
     def _create_mrjob_tar_gz(self):
         """Make a tarball of the mrjob library, without .pyc or .pyo files,
-        and return its path. This will also set self._mrjob_tar_gz_path
+        This will also set ``self._mrjob_tar_gz_path`` and return it.
+
+        Typically called from
+        :py:meth:`_create_setup_wrapper_script`.
 
         It's safe to call this method multiple times (we'll only create
         the tarball once.)
         """
-        if self._mrjob_tar_gz_path is None:
+        if not self._mrjob_tar_gz_path:
             # find mrjob library
             import mrjob
 
@@ -978,8 +1024,8 @@ class MRJobRunner(object):
 
             mrjob_dir = os.path.dirname(mrjob.__file__) or '.'
 
-            tar_gz_path = os.path.join(
-                self._get_local_tmp_dir(), 'mrjob.tar.gz')
+            tar_gz_path = os.path.join(self._get_local_tmp_dir(),
+                                       'mrjob.tar.gz')
 
             def filter_path(path):
                 filename = os.path.basename(path)
@@ -995,6 +1041,7 @@ class MRJobRunner(object):
                 mrjob_dir, tar_gz_path, os.path.join('mrjob', '')))
             tar_and_gzip(
                 mrjob_dir, tar_gz_path, filter=filter_path, prefix='mrjob')
+
             self._mrjob_tar_gz_path = tar_gz_path
 
         return self._mrjob_tar_gz_path
@@ -1026,18 +1073,20 @@ class MRJobRunner(object):
                                                             version)
         if uses_generic_jobconf(version):
             for key, value in sorted(jobconf.iteritems()):
-                args.extend(['-D', '%s=%s' % (key, value)])
+                if value is not None:
+                    args.extend(['-D', '%s=%s' % (key, value)])
         # old-style jobconf
         else:
             for key, value in sorted(jobconf.iteritems()):
-                args.extend(['-jobconf', '%s=%s' % (key, value)])
+                if value is not None:
+                    args.extend(['-jobconf', '%s=%s' % (key, value)])
 
         # partitioner
         if self._partitioner:
             args.extend(['-partitioner', self._partitioner])
 
         # cmdenv
-        for key, value in sorted(self._get_cmdenv().iteritems()):
+        for key, value in sorted(self._opts['cmdenv'].iteritems()):
             args.append('-cmdenv')
             args.append('%s=%s' % (key, value))
 

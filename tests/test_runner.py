@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -452,6 +452,14 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
                           '-jobconf', 'BAZ=qux',
                           '-jobconf', 'FOO=bar',
                           ])
+
+    def test_empty_jobconf_values(self):
+        # value of None means to omit that jobconf
+        jobconf = {'foo': '', 'bar': None}
+        runner = LocalMRJobRunner(conf_paths=[], jobconf=jobconf)
+
+        self.assertEqual(runner._hadoop_conf_args({}, 0, 1),
+                         ['-D', 'foo='])
 
     def test_configuration_translation(self):
         jobconf = {'mapred.jobtracker.maxtasks.per.job': 1}

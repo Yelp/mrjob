@@ -16,11 +16,11 @@
 Hadoop cluster.
 """
 
-__author__ = 'David Marin <dave@yelp.com>'
+__author__ = 'David Marin <dm@davidmarin.org>'
 
 __credits__ = [
     'Jordan Andersen <jordandandersen@gmail.com>',
-    'Tom Arnfield <tarnfeld@me.com>',
+    'Tom Arnfeld <tarnfeld@me.com>',
     'Hunter Blanks <hblanks@monetate.com>',
     'Jim Blomo <jblomo@yelp.com>',
     'Reno Bowen <renobowen@gmail.com>',
@@ -29,6 +29,7 @@ __credits__ = [
     'Jordan Christensen <jc@kobo.com>',
     'David Dehghan <ddehghan@gmail.com>',
     'Adam Derewecki <derewecki@gmail.com>',
+    'Nick Dimiduk <ndimiduk@gmail.com>',
     'Tom Dooner <tomdooner@gmail.com>',
     'Dan Frank <danielhfrank@gmail.com>',
     'Benjamin Goldenberg <benjamin@yelp.com',

@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,18 +30,6 @@ from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
 
 
-# keys and values that should encode/decode properly in all protocols
-SAFE_KEYS_AND_VALUES = [
-    (None, None),
-    (1, 2),
-    ('foo', 'bar'),
-    ([1, 2, 3], []),
-    ({'apples': 5}, {'oranges': 20}),
-    (u'Qu\xe9bec', u'Ph\u1ede'),
-    ('\t', '\n'),
-]
-
-
 class Point(object):
     """A simple class to test encoding of objects."""
 
@@ -60,6 +48,30 @@ class Point(object):
             return cmp((self.x, self.y), (other.x, other.y))
 
 
+# keys and values that JSON protocols should encode/decode correctly
+JSON_KEYS_AND_VALUES = [
+    (None, None),
+    (1, 2),
+    ('foo', 'bar'),
+    ([1, 2, 3], []),
+    ({'apples': 5}, {'oranges': 20}),
+    (u'Qu\xe9bec', u'Ph\u1ede'),
+    ('\t', '\n'),
+]
+
+# keys and values that repr protocols should encode/decode correctly
+REPR_KEYS_AND_VALUES = JSON_KEYS_AND_VALUES + [
+    ((1, 2), (3, 4)),
+    ('0\xa2', '\xe9'),
+    (set([1]), set()),
+]
+
+# keys and values that pickle protocols should encode/decode properly
+PICKLE_KEYS_AND_VALUES = REPR_KEYS_AND_VALUES + [
+    (Point(2, 3), Point(1, 4)),
+]
+
+
 class ProtocolTestCase(unittest.TestCase):
 
     def assertRoundTripOK(self, protocol, key, value):
@@ -67,6 +79,13 @@ class ProtocolTestCase(unittest.TestCase):
         and get the same key and value we started with."""
         self.assertEqual((key, value),
                          protocol.read(protocol.write(key, value)))
+
+    def assertRoundTripWithTrailingTabOK(self, protocol, key, value):
+        """Assert that we can encode the given key and value, add a
+        trailing tab (which Hadoop sometimes does), and decode it
+        to get the same key and value we started with."""
+        self.assertEqual((key, value),
+                         protocol.read(protocol.write(key, value) + '\t'))
 
     def assertCantEncode(self, protocol, key, value):
         self.assertRaises(Exception, protocol.write, key, value)
@@ -78,8 +97,12 @@ class ProtocolTestCase(unittest.TestCase):
 class JSONProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
-        for k, v in SAFE_KEYS_AND_VALUES:
+        for k, v in JSON_KEYS_AND_VALUES:
             self.assertRoundTripOK(JSONProtocol, k, v)
+
+    def test_round_trip_with_trailing_tab(self):
+        for k, v in JSON_KEYS_AND_VALUES:
+            self.assertRoundTripWithTrailingTabOK(JSONProtocol, k, v)
 
     def test_uses_json_format(self):
         KEY = ['a', 1]
@@ -119,8 +142,12 @@ class JSONProtocolTestCase(ProtocolTestCase):
 class JSONValueProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
-        for _, v in SAFE_KEYS_AND_VALUES:
+        for _, v in JSON_KEYS_AND_VALUES:
             self.assertRoundTripOK(JSONValueProtocol, None, v)
+
+    def test_round_trip_with_trailing_tab(self):
+        for _, v in JSON_KEYS_AND_VALUES:
+            self.assertRoundTripWithTrailingTabOK(JSONValueProtocol, None, v)
 
     def test_uses_json_format(self):
         VALUE = {'foo': {'bar': 3}, 'baz': None, 'quz': ['a', 1]}
@@ -161,12 +188,12 @@ class JSONValueProtocolTestCase(ProtocolTestCase):
 class PickleProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
-        for k, v in SAFE_KEYS_AND_VALUES:
+        for k, v in PICKLE_KEYS_AND_VALUES:
             self.assertRoundTripOK(PickleProtocol, k, v)
-        self.assertRoundTripOK(PickleProtocol, (1, 2), (3, 4))
-        self.assertRoundTripOK(PickleProtocol, '0\xa2', '\xe9')
-        self.assertRoundTripOK(PickleProtocol, set([1]), set())
-        self.assertRoundTripOK(PickleProtocol, Point(2, 3), Point(1, 4))
+
+    def test_round_trip_with_trailing_tab(self):
+        for k, v in PICKLE_KEYS_AND_VALUES:
+            self.assertRoundTripWithTrailingTabOK(PickleProtocol, k, v)
 
     def test_bad_data(self):
         self.assertCantDecode(PickleProtocol, '{@#$@#!^&*$%^')
@@ -177,12 +204,12 @@ class PickleProtocolTestCase(ProtocolTestCase):
 class PickleValueProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
-        for _, v in SAFE_KEYS_AND_VALUES:
+        for _, v in PICKLE_KEYS_AND_VALUES:
             self.assertRoundTripOK(PickleValueProtocol, None, v)
-        self.assertRoundTripOK(PickleValueProtocol, None, (3, 4))
-        self.assertRoundTripOK(PickleValueProtocol, None, '\xe9')
-        self.assertRoundTripOK(PickleValueProtocol, None, set())
-        self.assertRoundTripOK(PickleValueProtocol, None, Point(1, 4))
+
+    def test_round_trip_with_trailing_tab(self):
+        for _, v in PICKLE_KEYS_AND_VALUES:
+            self.assertRoundTripWithTrailingTabOK(PickleValueProtocol, None, v)
 
     def test_bad_data(self):
         self.assertCantDecode(PickleValueProtocol, '{@#$@#!^&*$%^')
@@ -240,11 +267,12 @@ class RawProtocolTestCase(ProtocolTestCase):
 class ReprProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
-        for k, v in SAFE_KEYS_AND_VALUES:
+        for k, v in REPR_KEYS_AND_VALUES:
             self.assertRoundTripOK(ReprProtocol, k, v)
-        self.assertRoundTripOK(ReprProtocol, (1, 2), (3, 4))
-        self.assertRoundTripOK(ReprProtocol, '0\xa2', '\xe9')
-        self.assertRoundTripOK(ReprProtocol, set([1]), set())
+
+    def test_round_trip_with_trailing_tab(self):
+        for k, v in REPR_KEYS_AND_VALUES:
+            self.assertRoundTripWithTrailingTabOK(ReprProtocol, k, v)
 
     def test_uses_repr_format(self):
         KEY = ['a', 1]
@@ -265,11 +293,12 @@ class ReprProtocolTestCase(ProtocolTestCase):
 class ReprValueProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
-        for _, v in SAFE_KEYS_AND_VALUES:
+        for _, v in REPR_KEYS_AND_VALUES:
             self.assertRoundTripOK(ReprValueProtocol, None, v)
-        self.assertRoundTripOK(ReprValueProtocol, None, (3, 4))
-        self.assertRoundTripOK(ReprValueProtocol, None, '\xe9')
-        self.assertRoundTripOK(ReprValueProtocol, None, set())
+
+    def test_round_trip_with_trailing_tab(self):
+        for _, v in REPR_KEYS_AND_VALUES:
+            self.assertRoundTripWithTrailingTabOK(ReprValueProtocol, None, v)
 
     def test_uses_repr_format(self):
         VALUE = {'foo': {'bar': 3}, 'baz': None, 'quz': ['a', 1]}

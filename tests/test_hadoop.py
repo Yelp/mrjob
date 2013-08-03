@@ -191,14 +191,22 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             self.assertEqual(runner._opts['hadoop_extra_args'],
                              ['-libjar', 'containsJars.jar'])
 
-            # make sure mrjob.tar.gz is was uploaded and added to PYTHONPATH
-            self.assertIsNotNone(runner._mrjob_tar_gz_path)
+            # make sure mrjob.tar.gz is was uploaded
+            self.assertTrue(os.path.exists(runner._mrjob_tar_gz_path))
             self.assertIn(runner._mrjob_tar_gz_path,
                           runner._upload_mgr.path_to_uri())
 
-            name = runner._working_dir_mgr.name('archive', runner._mrjob_tar_gz_path)
-            pythonpath = runner._get_cmdenv()['PYTHONPATH']
-            self.assertIn(name, pythonpath.split(':'))
+            # make sure setup script exists, and mrjob.tar.gz is added
+            # to PYTHONPATH in it
+            self.assertTrue(os.path.exists(runner._setup_wrapper_script_path))
+            self.assertIn(runner._setup_wrapper_script_path,
+                          runner._upload_mgr.path_to_uri())
+            mrjob_tar_gz_name = runner._working_dir_mgr.name(
+                'archive', runner._mrjob_tar_gz_path)
+            with open(runner._setup_wrapper_script_path) as wrapper:
+                self.assertTrue(any(
+                    ('export PYTHONPATH' in line and mrjob_tar_gz_name in line)
+                    for line in wrapper))
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
@@ -244,6 +252,9 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
     def test_end_to_end_without_pty_fork(self):
         with patch.object(pty, 'fork', side_effect=OSError()):
             self._test_end_to_end()
+
+    def test_end_to_end_with_disabled_input_path_check(self):
+        self._test_end_to_end(['--skip-hadoop-input-check'])
 
 
 class StreamingArgsTestCase(EmptyMrjobConfTestCase):

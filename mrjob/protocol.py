@@ -1,4 +1,4 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ class _ClassBasedKeyCachingProtocol(object):
 
         :return: A tuple of ``(key, value)``."""
 
-        raw_key, raw_value = line.split('\t')
+        raw_key, raw_value = line.split('\t', 1)
 
         if raw_key != cls._last_key_encoded:
             cls._last_key_encoded = raw_key

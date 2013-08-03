@@ -37,8 +37,10 @@ import itertools
 import logging
 import os.path
 import posixpath
+import re
 
 from mrjob.parse import is_uri
+from mrjob.util import expand_path
 
 
 log = logging.getLogger(__name__)
@@ -47,53 +49,123 @@ log = logging.getLogger(__name__)
 _SUPPORTED_TYPES = ('archive', 'file')
 
 
-# TODO: This is a model for how we expect to handle "new" hash paths to work.
-# This may not need to exist as a separate function because our final
-# goal is to parse these expressions out of a command-line with a regex,
-# in which case most of the parsing work will already be done, and many
-# of the error cases will be impossible.
-def parse_hash_path(hash_path):
-    """Parse Hadoop Distributed Cache-style paths into a dictionary.
+SETUP_CMD_RE = re.compile(
+    r"((?P<single_quoted>'[^']*')|"
+    r'(?P<double_quoted>"([^"\\]|\\.)*")|'
+    r'(?P<hash_path>'
+        r'(?P<path>([A-Za-z][A-Za-z0-9\.-]*://([^\'"\s\\]|\\.)+)|'
+            r'([^\'":=\s\\]|\\.)+)'
+        r'#(?P<name>([^\'":;><|=/#\s\\]|\\.)*)'
+            r'(?P<name_slash>/)?)|'
+    r'(?P<unquoted>([^\'":=\s\\]|\\.)+)|'
+    r'(?P<colon_or_equals>[:=])|'  # hash path could come next; stop capturing
+    r'(?P<whitespace>\s+)|'
+    r'(?P<error>.+))')
 
-    For example:
-    >>> parse_hash_path('/foo/bar.py#baz.py')
-    {'path': '/foo/bar.py', 'name': 'baz.py', 'type': 'file'}
 
-    A slash at the end of the name indicates an archive:
-    >>> parse_hash_path('/foo/bar.tar.gz#baz/')
-    {'path': '/foo/bar.py', 'name': 'baz.py', 'type': 'archive'}
+ESCAPE_RE = re.compile(
+    r'(\\(?P<escaped>.)|(?P<unescaped>[^\\]+)|(?P<error>.+))')
 
-    An empty name (e.g. ``'/foo/bar.py#'``) indicates any name is acceptable.
+
+def parse_setup_cmd(cmd):
+    """Parse a setup/bootstrap command, finding and pulling out Hadoop
+    Distributed Cache-style paths ("hash paths").
+
+    :param string cmd: shell command to parse
+    :return: a list containing dictionaries (parsed hash paths) and strings
+             (parts of the original command, left unparsed)
+
+    Hash paths look like ``path#name``, where *path* is either a local path
+    or a URI pointing to something we want to upload to Hadoop/EMR, and *name*
+    is the name we want it to have when we upload it; *name* is optional
+    (no name means to pick a unique one).
+
+    If *name* is followed by a trailing slash, that indicates *path* is an
+    archive (e.g. a tarball), and should be unarchived into a directory on the
+    remote system. The trailing slash will *also* be kept as part of the
+    original command.
+
+    Parsed hash paths are dicitionaries with the keys ``path``, ``name``, and
+    ``type`` (either ``'file'`` or ``'archive'``).
+
+    Most of the time, this function will just do what you expect. Rules for
+    finding hash paths:
+
+    * we only look for hash paths outside of quoted strings
+    * *path* may not contain quotes or whitespace
+    * *path* may not contain `:` or `=` unless it is a URI (starts with
+      ``<scheme>://``); this allows you to do stuff like
+      ``export PYTHONPATH=$PYTHONPATH:foo.egg#``.
+    * *name* may not contain whitespace or any of the following characters:
+      ``'":;><|=/#``, so you can do stuff like
+      ``sudo dpkg -i fooify.deb#; fooify bar``
+
+    If you really want to include forbidden characters, you may use backslash
+    escape sequences in *path* and *name*. (We can't guarantee Hadoop/EMR
+    will accept them though!). Also, remember that shell syntax allows you
+    to concatenate strings ``like""this``.
+
+    Environment variables and ``~`` (home dir) in *path* will be resolved
+    (use backslash escapes to stop this). We don't resolve *name* because it
+    doesn't make sense. Environment variables and ``~`` elsewhere in the
+    command are considered to be part of the script and will be resolved
+    on the remote system.
     """
-    if not '#' in hash_path:
-        raise ValueError('bad hash path %r, must contain #' % (hash_path,))
+    tokens = []
 
-    path, name = hash_path.split('#', 1)
+    for m in SETUP_CMD_RE.finditer(cmd):
+        keep_as_is = (m.group('single_quoted')
+                      or m.group('double_quoted')
+                      or m.group('unquoted')
+                      or m.group('whitespace')
+                      or m.group('colon_or_equals'))
 
-    if name.endswith('/'):
-        type = 'archive'
-        name = name[:-1]
-    else:
-        type = 'file'
+        if keep_as_is:
+            if tokens and isinstance(tokens[-1], basestring):
+                tokens[-1] += keep_as_is
+            else:
+                tokens.append(keep_as_is)
+        elif m.group('hash_path'):
+            tokens.append({
+                'path': _resolve_path(m.group('path')),
+                'name': m.group('name') or None,
+                'type': 'archive' if m.group('name_slash') else 'file'})
+            if m.group('name_slash'):
+                tokens.append('/')
+        elif m.group('error'):
+            # these match the error messages from shlex.split()
+            if m.group('error').startswith('\\'):
+                raise ValueError('No escaped character')
+            else:
+                raise ValueError('No closing quotation')
 
-    if not path:
-        raise ValueError('Path may not be empty!')
+    return tokens
 
-    if '/' in name or '#' in name:
-        raise ValueError('bad path %r; name must not contain # or /' % (path,))
 
-    # use None for no name
-    if not name:
-        name = None
+def _resolve_path(path):
+    """Helper for :py:func:`parse_setup_cmd`.
 
-    return {'path': path, 'name': name, 'type': type}
+    Resolve ``~`` (home dir) and environment variables in the
+    given path, and unescape backslashes."""
+    result = ''
+
+    for m in ESCAPE_RE.finditer(path):
+        if m.group('escaped'):
+            result += m.group('escaped')
+        elif m.group('unescaped'):
+            result += expand_path(m.group('unescaped'))
+        else:
+            raise ValueError('No escaped character')
+
+    return result
 
 
 def parse_legacy_hash_path(type, path, must_name=None):
     """Parse hash paths from old setup/bootstrap options.
 
-    This is similar to :py:func:`parse_hash_path` except that we pass in
-    path type explicitly, and we don't always require the hash.
+    This is similar to parsing hash paths out of shell commands (see
+    :py:func:`parse_setup_cmd`) except that we pass in
+    path type explicitly, and we don't always require the ``#`` character.
 
     :param type: Type of the path (``'archive'`` or ``'file'``)
     :param path: Path to parse, possibly with a ``#``

@@ -114,6 +114,7 @@ def make_option_parser():
             'emr_job_flow_pool_name',
             'enable_emr_debugging',
             'hadoop_version',
+            'max_hours_idle',
             'num_ec2_core_instances',
             'num_ec2_instances',
             'num_ec2_task_instances',

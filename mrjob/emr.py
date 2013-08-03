@@ -2000,9 +2000,6 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['max_hours_idle']:
             self._create_cloudwatch_idle_alarm()
 
-
-
-
         return self._emr_job_flow_id
 
     def get_emr_job_flow_id(self):
@@ -2324,9 +2321,10 @@ class EMRJobRunner(MRJobRunner):
             threshold=1,
             period=period,
             evaluation_periods=evaluation_periods,
-            dimensions=[{'JobFlowId': self._emr_job_flow_id}],
+            dimensions={'JobFlowId': self._emr_job_flow_id},
             alarm_actions=[action])
 
+        log.debug('calling create_alarm(%r)' % (idle_alarm,))
         cloudwatch_conn.create_alarm(idle_alarm)
 
     ### EMR-specific Stuff ###

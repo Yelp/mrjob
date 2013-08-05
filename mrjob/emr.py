@@ -2312,6 +2312,17 @@ class EMRJobRunner(MRJobRunner):
 
         action = cloudwatch_ec2_action_arn(self._aws_region, 'terminate')
 
+        # This is incomplete; we should call _describe_job_flow() until
+        # MasterInstanceId is set (it can take some time to provision it)
+        # and include it in dimensions, below:
+        #   dimensions={'JobFlowId': [...], 'InstanceId': [...]}
+        #
+        # However, although this creates an alarm that looks fine
+        # in the AWS CloudWatch Console (web interface), it never actually
+        # fires! CloudWatch just doesn't seem to be able to do this,
+        # and we need to abandon this approach.
+        #
+        # See Issue #628 for more info.
         idle_alarm = boto.ec2.cloudwatch.alarm.MetricAlarm(
             name=unique_alarm_name,
             metric='IsIdle',
@@ -2321,7 +2332,7 @@ class EMRJobRunner(MRJobRunner):
             threshold=1,
             period=period,
             evaluation_periods=evaluation_periods,
-            dimensions={'JobFlowId': self._emr_job_flow_id},
+            dimensions={'JobFlowId': [self._emr_job_flow_id]},
             alarm_actions=[action])
 
         log.debug('calling create_alarm(%r)' % (idle_alarm,))

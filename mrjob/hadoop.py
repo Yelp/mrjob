@@ -18,7 +18,7 @@ import os
 import posixpath
 import re
 from subprocess import Popen
-from subprocess import PIPE
+from subprocess import PIPE, STDOUT
 from subprocess import CalledProcessError
 
 try:
@@ -69,6 +69,8 @@ HADOOP_JOB_TIMESTAMP_RE = re.compile(
 # find version string in "Hadoop 0.20.203" etc.
 HADOOP_VERSION_RE = re.compile(r'^.*?(?P<version>(\d|\.)+).*?$')
 
+HADOOP_FETCH_URI_SCHEME = "hadoop conf -key fs.default.name"
+HADOOP_FETCH_URI_CLEANUP = re.compile(r'///\n')
 
 def find_hadoop_streaming_jar(path):
     """Return the path of the hadoop streaming jar inside the given
@@ -81,14 +83,20 @@ def find_hadoop_streaming_jar(path):
         return None
 
 
-def fully_qualify_hdfs_path(path):
-    """If path isn't an ``hdfs://`` URL, turn it into one."""
+def fully_qualify_hadoop_path(path):
+    """If we're on MapR, we should get an alternative to hdfs://. CDH4 will fail"""
+    process = Popen(HADOOP_FETCH_URI_SCHEME, shell=True, stdout=PIPE, stderr=STDOUT)
+    uri_scheme = process.communicate()[0]
+    if process.returncode != 0:
+       uri_scheme='hdfs://'
+    else:
+       uri_scheme = HADOOP_FETCH_URI_CLEANUP.sub('//', uri_scheme)
     if is_uri(path):
         return path
     elif path.startswith('/'):
-        return 'hdfs://' + path
+        return uri_scheme + path
     else:
-        return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
+        return '%s/user/%s/%s' % (uri_scheme, getpass.getuser(), path)
 
 
 def hadoop_log_dir(hadoop_home=None):
@@ -178,19 +186,19 @@ class HadoopJobRunner(MRJobRunner):
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 
-        self._hdfs_tmp_dir = fully_qualify_hdfs_path(
+        self._hadoop_tmp_dir = fully_qualify_hadoop_path(
             posixpath.join(
             self._opts['hdfs_scratch_dir'], self._job_name))
 
         # Keep track of local files to upload to HDFS. We'll add them
         # to this manager just before we need them.
-        hdfs_files_dir = posixpath.join(self._hdfs_tmp_dir, 'files', '')
+        hdfs_files_dir = posixpath.join(self._hadoop_tmp_dir, 'files', '')
         self._upload_mgr = UploadDirManager(hdfs_files_dir)
 
         # Set output dir if it wasn't set explicitly
-        self._output_dir = fully_qualify_hdfs_path(
+        self._output_dir = fully_qualify_hadoop_path(
             self._output_dir or
-            posixpath.join(self._hdfs_tmp_dir, 'output'))
+            posixpath.join(self._hadoop_tmp_dir, 'output'))
 
         self._hadoop_log_dir = hadoop_log_dir(self._opts['hadoop_home'])
 
@@ -441,23 +449,23 @@ class HadoopJobRunner(MRJobRunner):
                     for p in self._get_input_paths()]
         else:
             return [posixpath.join(
-                self._hdfs_tmp_dir, 'step-output', str(step_num))]
+                self._hadoop_tmp_dir, 'step-output', str(step_num))]
 
     def _hdfs_step_output_dir(self, step_num):
         if step_num == len(self._get_steps()) - 1:
             return self._output_dir
         else:
             return posixpath.join(
-                self._hdfs_tmp_dir, 'step-output', str(step_num + 1))
+                self._hadoop_tmp_dir, 'step-output', str(step_num + 1))
 
     def _cleanup_local_scratch(self):
         super(HadoopJobRunner, self)._cleanup_local_scratch()
 
-        if self._hdfs_tmp_dir:
-            log.info('deleting %s from HDFS' % self._hdfs_tmp_dir)
+        if self._hadoop_tmp_dir:
+            log.info('deleting %s from HDFS' % self._hadoop_tmp_dir)
 
             try:
-                self.invoke_hadoop(['fs', '-rmr', self._hdfs_tmp_dir])
+                self.invoke_hadoop(['fs', '-rmr', self._hadoop_tmp_dir])
             except Exception, e:
                 log.exception(e)
 

@@ -78,7 +78,8 @@ def parse_s3_uri(uri):
     return components.netloc, components.path[1:]
 
 
-def urlparse(urlstring, scheme='', allow_fragments=True):
+@wraps(urlparse_buggy)
+def urlparse(urlstring, scheme='', allow_fragments=True, *args, **kwargs):
     """A wrapper for :py:func:`urlparse.urlparse` with the following
     differences:
 
@@ -95,7 +96,7 @@ def urlparse(urlstring, scheme='', allow_fragments=True):
     # 'default_scheme' to 'scheme' in Python 2.6, so urlparse_buggy() should
     # be called with positional arguments.
     (scheme, netloc, path, params, query, fragment) = (
-        urlparse_buggy(urlstring, scheme, allow_fragments))
+        urlparse_buggy(urlstring, scheme, allow_fragments, *args, **kwargs))
     if netloc == '' and path.startswith('//'):
         m = NETLOC_RE.match(path)
         netloc = m.group(1)

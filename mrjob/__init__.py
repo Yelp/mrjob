@@ -32,6 +32,7 @@ __credits__ = [
     'Nick Dimiduk <ndimiduk@gmail.com>',
     'Tom Dooner <tomdooner@gmail.com>',
     'Dan Frank <danielhfrank@gmail.com>',
+    'Alan Gardner <alanctgardner@gmail.com>',
     'Benjamin Goldenberg <benjamin@yelp.com',
     'Peter Harrington <peter.b.harrington@gmail.com>',
     'Brandon Haynes <bhaynes@fas.harvard.edu>',

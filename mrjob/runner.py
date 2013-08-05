@@ -110,6 +110,7 @@ class RunnerOptionStore(OptionStore):
         'cmdenv',
         'hadoop_extra_args',
         'hadoop_streaming_jar',
+        'hadoop_uri_scheme',
         'hadoop_version',
         'interpreter',
         'jobconf',
@@ -196,6 +197,7 @@ class RunnerOptionStore(OptionStore):
             'cleanup': ['ALL'],
             'cleanup_on_failure': ['NONE'],
             'hadoop_version': '0.20',
+            'hadoop_uri_scheme': 'hdfs',
             'owner': owner,
             'sh_bin': ['sh'],
         })

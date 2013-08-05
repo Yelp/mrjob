@@ -15,10 +15,8 @@
 from functools import wraps
 import logging
 import re
-import urlparse
 from urlparse import ParseResult
-
-urlparse_buggy = urlparse.urlparse
+from urlparse import urlparse as urlparse_buggy
 
 try:
     from cStringIO import StringIO
@@ -27,18 +25,6 @@ except ImportError:
     from StringIO import StringIO
 
 from mrjob.compat import uses_020_counters
-
-
-### danger: monkey patch urlparse on python < 2.7.4 ###
-
-if hasattr(urlparse, 'uses_fragment'):
-    # Python 2.7.4 changes the behavior of urlparse to parse the fragment out
-    # of any URL scheme, which breaks our tests and possibly our code. The
-    # below patch will normalize the behavior for the listed URL schemes.
-    #
-    # http://bugs.python.org/issue9374
-    # http://hg.python.org/cpython/rev/79e6ff3d9afd
-    urlparse.uses_fragment.extend(['s3', 's3n', 'hdfs', 'mapreduce'])
 
 
 # match the filename of a hadoop streaming jar
@@ -94,17 +80,27 @@ def parse_s3_uri(uri):
 
 @wraps(urlparse_buggy)
 def urlparse(*args, **kwargs):
-    """A wrapper for :py:func:`urlparse.urlparse` that handles buckets in S3
-    URIs correctly. (:py:func:`~urlparse.urlparse` does this correctly sometime
-    after 2.6.1; this is just a patch for older Python versions.)"""
-    components = urlparse_buggy(*args, **kwargs)
-    if components.netloc == '' and components.path.startswith('//'):
-        m = NETLOC_RE.match(components.path)
-        return ParseResult(components.scheme, m.group(1), m.group(2),
-                           components.params, components.query,
-                           components.fragment)
-    else:
-        return components
+    """A wrapper for :py:func:`urlparse.urlparse` with the following
+    differences:
+
+    * Handles buckets in S3 URIs correctly. (:py:func:`~urlparse.urlparse`
+      does this correctly sometime after 2.6.1; this is just a patch for older
+      Python versions.)
+    * Splits the fragment correctly in all URIs, not just Web-related ones.
+      This behavior was fixed in the Python 2.7.4 standard library but we have
+      to back-port it for previous versions.
+    """
+    # we're probably going to mess with at least one of these values and
+    # re-pack the whole thing before we return it
+    (scheme, netloc, path, params, query, fragment) = (
+        urlparse_buggy(*args, **kwargs))
+    if netloc == '' and path.startswith('//'):
+        m = NETLOC_RE.match(path)
+        netloc = m.group(1)
+        path = m.group(1)
+    if '#' in path and not fragment:
+        path, fragment = path.split('#', 1)
+    return ParseResult(scheme, netloc, path, params, query, fragment)
 
 
 ### OPTION PARSING ###

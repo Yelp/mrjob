@@ -51,6 +51,7 @@ __credits__ = [
     'Jimmy Retzlaff <jretz@yelp.com>',
     'Ned Rockson <ned@tellapart.com>',
     'Paul Scott <paul@duedil.com>',
+    'Alex Shkop <a.v.shkop@gmail.com>',
     'Jesse Shieh <jesse@adku.com>',
     'Steve Spencer <steve@bigfrog.net>',
     'Jyry Suvilehto <jyry.suvilehto@iki.fi>',
@@ -59,4 +60,4 @@ __credits__ = [
     'Derek Wilson <jderekwilson@gmail.com>',
 ]
 
-__version__ = '0.4'
+__version__ = '0.4.1-dev'

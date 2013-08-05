@@ -540,7 +540,7 @@ class URITestCase(unittest.TestCase):
         self.assertEqual(urlparse('s3://bucket/path'),
                          ('s3', 'bucket', '/path', '', '', ''))
         self.assertEqual(urlparse('s3://bucket/path#customname'),
-                         ('s3', 'bucket', '/path#customname', '', '', ''))
+                         ('s3', 'bucket', '/path', '', '', 'customname'))
         self.assertEqual(urlparse('s3://bucket'),
                          ('s3', 'bucket', '', '', '', ''))
         self.assertEqual(urlparse('s3://bucket/'),

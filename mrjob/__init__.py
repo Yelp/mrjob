@@ -38,7 +38,7 @@ __credits__ = [
     'Brett Hoerner <brett@bretthoerner.com>',
     'Evan Klitzke <evan@eklitzke.org>',
     'Tom Janofsky <tjanofsky@monetate.com>',
-    'Stephen Johnson <sjohnson@yelp.com>',
+    'Stephen Johnson <steve@steveasleep.com>',
     'Matt Jones <mattj@yelp.com>',
     'Nikolaos Koutsopoulos <nhk@mochimedia.com>',
     'Julian Krause <juliank@yelp.com>',

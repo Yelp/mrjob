@@ -131,6 +131,7 @@ REGION_TO_EMR_ENDPOINT = {
     'ap-southeast-1': 'elasticmapreduce.ap-southeast-1.amazonaws.com',
     'ap-northeast-1': 'elasticmapreduce.ap-northeast-1.amazonaws.com',
     'sa-east-1': 'elasticmapreduce.sa-east-1.amazonaws.com',
+    'ap-southeast-2' : 'elasticmapreduce.ap-southeast-2.amazonaws.com',
     '': 'elasticmapreduce.amazonaws.com',  # when no region specified
 }
 
@@ -145,6 +146,7 @@ REGION_TO_S3_ENDPOINT = {
     'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com',
     'ap-northeast-1': 's3-ap-northeast-1.amazonaws.com',
     'sa-east-1': 's3-sa-east-1.amazonaws.com',
+    'ap-southeast-2' :  's3-ap-southeast-2.amazonaws.com',
     '': 's3.amazonaws.com',
 }
 

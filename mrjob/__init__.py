@@ -24,7 +24,7 @@ __credits__ = [
     'Hunter Blanks <hblanks@monetate.com>',
     'Jim Blomo <jblomo@yelp.com>',
     'Reno Bowen <renobowen@gmail.com>',
-    'James Brown <jbrown@yelp.com>',
+    'James Brown <jbrown@uber.com>',
     'Kevin Burke <kevin@twilio.com>',
     'Jordan Christensen <jc@kobo.com>',
     'David Dehghan <ddehghan@gmail.com>',

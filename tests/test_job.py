@@ -224,33 +224,38 @@ class ProtocolsTestCase(unittest.TestCase):
         def mapper(self, key, value):
             yield key, value
 
+    def assertMethodsEqual(self, fs, gs):
+        # we're going to use this to match bound against unbound methods
+        self.assertEqual([f.im_func for f in fs],
+                         [g.im_func for g in gs])
+
     def test_default_protocols(self):
         mr_job = MRBoringJob()
-        self.assertEqual(mr_job.pick_protocols(0, 'mapper'),
-                         (RawValueProtocol.read, JSONProtocol.write))
-        self.assertEqual(mr_job.pick_protocols(0, 'reducer'),
-                         (JSONProtocol.read, JSONProtocol.write))
+        self.assertMethodsEqual(mr_job.pick_protocols(0, 'mapper'),
+                                (RawValueProtocol.read, JSONProtocol.write))
+        self.assertMethodsEqual(mr_job.pick_protocols(0, 'reducer'),
+                               (JSONProtocol.read, JSONProtocol.write))
 
     def test_explicit_default_protocols(self):
         mr_job2 = self.MRBoringJob2().sandbox()
-        self.assertEqual(mr_job2.pick_protocols(0, 'mapper'),
-                         (JSONProtocol.read, PickleProtocol.write))
-        self.assertEqual(mr_job2.pick_protocols(0, 'reducer'),
-                         (PickleProtocol.read, ReprProtocol.write))
+        self.assertMethodsEqual(mr_job2.pick_protocols(0, 'mapper'),
+                                (JSONProtocol.read, PickleProtocol.write))
+        self.assertMethodsEqual(mr_job2.pick_protocols(0, 'reducer'),
+                                (PickleProtocol.read, ReprProtocol.write))
 
         mr_job3 = self.MRBoringJob3()
-        self.assertEqual(mr_job3.pick_protocols(0, 'mapper'),
-                         (RawValueProtocol.read, ReprProtocol.write))
+        self.assertMethodsEqual(mr_job3.pick_protocols(0, 'mapper'),
+                                (RawValueProtocol.read, ReprProtocol.write))
         # output protocol should default to JSON
-        self.assertEqual(mr_job3.pick_protocols(0, 'reducer'),
-                         (ReprProtocol.read, JSONProtocol.write))
+        self.assertMethodsEqual(mr_job3.pick_protocols(0, 'reducer'),
+                                (ReprProtocol.read, JSONProtocol.write))
 
         mr_job4 = self.MRBoringJob4()
-        self.assertEqual(mr_job4.pick_protocols(0, 'mapper'),
-                         (RawValueProtocol.read, ReprProtocol.write))
+        self.assertMethodsEqual(mr_job4.pick_protocols(0, 'mapper'),
+                                (RawValueProtocol.read, ReprProtocol.write))
         # output protocol should default to JSON
-        self.assertEqual(mr_job4.pick_protocols(0, 'reducer'),
-                         (ReprProtocol.read, JSONProtocol.write))
+        self.assertMethodsEqual(mr_job4.pick_protocols(0, 'reducer'),
+                                (ReprProtocol.read, JSONProtocol.write))
 
     def test_mapper_raw_value_to_json(self):
         RAW_INPUT = StringIO('foo\nbar\nbaz\n')
@@ -442,8 +447,8 @@ class PickProtocolsTestCase(unittest.TestCase):
         self._assert_script_protocols(
             [self._jar_step(0, 'blah', 'binks_jar.jar'),
              self._streaming_step(
-                1, mapper=self._yield_none, combiner=self._yield_none,
-                reducer=self._yield_none)],
+                 1, mapper=self._yield_none, combiner=self._yield_none,
+                 reducer=self._yield_none)],
             [(RawValueProtocol, RawValueProtocol),
              (PickleProtocol, JSONProtocol),
              (JSONProtocol, JSONProtocol),
@@ -802,7 +807,7 @@ class StepNumTestCase(unittest.TestCase):
         # sort output of mapper0
         mapper0_output_input_lines = StringIO(mapper0.stdout.getvalue())
         reducer0_input_lines = sorted(mapper0_output_input_lines,
-                               key=lambda line: line.split('\t'))
+                                      key=lambda line: line.split('\t'))
 
         def test_reducer0(mr_job, input_lines):
             mr_job.sandbox(input_lines)

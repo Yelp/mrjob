@@ -48,7 +48,7 @@ class _KeyCachingProtocol(object):
         """Encode a single key/value, and return it."""
         raise NotImplementedError
 
-    def read(cls, line):
+    def read(self, line):
         """Decode a line of input.
 
         :type line: str
@@ -58,12 +58,12 @@ class _KeyCachingProtocol(object):
 
         raw_key, raw_value = line.split('\t', 1)
 
-        if raw_key != cls._last_key_encoded:
-            cls._last_key_encoded = raw_key
-            cls._last_key_decoded = cls._loads(raw_key)
-        return (cls._last_key_decoded, cls._loads(raw_value))
+        if raw_key != self._last_key_encoded:
+            self._last_key_encoded = raw_key
+            self._last_key_decoded = self._loads(raw_key)
+        return (self._last_key_decoded, self._loads(raw_value))
 
-    def write(cls, key, value):
+    def write(self, key, value):
         """Encode a key and value.
 
         :param key: A key (of any type) yielded by a mapper/reducer
@@ -71,8 +71,8 @@ class _KeyCachingProtocol(object):
 
         :rtype: str
         :return: A line, without trailing newline."""
-        return '%s\t%s' % (cls._dumps(key),
-                           cls._dumps(value))
+        return '%s\t%s' % (self._dumps(key),
+                           self._dumps(value))
 
 
 class JSONProtocol(_KeyCachingProtocol):
@@ -81,10 +81,10 @@ class JSONProtocol(_KeyCachingProtocol):
     Note that JSON has some limitations; dictionary keys must be strings,
     and there's no distinction between lists and tuples."""
 
-    def _loads(cls, value):
+    def _loads(self, value):
         return json.loads(value)
 
-    def _dumps(cls, value):
+    def _dumps(self, value):
         return json.dumps(value)
 
 
@@ -92,10 +92,10 @@ class JSONValueProtocol(object):
     """Encode ``value`` as a JSON and discard ``key``
     (``key`` is read in as ``None``).
     """
-    def read(cls, line):
+    def read(self, line):
         return (None, json.loads(line))
 
-    def write(cls, key, value):
+    def write(self, key, value):
         return json.dumps(value)
 
 
@@ -110,10 +110,10 @@ class PickleProtocol(_KeyCachingProtocol):
     Ugly, but should work for any type.
     """
 
-    def _loads(cls, value):
+    def _loads(self, value):
         return cPickle.loads(value.decode('string_escape'))
 
-    def _dumps(cls, value):
+    def _dumps(self, value):
         return cPickle.dumps(value).encode('string_escape')
 
 
@@ -121,10 +121,10 @@ class PickleValueProtocol(object):
     """Encode ``value`` as a string-escaped pickle and discard ``key``
     (``key`` is read in as ``None``).
     """
-    def read(cls, line):
+    def read(self, line):
         return (None, cPickle.loads(line.decode('string_escape')))
 
-    def write(cls, key, value):
+    def write(self, key, value):
         return cPickle.dumps(value).encode('string_escape')
 
 
@@ -141,14 +141,14 @@ class RawProtocol(object):
     Your key should probably not be ``None`` or have tab characters in it, but
     we don't check.
     """
-    def read(cls, line):
+    def read(self, line):
         key_value = line.split('\t', 1)
         if len(key_value) == 1:
             key_value.append(None)
 
         return tuple(key_value)
 
-    def write(cls, key, value):
+    def write(self, key, value):
         return '\t'.join(x for x in (key, value) if x is not None)
 
 
@@ -158,10 +158,10 @@ class RawValueProtocol(object):
 
     The default way for a job to read its initial input.
     """
-    def read(cls, line):
+    def read(self, line):
         return (None, line)
 
-    def write(cls, key, value):
+    def write(self, key, value):
         return value
 
 
@@ -171,10 +171,10 @@ class ReprProtocol(_KeyCachingProtocol):
     This only works for basic types (we use :py:func:`mrjob.util.safeeval`).
     """
 
-    def _loads(cls, value):
+    def _loads(self, value):
         return safeeval(value)
 
-    def _dumps(cls, value):
+    def _dumps(self, value):
         return repr(value)
 
 
@@ -184,8 +184,8 @@ class ReprValueProtocol(object):
 
     This only works for basic types (we use :py:func:`mrjob.util.safeeval`).
     """
-    def read(cls, line):
+    def read(self, line):
         return (None, safeeval(line))
 
-    def write(cls, key, value):
+    def write(self, key, value):
         return repr(value)

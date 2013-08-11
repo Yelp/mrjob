@@ -447,8 +447,8 @@ class PickProtocolsTestCase(unittest.TestCase):
         self._assert_script_protocols(
             [self._jar_step(0, 'blah', 'binks_jar.jar'),
              self._streaming_step(
-                1, mapper=self._yield_none, combiner=self._yield_none,
-                reducer=self._yield_none)],
+                 1, mapper=self._yield_none, combiner=self._yield_none,
+                 reducer=self._yield_none)],
             [(RawValueProtocol, RawValueProtocol),
              (PickleProtocol, JSONProtocol),
              (JSONProtocol, JSONProtocol),
@@ -807,7 +807,7 @@ class StepNumTestCase(unittest.TestCase):
         # sort output of mapper0
         mapper0_output_input_lines = StringIO(mapper0.stdout.getvalue())
         reducer0_input_lines = sorted(mapper0_output_input_lines,
-                               key=lambda line: line.split('\t'))
+                                      key=lambda line: line.split('\t'))
 
         def test_reducer0(mr_job, input_lines):
             mr_job.sandbox(input_lines)

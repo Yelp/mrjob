@@ -15,7 +15,7 @@
 
 
 import logging
-from io import StringIO
+from io import StringIO, BytesIO
 from subprocess import PIPE
 from subprocess import Popen
 
@@ -45,7 +45,7 @@ from tests.quiet import no_handlers_for_logger
 
 class FindPythonTracebackTestCase(unittest.TestCase):
 
-    EXAMPLE_TRACEBACK = """Traceback (most recent call last):
+    EXAMPLE_TRACEBACK = b"""Traceback (most recent call last):
   File "mr_collect_per_search_info_remote.py", line 8, in <module>
     from batch.stat_loader_remote.protocols import MySQLLoadProtocol
   File "/mnt/var/lib/hadoop/mapred/taskTracker/jobcache/job_201108022217_0001/attempt_201108022217_0001_m_000001_0/work/yelp-src-tree. tar.gz/batch/stat_loader_remote/protocols.py", line 4, in <module>
@@ -58,7 +58,7 @@ Traceback (most recent call last):
 subprocess.CalledProcessError: Command '['python', 'mr_collect_per_search_info_remote.py', '--step-num=0', '--mapper']' returned non-  zero exit status 1
 """
 
-    EXAMPLE_STDERR_TRACEBACK_1 = """mr_profile_test.py:27: Warning: 'with' will become a reserved keyword in Python 2.6
+    EXAMPLE_STDERR_TRACEBACK_1 = b"""mr_profile_test.py:27: Warning: 'with' will become a reserved keyword in Python 2.6
   File "mr_profile_test.py", line 27
     with open('/mnt/var/log/hadoop/profile/bloop', 'w') as f:
             ^
@@ -71,7 +71,7 @@ Traceback (most recent call last):
 subprocess.CalledProcessError: Command '['python', 'mr_profile_test.py', '--step-num=0', '--reducer', '--input-protocol', 'raw_value', '--output-protocol', 'json', '--protocol', 'json']' returned non-zero exit status 1
 """
 
-    EXAMPLE_STDERR_TRACEBACK_2 = """tools/csv-to-myisam.c:18:19: error: mysql.h: No such file or directory
+    EXAMPLE_STDERR_TRACEBACK_2 = b"""tools/csv-to-myisam.c:18:19: error: mysql.h: No such file or directory
 make: *** [tools/csv-to-myisam] Error 1
 Traceback (most recent call last):
   File "wrapper.py", line 11, in <module>
@@ -86,21 +86,21 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
             return Popen(args, stdout=PIPE, stderr=PIPE).communicate()
 
         # sanity-check normal operations
-        ok_stdout, ok_stderr = run('python', '-c', "print sorted('321')")
-        self.assertEqual(ok_stdout.rstrip(), "['1', '2', '3']")
-        self.assertEqual(find_python_traceback(StringIO(ok_stderr)), None)
+        ok_stdout, ok_stderr = run('python', '-c', "print(sorted('321'))")
+        self.assertEqual(ok_stdout.rstrip(), b"['1', '2', '3']")
+        self.assertEqual(find_python_traceback(BytesIO(ok_stderr)), None)
 
         # Oops, can't sort a number.
-        stdout, stderr = run('python', '-c', "print sorted(321)")
+        stdout, stderr = run('python', '-c', "print(sorted(321))")
 
         # We expect something like this:
         #
          # Traceback (most recent call last):
         #   File "<string>", line 1, in <module>
         # TypeError: 'int' object is not iterable
-        self.assertEqual(stdout, '')
+        self.assertEqual(stdout, b'')
         # save the traceback for the next step
-        tb = find_python_traceback(StringIO(stderr))
+        tb = find_python_traceback(BytesIO(stderr))
         self.assertNotEqual(tb, None)
         assert isinstance(tb, list)
         # The first line ("Traceback...") is not skipped
@@ -108,26 +108,26 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
 
         # make sure we can find the same traceback in noise
         verbose_stdout, verbose_stderr = run(
-            'python', '-v', '-c', "print sorted(321)")
-        self.assertEqual(verbose_stdout, '')
+            'python', '-v', '-c', "print(sorted(321))")
+        self.assertEqual(verbose_stdout, b'')
         self.assertNotEqual(verbose_stderr, stderr)
-        verbose_tb = find_python_traceback(StringIO(verbose_stderr))
+        verbose_tb = find_python_traceback(BytesIO(verbose_stderr))
         self.assertEqual(verbose_tb, tb)
 
     def test_find_multiple_python_tracebacks(self):
-        total_traceback = self.EXAMPLE_TRACEBACK + 'junk\n'
-        tb = find_python_traceback(StringIO(total_traceback))
-        self.assertEqual(''.join(tb), self.EXAMPLE_TRACEBACK)
+        total_traceback = self.EXAMPLE_TRACEBACK + b'junk\n'
+        tb = find_python_traceback(BytesIO(total_traceback))
+        self.assertEqual(b''.join(tb), self.EXAMPLE_TRACEBACK)
 
     def test_find_python_traceback_with_more_stderr(self):
-        total_traceback = self.EXAMPLE_STDERR_TRACEBACK_1 + 'junk\n'
-        tb = find_python_traceback(StringIO(total_traceback))
-        self.assertEqual(''.join(tb), self.EXAMPLE_STDERR_TRACEBACK_1)
+        total_traceback = self.EXAMPLE_STDERR_TRACEBACK_1 + b'junk\n'
+        tb = find_python_traceback(BytesIO(total_traceback))
+        self.assertEqual(b''.join(tb), self.EXAMPLE_STDERR_TRACEBACK_1)
 
     def test_find_python_traceback_with_more_stderr_2(self):
-        total_traceback = self.EXAMPLE_STDERR_TRACEBACK_2 + 'junk\n'
-        tb = find_python_traceback(StringIO(total_traceback))
-        self.assertEqual(''.join(tb), self.EXAMPLE_STDERR_TRACEBACK_2)
+        total_traceback = self.EXAMPLE_STDERR_TRACEBACK_2 + b'junk\n'
+        tb = find_python_traceback(BytesIO(total_traceback))
+        self.assertEqual(b''.join(tb), self.EXAMPLE_STDERR_TRACEBACK_2)
 
 
 class FindMiscTestCase(unittest.TestCase):

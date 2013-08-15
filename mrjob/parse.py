@@ -17,6 +17,7 @@ import logging
 import re
 from urllib.parse import ParseResult
 from urllib.parse import urlparse as urlparse_buggy
+import codecs
 
 try:
     from io import StringIO
@@ -156,7 +157,8 @@ def counter_unescape(escaped_string):
     :param escaped_string: string from a counter log line
     :type escaped_string: str
     """
-    escaped_string = escaped_string.decode('string_escape')
+    #escaped_string = escaped_string.decode('string_escape')
+    escaped_string = codecs.getdecoder('unicode_escape')(escaped_string)[0]
     escaped_string = _HADOOP_0_20_ESCAPED_CHARS_RE.sub(r'\1', escaped_string)
     return escaped_string
 
@@ -189,7 +191,7 @@ def find_python_traceback(lines):
             if line.lstrip() == line:
                 in_traceback = False
 
-                if line.startswith('subprocess.CalledProcessError'):
+                if line.startswith(b'subprocess.CalledProcessError'):
                     # CalledProcessError may mean that the subprocess printed
                     # errors to stderr which we can show the user
                     all_tb_lines += non_tb_lines
@@ -200,7 +202,7 @@ def find_python_traceback(lines):
                 tb_lines = []
                 non_tb_lines = []
         else:
-            if line.startswith('Traceback (most recent call last):'):
+            if line.startswith(b'Traceback (most recent call last):'):
                 tb_lines.append(line)
                 in_traceback = True
             else:

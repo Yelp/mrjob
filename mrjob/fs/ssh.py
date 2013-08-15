@@ -15,10 +15,10 @@ import logging
 import posixpath
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
     StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
-    from StringIO import StringIO
+    from io import StringIO
 
 from mrjob.fs.base import Filesystem
 from mrjob.ssh import ssh_cat
@@ -114,7 +114,7 @@ class SSHFilesystem(Filesystem):
         paths = self.ls(path_glob)
         try:
             path_exists = any(paths)
-        except IOError, e:
+        except IOError as e:
             path_exists = False
         return path_exists
 

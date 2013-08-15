@@ -88,11 +88,11 @@ class MRJobStep(object):
         self._steps = steps
 
     def __repr__(self):
-        not_none = dict((k, v) for k, v in self._steps.iteritems()
+        not_none = dict((k, v) for k, v in self._steps.items()
                         if v is not None)
         return '%s(%s)' % (
             self.__class__.__name__,
-            ', '.join('%s=%r' % (k, v) for k, v in not_none.iteritems()))
+            ', '.join('%s=%r' % (k, v) for k, v in not_none.items()))
 
     def __eq__(self, other):
         return (isinstance(other, MRJobStep) and self._steps == other._steps)
@@ -118,7 +118,7 @@ class MRJobStep(object):
     def _render_substep(self, cmd_key, pre_filter_key=None):
         if self._steps[cmd_key]:
             cmd = self._steps[cmd_key]
-            if not isinstance(cmd, basestring):
+            if not isinstance(cmd, str):
                 cmd = cmd_line(cmd)
             if (pre_filter_key and self._steps[pre_filter_key]):
                 raise ValueError('Cannot specify both %s and %s' % (

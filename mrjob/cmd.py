@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import with_statement
+
 
 from sys import argv
 from sys import stderr
@@ -29,16 +29,16 @@ subcommands:"""
 
 def error(msg=None):
     if msg:
-        print >> stderr, msg
+        print(msg, file=stderr)
 
     longest_command = max(len(name) for name in commands)
     def subcommand_line(name):
         spaces = ' ' * (longest_command - len(name))
         return '  %s: %s%s' % (
             name, spaces, descriptions[name])
-    print >> stderr, usage
-    print >> stderr, '\n'.join(
-        subcommand_line(name) for name in sorted(commands))
+    print(usage, file=stderr)
+    print('\n'.join(
+        subcommand_line(name) for name in sorted(commands)), file=stderr)
 
 
 def command(name, description):

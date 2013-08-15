@@ -47,7 +47,7 @@ def map_int_to_tour(num_nodes, i, start_node):
     i -- the integer to be mapped to the set of tours for the graph
     start_node -- the node index to begin and end the tour on
     """
-    nodes_remaining = range(0, start_node) + range(start_node + 1, num_nodes)
+    nodes_remaining = list(range(0, start_node)) + list(range(start_node + 1, num_nodes))
     tour = []
 
     while len(nodes_remaining) > 0:
@@ -70,7 +70,7 @@ def cost_tour(graph, tour):
     tour -- A list of integers representing a tour through the graph where each
             entry is the index of a node on the graph.
     """
-    steps = zip(tour[0:-1], tour[1:])
+    steps = list(zip(tour[0:-1], tour[1:]))
     cost = sum([graph[step_from, step_to] for step_from, step_to in steps])
     return cost
 
@@ -105,7 +105,7 @@ class MRSalesman(MRJob):
         with while mapping in step 2 and output but the step 2 mapper_final.
         """
         super(MRSalesman, self).__init__(*args, **kwargs)
-        self.shortest_length = sys.maxint
+        self.shortest_length = sys.maxsize
         self.shortest_path = []
         self.longest_length = 0
         self.longest_path = []
@@ -129,8 +129,8 @@ class MRSalesman(MRJob):
         #pieces. Each piece is passed along as a key along with the trip
         #description.
         step_size = int(100 if num_tours < 100**2 else num_tours / 100)
-        steps = range(0, num_tours, step_size) + [num_tours]
-        ranges = zip(steps[0:-1], steps[1:])
+        steps = list(range(0, num_tours, step_size)) + [num_tours]
+        ranges = list(zip(steps[0:-1], steps[1:]))
 
         for range_low, range_high in ranges:
             #The key prepresents the range of tours to cost
@@ -152,7 +152,7 @@ class MRSalesman(MRJob):
         num_nodes = matrix.shape[0]
 
         #The key prepresents the range of tours to cost
-        range_low, range_high = map(int,key.split('-'))
+        range_low, range_high = list(map(int,key.split('-')))
         for i in range(range_low,range_high):
 
             tour = map_int_to_tour(num_nodes, i, sales_trip['start_node'])

@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import with_statement
+
 
 """Base class for all runners."""
 
@@ -34,10 +34,10 @@ from subprocess import check_call
 import tempfile
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
     StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
-    from StringIO import StringIO
+    from io import StringIO
 
 try:
     import simplejson as json
@@ -204,7 +204,7 @@ class RunnerOptionStore(OptionStore):
         # old API accepts strings for cleanup
         # new API wants lists
         for opt_key in ('cleanup', 'cleanup_on_failure'):
-            if isinstance(self[opt_key], basestring):
+            if isinstance(self[opt_key], str):
                 self[opt_key] = [self[opt_key]]
 
         def validate_cleanup(error_str, opt_list):
@@ -507,7 +507,7 @@ class MRJobRunner(object):
             log.info('removing tmp directory %s' % self._local_tmp_dir)
             try:
                 shutil.rmtree(self._local_tmp_dir)
-            except OSError, e:
+            except OSError as e:
                 log.exception(e)
 
         self._local_tmp_dir = None
@@ -593,7 +593,7 @@ class MRJobRunner(object):
             step_num = step_num + 1
             if limit_to_steps is None or step_num in limit_to_steps:
                 log.info('Counters from step %d:' % step_num)
-                if step_counters.keys():
+                if list(step_counters.keys()):
                     for group_name in sorted(step_counters.keys()):
                         log.info('  %s:' % group_name)
                         group_counters = step_counters[group_name]
@@ -912,7 +912,7 @@ class MRJobRunner(object):
 
         # setup_cmds
         for cmd in self._opts['setup_cmds']:
-            if not isinstance(cmd, basestring):
+            if not isinstance(cmd, str):
                 cmd = cmd_line(cmd)
             setup.append([cmd])
 
@@ -1072,12 +1072,12 @@ class MRJobRunner(object):
         jobconf = add_translated_jobconf_for_hadoop_version(jobconf,
                                                             version)
         if uses_generic_jobconf(version):
-            for key, value in sorted(jobconf.iteritems()):
+            for key, value in sorted(jobconf.items()):
                 if value is not None:
                     args.extend(['-D', '%s=%s' % (key, value)])
         # old-style jobconf
         else:
-            for key, value in sorted(jobconf.iteritems()):
+            for key, value in sorted(jobconf.items()):
                 if value is not None:
                     args.extend(['-jobconf', '%s=%s' % (key, value)])
 
@@ -1086,7 +1086,7 @@ class MRJobRunner(object):
             args.extend(['-partitioner', self._partitioner])
 
         # cmdenv
-        for key, value in sorted(self._opts['cmdenv'].iteritems()):
+        for key, value in sorted(self._opts['cmdenv'].items()):
             args.append('-cmdenv')
             args.append('%s=%s' % (key, value))
 
@@ -1102,7 +1102,7 @@ class MRJobRunner(object):
 
     def _arg_hash_paths(self, type, upload_mgr):
         """Helper function for the *upload_args methods."""
-        for name, path in self._working_dir_mgr.name_to_path(type).iteritems():
+        for name, path in self._working_dir_mgr.name_to_path(type).items():
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 

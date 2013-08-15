@@ -18,7 +18,7 @@ information, see :ref:`job-protocols` and :ref:`writing-protocols`.
 """
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-import cPickle
+import pickle
 
 from mrjob.util import safeeval
 
@@ -111,10 +111,10 @@ class PickleProtocol(_KeyCachingProtocol):
     """
 
     def _loads(self, value):
-        return cPickle.loads(value.decode('string_escape'))
+        return pickle.loads(value.decode('string_escape'))
 
     def _dumps(self, value):
-        return cPickle.dumps(value).encode('string_escape')
+        return pickle.dumps(value).encode('string_escape')
 
 
 class PickleValueProtocol(object):
@@ -122,10 +122,10 @@ class PickleValueProtocol(object):
     (``key`` is read in as ``None``).
     """
     def read(self, line):
-        return (None, cPickle.loads(line.decode('string_escape')))
+        return (None, pickle.loads(line.decode('string_escape')))
 
     def write(self, key, value):
-        return cPickle.dumps(value).encode('string_escape')
+        return pickle.dumps(value).encode('string_escape')
 
 
 # This was added in 0.3, so no @classmethod for backwards compatibility

@@ -64,10 +64,10 @@ def encode_document(text, cats=None, id=None):
     id -- a unique ID for the document (any kind of JSON-able value should
         work). If not specified, we'll auto-generate one.
     """
-    text = unicode(text)
-    cats = dict((unicode(cat), bool(is_in_cat))
+    text = str(text)
+    cats = dict((str(cat), bool(is_in_cat))
                 for cat, is_in_cat
-                in (cats or {}).iteritems())
+                in (cats or {}).items())
 
     return JSONValueProtocol.write(
         None, {'text': text, 'cats': cats, 'id': id}) + '\n'
@@ -243,11 +243,11 @@ class MRTextClassifier(MRJob):
         # yield the number of times the ngram appears in this doc
         # and the categories for this document, so we can train the classifier
         if not doc['in_test_set']:
-            for (n, ngram), count in ngram_counts.iteritems():
+            for (n, ngram), count in ngram_counts.items():
                 yield ('ngram', (n, ngram)), (count, doc['cats'])
 
         # yield the document itself, for safekeeping
-        doc['ngram_counts'] = ngram_counts.items()
+        doc['ngram_counts'] = list(ngram_counts.items())
         yield ('doc', doc['id']), doc
 
     def count_ngram_freq(self, type_and_key, values):
@@ -300,7 +300,7 @@ class MRTextClassifier(MRJob):
 
         for count, cats in values:
             total_df += 1
-            for cat in cats.iteritems():
+            for cat in cats.items():
                 cat_to_df[cat] += 1
                 cat_to_tf[cat] += count
 
@@ -309,7 +309,7 @@ class MRTextClassifier(MRJob):
             return
 
         yield (('global', None),
-               ((n, ngram), (cat_to_df.items(), cat_to_tf.items())))
+               ((n, ngram), (list(cat_to_df.items()), list(cat_to_tf.items()))))
 
     def score_ngrams(self, type_and_key, values):
         """Reducer: Look at all ngrams together, and assign scores by
@@ -369,7 +369,7 @@ class MRTextClassifier(MRJob):
         # rigorous estimate, but it's good enough
         m = len(ngram_to_info)
 
-        for (n, ngram), info in ngram_to_info.iteritems():
+        for (n, ngram), info in ngram_to_info.items():
             # do this even for the special ANY ngram; it's useful
             # as a normalization factor.
             cat_to_df, cat_to_tf = info
@@ -380,7 +380,7 @@ class MRTextClassifier(MRJob):
             # calculate the probability of any given term being
             # this term for documents of each type
             cat_to_p = {}
-            for cat, t in cat_to_t.iteritems():
+            for cat, t in cat_to_t.items():
                 tf = cat_to_tf.get(cat) or 0
                 # use Laplace's rule of succession to estimate p. See:
                 # http://en.wikipedia.org/wiki/Rule_of_succession#Generalization_to_any_number_of_possibilities
@@ -520,14 +520,14 @@ class MRTextClassifier(MRJob):
 
         for (n, ngram), cat_to_score in ngrams_and_scores:
             tf = ngram_counts[(n, ngram)]
-            for cat, score in cat_to_score.iteritems():
+            for cat, score in cat_to_score.items():
                 cat_to_n_to_total_score[cat][n] += score * tf
 
         # average scores for each ngram size
         cat_to_score = {}
-        for cat, n_to_total_score in cat_to_n_to_total_score.iteritems():
+        for cat, n_to_total_score in cat_to_n_to_total_score.items():
             total_score_for_cat = 0
-            for n, total_score in n_to_total_score.iteritems():
+            for n, total_score in n_to_total_score.items():
                 total_t = ngram_counts[(n, None)]
                 total_score_for_cat += (
                     total_score /

@@ -16,7 +16,7 @@
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-from __future__ import with_statement
+
 
 from collections import defaultdict
 import contextlib
@@ -64,14 +64,14 @@ def buffer_iterator_to_line_iterator(iterator):
     """boto's file iterator splits by buffer size instead of by newline. This
     wrapper puts them back into lines.
     """
-    buf = iterator.next()  # might raise StopIteration, but that's okay
+    buf = next(iterator)  # might raise StopIteration, but that's okay
     while True:
         if '\n' in buf:
             (line, buf) = buf.split('\n', 1)
             yield line + '\n'
         else:
             try:
-                more = iterator.next()
+                more = next(iterator)
                 buf += more
             except StopIteration:
                 if buf:
@@ -98,7 +98,7 @@ def extract_dir_for_tar(archive_path, compression='gz'):
     # Open the file for read-only streaming (no random seeks)
     tar = tarfile.open(archive_path, mode='r|%s' % compression)
     # Grab the first item
-    first_member = tar.next()
+    first_member = next(tar)
     tar.close()
     # Return the first path component of the item's name
     return first_member.name.split('/')[0]
@@ -327,7 +327,7 @@ def populate_option_groups_with_options(assignments, indexed_options):
                            :py:func:`util.scrape_options_and_index_by_dest`
     :param indexed_options: options to use when populating the parsers/groups
     """
-    for opt_group, opt_dest_list in assignments.iteritems():
+    for opt_group, opt_dest_list in assignments.items():
         new_options = []
         for option_dest in assignments[opt_group]:
             for option in indexed_options[option_dest]:
@@ -558,7 +558,7 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
             path = os.path.join(dirpath, filename)
             # janky version of os.path.relpath() (Python 2.6):
             rel_path = path[len(os.path.join(dir, '')):]
-            if filter(rel_path):
+            if list(filter(rel_path)):
                 # copy over real files, not symlinks
                 real_path = os.path.realpath(path)
                 path_in_tar_gz = os.path.join(prefix, rel_path)

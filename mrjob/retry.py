@@ -78,7 +78,7 @@ class RetryWrapper(object):
             while (not self.__max_tries or tries < self.__max_tries):
                 try:
                     return f(*args, **kwargs)
-                except Exception, ex:
+                except Exception as ex:
                     if self.__retry_if(ex):
                         log.info('Got retriable error: %r' % ex)
                         log.info('Backing off for %.1f seconds' % backoff)

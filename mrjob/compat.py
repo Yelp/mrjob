@@ -556,7 +556,7 @@ def _dict_list_to_compat_map(dict_list):
     # }
     compat_map = {}
     for version_dict in dict_list:
-        for value in version_dict.itervalues():
+        for value in version_dict.values():
             compat_map[value] = version_dict
     return compat_map
 
@@ -584,7 +584,7 @@ def get_jobconf_value(variable, default=None):
         return os.environ[name]
 
     # try alternatives (arbitrary order)
-    for var in _jobconf_map[variable].itervalues():
+    for var in _jobconf_map[variable].values():
         name = var.replace('.', '_')
         if name in os.environ:
             return os.environ[name]
@@ -600,9 +600,9 @@ def translate_jobconf(variable, version):
         return variable
 
     req_version = LooseVersion(version)
-    possible_versions = sorted(_jobconf_map[variable].keys(),
+    possible_versions = sorted(list(_jobconf_map[variable].keys()),
                                reverse=True,
-                               key=lambda(v): LooseVersion(v))
+                               key=lambda v: LooseVersion(v))
 
     for possible_version in possible_versions:
         if req_version >= LooseVersion(possible_version):
@@ -643,10 +643,10 @@ def uses_generic_jobconf(version):
 def version_gte(version, cmp_version_str):
     """Return True if version >= *cmp_version_str*."""
 
-    if not isinstance(version, basestring):
+    if not isinstance(version, str):
         raise TypeError('%r is not a string' % version)
 
-    if not isinstance(cmp_version_str, basestring):
+    if not isinstance(cmp_version_str, str):
         raise TypeError('%r is not a string' % cmp_version_str)
 
     return LooseVersion(version) >= LooseVersion(cmp_version_str)
@@ -663,7 +663,7 @@ def add_translated_jobconf_for_hadoop_version(jobconf, hadoop_version):
     """
     translated_jobconf = {}
     mismatch_key_to_translated_key = {}
-    for key, value in jobconf.iteritems():
+    for key, value in jobconf.items():
         new_key = translate_jobconf(key, hadoop_version)
         if key != new_key:
             translated_jobconf[new_key] = value
@@ -675,7 +675,7 @@ def add_translated_jobconf_for_hadoop_version(jobconf, hadoop_version):
                     "\nThe have been translated as follows\n %s",
                     hadoop_version,
                     '\n'.join(["%s: %s" % (key, value) for key, value
-                               in mismatch_key_to_translated_key.iteritems()])
+                               in mismatch_key_to_translated_key.items()])
         )
 
     translated_jobconf.update(jobconf)

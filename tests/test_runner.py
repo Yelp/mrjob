@@ -244,7 +244,7 @@ class TestStreamingOutput(unittest.TestCase):
 
         runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
         self.assertEqual(sorted(runner.stream_output()),
-                         ['A', 'B', 'C'])
+                         [b'A', b'B', b'C'])
 
 
 class TestInvokeSort(unittest.TestCase):

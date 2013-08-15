@@ -1191,7 +1191,7 @@ class MRJobRunner(object):
 
                 # shovel bytes into the sort process
                 for input_path in input_paths:
-                    with open(input_path, 'r') as input:
+                    with open(input_path, 'rb') as input:
                         while True:
                             buf = input.read(_BUFFER_SIZE)
                             if not buf:

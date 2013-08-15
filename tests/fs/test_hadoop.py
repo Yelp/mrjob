@@ -61,28 +61,28 @@ class HadoopFSTestCase(MockSubprocessTestCase):
     def test_ls_basic_2(self):
         self.make_mock_file('f')
         self.make_mock_file('f2')
-        self.assertItemsEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///f',
+        self.assertCountEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///f',
                                                         'hdfs:///f2'])
     def test_ls_recurse(self):
         self.make_mock_file('f')
         self.make_mock_file('d/f2')
-        self.assertItemsEqual(list(self.fs.ls('hdfs:///')),
+        self.assertCountEqual(list(self.fs.ls('hdfs:///')),
                          ['hdfs:///f', 'hdfs:///d/f2'])
 
     def test_ls_s3n(self):
         # hadoop fs -lsr doesn't have user and group info when reading from s3
         self.make_mock_file('f', 'foo')
         self.make_mock_file('f3 win', 'foo' * 10)
-        self.assertItemsEqual(list(self.fs.ls('s3n://bucket/')),
+        self.assertCountEqual(list(self.fs.ls('s3n://bucket/')),
                          ['s3n://bucket/f', 's3n://bucket/f3 win'])
 
     def test_single_space(self):
         self.make_mock_file('foo bar')
-        self.assertItemsEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///foo bar'])
+        self.assertCountEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///foo bar'])
 
     def test_double_space(self):
         self.make_mock_file('foo  bar')
-        self.assertItemsEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///foo  bar'])
+        self.assertCountEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///foo  bar'])
 
     def test_cat_uncompressed(self):
         # mockhadoop doesn't support compressed files, so we won't test for it.

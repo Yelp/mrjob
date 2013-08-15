@@ -97,8 +97,9 @@ def extract_dir_for_tar(archive_path, compression='gz'):
     """
     # Open the file for read-only streaming (no random seeks)
     tar = tarfile.open(archive_path, mode='r|%s' % compression)
+
     # Grab the first item
-    first_member = next(tar)
+    first_member = tar.firstmember
     tar.close()
     # Return the first path component of the item's name
     return first_member.name.split('/')[0]
@@ -408,7 +409,7 @@ def read_file(path, fileobj=None):
             else:
                 f = bunzip2_stream(fileobj)
         elif fileobj is None:
-            f = open(path)
+            f = open(path, 'rb')
         else:
             f = fileobj
 
@@ -428,7 +429,7 @@ def bunzip2_stream(fileobj):
         raise Exception('bz2 module was not successfully imported (likely not installed).')
     decomp = bz2.BZ2Decompressor()
     for part in fileobj:
-        buffer = buffer.join(decomp.decompress(part))
+        buffer = buffer.join(decomp.decompress(part).decode('utf-8'))
     f = buffer.splitlines(True)
     return f
 
@@ -501,7 +502,7 @@ def safeeval(expr, globals=None, locals=None):
     """
     # blank out builtins, but keep None, True, and False
     safe_globals = {'__builtins__': None, 'True': True, 'False': False,
-                    'None': None, 'set': set, 'xrange': xrange}
+                    'None': None, 'set': set, 'range': range}
 
     # add the user-specified global variables
     if globals:
@@ -558,7 +559,7 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
             path = os.path.join(dirpath, filename)
             # janky version of os.path.relpath() (Python 2.6):
             rel_path = path[len(os.path.join(dir, '')):]
-            if list(filter(rel_path)):
+            if filter(rel_path):
                 # copy over real files, not symlinks
                 real_path = os.path.realpath(path)
                 path_in_tar_gz = os.path.join(prefix, rel_path)

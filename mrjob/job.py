@@ -333,7 +333,8 @@ class MRJob(MRJobLauncher):
         kwargs = dict((func_name, getattr(self, func_name))
                       for func_name in _JOB_STEP_PARAMS
                       if (getattr(self, func_name).__func__ is not
-                          getattr(MRJob, func_name).__func__))
+                          getattr(MRJob, func_name)))
+
 
         # MRJobStep takes commands as strings, but the user defines them in the
         # class as functions that return strings, so call the functions.
@@ -449,12 +450,11 @@ class MRJob(MRJobLauncher):
         if isinstance(group, str) or isinstance(counter, str):
             group = str(group).replace(',', ';')
             counter = str(counter).replace(',', ';')
-            stderr = codecs.getwriter('utf-8')(self.stderr)
         else:
             group = str(group).replace(',', ';')
             counter = str(counter).replace(',', ';')
-            stderr = self.stderr
 
+        stderr = self.stderr
         stderr.write(
             'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
         stderr.flush()
@@ -471,10 +471,9 @@ class MRJob(MRJobLauncher):
         """
         if isinstance(msg, str):
             status = 'reporter:status:%s\n' % (msg,)
-            stderr = codecs.getwriter('utf-8')(self.stderr)
         else:
             status = 'reporter:status:%s\n' % (msg,)
-            stderr = self.stderr
+        stderr = self.stderr
         stderr.write(status)
         stderr.flush()
 

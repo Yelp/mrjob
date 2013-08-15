@@ -391,7 +391,7 @@ class SimMRJobRunner(MRJobRunner):
             outfile = None
 
             try:
-                outfile = open(outfile_name, 'w')
+                outfile = open(outfile_name, 'wb')
 
                 # write each line to a file as long as we are within the limit
                 # (split_size)
@@ -403,7 +403,7 @@ class SimMRJobRunner(MRJobRunner):
 
                         outfile_name = create_outfile(path, total_bytes)
                         outfile.close()
-                        outfile = open(outfile_name, 'w')
+                        outfile = open(outfile_name, 'wb')
 
                         bytes_written = 0
 

@@ -32,7 +32,7 @@ use create_mock_hadoop_script() to write out a shell script that runs
 mockhadoop.
 """
 
-from __future__ import with_statement
+
 
 import datetime
 import glob
@@ -240,9 +240,9 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
         max_size = 0
 
         if not real_paths:
-            print >> stderr, (
+            print((
                 'lsr: Cannot access %s: No such file or directory.' %
-                hdfs_path_glob)
+                hdfs_path_glob), file=stderr)
             failed = True
         else:
             for real_path in real_paths:
@@ -258,7 +258,7 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
                     paths.append((real_path, scheme, netloc, 0))
 
         for path in paths:
-            print >> stdout, _hadoop_ls_line(*path + (max_size, environ))
+            print(_hadoop_ls_line(*path + (max_size, environ)), file=stdout)
 
     if failed:
         return -1
@@ -283,16 +283,16 @@ def hadoop_fs_ls(stdout, stderr, environ, *args):
         max_size = 0
 
         if not real_paths:
-            print >> stderr, (
+            print((
                 'ls: Cannot access %s: No such file or directory.' %
-                hdfs_path_glob)
+                hdfs_path_glob), file=stderr)
             failed = True
         else:
             for real_path in real_paths:
                 paths.append((real_path, scheme, netloc, 0))
 
         for path in paths:
-            print >> stdout, _hadoop_ls_line(*path + (max_size, environ))
+            print(_hadoop_ls_line(*path + (max_size, environ)), file=stdout)
 
     if failed:
         return -1
@@ -332,9 +332,9 @@ def hadoop_fs_dus(stdout, stderr, environ, *args):
         real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
         real_paths = glob.glob(real_path_glob)
         if not real_paths:
-            print >> stderr, (
+            print((
                 'lsr: Cannot access %s: No such file or directory.' %
-                hdfs_path_glob)
+                hdfs_path_glob), file=stderr)
             failed = True
         else:
             for real_path in real_paths:
@@ -346,7 +346,7 @@ def hadoop_fs_dus(stdout, stderr, environ, *args):
                                 os.path.join(dirpath, filename))
                 else:
                     total_size += os.path.getsize(real_path)
-                print >> stdout, "%s    %d" % (real_path, total_size)
+                print("%s    %d" % (real_path, total_size), file=stdout)
 
     if failed:
         return -1

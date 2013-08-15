@@ -23,13 +23,13 @@ class MRVerboseJob(MRJob):
     def mapper_final(self):
         # the UNIX pipe buffer can hold 65536 bytes, so this should
         # definitely exceed that
-        for i in xrange(10000):
+        for i in range(10000):
             self.increment_counter('Foo', 'Bar')
 
-        for i in xrange(100):
+        for i in range(100):
             self.set_status(str(i))
 
-        print >> sys.stderr, 'Qux'
+        print('Qux', file=sys.stderr)
 
         # raise an exception so we can test stacktrace finding
         raise Exception('BOOM')

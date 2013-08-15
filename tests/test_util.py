@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """Tests of all the amazing utilities in mrjob.util"""
-from __future__ import with_statement
+
 
 import bz2
 import gzip
@@ -22,7 +22,7 @@ import os
 import shutil
 from subprocess import PIPE
 from subprocess import Popen
-from StringIO import StringIO
+from io import StringIO
 import tarfile
 import tempfile
 
@@ -258,7 +258,7 @@ class SafeEvalTestCase(unittest.TestCase):
 
     def test_simple_data_structure(self):
         # try unrepr-ing a bunch of simple data structures
-        for x in True, None, 1, range(5), {'foo': False, 'bar': 2}:
+        for x in True, None, 1, list(range(5)), {'foo': False, 'bar': 2}:
             self.assertEqual(x, safeeval(repr(x)))
 
     def test_no_mischief(self):

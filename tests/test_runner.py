@@ -13,7 +13,7 @@
 # limitations under the License.
 """Test the runner base class MRJobRunner"""
 
-from __future__ import with_statement
+
 
 import datetime
 import getpass
@@ -333,7 +333,7 @@ sys.exit(13)
         environment_vars = {}
 
         def check_call_se(*args, **kwargs):
-            for key in kwargs['env'].keys():
+            for key in list(kwargs['env'].keys()):
                 environment_vars[key] = kwargs['env'][key]
 
         with patch('mrjob.runner.check_call', side_effect=check_call_se):

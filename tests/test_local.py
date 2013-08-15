@@ -14,9 +14,9 @@
 
 """Tests for LocalMRJobRunner"""
 
-from __future__ import with_statement
 
-from StringIO import StringIO
+
+from io import StringIO
 import gzip
 import os
 import shutil
@@ -207,7 +207,7 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
         # Make sure that input.gz occurs in a single split that starts at
         # its beginning and ends at its end
-        for split_info in file_splits.values():
+        for split_info in list(file_splits.values()):
             if split_info['orig_name'] == input_gz_path:
                 self.assertEqual(split_info['start'], 0)
                 self.assertEqual(split_info['length'],
@@ -278,7 +278,7 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
         with mr_job.make_runner() as r:
             splits = r._get_file_splits([gz_path_1, gz_path_2, path_3], 1)
             self.assertEqual(
-                len(set(s['task_num'] for s in splits.values())), 3)
+                len(set(s['task_num'] for s in list(splits.values()))), 3)
 
 
 class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):
@@ -335,7 +335,7 @@ class LargeAmountsOfStderrTestCase(unittest.TestCase):
                 mr_job.run_job()
         except TimeoutException:
             raise
-        except Exception, e:
+        except Exception as e:
             # we expect the job to throw an exception
 
             # look for expected output from MRVerboseJob
@@ -360,7 +360,7 @@ class ExitWithoutExceptionTestCase(unittest.TestCase):
 
         try:
             mr_job.run_job()
-        except Exception, e:
+        except Exception as e:
             self.assertIn('returned non-zero exit status 42', repr(e))
             return
 
@@ -493,7 +493,7 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
                 try:
                     with no_handlers_for_logger():
                         runner.run()
-                except Exception, e:
+                except Exception as e:
                     # if mrjob is not installed, script won't be able to run
                     self.assertIn('ImportError', str(e))
                     return
@@ -588,14 +588,14 @@ class CompatTestCase(EmptyMrjobConfTestCase):
         with runner as runner:
             runner._setup_working_dir()
             self.assertIn('mapred_cache_localArchives',
-                          runner._subprocess_env('mapper', 0, 0).keys())
+                          list(runner._subprocess_env('mapper', 0, 0).keys()))
 
     def test_environment_variables_021(self):
         runner = LocalMRJobRunner(hadoop_version='0.21', conf_paths=[])
         with runner as runner:
             runner._setup_working_dir()
             self.assertIn('mapreduce_job_cache_local_archives',
-                          runner._subprocess_env('mapper', 0, 0).keys())
+                          list(runner._subprocess_env('mapper', 0, 0).keys()))
 
 
 class CommandSubstepTestCase(SandboxedTestCase):

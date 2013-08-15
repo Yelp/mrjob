@@ -15,7 +15,7 @@
 
 """Tests for EMRJobRunner"""
 
-from __future__ import with_statement
+
 
 from contextlib import contextmanager
 from contextlib import nested
@@ -28,7 +28,7 @@ import os
 import posixpath
 import py_compile
 import shutil
-from StringIO import StringIO
+from io import StringIO
 import tempfile
 import time
 
@@ -309,7 +309,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         # job should get terminated
         emr_conn = runner.make_emr_conn()
         job_flow_id = runner.get_emr_job_flow_id()
-        for _ in xrange(10):
+        for _ in range(10):
             emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -336,7 +336,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
                 emr_conn = runner.make_emr_conn()
                 job_flow_id = runner.get_emr_job_flow_id()
-                for _ in xrange(10):
+                for _ in range(10):
                     emr_conn.simulate_progress(job_flow_id)
 
                 job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -345,7 +345,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             # job should get terminated on cleanup
             emr_conn = runner.make_emr_conn()
             job_flow_id = runner.get_emr_job_flow_id()
-            for _ in xrange(10):
+            for _ in range(10):
                 emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -475,12 +475,12 @@ class S3ScratchURITestCase(MockEMRAndS3TestCase):
 
         # bucket shouldn't actually exist yet
         scratch_bucket, _ = parse_s3_uri(s3_scratch_uri)
-        self.assertNotIn(scratch_bucket, self.mock_s3_fs.keys())
+        self.assertNotIn(scratch_bucket, list(self.mock_s3_fs.keys()))
 
         # need to do something to ensure that the bucket actually gets
         # created. let's launch a (mock) job flow
         job_flow_id = runner.make_persistent_job_flow()
-        self.assertIn(scratch_bucket, self.mock_s3_fs.keys())
+        self.assertIn(scratch_bucket, list(self.mock_s3_fs.keys()))
         runner.make_emr_conn().terminate_jobflow(job_flow_id)
 
         # once our scratch bucket is created, we should re-use it
@@ -545,7 +545,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
             emr_conn = runner.make_emr_conn()
             job_flow_id = runner.get_emr_job_flow_id()
-            for _ in xrange(10):
+            for _ in range(10):
                 emr_conn.simulate_progress(job_flow_id)
 
             job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -554,7 +554,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
         job_flow_id = runner.get_emr_job_flow_id()
-        for _ in xrange(10):
+        for _ in range(10):
             emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -869,7 +869,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
 
         # convert expected to a dict of dicts
         role_to_expected = {}
-        for role, (num, instance_type, bid_price) in expected.iteritems():
+        for role, (num, instance_type, bid_price) in expected.items():
             info = {
                 'instancerequestcount': str(num),
                 'instancetype': instance_type,
@@ -908,7 +908,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
 
         expected_instance_count = str(sum(
             int(info['instancerequestcount'])
-            for info in role_to_expected.itervalues()))
+            for info in role_to_expected.values()))
         self.assertEqual(expected_instance_count, job_flow.instancecount)
 
     def set_in_mrjob_conf(self, **kwargs):
@@ -2495,7 +2495,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
             emr_conn = runner.make_emr_conn()
             job_flow_id = runner.get_emr_job_flow_id()
-            for _ in xrange(10):
+            for _ in range(10):
                 emr_conn.simulate_progress(job_flow_id)
 
             job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -2504,7 +2504,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
         job_flow_id = runner.get_emr_job_flow_id()
-        for _ in xrange(10):
+        for _ in range(10):
             emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -2531,7 +2531,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
             self.assertEqual(runner.get_emr_job_flow_id(), job_flow_id)
 
             emr_conn = runner.make_emr_conn()
-            for _ in xrange(10):
+            for _ in range(10):
                 emr_conn.simulate_progress(job_flow_id)
 
             job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -2540,7 +2540,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
         job_flow_id = runner.get_emr_job_flow_id()
-        for _ in xrange(10):
+        for _ in range(10):
             emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -2909,7 +2909,7 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
 
     def _assert_streaming_step(self, step, step_num=0, num_steps=1, **kwargs):
         d = self.runner._build_streaming_step(step, step_num, num_steps)
-        for k, v in kwargs.iteritems():
+        for k, v in kwargs.items():
             self.assertEqual(d[k], v)
 
     def test_basic_mapper(self):

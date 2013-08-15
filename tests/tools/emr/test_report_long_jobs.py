@@ -14,7 +14,7 @@
 """Very basic tests for the audit_usage script"""
 from datetime import datetime
 from datetime import timedelta
-from StringIO import StringIO
+from io import StringIO
 import sys
 
 from mrjob.emr import EMRJobRunner

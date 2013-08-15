@@ -15,12 +15,12 @@
 
 """Unit testing of MRJob."""
 
-from __future__ import with_statement
+
 
 import os
 from subprocess import Popen
 from subprocess import PIPE
-from StringIO import StringIO
+from io import StringIO
 import sys
 import time
 
@@ -97,7 +97,7 @@ class MRInitTestCase(EmptyMrjobConfTestCase):
     def test_mapper(self):
         j = MRInitJob()
         j.mapper_init()
-        self.assertEqual(j.mapper(None, None).next(), (None, j.sum_amount))
+        self.assertEqual(next(j.mapper(None, None)), (None, j.sum_amount))
 
     def test_init_funcs(self):
         num_inputs = 2
@@ -163,12 +163,12 @@ class CountersAndStatusTestCase(unittest.TestCase):
     def test_unicode_set_status(self):
         mr_job = MRJob().sandbox()
         # shouldn't raise an exception
-        mr_job.set_status(u'💩')
+        mr_job.set_status('💩')
 
     def test_unicode_counter(self):
         mr_job = MRJob().sandbox()
         # shouldn't raise an exception
-        mr_job.increment_counter(u'💩', 'x', 1)
+        mr_job.increment_counter('💩', 'x', 1)
 
     def test_negative_and_zero_counters(self):
         mr_job = MRJob().sandbox()
@@ -226,8 +226,8 @@ class ProtocolsTestCase(unittest.TestCase):
 
     def assertMethodsEqual(self, fs, gs):
         # we're going to use this to match bound against unbound methods
-        self.assertEqual([f.im_func for f in fs],
-                         [g.im_func for g in gs])
+        self.assertEqual([f.__func__ for f in fs],
+                         [g.__func__ for g in gs])
 
     def test_default_protocols(self):
         mr_job = MRBoringJob()
@@ -312,8 +312,8 @@ class ProtocolsTestCase(unittest.TestCase):
         # exception type varies between versions of simplejson,
         # so just make sure there were three exceptions of some sort
         counters = mr_job.parse_counters()
-        self.assertEqual(counters.keys(), ['Undecodable input'])
-        self.assertEqual(sum(counters['Undecodable input'].itervalues()), 3)
+        self.assertEqual(list(counters.keys()), ['Undecodable input'])
+        self.assertEqual(sum(counters['Undecodable input'].values()), 3)
 
     def test_undecodable_input_strict(self):
         BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +

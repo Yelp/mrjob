@@ -13,13 +13,13 @@
 # limitations under the License.
 """Test OptionStore's functionality"""
 
-from __future__ import with_statement
+
 
 import os
 
 from tempfile import mkdtemp
 from shutil import rmtree
-from StringIO import StringIO
+from io import StringIO
 
 try:
     import unittest2 as unittest

@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import with_statement
+
 
 import logging
 from optparse import Option
@@ -23,10 +23,10 @@ import sys
 import time
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
     StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
-    from StringIO import StringIO
+    from io import StringIO
 
 from mrjob.conf import combine_dicts
 from mrjob.options import add_basic_opts
@@ -424,7 +424,7 @@ class MRJobLauncher(object):
         if self.options.ssh_bind_ports:
             try:
                 ports = parse_port_range_list(self.options.ssh_bind_ports)
-            except ValueError, e:
+            except ValueError as e:
                 self.option_parser.error('invalid port range list "%s": \n%s' %
                                          (self.options.ssh_bind_ports,
                                           e.args[0]))

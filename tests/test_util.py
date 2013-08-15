@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """Tests of all the amazing utilities in mrjob.util"""
-from __future__ import with_statement
+
 
 import bz2
 import gzip
@@ -22,7 +22,7 @@ import os
 import shutil
 from subprocess import PIPE
 from subprocess import Popen
-from StringIO import StringIO
+from io import BytesIO
 import tarfile
 import tempfile
 
@@ -180,7 +180,7 @@ class ReadInputTestCase(unittest.TestCase):
 
     # we're going to put the same data in every file, so we don't
     # have to worry about ordering
-    BEAVER_DATA = 'Beavers mate for life.\n'
+    BEAVER_DATA = b'Beavers mate for life.\n'
 
     @classmethod
     def setup_tmpdir_with_beaver_data(self):
@@ -191,22 +191,22 @@ class ReadInputTestCase(unittest.TestCase):
             f.close()
 
         write_beaver_data_and_close(
-            open(os.path.join(self.tmpdir, 'beavers.txt'), 'w'))
+            open(os.path.join(self.tmpdir, 'beavers.txt'), 'wb'))
         write_beaver_data_and_close(
-            gzip.GzipFile(os.path.join(self.tmpdir, 'beavers.gz'), 'w'))
+            gzip.GzipFile(os.path.join(self.tmpdir, 'beavers.gz'), 'wb'))
         write_beaver_data_and_close(
-            bz2.BZ2File(os.path.join(self.tmpdir, 'beavers.bz2'), 'w'))
+            bz2.BZ2File(os.path.join(self.tmpdir, 'beavers.bz2'), 'wb'))
 
         os.mkdir(os.path.join(self.tmpdir, 'beavers'))
         write_beaver_data_and_close(
-            open(os.path.join(self.tmpdir, 'beavers/README.txt'), 'w'))
+            open(os.path.join(self.tmpdir, 'beavers/README.txt'), 'wb'))
 
     @classmethod
     def delete_tmpdir(self):
         shutil.rmtree(self.tmpdir)
 
     def test_stdin(self):
-        lines = read_input('-', stdin=StringIO(self.BEAVER_DATA))
+        lines = read_input('-', stdin=BytesIO(self.BEAVER_DATA))
         self.assertEqual(list(lines), [self.BEAVER_DATA])
 
     def test_stdin_can_be_iterator(self):
@@ -258,12 +258,13 @@ class SafeEvalTestCase(unittest.TestCase):
 
     def test_simple_data_structure(self):
         # try unrepr-ing a bunch of simple data structures
-        for x in True, None, 1, range(5), {'foo': False, 'bar': 2}:
+        for x in True, None, 1, list(range(5)), {'foo': False, 'bar': 2}:
             self.assertEqual(x, safeeval(repr(x)))
 
     def test_no_mischief(self):
         # make sure we can't do mischief
-        self.assertRaises(NameError, safeeval, "open('/tmp')")
+        #self.assertRaises(NameError, safeeval, "open('/tmp')")
+        self.assertRaises(TypeError, safeeval, "open('/tmp')")
 
     def test_globals_and_locals(self):
         # test passing in globals, locals
@@ -450,7 +451,7 @@ class read_fileTest(unittest.TestCase):
         for line in read_file(input_path):
             output.append(line)
 
-        self.assertEqual(output, ['bar\n', 'foo\n'])
+        self.assertEqual(output, [b'bar\n', b'foo\n'])
 
     def test_read_file_uncompressed_stream(self):
         input_path = os.path.join(self.tmp_dir, 'input')
@@ -466,45 +467,45 @@ class read_fileTest(unittest.TestCase):
     def test_read_file_compressed(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
         input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\nbar\n')
+        input_gz.write(b'foo\nbar\n')
         input_gz.close()
 
         output = []
         for line in read_file(input_gz_path):
             output.append(line)
 
-        self.assertEqual(output, ['foo\n', 'bar\n'])
+        self.assertEqual(output, [b'foo\n', b'bar\n'])
 
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
         input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
-        input_bz2.write('bar\nbar\nfoo\n')
+        input_bz2.write(b'bar\nbar\nfoo\n')
         input_bz2.close()
 
         output = []
         for line in read_file(input_bz2_path):
             output.append(line)
 
-        self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
+        self.assertEqual(output, [b'bar\n', b'bar\n', b'foo\n'])
 
     def test_cat_compressed_stream(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
         input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\nbar\n')
+        input_gz.write(b'foo\nbar\n')
         input_gz.close()
 
         output = []
-        for line in read_file(input_gz_path, fileobj=open(input_gz_path)):
+        for line in read_file(input_gz_path, fileobj=open(input_gz_path, 'rb')):
             output.append(line)
 
-        self.assertEqual(output, ['foo\n', 'bar\n'])
+        self.assertEqual(output, [b'foo\n', b'bar\n'])
 
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
         input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
-        input_bz2.write('bar\nbar\nfoo\n')
+        input_bz2.write(b'bar\nbar\nfoo\n')
         input_bz2.close()
 
         output = []
-        for line in read_file(input_bz2_path, fileobj=open(input_bz2_path)):
+        for line in read_file(input_bz2_path, fileobj=open(input_bz2_path, 'rb')):
             output.append(line)
 
         self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])

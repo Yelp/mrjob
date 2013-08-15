@@ -31,7 +31,7 @@ Options::
                         go back as far as EMR supports (currently about 2
                         months)
 """
-from __future__ import with_statement
+
 
 import boto.utils
 from datetime import datetime
@@ -160,7 +160,7 @@ def job_flows_to_stats(job_flows, now=None):
             start_to_nih = {}
             for jf in s['flows']:
                 for u in jf['usage']:
-                    for start, nih in u[key].iteritems():
+                    for start, nih in u[key].items():
                         start_to_nih.setdefault(start, 0.0)
                         start_to_nih[start] += nih
             s[key] = start_to_nih
@@ -420,7 +420,7 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
         })
 
     # fill in end_billing
-    for i in xrange(len(intervals) - 1):
+    for i in range(len(intervals) - 1):
         intervals[i]['end_billing'] = intervals[i + 1]['start']
 
     intervals[-1]['end_billing'] = jf_end_billing
@@ -436,13 +436,13 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
             (d, nih_per_sec * secs)
             for d, secs
             in subdivide_interval_by_date(interval['start'],
-                                          interval['end']).iteritems())
+                                          interval['end']).items())
 
         interval['hour_to_nih_used'] = dict(
             (d, nih_per_sec * secs)
             for d, secs
             in subdivide_interval_by_hour(interval['start'],
-                                          interval['end']).iteritems())
+                                          interval['end']).items())
 
         interval['nih_billed'] = (
             nih_per_sec *
@@ -452,25 +452,25 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
             (d, nih_per_sec * secs)
             for d, secs
             in subdivide_interval_by_date(interval['start'],
-                                          interval['end_billing']).iteritems())
+                                          interval['end_billing']).items())
 
         interval['hour_to_nih_billed'] = dict(
             (d, nih_per_sec * secs)
             for d, secs
             in subdivide_interval_by_hour(interval['start'],
-                                          interval['end_billing']).iteritems())
+                                          interval['end_billing']).items())
 
         # time billed but not used
         interval['nih_bbnu'] = interval['nih_billed'] - interval['nih_used']
 
         interval['date_to_nih_bbnu'] = {}
-        for d, nih_billed in interval['date_to_nih_billed'].iteritems():
+        for d, nih_billed in interval['date_to_nih_billed'].items():
             nih_bbnu = nih_billed - interval['date_to_nih_used'].get(d, 0.0)
             if nih_bbnu:
                 interval['date_to_nih_bbnu'][d] = nih_bbnu
 
         interval['hour_to_nih_bbnu'] = {}
-        for d, nih_billed in interval['hour_to_nih_billed'].iteritems():
+        for d, nih_billed in interval['hour_to_nih_billed'].items():
             nih_bbnu = nih_billed - interval['hour_to_nih_used'].get(d, 0.0)
             if nih_bbnu:
                 interval['hour_to_nih_bbnu'][d] = nih_bbnu
@@ -504,7 +504,7 @@ def subdivide_interval_by_date(start, end):
 
     # remove zeros
     date_to_secs = dict(
-        (d, secs) for d, secs in date_to_secs.iteritems() if secs)
+        (d, secs) for d, secs in date_to_secs.items() if secs)
 
     return date_to_secs
 
@@ -537,7 +537,7 @@ def subdivide_interval_by_hour(start, end):
 
     # remove zeros
     hour_to_secs = dict(
-        (h, secs) for h, secs in hour_to_secs.iteritems() if secs)
+        (h, secs) for h, secs in hour_to_secs.items() if secs)
 
     return hour_to_secs
 
@@ -578,164 +578,164 @@ def print_report(stats, now=None):
     s = stats
 
     if not s['flows']:
-        print 'No job flows created in the past two months!'
+        print('No job flows created in the past two months!')
         return
 
-    print 'Total  # of Job Flows: %d' % len(s['flows'])
-    print
+    print('Total  # of Job Flows: %d' % len(s['flows']))
+    print()
 
-    print '* All times are in UTC.'
-    print
+    print('* All times are in UTC.')
+    print()
 
-    print 'Min create time: %s' % min(jf['created'] for jf in s['flows'])
-    print 'Max create time: %s' % max(jf['created'] for jf in s['flows'])
-    print '   Current time: %s' % now.replace(microsecond=0)
-    print
+    print('Min create time: %s' % min(jf['created'] for jf in s['flows']))
+    print('Max create time: %s' % max(jf['created'] for jf in s['flows']))
+    print('   Current time: %s' % now.replace(microsecond=0))
+    print()
 
-    print '* All usage is measured in Normalized Instance Hours, which are'
-    print '  roughly equivalent to running an m1.small instance for an hour.'
-    print "  Billing is estimated, and may not match Amazon's system exactly."
-    print
+    print('* All usage is measured in Normalized Instance Hours, which are')
+    print('  roughly equivalent to running an m1.small instance for an hour.')
+    print("  Billing is estimated, and may not match Amazon's system exactly.")
+    print()
 
     # total compute-unit hours used
     def with_pct(usage):
         return (usage, percent(usage, s['nih_billed']))
 
-    print 'Total billed:  %9.2f  %5.1f%%' % with_pct(s['nih_billed'])
-    print '  Total used:  %9.2f  %5.1f%%' % with_pct(s['nih_used'])
-    print '    bootstrap: %9.2f  %5.1f%%' % with_pct(s['bootstrap_nih_used'])
-    print '    jobs:      %9.2f  %5.1f%%' % with_pct(s['job_nih_used'])
-    print '  Total waste: %9.2f  %5.1f%%' % with_pct(s['nih_bbnu'])
-    print '    at end:    %9.2f  %5.1f%%' % with_pct(s['end_nih_bbnu'])
-    print '    other:     %9.2f  %5.1f%%' % with_pct(s['other_nih_bbnu'])
-    print
+    print('Total billed:  %9.2f  %5.1f%%' % with_pct(s['nih_billed']))
+    print('  Total used:  %9.2f  %5.1f%%' % with_pct(s['nih_used']))
+    print('    bootstrap: %9.2f  %5.1f%%' % with_pct(s['bootstrap_nih_used']))
+    print('    jobs:      %9.2f  %5.1f%%' % with_pct(s['job_nih_used']))
+    print('  Total waste: %9.2f  %5.1f%%' % with_pct(s['nih_bbnu']))
+    print('    at end:    %9.2f  %5.1f%%' % with_pct(s['end_nih_bbnu']))
+    print('    other:     %9.2f  %5.1f%%' % with_pct(s['other_nih_bbnu']))
+    print()
 
     if s['date_to_nih_billed']:
-        print 'Daily statistics:'
-        print
-        print ' date          billed      used     waste   % waste'
+        print('Daily statistics:')
+        print()
+        print(' date          billed      used     waste   % waste')
         d = max(s['date_to_nih_billed'])
         while d >= min(s['date_to_nih_billed']):
-            print ' %10s %9.2f %9.2f %9.2f     %5.1f' % (
+            print(' %10s %9.2f %9.2f %9.2f     %5.1f' % (
                 d,
                 s['date_to_nih_billed'].get(d, 0.0),
                 s['date_to_nih_used'].get(d, 0.0),
                 s['date_to_nih_bbnu'].get(d, 0.0),
                 percent(s['date_to_nih_bbnu'].get(d, 0.0),
-                        s['date_to_nih_billed'].get(d, 0.0)))
+                        s['date_to_nih_billed'].get(d, 0.0))))
             d -= timedelta(days=1)
-        print
+        print()
 
     if s['hour_to_nih_billed']:
-        print 'Hourly statistics:'
-        print
-        print ' hour              billed      used     waste   % waste'
+        print('Hourly statistics:')
+        print()
+        print(' hour              billed      used     waste   % waste')
         h = max(s['hour_to_nih_billed'])
         while h >= min(s['hour_to_nih_billed']):
-            print ' %13s  %9.2f %9.2f %9.2f     %5.1f' % (
+            print(' %13s  %9.2f %9.2f %9.2f     %5.1f' % (
                 h.strftime('%Y-%m-%d %H'),
                 s['hour_to_nih_billed'].get(h, 0.0),
                 s['hour_to_nih_used'].get(h, 0.0),
                 s['hour_to_nih_bbnu'].get(h, 0.0),
                 percent(s['hour_to_nih_bbnu'].get(h, 0.0),
-                        s['hour_to_nih_billed'].get(h, 0.0)))
+                        s['hour_to_nih_billed'].get(h, 0.0))))
             h -= timedelta(hours=1)
-        print
+        print()
 
-    print '* Job flows are considered to belong to the user and job that'
-    print '  started them or last ran on them.'
-    print
+    print('* Job flows are considered to belong to the user and job that')
+    print('  started them or last ran on them.')
+    print()
 
     # Top jobs
-    print 'Top jobs, by total time used:'
-    for label, nih_used in sorted(s['label_to_nih_used'].iteritems(),
-                                    key=lambda (lb, nih): (-nih, lb)):
-        print '  %9.2f %s' % (nih_used, label)
-    print
+    print('Top jobs, by total time used:')
+    for label, nih_used in sorted(iter(s['label_to_nih_used'].items()),
+                                    key=lambda lb_nih: (-lb_nih[1], lb_nih[0])):
+        print('  %9.2f %s' % (nih_used, label))
+    print()
 
-    print 'Top jobs, by time billed but not used:'
-    for label, nih_bbnu in sorted(s['label_to_nih_bbnu'].iteritems(),
-                                  key=lambda (lb, nih): (-nih, lb)):
-        print '  %9.2f %s' % (nih_bbnu, label)
-    print
+    print('Top jobs, by time billed but not used:')
+    for label, nih_bbnu in sorted(iter(s['label_to_nih_bbnu'].items()),
+                                  key=lambda lb_nih1: (-lb_nih1[1], lb_nih1[0])):
+        print('  %9.2f %s' % (nih_bbnu, label))
+    print()
 
     # Top users
-    print 'Top users, by total time used:'
-    for owner, nih_used in sorted(s['owner_to_nih_used'].iteritems(),
-                                    key=lambda (o, nih): (-nih, o)):
-        print '  %9.2f %s' % (nih_used, owner)
-    print
+    print('Top users, by total time used:')
+    for owner, nih_used in sorted(iter(s['owner_to_nih_used'].items()),
+                                    key=lambda o_nih: (-o_nih[1], o_nih[0])):
+        print('  %9.2f %s' % (nih_used, owner))
+    print()
 
-    print 'Top users, by time billed but not used:'
-    for owner, nih_bbnu in sorted(s['owner_to_nih_bbnu'].iteritems(),
-                                  key=lambda (o, nih): (-nih, o)):
-        print '  %9.2f %s' % (nih_bbnu, owner)
-    print
+    print('Top users, by time billed but not used:')
+    for owner, nih_bbnu in sorted(iter(s['owner_to_nih_bbnu'].items()),
+                                  key=lambda o_nih2: (-o_nih2[1], o_nih2[0])):
+        print('  %9.2f %s' % (nih_bbnu, owner))
+    print()
 
     # Top job steps
-    print 'Top job steps, by total time used (step number first):'
+    print('Top job steps, by total time used (step number first):')
     for (label, step_num), nih_used in sorted(
-        s['job_step_to_nih_used'].iteritems(), key=lambda (k, nih): (-nih, k)):
+        iter(s['job_step_to_nih_used'].items()), key=lambda k_nih: (-k_nih[1], k_nih[0])):
         if label:
-            print '  %9.2f %3d %s' % (nih_used, step_num, label)
+            print('  %9.2f %3d %s' % (nih_used, step_num, label))
         else:
-            print '  %9.2f     (non-mrjob step)' % (nih_used,)
-    print
+            print('  %9.2f     (non-mrjob step)' % (nih_used,))
+    print()
 
-    print 'Top job steps, by total time billed but not used (un-pooled only):'
+    print('Top job steps, by total time billed but not used (un-pooled only):')
     for (label, step_num), nih_bbnu in sorted(
-        s['job_step_to_nih_bbnu_no_pool'].iteritems(),
-        key=lambda (k, nih): (-nih, k)):
+        iter(s['job_step_to_nih_bbnu_no_pool'].items()),
+        key=lambda k_nih3: (-k_nih3[1], k_nih3[0])):
 
         if label:
-            print '  %9.2f %3d %s' % (nih_bbnu, step_num, label)
+            print('  %9.2f %3d %s' % (nih_bbnu, step_num, label))
         else:
-            print '  %9.2f     (non-mrjob step)' % (nih_bbnu,)
-    print
+            print('  %9.2f     (non-mrjob step)' % (nih_bbnu,))
+    print()
 
     # Top pools
-    print 'All pools, by total time billed:'
-    for pool, nih_billed in sorted(s['pool_to_nih_billed'].iteritems(),
-                                   key=lambda (p, nih): (-nih, p)):
-        print '  %9.2f %s' % (nih_billed, pool or '(not pooled)')
-    print
+    print('All pools, by total time billed:')
+    for pool, nih_billed in sorted(iter(s['pool_to_nih_billed'].items()),
+                                   key=lambda p_nih: (-p_nih[1], p_nih[0])):
+        print('  %9.2f %s' % (nih_billed, pool or '(not pooled)'))
+    print()
 
-    print 'All pools, by total time billed but not used:'
-    for pool, nih_bbnu in sorted(s['pool_to_nih_bbnu'].iteritems(),
-                                 key=lambda (p, nih): (-nih, p)):
-        print '  %9.2f %s' % (nih_bbnu, pool or '(not pooled)')
-    print
+    print('All pools, by total time billed but not used:')
+    for pool, nih_bbnu in sorted(iter(s['pool_to_nih_bbnu'].items()),
+                                 key=lambda p_nih4: (-p_nih4[1], p_nih4[0])):
+        print('  %9.2f %s' % (nih_bbnu, pool or '(not pooled)'))
+    print()
 
     # Top job flows
-    print 'All job flows, by total time billed:'
+    print('All job flows, by total time billed:')
     top_job_flows = sorted(s['flows'],
                            key=lambda jf: (-jf['nih_billed'], jf['name']))
     for jf in top_job_flows:
-        print '  %9.2f %-15s %s' % (
-            jf['nih_billed'], jf['id'], jf['name'])
-    print
+        print('  %9.2f %-15s %s' % (
+            jf['nih_billed'], jf['id'], jf['name']))
+    print()
 
-    print 'All job flows, by time billed but not used:'
+    print('All job flows, by time billed but not used:')
     top_job_flows_bbnu = sorted(s['flows'],
                                 key=lambda jf: (-jf['nih_bbnu'], jf['name']))
     for jf in top_job_flows_bbnu:
-        print '  %9.2f %-15s %s' % (
-            jf['nih_bbnu'], jf['id'], jf['name'])
-    print
+        print('  %9.2f %-15s %s' % (
+            jf['nih_bbnu'], jf['id'], jf['name']))
+    print()
 
     # Details
-    print 'Details for all job flows:'
-    print
+    print('Details for all job flows:')
+    print()
     print (' id              state         created             steps'
            '        time ran     billed    waste   user   name')
 
     all_job_flows = sorted(s['flows'], key=lambda jf: jf['created'],
                            reverse=True)
     for jf in all_job_flows:
-        print ' %-15s %-13s %19s %3d %17s %9.2f %9.2f %8s %s' % (
+        print(' %-15s %-13s %19s %3d %17s %9.2f %9.2f %8s %s' % (
             jf['id'], jf['state'], jf['created'], jf['num_steps'],
             strip_microseconds(jf['ran']), jf['nih_used'], jf['nih_bbnu'],
-            (jf['owner'] or ''), (jf['label'] or ('not started by mrjob')))
+            (jf['owner'] or ''), (jf['label'] or ('not started by mrjob'))))
 
 
 def to_secs(delta):

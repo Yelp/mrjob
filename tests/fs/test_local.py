@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import with_statement
+
 
 import bz2
 import gzip
@@ -54,36 +54,36 @@ class LocalFSTestCase(SandboxedTestCase):
     def test_ls_basic_2(self):
         self.makefile('f', 'contents')
         self.makefile('f2', 'contents')
-        self.assertItemsEqual(list(self.fs.ls(self.tmp_dir)),
+        self.assertCountEqual(list(self.fs.ls(self.tmp_dir)),
                          self.abs_paths('f', 'f2'))
 
     def test_ls_recurse(self):
         self.makefile('f', 'contents')
         self.makefile('d/f2', 'contents')
-        self.assertItemsEqual(list(self.fs.ls(self.tmp_dir)),
+        self.assertCountEqual(list(self.fs.ls(self.tmp_dir)),
                          self.abs_paths('f', 'd/f2'))
 
     def test_cat_uncompressed(self):
         path = self.makefile('f', 'bar\nfoo\n')
-        self.assertEqual(list(self.fs._cat_file(path)), ['bar\n', 'foo\n'])
+        self.assertEqual(list(self.fs._cat_file(path)), [b'bar\n', b'foo\n'])
 
     def test_cat_gz(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
         input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\nbar\n')
+        input_gz.write(b'foo\nbar\n')
         input_gz.close()
 
         self.assertEqual(list(self.fs._cat_file(input_gz_path)),
-                         ['foo\n', 'bar\n'])
+                         [b'foo\n', b'bar\n'])
 
     def test_cat_bz2(self):
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
         input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
-        input_bz2.write('bar\nbar\nfoo\n')
+        input_bz2.write(b'bar\nbar\nfoo\n')
         input_bz2.close()
 
         self.assertEqual(list(self.fs._cat_file(input_bz2_path)),
-                         ['bar\n', 'bar\n', 'foo\n'])
+                         [b'bar\n', b'bar\n', b'foo\n'])
 
     def test_mkdir(self):
         path = os.path.join(self.tmp_dir, 'dir')

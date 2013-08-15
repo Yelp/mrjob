@@ -14,7 +14,7 @@
 # limitations under the License.
 """Run an MRJob locally by forking off a bunch of processes and piping
 them together. Useful for testing."""
-from __future__ import with_statement
+
 
 import itertools
 import logging
@@ -137,13 +137,13 @@ class SimMRJobRunner(MRJobRunner):
                 self._get_local_tmp_dir(), 'working_dir')
             self.mkdir(self._working_dir)
 
-        files = self._working_dir_mgr.name_to_path('file').iteritems()
+        files = iter(self._working_dir_mgr.name_to_path('file').items())
         # give all our files names, and symlink or unarchive them
         for name, path in files:
             dest = os.path.join(self._working_dir, name)
             self._symlink_to_file_or_copy(path, dest)
 
-        archives = self._working_dir_mgr.name_to_path('archive').iteritems()
+        archives = iter(self._working_dir_mgr.name_to_path('archive').items())
         for name, path in archives:
             dest = os.path.join(self._working_dir, name)
             log.debug('unarchiving %s -> %s' % (path, dest))
@@ -246,7 +246,7 @@ class SimMRJobRunner(MRJobRunner):
         # The correctly-ordered list of task_num, file_name pairs
         file_tasks = sorted([
             (t['task_num'], file_name) for file_name, t
-            in file_splits.items()], key=lambda t: t[0])
+            in list(file_splits.items())], key=lambda t: t[0])
 
         for task_num, file_name in file_tasks:
             log.debug("File name %s" % file_name)
@@ -391,7 +391,7 @@ class SimMRJobRunner(MRJobRunner):
             outfile = None
 
             try:
-                outfile = open(outfile_name, 'w')
+                outfile = open(outfile_name, 'wb')
 
                 # write each line to a file as long as we are within the limit
                 # (split_size)
@@ -403,7 +403,7 @@ class SimMRJobRunner(MRJobRunner):
 
                         outfile_name = create_outfile(path, total_bytes)
                         outfile.close()
-                        outfile = open(outfile_name, 'w')
+                        outfile = open(outfile_name, 'wb')
 
                         bytes_written = 0
 
@@ -420,7 +420,7 @@ class SimMRJobRunner(MRJobRunner):
 
     def _process_jobconf_args(self, jobconf):
         if jobconf:
-            for (conf_arg, value) in jobconf.iteritems():
+            for (conf_arg, value) in jobconf.items():
                 # Internally, use one canonical Hadoop version
                 canon_arg = translate_jobconf(conf_arg, '0.21')
 
@@ -461,7 +461,7 @@ class SimMRJobRunner(MRJobRunner):
 
         jobconf_env = dict(
             (translate_jobconf(k, version).replace('.', '_'), str(v))
-            for (k, v) in self._opts['jobconf'].iteritems())
+            for (k, v) in self._opts['jobconf'].items())
 
         internal_jobconf = self._simulate_jobconf_for_step(
             step_type, step_num, task_num, input_file=input_file,
@@ -469,7 +469,7 @@ class SimMRJobRunner(MRJobRunner):
 
         internal_jobconf_env = dict(
             (translate_jobconf(k, version).replace('.', '_'), str(v))
-            for (k, v) in internal_jobconf.iteritems())
+            for (k, v) in internal_jobconf.items())
 
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
@@ -501,12 +501,12 @@ class SimMRJobRunner(MRJobRunner):
         cache_local_archives = []
         cache_local_files = []
 
-        files = self._working_dir_mgr.name_to_path('file').iteritems()
+        files = iter(self._working_dir_mgr.name_to_path('file').items())
         for name, path in files:
             cache_files.append('%s#%s' % (path, name))
             cache_local_files.append(os.path.join(self._working_dir, name))
 
-        archives = self._working_dir_mgr.name_to_path('archive').iteritems()
+        archives = iter(self._working_dir_mgr.name_to_path('archive').items())
         for name, path in archives:
             cache_archives.append('%s#%s' % (path, name))
             cache_local_archives.append(os.path.join(self._working_dir, name))

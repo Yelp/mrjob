@@ -14,7 +14,7 @@
 
 """Tests for mrjob.ssh"""
 
-from __future__ import with_statement
+
 
 from subprocess import PIPE
 

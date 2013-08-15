@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import with_statement
+
 
 import logging
 import os
@@ -23,7 +23,7 @@ import re
 import signal
 import socket
 import time
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
@@ -31,10 +31,10 @@ from subprocess import Popen
 from subprocess import PIPE
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
     StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
-    from StringIO import StringIO
+    from io import StringIO
 
 try:
     import simplejson as json  # preferred because of C speedups
@@ -261,7 +261,7 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
             results = emr_conn.describe_jobflows(
                 states=states, jobflow_ids=jobflow_ids,
                 created_after=created_after, created_before=created_before)
-        except boto.exception.BotoServerError, ex:
+        except boto.exception.BotoServerError as ex:
             if 'ValidationError' in ex.body:
                 log.debug(
                     '  reached earliest allowed created_before time, done!')
@@ -427,7 +427,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'num_ec2_task_instances': 0,
             's3_sync_wait_time': 5.0,
             'ssh_bin': ['ssh'],
-            'ssh_bind_ports': range(40001, 40841),
+            'ssh_bind_ports': list(range(40001, 40841)),
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
             'cleanup_on_failure': ['JOB'],
@@ -632,7 +632,7 @@ class EMRJobRunner(MRJobRunner):
             self._bootstrap_python_packages.append(bpp)
             self._bootstrap_dir_mgr.add(**bpp)
 
-        if not (isinstance(self._opts['additional_emr_info'], basestring)
+        if not (isinstance(self._opts['additional_emr_info'], str)
                 or self._opts['additional_emr_info'] is None):
             self._opts['additional_emr_info'] = json.dumps(
                 self._opts['additional_emr_info'])
@@ -909,7 +909,7 @@ class EMRJobRunner(MRJobRunner):
 
         s3_conn = self.make_s3_conn()
 
-        for path, s3_uri in self._upload_mgr.path_to_uri().iteritems():
+        for path, s3_uri in self._upload_mgr.path_to_uri().items():
             log.debug('uploading %s -> %s' % (path, s3_uri))
             s3_key = self.make_s3_key(s3_uri, s3_conn)
             s3_key.set_contents_from_filename(path)
@@ -1028,7 +1028,7 @@ class EMRJobRunner(MRJobRunner):
                 try:
                     os.kill(self._ssh_proc.pid, signal.SIGKILL)
                     self._ssh_proc = None
-                except Exception, e:
+                except Exception as e:
                     log.exception(e)
 
         # stop the job flow if it belongs to us (it may have stopped on its
@@ -1040,7 +1040,7 @@ class EMRJobRunner(MRJobRunner):
             log.info('Terminating job flow: %s' % self._emr_job_flow_id)
             try:
                 self.make_emr_conn().terminate_jobflow(self._emr_job_flow_id)
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)
 
     def _cleanup_remote_scratch(self):
@@ -1050,7 +1050,7 @@ class EMRJobRunner(MRJobRunner):
                 log.info('Removing all files in %s' % self._s3_tmp_uri)
                 self.rm(self._s3_tmp_uri)
                 self._s3_tmp_uri = None
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)
 
     def _cleanup_logs(self):
@@ -1064,7 +1064,7 @@ class EMRJobRunner(MRJobRunner):
                 log.info('Removing all files in %s' % self._s3_job_log_uri)
                 self.rm(self._s3_job_log_uri)
                 self._s3_job_log_uri = None
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)
 
     def _cleanup_job(self):
@@ -1108,7 +1108,7 @@ class EMRJobRunner(MRJobRunner):
         try:
             log.info("Attempting to terminate job flow")
             emr_conn.terminate_jobflow(self._emr_job_flow_id)
-        except Exception, e:
+        except Exception as e:
             # Something happened with boto and the user should know.
             log.exception(e)
             return
@@ -1193,7 +1193,7 @@ class EMRJobRunner(MRJobRunner):
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (
             self._job_name, self._opts['s3_log_uri'],
-            ', '.join('%s=%r' % (k, v) for k, v in args.iteritems())))
+            ', '.join('%s=%r' % (k, v) for k, v in args.items())))
         emr_job_flow_id = emr_conn.run_jobflow(
             self._job_name, self._opts['s3_log_uri'], **args)
 
@@ -1516,7 +1516,7 @@ class EMRJobRunner(MRJobRunner):
 
                 if self._show_tracker_progress:
                     try:
-                        tracker_handle = urllib2.urlopen(self._tracker_url)
+                        tracker_handle = urllib.request.urlopen(self._tracker_url)
                         tracker_page = ''.join(tracker_handle.readlines())
                         tracker_handle.close()
                         # first two formatted percentages, map then reduce
@@ -1548,7 +1548,7 @@ class EMRJobRunner(MRJobRunner):
             log.info('Running time was %.1fs (not counting time spent waiting'
                      ' for the EC2 instances)' % total_step_time)
             self._fetch_counters(step_nums, lg_step_num_mapping)
-            self.print_counters(range(1, len(step_nums) + 1))
+            self.print_counters(list(range(1, len(step_nums) + 1)))
         else:
             msg = 'Job on job flow %s failed with status %s: %s' % (
                 job_flow.jobflowid, job_state, reason)
@@ -1621,7 +1621,7 @@ class EMRJobRunner(MRJobRunner):
             self._enable_slave_ssh_access()
             log.debug('Search %s for logs' % self._ssh_path(relative_path))
             return self.ls(self._ssh_path(relative_path))
-        except IOError, e:
+        except IOError as e:
             raise LogFetchError(e)
 
     def _ls_slave_ssh_logs(self, addr, relative_path):
@@ -1787,7 +1787,7 @@ class EMRJobRunner(MRJobRunner):
                              " mrjob fetch-logs --counters %s" %
                              job_flow.jobflowid)
             return results
-        except LogFetchError, e:
+        except LogFetchError as e:
             log.info("Unable to fetch counters: %s" % e)
             return {}
 
@@ -1837,7 +1837,7 @@ class EMRJobRunner(MRJobRunner):
 
         try:
             self._enable_slave_ssh_access()
-        except IOError, e:
+        except IOError as e:
             raise LogFetchError(e)
         task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
         step_logs = self.ls_step_logs_ssh(lg_step_nums)
@@ -1880,7 +1880,7 @@ class EMRJobRunner(MRJobRunner):
         if not any(key.startswith('bootstrap_') and
                key != 'bootstrap_actions' and  # these are separate scripts
                value
-               for (key, value) in self._opts.iteritems()):
+               for (key, value) in self._opts.items()):
             return
 
         # we call the script b.py because there's a character limit on
@@ -1925,7 +1925,7 @@ class EMRJobRunner(MRJobRunner):
 
         # download files using hadoop fs
         writeln('# download files using hadoop fs -copyToLocal')
-        files = self._bootstrap_dir_mgr.name_to_path('file').iteritems()
+        files = iter(self._bootstrap_dir_mgr.name_to_path('file').items())
         for name, path in files:
             s3_uri = self._upload_mgr.uri(path)
             writeln(
@@ -1977,7 +1977,7 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['bootstrap_cmds']:
             writeln('# run bootstrap cmds:')
             for cmd in self._opts['bootstrap_cmds']:
-                if isinstance(cmd, basestring):
+                if isinstance(cmd, str):
                     writeln('check_call(%r, shell=True)' % cmd)
                 else:
                     writeln('check_call(%r)' % cmd)
@@ -2186,7 +2186,7 @@ class EMRJobRunner(MRJobRunner):
                         int(ig.instancerequestcount))
 
             # check if there are enough compute units
-            for role, req_cu in role_to_req_cu.iteritems():
+            for role, req_cu in role_to_req_cu.items():
                 req_num_instances = role_to_req_num_instances[role]
                 # if we have at least as many units of the right type,
                 # don't bother counting compute units
@@ -2267,7 +2267,7 @@ class EMRJobRunner(MRJobRunner):
             # job starts its own job flow (also, its hash changes every time
             # since the tarball contains different timestamps)
             dict((name, self.md5sum(path)) for name, path
-                 in self._bootstrap_dir_mgr.name_to_path('file').iteritems()
+                 in self._bootstrap_dir_mgr.name_to_path('file').items()
                  if not path == self._mrjob_tar_gz_path),
             self._opts['additional_emr_info'],
             self._opts['bootstrap_mrjob'],

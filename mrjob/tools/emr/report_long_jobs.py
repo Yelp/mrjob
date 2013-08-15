@@ -31,7 +31,7 @@ Options::
                         Minimum number of hours a job can run before we report
                         it. Default: 24.0
 """
-from __future__ import with_statement
+
 
 from datetime import datetime
 from datetime import timedelta
@@ -167,14 +167,14 @@ def print_report(job_info):
     for ji in job_info:
         # BOOTSTRAPPING case
         if not ji['step_state']:
-            print '%-15s BOOTSTRAPPING for %17s (%s)' % (
+            print('%-15s BOOTSTRAPPING for %17s (%s)' % (
                 ji['job_flow_id'], format_timedelta(ji['time']),
-                ji['name'])
+                ji['name']))
         else:
-            print '%-15s       %7s for %17s (%s)' % (
+            print('%-15s       %7s for %17s (%s)' % (
                 ji['job_flow_id'],
                 ji['step_state'], format_timedelta(ji['time']),
-                ji['name'])
+                ji['name']))
 
 
 def format_timedelta(time):

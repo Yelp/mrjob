@@ -14,7 +14,7 @@
 # limitations under the License.
 """Run an MRJob locally by forking off a bunch of processes and piping
 them together. Useful for testing."""
-from __future__ import with_statement
+
 
 
 import logging
@@ -259,7 +259,7 @@ class LocalMRJobRunner(SimMRJobRunner):
         :return: dict(proc=Popen, args=[process args], write_to=file)
         """
         log.info('> %s > %s' % (' | '.join(
-            args if isinstance(args, basestring) else cmd_line(args)
+            args if isinstance(args, str) else cmd_line(args)
             for args in procs_args), outfile))
 
         with open(outfile, 'w') as write_to:

@@ -16,7 +16,7 @@
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-from __future__ import with_statement
+
 
 from collections import defaultdict
 import contextlib
@@ -64,14 +64,14 @@ def buffer_iterator_to_line_iterator(iterator):
     """boto's file iterator splits by buffer size instead of by newline. This
     wrapper puts them back into lines.
     """
-    buf = iterator.next()  # might raise StopIteration, but that's okay
+    buf = next(iterator)  # might raise StopIteration, but that's okay
     while True:
         if '\n' in buf:
             (line, buf) = buf.split('\n', 1)
             yield line + '\n'
         else:
             try:
-                more = iterator.next()
+                more = next(iterator)
                 buf += more
             except StopIteration:
                 if buf:
@@ -97,8 +97,9 @@ def extract_dir_for_tar(archive_path, compression='gz'):
     """
     # Open the file for read-only streaming (no random seeks)
     tar = tarfile.open(archive_path, mode='r|%s' % compression)
+
     # Grab the first item
-    first_member = tar.next()
+    first_member = tar.firstmember
     tar.close()
     # Return the first path component of the item's name
     return first_member.name.split('/')[0]
@@ -327,7 +328,7 @@ def populate_option_groups_with_options(assignments, indexed_options):
                            :py:func:`util.scrape_options_and_index_by_dest`
     :param indexed_options: options to use when populating the parsers/groups
     """
-    for opt_group, opt_dest_list in assignments.iteritems():
+    for opt_group, opt_dest_list in assignments.items():
         new_options = []
         for option_dest in assignments[opt_group]:
             for option in indexed_options[option_dest]:
@@ -408,7 +409,7 @@ def read_file(path, fileobj=None):
             else:
                 f = bunzip2_stream(fileobj)
         elif fileobj is None:
-            f = open(path)
+            f = open(path, 'rb')
         else:
             f = fileobj
 
@@ -428,7 +429,7 @@ def bunzip2_stream(fileobj):
         raise Exception('bz2 module was not successfully imported (likely not installed).')
     decomp = bz2.BZ2Decompressor()
     for part in fileobj:
-        buffer = buffer.join(decomp.decompress(part))
+        buffer = buffer.join(decomp.decompress(part).decode('utf-8'))
     f = buffer.splitlines(True)
     return f
 
@@ -501,7 +502,7 @@ def safeeval(expr, globals=None, locals=None):
     """
     # blank out builtins, but keep None, True, and False
     safe_globals = {'__builtins__': None, 'True': True, 'False': False,
-                    'None': None, 'set': set, 'xrange': xrange}
+                    'None': None, 'set': set, 'range': range}
 
     # add the user-specified global variables
     if globals:

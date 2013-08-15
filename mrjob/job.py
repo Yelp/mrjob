@@ -15,7 +15,7 @@
 for more information."""
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-from __future__ import with_statement
+
 
 import codecs
 import inspect
@@ -25,10 +25,10 @@ from optparse import OptionGroup
 import sys
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
     StringIO  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
-    from StringIO import StringIO
+    from io import StringIO
 
 try:
     import simplejson as json
@@ -332,13 +332,14 @@ class MRJob(MRJobLauncher):
         # Use mapper(), reducer() etc. only if they've been re-defined
         kwargs = dict((func_name, getattr(self, func_name))
                       for func_name in _JOB_STEP_PARAMS
-                      if (getattr(self, func_name).im_func is not
-                          getattr(MRJob, func_name).im_func))
+                      if (getattr(self, func_name).__func__ is not
+                          getattr(MRJob, func_name)))
+
 
         # MRJobStep takes commands as strings, but the user defines them in the
         # class as functions that return strings, so call the functions.
         updates = {}
-        for k, v in kwargs.iteritems():
+        for k, v in kwargs.items():
             if k.endswith('_cmd'):
                 updates[k] = v()
 
@@ -436,7 +437,7 @@ class MRJob(MRJobLauncher):
         with semicolons (commas confuse Hadoop streaming).
         """
         # don't allow people to pass in floats
-        if not isinstance(amount, (int, long)):
+        if not isinstance(amount, int):
             raise TypeError('amount must be an integer, not %r' % (amount,))
 
         # Extra commas screw up hadoop and there's no way to escape them. So
@@ -446,17 +447,16 @@ class MRJob(MRJobLauncher):
         #
         # The relevant Hadoop code is incrCounter(), here:
         # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup
-        if isinstance(group, unicode) or isinstance(counter, unicode):
-            group = unicode(group).replace(',', ';')
-            counter = unicode(counter).replace(',', ';')
-            stderr = codecs.getwriter('utf-8')(self.stderr)
+        if isinstance(group, str) or isinstance(counter, str):
+            group = str(group).replace(',', ';')
+            counter = str(counter).replace(',', ';')
         else:
             group = str(group).replace(',', ';')
             counter = str(counter).replace(',', ';')
-            stderr = self.stderr
 
+        stderr = self.stderr
         stderr.write(
-            u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
+            'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
         stderr.flush()
 
     def set_status(self, msg):
@@ -469,12 +469,11 @@ class MRJob(MRJobLauncher):
         If the type of **msg** is ``unicode``, then the message will be written
         as unicode. Otherwise, it will be written as ASCII.
         """
-        if isinstance(msg, unicode):
-            status = u'reporter:status:%s\n' % (msg,)
-            stderr = codecs.getwriter('utf-8')(self.stderr)
+        if isinstance(msg, str):
+            status = 'reporter:status:%s\n' % (msg,)
         else:
             status = 'reporter:status:%s\n' % (msg,)
-            stderr = self.stderr
+        stderr = self.stderr
         stderr.write(status)
         stderr.flush()
 
@@ -614,7 +613,7 @@ class MRJob(MRJobLauncher):
         # be careful to use generators for everything, to allow for
         # very large groupings of values
         for key, kv_pairs in itertools.groupby(read_lines(),
-                                               key=lambda(k, v): k):
+                                               key=lambda k_v: k_v[0]):
             values = (v for k, v in kv_pairs)
             for out_key, out_value in reducer(key, values) or ():
                 write_line(out_key, out_value)
@@ -659,7 +658,7 @@ class MRJob(MRJobLauncher):
         # be careful to use generators for everything, to allow for
         # very large groupings of values
         for key, kv_pairs in itertools.groupby(read_lines(),
-                                               key=lambda(k, v): k):
+                                               key=lambda k_v1: k_v1[0]):
             values = (v for k, v in kv_pairs)
             for out_key, out_value in combiner(key, values) or ():
                 write_line(out_key, out_value)
@@ -680,7 +679,7 @@ class MRJob(MRJobLauncher):
         We currently output something like ``MR M R``, but expect this to
         change!
         """
-        print >> self.stdout, json.dumps(self._steps_desc())
+        print(json.dumps(self._steps_desc()), file=self.stdout)
 
     def _steps_desc(self):
         step_descs = []
@@ -734,7 +733,7 @@ class MRJob(MRJobLauncher):
                 try:
                     key, value = read(line.rstrip('\r\n'))
                     yield key, value
-                except Exception, e:
+                except Exception as e:
                     if self.options.strict_protocols:
                         raise
                     else:
@@ -743,8 +742,8 @@ class MRJob(MRJobLauncher):
 
         def write_line(key, value):
             try:
-                print >> self.stdout, write(key, value)
-            except Exception, e:
+                print(write(key, value), file=self.stdout)
+            except Exception as e:
                 if self.options.strict_protocols:
                     raise
                 else:

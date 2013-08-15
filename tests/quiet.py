@@ -16,7 +16,7 @@
 
 from contextlib import contextmanager
 import logging
-from StringIO import StringIO
+from io import StringIO
 
 
 # this exists as logging.NullHandler as of Python 2.7

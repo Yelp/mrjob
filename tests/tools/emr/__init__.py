@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import with_statement
 
-from StringIO import StringIO
+
+from io import StringIO
 import sys
 
 from mrjob.emr import EMRJobRunner

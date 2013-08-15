@@ -263,7 +263,7 @@ class HadoopJobRunner(MRJobRunner):
         self._mkdir_on_hdfs(self._upload_mgr.prefix)
 
         log.info('Copying local files into %s' % self._upload_mgr.prefix)
-        for path, uri in self._upload_mgr.path_to_uri().iteritems():
+        for path, uri in self._upload_mgr.path_to_uri().items():
             self._upload_to_hdfs(path, uri)
 
     def _mkdir_on_hdfs(self, path):
@@ -362,8 +362,8 @@ class HadoopJobRunner(MRJobRunner):
             # when the child process exits, rather than EOF.
             while True:
                 try:
-                    yield iter.next()  # okay for StopIteration to bubble up
-                except IOError, e:
+                    yield next(iter)  # okay for StopIteration to bubble up
+                except IOError as e:
                     if e.errno == errno.EIO:
                         return
                     else:
@@ -458,7 +458,7 @@ class HadoopJobRunner(MRJobRunner):
 
             try:
                 self.invoke_hadoop(['fs', '-rmr', self._hdfs_tmp_dir])
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)
 
     ### LOG FETCHING/PARSING ###

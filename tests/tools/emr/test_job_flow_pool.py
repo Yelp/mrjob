@@ -14,7 +14,7 @@
 
 """Test the job flow pooling tool"""
 
-from __future__ import with_statement
+
 
 from optparse import OptionError
 

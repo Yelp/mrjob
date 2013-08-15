@@ -241,7 +241,7 @@ class S3Filesystem(Filesystem):
 
         try:
             bucket = s3_conn.get_bucket(bucket_name)
-        except boto.exception.S3ResponseError, e:
+        except boto.exception.S3ResponseError as e:
             if e.status != 404:
                 raise e
             key = None

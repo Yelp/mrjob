@@ -336,7 +336,7 @@ def terminate_and_notify(runner, to_terminate, dry_run=False,
                          ' trying to terminate it; skipping' % jf.jobflowid)
 
         if did_terminate and not quiet:
-            print msg
+            print(msg)
 
 
 def make_option_parser():

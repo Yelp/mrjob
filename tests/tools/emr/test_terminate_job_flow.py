@@ -14,7 +14,7 @@
 
 """Test the job flow termination tool"""
 
-from __future__ import with_statement
+
 
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.terminate_job_flow import main as terminate_main

@@ -55,7 +55,7 @@ JSON_KEYS_AND_VALUES = [
     ('foo', 'bar'),
     ([1, 2, 3], []),
     ({'apples': 5}, {'oranges': 20}),
-    (u'Qu\xe9bec', u'Ph\u1ede'),
+    ('Qu\xe9bec', 'Ph\u1ede'),
     ('\t', '\n'),
 ]
 

@@ -14,7 +14,7 @@
 # limitations under the License.
 """Test the mrboss tool"""
 
-from __future__ import with_statement
+
 
 import os
 import shutil

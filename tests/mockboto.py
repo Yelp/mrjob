@@ -21,7 +21,7 @@ If you need a more extensive set of mock boto objects, we recommend adding
 some sort of sandboxing feature to boto, rather than extending these somewhat
 ad-hoc mock objects.
 """
-from __future__ import with_statement
+
 from datetime import datetime
 from datetime import timedelta
 import hashlib
@@ -82,11 +82,11 @@ def add_mock_s3_data(mock_s3_fs, data, time_modified=None):
     time last modified."""
     if time_modified is None:
         time_modified = datetime.utcnow()
-    for bucket_name, key_name_to_bytes in data.iteritems():
+    for bucket_name, key_name_to_bytes in data.items():
         mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
 
-        for key_name, bytes in key_name_to_bytes.iteritems():
+        for key_name, bytes in key_name_to_bytes.items():
             bucket['keys'][key_name] = (bytes, time_modified)
 
 
@@ -552,7 +552,7 @@ class MockEmrConnection(object):
                     400, 'Bad Request', body=err_xml(
                     'Created-before field is before earliest allowed value'))
 
-        jfs = sorted(self.mock_emr_job_flows.itervalues(),
+        jfs = sorted(iter(self.mock_emr_job_flows.values()),
                      key=lambda jf: jf.creationdatetime,
                      reverse=True)
 
@@ -741,7 +741,7 @@ class MockEmrObject(object):
     can set any attribute on."""
 
     def __init__(self, **kwargs):
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
     def __setattr__(self, key, value):
@@ -750,8 +750,8 @@ class MockEmrObject(object):
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
-        my_items = self.__dict__.items()
-        other_items = other.__dict__.items()
+        my_items = list(self.__dict__.items())
+        other_items = list(other.__dict__.items())
 
         if len(my_items) != len(other_items):
             return False
@@ -771,4 +771,4 @@ class MockEmrObject(object):
             self.__class__.__module__,
             self.__class__.__name__,
             ', '.join('%s=%r' % (k, v)
-                      for k, v in sorted(self.__dict__.iteritems()))))
+                      for k, v in sorted(self.__dict__.items()))))

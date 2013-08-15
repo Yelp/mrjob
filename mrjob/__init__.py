@@ -47,7 +47,7 @@ __credits__ = [
     'Oliver Nicholas <bigo@wonlove.net>',
     'Matt Perry <matt@unshift.net>',
     'Pavel Repin <prepin@gmail.com>',
-    'Wahbeh Qardaji <wqardaji@yelp.com>',
+    'Wahbeh Qardaji <wahbeh.qardaji@gmail.com>',
     'Jimmy Retzlaff <jretz@yelp.com>',
     'Ned Rockson <ned@tellapart.com>',
     'Paul Scott <paul@duedil.com>',

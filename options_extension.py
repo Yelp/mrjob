@@ -1,3 +1,7 @@
+# what you should really do is
+# in the optlist directive, in doctree-read, output the whole table *but with
+# a temporary node for the option where the link will go*. Then generate the
+# ref with a separate traversal in doctree-resolved.
 from docutils import nodes
 from docutils.parsers.rst import directives
 from sphinx.util.compat import Directive

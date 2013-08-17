@@ -19,6 +19,46 @@ Most jobs have dependencies of some sort - Python packages, Debian packages,
 data files, etc. This section covers options available to all runners that
 mrjob uses to upload files to your job's execution environments.
 
+Savedopt
+^^^^^^^^
+
+.. mrjob-opt::
+    :config: a_saved_opt
+    :switch: -a, --a-saved-opt
+    :type: :ref:`string <data-type-string>`
+    :set: all
+    :default: ``None``
+
+    This is an option that does stuff. ``Inline styles work.``
+
+.. mrjob-opt::
+    :config: only_config
+    :type: list
+    :set: all
+    :default: (automatic)
+
+    Another option.
+
+.. mrjob-opt::
+    :switch: --a-third-opt
+    :type: int
+    :set: some
+    :default: ``[]``
+
+    Yay more options whoopee
+
+Option list: all
+^^^^^^^^^^^^^^^^
+
+.. mrjob-optlist:: all
+
+Option list: some
+^^^^^^^^^^^^^^^^^
+
+.. mrjob-optlist:: some
+
+Rest of the file
+^^^^^^^^^^^^^^^^
 
 .. _opt_bootstrap_mrjob:
 

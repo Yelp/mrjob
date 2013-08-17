@@ -84,8 +84,9 @@ class OptionDirective(Directive):
         dli.append(term)
 
         classifier = nodes.classifier()
-        t = option_info['options'].get('type', None)
-        classifier.append(nodes.Text(t, t))
+        type_nodes, messages = self.state.inline_text(
+            option_info['options'].get('type', ''), self.lineno)
+        classifier.extend(type_nodes)
         dli.append(classifier)
 
         option_desc = '\n'.join(option_info['content'])
@@ -109,6 +110,7 @@ class OptionDirective(Directive):
 
         dl.append(dli)
 
+        option_info['type_nodes'] = type_nodes
         option_info['default_nodes'] = default_nodes
         env.optionlist_all_options.append(option_info)
 
@@ -181,12 +183,13 @@ def process_option_nodes(app, doctree, fromdocname):
                 make_refnode(option_info['options'].get('config', '')))
             switches_column.append(
                 make_refnode(option_info['options'].get('switch', '')))
+
             par = nodes.paragraph()
             par.extend(option_info['default_nodes'])
             default_column.append(par)
-            t = option_info['options']['type']
+
             par = nodes.paragraph()
-            par.append(nodes.Text(t, t))
+            par.extend(option_info['type_nodes'])
             type_column.append(par)
 
             row.extend([

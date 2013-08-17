@@ -124,15 +124,41 @@ def process_option_nodes(app, doctree, fromdocname):
     env = app.builder.env
 
     for node in doctree.traverse(optionlist):
+        # see parsers/rst/states.py, build_table()
         table = nodes.table()
+
+        tgroup = nodes.tgroup(cols=4)
+        table += tgroup
+
+        for i in xrange(4):
+            tgroup += nodes.colspec(colwidth=1)
+
+        thead = nodes.thead()
+        row = nodes.row()
+        for label in ['Config', 'Command line', 'Default', 'Type']:
+            attributes = {
+                'morerows': 0,
+                'morecols': 0,
+                'stub': False,
+            }
+            par = nodes.paragraph()
+            par.append(nodes.Text(label, label))
+            entry = nodes.entry(**attributes)
+            entry += par
+            row += entry
+        thead.append(row)
+        tgroup += thead
+
+        tbody = nodes.tbody()
+        tgroup += tbody
 
         for option_info in env.optionlist_all_options:
             row = nodes.row()
 
-            config_column = nodes.description()
-            switches_column = nodes.description()
-            default_column = nodes.description()
-            type_column = nodes.description()
+            config_column = nodes.entry()
+            switches_column = nodes.entry()
+            default_column = nodes.entry()
+            type_column = nodes.entry()
 
             def make_refnode(text):
                 refnode = nodes.reference('', '')
@@ -142,15 +168,21 @@ def process_option_nodes(app, doctree, fromdocname):
                     fromdocname, option_info['docname'])
                 refnode['refuri'] += '#' + option_info['target']['refid']
                 refnode.append(innernode)
-                return refnode
+                par = nodes.paragraph()
+                par.append(refnode)
+                return par
 
-            #config_column.append(
-            #    make_refnode(option_info['options'].get('config')))
-            #switches_column.append(
-            #    make_refnode(option_info['options'].get('switch')))
-            #default_column.extend(option_info['default_nodes'])
-            #t = option_info['options']['type']
-            #type_column.append(nodes.Text(t, t))
+            config_column.append(
+                make_refnode(option_info['options'].get('config', '')))
+            switches_column.append(
+                make_refnode(option_info['options'].get('switch', '')))
+            par = nodes.paragraph()
+            par.extend(option_info['default_nodes'])
+            default_column.append(par)
+            t = option_info['options']['type']
+            par = nodes.paragraph()
+            par.append(nodes.Text(t, t))
+            type_column.append(par)
 
             row.extend([
                 config_column,
@@ -159,7 +191,7 @@ def process_option_nodes(app, doctree, fromdocname):
                 type_column,
             ])
 
-            table.append(row)
+            tbody.append(row)
 
         node.replace_self([table])
 

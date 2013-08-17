@@ -20,9 +20,12 @@ def depart_option_node(self, node):
 
 
 class OptionlistDirective(Directive):
+    has_content = True
 
     def run(self):
-        return [optionlist('')]
+        node = optionlist('')
+        node.option_set = self.content[0]
+        return [node]
 
 
 class OptionDirective(Directive):
@@ -35,7 +38,7 @@ class OptionDirective(Directive):
         'config': directives.unchanged,
         'switch': directives.unchanged,
         'type': directives.unchanged,
-        'set': directives.unchanged,
+        'set': directives.unchanged_required,
         'default': directives.unchanged,
     }
 
@@ -153,6 +156,8 @@ def process_option_nodes(app, doctree, fromdocname):
         tgroup += tbody
 
         for option_info in env.optionlist_all_options:
+            if option_info['options']['set'] != node.option_set:
+                continue
             row = nodes.row()
 
             config_column = nodes.entry()

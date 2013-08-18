@@ -114,8 +114,8 @@ class OptionDirective(Directive):
 
         dl.append(dli)
 
-        option_info['type_nodes'] = type_nodes
-        option_info['default_nodes'] = default_nodes
+        option_info['type_nodes'] = [n.deepcopy() for n in type_nodes]
+        option_info['default_nodes'] = [n.deepcopy() for n in default_nodes]
         env.optionlist_all_options.append(option_info)
 
         return [targetnode, dl]

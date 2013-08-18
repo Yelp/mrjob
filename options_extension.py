@@ -72,17 +72,6 @@ class OptionDirective(Directive):
         dl = nodes.definition_list()
         dli = nodes.definition_list_item()
 
-        if 'config' in option_info['options']:
-            if 'switch' in option_info['options']:
-                opt_name = ', '.join([
-                    option_info['options']['config'],
-                    option_info['options']['switch'],
-                ])
-            else:
-                opt_name = option_info['options']['config']
-        else:
-            opt_name = option_info['options']['switch']
-
         term = nodes.term()
 
         if 'config' in option_info['options']:
@@ -185,9 +174,18 @@ def populate_option_lists(app, doctree):
         tbody = nodes.tbody()
         tgroup += tbody
 
-        for option_info in env.optionlist_all_options:
-            if option_info['options']['set'] != node.option_set:
-                continue
+        my_options = [oi for oi in env.optionlist_all_options
+                      if oi['options']['set'] == node.option_set]
+
+        def sort_key(oi):
+            if 'config' in oi['options']:
+                return oi['options']['config']
+            else:
+                return oi['options']['switch'].lstrip('-')
+
+        my_options.sort(key=sort_key)
+
+        for option_info in my_options:
             row = nodes.row()
 
             config_column = nodes.entry()

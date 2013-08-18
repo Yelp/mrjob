@@ -47,13 +47,13 @@ Runner kwargs or method overrides
 .. |hadoop_input_format| replace:: :py:meth:`hadoop_input_format <mrjob.runner.MRJobRunner.__init__>`
 .. |hadoop_output_format| replace:: :py:meth:`hadoop_output_format <mrjob.runner.MRJobRunner.__init__>`
 
-.. |add_passthrough_option| replace:: (see :py:meth:`~mrjob.job.MRJob.add_passthrough_option`)
-.. |add_file_option| replace:: (see :py:meth:`~mrjob.job.MRJob.add_file_option`)
-.. |m_hadoop_input_format| replace:: (see :py:meth:`~mrjob.job.MRJob.hadoop_input_format`)
-.. |m_hadoop_output_format| replace:: (see :py:meth:`~mrjob.job.MRJob.hadoop_output_format`)
+.. |add_passthrough_option| replace:: :py:meth:`~mrjob.job.MRJob.add_passthrough_option`
+.. |add_file_option| replace:: :py:meth:`~mrjob.job.MRJob.add_file_option`
+.. |m_hadoop_input_format| replace:: :py:meth:`~mrjob.job.MRJob.hadoop_input_format`
+.. |m_hadoop_output_format| replace:: :py:meth:`~mrjob.job.MRJob.hadoop_output_format`
 
 ====================== ======================== ========
-Option                 Switches                 Default
+Option                 Method                   Default
 ====================== ======================== ========
 |extra_args|           |add_passthrough_option| ``[]``
 |file_upload_args|     |add_file_option|        ``[]``

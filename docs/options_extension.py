@@ -1,17 +1,24 @@
+# this extension doesn't exactly use "best practices" but it's generally how
+# they are written, with no hacks.
 from docutils import nodes
 from docutils.parsers.rst import directives
 from sphinx.util.compat import Directive
 
 
 class option(nodes.General, nodes.Element):
+    """node for defining an option"""
     pass
 
 
 class optionlist(nodes.General, nodes.Element):
+    """node that specifies where an option list goes"""
     pass
 
 
 class optionlink(nodes.General, nodes.Element):
+    """temporary node created during doctree-read and replaced with a link
+    during doctree-resolved
+    """
     pass
 
 
@@ -27,6 +34,8 @@ class OptionlistDirective(Directive):
     has_content = True
 
     def run(self):
+        # all we have to do during parsing is make a node where the directive
+        # is and remember which options it's supposed to have
         node = optionlist('')
         node.option_set = self.content[0]
         return [node]
@@ -34,7 +43,6 @@ class OptionlistDirective(Directive):
 
 class OptionDirective(Directive):
 
-    # this enables content in the directive
     has_content = True
     required_arguments = 0
     optional_arguments = 5
@@ -49,19 +57,12 @@ class OptionDirective(Directive):
     def run(self):
         env = self.state.document.settings.env
 
+        # make it possible to link back here from the option list
         targetid = "option-%d" % env.new_serialno('mrjob-opt')
         targetnode = nodes.target('', '', ids=[targetid])
 
         if not hasattr(env, 'optionlist_all_options'):
             env.optionlist_all_options = []
-
-        option_info = {
-            'docname': env.docname,
-            'lineno': self.lineno,
-            'options': self.options,
-            'content': self.content,
-            'target': targetnode,
-        }
 
         # Each option will be outputted as a single-item definition list
         # (just like it was doing before we used this extension)
@@ -70,25 +71,25 @@ class OptionDirective(Directive):
 
         term = nodes.term()
 
-        if 'config' in option_info['options']:
-            cfg = option_info['options']['config']
+        if 'config' in self.options:
+            cfg = self.options['config']
             term.append(nodes.strong(cfg, cfg))
-            if 'switch' in option_info['options']:
+            if 'switch' in self.options:
                 term.append(nodes.Text(' (', ' ('))
-        if 'switch' in option_info['options']:
-            switches = option_info['options']['switch'].split(', ')
+        if 'switch' in self.options:
+            switches = self.options['switch'].split(', ')
             for i, s in enumerate(switches):
                 if i > 0:
                     term.append(nodes.Text(', ', ', '))
                 term.append(nodes.literal(s, s))
-            if 'config' in option_info['options']:
+            if 'config' in self.options:
                 term.append(nodes.Text(')', ')'))
 
         dli.append(term)
 
         classifier = nodes.classifier()
         type_nodes, messages = self.state.inline_text(
-            option_info['options'].get('type', ''), self.lineno)
+            self.options.get('type', ''), self.lineno)
 
         # failed attempt at a markup shortcut
         #t = option_info['options']['type']
@@ -107,11 +108,11 @@ class OptionDirective(Directive):
         defn = nodes.definition()
 
         default_nodes = []
-        if 'default' in option_info['options']:
+        if 'default' in self.options:
             default_par = nodes.paragraph()
             default_par.append(nodes.strong('Default: ', 'Default: '))
             textnodes, messages = self.state.inline_text(
-                option_info['options']['default'], self.lineno)
+                self.options['default'], self.lineno)
             default_nodes = textnodes
             default_par.extend(textnodes)
             defn.append(default_par)
@@ -121,9 +122,15 @@ class OptionDirective(Directive):
 
         dl.append(dli)
 
-        option_info['type_nodes'] = [n.deepcopy() for n in type_nodes]
-        option_info['default_nodes'] = [n.deepcopy() for n in default_nodes]
-        env.optionlist_all_options.append(option_info)
+        env.optionlist_all_options.append({
+            'docname': env.docname,
+            'lineno': self.lineno,
+            'options': self.options,
+            'content': self.content,
+            'target': targetnode,
+            'type_nodes': [n.deepcopy() for n in type_nodes],
+            'default_nodes': [n.deepcopy() for n in default_nodes]
+        })
 
         return [targetnode, dl]
 

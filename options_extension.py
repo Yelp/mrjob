@@ -7,7 +7,7 @@ from docutils.parsers.rst import directives
 from sphinx.util.compat import Directive
 
 
-class option(nodes.Admonition, nodes.Element):
+class option(nodes.General, nodes.Element):
     pass
 
 
@@ -15,12 +15,16 @@ class optionlist(nodes.General, nodes.Element):
     pass
 
 
-def visit_option_node(self, node):
-    self.visit_admonition(node)
+class optionlink(nodes.General, nodes.Element):
+    pass
 
 
-def depart_option_node(self, node):
-    self.depart_admonition(node)
+def visit_noop(self, node):
+    pass
+
+
+def depart_noop(self, node):
+    pass
 
 
 class OptionlistDirective(Directive):
@@ -51,10 +55,6 @@ class OptionDirective(Directive):
 
         targetid = "option-%d" % env.new_serialno('mrjob-opt')
         targetnode = nodes.target('', '', ids=[targetid])
-
-        #ad = make_admonition(option, self.name, ['Option'], self.options,
-        #                     self.content, self.lineno, self.content_offset,
-        #                     self.block_text, self.state, self.state_machine)
 
         if not hasattr(env, 'optionlist_all_options'):
             env.optionlist_all_options = []
@@ -129,7 +129,7 @@ def purge_options(app, env, docname):
         if todo['docname'] != docname]
 
 
-def process_option_nodes(app, doctree, fromdocname):
+def populate_option_lists(app, doctree):
     env = app.builder.env
 
     for node in doctree.traverse(optionlist):
@@ -172,15 +172,12 @@ def process_option_nodes(app, doctree, fromdocname):
             type_column = nodes.entry()
 
             def make_refnode(text):
-                refnode = nodes.reference('', '')
-                innernode = nodes.emphasis(text, text)
-                refnode['refdocname'] = option_info['docname']
-                refnode['refuri'] = app.builder.get_relative_uri(
-                    fromdocname, option_info['docname'])
-                refnode['refuri'] += '#' + option_info['target']['refid']
-                refnode.append(innernode)
                 par = nodes.paragraph()
-                par.append(refnode)
+                ol = optionlink()
+                ol.text = text
+                ol.docname = option_info['docname']
+                ol.target = option_info['target']
+                par.append(ol)
                 return par
 
             config_column.append(
@@ -208,14 +205,34 @@ def process_option_nodes(app, doctree, fromdocname):
         node.replace_self([table])
 
 
+def replace_optionlinks_with_links(app, doctree, fromdocname):
+    # optionlink has attrs text, docname, target,
+
+    for node in doctree.traverse(optionlink):
+        refnode = nodes.reference('', '')
+        innernode = nodes.emphasis(node.text, node.text)
+        refnode['refdocname'] = node.docname
+        refnode['refuri'] = app.builder.get_relative_uri(
+            fromdocname, node.docname)
+        refnode['refuri'] += '#' + node.target['refid']
+        refnode.append(innernode)
+
+        node.replace_self([refnode])
+
+
 def setup(app):
     app.add_node(optionlist)
+    app.add_node(optionlink,
+                 html=(visit_noop, depart_noop),
+                 latex=(visit_noop, depart_noop),
+                 text=(visit_noop, depart_noop))
     app.add_node(option,
-                 html=(visit_option_node, depart_option_node),
-                 latex=(visit_option_node, depart_option_node),
-                 text=(visit_option_node, depart_option_node))
+                 html=(visit_noop, depart_noop),
+                 latex=(visit_noop, depart_noop),
+                 text=(visit_noop, depart_noop))
 
     app.add_directive('mrjob-opt', OptionDirective)
     app.add_directive('mrjob-optlist', OptionlistDirective)
-    app.connect('doctree-resolved', process_option_nodes)
+    app.connect('doctree-read', populate_option_lists)
+    app.connect('doctree-resolved', replace_optionlinks_with_links)
     app.connect('env-purge-doc', purge_options)

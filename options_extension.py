@@ -62,12 +62,13 @@ class OptionDirective(Directive):
         option_info = {
             'docname': env.docname,
             'lineno': self.lineno,
-            #'option': ad[0].deepcopy(),
             'options': self.options,
             'content': self.content,
             'target': targetnode,
         }
 
+        # Each option will be outputted as a single-item definition list
+        # (just like it was doing before we used this extension)
         dl = nodes.definition_list()
         dli = nodes.definition_list_item()
 
@@ -83,13 +84,36 @@ class OptionDirective(Directive):
             opt_name = option_info['options']['switch']
 
         term = nodes.term()
-        term.append(nodes.Text(opt_name, opt_name))
+
+        if 'config' in option_info['options']:
+            cfg = option_info['options']['config']
+            term.append(nodes.strong(cfg, cfg))
+            if 'switch' in option_info['options']:
+                term.append(nodes.Text(' (', ' ('))
+        if 'switch' in option_info['options']:
+            switches = option_info['options']['switch'].split(', ')
+            for i, s in enumerate(switches):
+                if i > 0:
+                    term.append(nodes.Text(', ', ', '))
+                term.append(nodes.literal(s, s))
+            if 'config' in option_info['options']:
+                term.append(nodes.Text(')', ')'))
 
         dli.append(term)
 
         classifier = nodes.classifier()
         type_nodes, messages = self.state.inline_text(
             option_info['options'].get('type', ''), self.lineno)
+
+        # failed attempt at a markup shortcut
+        #t = option_info['options']['type']
+        #refnode = addnodes.pending_xref(
+        #    t, reftarget='data-type-%s' % t,
+        #    refexplicit=True, reftype='ref')
+        #print refnode
+        #refnode += nodes.Text(t, t)
+        #type_nodes = [refnode]
+
         classifier.extend(type_nodes)
         dli.append(classifier)
 

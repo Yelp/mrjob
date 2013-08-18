@@ -106,10 +106,8 @@ class OptionDirective(Directive):
         classifier.extend(type_nodes)
         dli.append(classifier)
 
-        option_desc = '\n'.join(option_info['content'])
-        textnodes, messages = self.state.inline_text(option_desc, self.lineno)
-        desc_par = nodes.paragraph(option_desc)
-        desc_par.extend(textnodes)
+        desc_par = nodes.paragraph()
+        self.state.nested_parse(self.content, self.content_offset, desc_par)
         defn = nodes.definition()
 
         default_nodes = []

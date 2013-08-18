@@ -71,11 +71,13 @@ class OptionDirective(Directive):
 
         term = nodes.term()
 
+        # config option shall be bold
         if 'config' in self.options:
             cfg = self.options['config']
             term.append(nodes.strong(cfg, cfg))
             if 'switch' in self.options:
                 term.append(nodes.Text(' (', ' ('))
+        # switch shall be comma-separated literals
         if 'switch' in self.options:
             switches = self.options['switch'].split(', ')
             for i, s in enumerate(switches):
@@ -86,6 +88,9 @@ class OptionDirective(Directive):
                 term.append(nodes.Text(')', ')'))
 
         dli.append(term)
+
+        # classifier is either plan text or a link to some more docs, so parse
+        # its contents
 
         classifier = nodes.classifier()
         type_nodes, messages = self.state.inline_text(
@@ -103,9 +108,14 @@ class OptionDirective(Directive):
         classifier.extend(type_nodes)
         dli.append(classifier)
 
+        # parse the description like a nested block (see
+        # sphinx.compat.make_admonition)
+
         desc_par = nodes.paragraph()
         self.state.nested_parse(self.content, self.content_offset, desc_par)
         defn = nodes.definition()
+
+        # add a default if any
 
         default_nodes = []
         if 'default' in self.options:
@@ -122,6 +132,7 @@ class OptionDirective(Directive):
 
         dl.append(dli)
 
+        # store info for the optionlist traversal to find
         env.optionlist_all_options.append({
             'docname': env.docname,
             'lineno': self.lineno,
@@ -136,11 +147,12 @@ class OptionDirective(Directive):
 
 
 def purge_options(app, env, docname):
+    """Clear our data from the environment when necessary"""
     if not hasattr(env, 'optionlist_all_options'):
         return
     env.optionlist_all_options = [
-        todo for todo in env.optionlist_all_options
-        if todo['docname'] != docname]
+        option for option in env.optionlist_all_options
+        if option['docname'] != docname]
 
 
 def populate_option_lists(app, doctree):
@@ -148,8 +160,10 @@ def populate_option_lists(app, doctree):
 
     for node in doctree.traverse(optionlist):
         # see parsers/rst/states.py, build_table()
+        # it's a mess and so is this
         table = nodes.table()
 
+        # make the header block, I swear it's not my fault it's so convoluted
         tgroup = nodes.tgroup(cols=4)
         table += tgroup
 
@@ -175,9 +189,13 @@ def populate_option_lists(app, doctree):
         tbody = nodes.tbody()
         tgroup += tbody
 
+        # filter and sort options for this table
         my_options = [oi for oi in env.optionlist_all_options
                       if oi['options']['set'] == node.option_set]
 
+        # automagically alphabetical
+        # probably can assume we always have a config option, but who knows
+        # what the future holds?
         def sort_key(oi):
             if 'config' in oi['options']:
                 return oi['options']['config']
@@ -194,6 +212,7 @@ def populate_option_lists(app, doctree):
             default_column = nodes.entry()
             type_column = nodes.entry()
 
+            # make a stub node for us to replace after links have been resolved
             def make_refnode(text):
                 par = nodes.paragraph()
                 ol = optionlink()

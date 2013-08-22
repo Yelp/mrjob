@@ -210,11 +210,12 @@ Job execution context
     :switch: --interpreter
     :type: :ref:`string <data-type-string>`
     :set: all
-    :default: value of :ref:`python_bin <opt_python_bin>`
+    :default: value of :ref:`python_bin <opt_python_bin>` (``'python'``)
 
     Interpreter to launch your script with. Defaults to the value of
-    **python_bin**. Change this if you're using a language besides Python
-    2.5-2.7 or if you're running using :py:mod:`virtualenv`.
+    **python_bin**, which is deprecated. Change this if you're using a
+    language besides Python 2.5-2.7 or if you're running using
+    :py:mod:`virtualenv`.
 
 .. _opt_python_bin:
 
@@ -225,9 +226,8 @@ Job execution context
     :set: all
     :default: ``'python'``
 
-    Name/path of alternate Python binary for wrapper scripts and
-    mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to
-    ``'python'``.
+    Deprecated. Name/path of alternate Python binary for wrapper scripts and
+    mappers/reducers (e.g. for use with :py:mod:`virtualenv`).
 
 .. _opt_setup_cmds:
 

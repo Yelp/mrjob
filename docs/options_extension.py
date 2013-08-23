@@ -1,8 +1,70 @@
-# this extension doesn't exactly use "best practices" but it's generally how
-# they are written, with no hacks.
+"""
+This extension allows you to define an option like this:
+
+.. mrjob-opt::
+    :config: base_tmp_dir
+    :switch: --base-tmp-dir
+    :type: :ref:`path <data-type-path>`
+    :set: all
+    :default: value of :py:func:`tempfile.gettempdir`
+
+    Path to put local temp dirs inside.
+
+You generate the table for a set of options (in the above, that would be the
+'all' set) like this:
+
+.. mrjob-optlist: all
+
+If you need help, start here: http://sphinx-doc.org/ext/tutorial.html
+
+Order of operations
+===================
+
+As doctree is read
+------------------
+
+For each mrjob-optlist directive, generate an ``optionlist`` node with an
+``option_set`` attribute. This node will otherwise be empty as it will be
+populated in the next step.
+
+For each mrjob-option directive, generate an ``option`` node with the full
+contents. Save all relevant table data in ``env.optionlist_all_options``.
+
+After doctree is read
+---------------------
+
+For each ``optionlist`` node, populate its contents with a table. Use
+``optionlink`` nodes in place of references to ``option`` nodes, as links have
+not yet been resolved.
+
+After doctree is resolved
+-------------------------
+
+Replace ``optionlink`` nodes with references to their respective ``option``
+nodes.
+
+"""
 from docutils import nodes
 from docutils.parsers.rst import directives
 from sphinx.util.compat import Directive
+
+
+def setup(app):
+    app.add_node(optionlist)
+    app.add_node(optionlink,
+                 html=(visit_noop, depart_noop),
+                 latex=(visit_noop, depart_noop),
+                 text=(visit_noop, depart_noop))
+    app.add_node(option,
+                 html=(visit_noop, depart_noop),
+                 latex=(visit_noop, depart_noop),
+                 text=(visit_noop, depart_noop))
+
+    app.add_directive('mrjob-opt', OptionDirective)
+    app.add_directive('mrjob-optlist', OptionlistDirective)
+    app.connect('doctree-read', populate_option_lists)
+    app.connect('doctree-resolved', replace_optionlinks_with_links)
+    app.connect('env-purge-doc', purge_options)
 
 
 class option(nodes.General, nodes.Element):
@@ -22,6 +84,8 @@ class optionlink(nodes.General, nodes.Element):
     pass
 
 
+# We are required to have visit/depart functions for each node that appears in
+# the final tree, but our new nodes don't generate any markup of their own.
 def visit_noop(self, node):
     pass
 
@@ -31,7 +95,9 @@ def depart_noop(self, node):
 
 
 class OptionlistDirective(Directive):
-    has_content = True
+    """.. mrjob-optlist: <set identifier>"""
+
+    has_content = True  # content is the set identifier
 
     def run(self):
         # all we have to do during parsing is make a node where the directive
@@ -42,10 +108,20 @@ class OptionlistDirective(Directive):
 
 
 class OptionDirective(Directive):
+    """
+    .. mrjob-opt::
+        :config: <snake_case_config_option>
+        :switch: <--comma, --separated, --switches)
+        :type: <name of or link to a data type>
+        :set: <set identifier>
+        :default: <arbitrary markup for describing default value>
+    """
 
-    has_content = True
+    has_content = True  # content is the option description
     required_arguments = 0
     optional_arguments = 5
+    # pass all argument values through as strings; only set argument is
+    # required
     option_spec = {
         'config': directives.unchanged,
         'switch': directives.unchanged,
@@ -57,12 +133,9 @@ class OptionDirective(Directive):
     def run(self):
         env = self.state.document.settings.env
 
-        # make it possible to link back here from the option list
+        # generate the linkback node for this option
         targetid = "option-%d" % env.new_serialno('mrjob-opt')
         targetnode = nodes.target('', '', ids=[targetid])
-
-        if not hasattr(env, 'optionlist_all_options'):
-            env.optionlist_all_options = []
 
         # Each option will be outputted as a single-item definition list
         # (just like it was doing before we used this extension)
@@ -77,6 +150,7 @@ class OptionDirective(Directive):
             term.append(nodes.strong(cfg, cfg))
             if 'switch' in self.options:
                 term.append(nodes.Text(' (', ' ('))
+
         # switch shall be comma-separated literals
         if 'switch' in self.options:
             switches = self.options['switch'].split(', ')
@@ -91,12 +165,12 @@ class OptionDirective(Directive):
 
         # classifier is either plan text or a link to some more docs, so parse
         # its contents
-
         classifier = nodes.classifier()
         type_nodes, messages = self.state.inline_text(
             self.options.get('type', ''), self.lineno)
 
-        # failed attempt at a markup shortcut
+        # failed attempt at a markup shortcut; may be able to make this work
+        # later
         #t = option_info['options']['type']
         #refnode = addnodes.pending_xref(
         #    t, reftarget='data-type-%s' % t,
@@ -108,15 +182,10 @@ class OptionDirective(Directive):
         classifier.extend(type_nodes)
         dli.append(classifier)
 
-        # parse the description like a nested block (see
-        # sphinx.compat.make_admonition)
-
-        desc_par = nodes.paragraph()
-        self.state.nested_parse(self.content, self.content_offset, desc_par)
+        # definition holds the description
         defn = nodes.definition()
 
         # add a default if any
-
         default_nodes = []
         if 'default' in self.options:
             default_par = nodes.paragraph()
@@ -127,10 +196,17 @@ class OptionDirective(Directive):
             default_par.extend(textnodes)
             defn.append(default_par)
 
+        # parse the description like a nested block (see
+        # sphinx.compat.make_admonition)
+        desc_par = nodes.paragraph()
+        self.state.nested_parse(self.content, self.content_offset, desc_par)
         defn.append(desc_par)
-        dli.append(defn)
 
+        dli.append(defn)
         dl.append(dli)
+
+        if not hasattr(env, 'optionlist_all_options'):
+            env.optionlist_all_options = []
 
         # store info for the optionlist traversal to find
         env.optionlist_all_options.append({
@@ -155,6 +231,7 @@ def purge_options(app, env, docname):
         if option['docname'] != docname]
 
 
+# after doctree is read
 def populate_option_lists(app, doctree):
     env = app.builder.env
 
@@ -188,6 +265,7 @@ def populate_option_lists(app, doctree):
 
         tbody = nodes.tbody()
         tgroup += tbody
+        # end of header block; whew
 
         # filter and sort options for this table
         my_options = [oi for oi in env.optionlist_all_options
@@ -204,6 +282,8 @@ def populate_option_lists(app, doctree):
 
         my_options.sort(key=sort_key)
 
+        # table body
+
         for option_info in my_options:
             row = nodes.row()
 
@@ -212,7 +292,8 @@ def populate_option_lists(app, doctree):
             default_column = nodes.entry()
             type_column = nodes.entry()
 
-            # make a stub node for us to replace after links have been resolved
+            # make a stub node for us to replace after links have been
+            # resolved. one of these for each config key and switch.
             def make_refnode(text):
                 par = nodes.paragraph()
                 ol = optionlink()
@@ -247,6 +328,7 @@ def populate_option_lists(app, doctree):
         node.replace_self([table])
 
 
+# after doctree is resolved
 def replace_optionlinks_with_links(app, doctree, fromdocname):
     # optionlink has attrs text, docname, target,
 
@@ -260,21 +342,3 @@ def replace_optionlinks_with_links(app, doctree, fromdocname):
         refnode.append(innernode)
 
         node.replace_self([refnode])
-
-
-def setup(app):
-    app.add_node(optionlist)
-    app.add_node(optionlink,
-                 html=(visit_noop, depart_noop),
-                 latex=(visit_noop, depart_noop),
-                 text=(visit_noop, depart_noop))
-    app.add_node(option,
-                 html=(visit_noop, depart_noop),
-                 latex=(visit_noop, depart_noop),
-                 text=(visit_noop, depart_noop))
-
-    app.add_directive('mrjob-opt', OptionDirective)
-    app.add_directive('mrjob-optlist', OptionlistDirective)
-    app.connect('doctree-read', populate_option_lists)
-    app.connect('doctree-resolved', replace_optionlinks_with_links)
-    app.connect('env-purge-doc', purge_options)

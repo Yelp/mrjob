@@ -415,9 +415,8 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--max-hours-idle', dest='max_hours_idle',
             default=None, type='float',
-            help=("If we create a persistent job flow, have Amazon Cloudwatch"
-                  " terminate it automatically after it's been idle this many"
-                  " hours.")),
+            help=("If we create a persistent job flow, have it automatically"
+                  " terminate itself after it's been idle this many hours.")),
 
         opt_group.add_option(
             '--no-pool-emr-job-flows', dest='pool_emr_job_flows',

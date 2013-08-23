@@ -29,29 +29,26 @@ except ImportError:
     import json  # built in to Python 2.6 and later
 
 
-# DEPRECATED: Abstract base class for all protocols. Now just an alias for
-# ``object``.
-HadoopStreamingProtocol = object
+class _KeyCachingProtocol(object):
+    """Protocol that caches the last decoded key.
 
-
-class _ClassBasedKeyCachingProtocol(object):
-    """Protocol that caches the last decoded key and uses class methods
-    instead of instance methods. Do not inherit from this.
+    We're not currently exposing this class; inheriting from this class
+    will result in almost as much code as simply writing your own read/write
+    methods. You should probably cache keys, but in a way that makes sense for
+    your use case.
     """
-
     _last_key_encoded = None
     _last_key_decoded = None
 
-    @classmethod
-    def load_from_string(self, value):
+    def _loads(self, value):
+        """Decode a single key/value, and return it."""
         raise NotImplementedError
 
-    @classmethod
-    def dump_to_string(self, value):
+    def _dumps(self, value):
+        """Encode a single key/value, and return it."""
         raise NotImplementedError
 
-    @classmethod
-    def read(cls, line):
+    def read(self, line):
         """Decode a line of input.
 
         :type line: str
@@ -61,13 +58,12 @@ class _ClassBasedKeyCachingProtocol(object):
 
         raw_key, raw_value = line.split('\t', 1)
 
-        if raw_key != cls._last_key_encoded:
-            cls._last_key_encoded = raw_key
-            cls._last_key_decoded = cls.load_from_string(raw_key)
-        return (cls._last_key_decoded, cls.load_from_string(raw_value))
+        if raw_key != self._last_key_encoded:
+            self._last_key_encoded = raw_key
+            self._last_key_decoded = self._loads(raw_key)
+        return (self._last_key_decoded, self._loads(raw_value))
 
-    @classmethod
-    def write(cls, key, value):
+    def write(self, key, value):
         """Encode a key and value.
 
         :param key: A key (of any type) yielded by a mapper/reducer
@@ -75,22 +71,20 @@ class _ClassBasedKeyCachingProtocol(object):
 
         :rtype: str
         :return: A line, without trailing newline."""
-        return '%s\t%s' % (cls.dump_to_string(key),
-                           cls.dump_to_string(value))
+        return '%s\t%s' % (self._dumps(key),
+                           self._dumps(value))
 
 
-class JSONProtocol(_ClassBasedKeyCachingProtocol):
+class JSONProtocol(_KeyCachingProtocol):
     """Encode ``(key, value)`` as two JSONs separated by a tab.
 
     Note that JSON has some limitations; dictionary keys must be strings,
     and there's no distinction between lists and tuples."""
 
-    @classmethod
-    def load_from_string(cls, value):
+    def _loads(self, value):
         return json.loads(value)
 
-    @classmethod
-    def dump_to_string(cls, value):
+    def _dumps(self, value):
         return json.dumps(value)
 
 
@@ -98,16 +92,14 @@ class JSONValueProtocol(object):
     """Encode ``value`` as a JSON and discard ``key``
     (``key`` is read in as ``None``).
     """
-    @classmethod
-    def read(cls, line):
+    def read(self, line):
         return (None, json.loads(line))
 
-    @classmethod
-    def write(cls, key, value):
+    def write(self, key, value):
         return json.dumps(value)
 
 
-class PickleProtocol(_ClassBasedKeyCachingProtocol):
+class PickleProtocol(_KeyCachingProtocol):
     """Encode ``(key, value)`` as two string-escaped pickles separated
     by a tab.
 
@@ -118,12 +110,10 @@ class PickleProtocol(_ClassBasedKeyCachingProtocol):
     Ugly, but should work for any type.
     """
 
-    @classmethod
-    def load_from_string(cls, value):
+    def _loads(self, value):
         return cPickle.loads(value.decode('string_escape'))
 
-    @classmethod
-    def dump_to_string(cls, value):
+    def _dumps(self, value):
         return cPickle.dumps(value).encode('string_escape')
 
 
@@ -131,12 +121,10 @@ class PickleValueProtocol(object):
     """Encode ``value`` as a string-escaped pickle and discard ``key``
     (``key`` is read in as ``None``).
     """
-    @classmethod
-    def read(cls, line):
+    def read(self, line):
         return (None, cPickle.loads(line.decode('string_escape')))
 
-    @classmethod
-    def write(cls, key, value):
+    def write(self, key, value):
         return cPickle.dumps(value).encode('string_escape')
 
 
@@ -153,14 +141,14 @@ class RawProtocol(object):
     Your key should probably not be ``None`` or have tab characters in it, but
     we don't check.
     """
-    def read(cls, line):
+    def read(self, line):
         key_value = line.split('\t', 1)
         if len(key_value) == 1:
             key_value.append(None)
 
         return tuple(key_value)
 
-    def write(cls, key, value):
+    def write(self, key, value):
         return '\t'.join(x for x in (key, value) if x is not None)
 
 
@@ -170,27 +158,23 @@ class RawValueProtocol(object):
 
     The default way for a job to read its initial input.
     """
-    @classmethod
-    def read(cls, line):
+    def read(self, line):
         return (None, line)
 
-    @classmethod
-    def write(cls, key, value):
+    def write(self, key, value):
         return value
 
 
-class ReprProtocol(_ClassBasedKeyCachingProtocol):
+class ReprProtocol(_KeyCachingProtocol):
     """Encode ``(key, value)`` as two reprs separated by a tab.
 
     This only works for basic types (we use :py:func:`mrjob.util.safeeval`).
     """
 
-    @classmethod
-    def load_from_string(cls, value):
+    def _loads(self, value):
         return safeeval(value)
 
-    @classmethod
-    def dump_to_string(cls, value):
+    def _dumps(self, value):
         return repr(value)
 
 
@@ -200,10 +184,8 @@ class ReprValueProtocol(object):
 
     This only works for basic types (we use :py:func:`mrjob.util.safeeval`).
     """
-    @classmethod
-    def read(cls, line):
+    def read(self, line):
         return (None, safeeval(line))
 
-    @classmethod
-    def write(cls, key, value):
+    def write(self, key, value):
         return repr(value)

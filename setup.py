@@ -43,6 +43,7 @@ setup(
               'mrjob.fs',
               'mrjob.tools',
               'mrjob.tools.emr'],
+    package_data={'mrjob': ['bootstrap/*.sh']},
     scripts=['bin/mrjob'],
     url='http://github.com/Yelp/mrjob',
     version=mrjob.__version__,

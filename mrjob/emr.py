@@ -1263,10 +1263,10 @@ class EMRJobRunner(MRJobRunner):
                 s3_uri = self._upload_mgr.uri(
                             _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
                 # script takes args in (integer) seconds
-                args = [int(self._opts['max_hours_idle'] * 3600),
+                ba_args = [int(self._opts['max_hours_idle'] * 3600),
                         int(self._opts['mins_to_end_of_hour'] * 60)]
                 bootstrap_action_args.append(
-                    boto.emr.BootstrapAction('idle timeout', s3_uri, args))
+                    boto.emr.BootstrapAction('idle timeout', s3_uri, ba_args))
 
         if bootstrap_action_args:
             args['bootstrap_actions'] = bootstrap_action_args

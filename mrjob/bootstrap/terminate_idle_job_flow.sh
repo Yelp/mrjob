@@ -43,7 +43,7 @@
 # Both arguments must be integers
 
 MAX_SECS_IDLE=$1
-if [ -z "$MAX_HOURS_IDLE" ]; then MAX_SECS_IDLE=1800; fi
+if [ -z "$MAX_SECS_IDLE" ]; then MAX_SECS_IDLE=1800; fi
 
 MIN_SECS_TO_END_OF_HOUR=$2
 if [ -z "$MIN_SECS_TO_END_OF_HOUR" ]; then MIN_SECS_TO_END_OF_HOUR=300; fi

@@ -834,12 +834,14 @@ class EMRJobRunner(MRJobRunner):
         except boto.exception.S3ResponseError:
             pass
 
-    def _add_bootstrap_files_for_upload(self):
+    def _add_bootstrap_files_for_upload(self, persistent=False):
         """Add files needed by the bootstrap script to self._upload_mgr.
 
         Tar up mrjob if bootstrap_mrjob is True.
 
         Create the master bootstrap script if necessary.
+
+        persistent -- set by make_persistent_job_flow()
         """
         # lazily create mrjob.tar.gz
         if self._opts['bootstrap_mrjob']:
@@ -861,8 +863,9 @@ class EMRJobRunner(MRJobRunner):
         for bootstrap_action in self._bootstrap_actions:
             self._upload_mgr.add(bootstrap_action['path'])
 
-        # add max-hours-idle script if we might need it
-        if self._opts['max_hours_idle']:
+        # Add max-hours-idle script if we need it
+        if (self._opts['max_hours_idle'] and
+            (persistent or self._opts['pool_emr_job_flows'])):
             self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
 
     def _add_job_files_for_upload(self):
@@ -1996,7 +1999,7 @@ class EMRJobRunner(MRJobRunner):
 
         log.info('Creating persistent job flow to run several jobs in...')
 
-        self._add_bootstrap_files_for_upload()
+        self._add_bootstrap_files_for_upload(persistent=True)
         self._upload_local_files_to_s3()
 
         # don't allow user to call run()

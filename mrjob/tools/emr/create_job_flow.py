@@ -115,6 +115,7 @@ def make_option_parser():
             'enable_emr_debugging',
             'hadoop_version',
             'max_hours_idle',
+            'mins_to_end_of_hour',
             'num_ec2_core_instances',
             'num_ec2_instances',
             'num_ec2_task_instances',

@@ -144,7 +144,22 @@ Job flow creation and configuration
     :default: ``None``
 
     If we create a persistent job flow, have it automatically terminate itself
-    after it's been idle this many hours.
+    after it's been idle this many hours AND we're within
+    :ref:`mins_to_end_of_hour <opt_mins_to_end_of_hour>` of an EC2 billing
+    hour.
+
+.. _opt_mins_to_end_of_hour:
+
+.. mrjob-opt::
+    :config: mins_to_end_of_hour
+    :switch: --mins-to-end-of-hour
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: 5.0
+
+    If :ref:`max_hours_idle <opt_max_hours_idle>` is set, controls how close
+    to the end of an EC2 billing hour the job flow can automatically terminate
+    itself.
 
 Bootstrapping
 -------------

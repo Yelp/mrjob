@@ -357,6 +357,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
         'max_hours_idle',
+        'mins_to_end_of_hour',
         'num_ec2_core_instances',
         'pool_wait_minutes',
         'num_ec2_instances',
@@ -400,6 +401,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'hadoop_version': None,
             'hadoop_streaming_jar_on_emr':
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
+            'mins_to_end_of_hour': 5.0,
             'num_ec2_core_instances': 0,
             'num_ec2_instances': 1,
             'num_ec2_task_instances': 0,
@@ -1261,7 +1263,8 @@ class EMRJobRunner(MRJobRunner):
                 s3_uri = self._upload_mgr.uri(
                             _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
                 # script takes args in (integer) seconds
-                args = [int(self._opts['max_hours_idle'] * 3600)]
+                args = [int(self._opts['max_hours_idle'] * 3600),
+                        int(self._opts['mins_to_end_of_hour'] * 60)]
                 bootstrap_action_args.append(
                     boto.emr.BootstrapAction('idle timeout', s3_uri, args))
 

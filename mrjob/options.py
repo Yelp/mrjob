@@ -419,6 +419,13 @@ def add_emr_opts(opt_group):
                   " terminate itself after it's been idle this many hours.")),
 
         opt_group.add_option(
+            '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
+            default=None, type='float',
+            help=("If --max-hours-idle is set, control how close to the end"
+                  " of an EC2 billing hour the job flow can automatically"
+                  " terminate itself (default is 5 minutes).")),
+
+        opt_group.add_option(
             '--no-pool-emr-job-flows', dest='pool_emr_job_flows',
             action='store_false',
             help="Don't try to run our job on a pooled job flow."),

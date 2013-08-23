@@ -1,17 +1,46 @@
 #!/bin/sh
 
-# by default, terminate any job that's been idle at least a 15 minutes
-# AND has 5 minutes or less to the end of the hour (i.e. when get billed
-# for ec2 again
+# Copyright 2013 Lyft
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-# This script polls hadoop continuously (hadoop job -list) and considers the
-# job flow idle if no jobs are currently running; it can't see pending jobs.
+# Author: David Marin <dm@davidmarin.org>
 
-# usage:
+# This script is part of mrjob, but can be run as a bootstrap action on
+# ANY Elastic MapReduce job flow. Arguments are totally optional.
+
+# This script runs `hadoop job -list` in a loop and considers the job flow
+# idle if no jobs are currently running. If the job flow stays idle long
+# enough AND we're close enough to the end of an EC2 billing hour, we
+# shut down the master node, which kills the job flow.
+
+# By default, we allow an idle time of 15 minutes, and shut down within
+# the last 5 minutes of the hour.
+
+# Caveats:
+
+# Race conditions: this script can only see currently running jobs, not ones
+# pending in EMR, or ones that you're about to submit, or jobs that started
+# running since the last time we called `hadoop job -list`.
+
+# This script will leave the job flow in the FAILED (not TERMINATED) state,
+# with LastStateChangeReason "The master node was terminated. "
+
+# full usage:
 #
 # ./terminate_idle_job_flow.sh [ max_hours_idle [ min_secs_to_end_of_hour ] ]
 #
-# both arguments must be integers
+# Both arguments must be integers
 
 MAX_SECS_IDLE=$1
 if [ -z "$MAX_HOURS_IDLE" ]; then MAX_SECS_IDLE=1800; fi

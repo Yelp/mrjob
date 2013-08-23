@@ -17,22 +17,6 @@ mappings.
 """
 from __future__ import with_statement
 
-### CLOUDWATCH ###
-
-# How often cloudwatch checks metrics, in seconds
-CLOUDWATCH_DEFAULT_PERIOD = 300
-
-# prefix to use to stop or terminate EC2 instances through cloudwatch
-# See: http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/UsingAlarmActions.html#UsingCLIorAPI
-_CLOUDWATCH_EC2_ACTION_ARN = 'arn:aws:automate:%s:ec2:%s'
-
-
-def cloudwatch_ec2_action_arn(region, action):
-    """Get the prefix used by CloudWatch actions for EC2 instances in the
-    given region."""
-    return _CLOUDWATCH_EC2_ACTION_ARN % (region or _DEFAULT_REGION, action)
-
-
 ### EC2 Instances ###
 
 # map from instance type to number of compute units
@@ -80,10 +64,6 @@ MAX_STEPS_PER_JOB_FLOW = 256
 
 # See Issue #658 for why we don't just let boto handle this.
 
-# where to connect to CloudWatch
-_CLOUDWATCH_REGION_ENDPOINT = 'monitoring.%s.amazonaws.com'
-_CLOUDWATCH_REGIONLESS_ENDPOINT = 'monitoring.amazonaws.com'
-
 # where to connect to EMR. The docs say
 # elasticmapreduce.%s.amazonaws.com, but the SSL certificates,
 # they tell a different story. See Issue #621.
@@ -111,16 +91,6 @@ def _fix_region(region):
     """Convert "EU" to "eu-west-1", None to '', and convert to lowercase."""
     region = (region or '').lower()
     return _ALIAS_TO_REGION.get(region) or region
-
-
-def region_to_cloudwatch_endpoint(region):
-    """Get the host for CloudWatch in the given AWS region."""
-    region = _fix_region(region)
-
-    if not region:
-        return _CLOUDWATCH_REGIONLESS_ENDPOINT
-    else:
-        return _CLOUDWATCH_REGION_ENDPOINT % region
 
 
 def region_to_emr_endpoint(region):

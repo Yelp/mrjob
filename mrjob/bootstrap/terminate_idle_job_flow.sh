@@ -50,17 +50,16 @@ if [ -z "$MIN_SECS_TO_END_OF_HOUR" ]; then MIN_SECS_TO_END_OF_HOUR=300; fi
 
 
 (
-# we're a bootstrap script, so no jobs could have run before us
-LAST_ACTIVE=0
-
 while true  # the only way out is to SHUT DOWN THE MACHINE
 do
     # get the uptime as an integer (expr can't handle decimals)
     UPTIME=$(cat /proc/uptime | cut -f 1 -d .)
     SECS_TO_END_OF_HOUR=$(expr 3600 - $UPTIME % 3600)
 
-    # might as well nice this; if there's other activity, it's Hadoop jobs
-    if nice hadoop job -list 2> /dev/null | grep -q '^job_'
+    # first time through this loop, we just initialize LAST_ACTIVE
+    # might as well nice hadoop; if there's other activity, it's Hadoop jobs
+    if [ -z "$LAST_ACTIVE" ] || \
+	nice hadoop job -list 2> /dev/null | grep -q '^job_'
     then
 	LAST_ACTIVE=$UPTIME
 

@@ -15,7 +15,6 @@
 from __future__ import with_statement
 
 import logging
-import math
 import os
 import os.path
 import posixpath
@@ -161,6 +160,12 @@ REGION_TO_S3_ENDPOINT = {
 REGION_TO_S3_LOCATION_CONSTRAINT = {
     'us-east-1': '',
 }
+
+# bootstrap action which automatically terminates idle job flows
+_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
+    os.path.dirname(mrjob.__file__),
+    'bootstrap',
+    'terminate_idle_job_flow.sh')
 
 
 def s3_key_to_uri(s3_key):
@@ -585,6 +590,8 @@ class EMRJobRunner(MRJobRunner):
                 'args': args[1:],
             })
 
+        self._append_idle_termination_bootstrap_action_if_needed()
+
         for path in self._opts['bootstrap_files']:
             self._bootstrap_dir_mgr.add(**parse_legacy_hash_path(
                 'file', path, must_name='bootstrap_files'))
@@ -850,9 +857,13 @@ class EMRJobRunner(MRJobRunner):
         if self._master_bootstrap_script_path:
             self._upload_mgr.add(self._master_bootstrap_script_path)
 
-        # finally, make sure bootstrap action scripts are on S3
+        # make sure bootstrap action scripts are on S3
         for bootstrap_action in self._bootstrap_actions:
             self._upload_mgr.add(bootstrap_action['path'])
+
+        # add max-hours-idle script if we might need it
+        if self._opts['max_hours_idle']:
+            self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
 
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
@@ -1146,7 +1157,7 @@ class EMRJobRunner(MRJobRunner):
         """Create an empty job flow on EMR, and return the ID of that
         job.
 
-        persistent -- if this is true, create the job flow with the --alive
+        persistent -- if this is true, create the job flow with the keep_alive
             option, indicating the job will have to be manually terminated.
         """
         # make sure we can see the files we copied to S3
@@ -1241,6 +1252,19 @@ class EMRJobRunner(MRJobRunner):
                     self._upload_mgr.uri(self._master_bootstrap_script_path),
                     master_bootstrap_script_args))
 
+        if persistent or self._opts['pool_emr_job_flows']:
+            args['keep_alive'] = True
+
+            # only use idle termination script on persistent job flows
+            # add it last, so that we don't count bootstrapping as idle time
+            if self._opts['max_hours_idle']:
+                s3_uri = self._upload_mgr.uri(
+                            _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+                # script takes args in (integer) seconds
+                args = [int(self._opts['max_hours_idle'] * 3600)]
+                bootstrap_action_args.append(
+                    boto.emr.BootstrapAction('idle timeout', s3_uri, args))
+
         if bootstrap_action_args:
             args['bootstrap_actions'] = bootstrap_action_args
 
@@ -1256,8 +1280,6 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['visible_to_all_users']:
             args['visible_to_all_users'] = True
 
-        if persistent or self._opts['pool_emr_job_flows']:
-            args['keep_alive'] = True
 
         if steps:
             args['steps'] = steps
@@ -1958,6 +1980,19 @@ class EMRJobRunner(MRJobRunner):
 
         return out.getvalue()
 
+    def _append_idle_termination_bootstrap_action_if_needed(self):
+        persistent = (
+            self._opts['emr_job_flow_id'] or self._opts['pool_emr_job_flows'])
+
+        if persistent and self._opts['max_hours_idle']:
+            path = os.path.join(os.path.dirname(mrjob.__file__),
+                                'bootstrap',
+                                'terminate_idle_job_flow.sh')
+
+            args = [int(self._opts['max_hours_idle'] * 3600)]
+
+            self._bootstrap_actions.append({'path': path, 'args': args})
+
     ### EMR JOB MANAGEMENT UTILS ###
 
     def make_persistent_job_flow(self):
@@ -1980,9 +2015,6 @@ class EMRJobRunner(MRJobRunner):
         self._ran_job = True
 
         self._emr_job_flow_id = self._create_job_flow(persistent=True)
-
-        if self._opts['max_hours_idle']:
-            raise NotImplementedError
 
         return self._emr_job_flow_id
 

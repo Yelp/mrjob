@@ -592,8 +592,6 @@ class EMRJobRunner(MRJobRunner):
                 'args': args[1:],
             })
 
-        self._append_idle_termination_bootstrap_action_if_needed()
-
         for path in self._opts['bootstrap_files']:
             self._bootstrap_dir_mgr.add(**parse_legacy_hash_path(
                 'file', path, must_name='bootstrap_files'))
@@ -1982,19 +1980,6 @@ class EMRJobRunner(MRJobRunner):
             writeln()
 
         return out.getvalue()
-
-    def _append_idle_termination_bootstrap_action_if_needed(self):
-        persistent = (
-            self._opts['emr_job_flow_id'] or self._opts['pool_emr_job_flows'])
-
-        if persistent and self._opts['max_hours_idle']:
-            path = os.path.join(os.path.dirname(mrjob.__file__),
-                                'bootstrap',
-                                'terminate_idle_job_flow.sh')
-
-            args = [int(self._opts['max_hours_idle'] * 3600)]
-
-            self._bootstrap_actions.append({'path': path, 'args': args})
 
     ### EMR JOB MANAGEMENT UTILS ###
 

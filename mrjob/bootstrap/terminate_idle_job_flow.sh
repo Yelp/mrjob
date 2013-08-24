@@ -34,7 +34,8 @@
 # running since the last time we called `hadoop job -list`.
 
 # This script will leave the job flow in the FAILED (not TERMINATED) state,
-# with LastStateChangeReason "The master node was terminated. "
+# with LastStateChangeReason "The master node was terminated. ". It can
+# take EMR a minute or so to realize that master node has been shut down.
 
 # full usage:
 #
@@ -77,4 +78,6 @@ do
 	fi
     fi
 done
-)&
+# close file handles to daemonize the script; otherwise bootstrapping
+# never finishes
+) 0<&- &> /dev/null &

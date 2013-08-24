@@ -380,7 +380,7 @@ class MockEmrConnection(object):
         def make_fake_action(real_action):
             return MockEmrObject(name=real_action.name,
                                  path=real_action.path,
-                                 args=[MockEmrObject(value=v) for v \
+                                 args=[MockEmrObject(value=str(v)) for v \
                                        in real_action.bootstrap_action_args])
 
         # create a MockEmrObject corresponding to the job flow. We only

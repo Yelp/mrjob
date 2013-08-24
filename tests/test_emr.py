@@ -25,6 +25,7 @@ from datetime import timedelta
 import getpass
 import logging
 import os
+import os.path
 import posixpath
 import py_compile
 import shutil
@@ -47,6 +48,7 @@ from mrjob.fs.s3 import S3Filesystem
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import describe_all_job_flows
+from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
 from mrjob.parse import JOB_NAME_RE
@@ -2557,6 +2559,22 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         self.assertEqual(job_flow.state, 'WAITING')
 
 
+    def test_pooling_with_ami_version(self):
+        _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0')
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ami-version', '2.0'])
+
+    def test_max_hours_idle_doesnt_matter(self):
+        # max_hours_idle uses a bootstrap action, but it's not included
+        # in the pool hash
+        _, job_flow_id = self.make_pooled_job_flow()
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '--pool-emr-job-flows', '--max-hours-idle', '1'])
+
+
 class PoolingDisablingTestCase(MockEMRAndS3TestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
@@ -2639,6 +2657,89 @@ class S3LockTestCase(MockEMRAndS3TestCase):
 
         self.assertFalse(_lock_acquire_step_2(key, 'jf1'), 'Lock should fail')
 
+
+class MaxHoursIdleTestCase(MockEMRAndS3TestCase):
+
+    def assertRanIdleTimeoutScriptWith(self, runner, args):
+        emr_conn = runner.make_emr_conn()
+        job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+        action = job_flow.bootstrapactions[-1]
+        self.assertEqual(action.name, 'idle timeout')
+        self.assertEqual(
+            action.path,
+            runner._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
+        self.assertEqual([arg.value for arg in action.args], args)
+
+    def assertDidNotUseIdleTimeoutScript(self, runner):
+        emr_conn = runner.make_emr_conn()
+        job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+        action_names = [ba.name for ba in job_flow.bootstrapactions]
+        self.assertNotIn('idle timeout', action_names)
+        # idle timeout script should not even be uploaded
+        self.assertNotIn(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH,
+                         runner._upload_mgr.path_to_uri())
+
+    def test_default(self):
+        mr_job = MRWordCount(['-r', 'emr'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            self.assertDidNotUseIdleTimeoutScript(runner)
+
+    def test_non_persistent_job_flow(self):
+        mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            self.assertDidNotUseIdleTimeoutScript(runner)
+
+    def test_persistent_job_flow(self):
+        mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '0.01'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.make_persistent_job_flow()
+            self.assertRanIdleTimeoutScriptWith(runner, ['36', '300'])
+
+    def test_mins_to_end_of_hour(self):
+        mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1',
+                              '--mins-to-end-of-hour', '10'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.make_persistent_job_flow()
+            self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
+
+    def test_mins_to_end_of_hour_does_nothing_without_max_hours_idle(self):
+        mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '10'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.make_persistent_job_flow()
+            self.assertDidNotUseIdleTimeoutScript(runner)
+
+    def test_use_integers(self):
+        mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1.000001',
+                              '--mins-to-end-of-hour', '10.000001'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.make_persistent_job_flow()
+            self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
+
+    def pooled_job_flows(self):
+        mr_job = MRWordCount(['-r', 'emr', '--pool-emr-job-flows',
+                              '--max-hours-idle', '0.5'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            self.assertRanIdleTimeoutScriptWith(runner, ['1800', '300'])
+
+    def test_bootstrap_script_is_actually_installed(self):
+        self.assertTrue(os.path.exists(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
 
 class TestCatFallback(MockEMRAndS3TestCase):
 

@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@ from tests.tools.emr import ToolTestCase
 
 
 class JobFlowInspectionTestCase(ToolTestCase):
+
+    maxDiff = None
 
     def test_runner_kwargs(self):
         self.monkey_patch_argv('--quiet')
@@ -51,6 +53,8 @@ class JobFlowInspectionTestCase(ToolTestCase):
              'enable_emr_debugging': None,
              'hadoop_version': None,
              'label': None,
+             'mins_to_end_of_hour': None,
+             'max_hours_idle': None,
              'num_ec2_core_instances': None,
              'num_ec2_instances': None,
              'num_ec2_task_instances': None,

@@ -24,8 +24,6 @@ from tests.tools.emr import ToolTestCase
 
 class JobFlowInspectionTestCase(ToolTestCase):
 
-    maxDiff = None
-
     def test_runner_kwargs(self):
         self.monkey_patch_argv('--quiet')
         self.assertEqual(

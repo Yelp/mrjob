@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""Test the idle job flow terminator"""
+"""Test the create-job-flow script"""
 
 from __future__ import with_statement
 
@@ -51,6 +50,8 @@ class JobFlowInspectionTestCase(ToolTestCase):
              'enable_emr_debugging': None,
              'hadoop_version': None,
              'label': None,
+             'mins_to_end_of_hour': None,
+             'max_hours_idle': None,
              'num_ec2_core_instances': None,
              'num_ec2_instances': None,
              'num_ec2_task_instances': None,

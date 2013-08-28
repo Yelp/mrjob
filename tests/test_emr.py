@@ -2558,14 +2558,6 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         job_flow = emr_conn.describe_jobflow(job_flow_id)
         self.assertEqual(job_flow.state, 'WAITING')
 
-
-    def test_pooling_with_ami_version(self):
-        _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0')
-
-        self.assertJoins(job_flow_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--ami-version', '2.0'])
-
     def test_max_hours_idle_doesnt_matter(self):
         # max_hours_idle uses a bootstrap action, but it's not included
         # in the pool hash

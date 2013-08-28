@@ -61,8 +61,8 @@ import mrjob
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
-from mrjob.aws import region_to_emr_endpoint
-from mrjob.aws import region_to_s3_endpoint
+from mrjob.aws import emr_endpoint_for_region
+from mrjob.aws import s3_endpoint_for_region
 from mrjob.aws import region_to_s3_location_constraint
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
@@ -128,7 +128,7 @@ JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 SUBSECOND_RE = re.compile('\.[0-9]+')
 
 # Deprecated as of v0.4.1 (will be removed in v0.5).
-# Use mrjob.aws.region_to_emr_endpoint() instead
+# Use mrjob.aws.emr_endpoint_for_region() instead
 REGION_TO_EMR_ENDPOINT = {
     'us-east-1': 'elasticmapreduce.us-east-1.amazonaws.com',
     'us-west-1': 'elasticmapreduce.us-west-1.amazonaws.com',
@@ -142,7 +142,7 @@ REGION_TO_EMR_ENDPOINT = {
 }
 
 # Deprecated as of v0.4.1 (will be removed in v0.5).
-# Use mrjob.aws.region_to_s3_endpoint() instead
+# Use mrjob.aws.s3_endpoint_for_region() instead
 REGION_TO_S3_ENDPOINT = {
     'us-east-1': 's3.amazonaws.com',  # no region-specific endpoint
     'us-west-1': 's3-us-west-1.amazonaws.com',
@@ -777,7 +777,7 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['s3_endpoint']:
                 s3_endpoint = self._opts['s3_endpoint']
             else:
-                s3_endpoint = region_to_s3_endpoint(self._aws_region)
+                s3_endpoint = s3_endpoint_for_region(self._aws_region)
 
             self._s3_fs = S3Filesystem(self._opts['aws_access_key_id'],
                                        self._opts['aws_secret_access_key'],
@@ -2304,7 +2304,7 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['emr_endpoint']:
             endpoint = self._opts['emr_endpoint']
         else:
-            endpoint = region_to_emr_endpoint(self._aws_region)
+            endpoint = emr_endpoint_for_region(self._aws_region)
 
         return boto.ec2.regioninfo.RegionInfo(None, self._aws_region, endpoint)
 

@@ -93,7 +93,7 @@ def _fix_region(region):
     return _ALIAS_TO_REGION.get(region) or region
 
 
-def region_to_emr_endpoint(region):
+def emr_endpoint_for_region(region):
     """Get the host for Elastic MapReduce in the given AWS region."""
     region = _fix_region(region)
 
@@ -103,7 +103,7 @@ def region_to_emr_endpoint(region):
         return _EMR_REGION_ENDPOINT % region
 
 
-def region_to_s3_endpoint(region):
+def s3_endpoint_for_region(region):
     """Get the host for S3 in the given AWS region."""
     region = _fix_region(region)
 

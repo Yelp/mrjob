@@ -113,7 +113,7 @@ def s3_endpoint_for_region(region):
         return _S3_REGION_ENDPOINT % region
 
 
-def region_to_s3_location_constraint(region):
+def s3_location_constraint_for_region(region):
     """Get the location constraint an S3 bucket needs so that other AWS
     services can connect to it in the given region."""
     region = _fix_region(region)

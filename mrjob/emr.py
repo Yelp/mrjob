@@ -63,7 +63,7 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import s3_endpoint_for_region
-from mrjob.aws import region_to_s3_location_constraint
+from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -156,7 +156,7 @@ REGION_TO_S3_ENDPOINT = {
 }
 
 # Deprecated as of v0.4.1 (will be removed in v0.5).
-# Use mrjob.aws.region_to_s3_location_constraint() instead
+# Use mrjob.aws.s3_location_constraint_for_region() instead
 REGION_TO_S3_LOCATION_CONSTRAINT = {
     'us-east-1': '',
 }
@@ -750,7 +750,7 @@ class EMRJobRunner(MRJobRunner):
             s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as scratch space' %
                      self._s3_temp_bucket_to_create)
-            location = region_to_s3_location_constraint(self._aws_region)
+            location = s3_location_constraint_for_region(self._aws_region)
             s3_conn.create_bucket(
                 self._s3_temp_bucket_to_create, location=location)
             self._s3_temp_bucket_to_create = None

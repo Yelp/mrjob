@@ -60,22 +60,22 @@ do
     # first time through this loop, we just initialize LAST_ACTIVE
     # might as well nice hadoop; if there's other activity, it's Hadoop jobs
     if [ -z "$LAST_ACTIVE" ] || \
-	nice hadoop job -list 2> /dev/null | grep -q '^job_'
+        nice hadoop job -list 2> /dev/null | grep -q '^job_'
     then
-	LAST_ACTIVE=$UPTIME
+        LAST_ACTIVE=$UPTIME
 
-	# echo 0 $SECS_TO_END_OF_HOUR
+        # echo 0 $SECS_TO_END_OF_HOUR
     else
-	SECS_IDLE=$(expr $UPTIME - $LAST_ACTIVE)
+        SECS_IDLE=$(expr $UPTIME - $LAST_ACTIVE)
 
-	# echo $SECS_IDLE $SECS_TO_END_OF_HOUR
+        # echo $SECS_IDLE $SECS_TO_END_OF_HOUR
 
-	if expr $SECS_IDLE '>' $MAX_SECS_IDLE '&' \
-	    $SECS_TO_END_OF_HOUR '<' $MIN_SECS_TO_END_OF_HOUR > /dev/null
-	then
-	    sudo shutdown -h now
-	    exit
-	fi
+        if expr $SECS_IDLE '>' $MAX_SECS_IDLE '&' \
+            $SECS_TO_END_OF_HOUR '<' $MIN_SECS_TO_END_OF_HOUR > /dev/null
+        then
+            sudo shutdown -h now
+            exit
+        fi
     fi
 done
 # close file handles to daemonize the script; otherwise bootstrapping

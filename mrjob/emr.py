@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ except ImportError:
 try:
     import boto
     import boto.ec2
+    import boto.ec2.regioninfo
     import boto.emr
     import boto.emr.connection
     import boto.emr.instance_group
@@ -57,9 +58,12 @@ except ImportError:
     boto = None
 
 import mrjob
-from mrjob.setup import BootstrapWorkingDirManager
-from mrjob.setup import UploadDirManager
-from mrjob.setup import parse_legacy_hash_path
+from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
+from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
+from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
+from mrjob.aws import emr_endpoint_for_region
+from mrjob.aws import s3_endpoint_for_region
+from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -85,6 +89,9 @@ from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
+from mrjob.setup import BootstrapWorkingDirManager
+from mrjob.setup import UploadDirManager
+from mrjob.setup import parse_legacy_hash_path
 from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.ssh import ssh_slave_addresses
@@ -120,8 +127,8 @@ JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 # with boto.utils.ISO8601
 SUBSECOND_RE = re.compile('\.[0-9]+')
 
-# map from AWS region to EMR endpoint. See
-# http://docs.amazonwebservices.com/general/latest/gr/rande.html#emr_region
+# Deprecated as of v0.4.1 (will be removed in v0.5).
+# Use mrjob.aws.emr_endpoint_for_region() instead
 REGION_TO_EMR_ENDPOINT = {
     'us-east-1': 'elasticmapreduce.us-east-1.amazonaws.com',
     'us-west-1': 'elasticmapreduce.us-west-1.amazonaws.com',
@@ -134,8 +141,8 @@ REGION_TO_EMR_ENDPOINT = {
     '': 'elasticmapreduce.amazonaws.com',  # when no region specified
 }
 
-# map from AWS region to S3 endpoint. See
-# http://docs.amazonwebservices.com/general/latest/gr/rande.html#s3_region
+# Deprecated as of v0.4.1 (will be removed in v0.5).
+# Use mrjob.aws.s3_endpoint_for_region() instead
 REGION_TO_S3_ENDPOINT = {
     'us-east-1': 's3.amazonaws.com',  # no region-specific endpoint
     'us-west-1': 's3-us-west-1.amazonaws.com',
@@ -148,49 +155,17 @@ REGION_TO_S3_ENDPOINT = {
     '': 's3.amazonaws.com',
 }
 
-# map from AWS region to S3 LocationConstraint parameter for regions whose
-# location constraints differ from their AWS regions. See
-# http://docs.amazonwebservices.com/AmazonS3/latest/API/index.html?RESTBucketPUT.html
+# Deprecated as of v0.4.1 (will be removed in v0.5).
+# Use mrjob.aws.s3_location_constraint_for_region() instead
 REGION_TO_S3_LOCATION_CONSTRAINT = {
     'us-east-1': '',
 }
 
-
-# map from instance type to number of compute units
-# from http://aws.amazon.com/ec2/instance-types/
-EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS = {
-    't1.micro': 2,
-    'm1.small': 1,
-    'm1.large': 4,
-    'm1.xlarge': 8,
-    'm2.xlarge': 6.5,
-    'm2.2xlarge': 13,
-    'm2.4xlarge': 26,
-    'c1.medium': 5,
-    'c1.xlarge': 20,
-    'cc1.4xlarge': 33.5,
-    'cg1.4xlarge': 33.5,
-}
-
-
-# map from instance type to GB of memory
-# from http://aws.amazon.com/ec2/instance-types/
-EC2_INSTANCE_TYPE_TO_MEMORY = {
-    't1.micro': 0.6,
-    'm1.small': 1.7,
-    'm1.large': 7.5,
-    'm1.xlarge': 15,
-    'm2.xlarge': 17.5,
-    'm2.2xlarge': 34.2,
-    'm2.4xlarge': 68.4,
-    'c1.medium': 1.7,
-    'c1.xlarge': 7,
-    'cc1.4xlarge': 23,
-    'cg1.4xlarge': 22,
-}
-
-# EMR's hard limit on number of steps in a job flow
-MAX_STEPS_PER_JOB_FLOW = 256
+# bootstrap action which automatically terminates idle job flows
+_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
+    os.path.dirname(mrjob.__file__),
+    'bootstrap',
+    'terminate_idle_job_flow.sh')
 
 
 def s3_key_to_uri(s3_key):
@@ -350,6 +325,8 @@ class LogFetchError(Exception):
 
 class EMRRunnerOptionStore(RunnerOptionStore):
 
+    # documentation of these options is in docs/guides/emr-opts.rst
+
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'additional_emr_info',
         'ami_version',
@@ -379,6 +356,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'enable_emr_debugging',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
+        'max_hours_idle',
+        'mins_to_end_of_hour',
         'num_ec2_core_instances',
         'pool_wait_minutes',
         'num_ec2_instances',
@@ -422,6 +401,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'hadoop_version': None,
             'hadoop_streaming_jar_on_emr':
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
+            'mins_to_end_of_hour': 5.0,
             'num_ec2_core_instances': 0,
             'num_ec2_instances': 1,
             'num_ec2_task_instances': 0,
@@ -770,10 +750,9 @@ class EMRJobRunner(MRJobRunner):
             s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as scratch space' %
                      self._s3_temp_bucket_to_create)
-            location = REGION_TO_S3_LOCATION_CONSTRAINT.get(
-                self._aws_region, self._aws_region)
-            s3_conn.create_bucket(self._s3_temp_bucket_to_create,
-                                  location=(location or ''))
+            location = s3_location_constraint_for_region(self._aws_region)
+            s3_conn.create_bucket(
+                self._s3_temp_bucket_to_create, location=location)
             self._s3_temp_bucket_to_create = None
 
     def _check_and_fix_s3_dir(self, s3_uri):
@@ -798,14 +777,7 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['s3_endpoint']:
                 s3_endpoint = self._opts['s3_endpoint']
             else:
-                # look it up in our table
-                try:
-                    s3_endpoint = REGION_TO_S3_ENDPOINT[self._aws_region]
-                except KeyError:
-                    raise Exception(
-                        "Don't know the S3 endpoint for %s;"
-                        " try setting s3_endpoint explicitly" % (
-                            self._aws_region))
+                s3_endpoint = s3_endpoint_for_region(self._aws_region)
 
             self._s3_fs = S3Filesystem(self._opts['aws_access_key_id'],
                                        self._opts['aws_secret_access_key'],
@@ -862,12 +834,14 @@ class EMRJobRunner(MRJobRunner):
         except boto.exception.S3ResponseError:
             pass
 
-    def _add_bootstrap_files_for_upload(self):
+    def _add_bootstrap_files_for_upload(self, persistent=False):
         """Add files needed by the bootstrap script to self._upload_mgr.
 
         Tar up mrjob if bootstrap_mrjob is True.
 
         Create the master bootstrap script if necessary.
+
+        persistent -- set by make_persistent_job_flow()
         """
         # lazily create mrjob.tar.gz
         if self._opts['bootstrap_mrjob']:
@@ -885,9 +859,14 @@ class EMRJobRunner(MRJobRunner):
         if self._master_bootstrap_script_path:
             self._upload_mgr.add(self._master_bootstrap_script_path)
 
-        # finally, make sure bootstrap action scripts are on S3
+        # make sure bootstrap action scripts are on S3
         for bootstrap_action in self._bootstrap_actions:
             self._upload_mgr.add(bootstrap_action['path'])
+
+        # Add max-hours-idle script if we need it
+        if (self._opts['max_hours_idle'] and
+            (persistent or self._opts['pool_emr_job_flows'])):
+            self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
 
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
@@ -1181,7 +1160,7 @@ class EMRJobRunner(MRJobRunner):
         """Create an empty job flow on EMR, and return the ID of that
         job.
 
-        persistent -- if this is true, create the job flow with the --alive
+        persistent -- if this is true, create the job flow with the keep_alive
             option, indicating the job will have to be manually terminated.
         """
         # make sure we can see the files we copied to S3
@@ -1276,6 +1255,20 @@ class EMRJobRunner(MRJobRunner):
                     self._upload_mgr.uri(self._master_bootstrap_script_path),
                     master_bootstrap_script_args))
 
+        if persistent or self._opts['pool_emr_job_flows']:
+            args['keep_alive'] = True
+
+            # only use idle termination script on persistent job flows
+            # add it last, so that we don't count bootstrapping as idle time
+            if self._opts['max_hours_idle']:
+                s3_uri = self._upload_mgr.uri(
+                            _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+                # script takes args in (integer) seconds
+                ba_args = [int(self._opts['max_hours_idle'] * 3600),
+                        int(self._opts['mins_to_end_of_hour'] * 60)]
+                bootstrap_action_args.append(
+                    boto.emr.BootstrapAction('idle timeout', s3_uri, ba_args))
+
         if bootstrap_action_args:
             args['bootstrap_actions'] = bootstrap_action_args
 
@@ -1291,8 +1284,6 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['visible_to_all_users']:
             args['visible_to_all_users'] = True
 
-        if persistent or self._opts['pool_emr_job_flows']:
-            args['keep_alive'] = True
 
         if steps:
             args['steps'] = steps
@@ -2008,7 +1999,7 @@ class EMRJobRunner(MRJobRunner):
 
         log.info('Creating persistent job flow to run several jobs in...')
 
-        self._add_bootstrap_files_for_upload()
+        self._add_bootstrap_files_for_upload(persistent=True)
         self._upload_local_files_to_s3()
 
         # don't allow user to call run()
@@ -2279,7 +2270,7 @@ class EMRJobRunner(MRJobRunner):
             things_to_hash.append(mrjob.__version__)
         return hash_object(things_to_hash)
 
-    ### EMR-specific STUFF ###
+    ### EMR-specific Stuff ###
 
     def make_emr_conn(self):
         """Create a connection to EMR.
@@ -2313,13 +2304,7 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['emr_endpoint']:
             endpoint = self._opts['emr_endpoint']
         else:
-            # look up endpoint in our table
-            try:
-                endpoint = REGION_TO_EMR_ENDPOINT[self._aws_region]
-            except KeyError:
-                raise Exception(
-                    "Don't know the EMR endpoint for %s;"
-                    " try setting emr_endpoint explicitly" % self._aws_region)
+            endpoint = emr_endpoint_for_region(self._aws_region)
 
         return boto.ec2.regioninfo.RegionInfo(None, self._aws_region, endpoint)
 

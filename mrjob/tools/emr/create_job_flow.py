@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -114,6 +114,8 @@ def make_option_parser():
             'emr_job_flow_pool_name',
             'enable_emr_debugging',
             'hadoop_version',
+            'max_hours_idle',
+            'mins_to_end_of_hour',
             'num_ec2_core_instances',
             'num_ec2_instances',
             'num_ec2_task_instances',

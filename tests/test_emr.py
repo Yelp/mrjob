@@ -578,11 +578,11 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
 
     def test_defaults(self):
         job_flow = self.run_and_get_job_flow()
-        self.assertFalse(job_flow.visible_to_all_users)
+        self.assertEqual(job_flow.visibletoallusers, 'false')
 
     def test_visible(self):
         job_flow = self.run_and_get_job_flow('--visible-to-all-users')
-        self.assertTrue(job_flow.visible_to_all_users)
+        self.assertTrue(job_flow.visibletoallusers, 'true')
 
 
 class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):

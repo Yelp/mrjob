@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -380,7 +380,7 @@ class MockEmrConnection(object):
         def make_fake_action(real_action):
             return MockEmrObject(name=real_action.name,
                                  path=real_action.path,
-                                 args=[MockEmrObject(value=v) for v \
+                                 args=[MockEmrObject(value=str(v)) for v \
                                        in real_action.bootstrap_action_args])
 
         # create a MockEmrObject corresponding to the job flow. We only

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-# Copyright 2009-2012 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,7 +43,6 @@ from mrjob.step import JarStep
 from mrjob.step import MRJobStep
 from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
-from mrjob.job import MRJob
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled
@@ -225,33 +224,38 @@ class ProtocolsTestCase(unittest.TestCase):
         def mapper(self, key, value):
             yield key, value
 
+    def assertMethodsEqual(self, fs, gs):
+        # we're going to use this to match bound against unbound methods
+        self.assertEqual([f.im_func for f in fs],
+                         [g.im_func for g in gs])
+
     def test_default_protocols(self):
         mr_job = MRBoringJob()
-        self.assertEqual(mr_job.pick_protocols(0, 'mapper'),
-                         (RawValueProtocol.read, JSONProtocol.write))
-        self.assertEqual(mr_job.pick_protocols(0, 'reducer'),
-                         (JSONProtocol.read, JSONProtocol.write))
+        self.assertMethodsEqual(mr_job.pick_protocols(0, 'mapper'),
+                                (RawValueProtocol.read, JSONProtocol.write))
+        self.assertMethodsEqual(mr_job.pick_protocols(0, 'reducer'),
+                               (JSONProtocol.read, JSONProtocol.write))
 
     def test_explicit_default_protocols(self):
         mr_job2 = self.MRBoringJob2().sandbox()
-        self.assertEqual(mr_job2.pick_protocols(0, 'mapper'),
-                         (JSONProtocol.read, PickleProtocol.write))
-        self.assertEqual(mr_job2.pick_protocols(0, 'reducer'),
-                         (PickleProtocol.read, ReprProtocol.write))
+        self.assertMethodsEqual(mr_job2.pick_protocols(0, 'mapper'),
+                                (JSONProtocol.read, PickleProtocol.write))
+        self.assertMethodsEqual(mr_job2.pick_protocols(0, 'reducer'),
+                                (PickleProtocol.read, ReprProtocol.write))
 
         mr_job3 = self.MRBoringJob3()
-        self.assertEqual(mr_job3.pick_protocols(0, 'mapper'),
-                         (RawValueProtocol.read, ReprProtocol.write))
+        self.assertMethodsEqual(mr_job3.pick_protocols(0, 'mapper'),
+                                (RawValueProtocol.read, ReprProtocol.write))
         # output protocol should default to JSON
-        self.assertEqual(mr_job3.pick_protocols(0, 'reducer'),
-                         (ReprProtocol.read, JSONProtocol.write))
+        self.assertMethodsEqual(mr_job3.pick_protocols(0, 'reducer'),
+                                (ReprProtocol.read, JSONProtocol.write))
 
         mr_job4 = self.MRBoringJob4()
-        self.assertEqual(mr_job4.pick_protocols(0, 'mapper'),
-                         (RawValueProtocol.read, ReprProtocol.write))
+        self.assertMethodsEqual(mr_job4.pick_protocols(0, 'mapper'),
+                                (RawValueProtocol.read, ReprProtocol.write))
         # output protocol should default to JSON
-        self.assertEqual(mr_job4.pick_protocols(0, 'reducer'),
-                         (ReprProtocol.read, JSONProtocol.write))
+        self.assertMethodsEqual(mr_job4.pick_protocols(0, 'reducer'),
+                                (ReprProtocol.read, JSONProtocol.write))
 
     def test_mapper_raw_value_to_json(self):
         RAW_INPUT = StringIO('foo\nbar\nbaz\n')
@@ -443,8 +447,8 @@ class PickProtocolsTestCase(unittest.TestCase):
         self._assert_script_protocols(
             [self._jar_step(0, 'blah', 'binks_jar.jar'),
              self._streaming_step(
-                1, mapper=self._yield_none, combiner=self._yield_none,
-                reducer=self._yield_none)],
+                 1, mapper=self._yield_none, combiner=self._yield_none,
+                 reducer=self._yield_none)],
             [(RawValueProtocol, RawValueProtocol),
              (PickleProtocol, JSONProtocol),
              (JSONProtocol, JSONProtocol),
@@ -605,6 +609,94 @@ class JobConfTestCase(unittest.TestCase):
                          {'mapred.baz': 'bar'})
 
 
+class MRSortValuesJob(MRJob):
+    SORT_VALUES = True
+
+
+class MRSortValuesAndMoreJob(MRSortValuesJob):
+    PARTITIONER = 'org.apache.hadoop.mapred.lib.HashPartitioner'
+
+    JOBCONF = {
+        'stream.num.map.output.key.fields': 3,
+        'mapred.output.key.comparator.class':
+            'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
+        'mapred.text.key.comparator.options': '-k1 -k2nr',
+    }
+
+
+class SortValuesTestCase(unittest.TestCase):
+
+    def test_sort_values_sets_partitioner(self):
+        mr_job = MRSortValuesJob()
+
+        self.assertEqual(
+            mr_job.partitioner(),
+            'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
+
+    def test_sort_values_sets_jobconf(self):
+        mr_job = MRSortValuesJob()
+
+        self.assertEqual(
+            mr_job.jobconf(),
+            {'stream.num.map.output.key.fields': 2,
+             'mapred.text.key.partitioner.options': '-k1,1',
+             'mapred.output.key.comparator.class': None,
+             'mapred.text.key.comparator.options': None})
+
+    def test_can_override_sort_values_from_job(self):
+        mr_job = MRSortValuesAndMoreJob()
+
+        self.assertEqual(
+            mr_job.partitioner(),
+            'org.apache.hadoop.mapred.lib.HashPartitioner')
+
+        self.assertEqual(
+            mr_job.jobconf(),
+            {'stream.num.map.output.key.fields': 3,
+             'mapred.text.key.partitioner.options': '-k1,1',
+             'mapred.output.key.comparator.class':
+                'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
+             'mapred.text.key.comparator.options': '-k1 -k2nr'})
+
+    def test_can_override_sort_values_from_cmd_line(self):
+        mr_job = MRSortValuesJob(
+            ['--partitioner', 'org.pants.FancyPantsPartitioner',
+             '--jobconf', 'stream.num.map.output.key.fields=lots'])
+
+        self.assertEqual(
+            mr_job.partitioner(),
+            'org.pants.FancyPantsPartitioner')
+
+        self.assertEqual(
+            mr_job.jobconf(),
+            {'stream.num.map.output.key.fields': 'lots',
+             'mapred.text.key.partitioner.options': '-k1,1',
+             'mapred.output.key.comparator.class': None,
+             'mapred.text.key.comparator.options': None})
+
+
+class SortValuesRunnerTestCase(SandboxedTestCase):
+
+    MRJOB_CONF_CONTENTS = {'runners': {'local': {'jobconf': {
+        'mapred.text.key.partitioner.options': '-k1,1',
+        'mapred.output.key.comparator.class': 'egypt.god.Anubis',
+        'foo': 'bar',
+    }}}}
+
+    def test_cant_override_sort_values_from_mrjob_conf(self):
+        runner = MRSortValuesJob(['-r', 'local']).make_runner()
+
+        self.assertEqual(
+            runner._hadoop_conf_args({}, 0, 1),
+            # foo=bar is included, but the other options from mrjob.conf are
+            # blanked out so as not to mess up SORT_VALUES
+            ['-D', 'foo=bar',
+             '-D', 'mapred.text.key.partitioner.options=-k1,1',
+             '-D', 'stream.num.map.output.key.fields=2',
+             '-partitioner',
+                'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'])
+
+
 class HadoopFormatTestCase(unittest.TestCase):
 
     # MRHadoopFormatJob is imported above
@@ -715,7 +807,7 @@ class StepNumTestCase(unittest.TestCase):
         # sort output of mapper0
         mapper0_output_input_lines = StringIO(mapper0.stdout.getvalue())
         reducer0_input_lines = sorted(mapper0_output_input_lines,
-                               key=lambda line: line.split('\t'))
+                                      key=lambda line: line.split('\t'))
 
         def test_reducer0(mr_job, input_lines):
             mr_job.sandbox(input_lines)

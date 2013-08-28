@@ -3,7 +3,13 @@ Options available to all runners
 
 The format of each item in this document is:
 
-**mrjob_conf_option_name** (:option:`--command-line-option-name`)
+.. mrjob-opt::
+    :config: mrjob_conf_option_name
+    :switch: --command-line-option-name
+    :type: option_type
+    :set: none
+    :default: default value
+
     Description of option behavior
 
 Options that take multiple values can be passed multiple times on the command
@@ -19,13 +25,28 @@ Most jobs have dependencies of some sort - Python packages, Debian packages,
 data files, etc. This section covers options available to all runners that
 mrjob uses to upload files to your job's execution environments.
 
+.. _opt_bootstrap_mrjob:
 
-**bootstrap_mrjob** (:option:`--bootstrap-mrjob`, :option:`--no-bootstrap-mrjob`)
+.. mrjob-opt::
+    :config: bootstrap_mrjob
+    :switch: --bootstrap-mrjob, --no-bootstrap-mrjob
+    :type: boolean
+    :set: all
+    :default: ``True``
+
     Should we automatically tar up the mrjob library and install it when we run
     job?  Set this to ``False`` if you've already installed ``mrjob`` on your
     Hadoop cluster or install it by some other method.
 
-**upload_files** (:option:`--file`)
+.. _opt_upload_files:
+
+.. mrjob-opt::
+    :config: upload_files
+    :switch: --file
+    :type: :ref:`path list <data-type-path-list>`
+    :set: all
+    :default: ``[]``
+
     Files to copy to the local directory of the mr_job script when it runs. You
     can set the local name of the dir we unpack into by appending
     ``#localname`` to the path; otherwise we just use the name of the file.
@@ -40,7 +61,14 @@ mrjob uses to upload files to your job's execution environments.
 
         --file file_1.txt --file file_2.sqlite
 
-**upload_archives** (:option:`--archive`)
+.. _opt_upload_archives:
+
+.. mrjob-opt::
+    :config: upload_archives
+    :switch: --archive
+    :type: :ref:`path list <data-type-path-list>`
+    :set: all
+    :default: ``[]``
 
     A list of archives (e.g. tarballs) to unpack in the local directory of the
     mr_job script when it runs. You can set the local name of the dir we unpack
@@ -49,20 +77,42 @@ mrjob uses to upload files to your job's execution environments.
     ``foo.tar.gz/``, and ``foo.tar.gz#stuff`` is unpacked to the directory
     ``stuff/``).
 
-**python_archives** (:option:`--python-archive`)
+.. _opt_python_archives:
+
+.. mrjob-opt::
+    :config: python_archives
+    :switch: --python-archive
+    :type: :ref:`path list <data-type-path-list>`
+    :set: all
+    :default: ``[]``
+
     Same as upload_archives, except they get added to the job's
     :envvar:`PYTHONPATH`.
 
 Temp files and cleanup
 ----------------------
 
-**base_tmp_dir** (:option:`--base-tmp-dir`)
-    Path to put local temp dirs inside. By default we just call
-    :py:func:`tempfile.gettempdir`
+.. _opt_base_tmp_dir:
+
+.. mrjob-opt::
+    :config: base_tmp_dir
+    :switch: --base-tmp-dir
+    :type: :ref:`path <data-type-path>`
+    :set: all
+    :default: value of :py:func:`tempfile.gettempdir`
+
+    Path to put local temp dirs inside.
 
 .. _configs-all-runners-cleanup:
+.. _opt_cleanup:
 
-**cleanup** (:option:`--cleanup`)
+.. mrjob-opt::
+   :config: cleanup
+   :switch: --cleanup
+   :type: :ref:`string <data-type-string>`
+   :set: all
+   :default: ``'ALL'``
+
     List of which kinds of directories to delete when a job succeeds. Valid
     choices are:
 
@@ -87,11 +137,27 @@ Temp files and cleanup
 
         --cleanup=LOGS,JOB
 
-**cleanup_on_failure** (:option:`--cleanup-on-failure`)
+.. _opt_cleanup_on_failure:
+
+.. mrjob-opt::
+   :config: cleanup_on_failure
+   :switch: --cleanup-on-failure
+   :type: :ref:`string <data-type-string>`
+   :set: all
+   :default: ``'NONE'``
+
     Which kinds of directories to clean up when a job fails. Valid choices are
     the same as **cleanup**.
 
-**output_dir** (:option:`-o`, :option:`--output-dir`)
+.. _opt_output_dir:
+
+.. mrjob-opt::
+   :config: output_dir
+   :switch: --output-dir
+   :type: :ref:`string <data-type-string>`
+   :set: no_mrjob_conf
+   :default: (automatic)
+
     An empty/non-existent directory where Hadoop streaming should put the
     final output from the job.  If you don't specify an output directory,
     we'll output into a subdirectory of this job's temporary directory. You
@@ -100,14 +166,30 @@ Temp files and cleanup
     this path does not need to be fully qualified with ``hdfs://`` URIs
     because it's understood that it has to be on HDFS.
 
-**no_output** (:option:`--no-output`)
+.. _opt_no_output:
+
+.. mrjob-opt::
+    :config: no_output
+    :switch: --no-output
+    :type: boolean
+    :set: no_mrjob_conf
+    :default: ``False``
+
     Don't stream output to STDOUT after job completion.  This is often used in
     conjunction with ``--output-dir`` to store output only in HDFS or S3.
 
 Job execution context
 ---------------------
 
-**cmdenv** (:option:`--cmdenv`)
+.. _opt_cmdenv:
+
+.. mrjob-opt::
+    :config: cmdenv
+    :switch: --cmdenv
+    :type: :ref:`environment variable dict <data-type-env-dict>`
+    :set: all
+    :default: ``{}``
+
     Dictionary of environment variables to pass to the job inside Hadoop
     streaming.
 
@@ -121,17 +203,41 @@ Job execution context
 
         --cmdenv PYTHONPATH=$HOME/stuff,TZ=America/Los_Angeles
 
-**interpreter** (:option:`--interpreter`)
+.. _opt_interpreter:
+
+.. mrjob-opt::
+    :config: interpreter
+    :switch: --interpreter
+    :type: :ref:`string <data-type-string>`
+    :set: all
+    :default: value of :ref:`python_bin <opt_python_bin>` (``'python'``)
+
     Interpreter to launch your script with. Defaults to the value of
-    **python_bin**. Change this if you're using a language besides Python
-    2.5-2.7 or if you're running using :py:mod:`virtualenv`.
+    **python_bin**, which is deprecated. Change this if you're using a
+    language besides Python 2.5-2.7 or if you're running using
+    :py:mod:`virtualenv`.
 
-**python_bin** (:option:`--python-bin`)
-    Name/path of alternate Python binary for wrapper scripts and
-    mappers/reducers (e.g. for use with :py:mod:`virtualenv`). Defaults to
-    ``'python'``.
+.. _opt_python_bin:
 
-**setup_cmds** (:option:`--setup-cmd`)
+.. mrjob-opt::
+    :config: python_bin
+    :switch: --python-bin
+    :type: :ref:`command <data-type-command>`
+    :set: all
+    :default: ``'python'``
+
+    Deprecated. Name/path of alternate Python binary for wrapper scripts and
+    mappers/reducers (e.g. for use with :py:mod:`virtualenv`).
+
+.. _opt_setup_cmds:
+
+.. mrjob-opt::
+    :config: setup_cmds
+    :switch: --setup_cmd
+    :type: :ref:`string list <data-type-string-list>`
+    :set: all
+    :default: ``[]``
+
     A list of commands to run before each mapper/reducer step (e.g.  ``['cd
     my-src-tree; make', 'mkdir -p /tmp/foo']``).  You can specify commands as
     strings, which will be run through the shell, or lists of args, which will
@@ -139,13 +245,29 @@ Job execution context
     mappers/reducers running on the same node won't run *setup_cmds*
     simultaneously (it's safe to run ``make``).
 
-**setup_scripts** (:option:`--setup-script`)
+.. _opt_setup_scripts:
+
+.. mrjob-opt::
+    :config: setup_scripts
+    :switch: --setup-script
+    :type: :ref:`path list <data-type-path-list>`
+    :set: all
+    :default: ``[]``
+
     files that will be copied into the local working directory and then run.
     These are run after *setup_cmds*. Like with *setup_cmds*, we use file
     locking to keep multiple mappers/reducers on the same node from running
     *setup_scripts* simultaneously.
 
-**steps_python_bin** (:option:`--steps-python-bin`)
+.. _opt_steps_python_bin:
+
+.. mrjob-opt::
+    :config: steps_python_bin
+    :switch: --steps-python-bin
+    :type: :ref:`command <data-type-command>`
+    :set: all
+    :default: current Python interpreter
+
     Name/path of alternate python binary to use to query the job about its
     steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults
     to ``sys.executable`` (the current Python interpreter).
@@ -153,7 +275,15 @@ Job execution context
 Other
 -----
 
-**conf_paths** (:option:`-c`, :option:`--conf-path`, :option:`--no-conf`)
+.. _opt_conf_paths:
+
+.. mrjob-opt::
+    :config: conf_paths
+    :switch: -c, --conf-path, --no-conf
+    :type: :ref:`path list <data-type-path-list>`
+    :set: no_mrjob_conf
+    :default: see :py:func:`~mrjob.conf.find_mrjob_conf`
+
     List of paths to configuration files. This option cannot be used in
     configuration files, because that would cause a universe-ending causality
     paradox. Use `--no-conf` on the command line or `conf_paths=[]` to force
@@ -184,20 +314,20 @@ Options ignored by the inline runner
 
 These options are ignored because they require a real instance of Hadoop:
 
-* *hadoop_extra_args*
-* *hadoop_input_format*
-* *hadoop_output_format*,
-* *hadoop_streaming_jar*
-* *jobconf*
-* *partitioner*
+* :ref:`hadoop_extra_args <opt_hadoop_extra_args>`
+* :py:meth:`hadoop_input_format <mrjob.runner.MRJobRunner.__init__>`
+* :py:meth:`hadoop_output_format <mrjob.runner.MRJobRunner.__init__>`,
+* :ref:`hadoop_streaming_jar <opt_hadoop_streaming_jar>`
+* :ref:`jobconf <opt_jobconf>`
+* :ref:`partitioner <opt_partitioner>`
 
 These options are ignored because the ``inline`` runner does not invoke the job
 as a subprocess or run it in its own directory:
 
-* *cmdenv*
-* *python_bin*
-* *setup_cmds*
-* *setup_scripts*
-* *steps_python_bin*
-* *upload_archives*
-* *upload_files*
+* :ref:`cmdenv <opt_cmdenv>`
+* :ref:`python_bin <opt_python_bin>`
+* :ref:`setup_cmds <opt_setup_cmds>`
+* :ref:`setup_scripts <opt_setup_scripts>`
+* :ref:`steps_python_bin <opt_steps_python_bin>`
+* :ref:`upload_archives <opt_upload_archives>`
+* :ref:`upload_files <opt_upload_files>`

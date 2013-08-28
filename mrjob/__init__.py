@@ -16,19 +16,20 @@
 Hadoop cluster.
 """
 
-__author__ = 'David Marin <dave@yelp.com>'
+__author__ = 'David Marin <dm@davidmarin.org>'
 
 __credits__ = [
     'Jordan Andersen <jordandandersen@gmail.com>',
-    'Tom Arnfield <tarnfeld@me.com>',
+    'Tom Arnfeld <tarnfeld@me.com>',
     'Hunter Blanks <hblanks@monetate.com>',
     'Jim Blomo <jblomo@yelp.com>',
     'Reno Bowen <renobowen@gmail.com>',
-    'James Brown <jbrown@yelp.com>',
+    'James Brown <jbrown@uber.com>',
     'Kevin Burke <kevin@twilio.com>',
     'Jordan Christensen <jc@kobo.com>',
     'David Dehghan <ddehghan@gmail.com>',
     'Adam Derewecki <derewecki@gmail.com>',
+    'Nick Dimiduk <ndimiduk@gmail.com>',
     'Tom Dooner <tomdooner@gmail.com>',
     'Dan Frank <danielhfrank@gmail.com>',
     'Benjamin Goldenberg <benjamin@yelp.com',
@@ -37,7 +38,7 @@ __credits__ = [
     'Brett Hoerner <brett@bretthoerner.com>',
     'Evan Klitzke <evan@eklitzke.org>',
     'Tom Janofsky <tjanofsky@monetate.com>',
-    'Stephen Johnson <sjohnson@yelp.com>',
+    'Stephen Johnson <steve@steveasleep.com>',
     'Matt Jones <mattj@yelp.com>',
     'Nikolaos Koutsopoulos <nhk@mochimedia.com>',
     'Julian Krause <juliank@yelp.com>',
@@ -46,10 +47,11 @@ __credits__ = [
     'Oliver Nicholas <bigo@wonlove.net>',
     'Matt Perry <matt@unshift.net>',
     'Pavel Repin <prepin@gmail.com>',
-    'Wahbeh Qardaji <wqardaji@yelp.com>',
+    'Wahbeh Qardaji <wahbeh.qardaji@gmail.com>',
     'Jimmy Retzlaff <jretz@yelp.com>',
     'Ned Rockson <ned@tellapart.com>',
     'Paul Scott <paul@duedil.com>',
+    'Alex Shkop <a.v.shkop@gmail.com>',
     'Jesse Shieh <jesse@adku.com>',
     'Steve Spencer <steve@bigfrog.net>',
     'Jyry Suvilehto <jyry.suvilehto@iki.fi>',
@@ -58,4 +60,4 @@ __credits__ = [
     'Derek Wilson <jderekwilson@gmail.com>',
 ]
 
-__version__ = '0.4'
+__version__ = '0.4.1-dev'

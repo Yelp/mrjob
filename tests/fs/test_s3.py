@@ -86,6 +86,15 @@ class S3FSTestCase(SandboxedTestCase):
 
         self.assertEqual(list(self.fs.ls('s3://walrus/*/baz')), [paths[1]])
 
+    def test_ls_s3n(self):
+        paths = [
+            self.add_mock_s3_data('walrus', 'data/bar', 'abc123'),
+            self.add_mock_s3_data('walrus', 'data/baz', '123abc')
+        ]
+
+        self.assertEqual(list(self.fs.ls('s3n://walrus/data/*')),
+                         [ p.replace('s3://', 's3n://') for p in paths ])
+
     def test_du(self):
         paths = [
             self.add_mock_s3_data('walrus', 'data/foo', 'abcd'),

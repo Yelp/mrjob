@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,6 +51,21 @@ from mrjob.util import read_input
 
 
 log = logging.getLogger('mrjob.job')
+
+
+# jobconf options for implementing SORT_VALUES
+_SORT_VALUES_JOBCONF = {
+    'stream.num.map.output.key.fields': 2,
+    'mapred.text.key.partitioner.options': '-k1,1',
+    # Hadoop's defaults for these actually work fine; we just want to
+    # prevent interference from mrjob.conf.
+    'mapred.output.key.comparator.class': None,
+    'mapred.text.key.comparator.options': None,
+}
+
+# partitioner for sort_values
+_SORT_VALUES_PARTITIONER = \
+    'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
 
 
 class UsageError(Exception):
@@ -365,6 +380,8 @@ class MRJob(MRJobLauncher):
         :param combiner_final: function with same function signature as
                                :py:meth:`combiner_final`, or ``None`` for no
                                final combiner action.
+        :param jobconf: dictionary with custom jobconf arguments to pass to
+                        hadoop.
 
         Please consider the way we represent steps to be opaque, and expect
         it to change in future versions of ``mrjob``.
@@ -991,6 +1008,10 @@ class MRJob(MRJobLauncher):
     #:
     #: Passed to Hadoop with the *first* step of this job with the
     #: ``-inputformat`` option.
+    #:
+    #: If you require more sophisticated behavior, try
+    #: :py:meth:`hadoop_input_format` or the *hadoop_input_format* argument to
+    #: :py:meth:`mrjob.runner.MRJobRunner.__init__`.
     HADOOP_INPUT_FORMAT = None
 
     def hadoop_input_format(self):
@@ -1007,6 +1028,10 @@ class MRJob(MRJobLauncher):
     #:
     #: Passed to Hadoop with the *last* step of this job with the
     #: ``-outputformat`` option.
+    #:
+    #: If you require more sophisticated behavior, try
+    #: :py:meth:`hadoop_output_format` or the *hadoop_output_format* argument
+    #: to :py:meth:`mrjob.runner.MRJobRunner.__init__`.
     HADOOP_OUTPUT_FORMAT = None
 
     def hadoop_output_format(self):
@@ -1023,6 +1048,8 @@ class MRJob(MRJobLauncher):
     #: Optional Hadoop partitioner class to use to determine how mapper
     #: output should be sorted and distributed to reducers. For example:
     #: ``'org.apache.hadoop.mapred.lib.HashPartitioner'``.
+    #:
+    #: If you require more sophisticated behavior, try :py:meth:`partitioner`.
     PARTITIONER = None
 
     def partitioner(self):
@@ -1030,12 +1057,17 @@ class MRJob(MRJobLauncher):
         output should be sorted and distributed to reducers.
 
         By default, returns whatever is passed to :option:`--partitioner`,
-        of if that option isn't used, :py:attr:`PARTITIONER`.
+        or if that option isn't used, :py:attr:`PARTITIONER`, or if that
+        isn't set, and :py:attr:`SORT_VALUES` is true, it's set to
+        ``'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'``.
 
         You probably don't need to re-define this; it's just here for
         completeness.
         """
-        return self.options.partitioner or self.PARTITIONER
+        return (self.options.partitioner or
+                self.PARTITIONER or
+                ('org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner' if
+                 self.SORT_VALUES else None))
 
     ### Jobconf ###
 
@@ -1056,6 +1088,29 @@ class MRJob(MRJobLauncher):
         By default, this combines :option:`jobconf` options from the command
         lines with :py:attr:`JOBCONF`, with command line arguments taking
         precedence.
+
+        If :py:attr:`SORT_VALUES` is set, we also set these jobconf values::
+
+            stream.num.map.output.key.fields=2
+            mapred.text.key.partitioner.options=k1,1
+
+        We also blank out ``mapred.output.key.comparator.class``
+        and ``mapred.text.key.comparator.options`` to prevent interference
+        from :file:`mrjob.conf`.
+
+        :py:attr:`SORT_VALUES` *can* be overridden by :py:attr:`JOBCONF`, the
+        command line, and step-specific ``jobconf`` values.
+
+        For example, if you know your values are numbers, and want to sort
+        them in reverse, you could do::
+
+            SORT_VALUES = True
+
+            JOBCONF = {
+              'mapred.output.key.comparator.class':
+                  'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
+              'mapred.text.key.comparator.options': '-k1 -k2nr',
+            }
 
         If you want to re-define this, it's strongly recommended that do
         something like this, so as not to inadvertently disable
@@ -1099,7 +1154,33 @@ class MRJob(MRJobLauncher):
                 filtered_val = format_hadoop_version(unfiltered_val)
             filtered_jobconf[key] = filtered_val
 
+        if self.SORT_VALUES:
+            filtered_jobconf = combine_dicts(
+                _SORT_VALUES_JOBCONF, filtered_jobconf)
+
         return filtered_jobconf
+
+    ### Secondary Sort ###
+
+    #: Set this to ``True`` if you would like reducers to receive the values
+    #: associated with any key in sorted order (sorted by their *encoded*
+    #: value). Also known as secondary sort.
+    #:
+    #: This can be useful if you expect more values than you can fit in memory
+    #: to be associated with one key, but you want to apply information in
+    #: a small subset of these values to information in the other values.
+    #: For example, you may want to convert counts to percentages, and to do
+    #: this you first need to know the total count.
+    #:
+    #: Even though values are sorted by their encoded value, most encodings
+    #: will sort strings in order. For example, you could have values like:
+    #: ``['A', <total>]``, ``['B', <count_name>, <count>]``, and the value
+    #: containing the total should come first regardless of what protocol
+    #: you're using.
+    #:
+    #: See :py:meth:`jobconf()` and :py:meth:`partitioner()` for more about
+    #: how this works.
+    SORT_VALUES = None
 
     ### Testing ###
 

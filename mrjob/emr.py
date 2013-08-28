@@ -1282,8 +1282,11 @@ class EMRJobRunner(MRJobRunner):
             args['additional_info'] = self._opts['additional_emr_info']
 
         if self._opts['visible_to_all_users']:
-            args['visible_to_all_users'] = True
-
+            # Issue #701: this keyword arg was added to run_jobflow()
+            # in boto 2.8.0, but we only require boto 2.2.0. So use
+            # api_params instead.
+            args.setdefault('api_params', {})
+            args['api_params']['VisibleToAllUsers'] = 'true'
 
         if steps:
             args['steps'] = steps

@@ -147,7 +147,7 @@ class OptionDirective(Directive):
         env = self.state.document.settings.env
 
         # generate the linkback node for this option
-        targetid = "option-%d" % env.new_serialno('mrjob-opt')
+        targetid = "option-%s" % self.options['config']
         targetnode = nodes.target('', '', ids=[targetid])
 
         # Each option will be outputted as a single-item definition list

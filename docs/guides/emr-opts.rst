@@ -19,8 +19,6 @@ about setting these options.
 
     "username" for Amazon web services.
 
-.. _opt_aws_secret_access_key:
-
 .. mrjob-opt::
     :config: aws_secret_access_key
     :switch: --aws-secret-access-key
@@ -30,8 +28,6 @@ about setting these options.
 
     your "password" on AWS
 
-.. _opt_ec2_key_pair:
-
 .. mrjob-opt::
     :config: ec2_key_pair
     :switch: --ec2-key-pair
@@ -40,8 +36,6 @@ about setting these options.
     :default: ``None``
 
     name of the SSH key you set up for EMR.
-
-.. _opt_ec2_key_pair_file:
 
 .. mrjob-opt::
     :config: ec2_key_pair_file
@@ -55,8 +49,6 @@ about setting these options.
 Job flow creation and configuration
 -----------------------------------
 
-.. _opt_additional_emr_info:
-
 .. mrjob-opt::
     :config: additional_emr_info
     :switch: --additional-emr-info
@@ -67,8 +59,6 @@ Job flow creation and configuration
     Special parameters to select additional features, mostly to support beta
     EMR features. Pass a JSON string on the command line or use data
     structures in the config file (which is itself basically JSON).
-
-.. _opt_ami_version:
 
 .. mrjob-opt::
     :config: ami_version
@@ -84,8 +74,6 @@ Job flow creation and configuration
     .. _`the AWS docs on specifying the AMI version`:
         http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/EnvironmentConfig_AMIVersion.html
 
-.. _opt_aws_availability_zone:
-
 .. mrjob-opt::
     :config: aws_availability_zone
     :switch: --aws-availability-zone
@@ -95,8 +83,6 @@ Job flow creation and configuration
 
     Availability zone to run the job in
 
-.. _opt_aws_region:
-
 .. mrjob-opt::
     :config: aws_region
     :switch: --aws-region
@@ -105,23 +91,18 @@ Job flow creation and configuration
     :default: infer from scrach bucket region
 
     region to connect to S3 and EMR on (e.g.  ``us-west-1``). If you want to
-    use separate regions for S3 and EMR, set
-    :ref:`emr_endpoint <opt_emr_endpoint>` and
-    :ref:`s3_endpoint <opt_s3_endpoint>`.
-
-.. _opt_emr_endpoint:
+    use separate regions for S3 and EMR, set :mrjob-opt:`emr_endpoint` and
+    :mrjob-opt:`s3_endpoint`.
 
 .. mrjob-opt::
-    :config: emr-endpoint
+    :config: emr_endpoint
     :switch: --emr-endpoint
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: infer from :ref:`aws_region <opt_aws_region>`
+    :default: infer from :mrjob-opt:`aws_region`
 
     optional host to connect to when communicating with S3 (e.g.
     ``us-west-1.elasticmapreduce.amazonaws.com``).
-
-.. _opt_hadoop_streaming_jar_on_emr:
 
 .. mrjob-opt::
     :config: hadoop_streaming_jar_on_emr
@@ -130,11 +111,9 @@ Job flow creation and configuration
     :set: emr
     :default: AWS default
 
-    Like :ref:`hadoop_streaming_jar <opt_hadoop_streaming_jar>`, except that it
-    points to a path on the EMR instance, rather than to a local file or one on
-    S3. Rarely necessary to set this by hand.
-
-.. _opt_max_hours_idle:
+    Like :mrjob-opt:`hadoop_streaming_jar`, except that it points to a path on
+    the EMR instance, rather than to a local file or one on S3. Rarely
+    necessary to set this by hand.
 
 .. mrjob-opt::
     :config: max_hours_idle
@@ -145,10 +124,7 @@ Job flow creation and configuration
 
     If we create a persistent job flow, have it automatically terminate itself
     after it's been idle this many hours AND we're within
-    :ref:`mins_to_end_of_hour <opt_mins_to_end_of_hour>` of an EC2 billing
-    hour.
-
-.. _opt_mins_to_end_of_hour:
+    :mrjob-opt:`mins_to_end_of_hour` of an EC2 billing hour.
 
 .. mrjob-opt::
     :config: mins_to_end_of_hour
@@ -157,9 +133,8 @@ Job flow creation and configuration
     :set: emr
     :default: 5.0
 
-    If :ref:`max_hours_idle <opt_max_hours_idle>` is set, controls how close
-    to the end of an EC2 billing hour the job flow can automatically terminate
-    itself.
+    If :mrjob-opt:`max_hours_idle` is set, controls how close to the end of an
+    EC2 billing hour the job flow can automatically terminate itself.
 
 Bootstrapping
 -------------
@@ -168,8 +143,6 @@ These options apply at *bootstrap time*, before the Hadoop cluster has
 started. Bootstrap time is a good time to install Debian packages or compile
 and install another Python binary. See :ref:`configs-making-files-available`
 for task-time setup.
-
-.. _opt_bootstrap_actions:
 
 .. mrjob-opt::
     :config: bootstrap_actions
@@ -183,8 +156,6 @@ for task-time setup.
     command by spaces (we use :py:func:`shlex.split`). If the action is on the
     local filesystem, we'll automatically upload it to S3.
 
-.. _opt_bootstrap_cmds:
-
 .. mrjob-opt::
     :config: bootstrap_cmds
     :switch: --bootstrap-cmd
@@ -197,8 +168,6 @@ for task-time setup.
     or lists of args, which will be run directly.  Prepend ``sudo`` to
     commands to do things that require root privileges.
 
-.. _opt_bootstrap_files:
-
 .. mrjob-opt::
     :config: bootstrap_files
     :switch: --bootstrap-file
@@ -207,11 +176,9 @@ for task-time setup.
     :default: ``[]``
 
     files to download to the bootstrap working directory on the master node
-    before running :ref:`bootstrap_cmds <opt_bootstrap_cmds>` (for example,
-    Debian packages). May be local files for mrjob to upload to S3, or any URI
-    that ``hadoop fs`` can handle.
-
-.. _opt_bootstrap_python_packages:
+    before running :mrjob-opt:`bootstrap_cmds` (for example, Debian packages).
+    May be local files for mrjob to upload to S3, or any URI that ``hadoop fs``
+    can handle.
 
 .. mrjob-opt::
     :config: bootstrap_python_packages
@@ -224,8 +191,6 @@ for task-time setup.
     module tarballs. If a module is named ``foo.tar.gz``, we expect to be able
     to run ``tar xfz foo.tar.gz; cd foo; sudo python setup.py install``.
 
-.. _opt_bootstrap_scripts:
-
 .. mrjob-opt::
     :config: bootstrap_scripts
     :switch: --bootstrap-script
@@ -234,14 +199,11 @@ for task-time setup.
     :default: ``[]``
 
     scripts to upload and then run on the master node (a combination of
-    :ref:`bootstrap_cmds <opt_bootstrap_cmds>` and
-    :ref:`bootstrap_files <opt_bootstrap_files>`). These are run after the commands
-    from :ref:`bootstrap_cmds <opt_bootstrap_cmds>`.
+    :mrjob-opt:`bootstrap_cmds` and :mrjob-opt:`bootstrap_files`). These are
+    run after the commands from :mrjob-opt:`bootstrap_cmds`.
 
 Monitoring the job flow
 -----------------------
-
-.. _opt_check_emr_status_every:
 
 .. mrjob-opt::
     :config: check_emr_status_every
@@ -252,8 +214,6 @@ Monitoring the job flow
 
     How often to check on the status of EMR jobs in seconds. If you set this
     too low, AWS will throttle you.
-
-.. _opt_enable_emr_debugging:
 
 .. mrjob-opt::
     :config: enable_emr_debugging
@@ -267,8 +227,6 @@ Monitoring the job flow
 Number and type of instances
 ----------------------------
 
-.. _opt_ec2_instance_type:
-
 .. mrjob-opt::
     :config: ec2_instance_type
     :switch: --ec2-instance-type
@@ -278,12 +236,9 @@ Number and type of instances
 
     What sort of EC2 instance(s) to use on the nodes that actually run tasks
     (see http://aws.amazon.com/ec2/instance-types/).  When you run multiple
-    instances (see :ref:`num_ec2_instances <opt_num_ec2_instances>`), the
-    master node is just coordinating the other nodes, so usually the default
-    instance type (``m1.small``) is fine, and using larger instances is
-    wasteful.
-
-.. _opt_ec2_core_instance_type:
+    instances (see :mrjob-opt:`num_ec2_instances`), the master node is just
+    coordinating the other nodes, so usually the default instance type
+    (``m1.small``) is fine, and using larger instances is wasteful.
 
 .. mrjob-opt::
     :config: ec2_core_instance_type
@@ -292,12 +247,9 @@ Number and type of instances
     :set: emr
     :default: ``'m1.small'``
 
-    like :ref:`ec2_instance_type <opt_ec2_instance_type>`, but only for the
-    core (also know as "slave") Hadoop nodes; these nodes run tasks and host
-    HDFS. Usually you just want to use
-    :ref:`ec2_instance_type <opt_ec2_instance_type>`.
-
-.. _opt_ec2_core_instance_bid_price:
+    like :mrjob-opt:`ec2_instance_type`, but only for the core (also know as
+    "slave") Hadoop nodes; these nodes run tasks and host HDFS. Usually you
+    just want to use :mrjob-opt:`ec2_instance_type`.
 
 .. mrjob-opt::
     :config: ec2_core_instance_bid_price
@@ -310,8 +262,6 @@ Number and type of instances
     instance at this bid price.  You usually only want to set bid price for
     task instances.
 
-.. _opt_ec2_master_instance_type:
-
 .. mrjob-opt::
     :config: ec2_master_instance_type
     :switch: --ec2-master-instance-type
@@ -319,12 +269,9 @@ Number and type of instances
     :set: emr
     :default: ``'m1.small'``
 
-    like :ref:`ec2_instance_type <opt_ec2_instance_type>`, but only for the
-    master Hadoop node. This node hosts the task tracker and HDFS, and runs
-    tasks if there are no other nodes. Usually you just want to use
-    :ref:`ec2_instance_type <opt_ec2_instance_type>`.
-
-.. _opt_ec2_master_instance_bid_price:
+    like :mrjob-opt:`ec2_instance_type`, but only for the master Hadoop node.
+    This node hosts the task tracker and HDFS, and runs tasks if there are no
+    other nodes. Usually you just want to use :mrjob-opt:`ec2_instance_type`.
 
 .. mrjob-opt::
     :config: ec2_master_instance_bid_price
@@ -337,32 +284,26 @@ Number and type of instances
     instance at this bid price. You usually only want to set bid price for
     task instances unless the master instance is your only instance.
 
-.. _opt_ec2_slave_instance_type:
-
 .. mrjob-opt::
     :config: ec2_slave_instance_type
     :switch: --ec2-slave-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: value of :ref:`ec2_core_instance_type <opt_ec2_core_instance_type>`
+    :default: value of :mrjob-opt:`ec2_core_instance_type`
 
-    An alias for :ref:`ec2_core_instance_type <opt_ec2_core_instance_type>`,
-    for consistency with the EMR API.
-
-.. _opt_ec2_task_instance_type:
+    An alias for :mrjob-opt:`ec2_core_instance_type`, for consistency with the
+    EMR API.
 
 .. mrjob-opt::
     :config: ec2_task_instance_type
     :switch: --ec2-task-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: value of :ref:`ec2_core_instance_type <opt_ec2_core_instance_type>`
+    :default: value of :mrjob-opt:`ec2_core_instance_type`
 
-    like :ref:`ec2_instance_type <opt_ec2_instance_type>`, but only for the
-    task Hadoop nodes; these nodes run tasks but do not host HDFS. Usually you
-    just want to use :ref:`ec2_instance_type <opt_ec2_instance_type>`.
-
-.. _opt_ec2_task_instance_bid_price:
+    like :mrjob-opt:`ec2_instance_type`, but only for the task Hadoop nodes;
+    these nodes run tasks but do not host HDFS. Usually you just want to use
+    :mrjob-opt:`ec2_instance_type`.
 
 .. mrjob-opt::
     :config: ec2_task_instance_bid_price
@@ -375,8 +316,6 @@ Number and type of instances
     instance at this bid price.  (You usually only want to set bid price for
     task instances.)
 
-.. _opt_num_ec2_core_instances:
-
 .. mrjob-opt::
     :config: num_ec2_core_instances
     :switch: --num-ec2-core-instances
@@ -385,11 +324,8 @@ Number and type of instances
     :default: 0
 
     Number of core (or "slave") instances to start up. These run your job and
-    host HDFS. Incompatible with
-    :ref:`num_ec2_instances <opt_num_ec2_instances>`. This is in addition to
-    the single master instance.
-
-.. _opt_num_ec2_instances:
+    host HDFS. Incompatible with :mrjob-opt:`num_ec2_instances`. This is in
+    addition to the single master instance.
 
 .. mrjob-opt::
     :config: num_ec2_instances
@@ -400,11 +336,8 @@ Number and type of instances
 
     Total number of instances to start up; basically the number of core
     instance you want, plus 1 (there is always one master instance).
-    Incompatible with
-    :ref:`num_ec2_core_instances <opt_num_ec2_core_instances>` and
-    :ref:`num_ec2_task_instances <opt_num_ec2_task_instances>`.
-
-.. _opt_num_ec2_task_instances:
+    Incompatible with :mrjob-opt:`num_ec2_core_instances` and
+    :mrjob-opt:`num_ec2_task_instances`.
 
 .. mrjob-opt::
     :config: num_ec2_task_instances
@@ -414,16 +347,13 @@ Number and type of instances
     :default: 0
 
     Number of task instances to start up.  These run your job but do not host
-    HDFS. Incompatible with :ref:`num_ec2_instances <opt_num_ec2_instances>`.
-    If you use this, you must set
-    :ref:`num_ec2_core_instances <opt_num_ec2_core_instances>`; EMR does not
-    allow you to run task instances without core instances (because there's
-    nowhere to host HDFS).
+    HDFS. Incompatible with :mrjob-opt:`num_ec2_instances`. If you use this,
+    you must set :mrjob-opt:`num_ec2_core_instances`; EMR does not allow you to
+    run task instances without core instances (because there's nowhere to host
+    HDFS).
 
 Choosing/creating a job flow to join
 ------------------------------------
-
-.. _opt_emr_job_flow_id:
 
 .. mrjob-opt::
     :config: emr_job_flow_id
@@ -435,8 +365,6 @@ Choosing/creating a job flow to join
     The ID of a persistent EMR job flow to run jobs in.  It's fine for other
     jobs to be using the job flow; we give our job's steps a unique ID.
 
-.. _opt_emr_job_flow_pool_name:
-
 .. mrjob-opt::
     :config: emr_job_flow_pool_name
     :switch: --emr-job-flow-pool-name
@@ -445,8 +373,6 @@ Choosing/creating a job flow to join
     :default: ``'default'``
 
     Specify a pool name to join. Does not imply ``pool_emr_job_flows``.
-
-.. _opt_pool_emr_job_flows:
 
 .. mrjob-opt::
     :config: pool_emr_job_flows
@@ -463,8 +389,6 @@ Choosing/creating a job flow to join
     :py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job
     flows left idle can quickly become expensive!
 
-.. _opt_pool_wait_minutes:
-
 .. mrjob-opt::
     :config: pool_wait_minutes
     :switch: --pool-wait-minutes
@@ -479,33 +403,27 @@ Choosing/creating a job flow to join
 S3 paths and options
 --------------------
 
-.. _opt_s3_endpoint:
-
 .. mrjob-opt::
     :config: s3_endpoint
     :switch: --s3-endpoint
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: infer from :ref:`aws_region <opt_aws_region>`
+    :default: infer from :mrjob-opt:`aws_region`
 
     Host to connect to when communicating with S3 (e.g.
     ``s3-us-west-1.amazonaws.com``).
-
-.. _opt_s3_log_uri:
 
 .. mrjob-opt::
     :config: s3_log_uri
     :switch: --s3-log-uri
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: append ``logs`` to :ref:`s3_scratch_uri <opt_s3_scratch_uri>`
+    :default: append ``logs`` to :mrjob-opt:`s3_scratch_uri`
 
     Where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for
     your job flow will go into a subdirectory, e.g.
     ``s3://yourbucket/logs/j-JOBFLOWID/``. in this example
     s3://yourbucket/logs/j-YOURJOBID/).
-
-.. _opt_s3_scratch_uri:
 
 .. mrjob-opt::
     :config: s3_scratch_uri
@@ -516,8 +434,6 @@ S3 paths and options
 
     S3 directory (URI ending in ``/``) to use as scratch space, e.g.
     ``s3://yourbucket/tmp/``.
-
-.. _opt_s3_sync_wait_time:
 
 .. mrjob-opt::
     :config: s3_sync_wait_time
@@ -532,8 +448,6 @@ S3 paths and options
 SSH access and tunneling
 ------------------------
 
-.. _opt_ssh_bin:
-
 .. mrjob-opt::
     :config: ssh_bin
     :switch: --ssh-bin
@@ -543,8 +457,6 @@ SSH access and tunneling
 
     Path to the ssh binary; may include switches (e.g.  ``'ssh -v'`` or
     ``['ssh', '-v']``). Defaults to :command:`ssh`
-
-.. _opt_ssh_bind_ports:
 
 .. mrjob-opt::
     :config: ssh_bind_ports
@@ -557,8 +469,6 @@ SSH access and tunneling
     like ``2000[:2001][,2003,2005:2008,etc]``, where commas separate ranges and
     colons separate range endpoints.
 
-.. _opt_ssh_tunnel_to_job_tracker:
-
 .. mrjob-opt::
     :config: ssh_tunnel_to_job_tracker
     :switch: --ssh-tunnel-to-job-tracker
@@ -567,12 +477,9 @@ SSH access and tunneling
     :default: ``False``
 
     If True, create an ssh tunnel to the job tracker and listen on a randomly
-    chosen port. This requires you to set
-    :ref:`ec2_key_pair <opt_ec2_key_pair>` and
-    :ref:`ec2_key_pair_file <opt_ec2_key_pair_file>`.
-    See :ref:`ssh-tunneling` for detailed instructions.
-
-.. _opt_ssh_tunnel_is_open:
+    chosen port. This requires you to set :mrjob-opt:`ec2_key_pair` and
+    :mrjob-opt:`ec2_key_pair_file`. See :ref:`ssh-tunneling` for detailed
+    instructions.
 
 .. mrjob-opt::
     :config: ssh_tunnel_is_open

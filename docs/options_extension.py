@@ -176,21 +176,11 @@ class OptionDirective(Directive):
 
         dli.append(term)
 
-        # classifier is either plan text or a link to some more docs, so parse
+        # classifier is either plain text or a link to some more docs, so parse
         # its contents
         classifier = nodes.classifier()
         type_nodes, messages = self.state.inline_text(
             self.options.get('type', ''), self.lineno)
-
-        # failed attempt at a markup shortcut; may be able to make this work
-        # later
-        #t = option_info['options']['type']
-        #refnode = addnodes.pending_xref(
-        #    t, reftarget='data-type-%s' % t,
-        #    refexplicit=True, reftype='ref')
-        #print refnode
-        #refnode += nodes.Text(t, t)
-        #type_nodes = [refnode]
 
         classifier.extend(type_nodes)
         dli.append(classifier)

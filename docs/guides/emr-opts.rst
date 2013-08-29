@@ -385,9 +385,11 @@ Choosing/creating a job flow to join
     bootstrap configuration. Prefer the one with the most compute units. Use
     S3 to "lock" the job flow and ensure that the job is not scheduled behind
     another job. If no suitable job flow is `WAITING`, create a new pooled job
-    flow.  **WARNING**: do not run this without having\
-    :py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job
-    flows left idle can quickly become expensive!
+    flow.
+
+    .. warning:: Do not run this without having
+        :py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job
+        flows left idle can quickly become expensive!
 
 .. mrjob-opt::
     :config: pool_wait_minutes

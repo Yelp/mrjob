@@ -46,7 +46,12 @@ nodes.
 """
 from docutils import nodes
 from docutils.parsers.rst import directives
+from sphinx.errors import SphinxError
 from sphinx.util.compat import Directive
+
+
+class MRJobOptError(SphinxError):
+    category = 'mrjob-opt error'
 
 
 def setup(app):
@@ -62,6 +67,7 @@ def setup(app):
 
     app.add_directive('mrjob-opt', OptionDirective)
     app.add_directive('mrjob-optlist', OptionlistDirective)
+    app.add_role('mrjob-opt', mrjob_opt_role)
     app.connect('doctree-read', populate_option_lists)
     app.connect('doctree-resolved', replace_optionlinks_with_links)
     app.connect('env-purge-doc', purge_options)
@@ -81,7 +87,9 @@ class optionlink(nodes.General, nodes.Element):
     """temporary node created during doctree-read and replaced with a link
     during doctree-resolved
     """
-    pass
+    def __init__(self, text, *args, **kwargs):
+        super(optionlink, self).__init__(text, *args, **kwargs)
+        self.text = text
 
 
 # We are required to have visit/depart functions for each node that appears in
@@ -92,6 +100,11 @@ def visit_noop(self, node):
 
 def depart_noop(self, node):
     pass
+
+
+def mrjob_opt_role(role, rawtext, text, lineno, inliner,
+        options={}, content=[]):
+    return [optionlink(text=text, option_info_key=text)], []
 
 
 class OptionlistDirective(Directive):
@@ -207,9 +220,10 @@ class OptionDirective(Directive):
 
         if not hasattr(env, 'optionlist_all_options'):
             env.optionlist_all_options = []
+            env.optionlist_indexed_options = {}
 
         # store info for the optionlist traversal to find
-        env.optionlist_all_options.append({
+        info = {
             'docname': env.docname,
             'lineno': self.lineno,
             'options': self.options,
@@ -217,7 +231,9 @@ class OptionDirective(Directive):
             'target': targetnode,
             'type_nodes': [n.deepcopy() for n in type_nodes],
             'default_nodes': [n.deepcopy() for n in default_nodes]
-        })
+        }
+        env.optionlist_all_options.append(info)
+        env.optionlist_indexed_options[self.options['config']] = info
 
         return [targetnode, dl]
 
@@ -296,15 +312,13 @@ def populate_option_lists(app, doctree):
             # resolved. one of these for each config key and switch.
             def make_refnode(text):
                 par = nodes.paragraph()
-                ol = optionlink()
-                ol.text = text
-                ol.docname = option_info['docname']
-                ol.target = option_info['target']
+                ol = optionlink(
+                    text, option_info_key=option_info['options']['config'])
                 par.append(ol)
                 return par
 
             config_column.append(
-                make_refnode(option_info['options'].get('config', '')))
+                make_refnode(option_info['options']['config']))
             switches_column.append(
                 make_refnode(option_info['options'].get('switch', '')))
 
@@ -333,12 +347,20 @@ def replace_optionlinks_with_links(app, doctree, fromdocname):
     # optionlink has attrs text, docname, target,
 
     for node in doctree.traverse(optionlink):
+        env = app.builder.env
+
+        k = node['option_info_key']
+        try:
+            option_info = env.optionlist_indexed_options[k]
+        except KeyError:
+            raise MRJobOptError("Unknown mrjob-opt %s" % k)
+
         refnode = nodes.reference('', '')
         innernode = nodes.emphasis(node.text, node.text)
-        refnode['refdocname'] = node.docname
+        refnode['refdocname'] = option_info['docname']
         refnode['refuri'] = app.builder.get_relative_uri(
-            fromdocname, node.docname)
-        refnode['refuri'] += '#' + node.target['refid']
+            fromdocname, option_info['docname'])
+        refnode['refuri'] += '#' + option_info['target']['refid']
         refnode.append(innernode)
 
         node.replace_self([refnode])

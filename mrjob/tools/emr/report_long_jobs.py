@@ -50,7 +50,7 @@ from mrjob.util import strip_microseconds
 # default minimum number of hours a job can run before we report it.
 DEFAULT_MIN_HOURS = 24.0
 
-log = logging.getLogger('mrjob.tools.emr.report_long_jobs')
+log = logging.getLogger(__name__)
 
 
 def main(args, now=None):

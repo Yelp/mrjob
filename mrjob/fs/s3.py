@@ -34,7 +34,7 @@ from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import read_file
 
 
-log = logging.getLogger('mrjob.fs.s3')
+log = logging.getLogger(__name__)
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?
 EMR_BACKOFF = 20

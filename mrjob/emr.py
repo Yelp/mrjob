@@ -45,11 +45,11 @@ except ImportError:
 try:
     import boto
     import boto.ec2
-    import boto.ec2.regioninfo
     import boto.emr
     import boto.emr.connection
     import boto.emr.instance_group
     import boto.exception
+    import boto.regioninfo
     import boto.utils
     boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
@@ -57,11 +57,19 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
+# need this to retry on SSL errors (see Issue #621)
+try:
+    from boto.https_connection import InvalidCertificateException
+    InvalidCertificateException  # quiet pyflakes warning
+except ImportError:
+    InvalidCertificateException = None
+
 import mrjob
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
 from mrjob.aws import emr_endpoint_for_region
+from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import s3_endpoint_for_region
 from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import supports_new_distributed_cache_options
@@ -87,6 +95,7 @@ from mrjob.parse import is_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
+from mrjob.retry import RetryGoRound
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.setup import BootstrapWorkingDirManager
@@ -2284,29 +2293,33 @@ class EMRJobRunner(MRJobRunner):
         if boto is None:
             raise ImportError('You must install boto to connect to EMR')
 
-        region = self._get_region_info_for_emr_conn()
-        log.debug('creating EMR connection (to %s)' % region.endpoint)
+        def emr_conn_for_endpoint(endpoint):
+            return boto.emr.connection.EmrConnection(
+                aws_access_key_id=self._opts['aws_access_key_id'],
+                aws_secret_access_key=self._opts['aws_secret_access_key'],
+                region=boto.regioninfo.RegionInfo(
+                    name=self._aws_region, endpoint=endpoint))
 
-        raw_emr_conn = boto.emr.connection.EmrConnection(
-            aws_access_key_id=self._opts['aws_access_key_id'],
-            aws_secret_access_key=self._opts['aws_secret_access_key'],
-            region=region)
-        return wrap_aws_conn(raw_emr_conn)
+        endpoint = (self._opts['emr_endpoint'] or
+                    emr_endpoint_for_region(self._aws_region))
 
-    def _get_region_info_for_emr_conn(self):
-        """Get a :py:class:`boto.ec2.regioninfo.RegionInfo` object to
-        initialize EMR connections with.
+        log.debug('creating EMR connection (to %s)' % endpoint)
+        conn = emr_conn_for_endpoint(endpoint)
 
-        This is kind of silly because all
-        :py:class:`boto.emr.connection.EmrConnection` ever does with
-        this object is extract the hostname, but that's how boto rolls.
-        """
-        if self._opts['emr_endpoint']:
-            endpoint = self._opts['emr_endpoint']
-        else:
-            endpoint = emr_endpoint_for_region(self._aws_region)
+        # Issue #621: if we're using a region-specific endpoint,
+        # try both the canonical version of the hostname and the one
+        # that matches the SSL cert
+        if (self._aws_region and not self._opts['emr_endpoint'] and
+            InvalidCertificateException):
 
-        return boto.ec2.regioninfo.RegionInfo(None, self._aws_region, endpoint)
+            ssl_host = emr_ssl_host_for_region(self._aws_region)
+            fallback_conn = emr_conn_for_endpoint(ssl_host)
+
+            conn = RetryGoRound(
+                [conn, fallback_conn],
+                lambda ex: isinstance(ex, InvalidCertificateException))
+
+        return wrap_aws_conn(conn)
 
     def _describe_jobflow(self, emr_conn=None):
         emr_conn = emr_conn or self.make_emr_conn()

@@ -64,14 +64,20 @@ MAX_STEPS_PER_JOB_FLOW = 256
 
 # See Issue #658 for why we don't just let boto handle this.
 
+
 # where to connect to EMR. The docs say
-# elasticmapreduce.%s.amazonaws.com, but the SSL certificates,
+# elasticmapreduce.<region>.amazonaws.com, but the SSL certificates,
 # they tell a different story. See Issue #621.
-_EMR_REGION_ENDPOINT = '%s.elasticmapreduce.amazonaws.com'
+
+# where the AWS docs say to connect to EMR
+_EMR_REGION_ENDPOINT = 'elasticmapreduce.%(region)s.amazonaws.com'
+# the host that currently works with EMR's SSL certificate
+_EMR_REGION_SSL_HOST = '%(region)s.elasticmapreduce.amazonaws.com'
+# the regionless endpoint doesn't have SSL issues
 _EMR_REGIONLESS_ENDPOINT = 'elasticmapreduce.amazonaws.com'
 
 # where to connect to S3
-_S3_REGION_ENDPOINT = 's3-%s.amazonaws.com'
+_S3_REGION_ENDPOINT = 's3-%(region)s.amazonaws.com'
 _S3_REGIONLESS_ENDPOINT = 's3.amazonaws.com'
 
 # us-east-1 doesn't have its own endpoint or need bucket location constraints
@@ -100,7 +106,18 @@ def emr_endpoint_for_region(region):
     if not region:
         return _EMR_REGIONLESS_ENDPOINT
     else:
-        return _EMR_REGION_ENDPOINT % region
+        return _EMR_REGION_ENDPOINT % {'region': region}
+
+
+def emr_ssl_host_for_region(region):
+    """Get the host for Elastic MapReduce that matches their SSL cert
+    for the given region. (See Issue #621.)"""
+    region = _fix_region(region)
+
+    if not region:
+        return _EMR_REGIONLESS_ENDPOINT
+    else:
+        return _EMR_REGION_SSL_HOST % {'region': region}
 
 
 def s3_endpoint_for_region(region):
@@ -110,7 +127,7 @@ def s3_endpoint_for_region(region):
     if not region or region in _S3_REGIONS_WITH_NO_LOCATION_CONSTRAINT:
         return _S3_REGIONLESS_ENDPOINT
     else:
-        return _S3_REGION_ENDPOINT % region
+        return _S3_REGION_ENDPOINT % {'region': region}
 
 
 def s3_location_constraint_for_region(region):

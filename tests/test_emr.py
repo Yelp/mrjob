@@ -1657,49 +1657,49 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
     def test_eu(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='EU')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'eu-west-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.eu-west-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-eu-west-1.amazonaws.com')
 
     def test_eu_case_insensitive(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='eu')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'eu-west-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.eu-west-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-eu-west-1.amazonaws.com')
 
     def test_us_east_1(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='us-east-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'us-east-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.us-east-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3.amazonaws.com')
 
     def test_us_west_1(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='us-west-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'us-west-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.us-west-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-us-west-1.amazonaws.com')
 
     def test_us_west_1_case_insensitive(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='US-West-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'us-west-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.us-west-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-us-west-1.amazonaws.com')
 
     def test_ap_southeast_1(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='ap-southeast-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'ap-southeast-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.ap-southeast-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-ap-southeast-1.amazonaws.com')
 
     def test_previously_unknown_region(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='lolcatnia-1')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'lolcatnia-1.elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.lolcatnia-1.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
                          's3-lolcatnia-1.amazonaws.com')
 
@@ -1708,6 +1708,28 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
                               s3_endpoint='s3-proxy', emr_endpoint='emr-proxy')
         self.assertEqual(runner.make_emr_conn().endpoint, 'emr-proxy')
         self.assertEqual(runner.make_s3_conn().endpoint, 's3-proxy')
+
+    def test_ssl_fallback_host(self):
+        from boto.https_connection import InvalidCertificateException
+        runner = EMRJobRunner(conf_paths=[], aws_region='us-west-1')
+
+        with patch.object(MockEmrConnection, 'STRICT_SSL', True):
+            emr_conn = runner.make_emr_conn()
+            self.assertEqual(emr_conn.endpoint,
+                             'elasticmapreduce.us-west-1.amazonaws.com')
+            # this should still work
+            self.assertEqual(emr_conn.describe_jobflows(), [])
+            # but it's only because we've switched to the alternate hostname
+            self.assertEqual(emr_conn.endpoint,
+                             'us-west-1.elasticmapreduce.amazonaws.com')
+
+        # without SSL issues, we should stay on the same endpoint
+        emr_conn = runner.make_emr_conn()
+        self.assertEqual(emr_conn.endpoint,
+                         'elasticmapreduce.us-west-1.amazonaws.com')
+        self.assertEqual(emr_conn.describe_jobflows(), [])
+        self.assertEqual(emr_conn.endpoint,
+                         'elasticmapreduce.us-west-1.amazonaws.com')
 
 
 class TestS3Ls(MockEMRAndS3TestCase):

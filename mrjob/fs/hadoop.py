@@ -31,7 +31,7 @@ from mrjob.util import cmd_line
 from mrjob.util import read_file
 
 
-log = logging.getLogger('mrjob.fs.hadoop')
+log = logging.getLogger(__name__)
 
 # used by mkdir()
 HADOOP_FILE_EXISTS_RE = re.compile(r'.*File exists.*')

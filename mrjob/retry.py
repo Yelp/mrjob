@@ -15,7 +15,7 @@
 import logging
 import time
 
-log = logging.getLogger('mrjob.retry')
+log = logging.getLogger(__name__)
 
 
 class RetryWrapper(object):

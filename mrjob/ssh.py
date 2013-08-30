@@ -36,7 +36,7 @@ HADOOP_JOB_LIST_NUM_RE = re.compile(r'(\d+) jobs currently running')
 HADOOP_JOB_LIST_INFO_RE = re.compile(r'(\S+)\s+\d+\s+\d+\s+hadoop\s+\w+\s+\w+')
 
 
-log = logging.getLogger('mrjob.ssh')
+log = logging.getLogger(__name__)
 
 
 def _ssh_args(ssh_bin, address, ec2_key_pair_file):

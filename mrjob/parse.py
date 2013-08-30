@@ -37,7 +37,7 @@ JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
 STEP_NAME_RE = re.compile(
     r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+): Step (\d+) of (\d+)$')
 
-log = logging.getLogger('mrjob.parse')
+log = logging.getLogger(__name__)
 
 
 ### URI PARSING ###

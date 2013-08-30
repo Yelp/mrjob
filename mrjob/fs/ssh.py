@@ -28,7 +28,7 @@ from mrjob.ssh import SSH_URI_RE
 from mrjob.util import read_file
 
 
-log = logging.getLogger('mrjob.fs.ssh')
+log = logging.getLogger(__name__)
 
 
 class SSHFilesystem(Filesystem):

@@ -26,7 +26,7 @@ from mrjob.parse import find_timeout_error
 from mrjob.parse import parse_hadoop_counters_from_line
 
 
-log = logging.getLogger('mrjob.logparsers')
+log = logging.getLogger(__name__)
 
 
 # Constants used to distinguish between different kinds of logs

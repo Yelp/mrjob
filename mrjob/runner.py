@@ -69,7 +69,7 @@ from mrjob.util import file_ext
 from mrjob.util import tar_and_gzip
 
 
-log = logging.getLogger('mrjob.runner')
+log = logging.getLogger(__name__)
 
 # use to detect globs and break into the part before and after the glob
 GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')

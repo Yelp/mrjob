@@ -39,7 +39,7 @@ class RetryGoRound(object):
         """
         if not alternatives:
             raise ValueError('must provide at least one alternative')
-        self.__alternatives = list(alternatives)  # don't allow modifying list
+        self.__alternatives = tuple(alternatives)  # don't allow modifying list
 
         self.__retry_if = retry_if
 

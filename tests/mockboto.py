@@ -274,6 +274,12 @@ class MockEmrConnection(object):
     """Mock out boto.emr.EmrConnection. This actually handles a small
     state machine that simulates EMR job flows."""
 
+    # hook for simulating SSL cert errors. To use this, do:
+    #
+    # with patch.object(MockEmrConnection, 'STRICT_SSL', True):
+    #     ...
+    STRICT_SSL = False
+
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
                  is_secure=True, port=None, proxy=None, proxy_port=None,
                  proxy_user=None, proxy_pass=None, debug=0,
@@ -331,6 +337,13 @@ class MockEmrConnection(object):
         else:
             self.endpoint = 'elasticmapreduce.amazonaws.com'
 
+    def _enforce_strict_ssl(self):
+        if (self.STRICT_SSL and
+            not self.endpoint.endswith('elasticmapreduce.amazonaws.com')):
+            from boto.https_connection import InvalidCertificateException
+            raise InvalidCertificateException(
+                self.endpoint, None, 'hostname mismatch')
+
     def run_jobflow(self,
                     name, log_uri, ec2_keyname=None, availability_zone=None,
                     master_instance_type='m1.small',
@@ -350,6 +363,8 @@ class MockEmrConnection(object):
         If you set log_uri to None, you can get a jobflow with no loguri
         attribute, which is useful for testing.
         """
+        self._enforce_strict_ssl()
+
         if now is None:
             now = datetime.utcnow()
 
@@ -533,6 +548,8 @@ class MockEmrConnection(object):
         return jobflow_id
 
     def describe_jobflow(self, jobflow_id, now=None):
+        self._enforce_strict_ssl()
+
         if not jobflow_id in self.mock_emr_job_flows:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -542,6 +559,8 @@ class MockEmrConnection(object):
 
     def describe_jobflows(self, states=None, jobflow_ids=None,
                           created_after=None, created_before=None):
+        self._enforce_strict_ssl()
+
         now = datetime.utcnow()
 
         if created_before:
@@ -588,6 +607,8 @@ class MockEmrConnection(object):
         return jfs
 
     def add_jobflow_steps(self, jobflow_id, steps):
+        self._enforce_strict_ssl()
+
         if not jobflow_id in self.mock_emr_job_flows:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
@@ -608,6 +629,8 @@ class MockEmrConnection(object):
             job_flow.steps.append(step_object)
 
     def terminate_jobflow(self, jobflow_id):
+        self._enforce_strict_ssl()
+
         if not jobflow_id in self.mock_emr_job_flows:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 

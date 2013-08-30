@@ -1709,6 +1709,28 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
         self.assertEqual(runner.make_emr_conn().endpoint, 'emr-proxy')
         self.assertEqual(runner.make_s3_conn().endpoint, 's3-proxy')
 
+    def test_ssl_fallback_host(self):
+        from boto.https_connection import InvalidCertificateException
+        runner = EMRJobRunner(conf_paths=[], aws_region='us-west-1')
+
+        with patch.object(MockEmrConnection, 'STRICT_SSL', True):
+            emr_conn = runner.make_emr_conn()
+            self.assertEqual(emr_conn.endpoint,
+                             'elasticmapreduce.us-west-1.amazonaws.com')
+            # this should still work
+            self.assertEqual(emr_conn.describe_jobflows(), [])
+            # but it's only because we've switched to the alternate hostname
+            self.assertEqual(emr_conn.endpoint,
+                             'us-west-1.elasticmapreduce.amazonaws.com')
+
+        # without SSL issues, we should stay on the same endpoint
+        emr_conn = runner.make_emr_conn()
+        self.assertEqual(emr_conn.endpoint,
+                         'elasticmapreduce.us-west-1.amazonaws.com')
+        self.assertEqual(emr_conn.describe_jobflows(), [])
+        self.assertEqual(emr_conn.endpoint,
+                         'elasticmapreduce.us-west-1.amazonaws.com')
+
 
 class TestS3Ls(MockEMRAndS3TestCase):
 

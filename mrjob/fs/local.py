@@ -22,7 +22,7 @@ from mrjob.parse import is_uri
 from mrjob.util import read_file
 
 
-log = logging.getLogger('mrjob.fs.local')
+log = logging.getLogger(__name__)
 
 
 class LocalFilesystem(Filesystem):

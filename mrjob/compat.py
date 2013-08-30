@@ -22,7 +22,7 @@ import os
 # full listing thanks to translation table in
 # http://hadoop.apache.org/common/docs/current/hadoop-project-dist/hadoop-common/DeprecatedProperties.html
 
-log = logging.getLogger('mrjob.compat')
+log = logging.getLogger(__name__)
 
 JOBCONF_DICT_LIST = [
     {'0.18': 'StorageId',

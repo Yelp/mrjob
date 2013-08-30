@@ -48,7 +48,7 @@ from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import STEP_NAME_RE
 from mrjob.util import strip_microseconds
 
-log = logging.getLogger('mrjob.tools.emr.audit_usage')
+log = logging.getLogger(__name__)
 
 
 def main(args):

@@ -68,7 +68,7 @@ from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
 from mrjob.util import strip_microseconds
 
-log = logging.getLogger('mrjob.tools.emr.terminate_idle_job_flows')
+log = logging.getLogger(__name__)
 
 DEFAULT_MAX_HOURS_IDLE = 1
 DEFAULT_MAX_MINUTES_LOCKED = 1

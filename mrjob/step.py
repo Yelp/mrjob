@@ -33,7 +33,7 @@ _JOB_STEP_FUNC_PARAMS = _MAPPER_FUNCS + _COMBINER_FUNCS + _REDUCER_FUNCS
 _JOB_STEP_PARAMS = _JOB_STEP_FUNC_PARAMS + _HADOOP_OPTS
 
 
-log = logging.getLogger('mrjob.step')
+log = logging.getLogger(__name__)
 
 
 # used by MRJobStep below, to fake no mapper

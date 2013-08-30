@@ -14,7 +14,7 @@
 import logging
 
 
-log = logging.getLogger('mrjob.fs')
+log = logging.getLogger(__name__)
 
 
 class Filesystem(object):

@@ -103,7 +103,7 @@ from mrjob.util import hash_object
 from mrjob.util import shlex_split
 
 
-log = logging.getLogger('mrjob.emr')
+log = logging.getLogger(__name__)
 
 JOB_TRACKER_RE = re.compile(r'(\d{1,3}\.\d{2})%')
 

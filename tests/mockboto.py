@@ -357,7 +357,7 @@ class MockEmrConnection(object):
                     additional_info=None,
                     ami_version=None,
                     now=None,
-                    visible_to_all_users=False):
+                    api_params=None):
         """Mock of run_jobflow().
 
         If you set log_uri to None, you can get a jobflow with no loguri
@@ -519,7 +519,7 @@ class MockEmrConnection(object):
             normalizedinstancehours='9999',  # just need this filled in for now
             state='STARTING',
             steps=[],
-            visible_to_all_users=visible_to_all_users
+            visibletoallusers='false',  # can only be set with api_params
         )
 
         if slave_instance_type is not None:
@@ -532,6 +532,11 @@ class MockEmrConnection(object):
         # don't always set loguri, so we can test Issue #112
         if log_uri is not None:
             job_flow.loguri = log_uri
+
+        # include raw api params in job flow object
+        if api_params:
+            for k, v in api_params.iteritems():
+                setattr(job_flow, k.lower(), v)
 
         self.mock_emr_job_flows[jobflow_id] = job_flow
 

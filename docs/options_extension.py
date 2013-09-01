@@ -53,14 +53,11 @@ nodes.
   resolved (which unfortunately is a near certainty and definitely the case
   now), some of these subtrees will still contain pending_xref nodes.
 
-  We have no good way (that I can think of) to convert those to references from
-  our scope while generating the tables, so the best solution I could come up
-  with was to strip out the pending_xref node and replace it with its children.
-  So you see the text but there's no link.
-
-  In practice, this means that the 'type' column doesn't have links, but the
-  'default' column does because it gets lucky.
-
+  We have code to take care of 90% of these cases, but for some reason doesn't
+  work for all types, notably :envvar: and anything from intersphinx.  The best
+  band-aid I could come up with was to strip out offending pending_xref nodes
+  and replace them with their children. So you see the text but there's no
+  link.
 """
 from docutils import nodes
 from docutils.parsers.rst import directives
@@ -85,7 +82,7 @@ def setup(app):
                  text=(visit_noop, depart_noop))
 
     def doctree_resolved(app, doctree, fromdocname):
-        populate_option_lists(app, doctree)
+        populate_option_lists(app, doctree, fromdocname)
         replace_optionlinks_with_links(app, doctree, fromdocname)
 
     app.add_directive('mrjob-opt', OptionDirective)
@@ -95,14 +92,46 @@ def setup(app):
     app.connect('env-purge-doc', purge_options)
 
 
-def filter_out_pending_xrefs(maybe_xrefs):
-    """If any node is a pending_xref, remove it from the tree and replace it
-    with its children.
+def resolve_pending_xref(app, fromdocname, node):
+    # Based on nodes.py in Sphinx. Resolves a subset of possible pending_xref
+    # nodes that we see in practice in the config reference table. Uses only
+    # public methods (afaict the proper API, zero hacks).
+    # Currently does not work for :envvar: or intersphinx references for
+    # reasons unknown.
+    if 'refdomain' in node and node['refdomain']:
+        domain = None
+        contnode = node[0].deepcopy()
+
+        builder = app.builder
+        env = app.builder.env
+        try:
+            domain = env.domains[node['refdomain']]
+        except KeyError:
+            raise MRJobOptError('could not resolve domain for %s' % node)
+        newnode = domain.resolve_xref(
+            app, fromdocname, builder, node['reftype'], node['reftarget'],
+            node, contnode)
+        if newnode:
+            return [newnode]
+        else:
+            # this is a non-fatal error but should be noted when building the
+            # docs. the process for printing output during a build is
+            # undocumented, so just use a print statement.
+            print '(non-fatal) stripping unresolvable pending_xref', node
+            return node.children
+    else:
+        return node.children
+
+
+def resolve_possible_pending_xrefs(app, fromdocname, maybe_xrefs):
+    """If any node is a pending_xref, attempt to resolve it. If it cannot be
+    resolved, replace it with its children.
     """
     result = []
     for node in maybe_xrefs:
         if isinstance(node, addnodes.pending_xref):
-            result.extend(node.children)
+            result.extend(resolve_pending_xref(
+                app, fromdocname, node.deepcopy()))
         else:
             result.append(node)
     return result
@@ -254,8 +283,8 @@ class OptionDirective(Directive):
             'options': self.options,
             'content': self.content,
             'target': targetnode,
-            'type_nodes': [n for n in type_nodes],
-            'default_nodes': [n for n in default_nodes]
+            'type_nodes': type_nodes,
+            'default_nodes': default_nodes,
         }
         env.optionlist_all_options.append(info)
         env.optionlist_indexed_options[self.options['config']] = info
@@ -277,7 +306,7 @@ def purge_options(app, env, docname):
 
 
 # after doctree is read
-def populate_option_lists(app, doctree):
+def populate_option_lists(app, doctree, fromdocname):
     env = app.builder.env
 
     for node in doctree.traverse(optionlist):
@@ -352,11 +381,13 @@ def populate_option_lists(app, doctree):
                 make_refnode(option_info['options'].get('switch', '')))
 
             par = nodes.paragraph()
-            par.extend(filter_out_pending_xrefs(option_info['default_nodes']))
+            par.extend(resolve_possible_pending_xrefs(
+                app, fromdocname, option_info['default_nodes']))
             default_column.append(par)
 
             par = nodes.paragraph()
-            par.extend(filter_out_pending_xrefs(option_info['type_nodes']))
+            par.extend(resolve_possible_pending_xrefs(
+                app, fromdocname, option_info['type_nodes']))
             type_column.append(par)
 
             row.extend([

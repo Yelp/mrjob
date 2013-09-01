@@ -33,19 +33,38 @@ contents. Save all relevant table data in ``env.optionlist_all_options``.
 After doctree is read
 ---------------------
 
-For each ``optionlist`` node, populate its contents with a table. Use
-``optionlink`` nodes in place of references to ``option`` nodes, as links have
-not yet been resolved.
+Do nothing.
 
 After doctree is resolved
 -------------------------
 
+For each ``optionlist`` node, populate its contents with a table. Use
+``optionlink`` nodes in place of references to ``option`` nodes, as links have
+not yet been resolved. (This used to happen during doctree-read but was moved.
+It seemed prudent to keep the separation.) *see massive note below
+
 Replace ``optionlink`` nodes with references to their respective ``option``
 nodes.
+
+* The table includes subtrees taken verbatim from the 'type' and 'default'
+  fields of the option definition. These may include references (rendered at
+  read time by Sphinx as pending_xref nodes) which are converted to reference
+  nodes during resolution. If the tables are generated before every document is
+  resolved (which unfortunately is a near certainty and definitely the case
+  now), some of these subtrees will still contain pending_xref nodes.
+
+  We have no good way (that I can think of) to convert those to references from
+  our scope while generating the tables, so the best solution I could come up
+  with was to strip out the pending_xref node and replace it with its children.
+  So you see the text but there's no link.
+
+  In practice, this means that the 'type' column doesn't have links, but the
+  'default' column does because it gets lucky.
 
 """
 from docutils import nodes
 from docutils.parsers.rst import directives
+from sphinx import addnodes
 from sphinx.errors import SphinxError
 from sphinx.util.compat import Directive
 
@@ -65,12 +84,28 @@ def setup(app):
                  latex=(visit_noop, depart_noop),
                  text=(visit_noop, depart_noop))
 
+    def doctree_resolved(app, doctree, fromdocname):
+        populate_option_lists(app, doctree)
+        replace_optionlinks_with_links(app, doctree, fromdocname)
+
     app.add_directive('mrjob-opt', OptionDirective)
     app.add_directive('mrjob-optlist', OptionlistDirective)
     app.add_role('mrjob-opt', mrjob_opt_role)
-    app.connect('doctree-read', populate_option_lists)
-    app.connect('doctree-resolved', replace_optionlinks_with_links)
+    app.connect('doctree-resolved', doctree_resolved)
     app.connect('env-purge-doc', purge_options)
+
+
+def filter_out_pending_xrefs(maybe_xrefs):
+    """If any node is a pending_xref, remove it from the tree and replace it
+    with its children.
+    """
+    result = []
+    for node in maybe_xrefs:
+        if isinstance(node, addnodes.pending_xref):
+            result.extend(node.children)
+        else:
+            result.append(node)
+    return result
 
 
 class option(nodes.General, nodes.Element):
@@ -219,8 +254,8 @@ class OptionDirective(Directive):
             'options': self.options,
             'content': self.content,
             'target': targetnode,
-            'type_nodes': [n.deepcopy() for n in type_nodes],
-            'default_nodes': [n.deepcopy() for n in default_nodes]
+            'type_nodes': [n for n in type_nodes],
+            'default_nodes': [n for n in default_nodes]
         }
         env.optionlist_all_options.append(info)
         env.optionlist_indexed_options[self.options['config']] = info
@@ -235,6 +270,10 @@ def purge_options(app, env, docname):
     env.optionlist_all_options = [
         option for option in env.optionlist_all_options
         if option['docname'] != docname]
+    env.optionlist_indexed_options = dict([
+        (option['options']['config'], option)
+        for option in env.optionlist_all_options
+    ])
 
 
 # after doctree is read
@@ -313,11 +352,11 @@ def populate_option_lists(app, doctree):
                 make_refnode(option_info['options'].get('switch', '')))
 
             par = nodes.paragraph()
-            par.extend(option_info['default_nodes'])
+            par.extend(filter_out_pending_xrefs(option_info['default_nodes']))
             default_column.append(par)
 
             par = nodes.paragraph()
-            par.extend(option_info['type_nodes'])
+            par.extend(filter_out_pending_xrefs(option_info['type_nodes']))
             type_column.append(par)
 
             row.extend([

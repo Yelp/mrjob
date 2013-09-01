@@ -209,6 +209,9 @@ class MockKey(object):
     def set_contents_from_string(self, string):
         self.write_mock_data(string)
 
+    def get_file(self, fp):
+        fp.write(self.read_mock_data())
+
     def delete(self):
         if self.name in self.bucket.mock_state():
             del self.bucket.mock_state()[self.name]

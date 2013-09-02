@@ -181,6 +181,8 @@ class MockKey(object):
         self.bucket = bucket
         self.name = name
         self.date_to_str = date_to_str or to_iso8601
+        # position in data, for read() and next()
+        self._pos = 0
 
     def read_mock_data(self):
         """Read the bytes for this key out of the fake boto state."""
@@ -218,12 +220,24 @@ class MockKey(object):
     def make_public(self):
         pass
 
-    def __iter__(self):
+    def read(self, size=None):
         data = self.read_mock_data()
-        i = 0
-        while i < len(data):
-            yield data[i:min(len(data), i + SIMULATED_BUFFER_SIZE)]
-            i += SIMULATED_BUFFER_SIZE
+        if size is None or size < 0:
+            chunk = data[self._pos:]
+        else:
+            chunk = data[self._pos:self._pos + size]
+        self._pos += len(chunk)
+        return chunk
+
+    def next(self):
+        chunk = self.read(SIMULATED_BUFFER_SIZE)
+        if chunk:
+            return chunk
+        else:
+            raise StopIteration
+
+    def __iter__(self):
+        return self
 
     def _get_last_modified(self):
         if self.name in self.bucket.mock_state():

@@ -11,9 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import gzip
 import os
-from StringIO import StringIO
 
 try:
     import boto
@@ -23,6 +21,7 @@ except ImportError:
 
 from mrjob.fs.s3 import S3Filesystem
 
+from tests.compress import gz
 from tests.mockboto import MockS3Connection
 from tests.mockboto import add_mock_s3_data
 from tests.sandbox import SandboxedTestCase
@@ -65,14 +64,8 @@ class S3FSTestCase(SandboxedTestCase):
                          ['foo\n', 'foo\n'])
 
     def test_cat_gzipped_data(self):
-        # compress some data
-        s = StringIO()
-        g = gzip.GzipFile(fileobj=s, mode='wb')
-        g.write('foo\nfoo\n')
-        g.close()
-
         remote_path = self.add_mock_s3_data('walrus', 'data/foo.gz',
-                                            s.getvalue())
+                                            gz('foo\nfoo\n'))
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          ['foo\n', 'foo\n'])
 

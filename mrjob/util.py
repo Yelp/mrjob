@@ -387,11 +387,14 @@ def read_input(path, stdin=None):
         yield line
 
 
-def read_file(path, fileobj=None):
+def read_file(path, fileobj=None, yields_lines=True):
     """Reads a file.
 
     - Decompress ``.gz`` and ``.bz2`` files.
     - If *fileobj* is not ``None``, stream lines from the *fileobj*
+
+    If *fileobj*'s iterator yields chunks of data rather than lines
+    (like :py:class:`boto.s3.Key`), set *yields_lines* to ``False``
     """
     # sometimes values declared in the ``try`` block aren't accessible from the
     # ``finally`` block. not sure why.
@@ -412,8 +415,11 @@ def read_file(path, fileobj=None):
             else:
                 lines = bunzip2_stream(f)
         else:
-            # handle boto.s3.Key, which yields chunks of bytes, not lines
-            lines = buffer_iterator_to_line_iterator(f)
+            if yields_lines:
+                lines = f
+            else:
+                # handle boto.s3.Key, which yields chunks of bytes, not lines
+                lines = buffer_iterator_to_line_iterator(f)
 
         for line in lines:
             yield line

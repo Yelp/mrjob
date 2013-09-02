@@ -150,7 +150,9 @@ class S3Filesystem(Filesystem):
     def _cat_file(self, filename):
         # stream lines from the s3 key
         s3_key = self.get_s3_key(filename)
-        return read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
+        # yields_lines=False: warn read_file that s3_key yields chunks of bytes
+        return read_file(
+            s3_key_to_uri(s3_key), fileobj=s3_key, yields_lines=False)
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on S3 because there are

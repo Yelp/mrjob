@@ -572,8 +572,8 @@ def get_jobconf_value(variable, default=None):
     mapper is reading input from.
 
     If the name of the jobconf variable is different in different versions of
-    Hadoop (e.g. in Hadoop 0.21, `map.input.file` is
-    `mapreduce.map.input.file`), we'll automatically try all variants before
+    Hadoop (e.g. in Hadoop 0.21, ``map.input.file`` is
+    ``mapreduce.map.input.file``), we'll automatically try all variants before
     giving up.
 
     Return *default* if that jobconf variable isn't set.
@@ -613,7 +613,7 @@ def translate_jobconf(variable, version):
 
 
 def supports_combiners_in_hadoop_streaming(version):
-    """Return True if this version of Hadoop Streaming supports combiners
+    """Return ``True`` if this version of Hadoop Streaming supports combiners
     (i.e. >= 0.20.203), otherwise False.
     """
     return version_gte(version, '0.20')
@@ -641,7 +641,7 @@ def uses_generic_jobconf(version):
 
 
 def version_gte(version, cmp_version_str):
-    """Return True if version >= *cmp_version_str*."""
+    """Return ``True`` if version >= *cmp_version_str*."""
 
     if not isinstance(version, basestring):
         raise TypeError('%r is not a string' % version)

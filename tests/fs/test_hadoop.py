@@ -11,11 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import bz2
 import os
 
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs import hadoop as fs_hadoop
 
+from tests.compress import gz
 from tests.fs import MockSubprocessTestCase
 from tests.mockhadoop import main as mock_hadoop_main
 
@@ -78,21 +80,37 @@ class HadoopFSTestCase(MockSubprocessTestCase):
 
     def test_single_space(self):
         self.make_mock_file('foo bar')
-        self.assertItemsEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///foo bar'])
+        self.assertItemsEqual(list(self.fs.ls('hdfs:///')),
+                              ['hdfs:///foo bar'])
 
     def test_double_space(self):
         self.make_mock_file('foo  bar')
-        self.assertItemsEqual(list(self.fs.ls('hdfs:///')), ['hdfs:///foo  bar'])
+        self.assertItemsEqual(list(self.fs.ls('hdfs:///')),
+                              ['hdfs:///foo  bar'])
 
     def test_cat_uncompressed(self):
-        # mockhadoop doesn't support compressed files, so we won't test for it.
-        # this is only a sanity check anyway.
         self.make_mock_file('data/foo', 'foo\nfoo\n')
 
         remote_path = self.fs.path_join('hdfs:///data', 'foo')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          ['foo\n', 'foo\n'])
+
+    def test_cat_bz2(self):
+        self.make_mock_file('data/foo.bz2', bz2.compress('foo\n' * 1000))
+
+        remote_path = self.fs.path_join('hdfs:///data', 'foo.bz2')
+
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n'] * 1000)
+
+    def test_cat_gz(self):
+        self.make_mock_file('data/foo.gz', gz('foo\n' * 10000))
+
+        remote_path = self.fs.path_join('hdfs:///data', 'foo.gz')
+
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n'] * 10000)
 
     def test_du(self):
         self.make_mock_file('data1', 'abcd')

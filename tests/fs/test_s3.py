@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import gzip
 import os
+from StringIO import StringIO
 
 try:
     import boto
@@ -59,7 +61,20 @@ class S3FSTestCase(SandboxedTestCase):
 
     def test_cat_uncompressed(self):
         remote_path = self.add_mock_s3_data('walrus', 'data/foo', 'foo\nfoo\n')
-        self.assertEqual(list(self.fs._cat_file(remote_path)), ['foo\n', 'foo\n'])
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n', 'foo\n'])
+
+    def test_cat_gzipped_data(self):
+        # compress some data
+        s = StringIO()
+        g = gzip.GzipFile(fileobj=s, mode='wb')
+        g.write('foo\nfoo\n')
+        g.close()
+
+        remote_path = self.add_mock_s3_data('walrus', 'data/foo.gz',
+                                            s.getvalue())
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n', 'foo\n'])
 
     def test_ls_basic(self):
         remote_path = self.add_mock_s3_data('walrus', 'data/foo', 'foo\nfoo\n')

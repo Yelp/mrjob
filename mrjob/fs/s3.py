@@ -30,7 +30,6 @@ from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
 from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
-from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import read_file
 
 
@@ -151,8 +150,7 @@ class S3Filesystem(Filesystem):
     def _cat_file(self, filename):
         # stream lines from the s3 key
         s3_key = self.get_s3_key(filename)
-        buffer_iterator = read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
-        return buffer_iterator_to_line_iterator(buffer_iterator)
+        return read_file(s3_key_to_uri(s3_key), fileobj=s3_key)
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on S3 because there are

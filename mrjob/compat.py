@@ -659,7 +659,7 @@ def add_translated_jobconf_for_hadoop_version(jobconf, hadoop_version):
     version. Combines the original jobconf with the translated jobconf.
 
     :return: a map consisting of the original and translated configuration
-    property names and values.
+             property names and values.
     """
     translated_jobconf = {}
     mismatch_key_to_translated_key = {}

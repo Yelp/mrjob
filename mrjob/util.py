@@ -398,7 +398,7 @@ def read_file(path, fileobj=None):
     f = None
     try:
         if path.endswith('.gz'):
-            f = gzip.GzipFile(path, fileobj=fileobj)
+            f = buffer_iterator_to_line_iterator(gunzip_stream(fileobj))
         elif path.endswith('.bz2'):
             if bz2 is None:
                 f = None

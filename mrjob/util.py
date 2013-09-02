@@ -412,7 +412,7 @@ def read_file(path, fileobj=None):
             else:
                 lines = bunzip2_stream(f)
         else:
-            # handle boto.s3.S3Key, which yields chunks of bytes, not lines
+            # handle boto.s3.Key, which yields chunks of bytes, not lines
             lines = buffer_iterator_to_line_iterator(f)
 
         for line in lines:

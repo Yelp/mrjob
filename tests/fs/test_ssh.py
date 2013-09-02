@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,12 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import bz2
 import os
 
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob import ssh
 
+from tests.compress import gz
 from tests.fs import MockSubprocessTestCase
 from tests.mockssh import main as mock_ssh_main
 
@@ -76,12 +77,28 @@ class SSHFSTestCase(MockSubprocessTestCase):
                          ['ssh://testmaster/f', 'ssh://testmaster/d/f2'])
 
     def test_cat_uncompressed(self):
-        # mrjob's ssh doesn't support compressed files.
         self.make_master_file(os.path.join('data', 'foo'), 'foo\nfoo\n')
         remote_path = self.fs.path_join('ssh://testmaster/data', 'foo')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          ['foo\n', 'foo\n'])
+
+    def test_cat_bz2(self):
+        self.make_master_file(os.path.join('data', 'foo.bz2'),
+                              bz2.compress('foo\n' * 1000))
+        remote_path = self.fs.path_join('ssh://testmaster/data', 'foo.bz2')
+
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n'] * 1000)
+
+    def test_cat_gz(self):
+        self.make_master_file(os.path.join('data', 'foo.gz'),
+                              gz('foo\n' * 10000))
+        remote_path = self.fs.path_join('ssh://testmaster/data', 'foo.gz')
+
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n'] * 10000)
+
 
     def test_slave_cat(self):
         self.add_slave()

@@ -492,9 +492,19 @@ class read_fileTest(unittest.TestCase):
         input_gz.write('foo\nbar\n')
         input_gz.close()
 
+        # restrict a file object to only the read() method
+        class OnlyReadWrapper(object):
+
+            def __init__(self, fp):
+                self.fp = fp
+
+            def read(self, *args, **kwargs):
+                return self.fp.read(*args, **kwargs)
+
         output = []
-        for line in read_file(input_gz_path, fileobj=open(input_gz_path)):
-            output.append(line)
+        with open(input_gz_path) as f:
+            for line in read_file(input_gz_path, fileobj=OnlyReadWrapper(f)):
+                output.append(line)
 
         self.assertEqual(output, ['foo\n', 'bar\n'])
 

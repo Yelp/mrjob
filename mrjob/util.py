@@ -23,6 +23,7 @@ import contextlib
 from copy import deepcopy
 from datetime import timedelta
 import glob
+import gzip
 import hashlib
 import itertools
 import logging
@@ -396,26 +397,28 @@ def read_file(path, fileobj=None):
     # ``finally`` block. not sure why.
     f = None
     try:
-        if path.endswith('.gz'):
-            f = buffer_iterator_to_line_iterator(gunzip_stream(fileobj))
-        elif path.endswith('.bz2'):
-            if bz2 is None:
-                f = None
-                raise Exception('bz2 module was not successfully imported'
-                                ' (likely not installed).')
-            elif fileobj is None:
-                f = bz2.BZ2File(path)
-            else:
-                f = bunzip2_stream(fileobj)
-        elif fileobj is None:
+        # open path if we need to
+        if fileobj is None:
             f = open(path)
         else:
             f = fileobj
 
-        for line in f:
+        if path.endswith('.gz'):
+            lines = buffer_iterator_to_line_iterator(gunzip_stream(f))
+        elif path.endswith('.bz2'):
+            if bz2 is None:
+                raise Exception('bz2 module was not successfully imported'
+                                ' (likely not installed).')
+            else:
+                lines = bunzip2_stream(f)
+        else:
+            # handle boto.s3.S3Key, which yields chunks of bytes, not lines
+            lines = buffer_iterator_to_line_iterator(f)
+
+        for line in lines:
             yield line
     finally:
-        if fileobj is None and not f is None:
+        if f and f is not fileobj:
             f.close()
 
 

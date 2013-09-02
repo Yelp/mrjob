@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import shlex
 import sys
 import tarfile
 import zipfile
+import zlib
 
 try:
     import bz2
@@ -425,12 +426,36 @@ def bunzip2_stream(fileobj):
     # decompress chunks into a buffer, then stream from the buffer
     buffer = ''
     if bz2 is None:
-        raise Exception('bz2 module was not successfully imported (likely not installed).')
+        raise Exception(
+            'bz2 module was not successfully imported (likely not installed).')
     decomp = bz2.BZ2Decompressor()
     for part in fileobj:
         buffer = buffer.join(decomp.decompress(part))
     f = buffer.splitlines(True)
     return f
+
+
+def gunzip_stream(fileobj, bufsize=1024):
+    """Decompress gzipped data on the fly.
+
+    :param fileobj: object supporting ``read()``
+    :param bufsize: number of bytes to read from *fileobj* at a time. The
+                    default is the same as in :py:mod:`gzip`.
+
+    This yields decompressed chunks; it does *not* split on lines. Use
+    :py:func:`buffer_iterator_to_line_iterator` for that.
+    """
+    # see Issue #601 for why we need this.
+
+    # the 16 says to read gzip rather than zlib data
+    d = zlib.decompressobj(16 + zlib.MAX_WBITS)
+    while True:
+        chunk = fileobj.read(bufsize)
+        if not chunk:
+            return
+        data = d.decompress(chunk)
+        if data:
+            yield data
 
 
 @contextlib.contextmanager

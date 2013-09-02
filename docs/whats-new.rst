@@ -10,7 +10,8 @@ The default runner is now `inline` instead of `local`. This change will speed
 up debugging for many users. Use `local` if you need to simulate more features
 of Hadoop.
 
-The EMR tools can now be accessed more easily via the `mrjob` command. Learn more [here].
+The EMR tools can now be accessed more easily via the `mrjob` command. Learn
+more :doc:`here <guides/cmd>`.
 
 Job steps are much richer now:
 

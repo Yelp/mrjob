@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import bz2
 import os
 
 try:
@@ -59,15 +60,25 @@ class S3FSTestCase(SandboxedTestCase):
         return 's3://%s/%s' % (bucket, path)
 
     def test_cat_uncompressed(self):
-        remote_path = self.add_mock_s3_data('walrus', 'data/foo', 'foo\nfoo\n')
+        remote_path = self.add_mock_s3_data(
+            'walrus', 'data/foo', 'foo\nfoo\n')
+
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          ['foo\n', 'foo\n'])
 
-    def test_cat_gzipped_data(self):
-        remote_path = self.add_mock_s3_data('walrus', 'data/foo.gz',
-                                            gz('foo\nfoo\n'))
+    def test_cat_bzipped_data(self):
+        remote_path = self.add_mock_s3_data(
+            'walrus', 'data/foo.bz2', bz2.compress('foo\n' * 1000))
+
         self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         ['foo\n', 'foo\n'])
+                         ['foo\n'] * 1000)
+
+    def test_cat_gzipped_data(self):
+        remote_path = self.add_mock_s3_data(
+            'walrus', 'data/foo.gz', gz('foo\n' * 10000))
+
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n'] * 10000)
 
     def test_ls_basic(self):
         remote_path = self.add_mock_s3_data('walrus', 'data/foo', 'foo\nfoo\n')

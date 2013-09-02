@@ -23,7 +23,6 @@ import contextlib
 from copy import deepcopy
 from datetime import timedelta
 import glob
-import gzip
 import hashlib
 import itertools
 import logging

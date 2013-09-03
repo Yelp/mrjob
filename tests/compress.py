@@ -15,10 +15,10 @@
 import gzip
 from StringIO import StringIO
 
+
 # use bz2.compress() to compress bz2 data
 
-# not calling this "gzip" because that's a module name
-def gz(data):
+def gzip_compress(data):
     """return the gzip-compressed version of the given bytes."""
     s = StringIO()
     g = gzip.GzipFile(fileobj=s, mode='wb')

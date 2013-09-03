@@ -22,7 +22,7 @@ except ImportError:
 
 from mrjob.fs.s3 import S3Filesystem
 
-from tests.compress import gz
+from tests.compress import gzip_compress
 from tests.mockboto import MockS3Connection
 from tests.mockboto import add_mock_s3_data
 from tests.sandbox import SandboxedTestCase
@@ -75,7 +75,7 @@ class S3FSTestCase(SandboxedTestCase):
 
     def test_cat_gz(self):
         remote_path = self.add_mock_s3_data(
-            'walrus', 'data/foo.gz', gz('foo\n' * 10000))
+            'walrus', 'data/foo.gz', gzip_compress('foo\n' * 10000))
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          ['foo\n'] * 10000)
@@ -112,7 +112,7 @@ class S3FSTestCase(SandboxedTestCase):
         ]
 
         self.assertEqual(list(self.fs.ls('s3n://walrus/data/*')),
-                         [ p.replace('s3://', 's3n://') for p in paths ])
+                         [p.replace('s3://', 's3n://') for p in paths])
 
     def test_du(self):
         paths = [

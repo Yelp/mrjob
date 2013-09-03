@@ -388,16 +388,21 @@ def read_input(path, stdin=None):
 
 
 def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
-    """Reads a file.
+    """Yields lines from a file, possibly decompressing it based on file
+    extension.
 
-    - Decompress ``.gz`` and ``.bz2`` files.
-    - If *fileobj* is not ``None``, stream lines from the *fileobj*
+    Currently we handle compressed files with the extensions ``.gz`` and
+    ``.bz2``.
 
-    If *fileobj*'s iterator yields chunks of data rather than lines
-    (like :py:class:`boto.s3.Key`), set *yields_lines* to ``False``.
-
-    *cleanup* is an optional callback, called when EOF is reached
-    or if an exception is raised.
+    :param string path: file path. Need not be a path on the local filesystem
+                        (URIs are okay) as long as you specify *fileobj* too.
+    :param fileobj: file object to read from. Need not be seekable. If this
+                    is omitted, we ``open(path)``.
+    :param yields_lines: Does iterating over *fileobj* yield lines (like
+                         file objects are supposed to)? If not, set this to
+                         ``False`` (useful for :py:class:`boto.s3.Key`)
+    :param cleanup: Optional callback to call with no arguments when EOF is
+                    reached or an exception is thrown.
     """
     # sometimes values declared in the ``try`` block aren't accessible from the
     # ``finally`` block. not sure why.
@@ -462,8 +467,10 @@ def gunzip_stream(fileobj, bufsize=1024):
     """
     # see Issue #601 for why we need this.
 
-    # the 16 says to read gzip rather than zlib data
-    d = zlib.decompressobj(16 + zlib.MAX_WBITS)
+    # we need this flag to read gzip rather than raw zlib, but it's not
+    # actually defined in zlib, so we define it here.
+    READ_GZIP_DATA = 16
+    d = zlib.decompressobj(READ_GZIP_DATA | zlib.MAX_WBITS)
     while True:
         chunk = fileobj.read(bufsize)
         if not chunk:

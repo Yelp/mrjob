@@ -33,20 +33,38 @@ contents. Save all relevant table data in ``env.optionlist_all_options``.
 After doctree is read
 ---------------------
 
-For each ``optionlist`` node, populate its contents with a table. Use
-``optionlink`` nodes in place of references to ``option`` nodes, as links have
-not yet been resolved.
+Do nothing.
 
 After doctree is resolved
 -------------------------
 
+For each ``optionlist`` node, populate its contents with a table. Use
+``optionlink`` nodes in place of references to ``option`` nodes, as links have
+not yet been resolved. (This used to happen during doctree-read but was moved.
+It seemed prudent to keep the separation.) *see massive note below
+
 Replace ``optionlink`` nodes with references to their respective ``option``
 nodes.
 
+* The table includes subtrees taken verbatim from the 'type' and 'default'
+  fields of the option definition. These may include references (rendered at
+  read time by Sphinx as pending_xref nodes) which are converted to reference
+  nodes during resolution. If the tables are generated before every document is
+  resolved (which unfortunately is a near certainty and definitely the case
+  now), some of these subtrees will still contain pending_xref nodes.
+
+  This problem is fixed using a small function taken from the Sphinx source. It
+  doesn't work with intersphinx, but it's otherwise fine.
 """
 from docutils import nodes
 from docutils.parsers.rst import directives
+from sphinx import addnodes
+from sphinx.errors import SphinxError
 from sphinx.util.compat import Directive
+
+
+class MRJobOptError(SphinxError):
+    category = 'mrjob-opt error'
 
 
 def setup(app):
@@ -60,11 +78,57 @@ def setup(app):
                  latex=(visit_noop, depart_noop),
                  text=(visit_noop, depart_noop))
 
+    def doctree_resolved(app, doctree, fromdocname):
+        populate_option_lists(app, doctree, fromdocname)
+        replace_optionlinks_with_links(app, doctree, fromdocname)
+
     app.add_directive('mrjob-opt', OptionDirective)
     app.add_directive('mrjob-optlist', OptionlistDirective)
-    app.connect('doctree-read', populate_option_lists)
-    app.connect('doctree-resolved', replace_optionlinks_with_links)
+    app.add_role('mrjob-opt', mrjob_opt_role)
+    app.connect('doctree-resolved', doctree_resolved)
     app.connect('env-purge-doc', purge_options)
+
+
+def resolve_pending_xref(app, fromdocname, node):
+    # Based on nodes.py in Sphinx. Resolves a subset of possible pending_xref
+    # nodes that we see in practice in the config reference table. Uses only
+    # public methods (afaict the proper API, zero hacks).
+    if 'refdomain' in node and node['refdomain']:
+        domain = None
+        contnode = node[0].deepcopy()
+
+        builder = app.builder
+        env = app.builder.env
+        try:
+            domain = env.domains[node['refdomain']]
+        except KeyError:
+            raise MRJobOptError('could not resolve domain for %s' % node)
+        newnode = domain.resolve_xref(
+            app, fromdocname, builder, node['reftype'], node['reftarget'],
+            node, contnode)
+        if newnode:
+            return [newnode]
+        else:
+            # this reference can't be resolved, but that's probably because
+            # it's an 'optional link' like an :envvar: with no definition in
+            # the docs.
+            return node.children
+    else:
+        return node.children
+
+
+def resolve_possible_pending_xrefs(app, fromdocname, maybe_xrefs):
+    """If any node is a pending_xref, attempt to resolve it. If it cannot be
+    resolved, replace it with its children.
+    """
+    result = []
+    for node in maybe_xrefs:
+        if isinstance(node, addnodes.pending_xref):
+            result.extend(resolve_pending_xref(
+                app, fromdocname, node.deepcopy()))
+        else:
+            result.append(node)
+    return result
 
 
 class option(nodes.General, nodes.Element):
@@ -81,7 +145,9 @@ class optionlink(nodes.General, nodes.Element):
     """temporary node created during doctree-read and replaced with a link
     during doctree-resolved
     """
-    pass
+    def __init__(self, text, *args, **kwargs):
+        super(optionlink, self).__init__(text, *args, **kwargs)
+        self.text = text
 
 
 # We are required to have visit/depart functions for each node that appears in
@@ -92,6 +158,11 @@ def visit_noop(self, node):
 
 def depart_noop(self, node):
     pass
+
+
+def mrjob_opt_role(role, rawtext, text, lineno, inliner,
+        options={}, content=[]):
+    return [optionlink(text=text, option_info_key=text)], []
 
 
 class OptionlistDirective(Directive):
@@ -134,7 +205,7 @@ class OptionDirective(Directive):
         env = self.state.document.settings.env
 
         # generate the linkback node for this option
-        targetid = "option-%d" % env.new_serialno('mrjob-opt')
+        targetid = "option-%s" % self.options['config']
         targetnode = nodes.target('', '', ids=[targetid])
 
         # Each option will be outputted as a single-item definition list
@@ -163,21 +234,11 @@ class OptionDirective(Directive):
 
         dli.append(term)
 
-        # classifier is either plan text or a link to some more docs, so parse
+        # classifier is either plain text or a link to some more docs, so parse
         # its contents
         classifier = nodes.classifier()
         type_nodes, messages = self.state.inline_text(
             self.options.get('type', ''), self.lineno)
-
-        # failed attempt at a markup shortcut; may be able to make this work
-        # later
-        #t = option_info['options']['type']
-        #refnode = addnodes.pending_xref(
-        #    t, reftarget='data-type-%s' % t,
-        #    refexplicit=True, reftype='ref')
-        #print refnode
-        #refnode += nodes.Text(t, t)
-        #type_nodes = [refnode]
 
         classifier.extend(type_nodes)
         dli.append(classifier)
@@ -207,17 +268,20 @@ class OptionDirective(Directive):
 
         if not hasattr(env, 'optionlist_all_options'):
             env.optionlist_all_options = []
+            env.optionlist_indexed_options = {}
 
         # store info for the optionlist traversal to find
-        env.optionlist_all_options.append({
+        info = {
             'docname': env.docname,
             'lineno': self.lineno,
             'options': self.options,
             'content': self.content,
             'target': targetnode,
-            'type_nodes': [n.deepcopy() for n in type_nodes],
-            'default_nodes': [n.deepcopy() for n in default_nodes]
-        })
+            'type_nodes': type_nodes,
+            'default_nodes': default_nodes,
+        }
+        env.optionlist_all_options.append(info)
+        env.optionlist_indexed_options[self.options['config']] = info
 
         return [targetnode, dl]
 
@@ -229,10 +293,14 @@ def purge_options(app, env, docname):
     env.optionlist_all_options = [
         option for option in env.optionlist_all_options
         if option['docname'] != docname]
+    env.optionlist_indexed_options = dict([
+        (option['options']['config'], option)
+        for option in env.optionlist_all_options
+    ])
 
 
 # after doctree is read
-def populate_option_lists(app, doctree):
+def populate_option_lists(app, doctree, fromdocname):
     env = app.builder.env
 
     for node in doctree.traverse(optionlist):
@@ -296,24 +364,24 @@ def populate_option_lists(app, doctree):
             # resolved. one of these for each config key and switch.
             def make_refnode(text):
                 par = nodes.paragraph()
-                ol = optionlink()
-                ol.text = text
-                ol.docname = option_info['docname']
-                ol.target = option_info['target']
+                ol = optionlink(
+                    text, option_info_key=option_info['options']['config'])
                 par.append(ol)
                 return par
 
             config_column.append(
-                make_refnode(option_info['options'].get('config', '')))
+                make_refnode(option_info['options']['config']))
             switches_column.append(
                 make_refnode(option_info['options'].get('switch', '')))
 
             par = nodes.paragraph()
-            par.extend(option_info['default_nodes'])
+            par.extend(resolve_possible_pending_xrefs(
+                app, fromdocname, option_info['default_nodes']))
             default_column.append(par)
 
             par = nodes.paragraph()
-            par.extend(option_info['type_nodes'])
+            par.extend(resolve_possible_pending_xrefs(
+                app, fromdocname, option_info['type_nodes']))
             type_column.append(par)
 
             row.extend([
@@ -333,12 +401,20 @@ def replace_optionlinks_with_links(app, doctree, fromdocname):
     # optionlink has attrs text, docname, target,
 
     for node in doctree.traverse(optionlink):
+        env = app.builder.env
+
+        k = node['option_info_key']
+        try:
+            option_info = env.optionlist_indexed_options[k]
+        except KeyError:
+            raise MRJobOptError("Unknown mrjob-opt %s" % k)
+
         refnode = nodes.reference('', '')
         innernode = nodes.emphasis(node.text, node.text)
-        refnode['refdocname'] = node.docname
+        refnode['refdocname'] = option_info['docname']
         refnode['refuri'] = app.builder.get_relative_uri(
-            fromdocname, node.docname)
-        refnode['refuri'] += '#' + node.target['refid']
+            fromdocname, option_info['docname'])
+        refnode['refuri'] += '#' + option_info['target']['refid']
         refnode.append(innernode)
 
         node.replace_self([refnode])

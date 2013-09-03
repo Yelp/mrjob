@@ -108,6 +108,7 @@ html_theme = 'better'
 # further.  For a list of options available for each theme, see the
 # documentation.
 html_theme_options = {
+    'cssfiles': ['_static/style.css'],
 }
 
 html_context = {

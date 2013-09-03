@@ -140,6 +140,7 @@ class OptionDirective(Directive):
         # Each option will be outputted as a single-item definition list
         # (just like it was doing before we used this extension)
         dl = nodes.definition_list()
+        dl['classes'].append('mrjob-opt')
         dli = nodes.definition_list_item()
 
         term = nodes.term()

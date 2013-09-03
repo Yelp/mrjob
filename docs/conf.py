@@ -14,6 +14,9 @@
 
 import os
 import sys
+
+from better import better_theme_path
+
 import mrjob
 
 READ_THE_DOCS = os.environ.get('READTHEDOCS', None) == 'True'
@@ -99,27 +102,28 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'theme'
+html_theme = 'better'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 html_theme_options = {
+    'cssfiles': ['_static/style.css'],
 }
 
 html_context = {
 }
 
 if READ_THE_DOCS:
-    html_context['ga_ua'] = 'UA-42793220-1'
-    html_context['ga_domain'] = 'readthedocs.org'
+    html_theme_options['ga_ua'] = 'UA-42793220-1'
+    html_theme_options['ga_domain'] = 'readthedocs.org'
 else:
-    html_context['ga_ua'] = 'UA-42793220-2'
-    html_context['ga_domain'] = 'pythonhosted.org'
+    html_theme_options['ga_ua'] = 'UA-42793220-2'
+    html_theme_options['ga_domain'] = 'pythonhosted.org'
 
 
 # Add any paths that contain custom themes here, relative to this directory.
-html_theme_path = ['.']
+html_theme_path = [better_theme_path]
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".

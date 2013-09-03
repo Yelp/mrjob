@@ -1,0 +1,50 @@
+/*** stuff custom to mrjob's docs ***/
+
+/* make links red instead of blue */
+
+a { color: #a00; }
+a:visited { color: #800; }
+
+/*** stuff that will go back into sphinx-better-theme ***/
+/* (first used here to verify it use with this kind of project) */
+
+/* larger body width */
+header#pageheader, footer#pagefooter, div.related, div.document {
+  max-width: 60rem;
+}
+
+/* normalize sizing (override default theme's making parts larger) */
+dl.function > dt tt,
+dl.class > dt tt,
+dl.method > dt tt,
+dl.attribute > dt tt,
+dl.data > dt tt,
+dl.classmethod > dt tt {
+  font-size: 1.2rem;
+}
+
+/* if window is too small... */
+
+@media (max-width: 50rem) {
+  /* don't float sidebar */
+  div.bodywrapper { margin: 0; }
+  div.sphinxsidebar {
+    float: none;
+    margin: 0;
+  }
+
+  /* margins on body */
+  header#pageheader, footer#pagefooter, div.related, div.document {
+    margin: 0 1rem;
+    width: calc(100% - 2rem);
+  }
+}
+
+/* revert tt to default theme's font-family; some in sphinx-better-theme don't
+ * allow bold. (this will change in sphinx-better-theme soon.)
+ */
+
+tt {
+  font-family: monospace;
+  font-size: 1.2em;
+}

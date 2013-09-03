@@ -53,11 +53,8 @@ nodes.
   resolved (which unfortunately is a near certainty and definitely the case
   now), some of these subtrees will still contain pending_xref nodes.
 
-  We have code to take care of 90% of these cases, but for some reason doesn't
-  work for all types, notably :envvar: and anything from intersphinx.  The best
-  band-aid I could come up with was to strip out offending pending_xref nodes
-  and replace them with their children. So you see the text but there's no
-  link.
+  This problem is fixed using a small function taken from the Sphinx source. It
+  doesn't work with intersphinx, but it's otherwise fine.
 """
 from docutils import nodes
 from docutils.parsers.rst import directives
@@ -96,8 +93,6 @@ def resolve_pending_xref(app, fromdocname, node):
     # Based on nodes.py in Sphinx. Resolves a subset of possible pending_xref
     # nodes that we see in practice in the config reference table. Uses only
     # public methods (afaict the proper API, zero hacks).
-    # Currently does not work for :envvar: or intersphinx references for
-    # reasons unknown.
     if 'refdomain' in node and node['refdomain']:
         domain = None
         contnode = node[0].deepcopy()
@@ -114,10 +109,9 @@ def resolve_pending_xref(app, fromdocname, node):
         if newnode:
             return [newnode]
         else:
-            # this is a non-fatal error but should be noted when building the
-            # docs. the process for printing output during a build is
-            # undocumented, so just use a print statement.
-            print '(non-fatal) stripping unresolvable pending_xref', node
+            # this reference can't be resolved, but that's probably because
+            # it's an 'optional link' like an :envvar: with no definition in
+            # the docs.
             return node.children
     else:
         return node.children

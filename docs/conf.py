@@ -19,6 +19,9 @@ from better import better_theme_path
 
 import mrjob
 
+# Help sphinx find options_extension
+sys.path += [os.path.abspath(os.path.split(__file__)[0])]
+
 READ_THE_DOCS = os.environ.get('READTHEDOCS', None) == 'True'
 
 # If extensions (or modules to document with autodoc) are in another directory,

@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import bz2
 import os
 
 try:
@@ -21,6 +22,7 @@ except ImportError:
 
 from mrjob.fs.s3 import S3Filesystem
 
+from tests.compress import gzip_compress
 from tests.mockboto import MockS3Connection
 from tests.mockboto import add_mock_s3_data
 from tests.sandbox import SandboxedTestCase
@@ -58,8 +60,25 @@ class S3FSTestCase(SandboxedTestCase):
         return 's3://%s/%s' % (bucket, path)
 
     def test_cat_uncompressed(self):
-        remote_path = self.add_mock_s3_data('walrus', 'data/foo', 'foo\nfoo\n')
-        self.assertEqual(list(self.fs._cat_file(remote_path)), ['foo\n', 'foo\n'])
+        remote_path = self.add_mock_s3_data(
+            'walrus', 'data/foo', 'foo\nfoo\n')
+
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n', 'foo\n'])
+
+    def test_cat_bz2(self):
+        remote_path = self.add_mock_s3_data(
+            'walrus', 'data/foo.bz2', bz2.compress('foo\n' * 1000))
+
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n'] * 1000)
+
+    def test_cat_gz(self):
+        remote_path = self.add_mock_s3_data(
+            'walrus', 'data/foo.gz', gzip_compress('foo\n' * 10000))
+
+        self.assertEqual(list(self.fs._cat_file(remote_path)),
+                         ['foo\n'] * 10000)
 
     def test_ls_basic(self):
         remote_path = self.add_mock_s3_data('walrus', 'data/foo', 'foo\nfoo\n')
@@ -93,7 +112,7 @@ class S3FSTestCase(SandboxedTestCase):
         ]
 
         self.assertEqual(list(self.fs.ls('s3n://walrus/data/*')),
-                         [ p.replace('s3://', 's3n://') for p in paths ])
+                         [p.replace('s3://', 's3n://') for p in paths])
 
     def test_du(self):
         paths = [

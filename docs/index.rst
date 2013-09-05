@@ -75,8 +75,8 @@ Reference
     :maxdepth: 2
 
     whats-new.rst
-    reference.rst
     guides.rst
+    reference.rst
 
 * :ref:`genindex`
 * :ref:`modindex`

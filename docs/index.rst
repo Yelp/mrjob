@@ -68,8 +68,8 @@ Guides
 * :doc:`guides/contributing`
 * :doc:`guides/runner-job-interactions`
 
-Reference
-=========
+Table of Contents
+=================
 
 .. toctree::
     :maxdepth: 2

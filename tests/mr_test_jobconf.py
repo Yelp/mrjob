@@ -1,4 +1,5 @@
 # Copyright 2009-2012 Yelp
+# Copyright 2013 Lyft
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,7 +48,7 @@ JOBCONF_LIST = [
 
 class MRTestJobConf(MRJob):
 
-    def mapper(self, _, line):
+    def mapper_init(self):
         for jobconf in JOBCONF_LIST:
             yield (jobconf, get_jobconf_value(jobconf))
 

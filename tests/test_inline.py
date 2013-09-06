@@ -37,6 +37,7 @@ from mrjob.protocol import JSONValueProtocol
 from tests.mr_test_cmdenv import MRTestCmdenv
 from mrjob.job import MRJob
 from tests.mr_test_jobconf import MRTestJobConf
+from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -179,9 +180,9 @@ class NoMRJobConfTestCase(TestCase):
                 self.assertEqual(output, [2, 3, 4])
 
 
-class InlineMRJobRunnerTestJobConfCase(SandboxedTestCase):
+class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
 
-    def test_input_file(self):
+    def test_input_files_and_setting_number_of_tasks(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
             input_file.write('bar\nqux\nfoo\n')
@@ -211,7 +212,7 @@ class InlineMRJobRunnerTestJobConfCase(SandboxedTestCase):
         self.assertEqual(sorted(results),
                          [(input_path, 3), (input_gz_path, 1)])
 
-    def test_others(self):
+    def test_jobconf_set_by_runner(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
             input_file.write('foo\n')
@@ -245,3 +246,20 @@ class InlineMRJobRunnerTestJobConfCase(SandboxedTestCase):
                          runner._output_dir)
         self.assertEqual(results['mapreduce.task.partition'], '0')
         self.assertEqual(results['user.defined'], 'something')
+
+    def test_per_step_jobconf(self):
+        mr_job = MRTestPerStepJobConf([
+            '-r', 'inline', '--jobconf=user.defined=something'])
+        mr_job.sandbox()
+
+        results = {}
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results[key] = value
+
+        # user.defined gets re-defined in the second step
+        self.assertEqual(results['user.defined'], ['something', 'nothing'])

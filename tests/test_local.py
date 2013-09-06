@@ -1,4 +1,5 @@
-# Copyright 2009-2013 Yelp and Contributors
+# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2013 David Marin and Lyft
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,6 +45,7 @@ from tests.mr_filter_job import FilterJob
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_test_jobconf import MRTestJobConf
+from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.mr_word_count import MRWordCount
@@ -507,9 +509,9 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
                 self.assertFalse(script_mrjob_dir.startswith(local_tmp_dir))
 
 
-class LocalMRJobRunnerTestJobConfCase(SandboxedTestCase):
+class LocalMRJobRunnerJobConfTestCase(SandboxedTestCase):
 
-    def test_input_file(self):
+    def test_input_files_and_setting_number_of_tasks(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
             input_file.write('bar\nqux\nfoo\n')
@@ -539,7 +541,7 @@ class LocalMRJobRunnerTestJobConfCase(SandboxedTestCase):
         self.assertEqual(sorted(results),
                          [(input_path, 3), (input_gz_path, 1)])
 
-    def test_others(self):
+    def test_jobconf_set_by_runner(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
             input_file.write('foo\n')
@@ -576,6 +578,23 @@ class LocalMRJobRunnerTestJobConfCase(SandboxedTestCase):
                          runner._output_dir)
         self.assertEqual(results['mapreduce.task.partition'], '0')
         self.assertEqual(results['user.defined'], 'something')
+
+    def test_per_step_jobconf(self):
+        mr_job = MRTestPerStepJobConf([
+            '-r', 'local', '--jobconf=user.defined=something'])
+        mr_job.sandbox()
+
+        results = {}
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = mr_job.parse_output_line(line)
+                results[key] = value
+
+        # user.defined gets re-defined in the second step
+        self.assertEqual(results['user.defined'], ['something', 'nothing'])
 
 
 class CompatTestCase(EmptyMrjobConfTestCase):

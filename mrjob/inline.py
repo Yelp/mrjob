@@ -116,8 +116,11 @@ class InlineMRJobRunner(SimMRJobRunner):
     def _get_steps(self):
         """Redefine this so that we can get step descriptions without
         calling a subprocess."""
-        job_args = ['--steps'] + self._mr_job_extra_args(local=True)
-        return self._mrjob_cls(args=job_args)._steps_desc()
+        if self._steps is None:
+            job_args = ['--steps'] + self._mr_job_extra_args(local=True)
+            self._steps = self._mrjob_cls(args=job_args)._steps_desc()
+
+        return self._steps
 
     def run_step(self, step_dict, input_file, outfile_name,
                  step_number, step_type, env,

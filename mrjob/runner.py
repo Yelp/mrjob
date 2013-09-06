@@ -1067,7 +1067,7 @@ class MRJobRunner(object):
         return add_translated_jobconf_for_hadoop_version(
             jobconf, self.get_hadoop_version())
 
-    def _hadoop_conf_args(self, step_num):
+    def _hadoop_args_for_step(self, step_num):
         """Build a list of extra arguments to the hadoop binary.
 
         This handles *cmdenv*, *hadoop_extra_args*, *hadoop_input_format*,

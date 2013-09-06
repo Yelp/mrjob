@@ -395,17 +395,17 @@ sys.exit(13)
         self.environment_variable_checks(runner, ['TMP'])
 
 
-class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
+class HadoopArgsTestCase(EmptyMrjobConfTestCase):
 
     def test_empty(self):
         job = MRWordCount()
         with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_conf_args(0), [])
+            self.assertEqual(runner._hadoop_args_for_step(0), [])
 
     def test_hadoop_extra_args(self):
         job = MRWordCount(['--hadoop-arg', '-foo'])
         with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_conf_args(0), ['-foo'])
+            self.assertEqual(runner._hadoop_args_for_step(0), ['-foo'])
 
     def test_cmdenv(self):
         cmdenv = {'FOO': 'bar', 'BAZ': 'qux', 'BAX': 'Arnold'}
@@ -413,7 +413,7 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
                            '--cmdenv', 'BAZ=qux',
                            '--cmdenv', 'BAX=Arnold'])
         with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_conf_args(0),
+            self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-cmdenv', 'BAX=Arnold',
                               '-cmdenv', 'BAZ=qux',
                               '-cmdenv', 'FOO=bar',
@@ -427,16 +427,16 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
         # no cmd-line argument for this because it's part of job semantics
         job1.HADOOP_INPUT_FORMAT = input_format
         with job1.make_runner() as runner1:
-            self.assertEqual(runner1._hadoop_conf_args(0),
+            self.assertEqual(runner1._hadoop_args_for_step(0),
                              ['-inputformat', input_format])
 
         # multi-step job: only use -inputformat on the first step
         job2 = MRTwoStepJob()
         job2.HADOOP_INPUT_FORMAT = input_format
         with job2.make_runner() as runner2:
-            self.assertEqual(runner2._hadoop_conf_args(0),
+            self.assertEqual(runner2._hadoop_args_for_step(0),
                              ['-inputformat', input_format])
-            self.assertEqual(runner2._hadoop_conf_args(1), [])
+            self.assertEqual(runner2._hadoop_args_for_step(1), [])
 
     def test_hadoop_output_format(self):
         output_format = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
@@ -446,15 +446,15 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
         # no cmd-line argument for this because it's part of job semantics
         job1.HADOOP_OUTPUT_FORMAT = output_format
         with job1.make_runner() as runner1:
-            self.assertEqual(runner1._hadoop_conf_args(0),
+            self.assertEqual(runner1._hadoop_args_for_step(0),
                              ['-outputformat', output_format])
 
         # multi-step job: only use -outputformat on the last step
         job2 = MRTwoStepJob()
         job2.HADOOP_OUTPUT_FORMAT = output_format
         with job2.make_runner() as runner2:
-            self.assertEqual(runner2._hadoop_conf_args(0), [])
-            self.assertEqual(runner2._hadoop_conf_args(1),
+            self.assertEqual(runner2._hadoop_args_for_step(0), [])
+            self.assertEqual(runner2._hadoop_args_for_step(1),
                              ['-outputformat', output_format])
 
     def test_jobconf(self):
@@ -464,7 +464,7 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
 
         job = MRWordCount(jobconf_args)
         with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_conf_args(0),
+            self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-D', 'BAX=Arnold',
                               '-D', 'BAZ=qux',
                               '-D', 'FOO=bar',
@@ -472,7 +472,7 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
 
         job_0_18 = MRWordCount(jobconf_args + ['--hadoop-version', '0.18'])
         with job_0_18.make_runner() as runner_0_18:
-            self.assertEqual(runner_0_18._hadoop_conf_args(0),
+            self.assertEqual(runner_0_18._hadoop_args_for_step(0),
                              ['-jobconf', 'BAX=Arnold',
                               '-jobconf', 'BAZ=qux',
                               '-jobconf', 'FOO=bar',
@@ -485,7 +485,7 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
         job.JOBCONF = {'foo': '', 'bar': None}
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_conf_args(0),
+            self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-D', 'foo='])
 
     def test_configuration_translation(self):
@@ -495,7 +495,7 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
 
         with job.make_runner() as runner:
             with no_handlers_for_logger('mrjob.compat'):
-                self.assertEqual(runner._hadoop_conf_args(0),
+                self.assertEqual(runner._hadoop_args_for_step(0),
                          ['-D', 'mapred.jobtracker.maxtasks.per.job=1',
                           '-D', 'mapreduce.jobtracker.maxtasks.perjob=1'
                           ])
@@ -506,7 +506,7 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
         runner = LocalMRJobRunner(jobconf=jobconf)
         runner._steps = [{'jobconf': {'BAZ': 'quux', 'BAX': 'Arnold'}}]
 
-        self.assertEqual(runner._hadoop_conf_args(0),
+        self.assertEqual(runner._hadoop_args_for_step(0),
                          ['-D', 'BAX=Arnold',
                           '-D', 'BAZ=quux',
                           '-D', 'FOO=bar',
@@ -517,7 +517,7 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
         job = MRWordCount(['--partitioner', partitioner])
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_conf_args(0),
+            self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-partitioner', partitioner])
 
     def test_hadoop_extra_args_comes_first(self):
@@ -530,6 +530,6 @@ class HadoopConfArgsTestCase(EmptyMrjobConfTestCase):
         job.HADOOP_OUTPUT_FORMAT = 'BarOutputFormat'
 
         with job.make_runner() as runner:
-            conf_args = runner._hadoop_conf_args(0)
-            self.assertEqual(conf_args[:2], ['-libjar', 'qux.jar'])
-            self.assertEqual(len(conf_args), 12)
+            hadoop_args = runner._hadoop_args_for_step(0)
+            self.assertEqual(hadoop_args[:2], ['-libjar', 'qux.jar'])
+            self.assertEqual(len(hadoop_args), 12)

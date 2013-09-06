@@ -691,7 +691,7 @@ class SortValuesRunnerTestCase(SandboxedTestCase):
         runner = MRSortValuesJob().make_runner()
 
         self.assertEqual(
-            runner._hadoop_conf_args(0),
+            runner._hadoop_args_for_step(0),
             # foo=bar is included, but the other options from mrjob.conf are
             # blanked out so as not to mess up SORT_VALUES
             ['-D', 'foo=bar',

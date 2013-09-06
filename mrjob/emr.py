@@ -1342,7 +1342,7 @@ class EMRJobRunner(MRJobRunner):
         streaming_step_kwargs.update(self._cache_kwargs())
 
         streaming_step_kwargs['step_args'].extend(
-            self._hadoop_conf_args(step_num))
+            self._hadoop_args_for_step(step_num))
 
         mapper, combiner, reducer = (
             self._hadoop_streaming_commands(step, step_num))

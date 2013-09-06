@@ -591,10 +591,11 @@ class LocalMRJobRunnerJobConfTestCase(SandboxedTestCase):
 
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
-                results[key] = value
+                results[tuple(key)] = value
 
         # user.defined gets re-defined in the second step
-        self.assertEqual(results['user.defined'], ['something', 'nothing'])
+        self.assertEqual(results[(0, 'user.defined')], 'something')
+        self.assertEqual(results[(1, 'user.defined')], 'nothing')
 
 
 class CompatTestCase(EmptyMrjobConfTestCase):

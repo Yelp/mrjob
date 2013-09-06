@@ -17,7 +17,9 @@ from mrjob.compat import get_jobconf_value
 from mrjob.job import MRJob
 
 JOBCONF_LIST = [
-    'user.defined'
+    'mapred.map.tasks',
+    'mapreduce.job.local.dir',
+    'user.defined',
 ]
 
 
@@ -25,15 +27,17 @@ class MRTestPerStepJobConf(MRJob):
 
     def mapper_init(self):
         for jobconf in JOBCONF_LIST:
-            yield (jobconf, get_jobconf_value(jobconf))
+            yield ((self.options.step_num, jobconf),
+                   get_jobconf_value(jobconf))
 
-    def mapper2(self, jobconf, jobconf_value):
-        yield jobconf, [jobconf_value, get_jobconf_value(jobconf)]
+    def mapper(self, key, value):
+        yield key, value
 
     def steps(self):
         return([
             self.mr(mapper_init=self.mapper_init),
-            self.mr(mapper=self.mapper2,
+            self.mr(mapper_init=self.mapper_init,
+                    mapper=self.mapper,
                     jobconf={'user.defined': 'nothing'})])
 
 

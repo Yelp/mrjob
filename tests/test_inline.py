@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2011 Matthew Tai
+# Copyright 2012 Yelp
+# Copyright 2013 Yelp and Lyft
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -126,7 +128,7 @@ class MRIncrementerJob(MRJob):
         yield None, value + 1
 
     def steps(self):
-        return [self.mr(self.mapper)] * self.options.times
+        return [self.mr(mapper=self.mapper)] * self.options.times
 
 
 class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):

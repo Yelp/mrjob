@@ -11,6 +11,7 @@ jobs.
 `v0.4.1-dev documentation <http://mrjob.readthedocs.org/en/latest/>`_
 
 .. image:: https://travis-ci.org/Yelp/mrjob.png
+   :target: https://travis-ci.org/Yelp/mrjob
 
 mrjob fully supports Amazon's Elastic MapReduce (EMR) service, which allows you
 to buy time on a Hadoop cluster on an hourly basis. It also works with your own

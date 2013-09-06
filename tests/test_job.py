@@ -612,6 +612,10 @@ class JobConfTestCase(unittest.TestCase):
 class MRSortValuesJob(MRJob):
     SORT_VALUES = True
 
+    # need to define a mapper or reducer
+    def mapper_init(self):
+        pass
+
 
 class MRSortValuesAndMoreJob(MRSortValuesJob):
     PARTITIONER = 'org.apache.hadoop.mapred.lib.HashPartitioner'
@@ -677,17 +681,17 @@ class SortValuesTestCase(unittest.TestCase):
 
 class SortValuesRunnerTestCase(SandboxedTestCase):
 
-    MRJOB_CONF_CONTENTS = {'runners': {'local': {'jobconf': {
+    MRJOB_CONF_CONTENTS = {'runners': {'inline': {'jobconf': {
         'mapred.text.key.partitioner.options': '-k1,1',
         'mapred.output.key.comparator.class': 'egypt.god.Anubis',
         'foo': 'bar',
     }}}}
 
     def test_cant_override_sort_values_from_mrjob_conf(self):
-        runner = MRSortValuesJob(['-r', 'local']).make_runner()
+        runner = MRSortValuesJob().make_runner()
 
         self.assertEqual(
-            runner._hadoop_conf_args({}, 0, 1),
+            runner._hadoop_conf_args(0),
             # foo=bar is included, but the other options from mrjob.conf are
             # blanked out so as not to mess up SORT_VALUES
             ['-D', 'foo=bar',

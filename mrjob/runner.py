@@ -694,8 +694,9 @@ class MRJobRunner(object):
         there are mappers and reducers for each step. Validate its
         output.
 
-        Returns output as described in :ref:`steps-format`. Results are
-        cached to avoid round trips to a subprocess.
+        Returns output as described in :ref:`steps-format`.
+
+        Results are cached, so call this as many times as you want.
         """
         if self._steps is None:
             if not self._script_path:
@@ -731,6 +732,14 @@ class MRJobRunner(object):
                 self._steps = steps
 
         return self._steps
+
+    def _get_step(self, step_num):
+        """Get a single step (calls :py:meth:`_get_steps`)."""
+        return self._get_steps()[step_num]
+
+    def _num_steps(self):
+        """Get the number of steps (calls :py:meth:`get_steps`)."""
+        return len(self._get_steps())
 
     def _executable(self, steps=False):
         # default behavior is to always use an interpreter. local, emr, and
@@ -1046,19 +1055,19 @@ class MRJobRunner(object):
 
         return self._mrjob_tar_gz_path
 
-    def _jobconf_for_step(self, step):
-        """Get the jobconf dictionary for the given step.
+    def _jobconf_for_step(self, step_num):
+        """Get the jobconf dictionary, optionally including step-specific
+        jobconf info.
 
-        This reads from ``self._opts['jobconf']``, and the step
-        definition, and translates jobconf arguments to the
-        current hadoop version.
+        Also translate jobconfs to the current Hadoop version, if necessary.
         """
+        step = self._get_step(step_num)
         jobconf = combine_dicts(self._opts['jobconf'], step.get('jobconf'))
 
         return add_translated_jobconf_for_hadoop_version(
             jobconf, self.get_hadoop_version())
 
-    def _hadoop_conf_args(self, step, step_num, num_steps):
+    def _hadoop_conf_args(self, step_num):
         """Build a list of extra arguments to the hadoop binary.
 
         This handles *cmdenv*, *hadoop_extra_args*, *hadoop_input_format*,
@@ -1067,7 +1076,7 @@ class MRJobRunner(object):
         This doesn't handle input, output, mappers, reducers, or uploading
         files.
         """
-        assert 0 <= step_num < num_steps
+        assert 0 <= step_num < self._num_steps()
 
         args = []
 
@@ -1079,7 +1088,7 @@ class MRJobRunner(object):
 
         # translate the jobconf configuration names to match
         # the hadoop version
-        jobconf = self._jobconf_for_step(step)
+        jobconf = self._jobconf_for_step(step_num)
 
         if uses_generic_jobconf(version):
             for key, value in sorted(jobconf.iteritems()):
@@ -1105,7 +1114,7 @@ class MRJobRunner(object):
             args.extend(['-inputformat', self._hadoop_input_format])
 
         # hadoop_output_format
-        if (step_num == num_steps - 1 and self._hadoop_output_format):
+        if (step_num == self._num_steps() - 1 and self._hadoop_output_format):
             args.extend(['-outputformat', self._hadoop_output_format])
 
         return args

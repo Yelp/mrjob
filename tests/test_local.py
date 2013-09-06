@@ -600,18 +600,15 @@ class LocalMRJobRunnerJobConfTestCase(SandboxedTestCase):
 class CompatTestCase(EmptyMrjobConfTestCase):
 
     def test_environment_variables_018(self):
-        runner = LocalMRJobRunner(hadoop_version='0.18', conf_paths=[])
-        # clean up after we're done. On windows, job names are only to
-        # the millisecond, so these two tests end up trying to create
-        # the same temp dir
-        with runner as runner:
+        job = MRWordCount(['-r', 'local', '--hadoop-version', '0.18'])
+        with job.make_runner() as runner:
             runner._setup_working_dir()
             self.assertIn('mapred_cache_localArchives',
                           runner._subprocess_env('mapper', 0, 0).keys())
 
     def test_environment_variables_021(self):
-        runner = LocalMRJobRunner(hadoop_version='0.21', conf_paths=[])
-        with runner as runner:
+        job = MRWordCount(['-r', 'local', '--hadoop-version', '0.21'])
+        with job.make_runner() as runner:
             runner._setup_working_dir()
             self.assertIn('mapreduce_job_cache_local_archives',
                           runner._subprocess_env('mapper', 0, 0).keys())

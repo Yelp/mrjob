@@ -31,7 +31,7 @@ from mrjob.util import cmd_line
 from mrjob.util import read_file
 
 
-log = logging.getLogger('mrjob.fs.hadoop')
+log = logging.getLogger(__name__)
 
 # used by mkdir()
 HADOOP_FILE_EXISTS_RE = re.compile(r'.*File exists.*')
@@ -171,10 +171,7 @@ class HadoopFilesystem(Filesystem):
 
         cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
 
-        def stream():
-            for line in cat_proc.stdout:
-                yield line
-
+        def cleanup():
             # there shouldn't be any stderr
             for line in cat_proc.stderr:
                 log.error('STDERR: ' + line)
@@ -184,7 +181,7 @@ class HadoopFilesystem(Filesystem):
             if returncode != 0:
                 raise IOError("Could not stream %s" % filename)
 
-        return read_file(filename, stream())
+        return read_file(filename, cat_proc.stdout, cleanup=cleanup)
 
     def mkdir(self, path):
         try:

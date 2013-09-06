@@ -71,9 +71,10 @@ may ignore some options. See the text after the table for specifics.
 
 :py:class:`~mrjob.local.LocalMRJobRunner` takes no additional options, but:
 
-* :ref:`bootstrap_mrjob <opt_bootstrap_mrjob>` is ``False`` by default
-* :ref:`cmdenv <opt_cmdenv>` uses the local system path separator instead of ``:`` all the time (so ``;`` on Windows, no change elsewhere)
-* :ref:`python_bin <opt_python_bin>` defaults to the current Python interpreter
+* :mrjob-opt:`bootstrap_mrjob` is ``False`` by default
+* :mrjob-opt:`cmdenv` uses the local system path separator instead of ``:`` all
+  the time (so ``;`` on Windows, no change elsewhere)
+* :mrjob-opt:`python_bin` defaults to the current Python interpreter
 
 In addition, it ignores *hadoop_input_format*, *hadoop_output_format*,
 *hadoop_streaming_jar*, and *jobconf*

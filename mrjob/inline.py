@@ -34,7 +34,7 @@ from mrjob.sim import SimRunnerOptionStore
 from mrjob.job import MRJob
 from mrjob.util import save_current_environment
 
-log = logging.getLogger('mrjob.inline')
+log = logging.getLogger(__name__)
 
 DEFAULT_MAP_TASKS = 1
 DEFAULT_REDUCE_TASKS = 1

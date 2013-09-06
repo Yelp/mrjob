@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import shlex
 import sys
 import tarfile
 import zipfile
+import zlib
 
 try:
     import bz2
@@ -386,37 +387,57 @@ def read_input(path, stdin=None):
         yield line
 
 
-def read_file(path, fileobj=None):
-    """Reads a file.
+def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
+    """Yields lines from a file, possibly decompressing it based on file
+    extension.
 
-    - Decompress ``.gz`` and ``.bz2`` files.
-    - If *fileobj* is not ``None``, stream lines from the *fileobj*
+    Currently we handle compressed files with the extensions ``.gz`` and
+    ``.bz2``.
+
+    :param string path: file path. Need not be a path on the local filesystem
+                        (URIs are okay) as long as you specify *fileobj* too.
+    :param fileobj: file object to read from. Need not be seekable. If this
+                    is omitted, we ``open(path)``.
+    :param yields_lines: Does iterating over *fileobj* yield lines (like
+                         file objects are supposed to)? If not, set this to
+                         ``False`` (useful for :py:class:`boto.s3.Key`)
+    :param cleanup: Optional callback to call with no arguments when EOF is
+                    reached or an exception is thrown.
     """
     # sometimes values declared in the ``try`` block aren't accessible from the
     # ``finally`` block. not sure why.
     f = None
     try:
-        if path.endswith('.gz'):
-            f = gzip.GzipFile(path, fileobj=fileobj)
-        elif path.endswith('.bz2'):
-            if bz2 is None:
-                f = None
-                raise Exception('bz2 module was not successfully imported'
-                                ' (likely not installed).')
-            elif fileobj is None:
-                f = bz2.BZ2File(path)
-            else:
-                f = bunzip2_stream(fileobj)
-        elif fileobj is None:
+        # open path if we need to
+        if fileobj is None:
             f = open(path)
         else:
             f = fileobj
 
-        for line in f:
+        if path.endswith('.gz'):
+            lines = buffer_iterator_to_line_iterator(gunzip_stream(f))
+        elif path.endswith('.bz2'):
+            if bz2 is None:
+                raise Exception('bz2 module was not successfully imported'
+                                ' (likely not installed).')
+            else:
+                lines = bunzip2_stream(f)
+        else:
+            if yields_lines:
+                lines = f
+            else:
+                # handle boto.s3.Key, which yields chunks of bytes, not lines
+                lines = buffer_iterator_to_line_iterator(f)
+
+        for line in lines:
             yield line
     finally:
-        if fileobj is None and not f is None:
-            f.close()
+        try:
+            if f and f is not fileobj:
+                f.close()
+        finally:
+            if cleanup:
+                cleanup()
 
 
 def bunzip2_stream(fileobj):
@@ -425,12 +446,38 @@ def bunzip2_stream(fileobj):
     # decompress chunks into a buffer, then stream from the buffer
     buffer = ''
     if bz2 is None:
-        raise Exception('bz2 module was not successfully imported (likely not installed).')
+        raise Exception(
+            'bz2 module was not successfully imported (likely not installed).')
     decomp = bz2.BZ2Decompressor()
     for part in fileobj:
         buffer = buffer.join(decomp.decompress(part))
     f = buffer.splitlines(True)
     return f
+
+
+def gunzip_stream(fileobj, bufsize=1024):
+    """Decompress gzipped data on the fly.
+
+    :param fileobj: object supporting ``read()``
+    :param bufsize: number of bytes to read from *fileobj* at a time. The
+                    default is the same as in :py:mod:`gzip`.
+
+    This yields decompressed chunks; it does *not* split on lines. Use
+    :py:func:`buffer_iterator_to_line_iterator` for that.
+    """
+    # see Issue #601 for why we need this.
+
+    # we need this flag to read gzip rather than raw zlib, but it's not
+    # actually defined in zlib, so we define it here.
+    READ_GZIP_DATA = 16
+    d = zlib.decompressobj(READ_GZIP_DATA | zlib.MAX_WBITS)
+    while True:
+        chunk = fileobj.read(bufsize)
+        if not chunk:
+            return
+        data = d.decompress(chunk)
+        if data:
+            yield data
 
 
 @contextlib.contextmanager

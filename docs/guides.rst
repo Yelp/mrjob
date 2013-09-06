@@ -7,7 +7,6 @@ Guides
     guides/quickstart.rst
     guides/concepts.rst
     guides/writing-mrjobs.rst
-    guides/cmd.rst
     guides/runners.rst
     guides/configs-basics.rst
     guides/configs-all-runners.rst
@@ -20,5 +19,6 @@ Guides
     guides/emr-tools.rst
     guides/emr-troubleshooting.rst
     guides/emr-advanced.rst
+    guides/cmd.rst
     guides/contributing.rst
     guides/runner-job-interactions.rst

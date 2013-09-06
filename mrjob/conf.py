@@ -42,7 +42,7 @@ except ImportError:
 from mrjob.util import shlex_split
 
 
-log = logging.getLogger('mrjob.conf')
+log = logging.getLogger(__name__)
 
 
 class OptionStore(dict):

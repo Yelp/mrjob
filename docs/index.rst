@@ -68,17 +68,16 @@ Guides
 * :doc:`guides/contributing`
 * :doc:`guides/runner-job-interactions`
 
-Reference
-=========
+Table of Contents
+=================
 
 .. toctree::
     :maxdepth: 2
 
     whats-new.rst
-    reference.rst
     guides.rst
+    reference.rst
 
-Indices and tables
-==================
-
+* :ref:`genindex`
+* :ref:`modindex`
 * :ref:`search`

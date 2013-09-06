@@ -45,7 +45,7 @@ from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
 
 
-log = logging.getLogger('mrjob.run')
+log = logging.getLogger(__name__)
 
 
 # sentinel value; used when running MRJob as a script

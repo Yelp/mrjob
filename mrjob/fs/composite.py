@@ -16,7 +16,7 @@ import logging
 from mrjob.fs.base import Filesystem
 
 
-log = logging.getLogger('mrjob.fs.composite')
+log = logging.getLogger(__name__)
 
 
 class CompositeFilesystem(Filesystem):

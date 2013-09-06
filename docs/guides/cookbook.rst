@@ -3,8 +3,8 @@ Cookbook
 
 .. _cookbook-src-tree-pythonpath:
 
-Putting your source tree in the :envvar:`PYTHONPATH`
-----------------------------------------------------
+Putting your source tree in :envvar:`PYTHONPATH`
+------------------------------------------------
 
 If your job spans multiple files, you can create a tarball of your source tree
 and use ``python_archives`` to have it decompressed and added to the

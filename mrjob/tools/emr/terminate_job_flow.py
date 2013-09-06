@@ -39,7 +39,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 
-log = logging.getLogger('mrjob.tools.emr.terminate_job_flow')
+log = logging.getLogger(__name__)
 
 
 def main(cl_args=None):

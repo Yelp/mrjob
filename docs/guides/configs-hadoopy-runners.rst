@@ -11,8 +11,6 @@ Options available to local, hadoop, and emr runners
 These options are both used by Hadoop and simulated by the ``local`` runner to
 some degree.
 
-.. _opt_hadoop_version:
-
 .. mrjob-opt::
     :config: hadoop_version
     :switch: --hadoop-version
@@ -26,8 +24,6 @@ some degree.
     is not set, we'll default to Hadoop 0.20 for backwards compatibility with
     :py:mod:`mrjob` v0.3.0.
 
-.. _opt_jobconf:
-
 .. mrjob-opt::
     :config: jobconf
     :switch: --jobconf
@@ -38,12 +34,10 @@ some degree.
     ``-jobconf`` args to pass to hadoop streaming. This should be a map from
     property name to value.  Equivalent to passing ``['-jobconf',
     'KEY1=VALUE1', '-jobconf', 'KEY2=VALUE2', ...]`` to
-    :ref:`hadoop_extra_args <opt_hadoop_extra_args>`.
+    :mrjob-opt:`hadoop_extra_args`.
 
 Options available to hadoop and emr runners
 -------------------------------------------
-
-.. _opt_hadoop_extra_args:
 
 .. mrjob-opt::
     :config: hadoop_extra_args
@@ -56,8 +50,6 @@ Options available to hadoop and emr runners
     **extra_args** when passed as a keyword argument to
     :py:class:`MRJobRunner`.
 
-.. _opt_hadoop_streaming_jar:
-
 .. mrjob-opt::
     :config: hadoop_streaming_jar
     :switch: --hadoop-streaming-jar
@@ -69,8 +61,6 @@ Options available to hadoop and emr runners
     runner, which will search for it in :envvar:`HADOOP_HOME`. The emr runner
     can take a path either local to your machine or on S3.
 
-.. _opt_label:
-
 .. mrjob-opt::
     :config: label
     :switch: --label
@@ -80,8 +70,6 @@ Options available to hadoop and emr runners
 
     Description of this job to use as the part of its name.
 
-.. _opt_owner:
-
 .. mrjob-opt::
     :config: owner
     :switch: --owner
@@ -90,8 +78,6 @@ Options available to hadoop and emr runners
     :default: :py:func:`getpass.getuser`, or ``no_user`` if that fails
 
     Who is running this job. Used solely to set the job name.
-
-.. _opt_partitioner:
 
 .. mrjob-opt::
     :config: partitioner
@@ -110,18 +96,14 @@ Options available to hadoop and emr runners
 Options available to hadoop runner only
 ---------------------------------------
 
-.. _opt_hadoop_bin:
-
 .. mrjob-opt::
     :config: hadoop_bin
     :switch: --hadoop-bin
     :type: :ref:`command <data-type-command>`
     :set: hadoop
-    :default: :ref:`hadoop_home <opt_hadoop_home>` plus ``bin/hadoop``
+    :default: :mrjob-opt:`hadoop_home` plus ``bin/hadoop``
 
     Name/path of your hadoop program (may include arguments).
-
-.. _opt_hadoop_home:
 
 .. mrjob-opt::
     :config: hadoop_home
@@ -131,8 +113,6 @@ Options available to hadoop runner only
     :default: :envvar:`HADOOP_HOME`
 
     Alternative to setting the :envvar:`HADOOP_HOME` environment variable.
-
-.. _opt_hdfs_scratch_dir:
 
 .. mrjob-opt::
     :config: hdfs_scratch_dir

@@ -1,0 +1,4 @@
+/* make links red instead of blue */
+
+a { color: #a00; }
+a:visited { color: #800; }

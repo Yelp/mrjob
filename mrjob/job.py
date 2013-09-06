@@ -50,7 +50,7 @@ from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.util import read_input
 
 
-log = logging.getLogger('mrjob.job')
+log = logging.getLogger(__name__)
 
 
 # jobconf options for implementing SORT_VALUES

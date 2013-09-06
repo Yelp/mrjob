@@ -573,7 +573,7 @@ class JobConfTestCase(unittest.TestCase):
     def test_float_options_3(self):
         self.assert_hadoop_version(self.MRHadoopVersionJobConfJob3, '0.20')
 
-    def test_jobconf_attr(self):
+    def test_jobconf_method(self):
         mr_job = self.MRJobConfJob()
 
         self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
@@ -1020,6 +1020,13 @@ class StepsTestCase(unittest.TestCase):
         def reducer_cmd(self):
             return 'wc -l'
 
+    class SingleStepJobConfMethodJob(MRJob):
+        def mapper(self, key, value):
+            return None
+
+        def jobconf(self):
+            return {'mapred.baz': 'bar'}
+
     def test_steps(self):
         j = self.SteppyJob(['--no-conf'])
         self.assertEqual(
@@ -1040,3 +1047,16 @@ class StepsTestCase(unittest.TestCase):
                 'mapper': {'type': 'command', 'command': 'cat'},
                 'combiner': {'type': 'command', 'command': 'cat'},
                 'reducer': {'type': 'command', 'command': 'wc -l'}}])
+
+    def test_can_override_jobconf_method(self):
+        # regression test for #656
+        j = self.SingleStepJobConfMethodJob(['--no-conf'])
+
+        # overriding jobconf() should affect job_runner_kwargs()
+        # but not step definitions
+        self.assertEqual(j.job_runner_kwargs()['jobconf'],
+                         {'mapred.baz': 'bar'})
+
+        self.assertEqual(
+            j.steps()[0],
+            MRJobStep(mapper=j.mapper))

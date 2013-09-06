@@ -46,7 +46,7 @@ from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.step import JarStep
 from mrjob.step import MRJobStep
-from mrjob.step import _JOB_STEP_PARAMS
+from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.util import read_input
 
 
@@ -331,7 +331,7 @@ class MRJob(MRJobLauncher):
         """
         # Use mapper(), reducer() etc. only if they've been re-defined
         kwargs = dict((func_name, getattr(self, func_name))
-                      for func_name in _JOB_STEP_PARAMS
+                      for func_name in _JOB_STEP_FUNC_PARAMS
                       if (getattr(self, func_name).im_func is not
                           getattr(MRJob, func_name).im_func))
 

@@ -1046,6 +1046,18 @@ class MRJobRunner(object):
 
         return self._mrjob_tar_gz_path
 
+    def _jobconf_for_step(self, step):
+        """Get the jobconf dictionary for the given step.
+
+        This reads from ``self._opts['jobconf']``, and the step
+        definition, and translates jobconf arguments to the
+        current hadoop version.
+        """
+        jobconf = combine_dicts(self._opts['jobconf'], step.get('jobconf'))
+
+        return add_translated_jobconf_for_hadoop_version(
+            jobconf, self.get_hadoop_version())
+
     def _hadoop_conf_args(self, step, step_num, num_steps):
         """Build a list of extra arguments to the hadoop binary.
 
@@ -1059,8 +1071,6 @@ class MRJobRunner(object):
 
         args = []
 
-        jobconf = combine_dicts(self._opts['jobconf'], step.get('jobconf'))
-
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])
 
@@ -1069,8 +1079,8 @@ class MRJobRunner(object):
 
         # translate the jobconf configuration names to match
         # the hadoop version
-        jobconf = add_translated_jobconf_for_hadoop_version(jobconf,
-                                                            version)
+        jobconf = self._jobconf_for_step(step)
+
         if uses_generic_jobconf(version):
             for key, value in sorted(jobconf.iteritems()):
                 if value is not None:

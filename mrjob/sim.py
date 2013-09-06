@@ -490,7 +490,9 @@ class SimMRJobRunner(MRJobRunner):
         We use the newer (Hadoop 0.21+) jobconf names; these will be
         translated to the correct Hadoop version elsewhere.
         """
-        j = {}  # our final results
+        # read jobconf from config/cmd line and steps definition
+        step = self._get_steps()[step_num]
+        j = self._jobconf_for_step(step)
 
         j['mapreduce.job.id'] = self._job_name
         j['mapreduce.task.output.dir'] = self._output_dir

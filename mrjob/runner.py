@@ -415,7 +415,7 @@ class MRJobRunner(object):
         # access/make this using self._get_local_tmp_dir()
         self._local_tmp_dir = None
 
-        # info about our steps. this is basically a cache for self._get_steps()
+        # A cache for self._get_steps(); also useful as a test hook
         self._steps = None
 
         # if this is True, we have to pipe input into the sort command
@@ -767,7 +767,9 @@ class MRJobRunner(object):
         else:
             return args
 
-    def _substep_cmd_line(self, step, step_num, mrc):
+    def _substep_cmd_line(self, step_num, mrc):
+        step = self._get_step(step_num)
+
         if step[mrc]['type'] == 'command':
             # never wrap custom hadoop streaming commands in bash
             return step[mrc]['command'], False
@@ -785,28 +787,29 @@ class MRJobRunner(object):
             raise ValueError("Invalid %s step %d: %r" % (
                 mrc, step_num, step[mrc]))
 
-    def _render_substep(self, step, step_num, mrc):
+    def _render_substep(self, step_num, mrc):
+        step = self._get_step(step_num)
+
         if mrc in step:
-            return self._substep_cmd_line(
-                step, step_num, mrc)
+            return self._substep_cmd_line(step_num, mrc)
         else:
             if mrc == 'mapper':
                 return 'cat', False
             else:
                 return None, False
 
-    def _hadoop_streaming_commands(self, step, step_num):
+    def _hadoop_streaming_commands(self, step_num):
         version = self.get_hadoop_version()
 
         # Hadoop streaming stuff
         mapper, bash_wrap_mapper = self._render_substep(
-            step, step_num, 'mapper')
+            step_num, 'mapper')
 
         combiner, bash_wrap_combiner = self._render_substep(
-            step, step_num, 'combiner')
+            step_num, 'combiner')
 
         reducer, bash_wrap_reducer = self._render_substep(
-            step, step_num, 'reducer')
+            step_num, 'reducer')
 
         if (combiner is not None and
             not supports_combiners_in_hadoop_streaming(version)):

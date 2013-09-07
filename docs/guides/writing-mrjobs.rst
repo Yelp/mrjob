@@ -294,7 +294,7 @@ See :py:meth:`~mrjob.job.MRJob.pick_protocols` for details.
 .. _writing-protocols:
 
 Writing custom protocols
-------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 A protocol is an object with methods ``read(self, line)`` and ``write(self,
 key, value)``. The ``read()`` method takes a string and returns a 2-tuple of
@@ -410,6 +410,11 @@ custom :py:class:`Option` class, you'll need to set the
 
 .. _`extending optparse`:
     http://docs.python.org/library/optparse.html#extending-optparse
+
+.. _non-python-processing:
+
+Non-Python processing
+---------------------
 
 .. _cmd-filters:
 

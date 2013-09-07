@@ -2,3 +2,9 @@
 
 a { color: #a00; }
 a:visited { color: #800; }
+
+/* changes to be propagated up to sphinx-better-theme */
+
+tt {
+  font-size: 1rem;
+}

@@ -11,7 +11,7 @@ platforms.** You can:
 
 .. _Amazon Elastic MapReduce (EMR): http://aws.amazon.com/documentation/elasticmapreduce/
 
-To get started, install with ``pip``::
+To get started, install with ``pip`` and read :doc:`guides/quickstart`::
 
     pip install mrjob
 

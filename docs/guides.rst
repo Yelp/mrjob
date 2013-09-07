@@ -4,6 +4,7 @@ Guides
 .. toctree::
     :maxdepth: 2
 
+    guides/why-mrjob.rst
     guides/quickstart.rst
     guides/concepts.rst
     guides/writing-mrjobs.rst
@@ -14,11 +15,6 @@ Guides
     guides/configs-reference.rst
     guides/cookbook.rst
     guides/testing.rst
-    guides/emr-quickstart.rst
-    guides/emr-opts.rst
-    guides/emr-tools.rst
-    guides/emr-troubleshooting.rst
-    guides/emr-advanced.rst
-    guides/cmd.rst
+    guides/emr.rst
     guides/contributing.rst
     guides/runner-job-interactions.rst

@@ -104,6 +104,9 @@ The final output is sorted::
     "town", 1
     "wheels", 2
 
+
+.. _hadoop-streaming-and-mrjob:
+
 Hadoop Streaming and mrjob
 --------------------------
 

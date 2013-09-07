@@ -15,12 +15,15 @@
 """The classic MapReduce job: count the frequency of words.
 """
 from mrjob.job import MRJob
+from mrjob.protocol import RawValueProtocol
 import re
 
 WORD_RE = re.compile(r"[\w']+")
 
 
 class MRMostUsedWord(MRJob):
+
+    OUTPUT_PROTOCOL = RawValueProtocol
 
     def mapper_get_words(self, _, line):
         # yield each word in the line

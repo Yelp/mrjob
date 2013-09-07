@@ -1,5 +1,5 @@
-Quickstart
-==========
+Fundamentals
+============
 
 Installation
 ------------
@@ -15,17 +15,10 @@ or from a `git`_ clone of the `source code`_::
 .. _`git`: http://www.git-scm.org/
 .. _`source code`: http://www.github.com/yelp/mrjob
 
-Writing a job
--------------
+Writing your first job
+----------------------
 
-A job consists of an :py:class:`~mrjob.job.MRJob` subclass, one or more mapper,
-combiner, or reducer methods, a call at the bottom to invoke mrjob's logic, and
-all associated dependencies.
-
-For jobs that consist only of one mapper, combiner, and reducer, in that order,
-you can simply override one or more of the :py:meth:`~mrjob.job.MRJob.mapper`,
-:py:meth:`~mrjob.job.MRJob.combiner`, and :py:meth:`~mrjob.job.MRJob.reducer`
-methods::
+Open a file called :file:`word_count.py` and type this into it::
 
     from mrjob.job import MRJob
 
@@ -43,14 +36,56 @@ methods::
     if __name__ == '__main__':
         MRWordCounter.run()
 
-You may leave out any of the mapper, combiner, or reducer, and mrjob will use
-an identity function in its place.
+Now go back to the command line, find your favorite body of text (such mrjob's
+:file:`README.rst`, or heck, even your new file :file:`word_count.py`), and try
+this::
 
-The ``if __name__ == '__main__':`` block is necessary for the ``local``,
-``hadoop``, and ``emr`` runners. See :doc:`concepts` for more information.
+  $ python word_count.py my_file.txt
 
-To define multiple steps, override :py:meth:`~mrjob.job.MRJob.steps` and return
-steps constructed via :py:meth:`~mrjob.job.MRJob.mr`::
+You should see something like this::
+
+    "chars" 3654
+    "lines" 123
+    "words" 417
+
+Congratulations! You've just written and run your first program with mrjob.
+
+What's happening
+^^^^^^^^^^^^^^^^
+
+A job is defined by a class that inherits from :py:class:`~mrjob.job.MRJob`.
+This class contains methods that define the :term:`steps` of your job.
+
+A "step" consists of a mapper, a combiner, and a reducer. All of those are
+optional, though you must have at least one. So you could have a step that's
+just a mapper, or just a combiner and a reducer.
+
+When you only have one step, all you have to do is write methods called
+:py:meth:`~mrjob.job.MRJob.mapper`, :py:meth:`~mrjob.job.MRJob.combiner`, and
+:py:meth:`~mrjob.job.MRJob.reducer`.
+
+.. warning::
+
+  Forgetting the following information will result in confusion.
+
+The final required component of a job file is these two lines at the end of the
+file, **every time**::
+
+    if __name__ == '__main__':
+        MRWordCounter.run()  # where MRWordCounter is your job class
+
+These lines pass control over the command line arguments and execution to
+mrjob. **Without them, your job will not work.** For more information, see
+:ref:`hadoop-streaming-and-mrjob`.
+
+Writing your second job
+-----------------------
+
+Most of the time, you'll need more than one step in your job. To define
+multiple steps, override :py:meth:`~mrjob.job.MRJob.steps` and return a list of
+steps constructed via :py:meth:`~mrjob.job.MRJob.mr`
+
+Here's another way to write the job from the previous section::
 
     from mrjob.job import MRJob
 
@@ -71,33 +106,66 @@ steps constructed via :py:meth:`~mrjob.job.MRJob.mr`::
     if __name__ == '__main__':
         MRWordCounter.run()
 
-Running a job
--------------
+Running your job different ways
+-------------------------------
 
-Jobs can be directly executed from the command line. All jobs can use files or
-stdin as the job input. Output is written to stdout.
+The most basic way to run your job is on the command line::
 
-By default, your job will run in a single process::
+  $ python my_job.py input.txt
 
-    > python word_count.py README.txt
-    "chars" 3654
-    "lines" 123
-    "words" 417
+By default, output will be written to stdout.
 
-You can use ``-r local`` to run your job in a subprocess with a few Hadoop
-features simulated. If you have configured mrjob to use Hadoop, you can use
-``-r hadoop`` to run your job on the Hadoop cluster. If you have configured AWS
-credentials, you can use ``-r emr`` to run your job on EMR (see
-:doc:`emr-quickstart` for more information).
+You can pass input via stdin, but be aware that mrjob will just dump it to a
+file first::
+
+  $ python my_job.py < input.txt
+
+You can pass multiple input files, mixed with stdin (using the ``-``
+character)::
+
+  $ python my_job.py input1.txt input2.txt - < input3.txt
+
+By default, mrjob will run your job in a single Python process. This provides
+the friendliest debugging experience, but it's not exactly distributed
+computing!
+
+You change the way the job is run with the ``-r``/``--runner`` option. You can
+use ``-r inline`` (the default), ``-r local``, ``-r hadoop``, or ``-r emr``.
+
+To run your job in multiple subprocesses with a few Hadoop features simulated,
+use ``-r local``.
+
+To run it on your Hadoop cluster, use ``-r hadoop``.
+
+If you have Elastic MapReduce configured (see :doc:`emr-quickstart`), you can
+run it there with ``-r emr``.
+
+Your input files can come from HDFS if you're using Hadoop, or S3 if you're
+using EMR::
+
+  $ python my_job.py -r emr s3://my-inputs/input.txt
+  $ python my_job.py -r hadoop hdfs://my_home/input.txt
 
 If your code spans multiple files, see :ref:`cookbook-src-tree-pythonpath`.
 
 Configuration
 -------------
 
+mrjob has a cornucopia of configuration options. You'll want to specify some on
+the command line, some in a config file.
+
 You can put a config file at ``/etc/mrjob.conf``, ``~/.mrjob.conf``, or
 ``./mrjob.conf`` for mrjob to find it without passing it via ``--conf-path``.
-Here is an example file:
 
-.. include:: ../../mrjob.conf.example
-    :literal:
+Config files are interpreted as YAML if you have the :py:mod:`yaml` module
+installed. Otherwise, they are interpreted as JSON.
+
+See :doc:`configs-basics` for in-depth information. Here is an example file::
+
+  runners:
+    emr:
+      aws-region: us-west-1
+      python_archives:
+        - a_library_I_use_on_emr.tar.gz
+    inline:
+      base_tmp_dir: $HOME/.tmp

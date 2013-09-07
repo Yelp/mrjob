@@ -54,7 +54,7 @@ What's happening
 ^^^^^^^^^^^^^^^^
 
 A job is defined by a class that inherits from :py:class:`~mrjob.job.MRJob`.
-This class contains methods that define the :term:`steps` of your job.
+This class contains methods that define the :term:`steps <step>` of your job.
 
 A "step" consists of a mapper, a combiner, and a reducer. All of those are
 optional, though you must have at least one. So you could have a step that's

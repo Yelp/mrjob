@@ -11,9 +11,11 @@ platforms.** You can:
 
 .. _Amazon Elastic MapReduce (EMR): http://aws.amazon.com/documentation/elasticmapreduce/
 
-To get started, install with ``pip`` and read :doc:`guides/quickstart`::
+To get started, install with ``pip``::
 
     pip install mrjob
+
+and begin reading the tutorial below.
 
 .. toctree::
     :maxdepth: 3

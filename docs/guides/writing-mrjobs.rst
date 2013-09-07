@@ -1,6 +1,10 @@
 Writing jobs
 ============
 
+This guide covers everything you need to know to write your job. You'll
+probably need to flip between this guide and :doc:`runners` to find all the
+information you need.
+
 .. _writing-basics:
 
 Basics
@@ -8,13 +12,17 @@ Basics
 
 Your job will be defined in a file to be executed on your machine as a Python
 script, as well as on a Hadoop cluster as an individual map, combine, or reduce
-task. All dependencies must either be contained within the file, made available
-on the task nodes before the job is run, or uploaded to the cluster by mrjob
-when your job is submitted.
+task. (See :ref:`how-your-program-is-run` for more on that.)
 
-The simplest way to write a job is by overriding :py:class:`~mrjob.job.MRJob`'s
-:py:meth:`~mrjob.job.MRJob.mapper`, :py:meth:`~mrjob.job.MRJob.combiner`, and
-:py:meth:`~mrjob.job.MRJob.reducer` methods::
+All dependencies must either be contained within the file, available on the
+task nodes, or uploaded to the cluster by mrjob when your job is submitted.
+(:doc:`Runners` explains how to do those things.)
+
+Single-step jobs
+^^^^^^^^^^^^^^^^
+
+The simplest way to write a one-step job is to subclass
+:py:class:`~mrjob.job.MRJob` and override a few methods::
 
     from mrjob.job import MRJob
     import re
@@ -38,61 +46,70 @@ The simplest way to write a job is by overriding :py:class:`~mrjob.job.MRJob`'s
     if __name__ == '__main__':
         MRWordFreqCount.run()
 
-The default configuration sends input lines to mappers via the value parameter
-as a string object, with ``None`` for the key, so the mapper method above
-discards the key and operates only on the value. The mapper yields ``(word,
-1)`` for each word. The key and value are converted to `JSON`_ for transmission
-between tasks and for final output.
+This example is elaborated on later in this document in :ref:`job-protocols`.
 
-.. _`JSON`: http://www.json.org/
+Here are all the methods you can override to write a one-step job. Click on the
+ones that interest you, or keep reading.
 
-The combiner and reducer get a word as the key and an iterator of numbers as
-the value. They simply yield the word and the sum of the values.
+    * :py:meth:`~mrjob.job.MRJob.mapper`
+    * :py:meth:`~mrjob.job.MRJob.combiner`
+    * :py:meth:`~mrjob.job.MRJob.reducer`
+    * :py:meth:`~mrjob.job.MRJob.mapper_init`
+    * :py:meth:`~mrjob.job.MRJob.combiner_init`
+    * :py:meth:`~mrjob.job.MRJob.reducer_init`
+    * :py:meth:`~mrjob.job.MRJob.mapper_final`
+    * :py:meth:`~mrjob.job.MRJob.combiner_final`
+    * :py:meth:`~mrjob.job.MRJob.reducer_final`
+    * :py:meth:`~mrjob.job.MRJob.mapper_cmd`
+    * :py:meth:`~mrjob.job.MRJob.combiner_cmd`
+    * :py:meth:`~mrjob.job.MRJob.reducer_cmd`
+    * :py:meth:`~mrjob.job.MRJob.mapper_pre_filter`
+    * :py:meth:`~mrjob.job.MRJob.combiner_pre_filter`
+    * :py:meth:`~mrjob.job.MRJob.reducer_pre_filter`
 
-The final output of the job is a set of lines where each line is a
-tab-delimited key-value pair. Each key and value has been converted from its
-Python representation to a JSON representation.
+Multi-step jobs
+^^^^^^^^^^^^^^^
 
-::
-
-    "all"   1
-    "and"   4
-    "bus"   2
-    ...
-
-Many jobs require multiple steps. To define multiple steps, override the
-:py:meth:`~mrjob.job.MRJob.steps` method::
+To define multiple steps, override the :py:meth:`~mrjob.job.MRJob.steps`
+method::
 
 
     class MRDoubleWordFreqCount(MRJob):
         """Word frequency count job with an extra step to double all the
         values"""
 
-        def get_words(self, _, line):
+        def mapper_get_words(self, _, line):
             for word in WORD_RE.findall(line):
                 yield word.lower(), 1
 
-        def sum_words(self, word, counts):
+        def reducer_sum_words(self, word, counts):
             yield word, sum(counts)
 
-        def double_counts(self, word, counts):
+        def mapper_double_counts(self, word, counts):
             yield word, counts * 2
 
         def steps(self):
-            return [self.mr(mapper=self.get_words,
-                            combiner=self.sum_words,
-                            reducer=self.sum_words),
-                    self.mr(mapper=self.double_counts)]
+            return [self.mr(mapper=self.mapper_get_words,
+                            combiner=self.reducer_sum_words,
+                            reducer=self.reducer_sum_words),
+                    self.mr(mapper=self.mapper_double_counts)]
 
+.. link to the mr() function docs
+
+Setup and teardown
+^^^^^^^^^^^^^^^^^^
 
 You may wish to set up or tear down resources for each task. You can do so with
 ``init`` and ``final`` methods. For one-step jobs, you can override these:
 
+    * :py:meth:`~mrjob.job.MRJob.mapper`
+    * :py:meth:`~mrjob.job.MRJob.combiner`
+    * :py:meth:`~mrjob.job.MRJob.reducer`
     * :py:meth:`~mrjob.job.MRJob.mapper_init`
-    * :py:meth:`~mrjob.job.MRJob.mapper_final`
     * :py:meth:`~mrjob.job.MRJob.combiner_init`
-    * :py:meth:`~mrjob.job.MRJob.combiner_final`
     * :py:meth:`~mrjob.job.MRJob.reducer_init`
+    * :py:meth:`~mrjob.job.MRJob.mapper_final`
+    * :py:meth:`~mrjob.job.MRJob.combiner_final`
     * :py:meth:`~mrjob.job.MRJob.reducer_final`
 
 For multi-step jobs, use keyword arguments to the :py:meth:`mrjob.job.MRJob.mr`
@@ -161,6 +178,32 @@ At the end of your job, you'll get the counter's total value::
 
 Protocols
 ---------
+
+.. revisit example
+
+The default configuration sends input lines to mappers via the value parameter
+as a string object, with ``None`` for the key, so the mapper method above
+discards the key and operates only on the value. The mapper yields ``(word,
+1)`` for each word. The key and value are converted to `JSON`_ for transmission
+between tasks and for final output.
+
+.. _`JSON`: http://www.json.org/
+
+The combiner and reducer get a word as the key and an iterator of numbers as
+the value. They simply yield the word and the sum of the values.
+
+The final output of the job is a set of lines where each line is a
+tab-delimited key-value pair. Each key and value has been converted from its
+Python representation to a JSON representation.
+
+::
+
+    "all"   1
+    "and"   4
+    "bus"   2
+    ...
+
+.. end revisit example
 
 Input and output goes to and from each task in the form of newline-delimited
 bytes. Each line is separated into key and value by a tab character [#hc]_.

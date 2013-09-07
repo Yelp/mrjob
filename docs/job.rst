@@ -25,6 +25,9 @@ One-step jobs
 .. automethod:: MRJob.mapper_cmd
 .. automethod:: MRJob.reducer_cmd
 .. automethod:: MRJob.combiner_cmd
+.. automethod:: MRJob.mapper_pre_filter
+.. automethod:: MRJob.reducer_pre_filter
+.. automethod:: MRJob.combiner_pre_filter
 
 .. _writing-multi-step-jobs:
 

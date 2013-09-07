@@ -23,7 +23,7 @@ and begin reading the tutorial below.
     guides.rst
     reference.rst
     whats-new.rst
-
+    glossary.rst
 
 .. rubric:: Appendices
 

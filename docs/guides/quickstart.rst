@@ -37,7 +37,7 @@ Open a file called :file:`word_count.py` and type this into it::
         MRWordCounter.run()
 
 Now go back to the command line, find your favorite body of text (such mrjob's
-:file:`README.rst`, or heck, even your new file :file:`word_count.py`), and try
+:file:`README.rst`, or even your new file :file:`word_count.py`), and try
 this::
 
   $ python word_count.py my_file.txt
@@ -151,8 +151,8 @@ If your code spans multiple files, see :ref:`cookbook-src-tree-pythonpath`.
 Configuration
 -------------
 
-mrjob has a cornucopia of configuration options. You'll want to specify some on
-the command line, some in a config file.
+mrjob has an overflowing cornucopia of configuration options. You'll want to
+specify some on the command line, some in a config file.
 
 You can put a config file at ``/etc/mrjob.conf``, ``~/.mrjob.conf``, or
 ``./mrjob.conf`` for mrjob to find it without passing it via ``--conf-path``.

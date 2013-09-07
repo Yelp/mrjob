@@ -78,34 +78,6 @@ These lines pass control over the command line arguments and execution to
 mrjob. **Without them, your job will not work.** For more information, see
 :ref:`hadoop-streaming-and-mrjob`.
 
-Writing your second job
------------------------
-
-Most of the time, you'll need more than one step in your job. To define
-multiple steps, override :py:meth:`~mrjob.job.MRJob.steps` and return a list of
-steps constructed via :py:meth:`~mrjob.job.MRJob.mr`
-
-Here's another way to write the job from the previous section::
-
-    from mrjob.job import MRJob
-
-
-    class MRWordCounter(MRJob):
-
-        def get_words(self, key, line):
-            for word in line.split():
-                yield word, 1
-
-        def sum_words(self, word, occurrences):
-            yield word, sum(occurrences)
-
-        def steps(self):
-            return [self.mr(mapper=self.get_words, reducer=self.sum_words),]
-
-
-    if __name__ == '__main__':
-        MRWordCounter.run()
-
 Running your job different ways
 -------------------------------
 
@@ -147,6 +119,53 @@ using EMR::
   $ python my_job.py -r hadoop hdfs://my_home/input.txt
 
 If your code spans multiple files, see :ref:`cookbook-src-tree-pythonpath`.
+
+Writing your second job
+-----------------------
+
+Most of the time, you'll need more than one step in your job. To define
+multiple steps, override :py:meth:`~mrjob.job.MRJob.steps` and return a list of
+steps constructed via :py:meth:`~mrjob.job.MRJob.mr`
+
+Here's a job that finds the most commonly used word in the input::
+
+    from mrjob.job import MRJob
+    import re
+
+    WORD_RE = re.compile(r"[\w']+")
+
+
+    class MRMostUsedWord(MRJob):
+
+        def mapper_get_words(self, _, line):
+            # yield each word in the line
+            for word in WORD_RE.findall(line):
+                yield (word.lower(), 1)
+
+        def combiner_count_words(self, word, counts):
+            # sum the words we've seen so far
+            yield (word, sum(counts))
+
+        def reducer_count_words(self, word, counts):
+            # send all (num_occurrences, word) pairs to the same reducer.
+            # num_occurrences is so we can easily use Python's max() function.
+            yield None, (sum(counts), word)
+
+        # discard the key; it is just None
+        def reducer_find_max_word(self, _, word_count_pairs):
+            yield max(word_count_pairs)
+
+        def steps(self):
+            return [
+                self.mr(mapper=self.mapper_get_words,
+                        combiner=self.combiner_count_words,
+                        reducer=self.reducer_count_words),
+                self.mr(reducer=self.reducer_find_max_word)
+            ]
+
+
+    if __name__ == '__main__':
+        MRMostUsedWord.run()
 
 Configuration
 -------------

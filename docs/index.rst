@@ -24,8 +24,7 @@ and begin reading the tutorial below.
     reference.rst
     whats-new.rst
 
-Appendices
-^^^^^^^^^^
+**Appendices**
 
 :ref:`genindex`
 

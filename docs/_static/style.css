@@ -29,7 +29,7 @@ li.toctree-l1 > ul > li > a {
   color: #600;
   font-size: 1.25rem;
   display: block;
-  margin-bottom: 1em;
+  margin-bottom: 0.5em;
 }
 
 /* changes to be propagated up to sphinx-better-theme */

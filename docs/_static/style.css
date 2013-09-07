@@ -3,12 +3,12 @@
 a { color: #a00; }
 a:visited { color: #800; }
 
-.toctree-wrapper > ul {
+#mrjob .toctree-wrapper > ul {
   list-style-type: none;
   padding: 0;
 }
 
-li.toctree-l1 > a {
+#mrjob li.toctree-l1 > a {
   font-size: 1.5rem;
   color: black;
   display: block;
@@ -16,16 +16,16 @@ li.toctree-l1 > a {
   margin-bottom: 1em;
 }
 
-li.toctree-l1 > ul {
+#mrjob li.toctree-l1 > ul {
   list-style-type: none;
   padding: 0;
 }
 
-li.toctree-l1 > ul > li {
+#mrjob li.toctree-l1 > ul > li {
   margin-top: 1em;
 }
 
-li.toctree-l1 > ul > li > a {
+#mrjob li.toctree-l1 > ul > li > a {
   color: #600;
   font-size: 1.25rem;
   display: block;

@@ -453,14 +453,17 @@ serialization/deserialization results of keys. Look at the source code of
 Defining command line options
 -----------------------------
 
-Remember that your script is executed in several contexts: once for the initial
-invokation, and once for each task. If you just add an option to your job's
-option parser, that option's value won't be propagated to other runs of your
-script. Instead, you can use mrjob's option API:
-:py:meth:`~mrjob.job.MRJob.add_passthrough_option` and
+Recall from :ref:`how-your-program-is-run` that your script is executed in
+several contexts: once for the initial invokation, and once for each task. If
+you just add an option to your job's option parser, that option's value won't
+be propagated to other runs of your script. Instead, you can use mrjob's option
+API: :py:meth:`~mrjob.job.MRJob.add_passthrough_option` and
 :py:meth:`~mrjob.job.MRJob.add_file_option`.
 
-A **passthrough option** is an :py:mod:`optparse` option that mrjob is aware
+Passthrough options
+^^^^^^^^^^^^^^^^^^^
+
+A :dfn:`passthrough option` is an :py:mod:`optparse` option that mrjob is aware
 of. mrjob inspects the value of the option when you invoke your script [#popt]_
 and reproduces that value when it invokes your script in other contexts. The
 command line-switchable protocol example from before uses this feature::
@@ -490,26 +493,47 @@ command string.
 
 .. _`optparse docs`: http://docs.python.org/library/optparse.html
 
-A **file option** is takes a local file path as its argument. mrjob uploads the
-file to each task's working directory and updates the option value accordingly.
-For example, if you wanted to upload a :py:mod:`sqlite3` database to use
-within each map task, you could do this::
-
-    class SqliteJob(MRJob):
-
-        def configure_options(self):
-            super(CommandLineProtocolJob, self).configure_options()
-            self.add_file_option('--database', default='/etc/my_db.sqlite3')
-
-        def mapper_init(self):
-            # make sqlite3 database available to mapper
-            self.sqlite_conn = sqlite3.connect(self.options.database)
-
 .. rubric:: Footnotes
 
 .. [#popt] This is accomplished using crazy :py:mod:`optparse` hacks so you
     don't need to limit yourself to certain option types. However, your default
     values need to be compatible with :py:func:`copy.deepcopy`.
+
+File options
+^^^^^^^^^^^^
+
+A :dfn:`file option` is like a passthrough option, but:
+
+1. Its value must be a string or list of strings (``action="store"`` or
+   ``action="append"``), where each string represents either a local path, or
+   an HDFS or S3 path that will be accessible from the task nodes.
+2. That file will be downloaded to each task's local directory and the value of
+   the option will magically be changed to its path.
+
+For example, if you had a map task that required a :py:mod:`sqlite3` database,
+you could do this::
+
+    class SqliteJob(MRJob):
+
+        def configure_options(self):
+            super(CommandLineProtocolJob, self).configure_options()
+            self.add_file_option('--database')
+
+        def mapper_init(self):
+            # make sqlite3 database available to mapper
+            self.sqlite_conn = sqlite3.connect(self.options.database)
+
+You could call it any of these ways, depending on where the file is::
+
+    $ python sqlite_job.py -r local  --database=/etc/my_db.sqlite3
+    $ python sqlite_job.py -r hadoop --database=/etc/my_db.sqlite3
+    $ python sqlite_job.py -r hadoop --database=hdfs://my_dir/my_db.sqlite3
+    $ python sqlite_job.py -r emr    --database=/etc/my_db.sqlite3
+    $ python sqlite_job.py -r emr    --database=s3://my_bucket/my_db.sqlite3
+
+In any of these cases, when your task runs, :file:`my_db.sqlite3` will always
+be available in the task's working directory, and the value of
+``self.options.database`` will always be set to its path.
 
 .. _custom-options:
 
@@ -517,11 +541,11 @@ Custom option types
 ^^^^^^^^^^^^^^^^^^^
 
 :py:mod:`optparse` allows you to add custom types and actions to your options
-(see `extending optparse`_), but doing so requires passing a custom
-:py:class:`Option` object into the :py:class:`OptionParser`  constructor.
-mrjob creates its own :py:class:`OptionParser` object, so if you want to use a
-custom :py:class:`Option` class, you'll need to set the
-:py:attr:`~mrjob.job.MRJob.OPTION_CLASS` attribute.
+(see `Extending optparse`_), but doing so requires passing a custom
+:py:class:`Option` object into the :py:class:`~optparse.OptionParser`
+constructor.  mrjob creates its own :py:class:`~optparse.OptionParser` object,
+so if you want to use a custom :py:class:`~optparse.Option` class, you'll need
+to set the :py:attr:`~mrjob.job.MRJob.OPTION_CLASS` attribute.
 
 ::
 
@@ -538,7 +562,7 @@ custom :py:class:`Option` class, you'll need to set the
 
         OPTION_CLASS = MyOption
 
-.. _`extending optparse`:
+.. _Extending optparse:
     http://docs.python.org/library/optparse.html#extending-optparse
 
 .. _non-python-processing:

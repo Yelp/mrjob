@@ -65,6 +65,7 @@ Setting protocols
 .. automethod:: MRJob.input_protocol
 .. automethod:: MRJob.internal_protocol
 .. automethod:: MRJob.output_protocol
+.. automethod:: MRJob.pick_protocols
 
 Secondary sort
 --------------

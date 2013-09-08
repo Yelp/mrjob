@@ -413,16 +413,12 @@ instance. Here's an example that sneaks a peek at :ref:`writing-cl-opts`::
                 return RawValueProtocol()
 
 Finally, if you need to use a completely different concept of protocol
-assignment, you can override :py:meth:`mrjob.job.MRJob.pick_protocols`::
+assignment, you can override :py:meth:`~mrjob.job.MRJob.pick_protocols`::
 
     class WhatIsThisIDontEvenProtocolJob(MRJob):
 
         def pick_protocols(self, step_num, step_type):
             return random.choice([Protocololol, ROFLcol, Trolltocol, Locotorp])
-
-
-See :py:meth:`~mrjob.job.MRJob.pick_protocols` for details.
-
 
 .. _writing-protocols:
 

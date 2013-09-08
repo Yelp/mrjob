@@ -192,14 +192,144 @@ more places than just the ends of tasks.
 :ref:`writing-cl-opts` has a partial example that shows how to load a
 :py:mod:`sqlite3` database using :py:meth:`~mrjob.job.MRJob.mapper_init`.
 
+.. _cmd-steps:
+
+Shell commands as steps
+^^^^^^^^^^^^^^^^^^^^^^^
+
+You can forego scripts entirely for a step by specifying it as shell a command.
+To do so, use ``mapper_cmd``, ``combiner_cmd``, or ``reducer_cmd`` as arguments
+to :py:meth:`~mrjob.job.MRJob.mr()` or methods on :py:class:`~mrjob.job.MRJob`.
+(See :py:meth:`~mrjob.job.MRJob.mapper_cmd`,
+:py:meth:`~mrjob.job.MRJob.combiner_cmd`, and
+:py:meth:`~mrjob.job.MRJob.reducer_cmd`.)
+
+.. warning::
+
+    The ``inline`` runner does not support :py:func:`*_cmd`. If you want to
+    test locally, use the ``local`` runner (``-r local``).
+
+You may mix command and script steps at will. This job will count the number of
+lines containing the string "kitty"::
+
+    from mrjob.job import job
+
+
+    class KittyJob(MRJob):
+
+        OUTPUT_PROTOCOL = JSONValueProtocol
+
+        def mapper_cmd(self):
+            return "grep kitty"
+
+        def reducer(self, key, values):
+            yield None, sum(1 for _ in values)
+
+
+    if __name__ == '__main__':
+        KittyJob().run()
+
+Step commands are run without a shell. But if you'd like to use shell features
+such as pipes, you can use :py:func:`mrjob.util.bash_wrap()` to wrap your
+command in a call to ``bash``.
+
+::
+
+    from mrjob.util import bash_wrap
+
+    class DemoJob(MRJob):
+
+        def mapper_cmd(self):
+            return bash_wrap("grep 'blah blah' | wc -l")
+
+.. note::
+
+    You may not use :py:func:`*_cmd` with any other options for a task such as
+    :py:func:`*_filter`, :py:func:`*_init`, :py:func:`*_final`, or a regular
+    mapper/combiner/reducer function.
+
+.. note::
+
+    You might see an opportunity here to write your MapReduce code in whatever
+    language you please. If that appeals to you, check out
+    :mrjob-opt:`upload_files` for another piece of the puzzle.
+
+.. _cmd-filters:
+
+Filtering task input with shell commands
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can specify a command to filter a task's input before it reaches your task
+using the ``mapper_pre_filter`` and ``reducer_pre_filter`` arguments to
+:py:meth:`~mrjob.job.MRJob.mr()` or methods on :py:class:`~mrjob.job.MRJob`.
+Doing so will cause mrjob to pipe input through that comand before it reaches
+your mapper.
+
+.. warning::
+
+    The ``inline`` runner does not support :py:func:`*_cmd`. If you want to
+    test locally, use the ``local`` runner (``-r local``).
+
+Here's a job that tests filters using :command:`grep`::
+
+    from mrjob.job import MRJob
+    from mrjob.protocol import JSONValueProtocol
+
+
+    class KittiesJob(MRJob):
+
+        OUTPUT_PROTOCOL = JSONValueProtocol
+
+        def test_for_kitty(self, _, value):
+            yield None, 0  # make sure we have some output
+            if 'kitty' not in value:
+                yield None, 1
+
+        def sum_missing_kitties(self, _, values):
+            yield None, sum(values)
+
+        def steps(self):
+            return [
+                self.mr(mapper_pre_filter='grep "kitty"',
+                        mapper=self.test_for_kitty,
+                        reducer=self.sum_missing_kitties)]
+
+
+    if __name__ == '__main__':
+        KittiesJob().run()
+
+The output of the job should always be ``0``, since every line that gets to
+:py:func:`test_for_kitty()` is filtered by :command:`grep` to have "kitty" in
+it.
+
+Filter commands are run without a shell. But if you'd like to use shell
+features such as pipes, you can use :py:func:`mrjob.util.bash_wrap()` to wrap
+your command in a call to ``bash``. See :ref:`cmd-filters` for an example of
+:py:func:`mrjob.util.bash_wrap()`.
+
+Jar steps
+^^^^^^^^^
+
+You can ignore Hadoop Streaming entirely for a step by using
+:py:meth:`~mrjob.job.MRJob.jar()` instead of :py:meth:`~mrjob.job.MRJob.mr()` .
+For example, on EMR you can use a jar to run a script::
+
+    class ScriptyJarJob(MRJob):
+
+        def steps(self):
+            return [self.jar(
+                name='run a script',
+                jar='s3://elasticmapreduce/libs/script-runner/script-runner.jar',
+                step_args=['s3://my_bucket/my_script.sh'])]
+
 Counters
 ^^^^^^^^
 
-Hadoop lets you track *counters* that are aggregated over a step. A counter
-has a group, a name, and an integer value. Hadoop itself tracks a few counters
-automatically. mrjob prints your job's counters to the command line when your
-job finishes, and they are available to the runner object if you invoke it
-programmatically.
+Hadoop lets you track :dfn:`counters` that are aggregated over a step. A
+counter has a group, a name, and an integer value. Hadoop itself tracks a few
+counters automatically. mrjob prints your job's counters to the command line
+when your job finishes, and they are available to the runner object if you
+invoke it programmatically.
 
 To increment a counter from anywhere in your job, use the
 :py:meth:`~mrjob.job.MRJob.increment_counter` method::
@@ -566,101 +696,6 @@ to set the :py:attr:`~mrjob.job.MRJob.OPTION_CLASS` attribute.
     http://docs.python.org/library/optparse.html#extending-optparse
 
 .. _non-python-processing:
-
-Non-Python processing
----------------------
-
-.. _cmd-filters:
-
-Filtering task input with shell commands
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If your job is being run on a UNIX system (including EMR), you can specify a
-command to filter a task's input before it reaches your task using
-the ``mapper_pre_filter`` and ``reducer_pre_filter`` arguments to
-:py:meth:`~mrjob.job.MRJob.mr()` or methods on :py:class:`~mrjob.job.MRJob`.
-Doing so will cause mrjob to pipe input through that comand before it reaches
-your mapper.
-
-You may not use pipes or other shell syntax in a filter.
-
-For example, to filter input with :command:`grep` before your first mapper::
-
-    def steps(self):
-        return [self.mr(mapper_pre_filter='grep "some_string"', ...), ...]
-
-The command you specify will not be run in a shell, so by default you can't use
-things like pipe syntax. If you want to use shell features, you can use
-:py:func:`~mrjob.util.bash_wrap()` to wrap your command in a call to the
-``bash`` shell, automatically escaping quotes.
-
-    def steps(self):
-        return [self.mr(mapper_pre_filter=r"grep '\''some_string'\''", ...), ...]
-
-Note the use of a raw string ``r""`` to avoid needing to escape the
-backslashes.
-
-The combiner and reducer filters are called the same way.
-
-**The** ``inline`` **runner does not support filters.**
-
-.. _cmd-steps:
-
-Specifying mappers, combiners, and reducers as shell commands
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-You can forego scripts entirely for a step by specifying it as shell a command.
-To do so, use ``mapper_cmd``, ``combiner_cmd``, or ``reducer_cmd`` as arguments
-to :py:meth:`~mrjob.job.MRJob.mr()` or methods on :py:class:`~mrjob.job.MRJob`.
-
-Like filter commands, step commands are run without a shell by default, and you
-can use :py:func:`~mrjob.util.bash_wrap()` to wrap your command in a call to
-``bash``.
-
-::
-
-    from mrjob.util import bash_wrap
-
-    class MyMRJob(MRJob):
-
-        def mapper_cmd(self):
-            return bash_wrap("grep 'blah blah' | wc -l")
-
-You may mix command and script steps at will. This job will count the number of
-lines containing the string "kitty"::
-
-    class MyMRJob(MRJob):
-
-        OUTPUT_PROTOCOL = JSONValueProtocol
-
-        def mapper_cmd(self):
-            return "grep kitty"
-
-        def reducer(self, key, values):
-            yield None, sum(1 for _ in values)
-
-.. note:: You may not use ``cmd`` with any other options for a task such as
-    ``filter``, ``init``, ``final``, or a regular mapper/combiner/reducer
-    function.
-
-.. rubric:: Footnotes
-
-.. _non-hadoop-streaming-jar-steps:
-
-Non-Hadoop Streaming jar steps
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-You can ignore Hadoop Streaming entirely by using
-:py:meth:`~mrjob.job.MRJob.jar()`. For example, on EMR you can use a jar to run
-a script::
-
-    class ScriptyJarJob(MRJob):
-
-        def steps(self):
-            return [self.jar(
-                name='run a script',
-                jar='s3://elasticmapreduce/libs/script-runner/script-runner.jar',
-                step_args=['s3://my_bucket/my_script.sh'])]
 
 .. aliases
 

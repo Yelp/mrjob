@@ -95,11 +95,3 @@ Additional options for :py:class:`~mrjob.hadoop.HadoopJobRunner`
 ----------------------------------------------------------------
 
 .. mrjob-optlist:: hadoop
-
-.. |dt-string|          replace:: :ref:`string <data-type-string>`
-.. |dt-command|         replace:: :ref:`command <data-type-command>`
-.. |dt-path|            replace:: :ref:`path <data-type-path-list>`
-.. |dt-string-list|     replace:: :ref:`string list <data-type-string-list>`
-.. |dt-path-list|       replace:: :ref:`path list <data-type-path-list>`
-.. |dt-plain-dict|      replace:: :ref:`plain dict <data-type-plain-dict>`
-.. |dt-env-dict|        replace:: :ref:`environment variable dict <data-type-env-dict>`

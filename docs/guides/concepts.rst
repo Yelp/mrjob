@@ -27,8 +27,9 @@ The MapReduce framework consists of a single master "job tracker" and one slave
 jobs' component tasks on the slaves, monitoring them and re-executing the
 failed tasks. The slaves execute the tasks as directed by the master.
 
-As the job author, you write :term:`map`, :term:`combine`, and :term:`reduce`
-functions that are submitted to the job tracker for execution.
+As the job author, you write :term:`map <mapper>`, :term:`combine <combiner>`,
+and :term:`reduce <reducer>` functions that are submitted to the job tracker
+for execution.
 
 A :term:`mapper` takes a single key and value as input, and returns zero or
 more (key, value) pairs. The pairs from all map outputs of a single step are
@@ -140,6 +141,8 @@ or reducers.
 
 mrjob is a framework that assists you in submitting your job to the Hadoop job
 tracker and in running each individual step under Hadoop Streaming.
+
+.. _how-your-program-is-run:
 
 How your program is run
 ^^^^^^^^^^^^^^^^^^^^^^^

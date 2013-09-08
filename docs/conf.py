@@ -52,7 +52,8 @@ html_theme_options = {
 }
 html_context = {}
 
-html_title = "<project> v<release> documentation"
+html_title = "%(project)s v%(version)s documentation" % {
+    'project': project, 'version': version}
 html_short_title = "Home"
 # we will set this again when sphinx-better-theme supports a logo in a good
 # place
@@ -88,7 +89,7 @@ htmlhelp_basename = 'mrjobdoc'
 # [howto/manual]).
 latex_documents = [
     ('index', 'mrjob.tex', u'mrjob Documentation',
-     u'David Marin', 'manual'),
+     u'Steve Johnson', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of

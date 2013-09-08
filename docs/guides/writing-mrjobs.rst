@@ -307,6 +307,8 @@ features such as pipes, you can use :py:func:`mrjob.util.bash_wrap()` to wrap
 your command in a call to ``bash``. See :ref:`cmd-filters` for an example of
 :py:func:`mrjob.util.bash_wrap()`.
 
+.. _non-hadoop-streaming-jar-steps:
+
 Jar steps
 ^^^^^^^^^
 

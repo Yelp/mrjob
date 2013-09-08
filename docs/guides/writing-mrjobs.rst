@@ -104,6 +104,8 @@ method to return a list of :py:meth:`~mrjob.job.MRJob.mr` calls::
 
         # discard the key; it is just None
         def reducer_find_max_word(self, _, word_count_pairs):
+            # each item of word_count_pairs is (count, word),
+            # so yielding one results in key=counts, value=word
             yield max(word_count_pairs)
 
         def steps(self):
@@ -461,6 +463,8 @@ The final step is just a reducer::
 
         # discard the key; it is just None
         def reducer_find_max_word(self, _, word_count_pairs):
+            # each item of word_count_pairs is (count, word),
+            # so yielding one results in key=counts, value=word
             yield max(word_count_pairs)
 
 Since all input to this step has the same key (``None``), a single task will

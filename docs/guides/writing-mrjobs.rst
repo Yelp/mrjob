@@ -52,7 +52,7 @@ The simplest way to write a one-step job is to subclass
 (See :ref:`writing-your-first-job` for an explanation of this example.)
 
 Here are all the methods you can override to write a one-step job. We'll
-explain them better later in this document.
+explain them over the course of this document.
 
     * :py:meth:`~mrjob.job.MRJob.mapper`
     * :py:meth:`~mrjob.job.MRJob.combiner`

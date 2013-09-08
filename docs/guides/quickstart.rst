@@ -25,18 +25,19 @@ Open a file called :file:`word_count.py` and type this into it::
     from mrjob.job import MRJob
 
 
-    class MRWordCounter(MRJob):
+    class MRWordFrequencyCount(MRJob):
 
-        def mapper(self, key, line):
-            for word in line.split():
-                yield word, 1
+        def mapper(self, _, line):
+            yield "chars", len(line)
+            yield "words", len(line.split())
+            yield "lines", 1
 
-        def reducer(self, word, occurrences):
-            yield word, sum(occurrences)
+        def reducer(self, key, values):
+            yield key, sum(values)
 
 
     if __name__ == '__main__':
-        MRWordCounter.run()
+        MRWordFrequencyCount.run()
 
 Now go back to the command line, find your favorite body of text (such mrjob's
 :file:`README.rst`, or even your new file :file:`word_count.py`), and try
@@ -65,6 +66,13 @@ just a mapper, or just a combiner and a reducer.
 When you only have one step, all you have to do is write methods called
 :py:meth:`~mrjob.job.MRJob.mapper`, :py:meth:`~mrjob.job.MRJob.combiner`, and
 :py:meth:`~mrjob.job.MRJob.reducer`.
+
+The :py:func:`mapper()` method takes a key and a value as args (in this case,
+the key is ignored and a single line of text input is the value) and yields as
+many key-value pairs as it likes. The :py:func:`reduce()` method takes a key
+and an iterator of values and also yields as many key-value pairs as it likes.
+(In this case, it sums the values for each key, which represent the numbers of
+characters, words, and lines in the input.)
 
 .. warning::
 
@@ -147,7 +155,7 @@ Here's a job that finds the most commonly used word in the input::
                 yield (word.lower(), 1)
 
         def combiner_count_words(self, word, counts):
-            # sum the words we've seen so far
+            # optimization: sum the words we've seen so far
             yield (word, sum(counts))
 
         def reducer_count_words(self, word, counts):

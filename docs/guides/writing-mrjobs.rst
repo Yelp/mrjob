@@ -220,95 +220,50 @@ At the end of your job, you'll get the counter's total value::
 Protocols
 ---------
 
-.. revisit example
+mrjob assumes that all data is newline-delimited bytes. It automatically
+serializes and deserializes these bytes using :term:`protocols <protocol>`.
+Each job has an :term:`input protocol`, an :term:`output protocol`, and an
+:term:`internal protocol`.
 
-The default configuration sends input lines to mappers via the value parameter
-as a string object, with ``None`` for the key, so the mapper method above
-discards the key and operates only on the value. The mapper yields ``(word,
-1)`` for each word. The key and value are converted to `JSON`_ for transmission
-between tasks and for final output.
+A protocol has a :py:func:`read()` method and a :py:func:`write()` method. The
+:py:func:`read()` method converts bytes to pairs of Python objects representing
+the keys and values. The :py:func:`write()` method converts a pair of Python
+objects back to bytes.
 
-.. _`JSON`: http://www.json.org/
+The :term:`input protocol` is used to read the bytes sent to the first mapper
+(or reducer, if your first step doesn't use a mapper). The :term:`output
+protocol` is used to write the output of the last step to bytes written to the
+output file. The :term:`internal protocol` converts the output of one step to
+the input of the next if the job has more than one step.
 
-The combiner and reducer get a word as the key and an iterator of numbers as
-the value. They simply yield the word and the sum of the values.
-
-The final output of the job is a set of lines where each line is a
-tab-delimited key-value pair. Each key and value has been converted from its
-Python representation to a JSON representation.
-
-::
-
-    "all"   1
-    "and"   4
-    "bus"   2
-    ...
-
-.. end revisit example
-
-Input and output goes to and from each task in the form of newline-delimited
-bytes. Each line is separated into key and value by a tab character [#hc]_.
-
-When sending lines between tasks, Hadoop Streaming compares and sorts keys
-lexicographically, agnostic of encoding [#hc]_. mrjob is responsible for
-serializing and deserializing lines to and from the Python objects that your
-code operates on. Objects responsible for serializing and deserializing keys
-and values from bytes to and from Python objects are called **protocols**.
-
-The **input protocol** converts input lines into the key and value received by
-the first task in the first step. Depending on what step components you have
-defined this could be either a mapper or a reducer.
-
-The **internal protocol** is used to convert lines for transmission between
-tasks in between input and output.
-
-The **output protocol** converts the objects yielded by the final step
-component (mapper, combiner, or reducer) to the final output format to be sent
-back to the output directory, stdout, etc.
-
-Here are the default values::
+You can specify which protocols your job uses like this::
 
     class MyMRJob(mrjob.job.MRJob):
 
+        # these are the defaults
         INPUT_PROTOCOL = mrjob.protocol.RawValueProtocol
         INTERNAL_PROTOCOL = mrjob.protocol.JSONProtocol
         OUTPUT_PROTOCOL = mrjob.protocol.JSONProtocol
 
-The default input protocol, :py:class:`~mrjob.protocol.RawValueProtocol`,
-passes the entire line of input as the value parameter to the mapper, with the
-key as ``None``. The default internal and output protocols convert both the key
-and the value to and from JSON.
+The default input protocol is |RawValueProtocol|, which reads and writes lines
+of raw text with no key. So by default, the first step in your job sees
+``(None, <text of the line>)`` for each line of input.
 
-Consider a job that must pass values between internal steps that are too
-complex for JSON to handle. Such a job might look like this::
+The default output and internal protocols are both |JSONProtocol|, which reads
+and writes JSON strings separated by a tab character. (Hadoop Streaming uses
+the tab character to separate keys and values within one line when it sorts
+your data [#hc]_.)
 
-    class ComplicatedJob(MRJob):
+If your head hurts a bit, think of it this way: use |RawValueProtocol| when you
+want to read or write lines of raw text. Use |JSONProtocol| when you want to
+read or write key-value pairs where the key and value are JSON-enoded bytes.
 
-        INTERNAL_PROTOCOL = mrjob.protocol.PickleProtocol
+.. note::
 
-        def map_1(self, _, value):
-            pass # do stuff, yield complicated objects
+    Hadoop Streaming does not understand JSON, or mrjob protocols. It simply
+    groups lines by doing a string comparison on the keys.
 
-        def reduce_1(self, key, values):
-            pass # do more stuff
-
-        def reduce_2(self, key, values):
-            pass # do even more stuff
-
-        def steps(self):
-            return [self.mr(mapper=self.map_1,
-                            reducer=self.reduce_1),
-                    self.mr(reducer=self.reduce_2)]
-
-In this example, ``map_1()`` gets JSON-decoded values. Its output is serialized
-and deserialized into ``reduce_1()`` using ``pickle``, and again when sent to
-``reduce_2()``. The output keys and values of ``reduce_2()`` are serialized as
-JSON.
-
-Here is a complete list of built-in protocols. Classes named ``*ValueProtocol``
-ignore the key. For serialization, the value is serialized and sent as the
-entire line. For deserialization, the entire line is read as the value and the
-key is set to ``None``.
+Here are all the protocols mrjob includes:
 
 * :py:class:`~mrjob.protocol.JSONProtocol` /
   :py:class:`~mrjob.protocol.JSONValueProtocol`: JSON
@@ -320,12 +275,153 @@ key is set to ``None``.
   :py:class:`~mrjob.protocol.ReprValueProtocol`: serialize with ``repr()``,
   deserialize with :py:func:`mrjob.util.safeeval`
 
+The :py:class:`*ValueProtocol` protocols assume the input lines don't have
+keys, and don't write a key as output.
+
 .. rubric:: Footnotes
 
 .. [#hc] This behavior is configurable, but there is currently no
     mrjob-specific documentation. `Gitub pull requests
     <http://www.github.com/yelp/mrjob>`_ are always
     appreciated.
+
+Data flow walkthrough by example
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Let's revisit our example from :ref:`writing-multi-step-jobs`. It has two
+steps and takes a plain text file as input.
+
+::
+
+    class MRMostUsedWord(MRJob):
+
+        def steps(self):
+            return [
+                self.mr(mapper=self.mapper_get_words,
+                        combiner=self.combiner_count_words,
+                        reducer=self.reducer_count_words),
+                self.mr(reducer=self.reducer_find_max_word)
+            ]
+
+The first step starts with :py:func:`mapper_get_words()`::
+
+        def mapper_get_words(self, _, line):
+            # yield each word in the line
+            for word in WORD_RE.findall(line):
+                yield (word.lower(), 1)
+
+Since the input protocol is |RawValueProtocol|, the key will always be ``None``
+and the value will be the text of the line.
+
+The function discards the key and yields ``(word, 1)`` for each word in the
+line. Since the internal protocol is |JSONProtocol|, each component of the
+output is serialized to JSON. The serialized components are written to stdout
+separated by a tab character and ending in a newline character, like this::
+
+    "mrjob" 1
+    "is"    1
+    "a" 1
+    "python"    1
+
+The next two parts of the step are the combiner and reducer::
+
+        def combiner_count_words(self, word, counts):
+            # sum the words we've seen so far
+            yield (word, sum(counts))
+
+        def reducer_count_words(self, word, counts):
+            # send all (num_occurrences, word) pairs to the same reducer.
+            # num_occurrences is so we can easily use Python's max() function.
+            yield None, (sum(counts), word)
+
+In both cases, bytes are deserialized into ``(word, counts)`` by
+|JSONProtocol|, and the output is serialized as JSON in the same way (because
+both are followed by another step). It looks just like the first mapper output,
+but the results are summed::
+
+    "mrjob" 31
+    "is"    2
+    "a" 2
+    "Python"    1
+
+The final step is just a reducer::
+
+        # discard the key; it is just None
+        def reducer_find_max_word(self, _, word_count_pairs):
+            yield max(word_count_pairs)
+
+Since all input to this step has the same key (``None``), a single task will
+get all rows. Again, |JSONProtocol| will handle deserialization and produce the
+arguments to :py:func:`reducer_find_max_word()`.
+
+The output protocol is also |JSONProtocol|, so the final output will be::
+
+    31  "mrjob"
+
+And we're done! But that's a bit ugly; there's no need to write the key out at
+all. Let's use :py:class:`~mrjob.protocol.JSONValueProtocol` instead, so we
+only see the JSON-encoded value::
+
+    class MRMostUsedWord(MRJob):
+
+        OUTPUT_PROTOCOL = JSONValueProtocol
+
+Now we should have code that is identical to
+:file:`examples/mr_most_used_word.py` in mrjob's source code. Let's try running
+it::
+
+    $ # -q prevents debug logging
+    $ python mr_most_used_word.py README.txt -q
+    "mrjob"
+
+Hooray!
+
+Data flow walkthrough by diagram
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. note::
+
+    We would love for some kindly individual to draw us a nice diagram instead.
+
+.. code-block:: python
+
+    input.txt:
+        line 1
+        line 2
+
+    Hadoop distributes the input
+
+    Hadoop Streaming sends "line 1\nline 2\n" to the process
+        "python mr_wc.py --step-num=0 --mapper"
+
+    MRWordCountJob.INPUT_PROTOCOL().read()
+        # each item is a call to mapper()
+        -> (None, "line 1"), (None, "line 2")
+
+    MRWordCountJob.mapper(key, value)
+        # each item is a call to write()
+        -> ('word', 2), ('char', 6), ('line', 1),
+           ('word', 2), ('char', 6), ('line', 1)
+
+    MRWordCountJob.INTERNAL_PROTOCOL().write()
+        -> '"word"\t2', '"char"\t6', '"line"\t1',
+           '"word"\t2', '"char"\t6', '"line"\t1',
+
+    Hadoop sorts the data by key, sending all lines that share
+        a key to the same reducer
+
+    MRWordCountJob.INTERNAL_PROTOCOL().read()
+        # each item is a call to reducer()
+        -> ('word', 2), ('char', 6), ('line', 1), ...
+
+    MRWordCountJob.reducer(key, value)
+        # each item is a call to write()
+        -> ('word', 4), ('char', 12), ('line', 2)
+
+    MRWordCountJob.OUTPUT_PROTOCOL().write()
+        -> '"word"\t4', '"char"\t12', '"line"\t2'
+
+    (Hadoop writes the bytes to a file)
 
 Specifying protocols for your job
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -591,3 +687,8 @@ a script::
                 name='run a script',
                 jar='s3://elasticmapreduce/libs/script-runner/script-runner.jar',
                 step_args=['s3://my_bucket/my_script.sh'])]
+
+.. aliases
+
+.. |JSONProtocol| replace:: :py:class:`~mrjob.protocol.JSONProtocol`
+.. |RawValueProtocol| replace:: :py:class:`~mrjob.protocol.RawValueProtocol`

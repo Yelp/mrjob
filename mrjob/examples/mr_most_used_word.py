@@ -15,7 +15,7 @@
 """The classic MapReduce job: count the frequency of words.
 """
 from mrjob.job import MRJob
-from mrjob.protocol import RawValueProtocol
+from mrjob.protocol import JSONValueProtocol
 import re
 
 WORD_RE = re.compile(r"[\w']+")
@@ -23,7 +23,7 @@ WORD_RE = re.compile(r"[\w']+")
 
 class MRMostUsedWord(MRJob):
 
-    OUTPUT_PROTOCOL = RawValueProtocol
+    OUTPUT_PROTOCOL = JSONValueProtocol
 
     def mapper_get_words(self, _, line):
         # yield each word in the line

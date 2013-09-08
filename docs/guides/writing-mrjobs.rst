@@ -16,7 +16,10 @@ task. (See :ref:`how-your-program-is-run` for more on that.)
 
 All dependencies must either be contained within the file, available on the
 task nodes, or uploaded to the cluster by mrjob when your job is submitted.
-(:doc:`Runners` explains how to do those things.)
+(:doc:`runners` explains how to do those things.)
+
+The following two sections are more reference-oriented versions of
+:ref:`writing-your-first-job` and :ref:`writing-your-second-job`.
 
 Single-step jobs
 ^^^^^^^^^^^^^^^^
@@ -46,10 +49,10 @@ The simplest way to write a one-step job is to subclass
     if __name__ == '__main__':
         MRWordFreqCount.run()
 
-This example is elaborated on later in this document in :ref:`job-protocols`.
+(See :ref:`writing-your-first-job` for an explanation of this example.)
 
-Here are all the methods you can override to write a one-step job. Click on the
-ones that interest you, or keep reading.
+Here are all the methods you can override to write a one-step job. We'll
+explain them better later in this document.
 
     * :py:meth:`~mrjob.job.MRJob.mapper`
     * :py:meth:`~mrjob.job.MRJob.combiner`
@@ -67,44 +70,71 @@ ones that interest you, or keep reading.
     * :py:meth:`~mrjob.job.MRJob.combiner_pre_filter`
     * :py:meth:`~mrjob.job.MRJob.reducer_pre_filter`
 
+.. _writing-multi-step-jobs:
+
 Multi-step jobs
 ^^^^^^^^^^^^^^^
 
 To define multiple steps, override the :py:meth:`~mrjob.job.MRJob.steps`
-method::
+method to return a list of :py:meth:`~mrjob.job.MRJob.mr` calls::
+
+    from mrjob.job import MRJob
+    import re
+
+    WORD_RE = re.compile(r"[\w']+")
 
 
-    class MRDoubleWordFreqCount(MRJob):
-        """Word frequency count job with an extra step to double all the
-        values"""
+    class MRMostUsedWord(MRJob):
 
         def mapper_get_words(self, _, line):
+            # yield each word in the line
             for word in WORD_RE.findall(line):
-                yield word.lower(), 1
+                yield (word.lower(), 1)
 
-        def reducer_sum_words(self, word, counts):
-            yield word, sum(counts)
+        def combiner_count_words(self, word, counts):
+            # sum the words we've seen so far
+            yield (word, sum(counts))
 
-        def mapper_double_counts(self, word, counts):
-            yield word, counts * 2
+        def reducer_count_words(self, word, counts):
+            # send all (num_occurrences, word) pairs to the same reducer.
+            # num_occurrences is so we can easily use Python's max() function.
+            yield None, (sum(counts), word)
+
+        # discard the key; it is just None
+        def reducer_find_max_word(self, _, word_count_pairs):
+            yield max(word_count_pairs)
 
         def steps(self):
-            return [self.mr(mapper=self.mapper_get_words,
-                            combiner=self.reducer_sum_words,
-                            reducer=self.reducer_sum_words),
-                    self.mr(mapper=self.mapper_double_counts)]
+            return [
+                self.mr(mapper=self.mapper_get_words,
+                        combiner=self.combiner_count_words,
+                        reducer=self.reducer_count_words),
+                self.mr(reducer=self.reducer_find_max_word)
+            ]
 
-.. link to the mr() function docs
 
-Setup and teardown
-^^^^^^^^^^^^^^^^^^
+    if __name__ == '__main__':
+        MRMostUsedWord.run()
 
-You may wish to set up or tear down resources for each task. You can do so with
-``init`` and ``final`` methods. For one-step jobs, you can override these:
+(This example is explained further in :ref:`job-protocols`.)
 
-    * :py:meth:`~mrjob.job.MRJob.mapper`
-    * :py:meth:`~mrjob.job.MRJob.combiner`
-    * :py:meth:`~mrjob.job.MRJob.reducer`
+The keyword arguments accepted by :py:meth:`~mrjob.job.MRJob.mr` are the same
+as the method names listed in the previous section, plus a ``jobconf`` argument
+which takes a dictionary of jobconf arguments to pass to Hadoop.
+
+.. note::
+
+    If this is your first time learning about mrjob, you should skip down to
+    :ref:`job-protocols` and finish this section later.
+
+Setup and teardown of tasks
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Remember from :ref:`how-your-program-is-run` that your script is invoked once
+per task by Hadoop Streaming. It starts your script, feeds it stdin, reads its
+stdout, and closes it. mrjob lets you write methods to run at the beginning and
+end of this process: the :py:func:`*_init` and :py:func:`*_final` methods:
+
     * :py:meth:`~mrjob.job.MRJob.mapper_init`
     * :py:meth:`~mrjob.job.MRJob.combiner_init`
     * :py:meth:`~mrjob.job.MRJob.reducer_init`
@@ -112,13 +142,15 @@ You may wish to set up or tear down resources for each task. You can do so with
     * :py:meth:`~mrjob.job.MRJob.combiner_final`
     * :py:meth:`~mrjob.job.MRJob.reducer_final`
 
-For multi-step jobs, use keyword arguments to the :py:meth:`mrjob.job.MRJob.mr`
-function.
+(And the corresponding keyword arguments to :py:meth:`~mrjob.job.MRJob.mr`.)
 
-``init`` and ``final`` methods can yield values just like normal tasks. Here is
-our word frequency count example rewritten to use ``init`` and ``final``
-methods::
+If you need to load some kind of support file, like a :py:mod:`sqlite3`
+database, or perhaps create a temporary file, you can use these methods to do
+so.
 
+:py:func:`*_init` and :py:func:`*_final` methods can yield values just like
+normal tasks. Here is our word frequency count example rewritten to use
+these methods::
 
     class MRWordFreqCount(MRJob):
 
@@ -146,16 +178,25 @@ methods::
                             reducer=self.sum_words)]
 
 In this version, instead of yielding one line per word, the mapper keeps an
-internal count of word occurrences across *all lines this mapper has seen so
-far, including multiple input lines.* When Hadoop Streaming stops sending data
-to the map task, mrjob calls ``final_get_words()`` and it emits a much smaller
-set of output lines.
+internal count of word occurrences across all lines this mapper has seen so
+far. The mapper itself yields nothing. When Hadoop Streaming stops sending data
+to the map task, mrjob calls :py:func:`final_get_words()`. That function emits
+the totals for this task, which is a much smaller set of output lines than the
+mapper would have output.
+
+The optimization above is similar to using :term:`combiners <combiner>`,
+demonstrated in :ref:`writing-multi-step-jobs`. It is usually clearer to use a
+combiner rather than a custom data structure, and Hadoop may run combiners in
+more places than just the ends of tasks.
+
+:ref:`writing-cl-opts` has a partial example that shows how to load a
+:py:mod:`sqlite3` database using :py:meth:`~mrjob.job.MRJob.mapper_init`.
 
 Counters
 ^^^^^^^^
 
 Hadoop lets you track *counters* that are aggregated over a step. A counter
-had a group, a name, and an integer value. Hadoop itself tracks a few counters
+has a group, a name, and an integer value. Hadoop itself tracks a few counters
 automatically. mrjob prints your job's counters to the command line when your
 job finishes, and they are available to the runner object if you invoke it
 programmatically.

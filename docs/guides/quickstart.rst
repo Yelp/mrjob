@@ -15,6 +15,8 @@ or from a `git`_ clone of the `source code`_::
 .. _`git`: http://www.git-scm.org/
 .. _`source code`: http://www.github.com/yelp/mrjob
 
+.. _writing-your-first-job:
+
 Writing your first job
 ----------------------
 
@@ -119,6 +121,8 @@ using EMR::
   $ python my_job.py -r hadoop hdfs://my_home/input.txt
 
 If your code spans multiple files, see :ref:`cookbook-src-tree-pythonpath`.
+
+.. _writing-your-second-job:
 
 Writing your second job
 -----------------------

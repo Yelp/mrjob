@@ -375,55 +375,6 @@ it (``-q`` prevents debug logging)::
 
 Hooray!
 
-..
-
-Data flow walkthrough by diagram
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. note::
-
-    We would love for some kindly individual to draw us a nice diagram instead.
-
-.. code-block:: python
-
-    input.txt:
-        line 1
-        line 2
-
-    Hadoop distributes the input
-
-    Hadoop Streaming sends "line 1\nline 2\n" to the process
-        "python mr_wc.py --step-num=0 --mapper"
-
-    MRWordCountJob.INPUT_PROTOCOL().read()
-        # each item is a call to mapper()
-        -> (None, "line 1"), (None, "line 2")
-
-    MRWordCountJob.mapper(key, value)
-        # each item is a call to write()
-        -> ('word', 2), ('char', 6), ('line', 1),
-           ('word', 2), ('char', 6), ('line', 1)
-
-    MRWordCountJob.INTERNAL_PROTOCOL().write()
-        -> '"word"\t2', '"char"\t6', '"line"\t1',
-           '"word"\t2', '"char"\t6', '"line"\t1',
-
-    Hadoop sorts the data by key, sending all lines that share
-        a key to the same reducer
-
-    MRWordCountJob.INTERNAL_PROTOCOL().read()
-        # each item is a call to reducer()
-        -> ('word', 2), ('char', 6), ('line', 1), ...
-
-    MRWordCountJob.reducer(key, value)
-        # each item is a call to write()
-        -> ('word', 4), ('char', 12), ('line', 2)
-
-    MRWordCountJob.OUTPUT_PROTOCOL().write()
-        -> '"word"\t4', '"char"\t12', '"line"\t2'
-
-    (Hadoop writes the bytes to a file)
-
 Specifying protocols for your job
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

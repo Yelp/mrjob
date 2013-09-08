@@ -150,7 +150,7 @@ end of this process: the :py:func:`*_init` and :py:func:`*_final` methods:
 
 If you need to load some kind of support file, like a :py:mod:`sqlite3`
 database, or perhaps create a temporary file, you can use these methods to do
-so.
+so. (See :ref:`writing-file-options` for an example.)
 
 :py:func:`*_init` and :py:func:`*_final` methods can yield values just like
 normal tasks. Here is our word frequency count example rewritten to use
@@ -611,6 +611,8 @@ command string.
 .. [#popt] This is accomplished using crazy :py:mod:`optparse` hacks so you
     don't need to limit yourself to certain option types. However, your default
     values need to be compatible with :py:func:`copy.deepcopy`.
+
+.. _writing-file-options:
 
 File options
 ^^^^^^^^^^^^

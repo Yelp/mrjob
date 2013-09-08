@@ -54,6 +54,8 @@ The simplest way to write a one-step job is to subclass
 Here are all the methods you can override to write a one-step job. We'll
 explain them over the course of this document.
 
+.. _single-step-method-names:
+
     * :py:meth:`~mrjob.job.MRJob.mapper`
     * :py:meth:`~mrjob.job.MRJob.combiner`
     * :py:meth:`~mrjob.job.MRJob.reducer`
@@ -119,8 +121,10 @@ method to return a list of :py:meth:`~mrjob.job.MRJob.mr` calls::
 (This example is explained further in :ref:`job-protocols`.)
 
 The keyword arguments accepted by :py:meth:`~mrjob.job.MRJob.mr` are the same
-as the method names listed in the previous section, plus a ``jobconf`` argument
-which takes a dictionary of jobconf arguments to pass to Hadoop.
+as the
+:ref:`method names listed in the previous section <single-step-method-names>`,
+plus a ``jobconf`` argument which takes a
+dictionary of jobconf arguments to pass to Hadoop.
 
 .. note::
 

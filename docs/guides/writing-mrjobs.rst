@@ -7,8 +7,8 @@ information you need.
 
 .. _writing-basics:
 
-Basics
-------
+Defining steps
+--------------
 
 Your job will be defined in a file to be executed on your machine as a Python
 script, as well as on a Hadoop cluster as an individual map, combine, or reduce
@@ -323,29 +323,6 @@ For example, on EMR you can use a jar to run a script::
                 name='run a script',
                 jar='s3://elasticmapreduce/libs/script-runner/script-runner.jar',
                 step_args=['s3://my_bucket/my_script.sh'])]
-
-Counters
-^^^^^^^^
-
-Hadoop lets you track :dfn:`counters` that are aggregated over a step. A
-counter has a group, a name, and an integer value. Hadoop itself tracks a few
-counters automatically. mrjob prints your job's counters to the command line
-when your job finishes, and they are available to the runner object if you
-invoke it programmatically.
-
-To increment a counter from anywhere in your job, use the
-:py:meth:`~mrjob.job.MRJob.increment_counter` method::
-
-    class MRCountingJob(MRJob):
-
-        def mapper(self, _, value):
-            self.increment_counter('group', 'counter_name', 1)
-            yield _, value
-
-At the end of your job, you'll get the counter's total value::
-
-    group:
-        counter_name: 1
 
 .. _job-protocols:
 
@@ -697,7 +674,28 @@ to set the :py:attr:`~mrjob.job.MRJob.OPTION_CLASS` attribute.
 .. _Extending optparse:
     http://docs.python.org/library/optparse.html#extending-optparse
 
-.. _non-python-processing:
+Counters
+--------
+
+Hadoop lets you track :dfn:`counters` that are aggregated over a step. A
+counter has a group, a name, and an integer value. Hadoop itself tracks a few
+counters automatically. mrjob prints your job's counters to the command line
+when your job finishes, and they are available to the runner object if you
+invoke it programmatically.
+
+To increment a counter from anywhere in your job, use the
+:py:meth:`~mrjob.job.MRJob.increment_counter` method::
+
+    class MRCountingJob(MRJob):
+
+        def mapper(self, _, value):
+            self.increment_counter('group', 'counter_name', 1)
+            yield _, value
+
+At the end of your job, you'll get the counter's total value::
+
+    group:
+        counter_name: 1
 
 .. aliases
 

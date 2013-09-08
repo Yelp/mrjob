@@ -368,13 +368,14 @@ only see the JSON-encoded value::
 
 Now we should have code that is identical to
 :file:`examples/mr_most_used_word.py` in mrjob's source code. Let's try running
-it::
+it (``-q`` prevents debug logging)::
 
-    $ # -q prevents debug logging
     $ python mr_most_used_word.py README.txt -q
     "mrjob"
 
 Hooray!
+
+..
 
 Data flow walkthrough by diagram
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -444,19 +445,20 @@ If you need more complex behavior, you can override
 :py:meth:`~mrjob.job.MRJob.input_protocol`,
 :py:meth:`~mrjob.job.MRJob.internal_protocol`, or
 :py:meth:`~mrjob.job.MRJob.output_protocol` and return a protocol object
-instance::
+instance. Here's an example that sneaks a peek at :ref:`writing-cl-opts`::
 
     class CommandLineProtocolJob(MRJob):
 
         def configure_options(self):
             super(CommandLineProtocolJob, self).configure_options()
             self.add_passthrough_option(
-                '--input-format', default='raw', choices=['raw', 'json'])
+                '--output-format', default='raw', choices=['raw', 'json'],
+                help="Specify the output format of the job")
 
-        def input_protocol(self):
-            if self.options.input_format == 'json':
+        def output_protocol(self):
+            if self.options.output_format == 'json':
                 return JSONValueProtocol()
-            elif self.options.input_format == 'raw':
+            elif self.options.output_format == 'raw':
                 return RawValueProtocol()
 
 Finally, if you need to use a completely different concept of protocol
@@ -521,17 +523,18 @@ command line-switchable protocol example from before uses this feature::
         def configure_options(self):
             super(CommandLineProtocolJob, self).configure_options()
             self.add_passthrough_option(
-                '--input-format', default='raw', choices=['raw', 'json'])
+                '--output-format', default='raw', choices=['raw', 'json'],
+                help="Specify the output format of the job")
 
-        def input_protocol(self):
-            if self.options.input_format == 'json':
+        def output_protocol(self):
+            if self.options.output_format == 'json':
                 return JSONValueProtocol()
-            elif self.options.input_format == 'raw':
+            elif self.options.output_format == 'raw':
                 return RawValueProtocol()
 
-When you run your script with ``--input-format=json``, mrjob detects that you
-passed ``--input-format`` on the command line. When your script is run in any
-other context, such as on Hadoop, it adds ``input-format=json`` to its
+When you run your script with ``--output-format=json``, mrjob detects that you
+passed ``--output-format`` on the command line. When your script is run in any
+other context, such as on Hadoop, it adds ``--output-format=json`` to its
 command string.
 
 :py:meth:`~mrjob.job.MRJob.add_passthrough_option` takes the same arguments as

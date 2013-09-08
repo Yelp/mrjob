@@ -29,8 +29,6 @@ One-step jobs
 .. automethod:: MRJob.reducer_pre_filter
 .. automethod:: MRJob.combiner_pre_filter
 
-.. _writing-multi-step-jobs:
-
 Multi-step jobs
 ---------------
 

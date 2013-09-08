@@ -3,13 +3,10 @@ Glossary
 
 ..  glossary::
 
-    combine
-        The act of converting one key and a list of values that share that key
-        (not necessarily all values for the key) to zero or more key-value
-        pairs based on some function. See :doc:`guides/concepts` for details.
-
     combiner
-        A function that performs a :term:`combine` operation.
+        A function that converts one key and a list of values that share that
+        key (not necessarily all values for the key) to zero or more key-value
+        pairs based on some function. See :doc:`guides/concepts` for details.
 
     Hadoop Streaming
         A special jar that lets you run code written in any language on Hadoop.
@@ -24,12 +21,9 @@ Glossary
         The :term:`protocol` that converts the output of one step to the intput
         of the next.  See :ref:`job-protocols` for details.
 
-    map
-        The act of converting one key-value pair to zero or more key-value
-        pairs based on some function. See :doc:`guides/concepts` for details.
-
     mapper
-        A function that performs a :term:`map` operation.
+        A function that convertsone key-value pair to zero or more key-value
+        pairs based on some function. See :doc:`guides/concepts` for details.
 
     output protocol
         The :term:`protocol` that converts the output of the last step to the
@@ -39,13 +33,10 @@ Glossary
         An object that converts a stream of bytes to and from Python objects.
         See :ref:`job-protocols` for details.
 
-    reduce
-        The act of converting one key and all values that share that key to
+    reducer
+        A function that converts one key and all values that share that key to
         zero or more key-value pairs based on some function. See
         :doc:`guides/concepts` for details.
-
-    reducer
-        A function that performs a :term:`reduce` operation.
 
     step
         One :term:`mapper`, :term:`combiner`, and :term:`reducer`. Any of

@@ -25,8 +25,9 @@ One-step jobs
 .. automethod:: MRJob.mapper_cmd
 .. automethod:: MRJob.reducer_cmd
 .. automethod:: MRJob.combiner_cmd
-
-.. _writing-multi-step-jobs:
+.. automethod:: MRJob.mapper_pre_filter
+.. automethod:: MRJob.reducer_pre_filter
+.. automethod:: MRJob.combiner_pre_filter
 
 Multi-step jobs
 ---------------
@@ -62,6 +63,7 @@ Setting protocols
 .. automethod:: MRJob.input_protocol
 .. automethod:: MRJob.internal_protocol
 .. automethod:: MRJob.output_protocol
+.. automethod:: MRJob.pick_protocols
 
 Secondary sort
 --------------

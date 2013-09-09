@@ -173,8 +173,7 @@ class OptionlistDirective(Directive):
     def run(self):
         # all we have to do during parsing is make a node where the directive
         # is and remember which options it's supposed to have
-        node = optionlist('')
-        node.option_set = self.content[0]
+        node = optionlist('', option_set=self.content[0])
         return [node]
 
 
@@ -338,7 +337,7 @@ def populate_option_lists(app, doctree, fromdocname):
 
         # filter and sort options for this table
         my_options = [oi for oi in env.optionlist_all_options
-                      if oi['options']['set'] == node.option_set]
+                      if oi['options']['set'] == node['option_set']]
 
         # automagically alphabetical
         # probably can assume we always have a config option, but who knows

@@ -53,8 +53,10 @@ html_theme_options = {
 }
 html_context = {}
 html_sidebars = {
-    '**': ['localtoc.html', 'sourcelink.html', 'searchbox.html'],
-    'index': ['indexsidebar.html', 'sourcelink.html', 'searchbox.html'],
+    '**': ['localtoc.html', 'sidebarhelp.html', 'sourcelink.html',
+           'searchbox.html'],
+    'index': ['indexsidebar.html', 'sidebarhelp.html', 'sourcelink.html',
+              'searchbox.html'],
 }
 
 html_title = "%(project)s v%(version)s documentation" % {

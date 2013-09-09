@@ -24,7 +24,7 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', 'options_extension',
               'sphinx.ext.intersphinx']
 intersphinx_mapping = {'http://docs.python.org/2/': None}
 
-templates_path = ['_templates']  # if we needed it
+templates_path = ['_templates']
 exclude_patterns = ['_build']
 source_suffix = '.rst'
 #source_encoding = 'utf-8-sig'
@@ -48,9 +48,14 @@ html_theme_path = [better_theme_path]
 html_static_path = ['_static']
 html_theme = 'better'
 html_theme_options = {
+    'html_show_sourcelink': True,
     'cssfiles': ['_static/style.css'],
 }
 html_context = {}
+html_sidebars = {
+    '**': ['localtoc.html', 'sourcelink.html', 'searchbox.html'],
+    'index': ['indexsidebar.html', 'sourcelink.html', 'searchbox.html'],
+}
 
 html_title = "%(project)s v%(version)s documentation" % {
     'project': project, 'version': version}
@@ -66,9 +71,6 @@ if READ_THE_DOCS:
 else:
     html_theme_options['ga_ua'] = 'UA-42793220-2'
     html_theme_options['ga_domain'] = 'pythonhosted.org'
-
-# Custom sidebar templates, maps document names to template names.
-#html_sidebars = {}
 
 # Necessary for best search results
 html_show_sourcelink = True

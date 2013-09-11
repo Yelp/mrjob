@@ -173,7 +173,7 @@ v0.3.0, 2011-12-07 -- Worth the wait
    * Set Hadoop partitioner class with --partitioner, PARTITIONER, or
      partitioner() (Issue #6)
    * Custom option parsing (Issue #172)
-   * Use mrjob.compat.jobconf_from_env() to get jobconf values from environment
+   * Use mrjob.compat.get_jobconf_value() to get jobconf values from environment
  * Running jobs:
    * All modes:
      * All runners are Hadoop-version aware and use the correct jobconf and

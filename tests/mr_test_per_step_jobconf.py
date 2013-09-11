@@ -40,7 +40,7 @@ class MRTestPerStepJobConf(MRJob):
             self.mr(mapper_init=self.mapper_init,
                     mapper=self.mapper,
                     jobconf={'user.defined': 'nothing',
-                             'mapred.map.tasks': 5})])
+                             'mapred.map.tasks': 4})])
 
 
 if __name__ == '__main__':

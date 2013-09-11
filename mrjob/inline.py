@@ -36,6 +36,8 @@ from mrjob.util import save_current_environment
 
 log = logging.getLogger(__name__)
 
+
+# Deprecated in favor of class variables, remove in v0.5.0
 DEFAULT_MAP_TASKS = 1
 DEFAULT_REDUCE_TASKS = 1
 
@@ -50,21 +52,24 @@ class InlineMRJobRunner(SimMRJobRunner):
     To more accurately simulate your environment prior to running on
     Hadoop/EMR, use ``-r local``.
     """
-
     alias = 'inline'
 
     OPTION_STORE_CLASS = SimRunnerOptionStore
+
+    # stick to a single split for efficiency
+    _DEFAULT_MAP_TASKS = 1
+    _DEFAULT_REDUCE_TASKS = 1
 
     def __init__(self, mrjob_cls=None, **kwargs):
         """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword
         args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 
         * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*,
-          and *hadoop_streaming_jar*, *jobconf*, and *partitioner* are ignored
+          and *hadoop_streaming_jar*, and *partitioner* are ignored
           because they require Java. If you need to test these, consider
           starting up a standalone Hadoop instance and running your job with
           ``-r hadoop``.
-        * *cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*,
+        * *python_bin*, *setup_cmds*, *setup_scripts*,
           *steps_python_bin*, *upload_archives*, and *upload_files* are ignored
           because we don't invoke the job as a subprocess or run it in its own
           directory.

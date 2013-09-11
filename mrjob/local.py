@@ -35,6 +35,7 @@ from mrjob.util import shlex_split
 log = logging.getLogger(__name__)
 
 
+# Deprecated in favor of class variables, remove in v0.5.0
 DEFAULT_MAP_TASKS = 2
 DEFAULT_REDUCE_TASKS = 2
 

@@ -609,8 +609,8 @@ class LocalMRJobRunnerJobConfTestCase(SandboxedTestCase):
 
             # sanity test: --jobconf should definitely work
             self.assertEqual(runner.counters()[0]['count']['mapper_init'], 2)
-            # the job sets its own mapred.map.tasks to 5 for the 2nd step
-            self.assertEqual(runner.counters()[1]['count']['mapper_init'], 5)
+            # the job sets its own mapred.map.tasks to 4 for the 2nd step
+            self.assertEqual(runner.counters()[1]['count']['mapper_init'], 4)
 
 
 class CompatTestCase(EmptyMrjobConfTestCase):

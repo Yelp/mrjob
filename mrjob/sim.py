@@ -22,6 +22,8 @@ import os
 import shutil
 import stat
 
+from mrjob.compat import add_translated_jobconf_for_hadoop_version
+from mrjob.compat import jobconf_from_dict
 from mrjob.compat import translate_jobconf
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
@@ -78,6 +80,9 @@ class SimMRJobRunner(MRJobRunner):
     version.
 
     """
+    # try to run at least two tasks to catch bugs
+    _DEFAULT_MAP_TASKS = 2
+    _DEFAULT_REDUCE_TASKS = 2
 
     # options that we ignore because they require real Hadoop
     IGNORED_HADOOP_OPTS = [
@@ -181,9 +186,7 @@ class SimMRJobRunner(MRJobRunner):
             self._check_step_works_with_runner(step)
             self._counters.append({})
 
-            self._invoke_step(
-                step, 'step-%d-mapper' % step_num, step_num, 'mapper',
-                num_tasks=self._map_tasks)
+            self._invoke_step(step_num, 'mapper')
 
             if 'reducer' in step:
                 # sort the output. Treat this as a mini-step for the purpose
@@ -196,9 +199,7 @@ class SimMRJobRunner(MRJobRunner):
                 self._prev_outfiles = [sort_output_path]
 
                 # run the reducer
-                self._invoke_step(
-                    step, 'step-%d-reducer' % step_num, step_num, 'reducer',
-                    num_tasks=self._reduce_tasks)
+                self._invoke_step(step_num, 'reducer')
 
         # move final output to output directory
         for i, outfile in enumerate(self._prev_outfiles):
@@ -206,8 +207,7 @@ class SimMRJobRunner(MRJobRunner):
             log.info('Moving %s -> %s' % (outfile, final_outfile))
             shutil.move(outfile, final_outfile)
 
-    def _invoke_step(self, step_dict, outfile_name, step_num, step_type,
-                     num_tasks=1):
+    def _invoke_step(self, step_num, step_type):
         """Run the given command, outputting into outfile, and reading
         from the previous outfile (or, for the first step, from our
         original output files).
@@ -224,10 +224,22 @@ class SimMRJobRunner(MRJobRunner):
         :num_tasks: number of mapper or reducer tasks to be launched to execute
         this step
         """
+        step = self._get_step(step_num)
 
-        if step_dict['type'] != 'streaming':
+        if step['type'] != 'streaming':
             raise Exception("LocalMRJobRunner cannot run %s steps" %
-                            step_dict['type'])
+                            step['type'])
+
+        jobconf = self._jobconf_for_step(step_num)
+
+        outfile_prefix = 'step-%d-%s' % (step_num, step_type)
+
+        if step_type == 'reducer':
+            num_tasks = int(jobconf_from_dict(
+                jobconf, 'mapreduce.job.reduces', self._DEFAULT_REDUCE_TASKS))
+        else:
+            num_tasks = int(jobconf_from_dict(
+                jobconf, 'mapreduce.job.maps', self._DEFAULT_MAP_TASKS))
 
         # get file splits for mappers and reducers
         keep_sorted = (step_type == 'reducer')
@@ -251,30 +263,30 @@ class SimMRJobRunner(MRJobRunner):
         for task_num, file_name in file_tasks:
             log.debug("File name %s" % file_name)
             # setup environment variables
+            split_kwargs = {}
             if step_type == 'mapper':
-                env = self._subprocess_env(
-                    step_type, step_num, task_num,
-                    # mappers have extra file split info
+                # mappers have extra file split info
+                split_kwargs = dict(
                     input_file=file_splits[file_name]['orig_name'],
                     input_start=file_splits[file_name]['start'],
                     input_length=file_splits[file_name]['length'])
-            else:
-                env = self._subprocess_env(step_type, step_num, task_num)
 
-            task_outfile = outfile_name + '_part-%05d' % task_num
+            env = self._subprocess_env(
+                step_type, step_num, task_num, **split_kwargs)
 
-            log.info('writing to %s' % task_outfile)
-            outfile = os.path.join(self._get_local_tmp_dir(), task_outfile)
+            outfile_name = outfile_prefix + '_part-%05d' % task_num
+
+            outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
+            log.info('writing to %s' % outfile)
             self._prev_outfiles.append(outfile)
 
-            self.run_step(step_dict, file_name,
-                          outfile, step_num, step_type, env)
+            self.run_step(step, file_name, outfile, step_num, step_type, env)
 
         self.per_step_runner_finish(step_num)
         self.print_counters([step_num + 1])
 
     def run_step(self, step_dict, file_name,
-                 outfile_name, step_num, step_type, env):
+                 outfile, step_num, step_type, env):
         """ Runner specific per step method
         Inline and local runners override this method
         """
@@ -440,8 +452,7 @@ class SimMRJobRunner(MRJobRunner):
                         raise IOError("Directory %s does not exist" % value)
                     self._working_dir = value
 
-    def _subprocess_env(self, step_type, step_num, task_num, input_file=None,
-                        input_start=None, input_length=None):
+    def _subprocess_env(self, step_type, step_num, task_num, **split_kwargs):
         """Set up environment variables for a subprocess (mapper, etc.)
 
         This combines, in decreasing order of priority:
@@ -459,23 +470,23 @@ class SimMRJobRunner(MRJobRunner):
         """
         version = self.get_hadoop_version()
 
-        jobconf_env = dict(
-            (translate_jobconf(k, version).replace('.', '_'), str(v))
-            for (k, v) in self._opts['jobconf'].iteritems())
+        # auto-translate jobconf variables from the wrong version, like
+        # other runners do
+        user_jobconf = add_translated_jobconf_for_hadoop_version(
+            self._jobconf_for_step(step_num), version)
 
-        internal_jobconf = self._simulate_jobconf_for_step(
-            step_type, step_num, task_num, input_file=input_file,
-            input_start=input_start, input_length=input_length)
+        simulated_jobconf = self._simulate_jobconf_for_step(
+            step_type, step_num, task_num, **split_kwargs)
 
-        internal_jobconf_env = dict(
-            (translate_jobconf(k, version).replace('.', '_'), str(v))
-            for (k, v) in internal_jobconf.iteritems())
+        def to_env(jobconf):
+            return dict((k.replace('.', '_'), str(v))
+                        for k, v in jobconf.iteritems())
 
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
         return combine_local_envs(os.environ,
-                                  jobconf_env,
-                                  internal_jobconf_env,
+                                  to_env(user_jobconf),
+                                  to_env(simulated_jobconf),
                                   self._opts['cmdenv'])
 
     def _simulate_jobconf_for_step(self, step_type, step_num, task_num,
@@ -486,12 +497,10 @@ class SimMRJobRunner(MRJobRunner):
         Returns a dictionary mapping jobconf variable name
         (e.g. ``'mapreduce.map.input.file'``) to its value, which is always
         a string.
-
-        We use the newer (Hadoop 0.21+) jobconf names; these will be
-        translated to the correct Hadoop version elsewhere.
         """
-        # read jobconf from config/cmd line and steps definition
-        j = self._jobconf_for_step(step_num)
+        # By convention, we use the newer (Hadoop 0.21+) jobconf names and
+        # translate them at the very end.
+        j = {}
 
         j['mapreduce.job.id'] = self._job_name
         j['mapreduce.task.output.dir'] = self._output_dir
@@ -540,6 +549,10 @@ class SimMRJobRunner(MRJobRunner):
             j['mapreduce.map.input.start'] = str(input_start)
         if input_length is not None:
             j['mapreduce.map.input.length'] = str(input_length)
+
+        # translate to correct version
+        version = self.get_hadoop_version()
+        j = dict((translate_jobconf(k, version), v) for k, v in j.iteritems())
 
         return j
 

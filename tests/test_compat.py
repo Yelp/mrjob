@@ -32,26 +32,36 @@ from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_generic_jobconf
 
 
-class EnvVarTestCase(unittest.TestCase):
+class GetJobConfValueTestCase(unittest.TestCase):
 
     def setUp(self):
         p = patch.object(os, 'environ', {})
         p.start()
         self.addCleanup(p.stop)
 
-    def test_get_jobconf_value_1(self):
+    def test_get_old_hadoop_jobconf(self):
         os.environ['user_name'] = 'Edsger W. Dijkstra'
         self.assertEqual(get_jobconf_value('user.name'),
                          'Edsger W. Dijkstra')
         self.assertEqual(get_jobconf_value('mapreduce.job.user.name'),
                          'Edsger W. Dijkstra')
 
-    def test_get_jobconf_value_2(self):
+    def test_get_new_hadoop_jobconf(self):
         os.environ['mapreduce_job_user_name'] = 'Edsger W. Dijkstra'
         self.assertEqual(get_jobconf_value('user.name'),
                          'Edsger W. Dijkstra')
         self.assertEqual(get_jobconf_value('mapreduce.job.user.name'),
                          'Edsger W. Dijkstra')
+
+    def test_default(self):
+        self.assertEqual(get_jobconf_value('user.name'), None)
+        self.assertEqual(get_jobconf_value('user.name', 'dave'), 'dave')
+
+    def test_get_missing_jobconf_not_in_table(self):
+        # there was a bug where defaults didn't work for jobconf
+        # variables that we don't know about
+        self.assertEqual(get_jobconf_value('user.defined'), None)
+        self.assertEqual(get_jobconf_value('user.defined', 'art'), 'art')
 
 
 class CompatTestCase(unittest.TestCase):

@@ -584,7 +584,7 @@ def get_jobconf_value(variable, default=None):
         return os.environ[name]
 
     # try alternatives (arbitrary order)
-    for var in _jobconf_map[variable].itervalues():
+    for var in _jobconf_map.get(variable, {}).itervalues():
         name = var.replace('.', '_')
         if name in os.environ:
             return os.environ[name]

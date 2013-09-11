@@ -54,7 +54,7 @@ class SimMRJobRunner(MRJobRunner):
     """Abstract base class for runners for testing jobs in development
 
     The inline and local runners inherit from this class so functionality
-    common to them has been moved here.:py:method:`run_step` must be overriden
+    common to them has been moved here.:py:method:`_run_step` must be overriden
     by classes that extend SimMRJobRunner
 
     :py:class:`LocalMRJobRunner` and :py:class:`InlineMRJobRunner` simulate
@@ -101,7 +101,6 @@ class SimMRJobRunner(MRJobRunner):
 
     def __init__(self, **kwargs):
         super(SimMRJobRunner, self).__init__(**kwargs)
-        self._working_dir = None
         self._prev_outfiles = []
         self._counters = []
 
@@ -133,24 +132,23 @@ class SimMRJobRunner(MRJobRunner):
             log.debug('copying %s -> %s' % (path, dest))
             shutil.copyfile(path, dest)
 
-    def _setup_working_dir(self):
+    def _setup_working_dir(self, working_dir):
         """Make a working directory with symlinks to our script and
         external files. Return name of the script"""
+        log.info('setting up working dir in %s' % working_dir)
+
         # create the working directory
-        if not self._working_dir:
-            self._working_dir = os.path.join(
-                self._get_local_tmp_dir(), 'working_dir')
-            self.mkdir(self._working_dir)
+        self.mkdir(working_dir)
 
         files = self._working_dir_mgr.name_to_path('file').iteritems()
         # give all our files names, and symlink or unarchive them
         for name, path in files:
-            dest = os.path.join(self._working_dir, name)
+            dest = os.path.join(working_dir, name)
             self._symlink_to_file_or_copy(path, dest)
 
         archives = self._working_dir_mgr.name_to_path('archive').iteritems()
         for name, path in archives:
-            dest = os.path.join(self._working_dir, name)
+            dest = os.path.join(working_dir, name)
             log.debug('unarchiving %s -> %s' % (path, dest))
             unarchive(path, dest)
 
@@ -174,12 +172,7 @@ class SimMRJobRunner(MRJobRunner):
 
         self.warn_ignored_opts()
         self._create_setup_wrapper_script()
-        self._setup_working_dir()
         self._setup_output_dir()
-
-         # process jobconf arguments
-        jobconf = self._opts['jobconf']
-        self._process_jobconf_args(jobconf)
 
         # run mapper, combiner, sort, reducer for each step
         for step_num, step in enumerate(self._get_steps()):
@@ -208,21 +201,7 @@ class SimMRJobRunner(MRJobRunner):
             shutil.move(outfile, final_outfile)
 
     def _invoke_step(self, step_num, step_type):
-        """Run the given command, outputting into outfile, and reading
-        from the previous outfile (or, for the first step, from our
-        original output files).
-
-        outfile is a path relative to our local tmp dir. commands are run
-        inside self._working_dir
-
-        We'll intelligently handle stderr from the process.
-        :param step_dict: description of a step see step.py description
-        :param outfile_name: name of the output file to store the results
-        of executing this step
-        :param step_num: number of the step
-        :step_type: mapper/reducer
-        :num_tasks: number of mapper or reducer tasks to be launched to execute
-        this step
+        """Run the mapper or reducer for the given step.
         """
         step = self._get_step(step_num)
 
@@ -234,12 +213,18 @@ class SimMRJobRunner(MRJobRunner):
 
         outfile_prefix = 'step-%d-%s' % (step_num, step_type)
 
+        # allow setting number of tasks from jobconf
         if step_type == 'reducer':
             num_tasks = int(jobconf_from_dict(
                 jobconf, 'mapreduce.job.reduces', self._DEFAULT_REDUCE_TASKS))
         else:
             num_tasks = int(jobconf_from_dict(
                 jobconf, 'mapreduce.job.maps', self._DEFAULT_MAP_TASKS))
+
+        # make a new working_dir for each task
+        working_dir = os.path.join(self._get_local_tmp_dir(),
+                                   'job_local_dir', str(step_num), step_type)
+        self._setup_working_dir(working_dir)
 
         # get file splits for mappers and reducers
         keep_sorted = (step_type == 'reducer')
@@ -260,33 +245,35 @@ class SimMRJobRunner(MRJobRunner):
             (t['task_num'], file_name) for file_name, t
             in file_splits.items()], key=lambda t: t[0])
 
-        for task_num, file_name in file_tasks:
-            log.debug("File name %s" % file_name)
+        for task_num, input_path in file_tasks:
+            log.debug("File name %s" % input_path)
             # setup environment variables
             split_kwargs = {}
             if step_type == 'mapper':
                 # mappers have extra file split info
                 split_kwargs = dict(
-                    input_file=file_splits[file_name]['orig_name'],
-                    input_start=file_splits[file_name]['start'],
-                    input_length=file_splits[file_name]['length'])
+                    input_file=file_splits[input_path]['orig_name'],
+                    input_start=file_splits[input_path]['start'],
+                    input_length=file_splits[input_path]['length'])
 
             env = self._subprocess_env(
-                step_type, step_num, task_num, **split_kwargs)
+                step_type, step_num, task_num, working_dir, **split_kwargs)
 
-            outfile_name = outfile_prefix + '_part-%05d' % task_num
+            output_path = os.path.join(
+                self._get_local_tmp_dir(),
+                outfile_prefix + '_part-%05d' % task_num)
+            log.info('writing to %s' % output_path)
 
-            outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
-            log.info('writing to %s' % outfile)
-            self._prev_outfiles.append(outfile)
+            self._run_step(step_num, step_type, input_path, output_path,
+                           working_dir, env)
 
-            self.run_step(step, file_name, outfile, step_num, step_type, env)
+            self._prev_outfiles.append(output_path)
 
         self.per_step_runner_finish(step_num)
         self.print_counters([step_num + 1])
 
-    def run_step(self, step_dict, file_name,
-                 outfile, step_num, step_type, env):
+    def _run_step(self, step_num, step_type, input_path, output_path,
+                  working_dir, env):
         """ Runner specific per step method
         Inline and local runners override this method
         """
@@ -430,29 +417,8 @@ class SimMRJobRunner(MRJobRunner):
 
         return file_names
 
-    def _process_jobconf_args(self, jobconf):
-        if jobconf:
-            for (conf_arg, value) in jobconf.iteritems():
-                # Internally, use one canonical Hadoop version
-                canon_arg = translate_jobconf(conf_arg, '0.21')
-
-                if canon_arg == 'mapreduce.job.maps':
-                    self._map_tasks = int(value)
-                    if self._map_tasks < 1:
-                        raise ValueError(
-                            '%s should be at least 1' % conf_arg)
-                elif canon_arg == 'mapreduce.job.reduces':
-                    self._reduce_tasks = int(value)
-                    if self._reduce_tasks < 1:
-                        raise ValueError('%s should be at least 1' % conf_arg)
-                elif canon_arg == 'mapreduce.job.local.dir':
-                    # Hadoop supports multiple direcories. Sticking with only
-                    # one here
-                    if not os.path.isdir(value):
-                        raise IOError("Directory %s does not exist" % value)
-                    self._working_dir = value
-
-    def _subprocess_env(self, step_type, step_num, task_num, **split_kwargs):
+    def _subprocess_env(self, step_type, step_num, task_num, working_dir,
+                        **split_kwargs):
         """Set up environment variables for a subprocess (mapper, etc.)
 
         This combines, in decreasing order of priority:
@@ -476,7 +442,7 @@ class SimMRJobRunner(MRJobRunner):
             self._jobconf_for_step(step_num), version)
 
         simulated_jobconf = self._simulate_jobconf_for_step(
-            step_type, step_num, task_num, **split_kwargs)
+            step_type, step_num, task_num, working_dir, **split_kwargs)
 
         def to_env(jobconf):
             return dict((k.replace('.', '_'), str(v))
@@ -489,8 +455,9 @@ class SimMRJobRunner(MRJobRunner):
                                   to_env(simulated_jobconf),
                                   self._opts['cmdenv'])
 
-    def _simulate_jobconf_for_step(self, step_type, step_num, task_num,
-        input_file=None, input_start=None, input_length=None):
+    def _simulate_jobconf_for_step(
+            self, step_type, step_num, task_num, working_dir,
+            input_file=None, input_start=None, input_length=None):
         """Simulate jobconf variables set by Hadoop to indicate input
         files, files uploaded, working directory, etc. for a particular step.
 
@@ -504,7 +471,7 @@ class SimMRJobRunner(MRJobRunner):
 
         j['mapreduce.job.id'] = self._job_name
         j['mapreduce.task.output.dir'] = self._output_dir
-        j['mapreduce.job.local.dir'] = self._working_dir
+        j['mapreduce.job.local.dir'] = working_dir
         # archives and files for jobconf
         cache_archives = []
         cache_files = []
@@ -514,12 +481,12 @@ class SimMRJobRunner(MRJobRunner):
         files = self._working_dir_mgr.name_to_path('file').iteritems()
         for name, path in files:
             cache_files.append('%s#%s' % (path, name))
-            cache_local_files.append(os.path.join(self._working_dir, name))
+            cache_local_files.append(os.path.join(working_dir, name))
 
         archives = self._working_dir_mgr.name_to_path('archive').iteritems()
         for name, path in archives:
             cache_archives.append('%s#%s' % (path, name))
-            cache_local_archives.append(os.path.join(self._working_dir, name))
+            cache_local_archives.append(os.path.join(working_dir, name))
 
         # TODO: could add mtime info here too (e.g.
         # mapreduce.job.cache.archives.timestamps) here too

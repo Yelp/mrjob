@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ from __future__ import with_statement
 
 
 import logging
-import os
 from subprocess import Popen
 from subprocess import PIPE
 import sys
@@ -128,8 +127,6 @@ class LocalMRJobRunner(SimMRJobRunner):
         """
         super(LocalMRJobRunner, self).__init__(**kwargs)
 
-        self._map_tasks = DEFAULT_MAP_TASKS
-        self._reduce_tasks = DEFAULT_REDUCE_TASKS
         self._all_proc_dicts = None
 
         # jobconf variables set by our own job (e.g. files "uploaded")
@@ -139,20 +136,21 @@ class LocalMRJobRunner(SimMRJobRunner):
         # running the job)
         self._internal_jobconf = {}
 
-    def run_step(self, step_dict, input_file,
-                 outfile_name, step_num, step_type, env):
+    def _run_step(self, step_num, step_type, input_path, output_path,
+                  working_dir, env):
+        step = self._get_step(step_num)
 
         if self._all_proc_dicts is None:
             self._all_proc_dicts = []
         if step_type == 'mapper':
             procs_args = self._mapper_arg_chain(
-                step_dict, step_num, input_file)
+                step, step_num, input_path)
         elif step_type == 'reducer':
             procs_args = self._reducer_arg_chain(
-                step_dict, step_num, input_file)
+                step, step_num, input_path)
 
         proc_dicts = self._invoke_processes(
-            procs_args, outfile_name, env=env)
+            procs_args, output_path, working_dir, env)
         self._all_proc_dicts.extend(proc_dicts)
 
     def per_step_runner_finish(self, step_num):
@@ -166,16 +164,6 @@ class LocalMRJobRunner(SimMRJobRunner):
             if 'pre_filter' in substep_dict:
                 return shlex_split(substep_dict['pre_filter'])
         return None
-
-    def _executable(self, steps=False):
-        # detect executable files so we can discard the explicit interpreter if
-        # possible
-        if os.access(self._script_path, os.X_OK):
-            return [os.path.join(
-                self._working_dir,
-                self._working_dir_mgr.name('file', self._script_path))]
-        else:
-            return super(LocalMRJobRunner, self)._executable(steps)
 
     def _substep_args(self, step_dict, step_num, mrc, input_path=None):
         if step_dict['type'] != 'streaming':
@@ -195,12 +183,12 @@ class LocalMRJobRunner(SimMRJobRunner):
             else:
                 return [args + [input_path]]
 
-    def _substep_arg_chain(self, mrc, step_dict, step_num, input_file):
+    def _substep_arg_chain(self, mrc, step_dict, step_num, input_path):
         procs_args = []
 
         filter_args = self._filter_if_any(step_dict[mrc])
         if filter_args:
-            procs_args.append(['cat', input_file])
+            procs_args.append(['cat', input_path])
             procs_args.append(filter_args)
             # _substep_args may return more than one process
             procs_args.extend(
@@ -208,10 +196,10 @@ class LocalMRJobRunner(SimMRJobRunner):
         else:
             # _substep_args may return more than one process
             procs_args.extend(
-                self._substep_args(step_dict, step_num, mrc, input_file))
+                self._substep_args(step_dict, step_num, mrc, input_path))
         return procs_args
 
-    def _mapper_arg_chain(self, step_dict, step_num, input_file):
+    def _mapper_arg_chain(self, step_dict, step_num, input_path):
         # sometimes the mapper isn't actually there, so if it isn't, use cat
         if 'mapper' not in step_dict:
             new_step_dict = {
@@ -224,7 +212,7 @@ class LocalMRJobRunner(SimMRJobRunner):
             step_dict = new_step_dict
 
         procs_args = self._substep_arg_chain(
-            'mapper', step_dict, step_num, input_file)
+            'mapper', step_dict, step_num, input_path)
 
         if 'combiner' in step_dict:
             procs_args.append(['sort'])
@@ -246,12 +234,12 @@ class LocalMRJobRunner(SimMRJobRunner):
             self._substep_args(step_dict, step_num, 'combiner'))
         return procs_args
 
-    def _reducer_arg_chain(self, step_dict, step_num, input_file):
+    def _reducer_arg_chain(self, step_dict, step_num, input_path):
         return self._substep_arg_chain(
-            'reducer', step_dict, step_num, input_file)
+            'reducer', step_dict, step_num, input_path)
 
-    def _invoke_processes(self, procs_args, outfile, env):
-        """invoke the process described by *args* and write to *outfile_name*
+    def _invoke_processes(self, procs_args, output_path, working_dir, env):
+        """invoke the process described by *args* and write to *output_path*
 
         :param combiner_args: If this mapper has a combiner, we need to do
                               some extra shell wrangling, so pass the combiner
@@ -261,13 +249,13 @@ class LocalMRJobRunner(SimMRJobRunner):
         """
         log.info('> %s > %s' % (' | '.join(
             args if isinstance(args, basestring) else cmd_line(args)
-            for args in procs_args), outfile))
+            for args in procs_args), output_path))
 
-        with open(outfile, 'w') as write_to:
+        with open(output_path, 'w') as write_to:
             procs = _chain_procs(procs_args, stdout=write_to, stderr=PIPE,
-                                cwd=self._working_dir, env=env)
-            return [{'args': args, 'proc': proc, 'write_to': write_to}
-                    for args, proc in zip(procs_args, procs)]
+                                cwd=working_dir, env=env)
+            return [{'args': a, 'proc': proc, 'write_to': write_to}
+                    for a, proc in zip(procs_args, procs)]
 
     def _wait_for_process(self, proc_dict, step_num):
         # handle counters, status msgs, and other stuff on stderr

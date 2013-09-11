@@ -1,5 +1,5 @@
-
 # Copyright 2009-2012 Yelp
+# Copyright 2013 Lyft
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Test compatibility switching between different Hadoop versions"""
 
 import os
@@ -26,6 +25,7 @@ except ImportError:
 from mock import patch
 
 from mrjob.compat import get_jobconf_value
+from mrjob.compat import jobconf_from_dict
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import translate_jobconf
@@ -61,7 +61,35 @@ class GetJobConfValueTestCase(unittest.TestCase):
         # there was a bug where defaults didn't work for jobconf
         # variables that we don't know about
         self.assertEqual(get_jobconf_value('user.defined'), None)
-        self.assertEqual(get_jobconf_value('user.defined', 'art'), 'art')
+        self.assertEqual(get_jobconf_value('user.defined', 'beauty'), 'beauty')
+
+
+class JobConfFromDictTestCase(unittest.TestCase):
+
+    def test_get_old_hadoop_jobconf(self):
+        jobconf = {'user.name': 'Edsger W. Dijkstra'}
+        self.assertEqual(jobconf_from_dict(jobconf, 'user.name'),
+                         'Edsger W. Dijkstra')
+        self.assertEqual(jobconf_from_dict(jobconf, 'mapreduce.job.user.name'),
+                         'Edsger W. Dijkstra')
+
+    def test_get_new_hadoop_jobconf(self):
+        jobconf = {'mapreduce.job.user.name': 'Edsger W. Dijkstra'}
+        self.assertEqual(jobconf_from_dict(jobconf, 'user.name'),
+                         'Edsger W. Dijkstra')
+        self.assertEqual(jobconf_from_dict(jobconf, 'mapreduce.job.user.name'),
+                         'Edsger W. Dijkstra')
+
+    def test_default(self):
+        self.assertEqual(jobconf_from_dict({}, 'user.name'), None)
+        self.assertEqual(jobconf_from_dict({}, 'user.name', 'dave'), 'dave')
+
+    def test_get_missing_jobconf_not_in_table(self):
+        # there was a bug where defaults didn't work for jobconf
+        # variables that we don't know about
+        self.assertEqual(jobconf_from_dict({}, 'user.defined'), None)
+        self.assertEqual(
+            jobconf_from_dict({}, 'user.defined', 'beauty'), 'beauty')
 
 
 class CompatTestCase(unittest.TestCase):

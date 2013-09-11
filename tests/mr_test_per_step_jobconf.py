@@ -26,9 +26,10 @@ JOBCONF_LIST = [
 class MRTestPerStepJobConf(MRJob):
 
     def mapper_init(self):
+        self.increment_counter('count', 'mapper_init', 1)
         for jobconf in JOBCONF_LIST:
             yield ((self.options.step_num, jobconf),
-                   get_jobconf_value(jobconf))
+                   get_jobconf_value(jobconf, None))
 
     def mapper(self, key, value):
         yield key, value
@@ -38,7 +39,8 @@ class MRTestPerStepJobConf(MRJob):
             self.mr(mapper_init=self.mapper_init),
             self.mr(mapper_init=self.mapper_init,
                     mapper=self.mapper,
-                    jobconf={'user.defined': 'nothing'})])
+                    jobconf={'user.defined': 'nothing',
+                             'mapred.map.tasks': 5})])
 
 
 if __name__ == '__main__':

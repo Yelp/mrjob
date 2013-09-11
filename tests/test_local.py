@@ -522,8 +522,8 @@ class LocalMRJobRunnerJobConfTestCase(SandboxedTestCase):
         input_gz.close()
 
         mr_job = MRWordCount(['-r', 'local',
-                              '--jobconf=mapred.map.tasks=2',
-                              '--jobconf=mapred.reduce.tasks=2',
+                              '--jobconf=mapred.map.tasks=3',
+                              '--jobconf=mapred.reduce.tasks=3',
                               input_path, input_gz_path])
         mr_job.sandbox()
 
@@ -536,7 +536,7 @@ class LocalMRJobRunnerJobConfTestCase(SandboxedTestCase):
                 key, value = mr_job.parse_output_line(line)
                 results.append((key, value))
 
-            self.assertEqual(runner.counters()[0]['count']['combiners'], 2)
+            self.assertEqual(runner.counters()[0]['count']['combiners'], 3)
 
         self.assertEqual(sorted(results),
                          [(input_path, 3), (input_gz_path, 1)])
@@ -581,7 +581,7 @@ class LocalMRJobRunnerJobConfTestCase(SandboxedTestCase):
 
     def test_per_step_jobconf(self):
         mr_job = MRTestPerStepJobConf([
-            '-r', 'local', '--jobconf=user.defined=something'])
+            '-r', 'local', '--jobconf', 'user.defined=something'])
         mr_job.sandbox()
 
         results = {}
@@ -596,6 +596,21 @@ class LocalMRJobRunnerJobConfTestCase(SandboxedTestCase):
         # user.defined gets re-defined in the second step
         self.assertEqual(results[(0, 'user.defined')], 'something')
         self.assertEqual(results[(1, 'user.defined')], 'nothing')
+
+    def test_per_step_jobconf_can_set_number_of_tasks(self):
+        mr_job = MRTestPerStepJobConf([
+            '-r', 'local', '--jobconf', 'mapred.map.tasks=2',
+            ])
+        # need at least two items of input to get two map tasks
+        mr_job.sandbox(StringIO('foo\nbar\n'))
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            # sanity test: --jobconf should definitely work
+            self.assertEqual(runner.counters()[0]['count']['mapper_init'], 2)
+            # the job sets its own mapred.map.tasks to 5 for the 2nd step
+            self.assertEqual(runner.counters()[1]['count']['mapper_init'], 5)
 
 
 class CompatTestCase(EmptyMrjobConfTestCase):

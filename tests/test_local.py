@@ -44,8 +44,6 @@ from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_filter_job import FilterJob
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_os_walk_job import MROSWalkJob
-from tests.mr_test_jobconf import MRTestJobConf
-from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.mr_word_count import MRWordCount
@@ -53,6 +51,7 @@ from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+from tests.test_inline import SimRunnerJobConfTestCase
 
 
 class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
@@ -509,109 +508,9 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
                 self.assertFalse(script_mrjob_dir.startswith(local_tmp_dir))
 
 
-class LocalMRJobRunnerJobConfTestCase(SandboxedTestCase):
+class LocalMRJobRunnerJobConfTestCase(SimRunnerJobConfTestCase):
 
-    def test_input_files_and_setting_number_of_tasks(self):
-        input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as input_file:
-            input_file.write('bar\nqux\nfoo\n')
-
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\n')
-        input_gz.close()
-
-        mr_job = MRWordCount(['-r', 'local',
-                              '--jobconf=mapred.map.tasks=3',
-                              '--jobconf=mapred.reduce.tasks=3',
-                              input_path, input_gz_path])
-        mr_job.sandbox()
-
-        results = []
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
-
-            self.assertEqual(runner.counters()[0]['count']['combiners'], 3)
-
-        self.assertEqual(sorted(results),
-                         [(input_path, 3), (input_gz_path, 1)])
-
-    def test_jobconf_set_by_runner(self):
-        input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as input_file:
-            input_file.write('foo\n')
-
-        mr_job = MRTestJobConf(['-r', 'local',
-                                '--jobconf=user.defined=something',
-                                '--bootstrap-mrjob',
-                               input_path])
-        mr_job.sandbox()
-
-        results = {}
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results[key] = value
-
-        self.assertEqual(results['mapreduce.job.cache.archives'],
-                         runner._mrjob_tar_gz_path + '#mrjob.tar.gz')
-        self.assertEqual(results['mapreduce.job.id'], runner._job_name)
-        self.assertEqual(results['mapreduce.job.local.dir'],
-                         os.path.join(runner._get_local_tmp_dir(),
-                                      'job_local_dir', '0', 'mapper'))
-        self.assertEqual(results['mapreduce.map.input.file'], input_path)
-        self.assertEqual(results['mapreduce.map.input.length'], '4')
-        self.assertEqual(results['mapreduce.map.input.start'], '0')
-        self.assertEqual(results['mapreduce.task.attempt.id'],
-                       'attempt_%s_mapper_000000_0' % runner._job_name)
-        self.assertEqual(results['mapreduce.task.id'],
-                       'task_%s_mapper_000000' % runner._job_name)
-        self.assertEqual(results['mapreduce.task.ismap'], 'true')
-        self.assertEqual(results['mapreduce.task.output.dir'],
-                         runner._output_dir)
-        self.assertEqual(results['mapreduce.task.partition'], '0')
-        self.assertEqual(results['user.defined'], 'something')
-
-    def test_per_step_jobconf(self):
-        mr_job = MRTestPerStepJobConf([
-            '-r', 'local', '--jobconf', 'user.defined=something'])
-        mr_job.sandbox()
-
-        results = {}
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results[tuple(key)] = value
-
-        # user.defined gets re-defined in the second step
-        self.assertEqual(results[(0, 'user.defined')], 'something')
-        self.assertEqual(results[(1, 'user.defined')], 'nothing')
-
-    def test_per_step_jobconf_can_set_number_of_tasks(self):
-        mr_job = MRTestPerStepJobConf([
-            '-r', 'local', '--jobconf', 'mapred.map.tasks=2',
-            ])
-        # need at least two items of input to get two map tasks
-        mr_job.sandbox(StringIO('foo\nbar\n'))
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-
-            # sanity test: --jobconf should definitely work
-            self.assertEqual(runner.counters()[0]['count']['mapper_init'], 2)
-            # the job sets its own mapred.map.tasks to 4 for the 2nd step
-            self.assertEqual(runner.counters()[1]['count']['mapper_init'], 4)
+    RUNNER = 'local'
 
 
 class CompatTestCase(EmptyMrjobConfTestCase):

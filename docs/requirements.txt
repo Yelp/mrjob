@@ -5,7 +5,8 @@ PyYAML==3.10
 Pygments==1.6
 Sphinx==1.2b1
 docutils==0.11
-sphinx-better-theme==0.13
+sphinx-better-theme==0.1.4
+smartypants==1.8.2
 
 # optional: requirements for livereload
 livereload==1.0.1

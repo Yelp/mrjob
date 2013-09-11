@@ -1,6 +1,9 @@
 Contributing to mrjob
 =====================
 
+Contribution guidelines
+-----------------------
+
 mrjob is developed using a standard Github pull request process. Almost all
 code is reviewed in pull requests.
 

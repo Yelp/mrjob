@@ -14,7 +14,7 @@
 # limitations under the License.
 """Tests for JobConf Environment Variables
 """
-from mrjob.compat import get_jobconf_value
+from mrjob.compat import jobconf_from_env
 from mrjob.job import MRJob
 
 JOBCONF_LIST = [
@@ -37,7 +37,7 @@ class MRTestJobConf(MRJob):
 
     def mapper_init(self):
         for jobconf in JOBCONF_LIST:
-            yield (jobconf, get_jobconf_value(jobconf))
+            yield (jobconf, jobconf_from_env(jobconf))
 
 
 if __name__ == '__main__':

@@ -565,11 +565,11 @@ def _dict_list_to_compat_map(dict_list):
 _JOBCONF_MAP = _dict_list_to_compat_map(JOBCONF_DICT_LIST)
 
 
-def get_jobconf_value(variable, default=None):
+def jobconf_from_env(variable, default=None):
     """Get the value of a jobconf variable from the runtime environment.
 
     For example, a :py:class:`~mrjob.job.MRJob` could use
-    ``get_jobconf_value('map.input.file')`` to get the name of the file a
+    ``jobconf_from_env('map.input.file')`` to get the name of the file a
     mapper is reading input from.
 
     If the name of the jobconf variable is different in different versions of
@@ -591,6 +591,9 @@ def get_jobconf_value(variable, default=None):
             return os.environ[name]
 
     return default
+
+# old, deprecated name for get_jobconf_value().
+get_jobconf_value = jobconf_from_env
 
 
 def jobconf_from_dict(jobconf, name, default=None):

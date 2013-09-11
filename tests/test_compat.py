@@ -24,7 +24,7 @@ except ImportError:
 
 from mock import patch
 
-from mrjob.compat import get_jobconf_value
+from mrjob.compat import jobconf_from_env
 from mrjob.compat import jobconf_from_dict
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import supports_new_distributed_cache_options
@@ -41,27 +41,27 @@ class GetJobConfValueTestCase(unittest.TestCase):
 
     def test_get_old_hadoop_jobconf(self):
         os.environ['user_name'] = 'Edsger W. Dijkstra'
-        self.assertEqual(get_jobconf_value('user.name'),
+        self.assertEqual(jobconf_from_env('user.name'),
                          'Edsger W. Dijkstra')
-        self.assertEqual(get_jobconf_value('mapreduce.job.user.name'),
+        self.assertEqual(jobconf_from_env('mapreduce.job.user.name'),
                          'Edsger W. Dijkstra')
 
     def test_get_new_hadoop_jobconf(self):
         os.environ['mapreduce_job_user_name'] = 'Edsger W. Dijkstra'
-        self.assertEqual(get_jobconf_value('user.name'),
+        self.assertEqual(jobconf_from_env('user.name'),
                          'Edsger W. Dijkstra')
-        self.assertEqual(get_jobconf_value('mapreduce.job.user.name'),
+        self.assertEqual(jobconf_from_env('mapreduce.job.user.name'),
                          'Edsger W. Dijkstra')
 
     def test_default(self):
-        self.assertEqual(get_jobconf_value('user.name'), None)
-        self.assertEqual(get_jobconf_value('user.name', 'dave'), 'dave')
+        self.assertEqual(jobconf_from_env('user.name'), None)
+        self.assertEqual(jobconf_from_env('user.name', 'dave'), 'dave')
 
     def test_get_missing_jobconf_not_in_table(self):
         # there was a bug where defaults didn't work for jobconf
         # variables that we don't know about
-        self.assertEqual(get_jobconf_value('user.defined'), None)
-        self.assertEqual(get_jobconf_value('user.defined', 'beauty'), 'beauty')
+        self.assertEqual(jobconf_from_env('user.defined'), None)
+        self.assertEqual(jobconf_from_env('user.defined', 'beauty'), 'beauty')
 
 
 class JobConfFromDictTestCase(unittest.TestCase):

@@ -13,7 +13,7 @@
 # limitations under the License.
 """Tests for setting JobConf Environment Variables on a per-step basis
 """
-from mrjob.compat import get_jobconf_value
+from mrjob.compat import jobconf_from_env
 from mrjob.job import MRJob
 
 JOBCONF_LIST = [
@@ -29,7 +29,7 @@ class MRTestPerStepJobConf(MRJob):
         self.increment_counter('count', 'mapper_init', 1)
         for jobconf in JOBCONF_LIST:
             yield ((self.options.step_num, jobconf),
-                   get_jobconf_value(jobconf, None))
+                   jobconf_from_env(jobconf, None))
 
     def mapper(self, key, value):
         yield key, value

@@ -216,7 +216,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
         self.assertEqual(sorted(results),
                          [(input_path, 3), (input_gz_path, 1)])
 
-    def test_jobconf_set_by_runner(self):
+    def test_jobconf_simulated_by_runner(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'wb') as input_file:
             input_file.write('foo\n')
@@ -227,11 +227,16 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
 
         mr_job = MRTestJobConf(['-r', self.RUNNER,
                                 '--jobconf=user.defined=something',
+                                '--jobconf=mapred.map.tasks=1',
                                 '--file', upload_path,
                                input_path])
         mr_job.sandbox()
 
         results = {}
+
+        # between the single line of input and setting mapred.map.tasks to 1,
+        # we should be restricted to only one task, which will give more
+        # predictable results
 
         with mr_job.make_runner() as runner:
             script_path = runner._script_path
@@ -245,7 +250,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
         working_dir = results['mapreduce.job.local.dir']
         self.assertEqual(working_dir,
                          os.path.join(runner._get_local_tmp_dir(),
-                                      'job_local_dir', '0', 'mapper'))
+                                      'job_local_dir', '0', 'mapper', '0'))
 
         self.assertEqual(results['mapreduce.job.cache.archives'], '')
         self.assertEqual(results['mapreduce.job.cache.files'],

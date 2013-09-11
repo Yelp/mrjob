@@ -135,7 +135,7 @@ class SimMRJobRunner(MRJobRunner):
     def _setup_working_dir(self, working_dir):
         """Make a working directory with symlinks to our script and
         external files. Return name of the script"""
-        log.info('setting up working dir in %s' % working_dir)
+        log.debug('setting up working dir in %s' % working_dir)
 
         # create the working directory
         self.mkdir(working_dir)
@@ -221,11 +221,6 @@ class SimMRJobRunner(MRJobRunner):
             num_tasks = int(jobconf_from_dict(
                 jobconf, 'mapreduce.job.maps', self._DEFAULT_MAP_TASKS))
 
-        # make a new working_dir for each task
-        working_dir = os.path.join(self._get_local_tmp_dir(),
-                                   'job_local_dir', str(step_num), step_type)
-        self._setup_working_dir(working_dir)
-
         # get file splits for mappers and reducers
         keep_sorted = (step_type == 'reducer')
         file_splits = self._get_file_splits(
@@ -246,6 +241,12 @@ class SimMRJobRunner(MRJobRunner):
             in file_splits.items()], key=lambda t: t[0])
 
         for task_num, input_path in file_tasks:
+            # make a new working_dir for each task
+            working_dir = os.path.join(
+                self._get_local_tmp_dir(),
+                'job_local_dir', str(step_num), step_type, str(task_num))
+            self._setup_working_dir(working_dir)
+
             log.debug("File name %s" % input_path)
             # setup environment variables
             split_kwargs = {}

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# Copyright 2011 Matthew Tai
-# Copyright 2012 Yelp
+# Copyright 2011 Matthew Tai and Yelp
+# Copyright 2012-2013 Yelp and Contributors
 # Copyright 2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

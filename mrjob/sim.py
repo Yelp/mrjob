@@ -257,7 +257,7 @@ class SimMRJobRunner(MRJobRunner):
                     input_length=file_splits[input_path]['length'])
 
             env = self._subprocess_env(
-                step_type, step_num, task_num, working_dir, **split_kwargs)
+                step_num, step_type, task_num, working_dir, **split_kwargs)
 
             output_path = os.path.join(
                 self._get_local_tmp_dir(),
@@ -417,7 +417,7 @@ class SimMRJobRunner(MRJobRunner):
 
         return file_names
 
-    def _subprocess_env(self, step_type, step_num, task_num, working_dir,
+    def _subprocess_env(self, step_num, step_type, task_num, working_dir,
                         **split_kwargs):
         """Set up environment variables for a subprocess (mapper, etc.)
 
@@ -442,7 +442,7 @@ class SimMRJobRunner(MRJobRunner):
             self._jobconf_for_step(step_num), version)
 
         simulated_jobconf = self._simulate_jobconf_for_step(
-            step_type, step_num, task_num, working_dir, **split_kwargs)
+            step_num, step_type, task_num, working_dir, **split_kwargs)
 
         def to_env(jobconf):
             return dict((k.replace('.', '_'), str(v))
@@ -456,7 +456,7 @@ class SimMRJobRunner(MRJobRunner):
                                   self._opts['cmdenv'])
 
     def _simulate_jobconf_for_step(
-            self, step_type, step_num, task_num, working_dir,
+            self, step_num, step_type, task_num, working_dir,
             input_file=None, input_start=None, input_length=None):
         """Simulate jobconf variables set by Hadoop to indicate input
         files, files uploaded, working directory, etc. for a particular step.

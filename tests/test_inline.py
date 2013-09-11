@@ -218,33 +218,46 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
 
     def test_jobconf_set_by_runner(self):
         input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as input_file:
+        with open(input_path, 'wb') as input_file:
             input_file.write('foo\n')
+
+        upload_path = os.path.join(self.tmp_dir, 'upload')
+        with open(upload_path, 'wb') as upload_file:
+            upload_file.write('PAYLOAD')
 
         mr_job = MRTestJobConf(['-r', self.RUNNER,
                                 '--jobconf=user.defined=something',
-                                '--bootstrap-mrjob',
+                                '--file', upload_path,
                                input_path])
         mr_job.sandbox()
 
         results = {}
 
         with mr_job.make_runner() as runner:
+            script_path = runner._script_path
+
             runner.run()
 
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
                 results[key] = value
 
-        if self.RUNNER == 'inline':
-            self.assertEqual(results['mapreduce.job.cache.archives'], '')
-        else:
-            self.assertEqual(results['mapreduce.job.cache.archives'],
-                             runner._mrjob_tar_gz_path + '#mrjob.tar.gz')
-        self.assertEqual(results['mapreduce.job.id'], runner._job_name)
-        self.assertEqual(results['mapreduce.job.local.dir'],
+        working_dir = results['mapreduce.job.local.dir']
+        self.assertEqual(working_dir,
                          os.path.join(runner._get_local_tmp_dir(),
                                       'job_local_dir', '0', 'mapper'))
+
+        self.assertEqual(results['mapreduce.job.cache.archives'], '')
+        self.assertEqual(results['mapreduce.job.cache.files'],
+                         script_path + '#mr_test_jobconf.py' + ',' +
+                         upload_path + '#upload')
+        self.assertEqual(results['mapreduce.job.cache.local.archives'], '')
+        self.assertEqual(
+            results['mapreduce.job.cache.local.files'],
+            os.path.join(working_dir, 'mr_test_jobconf.py') + ',' +
+            os.path.join(working_dir, 'upload'))
+        self.assertEqual(results['mapreduce.job.id'], runner._job_name)
+
         self.assertEqual(results['mapreduce.map.input.file'], input_path)
         self.assertEqual(results['mapreduce.map.input.length'], '4')
         self.assertEqual(results['mapreduce.map.input.start'], '0')

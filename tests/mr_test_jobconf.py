@@ -29,6 +29,9 @@ JOBCONF_LIST = [
     'mapreduce.map.input.length',
     'mapreduce.task.output.dir',
     'mapreduce.job.cache.archives',
+    'mapreduce.job.cache.files',
+    'mapreduce.job.cache.local.archives',
+    'mapreduce.job.cache.local.files',
     'user.defined'
 ]
 

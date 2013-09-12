@@ -117,7 +117,7 @@ class TestPoolHashAndName(unittest.TestCase):
                     MockEmrObject(
                         value='pool-0123456789abcdef0123456789abcdef'),
                     MockEmrObject(value='reflecting'),
-                ]),
+                ], name='master'),
             ])
 
         self.assertEqual(pool_hash_and_name(jf),
@@ -132,7 +132,25 @@ class TestPoolHashAndName(unittest.TestCase):
                     MockEmrObject(
                         value='pool-0123456789abcdef0123456789abcdef'),
                     MockEmrObject(value='reflecting'),
-                ]),
+                ], name='master'),
+            ])
+
+        self.assertEqual(pool_hash_and_name(jf),
+                         ('0123456789abcdef0123456789abcdef', 'reflecting'))
+
+    def test_pooled_job_flow_with_max_hours_idle(self):
+        # max hours idle is added AFTER the master bootstrap script
+        jf = MockEmrObject(
+            bootstrapactions=[
+                MockEmrObject(args=[
+                    MockEmrObject(
+                        value='pool-0123456789abcdef0123456789abcdef'),
+                    MockEmrObject(value='reflecting'),
+                ], name='master'),
+                MockEmrObject(args=[
+                    MockEmrObject(value='900'),
+                    MockEmrObject(value='300'),
+                ], name='idle timeout'),
             ])
 
         self.assertEqual(pool_hash_and_name(jf),

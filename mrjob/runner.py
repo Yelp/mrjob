@@ -415,7 +415,7 @@ class MRJobRunner(object):
         # access/make this using self._get_local_tmp_dir()
         self._local_tmp_dir = None
 
-        # info about our steps. this is basically a cache for self._get_steps()
+        # A cache for self._get_steps(); also useful as a test hook
         self._steps = None
 
         # if this is True, we have to pipe input into the sort command
@@ -694,8 +694,9 @@ class MRJobRunner(object):
         there are mappers and reducers for each step. Validate its
         output.
 
-        Returns output as described in :ref:`steps-format`. Results are
-        cached to avoid round trips to a subprocess.
+        Returns output as described in :ref:`steps-format`.
+
+        Results are cached, so call this as many times as you want.
         """
         if self._steps is None:
             if not self._script_path:
@@ -732,6 +733,14 @@ class MRJobRunner(object):
 
         return self._steps
 
+    def _get_step(self, step_num):
+        """Get a single step (calls :py:meth:`_get_steps`)."""
+        return self._get_steps()[step_num]
+
+    def _num_steps(self):
+        """Get the number of steps (calls :py:meth:`get_steps`)."""
+        return len(self._get_steps())
+
     def _executable(self, steps=False):
         # default behavior is to always use an interpreter. local, emr, and
         # hadoop runners check for executable script paths and prepend the
@@ -758,7 +767,9 @@ class MRJobRunner(object):
         else:
             return args
 
-    def _substep_cmd_line(self, step, step_num, mrc):
+    def _substep_cmd_line(self, step_num, mrc):
+        step = self._get_step(step_num)
+
         if step[mrc]['type'] == 'command':
             # never wrap custom hadoop streaming commands in bash
             return step[mrc]['command'], False
@@ -776,28 +787,29 @@ class MRJobRunner(object):
             raise ValueError("Invalid %s step %d: %r" % (
                 mrc, step_num, step[mrc]))
 
-    def _render_substep(self, step, step_num, mrc):
+    def _render_substep(self, step_num, mrc):
+        step = self._get_step(step_num)
+
         if mrc in step:
-            return self._substep_cmd_line(
-                step, step_num, mrc)
+            return self._substep_cmd_line(step_num, mrc)
         else:
             if mrc == 'mapper':
                 return 'cat', False
             else:
                 return None, False
 
-    def _hadoop_streaming_commands(self, step, step_num):
+    def _hadoop_streaming_commands(self, step_num):
         version = self.get_hadoop_version()
 
         # Hadoop streaming stuff
         mapper, bash_wrap_mapper = self._render_substep(
-            step, step_num, 'mapper')
+            step_num, 'mapper')
 
         combiner, bash_wrap_combiner = self._render_substep(
-            step, step_num, 'combiner')
+            step_num, 'combiner')
 
         reducer, bash_wrap_reducer = self._render_substep(
-            step, step_num, 'reducer')
+            step_num, 'reducer')
 
         if (combiner is not None and
             not supports_combiners_in_hadoop_streaming(version)):
@@ -1046,7 +1058,19 @@ class MRJobRunner(object):
 
         return self._mrjob_tar_gz_path
 
-    def _hadoop_conf_args(self, step, step_num, num_steps):
+    def _jobconf_for_step(self, step_num):
+        """Get the jobconf dictionary, optionally including step-specific
+        jobconf info.
+
+        Also translate jobconfs to the current Hadoop version, if necessary.
+        """
+        step = self._get_step(step_num)
+        jobconf = combine_dicts(self._opts['jobconf'], step.get('jobconf'))
+
+        return add_translated_jobconf_for_hadoop_version(
+            jobconf, self.get_hadoop_version())
+
+    def _hadoop_args_for_step(self, step_num):
         """Build a list of extra arguments to the hadoop binary.
 
         This handles *cmdenv*, *hadoop_extra_args*, *hadoop_input_format*,
@@ -1055,11 +1079,9 @@ class MRJobRunner(object):
         This doesn't handle input, output, mappers, reducers, or uploading
         files.
         """
-        assert 0 <= step_num < num_steps
+        assert 0 <= step_num < self._num_steps()
 
         args = []
-
-        jobconf = combine_dicts(self._opts['jobconf'], step.get('jobconf'))
 
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])
@@ -1069,8 +1091,8 @@ class MRJobRunner(object):
 
         # translate the jobconf configuration names to match
         # the hadoop version
-        jobconf = add_translated_jobconf_for_hadoop_version(jobconf,
-                                                            version)
+        jobconf = self._jobconf_for_step(step_num)
+
         if uses_generic_jobconf(version):
             for key, value in sorted(jobconf.iteritems()):
                 if value is not None:
@@ -1095,7 +1117,7 @@ class MRJobRunner(object):
             args.extend(['-inputformat', self._hadoop_input_format])
 
         # hadoop_output_format
-        if (step_num == num_steps - 1 and self._hadoop_output_format):
+        if (step_num == self._num_steps() - 1 and self._hadoop_output_format):
             args.extend(['-outputformat', self._hadoop_output_format])
 
         return args

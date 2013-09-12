@@ -1,5 +1,7 @@
 v0.4.1-dev
  * EMR runner throws IOError if output path already exists (#634)
+ * Renamed mrjob.compat.get_jobconf_value() to jobconf_from_env()
+ * Fixed counter parsing for multi-step jobs in inline mode
 
 v0.4, 2013-04-30 -- Slouching toward nirvana
  * Changes:

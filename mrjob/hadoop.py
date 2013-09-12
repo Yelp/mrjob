@@ -289,12 +289,12 @@ class HadoopJobRunner(MRJobRunner):
 
     def _run_job_in_hadoop(self):
         self._counters = []
-        steps = self._get_steps()
 
-        for step_num, step in enumerate(steps):
-            log.debug('running step %d of %d' % (step_num + 1, len(steps)))
+        for step_num in xrange(self._num_steps()):
+            log.debug('running step %d of %d' %
+                      (step_num + 1, self._num_steps()))
 
-            streaming_args = self._streaming_args(step, step_num, len(steps))
+            streaming_args = self._streaming_args_for_step(step_num)
 
             log.debug('> %s' % cmd_line(streaming_args))
 
@@ -384,7 +384,7 @@ class HadoopJobRunner(MRJobRunner):
                 self._job_timestamp = m.group('timestamp')
                 self._start_step_num = int(m.group('step_num'))
 
-    def _streaming_args(self, step, step_num, num_steps):
+    def _streaming_args_for_step(self, step_num):
         version = self.get_hadoop_version()
 
         streaming_args = (self._opts['hadoop_bin'] +
@@ -399,8 +399,7 @@ class HadoopJobRunner(MRJobRunner):
         # Add extra hadoop args first as hadoop args could be a hadoop
         # specific argument (e.g. -libjar) which must come before job
         # specific args.
-        streaming_args.extend(
-            self._hadoop_conf_args(step, step_num, num_steps))
+        streaming_args.extend(self._hadoop_args_for_step(step_num))
 
         # set up input
         for input_uri in self._hdfs_step_input_files(step_num):
@@ -417,7 +416,7 @@ class HadoopJobRunner(MRJobRunner):
                 self._old_upload_args(self._upload_mgr))
 
         mapper, combiner, reducer = (
-            self._hadoop_streaming_commands(step, step_num))
+            self._hadoop_streaming_commands(step_num))
 
         streaming_args.append('-mapper')
         streaming_args.append(mapper)

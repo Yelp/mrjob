@@ -1302,24 +1302,6 @@ class EMRJobRunner(MRJobRunner):
 
         return args
 
-    def _build_steps(self):
-        """Return a list of boto Step objects corresponding to the
-        steps we want to run."""
-        # quick, add the other steps before the job spins up and
-        # then shuts itself down (in practice this takes several minutes)
-        steps = self._get_steps()
-        step_list = []
-
-        for step_num, step in enumerate(steps):
-            if step['type'] == 'streaming':
-                step_list.append(
-                    self._build_streaming_step(step, step_num, len(steps)))
-            elif step['type'] == 'jar':
-                step_list.append(
-                    self._build_jar_step(step, step_num, len(steps)))
-
-        return step_list
-
     @property
     def _action_on_failure(self):
         # don't terminate other people's job flows
@@ -1329,10 +1311,27 @@ class EMRJobRunner(MRJobRunner):
         else:
             return 'TERMINATE_JOB_FLOW'
 
-    def _build_streaming_step(self, step, step_num, num_steps):
+    def _build_steps(self):
+        """Return a list of boto Step objects corresponding to the
+        steps we want to run."""
+        # quick, add the other steps before the job spins up and
+        # then shuts itself down (in practice this takes several minutes)
+        return [self._build_step(n) for n in xrange(self._num_steps())]
+
+    def _build_step(self, step_num):
+        step = self._get_step(step_num)
+
+        if step['type'] == 'streaming':
+            return self._build_streaming_step(step_num)
+        elif step['type'] == 'jar':
+            return self._build_jar_step(step_num)
+        else:
+            raise AssertionError('Bad step type: %r' % (step['type'],))
+
+    def _build_streaming_step(self, step_num):
         streaming_step_kwargs = {
             'name': '%s: Step %d of %d' % (
-                self._job_name, step_num + 1, num_steps),
+                self._job_name, step_num + 1, self._num_steps()),
             'input': self._s3_step_input_uris(step_num),
             'output': self._s3_step_output_uri(step_num),
             'jar': self._get_jar(),
@@ -1342,10 +1341,10 @@ class EMRJobRunner(MRJobRunner):
         streaming_step_kwargs.update(self._cache_kwargs())
 
         streaming_step_kwargs['step_args'].extend(
-            self._hadoop_conf_args(step, step_num, num_steps))
+            self._hadoop_args_for_step(step_num))
 
         mapper, combiner, reducer = (
-            self._hadoop_streaming_commands(step, step_num))
+            self._hadoop_streaming_commands(step_num))
 
         streaming_step_kwargs['mapper'] = mapper
 

@@ -180,7 +180,7 @@ Changes and Deprecations
 
     In addition to :option:`--jobconf`, you can now set jobconf values with the
     :py:attr:`.JOBCONF` attribute or the :py:meth:`.jobconf()` method.  To read
-    jobconf values back, use :py:func:`mrjob.compat.get_jobconf_value()`, which
+    jobconf values back, use :py:func:`mrjob.compat.jobconf_from_env()`, which
     ensures that the correct name is used depending on which version of Hadoop
     is active.
 

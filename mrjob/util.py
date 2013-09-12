@@ -493,6 +493,17 @@ def save_current_environment():
     os.environ.update(original_environ)
 
 
+@contextlib.contextmanager
+def save_cwd():
+    """Context manager that saves the current working directory,
+    and chdir's back to it after execution."""
+    original_cwd = os.getcwd()
+
+    yield
+
+    os.chdir(original_cwd)
+
+
 def scrape_options_and_index_by_dest(*parsers_and_groups):
     """Scrapes ``optparse`` options from :py:class:`OptionParser` and
     :py:class:`OptionGroup` objects and builds a dictionary of

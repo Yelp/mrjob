@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2012 Yelp
+# Copyright 2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -561,14 +562,14 @@ def _dict_list_to_compat_map(dict_list):
     return compat_map
 
 
-_jobconf_map = _dict_list_to_compat_map(JOBCONF_DICT_LIST)
+_JOBCONF_MAP = _dict_list_to_compat_map(JOBCONF_DICT_LIST)
 
 
-def get_jobconf_value(variable, default=None):
+def jobconf_from_env(variable, default=None):
     """Get the value of a jobconf variable from the runtime environment.
 
     For example, a :py:class:`~mrjob.job.MRJob` could use
-    ``get_jobconf_value('map.input.file')`` to get the name of the file a
+    ``jobconf_from_env('map.input.file')`` to get the name of the file a
     mapper is reading input from.
 
     If the name of the jobconf variable is different in different versions of
@@ -584,10 +585,38 @@ def get_jobconf_value(variable, default=None):
         return os.environ[name]
 
     # try alternatives (arbitrary order)
-    for var in _jobconf_map[variable].itervalues():
+    for var in _JOBCONF_MAP.get(variable, {}).itervalues():
         name = var.replace('.', '_')
         if name in os.environ:
             return os.environ[name]
+
+    return default
+
+# old, deprecated name for get_jobconf_value().
+get_jobconf_value = jobconf_from_env
+
+
+def jobconf_from_dict(jobconf, name, default=None):
+    """Get the value of a jobconf variable from the given dictionary.
+
+    :param dict jobconf: jobconf dictionary
+    :param string name: name of the jobconf variable (e.g. ``'user.name'``)
+    :param default: fallback value
+
+    If the name of the jobconf variable is different in different versions of
+    Hadoop (e.g. in Hadoop 0.21, ``map.input.file`` is
+    ``mapreduce.map.input.file``), we'll automatically try all variants before
+    giving up.
+
+    Return *default* if that jobconf variable isn't set.
+    """
+    if name in jobconf:
+        return jobconf[name]
+
+    # try alternatives (arbitrary order)
+    for alternative in _JOBCONF_MAP.get(name, {}).itervalues():
+        if alternative in jobconf:
+            return jobconf[alternative]
 
     return default
 
@@ -596,20 +625,20 @@ def translate_jobconf(variable, version):
     """Translate *variable* to Hadoop version *version*. If it's not
     a variable we recognize, leave as-is.
     """
-    if not variable in _jobconf_map:
+    if not variable in _JOBCONF_MAP:
         return variable
 
     req_version = LooseVersion(version)
-    possible_versions = sorted(_jobconf_map[variable].keys(),
+    possible_versions = sorted(_JOBCONF_MAP[variable].keys(),
                                reverse=True,
                                key=lambda(v): LooseVersion(v))
 
     for possible_version in possible_versions:
         if req_version >= LooseVersion(possible_version):
-            return _jobconf_map[variable][possible_version]
+            return _JOBCONF_MAP[variable][possible_version]
 
     # return oldest version if we don't find required version
-    return _jobconf_map[variable][possible_versions[-1]]
+    return _JOBCONF_MAP[variable][possible_versions[-1]]
 
 
 def supports_combiners_in_hadoop_streaming(version):

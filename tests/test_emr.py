@@ -2385,20 +2385,39 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
             '--pool-name', 'pool1'],
             job_class=MRWordCount)
 
-    def test_dont_join_idle_with_steps(self):
-        dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
+    def test_dont_join_idle_with_pending_steps(self):
+        dummy_runner, job_flow_id = self.make_pooled_job_flow()
 
         self.mock_emr_job_flows[job_flow_id].steps = [
             MockEmrObject(
-                state='WAITING',
+                state='PENDING',
                 name='dummy',
                 actiononfailure='CANCEL_AND_WAIT',
                 args=[])]
 
-        self.assertDoesNotJoin(job_flow_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--pool-name', 'pool1'],
-            job_class=MRWordCount)
+        self.assertDoesNotJoin(job_flow_id,
+                               ['-r', 'emr', '--pool-emr-job-flows'])
+
+    def test_do_join_idle_with_cancelled_steps(self):
+        dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
+
+        self.mock_emr_job_flows[job_flow_id].steps = [
+            MockEmrObject(
+                state='FAILED',
+                name='step 1 of 2',
+                actiononfailure='CANCEL_AND_WAIT',
+                enddatetime='sometime in the past',
+                args=[]),
+            # step 2 never ran, so its enddatetime is not set
+            MockEmrObject(
+                state='CANCELLED',
+                name='step 2 of 2',
+                actiononfailure='CANCEL_AND_WAIT',
+                args=[])
+        ]
+
+        self.assertJoins(job_flow_id,
+                         ['-r', 'emr', '--pool-emr-job-flows'])
 
     def test_dont_join_wrong_named_pool(self):
         _, job_flow_id = self.make_pooled_job_flow('pool1')

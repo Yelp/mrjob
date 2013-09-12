@@ -22,6 +22,8 @@ import os
 import shutil
 import stat
 
+from mrjob.compat import add_translated_jobconf_for_hadoop_version
+from mrjob.compat import jobconf_from_dict
 from mrjob.compat import translate_jobconf
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
@@ -52,7 +54,7 @@ class SimMRJobRunner(MRJobRunner):
     """Abstract base class for runners for testing jobs in development
 
     The inline and local runners inherit from this class so functionality
-    common to them has been moved here.:py:method:`run_step` must be overriden
+    common to them has been moved here.:py:method:`_run_step` must be overriden
     by classes that extend SimMRJobRunner
 
     :py:class:`LocalMRJobRunner` and :py:class:`InlineMRJobRunner` simulate
@@ -78,6 +80,9 @@ class SimMRJobRunner(MRJobRunner):
     version.
 
     """
+    # try to run at least two tasks to catch bugs
+    _DEFAULT_MAP_TASKS = 2
+    _DEFAULT_REDUCE_TASKS = 2
 
     # options that we ignore because they require real Hadoop
     IGNORED_HADOOP_OPTS = [
@@ -96,7 +101,6 @@ class SimMRJobRunner(MRJobRunner):
 
     def __init__(self, **kwargs):
         super(SimMRJobRunner, self).__init__(**kwargs)
-        self._working_dir = None
         self._prev_outfiles = []
         self._counters = []
 
@@ -128,24 +132,23 @@ class SimMRJobRunner(MRJobRunner):
             log.debug('copying %s -> %s' % (path, dest))
             shutil.copyfile(path, dest)
 
-    def _setup_working_dir(self):
+    def _setup_working_dir(self, working_dir):
         """Make a working directory with symlinks to our script and
         external files. Return name of the script"""
+        log.debug('setting up working dir in %s' % working_dir)
+
         # create the working directory
-        if not self._working_dir:
-            self._working_dir = os.path.join(
-                self._get_local_tmp_dir(), 'working_dir')
-            self.mkdir(self._working_dir)
+        self.mkdir(working_dir)
 
         files = self._working_dir_mgr.name_to_path('file').iteritems()
         # give all our files names, and symlink or unarchive them
         for name, path in files:
-            dest = os.path.join(self._working_dir, name)
+            dest = os.path.join(working_dir, name)
             self._symlink_to_file_or_copy(path, dest)
 
         archives = self._working_dir_mgr.name_to_path('archive').iteritems()
         for name, path in archives:
-            dest = os.path.join(self._working_dir, name)
+            dest = os.path.join(working_dir, name)
             log.debug('unarchiving %s -> %s' % (path, dest))
             unarchive(path, dest)
 
@@ -169,21 +172,14 @@ class SimMRJobRunner(MRJobRunner):
 
         self.warn_ignored_opts()
         self._create_setup_wrapper_script()
-        self._setup_working_dir()
         self._setup_output_dir()
-
-         # process jobconf arguments
-        jobconf = self._opts['jobconf']
-        self._process_jobconf_args(jobconf)
 
         # run mapper, combiner, sort, reducer for each step
         for step_num, step in enumerate(self._get_steps()):
             self._check_step_works_with_runner(step)
             self._counters.append({})
 
-            self._invoke_step(
-                step, 'step-%d-mapper' % step_num, step_num, 'mapper',
-                num_tasks=self._map_tasks)
+            self._invoke_step(step_num, 'mapper')
 
             if 'reducer' in step:
                 # sort the output. Treat this as a mini-step for the purpose
@@ -196,9 +192,7 @@ class SimMRJobRunner(MRJobRunner):
                 self._prev_outfiles = [sort_output_path]
 
                 # run the reducer
-                self._invoke_step(
-                    step, 'step-%d-reducer' % step_num, step_num, 'reducer',
-                    num_tasks=self._reduce_tasks)
+                self._invoke_step(step_num, 'reducer')
 
         # move final output to output directory
         for i, outfile in enumerate(self._prev_outfiles):
@@ -206,28 +200,26 @@ class SimMRJobRunner(MRJobRunner):
             log.info('Moving %s -> %s' % (outfile, final_outfile))
             shutil.move(outfile, final_outfile)
 
-    def _invoke_step(self, step_dict, outfile_name, step_num, step_type,
-                     num_tasks=1):
-        """Run the given command, outputting into outfile, and reading
-        from the previous outfile (or, for the first step, from our
-        original output files).
-
-        outfile is a path relative to our local tmp dir. commands are run
-        inside self._working_dir
-
-        We'll intelligently handle stderr from the process.
-        :param step_dict: description of a step see step.py description
-        :param outfile_name: name of the output file to store the results
-        of executing this step
-        :param step_num: number of the step
-        :step_type: mapper/reducer
-        :num_tasks: number of mapper or reducer tasks to be launched to execute
-        this step
+    def _invoke_step(self, step_num, step_type):
+        """Run the mapper or reducer for the given step.
         """
+        step = self._get_step(step_num)
 
-        if step_dict['type'] != 'streaming':
+        if step['type'] != 'streaming':
             raise Exception("LocalMRJobRunner cannot run %s steps" %
-                            step_dict['type'])
+                            step['type'])
+
+        jobconf = self._jobconf_for_step(step_num)
+
+        outfile_prefix = 'step-%d-%s' % (step_num, step_type)
+
+        # allow setting number of tasks from jobconf
+        if step_type == 'reducer':
+            num_tasks = int(jobconf_from_dict(
+                jobconf, 'mapreduce.job.reduces', self._DEFAULT_REDUCE_TASKS))
+        else:
+            num_tasks = int(jobconf_from_dict(
+                jobconf, 'mapreduce.job.maps', self._DEFAULT_MAP_TASKS))
 
         # get file splits for mappers and reducers
         keep_sorted = (step_type == 'reducer')
@@ -248,33 +240,41 @@ class SimMRJobRunner(MRJobRunner):
             (t['task_num'], file_name) for file_name, t
             in file_splits.items()], key=lambda t: t[0])
 
-        for task_num, file_name in file_tasks:
-            log.debug("File name %s" % file_name)
+        for task_num, input_path in file_tasks:
+            # make a new working_dir for each task
+            working_dir = os.path.join(
+                self._get_local_tmp_dir(),
+                'job_local_dir', str(step_num), step_type, str(task_num))
+            self._setup_working_dir(working_dir)
+
+            log.debug("File name %s" % input_path)
             # setup environment variables
+            split_kwargs = {}
             if step_type == 'mapper':
-                env = self._subprocess_env(
-                    step_type, step_num, task_num,
-                    # mappers have extra file split info
-                    input_file=file_splits[file_name]['orig_name'],
-                    input_start=file_splits[file_name]['start'],
-                    input_length=file_splits[file_name]['length'])
-            else:
-                env = self._subprocess_env(step_type, step_num, task_num)
+                # mappers have extra file split info
+                split_kwargs = dict(
+                    input_file=file_splits[input_path]['orig_name'],
+                    input_start=file_splits[input_path]['start'],
+                    input_length=file_splits[input_path]['length'])
 
-            task_outfile = outfile_name + '_part-%05d' % task_num
+            env = self._subprocess_env(
+                step_num, step_type, task_num, working_dir, **split_kwargs)
 
-            log.info('writing to %s' % task_outfile)
-            outfile = os.path.join(self._get_local_tmp_dir(), task_outfile)
-            self._prev_outfiles.append(outfile)
+            output_path = os.path.join(
+                self._get_local_tmp_dir(),
+                outfile_prefix + '_part-%05d' % task_num)
+            log.info('writing to %s' % output_path)
 
-            self.run_step(step_dict, file_name,
-                          outfile, step_num, step_type, env)
+            self._run_step(step_num, step_type, input_path, output_path,
+                           working_dir, env)
+
+            self._prev_outfiles.append(output_path)
 
         self.per_step_runner_finish(step_num)
         self.print_counters([step_num + 1])
 
-    def run_step(self, step_dict, file_name,
-                 outfile_name, step_num, step_type, env):
+    def _run_step(self, step_num, step_type, input_path, output_path,
+                  working_dir, env):
         """ Runner specific per step method
         Inline and local runners override this method
         """
@@ -418,30 +418,8 @@ class SimMRJobRunner(MRJobRunner):
 
         return file_names
 
-    def _process_jobconf_args(self, jobconf):
-        if jobconf:
-            for (conf_arg, value) in jobconf.iteritems():
-                # Internally, use one canonical Hadoop version
-                canon_arg = translate_jobconf(conf_arg, '0.21')
-
-                if canon_arg == 'mapreduce.job.maps':
-                    self._map_tasks = int(value)
-                    if self._map_tasks < 1:
-                        raise ValueError(
-                            '%s should be at least 1' % conf_arg)
-                elif canon_arg == 'mapreduce.job.reduces':
-                    self._reduce_tasks = int(value)
-                    if self._reduce_tasks < 1:
-                        raise ValueError('%s should be at least 1' % conf_arg)
-                elif canon_arg == 'mapreduce.job.local.dir':
-                    # Hadoop supports multiple direcories. Sticking with only
-                    # one here
-                    if not os.path.isdir(value):
-                        raise IOError("Directory %s does not exist" % value)
-                    self._working_dir = value
-
-    def _subprocess_env(self, step_type, step_num, task_num, input_file=None,
-                        input_start=None, input_length=None):
+    def _subprocess_env(self, step_num, step_type, task_num, working_dir,
+                        **split_kwargs):
         """Set up environment variables for a subprocess (mapper, etc.)
 
         This combines, in decreasing order of priority:
@@ -459,42 +437,42 @@ class SimMRJobRunner(MRJobRunner):
         """
         version = self.get_hadoop_version()
 
-        jobconf_env = dict(
-            (translate_jobconf(k, version).replace('.', '_'), str(v))
-            for (k, v) in self._opts['jobconf'].iteritems())
+        # auto-translate jobconf variables from the wrong version, like
+        # other runners do
+        user_jobconf = add_translated_jobconf_for_hadoop_version(
+            self._jobconf_for_step(step_num), version)
 
-        internal_jobconf = self._simulate_jobconf_for_step(
-            step_type, step_num, task_num, input_file=input_file,
-            input_start=input_start, input_length=input_length)
+        simulated_jobconf = self._simulate_jobconf_for_step(
+            step_num, step_type, task_num, working_dir, **split_kwargs)
 
-        internal_jobconf_env = dict(
-            (translate_jobconf(k, version).replace('.', '_'), str(v))
-            for (k, v) in internal_jobconf.iteritems())
+        def to_env(jobconf):
+            return dict((k.replace('.', '_'), str(v))
+                        for k, v in jobconf.iteritems())
 
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
         return combine_local_envs(os.environ,
-                                  jobconf_env,
-                                  internal_jobconf_env,
+                                  to_env(user_jobconf),
+                                  to_env(simulated_jobconf),
                                   self._opts['cmdenv'])
 
-    def _simulate_jobconf_for_step(self, step_type, step_num, task_num,
-        input_file=None, input_start=None, input_length=None):
+    def _simulate_jobconf_for_step(
+            self, step_num, step_type, task_num, working_dir,
+            input_file=None, input_start=None, input_length=None):
         """Simulate jobconf variables set by Hadoop to indicate input
         files, files uploaded, working directory, etc. for a particular step.
 
         Returns a dictionary mapping jobconf variable name
         (e.g. ``'mapreduce.map.input.file'``) to its value, which is always
         a string.
-
-        We use the newer (Hadoop 0.21+) jobconf names; these will be
-        translated to the correct Hadoop version elsewhere.
         """
-        j = {}  # our final results
+        # By convention, we use the newer (Hadoop 0.21+) jobconf names and
+        # translate them at the very end.
+        j = {}
 
         j['mapreduce.job.id'] = self._job_name
         j['mapreduce.task.output.dir'] = self._output_dir
-        j['mapreduce.job.local.dir'] = self._working_dir
+        j['mapreduce.job.local.dir'] = working_dir
         # archives and files for jobconf
         cache_archives = []
         cache_files = []
@@ -504,12 +482,12 @@ class SimMRJobRunner(MRJobRunner):
         files = self._working_dir_mgr.name_to_path('file').iteritems()
         for name, path in files:
             cache_files.append('%s#%s' % (path, name))
-            cache_local_files.append(os.path.join(self._working_dir, name))
+            cache_local_files.append(os.path.join(working_dir, name))
 
         archives = self._working_dir_mgr.name_to_path('archive').iteritems()
         for name, path in archives:
             cache_archives.append('%s#%s' % (path, name))
-            cache_local_archives.append(os.path.join(self._working_dir, name))
+            cache_local_archives.append(os.path.join(working_dir, name))
 
         # TODO: could add mtime info here too (e.g.
         # mapreduce.job.cache.archives.timestamps) here too
@@ -539,6 +517,10 @@ class SimMRJobRunner(MRJobRunner):
             j['mapreduce.map.input.start'] = str(input_start)
         if input_length is not None:
             j['mapreduce.map.input.length'] = str(input_length)
+
+        # translate to correct version
+        version = self.get_hadoop_version()
+        j = dict((translate_jobconf(k, version), v) for k, v in j.iteritems())
 
         return j
 

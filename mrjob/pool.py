@@ -1,4 +1,5 @@
 # Copyright 2012 Yelp and Contributors
+# Copyright 2013 Lyft
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -57,8 +58,10 @@ def pool_hash_and_name(job_flow):
     ``(None, None)`` if it isn't pooled."""
     bootstrap_actions = getattr(job_flow, 'bootstrapactions', None)
     if bootstrap_actions:
-        args = [arg.value for arg in bootstrap_actions[-1].args]
-        if len(args) == 2 and args[0].startswith('pool-'):
-            return args[0][5:], args[1]
+        for bootstrap_action in bootstrap_actions:
+            if bootstrap_action.name == 'master':
+                args = [arg.value for arg in bootstrap_action.args]
+                if len(args) == 2 and args[0].startswith('pool-'):
+                    return args[0][5:], args[1]
 
     return (None, None)

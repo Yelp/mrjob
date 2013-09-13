@@ -23,6 +23,7 @@ import copy
 from datetime import datetime
 from datetime import timedelta
 import getpass
+import itertools
 import logging
 import os
 import os.path
@@ -128,6 +129,8 @@ class FastEMRTestCase(SandboxedTestCase):
 
 class MockEMRAndS3TestCase(FastEMRTestCase):
 
+    MAX_SIMULATION_STEPS = 100
+
     def _mock_boto_connect_s3(self, *args, **kwargs):
         kwargs['mock_s3_fs'] = self.mock_s3_fs
         return MockS3Connection(*args, **kwargs)
@@ -137,6 +140,7 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         kwargs['mock_emr_job_flows'] = self.mock_emr_job_flows
         kwargs['mock_emr_failures'] = self.mock_emr_failures
         kwargs['mock_emr_output'] = self.mock_emr_output
+        kwargs['simulation_iterator'] = self.simulation_iterator
         return MockEmrConnection(*args, **kwargs)
 
     def setUp(self):
@@ -145,6 +149,8 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         self.mock_emr_job_flows = {}
         self.mock_emr_failures = {}
         self.mock_emr_output = {}
+        self.simulation_iterator = itertools.repeat(
+            None, self.MAX_SIMULATION_STEPS)
 
         p_s3 = patch.object(boto, 'connect_s3', self._mock_boto_connect_s3)
         self.addCleanup(p_s3.stop)
@@ -281,17 +287,20 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            self.assertIn('-inputformat', job_flow.steps[0].args())
-            self.assertNotIn('-outputformat', job_flow.steps[0].args())
-            self.assertNotIn('-inputformat', job_flow.steps[1].args())
-            self.assertIn('-outputformat', job_flow.steps[1].args())
+            step_0_args = [arg.value for arg in job_flow.steps[0].args]
+            step_1_args = [arg.value for arg in job_flow.steps[1].args]
+
+            self.assertIn('-inputformat', step_0_args)
+            self.assertNotIn('-outputformat', step_0_args)
+            self.assertNotIn('-inputformat', step_1_args)
+            self.assertIn('-outputformat', step_1_args)
 
             # make sure jobconf got through
-            self.assertIn('-D', job_flow.steps[0].args())
-            self.assertIn('x=y', job_flow.steps[0].args())
-            self.assertIn('-D', job_flow.steps[1].args())
+            self.assertIn('-D', step_0_args)
+            self.assertIn('x=y', step_0_args)
+            self.assertIn('-D', step_1_args)
             # job overrides jobconf in step 1
-            self.assertIn('x=z', job_flow.steps[1].args())
+            self.assertIn('x=z', step_1_args)
 
             # make sure mrjob.tar.gz is created and uploaded as
             # a bootstrap file
@@ -418,12 +427,11 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertNotIn('-files',
-                             runner._describe_jobflow().steps[0].args())
-            self.assertIn('-cacheFile',
-                          runner._describe_jobflow().steps[0].args())
-            self.assertNotIn('-combiner',
-                             runner._describe_jobflow().steps[0].args())
+            step_args = [arg.value for arg in
+                         runner._describe_jobflow().steps[0].args]
+            self.assertNotIn('-files', step_args)
+            self.assertIn('-cacheFile', step_args)
+            self.assertNotIn('-combiner', step_args)
 
     def test_args_version_020_205(self):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
@@ -435,11 +443,11 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertIn('-files', runner._describe_jobflow().steps[0].args())
-            self.assertNotIn('-cacheFile',
-                             runner._describe_jobflow().steps[0].args())
-            self.assertIn('-combiner',
-                          runner._describe_jobflow().steps[0].args())
+            step_args = [arg.value for arg in
+                         runner._describe_jobflow().steps[0].args]
+            self.assertIn('-files', step_args)
+            self.assertNotIn('-cacheFile', step_args)
+            self.assertIn('-combiner', step_args)
 
     def test_wait_for_job_flow_termination(self):
         # Test regression from #338 where _wait_for_job_flow_termination
@@ -1710,7 +1718,6 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
         self.assertEqual(runner.make_s3_conn().endpoint, 's3-proxy')
 
     def test_ssl_fallback_host(self):
-        from boto.https_connection import InvalidCertificateException
         runner = EMRJobRunner(conf_paths=[], aws_region='us-west-1')
 
         with patch.object(MockEmrConnection, 'STRICT_SSL', True):
@@ -2386,20 +2393,40 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
             '--pool-name', 'pool1'],
             job_class=MRWordCount)
 
-    def test_dont_join_idle_with_steps(self):
-        dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
+    def test_dont_join_idle_with_pending_steps(self):
+        dummy_runner, job_flow_id = self.make_pooled_job_flow()
 
         self.mock_emr_job_flows[job_flow_id].steps = [
             MockEmrObject(
-                state='WAITING',
+                state='PENDING',
+                mock_no_progress=True,
                 name='dummy',
                 actiononfailure='CANCEL_AND_WAIT',
                 args=[])]
 
-        self.assertDoesNotJoin(job_flow_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--pool-name', 'pool1'],
-            job_class=MRWordCount)
+        self.assertDoesNotJoin(job_flow_id,
+                               ['-r', 'emr', '--pool-emr-job-flows'])
+
+    def test_do_join_idle_with_cancelled_steps(self):
+        dummy_runner, job_flow_id = self.make_pooled_job_flow()
+
+        self.mock_emr_job_flows[job_flow_id].steps = [
+            MockEmrObject(
+                state='FAILED',
+                name='step 1 of 2',
+                actiononfailure='CANCEL_AND_WAIT',
+                enddatetime='sometime in the past',
+                args=[]),
+            # step 2 never ran, so its enddatetime is not set
+            MockEmrObject(
+                state='CANCELLED',
+                name='step 2 of 2',
+                actiononfailure='CANCEL_AND_WAIT',
+                args=[])
+        ]
+
+        self.assertJoins(job_flow_id,
+                         ['-r', 'emr', '--pool-emr-job-flows'])
 
     def test_dont_join_wrong_named_pool(self):
         _, job_flow_id = self.make_pooled_job_flow('pool1')
@@ -2580,13 +2607,18 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         job_flow = emr_conn.describe_jobflow(job_flow_id)
         self.assertEqual(job_flow.state, 'WAITING')
 
-    def test_max_hours_idle_doesnt_matter(self):
+    def test_max_hours_idle_doesnt_affect_pool_hash(self):
         # max_hours_idle uses a bootstrap action, but it's not included
         # in the pool hash
         _, job_flow_id = self.make_pooled_job_flow()
 
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '--pool-emr-job-flows', '--max-hours-idle', '1'])
+
+    def test_can_join_job_flow_started_with_max_hours_idle(self):
+        _, job_flow_id = self.make_pooled_job_flow(max_hours_idle=1)
+
+        self.assertJoins(job_flow_id, ['-r', 'emr', '--pool-emr-job-flows'])
 
 
 class PoolingDisablingTestCase(MockEMRAndS3TestCase):

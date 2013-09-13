@@ -284,17 +284,20 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            self.assertIn('-inputformat', job_flow.steps[0].args)
-            self.assertNotIn('-outputformat', job_flow.steps[0].args)
-            self.assertNotIn('-inputformat', job_flow.steps[1].args)
-            self.assertIn('-outputformat', job_flow.steps[1].args)
+            step_0_args = [arg.value for arg in job_flow.steps[0].args]
+            step_1_args = [arg.value for arg in job_flow.steps[1].args]
+
+            self.assertIn('-inputformat', step_0_args)
+            self.assertNotIn('-outputformat', step_0_args)
+            self.assertNotIn('-inputformat', step_1_args)
+            self.assertIn('-outputformat', step_1_args)
 
             # make sure jobconf got through
-            self.assertIn('-D', job_flow.steps[0].args)
-            self.assertIn('x=y', job_flow.steps[0].args)
-            self.assertIn('-D', job_flow.steps[1].args)
+            self.assertIn('-D', step_0_args)
+            self.assertIn('x=y', step_0_args)
+            self.assertIn('-D', step_1_args)
             # job overrides jobconf in step 1
-            self.assertIn('x=z', job_flow.steps[1].args)
+            self.assertIn('x=z', step_1_args)
 
             # make sure mrjob.tar.gz is created and uploaded as
             # a bootstrap file
@@ -421,12 +424,11 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertNotIn('-files',
-                             runner._describe_jobflow().steps[0].args)
-            self.assertIn('-cacheFile',
-                          runner._describe_jobflow().steps[0].args)
-            self.assertNotIn('-combiner',
-                             runner._describe_jobflow().steps[0].args)
+            step_args = [arg.value for arg in
+                         runner._describe_jobflow().steps[0].args]
+            self.assertNotIn('-files', step_args)
+            self.assertIn('-cacheFile', step_args)
+            self.assertNotIn('-combiner', step_args)
 
     def test_args_version_020_205(self):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
@@ -438,11 +440,11 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertIn('-files', runner._describe_jobflow().steps[0].args)
-            self.assertNotIn('-cacheFile',
-                             runner._describe_jobflow().steps[0].args)
-            self.assertIn('-combiner',
-                          runner._describe_jobflow().steps[0].args)
+            step_args = [arg.value for arg in
+                         runner._describe_jobflow().steps[0].args]
+            self.assertIn('-files', step_args)
+            self.assertNotIn('-cacheFile', step_args)
+            self.assertIn('-combiner', step_args)
 
     def test_wait_for_job_flow_termination(self):
         # Test regression from #338 where _wait_for_job_flow_termination

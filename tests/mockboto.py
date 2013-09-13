@@ -641,7 +641,7 @@ class MockEmrConnection(object):
                 state='PENDING',
                 name=step.name,
                 actiononfailure=step.action_on_failure,
-                args=step.args(),
+                args=[MockEmrObject(value=arg) for arg in step.args()],
                 jar=DEFAULT_JAR,
             )
             job_flow.state = 'PENDING'
@@ -668,8 +668,8 @@ class MockEmrConnection(object):
         and looking for an -output argument."""
         # parse in reverse order, in case there are multiple -output args
         for i, arg in reversed(list(enumerate(step.args[:-1]))):
-            if arg == '-output':
-                return step.args[i + 1]
+            if arg.value == '-output':
+                return step.args[i + 1].value
         else:
             return None
 

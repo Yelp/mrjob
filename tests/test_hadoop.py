@@ -276,8 +276,8 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                           return_value=['new_upload_args'])
         self.simple_patch(self.runner, '_old_upload_args',
                           return_value=['old_upload_args'])
-        self.simple_patch(self.runner, '_hadoop_conf_args',
-                          return_value=['hadoop_conf_args'])
+        self.simple_patch(self.runner, '_hadoop_args_for_step',
+                          return_value=['hadoop_args_for_step'])
         self.simple_patch(self.runner, '_hdfs_step_input_files',
                           return_value=['hdfs_step_input_files'])
         self.simple_patch(self.runner, '_hdfs_step_output_dir',
@@ -286,13 +286,13 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 
         self._new_basic_args = [
             'hadoop', 'jar', 'streaming.jar',
-             'new_upload_args', 'hadoop_conf_args',
+             'new_upload_args', 'hadoop_args_for_step',
              '-input', 'hdfs_step_input_files',
              '-output', 'hdfs_step_output_dir']
 
         self._old_basic_args = [
             'hadoop', 'jar', 'streaming.jar',
-             'hadoop_conf_args',
+             'hadoop_args_for_step',
              '-input', 'hdfs_step_input_files',
              '-output', 'hdfs_step_output_dir',
              'old_upload_args']
@@ -303,16 +303,18 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def _assert_streaming_step(self, step, args, step_num=0, num_steps=1):
+    def _assert_streaming_step(self, step, args):
+        self.runner._steps = [step]
         self.assertEqual(
-            self.runner._streaming_args(step, step_num, num_steps),
+            self.runner._streaming_args_for_step(0),
             self._new_basic_args + args)
 
-    def _assert_streaming_step_old(self, step, args, step_num=0, num_steps=1):
+    def _assert_streaming_step_old(self, step, args):
         self.runner._hadoop_version = '0.18'
+        self.runner._steps = [step]
         self.assertEqual(
-            self._old_basic_args + args,
-            self.runner._streaming_args(step, step_num, num_steps))
+            self.runner._streaming_args_for_step(0),
+            self._old_basic_args + args)
 
     def test_basic_mapper(self):
         self._assert_streaming_step(

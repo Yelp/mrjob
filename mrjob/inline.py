@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# Copyright 2011 Matthew Tai
-# Copyright 2012 Yelp
+# Copyright 2011 Matthew Tai and Yelp
+# Copyright 2012-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ __author__ = 'Matthew Tai <mtai@adku.com>'
 import logging
 import os
 
-
 try:
     from cStringIO import StringIO
     StringIO  # quiet "redefinition of unused ..." warning from pyflakes
@@ -33,9 +32,12 @@ from mrjob.sim import SimMRJobRunner
 from mrjob.sim import SimRunnerOptionStore
 from mrjob.job import MRJob
 from mrjob.util import save_current_environment
+from mrjob.util import save_cwd
 
 log = logging.getLogger(__name__)
 
+
+# Deprecated in favor of class variables, remove in v0.5.0
 DEFAULT_MAP_TASKS = 1
 DEFAULT_REDUCE_TASKS = 1
 
@@ -50,41 +52,40 @@ class InlineMRJobRunner(SimMRJobRunner):
     To more accurately simulate your environment prior to running on
     Hadoop/EMR, use ``-r local``.
     """
-
     alias = 'inline'
 
     OPTION_STORE_CLASS = SimRunnerOptionStore
+
+    # stick to a single split for efficiency
+    _DEFAULT_MAP_TASKS = 1
+    _DEFAULT_REDUCE_TASKS = 1
 
     def __init__(self, mrjob_cls=None, **kwargs):
         """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword
         args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 
         * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*,
-          and *hadoop_streaming_jar*, *jobconf*, and *partitioner* are ignored
+          and *hadoop_streaming_jar*, and *partitioner* are ignored
           because they require Java. If you need to test these, consider
           starting up a standalone Hadoop instance and running your job with
           ``-r hadoop``.
-        * *cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*,
-          *steps_python_bin*, *upload_archives*, and *upload_files* are ignored
-          because we don't invoke the job as a subprocess or run it in its own
-          directory.
+        * *python_bin*, *setup*, *setup_cmds*, *setup_scripts* and
+          *steps_python_bin* are ignored because we don't invoke
+          subprocesses.
         """
         super(InlineMRJobRunner, self).__init__(**kwargs)
         assert ((mrjob_cls) is None or issubclass(mrjob_cls, MRJob))
 
         self._mrjob_cls = mrjob_cls
-        self._map_tasks = DEFAULT_MAP_TASKS
-        self._reduce_tasks = DEFAULT_REDUCE_TASKS
 
     # options that we ignore because they involve running subprocesses
     IGNORED_LOCAL_OPTS = [
         'bootstrap_mrjob',
         'python_bin',
+        'setup',
         'setup_cmds',
         'setup_scripts',
         'steps_python_bin',
-        'upload_archives',
-        'upload_files',
     ]
 
     def _check_step_works_with_runner(self, step_dict):
@@ -100,7 +101,7 @@ class InlineMRJobRunner(SimMRJobRunner):
                         "InlineMRJobRunner cannot run filters.")
 
     def _create_setup_wrapper_script(self):
-        # Inline mode does not use a wrapper script
+        # Inline mode does not use a wrapper script (no subprocesses)
         pass
 
     def warn_ignored_opts(self):
@@ -116,38 +117,45 @@ class InlineMRJobRunner(SimMRJobRunner):
     def _get_steps(self):
         """Redefine this so that we can get step descriptions without
         calling a subprocess."""
-        job_args = ['--steps'] + self._mr_job_extra_args(local=True)
-        return self._mrjob_cls(args=job_args)._steps_desc()
+        if self._steps is None:
+            job_args = ['--steps'] + self._mr_job_extra_args(local=True)
+            self._steps = self._mrjob_cls(args=job_args)._steps_desc()
 
-    def run_step(self, step_dict, input_file, outfile_name,
-                 step_number, step_type, env,
-                child_stdin=None):
-        common_args = (['--step-num=%d' % step_number] +
+        return self._steps
+
+    def _run_step(self, step_num, step_type, input_path, output_path,
+                  working_dir, env, child_stdin=None):
+        step = self._get_step(step_num)
+
+        common_args = (['--step-num=%d' % step_num] +
                        self._mr_job_extra_args(local=True))
 
         if step_type == 'mapper':
             child_args = (
-                ['--mapper'] + [input_file] + common_args)
+                ['--mapper'] + [input_path] + common_args)
         elif step_type == 'reducer':
             child_args = (
-                ['--reducer'] + [input_file] + common_args)
+                ['--reducer'] + [input_path] + common_args)
         elif step_type == 'combiner':
             child_args = ['--combiner'] + common_args + ['-']
 
         child_instance = self._mrjob_cls(args=child_args)
 
-        has_combiner = (step_type == 'mapper' and 'combiner' in step_dict)
+        has_combiner = (step_type == 'mapper' and 'combiner' in step)
 
         # Use custom stdin
         if has_combiner:
             child_stdout = StringIO()
         else:
-            child_stdout = open(outfile_name, 'w')
+            child_stdout = open(output_path, 'w')
 
         with save_current_environment():
-            os.environ.update(env)
-            child_instance.sandbox(stdin=child_stdin, stdout=child_stdout)
-            child_instance.execute()
+            with save_cwd():
+                os.environ.update(env)
+                os.chdir(working_dir)
+
+                child_instance.sandbox(stdin=child_stdin, stdout=child_stdout)
+                child_instance.execute()
 
         if has_combiner:
             sorted_lines = sorted(child_stdout.getvalue().splitlines())
@@ -157,12 +165,12 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         child_stdout.close()
 
-        while len(self._counters) <= step_number:
+        while len(self._counters) <= step_num:
             self._counters.append({})
-        child_instance.parse_counters(self._counters[step_number - 1])
+        child_instance.parse_counters(self._counters[step_num])
 
         if has_combiner:
-            self.run_step(step_dict, "", outfile_name, step_number, 'combiner',
-                          env=env, child_stdin=combiner_stdin)
+            self._run_step(step_num, 'combiner', None, output_path,
+                           working_dir, env, child_stdin=combiner_stdin)
 
             combiner_stdin.close()

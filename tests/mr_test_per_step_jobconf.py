@@ -1,4 +1,3 @@
-# Copyright 2009-2012 Yelp
 # Copyright 2013 Lyft
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,36 +11,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for JobConf Environment Variables
+"""Tests for setting JobConf Environment Variables on a per-step basis
 """
 from mrjob.compat import jobconf_from_env
 from mrjob.job import MRJob
 
 JOBCONF_LIST = [
-    'mapreduce.job.id',
+    'mapred.map.tasks',
     'mapreduce.job.local.dir',
-    'mapreduce.task.id',
-    'mapreduce.task.attempt.id',
-    'mapreduce.task.ismap',
-    'mapreduce.task.partition',
-    'mapreduce.map.input.file',
-    'mapreduce.map.input.start',
-    'mapreduce.map.input.length',
-    'mapreduce.task.output.dir',
-    'mapreduce.job.cache.archives',
-    'mapreduce.job.cache.files',
-    'mapreduce.job.cache.local.archives',
-    'mapreduce.job.cache.local.files',
-    'user.defined'
+    'user.defined',
 ]
 
 
-class MRTestJobConf(MRJob):
+class MRTestPerStepJobConf(MRJob):
 
     def mapper_init(self):
+        self.increment_counter('count', 'mapper_init', 1)
         for jobconf in JOBCONF_LIST:
-            yield (jobconf, jobconf_from_env(jobconf))
+            yield ((self.options.step_num, jobconf),
+                   jobconf_from_env(jobconf, None))
+
+    def mapper(self, key, value):
+        yield key, value
+
+    def steps(self):
+        return([
+            self.mr(mapper_init=self.mapper_init),
+            self.mr(mapper_init=self.mapper_init,
+                    mapper=self.mapper,
+                    jobconf={'user.defined': 'nothing',
+                             'mapred.map.tasks': 4})])
 
 
 if __name__ == '__main__':
-    MRTestJobConf.run()
+    MRTestPerStepJobConf.run()

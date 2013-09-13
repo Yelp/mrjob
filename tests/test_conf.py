@@ -1,4 +1,5 @@
 # Copyright 2009-2012 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -103,7 +104,6 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
 
     def test_precedence(self):
         os.environ['HOME'] = '/home/foo'
-        os.environ['PYTHONPATH'] = '/py1:/py2'
         self._existing_paths = set()
 
         self.assertEqual(find_mrjob_conf(), None)
@@ -158,54 +158,6 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         dump_mrjob_conf(conf, open(conf_path, 'w'))
         with no_handlers_for_logger('mrjob.conf'):
             self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
-
-
-class MRJobConfDeprecatedLocationTestCase(MRJobConfTestCase):
-
-    def test_mrjob_conf_in_python_path(self):
-        os.environ['PYTHONPATH'] = self.tmp_dir
-        mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        open(mrjob_conf_path, 'w').close()
-        self._existing_paths = [mrjob_conf_path]
-
-        with no_handlers_for_logger():
-            buf = log_to_buffer('mrjob.conf')
-            self.assertEqual(find_mrjob_conf(), mrjob_conf_path)
-            self.assertIn('This config path is deprecated', buf.getvalue())
-
-    def test_precedence_deprecated(self):
-        os.environ['HOME'] = '/home/foo'
-        os.environ['PYTHONPATH'] = '/py1:/py2'
-        self._existing_paths = set()
-
-        self.assertEqual(find_mrjob_conf(), None)
-
-        self._existing_paths.add('/etc/mrjob.conf')
-        self.assertEqual(find_mrjob_conf(), '/etc/mrjob.conf')
-
-        self._existing_paths.add('/py2/mrjob.conf')
-        with no_handlers_for_logger():
-            buf = log_to_buffer('mrjob.conf')
-            self.assertEqual(find_mrjob_conf(), '/py2/mrjob.conf')
-            self.assertIn('This config path is deprecated', buf.getvalue())
-
-        self._existing_paths.add('/py1/mrjob.conf')
-        with no_handlers_for_logger():
-            buf = log_to_buffer('mrjob.conf')
-            self.assertEqual(find_mrjob_conf(), '/py1/mrjob.conf')
-            self.assertIn('This config path is deprecated', buf.getvalue())
-
-        self._existing_paths.add('/home/foo/.mrjob')
-        with no_handlers_for_logger():
-            buf = log_to_buffer('mrjob.conf')
-            self.assertEqual(find_mrjob_conf(), '/home/foo/.mrjob')
-            self.assertIn('This config path is deprecated', buf.getvalue())
-
-        mrjob_conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
-        open(mrjob_conf_path, 'w').close()
-        os.environ['MRJOB_CONF'] = mrjob_conf_path
-        self._existing_paths.add(mrjob_conf_path)
-        self.assertEqual(find_mrjob_conf(), mrjob_conf_path)
 
 
 class MRJobConfNoYAMLTestCase(MRJobConfTestCase):

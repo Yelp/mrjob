@@ -129,6 +129,8 @@ class FastEMRTestCase(SandboxedTestCase):
 
 class MockEMRAndS3TestCase(FastEMRTestCase):
 
+    MAX_SIMULATION_STEPS = 100
+
     def _mock_boto_connect_s3(self, *args, **kwargs):
         kwargs['mock_s3_fs'] = self.mock_s3_fs
         return MockS3Connection(*args, **kwargs)
@@ -147,7 +149,8 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         self.mock_emr_job_flows = {}
         self.mock_emr_failures = {}
         self.mock_emr_output = {}
-        self.simulation_iterator = itertools.repeat(None, 100)
+        self.simulation_iterator = itertools.repeat(
+            None, self.MAX_SIMULATION_STEPS)
 
         p_s3 = patch.object(boto, 'connect_s3', self._mock_boto_connect_s3)
         self.addCleanup(p_s3.stop)

@@ -294,7 +294,6 @@ class MockEmrConnection(object):
     # with patch.object(MockEmrConnection, 'STRICT_SSL', True):
     #     ...
     STRICT_SSL = False
-    MAX_SIMULATION_STEPS = 100
 
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
                  is_secure=True, port=None, proxy=None, proxy_port=None,

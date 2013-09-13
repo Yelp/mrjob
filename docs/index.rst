@@ -17,6 +17,14 @@ To get started, install with ``pip``::
 
 and begin reading the tutorial below.
 
+.. ifconfig:: release.endswith('-dev')
+
+    .. note::
+
+        This documentation is for |release|, which is currently in
+        development. Documentation for the stable version of mrjob is hosted
+        at `http://pythonhosted.org/mrjob <http://pythonhosted.org/mrjob>`_.
+
 .. toctree::
     :maxdepth: 3
 

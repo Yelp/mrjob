@@ -1180,6 +1180,8 @@ class MRJob(MRJobLauncher):
     #:
     #: See :py:meth:`jobconf()` and :py:meth:`partitioner()` for more about
     #: how this works.
+    #:
+    #: .. versionadded:: 0.4.1
     SORT_VALUES = None
 
     ### Testing ###

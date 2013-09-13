@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.abspath('..'))
 needs_sphinx = '1.0'
 
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', 'options_extension',
-              'sphinx.ext.intersphinx']
+              'sphinx.ext.intersphinx', 'sphinx.ext.ifconfig']
 intersphinx_mapping = {'http://docs.python.org/2/': None}
 
 templates_path = ['_templates']
@@ -42,6 +42,7 @@ version = mrjob.__version__.split('-')[0]
 release = mrjob.__version__
 #language = None
 
+
 # -- HTML output --------------------------------------------------------------
 
 html_theme_path = [better_theme_path]
@@ -59,8 +60,8 @@ html_sidebars = {
               'searchbox.html'],
 }
 
-html_title = "%(project)s v%(version)s documentation" % {
-    'project': project, 'version': version}
+html_title = "%(project)s v%(release)s documentation" % {
+    'project': project, 'release': release}
 html_short_title = "Home"
 # we will set this again when sphinx-better-theme supports a logo in a good
 # place

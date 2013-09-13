@@ -32,6 +32,7 @@ def error(msg=None):
         print >> stderr, msg
 
     longest_command = max(len(name) for name in commands)
+
     def subcommand_line(name):
         spaces = ' ' * (longest_command - len(name))
         return '  %s: %s%s' % (

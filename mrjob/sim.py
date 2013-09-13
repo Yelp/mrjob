@@ -375,7 +375,7 @@ class SimMRJobRunner(MRJobRunner):
                 # assume that input is a collection of key <tab> value pairs
                 # match all non-tab characters
                 for _, lines in itertools.groupby(
-                    read_input(input_path), key=reducer_key):
+                        read_input(input_path), key=reducer_key):
                     yield lines
             else:
                 for line in read_input(input_path):

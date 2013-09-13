@@ -408,8 +408,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ec2_master_instance_type': 'm1.small',
             'emr_job_flow_pool_name': 'default',
             'hadoop_version': None,
-            'hadoop_streaming_jar_on_emr':
-                '/home/hadoop/contrib/streaming/hadoop-streaming.jar',
+            'hadoop_streaming_jar_on_emr': (
+                '/home/hadoop/contrib/streaming/hadoop-streaming.jar'),
             'mins_to_end_of_hour': 5.0,
             'num_ec2_core_instances': 0,
             'num_ec2_instances': 1,
@@ -498,7 +498,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
             # task instances
             if (self._opt_priority['ec2_instance_type'] >
-                self._opt_priority['ec2_task_instance_type']):
+                    self._opt_priority['ec2_task_instance_type']):
                 self['ec2_task_instance_type'] = ec2_instance_type
 
         # convert a bid price of '0' to None
@@ -671,7 +671,7 @@ class EMRJobRunner(MRJobRunner):
 
             # make sure they can communicate if both specified
             if (self._aws_region and bucket_loc and
-                self._aws_region != bucket_loc):
+                    self._aws_region != bucket_loc):
                 log.warning('warning: aws_region (%s) does not match bucket'
                             ' region (%s). Your EC2 instances may not be able'
                             ' to reach your S3 buckets.' %
@@ -874,7 +874,7 @@ class EMRJobRunner(MRJobRunner):
 
         # Add max-hours-idle script if we need it
         if (self._opts['max_hours_idle'] and
-            (persistent or self._opts['pool_emr_job_flows'])):
+                (persistent or self._opts['pool_emr_job_flows'])):
             self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
 
     def _add_job_files_for_upload(self):
@@ -1024,7 +1024,7 @@ class EMRJobRunner(MRJobRunner):
         # don't stop it if it was created due to --pool because the user
         # probably wants to use it again
         if self._emr_job_flow_id and not self._opts['emr_job_flow_id'] \
-           and not self._opts['pool_emr_job_flows']:
+                and not self._opts['pool_emr_job_flows']:
             log.info('Terminating job flow: %s' % self._emr_job_flow_id)
             try:
                 self.make_emr_conn().terminate_jobflow(self._emr_job_flow_id)
@@ -1047,7 +1047,7 @@ class EMRJobRunner(MRJobRunner):
         # delete the log files, if it's a job flow we created (the logs
         # belong to the job flow)
         if self._s3_job_log_uri and not self._opts['emr_job_flow_id'] \
-           and not self._opts['pool_emr_job_flows']:
+                and not self._opts['pool_emr_job_flows']:
             try:
                 log.info('Removing all files in %s' % self._s3_job_log_uri)
                 self.rm(self._s3_job_log_uri)
@@ -1120,12 +1120,12 @@ class EMRJobRunner(MRJobRunner):
             # mockboto throws this for some reason
             return
         if (jobflow.keepjobflowalivewhennosteps == 'true' and
-            jobflow.state == 'WAITING'):
+                jobflow.state == 'WAITING'):
             raise Exception('Operation requires job flow to terminate, but'
                             ' it may never do so.')
         while not self._job_flow_is_done(jobflow):
-            msg = 'Waiting for job flow to terminate (currently %s)' % \
-                                                         jobflow.state
+            msg = 'Waiting for job flow to terminate (currently %s)' % (
+                jobflow.state)
             log.info(msg)
             time.sleep(self._opts['check_emr_status_every'])
             jobflow = self._describe_jobflow()
@@ -1249,7 +1249,7 @@ class EMRJobRunner(MRJobRunner):
             s3_uri = self._upload_mgr.uri(bootstrap_action['path'])
             bootstrap_action_args.append(
                 boto.emr.BootstrapAction(
-                'action %d' % i, s3_uri, bootstrap_action['args']))
+                    'action %d' % i, s3_uri, bootstrap_action['args']))
 
         if self._master_bootstrap_script_path:
             master_bootstrap_script_args = []
@@ -1271,7 +1271,7 @@ class EMRJobRunner(MRJobRunner):
             # add it last, so that we don't count bootstrapping as idle time
             if self._opts['max_hours_idle']:
                 s3_uri = self._upload_mgr.uri(
-                            _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+                    _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
                 # script takes args in (integer) seconds
                 ba_args = [int(self._opts['max_hours_idle'] * 3600),
                         int(self._opts['mins_to_end_of_hour'] * 60)]
@@ -1306,7 +1306,7 @@ class EMRJobRunner(MRJobRunner):
     def _action_on_failure(self):
         # don't terminate other people's job flows
         if (self._opts['emr_job_flow_id'] or
-            self._opts['pool_emr_job_flows']):
+                self._opts['pool_emr_job_flows']):
             return 'CANCEL_AND_WAIT'
         else:
             return 'TERMINATE_JOB_FLOW'
@@ -1433,7 +1433,7 @@ class EMRJobRunner(MRJobRunner):
         # define out steps
         steps = self._build_steps()
         log.debug('Calling add_jobflow_steps(%r, %r)' % (
-                self._emr_job_flow_id, steps))
+            self._emr_job_flow_id, steps))
         emr_conn.add_jobflow_steps(self._emr_job_flow_id, steps)
 
         # keep track of when we launched our job
@@ -1471,7 +1471,7 @@ class EMRJobRunner(MRJobRunner):
             latest_lg_step_num = 0
             for i, step in enumerate(steps):
                 if LOG_GENERATING_STEP_NAME_RE.match(
-                    posixpath.basename(getattr(step, 'jar', ''))):
+                        posixpath.basename(getattr(step, 'jar', ''))):
                     latest_lg_step_num += 1
 
                 # ignore steps belonging to other jobs
@@ -1480,7 +1480,7 @@ class EMRJobRunner(MRJobRunner):
 
                 step_nums.append(i + 1)
                 if LOG_GENERATING_STEP_NAME_RE.match(
-                    posixpath.basename(getattr(step, 'jar', ''))):
+                        posixpath.basename(getattr(step, 'jar', ''))):
                     lg_step_num_mapping[i + 1] = latest_lg_step_num
 
                 step.state = step.state
@@ -1489,7 +1489,7 @@ class EMRJobRunner(MRJobRunner):
                     running_step_name = step.name
 
                 if (hasattr(step, 'startdatetime') and
-                    hasattr(step, 'enddatetime')):
+                        hasattr(step, 'enddatetime')):
                     start_time = iso8601_to_timestamp(step.startdatetime)
                     end_time = iso8601_to_timestamp(step.enddatetime)
                     total_step_time += end_time - start_time
@@ -1614,8 +1614,9 @@ class EMRJobRunner(MRJobRunner):
     ## SSH LOG FETCHING
 
     def _ssh_path(self, relative):
-        return SSH_PREFIX + self._address_of_master() + SSH_LOG_ROOT + \
-        '/' + relative
+        return (
+            SSH_PREFIX + self._address_of_master() + SSH_LOG_ROOT + '/' +
+            relative)
 
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
@@ -1735,8 +1736,9 @@ class EMRJobRunner(MRJobRunner):
         # parameter
         if lg_step_num_mapping is None:
             lg_step_num_mapping = dict((n, n) for n in step_nums)
-        lg_step_nums = sorted(lg_step_num_mapping[k] for k in step_nums
-                               if k in lg_step_num_mapping)
+        lg_step_nums = sorted(
+            lg_step_num_mapping[k] for k in step_nums
+            if k in lg_step_num_mapping)
 
         self._counters = []
         new_counters = {}
@@ -2134,7 +2136,7 @@ class EMRJobRunner(MRJobRunner):
             # trying to be defensive about EMR adding a new step state.
             for step in job_flow.steps:
                 if (getattr(step, 'enddatetime', None) is None and
-                    getattr(step, 'state', None) != 'CANCELLED'):
+                        getattr(step, 'state', None) != 'CANCELLED'):
                     return
 
             # total compute units per group
@@ -2319,7 +2321,7 @@ class EMRJobRunner(MRJobRunner):
         # try both the canonical version of the hostname and the one
         # that matches the SSL cert
         if (self._aws_region and not self._opts['emr_endpoint'] and
-            InvalidCertificateException):
+                InvalidCertificateException):
 
             ssl_host = emr_ssl_host_for_region(self._aws_region)
             fallback_conn = emr_conn_for_endpoint(ssl_host)
@@ -2345,12 +2347,12 @@ class EMRJobRunner(MRJobRunner):
 
             # infer the version from the job flow
             self._inferred_hadoop_version = (
-                    self._describe_jobflow().hadoopversion)
+                self._describe_jobflow().hadoopversion)
             # warn if the hadoop version specified does not match the
             # inferred hadoop_version
             hadoop_version = self._opts['hadoop_version']
-            if hadoop_version and \
-               hadoop_version != self._inferred_hadoop_version:
+            if (hadoop_version and
+                    hadoop_version != self._inferred_hadoop_version):
                 log.warning("Specified hadoop version (%s) does not match "
                 "job flow hadoop version (%s)" % (hadoop_version,
                                               self._inferred_hadoop_version))

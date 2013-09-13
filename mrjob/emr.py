@@ -1472,7 +1472,7 @@ class EMRJobRunner(MRJobRunner):
             latest_lg_step_num = 0
             for i, step in enumerate(steps):
                 if LOG_GENERATING_STEP_NAME_RE.match(
-                    posixpath.basename(step.jar)):
+                    posixpath.basename(getattr(step, 'jar', ''))):
                     latest_lg_step_num += 1
 
                 # ignore steps belonging to other jobs
@@ -1481,7 +1481,7 @@ class EMRJobRunner(MRJobRunner):
 
                 step_nums.append(i + 1)
                 if LOG_GENERATING_STEP_NAME_RE.match(
-                    posixpath.basename(step.jar)):
+                    posixpath.basename(getattr(step, 'jar', ''))):
                     lg_step_num_mapping[i + 1] = latest_lg_step_num
 
                 step.state = step.state
@@ -2086,6 +2086,9 @@ class EMRJobRunner(MRJobRunner):
                                                        float('Inf')))
 
         sort_keys_and_job_flows = []
+        # no point in showing this warning multiple times
+        # make this a list so we can set it from within add_if_match()
+        warned_about_ami_version_latest = []
 
         def add_if_match(job_flow):
             # this may be a retry due to locked job flows
@@ -2115,21 +2118,25 @@ class EMRJobRunner(MRJobRunner):
                 if job_flow_ami_version != self._opts['ami_version']:
                     return
             else:
-                log.warning(
-                    "When AMI version is set to 'latest', job flow pooling "
-                    "can result in the job being added to a pool using an "
-                    "older AMI version"
-                )
+                if not warned_about_ami_version_latest:
+                    log.warning(
+                        "When AMI version is set to 'latest', job flow pooling"
+                        " can result in the job being added to a pool using an"
+                        " older AMI version")
+                    # warned_about_... = True would just set a local variable
+                    warned_about_ami_version_latest.append(True)
 
             # there is a hard limit of 256 steps per job flow
             if len(job_flow.steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
                 return
 
             # in rare cases, job flow can be WAITING *and* have incomplete
-            # steps
-            if any(getattr(step, 'enddatetime', None) is None
-                   for step in job_flow.steps):
-                return
+            # steps. We could just check for PENDING steps, but we're
+            # trying to be defensive about EMR adding a new step state.
+            for step in job_flow.steps:
+                if (getattr(step, 'enddatetime', None) is None and
+                    getattr(step, 'state', None) != 'CANCELLED'):
+                    return
 
             # total compute units per group
             role_to_cu = defaultdict(float)

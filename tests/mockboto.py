@@ -28,6 +28,7 @@ import hashlib
 
 try:
     from boto.emr.connection import EmrConnection
+    from boto.emr.step import JarStep
     import boto.exception
     import boto.utils
     boto  # quiet "redefinition of unused ..." warning from pyflakes
@@ -293,6 +294,7 @@ class MockEmrConnection(object):
     # with patch.object(MockEmrConnection, 'STRICT_SSL', True):
     #     ...
     STRICT_SSL = False
+    MAX_SIMULATION_STEPS = 100
 
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
                  is_secure=True, port=None, proxy=None, proxy_port=None,
@@ -302,7 +304,7 @@ class MockEmrConnection(object):
                  mock_emr_failures=None, mock_emr_output=None,
                  max_days_ago=DEFAULT_MAX_DAYS_AGO,
                  max_job_flows_returned=DEFAULT_MAX_JOB_FLOWS_RETURNED,
-                 max_simulation_steps=100):
+                 simulation_iterator=None):
         """Create a mock version of EmrConnection. Most of these args are
         the same as for the real EmrConnection, and are ignored.
 
@@ -334,10 +336,9 @@ class MockEmrConnection(object):
         :type max_days_ago: int
         :param max_days_ago: the maximum amount of days that EMR will go back
                              in time
-        :type max_simulation_steps: int
-        :param max_simulation_steps: the maximum number of times we can
-                                     simulate the progress of EMR job flows (to
-                                     protect against simulating forever)
+        :param simulation_iterator: we call ``next()`` on this each time
+                                    we simulate progress. If there is
+                                    no next element, we bail out.
         """
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.mock_emr_job_flows = combine_values({}, mock_emr_job_flows)
@@ -345,7 +346,7 @@ class MockEmrConnection(object):
         self.mock_emr_output = combine_values({}, mock_emr_output)
         self.max_days_ago = max_days_ago
         self.max_job_flows_returned = max_job_flows_returned
-        self.simulation_steps_left = max_simulation_steps
+        self.simulation_iterator = simulation_iterator
         if region is not None:
             self.endpoint = region.endpoint
         else:
@@ -555,12 +556,11 @@ class MockEmrConnection(object):
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
         if enable_debugging:
-            debugging_step = MockEmrObject(
-                name='Setup Hadoop Debugging',
-                action_on_failure='TERMINATE_JOB_FLOW',
-                jar=EmrConnection.DebuggingJar,
-                args=[MockEmrObject(value=EmrConnection.DebuggingArgs)],
-                state='COMPLETED')
+            debugging_step = JarStep(name='Setup Hadoop Debugging',
+                                     action_on_failure='TERMINATE_JOB_FLOW',
+                                     main_class=None,
+                                     jar=EmrConnection.DebuggingJar,
+                                     step_args=EmrConnection.DebuggingArgs)
             steps.insert(0, debugging_step)
         self.add_jobflow_steps(jobflow_id, steps)
 
@@ -641,7 +641,7 @@ class MockEmrConnection(object):
                 state='PENDING',
                 name=step.name,
                 actiononfailure=step.action_on_failure,
-                args=step.args,
+                args=step.args(),
                 jar=DEFAULT_JAR,
             )
             job_flow.state = 'PENDING'
@@ -667,10 +667,9 @@ class MockEmrConnection(object):
         """Figure out the output dir for a step by parsing step.args
         and looking for an -output argument."""
         # parse in reverse order, in case there are multiple -output args
-        args = step.args()
-        for i, arg in reversed(list(enumerate(args[:-1]))):
+        for i, arg in reversed(list(enumerate(step.args[:-1]))):
             if arg == '-output':
-                return args[i + 1]
+                return step.args[i + 1]
         else:
             return None
 
@@ -686,10 +685,12 @@ class MockEmrConnection(object):
         if now is None:
             now = datetime.utcnow()
 
-        if self.simulation_steps_left <= 0:
-            raise AssertionError(
-                'Simulated progress too many times; bailing out')
-        self.simulation_steps_left -= 1
+        if self.simulation_iterator:
+            try:
+                self.simulation_iterator.next()
+            except StopIteration:
+                raise AssertionError(
+                    'Simulated progress too many times; bailing out')
 
         job_flow = self.mock_emr_job_flows[jobflow_id]
 
@@ -724,6 +725,10 @@ class MockEmrConnection(object):
             if step.name in ('Setup Hadoop Debugging', ):
                 step.state = 'COMPLETED'
                 continue
+
+            # allow steps to get stuck
+            if getattr(step, 'mock_no_progress', None):
+                return
 
             # found currently running step! going to handle it, then exit
             if step.state == 'PENDING':

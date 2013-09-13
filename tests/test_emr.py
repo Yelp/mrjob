@@ -23,6 +23,7 @@ import copy
 from datetime import datetime
 from datetime import timedelta
 import getpass
+import itertools
 import logging
 import os
 import os.path
@@ -137,6 +138,7 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         kwargs['mock_emr_job_flows'] = self.mock_emr_job_flows
         kwargs['mock_emr_failures'] = self.mock_emr_failures
         kwargs['mock_emr_output'] = self.mock_emr_output
+        kwargs['simulation_iterator'] = self.simulation_iterator
         return MockEmrConnection(*args, **kwargs)
 
     def setUp(self):
@@ -145,6 +147,7 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         self.mock_emr_job_flows = {}
         self.mock_emr_failures = {}
         self.mock_emr_output = {}
+        self.simulation_iterator = itertools.repeat(None, 100)
 
         p_s3 = patch.object(boto, 'connect_s3', self._mock_boto_connect_s3)
         self.addCleanup(p_s3.stop)
@@ -281,17 +284,17 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            self.assertIn('-inputformat', job_flow.steps[0].args())
-            self.assertNotIn('-outputformat', job_flow.steps[0].args())
-            self.assertNotIn('-inputformat', job_flow.steps[1].args())
-            self.assertIn('-outputformat', job_flow.steps[1].args())
+            self.assertIn('-inputformat', job_flow.steps[0].args)
+            self.assertNotIn('-outputformat', job_flow.steps[0].args)
+            self.assertNotIn('-inputformat', job_flow.steps[1].args)
+            self.assertIn('-outputformat', job_flow.steps[1].args)
 
             # make sure jobconf got through
-            self.assertIn('-D', job_flow.steps[0].args())
-            self.assertIn('x=y', job_flow.steps[0].args())
-            self.assertIn('-D', job_flow.steps[1].args())
+            self.assertIn('-D', job_flow.steps[0].args)
+            self.assertIn('x=y', job_flow.steps[0].args)
+            self.assertIn('-D', job_flow.steps[1].args)
             # job overrides jobconf in step 1
-            self.assertIn('x=z', job_flow.steps[1].args())
+            self.assertIn('x=z', job_flow.steps[1].args)
 
             # make sure mrjob.tar.gz is created and uploaded as
             # a bootstrap file
@@ -419,11 +422,11 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         with mr_job.make_runner() as runner:
             runner.run()
             self.assertNotIn('-files',
-                             runner._describe_jobflow().steps[0].args())
+                             runner._describe_jobflow().steps[0].args)
             self.assertIn('-cacheFile',
-                          runner._describe_jobflow().steps[0].args())
+                          runner._describe_jobflow().steps[0].args)
             self.assertNotIn('-combiner',
-                             runner._describe_jobflow().steps[0].args())
+                             runner._describe_jobflow().steps[0].args)
 
     def test_args_version_020_205(self):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
@@ -435,11 +438,11 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertIn('-files', runner._describe_jobflow().steps[0].args())
+            self.assertIn('-files', runner._describe_jobflow().steps[0].args)
             self.assertNotIn('-cacheFile',
-                             runner._describe_jobflow().steps[0].args())
+                             runner._describe_jobflow().steps[0].args)
             self.assertIn('-combiner',
-                          runner._describe_jobflow().steps[0].args())
+                          runner._describe_jobflow().steps[0].args)
 
     def test_wait_for_job_flow_termination(self):
         # Test regression from #338 where _wait_for_job_flow_termination
@@ -2391,6 +2394,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         self.mock_emr_job_flows[job_flow_id].steps = [
             MockEmrObject(
                 state='PENDING',
+                mock_no_progress=True,
                 name='dummy',
                 actiononfailure='CANCEL_AND_WAIT',
                 args=[])]
@@ -2399,7 +2403,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
                                ['-r', 'emr', '--pool-emr-job-flows'])
 
     def test_do_join_idle_with_cancelled_steps(self):
-        dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
+        dummy_runner, job_flow_id = self.make_pooled_job_flow()
 
         self.mock_emr_job_flows[job_flow_id].steps = [
             MockEmrObject(

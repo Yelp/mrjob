@@ -37,13 +37,13 @@ NODE_LOGS = 'NODE_LOGS'
 
 # regex for matching task-attempts log URIs
 TASK_ATTEMPTS_LOG_URI_RE = re.compile(
-    r'^.*/attempt_'                 #attempt_
-    r'(?P<timestamp>\d+)_'          #201203222119_
-    r'(?P<step_num>\d+)_'           #0001_
-    r'(?P<node_type>\w)_'           #m_
-    r'(?P<node_num>\d+)_'           #000000_
-    r'(?P<attempt_num>\d+)/'        #3/
-    r'(?P<stream>stderr|syslog)$')  #stderr
+    r'^.*/attempt_'                 # attempt_
+    r'(?P<timestamp>\d+)_'          # 201203222119_
+    r'(?P<step_num>\d+)_'           # 0001_
+    r'(?P<node_type>\w)_'           # m_
+    r'(?P<node_num>\d+)_'           # 000000_
+    r'(?P<attempt_num>\d+)/'        # 3/
+    r'(?P<stream>stderr|syslog)$')  # stderr
 
 # regex for matching step log URIs
 STEP_LOG_URI_RE = re.compile(
@@ -54,7 +54,7 @@ STEP_LOG_URI_RE = re.compile(
 EMR_JOB_LOG_URI_RE = re.compile(
     r'^.*?'     # sometimes there is a number at the beginning, and the
                 # containing directory can be almost anything.
-    r'job_(?P<timestamp>\d+)_(?P<step_num>\d+)' # oh look, meaningful data!
+    r'job_(?P<timestamp>\d+)_(?P<step_num>\d+)'  # oh look, meaningful data!
     r'(_\d+)?'  # sometimes there is a number here.
     r'_hadoop_streamjob(\d+).jar$')
 HADOOP_JOB_LOG_URI_RE = re.compile(
@@ -199,10 +199,12 @@ def best_error_from_logs(fs, task_attempts, steps, jobs):
     jobs = _sorted_jobs(jobs)
 
     val = _parse_task_attempts(fs, task_attempts)
-    if val: return val
+    if val:
+        return val
 
     val = _parse_simple_logs(fs, steps, _hadoop_streaming_error_wrapper)
-    if val: return val
+    if val:
+        return val
 
     return _parse_simple_logs(fs, jobs, _timeout_error_wrapper)
 
@@ -241,8 +243,8 @@ def scan_for_counters_in_files(log_file_uris, runner, hadoop_version):
             continue
 
         for line in log_lines:
-            new_counters, step_num = parse_hadoop_counters_from_line(
-                                        line, hadoop_version)
+            new_counters, step_num = (
+                parse_hadoop_counters_from_line(line, hadoop_version))
             if new_counters:
                 counters[step_num] = new_counters
     return counters

@@ -203,12 +203,14 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
 
         for include in includes:
             if include in already_loaded:
-                log.warn('%s tries to recursively include %s! (Already included:'
-                         ' %s)' % (conf_path, conf['include'],
-                                   ', '.join(already_loaded)))
+                log.warn('%s tries to recursively include %s! (Already'
+                         ' included:  %s)' % (
+                             conf_path, conf['include'],
+                             ', '.join(already_loaded)))
             else:
-                inherited.extend(load_opts_from_mrjob_conf(
-                                    runner_alias, include, already_loaded))
+                inherited.extend(
+                    load_opts_from_mrjob_conf(
+                        runner_alias, include, already_loaded))
     return inherited + [(conf_path, values)]
 
 

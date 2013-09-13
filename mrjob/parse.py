@@ -72,7 +72,7 @@ def parse_s3_uri(uri):
     """
     components = urlparse(uri)
     if (components.scheme not in ('s3', 's3n')
-        or '/' not in components.path):
+            or '/' not in components.path):
         raise ValueError('Invalid S3 URI: %s' % uri)
 
     return components.netloc, components.path[1:]
@@ -287,8 +287,9 @@ def find_interesting_hadoop_streaming_error(lines):
         2010-07-27 19:53:35,451 ERROR org.apache.hadoop.streaming.StreamJob (main): Error launching job , Output path already exists : Output directory s3://yourbucket/logs/2010/07/23/ already exists and is not empty
     """
     for line in lines:
-        match = _HADOOP_STREAMING_ERROR_RE.match(line) \
-                or _HADOOP_STREAMING_ERROR_RE_2.match(line)
+        match = (
+            _HADOOP_STREAMING_ERROR_RE.match(line) or
+            _HADOOP_STREAMING_ERROR_RE_2.match(line))
         if match:
             msg = match.group(1)
             if msg != 'Job not Successful!':

@@ -169,8 +169,8 @@ class RunnerOptionStore(OptionStore):
         self.cascading_dicts.append(opts)
 
         if (len(self.cascading_dicts) > 2 and
-            all(len(d) == 0 for d in self.cascading_dicts[2:-1]) and
-            (len(conf_paths or []) > 0 or len(opts) == 0)):
+                all(len(d) == 0 for d in self.cascading_dicts[2:-1]) and
+                (len(conf_paths or []) > 0 or len(opts) == 0)):
             log.warning('No configs specified for %s runner' % alias)
 
         self.populate_values_from_cascading_dicts()
@@ -726,8 +726,8 @@ class MRJobRunner(object):
                 for step in steps:
                     if step['type'] not in STEP_TYPES:
                         raise ValueError(
-                            'unexpected step type %r in steps %r' %
-                                         (step['type'], stdout))
+                            'unexpected step type %r in steps %r' % (
+                                step['type'], stdout))
 
                 self._steps = steps
 
@@ -812,7 +812,7 @@ class MRJobRunner(object):
             step_num, 'reducer')
 
         if (combiner is not None and
-            not supports_combiners_in_hadoop_streaming(version)):
+                not supports_combiners_in_hadoop_streaming(version)):
 
             # krazy hack to support combiners on hadoop <0.20
             bash_wrap_mapper = True

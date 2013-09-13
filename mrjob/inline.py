@@ -110,7 +110,7 @@ class InlineMRJobRunner(SimMRJobRunner):
         super(InlineMRJobRunner, self).warn_ignored_opts()
         for ignored_opt in self.IGNORED_LOCAL_OPTS:
             if ((not self._opts.is_default(ignored_opt)) and
-                self._opts[ignored_opt]):
+                    self._opts[ignored_opt]):
                 log.warning('ignoring %s option (use -r local instead): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 

@@ -1,4 +1,5 @@
 # Copyright 2009-2012 Yelp
+# Copyright 2013 Lyft
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -210,11 +211,11 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         jobflow_id = mock_conn.run_jobflow(name='j-HADOOP_DEBUGGING',
                                            log_uri='',
                                            enable_debugging=True,
-                                           steps=[step()],
                                            now=self.now -
-                                               timedelta(hours=6))
+                                           timedelta(hours=6))
         jf = mock_conn.describe_jobflow(jobflow_id)
         self.mock_emr_job_flows['j-HADOOP_DEBUGGING'] = jf
+        jf.steps.append(step())
         jf.state = 'WAITING'
         jf.startdatetime = to_iso8601(self.now - timedelta(hours=5))
         jf.readydatetime = to_iso8601(
@@ -241,12 +242,12 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         # pooled job flow reaching end of full hour
         self.mock_emr_job_flows['j-POOLED'] = MockEmrObject(
             bootstrapactions=[
-                MockEmrObject(args=[]),
+                MockEmrObject(args=[], name='action 0'),
                 MockEmrObject(args=[
                     MockEmrObject(
                         value='pool-0123456789abcdef0123456789abcdef'),
                     MockEmrObject(value='reflecting'),
-                ]),
+                ], name='master'),
             ],
             creationdatetime=to_iso8601(self.now - timedelta(hours=1)),
             readydatetime=to_iso8601(self.now - timedelta(minutes=50)),

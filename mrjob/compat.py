@@ -704,8 +704,7 @@ def add_translated_jobconf_for_hadoop_version(jobconf, hadoop_version):
                     "\nThe have been translated as follows\n %s",
                     hadoop_version,
                     '\n'.join(["%s: %s" % (key, value) for key, value
-                               in mismatch_key_to_translated_key.iteritems()])
-        )
+                               in mismatch_key_to_translated_key.iteritems()]))
 
     translated_jobconf.update(jobconf)
     return translated_jobconf

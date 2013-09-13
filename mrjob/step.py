@@ -105,13 +105,13 @@ class MRJobStep(object):
         # identity reducer should only show up if you specified 'reducer_init',
         # 'reducer_final', or 'reducer_pre_filter', but not 'reducer' itself
         if (key == 'reducer' and self._steps['reducer'] is None and
-            self.has_explicit_reducer):
+                self.has_explicit_reducer):
             return _IDENTITY_REDUCER
         # identity combiner should only show up if you specified
         # 'combiner_init', 'combiner_final', or 'combiner_pre_filter', but not
         # 'combiner' itself
         if (key == 'combiner' and self._steps['combiner'] is None and
-            self.has_explicit_combiner):
+                self.has_explicit_combiner):
             return _IDENTITY_REDUCER
         return self._steps[key]
 
@@ -127,7 +127,7 @@ class MRJobStep(object):
         else:
             substep = {'type': 'script'}
             if (pre_filter_key and
-                self._steps[pre_filter_key]):
+                    self._steps[pre_filter_key]):
                 substep['pre_filter'] = self._steps[pre_filter_key]
             return substep
 
@@ -147,8 +147,8 @@ class MRJobStep(object):
         #   - it is the first step and we don't want to mess up protocols
         #   - there are only combiners and we don't want to mess up protocols
         if (step_num == 0 or
-            self.has_explicit_mapper or
-            self.has_explicit_combiner):
+                self.has_explicit_mapper or
+                self.has_explicit_combiner):
             substep_descs['mapper'] = self.render_mapper()
         if self.has_explicit_combiner:
             substep_descs['combiner'] = self.render_combiner()

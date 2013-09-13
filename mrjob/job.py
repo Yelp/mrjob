@@ -738,8 +738,8 @@ class MRJob(MRJobLauncher):
                     if self.options.strict_protocols:
                         raise
                     else:
-                        self.increment_counter('Undecodable input',
-                                                e.__class__.__name__)
+                        self.increment_counter(
+                            'Undecodable input', e.__class__.__name__)
 
         def write_line(key, value):
             try:
@@ -748,8 +748,8 @@ class MRJob(MRJobLauncher):
                 if self.options.strict_protocols:
                     raise
                 else:
-                    self.increment_counter('Unencodable output',
-                                            e.__class__.__name__)
+                    self.increment_counter(
+                        'Unencodable output', e.__class__.__name__)
 
         return read_lines, write_line
 
@@ -904,9 +904,9 @@ class MRJob(MRJobLauncher):
         This is mostly useful inside :py:meth:`load_options`, to disable
         loading options when we aren't running inside Hadoop Streaming.
         """
-        return self.options.run_mapper \
-                or self.options.run_combiner \
-                or self.options.run_reducer
+        return (self.options.run_mapper or
+                self.options.run_combiner or
+                self.options.run_reducer)
 
     def _process_args(self, args):
         """mrjob.launch takes the first arg as the script path, but mrjob.job
@@ -1148,7 +1148,7 @@ class MRJob(MRJobLauncher):
 
             # hadoop_version should be a string
             elif (key == 'hadoop_version' and
-                isinstance(unfiltered_val, float)):
+                    isinstance(unfiltered_val, float)):
                 log.warn('hadoop_version should be a string, not %s' %
                          unfiltered_val)
                 filtered_val = format_hadoop_version(unfiltered_val)

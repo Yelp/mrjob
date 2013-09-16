@@ -114,7 +114,7 @@ class SSHFilesystem(Filesystem):
         paths = self.ls(path_glob)
         try:
             path_exists = any(paths)
-        except IOError, e:
+        except IOError:
             path_exists = False
         return path_exists
 

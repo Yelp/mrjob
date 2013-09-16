@@ -20,12 +20,11 @@ in memory, such as:
 
 The :mrjob-opt:`max_hours_idle` option allows you to spin up EMR job flows
 that will terminate themselves after being idle for a certain amount of time,
-in a way that optimizes EMR/EC2's full-hour billing model. For development
-(not production), we now recommend always using
-:ref:`job flow pooling <pooling-job-flows>`, with :mrjob-opt:`max_hours_idle`
-enabled.
+in a way that optimizes EMR/EC2's full-hour billing model.
 
-To enable these in your :ref:`mrjob.conf <mrjob.conf>`, do:
+For development (not production), we now recommend always using
+:ref:`job flow pooling <pooling-job-flows>`, with :mrjob-opt:`max_hours_idle`
+enabled. Update your :ref:`mrjob.conf <mrjob.conf>` like this:
 
 .. code-block:: yaml
 
@@ -38,7 +37,7 @@ To enable these in your :ref:`mrjob.conf <mrjob.conf>`, do:
 cronning :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows`), pooled job flows
 will stay active forever, costing you money!
 
-You can use :option:`--no-check-input-paths` with the Hadoop runner to
+You can now use :option:`--no-check-input-paths` with the Hadoop runner to
 allow jobs to run even if ``hadoop fs -ls`` can't see their input files.
 
 Two bits of straggling deprecated functionality were removed:

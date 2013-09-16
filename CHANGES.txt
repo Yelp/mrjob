@@ -14,6 +14,7 @@ v0.4.1-dev, 2013-09-16 -- secondary sort and self-terminating job flows
      * setup now uses sh rather than python internally
    * EMR runner:
      * max_hours_idle: self-terminating idle job flows (#628)
+       * mins_to_end_of_hour option gives finer control over self-termination.
      * Can reuse pooled job flows where previous job failed (#633)
      * Throws IOError if output path already exists (#634)
      * Gracefully handles SSL cert issues (#621, #706)

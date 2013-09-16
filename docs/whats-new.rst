@@ -33,9 +33,11 @@ enabled. Update your :ref:`mrjob.conf <mrjob.conf>` like this:
         max_hours_idle: 0.25
 	pool_emr_job_flows: true
 
-**Warning**: if you enable pooling *without* :mrjob-opt:`max_hours_idle` (or
-cronning :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows`), pooled job flows
-will stay active forever, costing you money!
+.. warning::
+
+   If you enable pooling *without* :mrjob-opt:`max_hours_idle` (or
+   cronning :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows`), pooled job
+   flows will stay active forever, costing you money!
 
 You can now use :option:`--no-check-input-paths` with the Hadoop runner to
 allow jobs to run even if ``hadoop fs -ls`` can't see their input files

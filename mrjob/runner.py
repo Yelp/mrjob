@@ -707,7 +707,7 @@ class MRJobRunner(object):
                 log.debug('> %s' % cmd_line(args))
                 # add . to PYTHONPATH (in case mrjob isn't actually installed)
                 env = combine_local_envs(os.environ,
-                                   {'PYTHONPATH': os.path.abspath('.')})
+                                         {'PYTHONPATH': os.path.abspath('.')})
                 steps_proc = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
                 stdout, stderr = steps_proc.communicate()
 
@@ -1042,12 +1042,12 @@ class MRJobRunner(object):
             def filter_path(path):
                 filename = os.path.basename(path)
                 return not(file_ext(filename).lower() in ('.pyc', '.pyo') or
-                    # filter out emacs backup files
-                    filename.endswith('~') or
-                    # filter out emacs lock files
-                    filename.startswith('.#') or
-                    # filter out MacFuse resource forks
-                    filename.startswith('._'))
+                           # filter out emacs backup files
+                           filename.endswith('~') or
+                           # filter out emacs lock files
+                           filename.startswith('.#') or
+                           # filter out MacFuse resource forks
+                           filename.startswith('._'))
 
             log.debug('archiving %s -> %s as %s' % (
                 mrjob_dir, tar_gz_path, os.path.join('mrjob', '')))

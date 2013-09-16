@@ -59,7 +59,7 @@ class HadoopFilesystem(Filesystem):
         return is_uri(path)
 
     def invoke_hadoop(self, args, ok_returncodes=None, ok_stderr=None,
-                       return_stdout=False):
+                      return_stdout=False):
         """Run the given hadoop command, raising an exception on non-zero
         return code. This only works for commands whose output we don't
         care about.
@@ -198,7 +198,7 @@ class HadoopFilesystem(Filesystem):
         """
         try:
             return_code = self.invoke_hadoop(['fs', '-ls', path_glob],
-                                             ok_returncodes=[0,-1,255])
+                                             ok_returncodes=[0, -1, 255])
             return (return_code == 0)
         except CalledProcessError:
             raise IOError("Could not check path %s" % path_glob)

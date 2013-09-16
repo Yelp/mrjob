@@ -172,16 +172,17 @@ def inspect_and_maybe_terminate_job_flows(
 
             log.debug(
                 'Job flow %s %s for %s, %s to end of hour, %s (%s)' %
-                      (jf.jobflowid,
-                       'pending' if pending else 'idle',
-                       strip_microseconds(time_idle),
-                       strip_microseconds(time_to_end_of_hour),
-                       ('unpooled' if pool is None else 'in %s pool' % pool),
-                       jf.name))
+                (jf.jobflowid,
+                 'pending' if pending else 'idle',
+                 strip_microseconds(time_idle),
+                 strip_microseconds(time_to_end_of_hour),
+                 ('unpooled' if pool is None else 'in %s pool' % pool),
+                 jf.name))
 
             # filter out job flows that don't meet our criteria
             if (max_hours_idle is not None and
-                time_idle <= timedelta(hours=max_hours_idle)):
+                    time_idle <= timedelta(hours=max_hours_idle)):
+
                 continue
 
             # mins_to_end_of_hour doesn't apply to jobs with pending steps
@@ -205,8 +206,8 @@ def inspect_and_maybe_terminate_job_flows(
     log.info(
         'Job flow statuses: %d bootstrapping, %d running, %d pending, %d idle,'
         ' %d active non-streaming, %d done' % (
-        num_running, num_bootstrapping, num_pending, num_idle,
-        num_non_streaming, num_done))
+            num_running, num_bootstrapping, num_pending, num_idle,
+            num_non_streaming, num_done))
 
     terminate_and_notify(runner, to_terminate, dry_run=dry_run,
                          max_mins_locked=max_mins_locked, quiet=quiet)
@@ -313,10 +314,10 @@ def terminate_and_notify(runner, to_terminate, dry_run=False,
     for jf, pending, time_idle, time_to_end_of_hour in to_terminate:
         fmt = ('Terminated job flow %s (%s); was %s for %s, %s to end of hour')
         msg = fmt % (
-                jf.jobflowid, jf.name,
-                'pending' if pending else 'idle',
-                strip_microseconds(time_idle),
-                strip_microseconds(time_to_end_of_hour))
+            jf.jobflowid, jf.name,
+            'pending' if pending else 'idle',
+            strip_microseconds(time_idle),
+            strip_microseconds(time_to_end_of_hour))
 
         did_terminate = False
         if not dry_run:

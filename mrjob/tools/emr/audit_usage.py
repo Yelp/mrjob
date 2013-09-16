@@ -64,7 +64,8 @@ def main(args):
     now = datetime.utcnow()
 
     log.info('getting job flow history...')
-    job_flows = get_job_flows(options.conf_paths, options.max_days_ago, now=now)
+    job_flows = get_job_flows(
+        options.conf_paths, options.max_days_ago, now=now)
 
     log.info('compiling job flow stats...')
     stats = job_flows_to_stats(job_flows, now=now)
@@ -649,7 +650,7 @@ def print_report(stats, now=None):
     # Top jobs
     print 'Top jobs, by total time used:'
     for label, nih_used in sorted(s['label_to_nih_used'].iteritems(),
-                                    key=lambda (lb, nih): (-nih, lb)):
+                                  key=lambda (lb, nih): (-nih, lb)):
         print '  %9.2f %s' % (nih_used, label)
     print
 
@@ -662,7 +663,7 @@ def print_report(stats, now=None):
     # Top users
     print 'Top users, by total time used:'
     for owner, nih_used in sorted(s['owner_to_nih_used'].iteritems(),
-                                    key=lambda (o, nih): (-nih, o)):
+                                  key=lambda (o, nih): (-nih, o)):
         print '  %9.2f %s' % (nih_used, owner)
     print
 
@@ -675,7 +676,9 @@ def print_report(stats, now=None):
     # Top job steps
     print 'Top job steps, by total time used (step number first):'
     for (label, step_num), nih_used in sorted(
-        s['job_step_to_nih_used'].iteritems(), key=lambda (k, nih): (-nih, k)):
+            s['job_step_to_nih_used'].iteritems(),
+            key=lambda (k, nih): (-nih, k)):
+
         if label:
             print '  %9.2f %3d %s' % (nih_used, step_num, label)
         else:
@@ -684,8 +687,8 @@ def print_report(stats, now=None):
 
     print 'Top job steps, by total time billed but not used (un-pooled only):'
     for (label, step_num), nih_bbnu in sorted(
-        s['job_step_to_nih_bbnu_no_pool'].iteritems(),
-        key=lambda (k, nih): (-nih, k)):
+            s['job_step_to_nih_bbnu_no_pool'].iteritems(),
+            key=lambda (k, nih): (-nih, k)):
 
         if label:
             print '  %9.2f %3d %s' % (nih_bbnu, step_num, label)

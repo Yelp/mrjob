@@ -48,9 +48,17 @@ a new job flow will be created that does not terminate when the job completes.
 When you use :option:`--pool-emr-job-flows` the next time, it will identify the
 job flow and add the job to it rather than creating a new one.
 
-**If you use job flow pools, keep**
-:py:mod:`~mrjob.tools.emr.terminate_idle_job_flows` **in your crontab!**
-Otherwise you will forget to terminate your job flows and waste a lot of money.
+.. warning::
+
+    If you use job flow pools, keep
+    :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows` in your crontab!
+    Otherwise you may forget to terminate your job flows and waste a lot of
+    money.
+
+Alternatively, you may use the :mrjob-opt:`max_hours_idle` option to create
+self-terminating job flows; the disadvantage is that pooled jobs may
+occasionally join job flows with out knowing they are about to self-terminate
+(this is better for development than production).
 
 Pooling is designed so that jobs run against the same :py:mod:`mrjob.conf` can
 share the same job flows. This means that the version of :py:mod:`mrjob`,

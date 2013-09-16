@@ -126,6 +126,8 @@ Job flow creation and configuration
     after it's been idle this many hours AND we're within
     :mrjob-opt:`mins_to_end_of_hour` of an EC2 billing hour.
 
+    .. versionadded:: 0.4.1
+
 .. mrjob-opt::
     :config: mins_to_end_of_hour
     :switch: --mins-to-end-of-hour
@@ -135,6 +137,20 @@ Job flow creation and configuration
 
     If :mrjob-opt:`max_hours_idle` is set, controls how close to the end of an
     EC2 billing hour the job flow can automatically terminate itself.
+
+    .. versionadded:: 0.4.1
+
+.. mrjob-opt::
+    :config: visible_to_all_users
+    :switch: --visible-to-all-users
+    :type: boolean
+    :set: emr
+    :default: ``False``
+
+    If ``True``, EMR job flows will be visible to all IAM users. If ``False``,
+    the job flow will only be visible to the IAM user that created it.
+
+    .. versionadded:: 0.4.1
 
 Bootstrapping
 -------------
@@ -387,7 +403,8 @@ Choosing/creating a job flow to join
     another job. If no suitable job flow is `WAITING`, create a new pooled job
     flow.
 
-    .. warning:: Do not run this without having
+    .. warning:: Do not run this without either setting
+        :mrjob-opt:`max_hours_idle` or putting
         :py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job
         flows left idle can quickly become expensive!
 

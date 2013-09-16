@@ -134,3 +134,5 @@ Options available to hadoop runner only
     Option to skip the input path check. With ``--no-check-input-paths``,
     input paths to the runner will be passed straight through, without
     checking if they exist.
+
+    .. versionadded:: 0.4.1

@@ -97,6 +97,19 @@ Options available to hadoop runner only
 ---------------------------------------
 
 .. mrjob-opt::
+    :config: check_input_paths
+    :switch: --check-input-paths, --no-check-input-paths
+    :type: boolean
+    :set: hadoop
+    :default: ``True``
+
+    Option to skip the input path check. With ``--no-check-input-paths``,
+    input paths to the runner will be passed straight through, without
+    checking if they exist.
+
+    .. versionadded:: 0.4.1
+
+.. mrjob-opt::
     :config: hadoop_bin
     :switch: --hadoop-bin
     :type: :ref:`command <data-type-command>`
@@ -123,16 +136,3 @@ Options available to hadoop runner only
 
     Scratch space on HDFS. This path does not need to be fully qualified with
     ``hdfs://`` URIs because it's understood that it has to be on HDFS.
-
-.. mrjob-opt::
-    :config: check_input_paths
-    :switch: --check-input-paths, --no-check-input-paths
-    :type: boolean
-    :set: hadoop
-    :default: ``True``
-
-    Option to skip the input path check. With ``--no-check-input-paths``,
-    input paths to the runner will be passed straight through, without
-    checking if they exist.
-
-    .. versionadded:: 0.4.1

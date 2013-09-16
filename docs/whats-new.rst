@@ -38,7 +38,8 @@ cronning :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows`), pooled job flows
 will stay active forever, costing you money!
 
 You can now use :option:`--no-check-input-paths` with the Hadoop runner to
-allow jobs to run even if ``hadoop fs -ls`` can't see their input files.
+allow jobs to run even if ``hadoop fs -ls`` can't see their input files
+(see :mrjob-opt:`check_input_paths`).
 
 Two bits of straggling deprecated functionality were removed:
 

@@ -253,7 +253,7 @@ class LocalMRJobRunner(SimMRJobRunner):
 
         with open(output_path, 'w') as write_to:
             procs = _chain_procs(procs_args, stdout=write_to, stderr=PIPE,
-                                cwd=working_dir, env=env)
+                                 cwd=working_dir, env=env)
             return [{'args': a, 'proc': proc, 'write_to': write_to}
                     for a, proc in zip(procs_args, procs)]
 

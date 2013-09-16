@@ -111,10 +111,10 @@ def hadoop_log_dir(hadoop_home=None):
 class HadoopRunnerOptionStore(RunnerOptionStore):
 
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
+        'check_input_paths',
         'hadoop_bin',
         'hadoop_home',
         'hdfs_scratch_dir',
-        'check_hadoop_input_paths'
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -157,7 +157,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         return combine_dicts(super_opts, {
             'hadoop_home': os.environ.get('HADOOP_HOME'),
             'hdfs_scratch_dir': 'tmp/mrjob',
-            'check_hadoop_input_paths': True
+            'check_input_paths': True
         })
 
 
@@ -243,7 +243,7 @@ class HadoopJobRunner(MRJobRunner):
             if path == '-':
                 continue  # STDIN always exists
 
-            if self._opts['check_hadoop_input_paths']:
+            if self._opts['check_input_paths']:
                 if not self.path_exists(path):
                     raise AssertionError(
                         'Input path %s does not exist!' % (path,))
@@ -340,7 +340,7 @@ class HadoopJobRunner(MRJobRunner):
                     # log cause, and put it in exception
                     cause_msg = []  # lines to log and put in exception
                     cause_msg.append('Probable cause of failure (from %s):' %
-                               cause['log_file_uri'])
+                                     cause['log_file_uri'])
                     cause_msg.extend(line.strip('\n')
                                      for line in cause['lines'])
                     if cause['input_uri']:

@@ -6,9 +6,9 @@ mrjob
 mrjob is a Python 2.5+ package that helps you write and run Hadoop Streaming
 jobs.
 
-`v0.4 documentation <http://packages.python.org/mrjob/>`_
+`Stable version (v0.4.1) documentation: <http://packages.python.org/mrjob/>`_
 
-`v0.4.1-dev documentation <http://mrjob.readthedocs.org/en/latest/>`_
+`Development version documentation: <http://mrjob.readthedocs.org/en/latest/>`_
 
 .. image:: https://travis-ci.org/Yelp/mrjob.png
    :target: https://travis-ci.org/Yelp/mrjob
@@ -53,7 +53,7 @@ Code for this example and more live in ``mrjob/examples``.
 
 .. code:: python
 
-   """The classic MapReduce job: count the frequency of words. 
+   """The classic MapReduce job: count the frequency of words.
    """
    from mrjob.job import MRJob
    import re
@@ -102,8 +102,8 @@ Setting up EMR on Amazon
 Advanced Configuration
 ----------------------
 
-To run in other AWS regions, upload your source tree, run ``make``, and use 
-other advanced mrjob features, you'll need to set up ``mrjob.conf``. mrjob looks 
+To run in other AWS regions, upload your source tree, run ``make``, and use
+other advanced mrjob features, you'll need to set up ``mrjob.conf``. mrjob looks
 for its conf file in:
 
 * The contents of ``$MRJOB_CONF``

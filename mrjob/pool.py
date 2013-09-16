@@ -44,7 +44,7 @@ def est_time_to_hour(job_flow, now=None):
             start = datetime.strptime(startdatetime, boto.utils.ISO8601)
         else:
             start = datetime.strptime(job_flow.creationdatetime,
-                                  boto.utils.ISO8601)
+                                      boto.utils.ISO8601)
     else:
         # do something reasonable if creationdatetime isn't set
         return timedelta(minutes=60)

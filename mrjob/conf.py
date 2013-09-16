@@ -113,7 +113,6 @@ def find_mrjob_conf():
     Return ``None`` if we can't find it.
     """
     def candidates():
-        """Yield path, deprecation_warning)"""
         if 'MRJOB_CONF' in os.environ:
             yield expand_path(os.environ['MRJOB_CONF'])
 

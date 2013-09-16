@@ -1148,8 +1148,7 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['ec2_instance_type']:
                 instance_type = self._opts['ec2_instance_type']
             else:
-                raise ValueError('Missing instance type for %s node(s)'
-                    % role)
+                raise ValueError('Missing instance type for %s node(s)' % role)
 
         if bid_price:
             market = 'SPOT'
@@ -1274,7 +1273,7 @@ class EMRJobRunner(MRJobRunner):
                     _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
                 # script takes args in (integer) seconds
                 ba_args = [int(self._opts['max_hours_idle'] * 3600),
-                        int(self._opts['mins_to_end_of_hour'] * 60)]
+                           int(self._opts['mins_to_end_of_hour'] * 60)]
                 bootstrap_action_args.append(
                     boto.emr.BootstrapAction('idle timeout', s3_uri, ba_args))
 
@@ -1522,9 +1521,9 @@ class EMRJobRunner(MRJobRunner):
                         tracker_page = ''.join(tracker_handle.readlines())
                         tracker_handle.close()
                         # first two formatted percentages, map then reduce
-                        map_complete, reduce_complete = [float(complete)
-                            for complete in JOB_TRACKER_RE.findall(
-                                tracker_page)[:2]]
+                        map_complete, reduce_complete = [
+                            float(complete) for complete
+                            in JOB_TRACKER_RE.findall(tracker_page)[:2]]
                         log.info(' map %3d%% reduce %3d%%' % (
                                  map_complete, reduce_complete))
                     except:
@@ -1564,7 +1563,7 @@ class EMRJobRunner(MRJobRunner):
                 # log cause, and put it in exception
                 cause_msg = []  # lines to log and put in exception
                 cause_msg.append('Probable cause of failure (from %s):' %
-                           cause['log_file_uri'])
+                                 cause['log_file_uri'])
                 cause_msg.extend(line.strip('\n') for line in cause['lines'])
                 if cause['input_uri']:
                     cause_msg.append('(while reading from %s)' %
@@ -1708,9 +1707,9 @@ class EMRJobRunner(MRJobRunner):
                                          step_nums)
 
     def ls_job_logs_s3(self, step_nums):
-        return  self._enforce_path_regexp(self._ls_s3_logs('jobs/'),
-                                          EMR_JOB_LOG_URI_RE,
-                                          step_nums)
+        return self._enforce_path_regexp(self._ls_s3_logs('jobs/'),
+                                         EMR_JOB_LOG_URI_RE,
+                                         step_nums)
 
     def ls_node_logs_s3(self):
         return self._enforce_path_regexp(self._ls_s3_logs('node/'),
@@ -1882,9 +1881,9 @@ class EMRJobRunner(MRJobRunner):
 
         # Also don't bother if we're not bootstrapping
         if not any(key.startswith('bootstrap_') and
-               key != 'bootstrap_actions' and  # these are separate scripts
-               value
-               for (key, value) in self._opts.iteritems()):
+                   key != 'bootstrap_actions' and  # these are separate scripts
+                   value
+                   for (key, value) in self._opts.iteritems()):
             return
 
         # we call the script b.py because there's a character limit on
@@ -2353,9 +2352,10 @@ class EMRJobRunner(MRJobRunner):
             hadoop_version = self._opts['hadoop_version']
             if (hadoop_version and
                     hadoop_version != self._inferred_hadoop_version):
-                log.warning("Specified hadoop version (%s) does not match "
-                "job flow hadoop version (%s)" % (hadoop_version,
-                                              self._inferred_hadoop_version))
+                log.warning(
+                    "Specified hadoop version (%s) does not match"
+                    " job flow hadoop version (%s)" % (
+                        hadoop_version, self._inferred_hadoop_version))
         return self._inferred_hadoop_version
 
     def _address_of_master(self, emr_conn=None):

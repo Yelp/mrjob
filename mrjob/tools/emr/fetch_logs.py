@@ -285,7 +285,7 @@ def find_failure(runner, step_num):
         # log cause, and put it in exception
         cause_msg = []  # lines to log and put in exception
         cause_msg.append('Probable cause of failure (from %s):' %
-                   cause['log_file_uri'])
+                         cause['log_file_uri'])
         cause_msg.extend(line.strip('\n') for line in cause['lines'])
         if cause['input_uri']:
             cause_msg.append('(while reading from %s)' %

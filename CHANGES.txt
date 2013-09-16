@@ -1,8 +1,41 @@
-v0.4.1-dev
- * EMR runner throws IOError if output path already exists (#634)
- * Renamed mrjob.compat.get_jobconf_value() to jobconf_from_env()
- * Fixed counter parsing for multi-step jobs in inline mode
- * Deprecated conf locations (~/.mrjob and in PYTHONPATH) removed (#747)
+v0.4.1-dev, 2013-09-16 -- secondary sort and self-terminating job flows
+ * jobs:
+   * SORT_VALUES: Secondary sort by value (#240)
+     * see mrjob/examples/
+   * can now override jobconf() again (#656)
+   * renamed mrjob.compat.get_jobconf_value() to jobconf_from_env()
+   * examples:
+     * bash_wrap/ (mapper/reducer_cmd() example)
+     * mr_most_used_word.py (two step job)
+     * mr_next_word_stats.py (SORT_VALUES example)
+ * runners:
+   * All runners:
+     * single --setup option works but is not yet documented (#206)
+     * setup now uses sh rather than python internally
+   * EMR runner:
+     * max_hours_idle: self-terminating idle job flows (#628)
+     * Can reuse pooled job flows where previous job failed (#633)
+     * Throws IOError if output path already exists (#634)
+     * Gracefully handles SSL cert issues (#621, #706)
+     * Automatically infers EMR/S3 endpoints from region (#658)
+     * ls() supports s3n:// schema (#672)
+     * Fixed log parsing crash on JarSteps (#645)
+     * visible_to_all_users works with boto <2.8.0 (#701)
+     * must use --interpreter with non-Python scripts (#683)
+     * cat() can decompress gzipped data (#601)
+   * Hadoop runner:
+     * check_input_paths: can disable input path checking (#583)
+     * cat() can decompress gzipped data (#601)
+   * Inline/Local runners:
+     * Fixed counter parsing for multi-step jobs in inline mode
+     * Supports per-step jobconf (#616)
+ * Documentation revamp
+ * mrjob.parse.urlparse() works consistently across Python versions (#686)
+ * deprecated:
+   * many constants in mrjob.emr replaced with functions in mrjob.aws
+ * removed deprecated features:
+   * old conf locations (~/.mrjob and in PYTHONPATH) (#747)
+   * built-in protocols must be instances (#488)
 
 v0.4, 2013-04-30 -- Slouching toward nirvana
  * Changes:

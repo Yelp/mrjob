@@ -58,7 +58,7 @@ class SSHFilesystem(Filesystem):
         return SSH_URI_RE.match(path) is not None
 
     def du(self, path_glob):
-        raise IOError() # not implemented
+        raise IOError()  # not implemented
 
     def ls(self, path_glob):
         if SSH_URI_RE.match(path_glob):
@@ -90,7 +90,7 @@ class SSHFilesystem(Filesystem):
                 yield SSH_PREFIX + addr + line
 
     def md5sum(self, path, s3_conn=None):
-        raise IOError() # not implemented
+        raise IOError()  # not implemented
 
     def _cat_file(self, filename):
         ssh_match = SSH_URI_RE.match(filename)
@@ -107,14 +107,14 @@ class SSHFilesystem(Filesystem):
         return read_file(filename, fileobj=StringIO(output))
 
     def mkdir(self, dest):
-        raise IOError() # not implemented
+        raise IOError()  # not implemented
 
     def path_exists(self, path_glob):
         # just fall back on ls(); it's smart
         paths = self.ls(path_glob)
         try:
             path_exists = any(paths)
-        except IOError, e:
+        except IOError:
             path_exists = False
         return path_exists
 
@@ -122,7 +122,7 @@ class SSHFilesystem(Filesystem):
         return posixpath.join(dirname, filename)
 
     def rm(self, path_glob):
-        raise IOError() # not implemented
+        raise IOError()  # not implemented
 
     def touchz(self, dest):
-        raise IOError() # not implemented
+        raise IOError()  # not implemented

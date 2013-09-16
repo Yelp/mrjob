@@ -105,7 +105,7 @@ class S3Filesystem(Filesystem):
         """
 
         # clean up the  base uri to ensure we have an equal uri to boto (s3://)
-        # just incase we get passed s3n://
+        # just in case we get passed s3n://
         scheme = urlparse(path_glob).scheme
 
         # support globs

@@ -125,12 +125,12 @@ Options available to hadoop runner only
     ``hdfs://`` URIs because it's understood that it has to be on HDFS.
 
 .. mrjob-opt::
-    :config: check_hadoop_input_paths
-    :switch: --skip-hadoop-input-check
+    :config: check_input_paths
+    :switch: --check-input-paths, --no-check-input-paths
     :type: boolean
     :set: hadoop
     :default: ``True``
 
-    Option to skip the input path check. With this option all input paths
-    to the runner will be passed straight through, without their existence
-    being validated.
+    Option to skip the input path check. With ``--no-check-input-paths``,
+    input paths to the runner will be passed straight through, without
+    checking if they exist.

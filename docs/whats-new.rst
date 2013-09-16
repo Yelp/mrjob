@@ -6,28 +6,26 @@ For a complete list of changes, see `CHANGES.txt
 
 0.4.1
 -----
-The :py:attr:`~mrjob.job.MRJob.SORT_VALUES` option enables secondary sort,
-ensuring that your reducer(s) receive values in sorted order (sorted by their
-encoded form, which is JSON by default). This allows you to do some things
-with reducers that would formerly involve storing all the values in memory,
-such as:
 
-* Receiving all "global" data before an arbitrary amount of specific data (e.g.
-  a grand total before any subtotals, so you can calculate percentages on the
-  fly).
+The :py:attr:`~mrjob.job.MRJob.SORT_VALUES` option enables secondary sort,
+ensuring that your reducer(s) receive values in sorted order. This allows you
+to do things with reducers that would otherwise involve storing all the values
+in memory, such as:
+
+* Receiving a grand total before any subtotals, so you can calculate
+  percentages on the fly. See `mr_next_word_stats.py
+  <https://github.com/Yelp/mrjob/blob/master/mrjob/examples/mr_next_word_stats.py>`_ for an example.
 * Running a window of fixed length over an arbitrary amount of sorted
-  values (e.g. a 24-hour window over logs).
+  values (e.g. a 24-hour window over timestamped log data).
 
 The :mrjob-opt:`max_hours_idle` option allows you to spin up EMR job flows
-that will terminate themselves after being idle for a certain amount of time.
-To take advantage of EMR's billing model, jobs are, by default, not terminated
-until the last 5 minutes of the billing hour (change this with the
-:mrjob-opt:`mins_to_end_of_hour` option.
+that will terminate themselves after being idle for a certain amount of time,
+in a way that optimizes EMR/EC2's full-hour billing model. For development
+(not production), we now recommend always using
+:ref:`job flow pooling <pooling-job-flows>`, with :mrjob-opt:`max_hours_idle`
+enabled.
 
-We now recommend using :mrjob-opt:`max_hours_idle` in conjunction with
-:ref:`Pooling <pooling-job-flows>` for *development* (pooled jobs may
-occasionally join a job flow without knowing it is about to self-terminate).
-To enable this in your :ref:`mrjob.conf`, do:
+To enable these in your :ref:`mrjob.conf <mrjob.conf>`, do:
 
 .. code-block:: yaml
 
@@ -36,23 +34,22 @@ To enable this in your :ref:`mrjob.conf`, do:
         max_hours_idle: 0.25
 	pool_emr_job_flows: true
 
-You can use :switch:`--no-check-input-paths` with the Hadoop runner to
-allow jobs to run even if ``hadoop fs -ls`` can't see their input files.
+**Warning**: if you enable pooling *without* :mrjob-opt:`max_hours_idle` (or
+cronning :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows`), pooled job flows
+will stay active forever, costing you money!
 
-``get_jobconf_value()`, which allows jobs to read configuration properties
-from the environment, was renamed to :py:func:`~mrjob.compat.jobconf_from_env`
-(the old name still works).
+You can use :option:`--no-check-input-paths` with the Hadoop runner to
+allow jobs to run even if ``hadoop fs -ls`` can't see their input files.
 
 Two bits of straggling deprecated functionality were removed:
 
-* the built-in :ref:`protocols <job-protocols>` must be instantiated
-  to be used (formerly they had ``classmethod``s)
-* old locations for :ref:`mrjob.conf` are no longer supported
+* Built-in :ref:`protocols <job-protocols>` must be instantiated
+  to be used (formerly they had class methods).
+* Old locations for :ref:`mrjob.conf <mrjob.conf>` are no longer supported.
 
 This version also contains numerous bugfixes and natural extensions of
-existing functionality; many more things will now Just Work (see
-<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_ for the complete
-list).
+existing functionality; many more things will now Just Work (see `CHANGES.txt
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_).
 
 0.4.0
 -----

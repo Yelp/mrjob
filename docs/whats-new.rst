@@ -4,6 +4,56 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+0.4.1
+-----
+The :py:attr:`~mrjob.job.MRJob.SORT_VALUES` option enables secondary sort,
+ensuring that your reducer(s) receive values in sorted order (sorted by their
+encoded form, which is JSON by default). This allows you to do some things
+with reducers that would formerly involve storing all the values in memory,
+such as:
+
+* Receiving all "global" data before an arbitrary amount of specific data (e.g.
+  a grand total before any subtotals, so you can calculate percentages on the
+  fly).
+* Running a window of fixed length over an arbitrary amount of sorted
+  values (e.g. a 24-hour window over logs).
+
+The :mrjob-opt:`max_hours_idle` option allows you to spin up EMR job flows
+that will terminate themselves after being idle for a certain amount of time.
+To take advantage of EMR's billing model, jobs are, by default, not terminated
+until the last 5 minutes of the billing hour (change this with the
+:mrjob-opt:`mins_to_end_of_hour` option.
+
+We now recommend using :mrjob-opt:`max_hours_idle` in conjunction with
+:ref:`Pooling <pooling-job-flows>` for *development* (pooled jobs may
+occasionally join a job flow without knowing it is about to self-terminate).
+To enable this in your :ref:`mrjob.conf`, do:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        max_hours_idle: 0.25
+	pool_emr_job_flows: true
+
+You can use :switch:`--no-check-input-paths` with the Hadoop runner to
+allow jobs to run even if ``hadoop fs -ls`` can't see their input files.
+
+``get_jobconf_value()`, which allows jobs to read configuration properties
+from the environment, was renamed to :py:func:`~mrjob.compat.jobconf_from_env`
+(the old name still works).
+
+Two bits of straggling deprecated functionality were removed:
+
+* the built-in :ref:`protocols <job-protocols>` must be instantiated
+  to be used (formerly they had ``classmethod``s)
+* old locations for :ref:`mrjob.conf` are no longer supported
+
+This version also contains numerous bugfixes and natural extensions of
+existing functionality; many more things will now Just Work (see
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_ for the complete
+list).
+
 0.4.0
 -----
 The default runner is now `inline` instead of `local`. This change will speed

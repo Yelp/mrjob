@@ -9,15 +9,6 @@ We look for :file:`mrjob.conf` in these locations:
 - :file:`~/.mrjob.conf`
 - :file:`/etc/mrjob.conf`
 
-If your :file:`mrjob.conf` path is deprecated, use this table to fix it:
-
-================================= ===============================
-Old Location                      New Location
-================================= ===============================
-:file:`~/.mrjob`                  :file:`~/.mrjob.conf`
-somewhere in :envvar:`PYTHONPATH` Specify in :envvar:`MRJOB_CONF`
-================================= ===============================
-
 You can specify one or more configuration files with the :option:`--conf-path`
 flag. See :doc:`configs-all-runners` for more information.
 

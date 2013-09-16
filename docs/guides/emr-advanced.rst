@@ -52,6 +52,11 @@ job flow and add the job to it rather than creating a new one.
 :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows` **in your crontab!**
 Otherwise you will forget to terminate your job flows and waste a lot of money.
 
+Alternatively, you may use the :mrjob-opt:`max_hours_idle` option to create
+self-terminating job flows; the disadvantage is that pooled jobs may
+occasionally join job flows with out knowing they are about to self-terminate
+(this is better for development than production).
+
 Pooling is designed so that jobs run against the same :py:mod:`mrjob.conf` can
 share the same job flows. This means that the version of :py:mod:`mrjob`,
 boostrap configuration, Hadoop version and AMI version all need to be exactly

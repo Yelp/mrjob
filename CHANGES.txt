@@ -24,7 +24,7 @@ v0.4.1-dev, 2013-09-16 -- secondary sort and self-terminating job flows
      * must use --interpreter with non-Python scripts (#683)
      * cat() can decompress gzipped data (#601)
    * Hadoop runner:
-     * check_hadoop_input_paths: can disable input path checking (#583)
+     * check_input_paths: can disable input path checking (#583)
      * cat() can decompress gzipped data (#601)
    * Inline/Local runners:
      * Fixed counter parsing for multi-step jobs in inline mode

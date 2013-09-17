@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,4 +64,4 @@ __credits__ = [
     'Derek Wilson <jderekwilson@gmail.com>',
 ]
 
-__version__ = '0.4.1-dev'
+__version__ = '0.4.1'

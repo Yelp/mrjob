@@ -1323,7 +1323,7 @@ class EMRJobRunner(MRJobRunner):
         if step['type'] == 'streaming':
             return self._build_streaming_step(step_num)
         elif step['type'] == 'jar':
-            return self._build_jar_step(step_num)
+            return self._build_jar_step(step, step_num, self._num_steps())
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 

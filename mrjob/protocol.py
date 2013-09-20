@@ -161,7 +161,7 @@ class RawProtocol(object):
         return tuple(key_value)
 
     def write(cls, key, value):
-        return '\t'.join(x for x in (key, value) if x is not None)
+        return '\t'.join(x for x in (str(key), str(value)) if x is not None)
 
 
 class RawValueProtocol(object):
@@ -176,7 +176,7 @@ class RawValueProtocol(object):
 
     @classmethod
     def write(cls, key, value):
-        return value
+        return str(value)
 
 
 class ReprProtocol(_ClassBasedKeyCachingProtocol):

@@ -3059,7 +3059,7 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
         self.simple_patch(
             self.runner, '_s3_step_output_uri', return_value=['output'])
         self.simple_patch(
-            self.runner, '_get_jar', return_value=['streaming.jar'])
+            self.runner, '_get_streaming_jar', return_value=['streaming.jar'])
 
         self.simple_patch(boto.emr, 'StreamingStep', dict)
         self.runner._inferred_hadoop_version = '0.20'

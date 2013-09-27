@@ -1333,7 +1333,7 @@ class EMRJobRunner(MRJobRunner):
                 self._job_name, step_num + 1, self._num_steps()),
             'input': self._s3_step_input_uris(step_num),
             'output': self._s3_step_output_uri(step_num),
-            'jar': self._get_jar(),
+            'jar': self._get_streaming_jar(),
             'action_on_failure': self._action_on_failure,
         }
 
@@ -1400,7 +1400,7 @@ class EMRJobRunner(MRJobRunner):
             'cache_archives': cache_archives,
         }
 
-    def _get_jar(self):
+    def _get_streaming_jar(self):
         if self._opts['hadoop_streaming_jar']:
             return self._upload_mgr.uri(self._opts['hadoop_streaming_jar'])
         else:

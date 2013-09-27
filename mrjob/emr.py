@@ -1327,7 +1327,7 @@ class EMRJobRunner(MRJobRunner):
         if step['type'] == 'streaming':
             return self._build_streaming_step(step_num)
         elif step['type'] == 'jar':
-            return self._build_jar_step(step, step_num, self._num_steps())
+            return self._build_jar_step(step_num)
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
@@ -1358,7 +1358,9 @@ class EMRJobRunner(MRJobRunner):
 
         return boto.emr.StreamingStep(**streaming_step_kwargs)
 
-    def _build_jar_step(self, step, step_num, num_steps):
+    def _build_jar_step(self, step_num):
+        step = self._get_step(step_num)
+
         # special case to allow access to jars inside EMR
         if step['jar'].startswith('file:///'):
             jar = step['jar'][7:]  # keep leading slash
@@ -1367,7 +1369,7 @@ class EMRJobRunner(MRJobRunner):
 
         return boto.emr.JarStep(
             name='%s: Step %d of %d' % (
-                self._job_name, step_num + 1, num_steps),
+                self._job_name, step_num + 1, self._num_steps()),
             jar=jar,
             main_class=step['main_class'],
             step_args=step['step_args'],

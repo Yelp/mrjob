@@ -641,7 +641,7 @@ class MockEmrConnection(object):
                 name=step.name,
                 actiononfailure=step.action_on_failure,
                 args=[MockEmrObject(value=arg) for arg in step.args()],
-                jar=DEFAULT_JAR,
+                jar=step.jar(),
             )
             job_flow.state = 'PENDING'
             job_flow.steps.append(step_object)

@@ -1362,7 +1362,7 @@ class EMRJobRunner(MRJobRunner):
         return boto.emr.JarStep(
             name='%s: Step %d of %d' % (
                 self._job_name, step_num + 1, num_steps),
-            jar=step['jar'],
+            jar=self._upload_mgr.uri(step['jar']),
             main_class=step['main_class'],
             step_args=step['step_args'],
             action_on_failure=self._action_on_failure)

@@ -23,7 +23,7 @@ class MRJustAJar(MRJob):
     def configure_options(self):
         super(MRJustAJar, self).configure_options()
 
-        self.option_parser.add_option('--jar', dest='jar')
+        self.add_passthrough_option('--jar')
 
     def steps(self):
         return [JarStep('', self.options.jar)]

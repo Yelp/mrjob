@@ -3053,6 +3053,7 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
         with patch_fs_s3():
             self.runner = EMRJobRunner(
                 mr_job_script='my_job.py', conf_paths=[], stdin=StringIO())
+        self.runner._steps = []  # don't actually run `my_job.py --steps`
         self.runner._add_job_files_for_upload()
 
         self.simple_patch(

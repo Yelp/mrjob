@@ -1,4 +1,5 @@
 # Copyright 2009-2012 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,6 +39,7 @@ from mrjob.util import shlex_split
 
 from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import add_mock_hadoop_output
+from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
@@ -422,3 +424,24 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                  " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' |"
                  " python my_job.py --step-num=0 --mapper'",
              '-jobconf', 'mapred.reduce.tasks=0'])
+
+
+class JarStepTestCase(MockHadoopTestCase):
+
+    def test_local_jar(self):
+        fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
+        open(fake_jar, 'w').close()
+
+        job = MRJustAJar(['-r', 'hadoop', '--jar', fake_jar])
+        job.sandbox()
+
+        add_mock_hadoop_output([''])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        with open(os.environ['MOCK_HADOOP_LOG']) as hadoop_log:
+            hadoop_jar_lines = [line for line in hadoop_log
+                                if line.startswith('jar ')]
+            self.assertEqual(len(hadoop_jar_lines), 1)
+            self.assertEqual(hadoop_jar_lines[0], 'jar ' + fake_jar)

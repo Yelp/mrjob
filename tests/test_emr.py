@@ -3206,3 +3206,18 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
             self.assertEqual(len(job_flow.steps), 1)
             self.assertEqual(job_flow.steps[0].jar, jar_uri)
+
+    def test_jar_on_s3(self):
+        self.add_mock_s3_data({'dubliners': {'whiskeyinthe.jar': ''}})
+        JAR_URI = 's3://dubliners/whiskeyinthe.jar'
+
+        job = MRJustAJar(['-r', 'emr', '--jar', JAR_URI])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+            self.assertEqual(len(job_flow.steps), 1)
+            self.assertEqual(job_flow.steps[0].jar, JAR_URI)

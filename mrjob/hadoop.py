@@ -446,7 +446,16 @@ class HadoopJobRunner(MRJobRunner):
     def _args_for_jar_step(self, step_num):
         step = self._get_step(step_num)
 
-        args = (self._opts['hadoop_bin'] + ['jar', step['jar']])
+        # special case for consistency with EMR runner.
+        #
+        # This might look less like duplicated code if we ever
+        # implement #780 (fetching jars from URIs)
+        if step['jar'].startswith('file:///'):
+            jar = step['jar'][7:]  # keep leading slash
+        else:
+            jar = step['jar']
+
+        args = (self._opts['hadoop_bin'] + ['jar', jar])
 
         if step.get('main_class'):
             args.append(step['main_class'])

@@ -889,6 +889,10 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['hadoop_streaming_jar']:
             self._upload_mgr.add(path)
 
+        for step in self._get_steps():
+            if step.get('jar'):
+                self._upload_mgr.add(step['jar'])
+
     def _upload_local_files_to_s3(self):
         """Copy local files tracked by self._upload_mgr to S3."""
         self._create_s3_temp_bucket_if_needed()

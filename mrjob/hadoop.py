@@ -294,16 +294,16 @@ class HadoopJobRunner(MRJobRunner):
             log.debug('running step %d of %d' %
                       (step_num + 1, self._num_steps()))
 
-            streaming_args = self._args_for_streaming_step(step_num)
+            step_args = self._args_for_step(step_num)
 
-            log.debug('> %s' % cmd_line(streaming_args))
+            log.debug('> %s' % cmd_line(step_args))
 
             # try to use a PTY if it's available
             try:
                 pid, master_fd = pty.fork()
             except (AttributeError, OSError):
                 # no PTYs, just use Popen
-                step_proc = Popen(streaming_args, stdout=PIPE, stderr=PIPE)
+                step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE)
 
                 self._process_stderr_from_streaming(step_proc.stderr)
 
@@ -315,7 +315,7 @@ class HadoopJobRunner(MRJobRunner):
             else:
                 # we have PTYs
                 if pid == 0:  # we are the child process
-                    os.execvp(streaming_args[0], streaming_args)
+                    os.execvp(step_args[0], step_args)
                 else:
                     master = os.fdopen(master_fd)
                     # reading from master gives us the subprocess's
@@ -331,7 +331,7 @@ class HadoopJobRunner(MRJobRunner):
                 self.print_counters([step_num + 1])
             else:
                 msg = ('Job failed with return code %d: %s' %
-                       (returncode, streaming_args))
+                       (returncode, step_args))
                 log.error(msg)
                 # look for a Python traceback
                 cause = self._find_probable_cause_of_failure(
@@ -353,7 +353,7 @@ class HadoopJobRunner(MRJobRunner):
                     # add cause_msg to exception message
                     msg += '\n' + '\n'.join(cause_msg) + '\n'
 
-                raise CalledProcessError(returncode, streaming_args)
+                raise CalledProcessError(returncode, step_args)
 
     def _process_stderr_from_streaming(self, stderr):
 
@@ -384,54 +384,77 @@ class HadoopJobRunner(MRJobRunner):
                 self._job_timestamp = m.group('timestamp')
                 self._start_step_num = int(m.group('step_num'))
 
+    def _args_for_step(self, step_num):
+        step = self._get_step(step_num)
+
+        if step['type'] == 'streaming':
+            return self._args_for_streaming_step(step_num)
+        elif step['type'] == 'jar':
+            return self._args_for_jar_step(step_num)
+        else:
+            raise AssertionError('Bad step type: %r' % (step['type'],))
+
     def _args_for_streaming_step(self, step_num):
         version = self.get_hadoop_version()
 
-        streaming_args = (self._opts['hadoop_bin'] +
+        args = (self._opts['hadoop_bin'] +
                           ['jar', self._opts['hadoop_streaming_jar']])
 
         # -files/-archives (generic options, new-style)
         if supports_new_distributed_cache_options(version):
             # set up uploading from HDFS to the working dir
-            streaming_args.extend(
+            args.extend(
                 self._new_upload_args(self._upload_mgr))
 
         # Add extra hadoop args first as hadoop args could be a hadoop
         # specific argument (e.g. -libjar) which must come before job
         # specific args.
-        streaming_args.extend(self._hadoop_args_for_step(step_num))
+        args.extend(self._hadoop_args_for_step(step_num))
 
         # set up input
         for input_uri in self._hdfs_step_input_files(step_num):
-            streaming_args.extend(['-input', input_uri])
+            args.extend(['-input', input_uri])
 
         # set up output
-        streaming_args.append('-output')
-        streaming_args.append(self._hdfs_step_output_dir(step_num))
+        args.append('-output')
+        args.append(self._hdfs_step_output_dir(step_num))
 
         # -cacheFile/-cacheArchive (streaming options, old-style)
         if not supports_new_distributed_cache_options(version):
             # set up uploading from HDFS to the working dir
-            streaming_args.extend(
+            args.extend(
                 self._old_upload_args(self._upload_mgr))
 
         mapper, combiner, reducer = (
             self._hadoop_streaming_commands(step_num))
 
-        streaming_args.append('-mapper')
-        streaming_args.append(mapper)
+        args.append('-mapper')
+        args.append(mapper)
 
         if combiner:
-            streaming_args.append('-combiner')
-            streaming_args.append(combiner)
+            args.append('-combiner')
+            args.append(combiner)
 
         if reducer:
-            streaming_args.append('-reducer')
-            streaming_args.append(reducer)
+            args.append('-reducer')
+            args.append(reducer)
         else:
-            streaming_args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
+            args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
 
-        return streaming_args
+        return args
+
+    def _args_for_jar_step(self, step_num):
+        step = self._get_step(step_num)
+
+        args = (self._opts['hadoop_bin'] + ['jar', step['jar']])
+
+        if step.get('main_class'):
+            args.append(step['main_class'])
+
+        if step.get('step_args'):
+            args.extend(step['step_args'])
+
+        return args
 
     def _hdfs_step_input_files(self, step_num):
         """Get the hdfs:// URI for input for the given step."""

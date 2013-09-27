@@ -435,8 +435,6 @@ class JarStepTestCase(MockHadoopTestCase):
         job = MRJustAJar(['-r', 'hadoop', '--jar', fake_jar])
         job.sandbox()
 
-        add_mock_hadoop_output([''])
-
         with job.make_runner() as runner:
             runner.run()
 
@@ -444,4 +442,4 @@ class JarStepTestCase(MockHadoopTestCase):
             hadoop_jar_lines = [line for line in hadoop_log
                                 if line.startswith('jar ')]
             self.assertEqual(len(hadoop_jar_lines), 1)
-            self.assertEqual(hadoop_jar_lines[0], 'jar ' + fake_jar)
+            self.assertEqual(hadoop_jar_lines[0].rstrip(), 'jar ' + fake_jar)

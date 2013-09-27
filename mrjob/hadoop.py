@@ -294,7 +294,7 @@ class HadoopJobRunner(MRJobRunner):
             log.debug('running step %d of %d' %
                       (step_num + 1, self._num_steps()))
 
-            streaming_args = self._streaming_args_for_step(step_num)
+            streaming_args = self._args_for_streaming_step(step_num)
 
             log.debug('> %s' % cmd_line(streaming_args))
 
@@ -384,7 +384,7 @@ class HadoopJobRunner(MRJobRunner):
                 self._job_timestamp = m.group('timestamp')
                 self._start_step_num = int(m.group('step_num'))
 
-    def _streaming_args_for_step(self, step_num):
+    def _args_for_streaming_step(self, step_num):
         version = self.get_hadoop_version()
 
         streaming_args = (self._opts['hadoop_bin'] +

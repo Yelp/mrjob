@@ -308,14 +308,14 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
     def _assert_streaming_step(self, step, args):
         self.runner._steps = [step]
         self.assertEqual(
-            self.runner._streaming_args_for_step(0),
+            self.runner._args_for_streaming_step(0),
             self._new_basic_args + args)
 
     def _assert_streaming_step_old(self, step, args):
         self.runner._hadoop_version = '0.18'
         self.runner._steps = [step]
         self.assertEqual(
-            self.runner._streaming_args_for_step(0),
+            self.runner._args_for_streaming_step(0),
             self._old_basic_args + args)
 
     def test_basic_mapper(self):

@@ -3221,3 +3221,17 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
             self.assertEqual(len(job_flow.steps), 1)
             self.assertEqual(job_flow.steps[0].jar, JAR_URI)
+
+    def test_jar_inside_emr(self):
+        job = MRJustAJar(['-r', 'emr', '--jar',
+                          'file:///home/hadoop/hadoop-examples.jar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+            self.assertEqual(len(job_flow.steps), 1)
+            self.assertEqual(job_flow.steps[0].jar,
+                             '/home/hadoop/hadoop-examples.jar')

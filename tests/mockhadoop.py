@@ -441,7 +441,7 @@ def hadoop_jar(stdout, stderr, environ, *args):
         if os.path.isdir(real_output_dir):
             os.rmdir(real_output_dir)
 
-            shutil.move(mock_output_dir, real_output_dir)
+        shutil.move(mock_output_dir, real_output_dir)
 
     now = datetime.datetime.now()
     stderr.write(now.strftime('Running job: job_%Y%m%d%H%M_0001\n'))

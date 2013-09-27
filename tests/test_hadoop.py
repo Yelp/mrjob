@@ -21,6 +21,7 @@ from StringIO import StringIO
 import getpass
 import os
 import pty
+from subprocess import CalledProcessError
 from subprocess import check_call
 
 from mock import patch
@@ -41,6 +42,7 @@ from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import add_mock_hadoop_output
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
+from tests.quiet import logger_disabled
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
@@ -443,3 +445,24 @@ class JarStepTestCase(MockHadoopTestCase):
                                 if line.startswith('jar ')]
             self.assertEqual(len(hadoop_jar_lines), 1)
             self.assertEqual(hadoop_jar_lines[0].rstrip(), 'jar ' + fake_jar)
+
+    def test_hdfs_jar_uri(self):
+        # this could change, but for now, we pass URIs straight through
+        mock_hdfs_jar = os.path.join(os.environ['MOCK_HDFS_ROOT'], 'fake.jar')
+        open(mock_hdfs_jar, 'w').close()
+
+        jar_uri = 'hdfs:///fake.jar'
+
+        job = MRJustAJar(['-r', 'hadoop', '--jar', jar_uri])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            with logger_disabled('mrjob.hadoop'):
+                # `hadoop jar` doesn't actually accept URIs
+                self.assertRaises(CalledProcessError, runner.run)
+
+        with open(os.environ['MOCK_HADOOP_LOG']) as hadoop_log:
+            hadoop_jar_lines = [line for line in hadoop_log
+                                if line.startswith('jar ')]
+            self.assertEqual(len(hadoop_jar_lines), 1)
+            self.assertEqual(hadoop_jar_lines[0].rstrip(), 'jar ' + jar_uri)

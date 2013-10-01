@@ -1855,7 +1855,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
-    def test_master_bootstrap_script_is_valid_python(self):
+    def test_create_master_bootstrap_script(self):
         # create a fake src tarball
         with open(os.path.join(self.tmp_dir, 'foo.py'), 'w'):
             pass
@@ -1875,7 +1875,6 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
         self.assertIsNotNone(runner._master_bootstrap_script_path)
         self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
-        py_compile.compile(runner._master_bootstrap_script_path)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False)
@@ -1962,11 +1961,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         with open(runner._master_bootstrap_script_path, 'r') as f:
             content = f.read()
 
-        self.assertIn(
-            "call(['sudo', 'anaconda', '-m', 'compileall', '-f',"" mrjob_dir]",
-            content)
-        self.assertIn(
-            "check_call(['sudo', 'anaconda', 'setup.py', 'install']", content)
+        self.assertIn('sudo anaconda -m compileall -f', content)
 
     def test_local_bootstrap_action(self):
         # make sure that local bootstrap action scripts get uploaded to S3

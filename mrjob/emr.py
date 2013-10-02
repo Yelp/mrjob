@@ -407,6 +407,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         return combine_dicts(super_opts, {
             'ami_version': 'latest',
             'check_emr_status_every': 30,
+            'cleanup_on_failure': ['JOB'],
             'ec2_core_instance_type': 'm1.small',
             'ec2_master_instance_type': 'm1.small',
             'emr_job_flow_pool_name': 'default',
@@ -418,11 +419,11 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'num_ec2_instances': 1,
             'num_ec2_task_instances': 0,
             's3_sync_wait_time': 5.0,
+            'sh_bin': ['/bin/sh'],
             'ssh_bin': ['ssh'],
             'ssh_bind_ports': range(40001, 40841),
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
-            'cleanup_on_failure': ['JOB'],
             'visible_to_all_users': False
         })
 
@@ -1972,7 +1973,10 @@ class EMRJobRunner(MRJobRunner):
             out.write(line + '\n')
 
         # shebang
-        writeln('#!/usr/bin/env %s' % cmd_line(self._opts['sh_bin']))
+        sh_bin = self._opts['sh_bin']
+        if not sh_bin[0].startswith('/'):
+            sh_bin = ['/usr/bin/env'] + sh_bin
+        writeln('#!' + cmd_line(sh_bin))
         writeln()
 
         # store $PWD

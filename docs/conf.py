@@ -67,10 +67,7 @@ html_short_title = "Home"
 #html_logo = None
 #html_favicon = None
 
-if READ_THE_DOCS:
-    html_theme_options['ga_ua'] = 'UA-42793220-1'
-    html_theme_options['ga_domain'] = 'readthedocs.org'
-else:
+if not READ_THE_DOCS:
     html_theme_options['ga_ua'] = 'UA-42793220-2'
     html_theme_options['ga_domain'] = 'pythonhosted.org'
 

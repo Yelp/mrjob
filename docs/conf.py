@@ -49,7 +49,6 @@ html_theme_path = [better_theme_path]
 html_static_path = ['_static']
 html_theme = 'better'
 html_theme_options = {
-    'html_show_sourcelink': True,
     'cssfiles': ['_static/style.css'],
 }
 html_context = {}

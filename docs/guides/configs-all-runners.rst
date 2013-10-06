@@ -23,7 +23,15 @@ Making files available to tasks
 
 Most jobs have dependencies of some sort - Python packages, Debian packages,
 data files, etc. This section covers options available to all runners that
-mrjob uses to upload files to your job's execution environments.
+mrjob uses to upload files to your job's execution environments. See
+:ref:`writing-file-options` if you want to write your own command line
+options related to file uploading.
+
+.. warning::
+
+    You **must** wait to read files until **after class initialization**. That
+    means you should use the :ref:`*_init() <single-step-method-names>` methods
+    to read files. Trying to read files into class variables will not work.
 
 .. mrjob-opt::
     :config: bootstrap_mrjob

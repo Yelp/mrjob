@@ -111,7 +111,7 @@ for its conf file in:
 * ``/etc/mrjob.conf``
 
 See `the mrjob.conf documentation
-<http://packages.python.org/mrjob/configs-conf.html>`_ for more information.
+<http://packages.python.org/mrjob/guides/configs-basics.html>`_ for more information.
 
 
 Project Links

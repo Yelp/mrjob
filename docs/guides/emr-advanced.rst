@@ -170,13 +170,13 @@ number of mappers and reducers to one per node::
 Setting up Ganglia
 ------------------
 
-`Ganglia <http://www.ganglia.info>`_` is a scalable distributed monitoring
+`Ganglia <http://www.ganglia.info>`_ is a scalable distributed monitoring
 system for high-performance computing systems. You can enable it for your
 EMR cluster with Amazon's `install-ganglia`_ bootstrap action::
 
     --bootstrap-action="s3://elasticmapreduce/bootstrap-actions/install-ganglia
 
-.. _install-ganglia: http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/index.html?init_Ganglia.html
+.. _install-ganglia: http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/UsingEMR_Ganglia.html
 
 Enabling Python core dumps
 --------------------------

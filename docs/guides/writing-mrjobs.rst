@@ -654,6 +654,15 @@ In any of these cases, when your task runs, :file:`my_db.sqlite3` will always
 be available in the task's working directory, and the value of
 ``self.options.database`` will always be set to its path.
 
+See :ref:`configs-making-files-available` if you want to upload a file to your
+tasks' working directories without writing a custom command line option.
+
+.. warning::
+
+    You **must** wait to read files until **after class initialization**. That
+    means you should use the :ref:`*_init() <single-step-method-names>` methods
+    to read files. Trying to read files into class variables will not work.
+
 .. _custom-options:
 
 Custom option types

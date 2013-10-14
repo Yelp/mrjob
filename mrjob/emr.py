@@ -1852,11 +1852,11 @@ class EMRJobRunner(MRJobRunner):
 
         try:
             self._enable_slave_ssh_access()
+            task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
+            step_logs = self.ls_step_logs_ssh(lg_step_nums)
+            job_logs = self.ls_job_logs_ssh(step_nums)
         except IOError, e:
             raise LogFetchError(e)
-        task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
-        step_logs = self.ls_step_logs_ssh(lg_step_nums)
-        job_logs = self.ls_job_logs_ssh(step_nums)
         log.info('Scanning SSH logs for probable cause of failure')
         return best_error_from_logs(self, task_attempt_logs, step_logs,
                                     job_logs)

@@ -36,7 +36,11 @@ log = logging.getLogger(__name__)
 # used by mkdir()
 HADOOP_FILE_EXISTS_RE = re.compile(r'.*File exists.*')
 
-# used by ls()
+# used by ls() and path_exists()
+_HADOOP_LS_NO_SUCH_FILE = re.compile(
+    r'^lsr?: Cannot access .*: No such file or directory.')
+
+# Deprecated: removing this in v0.5 and prepending _ to the other constants
 HADOOP_LSR_NO_SUCH_FILE = re.compile(
     r'^lsr: Cannot access .*: No such file or directory.')
 
@@ -133,7 +137,7 @@ class HadoopFilesystem(Filesystem):
             stdout = self.invoke_hadoop(
                 ['fs', '-lsr', path_glob],
                 return_stdout=True,
-                ok_stderr=[HADOOP_LSR_NO_SUCH_FILE])
+                ok_stderr=[_HADOOP_LS_NO_SUCH_FILE])
         except CalledProcessError:
             raise IOError("Could not ls %s" % path_glob)
 
@@ -197,8 +201,11 @@ class HadoopFilesystem(Filesystem):
         any files starting with that path.
         """
         try:
-            return_code = self.invoke_hadoop(['fs', '-ls', path_glob],
-                                             ok_returncodes=[0, -1, 255])
+            return_code = self.invoke_hadoop(
+                ['fs', '-ls', path_glob],
+                ok_returncodes=[0, -1, 255],
+                ok_stderr=[_HADOOP_LS_NO_SUCH_FILE])
+
             return (return_code == 0)
         except CalledProcessError:
             raise IOError("Could not check path %s" % path_glob)

@@ -37,12 +37,14 @@ from __future__ import with_statement
 import datetime
 import glob
 import os
+import os.path
 import pipes
 import shutil
 import stat
 import sys
 
 from mrjob.compat import version_gte
+from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import urlparse
 
 
@@ -423,21 +425,23 @@ def hadoop_jar(stdout, stderr, environ, *args):
             ' jar: %s\n' % jar_path)
         return -1
 
-    streaming_args = args[1:]
-    output_idx = list(streaming_args).index('-output')
-    assert output_idx != -1
-    output_dir = streaming_args[output_idx + 1]
-    real_output_dir = hdfs_path_to_real_path(output_dir, environ)
+    # only simulate for streaming steps
+    if HADOOP_STREAMING_JAR_RE.match(os.path.basename(jar_path)):
+        streaming_args = args[1:]
+        output_idx = list(streaming_args).index('-output')
+        assert output_idx != -1
+        output_dir = streaming_args[output_idx + 1]
+        real_output_dir = hdfs_path_to_real_path(output_dir, environ)
 
-    mock_output_dir = get_mock_hadoop_output()
-    if mock_output_dir is None:
-        stderr.write('Job failed!')
-        return -1
+        mock_output_dir = get_mock_hadoop_output()
+        if mock_output_dir is None:
+            stderr.write('Job failed!')
+            return -1
 
-    if os.path.isdir(real_output_dir):
-        os.rmdir(real_output_dir)
+        if os.path.isdir(real_output_dir):
+            os.rmdir(real_output_dir)
 
-    shutil.move(mock_output_dir, real_output_dir)
+        shutil.move(mock_output_dir, real_output_dir)
 
     now = datetime.datetime.now()
     stderr.write(now.strftime('Running job: job_%Y%m%d%H%M_0001\n'))

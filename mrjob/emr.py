@@ -1369,11 +1369,11 @@ class EMRJobRunner(MRJobRunner):
             jar = self._upload_mgr.uri(step['jar'])
 
         def interpolate(arg):
-            if arg == mrjob.step.JarStep.INPUT
+            if arg == mrjob.step.JarStep.INPUT:
                 return ','.join(self._step_input_uris(step_num))
-            elif arg == mrjob.step.JarStep.OUTPUT
+            elif arg == mrjob.step.JarStep.OUTPUT:
                 return self._step_output_uri(step_num)
-            else
+            else:
                 return arg
 
         step_args = [interpolate(arg) for arg in step['step_args']]

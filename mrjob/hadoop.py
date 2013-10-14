@@ -27,6 +27,7 @@ try:
 except ImportError:
     pty = None
 
+import mrjob.step
 from mrjob.setup import UploadDirManager
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
@@ -462,11 +463,11 @@ class HadoopJobRunner(MRJobRunner):
 
         # TODO: merge with logic in mrjob/emr.py
         def interpolate(arg):
-            if arg == mrjob.step.JarStep.INPUT
+            if arg == mrjob.step.JarStep.INPUT:
                 return ','.join(self._hdfs_step_input_files(step_num))
-            elif arg == mrjob.step.JarStep.OUTPUT
+            elif arg == mrjob.step.JarStep.OUTPUT:
                 return self._hdfs_step_output_dir(step_num)
-            else
+            else:
                 return arg
 
         if step.get('step_args'):

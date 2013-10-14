@@ -54,6 +54,7 @@ __credits__ = [
     'Wahbeh Qardaji <wahbeh.qardaji@gmail.com>',
     'Jimmy Retzlaff <jretz@yelp.com>',
     'Ned Rockson <ned@tellapart.com>',
+    'David Selassie <selassid@gmail.com>',
     'Paul Scott <paul@duedil.com>',
     'Alex Shkop <a.v.shkop@gmail.com>',
     'Jesse Shieh <jesse@adku.com>',

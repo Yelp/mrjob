@@ -1376,7 +1376,8 @@ class EMRJobRunner(MRJobRunner):
             else:
                 return arg
 
-        step_args = [interpolate(arg) for arg in step['step_args']]
+        if step_args:
+            step_args = [interpolate(arg) for arg in step['step_args']]
 
         return boto.emr.JarStep(
             name='%s: Step %d of %d' % (

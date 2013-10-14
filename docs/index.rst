@@ -11,6 +11,10 @@ platforms.** You can:
 
 .. _Amazon Elastic MapReduce (EMR): http://aws.amazon.com/documentation/elasticmapreduce/
 
+mrjob is licensed under the `Apache License, Version 2.0.`_
+
+.. _Apache License, Version 2.0.: https://raw.github.com/Yelp/mrjob/master/LICENSE.txt
+
 To get started, install with ``pip``::
 
     pip install mrjob

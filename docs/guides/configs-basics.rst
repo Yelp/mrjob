@@ -219,7 +219,7 @@ accomplish this, use the ``include`` option:
     runners:
         emr:
             num_ec2_core_instances: 20
-            ec2_core_instace_type: m1.xlarge
+            ec2_core_instance_type: m1.xlarge
 
 :file:`~/mrjob.very-small.conf`:
 
@@ -229,7 +229,7 @@ accomplish this, use the ``include`` option:
     runners:
         emr:
             num_ec2_core_instances: 2
-            ec2_core_instace_type: m1.small
+            ec2_core_instance_type: m1.small
 
 :file:`~/.mrjob.base.conf`:
 

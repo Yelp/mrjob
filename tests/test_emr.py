@@ -3057,9 +3057,9 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
         self.runner._add_job_files_for_upload()
 
         self.simple_patch(
-            self.runner, '_s3_step_input_uris', return_value=['input'])
+            self.runner, '_step_input_uris', return_value=['input'])
         self.simple_patch(
-            self.runner, '_s3_step_output_uri', return_value=['output'])
+            self.runner, '_step_output_uri', return_value=['output'])
         self.simple_patch(
             self.runner, '_get_streaming_jar', return_value=['streaming.jar'])
 

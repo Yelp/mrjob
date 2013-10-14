@@ -1336,8 +1336,8 @@ class EMRJobRunner(MRJobRunner):
         streaming_step_kwargs = {
             'name': '%s: Step %d of %d' % (
                 self._job_name, step_num + 1, self._num_steps()),
-            'input': self._s3_step_input_uris(step_num),
-            'output': self._s3_step_output_uri(step_num),
+            'input': self._step_input_uris(step_num),
+            'output': self._step_output_uri(step_num),
             'jar': self._get_streaming_jar(),
             'action_on_failure': self._action_on_failure,
         }
@@ -1370,9 +1370,9 @@ class EMRJobRunner(MRJobRunner):
 
         def interpolate(arg):
             if arg == mrjob.step.JarStep.INPUT
-                return ','.join(self._s3_step_input_uris(step_num))
+                return ','.join(self._step_input_uris(step_num))
             elif arg == mrjob.step.JarStep.OUTPUT
-                return self._s3_step_output_uri(step_num)
+                return self._step_output_uri(step_num)
             else
                 return arg
 
@@ -1600,7 +1600,7 @@ class EMRJobRunner(MRJobRunner):
 
             raise Exception(msg)
 
-    def _s3_step_input_uris(self, step_num):
+    def _step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""
         if step_num == 0:
             return [self._upload_mgr.uri(path)
@@ -1610,7 +1610,7 @@ class EMRJobRunner(MRJobRunner):
             return ['hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_name, step_num)]
 
-    def _s3_step_output_uri(self, step_num):
+    def _step_output_uri(self, step_num):
         if step_num == len(self._get_steps()) - 1:
             return self._output_dir
         else:

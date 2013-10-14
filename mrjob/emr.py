@@ -65,6 +65,7 @@ except ImportError:
     InvalidCertificateException = None
 
 import mrjob
+import mrjob.step
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
@@ -1367,39 +1368,15 @@ class EMRJobRunner(MRJobRunner):
         else:
             jar = self._upload_mgr.uri(step['jar'])
 
-        input_paths = self._s3_step_input_uris(step_num)
-        output_path = self._s3_step_output_uri(step_num)
-        step_args = step['step_args']
-        io = step['io']
+        def interpolate(arg):
+            if arg == mrjob.step.JarStep.INPUT
+                return ','.join(self._s3_step_input_uris(step_num))
+            elif arg == mrjob.step.JarStep.OUTPUT
+                return self._s3_step_output_uri(step_num)
+            else
+                return arg
 
-        ## The input_marker specifies where in the command
-        ## the input files should be specified. The input_format
-        ## specifies the way it should be formated. If there are spaces
-        ## in the format it is assumed that they should be viewed as seperate
-        ## shell arguments.
-        ## The same is true for the output specification.
-        if io['input_marker'] in step_args:
-            input_loc = step_args.index(io['input_marker'])
-            del step_args[input_loc] ## we delete the marker
-            i = input_loc
-            ## Then for each path we insert the input
-            ## Since each input specifier may be multiple shell arguments
-            ## we have to increment i manually.
-            ## this holds for inserting the output as well.
-            for path in input_paths:
-                inn = (io['input_format'] % path).split(' ')
-                for part in inn:
-                    step_args.insert(i, part)
-                    i += 1
-
-        if io['output_marker'] in step_args:
-            output_loc = step_args.index(io['output_marker'])
-            del step_args[output_loc]
-            i = output_loc
-            out = (io['output_format'] % output_path).split(' ')
-            for part in out:
-                step_args.insert(i, part)
-                i += 1
+        step_args = [interpolate(arg) for arg in step['step_args']]
 
         return boto.emr.JarStep(
             name='%s: Step %d of %d' % (

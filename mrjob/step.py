@@ -159,42 +159,31 @@ class MRJobStep(object):
             substep_descs['jobconf'] = self._steps['jobconf']
         return substep_descs
 
-INPUT_MARKER = "<<INPUT>>"
-OUTPUT_MARKER = "<<OUTPUT>>"
 
 class JarStep(object):
-    '''Represents a running a custom Jar as a step.
+    """Represents a running a custom Jar as a step.
 
     :param name: The name of the step (currently ignored by EMR)
     :param jar: The local path to the Jar. It will be uploaded to S3
     :param main_class: The main class to run from the Jar.
     :param step_args: A list of strings which specify any arguments to the
-                      Jar. It also specifies the spots for input/output
-                      using INPUT_MARKER and OUTPUT_MARKER (defined in
-                      mrjob.step). However, they can be over-ridden see
-                      below.
-    :param input_marker: Set a custom marker. default <<INPUT>>
-    :param output_marker: Set a custom marker. default <<OUTPUT>>
-    :param input_format: How should each input path be rendered. Defaults to
-                         "%s". If your jar requires flags such as --input
-                         you could try "--input=%s" as the format.
-    :param output_format: Same as input_format but for the output. Defaults
-                          to "%s".
-    '''
+                      Jar. See py:attr:`JarStep.INPUT` and
+                      py:attr:`JarStep.OUTPUT` for information about
+                      passing input and output paths to the jar.
+    """
+    #: If this is passed as one of the step's arguments, it'll be replaced
+    #: with the step's input paths (if there are multiple paths, they'll
+    #: be joined with commas)
+    INPUT = '<input>'
+    #: If this is passed as one of the step's arguments, it'll be replaced
+    #: with the step's output path
+    OUTPUT = '<output>'
 
-    def __init__(self, name, jar, main_class=None, step_args=None,
-          input_format="%s", output_format="%s",
-          input_marker=INPUT_MARKER, output_marker=OUTPUT_MARKER):
+    def __init__(self, name, jar, main_class=None, step_args=None):
         self.name = name
         self.jar = jar
         self.main_class = main_class
         self.step_args = step_args
-        self.io = {
-          'input_marker': input_marker,
-          'input_format': input_format,
-          'output_marker': output_marker,
-          'output_format': output_format,
-        }
 
     def __repr__(self):
         return 'JarStep(**%r)' % repr(
@@ -219,13 +208,6 @@ class JarStep(object):
                 'jar': local path to the jar,
                 'main_class': string, name of the main class,
                 'step_args': list of strings, args to the main class,
-                'io' : { specifies the input/output markers and format
-                    'input_marker': what is the string use to mark where the
-                                    input goes,
-                    'output_marker': same as input_marker but for the output,
-                    'input_format': how is the input formatted.
-                    'output_format: how is the output formatted. (see __init__)
-                }
             }
         '''
         return {
@@ -234,6 +216,4 @@ class JarStep(object):
             'jar': self.jar,
             'main_class': self.main_class,
             'step_args': self.step_args,
-            'io': self.io,
         }
-

@@ -460,8 +460,17 @@ class HadoopJobRunner(MRJobRunner):
         if step.get('main_class'):
             args.append(step['main_class'])
 
+        # TODO: merge with logic in mrjob/emr.py
+        def interpolate(arg):
+            if arg == mrjob.step.JarStep.INPUT
+                return ','.join(self._hdfs_step_input_files(step_num))
+            elif arg == mrjob.step.JarStep.OUTPUT
+                return self._hdfs_step_output_dir(step_num)
+            else
+                return arg
+
         if step.get('step_args'):
-            args.extend(step['step_args'])
+            args.extend(interpolate(arg) for arg in step['step_args'])
 
         return args
 

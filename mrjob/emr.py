@@ -889,6 +889,10 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['hadoop_streaming_jar']:
             self._upload_mgr.add(path)
 
+        for step in self._get_steps():
+            if step.get('jar'):
+                self._upload_mgr.add(step['jar'])
+
     def _upload_local_files_to_s3(self):
         """Copy local files tracked by self._upload_mgr to S3."""
         self._create_s3_temp_bucket_if_needed()
@@ -1323,7 +1327,7 @@ class EMRJobRunner(MRJobRunner):
         if step['type'] == 'streaming':
             return self._build_streaming_step(step_num)
         elif step['type'] == 'jar':
-            return self._build_jar_step(step, step_num, self._num_steps())
+            return self._build_jar_step(step_num)
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
@@ -1333,7 +1337,7 @@ class EMRJobRunner(MRJobRunner):
                 self._job_name, step_num + 1, self._num_steps()),
             'input': self._s3_step_input_uris(step_num),
             'output': self._s3_step_output_uri(step_num),
-            'jar': self._get_jar(),
+            'jar': self._get_streaming_jar(),
             'action_on_failure': self._action_on_failure,
         }
 
@@ -1354,11 +1358,19 @@ class EMRJobRunner(MRJobRunner):
 
         return boto.emr.StreamingStep(**streaming_step_kwargs)
 
-    def _build_jar_step(self, step, step_num, num_steps):
+    def _build_jar_step(self, step_num):
+        step = self._get_step(step_num)
+
+        # special case to allow access to jars inside EMR
+        if step['jar'].startswith('file:///'):
+            jar = step['jar'][7:]  # keep leading slash
+        else:
+            jar = self._upload_mgr.uri(step['jar'])
+
         return boto.emr.JarStep(
             name='%s: Step %d of %d' % (
-                self._job_name, step_num + 1, num_steps),
-            jar=step['jar'],
+                self._job_name, step_num + 1, self._num_steps()),
+            jar=jar,
             main_class=step['main_class'],
             step_args=step['step_args'],
             action_on_failure=self._action_on_failure)
@@ -1400,7 +1412,7 @@ class EMRJobRunner(MRJobRunner):
             'cache_archives': cache_archives,
         }
 
-    def _get_jar(self):
+    def _get_streaming_jar(self):
         if self._opts['hadoop_streaming_jar']:
             return self._upload_mgr.uri(self._opts['hadoop_streaming_jar'])
         else:

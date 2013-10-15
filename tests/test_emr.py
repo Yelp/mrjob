@@ -71,6 +71,7 @@ from tests.mockssh import create_mock_ssh_script
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
+from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.quiet import log_to_buffer
@@ -3052,6 +3053,7 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
         with patch_fs_s3():
             self.runner = EMRJobRunner(
                 mr_job_script='my_job.py', conf_paths=[], stdin=StringIO())
+        self.runner._steps = []  # don't actually run `my_job.py --steps`
         self.runner._add_job_files_for_upload()
 
         self.simple_patch(
@@ -3059,7 +3061,7 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
         self.simple_patch(
             self.runner, '_s3_step_output_uri', return_value=['output'])
         self.simple_patch(
-            self.runner, '_get_jar', return_value=['streaming.jar'])
+            self.runner, '_get_streaming_jar', return_value=['streaming.jar'])
 
         self.simple_patch(boto.emr, 'StreamingStep', dict)
         self.runner._inferred_hadoop_version = '0.20'
@@ -3177,3 +3179,60 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
                 " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' |"
                 " python my_job.py --step-num=0 --mapper'"),
         )
+
+
+class JarStepTestCase(MockEMRAndS3TestCase):
+
+    MRJOB_CONF_CONTENTS = {'runners': {'emr': {
+        'check_emr_status_every': 0.00,
+        's3_sync_wait_time': 0.00,
+    }}}
+
+    def test_local_jar_gets_uploaded(self):
+        fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
+        with open(fake_jar, 'w'):
+            pass
+
+        job = MRJustAJar(['-r', 'emr', '--jar', fake_jar])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertIn(fake_jar, runner._upload_mgr.path_to_uri())
+            jar_uri = runner._upload_mgr.uri(fake_jar)
+            self.assertTrue(runner.ls(jar_uri))
+
+            emr_conn = runner.make_emr_conn()
+            job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+            self.assertEqual(len(job_flow.steps), 1)
+            self.assertEqual(job_flow.steps[0].jar, jar_uri)
+
+    def test_jar_on_s3(self):
+        self.add_mock_s3_data({'dubliners': {'whiskeyinthe.jar': ''}})
+        JAR_URI = 's3://dubliners/whiskeyinthe.jar'
+
+        job = MRJustAJar(['-r', 'emr', '--jar', JAR_URI])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+            self.assertEqual(len(job_flow.steps), 1)
+            self.assertEqual(job_flow.steps[0].jar, JAR_URI)
+
+    def test_jar_inside_emr(self):
+        job = MRJustAJar(['-r', 'emr', '--jar',
+                          'file:///home/hadoop/hadoop-examples.jar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+            self.assertEqual(len(job_flow.steps), 1)
+            self.assertEqual(job_flow.steps[0].jar,
+                             '/home/hadoop/hadoop-examples.jar')

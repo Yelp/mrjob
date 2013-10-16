@@ -2127,7 +2127,12 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['ami_version'] != 'latest':
                 # match AMI version
                 job_flow_ami_version = getattr(job_flow, 'amiversion', None)
-                if job_flow_ami_version != self._opts['ami_version']:
+                # Support partial matches, e.g. let a request for
+                # '2.4' pass if the version is '2.4.2'. The version
+                # extracted from the existing job flow should always
+                # be a full major.minor.patch, so checking matching
+                # prefixes should be sufficient.
+                if not job_flow_ami_version.startswith(self._opts['ami_version']):
                     return
             else:
                 if not warned_about_ami_version_latest:

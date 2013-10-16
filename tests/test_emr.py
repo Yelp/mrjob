@@ -2171,6 +2171,20 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ami-version', '2.0'])
 
+    def test_pooling_with_ami_version_prefix_major_minor(self):
+        _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0.0')
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ami-version', '2.0'])
+
+    def test_pooling_with_ami_version_prefix_major(self):
+        _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0.0')
+
+        self.assertJoins(job_flow_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ami-version', '2'])
+
     def test_dont_join_pool_with_wrong_ami_version(self):
         _, job_flow_id = self.make_pooled_job_flow(ami_version='2.0')
 

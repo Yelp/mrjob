@@ -635,7 +635,7 @@ you could do this::
     class SqliteJob(MRJob):
 
         def configure_options(self):
-            super(CommandLineProtocolJob, self).configure_options()
+            super(SqliteJob, self).configure_options()
             self.add_file_option('--database')
 
         def mapper_init(self):

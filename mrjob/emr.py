@@ -2292,7 +2292,12 @@ class EMRJobRunner(MRJobRunner):
         things_to_hash = [
             # exclude mrjob.tar.gz because it's only created if the
             # job starts its own job flow (also, its hash changes every time
-            # since the tarball contains different timestamps)
+            # since the tarball contains different timestamps).
+            # The filenames/md5sums are sorted because we need to
+            # ensure the order they're added doesn't affect the hash
+            # here. Previously this used a dict, but Python doesn't
+            # guarantee the ordering of dicts -- they can vary
+            # depending on insertion/deletion order.
             sorted(
                 (name, self.md5sum(path)) for name, path
                 in self._bootstrap_dir_mgr.name_to_path('file').iteritems()

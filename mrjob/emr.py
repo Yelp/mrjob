@@ -29,7 +29,6 @@ from datetime import datetime
 from datetime import timedelta
 from subprocess import Popen
 from subprocess import PIPE
-from operator import itemgetter
 
 try:
     from cStringIO import StringIO
@@ -2295,10 +2294,9 @@ class EMRJobRunner(MRJobRunner):
             # job starts its own job flow (also, its hash changes every time
             # since the tarball contains different timestamps)
             sorted(
-                dict((name, self.md5sum(path)) for name, path
-                     in self._bootstrap_dir_mgr.name_to_path('file').iteritems()
-                     if not path == self._mrjob_tar_gz_path).items(),
-                key=itemgetter(0)),
+                (name, self.md5sum(path)) for name, path
+                in self._bootstrap_dir_mgr.name_to_path('file').iteritems()
+                if not path == self._mrjob_tar_gz_path),
             self._opts['additional_emr_info'],
             self._opts['bootstrap_mrjob'],
             self._opts['bootstrap_cmds'],

@@ -1949,7 +1949,7 @@ class EMRJobRunner(MRJobRunner):
             path_dict = parse_legacy_hash_path('file', path)
             # don't worry about inspecting the tarball; pip is smart
             # enough to deal with that
-            bootstrap.append(['sudo pip install', path_dict])
+            bootstrap.append(['sudo pip install ', path_dict])
 
         # setup_cmds
         for cmd in self._opts['bootstrap_cmds']:

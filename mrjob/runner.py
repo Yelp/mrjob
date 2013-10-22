@@ -898,9 +898,7 @@ class MRJobRunner(object):
         self._working_dir_mgr.add('file', self._setup_wrapper_script_path)
 
     def _parse_setup(self):
-        """Helper for :py:meth:`_create_setup_wrapper_script`.
-
-        Parse the *setup* option with
+        """Parse the *setup* option with
         :py:func:`mrjob.setup.parse_setup_cmd()`.
 
         If *bootstrap_mrjob* and ``self.BOOTSTRAP_MRJOB_IN_SETUP`` are both
@@ -953,7 +951,7 @@ class MRJobRunner(object):
 
         writeln('# store $PWD')
         writeln('__mrjob_PWD=$PWD')
-        writeln('')
+        writeln()
 
         writeln('# obtain exclusive file lock')
         # Basically, we're going to tie file descriptor 9 to our lockfile,

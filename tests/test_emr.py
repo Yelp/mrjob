@@ -1856,9 +1856,10 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
-    def test_master_bootstrap_script_is_valid_python(self):
+    def test_create_master_bootstrap_script(self):
         # create a fake src tarball
-        with open(os.path.join(self.tmp_dir, 'foo.py'), 'w'):
+        foo_py_path = os.path.join(self.tmp_dir, 'foo.py')
+        with open(foo_py_path, 'w'):
             pass
 
         yelpy_tar_gz_path = os.path.join(self.tmp_dir, 'yelpy.tar.gz')
@@ -1866,6 +1867,8 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
         # use all the bootstrap options
         runner = EMRJobRunner(conf_paths=[],
+                              bootstrap=['python ' + foo_py_path + '#bar.py',
+                                         's3://walrus/scripts/ohnoes.sh#'],
                               bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
                               bootstrap_files=['/tmp/quz'],
                               bootstrap_mrjob=True,
@@ -1876,7 +1879,58 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
         self.assertIsNotNone(runner._master_bootstrap_script_path)
         self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
-        py_compile.compile(runner._master_bootstrap_script_path)
+
+        lines = [line.rstrip() for line in
+                 open(runner._master_bootstrap_script_path)]
+
+        # check PWD gets stored
+        self.assertIn('__mrjob_PWD=$PWD', lines)
+
+        def assertScriptDownloads(path, name=None):
+            uri = runner._upload_mgr.uri(path)
+            name = runner._bootstrap_dir_mgr.name('file', path, name=name)
+
+            self.assertIn(
+                'hadoop fs -copyToLocal %s $__mrjob_PWD/%s' % (uri, name),
+                lines)
+            self.assertIn(
+                'chmod a+x $__mrjob_PWD/%s' % (name,),
+                lines)
+
+        # check files get downloaded
+        assertScriptDownloads(foo_py_path, 'bar.py')
+        assertScriptDownloads('s3://walrus/scripts/ohnoes.sh')
+        assertScriptDownloads('/tmp/quz', 'quz')
+        assertScriptDownloads(runner._mrjob_tar_gz_path)
+        assertScriptDownloads(yelpy_tar_gz_path)
+        assertScriptDownloads('speedups.sh')
+        assertScriptDownloads('/tmp/s.sh')
+
+        # check scripts get run
+
+        # bootstrap
+        self.assertIn('python $__mrjob_PWD/bar.py', lines)
+        self.assertIn('$__mrjob_PWD/ohnoes.sh', lines)
+        # bootstrap_cmds
+        self.assertIn('echo "Hi!"', lines)
+        self.assertIn('true', lines)
+        self.assertIn('ls', lines)
+        # bootstrap_mrjob
+        mrjob_tar_gz_name = runner._bootstrap_dir_mgr.name(
+            'file', runner._mrjob_tar_gz_path)
+        self.assertIn("__mrjob_PYTHON_LIB=$(python -c 'from"
+                      " distutils.sysconfig import get_python_lib; print"
+                      " get_python_lib()')", lines)
+        self.assertIn('sudo tar xfz $__mrjob_PWD/' + mrjob_tar_gz_name +
+                      ' -C $__mrjob_PYTHON_LIB', lines)
+        self.assertIn('sudo python -m compileall -f $__mrjob_PYTHON_LIB/mrjob'
+                      ' && true', lines)
+        # bootstrap_python_packages
+        self.assertIn('sudo apt-get install python-pip', lines)
+        self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
+        # bootstrap_scripts
+        self.assertIn('$__mrjob_PWD/speedups.sh', lines)
+        self.assertIn('$__mrjob_PWD/s.sh', lines)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False)
@@ -1963,11 +2017,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         with open(runner._master_bootstrap_script_path, 'r') as f:
             content = f.read()
 
-        self.assertIn(
-            "call(['sudo', 'anaconda', '-m', 'compileall', '-f',"" mrjob_dir]",
-            content)
-        self.assertIn(
-            "check_call(['sudo', 'anaconda', 'setup.py', 'install']", content)
+        self.assertIn('sudo anaconda -m compileall -f', content)
 
     def test_local_bootstrap_action(self):
         # make sure that local bootstrap action scripts get uploaded to S3

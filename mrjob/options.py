@@ -289,6 +289,13 @@ def add_emr_opts(opt_group):
             help='Region to connect to S3 and EMR on (e.g. us-west-1).'),
 
         opt_group.add_option(
+            '--bootstrap', dest='bootstrap', action='append',
+            help=('A shell command to set up libraries etc. before any steps'
+                  ' (e.g. "sudo apt-get -qy install python3"). You may'
+                  ' interpolate files available via URL or locally with Hadoop'
+                  ' Distributed Cache syntax ("sudo dpkg -i foo.deb#")')),
+
+        opt_group.add_option(
             '--bootstrap-action', dest='bootstrap_actions', action='append',
             default=[],
             help=('Raw bootstrap action scripts to run before any of the other'

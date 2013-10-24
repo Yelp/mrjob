@@ -26,7 +26,7 @@ Then, run your job with:
 
 .. code-block:: shell
 
-    --setup 'PYTHONPATH=$PYTHONPATH:your-src-code.tar.gz#/'
+    --setup 'export PYTHONPATH=$PYTHONPATH:your-src-code.tar.gz#/'
 
 It's basically just shell script, except the ``#/`` tells mrjob that
 ``your-src-code.tar.gz`` is an archive which should be expanded in your job's working
@@ -45,7 +45,7 @@ this in your :file:`mrjob.conf`:
     runners:
       hadoop:
         setup:
-        - PYTHONPATH=$PYTHONPATH:your-src-code.tar.gz#/
+        - export PYTHONPATH=$PYTHONPATH:your-src-code.tar.gz#/
 
 Compiling source code
 ---------------------

@@ -71,9 +71,6 @@ from mrjob.util import tar_and_gzip
 
 log = logging.getLogger(__name__)
 
-# use to detect globs and break into the part before and after the glob
-GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
-
 #: cleanup options:
 #:
 #: * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job flow
@@ -993,6 +990,7 @@ class MRJobRunner(object):
 
         return out.getvalue()
 
+    # TODO: remove stdin_path
     def _get_input_paths(self):
         """Get the paths to input files, dumping STDIN to a local
         file if need be."""
@@ -1012,8 +1010,7 @@ class MRJobRunner(object):
 
                 self._stdin_path = stdin_path
 
-        return [self._stdin_path if p == '-' else p
-                for p in self._input_paths]
+        return [self._stdin_path if p == '-' else p for p in self._input_paths]
 
     def _create_mrjob_tar_gz(self):
         """Make a tarball of the mrjob library, without .pyc or .pyo files,

@@ -555,5 +555,5 @@ def error_on_bad_paths(fs, paths):
         if fs.path_exists(path):
             return
 
-    raise ValueError("At least one valid path is required."
+    raise ValueError("At least one valid path is required. "
                      "None found in %s" % paths)

@@ -87,6 +87,10 @@ class InlineMRJobRunnerEndToEndTestCase(SandboxedTestCase):
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
+    def test_missing_input(self):
+        runner = InlineMRJobRunner(input_paths=['/some/bogus/file/path'])
+        self.assertRaises(runner._run)
+
 
 class InlineMRJobRunnerCmdenvTest(EmptyMrjobConfTestCase):
 
@@ -312,9 +316,6 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
             self.assertEqual(runner.counters()[0]['count']['mapper_init'], 2)
             # the job sets its own mapred.map.tasks to 4 for the 2nd step
             self.assertEqual(runner.counters()[1]['count']['mapper_init'], 4)
-
-
-# TODO: integration test for error on bad paths
 
 
 class ErrorOnBadPathsTestCase(unittest.TestCase):

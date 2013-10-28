@@ -549,7 +549,6 @@ def error_on_bad_paths(fs, paths):
     :raises ValueError: if there are no valid paths
     """
     for path in paths:
-        # TODO: remove once self._input_path is fixed
         if path == '-':
             return
         if fs.path_exists(path):

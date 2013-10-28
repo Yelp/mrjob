@@ -990,7 +990,6 @@ class MRJobRunner(object):
 
         return out.getvalue()
 
-    # TODO: remove stdin_path
     def _get_input_paths(self):
         """Get the paths to input files, dumping STDIN to a local
         file if need be."""

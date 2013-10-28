@@ -170,7 +170,7 @@ class SimMRJobRunner(MRJobRunner):
 
     def _run(self):
         self.warn_ignored_opts()
-        error_on_bad_paths(self.fs, self._input_paths)
+        _error_on_bad_paths(self.fs, self._input_paths)
         self._create_setup_wrapper_script()
         self._setup_output_dir()
 
@@ -539,7 +539,7 @@ class SimMRJobRunner(MRJobRunner):
         return self._counters
 
 
-def error_on_bad_paths(fs, paths):
+def _error_on_bad_paths(fs, paths):
     """Raise an exception if there is not at least one valid path.
 
     :param fs: a filesystem used to check if a path exists

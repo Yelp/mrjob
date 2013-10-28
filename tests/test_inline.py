@@ -36,7 +36,7 @@ from mock import patch
 from mrjob import conf
 from mrjob.fs.base import Filesystem
 from mrjob.inline import InlineMRJobRunner
-from mrjob.sim import error_on_bad_paths
+from mrjob.sim import _error_on_bad_paths
 from mrjob.protocol import JSONValueProtocol
 from tests.mr_test_cmdenv import MRTestCmdenv
 from mrjob.job import MRJob
@@ -325,12 +325,12 @@ class ErrorOnBadPathsTestCase(unittest.TestCase):
         self.paths = ['/one', '/two' '/three/*']
 
     def test_with_paths(self):
-        error_on_bad_paths(self.fs, self.paths)
+        _error_on_bad_paths(self.fs, self.paths)
         self.fs.path_exists.assert_called_once_with(self.paths[0])
 
     def test_no_paths(self):
         self.fs.path_exists.return_value = False
-        self.assertRaises(ValueError, error_on_bad_paths, self.fs, self.paths)
+        self.assertRaises(ValueError, _error_on_bad_paths, self.fs, self.paths)
 
 if __name__ == "__main__":
     unittest.main()

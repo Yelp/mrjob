@@ -14,7 +14,6 @@
 import fnmatch
 import logging
 import posixpath
-import re
 import socket
 
 try:
@@ -30,13 +29,11 @@ from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
 from mrjob.retry import RetryWrapper
+from mrjob.runner import GLOB_RE
 from mrjob.util import read_file
 
 
 log = logging.getLogger(__name__)
-
-# use to detect globs and break into the part before and after the glob
-GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?
 EMR_BACKOFF = 20

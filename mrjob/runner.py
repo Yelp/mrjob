@@ -71,6 +71,9 @@ from mrjob.util import tar_and_gzip
 
 log = logging.getLogger(__name__)
 
+# use to detect globs and break into the part before and after the glob
+GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
+
 #: cleanup options:
 #:
 #: * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job flow

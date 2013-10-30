@@ -169,8 +169,8 @@ class SimMRJobRunner(MRJobRunner):
         pass
 
     def _run(self):
-
         self.warn_ignored_opts()
+        _error_on_bad_paths(self.fs, self._input_paths)
         self._create_setup_wrapper_script()
         self._setup_output_dir()
 
@@ -315,7 +315,7 @@ class SimMRJobRunner(MRJobRunner):
         # sorted order due to already being lexicographically sorted.
 
         for input_path in input_paths:
-            for path in self.ls(input_path):
+            for path in self.fs.ls(input_path):
                 if path.endswith('.gz'):
                     # do not split compressed files
                     absolute_path = os.path.abspath(path)
@@ -537,3 +537,22 @@ class SimMRJobRunner(MRJobRunner):
 
     def counters(self):
         return self._counters
+
+
+def _error_on_bad_paths(fs, paths):
+    """Raise an exception if there is not at least one valid path.
+
+    :param fs: a filesystem used to check if a path exists
+    :type fs: :class:`mrjob.fs.base.Filesystem`
+    :param paths: a list of file paths or globs
+    :type paths: list of strings
+    :raises ValueError: if there are no valid paths
+    """
+    for path in paths:
+        if path == '-':
+            return
+        if fs.path_exists(path):
+            return
+
+    raise ValueError("At least one valid path is required. "
+                     "None found in %s" % paths)

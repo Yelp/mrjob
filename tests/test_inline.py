@@ -22,6 +22,7 @@ from StringIO import StringIO
 
 import gzip
 import os
+import unittest
 
 try:
     from unittest2 import TestCase
@@ -29,10 +30,13 @@ try:
 except ImportError:
     from unittest import TestCase
 
+import mock
 from mock import patch
 
 from mrjob import conf
+from mrjob.fs.base import Filesystem
 from mrjob.inline import InlineMRJobRunner
+from mrjob.sim import _error_on_bad_paths
 from mrjob.protocol import JSONValueProtocol
 from tests.mr_test_cmdenv import MRTestCmdenv
 from mrjob.job import MRJob
@@ -82,6 +86,10 @@ class InlineMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+
+    def test_missing_input(self):
+        runner = InlineMRJobRunner(input_paths=['/some/bogus/file/path'])
+        self.assertRaises(runner._run)
 
 
 class InlineMRJobRunnerCmdenvTest(EmptyMrjobConfTestCase):
@@ -308,3 +316,21 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
             self.assertEqual(runner.counters()[0]['count']['mapper_init'], 2)
             # the job sets its own mapred.map.tasks to 4 for the 2nd step
             self.assertEqual(runner.counters()[1]['count']['mapper_init'], 4)
+
+
+class ErrorOnBadPathsTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.fs = mock.create_autospec(Filesystem)
+        self.paths = ['/one', '/two' '/three/*']
+
+    def test_with_paths(self):
+        _error_on_bad_paths(self.fs, self.paths)
+        self.fs.path_exists.assert_called_once_with(self.paths[0])
+
+    def test_no_paths(self):
+        self.fs.path_exists.return_value = False
+        self.assertRaises(ValueError, _error_on_bad_paths, self.fs, self.paths)
+
+if __name__ == "__main__":
+    unittest.main()

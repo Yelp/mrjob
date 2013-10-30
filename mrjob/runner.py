@@ -1012,8 +1012,7 @@ class MRJobRunner(object):
 
                 self._stdin_path = stdin_path
 
-        return [self._stdin_path if p == '-' else p
-                for p in self._input_paths]
+        return [self._stdin_path if p == '-' else p for p in self._input_paths]
 
     def _create_mrjob_tar_gz(self):
         """Make a tarball of the mrjob library, without .pyc or .pyo files,

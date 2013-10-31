@@ -6,11 +6,17 @@ Bootstrapping allows you duplicate your production setup within EMR.
 Installing Python packages with pip
 -----------------------------------
 
-Make a `pip requirements file <http://www.pip-installer.org/en/1.1/requirements.html>`_, and run your script with
+First you need to install :command:`pip`:
 
 .. code-block:: sh
 
-    --bootstrap 'sudo pip install -r path/to/requirements.txt#'
+   --bootstrap 'sudo apt-get install -y python-pip'
+
+Then install the packages you want:
+
+.. code-block:: sh
+
+    --bootstrap 'sudo pip install --upgrade mr3po simplejson'
 
 Or, equivalently, in :file:`mrjob.conf`:
 
@@ -19,23 +25,43 @@ Or, equivalently, in :file:`mrjob.conf`:
     runners:
       emr:
         bootstrap:
-        - pip install -r requirements.txt#
+        - sudo apt-get install -y python-pip
+        - sudo pip install boto mr3po
 
-Installing Python packages from tarballs
-----------------------------------------
+Upgrading simplejson
+--------------------
 
-``pip`` can be used to install custom python packages from tarballs
-as well:
+mrjob relies on simplejson for rapid encoding and decoding of data.
+
+To use the latest (fastest) version, do:
 
 .. code-block:: sh
 
-    --bootstrap 'sudo pip install path/to/packages/*.tar.gz#'
+    --bootstrap 'sudo pip install --upgrade simplejson'
+
+Other ways to use pip to install Python packages
+------------------------------------------------
+
+If you have a lot of dependencies, best practice is to make a
+`pip requirements file <http://www.pip-installer.org/en/latest/cookbook.html>`_
+and use the ``-r`` switch:
+
+.. code-block:: sh
+
+    --bootstrap 'sudo pip install -r path/to/requirements.txt#'
+
+Note that :command:`pip` can also install from tarballs (which is useful
+for custom-built packages):
+
+.. code-block:: sh
+
+    --bootstrap 'sudo pip install $MY_PYTHON_PKGS/*.tar.gz#'
 
 Installing Debian packages
 --------------------------
 
-You can use ``apt-get`` to install Debian packages. For example, to install
-Python 3:
+As we did with :command:`pip`, you can use ``apt-get`` to install any
+package from the Debian archive. For example, to install Python 3:
 
 .. code-block:: sh
 
@@ -68,9 +94,9 @@ Then add this to your :file:`mrjob.conf`:
 	- ./configure && make && sudo make install
 
 :mrjob-opt:`bootstrap_mrjob` runs *last*, so mrjob will get bootstrapped
-into your newly upgraded version of Python. Of course, if you also install
-other Python libraries with bootstrap commands, you should run them *after*
-upgrading Python.
+into your newly upgraded version of Python. If you use other
+bootstrap commands to install/upgrade Python libraries, you should also
+run them *after* upgrading Python.
 
 Catching errors in your bootstrap script
 ----------------------------------------
@@ -78,11 +104,11 @@ Catching errors in your bootstrap script
 By default, shell scripts ignore errors and simply move to the next line
 when they fail.
 
-To fail on errors, use:
+To fail on errors, use the :mrjob-opt:`sh_bin` option:
 
 .. code-block:: sh
 
-    --bootstrap 'set -e'
+    --sh-bin 'sh -e'
 
 Using bash
 ----------

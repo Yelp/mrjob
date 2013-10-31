@@ -9,8 +9,10 @@ Combining shell syntax with Hadoop's DistributedCache notation, mrjob's
 pre-installing your Hadoop dependencies on every node.
 
 All our :file:`mrjob.conf` examples below are for the ``hadoop`` runner,
-but these work equally well with the ``emr`` runner (or ``local``, for
-that matter).
+but these work equally well with the ``emr`` runner. Also, if you are using
+EMR, take a look at the :doc:`emr-bootstrap-cookbook`.
+
+.. _cookbook-src-tree-pythonpath:
 
 Putting your source tree in :envvar:`PYTHONPATH`
 ------------------------------------------------
@@ -88,7 +90,7 @@ Using a virtualenv
 
 What if you can't install the libraries you need on your Hadoop cluster?
 
-You could make a `pip requirements file <http://www.pip-installer.org/en/latest/cookbook.html>`_, and then do something like this in your :file:`mrjob.conf`:
+You could do something like this in your :file:`mrjob.conf`:
 
 .. code-block:: yaml
 
@@ -97,7 +99,7 @@ You could make a `pip requirements file <http://www.pip-installer.org/en/latest/
         setup:
         - virtualenv venv
 	- . venv/bin/activate
-        - pip install -r requirements.txt#
+        - pip install mr3po simplejson
 
 However, now the locking feature that protects :command:`make` becomes a
 liability; each task on the same node has its own virtualenv, but one task has
@@ -114,24 +116,27 @@ machine, something like this:
         - VENV=/tmp/$mapred_job_id
         - if [ -e $VENV ]; then virtualenv $VENV; fi
 	- . $VENV/bin/activate
-        - pip install -r requirements.txt#
+        - pip install mr3po simplejson
 
 With newer Hadoop (0.21+ and 2.0+), you'd want to use ``$mapreduce_job_id``.
 
-Installing Python packages from tarballs
-----------------------------------------
+Other ways to use pip to install Python packages
+------------------------------------------------
 
-You'd still use a virtualenv as above, but not pass ``-r`` to :command:`pip`:
+If you have a lot of dependencies, best practice is to make a
+`pip requirements file <http://www.pip-installer.org/en/latest/cookbook.html>`_
+and use the ``-r`` switch:
 
-.. code-block:: yaml
+.. code-block:: sh
 
-    runners:
-      hadoop:
-        setup:
-        - VENV=/tmp/$mapred_job_id
-        - if [ -e $VENV ]; then virtualenv $VENV; fi
-	- . $VENV/bin/activate
-        - pip install $MY_PYTHON_PKGS/*.tar.gz#
+    --setup 'pip install -r path/to/requirements.txt#'
+
+Note that :command:`pip` can also install from tarballs (which is useful
+for custom-built packages):
+
+.. code-block:: sh
+
+    --setup 'pip install $MY_PYTHON_PKGS/*.tar.gz#'
 
 Catching errors in your setup script
 ------------------------------------
@@ -139,11 +144,11 @@ Catching errors in your setup script
 By default, shell scripts ignore errors and simply move to the next line
 when they fail.
 
-To fail on errors, use:
+To fail on errors, use the :mrjob-opt:`sh_bin` option:
 
 .. code-block:: sh
 
-    --setup 'set -e'
+    --sh-bin 'sh -e'
 
 Using bash
 ----------

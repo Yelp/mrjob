@@ -86,6 +86,8 @@ What if you can't install the libraries you need on your Hadoop cluster?
 
 You could do something like this in your :file:`mrjob.conf`:
 
+.. code-block:: yaml
+
     runners:
       hadoop:
         setup:
@@ -100,6 +102,8 @@ to finish setting up before the next can start.
 The solution is to share the virtualenv between all tasks on the same
 machine, something like this:
 
+.. code-block:: yaml
+
     runners:
       hadoop:
         setup:
@@ -109,6 +113,21 @@ machine, something like this:
         - pip install -r requirements.txt#
 
 With newer Hadoop (0.21+ and 2.0+), you'd want to use ``$mapreduce_job_id``.
+
+Installing Python packages from tarballs
+----------------------------------------
+
+You'd still use a virtualenv as above, but not pass ``-r`` to :command:`pip`:
+
+.. code-block:: yaml
+
+    runners:
+      hadoop:
+        setup:
+        - VENV=/tmp/$mapred_job_id
+        - if [ -e $VENV ]; then virtualenv $VENV; fi
+	- . $VENV/bin/activate
+        - pip install $MY_PYTHON_PKGS/*.tar.gz#
 
 Catching errors in your setup script
 ------------------------------------
@@ -133,5 +152,4 @@ To use bash instead, do:
 
     --sh-bin bash
 
-This will only work with shells that are compatible with Bourne shell;
-we rely on its environment variable, subshell, and redirect syntax.
+This only works with shells that are backwards-compatible with Bourne shell.

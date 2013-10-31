@@ -213,24 +213,36 @@ Job execution context
     :default: ``[]``
 
     A list of lines of shell script to run before each task (mapper/reducer).
-    For examples, see the :doc:`cookbook-setup`.
 
-    Expressions like ``<path>#<name>`` archive will cause ``<path>`` to be
-    automatically uploaded to the task's working directory with the name
-    ``<name>`` and interpolated into the script. ``<path>`` may also be a URI,
-    and ``~`` and environment variables within ``<path>`` will be resolved
-    based on the local environment. ``<name>`` is optional, and you can
+    This option is complex and powerful; the best way to get started is to
+    read the :doc:`setup-cookbook`.
+
+    Using this option replaces your task with a shell "wrapper" script that
+    executes the setup commands, and then executes the task as the last line
+    of the script. This means that environment variables set by hadoop
+    (e.g. ``$mapred_job_id``) are available to setup commands, and that you
+    can pass environment variables to the task (e.g. ``$PYTHONPATH``) using
+    ``export``. Setup commands should not write to stdout, as this will
+    be interpreted by Hadoop Streaming as output from the task.
+
+    We use file locking around the setup commands (not the task)
+    to ensure that multiple tasks running on the same node won't run them
+    simultaneously (it's safe to run ``make``).
+
+    In addition, passing expressions like ``<path>#<name>`` will cause
+    ``<path>`` to be automatically uploaded to the task's working directory
+    with the name ``<name>`` and interpolated into the script. ``<path>``
+    may also be a URI, and ``~`` and environment variables within ``<path>``
+    will be resolved based on the local environment. ``<name>`` is optional,
+    and you can
     indicate that an archive should be unarchived into a directory by putting
-    a ``/`` after name. Parsing these expressions generally works the way you
-    would expect; for full details see :py:func:`mrjob.setup.parse_setup_cmd`.
+    a ``/`` after name. Parsing generally works the way you
+    would expect; for full details see :py:func:`~mrjob.setup.parse_setup_cmd`.
 
-    The task is run as the last line of the script, so you can pass it
-    environment variables using ``export``. We cd back to the original
-    working directory before running the task, but otherwise don't
-    manage the working directory; however, uploaded files are always
-    referred to by their absolute path anyway. We use file locking to ensure
-    that multiple tasks running on the same node won't run
-    *setup* simultaneously (it's safe to run ``make``).
+    Using ``cd`` in a setup command *will* change the current working
+    for the next command, but this is rarely a problem as we change back to
+    the original working directory before running the task and uploaded files
+    are always interpolated as an absolute path.
 
 .. mrjob-opt::
     :config: setup_cmds

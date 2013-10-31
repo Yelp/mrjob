@@ -14,7 +14,7 @@ Guides
     guides/configs-hadoopy-runners.rst
     guides/configs-reference.rst
     guides/cookbook.rst
-    guides/cookbook-setup.rst
+    guides/setup-cookbook.rst
     guides/testing.rst
     guides/emr.rst
     guides/contributing.rst

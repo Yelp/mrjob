@@ -227,22 +227,18 @@ Job execution context
 
     We use file locking around the setup commands (not the task)
     to ensure that multiple tasks running on the same node won't run them
-    simultaneously (it's safe to run ``make``).
+    simultaneously (it's safe to run ``make``). Before running the task,
+    we ``cd`` back to the original working directory.
 
-    In addition, passing expressions like ``<path>#<name>`` will cause
-    ``<path>`` to be automatically uploaded to the task's working directory
-    with the name ``<name>`` and interpolated into the script. ``<path>``
-    may also be a URI, and ``~`` and environment variables within ``<path>``
-    will be resolved based on the local environment. ``<name>`` is optional,
-    and you can
-    indicate that an archive should be unarchived into a directory by putting
-    a ``/`` after name. Parsing generally works the way you
-    would expect; for full details see :py:func:`~mrjob.setup.parse_setup_cmd`.
-
-    Using ``cd`` in a setup command *will* change the current working
-    for the next command, but this is rarely a problem as we change back to
-    the original working directory before running the task and uploaded files
-    are always interpolated as an absolute path.
+    In addition, passing expressions like ``path#name`` will cause
+    *path* to be automatically uploaded to the task's working directory
+    with the filename *name*, marked as executable, and interpolated into the
+    script by their absolute path on the machine running the script. *path*
+    may also be a URI, and ``~`` and environment variables within *path*
+    will be resolved based on the local environment. *name* is optional.
+    You can indicate that an archive should be unarchived into a directory by
+    putting a ``/`` after *name*. For details of parsing, see
+    :py:func:`~mrjob.setup.parse_setup_cmd`.
 
 .. mrjob-opt::
     :config: setup_cmds

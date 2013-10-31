@@ -157,8 +157,33 @@ Bootstrapping
 
 These options apply at *bootstrap time*, before the Hadoop cluster has
 started. Bootstrap time is a good time to install Debian packages or compile
-and install another Python binary. See :ref:`configs-making-files-available`
-for task-time setup.
+and install another Python binary.
+
+.. mrjob-opt::
+    :config: bootstrap
+    :switch: --bootstrap
+    :type: :ref:`string list <data-type-string-list>`
+    :set: all
+    :default: ``[]``
+
+    A list of lines of shell script to run once on each node in your job flow,
+    at bootstrap time.
+
+    This option is complex and powerful; the best way to get started is to
+    read the :doc:`emr-bootstrap-cookbook`.
+
+    Passing expressions like ``path#name`` will cause
+    *path* to be automatically uploaded to the task's working directory
+    with the filename *name*, marked as executable, and interpolated into the
+    script by their absolute path on the machine running the script. *path*
+    may also be a URI, and ``~`` and environment variables within *path*
+    will be resolved based on the local environment. *name* is optional.
+    For details of parsing, see :py:func:`~mrjob.setup.parse_setup_cmd`.
+
+    Unlike with :mrjob-opt:`setup`, archives are not supported (unpack them
+    yourself).
+
+    Remember to put ``sudo`` before commands requiring root privileges!
 
 .. mrjob-opt::
     :config: bootstrap_actions
@@ -167,10 +192,14 @@ for task-time setup.
     :set: emr
     :default: ``[]``
 
-    a list of raw bootstrap actions (essentially scripts) to run prior to any
+    A list of raw bootstrap actions (essentially scripts) to run prior to any
     of the other bootstrap steps. Any arguments should be separated from the
     command by spaces (we use :py:func:`shlex.split`). If the action is on the
     local filesystem, we'll automatically upload it to S3.
+
+    This has little advantage over :mrjob-opt:`bootstrap` other than running
+    before it (you could upgrade :command:`sh`?), and is mostly included for
+    completeness.
 
 .. mrjob-opt::
     :config: bootstrap_cmds
@@ -179,10 +208,11 @@ for task-time setup.
     :set: emr
     :default: ``[]``
 
-    a list of commands to run on the master node to set up libraries, etc.
-    Like *setup_cmds*, these can be strings, which will be run in the shell,
-    or lists of args, which will be run directly.  Prepend ``sudo`` to
-    commands to do things that require root privileges.
+    .. deprecated:: 0.4.2
+
+    A list of commands to run at bootstrap time. Basically
+    :mrjob-opt:`bootstrap` without automatic file uploading/interpolation.
+    Can also take commands as lists of arguments.
 
 .. mrjob-opt::
     :config: bootstrap_files
@@ -191,10 +221,11 @@ for task-time setup.
     :set: emr
     :default: ``[]``
 
-    files to download to the bootstrap working directory on the master node
-    before running :mrjob-opt:`bootstrap_cmds` (for example, Debian packages).
-    May be local files for mrjob to upload to S3, or any URI that ``hadoop fs``
-    can handle.
+    .. deprecated:: 0.4.2
+
+    Files to download to the bootstrap working directory before running
+    bootstrap commands. Use the :mrjob-opt:`bootstrap` option's file
+    auto-upload/interpolation feature instead.
 
 .. mrjob-opt::
     :config: bootstrap_python_packages
@@ -203,9 +234,11 @@ for task-time setup.
     :set: emr
     :default: ``[]``
 
-    paths of python modules to install on EMR. These should be standard Python
-    module tarballs. If a module is named ``foo.tar.gz``, we expect to be able
-    to run ``tar xfz foo.tar.gz; cd foo; sudo python setup.py install``.
+    .. deprecated:: 0.4.2
+
+    Paths of python modules tarballs to install on EMR. Pass
+    ``pip install path/to/tarballs/*.tar.gz#`` to :mrjob-opt:`bootstrap`
+    instead.
 
 .. mrjob-opt::
     :config: bootstrap_scripts
@@ -214,9 +247,10 @@ for task-time setup.
     :set: emr
     :default: ``[]``
 
-    scripts to upload and then run on the master node (a combination of
-    :mrjob-opt:`bootstrap_cmds` and :mrjob-opt:`bootstrap_files`). These are
-    run after the commands from :mrjob-opt:`bootstrap_cmds`.
+    .. deprecated:: 0.4.2
+
+    Scripts to upload and then run at bootstrap time. Pass
+    ``path/to/script# args`` to :mrjob-opt:`bootstrap` instead.
 
 Monitoring the job flow
 -----------------------

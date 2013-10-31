@@ -8,6 +8,10 @@ Combining shell syntax with Hadoop's DistributedCache notation, mrjob's
 :mrjob-opt:`setup` option provides a powerful, dynamic alternative to
 pre-installing your Hadoop dependencies on every node.
 
+All our :file:`mrjob.conf` examples below are for the ``hadoop`` runner,
+but these work equally well with the ``emr`` runner (or ``local``, for
+that matter).
+
 Putting your source tree in :envvar:`PYTHONPATH`
 ------------------------------------------------
 
@@ -84,7 +88,7 @@ Using a virtualenv
 
 What if you can't install the libraries you need on your Hadoop cluster?
 
-You could do something like this in your :file:`mrjob.conf`:
+You could make a `pip requirements file <http://www.pip-installer.org/en/latest/cookbook.html>`_, and then do something like this in your :file:`mrjob.conf`:
 
 .. code-block:: yaml
 

@@ -267,6 +267,16 @@ Job execution context
     Pass ``'source <path>#'`` to :mrjob-opt:`setup` instead.
 
 .. mrjob-opt::
+    :config: sh_bin
+    :switch: --sh-bin
+    :type: :ref:`command <data-type-command>`
+    :set: all
+    :default: :command:`sh` (:command:`/bin/sh` on EMR)
+
+    Name/path of alternate shell binary to use for :mrjob-opt:`setup` and
+    :mrjob-opt:`bootstrap`.
+
+.. mrjob-opt::
     :config: steps_python_bin
     :switch: --steps-python-bin
     :type: :ref:`command <data-type-command>`

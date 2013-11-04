@@ -274,7 +274,11 @@ Job execution context
     :default: :command:`sh` (:command:`/bin/sh` on EMR)
 
     Name/path of alternate shell binary to use for :mrjob-opt:`setup` and
-    :mrjob-opt:`bootstrap`.
+    :mrjob-opt:`bootstrap`. Needs to be backwards compatible with
+    Bourne Shell (e.g. ``'bash'``).
+
+    To force setup/bootstrapping to terminate when any command exits with
+    an error, use ``'sh -e'``.
 
 .. mrjob-opt::
     :config: steps_python_bin

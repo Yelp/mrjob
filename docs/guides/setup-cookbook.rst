@@ -43,7 +43,7 @@ this in your :file:`mrjob.conf`:
     runners:
       hadoop:
         setup:
-        - export PYTHONPATH=$PYTHONPATH:your-src-dir.tar.gz#/
+        - export PYTHONPATH=$PYTHONPATH:your-src-code.tar.gz#/
 
 Running a makefile inside your source dir
 -----------------------------------------
@@ -60,7 +60,7 @@ or, in mrjob.conf:
       hadoop:
         setup:
         - cd your-src-dir.tar.gz#
-	- make
+        - make
 
 If Hadoop runs multiple tasks on the same node, your source dir will be shared
 between them. This is not a problem; mrjob automatically adds locking around
@@ -98,7 +98,7 @@ You could do something like this in your :file:`mrjob.conf`:
       hadoop:
         setup:
         - virtualenv venv
-	- . venv/bin/activate
+        - . venv/bin/activate
         - pip install mr3po simplejson
 
 However, now the locking feature that protects :command:`make` becomes a
@@ -113,12 +113,13 @@ machine, something like this:
     runners:
       hadoop:
         setup:
-        - VENV=/tmp/$mapred_job_id
+        - VENV=/tmp/$mapreduce_job_id
         - if [ -e $VENV ]; then virtualenv $VENV; fi
-	- . $VENV/bin/activate
+        - . $VENV/bin/activate
         - pip install mr3po simplejson
 
-With newer Hadoop (0.21+ and 2.0+), you'd want to use ``$mapreduce_job_id``.
+With older versions of Hadoop (0.20 and earlier, and the 1.x series), you'd
+want to use ``$mapred_job_id``.
 
 Other ways to use pip to install Python packages
 ------------------------------------------------
@@ -137,28 +138,3 @@ for custom-built packages):
 .. code-block:: sh
 
     --setup 'pip install $MY_PYTHON_PKGS/*.tar.gz#'
-
-Catching errors in your setup script
-------------------------------------
-
-By default, shell scripts ignore errors and simply move to the next line
-when they fail.
-
-To fail on errors, use the :mrjob-opt:`sh_bin` option:
-
-.. code-block:: sh
-
-    --sh-bin 'sh -e'
-
-Using bash
-----------
-
-By default, :mrjob-opt:`setup` uses :command:`sh` (Bourne shell).
-
-To use bash instead, do:
-
-.. code-block:: sh
-
-    --sh-bin bash
-
-This only works with shells that are backwards-compatible with Bourne shell.

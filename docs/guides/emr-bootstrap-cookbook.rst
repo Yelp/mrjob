@@ -1,7 +1,7 @@
 EMR Bootstrapping Cookbook
 ==========================
 
-Bootstrapping allows you duplicate your production setup within EMR.
+Bootstrapping allows you to configure EMR machines to your needs.
 
 Installing Python packages with pip
 -----------------------------------
@@ -91,37 +91,12 @@ Then add this to your :file:`mrjob.conf`:
         bootstrap:
         - tar xfz path/to/Python-x.y.z.tgz#
         - cd Python-x.y.z
-	- ./configure && make && sudo make install
+        - ./configure && make && sudo make install
 
 :mrjob-opt:`bootstrap_mrjob` runs *last*, so mrjob will get bootstrapped
 into your newly upgraded version of Python. If you use other
 bootstrap commands to install/upgrade Python libraries, you should also
 run them *after* upgrading Python.
-
-Catching errors in your bootstrap script
-----------------------------------------
-
-By default, shell scripts ignore errors and simply move to the next line
-when they fail.
-
-To fail on errors, use the :mrjob-opt:`sh_bin` option:
-
-.. code-block:: sh
-
-    --sh-bin 'sh -e'
-
-Using bash
-----------
-
-By default, :mrjob-opt:`bootstrap` uses :command:`sh` (Bourne shell).
-
-To use bash instead, do:
-
-.. code-block:: sh
-
-    --sh-bin bash
-
-This only works with shells that are backwards-compatible with Bourne shell.
 
 When to use bootsrap, and when to use setup
 -------------------------------------------

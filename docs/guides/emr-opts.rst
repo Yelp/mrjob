@@ -197,9 +197,8 @@ and install another Python binary.
     command by spaces (we use :py:func:`shlex.split`). If the action is on the
     local filesystem, we'll automatically upload it to S3.
 
-    This has little advantage over :mrjob-opt:`bootstrap` other than running
-    before it (you could upgrade :command:`sh`?), and is mostly included for
-    completeness.
+    This has little advantage over :mrjob-opt:`bootstrap`; it is included
+    in order to give direct access to the EMR API.
 
 .. mrjob-opt::
     :config: bootstrap_cmds

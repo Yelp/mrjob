@@ -325,7 +325,7 @@ class WorkingDirManager(object):
         """Add a path as either a file or an archive, optionally
         assigning it a name.
 
-        :param type: either ``'archive'` or `'file'`
+        :param type: either ``'archive'`` or ``'file'``
         :param path: path/URI to add
         :param name: optional name that this path *must* be assigned, or
                      None to assign this file a name later.
@@ -362,7 +362,7 @@ class WorkingDirManager(object):
         We won't ever give an auto-name that's the same an assigned name
         (even for the same path and type).
 
-        :param type: either ``'archive'` or `'file'`
+        :param type: either ``'archive'`` or ``'file'``
         :param path: path/URI
         :param name: known name of the file
         """
@@ -396,7 +396,7 @@ class WorkingDirManager(object):
         :option:`-archive` options to Hadoop (or fake them in a bootstrap
         script).
 
-        :param type: either ``'archive'` or `'file'`
+        :param type: either ``'archive'`` or ``'file'``
         """
         self._check_type(type)
 

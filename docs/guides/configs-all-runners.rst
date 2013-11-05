@@ -201,8 +201,7 @@ Job execution context
 
     Interpreter to launch your script with. Defaults to the value of
     **python_bin**, which is deprecated. Change this if you're using a
-    language besides Python 2.5-2.7 or if you're running using
-    :py:mod:`virtualenv`.
+    language besides Python 2.5-2.7.
 
 .. mrjob-opt::
     :config: python_bin
@@ -211,8 +210,43 @@ Job execution context
     :set: all
     :default: ``'python'``
 
-    Deprecated. Name/path of alternate Python binary for wrapper scripts and
-    mappers/reducers (e.g. for use with :py:mod:`virtualenv`).
+    Deprecated (use :mrjob-opt:`interpreter` instead). Name/path of alternate
+    Python binary for wrapper scripts and mappers/reducers.
+
+.. mrjob-opt::
+    :config: setup
+    :switch: --setup
+    :type: :ref:`string list <data-type-string-list>`
+    :set: all
+    :default: ``[]``
+
+    A list of lines of shell script to run before each task (mapper/reducer).
+
+    This option is complex and powerful; the best way to get started is to
+    read the :doc:`setup-cookbook`.
+
+    Using this option replaces your task with a shell "wrapper" script that
+    executes the setup commands, and then executes the task as the last line
+    of the script. This means that environment variables set by hadoop
+    (e.g. ``$mapred_job_id``) are available to setup commands, and that you
+    can pass environment variables to the task (e.g. ``$PYTHONPATH``) using
+    ``export``. Setup commands should not write to stdout, as this will
+    be interpreted by Hadoop Streaming as output from the task.
+
+    We use file locking around the setup commands (not the task)
+    to ensure that multiple tasks running on the same node won't run them
+    simultaneously (it's safe to run ``make``). Before running the task,
+    we ``cd`` back to the original working directory.
+
+    In addition, passing expressions like ``path#name`` will cause
+    *path* to be automatically uploaded to the task's working directory
+    with the filename *name*, marked as executable, and interpolated into the
+    script by their absolute path on the machine running the script. *path*
+    may also be a URI, and ``~`` and environment variables within *path*
+    will be resolved based on the local environment. *name* is optional.
+    You can indicate that an archive should be unarchived into a directory by
+    putting a ``/`` after *name*. For details of parsing, see
+    :py:func:`~mrjob.setup.parse_setup_cmd`.
 
 .. mrjob-opt::
     :config: setup_cmds
@@ -221,12 +255,11 @@ Job execution context
     :set: all
     :default: ``[]``
 
-    A list of commands to run before each mapper/reducer step (e.g.  ``['cd
-    my-src-tree; make', 'mkdir -p /tmp/foo']``).  You can specify commands as
-    strings, which will be run through the shell, or lists of args, which will
-    be invoked directly. We'll use file locking to ensure that multiple
-    mappers/reducers running on the same node won't run *setup_cmds*
-    simultaneously (it's safe to run ``make``).
+    .. deprecated:: 0.4.2
+
+    A list of commands to run before each mapper/reducer step. Basically
+    :mrjob-opt:`setup` without automatic file uploading/interpolation.
+    Can also take commands as lists of arguments.
 
 .. mrjob-opt::
     :config: setup_scripts
@@ -235,10 +268,25 @@ Job execution context
     :set: all
     :default: ``[]``
 
-    files that will be copied into the local working directory and then run.
-    These are run after *setup_cmds*. Like with *setup_cmds*, we use file
-    locking to keep multiple mappers/reducers on the same node from running
-    *setup_scripts* simultaneously.
+    .. deprecated:: 0.4.2
+
+    Files that will be copied into the local working directory and then run.
+
+    Pass ``'source <path>#'`` to :mrjob-opt:`setup` instead.
+
+.. mrjob-opt::
+    :config: sh_bin
+    :switch: --sh-bin
+    :type: :ref:`command <data-type-command>`
+    :set: all
+    :default: :command:`sh` (:command:`/bin/sh` on EMR)
+
+    Name/path of alternate shell binary to use for :mrjob-opt:`setup` and
+    :mrjob-opt:`bootstrap`. Needs to be backwards compatible with
+    Bourne Shell (e.g. ``'bash'``).
+
+    To force setup/bootstrapping to terminate when any command exits with
+    an error, use ``'sh -e'``.
 
 .. mrjob-opt::
     :config: steps_python_bin
@@ -248,8 +296,8 @@ Job execution context
     :default: current Python interpreter
 
     Name/path of alternate python binary to use to query the job about its
-    steps (e.g. for use with :py:mod:`virtualenv`). Rarely needed. Defaults
-    to ``sys.executable`` (the current Python interpreter).
+    steps. Rarely needed. Defaults to ``sys.executable`` (the current Python
+    interpreter).
 
 Other
 -----

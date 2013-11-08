@@ -842,9 +842,7 @@ class MRJob(MRJobLauncher):
         :type step_num: int
         :param step_num: which step to run (e.g. ``0`` for the first step)
         :type step_type: str
-        :param step_type: one of :py:data:`mrjob.step.'mapper'`,
-                          :py:data:`mrjob.step.'combiner'`, or
-                          :py:data:`mrjob.step.'reducer'`
+        :param step_type: one of `'mapper'`, `'combiner'`, or `'reducer'`
         :return: (read_function, write_function)
 
         By default, we use one protocol for reading input, one

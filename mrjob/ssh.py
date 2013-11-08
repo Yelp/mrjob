@@ -158,8 +158,6 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     out = check_output(*ssh_run_with_recursion(ssh_bin, address,
                                                ec2_key_pair_file,
                                                keyfile, ['cat', path]))
-    if 'No such file or directory' in out:
-        raise IOError("File not found: %s" % path)
     return out
 
 

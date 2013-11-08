@@ -13,7 +13,8 @@ Guides
     guides/configs-all-runners.rst
     guides/configs-hadoopy-runners.rst
     guides/configs-reference.rst
-    guides/cookbook.rst
+    guides/setup-cookbook.rst
+    guides/hadoop-cookbook.rst
     guides/testing.rst
     guides/emr.rst
     guides/contributing.rst

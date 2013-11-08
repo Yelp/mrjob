@@ -15,5 +15,6 @@ Reference
     protocols.rst
     utils-retry.rst
     runners-runner.rst
+    utils-setup.rst
     utils-util.rst
     step.rst

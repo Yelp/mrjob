@@ -127,7 +127,7 @@ class LocalMRJobRunner(SimMRJobRunner):
         """
         super(LocalMRJobRunner, self).__init__(**kwargs)
 
-        self._all_proc_dicts = None
+        self._all_proc_dicts = []
 
         # jobconf variables set by our own job (e.g. files "uploaded")
         #
@@ -140,8 +140,6 @@ class LocalMRJobRunner(SimMRJobRunner):
                   working_dir, env):
         step = self._get_step(step_num)
 
-        if self._all_proc_dicts is None:
-            self._all_proc_dicts = []
         if step_type == 'mapper':
             procs_args = self._mapper_arg_chain(
                 step, step_num, input_path)
@@ -157,7 +155,7 @@ class LocalMRJobRunner(SimMRJobRunner):
         for proc_dict in self._all_proc_dicts:
             self._wait_for_process(proc_dict, step_num)
 
-        self.all_proc_dicts = None
+        self._all_proc_dicts = []
 
     def _filter_if_any(self, substep_dict):
         if substep_dict['type'] == 'script':

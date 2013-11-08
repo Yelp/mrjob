@@ -100,7 +100,7 @@ def urlparse(urlstring, scheme='', allow_fragments=True, *args, **kwargs):
     if netloc == '' and path.startswith('//'):
         m = NETLOC_RE.match(path)
         netloc = m.group(1)
-        path = m.group(1)
+        path = m.group(2)
     if allow_fragments and '#' in path and not fragment:
         path, fragment = path.split('#', 1)
     return ParseResult(scheme, netloc, path, params, query, fragment)

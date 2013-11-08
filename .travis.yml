@@ -1,9 +1,10 @@
 language: python
 python:
+  - "2.5"
   - "2.6"
   - "2.7"
 # command to install dependencies
 install:
   - "pip install . --use-mirrors"
 # command to run tests
-script: python setup.py test 
+script: python setup.py test

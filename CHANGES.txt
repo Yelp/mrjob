@@ -1,4 +1,7 @@
-v0.4.1-dev, 2013-09-16 -- secondary sort and self-terminating job flows
+v0.4.2, 2013-??-??
+ * Fix to mrjob.parse.urlparse() that was breaking Python 2.5
+
+v0.4.1, 2013-09-16 -- secondary sort and self-terminating job flows
  * jobs:
    * SORT_VALUES: Secondary sort by value (#240)
      * see mrjob/examples/

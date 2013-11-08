@@ -2877,6 +2877,17 @@ class TestCatFallback(MockEMRAndS3TestCase):
             IOError, list,
             runner.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
 
+    def test_ssh_cat_errlog(self):
+        # A file *containing* an error message shouldn't cause an error.
+        runner = EMRJobRunner(conf_paths=[])
+        self.prepare_runner_for_ssh(runner)
+
+        error_message = 'cat: logs/err.log: No such file or directory\n'
+        mock_ssh_file('testmaster', 'logs/err.log', error_message)
+        self.assertEqual(
+            list(runner.cat(SSH_PREFIX + runner._address + '/logs/err.log')),
+            [error_message])
+
 
 class CleanUpJobTestCase(MockEMRAndS3TestCase):
 

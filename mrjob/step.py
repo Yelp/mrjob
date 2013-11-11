@@ -36,18 +36,18 @@ _JOB_STEP_PARAMS = _JOB_STEP_FUNC_PARAMS + _HADOOP_OPTS
 log = logging.getLogger(__name__)
 
 
-# used by MRJobStep below, to fake no mapper
+# used by MRStep below, to fake no mapper
 def _IDENTITY_MAPPER(key, value):
     yield key, value
 
 
-# used by MRJobStep below, to fake no reducer
+# used by MRStep below, to fake no reducer
 def _IDENTITY_REDUCER(key, values):
     for value in values:
         yield key, value
 
 
-class MRJobStep(object):
+class MRStep(object):
     """Represents steps handled by the script containing your job."""
 
     def __init__(self, **kwargs):
@@ -98,7 +98,7 @@ class MRJobStep(object):
             ', '.join('%s=%r' % (k, v) for k, v in not_none.iteritems()))
 
     def __eq__(self, other):
-        return (isinstance(other, MRJobStep) and self._steps == other._steps)
+        return (isinstance(other, MRStep) and self._steps == other._steps)
 
     def __getitem__(self, key):
         # always be prepared to run a mapper, since Hadoop Streaming requires

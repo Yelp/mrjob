@@ -40,7 +40,7 @@ from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.step import JarStep
-from mrjob.step import MRJobStep
+from mrjob.step import MRStep
 from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_tower_of_powers import MRTowerOfPowers
@@ -406,7 +406,7 @@ class PickProtocolsTestCase(unittest.TestCase):
                         self.assertIsInstance(actual_write, expect_write)
 
     def _streaming_step(self, n, *args, **kwargs):
-        return MRJobStep(*args, **kwargs).description(n)
+        return MRStep(*args, **kwargs).description(n)
 
     def _jar_step(self, n, *args, **kwargs):
         return JarStep(*args, **kwargs).description(n)
@@ -418,7 +418,7 @@ class PickProtocolsTestCase(unittest.TestCase):
             strict_protocols=True)
 
     def test_single_reducer(self):
-        # MRJobStep transparently adds mapper
+        # MRStep transparently adds mapper
         self._assert_script_protocols(
             [self._streaming_step(0, reducer=self._yield_none)],
             [(PickleProtocol, JSONProtocol),
@@ -1035,7 +1035,7 @@ class StepsTestCase(unittest.TestCase):
         j = self.SteppyJob(['--no-conf'])
         self.assertEqual(
             j.steps()[0],
-            MRJobStep(
+            MRStep(
                 mapper_init=j._yield_none,
                 mapper_pre_filter='cat',
                 reducer_cmd='wc -l'))
@@ -1063,4 +1063,4 @@ class StepsTestCase(unittest.TestCase):
 
         self.assertEqual(
             j.steps()[0],
-            MRJobStep(mapper=j.mapper))
+            MRStep(mapper=j.mapper))

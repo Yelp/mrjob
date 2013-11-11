@@ -45,7 +45,7 @@ from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.step import JarStep
-from mrjob.step import MRJobStep
+from mrjob.step import MRStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.util import read_input
 
@@ -335,7 +335,7 @@ class MRJob(MRJobLauncher):
                       if (getattr(self, func_name).im_func is not
                           getattr(MRJob, func_name).im_func))
 
-        # MRJobStep takes commands as strings, but the user defines them in the
+        # MRStep takes commands as strings, but the user defines them in the
         # class as functions that return strings, so call the functions.
         updates = {}
         for k, v in kwargs.iteritems():
@@ -382,7 +382,7 @@ class MRJob(MRJobLauncher):
         :param jobconf: dictionary with custom jobconf arguments to pass to
                         hadoop.
 
-        This is just a wrapper for :py:class:`~mrjob.step.MRJobStep`, plus
+        This is just a wrapper for :py:class:`~mrjob.step.MRStep`, plus
         a little logic to support deprecated use of positional arguments.
         """
         if args:
@@ -398,7 +398,7 @@ class MRJob(MRJobLauncher):
         if len(args) > 2:
             raise ValueError('mr() can take at most two positional arguments.')
 
-        return MRJobStep(**kwargs)
+        return MRStep(**kwargs)
 
     @classmethod
     def jar(cls, name, jar, main_class=None, step_args=None):

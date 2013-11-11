@@ -353,8 +353,7 @@ class MRJob(MRJobLauncher):
 
         Used by :py:meth:`steps`. (Don't re-define this, just call it!)
 
-        Accepts the following keyword arguments. For convenience, you may
-        specify *mapper* and *reducer* as positional arguments as well.
+        Accepts the following keyword arguments.
 
         :param mapper: function with same function signature as
                        :py:meth:`mapper`, or ``None`` for an identity mapper.
@@ -383,12 +382,12 @@ class MRJob(MRJobLauncher):
         :param jobconf: dictionary with custom jobconf arguments to pass to
                         hadoop.
 
-        Please consider the way we represent steps to be opaque, and expect
-        it to change in future versions of ``mrjob``.
+        This is just a wrapper for :py:class:`~mrjob.step.MRJobStep`, plus
+        a little logic to support deprecated use of positional arguments.
         """
         if args:
             log.warning('Using positional arguments to MRJob.mr() is'
-                        ' deprecated.')
+                        ' deprecated and will be removed in v0.5.0')
 
         if len(args) > 0:
             kwargs['mapper'] = args[0]

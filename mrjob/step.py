@@ -48,8 +48,11 @@ def _IDENTITY_REDUCER(key, values):
 
 
 class MRJobStep(object):
+    """Represents steps handled by the script containing your job."""
 
     def __init__(self, **kwargs):
+        """See :py:meth:`mrjob.job.MRJob.mr` for details."""
+
         # limit which keyword args can be specified
         bad_kwargs = sorted(set(kwargs) - set(_JOB_STEP_PARAMS))
         if bad_kwargs:
@@ -141,6 +144,42 @@ class MRJobStep(object):
         return self._render_substep('reducer_cmd', 'reducer_pre_filter')
 
     def description(self, step_num):
+        """Returns a dictionary representation of this step:
+
+        .. code-block:: js
+
+            {
+                'type': 'streaming',
+                'mapper': { ... },
+                'combiner': { ... },
+                'reducer': { ... },
+                'jobconf': dictionary of Hadoop configuration properties
+            }
+
+        ``jobconf`` is optional, and only one of ``mapper``, ``combiner``,
+        and ``reducer`` need be included.
+
+        ``mapper``, ``combiner``, and ``reducer`` are either handled by
+        the script containing your job definition:
+
+        .. code-block:: js
+
+           {
+               'type': 'script',
+               'pre_filter': (optional) cmd to pass input through, as a string
+           }
+
+        or they simply run a command:
+
+        .. code-block:: js
+
+            {
+                'type': 'command',
+                'command': command to run, as a string
+            }
+
+        See :ref:`steps-format` for examples.
+        """
         substep_descs = {'type': 'streaming'}
         # Use a mapper if:
         #   - the user writes one
@@ -198,9 +237,9 @@ class JarStep(object):
                 self.step_args == other.step_args)
 
     def description(self, step_num):
-        '''Returns a dictionary representation of the JarStep
+        """Returns a dictionary representation of this step:
 
-        format::
+        .. code-block:: js
 
             {
                 'type': 'jar',
@@ -209,7 +248,9 @@ class JarStep(object):
                 'main_class': string, name of the main class,
                 'step_args': list of strings, args to the main class,
             }
-        '''
+
+        See :ref:`steps-format` for examples.
+        """
         return {
             'type': 'jar',
             'name': self.name,

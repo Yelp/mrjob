@@ -588,9 +588,16 @@ for that step. For example::
              ]
 
 :py:class:`~mrjob.step.JarStep` has no concept of :ref:`job-protocols`. If your
-jar reads input from a :py:meth:`~mrjob.job.MRJob.mr()` step, that step
-will need to output data in the format your jar expects. You can set protocols
-for an individual step by overriding :py:meth:`~MRJob.job.pick_protocols`.
+jar reads input from a :py:meth:`~mrjob.job.MRJob.mr()` step, or writes input
+read by another :py:meth:`~mrjob.job.MRJob.mr()` step, it is up to those
+steps to read and write data in the format your jar expects.
+
+If you are writing the jar yourself, the easiest solution is to have it read
+and write mrjob's default protocol (lines containing two JSONs, separated
+by a tab).
+
+If you are using a third-party jar, you can set custom protocols for the steps
+before and after it by overriding :py:meth:`~mrjob.job.MRJob.pick_protocols`.
 
 .. warning::
 

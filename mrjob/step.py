@@ -207,7 +207,9 @@ class JarStep(object):
     """Represents a running a custom Jar as a step.
 
     :param name: The name of the step (currently ignored by EMR)
-    :param jar: The local path to the Jar. It will be uploaded to S3
+    :param jar: The local path to the Jar. On EMR, this can also be an
+                ``s3://`` URI, or ``file://`` to reference a jar on
+                the local filesystem of your EMR instance(s).
     :param main_class: The main class to run from the Jar.
     :param step_args: A list of strings which specify any arguments to the
                       Jar. See py:attr:`JarStep.INPUT` and

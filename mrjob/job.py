@@ -352,6 +352,7 @@ class MRJob(MRJobLauncher):
         mapper_init, reducer_final, etc.) for your job.
 
         Used by :py:meth:`steps`. (Don't re-define this, just call it!)
+        See :ref:`writing-multi-step-jobs` for sample usage.
 
         Accepts the following keyword arguments.
 
@@ -402,17 +403,9 @@ class MRJob(MRJobLauncher):
 
     @classmethod
     def jar(cls, name, jar, main_class=None, step_args=None):
-        """Define a jar step for your job.
+        """Alias for :py:class:`~mrjob.step.JarStep`.
 
-        Used by :py:meth:`steps`. (Don't re-define this, just call it!)
-
-        :param name: Name to give the job for display in Hadoop
-        :param jar: Hadoop-accessible path to the jar file to run
-        :param main_class: Path of the main class in the jar if not default
-        :param step_args: Extra arguments to pass the jar when running it
-
-        Please consider the way we represent steps to be opaque, and expect
-        it to change in future versions of ``mrjob``.
+        .. deprecated:: 0.4.2
         """
         return JarStep(name, jar, main_class=main_class, step_args=step_args)
 

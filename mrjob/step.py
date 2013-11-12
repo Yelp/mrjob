@@ -48,7 +48,8 @@ def _IDENTITY_REDUCER(key, values):
 
 
 class MRStep(object):
-    """Represents steps handled by the script containing your job."""
+    """Represents steps handled by the script containing your job.
+    """
 
     def __init__(self, **kwargs):
         """See :py:meth:`mrjob.job.MRJob.mr` for details."""
@@ -215,6 +216,8 @@ class JarStep(object):
                       Jar. See py:attr:`JarStep.INPUT` and
                       py:attr:`JarStep.OUTPUT` for information about
                       passing input and output paths to the jar.
+
+    See :ref:`non-hadoop-streaming-jar-steps` for sample usage.
     """
     #: If this is passed as one of the step's arguments, it'll be replaced
     #: with the step's input paths (if there are multiple paths, they'll

@@ -313,23 +313,6 @@ features such as pipes, you can use :py:func:`mrjob.util.bash_wrap()` to wrap
 your command in a call to ``bash``. See :ref:`cmd-filters` for an example of
 :py:func:`mrjob.util.bash_wrap()`.
 
-.. _non-hadoop-streaming-jar-steps:
-
-Jar steps
-^^^^^^^^^
-
-You can ignore Hadoop Streaming entirely for a step by using
-:py:meth:`~mrjob.job.MRJob.jar()` instead of :py:meth:`~mrjob.job.MRJob.mr()` .
-For example, on EMR you can use a jar to run a script::
-
-    class ScriptyJarJob(MRJob):
-
-        def steps(self):
-            return [self.jar(
-                name='run a script',
-                jar='s3://elasticmapreduce/libs/script-runner/script-runner.jar',
-                step_args=['s3://my_bucket/my_script.sh'])]
-
 .. _job-protocols:
 
 Protocols
@@ -396,7 +379,7 @@ keys, and don't write a key as output.
 .. rubric:: Footnotes
 
 .. [#hc] This behavior is configurable, but there is currently no
-    mrjob-specific documentation. `Gitub pull requests
+    mrjob-specific documentation. `GitHub pull requests
     <http://www.github.com/yelp/mrjob>`_ are always
     appreciated.
 
@@ -564,6 +547,59 @@ Here is a simplified version of mrjob's JSON protocol::
 You can improve performance significantly by caching the
 serialization/deserialization results of keys. Look at the source code of
 :py:mod:`mrjob.protocol` for an example.
+
+
+.. _non-hadoop-streaming-jar-steps:
+
+Jar steps
+^^^^^^^^^
+
+You can run Java directly on Hadoop (bypassing Hadoop Streaming) by using
+:py:class:`~mrjob.step.JarStep` instead of :py:meth:`~mrjob.job.MRJob.mr()`.
+
+For example, on EMR you can use a jar to run a script::
+
+    from mrjob.job import MRJob
+    from mrjob.step import JarStep
+
+    class ScriptyJarJob(MRJob):
+
+        def steps(self):
+            return [JarStep(
+                name='run a script',
+                jar='s3://elasticmapreduce/libs/script-runner/script-runner.jar',
+                step_args=['s3://my_bucket/my_script.sh'])]
+
+More interesting is combining :py:meth:`~mrjob.job.MRJob.mr()` and
+:py:class:`~mrjob.step.JarStep` in the same job. Use ``JarStep.INPUT`` and
+``JarStep.OUTPUT`` in *step_args* to stand for the input and output paths
+for that step. For example::
+
+     class NaiveBayesJob(MRJob):
+
+         def steps(self):
+             return [
+                 self.mr(mapper=self.mapper, reducer=self.reducer),
+                 JarStep(
+                     name='naive bayes',
+                     jar='elephant-driver.jar',
+                     step_args=['naive-bayes', JarStep.INPUT, JarStep.OUTPUT]
+                 )
+             ]
+
+:py:class:`~mrjob.step.JarStep` has no concept of :ref:`job-protocols`. If your
+jar reads input from a :py:meth:`~mrjob.job.MRJob.mr()` step, that step
+will need to output data in the format your jar expects. You can set protocols
+for an individual step by overriding :py:meth:`~MRJob.job.pick_protocols`.
+
+.. warning::
+
+    If the first step of your job is a :py:class:`~mrjob.step.JarStep` and you
+    pass in multiple input paths, mrjob will replace ``JarStep.INPUT`` with the
+    input paths joined together with a comma. Not all jars can handle this!
+
+    Best practice is to put all your input into a single directory and pass
+    that as your input path.
 
 .. _writing-cl-opts:
 

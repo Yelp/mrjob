@@ -164,6 +164,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
 
 class HadoopJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.
+    Invoked when you run your job with ``-r hadoop``.
 
     Input and support files can be either local or on HDFS; use ``hdfs://...``
     URLs to refer to files on HDFS.

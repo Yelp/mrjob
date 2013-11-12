@@ -523,6 +523,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
 class EMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
+    Invoked when you run your job with ``-r emr``.
 
     :py:class:`EMRJobRunner` runs your job in an EMR job flow, which is
     basically a temporary Hadoop cluster. Normally, it creates a job flow

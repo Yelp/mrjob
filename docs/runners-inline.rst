@@ -1,4 +1,4 @@
-mrjob.inline - alternate (debugger-friendly) local testing
+mrjob.inline - debugger-friendly local testing
 ==========================================================
 
 .. py:module:: mrjob.inline

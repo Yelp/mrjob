@@ -713,7 +713,7 @@ class MRJobRunner(object):
 
                 if steps_proc.returncode != 0:
                     raise Exception(
-                        'error getting step information: %s', stderr)
+                        'error getting step information: \n%s' % stderr)
 
                 try:
                     steps = json.loads(stdout)

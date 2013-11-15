@@ -19,6 +19,7 @@ import bz2
 import gzip
 import optparse
 import os
+import random
 import shutil
 from subprocess import PIPE
 from subprocess import Popen
@@ -497,6 +498,27 @@ class ReadFileTestCase(unittest.TestCase):
             output.append(line)
 
         self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
+
+    def test_read_large_bz2_file(self):
+        # catch incorrect use of bz2 library (Issue #814)
+
+        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
+        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
+
+        # can't just repeat same value, because we need the file to be
+        # compressed! 50000 lines is too few to catch the bug.
+        random.seed(0)
+        for _ in xrange(100000):
+            input_bz2.write('%016x\n' % random.randint(0, 2 ** 64 - 1))
+        input_bz2.close()
+
+        random.seed(0)
+        num_lines = 0
+        for line in read_file(input_bz2_path):
+            self.assertEqual(line, '%016x\n' % random.randint(0, 2 ** 64 - 1))
+            num_lines += 1
+
+        self.assertEqual(num_lines, 100000)
 
     def test_read_gz_file_from_fileobj(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')

@@ -541,9 +541,7 @@ class ReadFileTestCase(unittest.TestCase):
 
         output = []
         with open(input_bz2_path) as f:
-            # bunzip2_stream() should only iterate on f
-            f_iter = (line for line in f)
-            for line in read_file(input_bz2_path, fileobj=f_iter):
+            for line in read_file(input_bz2_path, fileobj=OnlyReadWrapper(f)):
                 output.append(line)
 
         self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])

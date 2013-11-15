@@ -491,7 +491,7 @@ def bunzip2_stream(fileobj, bufsize=1024):
         This yields lines for backwards compatibility only; in v0.5.0
         it will yield arbitrary chunks of data as part of supporting
         non-line-based protocols (see `Issue #715
-        <https://github.com/Yelp/mrjob/issues/715`_). If you want lines,
+        <https://github.com/Yelp/mrjob/issues/715>`_). If you want lines,
         wrap this in :py:func:`buffer_iterator_to_line_iterator`.
     """
     return buffer_iterator_to_line_iterator(_bunzip2_stream(fileobj, bufsize))

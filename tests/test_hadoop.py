@@ -497,10 +497,12 @@ class JarStepTestCase(MockHadoopTestCase):
                 self.assertEqual(jar_args[0], 'jar')
                 self.assertEqual(jar_args[1], fake_jar)
                 self.assertEqual(jar_args[2], 'stuff')
+
                 # check input is interpolated
                 input_arg = ','.join(
                     runner._upload_mgr.uri(path) for path in (input1, input2))
                 self.assertEqual(jar_args[3], input_arg)
+
                 # check output of jar is input of next step
                 jar_output_arg = jar_args[4]
                 streaming_input_arg = streaming_args[

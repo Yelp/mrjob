@@ -28,7 +28,6 @@ import logging
 import os
 import os.path
 import posixpath
-import py_compile
 import shutil
 from StringIO import StringIO
 import tempfile
@@ -71,6 +70,7 @@ from tests.mockssh import create_mock_ssh_script
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
+from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
@@ -3132,9 +3132,9 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
         self.runner._add_job_files_for_upload()
 
         self.simple_patch(
-            self.runner, '_s3_step_input_uris', return_value=['input'])
+            self.runner, '_step_input_uris', return_value=['input'])
         self.simple_patch(
-            self.runner, '_s3_step_output_uri', return_value=['output'])
+            self.runner, '_step_output_uri', return_value=['output'])
         self.simple_patch(
             self.runner, '_get_streaming_jar', return_value=['streaming.jar'])
 
@@ -3311,3 +3311,43 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             self.assertEqual(len(job_flow.steps), 1)
             self.assertEqual(job_flow.steps[0].jar,
                              '/home/hadoop/hadoop-examples.jar')
+
+    def test_input_output_interpolation(self):
+        fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
+        open(fake_jar, 'w').close()
+        input1 = os.path.join(self.tmp_dir, 'input1')
+        open(input1, 'w').close()
+        input2 = os.path.join(self.tmp_dir, 'input2')
+        open(input2, 'w').close()
+
+        job = MRJarAndStreaming(
+            ['-r', 'emr', '--jar', fake_jar, input1, input2])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+
+            self.assertEqual(len(job_flow.steps), 2)
+            jar_step, streaming_step = job_flow.steps
+
+            # on EMR, the jar gets uploaded
+            self.assertEqual(jar_step.jar, runner._upload_mgr.uri(fake_jar))
+
+            jar_args = [arg.value for arg in jar_step.args]
+            self.assertEqual(len(jar_args), 3)
+            self.assertEqual(jar_args[0], 'stuff')
+
+            # check input is interpolated
+            input_arg = ','.join(
+                runner._upload_mgr.uri(path) for path in (input1, input2))
+            self.assertEqual(jar_args[1], input_arg)
+
+            # check output of jar is input of next step
+            jar_output_arg = jar_args[2]
+            streaming_args = [arg.value for arg in streaming_step.args]
+            streaming_input_arg = streaming_args[
+                streaming_args.index('-input') + 1]
+            self.assertEqual(jar_output_arg, streaming_input_arg)

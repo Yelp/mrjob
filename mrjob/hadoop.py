@@ -27,6 +27,7 @@ try:
 except ImportError:
     pty = None
 
+import mrjob.step
 from mrjob.setup import UploadDirManager
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
@@ -163,6 +164,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
 
 class HadoopJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.
+    Invoked when you run your job with ``-r hadoop``.
 
     Input and support files can be either local or on HDFS; use ``hdfs://...``
     URLs to refer to files on HDFS.
@@ -460,8 +462,17 @@ class HadoopJobRunner(MRJobRunner):
         if step.get('main_class'):
             args.append(step['main_class'])
 
+        # TODO: merge with logic in mrjob/emr.py
+        def interpolate(arg):
+            if arg == mrjob.step.JarStep.INPUT:
+                return ','.join(self._hdfs_step_input_files(step_num))
+            elif arg == mrjob.step.JarStep.OUTPUT:
+                return self._hdfs_step_output_dir(step_num)
+            else:
+                return arg
+
         if step.get('step_args'):
-            args.extend(step['step_args'])
+            args.extend(interpolate(arg) for arg in step['step_args'])
 
         return args
 

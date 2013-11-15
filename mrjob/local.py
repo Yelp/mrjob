@@ -92,19 +92,18 @@ class LocalRunnerOptionStore(SimRunnerOptionStore):
 
 class LocalMRJobRunner(SimMRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing purposes.
+    Invoked when you run your job with ``-r local``.
 
-    This is NOT the default way of running jobs; we assume you'll spend some
-    time debugging your job before you're ready to run it on EMR or Hadoop.
+    Unlike :py:class:`~mrjob.job.InlineMRJobRunner`, this actually spawns
+    multiple subprocesses for each task.
+
+    This is fairly inefficient and *not* a substitute for Hadoop; it's
+    main purpose is to help you test out :mrjob-opt:`setup` commands.
 
     It's rare to need to instantiate this class directly (see
     :py:meth:`~LocalMRJobRunner.__init__` for details).
 
-    :py:class:`LocalMRJobRunner` adds the current working directory to the
-    subprocesses' :envvar:`PYTHONPATH`, so if you're using it to test an EMR
-    job locally, be aware that it may see more Python modules than will
-    actaully be uploaded. This behavior may change in the future.
     """
-
     alias = 'local'
 
     OPTION_STORE_CLASS = LocalRunnerOptionStore

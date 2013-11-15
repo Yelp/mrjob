@@ -45,7 +45,7 @@ from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.step import JarStep
-from mrjob.step import MRJobStep
+from mrjob.step import MRStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.util import read_input
 
@@ -335,7 +335,7 @@ class MRJob(MRJobLauncher):
                       if (getattr(self, func_name).im_func is not
                           getattr(MRJob, func_name).im_func))
 
-        # MRJobStep takes commands as strings, but the user defines them in the
+        # MRStep takes commands as strings, but the user defines them in the
         # class as functions that return strings, so call the functions.
         updates = {}
         for k, v in kwargs.iteritems():
@@ -352,9 +352,9 @@ class MRJob(MRJobLauncher):
         mapper_init, reducer_final, etc.) for your job.
 
         Used by :py:meth:`steps`. (Don't re-define this, just call it!)
+        See :ref:`writing-multi-step-jobs` for sample usage.
 
-        Accepts the following keyword arguments. For convenience, you may
-        specify *mapper* and *reducer* as positional arguments as well.
+        Accepts the following keyword arguments.
 
         :param mapper: function with same function signature as
                        :py:meth:`mapper`, or ``None`` for an identity mapper.
@@ -383,12 +383,12 @@ class MRJob(MRJobLauncher):
         :param jobconf: dictionary with custom jobconf arguments to pass to
                         hadoop.
 
-        Please consider the way we represent steps to be opaque, and expect
-        it to change in future versions of ``mrjob``.
+        This is just a wrapper for :py:class:`~mrjob.step.MRStep`, plus
+        a little logic to support deprecated use of positional arguments.
         """
         if args:
             log.warning('Using positional arguments to MRJob.mr() is'
-                        ' deprecated.')
+                        ' deprecated and will be removed in v0.5.0')
 
         if len(args) > 0:
             kwargs['mapper'] = args[0]
@@ -399,21 +399,13 @@ class MRJob(MRJobLauncher):
         if len(args) > 2:
             raise ValueError('mr() can take at most two positional arguments.')
 
-        return MRJobStep(**kwargs)
+        return MRStep(**kwargs)
 
     @classmethod
     def jar(cls, name, jar, main_class=None, step_args=None):
-        """Define a jar step for your job.
+        """Alias for :py:class:`~mrjob.step.JarStep`.
 
-        Used by :py:meth:`steps`. (Don't re-define this, just call it!)
-
-        :param name: Name to give the job for display in Hadoop
-        :param jar: Hadoop-accessible path to the jar file to run
-        :param main_class: Path of the main class in the jar if not default
-        :param step_args: Extra arguments to pass the jar when running it
-
-        Please consider the way we represent steps to be opaque, and expect
-        it to change in future versions of ``mrjob``.
+        .. deprecated:: 0.4.2
         """
         return JarStep(name, jar, main_class=main_class, step_args=step_args)
 
@@ -842,9 +834,7 @@ class MRJob(MRJobLauncher):
         :type step_num: int
         :param step_num: which step to run (e.g. ``0`` for the first step)
         :type step_type: str
-        :param step_type: one of :py:data:`mrjob.step.'mapper'`,
-                          :py:data:`mrjob.step.'combiner'`, or
-                          :py:data:`mrjob.step.'reducer'`
+        :param step_type: one of `'mapper'`, `'combiner'`, or `'reducer'`
         :return: (read_function, write_function)
 
         By default, we use one protocol for reading input, one

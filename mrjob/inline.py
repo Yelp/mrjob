@@ -43,14 +43,15 @@ DEFAULT_REDUCE_TASKS = 1
 
 
 class InlineMRJobRunner(SimMRJobRunner):
-    """Runs an :py:class:`~mrjob.job.MRJob` without invoking the job as
-    a subprocess, so it's easy to attach a debugger.
+    """Runs an :py:class:`~mrjob.job.MRJob` in the same process, so it's easy
+    to attach a debugger.
 
-    This is the default way of testing jobs; We assume you'll spend some time
-    debugging your job before you're ready to run it on EMR or Hadoop.
+    This is the default way to run jobs (we assume you'll spend some time
+    debugging your job before you're ready to run it on EMR or Hadoop).
 
     To more accurately simulate your environment prior to running on
-    Hadoop/EMR, use ``-r local``.
+    Hadoop/EMR, use ``-r local`` (see
+    :py:class:`~mrjob.local.LocalMRJobRunner`).
     """
     alias = 'inline'
 

@@ -40,6 +40,7 @@ from mrjob.util import shlex_split
 
 from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import add_mock_hadoop_output
+from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
 from tests.quiet import logger_disabled
@@ -462,24 +463,48 @@ class JarStepTestCase(MockHadoopTestCase):
                 self.assertRaises(CalledProcessError, runner.run)
 
         with open(os.environ['MOCK_HADOOP_LOG']) as hadoop_log:
-            hadoop_jar_lines = [line for line in hadoop_log
-                                if line.startswith('jar ')]
+            hadoop_jar_lines = [
+                line for line in hadoop_log if line.startswith('jar ')]
             self.assertEqual(len(hadoop_jar_lines), 1)
             self.assertEqual(hadoop_jar_lines[0].rstrip(), 'jar ' + jar_uri)
 
-    def test_file_jar_uri(self):
+    def test_input_output_interpolation(self):
         fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
         open(fake_jar, 'w').close()
-        jar_uri = 'file://' + fake_jar
+        input1 = os.path.join(self.tmp_dir, 'input1')
+        open(input1, 'w').close()
+        input2 = os.path.join(self.tmp_dir, 'input2')
+        open(input2, 'w').close()
 
-        job = MRJustAJar(['-r', 'hadoop', '--jar', jar_uri])
+        job = MRJarAndStreaming(
+            ['-r', 'hadoop', '--jar', fake_jar, input1, input2])
         job.sandbox()
+
+        add_mock_hadoop_output([''])  # need this for streaming step
 
         with job.make_runner() as runner:
             runner.run()
 
-        with open(os.environ['MOCK_HADOOP_LOG']) as hadoop_log:
-            hadoop_jar_lines = [line for line in hadoop_log
-                                if line.startswith('jar ')]
-            self.assertEqual(len(hadoop_jar_lines), 1)
-            self.assertEqual(hadoop_jar_lines[0].rstrip(), 'jar ' + fake_jar)
+            with open(os.environ['MOCK_HADOOP_LOG']) as hadoop_log:
+                hadoop_jar_lines = [
+                    line for line in hadoop_log if line.startswith('jar ')]
+
+                self.assertEqual(len(hadoop_jar_lines), 2)
+                jar_args = hadoop_jar_lines[0].rstrip().split()
+                streaming_args = hadoop_jar_lines[1].rstrip().split()
+
+                self.assertEqual(len(jar_args), 5)
+                self.assertEqual(jar_args[0], 'jar')
+                self.assertEqual(jar_args[1], fake_jar)
+                self.assertEqual(jar_args[2], 'stuff')
+
+                # check input is interpolated
+                input_arg = ','.join(
+                    runner._upload_mgr.uri(path) for path in (input1, input2))
+                self.assertEqual(jar_args[3], input_arg)
+
+                # check output of jar is input of next step
+                jar_output_arg = jar_args[4]
+                streaming_input_arg = streaming_args[
+                    streaming_args.index('-input') + 1]
+                self.assertEqual(jar_output_arg, streaming_input_arg)

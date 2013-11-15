@@ -1,5 +1,5 @@
-mrjob.job
-=========
+mrjob.job - defining your job
+=============================
 
 .. py:module:: mrjob.job
 

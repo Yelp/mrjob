@@ -20,7 +20,7 @@ except ImportError:
 
 from mrjob.step import _IDENTITY_MAPPER
 from mrjob.step import JarStep
-from mrjob.step import MRJobStep
+from mrjob.step import MRStep
 
 
 # functions we don't really care about the values of
@@ -62,19 +62,19 @@ class JarStepTestCase(TestCase):
         self.assertEqual(JarStep(**kwargs).description(0), expected)
 
 
-class MRJobStepInitTestCase(TestCase):
+class MRStepInitTestCase(TestCase):
 
     ### Basic behavior ###
 
     def test_nothing_specified(self):
-        self.assertRaises(ValueError, MRJobStep)
+        self.assertRaises(ValueError, MRStep)
 
     def test_only_hadoop_opts(self):
-        self.assertRaises(ValueError, MRJobStep,
+        self.assertRaises(ValueError, MRStep,
                           jobconf={'dfs.block.size': '134217728'})
 
     def _test_explicit(self, m=False, c=False, r=False, **kwargs):
-        s = MRJobStep(**kwargs)
+        s = MRStep(**kwargs)
         self.assertEqual(s.has_explicit_mapper, m)
         self.assertEqual(s.has_explicit_combiner, c)
         self.assertEqual(s.has_explicit_reducer, r)
@@ -137,7 +137,7 @@ class MRJobStepInitTestCase(TestCase):
     ### Conflicts ###
 
     def _test_conflict(self, **kwargs):
-        self.assertRaises(ValueError, MRJobStep, **kwargs)
+        self.assertRaises(ValueError, MRStep, **kwargs)
 
     def test_conflict_mapper(self):
         self._test_conflict(mapper_cmd='cat', mapper=identity_mapper)
@@ -149,24 +149,24 @@ class MRJobStepInitTestCase(TestCase):
         self._test_conflict(reducer_cmd='cat', reducer=identity_reducer)
 
 
-class MRJobStepGetItemTestCase(TestCase):
+class MRStepGetItemTestCase(TestCase):
 
     def test_get_identity_mapper(self):
         # this is the weird behavior
-        self.assertEqual(MRJobStep(mapper_final=identity_mapper)['mapper'],
+        self.assertEqual(MRStep(mapper_final=identity_mapper)['mapper'],
                          _IDENTITY_MAPPER)
 
     def test_get_regular_mapper(self):
         # this is the normal behavior
-        self.assertEqual(MRJobStep(mapper=identity_mapper)['mapper'],
+        self.assertEqual(MRStep(mapper=identity_mapper)['mapper'],
                          identity_mapper)
 
 
-class MRJobStepDescriptionTestCase(TestCase):
+class MRStepDescriptionTestCase(TestCase):
 
     def test_render_mapper(self):
         self.assertEqual(
-            MRJobStep(mapper=identity_mapper).description(0),
+            MRStep(mapper=identity_mapper).description(0),
             {
             'type': 'streaming',
             'mapper': {
@@ -176,7 +176,7 @@ class MRJobStepDescriptionTestCase(TestCase):
 
     def test_render_reducer_first_mapper_implied(self):
         self.assertEqual(
-            MRJobStep(reducer=identity_reducer).description(0),
+            MRStep(reducer=identity_reducer).description(0),
             {
                 'type': 'streaming',
                 'mapper': {
@@ -188,7 +188,7 @@ class MRJobStepDescriptionTestCase(TestCase):
             })
 
     def test_render_reducer_first_mapper_not_implied(self):
-        self.assertEqual(MRJobStep(
+        self.assertEqual(MRStep(
             reducer=identity_reducer).description(1),
             {
                 'type': 'streaming',
@@ -199,7 +199,7 @@ class MRJobStepDescriptionTestCase(TestCase):
 
     def test_render_combiner(self):
         self.assertEqual(
-            MRJobStep(combiner=identity_reducer).description(1),
+            MRStep(combiner=identity_reducer).description(1),
             {
                 'type': 'streaming',
                 'mapper': {
@@ -212,7 +212,7 @@ class MRJobStepDescriptionTestCase(TestCase):
 
     def test_render_mapper_pre_filter(self):
         self.assertEqual(
-            MRJobStep(
+            MRStep(
                 mapper=identity_mapper,
                 mapper_pre_filter='cat').description(0),
             {
@@ -225,7 +225,7 @@ class MRJobStepDescriptionTestCase(TestCase):
 
     def test_render_reducer_pre_filter(self):
         self.assertEqual(
-            MRJobStep(
+            MRStep(
                 reducer=identity_reducer,
                 reducer_pre_filter='cat').description(1),
             {
@@ -238,7 +238,7 @@ class MRJobStepDescriptionTestCase(TestCase):
 
     def test_render_mapper_cmd(self):
         self.assertEqual(
-            MRJobStep(mapper_cmd='cat').description(0),
+            MRStep(mapper_cmd='cat').description(0),
             {
                 'type': 'streaming',
                 'mapper': {
@@ -249,7 +249,7 @@ class MRJobStepDescriptionTestCase(TestCase):
 
     def test_render_reducer_cmd_first_mapper_implied(self):
         self.assertEqual(
-            MRJobStep(reducer_cmd='cat').description(0),
+            MRStep(reducer_cmd='cat').description(0),
             {
                 'type': 'streaming',
                 'mapper': {
@@ -263,7 +263,7 @@ class MRJobStepDescriptionTestCase(TestCase):
 
     def test_render_reducer_cmd_first_mapper_not_implied(self):
         self.assertEqual(
-            MRJobStep(reducer_cmd='cat').description(1),
+            MRStep(reducer_cmd='cat').description(1),
             {
                 'type': 'streaming',
                 'reducer': {
@@ -274,7 +274,7 @@ class MRJobStepDescriptionTestCase(TestCase):
 
     def test_render_combiner_cmd(self):
         self.assertEqual(
-            MRJobStep(combiner_cmd='cat').description(1),
+            MRStep(combiner_cmd='cat').description(1),
             {
                 'type': 'streaming',
                 'mapper': {
@@ -287,7 +287,7 @@ class MRJobStepDescriptionTestCase(TestCase):
             })
 
     def test_render_jobconf(self):
-        step = MRJobStep(mapper=identity_mapper,
+        step = MRStep(mapper=identity_mapper,
                          jobconf={'dfs.block.size': '134217728'})
 
         self.assertEqual(

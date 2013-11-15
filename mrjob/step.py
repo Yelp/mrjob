@@ -36,20 +36,24 @@ _JOB_STEP_PARAMS = _JOB_STEP_FUNC_PARAMS + _HADOOP_OPTS
 log = logging.getLogger(__name__)
 
 
-# used by MRJobStep below, to fake no mapper
+# used by MRStep below, to fake no mapper
 def _IDENTITY_MAPPER(key, value):
     yield key, value
 
 
-# used by MRJobStep below, to fake no reducer
+# used by MRStep below, to fake no reducer
 def _IDENTITY_REDUCER(key, values):
     for value in values:
         yield key, value
 
 
-class MRJobStep(object):
+class MRStep(object):
+    """Represents steps handled by the script containing your job.
+    """
 
     def __init__(self, **kwargs):
+        """See :py:meth:`mrjob.job.MRJob.mr` for details."""
+
         # limit which keyword args can be specified
         bad_kwargs = sorted(set(kwargs) - set(_JOB_STEP_PARAMS))
         if bad_kwargs:
@@ -95,7 +99,7 @@ class MRJobStep(object):
             ', '.join('%s=%r' % (k, v) for k, v in not_none.iteritems()))
 
     def __eq__(self, other):
-        return (isinstance(other, MRJobStep) and self._steps == other._steps)
+        return (isinstance(other, MRStep) and self._steps == other._steps)
 
     def __getitem__(self, key):
         # always be prepared to run a mapper, since Hadoop Streaming requires
@@ -141,6 +145,42 @@ class MRJobStep(object):
         return self._render_substep('reducer_cmd', 'reducer_pre_filter')
 
     def description(self, step_num):
+        """Returns a dictionary representation of this step:
+
+        .. code-block:: js
+
+            {
+                'type': 'streaming',
+                'mapper': { ... },
+                'combiner': { ... },
+                'reducer': { ... },
+                'jobconf': dictionary of Hadoop configuration properties
+            }
+
+        ``jobconf`` is optional, and only one of ``mapper``, ``combiner``,
+        and ``reducer`` need be included.
+
+        ``mapper``, ``combiner``, and ``reducer`` are either handled by
+        the script containing your job definition:
+
+        .. code-block:: js
+
+           {
+               'type': 'script',
+               'pre_filter': (optional) cmd to pass input through, as a string
+           }
+
+        or they simply run a command:
+
+        .. code-block:: js
+
+            {
+                'type': 'command',
+                'command': command to run, as a string
+            }
+
+        See :ref:`steps-format` for examples.
+        """
         substep_descs = {'type': 'streaming'}
         # Use a mapper if:
         #   - the user writes one
@@ -160,7 +200,32 @@ class MRJobStep(object):
         return substep_descs
 
 
+# for backwards compatibility; remove in v0.5.0
+MRJobStep = MRStep
+
+
 class JarStep(object):
+    """Represents a running a custom Jar as a step.
+
+    :param name: The name of the step (currently ignored by EMR)
+    :param jar: The local path to the Jar. On EMR, this can also be an
+                ``s3://`` URI, or ``file://`` to reference a jar on
+                the local filesystem of your EMR instance(s).
+    :param main_class: The main class to run from the Jar.
+    :param step_args: A list of strings which specify any arguments to the
+                      Jar. See py:attr:`JarStep.INPUT` and
+                      py:attr:`JarStep.OUTPUT` for information about
+                      passing input and output paths to the jar.
+
+    See :ref:`non-hadoop-streaming-jar-steps` for sample usage.
+    """
+    #: If this is passed as one of the step's arguments, it'll be replaced
+    #: with the step's input paths (if there are multiple paths, they'll
+    #: be joined with commas)
+    INPUT = '<input>'
+    #: If this is passed as one of the step's arguments, it'll be replaced
+    #: with the step's output path
+    OUTPUT = '<output>'
 
     def __init__(self, name, jar, main_class=None, step_args=None):
         self.name = name
@@ -181,6 +246,20 @@ class JarStep(object):
                 self.step_args == other.step_args)
 
     def description(self, step_num):
+        """Returns a dictionary representation of this step:
+
+        .. code-block:: js
+
+            {
+                'type': 'jar',
+                'name': name of the JarStep,
+                'jar': local path to the jar,
+                'main_class': string, name of the main class,
+                'step_args': list of strings, args to the main class,
+            }
+
+        See :ref:`steps-format` for examples.
+        """
         return {
             'type': 'jar',
             'name': self.name,

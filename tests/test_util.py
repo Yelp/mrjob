@@ -19,6 +19,7 @@ import bz2
 import gzip
 import optparse
 import os
+import random
 import shutil
 from subprocess import PIPE
 from subprocess import Popen
@@ -427,7 +428,18 @@ class ArchiveTestCase(unittest.TestCase):
             unarchive, join(self.tmp_dir, 'a', 'foo'), join(self.tmp_dir, 'b'))
 
 
-class read_fileTest(unittest.TestCase):
+class OnlyReadWrapper(object):
+    """Restrict a file object to only the read() method (used by
+    ReadFileTestCase)."""
+
+    def __init__(self, fp):
+        self.fp = fp
+
+    def read(self, *args, **kwargs):
+        return self.fp.read(*args, **kwargs)
+
+
+class ReadFileTestCase(unittest.TestCase):
 
     def setUp(self):
         self.make_tmp_dir()
@@ -441,7 +453,7 @@ class read_fileTest(unittest.TestCase):
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
-    def test_read_file_uncompressed(self):
+    def test_read_uncompressed_file(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
             input_file.write('bar\nfoo\n')
@@ -452,7 +464,7 @@ class read_fileTest(unittest.TestCase):
 
         self.assertEqual(output, ['bar\n', 'foo\n'])
 
-    def test_read_file_uncompressed_stream(self):
+    def test_read_uncompressed_file_from_fileobj(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
             input_file.write('bar\nfoo\n')
@@ -463,7 +475,7 @@ class read_fileTest(unittest.TestCase):
 
         self.assertEqual(output, ['bar\n', 'foo\n'])
 
-    def test_read_file_compressed(self):
+    def test_read_gz_file(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
         input_gz = gzip.GzipFile(input_gz_path, 'w')
         input_gz.write('foo\nbar\n')
@@ -475,6 +487,7 @@ class read_fileTest(unittest.TestCase):
 
         self.assertEqual(output, ['foo\n', 'bar\n'])
 
+    def test_read_bz2_file(self):
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
         input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
         input_bz2.write('bar\nbar\nfoo\n')
@@ -486,20 +499,32 @@ class read_fileTest(unittest.TestCase):
 
         self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
 
-    def test_cat_compressed_stream(self):
+    def test_read_large_bz2_file(self):
+        # catch incorrect use of bz2 library (Issue #814)
+
+        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
+        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
+
+        # can't just repeat same value, because we need the file to be
+        # compressed! 50000 lines is too few to catch the bug.
+        random.seed(0)
+        for _ in xrange(100000):
+            input_bz2.write('%016x\n' % random.randint(0, 2 ** 64 - 1))
+        input_bz2.close()
+
+        random.seed(0)
+        num_lines = 0
+        for line in read_file(input_bz2_path):
+            self.assertEqual(line, '%016x\n' % random.randint(0, 2 ** 64 - 1))
+            num_lines += 1
+
+        self.assertEqual(num_lines, 100000)
+
+    def test_read_gz_file_from_fileobj(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
         input_gz = gzip.GzipFile(input_gz_path, 'w')
         input_gz.write('foo\nbar\n')
         input_gz.close()
-
-        # restrict a file object to only the read() method
-        class OnlyReadWrapper(object):
-
-            def __init__(self, fp):
-                self.fp = fp
-
-            def read(self, *args, **kwargs):
-                return self.fp.read(*args, **kwargs)
 
         output = []
         with open(input_gz_path) as f:
@@ -508,13 +533,15 @@ class read_fileTest(unittest.TestCase):
 
         self.assertEqual(output, ['foo\n', 'bar\n'])
 
+    def test_read_bz2_file_from_fileobj(self):
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
         input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
         input_bz2.write('bar\nbar\nfoo\n')
         input_bz2.close()
 
         output = []
-        for line in read_file(input_bz2_path, fileobj=open(input_bz2_path)):
-            output.append(line)
+        with open(input_bz2_path) as f:
+            for line in read_file(input_bz2_path, fileobj=OnlyReadWrapper(f)):
+                output.append(line)
 
         self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])

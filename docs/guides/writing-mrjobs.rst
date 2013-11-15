@@ -575,17 +575,17 @@ More interesting is combining :py:meth:`~mrjob.job.MRJob.mr()` and
 ``JarStep.OUTPUT`` in *step_args* to stand for the input and output paths
 for that step. For example::
 
-     class NaiveBayesJob(MRJob):
+    class NaiveBayesJob(MRJob):
 
-         def steps(self):
-             return [
-                 self.mr(mapper=self.mapper, reducer=self.reducer),
-                 JarStep(
-                     name='naive bayes',
-                     jar='elephant-driver.jar',
-                     step_args=['naive-bayes', JarStep.INPUT, JarStep.OUTPUT]
-                 )
-             ]
+        def steps(self):
+            return [
+                self.mr(mapper=self.mapper, reducer=self.reducer),
+                JarStep(
+                    name='naive bayes',
+                    jar='elephant-driver.jar',
+                    step_args=['naive-bayes', JarStep.INPUT, JarStep.OUTPUT]
+                )
+            ]
 
 :py:class:`~mrjob.step.JarStep` has no concept of :ref:`job-protocols`. If your
 jar reads input from a :py:meth:`~mrjob.job.MRJob.mr()` step, or writes input

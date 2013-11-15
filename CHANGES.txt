@@ -41,7 +41,7 @@ v0.4.1, 2013-09-16 -- secondary sort and self-terminating job flows
    * old conf locations (~/.mrjob and in PYTHONPATH) (#747)
    * built-in protocols must be instances (#488)
 
-v0.4, 2013-04-30 -- Slouching toward nirvana
+v0.4.0, 2013-04-30 -- Slouching toward nirvana
  * Changes:
    * 'mrjob' command (#225)
    * Changed default runner from 'local' to 'inline' (#423)

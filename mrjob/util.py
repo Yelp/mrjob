@@ -63,20 +63,31 @@ def bash_wrap(cmd_str):
 def buffer_iterator_to_line_iterator(iterator):
     """boto's file iterator splits by buffer size instead of by newline. This
     wrapper puts them back into lines.
+
+    .. warning::
+
+        This may append a newline to your last chunk of data. In v0.5.0
+        it will not, for better compatibility with file objects.
     """
-    buf = iterator.next()  # might raise StopIteration, but that's okay
-    while True:
-        if '\n' in buf:
-            (line, buf) = buf.split('\n', 1)
-            yield line + '\n'
-        else:
-            try:
-                more = iterator.next()
-                buf += more
-            except StopIteration:
-                if buf:
-                    yield buf + '\n'
-                return
+    buf = ''
+    for chunk in iterator:
+        buf += chunk
+
+        # this is basically splitlines() without support for \r
+        start = 0
+        while True:
+            end = buf.find('\n', start) + 1
+            if end:  # if find() returned -1, end would be 0
+                yield buf[start:end]
+                start = end
+            else:
+                # this will happen eventually
+                buf = buf[start:]
+                break
+
+    if buf:
+        # in v0.5.0, don't append the newline
+        yield buf + '\n'
 
 
 def cmd_line(args):

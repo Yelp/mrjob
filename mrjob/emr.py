@@ -2360,11 +2360,26 @@ class EMRJobRunner(MRJobRunner):
             raise ImportError('You must install boto to connect to EMR')
 
         def emr_conn_for_endpoint(endpoint):
-            return boto.emr.connection.EmrConnection(
+            # the page below requires an actual region name
+            region_name = self._aws_region or 'us-east-1'
+
+            conn = boto.emr.connection.EmrConnection(
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 region=boto.regioninfo.RegionInfo(
-                    name=self._aws_region, endpoint=endpoint))
+                    name=region_name, endpoint=endpoint,
+                    connection_cls=boto.emr.connection.EmrConnection))
+
+            # Issue #778: EMR's odd endpoint hostnames mess up
+            # HMAC v4 authentication in boto 2.10.0 thru 2.15.0.
+            # This basically applies the fix in boto 2.16.0
+            if not getattr(conn, 'auth_region_name', None):
+                conn.auth_region_name = region_name
+
+            if not getattr(conn, 'auth_service_name', None):
+                conn.auth_service_name = 'elasticmapreduce'
+
+            return conn
 
         endpoint = (self._opts['emr_endpoint'] or
                     emr_endpoint_for_region(self._aws_region))

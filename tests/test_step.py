@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for mrjob.step"""
+from __future__ import with_statement
+
 try:
     from unittest2 import TestCase
     TestCase  # silency pyflakes

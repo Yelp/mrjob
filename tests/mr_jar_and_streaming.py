@@ -25,9 +25,8 @@ class MRJarAndStreaming(MRJob):
     def steps(self):
         return [
              JarStep(
-                 name='',
                  jar=self.options.jar,
-                 step_args=['stuff', JarStep.INPUT, JarStep.OUTPUT]
+                 args=['stuff', JarStep.INPUT, JarStep.OUTPUT]
              ),
              self.mr(mapper=self.mapper, reducer=self.reducer)
          ]

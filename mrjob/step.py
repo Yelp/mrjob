@@ -33,13 +33,6 @@ _JOB_STEP_FUNC_PARAMS = _MAPPER_FUNCS + _COMBINER_FUNCS + _REDUCER_FUNCS
 # all allowable step params
 _JOB_STEP_PARAMS = _JOB_STEP_FUNC_PARAMS + _HADOOP_OPTS
 
-# old, deprecated args to JarStep.__init__()
-_JAR_STEP_DEPRECATED_KWARGS = ('name', 'step_args')
-
-# kwargs to JarStep.__init__()
-_JAR_STEP_ATTRS = ('jar', 'args', 'main_class')
-
-
 
 log = logging.getLogger(__name__)
 
@@ -281,7 +274,7 @@ class JarStep(object):
     def __eq__(self, other):
         return (isinstance(other, JarStep) and
                 all(getattr(self, key) == getattr(other, key)
-                    for key in _JAR_STEP_ATTRS))
+                    for key in ('jar', 'args', 'main_class')))
 
     def description(self, step_num):
         """Returns a dictionary representation of this step:

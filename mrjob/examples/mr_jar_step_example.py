@@ -20,8 +20,8 @@ class MRJarStepExample(MRJob):
 
     def steps(self):
         return [
-            JarStep(jar=HADOOP_EXAMPLES_JAR, name='',
-                    step_args=['wordcount', JarStep.INPUT, JarStep.OUTPUT]),
+            JarStep(jar=HADOOP_EXAMPLES_JAR,
+                    args=['wordcount', JarStep.INPUT, JarStep.OUTPUT]),
             self.mr(mapper=self.mapper, combiner=self.reducer,
                     reducer=self.reducer)
         ]

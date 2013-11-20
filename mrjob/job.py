@@ -402,12 +402,14 @@ class MRJob(MRJobLauncher):
         return MRStep(**kwargs)
 
     @classmethod
-    def jar(cls, name, jar, main_class=None, step_args=None):
+    def jar(cls, *args, **kwargs):
         """Alias for :py:class:`~mrjob.step.JarStep`.
 
         .. deprecated:: 0.4.2
         """
-        return JarStep(name, jar, main_class=main_class, step_args=step_args)
+        log.warning('MRJob.jar() is deprecated and will be removed in'
+                    ' v0.5.0. Use mrjob.step.JarStep directly.')
+        return JarStep(*args, **kwargs)
 
     def increment_counter(self, group, counter, amount=1):
         """Increment a counter in Hadoop streaming by printing to stderr. If

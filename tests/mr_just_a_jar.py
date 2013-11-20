@@ -26,7 +26,7 @@ class MRJustAJar(MRJob):
         self.add_passthrough_option('--jar')
 
     def steps(self):
-        return [JarStep('', self.options.jar)]
+        return [JarStep(jar=self.options.jar)]
 
 
 if __name__ == '__main__':

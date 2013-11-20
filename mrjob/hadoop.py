@@ -471,8 +471,8 @@ class HadoopJobRunner(MRJobRunner):
             else:
                 return arg
 
-        if step.get('step_args'):
-            args.extend(interpolate(arg) for arg in step['step_args'])
+        if step.get('args'):
+            args.extend(interpolate(arg) for arg in step['args'])
 
         return args
 

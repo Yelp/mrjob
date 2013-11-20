@@ -22,9 +22,10 @@ from mrjob.step import _IDENTITY_MAPPER
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 
+from tests.quiet import logger_disabled
+
 
 # functions we don't really care about the values of
-
 
 def identity_mapper(k=None, v=None):
     yield k, v
@@ -37,12 +38,14 @@ def identity_reducer(k, vals):
 
 class JarStepTestCase(TestCase):
 
+    def test_empty(self):
+        self.assertRaises(TypeError, JarStep)
+
     def test_all(self):
         kwargs = {
-            'name': 'step_name',
             'jar': 'binks.jar.jar',
             'main_class': 'MyMainMan',
-            'step_args': ['argh', 'argh'],
+            'args': ['argh', 'argh'],
         }
         expected = kwargs.copy()
         expected['type'] = 'jar'
@@ -50,16 +53,49 @@ class JarStepTestCase(TestCase):
 
     def test_some(self):
         kwargs = {
-            'name': 'step_name',
             'jar': 'binks.jar.jar',
         }
         expected = kwargs.copy()
         expected.update({
             'type': 'jar',
             'main_class': None,
-            'step_args': None,
+            'args': [],
         })
         self.assertEqual(JarStep(**kwargs).description(0), expected)
+
+
+class JarStepDeprecatedArgumentsTestCase(TestCase):
+
+    def test_positional(self):
+        with logger_disabled('mrjob.step'):
+            self.assertEqual(
+                JarStep('foo', 'bell.jar', 'First', ['one', '2']),
+                JarStep(jar='bell.jar', main_class='First', args=['one', '2'])
+            )
+
+    def test_mixed(self):
+        with logger_disabled('mrjob.step'):
+            self.assertEqual(
+                JarStep('foo', jar='bell.jar', args=['3', 'four']),
+                JarStep(jar='bell.jar', args=['3', 'four'])
+            )
+
+    def test_step_args_kwarg(self):
+        with logger_disabled('mrjob.step'):
+            self.assertEqual(
+                JarStep(jar='bell.jar', step_args=['5', 'six']),
+                JarStep(jar='bell.jar', args=['5', 'six'])
+            )
+
+    def test_name_kwarg(self):
+        with logger_disabled('mrjob.step'):
+            self.assertEqual(
+                JarStep(jar='pickle.jar', name='Bubbies'),
+                JarStep(jar='pickle.jar')
+            )
+
+    def test_bad_kwarg(self):
+        self.assertRaises(TypeError, JarStep, foo='bar')
 
 
 class MRStepInitTestCase(TestCase):

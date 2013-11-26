@@ -696,18 +696,22 @@ class SetupTestCase(SandboxedTestCase):
             self.assertIn('./foo.sh-made-this', path_to_size)
 
     def test_bad_setup_command(self):
-        job = MROSWalkJob(
-            ['-r', 'local',
-             '--setup', 'touch bar',
-             '--setup', 'false',  # always "fails"
-             '--setup', 'touch baz'])
+        bar_path = os.path.join(self.tmp_dir, 'bar')
+        baz_path = os.path.join(self.tmp_dir, 'baz')
+
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--setup', 'touch %s' % bar_path,
+            '--setup', 'false',  # always "fails"
+            '--setup', 'touch %s' % baz_path,
+        ])
         job.sandbox()
 
         with job.make_runner() as r:
             tmp_dir = r._get_local_tmp_dir()
 
-            self.assertRaises(CalledProcessError, r.run)
+            self.assertRaises(Exception, r.run)
 
             # first command got run but not third one
-            self.assertTrue(os.path.exists(os.path.join(tmp_dir, 'bar')))
-            self.assertFalse(os.path.exists(os.path.join(tmp_dir, 'baz')))
+            self.assertTrue(os.path.exists(bar_path))
+            self.assertFalse(os.path.exists(baz_path))

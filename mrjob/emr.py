@@ -420,7 +420,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'num_ec2_instances': 1,
             'num_ec2_task_instances': 0,
             's3_sync_wait_time': 5.0,
-            'sh_bin': ['/bin/sh'],
+            'sh_bin': ['/bin/sh', '-e'],
             'ssh_bin': ['ssh'],
             'ssh_bind_ports': range(40001, 40841),
             'ssh_tunnel_to_job_tracker': False,

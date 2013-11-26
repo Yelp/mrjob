@@ -279,7 +279,7 @@ Job execution context
     :switch: --sh-bin
     :type: :ref:`command <data-type-command>`
     :set: all
-    :default: :command:`sh` (:command:`/bin/sh` on EMR)
+    :default: :command:`sh -e` (:command:`/bin/sh -e` on EMR)
 
     Name/path of alternate shell binary to use for :mrjob-opt:`setup` and
     :mrjob-opt:`bootstrap`. Needs to be backwards compatible with

@@ -18,6 +18,7 @@ from __future__ import with_statement
 import datetime
 import getpass
 import os
+import os.path
 import shutil
 import stat
 from subprocess import CalledProcessError
@@ -693,3 +694,20 @@ class SetupTestCase(SandboxedTestCase):
 
             self.assertEqual(path_to_size.get('./foo.sh'), self.foo_sh_size)
             self.assertIn('./foo.sh-made-this', path_to_size)
+
+    def test_bad_setup_command(self):
+        job = MROSWalkJob(
+            ['-r', 'local',
+             '--setup', 'touch bar',
+             '--setup', 'false',  # always "fails"
+             '--setup', 'touch baz'])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            tmp_dir = r._get_local_tmp_dir()
+
+            self.assertRaises(CalledProcessError, r.run)
+
+            # first command got run but not third one
+            self.assertTrue(os.path.exists(os.path.join(tmp_dir, 'bar')))
+            self.assertFalse(os.path.exists(os.path.join(tmp_dir, 'baz')))

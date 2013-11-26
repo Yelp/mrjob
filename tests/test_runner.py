@@ -189,15 +189,16 @@ class TestJobName(unittest.TestCase):
 class CreateMrjobTarGzTestCase(unittest.TestCase):
 
     def test_create_mrjob_tar_gz(self):
-        with InlineMRJobRunner(conf_paths=[]) as runner:
-            mrjob_tar_gz_path = runner._create_mrjob_tar_gz()
-            mrjob_tar_gz = tarfile.open(mrjob_tar_gz_path)
-            contents = mrjob_tar_gz.getnames()
+        with no_handlers_for_logger('mrjob.runner'):
+            with InlineMRJobRunner(conf_paths=[]) as runner:
+                mrjob_tar_gz_path = runner._create_mrjob_tar_gz()
+                mrjob_tar_gz = tarfile.open(mrjob_tar_gz_path)
+                contents = mrjob_tar_gz.getnames()
 
-            for path in contents:
-                self.assertEqual(path[:6], 'mrjob/')
+                for path in contents:
+                    self.assertEqual(path[:6], 'mrjob/')
 
-            self.assertIn('mrjob/job.py', contents)
+                self.assertIn('mrjob/job.py', contents)
 
 
 class TestStreamingOutput(unittest.TestCase):

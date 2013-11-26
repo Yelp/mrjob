@@ -600,7 +600,7 @@ class SetupTestCase(SandboxedTestCase):
         self.assertEqual(path_to_size.get('./foo/foo.py'),
                          self.foo_py_size)
 
-    def test_python_archive(self):
+    def test_deprecated_python_archive_option(self):
         job = MROSWalkJob(
             ['-r', 'local',
              '--python-archive', self.foo_tar_gz])
@@ -617,7 +617,7 @@ class SetupTestCase(SandboxedTestCase):
         self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
                          self.foo_py_size * 2)
 
-    def test_setup_cmd(self):
+    def test_deprecated_setup_cmd_option(self):
         job = MROSWalkJob(
             ['-r', 'local',
              '--setup-cmd', 'touch bar'])
@@ -631,10 +631,57 @@ class SetupTestCase(SandboxedTestCase):
 
         self.assertIn('./bar', path_to_size)
 
-    def test_setup_script(self):
+    def test_deprecated_setup_script_option(self):
         job = MROSWalkJob(
             ['-r', 'local',
              '--setup-script', self.foo_sh])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+            self.assertEqual(path_to_size.get('./foo.sh'), self.foo_sh_size)
+            self.assertIn('./foo.sh-made-this', path_to_size)
+
+    def test_python_archive(self):
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--setup', 'export PYTHONPATH=%s#/:$PYTHONPATH' % self.foo_tar_gz
+        ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        # foo.py should be there, and getsize() should be patched to return
+        # double the number of bytes
+        self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
+                         self.foo_py_size * 2)
+
+    def test_setup_command(self):
+        job = MROSWalkJob(
+            ['-r', 'local',
+             '--setup', 'touch bar'])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        self.assertIn('./bar', path_to_size)
+
+    def test_setup_script(self):
+        job = MROSWalkJob(
+            ['-r', 'local',
+             '--setup', self.foo_sh + '#'])
         job.sandbox()
 
         with job.make_runner() as r:

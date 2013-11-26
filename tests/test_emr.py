@@ -1883,6 +1883,8 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         lines = [line.rstrip() for line in
                  open(runner._master_bootstrap_script_path)]
 
+        self.assertEqual(lines[0], '#!/bin/sh -e')
+
         # check PWD gets stored
         self.assertIn('__mrjob_PWD=$PWD', lines)
 
@@ -1995,21 +1997,10 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         # make sure master bootstrap script is on S3
         self.assertTrue(runner.path_exists(actions[2].path))
 
-    def test_bootstrap_script_uses_python_bin(self):
-        # create a fake src tarball
-        with open(os.path.join(self.tmp_dir, 'foo.py'), 'w'):
-            pass
-
-        yelpy_tar_gz_path = os.path.join(self.tmp_dir, 'yelpy.tar.gz')
-        tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
-
+    def test_bootstrap_mrjob_uses_python_bin(self):
         # use all the bootstrap options
         runner = EMRJobRunner(conf_paths=[],
-                              bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
-                              bootstrap_files=['/tmp/quz'],
                               bootstrap_mrjob=True,
-                              bootstrap_python_packages=[yelpy_tar_gz_path],
-                              bootstrap_scripts=['speedups.sh', '/tmp/s.sh'],
                               python_bin=['anaconda'])
 
         runner._add_bootstrap_files_for_upload()

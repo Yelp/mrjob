@@ -74,7 +74,6 @@ from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
-from tests.quiet import log_to_buffer
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
@@ -1481,9 +1480,10 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
     def test_empty_counters_running_job(self):
         self.runner._describe_jobflow().state = 'RUNNING'
         with no_handlers_for_logger():
-            buf = log_to_buffer('mrjob.emr', logging.INFO)
+            stderr = StringIO()
+            log_to_stream('mrjob.emr', stderr)
             self.runner._fetch_counters([1], skip_s3_wait=True)
-            self.assertIn('5 minutes', buf.getvalue())
+            self.assertIn('5 minutes', stderr.getvalue())
 
     def test_present_counters_running_job(self):
         self.add_mock_s3_data({'walrus': {
@@ -1856,6 +1856,21 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
+    def test_usr_bin_env(self):
+        runner = EMRJobRunner(conf_paths=[],
+                              bootstrap_mrjob=True,
+                              sh_bin='bash -e')
+
+        runner._add_bootstrap_files_for_upload()
+
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
+
+        lines = [line.rstrip() for line in
+                 open(runner._master_bootstrap_script_path)]
+
+        self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
+
     def test_create_master_bootstrap_script(self):
         # create a fake src tarball
         foo_py_path = os.path.join(self.tmp_dir, 'foo.py')
@@ -1882,6 +1897,8 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
         lines = [line.rstrip() for line in
                  open(runner._master_bootstrap_script_path)]
+
+        self.assertEqual(lines[0], '#!/bin/sh -e')
 
         # check PWD gets stored
         self.assertIn('__mrjob_PWD=$PWD', lines)
@@ -1995,21 +2012,10 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         # make sure master bootstrap script is on S3
         self.assertTrue(runner.path_exists(actions[2].path))
 
-    def test_bootstrap_script_uses_python_bin(self):
-        # create a fake src tarball
-        with open(os.path.join(self.tmp_dir, 'foo.py'), 'w'):
-            pass
-
-        yelpy_tar_gz_path = os.path.join(self.tmp_dir, 'yelpy.tar.gz')
-        tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
-
+    def test_bootstrap_mrjob_uses_python_bin(self):
         # use all the bootstrap options
         runner = EMRJobRunner(conf_paths=[],
-                              bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
-                              bootstrap_files=['/tmp/quz'],
                               bootstrap_mrjob=True,
-                              bootstrap_python_packages=[yelpy_tar_gz_path],
-                              bootstrap_scripts=['speedups.sh', '/tmp/s.sh'],
                               python_bin=['anaconda'])
 
         runner._add_bootstrap_files_for_upload()

@@ -496,6 +496,7 @@ class MRJobLauncher(object):
             'partitioner': self.partitioner(),
             'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
+            'setup': self.options.setup,
             'setup_cmds': self.options.setup_cmds,
             'setup_scripts': self.options.setup_scripts,
             'stdin': self.stdin,

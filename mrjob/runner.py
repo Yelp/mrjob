@@ -197,7 +197,7 @@ class RunnerOptionStore(OptionStore):
             'cleanup_on_failure': ['NONE'],
             'hadoop_version': '0.20',
             'owner': owner,
-            'sh_bin': ['sh'],
+            'sh_bin': ['sh', '-e'],
         })
 
     def _validate_cleanup(self):
@@ -966,10 +966,14 @@ class MRJobRunner(object):
         writeln()
 
         writeln('# setup commands')
+        # group setup commands so we can redirect their input/output (see
+        # below). Don't use parens; this would invoke a subshell, which would
+        # keep us from exporting environment variables to the task.
+        writeln('{')
         for cmd in setup:
             # reconstruct the command line, substituting $__mrjob_PWD/<name>
             # for path dicts
-            line = ''
+            line = '  '  # indent, since these commands are in a group
             for token in cmd:
                 if isinstance(token, dict):
                     # it's a path dictionary
@@ -979,13 +983,16 @@ class MRJobRunner(object):
                     # it's raw script
                     line += token
             writeln(line)
+        # redirect setup commands' input/output so they don't interfere
+        # with the task (see Issue #803).
+        writeln('} 0</dev/null 1>&2')
         writeln()
 
         writeln('# release exclusive file lock')
         writeln('exec 9>&-')
         writeln()
 
-        writeln('# run job from the original working directory')
+        writeln('# run task from the original working directory')
         writeln('cd $__mrjob_PWD')
         writeln('"$@"')
 

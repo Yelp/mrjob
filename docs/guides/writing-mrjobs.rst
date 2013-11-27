@@ -566,13 +566,12 @@ For example, on EMR you can use a jar to run a script::
 
         def steps(self):
             return [JarStep(
-                name='run a script',
                 jar='s3://elasticmapreduce/libs/script-runner/script-runner.jar',
-                step_args=['s3://my_bucket/my_script.sh'])]
+                args=['s3://my_bucket/my_script.sh'])]
 
 More interesting is combining :py:meth:`~mrjob.job.MRJob.mr()` and
 :py:class:`~mrjob.step.JarStep` in the same job. Use ``JarStep.INPUT`` and
-``JarStep.OUTPUT`` in *step_args* to stand for the input and output paths
+``JarStep.OUTPUT`` in *args* to stand for the input and output paths
 for that step. For example::
 
     class NaiveBayesJob(MRJob):
@@ -581,9 +580,8 @@ for that step. For example::
             return [
                 self.mr(mapper=self.mapper, reducer=self.reducer),
                 JarStep(
-                    name='naive bayes',
                     jar='elephant-driver.jar',
-                    step_args=['naive-bayes', JarStep.INPUT, JarStep.OUTPUT]
+                    args=['naive-bayes', JarStep.INPUT, JarStep.OUTPUT]
                 )
             ]
 
@@ -605,8 +603,8 @@ before and after it by overriding :py:meth:`~mrjob.job.MRJob.pick_protocols`.
     pass in multiple input paths, mrjob will replace ``JarStep.INPUT`` with the
     input paths joined together with a comma. Not all jars can handle this!
 
-    Best practice is to put all your input into a single directory and pass
-    that as your input path.
+    Best practice in this case is to put all your input into a single
+    directory and pass that as your input path.
 
 .. _writing-cl-opts:
 

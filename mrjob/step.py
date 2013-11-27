@@ -1,4 +1,5 @@
 # Copyright 2012 Yelp and Contributors
+# Copyright 2013 David Marin and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -207,17 +208,6 @@ MRJobStep = MRStep
 class JarStep(object):
     """Represents a running a custom Jar as a step.
 
-    :param name: The name of the step (currently ignored by EMR)
-    :param jar: The local path to the Jar. On EMR, this can also be an
-                ``s3://`` URI, or ``file://`` to reference a jar on
-                the local filesystem of your EMR instance(s).
-    :param main_class: The main class to run from the Jar.
-    :param step_args: A list of strings which specify any arguments to the
-                      Jar. See py:attr:`JarStep.INPUT` and
-                      py:attr:`JarStep.OUTPUT` for information about
-                      passing input and output paths to the jar.
-
-    See :ref:`non-hadoop-streaming-jar-steps` for sample usage.
     """
     #: If this is passed as one of the step's arguments, it'll be replaced
     #: with the step's input paths (if there are multiple paths, they'll
@@ -227,23 +217,64 @@ class JarStep(object):
     #: with the step's output path
     OUTPUT = '<output>'
 
-    def __init__(self, name, jar, main_class=None, step_args=None):
-        self.name = name
+    # in v0.5.0, replace "*args" with "jar"
+    def __init__(self, *args, **kwargs):
+        """Define a Java JAR step.
+
+        Accepts the following keyword arguments:
+
+        :param jar: The local path to the Jar. On EMR, this can also be an
+                   ``s3://`` URI, or ``file://`` to reference a jar on
+                   the local filesystem of your EMR instance(s).
+        :param main_class: (optional) The main class to run from the jar. If
+                           not specified, Hadoop will use the main class
+                           in the jar's manifest file.
+        :param args: (optional) A list of arguments to the jar
+
+        See :ref:`non-hadoop-streaming-jar-steps` for sample usage.
+        """
+        if args:
+            self._init_deprecated(*args, **kwargs)
+        else:
+            self._init_kwargs(**kwargs)
+
+    def _init_deprecated(
+            self, name, jar, main_class=None, step_args=None, args=None):
+        log.warning('Positional arguments to JarStep() (other than'
+                    ' jar) are deprecated and will be removed in v0.5.0')
+
         self.jar = jar
         self.main_class = main_class
-        self.step_args = step_args
+        self.args = args or step_args or []
+
+    def _init_kwargs(
+            self, jar, main_class=None, args=None, step_args=None, name=None):
+        # deprecated arguments
+        if step_args:
+            log.warning('step_args argument to JarStep() has been'
+                        ' renamed to args, and will be removed in v0.5.0')
+        if name:
+            log.warning('name argument to JarStep() has no effect, and will'
+                        ' be removed in v0.5.0')
+
+        self.jar = jar
+        self.main_class = main_class
+        self.args = args or step_args or []
 
     def __repr__(self):
-        return 'JarStep(**%r)' % repr(
-            dict(name=self.name, jar=self.jar, main_class=self.main_class,
-                 step_args=self.step_args))
+        repr_args = []
+        repr_args.append(repr(self.jar))
+        if self.args:
+            repr_args.append('args=' + repr(self.args))
+        if self.main_class:
+            repr_args.append('main_class=' + repr(self.main_class))
+
+        return 'JarStep(%s)' % ', '.join(repr_args)
 
     def __eq__(self, other):
         return (isinstance(other, JarStep) and
-                self.name == other.name and
-                self.jar == other.jar and
-                self.main_class == other.main_class and
-                self.step_args == other.step_args)
+                all(getattr(self, key) == getattr(other, key)
+                    for key in ('jar', 'args', 'main_class')))
 
     def description(self, step_num):
         """Returns a dictionary representation of this step:
@@ -252,18 +283,16 @@ class JarStep(object):
 
             {
                 'type': 'jar',
-                'name': name of the JarStep,
-                'jar': local path to the jar,
+                'jar': path of the jar,
                 'main_class': string, name of the main class,
-                'step_args': list of strings, args to the main class,
+                'args': list of strings, args to the main class,
             }
 
         See :ref:`steps-format` for examples.
         """
         return {
             'type': 'jar',
-            'name': self.name,
+            'args': self.args,
             'jar': self.jar,
             'main_class': self.main_class,
-            'step_args': self.step_args,
-        }
+         }

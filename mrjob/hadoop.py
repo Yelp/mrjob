@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -471,8 +471,8 @@ class HadoopJobRunner(MRJobRunner):
             else:
                 return arg
 
-        if step.get('step_args'):
-            args.extend(interpolate(arg) for arg in step['step_args'])
+        if step.get('args'):
+            args.extend(interpolate(arg) for arg in step['args'])
 
         return args
 

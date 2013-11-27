@@ -747,7 +747,7 @@ class SetupTestCase(SandboxedTestCase):
                 path_to_size = dict(job.parse_output_line(line)
                                 for line in r.stream_output())
 
-                self.assertEqual(path_to_size.get('stdin.txt'), 0)
+                self.assertEqual(path_to_size.get('./stdin.txt'), 0)
                 # input gets passed through by identity mapper
                 self.assertEqual(path_to_size.get(None), 'some input')
 

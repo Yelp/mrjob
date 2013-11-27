@@ -74,7 +74,6 @@ from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
-from tests.quiet import log_to_buffer
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
@@ -1481,9 +1480,10 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
     def test_empty_counters_running_job(self):
         self.runner._describe_jobflow().state = 'RUNNING'
         with no_handlers_for_logger():
-            buf = log_to_buffer('mrjob.emr', logging.INFO)
+            stderr = StringIO()
+            log_to_stream('mrjob.emr', stderr)
             self.runner._fetch_counters([1], skip_s3_wait=True)
-            self.assertIn('5 minutes', buf.getvalue())
+            self.assertIn('5 minutes', stderr.getvalue())
 
     def test_present_counters_running_job(self):
         self.add_mock_s3_data({'walrus': {

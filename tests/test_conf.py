@@ -44,7 +44,6 @@ from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.conf import real_mrjob_conf_path
-from tests.quiet import log_to_buffer
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase

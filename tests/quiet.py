@@ -25,14 +25,6 @@ class NullHandler(logging.Handler):
         pass
 
 
-def log_to_buffer(name=None, level=logging.WARNING):
-    buf = StringIO()
-    log = logging.getLogger(name)
-    log.addHandler(logging.StreamHandler(buf))
-    log.setLevel(level)
-    return buf
-
-
 @contextmanager
 def logger_disabled(name=None):
     """Temporarily disable a logger.

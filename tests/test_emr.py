@@ -1856,6 +1856,21 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
     def rm_tmp_dir(self):
         shutil.rmtree(self.tmp_dir)
 
+    def test_usr_bin_env(self):
+        runner = EMRJobRunner(conf_paths=[],
+                              bootstrap_mrjob=True,
+                              sh_bin='bash -e')
+
+        runner._add_bootstrap_files_for_upload()
+
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
+
+        lines = [line.rstrip() for line in
+                 open(runner._master_bootstrap_script_path)]
+
+        self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
+
     def test_create_master_bootstrap_script(self):
         # create a fake src tarball
         foo_py_path = os.path.join(self.tmp_dir, 'foo.py')

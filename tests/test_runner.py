@@ -20,21 +20,31 @@ import getpass
 import os
 import os.path
 import shutil
+import signal
 import stat
 from subprocess import CalledProcessError
 import sys
 import tarfile
 import tempfile
+
+try:
+    from cStringIO import StringIO
+    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    from StringIO import StringIO
+
 try:
     import unittest2 as unittest
     unittest  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     import unittest
+
 from mock import patch
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import JOB_NAME_RE
 from mrjob.runner import MRJobRunner
+from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_two_step_job import MRTwoStepJob
@@ -708,10 +718,59 @@ class SetupTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as r:
-            tmp_dir = r._get_local_tmp_dir()
-
             self.assertRaises(Exception, r.run)
 
             # first command got run but not third one
             self.assertTrue(os.path.exists(bar_path))
             self.assertFalse(os.path.exists(baz_path))
+
+    def test_stdin_bypasses_wrapper_script(self):
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--setup', 'cat > stdin.txt',
+        ])
+        job.sandbox(stdin=StringIO('some input\n'))
+
+        # local mode doesn't currently pipe input into stdin
+        # (see issue #567), so this test would hang if it failed
+        def alarm_handler(*args, **kwargs):
+            raise Exception('Setup script stalled on stdin')
+
+        try:
+            self._old_alarm_handler = signal.signal(
+                signal.SIGALRM, alarm_handler)
+            signal.alarm(2)
+
+            with job.make_runner() as r:
+                r.run()
+
+                path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+                self.assertEqual(path_to_size.get('stdin.txt'), 0)
+                # input gets passed through by identity mapper
+                self.assertEqual(path_to_size.get(None), 'some input')
+
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, self._old_alarm_handler)
+
+    def test_wrapper_script_only_writes_to_stderr(self):
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--setup', 'echo stray output',
+        ])
+        job.sandbox()
+
+        with no_handlers_for_logger('mrjob.local'):
+            stderr = StringIO()
+            log_to_stream('mrjob.local', stderr)
+
+            with job.make_runner() as r:
+                r.run()
+
+                output = ''.join(r.stream_output())
+
+                # stray ouput should be in stderr, not the job's output
+                self.assertIn('stray output', stderr.getvalue())
+                self.assertNotIn('stray output', output)

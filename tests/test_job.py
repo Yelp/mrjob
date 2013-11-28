@@ -299,66 +299,68 @@ class ProtocolsTestCase(unittest.TestCase):
 
 class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
 
+    class MRBoringJSONJob(MRJob):
+        INPUT_PROTOCOL = JSONProtocol
+
+        def reducer(self, key, values):
+            yield(key, list(values))
+
+    BAD_JSON_INPUT = ('BAD\tJSON\n' +
+                      '"foo"\t"bar"\n' +
+                      '"too"\t"many"\t"tabs"\n' +
+                      '"notabs"\n')
+
+    UNENCODABLE_RAW_INPUT = ('foo\n' +
+                             '\xaa\n' +
+                             'bar\n')
+
     def test_undecodable_input(self):
-        BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
-                                  '"foo"\t"bar"\n' +
-                                  '"too"\t"many"\t"tabs"\n' +
-                                  '"notabs"\n')
+        mr_job = self.MRBoringJSONJob()
+        mr_job.sandbox(stdin=StringIO(self.BAD_JSON_INPUT))
 
-        mr_job = MRBoringJob(args=['--reducer'])
-        mr_job.sandbox(stdin=BAD_JSON_INPUT)
-        mr_job.run_reducer()
+        with mr_job.make_runner() as r:
+            r.run()
 
-        # good data should still get through
-        self.assertEqual(mr_job.stdout.getvalue(), '"foo"\t["bar"]\n')
+            # good data should still get through
+            self.assertEqual(''.join(r.stream_output()), '"foo"\t["bar"]\n')
 
-        # exception type varies between versions of simplejson,
-        # so just make sure there were three exceptions of some sort
-        counters = mr_job.parse_counters()
-        self.assertEqual(counters.keys(), ['Undecodable input'])
-        self.assertEqual(sum(counters['Undecodable input'].itervalues()), 3)
+            # exception type varies between versions of json/simplejson,
+            # so just make sure there were three exceptions of some sort
+            counters = r.counters()[0]
+            self.assertEqual(counters.keys(), ['Undecodable input'])
+            self.assertEqual(
+                sum(counters['Undecodable input'].itervalues()), 3)
 
     def test_undecodable_input_strict(self):
-        BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
-                                  '"foo"\t"bar"\n' +
-                                  '"too"\t"many"\t"tabs"\n' +
-                                  '"notabs"\n')
+        mr_job = self.MRBoringJSONJob(['--strict-protocols'])
+        mr_job.sandbox(stdin=StringIO(self.BAD_JSON_INPUT))
 
-        mr_job = MRBoringJob(args=['--reducer', '--strict-protocols'])
-        mr_job.sandbox(stdin=BAD_JSON_INPUT)
-
-        # make sure it raises an exception
-        self.assertRaises(Exception, mr_job.run_reducer)
+        with mr_job.make_runner() as r:
+            self.assertRaises(Exception, r.run)
 
     def test_unencodable_output(self):
-        UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
-                                         '\xaa\n' +
-                                         'bar\n')
+        mr_job = MRBoringJob()
+        mr_job.sandbox(stdin=StringIO(self.UNENCODABLE_RAW_INPUT))
 
-        mr_job = MRBoringJob(args=['--mapper'])
-        mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
-        mr_job.run_mapper()
+        with mr_job.make_runner() as r:
+            r.run()
 
-        # good data should still get through
-        self.assertEqual(mr_job.stdout.getvalue(),
-                         ('null\t"foo"\n' + 'null\t"bar"\n'))
+            # good data should still get through
+            self.assertEqual(''.join(r.stream_output()),
+                             'null\t["bar", "foo"]\n')
 
-        self.assertEqual(mr_job.parse_counters(),
-                         {'Unencodable output': {'UnicodeDecodeError': 1}})
+            # exception type varies between versions of json/simplejson,
+            # so just make sure there were three exceptions of some sort
+            counters = r.counters()[0]
+            self.assertEqual(counters,
+                             {'Unencodable output': {'UnicodeDecodeError': 1}})
 
     def test_undecodable_output_strict(self):
-        UNENCODABLE_RAW_INPUT = StringIO('foo\n' +
-                                         '\xaa\n' +
-                                         'bar\n')
+        mr_job = MRBoringJob(['--strict-protocols'])
+        mr_job.sandbox(stdin=StringIO(self.UNENCODABLE_RAW_INPUT))
 
-        mr_job = MRBoringJob(args=['--mapper', '--strict-protocols'])
-        mr_job.sandbox(stdin=UNENCODABLE_RAW_INPUT)
-
-        # make sure it raises an exception
-        self.assertRaises(Exception, mr_job.run_mapper)
-
-
-
+        with mr_job.make_runner() as r:
+            self.assertRaises(Exception, r.run)
 
 
 class PickProtocolsTestCase(unittest.TestCase):

@@ -296,6 +296,9 @@ class ProtocolsTestCase(unittest.TestCase):
                           "None\t'bar'\n" +
                           "None\t'baz'\n"))
 
+
+class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
+
     def test_undecodable_input(self):
         BAD_JSON_INPUT = StringIO('BAD\tJSON\n' +
                                   '"foo"\t"bar"\n' +
@@ -353,6 +356,9 @@ class ProtocolsTestCase(unittest.TestCase):
 
         # make sure it raises an exception
         self.assertRaises(Exception, mr_job.run_mapper)
+
+
+
 
 
 class PickProtocolsTestCase(unittest.TestCase):

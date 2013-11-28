@@ -39,8 +39,7 @@ Writing compressed output
 
 To save space, you can have Hadoop automatically save your job's output as
 compressed files. This can be done using the same method as changing the task
-timeout, with ``jobconf`` and the appropriate environment variables. This
-example uses the Hadoop 0.21+ version:
+timeout, with ``jobconf`` and the appropriate environment variables:
 
 .. code-block:: yaml
 
@@ -49,4 +48,4 @@ example uses the Hadoop 0.21+ version:
         jobconf:
           # "true" must be a string argument, not a boolean! (#323)
           mapreduce.output.compress: "true"
-          mapreduce.output.compression.codec: org.apache.hadoop.io.compress.GzipCodec
+          mapreduce.output.compression.codec: org.apache.hadoop.io.compress.BZip2Codec

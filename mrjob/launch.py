@@ -250,8 +250,7 @@ class MRJobLauncher(object):
             self.option_parser, 'Protocols')
         self.option_parser.add_option_group(self.proto_opt_group)
 
-        self._passthrough_options.extend(
-            add_protocol_opts(self.proto_opt_group))
+        add_protocol_opts(self.proto_opt_group)
 
         # options for running the entire job
         self.runner_opt_group = OptionGroup(
@@ -503,6 +502,7 @@ class MRJobLauncher(object):
             'stdin': self.stdin,
             'steps_interpreter': self.options.steps_interpreter,
             'steps_python_bin': self.options.steps_python_bin,
+            'strict_protocols': self.options.strict_protocols,
             'upload_archives': self.options.upload_archives,
             'upload_files': self.options.upload_files,
         }

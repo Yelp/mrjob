@@ -48,6 +48,7 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
+from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import SandboxedTestCase
 
 
@@ -314,6 +315,8 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
                              '\xaa\n' +
                              'bar\n')
 
+    STRICT_MRJOB_CONF ={'runners': {'inline': {'strict_protocols': True}}}
+
     def test_undecodable_input(self):
         mr_job = self.MRBoringJSONJob()
         mr_job.sandbox(stdin=StringIO(self.BAD_JSON_INPUT))
@@ -339,14 +342,12 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertRaises(Exception, r.run)
 
     def test_undecodable_input_strict_in_mrjob_conf(self):
-        self.MRJOB_CONF_CONTENTS = {
-            'runners': {'inline': {'strict_protocols': True}}}
-
         mr_job = self.MRBoringJSONJob()
         mr_job.sandbox(stdin=StringIO(self.BAD_JSON_INPUT))
 
-        with mr_job.make_runner() as r:
-            self.assertRaises(Exception, r.run)
+        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
+            with mr_job.make_runner() as r:
+                self.assertRaises(Exception, r.run)
 
     def test_unencodable_output(self):
         mr_job = MRBoringJob()
@@ -373,14 +374,12 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertRaises(Exception, r.run)
 
     def test_undecodable_output_strict_in_mrjob_conf(self):
-        self.MRJOB_CONF_CONTENTS = {
-            'runners': {'inline': {'strict_protocols': True}}}
-
         mr_job = MRBoringJob()
         mr_job.sandbox(stdin=StringIO(self.UNENCODABLE_RAW_INPUT))
 
-        with mr_job.make_runner() as r:
-            self.assertRaises(Exception, r.run)
+        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
+            with mr_job.make_runner() as r:
+                self.assertRaises(Exception, r.run)
 
 
 class PickProtocolsTestCase(unittest.TestCase):

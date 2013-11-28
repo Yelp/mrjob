@@ -338,6 +338,16 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
         with mr_job.make_runner() as r:
             self.assertRaises(Exception, r.run)
 
+    def test_undecodable_input_strict_in_mrjob_conf(self):
+        self.MRJOB_CONF_CONTENTS = {
+            'runners': {'inline': {'strict_protocols': True}}}
+
+        mr_job = self.MRBoringJSONJob()
+        mr_job.sandbox(stdin=StringIO(self.BAD_JSON_INPUT))
+
+        with mr_job.make_runner() as r:
+            self.assertRaises(Exception, r.run)
+
     def test_unencodable_output(self):
         mr_job = MRBoringJob()
         mr_job.sandbox(stdin=StringIO(self.UNENCODABLE_RAW_INPUT))
@@ -357,6 +367,16 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
 
     def test_undecodable_output_strict(self):
         mr_job = MRBoringJob(['--strict-protocols'])
+        mr_job.sandbox(stdin=StringIO(self.UNENCODABLE_RAW_INPUT))
+
+        with mr_job.make_runner() as r:
+            self.assertRaises(Exception, r.run)
+
+    def test_undecodable_output_strict_in_mrjob_conf(self):
+        self.MRJOB_CONF_CONTENTS = {
+            'runners': {'inline': {'strict_protocols': True}}}
+
+        mr_job = MRBoringJob()
         mr_job.sandbox(stdin=StringIO(self.UNENCODABLE_RAW_INPUT))
 
         with mr_job.make_runner() as r:

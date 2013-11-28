@@ -1,3 +1,5 @@
+v0.4.3, 201?-??-?? -- ???
+
 v0.4.2, 2013-11-27 -- that's one small step for a JAR
  * jobs:
    * can interpolate input and output path(s) into arguments of JarSteps,

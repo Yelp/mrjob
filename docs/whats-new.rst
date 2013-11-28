@@ -7,8 +7,8 @@ For a complete list of changes, see `CHANGES.txt
 0.4.2
 -----
 
-JarSteps, once experimental, are now fully integrated into multi-step jobs,
-and work with both the Hadoop and EMR runners. You can now use powerful
+JarSteps, previously experimental, are now fully integrated into multi-step
+jobs, and work with both the Hadoop and EMR runners. You can now use powerful
 Java libraries such as `Mahout <http://mahout.apache.org/>`_ in your MRJobs.
 For more information, see :ref:`non-hadoop-streaming-jar-steps`.
 

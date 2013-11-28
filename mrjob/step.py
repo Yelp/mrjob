@@ -295,4 +295,4 @@ class JarStep(object):
             'args': self.args,
             'jar': self.jar,
             'main_class': self.main_class,
-         }
+        }

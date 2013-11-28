@@ -1163,8 +1163,7 @@ class EMRJobRunner(MRJobRunner):
         name = role.lower()
 
         return boto.emr.instance_group.InstanceGroup(
-            count, role, instance_type, market, name, bidprice=bid_price
-            )
+            count, role, instance_type, market, name, bidprice=bid_price)
 
     def _create_job_flow(self, persistent=False, steps=None):
         """Create an empty job flow on EMR, and return the ID of that
@@ -1220,7 +1219,7 @@ class EMRJobRunner(MRJobRunner):
                     self._opts['ec2_master_instance_type'],
                     1,
                     self._opts['ec2_master_instance_bid_price']
-                    ),
+                ),
             ]
 
             if self._opts['num_ec2_core_instances']:
@@ -1240,8 +1239,8 @@ class EMRJobRunner(MRJobRunner):
                         self._opts['ec2_task_instance_type'],
                         self._opts['num_ec2_task_instances'],
                         self._opts['ec2_task_instance_bid_price']
-                        )
                     )
+                )
 
         # bootstrap actions
         bootstrap_action_args = []

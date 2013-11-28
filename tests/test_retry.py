@@ -19,7 +19,6 @@ try:
 except ImportError:
     import unittest
 
-import mrjob.retry
 from mrjob.retry import RetryGoRound
 
 

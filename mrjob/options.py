@@ -379,7 +379,7 @@ def add_emr_opts(opt_group):
                 'Bid price to specify for core (or "slave") nodes when'
                 ' setting them up as EC2 spot instances (you probably only'
                 ' want to set a bid price for task instances).')
-            ),
+        ),
 
         opt_group.add_option(
             '--ec2-master-instance-bid-price',
@@ -388,7 +388,7 @@ def add_emr_opts(opt_group):
                 'Bid price to specify for the master node when setting it up '
                 'as an EC2 spot instance (you probably only want to set '
                 'a bid price for task instances).')
-            ),
+        ),
 
         opt_group.add_option(
             '--ec2-task-instance-bid-price',
@@ -396,7 +396,7 @@ def add_emr_opts(opt_group):
             help=(
                 'Bid price to specify for task nodes when '
                 'setting them up as EC2 spot instances.')
-            ),
+        ),
 
         opt_group.add_option(
             '--emr-endpoint', dest='emr_endpoint', default=None,

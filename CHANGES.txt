@@ -1,5 +1,35 @@
-v0.4.2, 2013-??-??
+v0.4.2, 2013-11-27 -- that's one small step for a JAR
+ * jobs:
+   * can interpolate input and output path(s) into arguments of JarSteps,
+     so they can be part of multi-step jobs (#773)
+     * see mrjob/examples/mr_jar_step_example.py
+   * JarStep now takes keyword arguments only (#769)
+     * removed useless "name" field; "step_args" is now just "args"
+   * MRJobStep (usually accessed via MRJob.mr()) is now MRStep
+ * runners:
+   * All runners:
+     * --setup is now fully functional (#206)
+       * --python-archive, --setup-cmd, and --setup-script are deprecated
+     * --bootstrap option works and uses sh (#206)
+       * --bootstrap-cmd, --bootstrap-file, --bootstrap-python-package,
+         --bootstrap-script are deprecated
+     * setup commands can no longer corrupt a task's input and output (#803)
+     * sh_bin is now "sh -e" by default so setup fails fast (#810)
+       * default is "/bin/sh -e" on EMR
+   * EMR:
+     * JarSteps work again (#763)
+     * auto-uploads jars for JarSteps (#772)
+       * JARs on the EMR instances can be accessed with file:/// URIs
+     * ssh_cat() no longer raises an error when catting a file
+       containing an error (#807)
+     * Fixed SignatureDoesNotMatchError that happens with boto 2.10.0+
+       with Python prior to 2.7.5 (#778)
+   * Hadoop:
+     * now handles JarSteps too (#770)
  * Fix to mrjob.parse.urlparse() that was breaking Python 2.5
+ * mrjob.util.buffer_iterator_to_line_iterator() is now more efficient
+   and uses a bounded amount of memory
+ * bz2 decompression no longer discards data (#817)
 
 v0.4.1, 2013-09-16 -- secondary sort and self-terminating job flows
  * jobs:
@@ -13,7 +43,7 @@ v0.4.1, 2013-09-16 -- secondary sort and self-terminating job flows
      * mr_next_word_stats.py (SORT_VALUES example)
  * runners:
    * All runners:
-     * single --setup option works but is not yet documented (#206)
+     * single setup option works but is not yet documented (#206)
      * setup now uses sh rather than python internally
    * EMR runner:
      * max_hours_idle: self-terminating idle job flows (#628)

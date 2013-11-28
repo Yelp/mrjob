@@ -1,4 +1,5 @@
 # Copyright 2012 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +30,7 @@ from mrjob.util import bash_wrap
 class MRCmdJob(MRJob):
 
     def configure_options(self):
-        super(MRGrepJob, self).configure_options()
+        super(MRCmdJob, self).configure_options()
 
         def register_substep(option, opt, value, parser, mrc):
             def last_step_has(*args):
@@ -77,4 +78,4 @@ class MRCmdJob(MRJob):
 
 
 if __name__ == '__main__':
-    MRGrepJob().run()
+    MRCmdJob().run()

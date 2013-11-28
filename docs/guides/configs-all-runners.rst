@@ -230,8 +230,7 @@ Job execution context
     of the script. This means that environment variables set by hadoop
     (e.g. ``$mapred_job_id``) are available to setup commands, and that you
     can pass environment variables to the task (e.g. ``$PYTHONPATH``) using
-    ``export``. Setup commands should not write to stdout, as this will
-    be interpreted by Hadoop Streaming as output from the task.
+    ``export``.
 
     We use file locking around the setup commands (not the task)
     to ensure that multiple tasks running on the same node won't run them
@@ -241,8 +240,9 @@ Job execution context
     In addition, passing expressions like ``path#name`` will cause
     *path* to be automatically uploaded to the task's working directory
     with the filename *name*, marked as executable, and interpolated into the
-    script by their absolute path on the machine running the script. *path*
-    may also be a URI, and ``~`` and environment variables within *path*
+    script by its absolute path on the machine running the script.
+
+    *path* may also be a URI, and ``~`` and environment variables within *path*
     will be resolved based on the local environment. *name* is optional.
     You can indicate that an archive should be unarchived into a directory by
     putting a ``/`` after *name*. For details of parsing, see
@@ -272,7 +272,7 @@ Job execution context
 
     Files that will be copied into the local working directory and then run.
 
-    Pass ``'source <path>#'`` to :mrjob-opt:`setup` instead.
+    Pass ``'path/to/script#'`` to :mrjob-opt:`setup` instead.
 
 .. mrjob-opt::
     :config: sh_bin

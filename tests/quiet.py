@@ -1,4 +1,5 @@
-# Copyright 2011 Yelp
+# Copyright 2011-2012 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +17,6 @@
 
 from contextlib import contextmanager
 import logging
-from StringIO import StringIO
 
 
 # this exists as logging.NullHandler as of Python 2.7

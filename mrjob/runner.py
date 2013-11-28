@@ -870,8 +870,10 @@ class MRJobRunner(object):
         # See issue #726.
         if self._opts['strict_protocols']:
             return ['--strict-protocols']
-        else:
+        elif self._opts['strict_protocols'] is None:
             return []
+        else:
+            return ['--no-strict-protocols']
 
     def _create_setup_wrapper_script(self, dest='setup-wrapper.sh'):
         """Create the wrapper script, and write it into our local temp

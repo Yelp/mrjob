@@ -4,6 +4,27 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+0.4.2
+-----
+
+JarSteps, once experimental, are now fully integrated into multi-step jobs,
+and work with both the Hadoop and EMR runners. You can now use powerful
+Java libraries such as `Mahout <http://mahout.apache.org/>`_ in your MRJobs.
+For more information, see :ref:`non-hadoop-streaming-jar-steps`.
+
+Many options for setting up your task's environment (``--python-archive``,
+``setup-cmd`` and ``--setup-script``) have been replaced by a powerful
+``--setup`` option. See the :doc:`guides/setup-cookbook` for examples.
+
+Similarly, many options for bootstrapping nodes on EMR (``--bootstrap-cmd``,
+``--bootstrap-file``, ``--bootstrap-python-package`` and
+``--bootstrap-script``) have been replaced by a single ``--bootstrap``
+option. See the :doc:`guides/emr-bootstrap-cookbook`.
+
+This release also contains many `bugfixes
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_, including
+problems with boto 2.10.0+, bz2 decompression, and Python 2.5.
+
 0.4.1
 -----
 
@@ -31,7 +52,7 @@ enabled. Update your :ref:`mrjob.conf <mrjob.conf>` like this:
     runners:
       emr:
         max_hours_idle: 0.25
-	pool_emr_job_flows: true
+        pool_emr_job_flows: true
 
 .. warning::
 

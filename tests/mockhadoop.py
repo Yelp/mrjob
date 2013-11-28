@@ -43,7 +43,6 @@ import shutil
 import stat
 import sys
 
-from mrjob.compat import version_gte
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import urlparse
 

@@ -15,7 +15,6 @@ import os
 import os.path
 
 from mrjob.job import MRJob
-from mrjob.protocol import RawValueProtocol
 
 
 class MROSWalkJob(MRJob):
@@ -25,6 +24,7 @@ class MROSWalkJob(MRJob):
         # hook for test_local.LocalRunnerSetupTestCase.test_python_archive()
         try:
             import foo
+            foo # quiet pyflakes warning
         except ImportError:
             pass
 

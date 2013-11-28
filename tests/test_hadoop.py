@@ -218,10 +218,10 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         # make sure we called hadoop the way we expected
         with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
-            hadoop_cmd_args = [shlex_split(line) for line in mock_log]
+            hadoop_cmd_args = [shlex_split(cmd) for cmd in mock_log]
 
-        jar_cmd_args = [args for args in hadoop_cmd_args
-                        if args[:1] == ['jar']]
+        jar_cmd_args = [cmd_args for cmd_args in hadoop_cmd_args
+                        if cmd_args[:1] == ['jar']]
         self.assertEqual(len(jar_cmd_args), 2)
         step_0_args, step_1_args = jar_cmd_args
 

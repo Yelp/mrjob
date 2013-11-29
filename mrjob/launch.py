@@ -657,11 +657,14 @@ class MRJobLauncher(object):
         Simple testing example::
 
             mr_job = MRYourJob.sandbox()
-            assert_equal(list(mr_job.reducer('foo', ['bar', 'baz'])), [...])
+            self.assertEqual(list(mr_job.reducer('foo', ['a', 'b'])), [...])
 
         More complex testing example::
 
             from StringIO import StringIO
+
+            from mrjob.parse import parse_mr_job_stderr
+            from mrjob.protocol import JSONProtocol
 
             mr_job = MRYourJob(args=[...])
 
@@ -669,8 +672,9 @@ class MRJobLauncher(object):
             mr_job.sandbox(stdin=StringIO(fake_input))
 
             mr_job.run_reducer(link_num=0)
-            assert_equal(mr_job.parse_output(), ...)
-            assert_equal(mr_job.parse_counters(), ...)
+
+            self.assertEqual(mrjob.stdout.getvalue(), ...)
+            self.assertEqual(parse_mr_job_stderr(mr_job.stderr), ...)
         """
         self.stdin = stdin or StringIO()
         self.stdout = stdout or StringIO()

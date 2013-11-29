@@ -1198,24 +1198,21 @@ class MRJob(MRJobLauncher):
         return stderr_results['counters']
 
     def parse_output(self, protocol=None):
-        """Convenience method for parsing output from any mapper or reducer,
-        all at once.
+        """.. deprecated:: 0.4.2
 
-        This helps you test individual mappers and reducers by calling
-        run_mapper() or run_reducer(). For example::
-
-            mr_job.sandbox(stdin=your_input)
-            mr_job.run_mapper(step_num=0)
-            output = mrjob.parse_output()
+        Parse the output from the given sandboxed job. This is only useful
+        when testing individual mappers/reducers in a job.
 
         :type protocol: protocol
-        :param protocol: A protocol instance to use (e.g. JSONProtocol()),
-
-        This only works in sandbox mode. This does not clear ``self.stdout``.
+        :param protocol: A protocol instance to use. Defaults to
+                         ``JSONProtocol()``.
         """
         if self.stdout == sys.stdout:
             raise AssertionError('You must call sandbox() first;'
                                  ' parse_output() is for testing only.')
+
+        log.warning(
+            'parse_output() is deprecated and will be removed in v0.5.0')
 
         if protocol is None:
             protocol = JSONProtocol()

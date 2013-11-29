@@ -842,9 +842,9 @@ class StepNumTestCase(unittest.TestCase):
         def test_mapper0(mr_job, input_lines):
             mr_job.sandbox(input_lines)
             mr_job.run_mapper(0)
-            self.assertEqual(mr_job.parse_output(),
-                             [(None, 'foo'), ('foo', None),
-                              (None, 'bar'), ('bar', None)])
+            self.assertEqual(mr_job.stdout.getvalue(),
+                             'null\t"foo"\n' + '"foo"\tnull\n' +
+                             'null\t"bar"\n' + '"bar"\tnull\n')
 
         mapper0 = MRTwoStepJob()
         test_mapper0(mapper0, mapper0_input_lines)
@@ -861,8 +861,8 @@ class StepNumTestCase(unittest.TestCase):
         def test_reducer0(mr_job, input_lines):
             mr_job.sandbox(input_lines)
             mr_job.run_reducer(0)
-            self.assertEqual(mr_job.parse_output(),
-                             [('bar', 1), ('foo', 1), (None, 2)])
+            self.assertEqual(mr_job.stdout.getvalue(),
+                             '"bar"\t1\n' + '"foo"\t1\n' + 'null\t2\n')
 
         reducer0 = MRTwoStepJob()
         test_reducer0(reducer0, reducer0_input_lines)
@@ -877,8 +877,8 @@ class StepNumTestCase(unittest.TestCase):
         def test_mapper1(mr_job, input_lines):
             mr_job.sandbox(input_lines)
             mr_job.run_mapper(1)
-            self.assertEqual(mr_job.parse_output(),
-                             [(1, 'bar'), (1, 'foo'), (2, None)])
+            self.assertEqual(mr_job.stdout.getvalue(),
+                             '1\t"bar"\n' + '1\t"foo"\n' + '2\tnull\n')
 
         mapper1 = MRTwoStepJob()
         test_mapper1(mapper1, mapper1_input_lines)
@@ -925,15 +925,16 @@ class FileOptionsTestCase(SandboxedTestCase):
         self.assertEqual(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))
 
 
-class ParseOutputTestCase(unittest.TestCase):
-    # test parse_output() method
+class DeprecatedParseOutputTestCase(unittest.TestCase):
+    # test deprecated parse_output() method
 
     def test_default(self):
         # test parsing JSON
         mr_job = MRJob()
         output = '0\t1\n"a"\t"b"\n'
         mr_job.stdout = StringIO(output)
-        self.assertEqual(mr_job.parse_output(), [(0, 1), ('a', 'b')])
+        with logger_disabled('mrjob.job'):
+            self.assertEqual(mr_job.parse_output(), [(0, 1), ('a', 'b')])
 
         # verify that stdout is not cleared
         self.assertEqual(mr_job.stdout.getvalue(), output)
@@ -943,8 +944,9 @@ class ParseOutputTestCase(unittest.TestCase):
         mr_job = MRJob()
         output = "0\t1\n['a', 'b']\tset(['c', 'd'])\n"
         mr_job.stdout = StringIO(output)
-        self.assertEqual(mr_job.parse_output(ReprProtocol()),
-                         [(0, 1), (['a', 'b'], set(['c', 'd']))])
+        with logger_disabled('mrjob.job'):
+            self.assertEqual(mr_job.parse_output(ReprProtocol()),
+                             [(0, 1), (['a', 'b'], set(['c', 'd']))])
 
         # verify that stdout is not cleared
         self.assertEqual(mr_job.stdout.getvalue(), output)

@@ -177,7 +177,6 @@ class CommandLineArgsTestCase(unittest.TestCase):
             '--planck-constant', '42',
             '--extra-special-arg', 'you',
             '--extra-special-arg', 'me',
-            '--strict-protocols',
             ])
 
         self.assertEqual(mr_job.options.foo_size, 9)
@@ -187,7 +186,6 @@ class CommandLineArgsTestCase(unittest.TestCase):
         self.assertEqual(mr_job.options.pill_type, 'red')
         self.assertEqual(mr_job.options.planck_constant, 42)
         self.assertEqual(mr_job.options.extra_special_args, ['you', 'me'])
-        self.assertEqual(mr_job.options.strict_protocols, True)
         self.assertEqual(mr_job.generate_passthrough_arguments(),
                      [
                       '--bar-name', 'Alembic',
@@ -199,7 +197,6 @@ class CommandLineArgsTestCase(unittest.TestCase):
                       '--planck-constant', '1',
                       '--planck-constant', '42',
                       '--disable-quuxing',
-                      '--strict-protocols',
                       ])
 
     def test_explicit_passthrough_options_short(self):
@@ -209,7 +206,6 @@ class CommandLineArgsTestCase(unittest.TestCase):
             '-F9', '-BAlembic', '-MQ', '-T', 'red', '-C1', '-C42',
             '--extra-special-arg', 'you',
             '--extra-special-arg', 'me',
-            '--strict-protocols',
             ])
 
         self.assertEqual(mr_job.options.foo_size, 9)
@@ -219,7 +215,6 @@ class CommandLineArgsTestCase(unittest.TestCase):
         self.assertEqual(mr_job.options.pill_type, 'red')
         self.assertEqual(mr_job.options.planck_constant, 42)
         self.assertEqual(mr_job.options.extra_special_args, ['you', 'me'])
-        self.assertEqual(mr_job.options.strict_protocols, True)
         self.assertEqual(mr_job.generate_passthrough_arguments(),
                      [
                         '-B', 'Alembic',
@@ -231,7 +226,6 @@ class CommandLineArgsTestCase(unittest.TestCase):
                          '-C', '1',
                          '-C', '42',
                          '-Q',
-                         '--strict-protocols'
                      ])
 
     def test_bad_custom_options(self):

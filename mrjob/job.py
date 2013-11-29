@@ -1179,20 +1179,21 @@ class MRJob(MRJobLauncher):
     ### Testing ###
 
     def parse_counters(self, counters=None):
-        """Convenience method for reading counters. This only works
-        in sandbox mode. This does not clear ``self.stderr``.
+        """.. deprecated:: 0.4.2
 
-        :return: a map from counter group to counter name to amount.
+        Parse the counters from the given sandboxed job's ``self.stderr``;
+        superseded :py:func:`mrjob.parse.parse_mr_job_stderr`.
 
-        To read everything from ``self.stderr`` (including status messages)
-        use :py:meth:`mrjob.parse.parse_mr_job_stderr`.
-
-        When writing unit tests, you may find :py:meth:`MRJobRunner.counters()
-        <mrjob.runner.MRJobRunner.counters()>` more useful.
+        This was only useful for testing individual mappers/reducers
+        without a runner; normally you'd just use
+        :py:meth:`runner.counters() <mrjob.runner.MRJobRunner.counters()>`.
         """
         if self.stderr == sys.stderr:
             raise AssertionError('You must call sandbox() first;'
                                  ' parse_counters() is for testing only.')
+
+        log.warning(
+            'parse_counters() is deprecated and will be removed in v0.5.0')
 
         stderr_results = parse_mr_job_stderr(self.stderr.getvalue(), counters)
         return stderr_results['counters']
@@ -1200,8 +1201,12 @@ class MRJob(MRJobLauncher):
     def parse_output(self, protocol=None):
         """.. deprecated:: 0.4.2
 
-        Parse the output from the given sandboxed job. This is only useful
-        when testing individual mappers/reducers in a job.
+        Parse the output from the given sandboxed job's ``self.stdout``.
+
+        This was only useful for testing individual mappers/reducers
+        without using a runner; normally you'd just use
+        :py:meth:`runner.stream_output()
+        <mrjob.runner.MRJobRunner.stream_output()>`
 
         :type protocol: protocol
         :param protocol: A protocol instance to use. Defaults to

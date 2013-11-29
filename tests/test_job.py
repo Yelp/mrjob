@@ -158,9 +158,6 @@ class CountersAndStatusTestCase(unittest.TestCase):
                                        'Sorting metasyntactic variables...'],
                           'other': []})
 
-        # make sure parse_counters() works
-        self.assertEqual(mr_job.parse_counters(), parsed_stderr['counters'])
-
     def test_unicode_set_status(self):
         mr_job = MRJob().sandbox()
         # shouldn't raise an exception
@@ -179,7 +176,8 @@ class CountersAndStatusTestCase(unittest.TestCase):
         mr_job.increment_counter('Foo', 'Baz', -1)
         mr_job.increment_counter('Qux', 'Quux', 0)
 
-        self.assertEqual(mr_job.parse_counters(),
+        parsed_stderr = parse_mr_job_stderr(mr_job.stderr.getvalue())
+        self.assertEqual(parsed_stderr['counters'],
                          {'Foo': {'Bar': -1, 'Baz': 0}, 'Qux': {'Quux': 0}})
 
     def test_bad_counter_amounts(self):
@@ -197,7 +195,8 @@ class CountersAndStatusTestCase(unittest.TestCase):
         mr_job.increment_counter('Bad items', 'a, b, c')
         mr_job.increment_counter('girl, interrupted', 'movie')
 
-        self.assertEqual(mr_job.parse_counters(),
+        parsed_stderr = parse_mr_job_stderr(mr_job.stderr.getvalue())
+        self.assertEqual(parsed_stderr['counters'],
                          {'Bad items': {'a; b; c': 1},
                           'girl; interrupted': {'movie': 1}})
 
@@ -925,10 +924,9 @@ class FileOptionsTestCase(SandboxedTestCase):
         self.assertEqual(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))
 
 
-class DeprecatedParseOutputTestCase(unittest.TestCase):
-    # test deprecated parse_output() method
+class DeprecatedTestMethodsTestCase(unittest.TestCase):
 
-    def test_default(self):
+    def test_parse_output(self):
         # test parsing JSON
         mr_job = MRJob()
         output = '0\t1\n"a"\t"b"\n'
@@ -939,7 +937,7 @@ class DeprecatedParseOutputTestCase(unittest.TestCase):
         # verify that stdout is not cleared
         self.assertEqual(mr_job.stdout.getvalue(), output)
 
-    def test_protocol_instance(self):
+    def test_parse_output_with_protocol_instance(self):
         # see if we can use the repr protocol
         mr_job = MRJob()
         output = "0\t1\n['a', 'b']\tset(['c', 'd'])\n"
@@ -950,6 +948,16 @@ class DeprecatedParseOutputTestCase(unittest.TestCase):
 
         # verify that stdout is not cleared
         self.assertEqual(mr_job.stdout.getvalue(), output)
+
+    def test_parse_counters(self):
+        mr_job = MRJob().sandbox()
+
+        mr_job.increment_counter('Foo', 'Bar')
+        mr_job.increment_counter('Foo', 'Bar')
+        mr_job.increment_counter('Foo', 'Baz', 20)
+
+        self.assertEqual(mr_job.parse_counters(),
+                         {'Foo': {'Bar': 2, 'Baz': 20}})
 
 
 class RunJobTestCase(SandboxedTestCase):

@@ -384,9 +384,9 @@ _STATUS_RE = re.compile(r'^reporter:status:(.*)$')
 def parse_mr_job_stderr(stderr, counters=None):
     """Parse counters and status messages out of MRJob output.
 
-    :param data: a filehandle, a list of lines, or a str containing data
-    :type counters: Counters so far, to update; a map from group to counter
-                    name to count.
+    :param stderr: a filehandle, a list of lines, or a str containing data
+    :param counters: Counters so far, to update; a map from group to counter
+                     name to count.
 
     Returns a dictionary with the keys *counters*, *statuses*, *other*:
 

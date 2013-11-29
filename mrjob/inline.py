@@ -28,9 +28,10 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+from mrjob.job import MRJob
+from mrjob.parse import parse_mr_job_stderr
 from mrjob.sim import SimMRJobRunner
 from mrjob.sim import SimRunnerOptionStore
-from mrjob.job import MRJob
 from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
 
@@ -168,7 +169,8 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         while len(self._counters) <= step_num:
             self._counters.append({})
-        child_instance.parse_counters(self._counters[step_num])
+        parse_mr_job_stderr(child_instance.stderr.getvalue(),
+                            counters=self._counters[step_num])
 
         if has_combiner:
             self._run_step(step_num, 'combiner', None, output_path,

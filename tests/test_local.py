@@ -517,16 +517,22 @@ class CompatTestCase(EmptyMrjobConfTestCase):
     def test_environment_variables_018(self):
         job = MRWordCount(['-r', 'local', '--hadoop-version', '0.18'])
         with job.make_runner() as runner:
-            env = runner._subprocess_env(0, 'mapper', 0, '/tmp/foo')
-            self.assertIn('mapred_cache_localArchives', env)
-            self.assertNotIn('mapreduce_job_cache_local_archives', env)
+            simulated_jobconf = runner._simulate_jobconf_for_step(
+                0, 'mapper', 0, '/tmp/foo')
+            self.assertIn(
+                'mapred.cache.localArchives', simulated_jobconf)
+            self.assertNotIn(
+                'mapreduce.job.cache.local.archives', simulated_jobconf)
 
     def test_environment_variables_021(self):
         job = MRWordCount(['-r', 'local', '--hadoop-version', '0.21'])
         with job.make_runner() as runner:
-            env = runner._subprocess_env(0, 'mapper', 0, '/tmp/foo')
-            self.assertIn('mapreduce_job_cache_local_archives', env)
-            self.assertNotIn('mapred_cache_localArchives', env)
+            simulated_jobconf = runner._simulate_jobconf_for_step(
+                0, 'mapper', 0, '/tmp/foo')
+            self.assertIn(
+                'mapreduce.job.cache.local.archives', simulated_jobconf)
+            self.assertNotIn(
+                'mapred.cache.localArchives', simulated_jobconf)
 
 
 class CommandSubstepTestCase(SandboxedTestCase):

@@ -39,6 +39,8 @@ from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
+from mrjob.step import _IDENTITY_MAPPER
+from mrjob.step import _IDENTITY_REDUCER
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.util import log_to_stream
@@ -1064,3 +1066,31 @@ class StepsTestCase(unittest.TestCase):
         self.assertEqual(
             j.steps()[0],
             MRStep(mapper=j.mapper))
+
+
+class DeprecatedStepConstructorMethodsTestCase(unittest.TestCase):
+
+    def test_jar(self):
+        kwargs = {
+            'jar': 'binks.jar.jar',
+            'main_class': 'MyMainMan',
+            'args': ['argh', 'argh'],
+        }
+
+        with logger_disabled('mrjob.job'):
+            self.assertEqual(MRJob.jar(**kwargs), JarStep(**kwargs))
+
+    def test_mr(self):
+        kwargs = {
+            'mapper': _IDENTITY_MAPPER,
+            'reducer': _IDENTITY_REDUCER,
+        }
+
+        with logger_disabled('mrjob.job'):
+            self.assertEqual(MRJob.mr(**kwargs), MRStep(**kwargs))
+
+    def test_mr_positional_arguments(self):
+        with logger_disabled('mrjob.job'):
+            self.assertEqual(
+                MRJob.mr(_IDENTITY_MAPPER, _IDENTITY_REDUCER),
+                MRStep(mapper=_IDENTITY_MAPPER, reducer=_IDENTITY_REDUCER))

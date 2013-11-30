@@ -1009,8 +1009,8 @@ class StepsTestCase(unittest.TestCase):
 
         def steps(self):
             return [
-                self.mr(mapper_init=self._yield_none, mapper_pre_filter='cat',
-                        reducer_cmd='wc -l'),
+                MRStep(mapper_init=self._yield_none, mapper_pre_filter='cat',
+                       reducer_cmd='wc -l'),
                 JarStep(jar='s3://bookat/binks_jar.jar')]
 
     class SingleSteppyCommandJob(MRJob):

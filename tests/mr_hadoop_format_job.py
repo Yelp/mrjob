@@ -1,4 +1,6 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
+# Copyright 2012 Yelp and Contributors
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +15,7 @@
 # limitations under the License.
 """Trivial two-step job which sets hadoop input and output format."""
 from mrjob.job import MRJob
+from mrjob.step import MRStep
 
 
 class MRHadoopFormatJob(MRJob):
@@ -37,8 +40,10 @@ class MRHadoopFormatJob(MRJob):
         yield value, key
 
     def steps(self):
-        return [self.mr(self.mapper, self.reducer, combiner=self.combiner),
-                self.mr(self.mapper2, jobconf={'x': 'z'})]
+        return [MRStep(mapper=self.mapper,
+                       combiner=self.combiner,
+                       reducer=self.reducer),
+                MRStep(mapper=self.mapper2, jobconf={'x': 'z'})]
 
 
 if __name__ == '__main__':

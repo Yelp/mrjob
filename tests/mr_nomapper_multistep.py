@@ -1,4 +1,5 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from mrjob.job import MRJob
+from mrjob.step import MRStep
 
 
 class MRNoMapper(MRJob):
@@ -27,8 +29,8 @@ class MRNoMapper(MRJob):
         yield key, value
 
     def steps(self):
-        return [self.mr(self.mapper, self.reducer),
-                self.mr(reducer=self.reducer2)]
+        return [MRStep(self.mapper, self.reducer),
+                MRStep(reducer=self.reducer2)]
 
 
 if __name__ == '__main__':

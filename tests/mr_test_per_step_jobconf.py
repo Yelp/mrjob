@@ -1,4 +1,4 @@
-# Copyright 2013 Lyft
+# Copyright 2013 Lyft and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 """
 from mrjob.compat import jobconf_from_env
 from mrjob.job import MRJob
+from mrjob.step import MRStep
 
 JOBCONF_LIST = [
     'mapred.map.tasks',
@@ -36,11 +37,11 @@ class MRTestPerStepJobConf(MRJob):
 
     def steps(self):
         return([
-            self.mr(mapper_init=self.mapper_init),
-            self.mr(mapper_init=self.mapper_init,
-                    mapper=self.mapper,
-                    jobconf={'user.defined': 'nothing',
-                             'mapred.map.tasks': 4})])
+            MRStep(mapper_init=self.mapper_init),
+            MRStep(mapper_init=self.mapper_init,
+                   mapper=self.mapper,
+                   jobconf={'user.defined': 'nothing',
+                            'mapred.map.tasks': 4})])
 
 
 if __name__ == '__main__':

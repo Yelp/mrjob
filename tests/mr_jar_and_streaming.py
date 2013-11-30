@@ -11,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from mrjob.job import MRJob
 from mrjob.step import JarStep
+from mrjob.step import MRStep
+
 
 class MRJarAndStreaming(MRJob):
 
@@ -28,7 +29,7 @@ class MRJarAndStreaming(MRJob):
                  jar=self.options.jar,
                  args=['stuff', JarStep.INPUT, JarStep.OUTPUT]
              ),
-             self.mr(mapper=self.mapper, reducer=self.reducer)
+             MRStep(mapper=self.mapper, reducer=self.reducer)
          ]
 
     def mapper(self, key, value):

@@ -96,7 +96,7 @@ class MRSalesman(MRJob):
         return ([MRStep(mapper=self.splitter),
                  MRStep(mapper=self.mapper,
                         reducer=self.reducer,
-                        mapper_final = self.mapper_final)]
+                        mapper_final=self.mapper_final)]
                 )
 
     def __init__(self, *args, **kwargs):

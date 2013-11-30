@@ -146,7 +146,8 @@ class MRTextClassifier(MRJob):
         The documents themselves are passed through from step 1 to step 5.
         Ngram scoring information is passed through from step 4 to step 5.
         """
-        return [MRStep(self.parse_doc, self.count_ngram_freq),
+        return [MRStep(mapper=self.parse_doc,
+                       reducer=self.count_ngram_freq),
                 MRStep(reducer=self.score_ngrams),
                 MRStep(reducer=self.score_documents_by_ngram),
                 MRStep(reducer=self.score_documents)]

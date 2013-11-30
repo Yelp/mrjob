@@ -145,15 +145,16 @@ example below demonstrates the use of counters in a test case.
 ::
 
     from mrjob.job import MRJob
+    from mrjob.step import MRStep
 
 
     class MRCountingJob(MRJob):
 
         def steps(self):
             # 3 steps so we can check behavior of counters for multiple steps
-            return [self.mr(self.mapper),
-                    self.mr(self.mapper),
-                    self.mr(self.mapper)]
+            return [MRStep(self.mapper),
+                    MRStep(self.mapper),
+                    MRStep(self.mapper)]
 
         def mapper(self, _, value):
             self.increment_counter('group', 'counter_name', 1)

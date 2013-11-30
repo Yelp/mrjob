@@ -137,17 +137,26 @@ Writing your second job
 
 Most of the time, you'll need more than one step in your job. To define
 multiple steps, override :py:meth:`~mrjob.job.MRJob.steps` and return a list of
-steps constructed via :py:meth:`~mrjob.job.MRJob.mr`
+:py:class:`mrjob.step.MRStep`.
 
 Here's a job that finds the most commonly used word in the input::
 
     from mrjob.job import MRJob
+    from mrjob.step import MRStep
     import re
 
     WORD_RE = re.compile(r"[\w']+")
 
 
     class MRMostUsedWord(MRJob):
+
+        def steps(self):
+            return [
+                MRStep(mapper=self.mapper_get_words,
+                       combiner=self.combiner_count_words,
+                       reducer=self.reducer_count_words),
+                MRStep(reducer=self.reducer_find_max_word)
+            ]
 
         def mapper_get_words(self, _, line):
             # yield each word in the line
@@ -168,14 +177,6 @@ Here's a job that finds the most commonly used word in the input::
             # each item of word_count_pairs is (count, word),
             # so yielding one results in key=counts, value=word
             yield max(word_count_pairs)
-
-        def steps(self):
-            return [
-                self.mr(mapper=self.mapper_get_words,
-                        combiner=self.combiner_count_words,
-                        reducer=self.reducer_count_words),
-                self.mr(reducer=self.reducer_find_max_word)
-            ]
 
 
     if __name__ == '__main__':

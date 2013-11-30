@@ -81,6 +81,7 @@ To define multiple steps, override the :py:meth:`~mrjob.job.MRJob.steps`
 method to return a list of :py:meth:`~mrjob.job.MRJob.mr` calls::
 
     from mrjob.job import MRJob
+    from mrjob.step import MRStep
     import re
 
     WORD_RE = re.compile(r"[\w']+")
@@ -110,10 +111,10 @@ method to return a list of :py:meth:`~mrjob.job.MRJob.mr` calls::
 
         def steps(self):
             return [
-                self.mr(mapper=self.mapper_get_words,
-                        combiner=self.combiner_count_words,
-                        reducer=self.reducer_count_words),
-                self.mr(reducer=self.reducer_find_max_word)
+                MRStep(mapper=self.mapper_get_words,
+                       combiner=self.combiner_count_words,
+                       reducer=self.reducer_count_words),
+                MRStep(reducer=self.reducer_find_max_word)
             ]
 
 
@@ -158,6 +159,9 @@ so. (See :ref:`writing-file-options` for an example.)
 normal tasks. Here is our word frequency count example rewritten to use
 these methods::
 
+    from mrjob.job import MRJob
+    from mrjob.step import MRStep
+
     class MRWordFreqCount(MRJob):
 
         def init_get_words(self):
@@ -177,11 +181,11 @@ these methods::
             yield word, sum(counts)
 
         def steps(self):
-            return [self.mr(mapper_init=self.init_get_words,
-                            mapper=self.get_words,
-                            mapper_final=self.final_get_words,
-                            combiner=self.sum_words,
-                            reducer=self.sum_words)]
+            return [MRStep(mapper_init=self.init_get_words,
+                           mapper=self.get_words,
+                           mapper_final=self.final_get_words,
+                           combiner=self.sum_words,
+                           reducer=self.sum_words)]
 
 In this version, instead of yielding one line per word, the mapper keeps an
 internal count of word occurrences across all lines this mapper has seen so
@@ -205,15 +209,15 @@ Shell commands as steps
 
 You can forego scripts entirely for a step by specifying it as shell a command.
 To do so, use ``mapper_cmd``, ``combiner_cmd``, or ``reducer_cmd`` as arguments
-to :py:meth:`~mrjob.job.MRJob.mr()` or methods on :py:class:`~mrjob.job.MRJob`.
-(See :py:meth:`~mrjob.job.MRJob.mapper_cmd`,
+to :py:class:`~mrjob.step.MRStep`, or override the methods of the same names on
+:py:class:`~mrjob.job.MRJob`. (See :py:meth:`~mrjob.job.MRJob.mapper_cmd`,
 :py:meth:`~mrjob.job.MRJob.combiner_cmd`, and
 :py:meth:`~mrjob.job.MRJob.reducer_cmd`.)
 
 .. warning::
 
-    The ``inline`` runner does not support :py:func:`*_cmd`. If you want to
-    test locally, use the ``local`` runner (``-r local``).
+    The default ``inline`` runner does not support :py:func:`*_cmd`. If you
+    want to test locally, use the ``local`` runner (``-r local``).
 
 You may mix command and script steps at will. This job will count the number of
 lines containing the string "kitty"::
@@ -267,19 +271,20 @@ Filtering task input with shell commands
 
 You can specify a command to filter a task's input before it reaches your task
 using the ``mapper_pre_filter`` and ``reducer_pre_filter`` arguments to
-:py:meth:`~mrjob.job.MRJob.mr()` or methods on :py:class:`~mrjob.job.MRJob`.
-Doing so will cause mrjob to pipe input through that comand before it reaches
-your mapper.
+:py:class:`~mrjob.step.MRStep`, or override the methods of the same names on
+:py:class:`~mrjob.job.MRJob`. Doing so will cause mrjob to pipe input through
+that comand before it reaches your mapper.
 
 .. warning::
 
-    The ``inline`` runner does not support :py:func:`*_cmd`. If you want to
-    test locally, use the ``local`` runner (``-r local``).
+    The default ``inline`` runner does not support :py:func:`*_pre_filter`. If
+    you want to test locally, use the ``local`` runner (``-r local``).
 
 Here's a job that tests filters using :command:`grep`::
 
     from mrjob.job import MRJob
     from mrjob.protocol import JSONValueProtocol
+    from mrjob.step import MRStep
 
 
     class KittiesJob(MRJob):
@@ -296,9 +301,9 @@ Here's a job that tests filters using :command:`grep`::
 
         def steps(self):
             return [
-                self.mr(mapper_pre_filter='grep "kitty"',
-                        mapper=self.test_for_kitty,
-                        reducer=self.sum_missing_kitties)]
+                MRStep(mapper_pre_filter='grep "kitty"',
+                       mapper=self.test_for_kitty,
+                       reducer=self.sum_missing_kitties)]
 
 
     if __name__ == '__main__':
@@ -395,10 +400,10 @@ steps and takes a plain text file as input.
 
         def steps(self):
             return [
-                self.mr(mapper=self.mapper_get_words,
-                        combiner=self.combiner_count_words,
-                        reducer=self.reducer_count_words),
-                self.mr(reducer=self.reducer_find_max_word)
+                MRStep(mapper=self.mapper_get_words,
+                       combiner=self.combiner_count_words,
+                       reducer=self.reducer_count_words),
+                MRStep(reducer=self.reducer_find_max_word)
             ]
 
 The first step starts with :py:func:`mapper_get_words()`::
@@ -555,7 +560,7 @@ Jar steps
 ^^^^^^^^^
 
 You can run Java directly on Hadoop (bypassing Hadoop Streaming) by using
-:py:class:`~mrjob.step.JarStep` instead of :py:meth:`~mrjob.job.MRJob.mr()`.
+:py:class:`~mrjob.step.JarStep` instead of :py:meth:`~mrjob.step.MRStep`.
 
 For example, on EMR you can use a jar to run a script::
 
@@ -569,7 +574,7 @@ For example, on EMR you can use a jar to run a script::
                 jar='s3://elasticmapreduce/libs/script-runner/script-runner.jar',
                 args=['s3://my_bucket/my_script.sh'])]
 
-More interesting is combining :py:meth:`~mrjob.job.MRJob.mr()` and
+More interesting is combining :py:class:`~mrjob.step.MRStep` and
 :py:class:`~mrjob.step.JarStep` in the same job. Use ``JarStep.INPUT`` and
 ``JarStep.OUTPUT`` in *args* to stand for the input and output paths
 for that step. For example::
@@ -578,7 +583,7 @@ for that step. For example::
 
         def steps(self):
             return [
-                self.mr(mapper=self.mapper, reducer=self.reducer),
+                MRStep(mapper=self.mapper, reducer=self.reducer),
                 JarStep(
                     jar='elephant-driver.jar',
                     args=['naive-bayes', JarStep.INPUT, JarStep.OUTPUT]
@@ -586,8 +591,8 @@ for that step. For example::
             ]
 
 :py:class:`~mrjob.step.JarStep` has no concept of :ref:`job-protocols`. If your
-jar reads input from a :py:meth:`~mrjob.job.MRJob.mr()` step, or writes input
-read by another :py:meth:`~mrjob.job.MRJob.mr()` step, it is up to those
+jar reads input from a :py:class:`~mrjob.step.MRStep`, or writes input
+read by another :py:class:`~mrjob.step.MRStep`, it is up to those
 steps to read and write data in the format your jar expects.
 
 If you are writing the jar yourself, the easiest solution is to have it read

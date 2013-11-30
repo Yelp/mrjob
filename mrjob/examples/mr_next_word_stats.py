@@ -1,4 +1,5 @@
 # Copyright 2011 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@ words come next (including percentage).
 This is meant as a simple demonstration of why SORT_VALUES is useful.
 """
 from mrjob.job import MRJob
+from mrjob.step import MRStep
 import re
 
 
@@ -28,10 +30,10 @@ class MRNextWordStats(MRJob):
     SORT_VALUES = True
 
     def steps(self):
-        return [self.mr(mapper=self.m_find_words,
-                        #combiner=self.c_combine_counts,
-                        reducer=self.r_sum_counts),
-                self.mr(reducer=self.r_compute_stats)]
+        return [MRStep(mapper=self.m_find_words,
+                       combiner=self.c_combine_counts,
+                       reducer=self.r_sum_counts),
+                MRStep(reducer=self.r_compute_stats)]
 
     def m_find_words(self, _, line):
         """Tokenize lines, and look for pairs of adjacent words.

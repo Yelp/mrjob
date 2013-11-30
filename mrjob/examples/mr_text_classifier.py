@@ -1,4 +1,5 @@
 # Copyright 2009-2010 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,6 +52,7 @@ import re
 
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
+from mrjob.step import MRStep
 
 
 def encode_document(text, cats=None, id=None):
@@ -144,10 +146,10 @@ class MRTextClassifier(MRJob):
         The documents themselves are passed through from step 1 to step 5.
         Ngram scoring information is passed through from step 4 to step 5.
         """
-        return [self.mr(self.parse_doc, self.count_ngram_freq),
-                self.mr(reducer=self.score_ngrams),
-                self.mr(reducer=self.score_documents_by_ngram),
-                self.mr(reducer=self.score_documents)]
+        return [MRStep(self.parse_doc, self.count_ngram_freq),
+                MRStep(reducer=self.score_ngrams),
+                MRStep(reducer=self.score_documents_by_ngram),
+                MRStep(reducer=self.score_documents)]
 
     def configure_options(self):
         """Add command-line options specific to this script."""

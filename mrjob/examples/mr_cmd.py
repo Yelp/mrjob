@@ -24,6 +24,7 @@ unpredictable keys and you may not get a single number as output.
 
 """
 from mrjob.job import MRJob
+from mrjob.step import MRStep
 from mrjob.util import bash_wrap
 
 
@@ -73,7 +74,7 @@ class MRCmdJob(MRJob):
                 step_kwargs['combiner_cmd'] = bash_wrap(step['combiner'])
             if 'reducer' in step:
                 step_kwargs['reducer_cmd'] = bash_wrap(step['reducer'])
-            steps.append(self.mr(**step_kwargs))
+            steps.append(MRStep(**step_kwargs))
         return steps
 
 

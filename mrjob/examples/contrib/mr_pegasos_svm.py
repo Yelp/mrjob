@@ -1,4 +1,5 @@
 # Copyright 2011 Peter Harrington
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,6 +36,8 @@ from numpy import mat, zeros, shape, random
 
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
+from mrjob.step import MRStep
+
 
 class MRsvm(MRJob):
     INPUT_PROTOCOL = JSONValueProtocol
@@ -100,8 +103,9 @@ class MRsvm(MRJob):
                     yield (mapperNum, ['x', random.randint(shape(self.data)[0]) ])
 
     def steps(self):
-        return ([self.mr(mapper=self.map, reducer=self.reduce,
-                         mapper_final=self.map_fin)]*self.options.iterations)
+        return ([MRStep(mapper=self.map, reducer=self.reduce,
+                        mapper_final=self.map_fin)]*self.options.iterations)
+
 
 if __name__ == '__main__':
     MRsvm.run()

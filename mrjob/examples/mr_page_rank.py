@@ -1,4 +1,5 @@
 # Copyright 2009-2010 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@ http://en.wikipedia.org/wiki/PageRank
 """
 from mrjob.job import MRJob
 from mrjob.protocol import JSONProtocol
+from mrjob.step import MRStep
 
 
 def encode_node(node_id, links=None, score=1):
@@ -96,7 +98,7 @@ class MRPageRank(MRJob):
         yield node_id, node
 
     def steps(self):
-        return ([self.mr(mapper=self.send_score, reducer=self.receive_score)] *
+        return ([MRStep(mapper=self.send_score, reducer=self.receive_score)] *
                 self.options.iterations)
 
 

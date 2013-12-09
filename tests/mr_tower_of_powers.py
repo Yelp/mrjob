@@ -54,7 +54,7 @@ class MRTowerOfPowers(MRJob):
             yield key, value
 
     def steps(self):
-        return [self.mr(self.mapper, self.reducer)] * self.n
+        return [self.mr(mapper=self.mapper, reducer=self.reducer)] * self.n
 
     def show_steps(self):
         # when we invoke the job with --steps, it should

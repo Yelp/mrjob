@@ -1,4 +1,8 @@
 v0.4.3, 201?-??-?? -- ???
+ * runners:
+   * All runners:
+     * You can now set strict_protocols from mrjob.conf (#726)
+       * new --no-strict-protocols command-line option
 
 v0.4.2, 2013-11-27 -- that's one small step for a JAR
  * jobs:

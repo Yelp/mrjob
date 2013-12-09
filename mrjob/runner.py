@@ -123,6 +123,7 @@ class RunnerOptionStore(OptionStore):
         'sh_bin',
         'steps_interpreter',
         'steps_python_bin',
+        'strict_protocols',
         'upload_archives',
         'upload_files',
     ]))
@@ -840,7 +841,9 @@ class MRJobRunner(object):
         :param local: if this is True, use files' local paths rather than
             the path they'll have inside Hadoop streaming
         """
-        return self._get_file_upload_args(local=local) + self._extra_args
+        return (self._get_file_upload_args(local=local) +
+                self._get_strict_protocols_args() +
+                self._extra_args)
 
     def _get_file_upload_args(self, local=False):
         """Arguments used to pass through config files, etc from the job
@@ -858,6 +861,19 @@ class MRJobRunner(object):
             else:
                 args.append(self._working_dir_mgr.name(**path_dict))
         return args
+
+    def _get_strict_protocols_args(self):
+        """Arguments used to control protocol behavior in the job.
+        """
+        # These are only in the runner so that we can default them from
+        # mrjob.conf, which will allow us to eventually remove them.
+        # See issue #726.
+        if self._opts['strict_protocols']:
+            return ['--strict-protocols']
+        elif self._opts['strict_protocols'] is None:
+            return []
+        else:
+            return ['--no-strict-protocols']
 
     def _create_setup_wrapper_script(self, dest='setup-wrapper.sh'):
         """Create the wrapper script, and write it into our local temp

@@ -89,11 +89,10 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
         self.addCleanup(rmtree, self.tmp_dir)
 
         # environment
-        self._old_environ = os.environ.copy()
-
-    def tearDown(self):
-        os.environ.clear()
-        os.environ.update(self._old_environ)
+        old_environ = os.environ.copy()
+        # cleanup functions are called in reverse order
+        self.addCleanup(os.environ.update, old_environ)
+        self.addCleanup(os.environ.clear)
 
     def makedirs(self, path):
         abs_path = os.path.join(self.tmp_dir, path)

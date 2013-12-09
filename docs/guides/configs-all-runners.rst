@@ -299,6 +299,17 @@ Job execution context
     steps. Rarely needed. Defaults to ``sys.executable`` (the current Python
     interpreter).
 
+.. mrjob-opt::
+    :config: strict_protocols
+    :switch: --strict-protocols, --no-strict-protocols
+    :type: boolean
+    :set: all
+    :default: ``None``
+
+    If this is true, the job will raise an exception when encountering
+    input or output that can't be handled by its protocols (the default
+    is to increment a counter and continue).
+
 Other
 -----
 

@@ -45,6 +45,7 @@ from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.mr_word_count import MRWordCount
+from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -401,8 +402,8 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
         self.assertIn('#', mr_job.stderr.getvalue())
 
         # should still get expected results
-        self.assertEqual(sorted(mr_job.parse_output()),
-                         [(1, None), (1, 'bar')])
+        self.assertItemsEqual(mr_job.stdout.getvalue().splitlines(),
+                              ['1\tnull', '1\t"bar"'])
 
 
 class StepsPythonBinTestCase(unittest.TestCase):
@@ -516,16 +517,22 @@ class CompatTestCase(EmptyMrjobConfTestCase):
     def test_environment_variables_018(self):
         job = MRWordCount(['-r', 'local', '--hadoop-version', '0.18'])
         with job.make_runner() as runner:
-            env = runner._subprocess_env(0, 'mapper', 0, '/tmp/foo')
-            self.assertIn('mapred_cache_localArchives', env)
-            self.assertNotIn('mapreduce_job_cache_local_archives', env)
+            simulated_jobconf = runner._simulate_jobconf_for_step(
+                0, 'mapper', 0, '/tmp/foo')
+            self.assertIn(
+                'mapred.cache.localArchives', simulated_jobconf)
+            self.assertNotIn(
+                'mapreduce.job.cache.local.archives', simulated_jobconf)
 
     def test_environment_variables_021(self):
         job = MRWordCount(['-r', 'local', '--hadoop-version', '0.21'])
         with job.make_runner() as runner:
-            env = runner._subprocess_env(0, 'mapper', 0, '/tmp/foo')
-            self.assertIn('mapreduce_job_cache_local_archives', env)
-            self.assertNotIn('mapred_cache_localArchives', env)
+            simulated_jobconf = runner._simulate_jobconf_for_step(
+                0, 'mapper', 0, '/tmp/foo')
+            self.assertIn(
+                'mapreduce.job.cache.local.archives', simulated_jobconf)
+            self.assertNotIn(
+                'mapred.cache.localArchives', simulated_jobconf)
 
 
 class CommandSubstepTestCase(SandboxedTestCase):

@@ -1,4 +1,5 @@
-# Copyright 2011 Contributors (Jordan Andersen)
+# Copyright 2011 Jordan Andersen
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +29,7 @@ mapper.
 __author__ = 'Jordan Andersen <jordandandersen@gmail.com>'
 
 from mrjob.job import MRJob
+from mrjob.step import MRStep
 from scipy.misc.common import factorial
 import sys
 import numpy
@@ -91,10 +93,10 @@ class MRSalesman(MRJob):
         out by the first step to be inputs to step 2's mappers without having
         to be reduced.
         """
-        return ([self.mr(mapper=self.splitter),
-                self.mr(mapper=self.mapper,
+        return ([MRStep(mapper=self.splitter),
+                 MRStep(mapper=self.mapper,
                         reducer=self.reducer,
-                        mapper_final = self.mapper_final)]
+                        mapper_final=self.mapper_final)]
                 )
 
     def __init__(self, *args, **kwargs):

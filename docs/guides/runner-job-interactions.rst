@@ -88,7 +88,7 @@ data::
     class MRMapperJob(MRJob):
 
         def steps(self):
-            return [self.mr(mapper=self.my_mapper)]
+            return [MRStep(mapper=self.my_mapper)]
 
 The runners would then invoke Hadoop Streaming with::
 
@@ -112,8 +112,8 @@ using a ``pre_filter`` key in the substep dictionary::
     class MRMapperFilterJob(MRJob):
 
         def steps(self):
-            return [self.mr(mapper=self.my_mapper,
-                            mapper_pre_filter='grep "specific data"')]
+            return [MRStep(mapper=self.my_mapper,
+                           mapper_pre_filter='grep "specific data"')]
 
 Hadoop Streaming arguments::
 
@@ -144,7 +144,7 @@ The format for a command substep is very simple.
     class MRMapperCommandJob(MRJob):
 
         def steps(self):
-            return [self.mr(mapper_cmd='cat')]
+            return [MRStep(mapper_cmd='cat')]
 
 Hadoop Streaming arguments::
 

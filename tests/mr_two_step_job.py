@@ -1,4 +1,5 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2012 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +14,7 @@
 # limitations under the License.
 """Trivial multi-step job, useful for testing runners."""
 from mrjob.job import MRJob
+from mrjob.step import MRStep
 
 try:
     import simplejson as json  # preferred because of C speedups
@@ -68,9 +70,9 @@ class MRTwoStepJob(MRJob):
         yield value, key
 
     def steps(self):
-        return [self.mr(mapper=self.mapper, reducer=self.reducer,
-                        combiner=self.combiner),
-                self.mr(mapper=self.mapper2)]
+        return [MRStep(mapper=self.mapper, reducer=self.reducer,
+                       combiner=self.combiner),
+                MRStep(mapper=self.mapper2)]
 
 
 if __name__ == '__main__':

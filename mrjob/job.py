@@ -348,47 +348,15 @@ class MRJob(MRJobLauncher):
 
     @classmethod
     def mr(cls, *args, **kwargs):
-        """Define a Python step (mapper, reducer, and/or any combination of
-        mapper_init, reducer_final, etc.) for your job.
-
-        Used by :py:meth:`steps`. (Don't re-define this, just call it!)
-        See :ref:`writing-multi-step-jobs` for sample usage.
-
-        Accepts the following keyword arguments.
-
-        :param mapper: function with same function signature as
-                       :py:meth:`mapper`, or ``None`` for an identity mapper.
-        :param reducer: function with same function signature as
-                        :py:meth:`reducer`, or ``None`` for no reducer.
-        :param combiner: function with same function signature as
-                         :py:meth:`combiner`, or ``None`` for no combiner.
-        :param mapper_init: function with same function signature as
-                            :py:meth:`mapper_init`, or ``None`` for no initial
-                            mapper action.
-        :param mapper_final: function with same function signature as
-                             :py:meth:`mapper_final`, or ``None`` for no final
-                             mapper action.
-        :param reducer_init: function with same function signature as
-                             :py:meth:`reducer_init`, or ``None`` for no
-                             initial reducer action.
-        :param reducer_final: function with same function signature as
-                              :py:meth:`reducer_final`, or ``None`` for no
-                              final reducer action.
-        :param combiner_init: function with same function signature as
-                              :py:meth:`combiner_init`, or ``None`` for no
-                              initial combiner action.
-        :param combiner_final: function with same function signature as
-                               :py:meth:`combiner_final`, or ``None`` for no
-                               final combiner action.
-        :param jobconf: dictionary with custom jobconf arguments to pass to
-                        hadoop.
-
-        This is just a wrapper for :py:class:`~mrjob.step.MRStep`, plus
+        """A deprecated wrapper for :py:class:`~mrjob.step.MRStep`, plus
         a little logic to support deprecated use of positional arguments.
         """
         if args:
             log.warning('Using positional arguments to MRJob.mr() is'
                         ' deprecated and will be removed in v0.5.0')
+        else:
+            log.warning('mr() is deprecated and will be removed in v0.6.0.'
+                        ' Use mrjob.step.MRStep directly instead.')
 
         if len(args) > 0:
             kwargs['mapper'] = args[0]

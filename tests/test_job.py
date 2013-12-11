@@ -39,6 +39,8 @@ from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
+from mrjob.step import _IDENTITY_MAPPER
+from mrjob.step import _IDENTITY_REDUCER
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.util import log_to_stream
@@ -449,39 +451,34 @@ class PickProtocolsTestCase(unittest.TestCase):
                         self.assertIsInstance(actual_read, expect_read)
                         self.assertIsInstance(actual_write, expect_write)
 
-    def _streaming_step(self, n, *args, **kwargs):
-        return MRStep(*args, **kwargs).description(n)
-
-    def _jar_step(self, n, *args, **kwargs):
-        return JarStep(*args, **kwargs).description(n)
-
     def test_single_mapper(self):
         self._assert_script_protocols(
-            [self._streaming_step(0, mapper=self._yield_none)],
+            [MRStep(mapper=self._yield_none).description(0)],
             [(PickleProtocol, JSONValueProtocol)],
             strict_protocols=True)
 
     def test_single_reducer(self):
         # MRStep transparently adds mapper
         self._assert_script_protocols(
-            [self._streaming_step(0, reducer=self._yield_none)],
+            [MRStep(reducer=self._yield_none).description(0)],
             [(PickleProtocol, JSONProtocol),
              (JSONProtocol, JSONValueProtocol)],
             strict_protocols=True)
 
     def test_mapper_combiner(self):
         self._assert_script_protocols(
-            [self._streaming_step(
-                0, mapper=self._yield_none, combiner=self._yield_none)],
+            [MRStep(mapper=self._yield_none,
+                    combiner=self._yield_none).description(0)],
             [(PickleProtocol, JSONValueProtocol),
              (JSONValueProtocol, JSONValueProtocol)],
             strict_protocols=True)
 
     def test_mapper_combiner_reducer(self):
         self._assert_script_protocols(
-            [self._streaming_step(
-                0, mapper=self._yield_none, combiner=self._yield_none,
-                reducer=self._yield_none)],
+            [MRStep(
+                mapper=self._yield_none,
+                combiner=self._yield_none,
+                reducer=self._yield_none).description(0)],
             [(PickleProtocol, JSONProtocol),
              (JSONProtocol, JSONProtocol),
              (JSONProtocol, JSONValueProtocol)],
@@ -489,10 +486,11 @@ class PickProtocolsTestCase(unittest.TestCase):
 
     def test_begin_jar_step(self):
         self._assert_script_protocols(
-            [self._jar_step(0, 'blah', 'binks_jar.jar'),
-             self._streaming_step(
-                 1, mapper=self._yield_none, combiner=self._yield_none,
-                 reducer=self._yield_none)],
+            [JarStep(jar='binks_jar.jar').description(0),
+             MRStep(
+                 mapper=self._yield_none,
+                 combiner=self._yield_none,
+                 reducer=self._yield_none).description(1)],
             [(RawValueProtocol, RawValueProtocol),
              (PickleProtocol, JSONProtocol),
              (JSONProtocol, JSONProtocol),
@@ -500,10 +498,11 @@ class PickProtocolsTestCase(unittest.TestCase):
 
     def test_end_jar_step(self):
         self._assert_script_protocols(
-            [self._streaming_step(
-                0, mapper=self._yield_none, combiner=self._yield_none,
-                reducer=self._yield_none),
-             self._jar_step(1, 'blah', 'binks_jar.jar')],
+            [MRStep(
+                mapper=self._yield_none,
+                combiner=self._yield_none,
+                reducer=self._yield_none).description(0),
+             JarStep(jar='binks_jar.jar').description(1)],
             [(PickleProtocol, JSONProtocol),
              (JSONProtocol, JSONProtocol),
              (JSONProtocol, JSONValueProtocol),
@@ -511,10 +510,11 @@ class PickProtocolsTestCase(unittest.TestCase):
 
     def test_middle_jar_step(self):
         self._assert_script_protocols(
-            [self._streaming_step(
-                0, mapper=self._yield_none, combiner=self._yield_none),
-             self._jar_step(1, 'blah', 'binks_jar.jar'),
-             self._streaming_step(2, reducer=self._yield_none)],
+            [MRStep(
+                mapper=self._yield_none,
+                combiner=self._yield_none).description(0),
+             JarStep(jar='binks_jar.jar').description(1),
+             MRStep(reducer=self._yield_none).description(2)],
             [(PickleProtocol, JSONProtocol),
              (JSONProtocol, JSONProtocol),
              (RawValueProtocol, RawValueProtocol),
@@ -522,13 +522,14 @@ class PickProtocolsTestCase(unittest.TestCase):
 
     def test_single_mapper_cmd(self):
         self._assert_script_protocols(
-            [self._streaming_step(0, mapper_cmd='cat')],
+            [MRStep(mapper_cmd='cat').description(0)],
             [(RawValueProtocol, RawValueProtocol)])
 
     def test_single_mapper_cmd_with_script_combiner(self):
         self._assert_script_protocols(
-            [self._streaming_step(
-                0, mapper_cmd='cat', combiner=self._yield_none)],
+            [MRStep(
+                mapper_cmd='cat',
+                combiner=self._yield_none).description(0)],
             [(RawValueProtocol, RawValueProtocol),
              (RawValueProtocol, RawValueProtocol)])
 
@@ -536,8 +537,9 @@ class PickProtocolsTestCase(unittest.TestCase):
         # reducer is only script step so it uses INPUT_PROTOCOL and
         # OUTPUT_PROTOCOL
         self._assert_script_protocols(
-            [self._streaming_step(
-                0, mapper_cmd='cat', reducer=self._yield_none)],
+            [MRStep(
+                mapper_cmd='cat',
+                reducer=self._yield_none).description(0)],
             [(RawValueProtocol, RawValueProtocol),
              (PickleProtocol, JSONValueProtocol)])
 
@@ -545,10 +547,10 @@ class PickProtocolsTestCase(unittest.TestCase):
         # reducer is only script step so it uses INPUT_PROTOCOL and
         # OUTPUT_PROTOCOL
         self._assert_script_protocols(
-            [self._streaming_step(
-                0, mapper_cmd='cat', reducer=self._yield_none),
-             self._jar_step(1, 'blah', 'binks_jar.jar'),
-             self._streaming_step(2, mapper=self._yield_none)],
+            [MRStep(mapper_cmd='cat',
+                    reducer=self._yield_none).description(0),
+             JarStep(jar='binks_jar.jar').description(1),
+             MRStep(mapper=self._yield_none).description(2)],
             [(RawValueProtocol, RawValueProtocol),
              (PickleProtocol, JSONProtocol),
              (RawValueProtocol, RawValueProtocol),
@@ -1064,8 +1066,8 @@ class StepsTestCase(unittest.TestCase):
 
         def steps(self):
             return [
-                self.mr(mapper_init=self._yield_none, mapper_pre_filter='cat',
-                        reducer_cmd='wc -l'),
+                MRStep(mapper_init=self._yield_none, mapper_pre_filter='cat',
+                       reducer_cmd='wc -l'),
                 JarStep(jar='s3://bookat/binks_jar.jar')]
 
     class SingleSteppyCommandJob(MRJob):
@@ -1119,3 +1121,31 @@ class StepsTestCase(unittest.TestCase):
         self.assertEqual(
             j.steps()[0],
             MRStep(mapper=j.mapper))
+
+
+class DeprecatedStepConstructorMethodsTestCase(unittest.TestCase):
+
+    def test_jar(self):
+        kwargs = {
+            'jar': 'binks.jar.jar',
+            'main_class': 'MyMainMan',
+            'args': ['argh', 'argh'],
+        }
+
+        with logger_disabled('mrjob.job'):
+            self.assertEqual(MRJob.jar(**kwargs), JarStep(**kwargs))
+
+    def test_mr(self):
+        kwargs = {
+            'mapper': _IDENTITY_MAPPER,
+            'reducer': _IDENTITY_REDUCER,
+        }
+
+        with logger_disabled('mrjob.job'):
+            self.assertEqual(MRJob.mr(**kwargs), MRStep(**kwargs))
+
+    def test_mr_positional_arguments(self):
+        with logger_disabled('mrjob.job'):
+            self.assertEqual(
+                MRJob.mr(_IDENTITY_MAPPER, _IDENTITY_REDUCER),
+                MRStep(mapper=_IDENTITY_MAPPER, reducer=_IDENTITY_REDUCER))

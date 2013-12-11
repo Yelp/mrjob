@@ -50,8 +50,39 @@ def _IDENTITY_REDUCER(key, values):
 
 class MRStep(object):
     """Represents steps handled by the script containing your job.
-    """
 
+    Used by :py:meth:`MRJob.steps <mrjob.job.MRJob.steps>`.
+    See :ref:`writing-multi-step-jobs` for sample usage.
+
+    Accepts the following keyword arguments.
+
+    :param mapper: function with same function signature as
+                   :py:meth:`mapper`, or ``None`` for an identity mapper.
+    :param reducer: function with same function signature as
+                    :py:meth:`reducer`, or ``None`` for no reducer.
+    :param combiner: function with same function signature as
+                     :py:meth:`combiner`, or ``None`` for no combiner.
+    :param mapper_init: function with same function signature as
+                        :py:meth:`mapper_init`, or ``None`` for no initial
+                        mapper action.
+    :param mapper_final: function with same function signature as
+                         :py:meth:`mapper_final`, or ``None`` for no final
+                         mapper action.
+    :param reducer_init: function with same function signature as
+                         :py:meth:`reducer_init`, or ``None`` for no
+                         initial reducer action.
+    :param reducer_final: function with same function signature as
+                          :py:meth:`reducer_final`, or ``None`` for no
+                          final reducer action.
+    :param combiner_init: function with same function signature as
+                          :py:meth:`combiner_init`, or ``None`` for no
+                          initial combiner action.
+    :param combiner_final: function with same function signature as
+                           :py:meth:`combiner_final`, or ``None`` for no
+                           final combiner action.
+    :param jobconf: dictionary with custom jobconf arguments to pass to
+                    hadoop.
+    """
     def __init__(self, **kwargs):
         """See :py:meth:`mrjob.job.MRJob.mr` for details."""
 

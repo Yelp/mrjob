@@ -36,10 +36,11 @@ from mock import patch
 from mrjob import conf
 from mrjob.fs.base import Filesystem
 from mrjob.inline import InlineMRJobRunner
-from mrjob.sim import _error_on_bad_paths
-from mrjob.protocol import JSONValueProtocol
-from tests.mr_test_cmdenv import MRTestCmdenv
 from mrjob.job import MRJob
+from mrjob.protocol import JSONValueProtocol
+from mrjob.sim import _error_on_bad_paths
+from mrjob.step import MRStep
+from tests.mr_test_cmdenv import MRTestCmdenv
 from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
 from tests.mr_two_step_job import MRTwoStepJob
@@ -137,7 +138,7 @@ class MRIncrementerJob(MRJob):
         yield None, value + 1
 
     def steps(self):
-        return [self.mr(mapper=self.mapper)] * self.options.times
+        return [MRStep(mapper=self.mapper)] * self.options.times
 
 
 class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):

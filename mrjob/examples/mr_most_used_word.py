@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # Copyright 2009-2010 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +16,7 @@
 """Determine the most used word in the input."""
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
+from mrjob.step import MRStep
 import re
 
 WORD_RE = re.compile(r"[\w']+")
@@ -46,10 +48,10 @@ class MRMostUsedWord(MRJob):
 
     def steps(self):
         return [
-            self.mr(mapper=self.mapper_get_words,
-                    combiner=self.combiner_count_words,
-                    reducer=self.reducer_count_words),
-            self.mr(reducer=self.reducer_find_max_word)
+            MRStep(mapper=self.mapper_get_words,
+                   combiner=self.combiner_count_words,
+                   reducer=self.reducer_count_words),
+            MRStep(reducer=self.reducer_find_max_word)
         ]
 
 

@@ -1,4 +1,5 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2012 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +22,7 @@ import os
 
 from mrjob.protocol import JSONValueProtocol
 from mrjob.job import MRJob
+from mrjob.step import MRStep
 
 
 class MRTowerOfPowers(MRJob):
@@ -54,7 +56,7 @@ class MRTowerOfPowers(MRJob):
             yield key, value
 
     def steps(self):
-        return [self.mr(mapper=self.mapper, reducer=self.reducer)] * self.n
+        return [MRStep(mapper=self.mapper, reducer=self.reducer)] * self.n
 
     def show_steps(self):
         # when we invoke the job with --steps, it should

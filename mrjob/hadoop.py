@@ -136,7 +136,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         # fix hadoop_bin
         if not self['hadoop_bin']:
             self['hadoop_bin'] = [
-                os.path.join(self['hadoop_home'], 'bin/hadoop')]
+                os.path.join(self['hadoop_home'], 'bin', 'hadoop')]
 
         # fix hadoop_streaming_jar
         if not self['hadoop_streaming_jar']:

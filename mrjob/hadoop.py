@@ -271,12 +271,11 @@ class HadoopJobRunner(MRJobRunner):
     def _mkdir_on_hdfs(self, path):
         log.debug('Making directory %s on HDFS' % path)
         
-        hadoop_version = self.get_hadoop_version()
-        if hadoop_version.startswith("1.") or hadoop_version.startswith("0.1") or hadoop_version.startswith("0.20"):
-            self.invoke_hadoop(['fs', '-mkdir', path])
-        else:
-            # from version 0.23 / 2.x, -mkdir needs a -p option to create parent directories
+        # from version 0.23 / 2.x, -mkdir needs a -p option to create parent directories
+        if mrjob.compat.version_gte(self.get_hadoop_version(), "2.0"):
             self.invoke_hadoop(['fs', '-mkdir', '-p', path])
+        else:
+            self.invoke_hadoop(['fs', '-mkdir', path])
 
     def _upload_to_hdfs(self, path, target):
         log.debug('Uploading %s -> %s on HDFS' % (path, target))

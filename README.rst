@@ -124,7 +124,7 @@ Project Links
 Reference
 ---------
 
-* `Hadoop MapReduce <http://hadoop.apache.org/mapreduce/>`_
+* `Hadoop Streaming <http://hadoop.apache.org/docs/stable1/streaming.html>`_
 * `Elastic MapReduce <http://aws.amazon.com/documentation/elasticmapreduce/>`_
 
 More Information

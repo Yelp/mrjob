@@ -137,7 +137,7 @@ The basic way to control type and number of instances is with the
 *ec2_instance_type* and *num_ec2_instances* options, on the command line like
 this::
 
-    --ec2_instance_type c1.medium --num-ec2-instances 5
+    --ec2-instance-type c1.medium --num-ec2-instances 5
 
 or in :py:mod:`mrjob.conf`, like this::
 

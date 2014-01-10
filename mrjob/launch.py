@@ -368,7 +368,7 @@ class MRJobLauncher(object):
         uses all args as input files. This method determines the behavior:
         MRJobLauncher takes off the first arg as the script path.
         """
-        if self._script_path:
+        if not self._script_path:
             self._script_path = os.path.abspath(args[0])
         elif len(args) < 1:
             self.option_parser.error('Must supply script path')

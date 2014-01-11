@@ -278,3 +278,7 @@ class CommandLineArgsTestCase(unittest.TestCase):
     def test_no_conf_overridden(self):
         mr_job = MRCustomJobLauncher(args=['', '--no-conf', '-c', 'blah.conf'])
         self.assertEqual(mr_job.options.conf_paths, ['blah.conf'])
+
+    def test_requires_script_path(self):
+        self.assertRaises(ValueError, MRCustomJobLauncher, args=[])
+

@@ -29,7 +29,7 @@ from mrjob.compat import uses_020_counters
 
 
 # match the filename of a hadoop streaming jar
-HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*\.jar$')
+HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*(?<!-sources)\.jar$')
 
 # match an mrjob job name (these are used to name EMR job flows)
 JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')

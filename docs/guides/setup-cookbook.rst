@@ -114,7 +114,7 @@ machine, something like this:
       hadoop:
         setup:
         - VENV=/tmp/$mapreduce_job_id
-        - if [ -e $VENV ]; then virtualenv $VENV; fi
+        - if [ ! -e $VENV ]; then virtualenv $VENV; fi
         - . $VENV/bin/activate
         - pip install mr3po simplejson
 

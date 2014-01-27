@@ -270,7 +270,7 @@ class HadoopJobRunner(MRJobRunner):
 
     def _mkdir_on_hdfs(self, path):
         log.debug('Making directory %s on HDFS' % path)
-        self.invoke_hadoop(['fs', '-mkdir', path])
+        self.invoke_hadoop(['fs', '-mkdir', '-p', path])
 
     def _upload_to_hdfs(self, path, target):
         log.debug('Uploading %s -> %s on HDFS' % (path, target))

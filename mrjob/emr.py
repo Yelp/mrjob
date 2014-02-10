@@ -368,6 +368,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'enable_emr_debugging',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
+        'iam_job_flow_role',
         'max_hours_idle',
         'mins_to_end_of_hour',
         'num_ec2_core_instances',
@@ -415,6 +416,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'hadoop_version': None,
             'hadoop_streaming_jar_on_emr': (
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar'),
+            'iam_job_flow_role': None,
             'mins_to_end_of_hour': 5.0,
             'num_ec2_core_instances': 0,
             'num_ec2_instances': 1,
@@ -1297,6 +1299,11 @@ class EMRJobRunner(MRJobRunner):
             args.setdefault('api_params', {})
             args['api_params']['VisibleToAllUsers'] = 'true'
 
+        if self._opts['iam_job_flow_role']:
+            if 'api_params' not in args:
+                args.setdefault('api_params', {})
+            args['api_params']['JobFlowRole'] = self._opts['iam_job_flow_role']
+             
         if steps:
             args['steps'] = steps
 

@@ -45,6 +45,8 @@ def _ssh_args(ssh_bin, address, ec2_key_pair_file):
     ``subprocess``. Specifies an identity, disables strict host key checking,
     and adds the ``hadoop`` username.
     """
+    if ec2_key_pair_file is None:
+        raise ValueError('SSH key file path cannot be None')
     return ssh_bin + [
         '-i', ec2_key_pair_file,
         '-o', 'StrictHostKeyChecking=no',

@@ -521,6 +521,7 @@ class MockEmrConnection(object):
             creationdatetime=to_iso8601(now),
             ec2keyname=ec2_keyname,
             hadoopversion=hadoop_version,
+            iamjobflowrole=None,
             instancecount=str(num_instances),
             instancegroups=mock_groups,
             jobflowid=jobflow_id,
@@ -550,6 +551,8 @@ class MockEmrConnection(object):
         if api_params:
             for k, v in api_params.iteritems():
                 setattr(job_flow, k.lower(), v)
+            if 'JobFlowRole' in api_params:
+                job_flow.iamjobflowrole = api_params['JobFlowRole']
 
         self.mock_emr_job_flows[jobflow_id] = job_flow
 

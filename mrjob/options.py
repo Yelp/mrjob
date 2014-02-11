@@ -429,6 +429,11 @@ def add_emr_opts(opt_group):
                   ' Rarely necessary.')),
 
         opt_group.add_option(
+            '--iam-job-flow-role', dest='iam_job_flow_role',
+            default=None,
+            help='IAM Job flow role to use for the EMR cluster - see AWS docs on EMR for info on using IAM roles with EMR'),
+         
+        opt_group.add_option(
             '--max-hours-idle', dest='max_hours_idle',
             default=None, type='float',
             help=("If we create a persistent job flow, have it automatically"
@@ -539,6 +544,7 @@ def add_emr_opts(opt_group):
             '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
             default=None, action='store_true',
             help='Open up an SSH tunnel to the Hadoop job tracker'),
+
         opt_group.add_option(
             '--visible-to-all-users', dest='visible_to_all_users',
             default=None, action='store_true',
@@ -547,7 +553,7 @@ def add_emr_opts(opt_group):
                  ' to True, all IAM users of that AWS account can view and'
                  ' (if they have the proper policy permissions set) manage'
                  ' the job flow. If it is set to False, only the IAM user'
-                 ' that created the job flow can view and manage it.'),
+                 ' that created the job flow can view and manage it.')
     ]
 
 

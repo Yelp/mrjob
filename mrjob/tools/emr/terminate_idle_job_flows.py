@@ -53,15 +53,10 @@ import logging
 from optparse import OptionParser
 import re
 
-try:
-    import boto.utils
-    boto  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    boto = None
-
 from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
+from mrjob.emr import iso8601_to_datetime
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 from mrjob.pool import est_time_to_hour
@@ -294,7 +289,7 @@ def time_last_active(job_flow):
     # for ISO8601 timestamps, alpha order == chronological order
     last_timestamp = max(timestamps)
 
-    return datetime.strptime(last_timestamp, boto.utils.ISO8601)
+    return iso8601_to_datetime(last_timestamp)
 
 
 def job_flow_has_pending_steps(job_flow):

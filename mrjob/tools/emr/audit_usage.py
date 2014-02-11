@@ -33,7 +33,6 @@ Options::
 """
 from __future__ import with_statement
 
-import boto.utils
 from datetime import datetime
 from datetime import timedelta
 import math
@@ -42,6 +41,7 @@ from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
+from mrjob.emr import iso8601_to_datetime
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 from mrjob.parse import JOB_NAME_RE
@@ -758,7 +758,7 @@ def to_datetime(iso8601_time):
     if iso8601_time is None:
         return None
 
-    return datetime.strptime(iso8601_time, boto.utils.ISO8601)
+    return iso8601_to_datetime(iso8601_time)
 
 
 def percent(x, total, default=0.0):

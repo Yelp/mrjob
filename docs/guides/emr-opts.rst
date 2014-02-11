@@ -153,7 +153,7 @@ Job flow creation and configuration
 .. mrjob-opt::
     :config: no_emr_api_params
     :switch: --no-emr-api-param
-    :type: :ref:`list <data-type-plain-list>`
+    :type: :ref:`string list <data-type-string-list>`
     :set: emr
     :default: ``[]``
 

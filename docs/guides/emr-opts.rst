@@ -141,6 +141,25 @@ Job flow creation and configuration
     .. versionadded:: 0.4.1
 
 .. mrjob-opt::
+    :config: emr_api_params
+    :switch: --emr-api-param
+    :type: :ref:`dict <data-type-plain-dict>`
+    :set: emr
+    :default: ``{}``
+
+    Additional parameters to pass directly to the EMR API. This is a way to
+    pass new API parameters without updating the library.
+
+.. mrjob-opt::
+    :config: no_emr_api_params
+    :switch: --no-emr-api-param
+    :type: :ref:`list <data-type-plain-list>`
+    :set: emr
+    :default: ``[]``
+
+    Parameters to be unset when calling EMR API.
+
+.. mrjob-opt::
     :config: visible_to_all_users
     :switch: --visible-to-all-users
     :type: boolean
@@ -148,7 +167,8 @@ Job flow creation and configuration
     :default: ``False``
 
     If ``True``, EMR job flows will be visible to all IAM users. If ``False``,
-    the job flow will only be visible to the IAM user that created it.
+    the job flow will only be visible to the IAM user that created it. This parameter
+    overrides :mrjob-opt:`emr_api_params` with key ``VisbleToAllUsers``
 
     .. versionadded:: 0.4.1
 

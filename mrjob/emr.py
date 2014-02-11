@@ -1968,7 +1968,7 @@ class EMRJobRunner(MRJobRunner):
 
         # bootstrap_python_packages
         if self._opts['bootstrap_python_packages']:
-            bootstrap.append(['sudo apt-get install -y python-pip'])
+            bootstrap.append(['sudo apt-get install -y python-pip || sudo yum install -y python-pip'])
 
         for path in self._opts['bootstrap_python_packages']:
             path_dict = parse_legacy_hash_path('file', path)

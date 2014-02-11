@@ -383,7 +383,9 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_bind_ports',
         'ssh_tunnel_is_open',
         'ssh_tunnel_to_job_tracker',
-        'visible_to_all_users'
+        'visible_to_all_users',
+        'emr_api_params',
+        'no_emr_api_params'
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -397,6 +399,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         's3_log_uri': combine_paths,
         's3_scratch_uri': combine_paths,
         'ssh_bin': combine_cmds,
+        'emr_api_params': combine_dicts
     })
 
     def __init__(self, alias, opts, conf_path):
@@ -1289,6 +1292,14 @@ class EMRJobRunner(MRJobRunner):
 
         if self._opts['additional_emr_info']:
             args['additional_info'] = self._opts['additional_emr_info']
+
+        if self._opts['emr_api_params']:
+            args['api_params'] = self._opts['emr_api_params']
+
+        if self._opts['no_emr_api_params']:
+            args.setdefault('api_params', {})
+            for param in self._opts['no_emr_api_params']:
+                args['api_params'][param] = None
 
         if self._opts['visible_to_all_users']:
             # Issue #701: this keyword arg was added to run_jobflow()

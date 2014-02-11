@@ -532,6 +532,7 @@ class MockEmrConnection(object):
             normalizedinstancehours='9999',  # just need this filled in for now
             state='STARTING',
             steps=[],
+            api_params={},
             visibletoallusers='false',  # can only be set with api_params
         )
 
@@ -548,8 +549,9 @@ class MockEmrConnection(object):
 
         # include raw api params in job flow object
         if api_params:
-            for k, v in api_params.iteritems():
-                setattr(job_flow, k.lower(), v)
+            job_flow.api_params = api_params
+            if 'VisibleToAllUsers' in api_params:
+                job_flow.visibletoallusers = api_params['VisibleToAllUsers']
 
         self.mock_emr_job_flows[jobflow_id] = job_flow
 

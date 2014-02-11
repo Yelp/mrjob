@@ -593,6 +593,34 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
         self.assertTrue(job_flow.visibletoallusers, 'true')
 
 
+class EMRApiParamsTestCase(MockEMRAndS3TestCase):
+
+    def run_and_get_job_flow(self, *args):
+        stdin = StringIO('foo\nbar\n')
+        mr_job = MRTwoStepJob(
+            ['-r', 'emr', '-v'] + list(args))
+        mr_job.sandbox(stdin=stdin)
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            emr_conn = runner.make_emr_conn()
+            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+
+    def test_param_set(self):
+        job_flow = self.run_and_get_job_flow('--emr-api-param', 'Test.API=a', '--emr-api-param', 'Test.API2=b')
+        self.assertTrue('Test.API' in job_flow.api_params)
+        self.assertTrue('Test.API2' in job_flow.api_params)
+        self.assertEqual(job_flow.api_params['Test.API'], 'a')
+        self.assertEqual(job_flow.api_params['Test.API2'], 'b')
+
+    def test_param_unset(self):
+        job_flow = self.run_and_get_job_flow('--no-emr-api-param', 'Test.API', '--no-emr-api-param', 'Test.API2')
+        self.assertTrue('Test.API' in job_flow.api_params)
+        self.assertTrue('Test.API2' in job_flow.api_params)
+        self.assertIsNone(job_flow.api_params['Test.API'])
+        self.assertIsNone(job_flow.api_params['Test.API2'])
+
+
 class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
 
     def run_and_get_job_flow(self, *args):

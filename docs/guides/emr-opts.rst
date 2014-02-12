@@ -118,7 +118,7 @@ Job flow creation and configuration
 .. mrjob-opt::
     :config: iam_job_flow_role
     :switch: --iam-job-flow-role
-    :type: :ref:`string <data-type=string>`
+    :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``None``
 

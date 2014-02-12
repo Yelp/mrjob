@@ -1975,7 +1975,11 @@ class EMRJobRunner(MRJobRunner):
 
         # bootstrap_python_packages
         if self._opts['bootstrap_python_packages']:
-            bootstrap.append(['sudo apt-get install -y python-pip'])
+            # 3.0.x AMIs use yum rather than apt-get;
+            # can't determine which AMI `latest` is at
+            # job flow creation time so we call both
+            bootstrap.append(['sudo apt-get install -y python-pip || '
+                'sudo yum install -y python-pip'])
 
         for path in self._opts['bootstrap_python_packages']:
             path_dict = parse_legacy_hash_path('file', path)

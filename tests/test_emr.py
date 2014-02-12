@@ -1965,7 +1965,8 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         self.assertIn('sudo python -m compileall -f $__mrjob_PYTHON_LIB/mrjob'
                       ' && true', lines)
         # bootstrap_python_packages
-        self.assertIn('sudo apt-get install -y python-pip', lines)
+        self.assertIn('sudo apt-get install -y python-pip || '
+                'sudo yum install -y python-pip', lines)
         self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
         # bootstrap_scripts
         self.assertIn('$__mrjob_PWD/speedups.sh', lines)

@@ -539,18 +539,20 @@ def add_emr_opts(opt_group):
             '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
             default=None, action='store_true',
             help='Open up an SSH tunnel to the Hadoop job tracker'),
+
         opt_group.add_option(
             '--emr-api-param', dest='emr_api_params',
             default=[], action='append',
             help='Additional parameters to pass directly to the EMR API; should'
-                 ' take the form KEY=VALUE. You can use --emr-api-params multiple'
+                 ' take the form KEY=VALUE. You can use --emr-api-param multiple'
                  ' times.'
         ),
+
         opt_group.add_option(
             '--no-emr-api-param', dest='no_emr_api_params',
             default=[], action='append',
             help='Parameters to be unset when calling EMR API.'
-                 ' You can use --emr-api-params multiple times.'
+                 ' You can use --no-emr-api-param multiple times.'
         ),
         opt_group.add_option(
             '--visible-to-all-users', dest='visible_to_all_users',
@@ -561,7 +563,8 @@ def add_emr_opts(opt_group):
                  ' (if they have the proper policy permissions set) manage'
                  ' the job flow. If it is set to False, only the IAM user'
                  ' that created the job flow can view and manage it.'
-                 ' This option overrides --emr-api-params VisibleToAllUsers=1.'
+                 ' This option can be overridden by'
+                 ' --emr-api-param VisibleToAllUsers=true|false.'
         ),
     ]
 

@@ -620,6 +620,13 @@ class EMRApiParamsTestCase(MockEMRAndS3TestCase):
         self.assertIsNone(job_flow.api_params['Test.API'])
         self.assertIsNone(job_flow.api_params['Test.API2'])
 
+    def test_invalid_param(self):
+        self.assertRaises(ValueError, self.run_and_get_job_flow, '--emr-api-param', 'Test.API')
+
+    def test_overrides(self):
+        job_flow = self.run_and_get_job_flow('--emr-api-param', 'VisibleToAllUsers=false', '--visible-to-all-users')
+        self.assertEqual(job_flow.visibletoallusers, 'false')
+
 
 class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
 

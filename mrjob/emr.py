@@ -85,6 +85,8 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
+from mrjob.conversions import iso8601_to_timestamp
+from mrjob.conversions import iso8601_to_datetime
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
 from mrjob.logparsers import NODE_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
@@ -134,10 +136,6 @@ WAIT_FOR_SSH_TO_FAIL = 1.0
 # amount of time to wait between checks for available pooled job flows
 JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 
-# sometimes AWS gives us seconds as a decimal, which we can't parse
-# with boto.utils.ISO8601
-SUBSECOND_RE = re.compile('\.[0-9]+')
-
 # Deprecated as of v0.4.1 (will be removed in v0.5).
 # Use mrjob.aws.emr_endpoint_for_region() instead
 REGION_TO_EMR_ENDPOINT = {
@@ -182,31 +180,6 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
-
-
-# AWS actually gives dates in two formats, and we only recently started using
-# API calls that return the second. So the date parsing function is called
-# iso8601_to_*, but it also parses RFC1123.
-# Until boto starts seamlessly parsing these, we check for them ourselves.
-
-# Thu, 29 Mar 2012 04:55:44 GMT
-RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
-
-
-def iso8601_to_timestamp(iso8601_time):
-    iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
-    try:
-        return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
-    except ValueError:
-        return time.mktime(time.strptime(iso8601_time, RFC1123))
-
-
-def iso8601_to_datetime(iso8601_time):
-    iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
-    try:
-        return datetime.strptime(iso8601_time, boto.utils.ISO8601)
-    except ValueError:
-        return datetime.strptime(iso8601_time, RFC1123)
 
 
 def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,

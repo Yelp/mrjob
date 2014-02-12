@@ -17,14 +17,7 @@
 from datetime import datetime
 from datetime import timedelta
 
-try:
-    import boto.utils
-    boto  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    # don't require boto; MRJobs don't actually need it when running
-    # inside hadoop streaming
-    boto = None
-
+from mrjob.conversions import iso8601_to_datetime
 
 def est_time_to_hour(job_flow, now=None):
     """How long before job reaches the end of the next full hour since it
@@ -41,10 +34,9 @@ def est_time_to_hour(job_flow, now=None):
 
     if creationdatetime:
         if startdatetime:
-            start = datetime.strptime(startdatetime, boto.utils.ISO8601)
+            start = iso8601_to_datetime(startdatetime)
         else:
-            start = datetime.strptime(job_flow.creationdatetime,
-                                      boto.utils.ISO8601)
+            start = iso8601_to_datetime(job_flow.creationdatetime)
     else:
         # do something reasonable if creationdatetime isn't set
         return timedelta(minutes=60)

@@ -41,7 +41,7 @@ from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
-from mrjob.emr import iso8601_to_datetime
+from mrjob.conversions import iso8601_to_datetime
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 from mrjob.parse import JOB_NAME_RE

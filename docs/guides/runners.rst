@@ -134,6 +134,67 @@ Further reference:
 * :py:meth:`~mrjob.runner.MRJobRunner.stream_output`
 * :py:meth:`~mrjob.job.MRJob.parse_output_line`
 
+Limitations
+^^^^^^^^^^^
+
+.. note:: You should pay attention to the next sentence.
+
+**You cannot use the programmatic runner functionality in the same file as your
+job class.** As an example of what not to do, here is some code that does not
+work.
+
+.. warning:: The code below shows you what **not** to do.
+
+.. code-block:: python
+
+    from mrjob.job import MRJob
+
+    class MyJob(MRJob):
+        # (your job)
+
+    mr_job = MyJob(args=[args])
+    with mr_job.make_runner() as runner:
+        runner.run()
+        # ... etc
+
+What you need to do instead is put your job in one file, and your run code in
+another. Here are two files that would correctly handle the above case.
+
+.. code-block:: python
+
+    # job.py
+    from mrjob.job import MRJob
+
+    class MyJob(MRJob):
+        # (your job)
+
+    if __name__ == '__main__':
+        MyJob.run()
+
+.. code-block:: python
+
+    # run.py
+    from job import MyJob
+    mr_job = MyJob(args=[args])
+    with mr_job.make_runner() as runner:
+        runner.run()
+        # ... etc
+
+.. _why-not-runner-in-file:
+
+Why can't I put the job class and run code in the same file?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The file with the job class is sent to Hadoop to be run. Therefore, the job
+file cannot attempt to start the Hadoop job, or you would be recursively
+creating Hadoop jobs!
+
+The code that runs the job should only run *outside* of the Hadoop context.
+
+The ``if __name__ == '__main__'`` block is only run if you invoke the job file
+as a script. It is not run when imported. That's why you can import the job
+class to be run, but it can still be invoked as an executable.
+
 Counters
 ^^^^^^^^
 

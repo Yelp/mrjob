@@ -86,7 +86,7 @@ file, **every time**::
 
 These lines pass control over the command line arguments and execution to
 mrjob. **Without them, your job will not work.** For more information, see
-:ref:`hadoop-streaming-and-mrjob`.
+:ref:`hadoop-streaming-and-mrjob` and :ref:`why-not-runner-in-file`.
 
 Running your job different ways
 -------------------------------

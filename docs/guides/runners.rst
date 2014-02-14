@@ -157,6 +157,14 @@ work.
         runner.run()
         # ... etc
 
+If you try to do this, mrjob will give you an error message similar or
+identical to this one:
+
+::
+
+    UsageError: make_runner() was called with --steps. This probably means you
+                tried to use it from __main__, which doesn't work.
+
 What you need to do instead is put your job in one file, and your run code in
 another. Here are two files that would correctly handle the above case.
 

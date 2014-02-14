@@ -36,9 +36,9 @@ except ImportError:
     boto = None
 
 from mrjob.conf import combine_values
-from mrjob.emr import RFC1123
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
+from mrjob.parse import RFC1123
 
 
 DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
@@ -272,7 +272,7 @@ class MockKey(object):
 def to_iso8601(when):
     """Convert a datetime to ISO8601 format.
     """
-    return when.strftime(boto.utils.ISO8601)
+    return when.strftime(boto.utils.ISO8601_MS)
 
 
 def to_rfc1123(when):

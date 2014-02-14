@@ -39,12 +39,11 @@ import logging
 from optparse import OptionParser
 import sys
 
-import boto.utils
-
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
+from mrjob.parse import iso8601_to_datetime
 from mrjob.util import strip_microseconds
 
 # default minimum number of hours a job can run before we report it.
@@ -104,7 +103,7 @@ def find_long_running_jobs(job_flows, min_time, now=None):
         # special case for jobs that are taking a long time to bootstrap
         if jf.state == 'BOOTSTRAPPING':
             start_timestamp = jf.startdatetime
-            start = datetime.strptime(start_timestamp, boto.utils.ISO8601)
+            start = iso8601_to_datetime(start_timestamp)
 
             time_running = now - start
 
@@ -128,7 +127,7 @@ def find_long_running_jobs(job_flows, min_time, now=None):
             for step in running_steps:
 
                 start_timestamp = step.startdatetime
-                start = datetime.strptime(start_timestamp, boto.utils.ISO8601)
+                start = iso8601_to_datetime(start_timestamp)
 
                 time_running = now - start
 
@@ -149,7 +148,7 @@ def find_long_running_jobs(job_flows, min_time, now=None):
                 if step.state == 'COMPLETED':
                     start_timestamp = step.enddatetime
 
-            start = datetime.strptime(start_timestamp, boto.utils.ISO8601)
+            start = iso8601_to_datetime(start_timestamp)
             time_pending = now - start
 
             if time_pending >= min_time:

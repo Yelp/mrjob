@@ -56,9 +56,9 @@ import re
 from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
-from mrjob.conversions import iso8601_to_datetime
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
+from mrjob.parse import iso8601_to_datetime
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
 from mrjob.util import strip_microseconds

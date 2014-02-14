@@ -17,7 +17,7 @@
 from datetime import datetime
 from datetime import timedelta
 
-from mrjob.conversions import iso8601_to_datetime
+from mrjob.parse import iso8601_to_datetime
 
 def est_time_to_hour(job_flow, now=None):
     """How long before job reaches the end of the next full hour since it

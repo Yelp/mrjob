@@ -41,11 +41,11 @@ from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
-from mrjob.conversions import iso8601_to_datetime
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import STEP_NAME_RE
+from mrjob.parse import iso8601_to_datetime
 from mrjob.util import strip_microseconds
 
 log = logging.getLogger(__name__)

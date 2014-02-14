@@ -85,8 +85,6 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
-from mrjob.conversions import iso8601_to_timestamp
-from mrjob.conversions import iso8601_to_datetime
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
 from mrjob.logparsers import NODE_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
@@ -96,6 +94,8 @@ from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
+from mrjob.parse import iso8601_to_datetime
+from mrjob.parse import iso8601_to_timestamp
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name

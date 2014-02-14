@@ -41,9 +41,9 @@ import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
-from mrjob.conversions import iso8601_to_datetime
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
+from mrjob.parse import iso8601_to_datetime
 from mrjob.util import strip_microseconds
 
 # default minimum number of hours a job can run before we report it.

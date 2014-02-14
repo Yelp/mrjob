@@ -221,6 +221,19 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         for path in self.slave_ssh_roots:
             shutil.rmtree(path)
 
+    def run_and_get_job_flow(self, *args):
+        # set up a job flow without caring about what the job is or what its
+        # inputs are.
+        stdin = StringIO('foo\nbar\n')
+        mr_job = MRTwoStepJob(
+            ['-r', 'emr', '-v'] + list(args))
+        mr_job.sandbox(stdin=stdin)
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            emr_conn = runner.make_emr_conn()
+            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+
 
 class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
@@ -573,17 +586,6 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
 class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
 
-    def run_and_get_job_flow(self, *args):
-        stdin = StringIO('foo\nbar\n')
-        mr_job = MRTwoStepJob(
-            ['-r', 'emr', '-v'] + list(args))
-        mr_job.sandbox(stdin=stdin)
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-            emr_conn = runner.make_emr_conn()
-            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
-
     def test_defaults(self):
         job_flow = self.run_and_get_job_flow()
         self.assertEqual(job_flow.visibletoallusers, 'false')
@@ -594,17 +596,6 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
 
 
 class EMRApiParamsTestCase(MockEMRAndS3TestCase):
-
-    def run_and_get_job_flow(self, *args):
-        stdin = StringIO('foo\nbar\n')
-        mr_job = MRTwoStepJob(
-            ['-r', 'emr', '-v'] + list(args))
-        mr_job.sandbox(stdin=stdin)
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-            emr_conn = runner.make_emr_conn()
-            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
 
     def test_param_set(self):
         job_flow = self.run_and_get_job_flow('--emr-api-param', 'Test.API=a', '--emr-api-param', 'Test.API2=b')
@@ -629,18 +620,6 @@ class EMRApiParamsTestCase(MockEMRAndS3TestCase):
 
 
 class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
-
-    def run_and_get_job_flow(self, *args):
-        stdin = StringIO('foo\nbar\n')
-        mr_job = MRTwoStepJob(
-            ['-r', 'emr', '-v'] + list(args))
-        mr_job.sandbox(stdin=stdin)
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-
-            emr_conn = runner.make_emr_conn()
-            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
 
     def test_defaults(self):
         job_flow = self.run_and_get_job_flow('--ami-version=1.0')

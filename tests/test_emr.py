@@ -595,6 +595,28 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
         self.assertTrue(job_flow.visibletoallusers, 'true')
 
 
+class IAMJobFlowRoleTestCase(MockEMRAndS3TestCase):
+
+    def run_and_get_job_flow(self, *args):
+        stdin = StringIO('foo\nbar\n')
+        mr_job = MRTwoStepJob(
+            ['-r', 'emr', '-v'] + list(args))
+        mr_job.sandbox(stdin=stdin)
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            emr_conn = runner.make_emr_conn()
+            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+
+    def test_defaults(self):
+        job_flow = self.run_and_get_job_flow()
+        self.assertEqual(job_flow.iamjobflowrole, None)
+
+    def test_iamjobflowrole(self):
+        job_flow = self.run_and_get_job_flow('--iam-job-flow-role=EMRDefaultRole')
+        self.assertEqual(job_flow.iamjobflowrole, 'EMRDefaultRole')
+
+
 class EMRApiParamsTestCase(MockEMRAndS3TestCase):
 
     def test_param_set(self):
@@ -1957,7 +1979,8 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         self.assertIn('sudo python -m compileall -f $__mrjob_PYTHON_LIB/mrjob'
                       ' && true', lines)
         # bootstrap_python_packages
-        self.assertIn('sudo apt-get install -y python-pip', lines)
+        self.assertIn('sudo apt-get install -y python-pip || '
+                'sudo yum install -y python-pip', lines)
         self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
         # bootstrap_scripts
         self.assertIn('$__mrjob_PWD/speedups.sh', lines)

@@ -368,6 +368,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'enable_emr_debugging',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
+        'iam_job_flow_role',
         'max_hours_idle',
         'mins_to_end_of_hour',
         'num_ec2_core_instances',
@@ -417,6 +418,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'hadoop_version': None,
             'hadoop_streaming_jar_on_emr': (
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar'),
+            'iam_job_flow_role': None,
             'mins_to_end_of_hour': 5.0,
             'num_ec2_core_instances': 0,
             'num_ec2_instances': 1,
@@ -1299,6 +1301,11 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['emr_api_params']:
             args['api_params'] = self._opts['emr_api_params']
 
+        if self._opts['iam_job_flow_role']:
+            if 'api_params' not in args:
+                args.setdefault('api_params', {})
+            args['api_params']['JobFlowRole'] = self._opts['iam_job_flow_role']
+             
         if steps:
             args['steps'] = steps
 
@@ -1970,7 +1977,11 @@ class EMRJobRunner(MRJobRunner):
 
         # bootstrap_python_packages
         if self._opts['bootstrap_python_packages']:
-            bootstrap.append(['sudo apt-get install -y python-pip'])
+            # 3.0.x AMIs use yum rather than apt-get;
+            # can't determine which AMI `latest` is at
+            # job flow creation time so we call both
+            bootstrap.append(['sudo apt-get install -y python-pip || '
+                'sudo yum install -y python-pip'])
 
         for path in self._opts['bootstrap_python_packages']:
             path_dict = parse_legacy_hash_path('file', path)

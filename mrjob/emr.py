@@ -362,6 +362,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ec2_slave_instance_type',
         'ec2_task_instance_bid_price',
         'ec2_task_instance_type',
+        'emr_api_params',
         'emr_endpoint',
         'emr_job_flow_id',
         'emr_job_flow_pool_name',
@@ -385,7 +386,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_tunnel_is_open',
         'ssh_tunnel_to_job_tracker',
         'visible_to_all_users',
-        'emr_api_params'
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -1305,7 +1305,7 @@ class EMRJobRunner(MRJobRunner):
             if 'api_params' not in args:
                 args.setdefault('api_params', {})
             args['api_params']['JobFlowRole'] = self._opts['iam_job_flow_role']
-             
+
         if steps:
             args['steps'] = steps
 

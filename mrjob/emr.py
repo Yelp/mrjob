@@ -335,6 +335,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ec2_slave_instance_type',
         'ec2_task_instance_bid_price',
         'ec2_task_instance_type',
+        'emr_api_params',
         'emr_endpoint',
         'emr_job_flow_id',
         'emr_job_flow_pool_name',
@@ -357,7 +358,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_bind_ports',
         'ssh_tunnel_is_open',
         'ssh_tunnel_to_job_tracker',
-        'visible_to_all_users'
+        'visible_to_all_users',
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -371,6 +372,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         's3_log_uri': combine_paths,
         's3_scratch_uri': combine_paths,
         'ssh_bin': combine_cmds,
+        'emr_api_params': combine_dicts
     })
 
     def __init__(self, alias, opts, conf_path):
@@ -1265,18 +1267,18 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['additional_emr_info']:
             args['additional_info'] = self._opts['additional_emr_info']
 
-        if self._opts['visible_to_all_users']:
-            # Issue #701: this keyword arg was added to run_jobflow()
-            # in boto 2.8.0, but we only require boto 2.2.0. So use
-            # api_params instead.
-            args.setdefault('api_params', {})
-            args['api_params']['VisibleToAllUsers'] = 'true'
+        if self._opts['visible_to_all_users'] and not 'VisibleToAllUsers' in self._opts['emr_api_params']:
+            self._opts['emr_api_params']['VisibleToAllUsers'] = \
+                'true' if self._opts['visible_to_all_users'] else 'false'
+
+        if self._opts['emr_api_params']:
+            args['api_params'] = self._opts['emr_api_params']
 
         if self._opts['iam_job_flow_role']:
             if 'api_params' not in args:
                 args.setdefault('api_params', {})
             args['api_params']['JobFlowRole'] = self._opts['iam_job_flow_role']
-             
+
         if steps:
             args['steps'] = steps
 

@@ -309,7 +309,7 @@ def hadoop_fs_mkdir(stdout, stderr, environ, *args):
         return -1
 
     failed = False
-    if environ['MOCK_HADOOP_VERSION'] in ['0.23', '2.0']:
+    if environ['MOCK_HADOOP_VERSION'] in ['0.23.0', '2.0.0']:
         # for version 0.23 and 2.0 or above, expect a -p parameter for mkdir
         if args[0] == '-p':
             args = args[1:]

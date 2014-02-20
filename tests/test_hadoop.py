@@ -117,6 +117,7 @@ class MockHadoopTestCase(SandboxedTestCase):
         # setup fake hadoop home
         hadoop_home = self.makedirs('mock_hadoop_home')
         os.environ['HADOOP_HOME'] = hadoop_home
+        os.environ['MOCK_HADOOP_VERSION'] = "1.2.0"
 
         # make fake hadoop binary
         os.mkdir(os.path.join(hadoop_home, 'bin'))

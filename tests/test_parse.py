@@ -527,6 +527,9 @@ class URITestCase(unittest.TestCase):
     def test_uri_parsing(self):
         self.assertEqual(is_uri('notauri!'), False)
         self.assertEqual(is_uri('they://did/the/monster/mash'), True)
+        self.assertEqual(is_uri('C:\some\windows\path'), False)
+        self.assertEqual(is_windows_path('C:\some\windows\path'), True)
+        self.assertEqual(is_windows_path('s3://a/uri'), False)
         self.assertEqual(is_s3_uri('s3://a/uri'), True)
         self.assertEqual(is_s3_uri('s3n://a/uri'), True)
         self.assertEqual(is_s3_uri('hdfs://a/uri'), False)

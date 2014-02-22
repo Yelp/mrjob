@@ -32,6 +32,7 @@ from mrjob.parse import find_interesting_hadoop_streaming_error
 from mrjob.parse import find_job_log_multiline_error
 from mrjob.parse import find_python_traceback
 from mrjob.parse import find_timeout_error
+from mrjob.parse import is_windows_path
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import parse_hadoop_counters_from_line

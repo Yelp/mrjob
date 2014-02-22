@@ -63,6 +63,8 @@ WINPATH_RE = re.compile(r"^[aA-zZ]:\\")
 def is_windows_path(uri):
     """Return True if *uri* is a windows path."""
     if WINPATH_RE.match(uri):
+        return True
+    else:
         return False
 
 

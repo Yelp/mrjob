@@ -56,12 +56,26 @@ log = logging.getLogger(__name__)
 # urlparse()
 NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
 
+# Used to check if the candidate candidate uri is actually a local windows path.
+WINPATH_RE = re.compile(r"^[aA-zZ]:\\")
+
+
+def is_windows_path(uri):
+    """Return True if *uri* is a windows path."""
+    if WINPATH_RE.match(uri):
+        return True
+    else:
+        return False
+
 
 def is_uri(uri):
     """Return True if *uri* is any sort of URI."""
+    if is_windows_path(uri):
+        return False
+    
     return bool(urlparse(uri).scheme)
 
-
+    
 def is_s3_uri(uri):
     """Return True if *uri* can be parsed into an S3 URI, False otherwise."""
     try:

@@ -911,10 +911,10 @@ class ProtocolTypeTestCase(unittest.TestCase):
             self.assertNotIn('OUTPUT_PROTOCOL should be a class', logs)
 
     def test_attrs_need_to_be_callable(self):
-        job = self.StrangeJob()
-        self.assertRaises(TypeError, job.input_protocol())
-        self.assertRaises(TypeError, job.internal_protocol())
-        self.assertRaises(TypeError, job.output_protocol())
+        job = self.BadJob()
+        self.assertRaises(TypeError, job.input_protocol)
+        self.assertRaises(TypeError, job.internal_protocol)
+        self.assertRaises(TypeError, job.output_protocol)
 
 
 class StepsTestCase(unittest.TestCase):

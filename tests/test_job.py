@@ -890,7 +890,13 @@ class ProtocolTypeTestCase(unittest.TestCase):
         def OUTPUT_PROTOCOL(self):
             return JSONProtocol()
 
-    def test_attrs_should_be_classes(self):
+    class BadJob(MRJob):
+
+        INPUT_PROTOCOL = object()
+        INTERNAL_PROTOCOL = object()
+        OUTPUT_PROTOCOL = object()
+
+    def test_attrs_dont_need_to_be_classes(self):
         with no_handlers_for_logger('mrjob.job'):
             stderr = StringIO()
             log_to_stream('mrjob.job', stderr)
@@ -899,9 +905,16 @@ class ProtocolTypeTestCase(unittest.TestCase):
             self.assertIsInstance(job.internal_protocol(), JSONProtocol)
             self.assertIsInstance(job.output_protocol(), JSONProtocol)
             logs = stderr.getvalue()
-            self.assertIn('INPUT_PROTOCOL should be a class', logs)
-            self.assertIn('INTERNAL_PROTOCOL should be a class', logs)
-            self.assertIn('OUTPUT_PROTOCOL should be a class', logs)
+            # Protocols only need to be callable.
+            self.assertNotIn('INPUT_PROTOCOL should be a class', logs)
+            self.assertNotIn('INTERNAL_PROTOCOL should be a class', logs)
+            self.assertNotIn('OUTPUT_PROTOCOL should be a class', logs)
+
+    def test_attrs_need_to_be_callable(self):
+        job = self.StrangeJob()
+        self.assertRaises(TypeError, job.input_protocol())
+        self.assertRaises(TypeError, job.internal_protocol())
+        self.assertRaises(TypeError, job.output_protocol())
 
 
 class StepsTestCase(unittest.TestCase):

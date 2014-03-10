@@ -161,6 +161,13 @@ class S3Filesystem(Filesystem):
         buffer_iterator = read_file(s3_key_to_uri(s3_key), fileobj=stream)
         return buffer_iterator_to_line_iterator(buffer_iterator)
 
+    def write(self, path, content):
+        key = self.get_s3_key(path)
+        if key and key.size != 0:
+            raise OSError('Non-empty file %r already exists!' % (path,))
+
+        self.make_s3_key(path).set_contents_from_string(content)
+
     def mkdir(self, dest):
         """Make a directory. This does nothing on S3 because there are
         no directories.
@@ -204,11 +211,7 @@ class S3Filesystem(Filesystem):
     def touchz(self, dest):
         """Make an empty file in the given location. Raises an error if
         a non-empty file already exists in that location."""
-        key = self.get_s3_key(dest)
-        if key and key.size != 0:
-            raise OSError('Non-empty file %r already exists!' % (dest,))
-
-        self.make_s3_key(dest).set_contents_from_string('')
+        self.write(dest, '')
 
     # Utilities for interacting with S3 using S3 URIs.
 

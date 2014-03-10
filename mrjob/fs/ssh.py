@@ -126,3 +126,6 @@ class SSHFilesystem(Filesystem):
 
     def touchz(self, dest):
         raise IOError() # not implemented
+
+    def write(self, path, content):
+        raise IOError()  # not implemented

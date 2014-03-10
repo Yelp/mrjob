@@ -32,6 +32,11 @@ class LocalFilesystem(Filesystem):
     def can_handle_path(self, path):
         return not is_uri(path)
 
+    def write(self, path, content):
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+        with os.fdopen(fd, 'w') as f:
+            f.write(content)
+
     def du(self, path_glob):
         return sum(os.path.getsize(path) for path in self.ls(path_glob))
 

@@ -132,3 +132,16 @@ class S3FSTestCase(SandboxedTestCase):
 
         self.fs.rm(path)
         self.assertEqual(self.fs.path_exists(path), False)
+
+    def test_write(self):
+        # Ensure that the test bucket exists
+        self.add_mock_s3_data('walrus', 'old-things', 'ensure bucket exists')
+
+        path = "s3://walrus/new-things"
+        content = 'some content!\n'
+        self.fs.write(path, content)
+        self.assertEqual("".join(self.fs.cat(path)), content)
+
+    def test_overwrite(self):
+        path = self.add_mock_s3_data('walrus', 'existing/file', 'herp')
+        self.assertRaises(OSError, self.fs.write, path, 'derp')

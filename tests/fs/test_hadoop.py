@@ -94,6 +94,16 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          ['foo\n', 'foo\n'])
 
+    def test_write(self):
+        path = 'hdfs:///write-test'
+        content = 'some content!'
+        self.fs.write(path, content)
+        self.assertEqual("".join(self.fs.cat(path)), content)
+
+    def test_write_overwrite(self):
+        self.make_mock_file('existing', 'this file already exists')
+        self.assertRaises(OSError, self.fs.write, 'hdfs:///existing', 'can not overwrite')
+
     def test_du(self):
         self.make_mock_file('data1', 'abcd')
         self.make_mock_file('more/data2', 'defg')

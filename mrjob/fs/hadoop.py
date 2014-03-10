@@ -13,10 +13,12 @@
 # limitations under the License.
 import logging
 import posixpath
+import os
 import re
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
+from tempfile import mkstemp
 
 try:
     from cStringIO import StringIO
@@ -107,6 +109,17 @@ class HadoopFilesystem(Filesystem):
             return stdout
         else:
             return proc.returncode
+
+    def write(self, path, content):
+        fd, content_path = mkstemp(suffix='hadoop-upload')
+        with os.fdopen(fd, 'w') as f:
+            f.write(content)
+        try:
+            self.invoke_hadoop(['fs', '-put', content_path, path])
+        except CalledProcessError as e:
+            raise OSError("Could not create file: %s" % e)
+        finally:
+            os.remove(content_path)
 
     def du(self, path_glob):
         """Get the size of a file, or None if it's not a file or doesn't

@@ -136,3 +136,7 @@ class SSHFSTestCase(MockSubprocessTestCase):
     def test_md5sum(self):
         # not implemented
         self.assertRaises(IOError, self.fs.md5sum, 'ssh://testmaster/d')
+
+    def test_write(self):
+        # not imlemented
+        self.assertRaises(IOError, self.fs.write, 'ssh://testmaster/new', 'x')

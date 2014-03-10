@@ -44,6 +44,16 @@ class LocalFSTestCase(SandboxedTestCase):
         self.assertEqual(self.fs.du(data_path_1), 4)
         self.assertEqual(self.fs.du(data_path_2), 4)
 
+    def test_write(self):
+        path = self.abs_paths('new')[0]
+        content = 'some content!'
+        self.fs.write(path, content)
+        self.assertEqual("".join(self.fs.cat(path)), content)
+
+    def test_overwrite(self):
+        path = self.makefile('existing', 'herp')
+        self.assertRaises(OSError, self.fs.write, path, 'derp')
+
     def test_ls_empty(self):
         self.assertEqual(list(self.fs.ls(self.tmp_dir)), [])
 

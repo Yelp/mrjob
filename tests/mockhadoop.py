@@ -331,14 +331,35 @@ def hadoop_fs_put(stdout, stderr, environ, *args):
     dst = args[-1]
 
     real_dst = hdfs_path_to_real_path(dst, environ)
+    dst_dir = os.path.isdir(real_dst)
     real_dir = os.path.dirname(real_dst)
+
     # dst could be a dir or a filename; we don't know
-    if not (os.path.isdir(real_dst) or os.path.isdir(real_dir)):
+    if not dst_dir and not os.path.isdir(real_dir):
         os.makedirs(real_dir)
 
+    skipped = False
+
     for src in srcs:
+        # If the destination is a directory then we put the source into it
+        # under its basename. If the destination is a file or does not exist
+        # then this is where we wish to write to.
+        target = os.path.join(real_dst, os.path.basename(src)) \
+            if dst_dir else real_dst
+
+        if os.path.exists(target):
+            if os.path.isdir(src):
+                stderr.write("Target %s is a directory" %
+                             real_path_to_hdfs_path(target, environ))
+            else:
+                stderr.write("Target %s already exists" %
+                             real_path_to_hdfs_path(target, environ))
+            skipped = True
+            continue
+
         shutil.copy(src, real_dst)
-    return 0
+
+    return 255 if skipped else 0
 
 
 def hadoop_fs_rmr(stdout, stderr, environ, *args):

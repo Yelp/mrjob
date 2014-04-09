@@ -262,14 +262,19 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
                                       'job_local_dir', '0', 'mapper', '0'))
 
         self.assertEqual(results['mapreduce.job.cache.archives'], '')
-        self.assertEqual(results['mapreduce.job.cache.files'],
-                         script_path + '#mr_test_jobconf.py' + ',' +
-                         upload_path + '#upload')
+        expected_cache_files = (
+            script_path + '#mr_test_jobconf.py',
+            upload_path + '#upload')
+        self.assertItemsEqual(
+            results['mapreduce.job.cache.files'].split(','),
+            expected_cache_files)
         self.assertEqual(results['mapreduce.job.cache.local.archives'], '')
-        self.assertEqual(
-            results['mapreduce.job.cache.local.files'],
-            os.path.join(working_dir, 'mr_test_jobconf.py') + ',' +
+        expected_local_files = (
+            os.path.join(working_dir, 'mr_test_jobconf.py'),
             os.path.join(working_dir, 'upload'))
+        self.assertItemsEqual(
+            results['mapreduce.job.cache.local.files'].split(','),
+            expected_local_files)
         self.assertEqual(results['mapreduce.job.id'], runner._job_name)
 
         self.assertEqual(results['mapreduce.map.input.file'], input_path)

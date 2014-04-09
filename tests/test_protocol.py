@@ -106,8 +106,8 @@ class JSONProtocolTestCase(ProtocolTestCase):
 
     def test_uses_json_format(self):
         KEY = ['a', 1]
-        VALUE = {'foo': {'bar': 3}, 'baz': None}
-        ENCODED = '["a", 1]\t{"foo": {"bar": 3}, "baz": null}'
+        VALUE = {'foo': 'bar'}
+        ENCODED = '["a", 1]\t{"foo": "bar"}'
 
         self.assertEqual((KEY, VALUE), JSONProtocol().read(ENCODED))
         self.assertEqual(ENCODED, JSONProtocol().write(KEY, VALUE))
@@ -152,8 +152,8 @@ class JSONValueProtocolTestCase(ProtocolTestCase):
             self.assertRoundTripWithTrailingTabOK(JSONValueProtocol(), None, v)
 
     def test_uses_json_format(self):
-        VALUE = {'foo': {'bar': 3}, 'baz': None, 'quz': ['a', 1]}
-        ENCODED = '{"foo": {"bar": 3}, "baz": null, "quz": ["a", 1]}'
+        VALUE = {'foo': 'bar'}
+        ENCODED = '{"foo": "bar"}'
 
         self.assertEqual((None, VALUE), JSONValueProtocol().read(ENCODED))
         self.assertEqual(ENCODED, JSONValueProtocol().write(None, VALUE))

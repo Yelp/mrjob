@@ -605,6 +605,11 @@ def safeeval(expr, globals=None, locals=None):
     safe_globals = {'__builtins__': None, 'True': True, 'False': False,
                     'None': None, 'set': set, 'xrange': xrange}
 
+    # PyPy needs special magic
+    def open(*args, **kwargs):
+        raise NameError("name 'open' is not defined")
+    safe_globals['open'] = open
+
     # add the user-specified global variables
     if globals:
         safe_globals.update(globals)

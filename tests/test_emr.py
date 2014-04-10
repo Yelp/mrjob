@@ -2913,9 +2913,9 @@ class TestCatFallback(MockEMRAndS3TestCase):
         self.prepare_runner_for_ssh(runner)
         mock_ssh_file('testmaster', 'etc/init.d', 'meow')
 
-        self.assertEqual(
-            list(runner.cat(SSH_PREFIX + runner._address + '/etc/init.d')),
-            ['meow\n'])
+        ssh_cat_gen = runner.cat(
+            SSH_PREFIX + runner._address + '/etc/init.d')
+        self.assertEqual(list(ssh_cat_gen)[0].rstrip(), 'meow')
         self.assertRaises(
             IOError, list,
             runner.cat(SSH_PREFIX + runner._address + '/does_not_exist'))

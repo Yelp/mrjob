@@ -15,6 +15,7 @@
 from __future__ import with_statement
 
 import logging
+import sys
 from StringIO import StringIO
 from subprocess import PIPE
 from subprocess import Popen
@@ -105,7 +106,12 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
         self.assertNotEqual(tb, None)
         assert isinstance(tb, list)
         # The first line ("Traceback...") is not skipped
-        self.assertEqual(len(tb), 3)
+        self.assertIn("Traceback (most recent call last):", tb[0])
+        self.assertIn("TypeError: 'int' object is not iterable", tb[-1])
+
+        # PyPy doesn't support -v
+        if hasattr(sys, 'pypy_version_info'):
+            return
 
         # make sure we can find the same traceback in noise
         verbose_stdout, verbose_stderr = run(

@@ -66,7 +66,7 @@ class MRBossTestCase(MockEMRAndS3TestCase):
                          print_stderr=False)
 
         with open(os.path.join(self.output_dir, 'master', 'stdout'), 'r') as f:
-            self.assertEqual(f.read(), 'file contents\n')
+            self.assertEqual(f.read().rstrip(), 'file contents')
 
         self.assertEqual(os.listdir(self.output_dir), ['master'])
 
@@ -84,11 +84,11 @@ class MRBossTestCase(MockEMRAndS3TestCase):
                          print_stderr=False)
 
         with open(os.path.join(self.output_dir, 'master', 'stdout'), 'r') as f:
-            self.assertEqual(f.read(), 'file contents 1\n')
+            self.assertEqual(f.read().rstrip(), 'file contents 1')
 
         with open(os.path.join(self.output_dir, 'slave testslave0', 'stdout'),
                   'r') as f:
-            self.assertEqual(f.read(), 'file contents 2\n')
+            self.assertEqual(f.read().strip(), 'file contents 2')
 
         self.assertEqual(sorted(os.listdir(self.output_dir)),
                          ['master', 'slave testslave0'])

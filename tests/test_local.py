@@ -388,6 +388,8 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
         self.assertIn('--step-num=1', output)
         self.assertIn('--mapper', output)
 
+    @unittest.skipIf(hasattr(sys, 'pypy_version_info'),
+                     "-v option doesn't work with pypy")
     def test_python_dash_v_as_python_bin(self):
         python_cmd = cmd_line([sys.executable or 'python', '-v'])
         mr_job = MRTwoStepJob(['--python-bin', python_cmd, '--no-conf',

@@ -613,4 +613,6 @@ Terminated job flow j-IDLE_AND_FAILED (Idle And Failed Job Flow); was idle for 3
 Terminated job flow j-HADOOP_DEBUGGING (Hadoop Debugging Job Flow); was idle for 2:00:00, 1:00:00 to end of hour
 Terminated job flow j-EMPTY (Empty Job Flow); was idle for 10:00:00, 1:00:00 to end of hour
 """
-        self.assertEqual(stdout.getvalue(), output)
+        self.assertItemsEqual(
+            stdout.getvalue().splitlines(),
+            output.splitlines())

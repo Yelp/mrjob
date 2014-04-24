@@ -15,7 +15,9 @@
 
 from __future__ import with_statement
 
+import cStringIO
 import inspect
+import logging
 from optparse import OptionError
 import os
 from subprocess import Popen
@@ -34,6 +36,7 @@ from mock import patch
 from mrjob.conf import combine_envs
 from mrjob.emr import EMRJobRunner
 from mrjob.hadoop import HadoopJobRunner
+from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from tests.quiet import no_handlers_for_logger
@@ -281,4 +284,26 @@ class CommandLineArgsTestCase(unittest.TestCase):
 
     def test_requires_script_path(self):
         self.assertRaises(ValueError, MRCustomJobLauncher, args=[])
+
+
+class TestToolLogging(unittest.TestCase):
+    """ Verify the behavior of logging configuration for CLI tools
+    """
+    def test_default_options(self):
+        with no_handlers_for_logger('__main__'):
+            with patch.object(sys, 'stderr', cStringIO.StringIO()) as stderr:
+                MRJob.set_up_logging()
+                log = logging.getLogger('__main__')
+                log.info('INFO')
+                log.debug('DEBUG')
+                self.assertEqual(stderr.getvalue(), 'INFO\n')
+
+    def test_verbose(self):
+        with no_handlers_for_logger('__main__'):
+            with patch.object(sys, 'stderr', cStringIO.StringIO()) as stderr:
+                MRJob.set_up_logging(verbose=True)
+                log = logging.getLogger('__main__')
+                log.info('INFO')
+                log.debug('DEBUG')
+                self.assertEqual(stderr.getvalue(), 'INFO\nDEBUG\n')
 

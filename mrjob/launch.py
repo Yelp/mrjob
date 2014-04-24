@@ -187,8 +187,10 @@ class MRJobLauncher(object):
         """
         if quiet:
             log_to_null(name='mrjob')
+            log_to_null(name='__main__')
         else:
             log_to_stream(name='mrjob', debug=verbose, stream=stream)
+            log_to_stream(name='__main__', debug=verbose, stream=stream)
 
         log_to_null(name='boto')
 

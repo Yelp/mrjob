@@ -191,7 +191,7 @@ class HadoopFilesystem(Filesystem):
     def mkdir(self, path):
         try:
             self.invoke_hadoop(
-                ['fs', '-mkdir', path], ok_stderr=[HADOOP_FILE_EXISTS_RE])
+                ['fs', '-mkdir', '-p', path], ok_stderr=[HADOOP_FILE_EXISTS_RE])
         except CalledProcessError:
             raise IOError("Could not mkdir %s" % path)
 

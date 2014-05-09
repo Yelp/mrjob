@@ -38,7 +38,7 @@ def main(args=None):
     printing to ``sys.stdout``."""
     runner = EMRJobRunner(**runner_kwargs(args))
     emr_job_flow_id = runner.make_persistent_job_flow()
-    print emr_job_flow_id
+    return emr_job_flow_id
 
 
 def runner_kwargs(cl_args=None):
@@ -135,4 +135,4 @@ def make_option_parser():
 
 
 if __name__ == '__main__':
-    main()
+    print main()

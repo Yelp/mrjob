@@ -93,6 +93,12 @@ def resolve_pending_xref(app, fromdocname, node):
     # Based on nodes.py in Sphinx. Resolves a subset of possible pending_xref
     # nodes that we see in practice in the config reference table. Uses only
     # public methods (afaict the proper API, zero hacks).
+
+    # This function had to be moved over because we generate the option list
+    # markup pretty late, and Sphinx apparently doesn't expose a way to resolve
+    # refs at that point, even though it knows where all the refs should point
+    # to.
+
     if 'refdomain' in node and node['refdomain']:
         domain = None
         contnode = node[0].deepcopy()
@@ -181,7 +187,7 @@ class OptionDirective(Directive):
     """
     .. mrjob-opt::
         :config: <snake_case_config_option>
-        :switch: <--comma, --separated, --switches)
+        :switch: <--comma, --separated, --switches>
         :type: <name of or link to a data type>
         :set: <set identifier>
         :default: <arbitrary markup for describing default value>

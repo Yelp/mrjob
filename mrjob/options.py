@@ -413,6 +413,11 @@ def add_emr_opts(opt_group):
             help='ID of an existing EMR job flow to use'),
 
         opt_group.add_option(
+            '--emr-action-on-failure', dest='emr_action_on_failure', default=None,
+            help=('Action to take when a step fails'
+                 ' (eg. TERMINATE_JOB_FLOW | TERMINATE_CLUSTER | CANCEL_AND_WAIT | CONTINUE)')),
+
+        opt_group.add_option(
             '--enable-emr-debugging', dest='enable_emr_debugging',
             default=None, action='store_true',
             help='Enable storage of Hadoop logs in SimpleDB'),

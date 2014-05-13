@@ -339,6 +339,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_endpoint',
         'emr_job_flow_id',
         'emr_job_flow_pool_name',
+        'emr_action_on_failure',
         'enable_emr_debugging',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
@@ -1287,7 +1288,9 @@ class EMRJobRunner(MRJobRunner):
     @property
     def _action_on_failure(self):
         # don't terminate other people's job flows
-        if (self._opts['emr_job_flow_id'] or
+        if (self._opts['emr_action_on_failure']):
+            return self._opts['emr_action_on_failure']
+        elif (self._opts['emr_job_flow_id'] or
                 self._opts['pool_emr_job_flows']):
             return 'CANCEL_AND_WAIT'
         else:

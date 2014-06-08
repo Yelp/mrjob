@@ -89,7 +89,7 @@ class MRLogSampler(MRJob):
             value - (random seed, line)
         """
         if random.random() < self.sampling_probability:
-            seed = '%20i' % random.randint(0, sys.maxint)
+            seed = '%20i' % random.randint(0, sys.maxsize)
             yield None, (seed, line)
 
     def reducer(self, _, values):

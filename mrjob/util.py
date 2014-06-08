@@ -111,7 +111,7 @@ def extract_dir_for_tar(archive_path, compression='gz'):
     # Open the file for read-only streaming (no random seeks)
     tar = tarfile.open(archive_path, mode='r|%s' % compression)
     # Grab the first item
-    first_member = tar.next()
+    first_member = next(tar)
     tar.close()
     # Return the first path component of the item's name
     return first_member.name.split('/')[0]

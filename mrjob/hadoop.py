@@ -375,8 +375,8 @@ class HadoopJobRunner(MRJobRunner):
             # when the child process exits, rather than EOF.
             while True:
                 try:
-                    yield iter.next()  # okay for StopIteration to bubble up
-                except IOError, e:
+                    yield next(iter)  # okay for StopIteration to bubble up
+                except IOError as e:
                     if e.errno == errno.EIO:
                         return
                     else:
@@ -511,7 +511,7 @@ class HadoopJobRunner(MRJobRunner):
 
             try:
                 self.invoke_hadoop(['fs', '-rmr', self._hdfs_tmp_dir])
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)
 
     ### LOG FETCHING/PARSING ###

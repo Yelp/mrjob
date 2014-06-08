@@ -631,7 +631,7 @@ def translate_jobconf(variable, version):
     req_version = LooseVersion(version)
     possible_versions = sorted(_JOBCONF_MAP[variable].keys(),
                                reverse=True,
-                               key=lambda(v): LooseVersion(v))
+                               key=lambda v: LooseVersion(v))
 
     for possible_version in possible_versions:
         if req_version >= LooseVersion(possible_version):

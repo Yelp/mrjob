@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from __future__ import with_statement
+from __future__ import print_function
 
 from sys import argv
 from sys import stderr
@@ -29,7 +30,7 @@ subcommands:"""
 
 def error(msg=None):
     if msg:
-        print >> stderr, msg
+        print(msg, file=stderr)
 
     longest_command = max(len(name) for name in commands)
 
@@ -37,9 +38,9 @@ def error(msg=None):
         spaces = ' ' * (longest_command - len(name))
         return '  %s: %s%s' % (
             name, spaces, descriptions[name])
-    print >> stderr, usage
-    print >> stderr, '\n'.join(
-        subcommand_line(name) for name in sorted(commands))
+    print(usage, file=stderr)
+    print('\n'.join(
+        subcommand_line(name) for name in sorted(commands)), file=stderr)
 
 
 def command(name, description):

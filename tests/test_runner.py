@@ -774,3 +774,19 @@ class SetupTestCase(SandboxedTestCase):
                 # stray ouput should be in stderr, not the job's output
                 self.assertIn('stray output', stderr.getvalue())
                 self.assertNotIn('stray output', output)
+
+
+class ExportJobNameTestCase(EmptyMrjobConfTestCase):
+
+    def test_export_job_name_true(self):
+        job = MRWordCount(['--export-job-name'])
+        with job.make_runner() as runner:
+            self.assertTrue(runner._opts['export_job_name'])
+            self.assertEqual(runner._opts['cmdenv']['MRJOB_JOB_NAME'],
+                             runner.get_job_name())
+
+    def test_export_job_name_default_false(self):
+        job = MRWordCount()
+        with job.make_runner() as runner:
+            self.assertFalse(runner._opts['export_job_name'])
+            self.assertEqual(runner._opts['cmdenv'], {})

@@ -108,6 +108,7 @@ class RunnerOptionStore(OptionStore):
         'cleanup',
         'cleanup_on_failure',
         'cmdenv',
+        'export_job_name',
         'hadoop_extra_args',
         'hadoop_streaming_jar',
         'hadoop_version',

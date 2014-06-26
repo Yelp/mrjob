@@ -74,7 +74,7 @@ Code for this example and more live in ``mrjob/examples``.
            yield (word, sum(counts))
 
 
-    if __name__ == '__main__':
+   if __name__ == '__main__':
         MRWordFreqCount.run()
 
 Try It Out!

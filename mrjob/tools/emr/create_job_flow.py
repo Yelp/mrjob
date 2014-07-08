@@ -24,6 +24,7 @@ Usage::
 left idle can quickly become expensive!
 """
 from __future__ import with_statement
+from __future__ import print_function
 
 from optparse import OptionParser
 from optparse import OptionGroup
@@ -38,7 +39,7 @@ def main(args=None):
     printing to ``sys.stdout``."""
     runner = EMRJobRunner(**runner_kwargs(args))
     emr_job_flow_id = runner.make_persistent_job_flow()
-    print emr_job_flow_id
+    print(emr_job_flow_id)
 
 
 def runner_kwargs(cl_args=None):

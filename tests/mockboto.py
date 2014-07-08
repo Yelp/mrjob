@@ -229,7 +229,7 @@ class MockKey(object):
         self._pos += len(chunk)
         return chunk
 
-    def next(self):
+    def __next__(self):
         chunk = self.read(SIMULATED_BUFFER_SIZE)
         if chunk:
             return chunk
@@ -690,7 +690,7 @@ class MockEmrConnection(object):
 
         if self.simulation_iterator:
             try:
-                self.simulation_iterator.next()
+                next(self.simulation_iterator)
             except StopIteration:
                 raise AssertionError(
                     'Simulated progress too many times; bailing out')

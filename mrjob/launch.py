@@ -488,6 +488,7 @@ class MRJobLauncher(object):
             'cmdenv': self.options.cmdenv,
             'conf_path': None,
             'conf_paths': self.options.conf_paths,
+            'export_job_name': self.options.export_job_name,
             'extra_args': self.generate_passthrough_arguments(),
             'file_upload_args': self.generate_file_upload_args(),
             'hadoop_extra_args': self.options.hadoop_extra_args,

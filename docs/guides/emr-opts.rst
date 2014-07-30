@@ -159,7 +159,7 @@ Job flow creation and configuration
     :switch: --visible-to-all-users
     :type: boolean
     :set: emr
-    :default: ``False``
+    :default: ``True``
 
     If ``True``, EMR job flows will be visible to all IAM users. If ``False``,
     the job flow will only be visible to the IAM user that created it. This parameter

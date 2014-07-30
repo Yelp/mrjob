@@ -588,11 +588,16 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
 
     def test_defaults(self):
         job_flow = self.run_and_get_job_flow()
-        self.assertEqual(job_flow.visibletoallusers, 'false')
+        self.assertEqual(job_flow.visibletoallusers, 'true')
 
     def test_visible(self):
         job_flow = self.run_and_get_job_flow('--visible-to-all-users')
         self.assertTrue(job_flow.visibletoallusers, 'true')
+
+    def test_explicit_invisible(self):
+        job_flow = self.run_and_get_job_flow('--emr-api-param', 'VisibleToAllUsers=false')
+        self.assertTrue(job_flow.visibletoallusers, 'false')
+
 
 
 class IAMJobFlowRoleTestCase(MockEMRAndS3TestCase):

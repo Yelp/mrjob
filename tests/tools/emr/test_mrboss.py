@@ -57,7 +57,6 @@ class MRBossTestCase(MockEMRAndS3TestCase):
         """
         shutil.rmtree(self.output_dir)
         self.runner.cleanup()
-        self.teardown_ssh()
 
     def test_one_node(self):
         mock_ssh_file('testmaster', 'some_file', 'file contents')

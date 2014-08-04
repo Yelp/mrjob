@@ -724,6 +724,7 @@ class SetupTestCase(SandboxedTestCase):
             '--setup', 'touch %s' % bar_path,
             '--setup', 'false',  # always "fails"
             '--setup', 'touch %s' % baz_path,
+            '--cleanup-on-failure=ALL',
         ])
         job.sandbox()
 

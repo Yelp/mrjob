@@ -1011,6 +1011,7 @@ class MRJobRunner(object):
 
         writeln('# release exclusive file lock')
         writeln('exec 9>&-')
+        writeln('rm /tmp/wrapper.lock.%s' % self._job_name)
         writeln()
 
         writeln('# run task from the original working directory')

@@ -60,7 +60,7 @@ do
     # first time through this loop, we just initialize LAST_ACTIVE
     # might as well nice hadoop; if there's other activity, it's Hadoop jobs
     if [ -z "$LAST_ACTIVE" ] || \
-        nice hadoop job -list 2> /dev/null | grep -q '^job_'
+        nice hadoop job -list 2> /dev/null | grep -q '^\s*job_'
     then
         LAST_ACTIVE=$UPTIME
 

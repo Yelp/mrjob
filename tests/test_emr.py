@@ -176,20 +176,23 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
 
         # Create temporary directories and add them to MOCK_SSH_ROOTS
-        self.master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
-        os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % self.master_ssh_root
+        master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
+        os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % master_ssh_root
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
 
-        self.slave_ssh_roots = []
+        if not hasattr(self, 'slave_ssh_roots'):
+            self.slave_ssh_roots = []
+
+        self.addCleanup(self.teardown_ssh, master_ssh_root)
 
         # Make the fake binary
-        os.mkdir(os.path.join(self.master_ssh_root, 'bin'))
-        self.ssh_bin = os.path.join(self.master_ssh_root, 'bin', 'ssh')
+        os.mkdir(os.path.join(master_ssh_root, 'bin'))
+        self.ssh_bin = os.path.join(master_ssh_root, 'bin', 'ssh')
         create_mock_ssh_script(self.ssh_bin)
 
         # Make a fake keyfile so that the 'file exists' requirements are
         # satsified
-        self.keyfile_path = os.path.join(self.master_ssh_root, 'key.pem')
+        self.keyfile_path = os.path.join(master_ssh_root, 'key.pem')
         with open(self.keyfile_path, 'w') as f:
             f.write('I AM DEFINITELY AN SSH KEY FILE')
 
@@ -216,8 +219,8 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         os.environ['MOCK_SSH_ROOTS'] += (':testmaster!testslave%d=%s'
                                          % (slave_num, new_dir))
 
-    def teardown_ssh(self):
-        shutil.rmtree(self.master_ssh_root)
+    def teardown_ssh(self, master_ssh_root):
+        shutil.rmtree(master_ssh_root)
         for path in self.slave_ssh_roots:
             shutil.rmtree(path)
 
@@ -1610,7 +1613,6 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
         arguments for different tests.
         """
         self.runner.cleanup()
-        self.teardown_ssh()
 
     def test_ssh_comes_first(self):
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
@@ -1818,14 +1820,10 @@ class TestSSHLs(MockEMRAndS3TestCase):
 
     def tearDown(self):
         super(TestSSHLs, self).tearDown()
-        self.cleanup_runner()
 
     def make_runner(self):
         self.runner = EMRJobRunner(conf_paths=[])
         self.prepare_runner_for_ssh(self.runner)
-
-    def cleanup_runner(self):
-        self.teardown_ssh()
 
     def test_ssh_ls(self):
         self.add_slave()

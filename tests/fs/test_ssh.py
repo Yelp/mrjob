@@ -13,6 +13,7 @@
 # limitations under the License.
 import bz2
 import os
+import shutil
 
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob import ssh
@@ -40,6 +41,13 @@ class SSHFSTestCase(MockSubprocessTestCase):
             MOCK_SSH_ROOTS='testmaster=%s' % self.master_ssh_root,
         )
         self.ssh_slave_roots = []
+
+        self.addCleanup(self.teardown_ssh, self.master_ssh_root)
+
+    def teardown_ssh(self, master_ssh_root):
+        shutil.rmtree(master_ssh_root)
+        for path in self.ssh_slave_roots:
+            shutil.rmtree(path)
 
     def add_slave(self):
         slave_num = len(self.ssh_slave_roots) + 1

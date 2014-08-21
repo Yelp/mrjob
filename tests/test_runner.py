@@ -365,6 +365,8 @@ sys.exit(13)
 
     def test_one_file(self):
         runner = MRJobRunner(conf_paths=[])
+        self.addCleanup(runner.cleanup)
+
         runner._invoke_sort([self.a], self.out)
 
         self.assertEqual(list(open(self.out)),
@@ -374,6 +376,8 @@ sys.exit(13)
 
     def test_two_files(self):
         runner = MRJobRunner(conf_paths=[])
+        self.addCleanup(runner.cleanup)
+
         runner._invoke_sort([self.a, self.b], self.out)
 
         self.assertEqual(list(open(self.out)),
@@ -396,16 +400,22 @@ sys.exit(13)
         self.use_bad_sort()
 
         runner = MRJobRunner(conf_paths=[])
+        self.addCleanup(runner.cleanup)
+
         with no_handlers_for_logger():
             self.assertRaises(CalledProcessError,
                               runner._invoke_sort, [self.a, self.b], self.out)
 
     def test_environment_variables_non_windows(self):
         runner = MRJobRunner(conf_path=False)
+        self.addCleanup(runner.cleanup)
+
         self.environment_variable_checks(runner, ['TEMP', 'TMPDIR'])
 
     def test_environment_variables_windows(self):
         runner = MRJobRunner(conf_path=False)
+        self.addCleanup(runner.cleanup)
+
         runner._sort_is_windows_sort = True
         self.environment_variable_checks(runner, ['TMP'])
 
@@ -714,6 +724,7 @@ class SetupTestCase(SandboxedTestCase):
             '--setup', 'touch %s' % bar_path,
             '--setup', 'false',  # always "fails"
             '--setup', 'touch %s' % baz_path,
+            '--cleanup-on-failure=ALL',
         ])
         job.sandbox()
 

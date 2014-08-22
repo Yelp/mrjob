@@ -199,7 +199,7 @@ class RunnerOptionStore(OptionStore):
             'cleanup_on_failure': ['NONE'],
             'hadoop_version': '0.20',
             'owner': owner,
-            'sh_bin': ['sh', '-e'],
+            'sh_bin': ['sh', '-ex'],
         })
 
     def _validate_cleanup(self):

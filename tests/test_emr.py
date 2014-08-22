@@ -1937,7 +1937,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         lines = [line.rstrip() for line in
                  open(runner._master_bootstrap_script_path)]
 
-        self.assertEqual(lines[0], '#!/bin/sh -e')
+        self.assertEqual(lines[0], '#!/bin/sh -ex')
 
         # check PWD gets stored
         self.assertIn('__mrjob_PWD=$PWD', lines)

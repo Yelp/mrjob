@@ -114,10 +114,10 @@ machine, something like this:
       hadoop:
         setup:
         - VENV=/tmp/$mapreduce_job_id
-        - if [ ! -e $VENV ]; then virtualenv $VENV; fi
+        - if [ ! -d $VENV ]; then virtualenv $VENV ; fi
         - . $VENV/bin/activate
         - pip install mr3po simplejson
-
+        
 With older versions of Hadoop (0.20 and earlier, and the 1.x series), you'd
 want to use ``$mapred_job_id``.
 

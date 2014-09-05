@@ -15,7 +15,6 @@
 
 """Test the idle job flow terminator"""
 
-from __future__ import with_statement
 
 from StringIO import StringIO
 from datetime import datetime

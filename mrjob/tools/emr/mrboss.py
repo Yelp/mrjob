@@ -29,7 +29,6 @@ Options::
   -q, --quiet           Don't print anything to stderr
   -v, --verbose         print more messages to stderr
 """
-from __future__ import with_statement
 from __future__ import print_function
 
 from optparse import OptionParser

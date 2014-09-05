@@ -15,7 +15,6 @@
 
 """Unit testing of MRJob."""
 
-from __future__ import with_statement
 
 import os
 from subprocess import Popen

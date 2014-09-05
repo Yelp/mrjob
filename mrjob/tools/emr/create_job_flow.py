@@ -23,7 +23,6 @@ Usage::
 :py:mod:`mrjob.tools.emr.terminate_idle_job_flows` in your crontab; job flows
 left idle can quickly become expensive!
 """
-from __future__ import with_statement
 from __future__ import print_function
 
 from optparse import OptionParser

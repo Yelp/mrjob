@@ -41,7 +41,6 @@ Options::
                         and --cat.
   -v, --verbose         print more messages to stderr
 """
-from __future__ import with_statement
 from __future__ import print_function
 
 from optparse import OptionError

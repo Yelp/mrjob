@@ -17,8 +17,6 @@
 for :py:mod:`mrjob`.
 """
 
-from __future__ import with_statement
-
 import glob
 from itertools import chain
 import logging

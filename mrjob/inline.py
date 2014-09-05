@@ -15,7 +15,6 @@
 # limitations under the License.
 """Run an MRJob inline by running all mappers and reducers through the same
 process. Useful for debugging."""
-from __future__ import with_statement
 
 __author__ = 'Matthew Tai <mtai@adku.com>'
 

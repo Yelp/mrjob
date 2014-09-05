@@ -13,7 +13,6 @@
 # limitations under the License.
 """Test OptionStore's functionality"""
 
-from __future__ import with_statement
 
 import os
 

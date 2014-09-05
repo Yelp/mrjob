@@ -32,7 +32,6 @@ Hadoop can see them (HDFS or S3), we provide :py:class:`UploadDirManager`.
 Path dictionaries are meant to be immutable; all state is handled by
 manager classes.
 """
-from __future__ import with_statement
 
 import itertools
 import logging

@@ -13,7 +13,6 @@
 # limitations under the License.
 """Test the S3 tmpwatch script"""
 
-from __future__ import with_statement
 
 from datetime import datetime
 from datetime import timedelta

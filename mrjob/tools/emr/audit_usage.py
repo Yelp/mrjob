@@ -31,7 +31,6 @@ Options::
                         go back as far as EMR supports (currently about 2
                         months)
 """
-from __future__ import with_statement
 from __future__ import print_function
 
 from datetime import datetime

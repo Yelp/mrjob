@@ -21,7 +21,6 @@ If you need a more extensive set of mock boto objects, we recommend adding
 some sort of sandboxing feature to boto, rather than extending these somewhat
 ad-hoc mock objects.
 """
-from __future__ import with_statement
 from datetime import datetime
 from datetime import timedelta
 import hashlib

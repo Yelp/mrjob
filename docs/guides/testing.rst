@@ -43,8 +43,6 @@ for Python 2.3 and up. Most tests also require the :keyword:`with` statement.
 
 ::
 
-    from __future__ import with_statement
-
     try:
         import unittest2 as unittest
     except ImportError:

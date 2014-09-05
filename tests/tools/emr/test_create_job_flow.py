@@ -13,7 +13,6 @@
 # limitations under the License.
 """Test the create-job-flow script"""
 
-from __future__ import with_statement
 
 from mrjob.tools.emr.create_job_flow import main as create_job_flow_main
 from mrjob.tools.emr.create_job_flow import runner_kwargs

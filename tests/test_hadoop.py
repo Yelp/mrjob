@@ -15,7 +15,6 @@
 
 """Test the hadoop job runner."""
 
-from __future__ import with_statement
 
 from StringIO import StringIO
 import getpass

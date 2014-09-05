@@ -21,7 +21,6 @@ If you need a more extensive set of mock boto objects, we recommend adding
 some sort of sandboxing feature to boto, rather than extending these somewhat
 ad-hoc mock objects.
 """
-from __future__ import with_statement
 from datetime import datetime
 from datetime import timedelta
 import hashlib
@@ -229,7 +228,7 @@ class MockKey(object):
         self._pos += len(chunk)
         return chunk
 
-    def next(self):
+    def __next__(self):
         chunk = self.read(SIMULATED_BUFFER_SIZE)
         if chunk:
             return chunk
@@ -690,7 +689,7 @@ class MockEmrConnection(object):
 
         if self.simulation_iterator:
             try:
-                self.simulation_iterator.next()
+                next(self.simulation_iterator)
             except StopIteration:
                 raise AssertionError(
                     'Simulated progress too many times; bailing out')

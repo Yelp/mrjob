@@ -41,7 +41,7 @@ Options::
                         and --cat.
   -v, --verbose         print more messages to stderr
 """
-from __future__ import with_statement
+from __future__ import print_function
 
 from optparse import OptionError
 from optparse import OptionParser
@@ -183,18 +183,18 @@ def make_option_parser():
 
 def prettyprint_paths(paths):
     for path in paths:
-        print path
-    print
+        print(path)
+    print()
 
 
 def _prettyprint_relevant(log_type_to_uri_list):
-    print 'Task attempts:'
+    print('Task attempts:')
     prettyprint_paths(log_type_to_uri_list[TASK_ATTEMPT_LOGS])
-    print 'Steps:'
+    print('Steps:')
     prettyprint_paths(log_type_to_uri_list[STEP_LOGS])
-    print 'Jobs:'
+    print('Jobs:')
     prettyprint_paths(log_type_to_uri_list[JOB_LOGS])
-    print 'Nodes:'
+    print('Nodes:')
     prettyprint_paths(log_type_to_uri_list[NODE_LOGS])
 
 
@@ -226,20 +226,20 @@ def list_all(runner):
 
 def cat_from_list(runner, path_list):
     for path in path_list:
-        print '===', path, '==='
+        print('===', path, '===')
         for line in runner.cat(path):
-            print line.rstrip()
-        print
+            print(line.rstrip())
+        print()
 
 
 def _cat_from_relevant(runner, log_type_to_uri_list):
-    print 'Task attempts:'
+    print('Task attempts:')
     cat_from_list(runner, log_type_to_uri_list[TASK_ATTEMPT_LOGS])
-    print 'Steps:'
+    print('Steps:')
     cat_from_list(runner, log_type_to_uri_list[STEP_LOGS])
-    print 'Jobs:'
+    print('Jobs:')
     cat_from_list(runner, log_type_to_uri_list[JOB_LOGS])
-    print 'Slaves:'
+    print('Slaves:')
     cat_from_list(runner, log_type_to_uri_list[NODE_LOGS])
 
 
@@ -277,7 +277,7 @@ def find_failure(runner, step_num):
         if job_flow:
             step_nums = range(1, len(job_flow.steps) + 1)
         else:
-            print 'You do not have access to that job flow.'
+            print('You do not have access to that job flow.')
             sys.exit(1)
 
     cause = runner._find_probable_cause_of_failure(step_nums)
@@ -291,9 +291,9 @@ def find_failure(runner, step_num):
             cause_msg.append('(while reading from %s)' %
                              cause['input_uri'])
 
-        print '\n'.join(cause_msg)
+        print('\n'.join(cause_msg))
     else:
-        print 'No probable cause of failure found.'
+        print('No probable cause of failure found.')
 
 
 if __name__ == '__main__':

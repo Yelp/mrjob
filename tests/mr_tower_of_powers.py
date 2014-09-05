@@ -16,7 +16,6 @@
 
 This is basically a contrived way of taking a number to the nth power,
 n times."""
-from __future__ import with_statement
 
 import os
 

@@ -38,7 +38,7 @@ class AuditUsageTestCase(MockEMRAndS3TestCase):
 
     def setUp(self):
         super(AuditUsageTestCase, self).setUp()
-        # redirect print statements to self.stdout
+        # redirect print output to self.stdout
         self._real_stdout = sys.stdout
         self.stdout = StringIO()
         sys.stdout = self.stdout

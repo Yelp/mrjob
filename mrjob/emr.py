@@ -220,7 +220,7 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
             results = emr_conn.describe_jobflows(
                 states=states, jobflow_ids=jobflow_ids,
                 created_after=created_after, created_before=created_before)
-        except boto.exception.BotoServerError, ex:
+        except boto.exception.BotoServerError as ex:
             if 'ValidationError' in ex.body:
                 log.debug(
                     '  reached earliest allowed created_before time, done!')
@@ -995,7 +995,7 @@ class EMRJobRunner(MRJobRunner):
                 try:
                     os.kill(self._ssh_proc.pid, signal.SIGKILL)
                     self._ssh_proc = None
-                except Exception, e:
+                except Exception as e:
                     log.exception(e)
 
         # stop the job flow if it belongs to us (it may have stopped on its
@@ -1007,7 +1007,7 @@ class EMRJobRunner(MRJobRunner):
             log.info('Terminating job flow: %s' % self._emr_job_flow_id)
             try:
                 self.make_emr_conn().terminate_jobflow(self._emr_job_flow_id)
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)
 
     def _cleanup_remote_scratch(self):
@@ -1017,7 +1017,7 @@ class EMRJobRunner(MRJobRunner):
                 log.info('Removing all files in %s' % self._s3_tmp_uri)
                 self.rm(self._s3_tmp_uri)
                 self._s3_tmp_uri = None
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)
 
     def _cleanup_logs(self):
@@ -1031,7 +1031,7 @@ class EMRJobRunner(MRJobRunner):
                 log.info('Removing all files in %s' % self._s3_job_log_uri)
                 self.rm(self._s3_job_log_uri)
                 self._s3_job_log_uri = None
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)
 
     def _cleanup_job(self):
@@ -1075,7 +1075,7 @@ class EMRJobRunner(MRJobRunner):
         try:
             log.info("Attempting to terminate job flow")
             emr_conn.terminate_jobflow(self._emr_job_flow_id)
-        except Exception, e:
+        except Exception as e:
             # Something happened with boto and the user should know.
             log.exception(e)
             return
@@ -1626,7 +1626,7 @@ class EMRJobRunner(MRJobRunner):
             self._enable_slave_ssh_access()
             log.debug('Search %s for logs' % self._ssh_path(relative_path))
             return self.ls(self._ssh_path(relative_path))
-        except IOError, e:
+        except IOError as e:
             raise LogFetchError(e)
 
     def _ls_slave_ssh_logs(self, addr, relative_path):
@@ -1793,7 +1793,7 @@ class EMRJobRunner(MRJobRunner):
                              " mrjob fetch-logs --counters %s" %
                              job_flow.jobflowid)
             return results
-        except LogFetchError, e:
+        except LogFetchError as e:
             log.info("Unable to fetch counters: %s" % e)
             return {}
 
@@ -1846,7 +1846,7 @@ class EMRJobRunner(MRJobRunner):
             task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
             step_logs = self.ls_step_logs_ssh(lg_step_nums)
             job_logs = self.ls_job_logs_ssh(step_nums)
-        except IOError, e:
+        except IOError as e:
             raise LogFetchError(e)
         log.info('Scanning SSH logs for probable cause of failure')
         return best_error_from_logs(self, task_attempt_logs, step_logs,
@@ -1903,7 +1903,7 @@ class EMRJobRunner(MRJobRunner):
             mrjob_bootstrap.append([
                 "__mrjob_PYTHON_LIB=$(%s -c "
                 "'from distutils.sysconfig import get_python_lib;"
-                " print get_python_lib()')" %
+                " print(get_python_lib())')" %
                 cmd_line(self._opts['python_bin'])])
             # un-tar mrjob.tar.gz
             mrjob_bootstrap.append(

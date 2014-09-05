@@ -52,7 +52,7 @@ class CompositeFilesystem(Filesystem):
             if fs.can_handle_path(path):
                 try:
                     return getattr(fs, action)(path, *args, **kwargs)
-                except IOError, e:
+                except IOError as e:
                     if first_exception is None:
                         first_exception = e
 

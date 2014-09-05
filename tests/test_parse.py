@@ -87,12 +87,12 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
             return Popen(args, stdout=PIPE, stderr=PIPE).communicate()
 
         # sanity-check normal operations
-        ok_stdout, ok_stderr = run('python', '-c', "print sorted('321')")
+        ok_stdout, ok_stderr = run('python', '-c', "print(sorted('321'))")
         self.assertEqual(ok_stdout.rstrip(), "['1', '2', '3']")
         self.assertEqual(find_python_traceback(StringIO(ok_stderr)), None)
 
         # Oops, can't sort a number.
-        stdout, stderr = run('python', '-c', "print sorted(321)")
+        stdout, stderr = run('python', '-c', "print(sorted(321))")
 
         # We expect something like this:
         #
@@ -114,7 +114,7 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
 
         # make sure we can find the same traceback in noise
         verbose_stdout, verbose_stderr = run(
-            'python', '-v', '-c', "print sorted(321)")
+            'python', '-v', '-c', "print(sorted(321))")
         self.assertEqual(verbose_stdout, '')
         self.assertNotEqual(verbose_stderr, stderr)
         verbose_tb = find_python_traceback(StringIO(verbose_stderr))

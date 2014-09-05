@@ -1903,7 +1903,7 @@ class EMRJobRunner(MRJobRunner):
             mrjob_bootstrap.append([
                 "__mrjob_PYTHON_LIB=$(%s -c "
                 "'from distutils.sysconfig import get_python_lib;"
-                " print get_python_lib()')" %
+                " print(get_python_lib())')" %
                 cmd_line(self._opts['python_bin'])])
             # un-tar mrjob.tar.gz
             mrjob_bootstrap.append(

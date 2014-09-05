@@ -319,12 +319,13 @@ class TestInvokeSort(unittest.TestCase):
 
     def use_simulated_windows_sort(self):
         script_contents = """\
+from __future__ import print_function
 import os
 from subprocess import check_call
 import sys
 
 if len(sys.argv) > 2:
-    print >> sys.stderr, 'Input file specified two times.'
+    print('Input file specified two times.', sys.stderr)
     sys.exit(1)
 
 real_sort_bin = %r
@@ -336,9 +337,10 @@ check_call([real_sort_bin] + sys.argv[1:])
 
     def use_bad_sort(self):
         script_contents = """\
+from __future__ import print_function
 import sys
 
-print >> sys.stderr, 'Sorting is for chumps!'
+print('Sorting is for chumps!', sys.stderr)
 sys.exit(13)
 """
 

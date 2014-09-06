@@ -166,6 +166,7 @@ def main(stdin, stdout, stderr, args, environ):
             return 1
         with open(local_dest, 'r') as f:
             print(f.read(), end=' ', file=stdout)
+            stdout.flush()
             return 0
 
 
@@ -234,6 +235,7 @@ def main(stdin, stdout, stderr, args, environ):
     if environ.get('MOCK_SSH_VERIFY_KEY_FILE', 'false') == 'true' \
        and not os.path.exists(args[arg_pos]):
         print('Warning: Identity file', end=' ', file=stderr)
+        stderr.flush()
         args[arg_pos], 'not accessible: No such file or directory.'
         return 1
 

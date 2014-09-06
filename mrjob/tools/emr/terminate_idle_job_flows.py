@@ -47,6 +47,7 @@ Options::
                         Only terminate job flows in the given named pool.
   --dry-run             Don't actually kill idle jobs; just log that we would
 """
+from __future__ import print_function
 from datetime import datetime
 from datetime import timedelta
 import logging
@@ -332,7 +333,7 @@ def terminate_and_notify(runner, to_terminate, dry_run=False,
                          ' trying to terminate it; skipping' % jf.jobflowid)
 
         if did_terminate and not quiet:
-            print msg
+            print(msg)
 
 
 def make_option_parser():

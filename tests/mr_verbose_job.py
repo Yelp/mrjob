@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """We use this to test jobs that emit a large amount of stderr."""
+from __future__ import print_function
 import sys
 
 from mrjob.job import MRJob
@@ -29,7 +30,7 @@ class MRVerboseJob(MRJob):
         for i in xrange(100):
             self.set_status(str(i))
 
-        print >> sys.stderr, 'Qux'
+        print('Qux', file=sys.stderr)
 
         # raise an exception so we can test stacktrace finding
         raise Exception('BOOM')

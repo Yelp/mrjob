@@ -11,21 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Basic tests for the count_emr_list_active script"""
+"""Basic tests for collect_emr_stats script"""
 from datetime import date
 from datetime import datetime
-from datetime import timedelta
 from StringIO import StringIO
 import sys
 
 import boto.emr.connection
-from mrjob.tools.emr.count_active_emr import 
-#from mrjob.tools.emr.audit_usage import job_flow_to_full_summary
-#from mrjob.tools.emr.audit_usage import subdivide_interval_by_date
-#from mrjob.tools.emr.audit_usage import subdivide_interval_by_hour
-#from mrjob.tools.emr.audit_usage import main
-#from mrjob.tools.emr.audit_usage import percent
-
+from mrjob.tools.emr.collect_emr_stats import main
+from mrjob.tools.emr.collect_emr_stats import collect_active_job_flows
+from mrjob.tools.emr.collect_emr_stats import job_flows_to_stats
 from tests.mockboto import MockEmrObject
 from tests.test_emr import MockEMRAndS3TestCase
 
@@ -36,12 +31,10 @@ except ImportError:
     import unittest
 
 
-# setUp / tearDown ??
-
-class CountEMRListActiveTestCase(MockEMRAndS3TestCase):
+class CollectEMRStatsTestCase(MockEMRAndS3TestCase):
 
     def setUp(self):
-        super(AuditUsageTestCase, self).setUp()
+        super(CollectEMRStatsTestCase, self).setUp()
         # redirect print statements to self.stdout
         self._real_stdout = sys.stdout
         self.stdout = StringIO()
@@ -49,25 +42,11 @@ class CountEMRListActiveTestCase(MockEMRAndS3TestCase):
 
     def tearDown(self):
         sys.stdout = self._real_stdout
-        super(AuditUsageTestCase, self).tearDown()
+        super(CollectEMRStatsTestCase, self).tearDown()
 
-    def test_with_no_job_flows(self):
-        main(['-q', '--no-conf'])  # just make sure it doesn't crash
-
-    def test_with_one_job_flow(self):
-        emr_conn = boto.emr.connection.EmrConnection()
-        emr_conn.run_jobflow('no name', log_uri=None)
-
-        main(['-q', '--no-conf'])
-        self.assertIn('j-MOCKJOBFLOW0', self.stdout.getvalue())
+    def test_collect_active_job_flows(self):
+        pass
 
 
-# state names: [BOOTSTRAPPING, STARTING, TERMINATED, COMPLETED, WAITING, FAILED, SHUTTING_DOWN, RUNNING] 
-# active : [STARTING, BOOTSTRAPPING, WAITING]
-
-
-#    def test_emr_list_active(self):
-        
-
-
-
+    def test_job_flows_to_stats(self):
+        pass

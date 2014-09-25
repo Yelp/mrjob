@@ -44,37 +44,27 @@ log = logging.getLogger(__name__)
 
 def main(args):
     # parser command-line args
-    option_parser = make_option_parser()
+    usage = '%prog [options]'
+    description = 'Collect EMR stats from active jobflows.'
+    option_parser = OptionParser(usage=usage, description=description)
+    add_basic_opts(option_parser)
     options, args = option_parser.parse_args(args)
-
     if args:
         option_parser.error('takes no arguments')
 
-    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
-
     now = datetime.utcnow()
 
+    MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
     log.info('collecting emr jobflow information...')
 
     job_flows = collect_active_job_flows(options.conf_paths)
 
-    log.info('compiling stats from emr jobflows...')
+    log.info('compiling stats from collected jobflows...')
 
     stats = job_flows_to_stats(job_flows, now=now)
 
-    print stats
+    return stats
 
-
-def make_option_parser():
-    usage = '%prog [options]'
-    description = 'Collect EMR stats from active jobflows.'
-    option_parser = OptionParser(usage=usage, description=description)
-#    option_parser.add_option(
-#        '--max-days-ago', dest='max_days_ago', type='float', default=None,
-#        help=('Max number of days ago to look at jobs. By default, we go back'
-#              ' as far as EMR supports (currently about 2 months)'))
-    add_basic_opts(option_parser)
-    return option_parser
 
 def collect_active_job_flows(conf_paths):
     """Collect active job flow information from EMR.
@@ -82,8 +72,8 @@ def collect_active_job_flows(conf_paths):
     :param str conf_path: Alternate path to read :py:mod:`mrjob.conf` from, or ``False`` to ignore all config files
     """
     emr_conn = EMRJobRunner(conf_paths=conf_paths).make_emr_conn()
+    active_states = ['STARTING', 'BOOTSTRAPPING', 'WAITING', 'RUNNING']
 
-    active_states = ['STARTING', 'BOOTSTRAPPING', 'WAITING', 'RUNNING']  
     return describe_all_job_flows(emr_conn, states=active_states)
 
 
@@ -105,4 +95,5 @@ def job_flows_to_stats(job_flows, now=None):
 
 
 if __name__ == '__main__':
-    main(None)
+    print main(None)
+

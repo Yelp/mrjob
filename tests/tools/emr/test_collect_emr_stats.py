@@ -17,11 +17,11 @@ from datetime import datetime
 from StringIO import StringIO
 import sys
 
-import boto.emr.connection
+from mock import Mock, call, patch
 from mrjob.tools.emr.collect_emr_stats import main
 from mrjob.tools.emr.collect_emr_stats import collect_active_job_flows
 from mrjob.tools.emr.collect_emr_stats import job_flows_to_stats
-from tests.mockboto import MockEmrObject
+from tests.mockboto import MockEmrObject, MockEmrConnection
 from tests.test_emr import MockEMRAndS3TestCase
 
 try:
@@ -44,9 +44,14 @@ class CollectEMRStatsTestCase(MockEMRAndS3TestCase):
         sys.stdout = self._real_stdout
         super(CollectEMRStatsTestCase, self).tearDown()
 
-    def test_collect_active_job_flows(self):
-        pass
+    @patch('mrjob.tools.emr.collect_emr_stats.describe_all_job_flows')
+    @patch('mrjob.tools.emr.collect_emr_stats.EMRJobRunner')
+    def test_collect_active_job_flows(self, mock_job_runner, mock_describe_jobflows):
+        job_flows = collect_active_job_flows(conf_paths=[])
+        assert mock_job_runner.called
+        self.assertEqual(mock_job_runner.call_args_list, [call(conf_paths=[])])
+        assert mock_describe_jobflows.called
+        states=['STARTING', 'BOOTSTRAPPING', 'WAITING', 'RUNNING']
+        args, kwargs = mock_describe_jobflows.call_args
+        self.assertEqual(states, kwargs['states'])
 
-
-    def test_job_flows_to_stats(self):
-        pass

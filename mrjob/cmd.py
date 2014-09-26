@@ -65,12 +65,15 @@ def run(args):
     from mrjob.launch import MRJobLauncher
     MRJobLauncher(args=args, from_cl=True).run_job()
 
-
 @command('audit-emr-usage', 'Audit EMR usage')
 def audit_usage(args):
     from mrjob.tools.emr.audit_usage import main
     main(args)
 
+@command('collect-emr-active-stats', 'Collect EMR stats from active jobflows')
+def collect_emr_stats(args):
+    from mrjob.tools.emr.collect_emr_stats import main
+    main(args)
 
 @command('create-job-flow', 'Create an EMR job flow')
 def create_jf(args):

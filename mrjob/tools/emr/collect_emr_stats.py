@@ -86,7 +86,7 @@ def job_flows_to_stats(job_flows, now=None):
 
     Returns a dictionary with many keys, including:
 
-    * *timestamp*: The time these jobflows are collected (current UTC time)
+    * *timestamp*: The time when stats are collected (current UTC time in POSIX timestamp format)
     * *num_jobflows*: total number of jobflows
     * *total_instance_count*: total number of instance count from jobflows
 

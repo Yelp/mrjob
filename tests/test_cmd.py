@@ -63,7 +63,7 @@ class CommandTestCase(TestCase):
         self._test_main_call(audit_usage, 'audit-emr-usage')
 
     def test_collect_emr_stats(self):
-        self._test_main_call(collect_emr_stats, 'collect-emr-stats')
+        self._test_main_call(collect_emr_stats, 'collect-emr-active-stats')
 
     def test_create_job_flow(self):
         self._test_main_call(create_job_flow, 'create-job-flow')

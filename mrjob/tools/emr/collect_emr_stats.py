@@ -98,7 +98,7 @@ def job_flows_to_stats(job_flows, now=None):
         now = datetime.utcnow()
 
     stats = {}
-    stats['timestamp'] = now
+    stats['timestamp'] = now.isoformat()
     stats['num_jobflows'] = len(job_flow_ids)
     stats['total_instance_count'] = total_instance_count
 

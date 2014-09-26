@@ -17,12 +17,12 @@ from datetime import datetime
 from StringIO import StringIO
 import sys
 
-from mock import Mock, call, patch
-from mrjob.tools.emr.collect_emr_stats import main
+from mock import call, patch
+#from mrjob.tools.emr.collect_emr_stats import main
 from mrjob.tools.emr.collect_emr_stats import collect_active_job_flows
 from mrjob.tools.emr.collect_emr_stats import job_flows_to_stats
-from tests.mockboto import MockEmrObject, MockEmrConnection
-from tests.test_emr import MockEMRAndS3TestCase
+from tests.mockboto import MockEmrObject
+#from tests.test_emr import MockEMRAndS3TestCase
 
 try:
     import unittest2 as unittest
@@ -31,27 +31,36 @@ except ImportError:
     import unittest
 
 
-class CollectEMRStatsTestCase(MockEMRAndS3TestCase):
-
-    def setUp(self):
-        super(CollectEMRStatsTestCase, self).setUp()
-        # redirect print statements to self.stdout
-        self._real_stdout = sys.stdout
-        self.stdout = StringIO()
-        sys.stdout = self.stdout
-
-    def tearDown(self):
-        sys.stdout = self._real_stdout
-        super(CollectEMRStatsTestCase, self).tearDown()
+class CollectEMRStatsTestCase(unittest.TestCase):
 
     @patch('mrjob.tools.emr.collect_emr_stats.describe_all_job_flows')
     @patch('mrjob.tools.emr.collect_emr_stats.EMRJobRunner')
     def test_collect_active_job_flows(self, mock_job_runner, mock_describe_jobflows):
+
         job_flows = collect_active_job_flows(conf_paths=[])
+
         assert mock_job_runner.called
         self.assertEqual(mock_job_runner.call_args_list, [call(conf_paths=[])])
         assert mock_describe_jobflows.called
-        states=['STARTING', 'BOOTSTRAPPING', 'WAITING', 'RUNNING']
+        active_states = ['STARTING', 'BOOTSTRAPPING', 'WAITING', 'RUNNING']
         args, kwargs = mock_describe_jobflows.call_args
-        self.assertEqual(states, kwargs['states'])
+        self.assertEqual(active_states, kwargs['states'])
 
+
+    def test_job_flows_to_stats(self):
+
+        NUM_JOB_FLOWS = 30
+
+        # fake jobflows
+        job_flows = []
+        for i in range(NUM_JOB_FLOWS):
+            job_flow_id = 'j-%04d' % i
+            job_flows.append(MockEmrObject(
+                jobflowid=job_flow_id,
+                instancecount=i, # each jobflow has instance count i
+            ))
+
+        stats = job_flows_to_stats(job_flows)
+
+        self.assertEqual(stats['num_jobflows'], NUM_JOB_FLOWS)
+        self.assertEqual(stats['total_instance_count'], sum(range(NUM_JOB_FLOWS)))

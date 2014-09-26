@@ -78,7 +78,18 @@ def collect_active_job_flows(conf_paths):
 
 
 def job_flows_to_stats(job_flows, now=None):
+    """ Compute number of clusters and instances from the collected jobflow information
+    
+    :param job_flows: A list of :py:class:`boto.emr.EmrObject`
+    :param now: the current UTC time, as a :py:class:`datetime.datetime`. Default to current time.
 
+    Returns a dictionary with many keys, including:
+
+    * *timestamp*: The time these jobflows are collected (current UTC time)
+    * *num_jobflows*: total number of active jobflows
+    * *total_instance_count*: total number of instance count from active jobflows
+
+    """
     job_flow_ids = [getattr(jf, 'jobflowid', None) for jf in job_flows]
     instance_counts = [int(getattr(jf, 'instancecount', None)) for jf in job_flows]
     total_instance_count = sum(instance_counts)
@@ -88,7 +99,7 @@ def job_flows_to_stats(job_flows, now=None):
 
     stats = {}
     stats['timestamp'] = now
-    stats['total_num_jobflow'] = len(job_flow_ids)
+    stats['num_jobflows'] = len(job_flow_ids)
     stats['total_instance_count'] = total_instance_count
 
     return stats

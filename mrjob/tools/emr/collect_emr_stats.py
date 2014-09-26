@@ -31,6 +31,7 @@ Options::
 from __future__ import with_statement
 
 from datetime import datetime
+from time import mktime
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
@@ -98,7 +99,7 @@ def job_flows_to_stats(job_flows, now=None):
         now = datetime.utcnow()
 
     stats = {}
-    stats['timestamp'] = now.isoformat()
+    stats['timestamp'] = int(mktime(now.timetuple())) # convert into POSIX timestamp
     stats['num_jobflows'] = len(job_flow_ids)
     stats['total_instance_count'] = total_instance_count
 

@@ -18,11 +18,10 @@ from StringIO import StringIO
 import sys
 
 from mock import call, patch
-#from mrjob.tools.emr.collect_emr_stats import main
+from mrjob.tools.emr.collect_emr_stats import main
 from mrjob.tools.emr.collect_emr_stats import collect_active_job_flows
 from mrjob.tools.emr.collect_emr_stats import job_flows_to_stats
 from tests.mockboto import MockEmrObject
-#from tests.test_emr import MockEMRAndS3TestCase
 
 try:
     import unittest2 as unittest
@@ -39,9 +38,9 @@ class CollectEMRStatsTestCase(unittest.TestCase):
 
         job_flows = collect_active_job_flows(conf_paths=[])
 
-        assert mock_job_runner.called
+        assert (mock_job_runner.call_count == 1)
         self.assertEqual(mock_job_runner.call_args_list, [call(conf_paths=[])])
-        assert mock_describe_jobflows.called
+        assert (mock_describe_jobflows.call_count == 1)
         active_states = ['STARTING', 'BOOTSTRAPPING', 'WAITING', 'RUNNING']
         args, kwargs = mock_describe_jobflows.call_args
         self.assertEqual(active_states, kwargs['states'])
@@ -49,18 +48,29 @@ class CollectEMRStatsTestCase(unittest.TestCase):
 
     def test_job_flows_to_stats(self):
 
+        # mock jobflows
         NUM_JOB_FLOWS = 30
-
-        # fake jobflows
         job_flows = []
         for i in range(NUM_JOB_FLOWS):
             job_flow_id = 'j-%04d' % i
             job_flows.append(MockEmrObject(
                 jobflowid=job_flow_id,
-                instancecount=i, # each jobflow has instance count i
+                instancecount=i, # each jobflow has different instance count
             ))
 
         stats = job_flows_to_stats(job_flows)
 
         self.assertEqual(stats['num_jobflows'], NUM_JOB_FLOWS)
         self.assertEqual(stats['total_instance_count'], sum(range(NUM_JOB_FLOWS)))
+
+
+    @patch('mrjob.tools.emr.collect_emr_stats.job_flows_to_stats')
+    @patch('mrjob.tools.emr.collect_emr_stats.collect_active_job_flows')
+    def test_main_no_conf(self, mock_collect_active_jobflows, mock_job_flows_to_stats):
+
+        main(['-q', '--no-conf'])
+
+        assert (mock_collect_active_jobflows.call_count == 1)
+        self.assertEqual(mock_collect_active_jobflows.call_args_list, [call([])])
+        assert (mock_job_flows_to_stats.call_count == 1)
+

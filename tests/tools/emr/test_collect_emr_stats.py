@@ -17,7 +17,8 @@ from datetime import datetime
 from StringIO import StringIO
 import sys
 
-from mock import call, patch
+from mock import call
+from mock import patch
 from mrjob.tools.emr.collect_emr_stats import main
 from mrjob.tools.emr.collect_emr_stats import collect_active_job_flows
 from mrjob.tools.emr.collect_emr_stats import job_flows_to_stats
@@ -38,9 +39,12 @@ class CollectEMRStatsTestCase(unittest.TestCase):
 
         job_flows = collect_active_job_flows(conf_paths=[])
 
+        # check if args for calling describe_jobflows are correct
         assert (mock_job_runner.call_count == 1)
         self.assertEqual(mock_job_runner.call_args_list, [call(conf_paths=[])])
         assert (mock_describe_jobflows.call_count == 1)
+
+        # check if args for calling describe_jobflows are correct
         active_states = ['STARTING', 'BOOTSTRAPPING', 'WAITING', 'RUNNING']
         args, kwargs = mock_describe_jobflows.call_args
         self.assertEqual(active_states, kwargs['states'])
@@ -70,7 +74,7 @@ class CollectEMRStatsTestCase(unittest.TestCase):
 
         main(['-q', '--no-conf'])
 
+        # check if args for calling collect_active_jobflows are correct
         assert (mock_collect_active_jobflows.call_count == 1)
         self.assertEqual(mock_collect_active_jobflows.call_args_list, [call([])])
         assert (mock_job_flows_to_stats.call_count == 1)
-

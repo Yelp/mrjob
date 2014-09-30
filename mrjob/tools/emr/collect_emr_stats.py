@@ -29,8 +29,8 @@ Options::
   -q, --quiet           Don't log status messages; just print the report.
   -c CONF_PATH, --conf-path=CONF_PATH
                         Path to alternate mrjob.conf file to read from
+  -p, --pretty-print    Pretty print the collected stats.
   --no-conf             Don't load mrjob.conf even if it's available
-
 """
 
 from datetime import datetime
@@ -51,7 +51,11 @@ def main(args):
     usage = '%prog [options]'
     description = 'Collect EMR stats from active jobflows.'
     option_parser = OptionParser(usage=usage, description=description)
+    option_parser.add_option("-p", "--pretty-print", 
+        action="store_true", dest="pretty_print", default=False,
+        help=('Pretty print the collected stats'))
     add_basic_opts(option_parser)
+
     options, args = option_parser.parse_args(args)
     if args:
         option_parser.error('takes no arguments')
@@ -65,8 +69,24 @@ def main(args):
 
     stats = job_flows_to_stats(job_flows)
 
-    print stats
+    if options.pretty_print:
+        pretty_print(stats)
+    else:
+        print stats
 
+
+def pretty_print(stats):
+    """Pretty print stats report.
+
+    :param stats: A dictionary returned by :py:func:`job_flows_to_stats`
+    """
+    s = stats
+    print '                Timestamp: %s' % s['timestamp']
+    print 'Number of active jobflows: %s' % s['num_jobflows']
+    print 'Number of instance counts: %s' % s['total_instance_count']
+    print '* The active jobflows are those in states of BOOTSTRAPPING,'
+    print '  STARTING, RUNNING, and WAITING.'
+   
 
 def collect_active_job_flows(conf_paths):
     """Collect active job flow information from EMR.

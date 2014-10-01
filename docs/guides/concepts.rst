@@ -6,7 +6,7 @@ MapReduce and Apache Hadoop
 
 *This section uses text from Apache's* `MapReduce Tutorial`_.
 
-.. _`MapReduce Tutorial`: http://hadoop.apache.org/common/docs/current/mapred_tutorial.html
+.. _`MapReduce Tutorial`: http://hadoop.apache.org/docs/current/hadoop-mapreduce-client/hadoop-mapreduce-client-core/MapReduceTutorial.html
 
 MapReduce is a way of writing programs designed for processing vast amounts of
 data, and a system for running those programs in a distributed and

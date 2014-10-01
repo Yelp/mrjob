@@ -72,6 +72,8 @@ class CollectEMRStatsTestCase(unittest.TestCase):
     @patch('mrjob.tools.emr.collect_emr_stats.collect_active_job_flows')
     def test_main_no_conf(self, mock_collect_active_jobflows, mock_job_flows_to_stats):
 
+        mock_collect_active_jobflows.return_value = []
+        mock_job_flows_to_stats.return_value = {}
         main(['-q', '--no-conf'])
 
         # check if args for calling collect_active_jobflows are correct

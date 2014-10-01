@@ -38,6 +38,11 @@ from logging import getLogger
 from optparse import OptionParser
 from time import mktime
 
+try:
+    import simplejson as json
+except ImportError:
+    import json
+
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
@@ -62,17 +67,14 @@ def main(args):
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
     log.info('collecting EMR active jobflows...')
-
     job_flows = collect_active_job_flows(options.conf_paths)
-
     log.info('compiling stats from collected jobflows...')
-
     stats = job_flows_to_stats(job_flows)
 
     if options.pretty_print:
         pretty_print(stats)
     else:
-        print stats
+        print json.dumps(stats)
 
 
 def pretty_print(stats):
@@ -93,6 +95,8 @@ def collect_active_job_flows(conf_paths):
 
     :param str conf_path: Alternate path to read :py:mod:`mrjob.conf` from, 
                           or ``False`` to ignore all config files
+
+    Return a list of job flows                          
     """
     emr_conn = EMRJobRunner(conf_paths=conf_paths).make_emr_conn()
     active_states = ['STARTING', 'BOOTSTRAPPING', 'WAITING', 'RUNNING']

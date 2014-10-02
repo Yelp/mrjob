@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """ Collect EMR stats from active jobflows. 
-    Active jobflows are those in states of BOOTSTRAPPING, RUNNING, STARTING, 
-    and WAITING. 
+    Active jobflows are those in states of:
+        BOOTSTRAPPING, RUNNING, STARTING, and WAITING.
     Collected stats include total number of active jobflows and total 
-    number of instance counts from these jobflows.
+    number of Amazon EC2 instances used to execute these jobflows.
 
 Usage::
 
     mrjob collect-emr-stats > report
-    python -m mrjob.tools.emr.collect_emr_status > report
+    python -m mrjob.tools.emr.collect_emr_stats > report
 
 Options::
 
@@ -52,6 +52,12 @@ from mrjob.options import add_basic_opts
 log = getLogger(__name__)
 
 def main(args):
+""" Collect EMR stats from active jobflows. 
+    Active jobflows are those in states of:
+        BOOTSTRAPPING, RUNNING, STARTING, and WAITING.
+    Collected stats include total number of active jobflows and total
+    number of Amazon EC2 instances used to execute these jobflows.
+"""
     # parser command-line args
     usage = '%prog [options]'
     description = 'Collect EMR stats from active jobflows.'

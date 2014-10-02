@@ -16,6 +16,7 @@
         BOOTSTRAPPING, RUNNING, STARTING, and WAITING.
     Collected stats include total number of active jobflows and total 
     number of Amazon EC2 instances used to execute these jobflows.
+    The instance counts are not separated by instance type.
 
 Usage::
 
@@ -57,6 +58,7 @@ def main(args):
         BOOTSTRAPPING, RUNNING, STARTING, and WAITING.
     Collected stats include total number of active jobflows and total
     number of Amazon EC2 instances used to execute these jobflows.
+    The instance counts are not separated by instance type.
 """
     # parser command-line args
     usage = '%prog [options]'

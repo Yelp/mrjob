@@ -53,16 +53,15 @@ from mrjob.options import add_basic_opts
 log = getLogger(__name__)
 
 def main(args):
-""" Collect EMR stats from active jobflows. 
-    Active jobflows are those in states of:
-        BOOTSTRAPPING, RUNNING, STARTING, and WAITING.
-    Collected stats include total number of active jobflows and total
-    number of Amazon EC2 instances used to execute these jobflows.
-    The instance counts are not separated by instance type.
-"""
     # parser command-line args
     usage = '%prog [options]'
-    description = 'Collect EMR stats from active jobflows.'
+    description = "Collect EMR stats from active jobflows. "
+    description += "Active jobflows are those in states of: "
+    description += "BOOTSTRAPPING, RUNNING, STARTING, and WAITING. "
+    description += "Collected stats include total number of active jobflows"
+    description += "and total number of Amazon EC2 instances used to execute"
+    description += "these jobflows. The instance counts are not separated by"
+    description += "instance type."
     option_parser = OptionParser(usage=usage, description=description)
     option_parser.add_option("-p", "--pretty-print", 
         action="store_true", dest="pretty_print", default=False,

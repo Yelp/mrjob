@@ -70,19 +70,25 @@ def buffer_iterator_to_line_iterator(iterator):
         it will not, for better compatibility with file objects.
     """
     buf = ''
+    search_offset = 0
     for chunk in iterator:
         buf += chunk
 
         # this is basically splitlines() without support for \r
         start = 0
         while True:
-            end = buf.find('\n', start) + 1
+            end = buf.find('\n', start + search_offset) + 1
             if end:  # if find() returned -1, end would be 0
                 yield buf[start:end]
                 start = end
+                # reset the search offset
+                search_offset = 0
             else:
                 # this will happen eventually
                 buf = buf[start:]
+
+                # set search offset so we do not need to scan this part of the buffer again
+                search_offset = len(buf)
                 break
 
     if buf:

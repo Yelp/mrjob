@@ -69,6 +69,16 @@ class BufferIteratorToLineIteratorTestCase(unittest.TestCase):
                                                    ' Alouette.'])),
             ['Alouette,\n', 'gentille Alouette.\n'])
 
+    def test_long_lines(self):
+        super_long_line = 'a' * 10000 + '\n' + 'b' * 1000 + '\nlast\n'
+        self.assertEqual(
+            list(buffer_iterator_to_line_iterator(
+                chunk for chunk in
+                (super_long_line[0+i:1024+i] for i in range(0, len(super_long_line), 1024)))),
+            ['a' * 10000 + '\n', 'b' * 1000 + '\n', 'last\n'])
+
+
+
 
 class CmdLineTestCase(unittest.TestCase):
 

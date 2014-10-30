@@ -16,7 +16,6 @@
 # limitations under the License.
 """Tests for InlineMRJobRunner"""
 
-from __future__ import with_statement
 
 from StringIO import StringIO
 

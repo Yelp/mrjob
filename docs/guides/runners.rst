@@ -115,8 +115,6 @@ This pattern can also be used to write integration tests (see :doc:`testing`).
 
 ::
 
-    from __future__ import with_statement # only needed on Python 2.5
-
     mr_job = MRWordCounter(args=['-r', 'emr'])
     with mr_job.make_runner() as runner:
         runner.run()
@@ -235,8 +233,6 @@ example below demonstrates the use of counters in a test case.
 
 ``test_counters.py``
 ::
-
-    from __future__ import with_statement
 
     try:
         import unittest2 as unittest

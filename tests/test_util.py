@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """Tests of all the amazing utilities in mrjob.util"""
-from __future__ import with_statement
 
 import bz2
 import gzip

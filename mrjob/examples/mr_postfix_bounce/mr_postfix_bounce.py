@@ -17,7 +17,6 @@ messages that have bounced and yielding the (email address, date ordinal).
 The emitted email addresses can then be unconfirmed or handled in some other
 way.
 """
-from __future__ import with_statement
 
 __author__ = 'Adam Derewecki <derewecki@gmail.com>'
 

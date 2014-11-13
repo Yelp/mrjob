@@ -40,6 +40,10 @@ EMR_BACKOFF = 20
 EMR_BACKOFF_MULTIPLIER = 1.5
 EMR_MAX_TRIES = 20  # this takes about a day before we run out of tries
 
+# Should we suppress boto validating a bucket? (2.25.0+ uses a cheap
+#    HEAD request avoids the scaling problem with large buckets)
+VALIDATE_BUCKET = boto and boto.Version >= '2.25.0'
+
 
 def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
@@ -140,7 +144,7 @@ class S3Filesystem(Filesystem):
         s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        bucket = s3_conn.get_bucket(bucket_name)
+        bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
         for key in bucket.list(key_name):
             yield s3_key_to_uri(key)
 
@@ -241,7 +245,7 @@ class S3Filesystem(Filesystem):
         bucket_name, key_name = parse_s3_uri(uri)
 
         try:
-            bucket = s3_conn.get_bucket(bucket_name)
+            bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
         except boto.exception.S3ResponseError, e:
             if e.status != 404:
                 raise e
@@ -264,7 +268,8 @@ class S3Filesystem(Filesystem):
             s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        return s3_conn.get_bucket(bucket_name).new_key(key_name)
+        return s3_conn.get_bucket(
+            bucket_name, validate=VALIDATE_BUCKET).new_key(key_name)
 
     def get_s3_keys(self, uri, s3_conn=None):
         """Get a stream of boto Key objects for each key inside
@@ -278,7 +283,7 @@ class S3Filesystem(Filesystem):
             s3_conn = self.make_s3_conn()
 
         bucket_name, key_prefix = parse_s3_uri(uri)
-        bucket = s3_conn.get_bucket(bucket_name)
+        bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
         for key in bucket.list(key_prefix):
             yield key
 
@@ -312,7 +317,7 @@ class S3Filesystem(Filesystem):
             s3_conn = self.make_s3_conn()
 
         bucket_name, key_name = parse_s3_uri(uri)
-        bucket = s3_conn.get_bucket(bucket_name)
+        bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
 
         dirs = key_name.split('/')
         for i in range(len(dirs)):

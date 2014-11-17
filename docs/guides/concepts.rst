@@ -133,7 +133,7 @@ newline-delimited files. Each line of input is passed to your mapper, which
 outputs key-value pairs expressed as two strings separated by a tab and ending
 with a newline, like this::
 
-    key1\tvalue1\nkey2\nvalue2\n
+    key1\tvalue1\nkey2\tvalue2\n
 
 Hadoop then sorts the output lines by key (the line up to the
 first tab character) and passes the sorted lines to the appropriate combiners

@@ -39,6 +39,14 @@ try:
     bz2  # redefine bz2 for pepflakes
 except ImportError:
     bz2 = None
+try:
+    import boto
+except ImportError:
+    boto = None
+
+# Should we suppress boto validating a bucket? (2.25.0+ uses a cheap
+#    HEAD request avoids the scaling problem with large buckets)
+VALIDATE_BUCKET = boto and boto.Version >= '2.25.0'
 
 #: .. deprecated:: 0.4
 is_ironpython = "IronPython" in sys.version

@@ -114,6 +114,7 @@ from mrjob.ssh import ssh_terminate_single_job
 from mrjob.util import cmd_line
 from mrjob.util import hash_object
 from mrjob.util import shlex_split
+from mrjob.util import VALIDATE_BUCKET
 
 
 log = logging.getLogger(__name__)
@@ -175,10 +176,6 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
     os.path.dirname(mrjob.__file__),
     'bootstrap',
     'terminate_idle_job_flow.sh')
-
-# Should we suppress boto validating a bucket? (2.25.0+ uses a cheap
-#    HEAD request avoids the scaling problem with large buckets)
-VALIDATE_BUCKET = boto and boto.Version >= '2.25.0'
 
 
 def s3_key_to_uri(s3_key):

@@ -31,6 +31,7 @@ from mrjob.parse import urlparse
 from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
 from mrjob.util import read_file
+from mrjob.util import VALIDATE_BUCKET
 
 
 log = logging.getLogger(__name__)
@@ -39,10 +40,6 @@ log = logging.getLogger(__name__)
 EMR_BACKOFF = 20
 EMR_BACKOFF_MULTIPLIER = 1.5
 EMR_MAX_TRIES = 20  # this takes about a day before we run out of tries
-
-# Should we suppress boto validating a bucket? (2.25.0+ uses a cheap
-#    HEAD request avoids the scaling problem with large buckets)
-VALIDATE_BUCKET = boto and boto.Version >= '2.25.0'
 
 
 def s3_key_to_uri(s3_key):

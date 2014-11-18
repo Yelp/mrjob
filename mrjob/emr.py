@@ -114,6 +114,7 @@ from mrjob.ssh import ssh_terminate_single_job
 from mrjob.util import cmd_line
 from mrjob.util import hash_object
 from mrjob.util import shlex_split
+from mrjob.util import VALIDATE_BUCKET
 
 
 log = logging.getLogger(__name__)
@@ -262,7 +263,7 @@ def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
 
 def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
     bucket_name, key_prefix = parse_s3_uri(lock_uri)
-    bucket = s3_conn.get_bucket(bucket_name)
+    bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
     key = bucket.get_key(key_prefix)
 
     # EMRJobRunner should start using a job flow within about a second of
@@ -642,7 +643,8 @@ class EMRJobRunner(MRJobRunner):
         # check s3_scratch_uri against aws_region if specified
         if self._opts['s3_scratch_uri']:
             bucket_name, _ = parse_s3_uri(self._opts['s3_scratch_uri'])
-            bucket_loc = s3_conn.get_bucket(bucket_name).get_location()
+            bucket_loc = s3_conn.get_bucket(
+                bucket_name, validate=VALIDATE_BUCKET).get_location()
 
             # make sure they can communicate if both specified
             if (self._aws_region and bucket_loc and

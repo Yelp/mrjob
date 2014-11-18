@@ -480,6 +480,13 @@ Choosing/creating a job flow to join
 
 S3 paths and options
 --------------------
+MRJob uses boto to manipulate/access S3. Older versions of boto prior to 2.25.0
+would enumerate all keys in a bucket by default to validate existence, slowing
+down MRJob and inflating costs. 2.25.0 and above use a HEAD request to validate
+a bucket.
+
+MRJob will validate a bucket using the constant in mrjob.utils.VALIDATE_BUCKET,
+which is set to True if boto.Version >= '2.25.0'
 
 .. mrjob-opt::
     :config: s3_endpoint

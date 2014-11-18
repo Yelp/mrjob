@@ -31,6 +31,7 @@ from mrjob.parse import urlparse
 from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
 from mrjob.util import read_file
+from mrjob.util import VALIDATE_BUCKET
 
 
 log = logging.getLogger(__name__)
@@ -140,7 +141,7 @@ class S3Filesystem(Filesystem):
         s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        bucket = s3_conn.get_bucket(bucket_name)
+        bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
         for key in bucket.list(key_name):
             yield s3_key_to_uri(key)
 
@@ -241,7 +242,7 @@ class S3Filesystem(Filesystem):
         bucket_name, key_name = parse_s3_uri(uri)
 
         try:
-            bucket = s3_conn.get_bucket(bucket_name)
+            bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
         except boto.exception.S3ResponseError, e:
             if e.status != 404:
                 raise e
@@ -264,7 +265,8 @@ class S3Filesystem(Filesystem):
             s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        return s3_conn.get_bucket(bucket_name).new_key(key_name)
+        return s3_conn.get_bucket(
+            bucket_name, validate=VALIDATE_BUCKET).new_key(key_name)
 
     def get_s3_keys(self, uri, s3_conn=None):
         """Get a stream of boto Key objects for each key inside
@@ -278,7 +280,7 @@ class S3Filesystem(Filesystem):
             s3_conn = self.make_s3_conn()
 
         bucket_name, key_prefix = parse_s3_uri(uri)
-        bucket = s3_conn.get_bucket(bucket_name)
+        bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
         for key in bucket.list(key_prefix):
             yield key
 
@@ -312,7 +314,7 @@ class S3Filesystem(Filesystem):
             s3_conn = self.make_s3_conn()
 
         bucket_name, key_name = parse_s3_uri(uri)
-        bucket = s3_conn.get_bucket(bucket_name)
+        bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
 
         dirs = key_name.split('/')
         for i in range(len(dirs)):

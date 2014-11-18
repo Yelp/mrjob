@@ -110,7 +110,7 @@ class MockS3Connection(object):
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.endpoint = host or 's3.amazonaws.com'
 
-    def get_bucket(self, bucket_name):
+    def get_bucket(self, bucket_name, validate=True, headers=None):
         if bucket_name in self.mock_s3_fs:
             return MockBucket(connection=self, name=bucket_name)
         else:

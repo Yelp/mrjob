@@ -142,6 +142,7 @@ or reducers.
 mrjob is a framework that assists you in submitting your job to the Hadoop job
 tracker and in running each individual step under Hadoop Streaming.
 
+
 .. _how-your-program-is-run:
 
 How your program is run

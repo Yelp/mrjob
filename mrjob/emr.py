@@ -360,6 +360,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_tunnel_is_open',
         'ssh_tunnel_to_job_tracker',
         'visible_to_all_users',
+        'check_input_paths',
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -403,7 +404,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ssh_bind_ports': range(40001, 40841),
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
-            'visible_to_all_users': False
+            'visible_to_all_users': False,
+            'check_input_paths': True
         })
 
     def _fix_ec2_instance_opts(self):
@@ -798,16 +800,17 @@ class EMRJobRunner(MRJobRunner):
     def _check_input_exists(self):
         """Make sure all input exists before continuing with our job.
         """
-        for path in self._input_paths:
-            if path == '-':
-                continue  # STDIN always exists
+        if self._opts['check_input_paths']:
+            for path in self._input_paths:
+                if path == '-':
+                    continue  # STDIN always exists
 
-            if is_uri(path) and not is_s3_uri(path):
-                continue  # can't check non-S3 URIs, hope for the best
+                if is_uri(path) and not is_s3_uri(path):
+                    continue  # can't check non-S3 URIs, hope for the best
 
-            if not self.path_exists(path):
-                raise AssertionError(
-                    'Input path %s does not exist!' % (path,))
+                if not self.path_exists(path):
+                    raise AssertionError(
+                        'Input path %s does not exist!' % (path,))
 
     def _check_output_not_exists(self):
         """Verify the output path does not already exist. This avoids

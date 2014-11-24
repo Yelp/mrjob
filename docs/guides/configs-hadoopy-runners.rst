@@ -93,9 +93,6 @@ Options available to hadoop and emr runners
     :py:attr:`~mrjob.job.MRJob.PARTITIONER` attribute or the
     :py:meth:`~mrjob.job.MRJob.partitioner` method.
 
-Options available to hadoop runner only
----------------------------------------
-
 .. mrjob-opt::
     :config: check_input_paths
     :switch: --check-input-paths, --no-check-input-paths
@@ -108,6 +105,9 @@ Options available to hadoop runner only
     checking if they exist.
 
     .. versionadded:: 0.4.1
+
+Options available to hadoop runner only
+---------------------------------------
 
 .. mrjob-opt::
     :config: hadoop_bin

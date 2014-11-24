@@ -250,6 +250,16 @@ def add_hadoop_emr_opts(opt_group):
             help=('Hadoop partitioner class to use to determine how mapper'
                   ' output should be sorted and distributed to reducers. For'
                   ' example: org.apache.hadoop.mapred.lib.HashPartitioner')),
+
+        opt_group.add_option(
+            '--check-input-paths', dest='check_input_paths',
+            default=True, action='store_true',
+            help='Check input paths exist before running (the default)'),
+
+        opt_group.add_option(
+            '--no-check-input-paths', dest='check_input_paths',
+            default=True, action='store_false',
+            help='Skip the checks to ensure all input paths exist'),
     ]
 
 
@@ -264,16 +274,6 @@ def add_hadoop_opts(opt_group):
             '--hdfs-scratch-dir', dest='hdfs_scratch_dir',
             default=None,
             help='Scratch space on HDFS (default is tmp/)'),
-
-        opt_group.add_option(
-            '--check-input-paths', dest='check_input_paths',
-            default=True, action='store_true',
-            help='Check input paths exist before running (the default)'),
-
-        opt_group.add_option(
-            '--no-check-input-paths', dest='check_input_paths',
-            default=True, action='store_false',
-            help='Skip the checks to ensure all input paths exist'),
     ]
 
 
@@ -438,8 +438,9 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--iam-job-flow-role', dest='iam_job_flow_role',
             default=None,
-            help='IAM Job flow role to use for the EMR cluster - see AWS docs on EMR for info on using IAM roles with EMR'),
-         
+            help=('IAM Job flow role to use for the EMR cluster - see AWS '
+                  'docs on EMR for info on using IAM roles with EMR')),
+
         opt_group.add_option(
             '--max-hours-idle', dest='max_hours_idle',
             default=None, type='float',

@@ -360,7 +360,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_tunnel_is_open',
         'ssh_tunnel_to_job_tracker',
         'visible_to_all_users',
-        'check_input_paths',
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -405,7 +404,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
             'visible_to_all_users': False,
-            'check_input_paths': True
         })
 
     def _fix_ec2_instance_opts(self):

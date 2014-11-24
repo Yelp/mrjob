@@ -112,7 +112,6 @@ def hadoop_log_dir(hadoop_home=None):
 class HadoopRunnerOptionStore(RunnerOptionStore):
 
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
-        'check_input_paths',
         'hadoop_bin',
         'hadoop_home',
         'hdfs_scratch_dir',
@@ -158,7 +157,6 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         return combine_dicts(super_opts, {
             'hadoop_home': os.environ.get('HADOOP_HOME'),
             'hdfs_scratch_dir': 'tmp/mrjob',
-            'check_input_paths': True
         })
 
 

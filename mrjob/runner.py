@@ -127,6 +127,7 @@ class RunnerOptionStore(OptionStore):
         'strict_protocols',
         'upload_archives',
         'upload_files',
+        'check_input_paths',
     ]))
 
     COMBINERS = combine_dicts(OptionStore.COMBINERS, {
@@ -200,6 +201,7 @@ class RunnerOptionStore(OptionStore):
             'hadoop_version': '0.20',
             'owner': owner,
             'sh_bin': ['sh', '-ex'],
+            'check_input_paths': True
         })
 
     def _validate_cleanup(self):

@@ -63,6 +63,10 @@ def add_basic_opts(opt_group):
             help='Path to alternate mrjob.conf file to read from'),
 
         opt_group.add_option(
+            '--job-name', dest='job_name', default=None,
+            help='Name of the job'),
+
+        opt_group.add_option(
             '--no-conf', dest='conf_paths', action='store_const', const=[],
             help="Don't load mrjob.conf even if it's available"),
 

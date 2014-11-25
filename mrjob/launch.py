@@ -486,6 +486,7 @@ class MRJobLauncher(object):
             'cleanup': self.options.cleanup,
             'cleanup_on_failure': self.options.cleanup_on_failure,
             'cmdenv': self.options.cmdenv,
+            'job_name': self.options.job_name,
             'conf_path': None,
             'conf_paths': self.options.conf_paths,
             'export_job_name': self.options.export_job_name,

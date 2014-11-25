@@ -269,7 +269,7 @@ class MRJobRunner(object):
                  extra_args=None, file_upload_args=None,
                  hadoop_input_format=None, hadoop_output_format=None,
                  input_paths=None, output_dir=None, partitioner=None,
-                 stdin=None, conf_paths=None, **opts):
+                 stdin=None, conf_paths=None, job_name=None, **opts):
         """All runners take the following keyword arguments:
 
         :type mr_job_script: str
@@ -363,8 +363,11 @@ class MRJobRunner(object):
             self._working_dir_mgr.add('file', self._script_path)
 
         # give this job a unique name
-        self._job_name = self._make_unique_job_name(
-            label=self._opts['label'], owner=self._opts['owner'])
+        if job_name is not None:
+            self._job_name = job_name
+        else:
+            self._job_name = self._make_unique_job_name(
+                label=self._opts['label'], owner=self._opts['owner'])
 
         # export the unique name to a environment variable
         if self._opts['export_job_name']:

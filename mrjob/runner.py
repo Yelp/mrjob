@@ -674,6 +674,8 @@ class MRJobRunner(object):
         if not self._local_tmp_dir:
             path = os.path.join(self._opts['base_tmp_dir'], self._job_name)
             log.info('creating tmp directory %s' % path)
+            if os.path.isdir(path):
+                shutil.rmtree(path)
             os.makedirs(path)
             self._local_tmp_dir = path
 

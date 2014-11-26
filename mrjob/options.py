@@ -63,10 +63,6 @@ def add_basic_opts(opt_group):
             help='Path to alternate mrjob.conf file to read from'),
 
         opt_group.add_option(
-            '--job-name', dest='job_name', default=None,
-            help='Name of the job'),
-
-        opt_group.add_option(
             '--no-conf', dest='conf_paths', action='store_const', const=[],
             help="Don't load mrjob.conf even if it's available"),
 
@@ -132,6 +128,10 @@ def add_runner_opts(opt_group, default_runner='local'):
         opt_group.add_option(
             '--interpreter', dest='interpreter', default=None,
             help=("Interpreter to run your script, e.g. python or ruby.")),
+
+        opt_group.add_option(
+            '--job-name', dest='job_name', default=None,
+            help='Specify the internal job name manually.'),
 
         opt_group.add_option(
             '--no-bootstrap-mrjob', dest='bootstrap_mrjob',

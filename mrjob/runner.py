@@ -114,6 +114,7 @@ class RunnerOptionStore(OptionStore):
         'hadoop_version',
         'interpreter',
         'jobconf',
+        'job_name',
         'label',
         'owner',
         'python_archives',

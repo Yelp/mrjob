@@ -131,7 +131,9 @@ def add_runner_opts(opt_group, default_runner='local'):
 
         opt_group.add_option(
             '--job-name', dest='job_name', default=None,
-            help='Specify the internal job name manually.'),
+            help='Specify the job name manually instead of asking mrjob for '
+                 'a unique name. Use this option if you want to give the job '
+                 'a descriptive name.'),
 
         opt_group.add_option(
             '--no-bootstrap-mrjob', dest='bootstrap_mrjob',

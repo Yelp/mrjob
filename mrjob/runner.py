@@ -114,6 +114,7 @@ class RunnerOptionStore(OptionStore):
         'hadoop_version',
         'interpreter',
         'jobconf',
+        'job_name',
         'label',
         'owner',
         'python_archives',
@@ -363,8 +364,11 @@ class MRJobRunner(object):
             self._working_dir_mgr.add('file', self._script_path)
 
         # give this job a unique name
-        self._job_name = self._make_unique_job_name(
-            label=self._opts['label'], owner=self._opts['owner'])
+        if len((self._opts['job_name'] or '').strip()) > 0:
+            self._job_name = self._opts['job_name']
+        else:
+            self._job_name = self._make_unique_job_name(
+                label=self._opts['label'], owner=self._opts['owner'])
 
         # export the unique name to a environment variable
         if self._opts['export_job_name']:
@@ -671,6 +675,8 @@ class MRJobRunner(object):
         if not self._local_tmp_dir:
             path = os.path.join(self._opts['base_tmp_dir'], self._job_name)
             log.info('creating tmp directory %s' % path)
+            if os.path.isdir(path):
+                shutil.rmtree(path)
             os.makedirs(path)
             self._local_tmp_dir = path
 

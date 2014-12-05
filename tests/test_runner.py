@@ -190,7 +190,7 @@ class TestJobName(unittest.TestCase):
 
     def test_owner_and_label_kwargs(self):
         runner = InlineMRJobRunner(conf_paths=[],
-                                  owner='ads', label='ads_chain')
+                                   owner='ads', label='ads_chain')
         match = JOB_NAME_RE.match(runner.get_job_name())
 
         self.assertEqual(match.group(1), 'ads_chain')
@@ -801,3 +801,32 @@ class ExportJobNameTestCase(EmptyMrjobConfTestCase):
         with job.make_runner() as runner:
             self.assertFalse(runner._opts['export_job_name'])
             self.assertEqual(runner._opts['cmdenv'], {})
+
+
+class JobNameTestCase(EmptyMrjobConfTestCase):
+
+    def test_job_name_specified(self):
+        job_name = datetime.datetime.now().strftime('WordCount-%Y%m%d%H%M%S')
+        job = MRWordCount(['--job-name', job_name])
+        with job.make_runner() as runner:
+            self.assertTrue(runner._opts['job_name'])
+            self.assertEqual(job_name, runner.get_job_name())
+
+    def test_job_name_not_specified(self):
+        job = MRWordCount()
+        with job.make_runner() as runner:
+            self.assertFalse(runner._opts['job_name'])
+            self.assertIsNotNone(JOB_NAME_RE.match(runner.get_job_name()))
+
+    def test_job_name_specified_run_twice(self):
+        job_name = datetime.datetime.now().strftime('WordCount2-%Y%m%d%H%M%S')
+        try:
+            job = MRWordCount(['--job-name', job_name,
+                               '--cleanup', 'NONE', __file__])
+            with job.make_runner() as runner:
+                runner.run()
+            job2 = MRWordCount(['--job-name', job_name, __file__])
+            with job2.make_runner() as runner2:
+                runner2.run()
+        except OSError:
+            self.fail('Local scratch was not auto-deleted')

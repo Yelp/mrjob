@@ -364,7 +364,7 @@ class MRJobRunner(object):
             self._working_dir_mgr.add('file', self._script_path)
 
         # give this job a unique name
-        if self._opts['job_name'] is not None:
+        if len((self._opts['job_name'] or '').strip()) > 0:
             self._job_name = self._opts['job_name']
         else:
             self._job_name = self._make_unique_job_name(

@@ -359,6 +359,18 @@ Other
 
     .. versionadded:: 0.4.3
 
+.. mrjob-opt::
+    :config: export_job_name
+    :switch: --export-job-name
+    :type: :ref:`string <data-type-string>`
+    :set: all
+    :default: (automatic)
+
+    Sets the environment variable MRJOB_JOB_NAME to the name of this job.
+
+    .. versionadded:: 0.4.3
+
+
 Options ignored by the inline runner
 ------------------------------------
 

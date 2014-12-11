@@ -802,6 +802,14 @@ class ExportJobNameTestCase(EmptyMrjobConfTestCase):
             self.assertFalse(runner._opts['export_job_name'])
             self.assertEqual(runner._opts['cmdenv'], {})
 
+class ClosedRunnerTestCase(EmptyMrjobConfTestCase):
+
+    def test_job_closed_on_cleanup(self):
+        job = MRWordCount()
+        with job.make_runner() as runner:
+            # do nothing
+            self.assertFalse(runner._closed)
+        self.assertTrue(runner._closed)
 
 class JobNameTestCase(EmptyMrjobConfTestCase):
 

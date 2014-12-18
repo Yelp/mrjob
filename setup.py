@@ -31,7 +31,7 @@ except ImportError:
     from distutils.core import setup
     setuptools_kwargs = {}
 
-import mrjob
+execfile('mrjob/version.py')
 
 setup(
     author='David Marin',
@@ -70,6 +70,6 @@ setup(
     },
     scripts=['bin/mrjob'],
     url='http://github.com/Yelp/mrjob',
-    version=mrjob.__version__,
+    version=__version__,
     **setuptools_kwargs
 )

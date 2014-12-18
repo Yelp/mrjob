@@ -4,6 +4,8 @@
 *.pyc
 *~
 *.swp
+.eggs
+.idea
 .project
 .pydevproject
 .ropeproject/

@@ -344,7 +344,7 @@ class MRJob(MRJobLauncher):
 
         kwargs.update(updates)
 
-        return [self.mr(**kwargs)]
+        return [MRStep(**kwargs)]
 
     @classmethod
     def mr(cls, *args, **kwargs):

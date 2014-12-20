@@ -434,6 +434,10 @@ class MRJobRunner(object):
         # rather than feed it multiple files
         self._sort_is_windows_sort = None
 
+        # this variable marks whether a cleanup has happened and this runner's
+        # output stream is no longer available.
+        self._closed = False
+
     ### Filesystem object ###
 
     @property
@@ -477,6 +481,9 @@ class MRJobRunner(object):
         output_dir = self.get_output_dir()
         if output_dir is None:
             raise AssertionError('Run the job before streaming output')
+
+        if self._closed is True:
+            log.warn('WARNING! Trying to stream output from a closed runner, output will probably be empty.')
 
         log.info('Streaming final output from %s' % output_dir)
 
@@ -579,6 +586,8 @@ class MRJobRunner(object):
 
         if mode_has('ALL', 'LOGS'):
             self._cleanup_logs()
+
+        self._closed = True
 
     def counters(self):
         """Get counters associated with this run in this form::

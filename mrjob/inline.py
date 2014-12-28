@@ -130,7 +130,7 @@ class InlineMRJobRunner(SimMRJobRunner):
         step = self._get_step(step_num)
 
         common_args = (['--step-num=%d' % step_num] +
-                       self._mr_job_extra_args(local=True))
+                       self._mr_job_extra_args(local=False))
 
         if step_type == 'mapper':
             child_args = (

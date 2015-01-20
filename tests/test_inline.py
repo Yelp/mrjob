@@ -140,6 +140,25 @@ class MRIncrementerJob(MRJob):
     def steps(self):
         return [MRStep(mapper=self.mapper)] * self.options.times
 
+class MRCustomFileOptionJob(MRJob):
+    """ A simple MRJob that uses the input file option."""
+
+    INPUT_PROTOCOL = JSONValueProtocol
+    OUTPUT_PROTOCOL = JSONValueProtocol
+
+    multiplier = 1
+
+    def configure_options(self):
+        super(MRCustomFileOptionJob, self).configure_options()
+        self.add_file_option('--platform_file')
+
+    def mapper_init(self):
+        with open(self.options.platform_file) as f:
+            self.multiplier = int(f.read())
+
+    def mapper(self, _, value):
+        yield None, value * self.multiplier
+
 
 class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
     # make sure file options get passed to --steps in inline mode
@@ -173,6 +192,19 @@ class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
                             for line in runner.stream_output())
 
             self.assertEqual(output, [2, 3, 4])
+
+class MRJobFileOptionsTestCase(TestCase):
+
+    def test_with_input_file_option(self):
+        mr_job = MRCustomFileOptionJob(['-r', 'inline', '--platform_file=tests/input/test_input_file.txt'])
+        mr_job.sandbox(stdin=StringIO('1\n'))
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            output = sorted(mr_job.parse_output_line(line)[1]
+                        for line in runner.stream_output())
+
+            self.assertEqual(output, [2])
 
 
 class NoMRJobConfTestCase(TestCase):

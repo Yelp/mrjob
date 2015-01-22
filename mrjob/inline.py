@@ -129,8 +129,10 @@ class InlineMRJobRunner(SimMRJobRunner):
                   working_dir, env, child_stdin=None):
         step = self._get_step(step_num)
 
+        # Passing local=False ensures the job uses proper names for file
+        # options (see issue #851 on github)
         common_args = (['--step-num=%d' % step_num] +
-                       self._mr_job_extra_args(local=True))
+                       self._mr_job_extra_args(local=False))
 
         if step_type == 'mapper':
             child_args = (

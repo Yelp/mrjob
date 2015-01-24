@@ -545,10 +545,12 @@ def save_current_environment():
     """
     original_environ = os.environ.copy()
 
-    yield
+    try:
+        yield
 
-    os.environ.clear()
-    os.environ.update(original_environ)
+    finally:
+        os.environ.clear()
+        os.environ.update(original_environ)
 
 
 @contextlib.contextmanager
@@ -557,9 +559,11 @@ def save_cwd():
     and chdir's back to it after execution."""
     original_cwd = os.getcwd()
 
-    yield
+    try:
+        yield
 
-    os.chdir(original_cwd)
+    finally:
+        os.chdir(original_cwd)
 
 
 def scrape_options_and_index_by_dest(*parsers_and_groups):

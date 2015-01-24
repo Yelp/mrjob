@@ -250,7 +250,7 @@ Job execution context
 
 .. mrjob-opt::
     :config: setup_cmds
-    :switch: --setup_cmd
+    :switch: --setup-cmd
     :type: :ref:`string list <data-type-string-list>`
     :set: all
     :default: ``[]``

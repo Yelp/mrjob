@@ -96,13 +96,13 @@ class MRStep(object):
             raise ValueError("Step has no mappers and no reducers")
 
         self.has_explicit_mapper = any(
-            name for name in kwargs if name in _MAPPER_FUNCS)
+            value for name, value in kwargs.iteritems() if name in _MAPPER_FUNCS)
 
         self.has_explicit_combiner = any(
-            name for name in kwargs if name in _COMBINER_FUNCS)
+            value for name, value in kwargs.iteritems() if name in _COMBINER_FUNCS)
 
         self.has_explicit_reducer = any(
-            name for name in kwargs if name in _REDUCER_FUNCS)
+            value for name, value in kwargs.iteritems() if name in _REDUCER_FUNCS)
 
         steps = dict((f, None) for f in _JOB_STEP_PARAMS)
 

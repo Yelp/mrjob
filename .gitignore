@@ -7,7 +7,8 @@
 .project
 .pydevproject
 .ropeproject/
-build
-dist
-mrjob.egg-info
+/build
+/dist
+/mrjob.egg-info
+/docs/_build
 .tox

@@ -671,8 +671,6 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
     if not filter:
         filter = lambda path: True
 
-    # supposedly you can also call tarfile.TarFile(), but I couldn't
-    # get this to work in Python 2.5.1. Please leave as-is.
     tar_gz = tarfile.open(out_path, mode='w:gz')
 
     for dirpath, dirnames, filenames in os.walk(dir):

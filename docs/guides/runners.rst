@@ -72,8 +72,6 @@ Running on your own Hadoop cluster
 ----------------------------------
 
 * Set up a hadoop cluster (see http://hadoop.apache.org/common/docs/current/)
-* If running Python 2.5 on your cluster, install the :py:mod:`simplejson`
-  module on all nodes (recommended but not required for Python 2.6+).
 * Make sure :envvar:`HADOOP_HOME` is set
 * Run your job with ``-r hadoop``::
 

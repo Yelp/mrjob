@@ -52,7 +52,7 @@ log = logging.getLogger(__name__)
 ### URI PARSING ###
 
 
-# Used to parse the real netloc out of a malformed path from Python 2.5
+# Used to parse the real netloc out of a malformed path from early Python 2.6
 # urlparse()
 NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
 
@@ -72,10 +72,10 @@ def is_uri(uri):
     """Return True if *uri* is any sort of URI."""
     if is_windows_path(uri):
         return False
-    
+
     return bool(urlparse(uri).scheme)
 
-    
+
 def is_s3_uri(uri):
     """Return True if *uri* can be parsed into an S3 URI, False otherwise."""
     try:

@@ -74,6 +74,11 @@ Job flow creation and configuration
     .. _`the AWS docs on specifying the AMI version`:
         http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/EnvironmentConfig_AMIVersion.html
 
+    .. warning::
+
+        The 1.x series of AMIs is no longer supported because they use Python
+        2.5.
+
 .. mrjob-opt::
     :config: aws_availability_zone
     :switch: --aws-availability-zone
@@ -122,7 +127,7 @@ Job flow creation and configuration
     :set: emr
     :default: ``None``
 
-    IAM job flow role to use on the EMR cluster. See 
+    IAM job flow role to use on the EMR cluster. See
     http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles.html
     for more details on using IAM roles with EMR.
     Needs AMI version 2.3.0 or later to work.

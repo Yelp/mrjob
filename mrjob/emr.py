@@ -564,6 +564,11 @@ class EMRJobRunner(MRJobRunner):
         else:
             self._output_dir = self._s3_tmp_uri + 'output/'
 
+        # check AMI version
+        if self._opts['ami_version'].startswith('1.'):
+            log.warning('1.x AMIs will probably not work because they use'
+                        ' Python 2.5. Use a later AMI version or mrjob v0.4.2')
+
         # manage working dir for bootstrap script
         self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
 

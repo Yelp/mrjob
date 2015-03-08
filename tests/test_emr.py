@@ -648,19 +648,22 @@ class EMRApiParamsTestCase(MockEMRAndS3TestCase):
 class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
 
     def test_defaults(self):
-        job_flow = self.run_and_get_job_flow('--ami-version=1.0')
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow('--ami-version=1.0')
         self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.18')
 
     def test_hadoop_version_0_18(self):
-        job_flow = self.run_and_get_job_flow(
-            '--hadoop-version=0.18', '--ami-version=1.0')
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow(
+                '--hadoop-version=0.18', '--ami-version=1.0')
         self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.18')
 
     def test_hadoop_version_0_20(self):
-        job_flow = self.run_and_get_job_flow(
-            '--hadoop-version=0.20', '--ami-version=1.0')
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow(
+                '--hadoop-version=0.20', '--ami-version=1.0')
         self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.20')
 
@@ -670,7 +673,8 @@ class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
                           '--hadoop-version', '0.99')
 
     def test_ami_version_1_0(self):
-        job_flow = self.run_and_get_job_flow('--ami-version', '1.0')
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow('--ami-version', '1.0')
         self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.18')
 
@@ -690,22 +694,25 @@ class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
                           '--ami-version', '1.5')
 
     def test_ami_version_1_0_hadoop_version_0_18(self):
-        job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
-                                             '--hadoop-version', '0.18')
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
+                                                 '--hadoop-version', '0.18')
         self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.18')
 
     def test_ami_version_1_0_hadoop_version_0_20(self):
-        job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
-                                             '--hadoop-version', '0.20')
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
+                                                 '--hadoop-version', '0.20')
         self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.20')
 
     def test_mismatched_ami_and_hadoop_versions(self):
-        self.assertRaises(boto.exception.EmrResponseError,
-                          self.run_and_get_job_flow,
-                          '--ami-version', '1.0',
-                          '--hadoop-version', '0.20.205')
+        with logger_disabled('mrjob.emr'):
+            self.assertRaises(boto.exception.EmrResponseError,
+                              self.run_and_get_job_flow,
+                              '--ami-version', '1.0',
+                              '--hadoop-version', '0.20.205')
 
 
 class AvailabilityZoneTestCase(MockEMRAndS3TestCase):

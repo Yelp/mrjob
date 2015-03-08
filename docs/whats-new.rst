@@ -4,6 +4,24 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+0.4.3
+-----
+``--export-job-name`` option exports the job name to the environment variable
+MRJOB_JOB_NAME.
+``--iam-job-flow-role`` option allows setting of a specific IAM role to run this
+job flow.
+
+Added a new tool, collect-emr-active-stats, to collect stats about active jobflows and
+instance counts.
+
+Job flows are now visible to all IAM users by default.
+
+Tests now use pytest and support tox.
+
+This release also contains many `bugfixes
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_, including
+problems with documentation.
+
 0.4.2
 -----
 

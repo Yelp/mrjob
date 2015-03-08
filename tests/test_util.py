@@ -323,10 +323,6 @@ class ArchiveTestCase(unittest.TestCase):
         expected_files = (set(expected_files + added_files) -
                           set(excluded_files))
 
-        # Python <= 2.5 inserts this into tarballs by default and doesn't strip
-        # it out again when unarchiving. Don't let it mess up our tests.
-        no_pax = lambda paths: (x for x in paths if x != 'PaxHeader')
-
         self.assertEqual(
             sorted(no_pax(os.listdir(join(self.tmp_dir, 'b')))),
             sorted(expected_files))

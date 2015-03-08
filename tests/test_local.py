@@ -331,7 +331,7 @@ class LargeAmountsOfStderrTestCase(unittest.TestCase):
                 mr_job.run_job()
         except TimeoutException:
             raise
-        except Exception, e:
+        except Exception as e:
             # we expect the job to throw an exception
 
             # look for expected output from MRVerboseJob
@@ -356,7 +356,7 @@ class ExitWithoutExceptionTestCase(unittest.TestCase):
 
         try:
             mr_job.run_job()
-        except Exception, e:
+        except Exception as e:
             self.assertIn('returned non-zero exit status 42', repr(e))
             return
 
@@ -491,7 +491,7 @@ class LocalBootstrapMrjobTestCase(unittest.TestCase):
                 try:
                     with no_handlers_for_logger():
                         runner.run()
-                except Exception, e:
+                except Exception as e:
                     # if mrjob is not installed, script won't be able to run
                     self.assertIn('ImportError', str(e))
                     return

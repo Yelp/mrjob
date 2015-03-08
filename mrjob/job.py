@@ -695,7 +695,7 @@ class MRJob(MRJobLauncher):
                 try:
                     key, value = read(line.rstrip('\r\n'))
                     yield key, value
-                except Exception, e:
+                except Exception as e:
                     if self.options.strict_protocols:
                         raise
                     else:
@@ -705,7 +705,7 @@ class MRJob(MRJobLauncher):
         def write_line(key, value):
             try:
                 print >> self.stdout, write(key, value)
-            except Exception, e:
+            except Exception as e:
                 if self.options.strict_protocols:
                     raise
                 else:

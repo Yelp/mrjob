@@ -30,7 +30,8 @@ v0.4.3, 2014-01-15 -- mostly cleanup and bugfixes
  * Fix to avoid interpreting windows paths as URIs (#880)
  * Better error message when ssh keyfile is missing (#858)
  * Update EMR tool ISO8601 parsing to be consistent with EMR runner (#870)
- * Dropped support for Python 2.5
+ * Dropped support for Python 2.5 (#713)
+   * Dropped support for the 1.x EMR AMI series, which uses Python 2.5
 
 v0.4.2, 2013-11-27 -- that's one small step for a JAR
  * jobs:

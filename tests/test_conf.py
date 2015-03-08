@@ -14,9 +14,6 @@
 # limitations under the License.
 
 """Test configuration parsing and option combining"""
-
-from __future__ import with_statement
-
 import os
 
 try:

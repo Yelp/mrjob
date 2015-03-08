@@ -11,10 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Tests of all the amazing utilities in mrjob.util"""
-from __future__ import with_statement
-
 import bz2
 import gzip
 import optparse

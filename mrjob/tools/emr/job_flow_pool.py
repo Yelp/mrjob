@@ -18,8 +18,6 @@ Usage::
 
     python -m mrjob.tools.emr.job_flow_pool
 """
-from __future__ import with_statement
-
 from optparse import OptionError
 from optparse import OptionGroup
 from optparse import OptionParser

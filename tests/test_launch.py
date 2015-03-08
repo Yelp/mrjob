@@ -12,9 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from __future__ import with_statement
-
 import cStringIO
 import inspect
 import logging
@@ -306,4 +303,3 @@ class TestToolLogging(unittest.TestCase):
                 log.info('INFO')
                 log.debug('DEBUG')
                 self.assertEqual(stderr.getvalue(), 'INFO\nDEBUG\n')
-

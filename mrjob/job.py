@@ -13,10 +13,9 @@
 # limitations under the License.
 """Class to inherit your MapReduce jobs from. See :doc:`guides/writing-mrjobs`
 for more information."""
+
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-from __future__ import with_statement
-
 import codecs
 import inspect
 import itertools

@@ -21,7 +21,6 @@ If you need a more extensive set of mock boto objects, we recommend adding
 some sort of sandboxing feature to boto, rather than extending these somewhat
 ad-hoc mock objects.
 """
-from __future__ import with_statement
 from datetime import datetime
 from datetime import timedelta
 import hashlib
@@ -39,7 +38,6 @@ from mrjob.conf import combine_values
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import RFC1123
-
 
 DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
 DEFAULT_MAX_DAYS_AGO = 61

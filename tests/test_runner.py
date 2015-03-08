@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the runner base class MRJobRunner"""
-
-from __future__ import with_statement
-
 import datetime
 import getpass
 import os

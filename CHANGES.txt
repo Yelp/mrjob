@@ -1,4 +1,4 @@
-v0.4.3, 2014-01-15 -- mostly cleanup and bugfixes
+v0.4.3, 2014-03-?? -- mostly cleanup and bugfixes
  * jobs:
    * exclude hadoop source jars from lookup (#861)
    * MRStep's constructor treats kwarg=None same as not setting it (#970)

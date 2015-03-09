@@ -21,11 +21,11 @@ v0.4.3, 2014-01-15 -- mostly cleanup and bugfixes
      * --no-emr-api-params to unset parameters being passed to EMR API (#879)
      * Use apt-get and yum to bootstrap python packages on EMR AMIs (#872)
    * Hadoop:
-     * Fixed a bug where mkdir_on_hdfs was not working correctly on hadoop 2.2
-     * Fixed bug where hadoop home path was incorrect on Windows
+     * Fixed mkdir_on_hdfs for Hadoop version 2.x (#923)
+     * Fixed hadoop_bin on Windows (#843)
  * Use pytest in tests (#898)
- * collect-emr-active-stats tool collects stats on active job flows and instance
-   counts and prints it to stdout (#947)
+ * collect-emr-active-stats tool collects stats on active job flows and
+   instance counts and prints it to stdout (#947)
  * Using xtrace flag to get more output during bootstrap (#943)
  * Ensure logging from tools writes out properly (#901)
  * Fix to avoid interpreting windows paths as URIs (#880)

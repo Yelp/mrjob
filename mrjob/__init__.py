@@ -16,8 +16,6 @@
 Hadoop cluster.
 """
 
-from .version import __version__
-
 __author__ = 'David Marin <dm@davidmarin.org>'
 
 __credits__ = [

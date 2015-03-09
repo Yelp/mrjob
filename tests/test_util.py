@@ -324,11 +324,11 @@ class ArchiveTestCase(unittest.TestCase):
                           set(excluded_files))
 
         self.assertEqual(
-            sorted(no_pax(os.listdir(join(self.tmp_dir, 'b')))),
+            sorted(os.listdir(join(self.tmp_dir, 'b'))),
             sorted(expected_files))
 
         self.assertEqual(
-            list(no_pax(os.listdir(join(self.tmp_dir, 'b', 'qux')))), ['quux'])
+            list(os.listdir(join(self.tmp_dir, 'b', 'qux'))), ['quux'])
 
         # make sure their contents are intact
         with open(join(self.tmp_dir, 'b', 'foo')) as foo:

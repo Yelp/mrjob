@@ -122,7 +122,7 @@ Job flow creation and configuration
     :set: emr
     :default: ``None``
 
-    IAM job flow role to use on the EMR cluster. See 
+    IAM job flow role to use on the EMR cluster. See
     http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles.html
     for more details on using IAM roles with EMR.
     Needs AMI version 2.3.0 or later to work.
@@ -333,8 +333,8 @@ Number and type of instances
     :set: emr
     :default: ``None``
 
-    When specified and not "0", this creates the master Hadoop node as a spot
-    instance at this bid price.  You usually only want to set bid price for
+    When specified and not "0", this creates the core Hadoop nodes as spot
+    instances at this bid price.  You usually only want to set bid price for
     task instances.
 
 .. mrjob-opt::

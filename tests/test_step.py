@@ -129,6 +129,15 @@ class MRStepInitTestCase(TestCase):
     def test_explicit_reducer(self):
         self._test_explicit(reducer=identity_reducer, r=True)
 
+    def test_no_explicit_mapper(self):
+        self._test_explicit(mapper=None, m=False)
+
+    def test_no_explicit_combiner(self):
+        self._test_explicit(combiner=None, c=False)
+
+    def test_no_explicit_reducer(self):
+        self._test_explicit(reducer=None, r=False)
+
     # final
 
     def test_explicit_mapper_final(self):
@@ -140,6 +149,15 @@ class MRStepInitTestCase(TestCase):
     def test_explicit_reducer_final(self):
         self._test_explicit(reducer_final=identity_reducer, r=True)
 
+    def test_no_explicit_mapper_final(self):
+        self._test_explicit(mapper_final=None, m=False)
+
+    def test_no_explicit_combiner_final(self):
+        self._test_explicit(combiner_final=None, c=False)
+
+    def test_no_explicit_reducer_final(self):
+        self._test_explicit(reducer_final=None, r=False)
+
     # init
 
     def test_explicit_mapper_init(self):
@@ -150,6 +168,15 @@ class MRStepInitTestCase(TestCase):
 
     def test_explicit_reducer_init(self):
         self._test_explicit(reducer_init=identity_reducer, r=True)
+
+    def test_no_explicit_mapper_init(self):
+        self._test_explicit(mapper_init=None, m=False)
+
+    def test_no_explicit_combiner_init(self):
+        self._test_explicit(combiner_init=None, c=False)
+
+    def test_no_explicit_reducer_init(self):
+        self._test_explicit(reducer_init=None, r=False)
 
     # cmd
 

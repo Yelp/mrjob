@@ -567,6 +567,8 @@ def add_emr_opts(opt_group):
                  ' times.'
         ),
 
+        # note that MRJobLauncher.load_options() deletes this option after
+        # updating emr_api_params
         opt_group.add_option(
             '--no-emr-api-param', dest='no_emr_api_params',
             default=[], action='append',

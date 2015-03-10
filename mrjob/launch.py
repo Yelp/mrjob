@@ -383,7 +383,8 @@ class MRJobLauncher(object):
         sys.exit(0)
 
     def load_options(self, args):
-        """Load command-line options into ``self.options``.
+        """Load command-line options into ``self.options``,
+        ``self._script_path``, and ``self.args``.
 
         Called from :py:meth:`__init__()` after :py:meth:`configure_options`.
 
@@ -442,12 +443,16 @@ class MRJobLauncher(object):
                                                     jobconf_err,
                                                     self.option_parser.error)
 
+        # emr_api_params
         emr_api_err = 'emr-api-params argument "%s" is not of the form KEY=VALUE'
         self.options.emr_api_params = parse_key_value_list(self.options.emr_api_params,
                                                            emr_api_err,
                                                            self.option_parser.error)
         for param in self.options.no_emr_api_params:
             self.options.emr_api_params[param] = None
+
+        # no_emr_api_params just exists to modify emr_api_params
+        del self.options.no_emr_api_params
 
         def parse_commas(cleanup_str):
             cleanup_error = ('cleanup option %s is not one of '

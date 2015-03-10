@@ -3427,10 +3427,15 @@ class EMRAPIParamsTestCase(MockEMRAndS3TestCase):
                              {'Instance.Ec2SubnetId': 'someID',
                               'VisibleToAllUsers': None})
 
-    def test_no_emr_api_params_is_not_an_actual_option(self):
+    def test_no_emr_api_params_is_not_a_real_option(self):
         job = MRWordCount([
             '-r', 'emr',
             '--no-emr-api-param', 'VisibleToAllUsers'])
+
+        self.assertNotIn('no_emr_api_params',
+                         sorted(job.emr_job_runner_kwargs()))
+        self.assertNotIn('no_emr_api_param',
+                         sorted(job.emr_job_runner_kwargs()))
 
         with job.make_runner() as runner:
             self.assertNotIn('no_emr_api_params', sorted(runner._opts))

@@ -478,6 +478,15 @@ Choosing/creating a job flow to join
     flow every 30 seconds until this many minutes have passed, then start a new
     job flow instead of joining one.
 
+.. mrjob-opt::
+    :config: emr_action_on_failure
+    :switch: --emr-action-on-failure
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: ``'CANCEL_AND_WAIT'``
+
+    The options are TERMINATE_JOB_FLOW | TERMINATE_CLUSTER | CANCEL_AND_WAIT | CONTINUE
+
 S3 paths and options
 --------------------
 MRJob uses boto to manipulate/access S3. Older versions of boto prior to 2.25.0

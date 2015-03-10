@@ -60,7 +60,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                  start_hours_ago=None,
                  end_hours_ago=None,
                  name='Streaming Step',
-                 action_on_failure='TERMINATE_JOB_FLOW',
+                 action_on_failure='TERMINATE_CLUSTER',
                  **kwargs):
             if create_hours_ago:
                 kwargs['creationdatetime'] = to_iso8601(

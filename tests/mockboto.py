@@ -361,7 +361,7 @@ class MockEmrConnection(object):
                     name, log_uri, ec2_keyname=None, availability_zone=None,
                     master_instance_type='m1.small',
                     slave_instance_type='m1.small', num_instances=1,
-                    action_on_failure='TERMINATE_JOB_FLOW', keep_alive=False,
+                    action_on_failure='TERMINATE_CLUSTER', keep_alive=False,
                     enable_debugging=False,
                     hadoop_version=None,
                     steps=None,
@@ -560,7 +560,7 @@ class MockEmrConnection(object):
 
         if enable_debugging:
             debugging_step = JarStep(name='Setup Hadoop Debugging',
-                                     action_on_failure='TERMINATE_JOB_FLOW',
+                                     action_on_failure='TERMINATE_CLUSTER',
                                      main_class=None,
                                      jar=EmrConnection.DebuggingJar,
                                      step_args=EmrConnection.DebuggingArgs)
@@ -748,7 +748,9 @@ class MockEmrConnection(object):
                 reason = self.mock_emr_failures[(jobflow_id, step_num)]
                 if reason:
                     job_flow.reason = reason
-                if step.actiononfailure == 'TERMINATE_JOB_FLOW':
+                # TERMINATED_JOB_FLOW is the old name for TERMINATE_CLUSTER
+                if step.actiononfailure in (
+                        'TERMINATE_CLUSTER','TERMINATE_JOB_FLOW'):
                     job_flow.state = 'SHUTTING_DOWN'
                     if not reason:
                         job_flow.reason = 'Shut down as step failed'

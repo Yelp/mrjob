@@ -1299,7 +1299,7 @@ class EMRJobRunner(MRJobRunner):
                 self._opts['pool_emr_job_flows']):
             return 'CANCEL_AND_WAIT'
         else:
-            return 'TERMINATE_JOB_FLOW'
+            return 'TERMINATE_CLUSTER'
 
     def _build_steps(self):
         """Return a list of boto Step objects corresponding to the

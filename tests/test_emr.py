@@ -3404,7 +3404,7 @@ class ActionOnFailureTestCase(MockEMRAndS3TestCase):
     def test_default(self):
         runner = EMRJobRunner()
         self.assertEqual(runner._action_on_failure,
-                         'TERMINATE_JOB_FLOW')
+                         'TERMINATE_CLUSTER')
 
     def test_default_with_job_flow_id(self):
         runner = EMRJobRunner(emr_job_flow_id='j-JOBFLOW')

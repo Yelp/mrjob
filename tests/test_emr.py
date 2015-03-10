@@ -3397,3 +3397,59 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             streaming_input_arg = streaming_args[
                 streaming_args.index('-input') + 1]
             self.assertEqual(jar_output_arg, streaming_input_arg)
+
+
+class EMRAPIParamsTestCase(MockEMRAndS3TestCase):
+
+    API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
+        'check_emr_status_every': 0.00,
+        's3_sync_wait_time': 0.00,
+        'emr_api_params': {
+            'Instance.Ec2SubnetId': 'someID',
+            'VisibleToAllUsers': None,
+            'Name': 'eaten_by_a_whale',
+        },
+    }}}
+
+    def test_default(self):
+        job = MRWordCount(['-r', 'emr'])
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_api_params'], {})
+
+    def test_command_line_opts(self):
+        job = MRWordCount([
+            '-r', 'emr',
+            '--emr-api-param', 'Instance.Ec2SubnetId=someID',
+            '--no-emr-api-param', 'VisibleToAllUsers'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_api_params'],
+                             {'Instance.Ec2SubnetId': 'someID',
+                              'VisibleToAllUsers': None})
+
+    def test_no_emr_api_params_is_not_an_actual_option(self):
+        job = MRWordCount([
+            '-r', 'emr',
+            '--no-emr-api-param', 'VisibleToAllUsers'])
+
+        with job.make_runner() as runner:
+            self.assertNotIn('no_emr_api_params', sorted(runner._opts))
+            self.assertNotIn('no_emr_api_param', sorted(runner._opts))
+            self.assertEqual(runner._opts['emr_api_params'],
+                            {'VisibleToAllUsers': None})
+
+    def test_command_line_overrides_config(self):
+        # want to make sure a nulled-out param in the config file
+        # can't override a param set on the command line
+
+        job = MRWordCount([
+            '-r', 'emr',
+            '--no-emr-api-param', 'Instance.Ec2SubnetId',
+            '--emr-api-param', 'VisibleToAllUsers=true'])
+
+        with mrjob_conf_patcher(self.API_PARAMS_MRJOB_CONF):
+            with job.make_runner() as runner:
+                self.assertEqual(runner._opts['emr_api_params'],
+                    {'Instance.Ec2SubnetId': None,
+                     'VisibleToAllUsers': 'true',
+                     'Name': 'eaten_by_a_whale'})

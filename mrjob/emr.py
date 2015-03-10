@@ -346,6 +346,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'iam_job_flow_role',
         'max_hours_idle',
         'mins_to_end_of_hour',
+        'no_emr_api_params',
         'num_ec2_core_instances',
         'pool_wait_minutes',
         'num_ec2_instances',

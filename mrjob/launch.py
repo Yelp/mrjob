@@ -52,6 +52,11 @@ log = logging.getLogger(__name__)
 # sentinel value; used when running MRJob as a script
 _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
 
+# options only used to modify other options; don't pass to runners
+_FAKE_OPTIONS = set([
+    'no_emr_api_params',
+])
+
 
 class MRJobLauncher(object):
     """Handle running a MapReduce job on an executable from the command line.
@@ -448,11 +453,10 @@ class MRJobLauncher(object):
         self.options.emr_api_params = parse_key_value_list(self.options.emr_api_params,
                                                            emr_api_err,
                                                            self.option_parser.error)
-        for param in self.options.no_emr_api_params:
-            self.options.emr_api_params[param] = None
 
         # no_emr_api_params just exists to modify emr_api_params
-        del self.options.no_emr_api_params
+        for param in self.options.no_emr_api_params:
+            self.options.emr_api_params[param] = None
 
         def parse_commas(cleanup_str):
             cleanup_error = ('cleanup option %s is not one of '
@@ -600,7 +604,8 @@ class MRJobLauncher(object):
         keyword args we want to set have identical names).
         """
         keys = set(opt.dest for opt in opt_group.option_list)
-        return dict((key, getattr(self.options, key)) for key in keys)
+        return dict((key, getattr(self.options, key)) for key in keys
+                    if key not in _FAKE_OPTIONS)
 
     def generate_passthrough_arguments(self):
         """Returns a list of arguments to pass to subprocesses, either on

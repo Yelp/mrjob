@@ -100,6 +100,47 @@ Job flow creation and configuration
     :mrjob-opt:`s3_endpoint`.
 
 .. mrjob-opt::
+    :config: emr_api_params
+    :switch: --emr-api-param, --no-emr-api-param
+    :type: :ref:`dict <data-type-plain-dict>`
+    :set: emr
+    :default: ``{}``
+
+    Additional raw parameters to pass directly to the EMR API when creating a
+    job flow. This allows old versions of `mrjob` to access new API features.
+    See `the API documentation for RunJobFlow`_ for the full list of options.
+
+    .. _`the API documentation for RunJobFlow`:
+        http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_RunJobFlow.html
+
+    Option names and values are strings. On the command line, to set an option
+    use ``--emr-api-param KEY=VALUE``:
+
+    .. code-block:: sh
+
+        --emr-api-param Instance.Ec2SubnetId=someID
+
+    and to suppress a value that would normally be passed to the API, use
+    ``--no-emr-api-param``:
+
+    .. code-block:: sh
+
+        --no-emr-api-param VisibleToAllUsers
+
+    In the config file, ``emr_api_params`` is a dict; params can be suppressed
+    by setting them to ``null``:
+
+    .. code-block:: yaml
+
+        runners:
+          emr:
+            emr_api_params:
+              Instance.Ec2SubnetId: someID
+              VisibleToAllUsers: null
+
+    .. versionadded:: 0.4.3
+
+.. mrjob-opt::
     :config: emr_endpoint
     :switch: --emr-endpoint
     :type: :ref:`string <data-type-string>`
@@ -171,17 +212,6 @@ Job flow creation and configuration
     can be overridden by :mrjob-opt:`emr_api_params` with key ``VisibleToAllUsers``.
 
     .. versionadded:: 0.4.1
-
-.. mrjob-opt::
-    :config: emr_api_params
-    :switch: --emr-api-param, --no-emr-api-param
-    :type: :ref:`dict <data-type-plain-dict>`
-    :set: emr
-    :default: ``{}``
-
-    Additional parameters to pass directly to the EMR API. This is a way to
-    pass new API parameters without updating the library. If value for parameter
-    is set to ``None``, this parameter will be deleted from API call.
 
 Bootstrapping
 -------------

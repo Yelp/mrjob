@@ -621,7 +621,7 @@ class IAMJobFlowRoleTestCase(MockEMRAndS3TestCase):
         self.assertEqual(job_flow.iamjobflowrole, 'EMRDefaultRole')
 
 
-class EMRApiParamsTestCase(MockEMRAndS3TestCase):
+class EMRAPIParamsTestCase(MockEMRAndS3TestCase):
 
     def test_param_set(self):
         job_flow = self.run_and_get_job_flow('--emr-api-param', 'Test.API=a', '--emr-api-param', 'Test.API2=b')
@@ -643,6 +643,59 @@ class EMRApiParamsTestCase(MockEMRAndS3TestCase):
     def test_overrides(self):
         job_flow = self.run_and_get_job_flow('--emr-api-param', 'VisibleToAllUsers=false', '--visible-to-all-users')
         self.assertEqual(job_flow.visibletoallusers, 'false')
+
+    def test_no_emr_api_param_command_line_switch(self):
+        job = MRWordCount([
+            '-r', 'emr',
+            '--emr-api-param', 'Instance.Ec2SubnetId=someID',
+            '--no-emr-api-param', 'VisibleToAllUsers'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_api_params'],
+                             {'Instance.Ec2SubnetId': 'someID',
+                              'VisibleToAllUsers': None})
+
+    def test_no_emr_api_params_is_not_a_real_option(self):
+        job = MRWordCount([
+            '-r', 'emr',
+            '--no-emr-api-param', 'VisibleToAllUsers'])
+
+        self.assertNotIn('no_emr_api_params',
+                         sorted(job.emr_job_runner_kwargs()))
+        self.assertNotIn('no_emr_api_param',
+                         sorted(job.emr_job_runner_kwargs()))
+
+        with job.make_runner() as runner:
+            self.assertNotIn('no_emr_api_params', sorted(runner._opts))
+            self.assertNotIn('no_emr_api_param', sorted(runner._opts))
+            self.assertEqual(runner._opts['emr_api_params'],
+                            {'VisibleToAllUsers': None})
+
+    def test_command_line_overrides_config(self):
+        # want to make sure a nulled-out param in the config file
+        # can't override a param set on the command line
+
+        API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
+            'check_emr_status_every': 0.00,
+            's3_sync_wait_time': 0.00,
+            'emr_api_params': {
+                'Instance.Ec2SubnetId': 'someID',
+                'VisibleToAllUsers': None,
+                'Name': 'eaten_by_a_whale',
+            },
+        }}}
+
+        job = MRWordCount([
+            '-r', 'emr',
+            '--no-emr-api-param', 'Instance.Ec2SubnetId',
+            '--emr-api-param', 'VisibleToAllUsers=true'])
+
+        with mrjob_conf_patcher(API_PARAMS_MRJOB_CONF):
+            with job.make_runner() as runner:
+                self.assertEqual(runner._opts['emr_api_params'],
+                    {'Instance.Ec2SubnetId': None,
+                     'VisibleToAllUsers': 'true',
+                     'Name': 'eaten_by_a_whale'})
 
 
 class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):

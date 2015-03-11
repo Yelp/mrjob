@@ -50,6 +50,11 @@ log = logging.getLogger(__name__)
 # sentinel value; used when running MRJob as a script
 _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
 
+# options only used to modify other options; don't pass to runners
+_FAKE_OPTIONS = set([
+    'no_emr_api_params',
+])
+
 
 class MRJobLauncher(object):
     """Handle running a MapReduce job on an executable from the command line.
@@ -381,7 +386,8 @@ class MRJobLauncher(object):
         sys.exit(0)
 
     def load_options(self, args):
-        """Load command-line options into ``self.options``.
+        """Load command-line options into ``self.options``,
+        ``self._script_path``, and ``self.args``.
 
         Called from :py:meth:`__init__()` after :py:meth:`configure_options`.
 
@@ -440,10 +446,13 @@ class MRJobLauncher(object):
                                                     jobconf_err,
                                                     self.option_parser.error)
 
+        # emr_api_params
         emr_api_err = 'emr-api-params argument "%s" is not of the form KEY=VALUE'
         self.options.emr_api_params = parse_key_value_list(self.options.emr_api_params,
                                                            emr_api_err,
                                                            self.option_parser.error)
+
+        # no_emr_api_params just exists to modify emr_api_params
         for param in self.options.no_emr_api_params:
             self.options.emr_api_params[param] = None
 
@@ -593,7 +602,8 @@ class MRJobLauncher(object):
         keyword args we want to set have identical names).
         """
         keys = set(opt.dest for opt in opt_group.option_list)
-        return dict((key, getattr(self.options, key)) for key in keys)
+        return dict((key, getattr(self.options, key)) for key in keys
+                    if key not in _FAKE_OPTIONS)
 
     def generate_passthrough_arguments(self):
         """Returns a list of arguments to pass to subprocesses, either on

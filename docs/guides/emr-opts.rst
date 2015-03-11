@@ -74,6 +74,11 @@ Job flow creation and configuration
     .. _`the AWS docs on specifying the AMI version`:
         http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/EnvironmentConfig_AMIVersion.html
 
+    .. warning::
+
+        The 1.x series of AMIs is no longer supported because they use Python
+        2.5.
+
 .. mrjob-opt::
     :config: aws_availability_zone
     :switch: --aws-availability-zone

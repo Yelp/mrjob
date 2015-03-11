@@ -70,11 +70,11 @@ Now you can use the job flow ID to start the troublesome job::
     Traceback (most recent call last):
       File "buggy_job.py", line 36, in <module>
         MRWordFreqCount.run()
-      File "/usr/lib/python2.5/site-packages/mrjob/job.py", line 448, in run
+      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 448, in run
         mr_job.execute()
-      File "/usr/lib/python2.5/site-packages/mrjob/job.py", line 455, in execute
+      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 455, in execute
         self.run_mapper(self.options.step_num)
-      File "/usr/lib/python2.5/site-packages/mrjob/job.py", line 548, in run_mapper
+      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 548, in run_mapper
         for out_key, out_value in mapper(key, value) or ():
       File "buggy_job.py", line 24, in mapper
         raise IndexError
@@ -82,7 +82,7 @@ Now you can use the job flow ID to start the troublesome job::
     Traceback (most recent call last):
       File "wrapper.py", line 16, in <module>
         check_call(sys.argv[1:])
-      File "/usr/lib/python2.5/subprocess.py", line 462, in check_call
+      File "/usr/lib/python2.7/subprocess.py", line 462, in check_call
         raise CalledProcessError(retcode, cmd)
     subprocess.CalledProcessError: Command '['python', 'buggy_job.py', '--step-num=0', '--mapper']' returned non-zero exit status 1
     (while reading from s3://scratch-bucket/tmp/buggy_job.username.20110811.185410.536519/input/00000-README.rst)
@@ -108,11 +108,11 @@ you can use the :py:mod:`mrjob.tools.emr.fetch_logs` tool to scan the logs::
     Traceback (most recent call last):
       File "buggy_job.py", line 36, in <module>
         MRWordFreqCount.run()
-      File "/usr/lib/python2.5/site-packages/mrjob/job.py", line 448, in run
+      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 448, in run
         mr_job.execute()
-      File "/usr/lib/python2.5/site-packages/mrjob/job.py", line 455, in execute
+      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 455, in execute
         self.run_mapper(self.options.step_num)
-      File "/usr/lib/python2.5/site-packages/mrjob/job.py", line 548, in run_mapper
+      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 548, in run_mapper
         for out_key, out_value in mapper(key, value) or ():
       File "buggy_job.py", line 24, in mapper
         raise IndexError
@@ -120,7 +120,7 @@ you can use the :py:mod:`mrjob.tools.emr.fetch_logs` tool to scan the logs::
     Traceback (most recent call last):
       File "wrapper.py", line 16, in <module>
         check_call(sys.argv[1:])
-      File "/usr/lib/python2.5/subprocess.py", line 462, in check_call
+      File "/usr/lib/python2.7/subprocess.py", line 462, in check_call
         raise CalledProcessError(retcode, cmd)
     subprocess.CalledProcessError: Command '['python', 'buggy_job.py', '--step-num=0', '--mapper']' returned non-zero exit status 1
     (while reading from s3://scratch-bucket/tmp/buggy_job.username.20110811.185410.536519/input/00000-README.rst)
@@ -145,11 +145,11 @@ problem. You can look at the logs yourself by using Amazon's `elastic-mapreduce
     Traceback (most recent call last):
       File "mr_word_freq_count.py", line 36, in <module>
         MRWordFreqCount.run()
-      File "/usr/lib/python2.5/site-packages/mrjob/job.py", line 448, in run
+      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 448, in run
         mr_job.execute()
-      File "/usr/lib/python2.5/site-packages/mrjob/job.py", line 455, in execute
+      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 455, in execute
         self.run_mapper(self.options.step_num)
-      File "/usr/lib/python2.5/site-packages/mrjob/job.py", line 548, in run_mapper
+      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 548, in run_mapper
         for out_key, out_value in mapper(key, value) or ():
       File "mr_word_freq_count.py", line 24, in mapper
         raise IndexError
@@ -157,7 +157,7 @@ problem. You can look at the logs yourself by using Amazon's `elastic-mapreduce
     Traceback (most recent call last):
       File "wrapper.py", line 16, in <module>
         check_call(sys.argv[1:])
-      File "/usr/lib/python2.5/subprocess.py", line 462, in check_call
+      File "/usr/lib/python2.7/subprocess.py", line 462, in check_call
         raise CalledProcessError(retcode, cmd)
     subprocess.CalledProcessError: Command '['python', 'mr_word_freq_count.py', '--step-num=0', '--mapper']' returned non-zero exit status 1
     java.lang.RuntimeException: PipeMapRed.waitOutputThreads(): subprocess failed with code 1

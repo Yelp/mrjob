@@ -18,6 +18,8 @@ Job flows are now visible to all IAM users by default.
 
 Tests now use pytest and support tox.
 
+Support for Python 2.5 has been dropped.
+
 This release also contains many `bugfixes
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_, including
 problems with documentation.

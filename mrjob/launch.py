@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import with_statement
-
 import logging
 from optparse import Option
 from optparse import OptionError
@@ -426,7 +424,7 @@ class MRJobLauncher(object):
         if self.options.ssh_bind_ports:
             try:
                 ports = parse_port_range_list(self.options.ssh_bind_ports)
-            except ValueError, e:
+            except ValueError as e:
                 self.option_parser.error('invalid port range list "%s": \n%s' %
                                          (self.options.ssh_bind_ports,
                                           e.args[0]))

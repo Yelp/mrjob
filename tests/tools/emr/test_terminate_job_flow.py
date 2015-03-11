@@ -11,11 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Test the job flow termination tool"""
-
-from __future__ import with_statement
-
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.terminate_job_flow import main as terminate_main
 from mrjob.tools.emr.terminate_job_flow import make_option_parser

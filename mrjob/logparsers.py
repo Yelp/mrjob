@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Parsing classes to find errors in Hadoop logs"""
-from __future__ import with_statement
-
 import logging
 import posixpath
 import re
@@ -25,9 +23,7 @@ from mrjob.parse import find_python_traceback
 from mrjob.parse import find_timeout_error
 from mrjob.parse import parse_hadoop_counters_from_line
 
-
 log = logging.getLogger(__name__)
-
 
 # Constants used to distinguish between different kinds of logs
 TASK_ATTEMPT_LOGS = 'TASK_ATTEMPT_LOGS'

@@ -13,10 +13,9 @@
 # limitations under the License.
 """Class to inherit your MapReduce jobs from. See :doc:`guides/writing-mrjobs`
 for more information."""
+
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-from __future__ import with_statement
-
 import codecs
 import inspect
 import itertools
@@ -696,7 +695,7 @@ class MRJob(MRJobLauncher):
                 try:
                     key, value = read(line.rstrip('\r\n'))
                     yield key, value
-                except Exception, e:
+                except Exception as e:
                     if self.options.strict_protocols:
                         raise
                     else:
@@ -706,7 +705,7 @@ class MRJob(MRJobLauncher):
         def write_line(key, value):
             try:
                 print >> self.stdout, write(key, value)
-            except Exception, e:
+            except Exception as e:
                 if self.options.strict_protocols:
                     raise
                 else:

@@ -30,8 +30,6 @@ Options::
   --no-conf             Don't load mrjob.conf even if it's available
 
 """
-from __future__ import with_statement
-
 import logging
 from optparse import OptionParser
 

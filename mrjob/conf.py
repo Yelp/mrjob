@@ -16,9 +16,6 @@
 """"mrjob.conf" is the name of both this module, and the global config file
 for :py:mod:`mrjob`.
 """
-
-from __future__ import with_statement
-
 import glob
 from itertools import chain
 import logging
@@ -152,7 +149,7 @@ def conf_object_at_path(conf_path):
         else:
             try:
                 return json.load(f)
-            except ValueError, e:
+            except ValueError as e:
                 msg = ('If your mrjob.conf is in YAML, you need to install'
                        ' yaml; see http://pypi.python.org/pypi/PyYAML/')
                 # Use msg attr if it's set

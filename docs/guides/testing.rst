@@ -38,12 +38,7 @@ See :py:class:`~mrjob.local.LocalMRJobRunner` for reference about its behavior.
 Anatomy of a test case
 ----------------------
 
-mrjob's test cases use the :py:mod:`unittest2` module, which is available
-for Python 2.3 and up. Most tests also require the :keyword:`with` statement.
-
-::
-
-    from __future__ import with_statement
+mrjob's test cases use the :py:mod:`unittest2` module::
 
     try:
         import unittest2 as unittest

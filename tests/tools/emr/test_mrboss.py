@@ -13,13 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the mrboss tool"""
-
-from __future__ import with_statement
-
 import os
 import shutil
 import tempfile
-
 
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.mrboss import run_on_all_nodes

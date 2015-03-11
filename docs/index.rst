@@ -1,7 +1,7 @@
 mrjob
 =====
 
-**mrjob lets you write MapReduce jobs in Python 2.5+ and run them on several
+**mrjob lets you write MapReduce jobs in Python 2.6+ and run them on several
 platforms.** You can:
 
 * Write multi-step MapReduce jobs in pure Python

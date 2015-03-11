@@ -11,13 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Utility functions for MRJob that have no external dependencies."""
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-from __future__ import with_statement
-
 from collections import defaultdict
 import contextlib
 from copy import deepcopy
@@ -674,8 +671,6 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
     if not filter:
         filter = lambda path: True
 
-    # supposedly you can also call tarfile.TarFile(), but I couldn't
-    # get this to work in Python 2.5.1. Please leave as-is.
     tar_gz = tarfile.open(out_path, mode='w:gz')
 
     for dirpath, dirnames, filenames in os.walk(dir):

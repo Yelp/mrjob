@@ -31,8 +31,6 @@ Options::
                         Minimum number of hours a job can run before we report
                         it. Default: 24.0
 """
-from __future__ import with_statement
-
 from datetime import datetime
 from datetime import timedelta
 import logging

@@ -3453,3 +3453,34 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             streaming_input_arg = streaming_args[
                 streaming_args.index('-input') + 1]
             self.assertEqual(jar_output_arg, streaming_input_arg)
+
+
+class ActionOnFailureTestCase(MockEMRAndS3TestCase):
+
+    def test_default(self):
+        runner = EMRJobRunner()
+        self.assertEqual(runner._action_on_failure,
+                         'TERMINATE_CLUSTER')
+
+    def test_default_with_job_flow_id(self):
+        runner = EMRJobRunner(emr_job_flow_id='j-JOBFLOW')
+        self.assertEqual(runner._action_on_failure,
+                         'CANCEL_AND_WAIT')
+
+    def test_default_with_pooling(self):
+        runner = EMRJobRunner(pool_emr_job_flows=True)
+        self.assertEqual(runner._action_on_failure,
+                         'CANCEL_AND_WAIT')
+
+    def test_option(self):
+        runner = EMRJobRunner(emr_action_on_failure='CONTINUE')
+        self.assertEqual(runner._action_on_failure,
+                         'CONTINUE')
+
+    def test_switch(self):
+        mr_job = MRWordCount(
+            ['-r', 'emr', '--emr-action-on-failure', 'CONTINUE'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            self.assertEqual(runner._action_on_failure, 'CONTINUE')

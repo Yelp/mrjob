@@ -466,6 +466,26 @@ Choosing/creating a job flow to join
 ------------------------------------
 
 .. mrjob-opt::
+    :config: emr_action_on_failure
+    :switch: --emr-action-on-failure
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: (automatic)
+
+    What happens if step of your job fails
+
+    * ``'CANCEL_AND_WAIT'`` cancels all steps on the job flow
+    * ``'CONTINUE'`` continues to the next step (useful when submitting several
+        jobs to the same job flow)
+    * ``'TERMINATE_CLUSTER'`` shuts down the job flow entirely
+
+    The default is ``'CANCEL_AND_WAIT'`` when using pooling (see
+    :mrjob-opt:`pool_emr_job_flows`) or an existing job flow (see
+    :mrjob-opt:`emr_job_flow_id`), and ``'TERMINATE_CLUSTER'`` otherwise.
+
+    .. versionadded:: 0.4.3
+
+.. mrjob-opt::
     :config: emr_job_flow_id
     :switch: --emr-job-flow-id
     :type: :ref:`string <data-type-string>`
@@ -512,6 +532,7 @@ Choosing/creating a job flow to join
     If pooling is enabled and no job flow is available, retry finding a job
     flow every 30 seconds until this many minutes have passed, then start a new
     job flow instead of joining one.
+
 
 S3 paths and options
 --------------------

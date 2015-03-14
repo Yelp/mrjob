@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Collect EMR stats from active jobflows. 
+""" Collect EMR stats from active jobflows.
     Active jobflows are those in states of:
         BOOTSTRAPPING, RUNNING, STARTING, and WAITING.
-    Collected stats include total number of active jobflows and total 
+    Collected stats include total number of active jobflows and total
     number of Amazon EC2 instances used to execute these jobflows.
     The instance counts are not separated by instance type.
 
@@ -49,8 +49,8 @@ from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 
-
 log = getLogger(__name__)
+
 
 def main(args):
     # parser command-line args
@@ -63,7 +63,8 @@ def main(args):
     description += "these jobflows. The instance counts are not separated by"
     description += "instance type."
     option_parser = OptionParser(usage=usage, description=description)
-    option_parser.add_option("-p", "--pretty-print", 
+    option_parser.add_option(
+        "-p", "--pretty-print",
         action="store_true", dest="pretty_print", default=False,
         help=('Pretty print the collected stats'))
     add_basic_opts(option_parser)
@@ -95,15 +96,15 @@ def pretty_print(stats):
     print 'Number of instance counts: %s' % s['total_instance_count']
     print '* The active jobflows are those in states of BOOTSTRAPPING,'
     print '  STARTING, RUNNING, and WAITING.'
-   
+
 
 def collect_active_job_flows(conf_paths):
     """Collect active job flow information from EMR.
 
-    :param str conf_path: Alternate path to read :py:mod:`mrjob.conf` from, 
+    :param str conf_path: Alternate path to read :py:mod:`mrjob.conf` from,
                           or ``False`` to ignore all config files
 
-    Return a list of job flows                          
+    Return a list of job flows
     """
     emr_conn = EMRJobRunner(conf_paths=conf_paths).make_emr_conn()
     active_states = ['STARTING', 'BOOTSTRAPPING', 'WAITING', 'RUNNING']
@@ -112,14 +113,14 @@ def collect_active_job_flows(conf_paths):
 
 
 def job_flows_to_stats(job_flows):
-    """ Compute total number of jobflows and instance count given a list of 
+    """ Compute total number of jobflows and instance count given a list of
         jobflows.
-    
+
     :param job_flows: A list of :py:class:`boto.emr.EmrObject`
 
     Returns a dictionary with many keys, including:
 
-    * *timestamp*: The time when stats are collected (current UTC time in 
+    * *timestamp*: The time when stats are collected (current UTC time in
                    POSIX timestamp, float format).
     * *num_jobflows*: Total number of jobflows.
     * *total_instance_count*: Total number of instance counts from jobflows.

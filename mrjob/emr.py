@@ -1959,10 +1959,9 @@ class EMRJobRunner(MRJobRunner):
             # can't determine which AMI `latest` is at
             # job flow creation time so we call both
             bootstrap.append(['sudo apt-get install -y python-pip || '
-                'sudo yum install -y python-pip'])
+                              'sudo yum install -y python-pip'])
             # Print a warning
             log.warning("bootstrap_python_packages is deprecated since v0.4.2 and will be removed in v0.6.0. Consider using bootstrap instead.")
-
 
         for path in self._opts['bootstrap_python_packages']:
             path_dict = parse_legacy_hash_path('file', path)

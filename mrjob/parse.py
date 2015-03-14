@@ -72,10 +72,10 @@ def is_uri(uri):
     """Return True if *uri* is any sort of URI."""
     if is_windows_path(uri):
         return False
-    
+
     return bool(urlparse(uri).scheme)
 
-    
+
 def is_s3_uri(uri):
     """Return True if *uri* can be parsed into an S3 URI, False otherwise."""
     try:

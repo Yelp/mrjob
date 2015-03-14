@@ -37,7 +37,8 @@ except ImportError:
     boto = None
 
 # match the filename of a hadoop streaming jar
-HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*(?<!-sources)\.jar$')
+HADOOP_STREAMING_JAR_RE = re.compile(
+    r'^hadoop.*streaming.*(?<!-sources)\.jar$')
 
 # match an mrjob job name (these are used to name EMR job flows)
 JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
@@ -56,7 +57,7 @@ log = logging.getLogger(__name__)
 # urlparse()
 NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
 
-# Used to check if the candidate candidate uri is actually a local windows path.
+# Used to check if the candidate uri is actually a local windows path.
 WINPATH_RE = re.compile(r"^[aA-zZ]:\\")
 
 
@@ -242,18 +243,18 @@ def find_hadoop_java_stack_trace(lines):
 
     Sample stack trace::
 
-        2010-07-27 18:25:48,397 WARN org.apache.hadoop.mapred.TaskTracker (main): Error running child
+        2010-07-27 18:25:48,397 WARN org.apache.hadoop.mapred.TaskTracker (main): Error running child  .. # noqa
         java.lang.OutOfMemoryError: Java heap space
-                at org.apache.hadoop.mapred.IFile$Reader.readNextBlock(IFile.java:270)
+                at org.apache.hadoop.mapred.IFile$Reader.readNextBlock(IFile.java:270)  .. # noqa
                 at org.apache.hadoop.mapred.IFile$Reader.next(IFile.java:332)
-                at org.apache.hadoop.mapred.Merger$Segment.next(Merger.java:147)
-                at org.apache.hadoop.mapred.Merger$MergeQueue.adjustPriorityQueue(Merger.java:238)
-                at org.apache.hadoop.mapred.Merger$MergeQueue.next(Merger.java:255)
+                at org.apache.hadoop.mapred.Merger$Segment.next(Merger.java:147)  .. # noqa
+                at org.apache.hadoop.mapred.Merger$MergeQueue.adjustPriorityQueue(Merger.java:238)  .. # noqa
+                at org.apache.hadoop.mapred.Merger$MergeQueue.next(Merger.java:255)  .. # noqa
                 at org.apache.hadoop.mapred.Merger.writeFile(Merger.java:86)
-                at org.apache.hadoop.mapred.Merger$MergeQueue.merge(Merger.java:377)
+                at org.apache.hadoop.mapred.Merger$MergeQueue.merge(Merger.java:377)  .. # noqa
                 at org.apache.hadoop.mapred.Merger.merge(Merger.java:58)
                 at org.apache.hadoop.mapred.ReduceTask.run(ReduceTask.java:277)
-                at org.apache.hadoop.mapred.TaskTracker$Child.main(TaskTracker.java:2216)
+                at org.apache.hadoop.mapred.TaskTracker$Child.main(TaskTracker.java:2216)  .. # noqa
 
     (We omit the "Error running child" line from the results)
     """
@@ -283,7 +284,7 @@ def find_input_uri_for_mapper(lines):
 
     Matching log lines look like::
 
-        2010-07-27 17:54:54,344 INFO org.apache.hadoop.fs.s3native.NativeS3FileSystem (main): Opening 's3://yourbucket/logs/2010/07/23/log2-00077.gz' for reading
+        2010-07-27 17:54:54,344 INFO org.apache.hadoop.fs.s3native.NativeS3FileSystem (main): Opening 's3://yourbucket/logs/2010/07/23/log2-00077.gz' for reading  .. # noqa
     """
     val = None
     for line in lines:
@@ -307,7 +308,7 @@ def find_interesting_hadoop_streaming_error(lines):
 
     Example line::
 
-        2010-07-27 19:53:35,451 ERROR org.apache.hadoop.streaming.StreamJob (main): Error launching job , Output path already exists : Output directory s3://yourbucket/logs/2010/07/23/ already exists and is not empty
+        2010-07-27 19:53:35,451 ERROR org.apache.hadoop.streaming.StreamJob (main): Error launching job , Output path already exists : Output directory s3://yourbucket/logs/2010/07/23/ already exists and is not empty  .. # noqa
     """
     for line in lines:
         match = (
@@ -330,20 +331,20 @@ def find_job_log_multiline_error(lines):
 
     Here is an example error::
 
-        MapAttempt TASK_TYPE="MAP" TASKID="task_201106280040_0001_m_000218" TASK_ATTEMPT_ID="attempt_201106280040_0001_m_000218_5" TASK_STATUS="FAILED" FINISH_TIME="1309246900665" HOSTNAME="/default-rack/ip-10-166-239-133.us-west-1.compute.internal" ERROR="Error initializing attempt_201106280040_0001_m_000218_5:
-        java.io.IOException: Cannot run program "bash": java.io.IOException: error=12, Cannot allocate memory
+        MapAttempt TASK_TYPE="MAP" TASKID="task_201106280040_0001_m_000218" TASK_ATTEMPT_ID="attempt_201106280040_0001_m_000218_5" TASK_STATUS="FAILED" FINISH_TIME="1309246900665" HOSTNAME="/default-rack/ip-10-166-239-133.us-west-1.compute.internal" ERROR="Error initializing attempt_201106280040_0001_m_000218_5:  .. # noqa
+        java.io.IOException: Cannot run program "bash": java.io.IOException: error=12, Cannot allocate memory  .. # noqa
             at java.lang.ProcessBuilder.start(ProcessBuilder.java:460)
             at org.apache.hadoop.util.Shell.runCommand(Shell.java:149)
             at org.apache.hadoop.util.Shell.run(Shell.java:134)
             at org.apache.hadoop.fs.DF.getAvailable(DF.java:73)
-            at org.apache.hadoop.fs.LocalDirAllocator$AllocatorPerContext.getLocalPathForWrite(LocalDirAllocator.java:296)
-            at org.apache.hadoop.fs.LocalDirAllocator.getLocalPathForWrite(LocalDirAllocator.java:124)
-            at org.apache.hadoop.mapred.TaskTracker.localizeJob(TaskTracker.java:648)
-            at org.apache.hadoop.mapred.TaskTracker.startNewTask(TaskTracker.java:1320)
-            at org.apache.hadoop.mapred.TaskTracker.offerService(TaskTracker.java:956)
+            at org.apache.hadoop.fs.LocalDirAllocator$AllocatorPerContext.getLocalPathForWrite(LocalDirAllocator.java:296)  .. # noqa
+            at org.apache.hadoop.fs.LocalDirAllocator.getLocalPathForWrite(LocalDirAllocator.java:124)  .. # noqa
+            at org.apache.hadoop.mapred.TaskTracker.localizeJob(TaskTracker.java:648)  .. # noqa
+            at org.apache.hadoop.mapred.TaskTracker.startNewTask(TaskTracker.java:1320)  .. # noqa
+            at org.apache.hadoop.mapred.TaskTracker.offerService(TaskTracker.java:956)  .. # noqa
             at org.apache.hadoop.mapred.TaskTracker.run(TaskTracker.java:1357)
             at org.apache.hadoop.mapred.TaskTracker.main(TaskTracker.java:2361)
-        Caused by: java.io.IOException: java.io.IOException: error=12, Cannot allocate memory
+        Caused by: java.io.IOException: java.io.IOException: error=12, Cannot allocate memory  .. # noqa
             at java.lang.UNIXProcess.<init>(UNIXProcess.java:148)
             at java.lang.ProcessImpl.start(ProcessImpl.java:65)
             at java.lang.ProcessBuilder.start(ProcessBuilder.java:453)
@@ -385,7 +386,7 @@ def find_timeout_error(lines):
 
     Example line::
 
-        Task TASKID="task_201010202309_0001_m_000153" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1287618918658" ERROR="Task attempt_201010202309_0001_m_000153_3 failed to report status for 602 seconds. Killing!"
+        Task TASKID="task_201010202309_0001_m_000153" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1287618918658" ERROR="Task attempt_201010202309_0001_m_000153_3 failed to report status for 602 seconds. Killing!"  .. # noqa
     """
     result = None
     for line in lines:
@@ -417,7 +418,7 @@ def parse_mr_job_stderr(stderr, counters=None):
     - *other*: lines that aren't either counters or status messages
     """
     # For the corresponding code in Hadoop Streaming, see ``incrCounter()`` in
-    # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup
+    # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup  # noqa
     if isinstance(stderr, str):
         stderr = StringIO(stderr)
 

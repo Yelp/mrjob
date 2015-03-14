@@ -133,7 +133,7 @@ def job_flows_to_stats(job_flows):
     now = datetime.utcnow()
 
     stats = {}
-    stats['timestamp'] = mktime(now.timetuple())  # convert into POSIX timestamp
+    stats['timestamp'] = mktime(now.timetuple())  # convert to POSIX timestamp
     stats['num_jobflows'] = len(job_flow_ids)
     stats['total_instance_count'] = total_instance_count
 

@@ -54,8 +54,8 @@ SETUP_CMD_RE = re.compile(
     r"((?P<single_quoted>'[^']*')|"
     r'(?P<double_quoted>"([^"\\]|\\.)*")|'
     r'(?P<hash_path>'
-        r'(?P<path>([A-Za-z][A-Za-z0-9\.-]*://([^\'"\s\\]|\\.)+)|'
-            r'([^\'":=\s\\]|\\.)+)'
+        r'(?P<path>([A-Za-z][A-Za-z0-9\.-]*://([^\'"\s\\]|\\.)+)|'  # noqa
+            r'([^\'":=\s\\]|\\.)+)'  # noqa
         r'#(?P<name>([^\'":;><|=/#\s\\]|\\.)*)'
             r'(?P<name_slash>/)?)|'
     r'(?P<unquoted>([^\'":=\s\\]|\\.)+)|'

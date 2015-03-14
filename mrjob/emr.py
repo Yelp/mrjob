@@ -586,7 +586,9 @@ class EMRJobRunner(MRJobRunner):
             })
 
         if self._opts['bootstrap_files']:
-            log.warning("bootstrap_files is deprecated since v0.4.2 and will be removed in v0.6.0. Consider using bootstrap instead.")
+            log.warning(
+                "bootstrap_files is deprecated since v0.4.2 and will be"
+                " removed in v0.6.0. Consider using bootstrap instead.")
         for path in self._opts['bootstrap_files']:
             self._bootstrap_dir_mgr.add(**parse_legacy_hash_path(
                 'file', path, must_name='bootstrap_files'))
@@ -1272,9 +1274,11 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['additional_emr_info']:
             args['additional_info'] = self._opts['additional_emr_info']
 
-        if self._opts['visible_to_all_users'] and not 'VisibleToAllUsers' in self._opts['emr_api_params']:
-            self._opts['emr_api_params']['VisibleToAllUsers'] = \
-                'true' if self._opts['visible_to_all_users'] else 'false'
+        if (self._opts['visible_to_all_users'] and
+            not 'VisibleToAllUsers' in self._opts['emr_api_params']):  # noqa
+
+            self._opts['emr_api_params']['VisibleToAllUsers'] = (
+                'true' if self._opts['visible_to_all_users'] else 'false')
 
         if self._opts['emr_api_params']:
             args['api_params'] = self._opts['emr_api_params']
@@ -1961,7 +1965,9 @@ class EMRJobRunner(MRJobRunner):
             bootstrap.append(['sudo apt-get install -y python-pip || '
                               'sudo yum install -y python-pip'])
             # Print a warning
-            log.warning("bootstrap_python_packages is deprecated since v0.4.2 and will be removed in v0.6.0. Consider using bootstrap instead.")
+            log.warning(
+                "bootstrap_python_packages is deprecated since v0.4.2 and will"
+                " be removed in v0.6.0. Consider using bootstrap instead.")
 
         for path in self._opts['bootstrap_python_packages']:
             path_dict = parse_legacy_hash_path('file', path)
@@ -1971,7 +1977,9 @@ class EMRJobRunner(MRJobRunner):
 
         # setup_cmds
         if self._opts['bootstrap_cmds']:
-            log.warning("bootstrap_cmds is deprecated since v0.4.2 and will be removed in v0.6.0. Consider using bootstrap instead.")
+            log.warning(
+                "bootstrap_cmds is deprecated since v0.4.2 and will be"
+                " removed in v0.6.0. Consider using bootstrap instead.")
         for cmd in self._opts['bootstrap_cmds']:
             if not isinstance(cmd, basestring):
                 cmd = cmd_line(cmd)
@@ -1979,7 +1987,9 @@ class EMRJobRunner(MRJobRunner):
 
         # bootstrap_scripts
         if self._opts['bootstrap_scripts']:
-            log.warning("bootstrap_scripts is deprecated since v0.4.2 and will be removed in v0.6.0. Consider using bootstrap instead.")
+            log.warning(
+                "bootstrap_scripts is deprecated since v0.4.2 and will be"
+                " removed in v0.6.0. Consider using bootstrap instead.")
 
         for path in self._opts['bootstrap_scripts']:
             path_dict = parse_legacy_hash_path('file', path)
@@ -2161,7 +2171,8 @@ class EMRJobRunner(MRJobRunner):
                 # extracted from the existing job flow should always
                 # be a full major.minor.patch, so checking matching
                 # prefixes should be sufficient.
-                if not job_flow_ami_version.startswith(self._opts['ami_version']):
+                if not job_flow_ami_version.startswith(
+                        self._opts['ami_version']):
                     return
             else:
                 if not warned_about_ami_version_latest:

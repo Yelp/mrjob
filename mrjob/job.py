@@ -407,7 +407,7 @@ class MRJob(MRJobLauncher):
         # cast to str() because sometimes people pass in exceptions or whatever
         #
         # The relevant Hadoop code is incrCounter(), here:
-        # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup
+        # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup  # noqa
         if isinstance(group, unicode) or isinstance(counter, unicode):
             group = unicode(group).replace(',', ';')
             counter = unicode(counter).replace(',', ';')

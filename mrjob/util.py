@@ -95,7 +95,8 @@ def buffer_iterator_to_line_iterator(iterator):
                 # this will happen eventually
                 buf = buf[start:]
 
-                # set search offset so we do not need to scan this part of the buffer again
+                # set search offset so we do not need to scan this part of
+                # the buffer again
                 search_offset = len(buf)
                 break
 

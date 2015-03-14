@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Basic tests for collect_emr_stats script"""
-from datetime import date
-from datetime import datetime
-from StringIO import StringIO
-import sys
-
 from mock import call
 from mock import patch
 from mrjob.tools.emr.collect_emr_stats import main
@@ -37,7 +32,7 @@ class CollectEMRStatsTestCase(unittest.TestCase):
     @patch('mrjob.tools.emr.collect_emr_stats.EMRJobRunner')
     def test_collect_active_job_flows(self, mock_job_runner, mock_describe_jobflows):
 
-        job_flows = collect_active_job_flows(conf_paths=[])
+        collect_active_job_flows(conf_paths=[])
 
         # check if args for calling describe_jobflows are correct
         assert (mock_job_runner.call_count == 1)

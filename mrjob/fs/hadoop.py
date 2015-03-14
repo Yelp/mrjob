@@ -152,8 +152,12 @@ class HadoopFilesystem(Filesystem):
 
             # Try to figure out which part of the line is the path
             # Expected lines:
-            # -rw-r--r--   3 dave users       3276 2010-01-13 14:00 /foo/bar # HDFS
-            # -rwxrwxrwx   1          3276 010-01-13 14:00 /foo/bar # S3
+            #
+            # HDFS:
+            # -rw-r--r--   3 dave users       3276 2010-01-13 14:00 /foo/bar
+            #
+            # S3:
+            # -rwxrwxrwx   1          3276 010-01-13 14:00 /foo/bar
             path_index = None
             for index, field in enumerate(fields):
                 if len(field) == 5 and field[2] == ':':

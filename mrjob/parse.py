@@ -37,7 +37,8 @@ except ImportError:
     boto = None
 
 # match the filename of a hadoop streaming jar
-HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*(?<!-sources)\.jar$')
+HADOOP_STREAMING_JAR_RE = re.compile(
+    r'^hadoop.*streaming.*(?<!-sources)\.jar$')
 
 # match an mrjob job name (these are used to name EMR job flows)
 JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
@@ -56,7 +57,7 @@ log = logging.getLogger(__name__)
 # urlparse()
 NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
 
-# Used to check if the candidate candidate uri is actually a local windows path.
+# Used to check if the candidate uri is actually a local windows path.
 WINPATH_RE = re.compile(r"^[aA-zZ]:\\")
 
 
@@ -417,7 +418,7 @@ def parse_mr_job_stderr(stderr, counters=None):
     - *other*: lines that aren't either counters or status messages
     """
     # For the corresponding code in Hadoop Streaming, see ``incrCounter()`` in
-    # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup
+    # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup  # noqa
     if isinstance(stderr, str):
         stderr = StringIO(stderr)
 

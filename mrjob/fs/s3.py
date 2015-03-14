@@ -80,7 +80,7 @@ class S3Filesystem(Filesystem):
         """
         :param aws_access_key_id: Your AWS access key ID
         :param aws_secret_access_key: Your AWS secret access key
-        :param s3_endpoint: S3 endpoint to access, e.g. 
+        :param s3_endpoint: S3 endpoint to access, e.g.
                             ``s3-us-west-2.amazonaws.com``
         """
         super(S3Filesystem, self).__init__()

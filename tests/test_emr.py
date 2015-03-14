@@ -12,11 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Tests for EMRJobRunner"""
-
-from __future__ import with_statement
-
 from contextlib import contextmanager
 from contextlib import nested
 import copy
@@ -625,7 +621,7 @@ class IAMJobFlowRoleTestCase(MockEMRAndS3TestCase):
         self.assertEqual(job_flow.iamjobflowrole, 'EMRDefaultRole')
 
 
-class EMRApiParamsTestCase(MockEMRAndS3TestCase):
+class EMRAPIParamsTestCase(MockEMRAndS3TestCase):
 
     def test_param_set(self):
         job_flow = self.run_and_get_job_flow('--emr-api-param', 'Test.API=a', '--emr-api-param', 'Test.API2=b')
@@ -648,23 +644,79 @@ class EMRApiParamsTestCase(MockEMRAndS3TestCase):
         job_flow = self.run_and_get_job_flow('--emr-api-param', 'VisibleToAllUsers=false', '--visible-to-all-users')
         self.assertEqual(job_flow.visibletoallusers, 'false')
 
+    def test_no_emr_api_param_command_line_switch(self):
+        job = MRWordCount([
+            '-r', 'emr',
+            '--emr-api-param', 'Instance.Ec2SubnetId=someID',
+            '--no-emr-api-param', 'VisibleToAllUsers'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_api_params'],
+                             {'Instance.Ec2SubnetId': 'someID',
+                              'VisibleToAllUsers': None})
+
+    def test_no_emr_api_params_is_not_a_real_option(self):
+        job = MRWordCount([
+            '-r', 'emr',
+            '--no-emr-api-param', 'VisibleToAllUsers'])
+
+        self.assertNotIn('no_emr_api_params',
+                         sorted(job.emr_job_runner_kwargs()))
+        self.assertNotIn('no_emr_api_param',
+                         sorted(job.emr_job_runner_kwargs()))
+
+        with job.make_runner() as runner:
+            self.assertNotIn('no_emr_api_params', sorted(runner._opts))
+            self.assertNotIn('no_emr_api_param', sorted(runner._opts))
+            self.assertEqual(runner._opts['emr_api_params'],
+                            {'VisibleToAllUsers': None})
+
+    def test_command_line_overrides_config(self):
+        # want to make sure a nulled-out param in the config file
+        # can't override a param set on the command line
+
+        API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
+            'check_emr_status_every': 0.00,
+            's3_sync_wait_time': 0.00,
+            'emr_api_params': {
+                'Instance.Ec2SubnetId': 'someID',
+                'VisibleToAllUsers': None,
+                'Name': 'eaten_by_a_whale',
+            },
+        }}}
+
+        job = MRWordCount([
+            '-r', 'emr',
+            '--no-emr-api-param', 'Instance.Ec2SubnetId',
+            '--emr-api-param', 'VisibleToAllUsers=true'])
+
+        with mrjob_conf_patcher(API_PARAMS_MRJOB_CONF):
+            with job.make_runner() as runner:
+                self.assertEqual(runner._opts['emr_api_params'],
+                    {'Instance.Ec2SubnetId': None,
+                     'VisibleToAllUsers': 'true',
+                     'Name': 'eaten_by_a_whale'})
+
 
 class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
 
     def test_defaults(self):
-        job_flow = self.run_and_get_job_flow('--ami-version=1.0')
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow('--ami-version=1.0')
         self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.18')
 
     def test_hadoop_version_0_18(self):
-        job_flow = self.run_and_get_job_flow(
-            '--hadoop-version=0.18', '--ami-version=1.0')
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow(
+                '--hadoop-version=0.18', '--ami-version=1.0')
         self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.18')
 
     def test_hadoop_version_0_20(self):
-        job_flow = self.run_and_get_job_flow(
-            '--hadoop-version=0.20', '--ami-version=1.0')
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow(
+                '--hadoop-version=0.20', '--ami-version=1.0')
         self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.20')
 
@@ -674,7 +726,8 @@ class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
                           '--hadoop-version', '0.99')
 
     def test_ami_version_1_0(self):
-        job_flow = self.run_and_get_job_flow('--ami-version', '1.0')
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow('--ami-version', '1.0')
         self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.18')
 
@@ -694,22 +747,25 @@ class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
                           '--ami-version', '1.5')
 
     def test_ami_version_1_0_hadoop_version_0_18(self):
-        job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
-                                             '--hadoop-version', '0.18')
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
+                                                 '--hadoop-version', '0.18')
         self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.18')
 
     def test_ami_version_1_0_hadoop_version_0_20(self):
-        job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
-                                             '--hadoop-version', '0.20')
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow('--ami-version', '1.0',
+                                                 '--hadoop-version', '0.20')
         self.assertEqual(job_flow.amiversion, '1.0')
         self.assertEqual(job_flow.hadoopversion, '0.20')
 
     def test_mismatched_ami_and_hadoop_versions(self):
-        self.assertRaises(boto.exception.EmrResponseError,
-                          self.run_and_get_job_flow,
-                          '--ami-version', '1.0',
-                          '--hadoop-version', '0.20.205')
+        with logger_disabled('mrjob.emr'):
+            self.assertRaises(boto.exception.EmrResponseError,
+                              self.run_and_get_job_flow,
+                              '--ami-version', '1.0',
+                              '--hadoop-version', '0.20.205')
 
 
 class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
@@ -3397,3 +3453,34 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             streaming_input_arg = streaming_args[
                 streaming_args.index('-input') + 1]
             self.assertEqual(jar_output_arg, streaming_input_arg)
+
+
+class ActionOnFailureTestCase(MockEMRAndS3TestCase):
+
+    def test_default(self):
+        runner = EMRJobRunner()
+        self.assertEqual(runner._action_on_failure,
+                         'TERMINATE_CLUSTER')
+
+    def test_default_with_job_flow_id(self):
+        runner = EMRJobRunner(emr_job_flow_id='j-JOBFLOW')
+        self.assertEqual(runner._action_on_failure,
+                         'CANCEL_AND_WAIT')
+
+    def test_default_with_pooling(self):
+        runner = EMRJobRunner(pool_emr_job_flows=True)
+        self.assertEqual(runner._action_on_failure,
+                         'CANCEL_AND_WAIT')
+
+    def test_option(self):
+        runner = EMRJobRunner(emr_action_on_failure='CONTINUE')
+        self.assertEqual(runner._action_on_failure,
+                         'CONTINUE')
+
+    def test_switch(self):
+        mr_job = MRWordCount(
+            ['-r', 'emr', '--emr-action-on-failure', 'CONTINUE'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            self.assertEqual(runner._action_on_failure, 'CONTINUE')

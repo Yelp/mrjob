@@ -74,6 +74,11 @@ Job flow creation and configuration
     .. _`the AWS docs on specifying the AMI version`:
         http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/EnvironmentConfig_AMIVersion.html
 
+    .. warning::
+
+        The 1.x series of AMIs is no longer supported because they use Python
+        2.5.
+
 .. mrjob-opt::
     :config: aws_availability_zone
     :switch: --aws-availability-zone
@@ -93,6 +98,47 @@ Job flow creation and configuration
     region to connect to S3 and EMR on (e.g.  ``us-west-1``). If you want to
     use separate regions for S3 and EMR, set :mrjob-opt:`emr_endpoint` and
     :mrjob-opt:`s3_endpoint`.
+
+.. mrjob-opt::
+    :config: emr_api_params
+    :switch: --emr-api-param, --no-emr-api-param
+    :type: :ref:`dict <data-type-plain-dict>`
+    :set: emr
+    :default: ``{}``
+
+    Additional raw parameters to pass directly to the EMR API when creating a
+    job flow. This allows old versions of `mrjob` to access new API features.
+    See `the API documentation for RunJobFlow`_ for the full list of options.
+
+    .. _`the API documentation for RunJobFlow`:
+        http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_RunJobFlow.html
+
+    Option names and values are strings. On the command line, to set an option
+    use ``--emr-api-param KEY=VALUE``:
+
+    .. code-block:: sh
+
+        --emr-api-param Instance.Ec2SubnetId=someID
+
+    and to suppress a value that would normally be passed to the API, use
+    ``--no-emr-api-param``:
+
+    .. code-block:: sh
+
+        --no-emr-api-param VisibleToAllUsers
+
+    In the config file, ``emr_api_params`` is a dict; params can be suppressed
+    by setting them to ``null``:
+
+    .. code-block:: yaml
+
+        runners:
+          emr:
+            emr_api_params:
+              Instance.Ec2SubnetId: someID
+              VisibleToAllUsers: null
+
+    .. versionadded:: 0.4.3
 
 .. mrjob-opt::
     :config: emr_endpoint
@@ -166,17 +212,6 @@ Job flow creation and configuration
     can be overridden by :mrjob-opt:`emr_api_params` with key ``VisibleToAllUsers``.
 
     .. versionadded:: 0.4.1
-
-.. mrjob-opt::
-    :config: emr_api_params
-    :switch: --emr-api-param, --no-emr-api-param
-    :type: :ref:`dict <data-type-plain-dict>`
-    :set: emr
-    :default: ``{}``
-
-    Additional parameters to pass directly to the EMR API. This is a way to
-    pass new API parameters without updating the library. If value for parameter
-    is set to ``None``, this parameter will be deleted from API call.
 
 Bootstrapping
 -------------
@@ -431,6 +466,26 @@ Choosing/creating a job flow to join
 ------------------------------------
 
 .. mrjob-opt::
+    :config: emr_action_on_failure
+    :switch: --emr-action-on-failure
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: (automatic)
+
+    What happens if step of your job fails
+
+    * ``'CANCEL_AND_WAIT'`` cancels all steps on the job flow
+    * ``'CONTINUE'`` continues to the next step (useful when submitting several
+        jobs to the same job flow)
+    * ``'TERMINATE_CLUSTER'`` shuts down the job flow entirely
+
+    The default is ``'CANCEL_AND_WAIT'`` when using pooling (see
+    :mrjob-opt:`pool_emr_job_flows`) or an existing job flow (see
+    :mrjob-opt:`emr_job_flow_id`), and ``'TERMINATE_CLUSTER'`` otherwise.
+
+    .. versionadded:: 0.4.3
+
+.. mrjob-opt::
     :config: emr_job_flow_id
     :switch: --emr-job-flow-id
     :type: :ref:`string <data-type-string>`
@@ -477,6 +532,7 @@ Choosing/creating a job flow to join
     If pooling is enabled and no job flow is available, retry finding a job
     flow every 30 seconds until this many minutes have passed, then start a new
     job flow instead of joining one.
+
 
 S3 paths and options
 --------------------

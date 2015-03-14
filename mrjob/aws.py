@@ -15,7 +15,6 @@
 """General information about Amazon Web Services, such as region-to-endpoint
 mappings.
 """
-from __future__ import with_statement
 
 ### EC2 Instances ###
 

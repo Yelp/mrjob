@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import with_statement
-
 import logging
 from optparse import Option
 from optparse import OptionError
@@ -51,6 +49,11 @@ log = logging.getLogger(__name__)
 
 # sentinel value; used when running MRJob as a script
 _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
+
+# options only used to modify other options; don't pass to runners
+_FAKE_OPTIONS = set([
+    'no_emr_api_params',
+])
 
 
 class MRJobLauncher(object):
@@ -383,7 +386,8 @@ class MRJobLauncher(object):
         sys.exit(0)
 
     def load_options(self, args):
-        """Load command-line options into ``self.options``.
+        """Load command-line options into ``self.options``,
+        ``self._script_path``, and ``self.args``.
 
         Called from :py:meth:`__init__()` after :py:meth:`configure_options`.
 
@@ -426,7 +430,7 @@ class MRJobLauncher(object):
         if self.options.ssh_bind_ports:
             try:
                 ports = parse_port_range_list(self.options.ssh_bind_ports)
-            except ValueError, e:
+            except ValueError as e:
                 self.option_parser.error('invalid port range list "%s": \n%s' %
                                          (self.options.ssh_bind_ports,
                                           e.args[0]))
@@ -442,6 +446,7 @@ class MRJobLauncher(object):
                                                     jobconf_err,
                                                     self.option_parser.error)
 
+        # emr_api_params
         emr_api_err = (
             'emr-api-params argument "%s" is not of the form KEY=VALUE')
 
@@ -450,6 +455,7 @@ class MRJobLauncher(object):
             emr_api_err,
             self.option_parser.error)
 
+        # no_emr_api_params just exists to modify emr_api_params
         for param in self.options.no_emr_api_params:
             self.options.emr_api_params[param] = None
 
@@ -599,7 +605,8 @@ class MRJobLauncher(object):
         keyword args we want to set have identical names).
         """
         keys = set(opt.dest for opt in opt_group.option_list)
-        return dict((key, getattr(self.options, key)) for key in keys)
+        return dict((key, getattr(self.options, key)) for key in keys
+                    if key not in _FAKE_OPTIONS)
 
     def generate_passthrough_arguments(self):
         """Returns a list of arguments to pass to subprocesses, either on

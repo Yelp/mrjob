@@ -71,7 +71,7 @@ class RetryGoRound(object):
                     # this one works, start here next time!
                     self.__start_index = index
                     return result
-                except Exception, ex:
+                except Exception as ex:
                     # that one didn't work out, retry if we can
                     if i < n - 1 and self.__retry_if(ex):
                         log.info('%r.%s() raised %r, trying next alternative'
@@ -146,7 +146,7 @@ class RetryWrapper(object):
             while (not self.__max_tries or tries < self.__max_tries):
                 try:
                     return f(*args, **kwargs)
-                except Exception, ex:
+                except Exception as ex:
                     if self.__retry_if(ex):
                         log.info('Got retriable error: %r' % ex)
                         log.info('Backing off for %.1f seconds' % backoff)

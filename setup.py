@@ -11,6 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from os.path import join
+from os.path import dirname
+
+# get __version__
+execfile(join(dirname(__file__), 'mrjob/__init__.py'))
 
 try:
     from setuptools import setup
@@ -31,8 +36,6 @@ except ImportError:
     from distutils.core import setup
     setuptools_kwargs = {}
 
-import mrjob
-
 setup(
     author='David Marin',
     author_email='dave@yelp.com',
@@ -43,7 +46,6 @@ setup(
         'Natural Language :: English',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2.5',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
         'Topic :: System :: Distributed Computing',
@@ -70,6 +72,6 @@ setup(
     },
     scripts=['bin/mrjob'],
     url='http://github.com/Yelp/mrjob',
-    version=mrjob.__version__,
+    version=__version__,
     **setuptools_kwargs
 )

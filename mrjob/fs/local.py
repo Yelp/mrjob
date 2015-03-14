@@ -9,8 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import with_statement
-
 import glob
 import hashlib
 import logging
@@ -20,7 +18,6 @@ import shutil
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_uri
 from mrjob.util import read_file
-
 
 log = logging.getLogger(__name__)
 

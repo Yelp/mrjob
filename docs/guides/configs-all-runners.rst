@@ -201,7 +201,7 @@ Job execution context
 
     Interpreter to launch your script with. Defaults to the value of
     **python_bin**, which is deprecated. Change this if you're using a
-    language besides Python 2.5-2.7.
+    language besides Python 2.6-2.7.
 
 .. mrjob-opt::
     :config: python_bin

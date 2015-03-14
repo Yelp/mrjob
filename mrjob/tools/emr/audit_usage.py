@@ -31,8 +31,6 @@ Options::
                         go back as far as EMR supports (currently about 2
                         months)
 """
-from __future__ import with_statement
-
 from datetime import datetime
 from datetime import timedelta
 import math

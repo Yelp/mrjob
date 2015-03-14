@@ -14,9 +14,6 @@
 # limitations under the License.
 """Run an MRJob locally by forking off a bunch of processes and piping
 them together. Useful for testing."""
-from __future__ import with_statement
-
-
 import logging
 from subprocess import Popen
 from subprocess import PIPE

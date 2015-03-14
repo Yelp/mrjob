@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import with_statement
-
 import logging
 import sys
 from StringIO import StringIO
@@ -55,7 +53,7 @@ ImportError: No module named mr3po.mysqldump
 Traceback (most recent call last):
   File "wrapper.py", line 16, in <module>
     check_call(sys.argv[1:])
-  File "/usr/lib/python2.5/subprocess.py", line 462, in check_call
+  File "/usr/lib/python2.7/subprocess.py", line 462, in check_call
     raise CalledProcessError(retcode, cmd)
 subprocess.CalledProcessError: Command '['python', 'mr_collect_per_search_info_remote.py', '--step-num=0', '--mapper']' returned non-  zero exit status 1
 """
@@ -68,7 +66,7 @@ SyntaxError: invalid syntax
 Traceback (most recent call last):
   File "wrapper.py", line 16, in <module>
     check_call(sys.argv[1:])
-  File "/usr/lib/python2.5/subprocess.py", line 462, in check_call
+  File "/usr/lib/python2.7/subprocess.py", line 462, in check_call
     raise CalledProcessError(retcode, cmd)
 subprocess.CalledProcessError: Command '['python', 'mr_profile_test.py', '--step-num=0', '--reducer', '--input-protocol', 'raw_value', '--output-protocol', 'json', '--protocol', 'json']' returned non-zero exit status 1
 """
@@ -78,7 +76,7 @@ make: *** [tools/csv-to-myisam] Error 1
 Traceback (most recent call last):
   File "wrapper.py", line 11, in <module>
     check_call('cd yelp-src-tree.tar.gz; ln -sf $(readlink -f config/emr/level.py) config/level.py; make -f Makefile.emr', shell=True, stdout=open('/dev/null', 'w'))
-  File "/usr/lib/python2.5/subprocess.py", line 462, in check_call
+  File "/usr/lib/python2.7/subprocess.py", line 462, in check_call
     raise CalledProcessError(retcode, cmd)
 subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readlink -f config/emr/level.py) config/level.py; make -f    Makefile.emr' returned non-zero exit status 2
 """

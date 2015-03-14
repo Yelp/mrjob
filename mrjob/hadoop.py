@@ -379,7 +379,7 @@ class HadoopJobRunner(MRJobRunner):
             while True:
                 try:
                     yield iter.next()  # okay for StopIteration to bubble up
-                except IOError, e:
+                except IOError as e:
                     if e.errno == errno.EIO:
                         return
                     else:
@@ -514,7 +514,7 @@ class HadoopJobRunner(MRJobRunner):
 
             try:
                 self.invoke_hadoop(['fs', '-rmr', self._hdfs_tmp_dir])
-            except Exception, e:
+            except Exception as e:
                 log.exception(e)
 
     ### LOG FETCHING/PARSING ###

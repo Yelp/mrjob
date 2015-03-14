@@ -293,9 +293,7 @@ def add_emr_opts(opt_group):
 
         opt_group.add_option(
             '--ami-version', dest='ami_version', default=None,
-            help=(
-                'AMI Version to use (currently 1.0, 2.0, or latest, default'
-                ' latest).')),
+            help=('AMI Version to use, e.g. "2.4.11" (default "latest").')),
 
         opt_group.add_option(
             '--aws-availability-zone', dest='aws_availability_zone',
@@ -425,6 +423,11 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
             help='ID of an existing EMR job flow to use'),
+
+        opt_group.add_option(
+            '--emr-action-on-failure', dest='emr_action_on_failure', default=None,
+            help=('Action to take when a step fails'
+                 ' (e.g. TERMINATE_CLUSTER | CANCEL_AND_WAIT | CONTINUE)')),
 
         opt_group.add_option(
             '--enable-emr-debugging', dest='enable_emr_debugging',

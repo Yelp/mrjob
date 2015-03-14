@@ -14,9 +14,6 @@
 # limitations under the License.
 
 """Test configuration parsing and option combining"""
-
-from __future__ import with_statement
-
 import os
 
 try:
@@ -203,7 +200,7 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         try:
             load_mrjob_conf(conf_path)
             assert False
-        except ValueError, e:
+        except ValueError as e:
             self.assertIn('If your mrjob.conf is in YAML', e.msg)
 
 

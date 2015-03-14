@@ -53,7 +53,7 @@ log = logging.getLogger(__name__)
 ### URI PARSING ###
 
 
-# Used to parse the real netloc out of a malformed path from Python 2.5
+# Used to parse the real netloc out of a malformed path from early Python 2.6
 # urlparse()
 NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
 

@@ -11,10 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Tests of all the amazing utilities in mrjob.util"""
-from __future__ import with_statement
-
 import bz2
 import gzip
 import optparse
@@ -326,16 +323,12 @@ class ArchiveTestCase(unittest.TestCase):
         expected_files = (set(expected_files + added_files) -
                           set(excluded_files))
 
-        # Python <= 2.5 inserts this into tarballs by default and doesn't strip
-        # it out again when unarchiving. Don't let it mess up our tests.
-        no_pax = lambda paths: (x for x in paths if x != 'PaxHeader')
-
         self.assertEqual(
-            sorted(no_pax(os.listdir(join(self.tmp_dir, 'b')))),
+            sorted(os.listdir(join(self.tmp_dir, 'b'))),
             sorted(expected_files))
 
         self.assertEqual(
-            list(no_pax(os.listdir(join(self.tmp_dir, 'b', 'qux')))), ['quux'])
+            list(os.listdir(join(self.tmp_dir, 'b', 'qux'))), ['quux'])
 
         # make sure their contents are intact
         with open(join(self.tmp_dir, 'b', 'foo')) as foo:

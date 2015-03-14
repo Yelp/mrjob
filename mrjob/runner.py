@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import with_statement
-
 """Base class for all runners."""
 
 import copy
@@ -528,7 +526,7 @@ class MRJobRunner(object):
             log.info('removing tmp directory %s' % self._local_tmp_dir)
             try:
                 shutil.rmtree(self._local_tmp_dir)
-            except OSError, e:
+            except OSError as e:
                 log.exception(e)
 
         self._local_tmp_dir = None

@@ -9,8 +9,6 @@ v0.4.3, 2014-03-?? -- mostly cleanup and bugfixes
        * new --no-strict-protocols command-line option
      * streaming output from closed runner shows a warning (#853)
      * --job-name option lets you set a specific name for the job (#955)
-     * --export-job-name option exports the job name to the MRJOB_JOB_NAME
-       environment variable (#916)
    * EMR:
      * --check-input-paths and --no-check-input-paths options (#864)
      * skip (very slow) validation of s3 buckets if boto < 2.25.0 (#865)

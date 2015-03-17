@@ -361,11 +361,8 @@ class MRJobRunner(object):
             self._working_dir_mgr.add('file', self._script_path)
 
         # give this job a unique name
-        if len((self._opts['job_name'] or '').strip()) > 0:
-            self._job_name = self._opts['job_name']
-        else:
-            self._job_name = self._make_unique_job_name(
-                label=self._opts['label'], owner=self._opts['owner'])
+        self._job_name = self._make_unique_job_name(
+            label=self._opts['label'], owner=self._opts['owner'])
 
         # we'll create the wrapper script later
         self._setup_wrapper_script_path = None

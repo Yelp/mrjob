@@ -97,7 +97,7 @@ Options available to hadoop and emr runners
     :config: check_input_paths
     :switch: --check-input-paths, --no-check-input-paths
     :type: boolean
-    :set: hadoop
+    :set: all
     :default: ``True``
 
     Option to skip the input path check. With ``--no-check-input-paths``,

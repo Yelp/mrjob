@@ -26,8 +26,6 @@ try:
 except ImportError:
     import unittest
 
-from unittest import TestCase
-
 from mock import Mock
 from mock import patch
 
@@ -151,7 +149,7 @@ class S3FSTestCase(SandboxedTestCase):
         self.assertEqual(self.fs.path_exists(path), False)
 
 
-class GetBucketTestCase(TestCase):
+class GetBucketTestCase(unittest.TestCase):
 
     def assert_bucket_validation(self, boto_version, should_validate):
         with patch('boto.Version', boto_version):

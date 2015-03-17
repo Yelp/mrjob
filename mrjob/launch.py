@@ -363,7 +363,7 @@ class MRJobLauncher(object):
             raise OptionError(
                 'passthrough file options must take strings' % pass_opt.type)
 
-        if not pass_opt.action in ('store', 'append'):
+        if pass_opt.action not in ('store', 'append'):
             raise OptionError("passthrough file options must use the options"
                               " 'store' or 'append'")
 
@@ -461,8 +461,8 @@ class MRJobLauncher(object):
             self.options.emr_api_params[param] = None
 
         def parse_commas(cleanup_str):
-            cleanup_error = ('cleanup option %s is not one of '
-                             + ', '.join(CLEANUP_CHOICES))
+            cleanup_error = ('cleanup option %s is not one of ' +
+                             ', '.join(CLEANUP_CHOICES))
             new_cleanup_options = []
             for choice in cleanup_str.split(','):
                 if choice in CLEANUP_CHOICES:

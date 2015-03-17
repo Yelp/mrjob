@@ -606,8 +606,8 @@ class EMRJobRunner(MRJobRunner):
                 if isinstance(maybe_path_dict, dict):
                     self._bootstrap_dir_mgr.add(**maybe_path_dict)
 
-        if not (isinstance(self._opts['additional_emr_info'], basestring)
-                or self._opts['additional_emr_info'] is None):
+        if not (isinstance(self._opts['additional_emr_info'], basestring) or
+                self._opts['additional_emr_info'] is None):
             self._opts['additional_emr_info'] = json.dumps(
                 self._opts['additional_emr_info'])
 
@@ -1280,7 +1280,7 @@ class EMRJobRunner(MRJobRunner):
             args['additional_info'] = self._opts['additional_emr_info']
 
         if (self._opts['visible_to_all_users'] and
-            not 'VisibleToAllUsers' in self._opts['emr_api_params']):  # noqa
+            'VisibleToAllUsers' not in self._opts['emr_api_params']):  # noqa
 
             self._opts['emr_api_params']['VisibleToAllUsers'] = (
                 'true' if self._opts['visible_to_all_users'] else 'false')
@@ -1902,8 +1902,8 @@ class EMRJobRunner(MRJobRunner):
 
         # Also don't bother if we're not bootstrapping
         if not (self._bootstrap or self._legacy_bootstrap or
-                self._opts['bootstrap_files']
-                or self._opts['bootstrap_mrjob']):
+                self._opts['bootstrap_files'] or
+                self._opts['bootstrap_mrjob']):
             return
 
         # create mrjob.tar.gz if we need it, and add commands to install it

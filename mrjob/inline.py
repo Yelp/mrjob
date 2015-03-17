@@ -15,8 +15,6 @@
 # limitations under the License.
 """Run an MRJob inline by running all mappers and reducers through the same
 process. Useful for debugging."""
-__author__ = 'Matthew Tai <mtai@adku.com>'
-
 import logging
 import os
 
@@ -34,6 +32,8 @@ from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
 
 log = logging.getLogger(__name__)
+
+__author__ = 'Matthew Tai <mtai@adku.com>'
 
 # Deprecated in favor of class variables, remove in v0.5.0
 DEFAULT_MAP_TASKS = 1

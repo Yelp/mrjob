@@ -526,11 +526,12 @@ class HadoopJobRunner(MRJobRunner):
         """
         for path in paths:
             m = regexp.match(path)
-            if (m
-                and (step_nums is None or
-                     int(m.group('step_num')) in step_nums)
-                and (self._job_timestamp is None or
-                     m.group('timestamp') == self._job_timestamp)):
+            if (m and
+                (step_nums is None or
+                 int(m.group('step_num')) in step_nums) and
+                (self._job_timestamp is None or
+                 m.group('timestamp') == self._job_timestamp)):
+
                 yield path
 
     def _ls_logs(self, relative_path):

@@ -55,8 +55,9 @@ def _ssh_args(ssh_bin, address, ec2_key_pair_file):
 
 def check_output(out, err):
     if err:
-        if (('No such file or directory' in err)
-                or ('Warning: Permanently added' not in err)):
+        if ('No such file or directory' in err or
+            'Warning: Permanently added' not in err):  # noqa
+
             raise IOError(err)
 
     if 'Permission denied' in out:

@@ -411,7 +411,7 @@ class SimMRJobRunner(MRJobRunner):
 
                 file_names[outfile_name]['length'] = bytes_written
             finally:
-                if not outfile is None:
+                if outfile is not None:
                     outfile.close()
 
         return file_names

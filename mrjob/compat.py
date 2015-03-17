@@ -625,7 +625,7 @@ def translate_jobconf(variable, version):
     """Translate *variable* to Hadoop version *version*. If it's not
     a variable we recognize, leave as-is.
     """
-    if not variable in _JOBCONF_MAP:
+    if variable not in _JOBCONF_MAP:
         return variable
 
     req_version = LooseVersion(version)

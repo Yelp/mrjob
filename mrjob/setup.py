@@ -113,11 +113,11 @@ def parse_setup_cmd(cmd):
     tokens = []
 
     for m in SETUP_CMD_RE.finditer(cmd):
-        keep_as_is = (m.group('single_quoted')
-                      or m.group('double_quoted')
-                      or m.group('unquoted')
-                      or m.group('whitespace')
-                      or m.group('colon_or_equals'))
+        keep_as_is = (m.group('single_quoted') or
+                      m.group('double_quoted') or
+                      m.group('unquoted') or
+                      m.group('whitespace') or
+                      m.group('colon_or_equals'))
 
         if keep_as_is:
             if tokens and isinstance(tokens[-1], basestring):
@@ -428,7 +428,7 @@ class WorkingDirManager(object):
             raise ValueError('names may not contain slashes: %r' % (name,))
 
     def _check_type(self, type):
-        if not type in self._SUPPORTED_TYPES:
+        if type not in self._SUPPORTED_TYPES:
             raise ValueError('bad path type %r, must be one of %s' % (
                 type, ', '.join(sorted(self._SUPPORTED_TYPES))))
 

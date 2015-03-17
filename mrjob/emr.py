@@ -1966,9 +1966,13 @@ class EMRJobRunner(MRJobRunner):
 
         # bootstrap_python_packages
         if self._opts['bootstrap_python_packages']:
-            # 3.0.x AMIs use yum rather than apt-get;
-            # can't determine which AMI `latest` is at
-            # job flow creation time so we call both
+            # 1.x and 2.x AMIs use Debian (apt-get) and 3.x AMIs use
+            # Amazon Linux (yum). Who knows what 4.x AMIs will use?
+            #
+            # Rather than keeping mrjob in sync with AMI versions, just
+            # run whatever package manager works (until
+            # bootstrap_python_packages becomes obsolete, and we can
+            # rip this code out entirely)
             bootstrap.append(['sudo apt-get install -y python-pip || '
                               'sudo yum install -y python-pip'])
             # Print a warning

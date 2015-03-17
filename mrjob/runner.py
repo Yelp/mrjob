@@ -106,7 +106,6 @@ class RunnerOptionStore(OptionStore):
         'cleanup',
         'cleanup_on_failure',
         'cmdenv',
-        'export_job_name',
         'hadoop_extra_args',
         'hadoop_streaming_jar',
         'hadoop_version',
@@ -367,10 +366,6 @@ class MRJobRunner(object):
         else:
             self._job_name = self._make_unique_job_name(
                 label=self._opts['label'], owner=self._opts['owner'])
-
-        # export the unique name to a environment variable
-        if self._opts['export_job_name']:
-            self._opts['cmdenv'].update({'MRJOB_JOB_NAME': self._job_name})
 
         # we'll create the wrapper script later
         self._setup_wrapper_script_path = None

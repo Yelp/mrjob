@@ -113,14 +113,6 @@ def add_runner_opts(opt_group, default_runner='local'):
             'multiple times.'),
 
         opt_group.add_option(
-            '--export-job-name', dest='export_job_name', action='store_true',
-            default=None,
-            help="Export the internal job name that uniquely identifies each"
-                 " task to the environment variable MRJOB_JOB_NAME as if using"
-                 " --cmdenv, which can be useful for, e.g., setup scripts."
-        ),
-
-        opt_group.add_option(
             '--file', dest='upload_files', action='append',
             default=[],
             help=('Copy file to the working directory of this script. You can'

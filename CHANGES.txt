@@ -1,4 +1,4 @@
-v0.4.3, 2014-03-?? -- SO many bugfixes
+v0.4.3, 2014-03-24 -- SO many bugfixes
  * jobs:
    * MRStep's constructor treats kwarg=None same as not setting it (#970)
    * parse_counters() and parse_output() are deprecated (#829)

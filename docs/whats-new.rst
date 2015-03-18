@@ -6,23 +6,44 @@ For a complete list of changes, see `CHANGES.txt
 
 0.4.3
 -----
-``--export-job-name`` option exports the job name to the environment variable
-MRJOB_JOB_NAME.
-``--iam-job-flow-role`` option allows setting of a specific IAM role to run this
-job flow.
 
-Added a new tool, collect-emr-active-stats, to collect stats about active jobflows and
-instance counts.
+This release also contains many, many bugfixes, one of which probably
+affects you! See `CHANGES.txt
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_ for details.
 
-Job flows are now visible to all IAM users by default.
+Added a new subcommand, ``mrjob collect-emr-active-stats``, to collect stats
+about active jobflows and instance counts.
 
-Tests now use pytest and support tox.
+``--iam-job-flow-role`` option allows setting of a specific IAM role to run
+this job flow.
+
+You can now use ``--check-input-paths`` and ``--no-check-input-paths`` on EMR
+as well as Hadoop.
+
+You can now require protocols to be strict from :ref:`mrjob.conf <mrjob.conf>`;
+this means unencodable input/output will result in an exception rather
+than the job quietly incrementing a counter. It is recommended you set this
+for all runners:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        strict_protocols: true
+      hadoop:
+        strict_protocols: true
+      inline:
+        strict_protocols: true
+      local:
+        strict_protocols: true
+
+You can use ``--no-strict-protocols`` to turn off strict protocols for
+a particular job.
+
+Tests now support pytest and tox.
 
 Support for Python 2.5 has been dropped.
 
-This release also contains many `bugfixes
-<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_, including
-problems with documentation.
 
 0.4.2
 -----

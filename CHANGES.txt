@@ -1,4 +1,4 @@
-v0.4.3, 2014-03-?? -- mostly cleanup and bugfixes
+v0.4.3, 2014-03-?? -- SO many bugfixes
  * jobs:
    * MRStep's constructor treats kwarg=None same as not setting it (#970)
    * parse_counters() and parse_output() are deprecated (#829)
@@ -8,9 +8,6 @@ v0.4.3, 2014-03-?? -- mostly cleanup and bugfixes
      * You can now set strict_protocols from mrjob.conf (#726)
        * new --no-strict-protocols command-line option
      * streaming output from closed runner shows a warning (#853)
-     * --job-name option lets you set a specific name for the job (#955)
-     * --export-job-name option exports the job name to the MRJOB_JOB_NAME
-       environment variable (#916)
    * EMR:
      * --check-input-paths and --no-check-input-paths options (#864)
      * skip (very slow) validation of s3 buckets if boto < 2.25.0 (#865)

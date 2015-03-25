@@ -53,6 +53,7 @@ except ImportError:
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import iso8601_to_datetime
+from mrjob.fs.s3 import _get_bucket
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 from mrjob.parse import parse_s3_uri
@@ -92,7 +93,7 @@ def s3_cleanup(glob_path, time_old, dry_run=False, conf_paths=None):
 
     for path in runner.ls(glob_path):
         bucket_name, key_name = parse_s3_uri(path)
-        bucket = s3_conn.get_bucket(bucket_name)
+        bucket = _get_bucket(s3_conn, bucket_name)
 
         for key in bucket.list(key_name):
             last_modified = iso8601_to_datetime(key.last_modified)

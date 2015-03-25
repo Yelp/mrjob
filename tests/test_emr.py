@@ -3479,3 +3479,88 @@ class ActionOnFailureTestCase(MockEMRAndS3TestCase):
 
         with mr_job.make_runner() as runner:
             self.assertEqual(runner._action_on_failure, 'CONTINUE')
+
+class MultipartUploadTestCase(MockEMRAndS3TestCase):
+    class FakeStats:
+        def __init__(self, size):
+            self.st_size = size
+
+    def setUp(self):
+        from mrjob.emr import CHUNKY_FSIZE_LIMIT
+
+        self.size_limit = CHUNKY_FSIZE_LIMIT
+
+        self.test_uri = 's3://walrus/tmp'
+        self.test_fname = 'alice in wonderland.txt'
+
+    def test_import_filechunkio(self):
+        """ Test to make sure we can import this...otherwise all other tests will tank"""
+        from filechunkio import filechunkio
+        from mrjob.fs.s3 import S3Filesystem
+
+    def big_file(self):
+        # TODO make these read/write from the conf
+        fsize = 40 * 1024 * 1024
+        expected_call_count = 8
+        self.assertTrue(fsize > self.size_limit)
+        os.stat = Mock(return_value=MultipartUploadTestCase.FakeStats(fsize))
+        return fsize, expected_call_count
+
+    def get_emr(self):
+        mock_s3_conn = Mock()
+        mock_s3_key = Mock()
+        mock_bucket = Mock()
+        mock_mp_upload = Mock()
+
+        emrunner = EMRJobRunner(conf_paths=[], s3_scratch_uri=self.test_uri)
+        emrunner.make_s3_key = Mock(return_value=mock_s3_key)
+        emrunner.make_s3_conn = Mock(return_value=mock_s3_conn)
+        mock_s3_conn.get_bucket = Mock(return_value=mock_bucket)
+        mock_bucket.initiate_multipart_upload = Mock(return_value=mock_mp_upload)
+
+        return emrunner, mock_s3_conn, mock_s3_key, mock_bucket, mock_mp_upload
+
+    @patch('filechunkio.FileChunkIO')
+    def test_small_file_upload(self, mock_fp):
+        fsize = 5 * 1024
+        self.assertTrue(fsize < self.size_limit)
+
+        emr_under_test, mock_s3_conn, mock_s3_key, mock_bucket, __ = self.get_emr()
+
+        os.stat = Mock(return_value=MultipartUploadTestCase.FakeStats(fsize))
+        ret_key = self.emr_under_test._upload_contents(self.test_uri,
+                                                       mock_s3_conn,
+                                                       self.test_fname)
+
+        self.mock_s3_conn.set_contents_from_filename.assert_called_with(self.test_fname)
+        assert_equals(ret_key, self.mock_s3_key)
+        self.assertFalse(mock_bucket.initiate_multipart_upload.called)
+
+    @patch('filechunkio.FileChunkIO')
+    def test_large_file_upload(self, mock_fp):
+        emr_under_test, mock_s3_conn, mock_s3_key, mock_bucket, mock_mp_upload = self.get_emr()
+
+        fsize, expected_call_count = self.big_file()
+        ret_key = emr_under_test._upload_contents(self.test_uri,
+                                                  mock_s3_conn,
+                                                  self.test_fname)
+
+        bytes_read = sum(calls[0][3] for calls in mock_fp.__init__.call_arg_list)
+        self.assertEqual(bytes_read, fsize)
+        self.assertEqual(expected_call_count, mock_mp_upload.complete_upload.call_count)
+        self.assertTrue(mock_mp_upload.complete_upload.called)
+        self.assertFalse(mock_mp_upload.cancel_multipart_upload.called)
+        mock_bucket.new_key.assert_called_once_with('tmp')
+
+    def test_large_file_exception(self):
+        emr_under_test, mock_s3_conn, mock_s3_key, mock_bucket, mock_mp_upload = self.get_emr()
+        fsize, expected_call_count = self.big_file()
+
+        with self.assertRaises(IOError):
+            emr_under_test._upload_contents(self.test_uri,
+                                            mock_s3_conn,
+                                            self.test_fname)
+
+        self.assertFalse(mock_mp_upload.complete_upload.called)
+        self.assertTrue(mock_mp_upload.cancel_multipart_upload.called)
+        self.assertFalse(mock_bucket.new_key.called)

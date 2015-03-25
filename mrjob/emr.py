@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+import math
 import os
 import os.path
 import pipes
@@ -27,6 +28,7 @@ import urllib2
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
+from filechunkio import FileChunkIO
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -82,7 +84,6 @@ from mrjob.conf import combine_paths
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
-from mrjob.fs.s3 import _get_bucket
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
@@ -114,6 +115,7 @@ from mrjob.ssh import ssh_terminate_single_job
 from mrjob.util import cmd_line
 from mrjob.util import hash_object
 from mrjob.util import shlex_split
+from mrjob.util import VALIDATE_BUCKET
 
 
 log = logging.getLogger(__name__)
@@ -129,6 +131,10 @@ EMR_JOB_TRACKER_PORT = 9100
 EMR_JOB_TRACKER_PATH = '/jobtracker.jsp'
 
 MAX_SSH_RETRIES = 20
+
+# multipart upload limits
+CHUNKY_FSIZE_LIMIT = 10 * 1024 * 1024
+CHUNKY_CHUNK_SIZE = 5 * 1024 * 1024
 
 # ssh should fail right away if it can't bind a port
 WAIT_FOR_SSH_TO_FAIL = 1.0
@@ -262,7 +268,7 @@ def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
 
 def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
     bucket_name, key_prefix = parse_s3_uri(lock_uri)
-    bucket = _get_bucket(s3_conn, bucket_name)
+    bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
     key = bucket.get_key(key_prefix)
 
     # EMRJobRunner should start using a job flow within about a second of
@@ -652,7 +658,10 @@ class EMRJobRunner(MRJobRunner):
         # check s3_scratch_uri against aws_region if specified
         if self._opts['s3_scratch_uri']:
             bucket_name, _ = parse_s3_uri(self._opts['s3_scratch_uri'])
-            bucket_loc = _get_bucket(s3_conn, bucket_name).get_location()
+            print bucket_name
+            print s3_conn
+            bucket_loc = s3_conn.get_bucket(
+                bucket_name, validate=VALIDATE_BUCKET).get_location()
 
             # make sure they can communicate if both specified
             if (self._aws_region and bucket_loc and
@@ -687,6 +696,7 @@ class EMRJobRunner(MRJobRunner):
     def _set_s3_scratch_uri(self, s3_conn):
         """Helper for _fix_s3_scratch_and_log_uri_opts"""
         buckets = s3_conn.get_all_buckets()
+        print type(buckets), buckets
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
 
         # Loop over buckets until we find one that is not region-
@@ -889,8 +899,38 @@ class EMRJobRunner(MRJobRunner):
 
         for path, s3_uri in self._upload_mgr.path_to_uri().iteritems():
             log.debug('uploading %s -> %s' % (path, s3_uri))
+            s3_key = self._upload_contents(s3_uri, s3_conn, path)
+
+    def _upload_contents(self, s3_uri, s3_conn, path):
+        """ Determines if the file needs to be done as a multipart upload."""
+        fsize = os.stat(path).st_size
+        s3_key = None
+        if fsize > CHUNKY_FSIZE_LIMIT:
             s3_key = self.make_s3_key(s3_uri, s3_conn)
             s3_key.set_contents_from_filename(path)
+        else:
+            log.debug(
+                "Starting multipart upload of %s because it is "
+                "larger than %d" % (path, CHUNKY_FSIZE_LIMIT))
+            bucket_name, key_name = parse_s3_uri(s3_uri)
+            bucket = s3_conn.get_bucket(bucket_name)
+            num_of_chunks = int(math.ceil(fsize / float(CHUNKY_FSIZE_LIMIT)))
+
+            mpul = bucket.initiate_multipart_upload(key_name)
+            try:
+                for i in xrange(num_of_chunks):
+                    log.debug("uploading %d/%d of %s" % (i, num_of_chunks, key_name))
+                    offset = CHUNKY_CHUNK_SIZE * i
+                    bytes_in_this_chunk = min(CHUNKY_CHUNK_SIZE, fsize - offset)
+                    with FileChunkIO(path, 'r', offset=offset, bytes=bytes_in_this_chunk) as fp:
+                        mpul.upload_part_from_file(fp, part_num=i + 1)
+                s3_key = bucket.new_key(key_name)
+                log.debug("Completed multipart upload of %s to %s" % path, key_name)
+                mpul.complete_upload()
+            except:
+                mpul.cancel_multipart_upload(key_name)
+                raise
+        return s3_key
 
     def setup_ssh_tunnel_to_job_tracker(self, host):
         """setup the ssh tunnel to the job tracker, if it's not currently

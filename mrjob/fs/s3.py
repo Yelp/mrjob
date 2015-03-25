@@ -24,6 +24,7 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
+from mrjob.compat import version_gte
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
@@ -31,7 +32,6 @@ from mrjob.parse import urlparse
 from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
 from mrjob.util import read_file
-from mrjob.util import VALIDATE_BUCKET
 
 
 log = logging.getLogger(__name__)
@@ -67,6 +67,16 @@ def wrap_aws_conn(raw_conn):
                         backoff=EMR_BACKOFF,
                         multiplier=EMR_BACKOFF_MULTIPLIER,
                         max_tries=EMR_MAX_TRIES)
+
+
+def _get_bucket(s3_conn, bucket_name):
+    """Wrapper for s3_conn.get_bucket().
+
+    This only validate buckets in boto >= 2.25.0, which features quick
+    validation using HEAD requests (see Issue #865).
+    """
+    return s3_conn.get_bucket(bucket_name,
+                              validate=version_gte(boto.Version, '2.25.0'))
 
 
 class S3Filesystem(Filesystem):
@@ -141,7 +151,7 @@ class S3Filesystem(Filesystem):
         s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
+        bucket = _get_bucket(s3_conn, bucket_name)
         for key in bucket.list(key_name):
             yield s3_key_to_uri(key)
 
@@ -242,7 +252,7 @@ class S3Filesystem(Filesystem):
         bucket_name, key_name = parse_s3_uri(uri)
 
         try:
-            bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
+            bucket = _get_bucket(s3_conn, bucket_name)
         except boto.exception.S3ResponseError as e:
             if e.status != 404:
                 raise e
@@ -265,8 +275,7 @@ class S3Filesystem(Filesystem):
             s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        return s3_conn.get_bucket(
-            bucket_name, validate=VALIDATE_BUCKET).new_key(key_name)
+        return _get_bucket(s3_conn, bucket_name).new_key(key_name)
 
     def get_s3_keys(self, uri, s3_conn=None):
         """Get a stream of boto Key objects for each key inside
@@ -280,7 +289,7 @@ class S3Filesystem(Filesystem):
             s3_conn = self.make_s3_conn()
 
         bucket_name, key_prefix = parse_s3_uri(uri)
-        bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
+        bucket = _get_bucket(s3_conn, bucket_name)
         for key in bucket.list(key_prefix):
             yield key
 
@@ -314,7 +323,7 @@ class S3Filesystem(Filesystem):
             s3_conn = self.make_s3_conn()
 
         bucket_name, key_name = parse_s3_uri(uri)
-        bucket = s3_conn.get_bucket(bucket_name, validate=VALIDATE_BUCKET)
+        bucket = _get_bucket(s3_conn, bucket_name)
 
         dirs = key_name.split('/')
         for i in range(len(dirs)):

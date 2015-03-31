@@ -909,30 +909,33 @@ class EMRJobRunner(MRJobRunner):
 
         if self._should_use_multipart_upload(fsize, part_size, path):
             log.debug("Starting multipart upload of %s" % (path,))
-
-            offsets = xrange(0, fsize, part_size)
-
             mpul = s3_key.bucket.initiate_multipart_upload(s3_key.name)
+
             try:
-                for i, offset in enumerate(offsets):
-                    part_num = i + 1
-
-                    log.debug("uploading %d/%d of %s" % (
-                        part_num, len(offsets), s3_key.name))
-                    chunk_bytes = min(part_size, fsize - offset)
-
-                    with filechunkio.FileChunkIO(
-                            path, 'r', offset=offset, bytes=chunk_bytes) as fp:
-                        mpul.upload_part_from_file(fp, part_num)
-
-                log.debug("Completed multipart upload of %s to %s" % (
-                    path, s3_key.name))
-                mpul.complete_upload()
+                self._upload_parts(mpul, path, fsize, part_size)
             except:
-                mpul.cancel_multipart_upload(s3_key.name)
+                mpul.cancel_upload()
                 raise
+
+            log.debug("Completed multipart upload of %s to %s" % (
+                      path, s3_key.name))
+            mpul.complete_upload()
         else:
             s3_key.set_contents_from_filename(path)
+
+    def _upload_parts(self, mpul, path, fsize, part_size):
+        offsets = xrange(0, fsize, part_size)
+
+        for i, offset in enumerate(offsets):
+            part_num = i + 1
+
+            log.debug("uploading %d/%d of %s" % (
+                part_num, len(offsets), path))
+            chunk_bytes = min(part_size, fsize - offset)
+
+            with filechunkio.FileChunkIO(
+                    path, 'r', offset=offset, bytes=chunk_bytes) as fp:
+                mpul.upload_part_from_file(fp, part_num)
 
     def _get_upload_part_size(self):
         # part size is in MB, as the minimum is 5 MB
@@ -949,11 +952,11 @@ class EMRJobRunner(MRJobRunner):
             return False
 
         if filechunkio is None:
-            log.warning("Can't use S3 multipart upload for % because"
+            log.warning("Can't use S3 multipart upload for %s because"
                         " filechunkio is not installed" % path)
             return False
 
-        return fsize > part_size
+        return True
 
     def setup_ssh_tunnel_to_job_tracker(self, host):
         """setup the ssh tunnel to the job tracker, if it's not currently

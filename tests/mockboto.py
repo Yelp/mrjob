@@ -34,6 +34,8 @@ try:
 except ImportError:
     boto = None
 
+from mock import Mock
+
 from mrjob.conf import combine_values
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
@@ -173,6 +175,8 @@ class MockBucket(object):
         return MockMultiPartUpload(key)
 
 
+
+
 class MockKey(object):
     """Mock out boto.s3.Key"""
 
@@ -192,6 +196,9 @@ class MockKey(object):
             return self.bucket.mock_state()[self.name][0]
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
+
+    def mock_multipart_upload_was_cancelled(self):
+        return isinstance(self.read_mock_data(), MultiPartUploadCancelled)
 
     def write_mock_data(self, data):
         if self.name in self.bucket.mock_state():
@@ -269,6 +276,9 @@ class MockKey(object):
         return len(self.get_contents_as_string())
 
 
+class MultiPartUploadCancelled(str):
+    pass
+
 class MockMultiPartUpload(object):
 
     def __init__(self, key):
@@ -287,17 +297,26 @@ class MockMultiPartUpload(object):
         if part_num < 1:
             raise ValueError('Part numbers must be greater than zero')
 
-        self.parts[part_num] = part_num
+        self.parts[part_num] = fp.read()
 
     def complete_upload(self):
         data = ''
 
         if self.parts:
-            num_parts = max(self.parts.itervalues())
+            num_parts = max(self.parts)
             for part_num in xrange(1, num_parts + 1):
                 # S3 might be more graceful about missing parts. But we
                 # certainly don't want this to slip past testing
                 data += self.parts[part_num]
+
+        self.key.set_contents_from_string(data)
+
+    def cancel_upload(self):
+        self.parts = None  # should break any further calls
+
+        # record that multipart upload was cancelled
+        cancelled = MultiPartUploadCancelled(self.key.get_contents_as_string())
+        self.key.set_contents_from_string(cancelled)
 
 
 ### EMR ###

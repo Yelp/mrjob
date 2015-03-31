@@ -913,13 +913,12 @@ class EMRJobRunner(MRJobRunner):
             bucket = s3_conn.get_bucket(bucket_name)
 
             offsets = xrange(0, fsize, part_size)
-            num_chunks = len(offsets)
 
             mpul = bucket.initiate_multipart_upload(key_name)
             try:
                 for i, offset in enumerate(offsets):
                     log.debug("uploading %d/%d of %s" % (
-                        i, num_chunks, key_name))
+                        i + 1, len(offsets), key_name))
                     chunk_bytes = min(part_size, fsize - offset)
 
                     with filechunkio.FileChunkIO(

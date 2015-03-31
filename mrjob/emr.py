@@ -901,7 +901,7 @@ class EMRJobRunner(MRJobRunner):
         """ Determines if the file needs to be done as a multipart upload."""
         fsize = os.stat(path).st_size
         s3_key = None
-        if fsize > CHUNKY_FSIZE_LIMIT:
+        if fsize <= CHUNKY_FSIZE_LIMIT:
             s3_key = self.make_s3_key(s3_uri, s3_conn)
             s3_key.set_contents_from_filename(path)
         else:

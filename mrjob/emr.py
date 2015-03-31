@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import logging
-import math
 import os
 import os.path
 import pipes
@@ -898,7 +897,7 @@ class EMRJobRunner(MRJobRunner):
 
         for path, s3_uri in self._upload_mgr.path_to_uri().iteritems():
             log.debug('uploading %s -> %s' % (path, s3_uri))
-            s3_key = self._upload_contents(s3_uri, s3_conn, path)
+            self._upload_contents(s3_uri, s3_conn, path)
 
     def _upload_contents(self, s3_uri, s3_conn, path):
         """ Determines if the file needs to be done as a multipart upload."""
@@ -912,24 +911,24 @@ class EMRJobRunner(MRJobRunner):
 
             offsets = xrange(0, fsize, part_size)
 
-            mpul = s3_key.bucket.initiate_multipart_upload(key_name)
+            mpul = s3_key.bucket.initiate_multipart_upload(s3_key.name)
             try:
                 for i, offset in enumerate(offsets):
                     part_num = i + 1
 
                     log.debug("uploading %d/%d of %s" % (
-                        i + 1, len(offsets), key_name))
+                        part_num, len(offsets), s3_key.name))
                     chunk_bytes = min(part_size, fsize - offset)
 
                     with filechunkio.FileChunkIO(
                             path, 'r', offset=offset, bytes=chunk_bytes) as fp:
-                        mpul.upload_part_from_file(fp, part_num=i + 1)
+                        mpul.upload_part_from_file(fp, part_num)
 
                 log.debug("Completed multipart upload of %s to %s" % (
-                    path, key_name))
+                    path, s3_key.name))
                 mpul.complete_upload()
             except:
-                mpul.cancel_multipart_upload(key_name)
+                mpul.cancel_multipart_upload(s3_key.name)
                 raise
         else:
             s3_key.set_contents_from_filename(path)

@@ -28,7 +28,6 @@ import urllib2
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
-from filechunkio import FileChunkIO
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -58,6 +57,12 @@ except ImportError:
     # don't require boto; MRJobs don't actually need it when running
     # inside hadoop streaming
     boto = None
+
+try:
+    import filechunkio
+except ImportError:
+    # that's cool; filechunkio is only for multipart uploading
+    filechunkio = None
 
 # need this to retry on SSL errors (see Issue #621)
 try:
@@ -902,7 +907,7 @@ class EMRJobRunner(MRJobRunner):
 
         s3_key = None
 
-        if self._should_use_multipart_upload(fsize=fsize, part_size=part_size):
+        if self._should_use_multipart_upload(fsize, part_size, path):
             log.debug("Starting multipart upload of %s" % (path,))
             bucket_name, key_name = parse_s3_uri(s3_uri)
             bucket = s3_conn.get_bucket(bucket_name)
@@ -913,9 +918,12 @@ class EMRJobRunner(MRJobRunner):
                 for i in xrange(num_of_chunks):
                     log.debug("uploading %d/%d of %s" % (i, num_of_chunks, key_name))
                     offset = part_size * i
-                    bytes_in_this_chunk = min(part_size, fsize - offset)
-                    with FileChunkIO(path, 'r', offset=offset, bytes=bytes_in_this_chunk) as fp:
+                    chunk_bytes = min(part_size, fsize - offset)
+
+                    with filechunkio.FileChunkIO(
+                            path, 'r', offset=offset, bytes=chunk_bytes) as fp:
                         mpul.upload_part_from_file(fp, part_num=i + 1)
+
                 s3_key = bucket.new_key(key_name)
                 log.debug("Completed multipart upload of %s to %s" % path, key_name)
                 mpul.complete_upload()
@@ -932,8 +940,16 @@ class EMRJobRunner(MRJobRunner):
         # part size is in MB, as the minimum is 5 MB
         return int((self._opts['s3_upload_part_size'] or 0) * 1000 * 1000)
 
-    def _should_use_multipart_upload(self, fsize, part_size):
+    def _should_use_multipart_upload(self, fsize, part_size, path):
         if not part_size:  # disabled
+            return False
+
+        if fsize <= part_size:
+            return False
+
+        if filechunkio is None:
+            log.warning("Can't use S3 multipart upload for % because"
+                        " filechunkio is not installed" % path)
             return False
 
         return fsize > part_size

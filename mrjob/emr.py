@@ -132,10 +132,6 @@ EMR_JOB_TRACKER_PATH = '/jobtracker.jsp'
 
 MAX_SSH_RETRIES = 20
 
-# multipart upload limits
-CHUNKY_FSIZE_LIMIT = 10 * 1024 * 1024
-CHUNKY_CHUNK_SIZE = 5 * 1024 * 1024
-
 # ssh should fail right away if it can't bind a port
 WAIT_FOR_SSH_TO_FAIL = 1.0
 
@@ -361,6 +357,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         's3_log_uri',
         's3_scratch_uri',
         's3_sync_wait_time',
+        's3_upload_part_size',
         'ssh_bin',
         'ssh_bind_ports',
         'ssh_tunnel_is_open',
@@ -404,6 +401,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'num_ec2_instances': 1,
             'num_ec2_task_instances': 0,
             's3_sync_wait_time': 5.0,
+            's3_upload_part_size': 100,  # 100 MB
             'sh_bin': ['/bin/sh', '-ex'],
             'ssh_bin': ['ssh'],
             'ssh_bind_ports': range(40001, 40841),
@@ -900,24 +898,22 @@ class EMRJobRunner(MRJobRunner):
     def _upload_contents(self, s3_uri, s3_conn, path):
         """ Determines if the file needs to be done as a multipart upload."""
         fsize = os.stat(path).st_size
+        part_size = self._get_upload_part_size()
+
         s3_key = None
-        if fsize <= CHUNKY_FSIZE_LIMIT:
-            s3_key = self.make_s3_key(s3_uri, s3_conn)
-            s3_key.set_contents_from_filename(path)
-        else:
-            log.debug(
-                "Starting multipart upload of %s because it is "
-                "larger than %d" % (path, CHUNKY_FSIZE_LIMIT))
+
+        if self._should_use_multipart_upload(fsize=fsize, part_size=part_size):
+            log.debug("Starting multipart upload of %s" % (path,))
             bucket_name, key_name = parse_s3_uri(s3_uri)
             bucket = s3_conn.get_bucket(bucket_name)
-            num_of_chunks = int(math.ceil(fsize / float(CHUNKY_FSIZE_LIMIT)))
+            num_chunks = fsize / part_size + (1 if fsize % part_size else 0)
 
             mpul = bucket.initiate_multipart_upload(key_name)
             try:
                 for i in xrange(num_of_chunks):
                     log.debug("uploading %d/%d of %s" % (i, num_of_chunks, key_name))
-                    offset = CHUNKY_CHUNK_SIZE * i
-                    bytes_in_this_chunk = min(CHUNKY_CHUNK_SIZE, fsize - offset)
+                    offset = part_size * i
+                    bytes_in_this_chunk = min(part_size, fsize - offset)
                     with FileChunkIO(path, 'r', offset=offset, bytes=bytes_in_this_chunk) as fp:
                         mpul.upload_part_from_file(fp, part_num=i + 1)
                 s3_key = bucket.new_key(key_name)
@@ -926,7 +922,21 @@ class EMRJobRunner(MRJobRunner):
             except:
                 mpul.cancel_multipart_upload(key_name)
                 raise
+        else:
+            s3_key = self.make_s3_key(s3_uri, s3_conn)
+            s3_key.set_contents_from_filename(path)
+
         return s3_key
+
+    def _get_upload_part_size(self):
+        # part size is in MB, as the minimum is 5 MB
+        return int((self._opts['s3_upload_part_size'] or 0) * 1000 * 1000)
+
+    def _should_use_multipart_upload(self, fsize, part_size):
+        if not part_size:  # disabled
+            return False
+
+        return fsize > part_size
 
     def setup_ssh_tunnel_to_job_tracker(self, host):
         """setup the ssh tunnel to the job tracker, if it's not currently

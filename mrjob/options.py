@@ -529,6 +529,13 @@ def add_emr_opts(opt_group):
                   ' default is 5.0 to be safe.')),
 
         opt_group.add_option(
+            '--s3-upload-part-size', dest='s3_upload_part_size', default=None,
+            type='float',
+            help=('Upload files to S3 in parts no bigger than this many'
+                  ' megabytes. Default is 100 MB. Set to 0 to disable'
+                  ' multipart uploading entirely.')),
+
+        opt_group.add_option(
             '--ssh-bin', dest='ssh_bin', default=None,
             help=("Name/path of ssh binary. Arguments are allowed (e.g."
                   " --ssh-bin 'ssh -v')")),

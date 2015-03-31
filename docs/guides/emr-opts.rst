@@ -586,6 +586,20 @@ which is set to True if boto.Version >= '2.25.0'
     How long to wait for S3 to reach eventual consistency. This is typically
     less than a second (zero in U.S. West), but the default is 5.0 to be safe.
 
+.. mrjob-opt::
+   :config: s3_upload_part_size
+   :switch: --s3-upload-part-size
+   :type: integer
+   :set: emr
+   :default: 100
+
+   Upload files to S3 in parts no bigger than this many megabytes. Default is
+   100 MB, as `recommended by Amazon`_. Set to 0 to disable multipart uploading
+   entirely.
+
+   .. _`recommended by Amazon`:
+       http://docs.aws.amazon.com/AmazonS3/latest/dev/UploadingObjects.html
+
 SSH access and tunneling
 ------------------------
 

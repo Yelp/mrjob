@@ -900,7 +900,8 @@ class EMRJobRunner(MRJobRunner):
             self._upload_contents(s3_uri, s3_conn, path)
 
     def _upload_contents(self, s3_uri, s3_conn, path):
-        """ Determines if the file needs to be done as a multipart upload."""
+        """Uploads the file at the given path to S3, possibly using
+        multipart upload."""
         fsize = os.stat(path).st_size
         part_size = self._get_upload_part_size()
 
@@ -932,8 +933,6 @@ class EMRJobRunner(MRJobRunner):
                 raise
         else:
             s3_key.set_contents_from_filename(path)
-
-        return s3_key
 
     def _get_upload_part_size(self):
         # part size is in MB, as the minimum is 5 MB

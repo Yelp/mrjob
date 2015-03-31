@@ -905,18 +905,18 @@ class EMRJobRunner(MRJobRunner):
         fsize = os.stat(path).st_size
         part_size = self._get_upload_part_size()
 
-        s3_key = None
+        s3_key = self.make_s3_key(s3_uri, s3_conn)
 
         if self._should_use_multipart_upload(fsize, part_size, path):
             log.debug("Starting multipart upload of %s" % (path,))
-            bucket_name, key_name = parse_s3_uri(s3_uri)
-            bucket = s3_conn.get_bucket(bucket_name)
 
             offsets = xrange(0, fsize, part_size)
 
-            mpul = bucket.initiate_multipart_upload(key_name)
+            mpul = s3_key.bucket.initiate_multipart_upload(key_name)
             try:
                 for i, offset in enumerate(offsets):
+                    part_num = i + 1
+
                     log.debug("uploading %d/%d of %s" % (
                         i + 1, len(offsets), key_name))
                     chunk_bytes = min(part_size, fsize - offset)
@@ -925,7 +925,6 @@ class EMRJobRunner(MRJobRunner):
                             path, 'r', offset=offset, bytes=chunk_bytes) as fp:
                         mpul.upload_part_from_file(fp, part_num=i + 1)
 
-                s3_key = bucket.new_key(key_name)
                 log.debug("Completed multipart upload of %s to %s" % (
                     path, key_name))
                 mpul.complete_upload()
@@ -933,7 +932,6 @@ class EMRJobRunner(MRJobRunner):
                 mpul.cancel_multipart_upload(key_name)
                 raise
         else:
-            s3_key = self.make_s3_key(s3_uri, s3_conn)
             s3_key.set_contents_from_filename(path)
 
         return s3_key

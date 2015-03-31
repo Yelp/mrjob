@@ -918,7 +918,8 @@ class EMRJobRunner(MRJobRunner):
             mpul = bucket.initiate_multipart_upload(key_name)
             try:
                 for i, offset in enumerate(offsets):
-                    log.debug("uploading %d/%d of %s" % (i, num_chunks, key_name))
+                    log.debug("uploading %d/%d of %s" % (
+                        i, num_chunks, key_name))
                     chunk_bytes = min(part_size, fsize - offset)
 
                     with filechunkio.FileChunkIO(
@@ -926,7 +927,8 @@ class EMRJobRunner(MRJobRunner):
                         mpul.upload_part_from_file(fp, part_num=i + 1)
 
                 s3_key = bucket.new_key(key_name)
-                log.debug("Completed multipart upload of %s to %s" % path, key_name)
+                log.debug("Completed multipart upload of %s to %s" % (
+                    path, key_name))
                 mpul.complete_upload()
             except:
                 mpul.cancel_multipart_upload(key_name)
@@ -942,6 +944,9 @@ class EMRJobRunner(MRJobRunner):
         return int((self._opts['s3_upload_part_size'] or 0) * 1000 * 1000)
 
     def _should_use_multipart_upload(self, fsize, part_size, path):
+        """Decide if we want to use multipart uploading.
+
+        path is only used to log warnings."""
         if not part_size:  # disabled
             return False
 

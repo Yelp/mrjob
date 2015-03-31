@@ -693,7 +693,6 @@ class EMRJobRunner(MRJobRunner):
     def _set_s3_scratch_uri(self, s3_conn):
         """Helper for _fix_s3_scratch_and_log_uri_opts"""
         buckets = s3_conn.get_all_buckets()
-        print type(buckets), buckets
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
 
         # Loop over buckets until we find one that is not region-

@@ -263,11 +263,15 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
         with open(upload_path, 'wb') as upload_file:
             upload_file.write('PAYLOAD')
 
+        # use --no-bootstrap-mrjob so we don't have to worry about
+        # mrjob.tar.gz and the setup wrapper script
         mr_job = MRTestJobConf(['-r', self.RUNNER,
+                                '--no-bootstrap-mrjob',
                                 '--jobconf=user.defined=something',
                                 '--jobconf=mapred.map.tasks=1',
                                 '--file', upload_path,
                                input_path])
+
         mr_job.sandbox()
 
         results = {}

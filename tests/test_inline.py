@@ -265,6 +265,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
 
         # use --no-bootstrap-mrjob so we don't have to worry about
         # mrjob.tar.gz and the setup wrapper script
+        self.add_mrjob_to_pythonpath()
         mr_job = MRTestJobConf(['-r', self.RUNNER,
                                 '--no-bootstrap-mrjob',
                                 '--jobconf=user.defined=something',
@@ -370,6 +371,7 @@ class ErrorOnBadPathsTestCase(unittest.TestCase):
     def test_no_paths(self):
         self.fs.path_exists.return_value = False
         self.assertRaises(ValueError, _error_on_bad_paths, self.fs, self.paths)
+
 
 if __name__ == "__main__":
     unittest.main()

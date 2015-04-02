@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import contextlib
 import os
+import os.path
 from tempfile import mkdtemp
 from shutil import rmtree
 
@@ -24,7 +26,9 @@ except ImportError:
 from mock import MagicMock
 from mock import patch
 
+import mrjob
 from mrjob import runner
+from mrjob.util import save_current_environment
 
 
 # simple config that also silences 'no config options for runner' logging
@@ -78,7 +82,6 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
     """Patch mrjob.conf, create a temp directory, and save the environment for
     each test
     """
-
     def setUp(self):
         super(SandboxedTestCase, self).setUp()
 
@@ -91,6 +94,8 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
         # cleanup functions are called in reverse order
         self.addCleanup(os.environ.update, old_environ)
         self.addCleanup(os.environ.clear)
+
+        # make sure mrjob is in PYTHONPATH so subprocesses can find it
 
     def makedirs(self, path):
         abs_path = os.path.join(self.tmp_dir, path)
@@ -107,3 +112,16 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
 
     def abs_paths(self, *paths):
         return [os.path.join(self.tmp_dir, path) for path in paths]
+
+    def add_mrjob_to_pythonpath(self):
+        """call this for tests that are going to invoke a subprocess
+        that needs to find mrjob.
+
+        (Merely using the local runner won't require this, because it
+        bootstraps mrjob by default.)
+        """
+        mrjob_pythonpath = os.path.abspath(
+            os.path.join(os.path.dirname(mrjob.__file__), '..'))
+
+        os.environ['PYTHONPATH'] = (
+            mrjob_pythonpath + ':' + os.environ.get('PYTHONPATH', ''))

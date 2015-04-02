@@ -747,7 +747,7 @@ class SetupTestCase(SandboxedTestCase):
         try:
             self._old_alarm_handler = signal.signal(
                 signal.SIGALRM, alarm_handler)
-            signal.alarm(2)
+            signal.alarm(10)
 
             with job.make_runner() as r:
                 r.run()

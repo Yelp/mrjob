@@ -346,25 +346,27 @@ Other
         python my_job.py -c left.conf --no-conf -c right.conf
 
 
-Options ignored by the inline runner
-------------------------------------
+Options ignored by the local and inline runners
+-----------------------------------------------
 
 These options are ignored because they require a real instance of Hadoop:
 
 * :mrjob-opt:`hadoop_extra_args`
 * :py:meth:`hadoop_input_format <mrjob.runner.MRJobRunner.__init__>`
-* :py:meth:`hadoop_output_format <mrjob.runner.MRJobRunner.__init__>`,
+* :py:meth:`hadoop_output_format <mrjob.runner.MRJobRunner.__init__>`
 * :mrjob-opt:`hadoop_streaming_jar`
-* :mrjob-opt:`jobconf`
 * :mrjob-opt:`partitioner`
 
-These options are ignored because the ``inline`` runner does not invoke the job
-as a subprocess or run it in its own directory:
 
-* :mrjob-opt:`cmdenv`
+Options ignored by the inline runner
+------------------------------------
+
+These options are ignored because the ``inline`` runner does not invoke the job
+as a subprocess:
+
+* :mrjob-opt:`bootstrap_mrjob`
 * :mrjob-opt:`python_bin`
+* :mrjob-opt:`setup`
 * :mrjob-opt:`setup_cmds`
 * :mrjob-opt:`setup_scripts`
 * :mrjob-opt:`steps_python_bin`
-* :mrjob-opt:`upload_archives`
-* :mrjob-opt:`upload_files`

@@ -138,6 +138,9 @@ class MockHadoopTestCase(SandboxedTestCase):
         mock_log_path = self.makefile('mock_hadoop_logs', '')
         os.environ['MOCK_HADOOP_LOG'] = mock_log_path
 
+        # make sure the fake hadoop binaries can find mrjob
+        self.add_mrjob_to_pythonpath()
+
 
 class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
@@ -172,6 +175,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         with mr_job.make_runner() as runner:
             assert isinstance(runner, HadoopJobRunner)
+
             runner.run()
 
             for line in runner.stream_output():

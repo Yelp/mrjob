@@ -263,11 +263,16 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
         with open(upload_path, 'wb') as upload_file:
             upload_file.write('PAYLOAD')
 
+        # use --no-bootstrap-mrjob so we don't have to worry about
+        # mrjob.tar.gz and the setup wrapper script
+        self.add_mrjob_to_pythonpath()
         mr_job = MRTestJobConf(['-r', self.RUNNER,
+                                '--no-bootstrap-mrjob',
                                 '--jobconf=user.defined=something',
                                 '--jobconf=mapred.map.tasks=1',
                                 '--file', upload_path,
                                input_path])
+
         mr_job.sandbox()
 
         results = {}
@@ -366,6 +371,7 @@ class ErrorOnBadPathsTestCase(unittest.TestCase):
     def test_no_paths(self):
         self.fs.path_exists.return_value = False
         self.assertRaises(ValueError, _error_on_bad_paths, self.fs, self.paths)
+
 
 if __name__ == "__main__":
     unittest.main()

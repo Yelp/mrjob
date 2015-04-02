@@ -57,6 +57,12 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
+try:
+    import filechunkio
+except ImportError:
+    # that's cool; filechunkio is only for multipart uploading
+    filechunkio = None
+
 # need this to retry on SSL errors (see Issue #621)
 try:
     from boto.https_connection import InvalidCertificateException
@@ -355,6 +361,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         's3_log_uri',
         's3_scratch_uri',
         's3_sync_wait_time',
+        's3_upload_part_size',
         'ssh_bin',
         'ssh_bind_ports',
         'ssh_tunnel_is_open',
@@ -398,6 +405,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'num_ec2_instances': 1,
             'num_ec2_task_instances': 0,
             's3_sync_wait_time': 5.0,
+            's3_upload_part_size': 100,  # 100 MB
             'sh_bin': ['/bin/sh', '-ex'],
             'ssh_bin': ['ssh'],
             'ssh_bind_ports': range(40001, 40841),
@@ -889,8 +897,66 @@ class EMRJobRunner(MRJobRunner):
 
         for path, s3_uri in self._upload_mgr.path_to_uri().iteritems():
             log.debug('uploading %s -> %s' % (path, s3_uri))
-            s3_key = self.make_s3_key(s3_uri, s3_conn)
+            self._upload_contents(s3_uri, s3_conn, path)
+
+    def _upload_contents(self, s3_uri, s3_conn, path):
+        """Uploads the file at the given path to S3, possibly using
+        multipart upload."""
+        fsize = os.stat(path).st_size
+        part_size = self._get_upload_part_size()
+
+        s3_key = self.make_s3_key(s3_uri, s3_conn)
+
+        if self._should_use_multipart_upload(fsize, part_size, path):
+            log.debug("Starting multipart upload of %s" % (path,))
+            mpul = s3_key.bucket.initiate_multipart_upload(s3_key.name)
+
+            try:
+                self._upload_parts(mpul, path, fsize, part_size)
+            except:
+                mpul.cancel_upload()
+                raise
+
+            mpul.complete_upload()
+            log.debug("Completed multipart upload of %s to %s" % (
+                      path, s3_key.name))
+        else:
             s3_key.set_contents_from_filename(path)
+
+    def _upload_parts(self, mpul, path, fsize, part_size):
+        offsets = xrange(0, fsize, part_size)
+
+        for i, offset in enumerate(offsets):
+            part_num = i + 1
+
+            log.debug("uploading %d/%d of %s" % (
+                part_num, len(offsets), path))
+            chunk_bytes = min(part_size, fsize - offset)
+
+            with filechunkio.FileChunkIO(
+                    path, 'r', offset=offset, bytes=chunk_bytes) as fp:
+                mpul.upload_part_from_file(fp, part_num)
+
+    def _get_upload_part_size(self):
+        # part size is in MB, as the minimum is 5 MB
+        return int((self._opts['s3_upload_part_size'] or 0) * 1024 * 1024)
+
+    def _should_use_multipart_upload(self, fsize, part_size, path):
+        """Decide if we want to use multipart uploading.
+
+        path is only used to log warnings."""
+        if not part_size:  # disabled
+            return False
+
+        if fsize <= part_size:
+            return False
+
+        if filechunkio is None:
+            log.warning("Can't use S3 multipart upload for %s because"
+                        " filechunkio is not installed" % path)
+            return False
+
+        return True
 
     def setup_ssh_tunnel_to_job_tracker(self, host):
         """setup the ssh tunnel to the job tracker, if it's not currently

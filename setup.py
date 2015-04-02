@@ -24,6 +24,7 @@ try:
     setuptools_kwargs = {
         'install_requires': [
             'boto>=2.2.0',
+            'filechunkio',
             'PyYAML',
             'simplejson>=2.0.9',
         ],

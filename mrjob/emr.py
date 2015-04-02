@@ -917,9 +917,9 @@ class EMRJobRunner(MRJobRunner):
                 mpul.cancel_upload()
                 raise
 
+            mpul.complete_upload()
             log.debug("Completed multipart upload of %s to %s" % (
                       path, s3_key.name))
-            mpul.complete_upload()
         else:
             s3_key.set_contents_from_filename(path)
 
@@ -939,7 +939,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _get_upload_part_size(self):
         # part size is in MB, as the minimum is 5 MB
-        return int((self._opts['s3_upload_part_size'] or 0) * 1000 * 1000)
+        return int((self._opts['s3_upload_part_size'] or 0) * 1024 * 1024)
 
     def _should_use_multipart_upload(self, fsize, part_size, path):
         """Decide if we want to use multipart uploading.

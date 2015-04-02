@@ -532,7 +532,7 @@ def add_emr_opts(opt_group):
             '--s3-upload-part-size', dest='s3_upload_part_size', default=None,
             type='float',
             help=('Upload files to S3 in parts no bigger than this many'
-                  ' megabytes. Default is 100 MB. Set to 0 to disable'
+                  ' megabytes. Default is 100 MiB. Set to 0 to disable'
                   ' multipart uploading entirely.')),
 
         opt_group.add_option(

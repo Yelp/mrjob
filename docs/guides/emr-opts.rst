@@ -593,12 +593,20 @@ which is set to True if boto.Version >= '2.25.0'
    :set: emr
    :default: 100
 
-   Upload files to S3 in parts no bigger than this many megabytes. Default is
-   100 MB, as `recommended by Amazon`_. Set to 0 to disable multipart uploading
+   Upload files to S3 in parts no bigger than this many megabytes
+   (technically, `mebibytes`_). Default is 100 MiB, as
+   `recommended by Amazon`_. Set to 0 to disable multipart uploading
    entirely.
 
+   Currently, Amazon `requires parts to be between 5 MiB and 5 GiB`_.
+   mrjob does not enforce these limits.
+
+   .. _`mebibytes`:
+       http://en.wikipedia.org/wiki/Mebibyte
    .. _`recommended by Amazon`:
        http://docs.aws.amazon.com/AmazonS3/latest/dev/UploadingObjects.html
+   .. _`requires parts to be between 5 MiB and 5 GiB`:
+       http://docs.aws.amazon.com/AmazonS3/latest/dev/qfacts.html
 
 SSH access and tunneling
 ------------------------

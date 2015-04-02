@@ -3486,6 +3486,7 @@ class ActionOnFailureTestCase(MockEMRAndS3TestCase):
 
 class MultiPartUploadTestCase(MockEMRAndS3TestCase):
 
+    PART_SIZE_IN_MB = 50.0 / 1024 / 1024
     TEST_BUCKET = 'walrus'
     TEST_FILENAME = 'data.dat'
     TEST_S3_URI = 's3://%s/%s' % (TEST_BUCKET, TEST_FILENAME)
@@ -3525,14 +3526,14 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
     def test_large_file(self):
         # Real S3 has a minimum chunk size of 5MB, but I'd rather not
         # store that in memory (in our mock S3 filesystem)
-        runner = EMRJobRunner(s3_upload_part_size=0.00005)
+        runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)
         self.assertEqual(runner._get_upload_part_size(), 50)
 
         data = 'Mew' * 20
         self.assert_upload_succeeds(runner, data, expect_multipart=True)
 
     def test_file_size_equals_part_size(self):
-        runner = EMRJobRunner(s3_upload_part_size=0.00005)
+        runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)
         self.assertEqual(runner._get_upload_part_size(), 50)
 
         data = 'o' * 50
@@ -3547,7 +3548,7 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
 
     def test_no_filechunkio(self):
         with patch.object(mrjob.emr, 'filechunkio', None):
-            runner = EMRJobRunner(s3_upload_part_size=0.00005)
+            runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)
             self.assertEqual(runner._get_upload_part_size(), 50)
 
             data = 'Mew' * 20
@@ -3557,7 +3558,7 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
 
     def test_exception_while_uploading_large_file(self):
 
-        runner = EMRJobRunner(s3_upload_part_size=0.00005)
+        runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)
         self.assertEqual(runner._get_upload_part_size(), 50)
 
         data = 'Mew' * 20

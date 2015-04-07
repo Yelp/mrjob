@@ -58,10 +58,8 @@ from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
 from tests.mockboto import DEFAULT_MAX_JOB_FLOWS_RETURNED
-from tests.mockboto import MockBucket
 from tests.mockboto import MockEmrConnection
 from tests.mockboto import MockEmrObject
-from tests.mockboto import MockMultiPartUpload
 from tests.mockboto import MockS3Connection
 from tests.mockboto import add_mock_s3_data
 from tests.mockboto import to_iso8601
@@ -3562,8 +3560,6 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
         self.assertEqual(runner._get_upload_part_size(), 50)
 
         data = 'Mew' * 20
-
-        saved_mpul = []
 
         with patch.object(runner, '_upload_parts', side_effect=IOError):
             self.assertRaises(IOError, self.upload_data, runner, data)

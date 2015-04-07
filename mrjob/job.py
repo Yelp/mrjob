@@ -16,6 +16,8 @@ for more information."""
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
+from __future__ import print_function
+
 import codecs
 import inspect
 import itertools
@@ -331,8 +333,8 @@ class MRJob(MRJobLauncher):
         # Use mapper(), reducer() etc. only if they've been re-defined
         kwargs = dict((func_name, getattr(self, func_name))
                       for func_name in _JOB_STEP_FUNC_PARAMS
-                      if (getattr(self, func_name).im_func is not
-                          getattr(MRJob, func_name).im_func))
+                      if (getattr(self, func_name).__func__ is not
+                          getattr(MRJob, func_name).__func__))
 
         # MRStep takes commands as strings, but the user defines them in the
         # class as functions that return strings, so call the functions.
@@ -575,7 +577,7 @@ class MRJob(MRJobLauncher):
         # be careful to use generators for everything, to allow for
         # very large groupings of values
         for key, kv_pairs in itertools.groupby(read_lines(),
-                                               key=lambda(k, v): k):
+                                               key=lambda k_v: k_v[0]):
             values = (v for k, v in kv_pairs)
             for out_key, out_value in reducer(key, values) or ():
                 write_line(out_key, out_value)
@@ -620,7 +622,7 @@ class MRJob(MRJobLauncher):
         # be careful to use generators for everything, to allow for
         # very large groupings of values
         for key, kv_pairs in itertools.groupby(read_lines(),
-                                               key=lambda(k, v): k):
+                                               key=lambda k_v1: k_v1[0]):
             values = (v for k, v in kv_pairs)
             for out_key, out_value in combiner(key, values) or ():
                 write_line(out_key, out_value)
@@ -641,7 +643,7 @@ class MRJob(MRJobLauncher):
         We currently output something like ``MR M R``, but expect this to
         change!
         """
-        print >> self.stdout, json.dumps(self._steps_desc())
+        print(json.dumps(self._steps_desc()), file=self.stdout)
 
     def _steps_desc(self):
         step_descs = []
@@ -704,7 +706,7 @@ class MRJob(MRJobLauncher):
 
         def write_line(key, value):
             try:
-                print >> self.stdout, write(key, value)
+               print(write(key, value), file=self.stdout)
             except Exception as e:
                 if self.options.strict_protocols:
                     raise

@@ -31,9 +31,9 @@ from mrjob.sim import SimRunnerOptionStore
 from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
 
-log = logging.getLogger(__name__)
-
 __author__ = 'Matthew Tai <mtai@adku.com>'
+
+log = logging.getLogger(__name__)
 
 # Deprecated in favor of class variables, remove in v0.5.0
 DEFAULT_MAP_TASKS = 1

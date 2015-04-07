@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Base class for all runners."""
-
 import copy
 import datetime
 import getpass

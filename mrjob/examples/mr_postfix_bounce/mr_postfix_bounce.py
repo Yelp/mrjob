@@ -17,14 +17,14 @@ messages that have bounced and yielding the (email address, date ordinal).
 The emitted email addresses can then be unconfirmed or handled in some other
 way.
 """
-__author__ = 'Adam Derewecki <derewecki@gmail.com>'
-
 import datetime
 import re
 import simplejson
 import time
 
 from mrjob.job import MRJob
+
+__author__ = 'Adam Derewecki <derewecki@gmail.com>'
 
 PROCESS_TYPE_PATTERN = re.compile(
     r'postfix-(?P<queue>[^/]+)/(?P<process>[^[]+)\[\d+\]:')

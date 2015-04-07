@@ -378,7 +378,7 @@ class HadoopJobRunner(MRJobRunner):
             # when the child process exits, rather than EOF.
             while True:
                 try:
-                    yield iter.next()  # okay for StopIteration to bubble up
+                    yield next(iter)  # okay for StopIteration to bubble up
                 except IOError as e:
                     if e.errno == errno.EIO:
                         return

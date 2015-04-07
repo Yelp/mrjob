@@ -140,8 +140,6 @@ class InlineMRJobRunner(SimMRJobRunner):
         elif step_type == 'combiner':
             child_args = ['--combiner'] + common_args + ['-']
 
-        child_instance = self._mrjob_cls(args=child_args)
-
         has_combiner = (step_type == 'mapper' and 'combiner' in step)
 
         # Use custom stdin
@@ -155,6 +153,7 @@ class InlineMRJobRunner(SimMRJobRunner):
                 os.environ.update(env)
                 os.chdir(working_dir)
 
+                child_instance = self._mrjob_cls(args=child_args)
                 child_instance.sandbox(stdin=child_stdin, stdout=child_stdout)
                 child_instance.execute()
 

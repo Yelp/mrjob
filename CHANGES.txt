@@ -26,6 +26,7 @@ v0.4.3, 2014-04-02 -- SO many bugfixes
      * bootstrap mrjob by default (#984)
    * Inline
      * fix for add_file_option() (#851)
+     * cd to job's working directory before instantiating mrjob class (#988)
  * Use pytest to run tests (#898)
  * collect-emr-active-stats subcommand (#947)
  * Using xtrace flag to get more output during bootstrap (#943)

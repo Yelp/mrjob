@@ -20,6 +20,7 @@ mappings.
 
 # map from instance type to number of compute units
 # from http://aws.amazon.com/ec2/instance-types/
+# and http://aws.amazon.com/ec2/previous-generation/
 EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS = {
     't1.micro': 2,
     # t2 units are "burstable", and receive a certain number of "credits"
@@ -51,7 +52,9 @@ EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS = {
     'c4.4xlarge': 62,
     'c4.8xlarge': 132,
     'cc1.4xlarge': 33.5,
+    'cc2.8xlarge': 32,
     'cg1.4xlarge': 33.5,
+    'cr1.8xlarge': 32,
     'g2.2xlarge': 26,
     'r3.large': 6.5,
     'r3.xlarge': 13,
@@ -66,10 +69,13 @@ EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS = {
     'd2.2xlarge': 28,
     'd2.4xlarge': 56,
     'd2.8xlarge': 116,
+    'hi1.4xlarge': 16,
+    'hs2.8xlarge': 17,
 }
 
 # map from instance type to GB of memory
 # from http://aws.amazon.com/ec2/instance-types/
+# and http://aws.amazon.com/ec2/previous-generation/
 EC2_INSTANCE_TYPE_TO_MEMORY = {
     't1.micro': 0.6,
     't2.micro': 1,
@@ -98,7 +104,9 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
     'c4.4xlarge': 30,
     'c4.8xlarge': 60,
     'cc1.4xlarge': 23,
+    'cc2.8xlarge': 60.5,
     'cg1.4xlarge': 22,
+    'cr1.8xlarge': 244,
     'g2.2xlarge': 15,
     'r3.large': 15,
     'r3.xlarge': 30.5,
@@ -113,6 +121,8 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
     'd2.2xlarge': 61,
     'd2.4xlarge': 122,
     'd2.8xlarge': 244,
+    'hi1.4xlarge': 60.5,
+    'hs1.8xlarge': 117,
 }
 
 

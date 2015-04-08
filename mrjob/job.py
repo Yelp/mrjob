@@ -339,7 +339,7 @@ class MRJob(MRJobLauncher):
         # MRStep takes commands as strings, but the user defines them in the
         # class as functions that return strings, so call the functions.
         updates = {}
-        for k, v in kwargs.iteritems():
+        for k, v in kwargs.items():
             if k.endswith('_cmd'):
                 updates[k] = v()
 

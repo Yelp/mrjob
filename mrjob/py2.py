@@ -12,8 +12,10 @@ IN_PY2 = (sys.version_info[0] == 2)
 
 # Dictionaries
 
-# use these only if you need *efficient* iteration through a dict's
-# items or values. Otherwise, d.items() is fine.
+# Please use these only if you *need* efficiency. If the size of your
+# dictionary is bounded, or you're going to immediately pass it to sorted(),
+# just use items/values
+
 
 # iteritems(d) replaces d.iteritems()
 if IN_PY2:

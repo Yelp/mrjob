@@ -557,7 +557,7 @@ def _dict_list_to_compat_map(dict_list):
     # }
     compat_map = {}
     for version_dict in dict_list:
-        for value in version_dict.itervalues():
+        for value in version_dict.values():
             compat_map[value] = version_dict
     return compat_map
 
@@ -585,7 +585,7 @@ def jobconf_from_env(variable, default=None):
         return os.environ[name]
 
     # try alternatives (arbitrary order)
-    for var in _JOBCONF_MAP.get(variable, {}).itervalues():
+    for var in _JOBCONF_MAP.get(variable, {}).values():
         name = var.replace('.', '_')
         if name in os.environ:
             return os.environ[name]
@@ -614,7 +614,7 @@ def jobconf_from_dict(jobconf, name, default=None):
         return jobconf[name]
 
     # try alternatives (arbitrary order)
-    for alternative in _JOBCONF_MAP.get(name, {}).itervalues():
+    for alternative in _JOBCONF_MAP.get(name, {}).values():
         if alternative in jobconf:
             return jobconf[alternative]
 
@@ -692,7 +692,7 @@ def add_translated_jobconf_for_hadoop_version(jobconf, hadoop_version):
     """
     translated_jobconf = {}
     mismatch_key_to_translated_key = {}
-    for key, value in jobconf.iteritems():
+    for key, value in jobconf.items():
         new_key = translate_jobconf(key, hadoop_version)
         if key != new_key:
             translated_jobconf[new_key] = value
@@ -704,7 +704,7 @@ def add_translated_jobconf_for_hadoop_version(jobconf, hadoop_version):
                     "\nThe have been translated as follows\n %s",
                     hadoop_version,
                     '\n'.join(["%s: %s" % (key, value) for key, value
-                               in mismatch_key_to_translated_key.iteritems()]))
+                               in mismatch_key_to_translated_key.items()]))
 
     translated_jobconf.update(jobconf)
     return translated_jobconf

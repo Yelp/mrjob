@@ -1167,10 +1167,7 @@ class MRJobRunner(object):
 
     def _arg_hash_paths(self, type, upload_mgr):
         """Helper function for the *upload_args methods."""
-        name_to_path = self._working_dir_mgr.name_to_path(type)
-
-        for name in name_to_path:
-            path = name_to_path[name]
+        for name, path in self._working_dir_mgr.name_to_path(type).items():
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 

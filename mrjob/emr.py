@@ -895,10 +895,7 @@ class EMRJobRunner(MRJobRunner):
 
         s3_conn = self.make_s3_conn()
 
-        path_to_uri = self._upload_mgr.path_to_uri()
-
-        for path in path_to_uri:
-            s3_uri = path_to_uri[path]
+        for path, s3_uri in self._upload_mgr.path_to_uri().items():
             log.debug('uploading %s -> %s' % (path, s3_uri))
             self._upload_contents(s3_uri, s3_conn, path)
 

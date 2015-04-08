@@ -1137,12 +1137,12 @@ class MRJobRunner(object):
         jobconf = self._jobconf_for_step(step_num)
 
         if uses_generic_jobconf(version):
-            for key, value in sorted(jobconf.iteritems()):
+            for key, value in sorted(jobconf.items()):
                 if value is not None:
                     args.extend(['-D', '%s=%s' % (key, value)])
         # old-style jobconf
         else:
-            for key, value in sorted(jobconf.iteritems()):
+            for key, value in sorted(jobconf.items()):
                 if value is not None:
                     args.extend(['-jobconf', '%s=%s' % (key, value)])
 
@@ -1151,7 +1151,7 @@ class MRJobRunner(object):
             args.extend(['-partitioner', self._partitioner])
 
         # cmdenv
-        for key, value in sorted(self._opts['cmdenv'].iteritems()):
+        for key, value in sorted(self._opts['cmdenv'].items()):
             args.append('-cmdenv')
             args.append('%s=%s' % (key, value))
 
@@ -1167,7 +1167,10 @@ class MRJobRunner(object):
 
     def _arg_hash_paths(self, type, upload_mgr):
         """Helper function for the *upload_args methods."""
-        for name, path in self._working_dir_mgr.name_to_path(type).iteritems():
+        name_to_path = self._working_dir_mgr.name_to_path(type)
+
+        for name in name_to_path:
+            path = name_to_path[name]
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 

@@ -263,8 +263,12 @@ class HadoopJobRunner(MRJobRunner):
         self._mkdir_on_hdfs(self._upload_mgr.prefix)
 
         log.info('Copying local files into %s' % self._upload_mgr.prefix)
-        for path, uri in self._upload_mgr.path_to_uri().iteritems():
-            self._upload_to_hdfs(path, uri)
+
+        path_to_uri = self._upload_mgr.path_to_uri()
+
+        for path in path_to_uri:
+            hdfs_uri = path_to_uri[path]
+            self._upload_to_hdfs(path, hdfs_uri)
 
     def _mkdir_on_hdfs(self, path):
         log.debug('Making directory %s on HDFS' % path)

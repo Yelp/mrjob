@@ -376,7 +376,7 @@ class WorkingDirManager(object):
 
         if (type, path) not in self._typed_path_to_auto_name:
             # print useful error message
-            if (type, path) in self._name_to_typed_path.itervalues():
+            if (type, path) in self._name_to_typed_path.values():
                 raise ValueError('%s %r was never added without a name!' %
                                  (type, path))
             else:
@@ -405,7 +405,7 @@ class WorkingDirManager(object):
 
         return dict((name, typed_path[1])
                     for name, typed_path
-                    in self._name_to_typed_path.iteritems()
+                    in self._name_to_typed_path.items()
                     if typed_path[0] == type)
 
     def paths(self):
@@ -413,7 +413,7 @@ class WorkingDirManager(object):
         paths = set()
 
         paths.update(p for (t, p) in self._typed_path_to_auto_name)
-        paths.update(p for (t, p) in self._name_to_typed_path.itervalues())
+        paths.update(p for (t, p) in self._name_to_typed_path.values())
 
         return paths
 

@@ -895,7 +895,10 @@ class EMRJobRunner(MRJobRunner):
 
         s3_conn = self.make_s3_conn()
 
-        for path, s3_uri in self._upload_mgr.path_to_uri().iteritems():
+        path_to_uri = self._upload_mgr.path_to_uri()
+
+        for path in path_to_uri:
+            s3_uri = path_to_uri[path]
             log.debug('uploading %s -> %s' % (path, s3_uri))
             self._upload_contents(s3_uri, s3_conn, path)
 
@@ -1235,7 +1238,7 @@ class EMRJobRunner(MRJobRunner):
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (
             self._job_name, self._opts['s3_log_uri'],
-            ', '.join('%s=%r' % (k, v) for k, v in args.iteritems())))
+            ', '.join('%s=%r' % (k, v) for k, v in args.items())))
         emr_job_flow_id = emr_conn.run_jobflow(
             self._job_name, self._opts['s3_log_uri'], **args)
 
@@ -2096,7 +2099,7 @@ class EMRJobRunner(MRJobRunner):
         # download files using hadoop fs
         writeln('# download files and mark them executable')
         for name, path in sorted(
-                self._bootstrap_dir_mgr.name_to_path('file').iteritems()):
+                self._bootstrap_dir_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
             writeln('hadoop fs -copyToLocal %s $__mrjob_PWD/%s' %
                     (pipes.quote(uri), pipes.quote(name)))
@@ -2329,7 +2332,7 @@ class EMRJobRunner(MRJobRunner):
                         int(ig.instancerequestcount))
 
             # check if there are enough compute units
-            for role, req_cu in role_to_req_cu.iteritems():
+            for role, req_cu in role_to_req_cu.items():
                 req_num_instances = role_to_req_num_instances[role]
                 # if we have at least as many units of the right type,
                 # don't bother counting compute units
@@ -2416,7 +2419,7 @@ class EMRJobRunner(MRJobRunner):
             # depending on insertion/deletion order.
             sorted(
                 (name, self.md5sum(path)) for name, path
-                in self._bootstrap_dir_mgr.name_to_path('file').iteritems()
+                in self._bootstrap_dir_mgr.name_to_path('file').items()
                 if not path == self._mrjob_tar_gz_path),
             self._opts['additional_emr_info'],
             self._bootstrap,

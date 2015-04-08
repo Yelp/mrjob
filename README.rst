@@ -1,12 +1,12 @@
 mrjob: the Python MapReduce library
 ===================================
 
-.. image:: docs/logos/logo_medium.png
+.. image:: https://github.com/Yelp/mrjob/raw/master/docs/logos/logo_medium.png
 
 mrjob is a Python 2.6+ package that helps you write and run Hadoop Streaming
 jobs.
 
-`Stable version (v0.4.2) documentation <http://packages.python.org/mrjob/>`_
+`Stable version (v0.4.3) documentation <http://packages.python.org/mrjob/>`_
 
 `Development version documentation <http://mrjob.readthedocs.org/en/latest/>`_
 
@@ -51,7 +51,7 @@ A Simple Map Reduce Job
 
 Code for this example and more live in ``mrjob/examples``.
 
-.. code:: python
+::
 
    """The classic MapReduce job: count the frequency of words.
    """
@@ -93,7 +93,7 @@ Setting up EMR on Amazon
 ------------------------
 
 * create an `Amazon Web Services account <http://aws.amazon.com/>`_
-* sign up for `Elastic MapReduce <http://aws.amazon.com/elasticmapreduce/>`_
+* sign up for `Elastic MapReduce <http://aws.amazon.com/elasticmapreduce/>`__
 * Get your access and secret keys (click "Security Credentials" on
   `your account page <http://aws.amazon.com/account/>`_)
 * Set the environment variables ``$AWS_ACCESS_KEY_ID`` and
@@ -117,7 +117,7 @@ See `the mrjob.conf documentation
 Project Links
 -------------
 
-* `Source code <http://github.com/Yelp/mrjob>`_
+* `Source code <http://github.com/Yelp/mrjob>`__
 * `Documentation <http://packages.python.org/mrjob/>`_
 * `Discussion group <http://groups.google.com/group/mrjob>`_
 
@@ -125,14 +125,14 @@ Reference
 ---------
 
 * `Hadoop Streaming <http://hadoop.apache.org/docs/stable1/streaming.html>`_
-* `Elastic MapReduce <http://aws.amazon.com/documentation/elasticmapreduce/>`_
+* `Elastic MapReduce <http://aws.amazon.com/documentation/elasticmapreduce/>`__
 
 More Information
 ----------------
 
 * `PyCon 2011 mrjob overview <http://blip.tv/pycon-us-videos-2009-2010-2011/pycon-2011-mrjob-distributed-computing-for-everyone-4898987/>`_
 * `Introduction to Recommendations and MapReduce with mrjob <http://aimotion.blogspot.com/2012/08/introduction-to-recommendations-with.html>`_
-  (`source code <https://github.com/marcelcaraciolo/recsys-mapreduce-mrjob>`_)
+  (`source code <https://github.com/marcelcaraciolo/recsys-mapreduce-mrjob>`__)
 * `Social Graph Analysis Using Elastic MapReduce and PyPy <http://postneo.com/2011/05/04/social-graph-analysis-using-elastic-mapreduce-and-pypy>`_
 
 Thanks to `Greg Killion <mailto:greg@blind-works.net>`_

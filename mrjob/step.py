@@ -97,15 +97,15 @@ class MRStep(object):
             raise ValueError("Step has no mappers and no reducers")
 
         self.has_explicit_mapper = any(
-            value for name, value in kwargs.iteritems()
+            value for name, value in kwargs.items()
             if name in _MAPPER_FUNCS)
 
         self.has_explicit_combiner = any(
-            value for name, value in kwargs.iteritems()
+            value for name, value in kwargs.items()
             if name in _COMBINER_FUNCS)
 
         self.has_explicit_reducer = any(
-            value for name, value in kwargs.iteritems()
+            value for name, value in kwargs.items()
             if name in _REDUCER_FUNCS)
 
         steps = dict((f, None) for f in _JOB_STEP_PARAMS)
@@ -128,11 +128,11 @@ class MRStep(object):
         self._steps = steps
 
     def __repr__(self):
-        not_none = dict((k, v) for k, v in self._steps.iteritems()
+        not_none = dict((k, v) for k, v in self._steps.items()
                         if v is not None)
         return '%s(%s)' % (
             self.__class__.__name__,
-            ', '.join('%s=%r' % (k, v) for k, v in not_none.iteritems()))
+            ', '.join('%s=%r' % (k, v) for k, v in not_none.items()))
 
     def __eq__(self, other):
         return (isinstance(other, MRStep) and self._steps == other._steps)

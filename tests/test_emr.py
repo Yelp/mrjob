@@ -975,7 +975,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
 
         # convert expected to a dict of dicts
         role_to_expected = {}
-        for role, (num, instance_type, bid_price) in expected.iteritems():
+        for role, (num, instance_type, bid_price) in expected.items():
             info = {
                 'instancerequestcount': str(num),
                 'instancetype': instance_type,
@@ -1014,7 +1014,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
 
         expected_instance_count = str(sum(
             int(info['instancerequestcount'])
-            for info in role_to_expected.itervalues()))
+            for info in role_to_expected.values()))
         self.assertEqual(expected_instance_count, job_flow.instancecount)
 
     def set_in_mrjob_conf(self, **kwargs):
@@ -3242,7 +3242,7 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
     def _assert_streaming_step(self, step, **kwargs):
         self.runner._steps = [step]
         d = self.runner._build_streaming_step(0)
-        for k, v in kwargs.iteritems():
+        for k, v in kwargs.items():
             self.assertEqual(d[k], v)
 
     def test_basic_mapper(self):

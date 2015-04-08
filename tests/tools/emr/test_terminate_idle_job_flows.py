@@ -264,13 +264,13 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         )
 
         # add job flow IDs and fake names to the mock job flows
-        for jfid, jf in self.mock_emr_job_flows.iteritems():
+        for jfid, jf in self.mock_emr_job_flows.items():
             jf.jobflowid = jfid
             jf.name = jfid[2:].replace('_', ' ').title() + ' Job Flow'
 
     def terminated_jfs(self):
         return sorted(jf.jobflowid
-                      for jf in self.mock_emr_job_flows.itervalues()
+                      for jf in self.mock_emr_job_flows.values()
                       if jf.state in ('SHUTTING_DOWN', 'TERMINATED'))
 
     def inspect_and_maybe_terminate_quietly(self, stdout=None, **kwargs):

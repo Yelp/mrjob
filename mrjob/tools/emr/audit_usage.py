@@ -161,7 +161,7 @@ def job_flows_to_stats(job_flows, now=None):
             start_to_nih = {}
             for jf in s['flows']:
                 for u in jf['usage']:
-                    for start, nih in u[key].iteritems():
+                    for start, nih in u[key].items():
                         start_to_nih.setdefault(start, 0.0)
                         start_to_nih[start] += nih
             s[key] = start_to_nih
@@ -437,13 +437,13 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
             (d, nih_per_sec * secs)
             for d, secs
             in subdivide_interval_by_date(interval['start'],
-                                          interval['end']).iteritems())
+                                          interval['end']).items())
 
         interval['hour_to_nih_used'] = dict(
             (d, nih_per_sec * secs)
             for d, secs
             in subdivide_interval_by_hour(interval['start'],
-                                          interval['end']).iteritems())
+                                          interval['end']).items())
 
         interval['nih_billed'] = (
             nih_per_sec *
@@ -453,25 +453,25 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
             (d, nih_per_sec * secs)
             for d, secs
             in subdivide_interval_by_date(interval['start'],
-                                          interval['end_billing']).iteritems())
+                                          interval['end_billing']).items())
 
         interval['hour_to_nih_billed'] = dict(
             (d, nih_per_sec * secs)
             for d, secs
             in subdivide_interval_by_hour(interval['start'],
-                                          interval['end_billing']).iteritems())
+                                          interval['end_billing']).items())
 
         # time billed but not used
         interval['nih_bbnu'] = interval['nih_billed'] - interval['nih_used']
 
         interval['date_to_nih_bbnu'] = {}
-        for d, nih_billed in interval['date_to_nih_billed'].iteritems():
+        for d, nih_billed in interval['date_to_nih_billed'].items():
             nih_bbnu = nih_billed - interval['date_to_nih_used'].get(d, 0.0)
             if nih_bbnu:
                 interval['date_to_nih_bbnu'][d] = nih_bbnu
 
         interval['hour_to_nih_bbnu'] = {}
-        for d, nih_billed in interval['hour_to_nih_billed'].iteritems():
+        for d, nih_billed in interval['hour_to_nih_billed'].items():
             nih_bbnu = nih_billed - interval['hour_to_nih_used'].get(d, 0.0)
             if nih_bbnu:
                 interval['hour_to_nih_bbnu'][d] = nih_bbnu
@@ -505,7 +505,7 @@ def subdivide_interval_by_date(start, end):
 
     # remove zeros
     date_to_secs = dict(
-        (d, secs) for d, secs in date_to_secs.iteritems() if secs)
+        (d, secs) for d, secs in date_to_secs.items() if secs)
 
     return date_to_secs
 
@@ -538,7 +538,7 @@ def subdivide_interval_by_hour(start, end):
 
     # remove zeros
     hour_to_secs = dict(
-        (h, secs) for h, secs in hour_to_secs.iteritems() if secs)
+        (h, secs) for h, secs in hour_to_secs.items() if secs)
 
     return hour_to_secs
 
@@ -649,26 +649,26 @@ def print_report(stats, now=None):
 
     # Top jobs
     print('Top jobs, by total time used:')
-    for label, nih_used in sorted(s['label_to_nih_used'].iteritems(),
+    for label, nih_used in sorted(s['label_to_nih_used'].items(),
                                   key=lambda lb_nih: (-lb_nih[1], lb_nih[0])):
         print('  %9.2f %s' % (nih_used, label))
     print()
 
     print('Top jobs, by time billed but not used:')
-    for label, nih_bbnu in sorted(s['label_to_nih_bbnu'].iteritems(),
+    for label, nih_bbnu in sorted(s['label_to_nih_bbnu'].items(),
                                   key=lambda lb_nih1: (-lb_nih1[1], lb_nih1[0])):
         print('  %9.2f %s' % (nih_bbnu, label))
     print()
 
     # Top users
     print('Top users, by total time used:')
-    for owner, nih_used in sorted(s['owner_to_nih_used'].iteritems(),
+    for owner, nih_used in sorted(s['owner_to_nih_used'].items(),
                                   key=lambda o_nih: (-o_nih[1], o_nih[0])):
         print('  %9.2f %s' % (nih_used, owner))
     print()
 
     print('Top users, by time billed but not used:')
-    for owner, nih_bbnu in sorted(s['owner_to_nih_bbnu'].iteritems(),
+    for owner, nih_bbnu in sorted(s['owner_to_nih_bbnu'].items(),
                                   key=lambda o_nih2: (-o_nih2[1], o_nih2[0])):
         print('  %9.2f %s' % (nih_bbnu, owner))
     print()
@@ -676,7 +676,7 @@ def print_report(stats, now=None):
     # Top job steps
     print('Top job steps, by total time used (step number first):')
     for (label, step_num), nih_used in sorted(
-            s['job_step_to_nih_used'].iteritems(),
+            s['job_step_to_nih_used'].items(),
             key=lambda k_nih: (-k_nih[1], k_nih[0])):
 
         if label:
@@ -687,7 +687,7 @@ def print_report(stats, now=None):
 
     print('Top job steps, by total time billed but not used (un-pooled only):')
     for (label, step_num), nih_bbnu in sorted(
-            s['job_step_to_nih_bbnu_no_pool'].iteritems(),
+            s['job_step_to_nih_bbnu_no_pool'].items(),
             key=lambda k_nih3: (-k_nih3[1], k_nih3[0])):
 
         if label:
@@ -698,13 +698,13 @@ def print_report(stats, now=None):
 
     # Top pools
     print('All pools, by total time billed:')
-    for pool, nih_billed in sorted(s['pool_to_nih_billed'].iteritems(),
+    for pool, nih_billed in sorted(s['pool_to_nih_billed'].items(),
                                    key=lambda p_nih: (-p_nih[1], p_nih[0])):
         print('  %9.2f %s' % (nih_billed, pool or '(not pooled)'))
     print()
 
     print('All pools, by total time billed but not used:')
-    for pool, nih_bbnu in sorted(s['pool_to_nih_bbnu'].iteritems(),
+    for pool, nih_bbnu in sorted(s['pool_to_nih_bbnu'].items(),
                                  key=lambda p_nih4: (-p_nih4[1], p_nih4[0])):
         print('  %9.2f %s' % (nih_bbnu, pool or '(not pooled)'))
     print()

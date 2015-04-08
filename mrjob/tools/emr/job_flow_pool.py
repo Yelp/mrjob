@@ -86,7 +86,7 @@ minutes to the hour)
 
 def pprint_pools(runner):
     pools = get_pools(runner.make_emr_conn())
-    for pool_name, job_flows in pools.iteritems():
+    for pool_name, job_flows in pools.items():
         print('-' * len(pool_name))
         print(pool_name)
         print('-' * len(pool_name))

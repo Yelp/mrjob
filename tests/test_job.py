@@ -329,7 +329,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             counters = r.counters()[0]
             self.assertEqual(counters.keys(), ['Undecodable input'])
             self.assertEqual(
-                sum(counters['Undecodable input'].itervalues()), 3)
+                sum(counters['Undecodable input'].values()), 3)
 
     def assertJobRaisesExceptionOnUndecodableInput(self, job_args):
         job = self.MRBoringJSONJob(job_args)

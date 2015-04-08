@@ -18,6 +18,7 @@ v0.4.3, 2014-03-?? -- SO many bugfixes
        * unset paramaters with --no-emr-api-param
      * bootstrap_python_packages (deprecated) now works on 3.x EMR AMIs (#863)
      * Use TERMINATE_CLUSTER instead of deprecated TERMINATE_JOB_FLOW (#974)
+     * updated EC2 instance type data for pooling (#995)
    * Hadoop:
      * exclude hadoop source jars when looking for streaming jar (#861)
      * Fixed mkdir_on_hdfs for Hadoop version 2.x (#923)

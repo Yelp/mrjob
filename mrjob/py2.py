@@ -10,30 +10,6 @@ import sys
 # use this to check if we're in Python 2
 IN_PY2 = (sys.version_info[0] == 2)
 
-# Dictionaries
-
-# Please use these only if you *need* efficiency. If the size of your
-# dictionary is bounded, or you're going to immediately pass it to sorted(),
-# just use items/values
-
-
-# iteritems(d) replaces d.iteritems()
-if IN_PY2:
-    def iteritems(d):
-        d.iteritems()
-else:
-    def iteritems(d):
-        d.items()
-
-
-# itervalues(d) replaces d.itervalues()
-if IN_PY2:
-    def itervalues(d):
-        d.iteritems()
-else:
-    def itervalues(d):
-        d.items()
-
 
 # Strings
 

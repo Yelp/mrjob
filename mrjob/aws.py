@@ -22,9 +22,12 @@ mappings.
 # from http://aws.amazon.com/ec2/instance-types/
 EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS = {
     't1.micro': 2,
-    't2.micro': 1,
-    't2.small': 1,
-    't2.medium': 1,
+    # t2 units are "burstable", and receive a certain number of "credits"
+    # (CPU-minutes) per hour. MapReduce usage is pretty much continuous, so
+    # just rating them by how much they can use in one hour.
+    't2.micro': 0.1,
+    't2.small': 0.2,
+    't2.medium': 0.4,
     'm1.small': 1,
     'm1.large': 4,
     'm1.xlarge': 8,

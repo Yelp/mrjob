@@ -140,7 +140,7 @@ def parse_port_range_list(range_list_str):
     for range_str in range_list_str.split(','):
         if ':' in range_str:
             a, b = [int(x) for x in range_str.split(':')]
-            all_ranges.extend(xrange(a, b + 1))
+            all_ranges.extend(range(a, b + 1))
         else:
             all_ranges.append(int(range_str))
     return all_ranges

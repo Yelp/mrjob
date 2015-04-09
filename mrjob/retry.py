@@ -62,7 +62,7 @@ class RetryGoRound(object):
         def call_and_maybe_retry(*args, **kwargs):
             n = len(self.__alternatives)
 
-            for i in xrange(n):
+            for i in range(n):
                 index = (self.__start_index + i) % n
                 alternative = self.__alternatives[index]
 

@@ -333,7 +333,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         # job should get terminated
         emr_conn = runner.make_emr_conn()
         job_flow_id = runner.get_emr_job_flow_id()
-        for _ in xrange(10):
+        for _ in range(10):
             emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -360,7 +360,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
                 emr_conn = runner.make_emr_conn()
                 job_flow_id = runner.get_emr_job_flow_id()
-                for _ in xrange(10):
+                for _ in range(10):
                     emr_conn.simulate_progress(job_flow_id)
 
                 job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -369,7 +369,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             # job should get terminated on cleanup
             emr_conn = runner.make_emr_conn()
             job_flow_id = runner.get_emr_job_flow_id()
-            for _ in xrange(10):
+            for _ in range(10):
                 emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -568,7 +568,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
             emr_conn = runner.make_emr_conn()
             job_flow_id = runner.get_emr_job_flow_id()
-            for _ in xrange(10):
+            for _ in range(10):
                 emr_conn.simulate_progress(job_flow_id)
 
             job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -577,7 +577,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
         job_flow_id = runner.get_emr_job_flow_id()
-        for _ in xrange(10):
+        for _ in range(10):
             emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -2719,7 +2719,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
             emr_conn = runner.make_emr_conn()
             job_flow_id = runner.get_emr_job_flow_id()
-            for _ in xrange(10):
+            for _ in range(10):
                 emr_conn.simulate_progress(job_flow_id)
 
             job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -2728,7 +2728,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
         job_flow_id = runner.get_emr_job_flow_id()
-        for _ in xrange(10):
+        for _ in range(10):
             emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -2755,7 +2755,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
             self.assertEqual(runner.get_emr_job_flow_id(), job_flow_id)
 
             emr_conn = runner.make_emr_conn()
-            for _ in xrange(10):
+            for _ in range(10):
                 emr_conn.simulate_progress(job_flow_id)
 
             job_flow = emr_conn.describe_jobflow(job_flow_id)
@@ -2764,7 +2764,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
         job_flow_id = runner.get_emr_job_flow_id()
-        for _ in xrange(10):
+        for _ in range(10):
             emr_conn.simulate_progress(job_flow_id)
 
         job_flow = emr_conn.describe_jobflow(job_flow_id)

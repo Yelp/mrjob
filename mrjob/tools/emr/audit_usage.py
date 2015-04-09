@@ -421,7 +421,7 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
         })
 
     # fill in end_billing
-    for i in xrange(len(intervals) - 1):
+    for i in range(len(intervals) - 1):
         intervals[i]['end_billing'] = intervals[i + 1]['start']
 
     intervals[-1]['end_billing'] = jf_end_billing

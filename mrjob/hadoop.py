@@ -306,7 +306,7 @@ class HadoopJobRunner(MRJobRunner):
     def _run_job_in_hadoop(self):
         self._counters = []
 
-        for step_num in xrange(self._num_steps()):
+        for step_num in range(self._num_steps()):
             log.debug('running step %d of %d' %
                       (step_num + 1, self._num_steps()))
 

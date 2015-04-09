@@ -924,7 +924,7 @@ class EMRJobRunner(MRJobRunner):
             s3_key.set_contents_from_filename(path)
 
     def _upload_parts(self, mpul, path, fsize, part_size):
-        offsets = xrange(0, fsize, part_size)
+        offsets = range(0, fsize, part_size)
 
         for i, offset in enumerate(offsets):
             part_num = i + 1
@@ -1379,7 +1379,7 @@ class EMRJobRunner(MRJobRunner):
         steps we want to run."""
         # quick, add the other steps before the job spins up and
         # then shuts itself down (in practice this takes several minutes)
-        return [self._build_step(n) for n in xrange(self._num_steps())]
+        return [self._build_step(n) for n in range(self._num_steps())]
 
     def _build_step(self, step_num):
         step = self._get_step(step_num)

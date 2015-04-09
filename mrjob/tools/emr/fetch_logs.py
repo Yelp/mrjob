@@ -95,7 +95,7 @@ def perform_actions(options, runner):
         desc = runner._describe_jobflow()
         runner._set_s3_job_log_uri(desc)
         runner._fetch_counters(
-            xrange(1, len(desc.steps) + 1), skip_s3_wait=True)
+            range(1, len(desc.steps) + 1), skip_s3_wait=True)
         runner.print_counters()
 
     if options.find_failure:

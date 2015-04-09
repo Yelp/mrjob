@@ -302,7 +302,7 @@ class MockMultiPartUpload(object):
 
         if self.parts:
             num_parts = max(self.parts)
-            for part_num in xrange(1, num_parts + 1):
+            for part_num in range(1, num_parts + 1):
                 # S3 might be more graceful about missing parts. But we
                 # certainly don't want this to slip past testing
                 data += self.parts[part_num]

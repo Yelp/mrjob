@@ -511,7 +511,7 @@ class ReadFileTestCase(unittest.TestCase):
         # can't just repeat same value, because we need the file to be
         # compressed! 50000 lines is too few to catch the bug.
         random.seed(0)
-        for _ in xrange(100000):
+        for _ in range(100000):
             input_bz2.write('%016x\n' % random.randint(0, 2 ** 64 - 1))
         input_bz2.close()
 

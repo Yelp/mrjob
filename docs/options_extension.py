@@ -318,7 +318,7 @@ def populate_option_lists(app, doctree, fromdocname):
         tgroup = nodes.tgroup(cols=4)
         table += tgroup
 
-        for i in xrange(4):
+        for i in range(4):
             tgroup += nodes.colspec(colwidth=1)
 
         thead = nodes.thead()

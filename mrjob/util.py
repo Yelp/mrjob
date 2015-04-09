@@ -611,7 +611,13 @@ def safeeval(expr, globals=None, locals=None):
     """
     # blank out builtins, but keep None, True, and False
     safe_globals = {'__builtins__': None, 'True': True, 'False': False,
-                    'None': None, 'set': set, 'xrange': xrange}
+                    'None': None, 'set': set}
+
+    # xrange is range in Python 3
+    if hasattr(__builtins__, 'xrange'):
+        safe_globals['xrange'] = xrange
+    else:
+        safe_globals['range'] = range
 
     # PyPy needs special magic
     def open(*args, **kwargs):

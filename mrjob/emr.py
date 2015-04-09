@@ -403,7 +403,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             's3_upload_part_size': 100,  # 100 MB
             'sh_bin': ['/bin/sh', '-ex'],
             'ssh_bin': ['ssh'],
-            'ssh_bind_ports': range(40001, 40841),
+            'ssh_bind_ports': list(range(40001, 40841)),
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
             'visible_to_all_users': False,

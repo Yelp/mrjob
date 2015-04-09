@@ -15,6 +15,7 @@
 # limitations under the License.
 import logging
 
+from mrjob.py2 import basestring
 from mrjob.util import cmd_line
 
 

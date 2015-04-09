@@ -39,6 +39,7 @@ import posixpath
 import re
 
 from mrjob.parse import is_uri
+from mrjob.py2 import basestring
 from mrjob.util import expand_path
 
 

@@ -24,6 +24,7 @@ from mrjob.sim import SimMRJobRunner
 from mrjob.sim import SimRunnerOptionStore
 from mrjob.parse import find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
+from mrjob.py2 import basestring
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
 

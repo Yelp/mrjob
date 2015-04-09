@@ -21,8 +21,6 @@ from itertools import chain
 import logging
 import os
 
-from mrjob.util import expand_path
-
 try:
     import simplejson as json  # preferred because of C speedups
     json  # quiet "redefinition of unused ..." warning from pyflakes
@@ -36,7 +34,8 @@ try:
 except ImportError:
     yaml = None
 
-
+from mrjob.py2 import basestring
+from mrjob.util import expand_path
 from mrjob.util import shlex_split
 
 

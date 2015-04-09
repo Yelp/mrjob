@@ -19,6 +19,8 @@ from distutils.version import LooseVersion
 import logging
 import os
 
+from mrjob.py2 import basestring
+
 # lists alternative names for jobconf variables
 # full listing thanks to translation table in
 # http://hadoop.apache.org/common/docs/current/hadoop-project-dist/hadoop-common/DeprecatedProperties.html # noqa

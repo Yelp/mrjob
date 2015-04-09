@@ -22,14 +22,9 @@ import codecs
 import inspect
 import itertools
 import logging
+from io import BytesIO
 from optparse import OptionGroup
 import sys
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
 
 try:
     import simplejson as json
@@ -1191,7 +1186,7 @@ class MRJob(MRJobLauncher):
         if protocol is None:
             protocol = JSONProtocol()
 
-        lines = StringIO(self.stdout.getvalue())
+        lines = BytesIO(self.stdout.getvalue())
         return [protocol.read(line) for line in lines]
 
 

@@ -27,14 +27,9 @@ import urllib2
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
+from io import BytesIO
 from subprocess import Popen
 from subprocess import PIPE
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
 
 try:
     import simplejson as json  # preferred because of C speedups
@@ -2004,7 +1999,7 @@ class EMRJobRunner(MRJobRunner):
 
         contents = self._master_bootstrap_script_content(
             self._bootstrap + mrjob_bootstrap + self._legacy_bootstrap)
-        for line in StringIO(contents):
+        for line in BytesIO(contents):
             log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
         with open(path, 'w') as f:
@@ -2076,7 +2071,7 @@ class EMRJobRunner(MRJobRunner):
     def _master_bootstrap_script_content(self, bootstrap):
         """Create the contents of the master bootstrap script.
         """
-        out = StringIO()
+        out = BytesIO()
 
         def writeln(line=''):
             out.write(line + '\n')

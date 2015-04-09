@@ -14,19 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import os
+import sys
+import time
+from io import BytesIO
 from optparse import Option
 from optparse import OptionError
 from optparse import OptionGroup
 from optparse import OptionParser
-import os
-import sys
-import time
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
 
 from mrjob.conf import combine_dicts
 from mrjob.options import add_basic_opts
@@ -655,7 +650,7 @@ class MRJobLauncher(object):
         """Redirect stdin, stdout, and stderr for automated testing.
 
         You can set stdin, stdout, and stderr to file objects. By
-        default, they'll be set to empty ``StringIO`` objects.
+        default, they'll be set to empty ``BytesIO`` objects.
         You can then access the job's file handles through ``self.stdin``,
         ``self.stdout``, and ``self.stderr``. See :ref:`testing` for more
         information about testing.
@@ -666,7 +661,7 @@ class MRJobLauncher(object):
         ``stdin`` is empty by default. You can set it to anything that yields
         lines::
 
-            mr_job.sandbox(stdin=StringIO('some_data\\n'))
+            mr_job.sandbox(stdin=BytesIO('some_data\\n'))
 
         or, equivalently::
 
@@ -683,7 +678,7 @@ class MRJobLauncher(object):
 
         More complex testing example::
 
-            from StringIO import StringIO
+            from BytesIO import BytesIO
 
             from mrjob.parse import parse_mr_job_stderr
             from mrjob.protocol import JSONProtocol
@@ -691,16 +686,16 @@ class MRJobLauncher(object):
             mr_job = MRYourJob(args=[...])
 
             fake_input = '"foo"\\t"bar"\\n"foo"\\t"baz"\\n'
-            mr_job.sandbox(stdin=StringIO(fake_input))
+            mr_job.sandbox(stdin=BytesIO(fake_input))
 
             mr_job.run_reducer(link_num=0)
 
             self.assertEqual(mrjob.stdout.getvalue(), ...)
             self.assertEqual(parse_mr_job_stderr(mr_job.stderr), ...)
         """
-        self.stdin = stdin or StringIO()
-        self.stdout = stdout or StringIO()
-        self.stderr = stderr or StringIO()
+        self.stdin = stdin or BytesIO()
+        self.stdout = stdout or BytesIO()
+        self.stderr = stderr or BytesIO()
 
         return self
 

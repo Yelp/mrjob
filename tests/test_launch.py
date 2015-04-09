@@ -12,14 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import cStringIO
 import inspect
 import logging
-from optparse import OptionError
 import os
+import sys
+
+from io import BytesIO
+from optparse import OptionError
 from subprocess import Popen
 from subprocess import PIPE
-import sys
 
 try:
     import unittest2 as unittest
@@ -288,7 +289,7 @@ class TestToolLogging(unittest.TestCase):
     """
     def test_default_options(self):
         with no_handlers_for_logger('__main__'):
-            with patch.object(sys, 'stderr', cStringIO.StringIO()) as stderr:
+            with patch.object(sys, 'stderr', BytesIO()) as stderr:
                 MRJob.set_up_logging()
                 log = logging.getLogger('__main__')
                 log.info('INFO')
@@ -297,7 +298,7 @@ class TestToolLogging(unittest.TestCase):
 
     def test_verbose(self):
         with no_handlers_for_logger('__main__'):
-            with patch.object(sys, 'stderr', cStringIO.StringIO()) as stderr:
+            with patch.object(sys, 'stderr', BytesIO()) as stderr:
                 MRJob.set_up_logging(verbose=True)
                 log = logging.getLogger('__main__')
                 log.info('INFO')

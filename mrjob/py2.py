@@ -26,6 +26,22 @@ Is it a string?
     from mrjob.py2 import basestring
     isinstance(..., basestring)
 
+StringIO
+
+    Replace:
+
+        try:
+            from cStringIO import StringIO
+        except ImportError:
+            from StringIO import StringIO
+
+    with:
+
+        from io import BytesIO
+
+    and use BytesIO instead of StringIO. It works the same way, exists
+    in Python 3, and appears (in my rudimentary hand-testing) to be faster!
+
 xrange
 
     Is it going to contain less than a million items? Just use range()

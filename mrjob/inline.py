@@ -17,12 +17,7 @@
 process. Useful for debugging."""
 import logging
 import os
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
+from io import BytesIO
 
 from mrjob.job import MRJob
 from mrjob.parse import parse_mr_job_stderr
@@ -144,7 +139,7 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         # Use custom stdin
         if has_combiner:
-            child_stdout = StringIO()
+            child_stdout = BytesIO()
         else:
             child_stdout = open(output_path, 'w')
 
@@ -159,7 +154,7 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         if has_combiner:
             sorted_lines = sorted(child_stdout.getvalue().splitlines())
-            combiner_stdin = StringIO('\n'.join(sorted_lines))
+            combiner_stdin = BytesIO('\n'.join(sorted_lines))
         else:
             child_stdout.flush()
 

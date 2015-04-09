@@ -24,17 +24,12 @@ import pprint
 import re
 import shutil
 import sys
+from io import BytesIO
 from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
 import tempfile
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
 
 try:
     import simplejson as json
@@ -331,7 +326,7 @@ class MRJobRunner(object):
                             Hadoop streaming will use this to determine how
                             mapper output should be sorted and distributed
                             to reducers.
-        :param stdin: an iterable (can be a ``StringIO`` or even a list) to use
+        :param stdin: an iterable (can be a ``BytesIO`` or even a list) to use
                       as stdin. This is a hook for testing; if you set
                       ``stdin`` via :py:meth:`~mrjob.job.MRJob.sandbox`, it'll
                       get passed through to the runner. If for some reason
@@ -917,7 +912,7 @@ class MRJobRunner(object):
         log.info('writing wrapper script to %s' % path)
 
         contents = self._setup_wrapper_script_content(setup)
-        for line in StringIO(contents):
+        for line in BytesIO(contents):
             log.debug('WRAPPER: ' + line.rstrip('\r\n'))
 
         with open(path, 'w') as f:
@@ -980,7 +975,7 @@ class MRJobRunner(object):
         cannot run simultaneously on the same machine (this helps for running
         :command:`make` on a shared source code archive, for example).
         """
-        out = StringIO()
+        out = BytesIO()
 
         def writeln(line=''):
             out.write(line + '\n')

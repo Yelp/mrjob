@@ -19,16 +19,11 @@ import os.path
 import shutil
 import signal
 import stat
-from subprocess import CalledProcessError
 import sys
 import tarfile
 import tempfile
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
+from io import BytesIO
+from subprocess import CalledProcessError
 
 try:
     import unittest2 as unittest
@@ -737,7 +732,7 @@ class SetupTestCase(SandboxedTestCase):
             '-r', 'local',
             '--setup', 'cat > stdin.txt',
         ])
-        job.sandbox(stdin=StringIO('some input\n'))
+        job.sandbox(stdin=BytesIO('some input\n'))
 
         # local mode doesn't currently pipe input into stdin
         # (see issue #567), so this test would hang if it failed
@@ -771,7 +766,7 @@ class SetupTestCase(SandboxedTestCase):
         job.sandbox()
 
         with no_handlers_for_logger('mrjob.local'):
-            stderr = StringIO()
+            stderr = BytesIO()
             log_to_stream('mrjob.local', stderr)
 
             with job.make_runner() as r:

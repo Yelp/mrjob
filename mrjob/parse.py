@@ -19,14 +19,9 @@ from functools import wraps
 import logging
 import re
 import time
+from io import BytesIO
 from urlparse import ParseResult
 from urlparse import urlparse as urlparse_buggy
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
 
 from mrjob.compat import uses_020_counters
 
@@ -422,7 +417,7 @@ def parse_mr_job_stderr(stderr, counters=None):
     # For the corresponding code in Hadoop Streaming, see ``incrCounter()`` in
     # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup  # noqa
     if isinstance(stderr, str):
-        stderr = StringIO(stderr)
+        stderr = BytesIO(stderr)
 
     if counters is None:
         counters = {}

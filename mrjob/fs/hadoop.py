@@ -15,15 +15,10 @@
 import logging
 import posixpath
 import re
+from io import BytesIO
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
 
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_uri
@@ -88,7 +83,7 @@ class HadoopFilesystem(Filesystem):
 
         log_func = log.debug if proc.returncode == 0 else log.error
         if not return_stdout:
-            for line in StringIO(stdout):
+            for line in BytesIO(stdout):
                 log_func('STDOUT: ' + line.rstrip('\r\n'))
 
         # check if STDERR is okay
@@ -100,7 +95,7 @@ class HadoopFilesystem(Filesystem):
                     break
 
         if not stderr_is_ok:
-            for line in StringIO(stderr):
+            for line in BytesIO(stderr):
                 log_func('STDERR: ' + line.rstrip('\r\n'))
 
         ok_returncodes = ok_returncodes or [0]
@@ -142,7 +137,7 @@ class HadoopFilesystem(Filesystem):
         except CalledProcessError:
             raise IOError("Could not ls %s" % path_glob)
 
-        for line in StringIO(stdout):
+        for line in BytesIO(stdout):
             line = line.rstrip('\r\n')
             fields = line.split(' ')
 

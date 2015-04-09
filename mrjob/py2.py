@@ -26,6 +26,10 @@ Is it a string?
     from mrjob.py2 import basestring
     isinstance(..., basestring)
 
+Is this string unicode?
+
+    not isinstance(..., bytes)
+
 StringIO
 
     Replace:
@@ -70,3 +74,15 @@ else:
     long = int
     unicode = str
     xrange = range
+
+
+# standard input/output/error in binary mode
+
+if IN_PY2:
+    stderr = sys.stderr
+    stdin = sys.stdin
+    stdout = sys.stdout
+else:
+    stderr = sys.stderr.buffer
+    stdin = sys.stdin.buffer
+    stdout = sys.stdout.buffer

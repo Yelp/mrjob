@@ -23,6 +23,7 @@ from optparse import OptionError
 from optparse import OptionGroup
 from optparse import OptionParser
 
+from mrjob import py2
 from mrjob.conf import combine_dicts
 from mrjob.options import add_basic_opts
 from mrjob.options import add_emr_opts
@@ -112,9 +113,9 @@ class MRJobLauncher(object):
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
         # See sandbox(), below.
-        self.stdin = sys.stdin
-        self.stdout = sys.stdout
-        self.stderr = sys.stderr
+        self.stdin = py2.stdin
+        self.stdout = py2.stdout
+        self.stderr = py2.stderr
 
     @classmethod
     def _usage(cls):

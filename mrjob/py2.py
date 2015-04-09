@@ -1,18 +1,39 @@
-"""Backwards-compatilibity with Python 2.
+"""Backwards-compatilibity with Python 2.6+ (from Python 3.3+)
 
-This is basically a poor man's version of the "future" library. You can see
-a list of compatible idioms here:
+It's almost always better to use an idiom that works in both flavors of
+Python than to fill your code with wrapper functions. Most of mrjob's code
+is aimed at launching jobs, so the overhead of, say, creating a list
+rather than using an iterator just isn't going to matter.
+
+(Efficiency *does* matter for code that's going to run as many times
+as there are lines in your job, such as protocols. In these cases, you
+shouldn't be using wrappers anyway; use IN_PY2 and write a separate
+efficient version for both flavors of Python.)
+
+Specific suggestions:
+
+Dictionary iterators: iteritems(), itervalues()
+
+    Just use items() or values()
+
+Is it an integer?
+
+    from mrjob.py2 import long
+    isinstance(..., (int, long))
+
+Is it a string?
+
+    from mrjob.py2 import basestring
+    isinstance(..., basestring)
+
+xrange
+
+    Is it going to contain less than a million items? Just use range()
+
+More idioms can be found here:
 
     http://python-future.org/compatible_idioms.html
 
-Try to use this module sparingly; in most cases, there is an idiom that
-works in both versions of Python.
-
-For example, we don't provide an iteritems() wrapper because dict.items()
-is perfectly fine in both languages; the additional overhead of creating
-a list in Python 2 just isn't going to matter. Surprisingly, mrjob has very
-little performance-critical code; it's pretty much just protocols and
-MRJob.run_*() that need to be efficient.
 """
 import sys
 
@@ -27,7 +48,9 @@ if IN_PY2:
     basestring = basestring
     long = long
     unicode = unicode
+    xrange = xrange
 else:
     basestring = str
     long = int
     unicode = str
+    xrange = range

@@ -30,6 +30,7 @@ try:
 except ImportError:
     import unittest
 
+from mrjob.py2 import xrange
 from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
@@ -266,6 +267,9 @@ class SafeEvalTestCase(unittest.TestCase):
 
     def test_simple_data_structure(self):
         # try unrepr-ing a bunch of simple data structures
+
+
+
         for x in True, None, 1, range(5), {'foo': False, 'bar': 2}:
             self.assertEqual(x, safeeval(repr(x)))
 

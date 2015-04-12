@@ -16,7 +16,6 @@ import os
 
 from tempfile import mkdtemp
 from shutil import rmtree
-from io import StringIO
 
 try:
     import unittest2 as unittest
@@ -36,6 +35,8 @@ except ImportError:
 from mrjob.conf import dump_mrjob_conf
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import log_to_stream
+
+from tests.py2 import StringIO
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase

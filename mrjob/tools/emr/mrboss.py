@@ -121,10 +121,10 @@ def run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
         if not os.path.exists(base_dir):
             os.makedirs(base_dir)
 
-        with open(os.path.join(base_dir, 'stdout'), 'w') as f:
+        with open(os.path.join(base_dir, 'stdout'), 'wb') as f:
             f.write(stdout)
 
-        with open(os.path.join(base_dir, 'stderr'), 'w') as f:
+        with open(os.path.join(base_dir, 'stderr'), 'wb') as f:
             f.write(stderr)
 
 

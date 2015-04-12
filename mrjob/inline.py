@@ -141,7 +141,7 @@ class InlineMRJobRunner(SimMRJobRunner):
         if has_combiner:
             child_stdout = BytesIO()
         else:
-            child_stdout = open(output_path, 'w')
+            child_stdout = open(output_path, 'wb')
 
         with save_current_environment():
             with save_cwd():

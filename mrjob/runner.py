@@ -51,6 +51,7 @@ from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.local import LocalFilesystem
+from mrjob.py2 import IN_PY2
 from mrjob.py2 import basestring
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_legacy_hash_path
@@ -392,7 +393,10 @@ class MRJobRunner(object):
 
         # Where to read input from (log files, etc.)
         self._input_paths = input_paths or ['-']  # by default read from stdin
-        self._stdin = stdin or sys.stdin
+        if IN_PY2:
+            self._stdin = stdin or sys.stdin
+        else:
+            self._stdin = stdin or sys.stdin.buffer
         self._stdin_path = None  # temp file containing dump from stdin
 
         # where a tarball of the mrjob library is stored locally
@@ -1043,11 +1047,11 @@ class MRJobRunner(object):
 
                 stdin_path = os.path.join(self._get_local_tmp_dir(), 'STDIN')
                 log.debug('dumping stdin to local file %s' % stdin_path)
-                with open(stdin_path, 'w') as stdin_file:
+                with open(stdin_path, 'wb') as stdin_file:
                     for line in self._stdin:
                         # catch missing newlines (often happens with test data)
-                        if not line.endswith('\n'):
-                            line += '\n'
+                        if not line.endswith(b'\n'):
+                            line += b'\n'
                         stdin_file.write(line)
 
                 self._stdin_path = stdin_path
@@ -1229,8 +1233,8 @@ class MRJobRunner(object):
 
         # assume we're using UNIX sort unless we know otherwise
         if (not self._sort_is_windows_sort) or len(input_paths) == 1:
-            with open(output_path, 'w') as output:
-                with open(err_path, 'w') as err:
+            with open(output_path, 'wb') as output:
+                with open(err_path, 'wb') as err:
                     args = ['sort'] + list(input_paths)
                     log.info('> %s' % cmd_line(args))
                     try:
@@ -1243,8 +1247,8 @@ class MRJobRunner(object):
         self._sort_is_windows_sort = True
 
         log.info('Piping files into sort for Windows compatibility')
-        with open(output_path, 'w') as output:
-            with open(err_path, 'w') as err:
+        with open(output_path, 'wb') as output:
+            with open(err_path, 'wb') as err:
                 args = ['sort']
                 log.info('> %s' % cmd_line(args))
                 proc = Popen(args, stdin=PIPE, stdout=output, stderr=err,
@@ -1252,7 +1256,7 @@ class MRJobRunner(object):
 
                 # shovel bytes into the sort process
                 for input_path in input_paths:
-                    with open(input_path, 'r') as input:
+                    with open(input_path, 'rb') as input:
                         while True:
                             buf = input.read(_BUFFER_SIZE)
                             if not buf:

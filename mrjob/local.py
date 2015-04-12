@@ -246,7 +246,7 @@ class LocalMRJobRunner(SimMRJobRunner):
             args if isinstance(args, basestring) else cmd_line(args)
             for args in procs_args), output_path))
 
-        with open(output_path, 'w') as write_to:
+        with open(output_path, 'wb') as write_to:
             procs = _chain_procs(procs_args, stdout=write_to, stderr=PIPE,
                                  cwd=working_dir, env=env)
             return [{'args': a, 'proc': proc, 'write_to': write_to}

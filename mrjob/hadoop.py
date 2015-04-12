@@ -297,7 +297,7 @@ class HadoopJobRunner(MRJobRunner):
         log.info('reading from STDIN')
 
         log.debug('dumping stdin to local file %s' % stdin_path)
-        stdin_file = open(stdin_path, 'w')
+        stdin_file = open(stdin_path, 'wb')
         for line in self._stdin:
             stdin_file.write(line)
 

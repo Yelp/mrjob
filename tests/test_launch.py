@@ -38,6 +38,7 @@ from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import mrjob_pythonpath
 from tests.sandbox import patch_fs_s3
 
 
@@ -124,12 +125,13 @@ class CommandLineArgsTestCase(unittest.TestCase):
     def test_should_exit_when_invoked_as_script(self):
         args = [sys.executable, inspect.getsourcefile(MRJobLauncher),
                 '--quux', 'baz']
+
         # add . to PYTHONPATH (in case mrjob isn't actually installed)
         env = combine_envs(os.environ,
-                           {'PYTHONPATH': os.path.abspath('.')})
+                           {'PYTHONPATH': mrjob_pythonpath()})
         proc = Popen(args, stderr=PIPE, stdout=PIPE, env=env)
-        proc.communicate()
-        self.assertEqual(proc.returncode, 2)
+        _, err = proc.communicate()
+        self.assertEqual(proc.returncode, 2, err)
 
     def test_custom_key_value_option_parsing(self):
         # simple example

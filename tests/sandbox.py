@@ -118,8 +118,11 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
         (Merely using the local runner won't require this, because it
         bootstraps mrjob by default.)
         """
-        mrjob_pythonpath = os.path.abspath(
-            os.path.join(os.path.dirname(mrjob.__file__), '..'))
-
         os.environ['PYTHONPATH'] = (
-            mrjob_pythonpath + ':' + os.environ.get('PYTHONPATH', ''))
+            mrjob_pythonpath() + ':' + os.environ.get('PYTHONPATH', ''))
+
+
+def mrjob_pythonpath():
+    """The directory containing the mrjob package that we've imported."""
+    return os.path.abspath(
+        os.path.join(os.path.dirname(mrjob.__file__), '..'))

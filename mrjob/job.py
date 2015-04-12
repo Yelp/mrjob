@@ -33,8 +33,8 @@ except ImportError:
     import json
 
 # don't use relative imports, to allow this script to be invoked as __main__
-from mrjob import py2
 from mrjob.conf import combine_dicts
+
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
@@ -43,7 +43,6 @@ from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
-from mrjob.py2 import long
 from mrjob.util import read_input
 
 
@@ -377,7 +376,12 @@ class MRJob(MRJobLauncher):
         return JarStep(*args, **kwargs)
 
     def increment_counter(self, group, counter, amount=1):
-        """Increment a counter in Hadoop streaming by printing to stderr.
+        """Increment a counter in Hadoop streaming by printing to stderr. If
+        the type of either **group** or **counter** is ``unicode``, then the
+        counter will be written as unicode. Otherwise, the counter will be
+        written as ASCII. Although writing non-ASCII will succeed, the
+        resulting counter names may not be displayed correctly at the end of
+        the job.
 
         :type group: str
         :param group: counter group
@@ -393,13 +397,6 @@ class MRJob(MRJobLauncher):
         if not isinstance(amount, (int, long)):
             raise TypeError('amount must be an integer, not %r' % (amount,))
 
-        # make sure everything is a string
-        if isinstance(group, bytes):
-            group = group.decode('utf-8')
-
-        if isinstance(counter, bytes):
-            counter = counter.decode('utf-8')
-
         # Extra commas screw up hadoop and there's no way to escape them. So
         # replace them with the next best thing: semicolons!
         #
@@ -407,12 +404,18 @@ class MRJob(MRJobLauncher):
         #
         # The relevant Hadoop code is incrCounter(), here:
         # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup  # noqa
-        group = group.replace(',', ';')
-        counter = counter.replace(',', ';')
+        if isinstance(group, unicode) or isinstance(counter, unicode):
+            group = unicode(group).replace(',', ';')
+            counter = unicode(counter).replace(',', ';')
+            stderr = codecs.getwriter('utf-8')(self.stderr)
+        else:
+            group = str(group).replace(',', ';')
+            counter = str(counter).replace(',', ';')
+            stderr = self.stderr
 
-        line = 'reporter:counter:%s,%s,%d\n' % (group, counter, amount)
-        self.stderr.write(line.encode('utf-8'))
-        self.stderr.flush()
+        stderr.write(
+            u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
+        stderr.flush()
 
     def set_status(self, msg):
         """Set the job status in hadoop streaming by printing to stderr.
@@ -1149,7 +1152,7 @@ class MRJob(MRJobLauncher):
         without a runner; normally you'd just use
         :py:meth:`runner.counters() <mrjob.runner.MRJobRunner.counters()>`.
         """
-        if self.stderr == py2.stderr:
+        if self.stderr == sys.stderr:
             raise AssertionError('You must call sandbox() first;'
                                  ' parse_counters() is for testing only.')
 
@@ -1173,7 +1176,7 @@ class MRJob(MRJobLauncher):
         :param protocol: A protocol instance to use. Defaults to
                          ``JSONProtocol()``.
         """
-        if self.stdout == py2.stdout:
+        if self.stdout == sys.stdout:
             raise AssertionError('You must call sandbox() first;'
                                  ' parse_output() is for testing only.')
 

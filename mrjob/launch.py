@@ -662,11 +662,11 @@ class MRJobLauncher(object):
         ``stdin`` is empty by default. You can set it to anything that yields
         lines::
 
-            mr_job.sandbox(stdin=BytesIO('some_data\\n'))
+            mr_job.sandbox(stdin=BytesIO(b'some_data\\n'))
 
         or, equivalently::
 
-            mr_job.sandbox(stdin=['some_data\\n'])
+            mr_job.sandbox(stdin=[b'some_data\\n'])
 
         For convenience, this sandbox() returns self, so you can do::
 

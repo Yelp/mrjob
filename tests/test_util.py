@@ -18,9 +18,9 @@ import optparse
 import os
 import random
 import shutil
+from io import BytesIO
 from subprocess import PIPE
 from subprocess import Popen
-from StringIO import StringIO
 import tarfile
 import tempfile
 
@@ -189,7 +189,7 @@ class ReadInputTestCase(unittest.TestCase):
 
     # we're going to put the same data in every file, so we don't
     # have to worry about ordering
-    BEAVER_DATA = 'Beavers mate for life.\n'
+    BEAVER_DATA = b'Beavers mate for life.\n'
 
     @classmethod
     def setup_tmpdir_with_beaver_data(self):
@@ -200,22 +200,22 @@ class ReadInputTestCase(unittest.TestCase):
             f.close()
 
         write_beaver_data_and_close(
-            open(os.path.join(self.tmpdir, 'beavers.txt'), 'w'))
+            open(os.path.join(self.tmpdir, 'beavers.txt'), 'wb'))
         write_beaver_data_and_close(
-            gzip.GzipFile(os.path.join(self.tmpdir, 'beavers.gz'), 'w'))
+            gzip.GzipFile(os.path.join(self.tmpdir, 'beavers.gz'), 'wb'))
         write_beaver_data_and_close(
-            bz2.BZ2File(os.path.join(self.tmpdir, 'beavers.bz2'), 'w'))
+            bz2.BZ2File(os.path.join(self.tmpdir, 'beavers.bz2'), 'wb'))
 
         os.mkdir(os.path.join(self.tmpdir, 'beavers'))
         write_beaver_data_and_close(
-            open(os.path.join(self.tmpdir, 'beavers/README.txt'), 'w'))
+            open(os.path.join(self.tmpdir, 'beavers/README.txt'), 'wb'))
 
     @classmethod
     def delete_tmpdir(self):
         shutil.rmtree(self.tmpdir)
 
     def test_stdin(self):
-        lines = read_input('-', stdin=StringIO(self.BEAVER_DATA))
+        lines = read_input('-', stdin=BytesIO(self.BEAVER_DATA))
         self.assertEqual(list(lines), [self.BEAVER_DATA])
 
     def test_stdin_can_be_iterator(self):

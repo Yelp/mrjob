@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Very basic tests for the audit_usage script"""
+import sys
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
-from StringIO import StringIO
-import sys
 
 import boto.emr.connection
 from mrjob.tools.emr.audit_usage import job_flow_to_full_summary
@@ -24,7 +23,9 @@ from mrjob.tools.emr.audit_usage import subdivide_interval_by_date
 from mrjob.tools.emr.audit_usage import subdivide_interval_by_hour
 from mrjob.tools.emr.audit_usage import main
 from mrjob.tools.emr.audit_usage import percent
+
 from tests.mockboto import MockEmrObject
+from tests.py2 import StringIO
 from tests.test_emr import MockEMRAndS3TestCase
 
 try:

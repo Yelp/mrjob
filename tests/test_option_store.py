@@ -16,7 +16,7 @@ import os
 
 from tempfile import mkdtemp
 from shutil import rmtree
-from StringIO import StringIO
+from io import StringIO
 
 try:
     import unittest2 as unittest

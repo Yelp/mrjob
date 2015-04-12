@@ -14,11 +14,11 @@
 # limitations under the License.
 """Unit testing of MRJob."""
 import os
-from subprocess import Popen
-from subprocess import PIPE
-from StringIO import StringIO
 import sys
 import time
+from io import BytesIO
+from subprocess import Popen
+from subprocess import PIPE
 
 try:
     import unittest2 as unittest
@@ -100,7 +100,7 @@ class MRInitTestCase(EmptyMrjobConfTestCase):
 
     def test_init_funcs(self):
         num_inputs = 2
-        stdin = StringIO("x\n" * num_inputs)
+        stdin = BytesIO(b"x\n" * num_inputs)
         mr_job = MRInitJob(['-r', 'inline', '-'])
         mr_job.sandbox(stdin=stdin)
 
@@ -256,7 +256,7 @@ class ProtocolsTestCase(unittest.TestCase):
                                 (ReprProtocol.read, JSONProtocol.write))
 
     def test_mapper_raw_value_to_json(self):
-        RAW_INPUT = StringIO('foo\nbar\nbaz\n')
+        RAW_INPUT = BytesIO(b'foo\nbar\nbaz\n')
 
         mr_job = MRBoringJob(['--mapper'])
         mr_job.sandbox(stdin=RAW_INPUT)
@@ -268,7 +268,7 @@ class ProtocolsTestCase(unittest.TestCase):
                          'null\t"baz"\n')
 
     def test_reducer_json_to_json(self):
-        JSON_INPUT = StringIO('"foo"\t"bar"\n' +
+        JSON_INPUT = BytesIO(b'"foo"\t"bar"\n' +
                               '"foo"\t"baz"\n' +
                               '"bar"\t"qux"\n')
 
@@ -283,7 +283,7 @@ class ProtocolsTestCase(unittest.TestCase):
     def test_output_protocol_with_no_final_reducer(self):
         # if there's no reducer, the last mapper should use the
         # output protocol (in this case, repr)
-        RAW_INPUT = StringIO('foo\nbar\nbaz\n')
+        RAW_INPUT = BytesIO(b'foo\nbar\nbaz\n')
 
         mr_job = self.MRTrivialJob(['--mapper'])
         mr_job.sandbox(stdin=RAW_INPUT)
@@ -303,20 +303,20 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
         def reducer(self, key, values):
             yield(key, list(values))
 
-    BAD_JSON_INPUT = ('BAD\tJSON\n' +
-                      '"foo"\t"bar"\n' +
-                      '"too"\t"many"\t"tabs"\n' +
-                      '"notabs"\n')
+    BAD_JSON_INPUT = (b'BAD\tJSON\n' +
+                      b'"foo"\t"bar"\n' +
+                      b'"too"\t"many"\t"tabs"\n' +
+                      b'"notabs"\n')
 
-    UNENCODABLE_RAW_INPUT = ('foo\n' +
-                             '\xaa\n' +
-                             'bar\n')
+    UNENCODABLE_RAW_INPUT = (b'foo\n' +
+                             b'\xaa\n' +
+                             b'bar\n')
 
     STRICT_MRJOB_CONF ={'runners': {'inline': {'strict_protocols': True}}}
 
     def assertJobHandlesUndecodableInput(self, job_args):
         job = self.MRBoringJSONJob(job_args)
-        job.sandbox(stdin=StringIO(self.BAD_JSON_INPUT))
+        job.sandbox(stdin=BytesIO(self.BAD_JSON_INPUT))
 
         with job.make_runner() as r:
             r.run()
@@ -333,14 +333,14 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
 
     def assertJobRaisesExceptionOnUndecodableInput(self, job_args):
         job = self.MRBoringJSONJob(job_args)
-        job.sandbox(stdin=StringIO(self.BAD_JSON_INPUT))
+        job.sandbox(stdin=BytesIO(self.BAD_JSON_INPUT))
 
         with job.make_runner() as r:
             self.assertRaises(Exception, r.run)
 
     def assertJobHandlesUnencodableOutput(self, job_args):
         job = MRBoringJob(job_args)
-        job.sandbox(stdin=StringIO(self.UNENCODABLE_RAW_INPUT))
+        job.sandbox(stdin=BytesIO(self.UNENCODABLE_RAW_INPUT))
 
         with job.make_runner() as r:
             r.run()
@@ -357,7 +357,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
 
     def assertJobRaisesExceptionOnUnencodableOutput(self, job_args):
         job = MRBoringJob(job_args)
-        job.sandbox(stdin=StringIO(self.UNENCODABLE_RAW_INPUT))
+        job.sandbox(stdin=BytesIO(self.UNENCODABLE_RAW_INPUT))
 
         with job.make_runner() as r:
             self.assertRaises(Exception, r.run)
@@ -599,7 +599,7 @@ class JobConfTestCase(unittest.TestCase):
 
     def assert_hadoop_version(self, JobClass, version_string):
         mr_job = JobClass()
-        mock_log = StringIO()
+        mock_log = BytesIO()
         with no_handlers_for_logger('mrjob.job'):
             log_to_stream('mrjob.job', mock_log)
             self.assertEqual(mr_job.jobconf()['hadoop_version'],
@@ -851,7 +851,7 @@ class StepNumTestCase(unittest.TestCase):
         test_mapper0(mapper0_no_step_num, mapper0_input_lines)
 
         # sort output of mapper0
-        mapper0_output_input_lines = StringIO(mapper0.stdout.getvalue())
+        mapper0_output_input_lines = BytesIO(mapper0.stdout.getvalue())
         reducer0_input_lines = sorted(mapper0_output_input_lines,
                                       key=lambda line: line.split('\t'))
 
@@ -869,7 +869,7 @@ class StepNumTestCase(unittest.TestCase):
         test_reducer0(reducer0_no_step_num, reducer0_input_lines)
 
         # mapper can use reducer0's output as-is
-        mapper1_input_lines = StringIO(reducer0.stdout.getvalue())
+        mapper1_input_lines = BytesIO(reducer0.stdout.getvalue())
 
         def test_mapper1(mr_job, input_lines):
             mr_job.sandbox(input_lines)
@@ -927,8 +927,8 @@ class DeprecatedTestMethodsTestCase(unittest.TestCase):
     def test_parse_output(self):
         # test parsing JSON
         mr_job = MRJob()
-        output = '0\t1\n"a"\t"b"\n'
-        mr_job.stdout = StringIO(output)
+        output = b'0\t1\n"a"\t"b"\n'
+        mr_job.stdout = BytesIO(output)
         with logger_disabled('mrjob.job'):
             self.assertEqual(mr_job.parse_output(), [(0, 1), ('a', 'b')])
 
@@ -938,8 +938,8 @@ class DeprecatedTestMethodsTestCase(unittest.TestCase):
     def test_parse_output_with_protocol_instance(self):
         # see if we can use the repr protocol
         mr_job = MRJob()
-        output = "0\t1\n['a', 'b']\tset(['c', 'd'])\n"
-        mr_job.stdout = StringIO(output)
+        output = b"0\t1\n['a', 'b']\tset(['c', 'd'])\n"
+        mr_job.stdout = BytesIO(output)
         with logger_disabled('mrjob.job'):
             self.assertEqual(mr_job.parse_output(ReprProtocol()),
                              [(0, 1), (['a', 'b'], set(['c', 'd']))])
@@ -967,12 +967,12 @@ class RunJobTestCase(SandboxedTestCase):
         env = combine_envs(os.environ,
                            {'PYTHONPATH': os.path.abspath('.')})
         proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
-        stdout, stderr = proc.communicate(input='foo\nbar\nbar\n')
+        stdout, stderr = proc.communicate(input=b'foo\nbar\nbar\n')
         return stdout, stderr, proc.returncode
 
     def test_quiet(self):
         stdout, stderr, returncode = self.run_job(['-q'])
-        self.assertEqual(sorted(StringIO(stdout)), ['1\t"foo"\n',
+        self.assertEqual(sorted(BytesIO(stdout)), ['1\t"foo"\n',
                                                     '2\t"bar"\n',
                                                     '3\tnull\n'])
         self.assertEqual(stderr, '')
@@ -980,7 +980,7 @@ class RunJobTestCase(SandboxedTestCase):
 
     def test_verbose(self):
         stdout, stderr, returncode = self.run_job()
-        self.assertEqual(sorted(StringIO(stdout)), ['1\t"foo"\n',
+        self.assertEqual(sorted(BytesIO(stdout)), ['1\t"foo"\n',
                                                     '2\t"bar"\n',
                                                     '3\tnull\n'])
         self.assertNotEqual(stderr, '')
@@ -988,7 +988,7 @@ class RunJobTestCase(SandboxedTestCase):
         normal_stderr = stderr
 
         stdout, stderr, returncode = self.run_job(['-v'])
-        self.assertEqual(sorted(StringIO(stdout)), ['1\t"foo"\n',
+        self.assertEqual(sorted(BytesIO(stdout)), ['1\t"foo"\n',
                                                     '2\t"bar"\n',
                                                     '3\tnull\n'])
         self.assertNotEqual(stderr, '')
@@ -1041,7 +1041,7 @@ class ProtocolTypeTestCase(unittest.TestCase):
 
     def test_attrs_should_be_classes(self):
         with no_handlers_for_logger('mrjob.job'):
-            stderr = StringIO()
+            stderr = BytesIO()
             log_to_stream('mrjob.job', stderr)
             job = self.StrangeJob()
             self.assertIsInstance(job.input_protocol(), JSONProtocol)

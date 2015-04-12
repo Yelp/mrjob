@@ -15,11 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for InlineMRJobRunner"""
-from StringIO import StringIO
-
 import gzip
 import os
 import unittest
+from io import BytesIO
 
 try:
     from unittest2 import TestCase
@@ -50,7 +49,7 @@ class InlineMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
     def test_end_to_end(self):
         # read from STDIN, a regular file, and a .gz
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
@@ -100,7 +99,7 @@ class InlineMRJobRunnerCmdenvTest(EmptyMrjobConfTestCase):
         old_env = os.environ.copy()
 
         mr_job = MRTestCmdenv(['--runner', 'inline', '--cmdenv=FOO=bar'])
-        mr_job.sandbox(stdin=StringIO('foo\n'))
+        mr_job.sandbox(stdin=BytesIO(b'foo\n'))
 
         results = []
 
@@ -162,7 +161,7 @@ class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
 
     def test_adding_2(self):
         mr_job = MRIncrementerJob(['-r', 'inline', '--times', '2'])
-        mr_job.sandbox(stdin=StringIO('0\n1\n2\n'))
+        mr_job.sandbox(stdin=BytesIO(b'0\n1\n2\n'))
 
         self.assertEqual(len(mr_job.steps()), 2)
 
@@ -194,7 +193,7 @@ class MRJobFileOptionsTestCase(TestCase):
 
     def test_with_input_file_option(self):
         mr_job = MRCustomFileOptionJob(['-r', 'inline', '--platform_file=tests/input/test_input_file.txt'])
-        mr_job.sandbox(stdin=StringIO('1\n'))
+        mr_job.sandbox(stdin=BytesIO(b'1\n'))
 
         with mr_job.make_runner() as runner:
             runner.run()
@@ -209,7 +208,7 @@ class NoMRJobConfTestCase(TestCase):
     def test_no_mrjob_confs(self):
         with patch.object(conf, 'real_mrjob_conf_path', return_value=None):
             mr_job = MRIncrementerJob(['-r', 'inline', '--times', '2'])
-            mr_job.sandbox(stdin=StringIO('0\n1\n2\n'))
+            mr_job.sandbox(stdin=BytesIO(b'0\n1\n2\n'))
 
             with mr_job.make_runner() as runner:
                 runner.run()
@@ -347,7 +346,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
             '-r', self.RUNNER, '--jobconf', 'mapred.map.tasks=2',
             ])
         # need at least two items of input to get two map tasks
-        mr_job.sandbox(StringIO('foo\nbar\n'))
+        mr_job.sandbox(BytesIO(b'foo\nbar\n'))
 
         with mr_job.make_runner() as runner:
             runner.run()

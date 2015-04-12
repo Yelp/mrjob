@@ -732,7 +732,7 @@ class SetupTestCase(SandboxedTestCase):
             '-r', 'local',
             '--setup', 'cat > stdin.txt',
         ])
-        job.sandbox(stdin=BytesIO('some input\n'))
+        job.sandbox(stdin=BytesIO(b'some input\n'))
 
         # local mode doesn't currently pipe input into stdin
         # (see issue #567), so this test would hang if it failed

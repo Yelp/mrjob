@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import sys
-from StringIO import StringIO
+from io import BytesIO
 from subprocess import PIPE
 from subprocess import Popen
 
@@ -40,6 +40,8 @@ from mrjob.parse import parse_port_range_list
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
 from mrjob.util import log_to_stream
+
+from tests.py2 import StringIO
 from tests.quiet import no_handlers_for_logger
 
 
@@ -88,7 +90,7 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
         # sanity-check normal operations
         ok_stdout, ok_stderr = run('python', '-c', "print sorted('321')")
         self.assertEqual(ok_stdout.rstrip(), "['1', '2', '3']")
-        self.assertEqual(find_python_traceback(StringIO(ok_stderr)), None)
+        self.assertEqual(find_python_traceback(BytesIO(ok_stderr)), None)
 
         # Oops, can't sort a number.
         stdout, stderr = run('python', '-c', "print sorted(321)")
@@ -100,7 +102,7 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
         # TypeError: 'int' object is not iterable
         self.assertEqual(stdout, '')
         # save the traceback for the next step
-        tb = find_python_traceback(StringIO(stderr))
+        tb = find_python_traceback(BytesIO(stderr))
         self.assertNotEqual(tb, None)
         assert isinstance(tb, list)
         # The first line ("Traceback...") is not skipped
@@ -116,22 +118,22 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
             'python', '-v', '-c', "print sorted(321)")
         self.assertEqual(verbose_stdout, '')
         self.assertNotEqual(verbose_stderr, stderr)
-        verbose_tb = find_python_traceback(StringIO(verbose_stderr))
+        verbose_tb = find_python_traceback(BytesIO(verbose_stderr))
         self.assertEqual(verbose_tb, tb)
 
     def test_find_multiple_python_tracebacks(self):
         total_traceback = self.EXAMPLE_TRACEBACK + 'junk\n'
-        tb = find_python_traceback(StringIO(total_traceback))
+        tb = find_python_traceback(BytesIO(total_traceback))
         self.assertEqual(''.join(tb), self.EXAMPLE_TRACEBACK)
 
     def test_find_python_traceback_with_more_stderr(self):
         total_traceback = self.EXAMPLE_STDERR_TRACEBACK_1 + 'junk\n'
-        tb = find_python_traceback(StringIO(total_traceback))
+        tb = find_python_traceback(BytesIO(total_traceback))
         self.assertEqual(''.join(tb), self.EXAMPLE_STDERR_TRACEBACK_1)
 
     def test_find_python_traceback_with_more_stderr_2(self):
         total_traceback = self.EXAMPLE_STDERR_TRACEBACK_2 + 'junk\n'
-        tb = find_python_traceback(StringIO(total_traceback))
+        tb = find_python_traceback(BytesIO(total_traceback))
         self.assertEqual(''.join(tb), self.EXAMPLE_STDERR_TRACEBACK_2)
 
 
@@ -402,6 +404,7 @@ class FindMiscTestCase(unittest.TestCase):
                              parse_hadoop_counters_from_line(counter_string))
             self.assertIn('Cannot parse Hadoop counter string',
                           stderr.getvalue())
+
     def test_freaky_counter_names(self):
         freaky_name = r'\\\\\{\}\(\)\[\]\.\\\\'
         counter_string = (r'Job JOBID="_001" FAILED_REDUCES="0" '
@@ -446,18 +449,18 @@ class FindMiscTestCase(unittest.TestCase):
 class ParseMRJobStderr(unittest.TestCase):
 
     def test_empty(self):
-        self.assertEqual(parse_mr_job_stderr(StringIO()),
+        self.assertEqual(parse_mr_job_stderr(BytesIO()),
                          {'counters': {}, 'statuses': [], 'other': []})
 
     def test_parsing(self):
-        INPUT = StringIO(
-            'reporter:counter:Foo,Bar,2\n' +
-            'reporter:status:Baz\n' +
-            'reporter:status:Baz\n' +
-            'reporter:counter:Foo,Bar,1\n' +
-            'reporter:counter:Foo,Baz,1\n' +
-            'reporter:counter:Quux Subsystem,Baz,42\n' +
-            'Warning: deprecated metasyntactic variable: garply\n')
+        INPUT = BytesIO(
+            b'reporter:counter:Foo,Bar,2\n' +
+            b'reporter:status:Baz\n' +
+            b'reporter:status:Baz\n' +
+            b'reporter:counter:Foo,Bar,1\n' +
+            b'reporter:counter:Foo,Baz,1\n' +
+            b'reporter:counter:Quux Subsystem,Baz,42\n' +
+            b'Warning: deprecated metasyntactic variable: garply\n')
 
         self.assertEqual(
             parse_mr_job_stderr(INPUT),
@@ -471,7 +474,7 @@ class ParseMRJobStderr(unittest.TestCase):
         counters = {'Foo': {'Bar': 3, 'Baz': 1}}
 
         parse_mr_job_stderr(
-            StringIO('reporter:counter:Foo,Baz,1\n'), counters=counters)
+            BytesIO(b'reporter:counter:Foo,Baz,1\n'), counters=counters)
 
         self.assertEqual(counters, {'Foo': {'Bar': 3, 'Baz': 2}})
 

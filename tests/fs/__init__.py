@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from StringIO import StringIO
+from io import BytesIO
+
+from mrjob.py2 import stdin
 
 from tests.sandbox import SandboxedTestCase
 
@@ -38,11 +40,11 @@ class MockSubprocessTestCase(SandboxedTestCase):
 
             def __init__(self, args, stdin=None, stdout=None, stderr=None):
                 self.args = args
-                self.stdin = stdin if stdin is not None else StringIO()
+                self.stdin = stdin if stdin is not None else BytesIO()
 
                 # discard incoming stdout/stderr objects
-                self.stdout = StringIO()
-                self.stderr = StringIO()
+                self.stdout = BytesIO()
+                self.stderr = BytesIO()
 
                 if stdin is None:
                     self._run()
@@ -62,8 +64,8 @@ class MockSubprocessTestCase(SandboxedTestCase):
                 outer.io_log.append((self.stdout_result, self.stderr_result))
 
                 # expose the results as readable file objects
-                self.stdout = StringIO(self.stdout_result)
-                self.stderr = StringIO(self.stderr_result)
+                self.stdout = BytesIO(self.stdout_result)
+                self.stderr = BytesIO(self.stderr_result)
 
             def communicate(self, stdin=None):
                 if stdin is not None:

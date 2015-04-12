@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Very basic tests for the audit_usage script"""
+import sys
 from datetime import datetime
 from datetime import timedelta
-from StringIO import StringIO
-import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.report_long_jobs import find_long_running_jobs
 from mrjob.tools.emr.report_long_jobs import main
+
 from tests.mockboto import MockEmrObject
+from tests.py2 import StringIO
 from tests.test_emr import MockEMRAndS3TestCase
 
 try:

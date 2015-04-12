@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the idle job flow terminator"""
-from StringIO import StringIO
+import sys
 from datetime import datetime
 from datetime import timedelta
-import sys
 
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
@@ -33,6 +32,7 @@ from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
 from tests.mockboto import MockEmrConnection
 from tests.mockboto import MockS3Connection
+from tests.py2 import StringIO
 from tests.test_emr import MockEMRAndS3TestCase
 
 

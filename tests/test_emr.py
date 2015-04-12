@@ -13,11 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for EMRJobRunner"""
-from contextlib import contextmanager
-from contextlib import nested
 import copy
-from datetime import datetime
-from datetime import timedelta
 import getpass
 import itertools
 import logging
@@ -25,9 +21,13 @@ import os
 import os.path
 import posixpath
 import shutil
-from StringIO import StringIO
 import tempfile
 import time
+from contextlib import contextmanager
+from contextlib import nested
+from datetime import datetime
+from datetime import timedelta
+from io import BytesIO
 
 from mock import patch
 from mock import Mock
@@ -224,7 +224,7 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
     def run_and_get_job_flow(self, *args):
         # set up a job flow without caring about what the job is or what its
         # inputs are.
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
         mr_job = MRTwoStepJob(
             ['-r', 'emr', '-v'] + list(args))
         mr_job.sandbox(stdin=stdin)
@@ -245,7 +245,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
     def test_end_to_end(self):
         # read from STDIN, a local file, and a remote file
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         local_input_path = os.path.join(self.tmp_dir, 'input')
         with open(local_input_path, 'w') as local_input_file:
@@ -347,7 +347,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with no_handlers_for_logger('mrjob.emr'):
-            stderr = StringIO()
+            stderr = BytesIO()
             log_to_stream('mrjob.emr', stderr)
 
             with mr_job.make_runner() as runner:
@@ -377,7 +377,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
     def _test_remote_scratch_cleanup(self, mode, scratch_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '--s3-log-uri', 's3://walrus/logs',
@@ -432,7 +432,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
     def test_args_version_018(self):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
         # read from STDIN, a local file, and a remote file
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '--hadoop-version=0.18', '--ami-version=1.0'])
@@ -449,7 +449,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
     def test_args_version_020_205(self):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
         # read from STDIN, a local file, and a remote file
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--ami-version=2.0'])
         mr_job.sandbox(stdin=stdin)
@@ -522,7 +522,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
             name='Development Job Flow', log_uri=None,
             keep_alive=True)
 
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
         self.mock_emr_output = {(emr_job_flow_id, 1): [
             '1\t"bar"\n1\t"foo"\n2\tnull\n']}
 
@@ -598,7 +598,7 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
 class IAMJobFlowRoleTestCase(MockEMRAndS3TestCase):
 
     def run_and_get_job_flow(self, *args):
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
         mr_job = MRTwoStepJob(
             ['-r', 'emr', '-v'] + list(args))
         mr_job.sandbox(stdin=stdin)
@@ -881,7 +881,7 @@ class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
     def test_region_bucket_does_not_match(self):
         # aws_region specified, bucket specified with incorrect location
         with no_handlers_for_logger():
-            stderr = StringIO()
+            stderr = BytesIO()
             log = logging.getLogger('mrjob.emr')
             log.addHandler(logging.StreamHandler(stderr))
             log.setLevel(logging.WARNING)
@@ -1256,7 +1256,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
             task=(20, 'c1.medium', None))
 
     def test_mixing_instance_number_opts_on_cmd_line(self):
-        stderr = StringIO()
+        stderr = BytesIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.emr', stderr)
             self._test_instance_groups(
@@ -1272,7 +1272,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
                                num_ec2_core_instances=5,
                                num_ec2_task_instances=9)
 
-        stderr = StringIO()
+        stderr = BytesIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.emr', stderr)
             self._test_instance_groups(
@@ -1287,7 +1287,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self.set_in_mrjob_conf(num_ec2_core_instances=5,
                                num_ec2_task_instances=9)
 
-        stderr = StringIO()
+        stderr = BytesIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.emr', stderr)
             self._test_instance_groups(
@@ -1382,7 +1382,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         self.assertEqual(
             self.runner._find_probable_cause_of_failure([1]),
-            {'lines': list(StringIO(TRACEBACK_START + PY_EXCEPTION)),
+            {'lines': list(BytesIO(TRACEBACK_START + PY_EXCEPTION)),
              'log_file_uri': BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
              'input_uri': BUCKET_URI + 'input.gz'})
 
@@ -1393,7 +1393,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         self.assertEqual(
             self.runner._find_probable_cause_of_failure([1]),
-            {'lines': list(StringIO(TRACEBACK_START + PY_EXCEPTION)),
+            {'lines': list(BytesIO(TRACEBACK_START + PY_EXCEPTION)),
              'log_file_uri': BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
              'input_uri': None})
 
@@ -1409,7 +1409,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         self.assertEqual(
             self.runner._find_probable_cause_of_failure([1]),
-            {'lines': list(StringIO(JAVA_STACK_TRACE)),
+            {'lines': list(BytesIO(JAVA_STACK_TRACE)),
              'log_file_uri': BUCKET_URI + ATTEMPT_0_DIR + 'syslog',
              'input_uri': BUCKET_URI + 'input.gz'})
 
@@ -1422,7 +1422,7 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
         }})
         self.assertEqual(
             self.runner._find_probable_cause_of_failure([1]),
-            {'lines': list(StringIO(JAVA_STACK_TRACE)),
+            {'lines': list(BytesIO(JAVA_STACK_TRACE)),
              'log_file_uri': BUCKET_URI + ATTEMPT_0_DIR + 'syslog',
              'input_uri': None})
 
@@ -1576,7 +1576,7 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
     def test_empty_counters_running_job(self):
         self.runner._describe_jobflow().state = 'RUNNING'
         with no_handlers_for_logger():
-            stderr = StringIO()
+            stderr = BytesIO()
             log_to_stream('mrjob.emr', stderr)
             self.runner._fetch_counters([1], skip_s3_wait=True)
             self.assertIn('5 minutes', stderr.getvalue())
@@ -2172,7 +2172,7 @@ class EMRNoMapperTest(MockEMRAndS3TestCase):
 
     def test_no_mapper(self):
         # read from STDIN, a local file, and a remote file
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         local_input_path = os.path.join(self.tmp_dir, 'input')
         with open(local_input_path, 'w') as local_input_file:
@@ -3061,7 +3061,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
 
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
-            stderr = StringIO()
+            stderr = BytesIO()
             log_to_stream('mrjob.emr', stderr)
             with patch.object(mrjob.emr, 'ssh_terminate_single_job',
                               side_effect=die_ssh):
@@ -3076,7 +3076,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             r = self._quick_runner()
             with patch.object(mrjob.emr, 'ssh_terminate_single_job',
                               side_effect=die_io):
-                stderr = StringIO()
+                stderr = BytesIO()
                 log_to_stream('mrjob.emr', stderr)
                 r._cleanup_job()
                 self.assertIn('Unable to kill job', stderr.getvalue())
@@ -3225,7 +3225,7 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
         super(BuildStreamingStepTestCase, self).setUp()
         with patch_fs_s3():
             self.runner = EMRJobRunner(
-                mr_job_script='my_job.py', conf_paths=[], stdin=StringIO())
+                mr_job_script='my_job.py', conf_paths=[], stdin=BytesIO())
         self.runner._steps = []  # don't actually run `my_job.py --steps`
         self.runner._add_job_files_for_upload()
 

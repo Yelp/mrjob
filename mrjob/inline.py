@@ -154,7 +154,7 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         if has_combiner:
             sorted_lines = sorted(child_stdout.getvalue().splitlines())
-            combiner_stdin = BytesIO('\n'.join(sorted_lines))
+            combiner_stdin = BytesIO(b'\n'.join(sorted_lines))
         else:
             child_stdout.flush()
 

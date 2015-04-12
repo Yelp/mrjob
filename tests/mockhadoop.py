@@ -64,7 +64,7 @@ def add_mock_hadoop_output(parts):
 
     Args:
     parts -- a list of the contents of parts files, which should be iterables
-        that return lines (e.g. lists, StringIOs).
+        that return lines (e.g. lists, BytesIOs).
 
     The environment variable MOCK_HADOOP_OUTPUT must be set.
     """

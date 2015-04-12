@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for LocalMRJobRunner"""
-from StringIO import StringIO
 import gzip
 import os
 import shutil
@@ -21,6 +20,7 @@ import signal
 import stat
 import sys
 import tempfile
+from io import BytesIO
 
 try:
     import unittest2 as unittest
@@ -52,7 +52,7 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
     def test_end_to_end(self):
         # read from STDIN, a regular file, and a .gz
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
@@ -90,7 +90,7 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
     def test_end_to_end_multiple_tasks(self):
         # read from STDIN, a regular file, and a .gz
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
@@ -239,7 +239,7 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
         self.gz_test('')
 
     def test_multi_step_counters(self):
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         mr_job = MRCountingJob(['-r', 'local', '-'])
         mr_job.sandbox(stdin=stdin)
@@ -535,9 +535,9 @@ class CompatTestCase(EmptyMrjobConfTestCase):
 class CommandSubstepTestCase(SandboxedTestCase):
 
     def test_cat_mapper(self):
-        data = 'x\ny\nz\n'
+        data = b'x\ny\nz\n'
         job = CmdJob(['--mapper-cmd=cat', '--runner=local'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -552,9 +552,9 @@ class CommandSubstepTestCase(SandboxedTestCase):
             self.assertItemsEqual(lines, data.split())
 
     def test_uniq_combiner(self):
-        data = 'x\nx\nx\nx\nx\nx\n'
+        data = b'x\nx\nx\nx\nx\nx\n'
         job = CmdJob(['--combiner-cmd=uniq', '--runner=local'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -575,9 +575,9 @@ class CommandSubstepTestCase(SandboxedTestCase):
             self.assertEqual(''.join(r.stream_output()), 'x\nx\n')
 
     def test_cat_reducer(self):
-        data = 'x\ny\nz\n'
+        data = b'x\ny\nz\n'
         job = CmdJob(['--reducer-cmd', 'cat -e', '--runner=local'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -596,7 +596,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
             self.assertItemsEqual(lines, ['x$\n', 'y$\n', 'z$\n'])
 
     def test_multiple(self):
-        data = 'x\nx\nx\nx\nx\nx\n'
+        data = b'x\nx\nx\nx\nx\nx\n'
         mapper_cmd = 'cat -e'
         reducer_cmd = bash_wrap('wc -l | tr -Cd "[:digit:]"')
         job = CmdJob([
@@ -604,7 +604,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
             '--mapper-cmd', mapper_cmd,
             '--combiner-cmd', 'uniq',
             '--reducer-cmd', reducer_cmd])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -620,10 +620,10 @@ class CommandSubstepTestCase(SandboxedTestCase):
             self.assertEqual(list(r.stream_output()), ['2'])
 
     def test_multiple_2(self):
-        data = 'x\ny\nz\n'
+        data = b'x\ny\nz\n'
         job = CmdJob(['--mapper-cmd=cat', '--reducer-cmd-2', 'wc -l',
                       '--runner=local', '--no-conf'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             r.run()
             self.assertEqual(sum(int(l) for l in r.stream_output()), 3)
@@ -632,9 +632,9 @@ class CommandSubstepTestCase(SandboxedTestCase):
 class FilterTestCase(SandboxedTestCase):
 
     def test_mapper_pre_filter(self):
-        data = 'x\ny\nz\n'
+        data = b'x\ny\nz\n'
         job = FilterJob(['--mapper-filter', 'cat -e', '--runner=local'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -650,9 +650,9 @@ class FilterTestCase(SandboxedTestCase):
             self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
 
     def test_combiner_pre_filter(self):
-        data = 'x\ny\nz\n'
+        data = b'x\ny\nz\n'
         job = FilterJob(['--combiner-filter', 'cat -e', '--runner=local'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -671,9 +671,9 @@ class FilterTestCase(SandboxedTestCase):
             self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
 
     def test_reducer_pre_filter(self):
-        data = 'x\ny\nz\n'
+        data = b'x\ny\nz\n'
         job = FilterJob(['--reducer-filter', 'cat -e', '--runner=local'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),

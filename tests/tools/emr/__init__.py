@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from StringIO import StringIO
 import sys
 
 from mrjob.emr import EMRJobRunner
 
+from tests.py2 import StringIO
 from tests.test_emr import MockEMRAndS3TestCase
 
 

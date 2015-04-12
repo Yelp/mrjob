@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the hadoop job runner."""
-from StringIO import StringIO
 import getpass
 import os
 import pty
+from io import BytesIO
 from subprocess import CalledProcessError
 from subprocess import check_call
 
@@ -146,7 +146,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
     def _test_end_to_end(self, args=()):
         # read from STDIN, a local file, and a remote file
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         local_input_path = os.path.join(self.tmp_dir, 'input')
         with open(local_input_path, 'w') as local_input_file:
@@ -274,7 +274,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
         super(StreamingArgsTestCase, self).setUp()
         self.runner = HadoopJobRunner(
             hadoop_bin='hadoop', hadoop_streaming_jar='streaming.jar',
-            mr_job_script='my_job.py', stdin=StringIO())
+            mr_job_script='my_job.py', stdin=BytesIO())
         self.runner._add_job_files_for_upload()
 
         self.runner._hadoop_version='0.20.204'

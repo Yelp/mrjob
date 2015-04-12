@@ -43,6 +43,7 @@ from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
+from mrjob.py2 import long
 from mrjob.util import read_input
 
 
@@ -376,12 +377,7 @@ class MRJob(MRJobLauncher):
         return JarStep(*args, **kwargs)
 
     def increment_counter(self, group, counter, amount=1):
-        """Increment a counter in Hadoop streaming by printing to stderr. If
-        the type of either **group** or **counter** is ``unicode``, then the
-        counter will be written as unicode. Otherwise, the counter will be
-        written as ASCII. Although writing non-ASCII will succeed, the
-        resulting counter names may not be displayed correctly at the end of
-        the job.
+        """Increment a counter in Hadoop streaming by printing to stderr.
 
         :type group: str
         :param group: counter group
@@ -404,18 +400,15 @@ class MRJob(MRJobLauncher):
         #
         # The relevant Hadoop code is incrCounter(), here:
         # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup  # noqa
-        if isinstance(group, unicode) or isinstance(counter, unicode):
-            group = unicode(group).replace(',', ';')
-            counter = unicode(counter).replace(',', ';')
-            stderr = codecs.getwriter('utf-8')(self.stderr)
-        else:
-            group = str(group).replace(',', ';')
-            counter = str(counter).replace(',', ';')
-            stderr = self.stderr
+        group = group.replace(',', ';')
+        counter = counter.replace(',', ';')
 
-        stderr.write(
-            u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
-        stderr.flush()
+        line = 'reporter:counter:%s,%s,%d\n' % (group, counter, amount)
+        if not isinstance(line, bytes):
+            line = line.encode('utf-8')
+
+        self.stderr.write(line)
+        self.stderr.flush()
 
     def set_status(self, msg):
         """Set the job status in hadoop streaming by printing to stderr.
@@ -423,18 +416,13 @@ class MRJob(MRJobLauncher):
         This is also a good way of doing a keepalive for a job that goes a
         long time between outputs; Hadoop streaming usually times out jobs
         that give no output for longer than 10 minutes.
-
-        If the type of **msg** is ``unicode``, then the message will be written
-        as unicode. Otherwise, it will be written as ASCII.
         """
-        if isinstance(msg, unicode):
-            status = u'reporter:status:%s\n' % (msg,)
-            stderr = codecs.getwriter('utf-8')(self.stderr)
-        else:
-            status = 'reporter:status:%s\n' % (msg,)
-            stderr = self.stderr
-        stderr.write(status)
-        stderr.flush()
+        line = 'reporter:status:%s\n' % (msg,)
+        if not isinstance(line, bytes):
+            line = line.encode('utf-8')
+
+        self.stderr.write(line)
+        self.stderr.flush()
 
     ### Running the job ###
 

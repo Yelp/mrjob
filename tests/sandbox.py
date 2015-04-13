@@ -104,7 +104,9 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
     def makefile(self, path, contents):
         self.makedirs(os.path.split(path)[0])
         abs_path = os.path.join(self.tmp_dir, path)
-        with open(abs_path, 'w') as f:
+
+        mode = 'wb' if isinstance(contents, bytes) else 'w'
+        with open(abs_path, mode) as f:
             f.write(contents)
         return abs_path
 

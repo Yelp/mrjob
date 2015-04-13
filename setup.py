@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import sys
 from os.path import join
 from os.path import dirname
 
@@ -30,9 +31,12 @@ try:
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',
-        'tests_require': ['unittest2', 'mock'],
+        'tests_require': ['mock'],
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
+    if sys.version_info < (2, 7):
+        setuptools_kwargs['tests_require'].append('unittest2')
+
 except ImportError:
     from distutils.core import setup
     setuptools_kwargs = {}

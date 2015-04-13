@@ -83,7 +83,7 @@ def main(args):
     if options.pretty_print:
         pretty_print(stats)
     else:
-        print json.dumps(stats)
+        print(json.dumps(stats))
 
 
 def pretty_print(stats):
@@ -92,11 +92,11 @@ def pretty_print(stats):
     :param stats: A dictionary returned by :py:func:`job_flows_to_stats`
     """
     s = stats
-    print '                Timestamp: %s' % s['timestamp']
-    print 'Number of active jobflows: %s' % s['num_jobflows']
-    print 'Number of instance counts: %s' % s['total_instance_count']
-    print '* The active jobflows are those in states of BOOTSTRAPPING,'
-    print '  STARTING, RUNNING, and WAITING.'
+    print('                Timestamp: %s' % s['timestamp'])
+    print('Number of active jobflows: %s' % s['num_jobflows'])
+    print('Number of instance counts: %s' % s['total_instance_count'])
+    print('* The active jobflows are those in states of BOOTSTRAPPING,')
+    print('  STARTING, RUNNING, and WAITING.')
 
 
 def collect_active_job_flows(conf_paths):

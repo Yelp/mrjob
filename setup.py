@@ -12,11 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import sys
-from os.path import join
-from os.path import dirname
 
-# get __version__
-execfile(join(dirname(__file__), 'mrjob/__init__.py'))
+import mrjob
 
 try:
     from setuptools import setup
@@ -24,7 +21,6 @@ try:
     # arguments that distutils doesn't understand
     setuptools_kwargs = {
         'install_requires': [
-            'boto>=2.2.0',
             'filechunkio',
             'PyYAML',
             'simplejson>=2.0.9',
@@ -34,8 +30,12 @@ try:
         'tests_require': ['mock'],
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
+    # unittest2 is a backport of unittest from Python 2.7
     if sys.version_info < (2, 7):
         setuptools_kwargs['tests_require'].append('unittest2')
+    # no boto on Python 3 yet
+    if sys.version_info < (3, 0):
+        setuptools_kwargs['install_requires'].append('boto>=2.2.0')
 
 except ImportError:
     from distutils.core import setup
@@ -77,6 +77,6 @@ setup(
     },
     scripts=['bin/mrjob'],
     url='http://github.com/Yelp/mrjob',
-    version=__version__,
+    version=mrjob.__version__,
     **setuptools_kwargs
 )

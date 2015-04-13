@@ -14,8 +14,8 @@
 import sys
 
 from mrjob.emr import EMRJobRunner
+from mrjob.py2 import StringIO
 
-from tests.py2 import StringIO
 from tests.test_emr import MockEMRAndS3TestCase
 
 

@@ -39,9 +39,9 @@ from mrjob.parse import parse_mr_job_stderr
 from mrjob.parse import parse_port_range_list
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
+from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
 
-from tests.py2 import StringIO
 from tests.quiet import no_handlers_for_logger
 
 

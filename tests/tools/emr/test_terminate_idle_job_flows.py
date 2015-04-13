@@ -19,6 +19,7 @@ from datetime import timedelta
 
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
+from mrjob.py2 import StringIO
 from mrjob.tools.emr.terminate_idle_job_flows import (
     inspect_and_maybe_terminate_job_flows,)
 from mrjob.tools.emr.terminate_idle_job_flows import is_job_flow_bootstrapping
@@ -32,7 +33,6 @@ from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
 from tests.mockboto import MockEmrConnection
 from tests.mockboto import MockS3Connection
-from tests.py2 import StringIO
 from tests.test_emr import MockEMRAndS3TestCase
 
 

@@ -18,6 +18,7 @@ from datetime import datetime
 from datetime import timedelta
 
 import boto.emr.connection
+from mrjob.py2 import StringIO
 from mrjob.tools.emr.audit_usage import job_flow_to_full_summary
 from mrjob.tools.emr.audit_usage import subdivide_interval_by_date
 from mrjob.tools.emr.audit_usage import subdivide_interval_by_hour
@@ -25,7 +26,6 @@ from mrjob.tools.emr.audit_usage import main
 from mrjob.tools.emr.audit_usage import percent
 
 from tests.mockboto import MockEmrObject
-from tests.py2 import StringIO
 from tests.test_emr import MockEMRAndS3TestCase
 
 try:

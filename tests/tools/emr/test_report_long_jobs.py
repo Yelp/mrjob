@@ -17,11 +17,11 @@ from datetime import datetime
 from datetime import timedelta
 
 from mrjob.emr import EMRJobRunner
+from mrjob.py2 import StringIO
 from mrjob.tools.emr.report_long_jobs import find_long_running_jobs
 from mrjob.tools.emr.report_long_jobs import main
 
 from tests.mockboto import MockEmrObject
-from tests.py2 import StringIO
 from tests.test_emr import MockEMRAndS3TestCase
 
 try:

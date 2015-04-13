@@ -1,72 +1,110 @@
-"""Backwards-compatilibity with Python 2.6+ (from Python 3.3+)
+"""Minimal utilities to make Python work for 2.6+ and 3.3+
 
-It's almost always better to use an idiom that works in both flavors of
-Python than to fill your code with wrapper functions. Most of mrjob's code
-is aimed at launching jobs, so the overhead of, say, creating a list
-rather than using an iterator just isn't going to matter.
+Strategies for making `mrjob` work across Python versions:
 
-(Efficiency *does* matter for code that's going to run as many times
-as there are lines in your job, such as protocols. In these cases, you
-shouldn't be using wrappers anyway; use IN_PY2 and write a separate
-efficient version for both flavors of Python.)
+Bytes vs. Unicode
+-----------------
 
-Specific suggestions:
+It's tempting to use `from __future__ import unicode_literals` and require
+that all non-byte strings be unicode. But that doesn't really make sense for
+Python 2, where str (bytes) and unicode can be used interchangeably.
 
-Dictionary iterators: iteritems(), itervalues()
+So really our string datatypes fall into two categories, bytes, and
+"strings", which are either str (i.e., bytes) or unicode in Python 2, and
+str (i.e. unicode) in Python 3.
 
-    Just use items() or values()
+These things should always be bytes:
 
-Is it an integer?
+- input data files
+  - use `'b'` when opening files: `open(..., 'rb')`
+  - read data from `sys.stdin.buffer` in Python 3, not `sys.stdin`
+- data from subprocesses (this already happens by default)
+- file content from our filesystem interfaces.
 
-    from mrjob.py2 import long
-    isinstance(..., (int, long))
+Instead of using `StringIO` to deal with these, use `io.BytesIO`.
 
-Is it a string?
+Not that both Python 2.6+ and Python 3.3+ have the `bytes` type and
+`b''` constants built-in.
 
-    from mrjob.py2 import basestring
-    isinstance(..., basestring)
+These things should always be strings:
 
-StringIO
+- streams that you print() to (e.g. sys.stdout if you mock it out)
+- streams that you log to
+- config files
+- scripts output by mrjob (e.g. the setup wrapper script)
+- empty files (no need to `open(..., 'wb')` if you're not writing anything)
+- paths
+- arguments to commands
+- most string constants (e.g. option names)
 
-    Replace:
+Use the `StringIO` from this module to deal with these (it's
+`StringIO.StringIO` in Python 2 and `io.StringIO` in Python 3).
 
-        try:
-            from cStringIO import StringIO
-        except ImportError:
-            from StringIO import StringIO
+Please use `%` for format strings and not `format()`, which is much more
+picky about mixing unicode and bytes.
 
-    with:
+This module provides a `basestring` type so you can check if something
+is a "string".
 
-        from io import BytesIO
+We don't provide a `unicode` constant:
 
-    and use BytesIO instead of StringIO. It works the same way, exists
-    in Python 3, and appears (in my rudimentary hand-testing) to be faster!
+- Use `not isinstance(..., bytes)` to check if a string is Unicode
+- To convert `bytes` to `unicode`, use `.decode('utf-8')`.
 
-xrange
+Iterables
+---------
 
-    Is it going to contain less than a million items? Just use range()
+Using `.iteritems()` or `.itervalues()` in Python 2 to iterate over a
+dictionary when you don't need a list is best practice, but it's also (in most
+cases) an over-optimization. We'd prefer clean code; just use `.items()`
+and `.values()`.
 
-More idioms can be found here:
+If you *do* every need that extra efficiency `for k in some_dict` does not
+create a list in either version of Python, and you for performance-critical
+code, it's fine to write custom code for each Python version (use `IN_PY2`
+from this module to check which version you're in).
 
-    http://python-future.org/compatible_idioms.html
+Same goes for `xrange`; just use `range` (this module provides `xrange`
+solely to support `ReprProtocol`).
 
+Miscellany
+----------
+
+We provide a `long` type (aliased to `int` on Python 3) so you can
+check if something is an integer: `isinstance(..., (int, long))`.
+
+Any standard library function starting with "url" (e.g. `urlparse()`) should
+be imported from this module.
 """
 import sys
 
 # use this to check if we're in Python 2
 IN_PY2 = (sys.version_info[0] == 2)
 
-# Types that only exist in Python 2
 
-# note the "bytes" type exists in both Python 2.6+ and 3, as do b'' literals
-
+# `basestring`, for `isinstance(..., basestring)`
 if IN_PY2:
     basestring = basestring
-    long = long
-    unicode = unicode
-    xrange = xrange
 else:
     basestring = str
+
+# `long`, for `isinstance(..., (int, long))`
+if IN_PY2:
+    long = long
+else:
     long = int
-    unicode = str
+
+# `xrange`, for `ReprProtocol`
+#
+# Please just use `range` unless you really need the optimization.
+if IN_PY2:
+    xrange = xrange
+else:
     xrange = range
+
+# `StringIO`, for mocking out `sys.stdout`, etc. You probably won't need
+# this outside of
+if IN_PY2:
+    from StringIO import StringIO
+else:
+    from io import StringIO

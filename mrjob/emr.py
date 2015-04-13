@@ -101,6 +101,7 @@ from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
 from mrjob.py2 import basestring
+from mrjob.py2 import urlopen
 from mrjob.retry import RetryGoRound
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
@@ -1597,7 +1598,7 @@ class EMRJobRunner(MRJobRunner):
 
                 if self._show_tracker_progress:
                     try:
-                        tracker_handle = urllib2.urlopen(self._tracker_url)
+                        tracker_handle = urlopen(self._tracker_url)
                         tracker_page = ''.join(tracker_handle.readlines())
                         tracker_handle.close()
                         # first two formatted percentages, map then reduce

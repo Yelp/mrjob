@@ -20,10 +20,10 @@ import logging
 import re
 import time
 from io import BytesIO
-from urlparse import ParseResult
-from urlparse import urlparse as urlparse_buggy
 
 from mrjob.compat import uses_020_counters
+from mrjob.py2 import ParseResult
+from mrjob.py2 import urlparse as urlparse_buggy
 
 try:
     import boto.utils

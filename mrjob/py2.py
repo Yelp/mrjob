@@ -30,14 +30,17 @@ These things should always be strings:
 
 - streams that you print() to (e.g. sys.stdout if you mock it out)
 - streams that you log to
-- config files
-- scripts output by mrjob (e.g. the setup wrapper script)
-- empty files (no need to `open(..., 'wb')` if you're not writing anything)
 - paths
 - arguments to commands
-- most string constants (e.g. option names)
+- option names
 
-Use the `StringIO` from this module to deal with these (it's
+These things are strings because it makes for simpler code:
+
+- contents of config files
+- contents of scripts output by mrjob (e.g. the setup wrapper script)
+- contents of empty files (`open(..., 'w')` is fine)
+
+Use the `StringIO` from this module to deal with strings (it's
 `StringIO.StringIO` in Python 2 and `io.StringIO` in Python 3).
 
 Please use `%` for format strings and not `format()`, which is much more
@@ -50,6 +53,7 @@ We don't provide a `unicode` constant:
 
 - Use `not isinstance(..., bytes)` to check if a string is Unicode
 - To convert `bytes` to `unicode`, use `.decode('utf-8')`.
+- Python 3.3+ has `u''` literals; please use sparingly
 
 Iterables
 ---------
@@ -81,7 +85,6 @@ import sys
 # use this to check if we're in Python 2
 IN_PY2 = (sys.version_info[0] == 2)
 
-
 # `basestring`, for `isinstance(..., basestring)`
 if IN_PY2:
     basestring = basestring
@@ -94,6 +97,27 @@ if IN_PY2:
 else:
     long = int
 
+# `StringIO`, for mocking out `sys.stdout`, etc. You probably won't need
+# this outside of
+if IN_PY2:
+    from StringIO import StringIO
+else:
+    from io import StringIO
+
+# urlopen()
+if IN_PY2:
+    from urllib2 import urlopen
+else:
+    from urllib.request import urlopen
+
+# urlparse() (in most cases you should use `mrjob.parse.urlparse()`)
+if IN_PY2:
+    from urlparse import urlparse
+    from urlparse import ParseResult
+else:
+    from urllib.parse import urlparse
+    from urllib.parse import ParseResult
+
 # `xrange`, for `ReprProtocol`
 #
 # Please just use `range` unless you really need the optimization.
@@ -101,10 +125,3 @@ if IN_PY2:
     xrange = xrange
 else:
     xrange = range
-
-# `StringIO`, for mocking out `sys.stdout`, etc. You probably won't need
-# this outside of
-if IN_PY2:
-    from StringIO import StringIO
-else:
-    from io import StringIO

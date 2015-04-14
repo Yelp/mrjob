@@ -24,12 +24,12 @@ import pprint
 import re
 import shutil
 import sys
+import tempfile
 from io import BytesIO
 from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
-import tempfile
 
 try:
     import simplejson as json
@@ -223,15 +223,27 @@ class RunnerOptionStore(OptionStore):
         validate_cleanup(cleanup_failure_error,
                          self['cleanup_on_failure'])
 
+    def _default_python_bin(self, local=False):
+        """The default python command. If local is true, try to use
+        sys.executable. Otherwise use 'python' or 'python3' as appropriate.
+
+        This returns a single-item list (because it's a command).
+        """
+        if local and sys.executable:
+            return [sys.executable]
+        elif IN_PY2:
+            return ['python']
+        else:
+            # e.g. python3
+            return ['python%d' % sys.version_info[0]]
+
     def _fix_interp_options(self):
         if not self['steps_python_bin']:
             self['steps_python_bin'] = (
-                self['python_bin'] or
-                [sys.executable] or
-                ['python'])
+                self['python_bin'] or self._default_python_bin(local=True))
 
         if not self['python_bin']:
-            self['python_bin'] = ['python']
+            self['python_bin'] = self._default_python_bin()
 
         if not self['steps_interpreter']:
             if self['interpreter']:

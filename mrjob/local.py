@@ -80,12 +80,9 @@ def _chain_procs(procs_args, **kwargs):
 
 class LocalRunnerOptionStore(SimRunnerOptionStore):
 
-    def default_options(self):
-        super_opts = super(LocalRunnerOptionStore, self).default_options()
-        return combine_dicts(super_opts, {
-            # prefer whatever interpreter we're currently using
-            'python_bin': [sys.executable or 'python'],
-        })
+    def _default_python_bin(self, local=False):
+        return super(LocalRunnerOptionStore, self)._default_python_bin(
+            local=True)
 
 
 class LocalMRJobRunner(SimMRJobRunner):

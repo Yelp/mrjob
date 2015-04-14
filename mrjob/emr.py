@@ -341,22 +341,23 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ec2_slave_instance_type',
         'ec2_task_instance_bid_price',
         'ec2_task_instance_type',
+        'emr_action_on_failure',
         'emr_api_params',
         'emr_endpoint',
         'emr_job_flow_id',
         'emr_job_flow_pool_name',
-        'emr_action_on_failure',
         'enable_emr_debugging',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
         'iam_job_flow_role',
+        'iam_service_role',
         'max_hours_idle',
         'mins_to_end_of_hour',
         'num_ec2_core_instances',
-        'pool_wait_minutes',
         'num_ec2_instances',
         'num_ec2_task_instances',
         'pool_emr_job_flows',
+        'pool_wait_minutes',
         's3_endpoint',
         's3_log_uri',
         's3_scratch_uri',
@@ -396,10 +397,9 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ec2_core_instance_type': 'm1.small',
             'ec2_master_instance_type': 'm1.small',
             'emr_job_flow_pool_name': 'default',
-            'hadoop_version': None,
             'hadoop_streaming_jar_on_emr': (
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar'),
-            'iam_job_flow_role': None,
+            'hadoop_version': None,  # override runner default
             'mins_to_end_of_hour': 5.0,
             'num_ec2_core_instances': 0,
             'num_ec2_instances': 1,
@@ -1357,6 +1357,11 @@ class EMRJobRunner(MRJobRunner):
             if 'api_params' not in args:
                 args.setdefault('api_params', {})
             args['api_params']['JobFlowRole'] = self._opts['iam_job_flow_role']
+
+        if self._opts['iam_service_role']:
+            if 'api_params' not in args:
+                args.setdefault('api_params', {})
+            args['api_params']['ServiceRole'] = self._opts['iam_service_role']
 
         if steps:
             args['steps'] = steps

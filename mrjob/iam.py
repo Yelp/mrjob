@@ -114,6 +114,26 @@ def _get_result(resp):
     raise ValueError
 
 
+def list_roles_with_policies(conn, path_prefix=None):
+    """Get a map from role name to (role, [policy])."""
+    params = {}
+    if path_prefix is not None:
+        params['PathPrefix'] = path_prefix
+    resp = conn.get_response('ListRoles', params, list_marker='Roles')
+
+    roles_with_policies = {}
+
+    for role_data in _get_result(resp)['roles']:
+        role_name = role_data['role_name']
+        role = _unquote_json(role_data['assume_role_policy_document'])
+
+        policies = get_policies_for_role(conn, role_name)
+
+        roles_with_policies[role_name] = (role, policies)
+
+    return roles_with_policies
+
+
 def get_policies_for_role(conn, role_name):
     """Given a role name, return a list of policy documents.
 

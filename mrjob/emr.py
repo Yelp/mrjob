@@ -77,6 +77,7 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
+from mrjob.aws import random_identifier
 from mrjob.aws import s3_endpoint_for_region
 from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import supports_new_distributed_cache_options
@@ -732,7 +733,7 @@ class EMRJobRunner(MRJobRunner):
                 return
 
         # That may have all failed. If so, pick a name.
-        scratch_bucket_name = 'mrjob-%016x' % random.randint(0, 2 ** 64 - 1)
+        scratch_bucket_name = 'mrjob-' + random_identifier()
         self._s3_temp_bucket_to_create = scratch_bucket_name
         log.info("creating new scratch bucket %s" % scratch_bucket_name)
         self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name

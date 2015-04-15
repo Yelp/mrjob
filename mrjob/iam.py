@@ -103,15 +103,22 @@ def _quote_json(document):
     json_document = json.dumps(document)
     return quote(json_document)
 
-def _get_result(resp):
+def _unwrap_response(resp):
     """Get the actual result from an IAM API response."""
-    for response_key, response in resp.items():
-        if response_key.endswith('_response'):
-            for result_key, result in response.items():
+    for resp_key, resp_data in resp.items():
+        if resp_key.endswith('_response'):
+            for result_key, result in resp_data.items():
                 if result_key.endswith('_result'):
                     return result
 
     raise ValueError
+
+
+def _get_response(conn, *args, **kwargs):
+    """Replacement for conn.get_response(...).
+    """
+    resp = conn.get_response(*args, **kwargs)
+    return _unwrap_response(resp)
 
 
 def list_roles_with_policies(conn, path_prefix=None):
@@ -119,11 +126,11 @@ def list_roles_with_policies(conn, path_prefix=None):
     params = {}
     if path_prefix is not None:
         params['PathPrefix'] = path_prefix
-    resp = conn.get_response('ListRoles', params, list_marker='Roles')
+    resp = _get_response(conn, 'ListRoles', params, list_marker='Roles')
 
     roles_with_policies = {}
 
-    for role_data in _get_result(resp)['roles']:
+    for role_data in resp['roles']:
         role_name = role_data['role_name']
         role = _unquote_json(role_data['assume_role_policy_document'])
 
@@ -139,23 +146,22 @@ def get_policies_for_role(conn, role_name):
 
     conn should be a boto.iam.IAMConnection
     """
-    # just using raw IAMConnection.get_response(); the role stuff didn't exist
-    # in boto 2.2.0, and newer boto adds very little value (you still have to
-    # unpack the response like we do below).
-    resp = conn.get_response('ListRolePolicies',
-                             {'RoleName': role_name},
-                             list_marker='PolicyNames')
+    resp = _get_response(conn,
+                         'ListRolePolicies',
+                         {'RoleName': role_name},
+                         list_marker='PolicyNames')
 
-    policy_names = _get_result(resp)['policy_names']
+    policy_names = resp['policy_names']
 
     policies = []
 
     for policy_name in policy_names:
-        resp = conn.get_response('GetRolePolicy',
-                                 {'RoleName': role_name,
-                                  'PolicyName': policy_name})
+        resp = _get_response(conn,
+                             'GetRolePolicy',
+                             {'RoleName': role_name,
+                              'PolicyName': policy_name})
 
-        policy = _unquote_json(_get_result(resp)['policy_document'])
+        policy = _unquote_json(resp['policy_document'])
 
         policies.append(policy)
 

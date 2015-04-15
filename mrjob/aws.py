@@ -218,4 +218,4 @@ def s3_location_constraint_for_region(region):
 
 def random_identifier():
     """Used to randomly name new buckets and roles."""
-    return '016x' % random.randint(0, 2 ** 64 - 1)
+    return '%016x' % random.randint(0, 2 ** 64 - 1)

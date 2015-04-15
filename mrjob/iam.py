@@ -3,15 +3,15 @@
 # recommended IAM roles and policies for EMR, from:
 # http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles-defaultroles.html
 import json
-from urllib import unquote_plus
-
+from urllib import quote
+from urllib import unquote
 
 # where to store roles created by mrjob
 MRJOB_EMR_ROLE_PATH = '/mrjob/emr/'
 MRJOB_EMR_EC2_ROLE_PATH = '/mrjob/ec2/'
 
 # use this for service_role
-DEFAULT_EMR_ROLE = {
+MRJOB_EMR_ROLE = {
     "Version": "2008-10-17",
     "Statement": [{
         "Sid": "",
@@ -23,8 +23,8 @@ DEFAULT_EMR_ROLE = {
     }]
 }
 
-# policy to add to DEFAULT_EMR_ROLE
-DEFAULT_EMR_ROLE_POLICY = {
+# policy to add to MRJOB_EMR_ROLE
+MRJOB_EMR_ROLE_POLICY = {
     "Statement": [{
         "Action": [
             "ec2:AuthorizeSecurityGroupIngress",
@@ -55,7 +55,7 @@ DEFAULT_EMR_ROLE_POLICY = {
 }
 
 # use this for job_flow_role
-DEFAULT_EMR_EC2_ROLE = {
+MRJOB_EMR_EC2_ROLE = {
   "Version": "2008-10-17",
   "Statement": [
     {
@@ -71,8 +71,8 @@ DEFAULT_EMR_EC2_ROLE = {
   ]
 }
 
-# policies to attach to DEFAULT_EMR_EC2_ROLE
-DEFAULT_EMR_EC2_ROLE_POLICY = {
+# policies to attach to MRJOB_EMR_EC2_ROLE
+MRJOB_EMR_EC2_ROLE_POLICY = {
     "Statement": [{
         "Action": [
             "cloudwatch:*",
@@ -91,11 +91,33 @@ DEFAULT_EMR_EC2_ROLE_POLICY = {
 }
 
 
-def get_policies_for_role(conn, role_name):
-    """Given a role name, return a map from role policy name to the (decoded)
-    policy document.
+# TODO: handle paginated results
 
-    conn should be an boto.iam.IAMConnection
+def _unquote_json(quoted_json_document):
+    """URI-decode and then JSON-decode the given document."""
+    json_document = unquote(quoted_json_document)
+    return json.loads(json_document)
+
+def _quote_json(document):
+    """JSON-encode and then URI-encode the given document."""
+    json_document = json.dumps(document)
+    return quote(json_document)
+
+def _get_result(resp):
+    """Get the actual result from an IAM API response."""
+    for response_key, response in resp.items():
+        if response_key.endswith('_response'):
+            for result_key, result in response.items():
+                if result_key.endswith('_result'):
+                    return result
+
+    raise ValueError
+
+
+def get_policies_for_role(conn, role_name):
+    """Given a role name, return a list of policy documents.
+
+    conn should be a boto.iam.IAMConnection
     """
     # just using raw IAMConnection.get_response(); the role stuff didn't exist
     # in boto 2.2.0, and newer boto adds very little value (you still have to
@@ -104,20 +126,17 @@ def get_policies_for_role(conn, role_name):
                              {'RoleName': role_name},
                              list_marker='PolicyNames')
 
-    policy_names = resp['list_role_policies_response'][
-            'list_role_policies_result']['policy_names']
+    policy_names = _get_result(resp)['policy_names']
 
-    policies_by_name = {}
+    policies = []
 
     for policy_name in policy_names:
         resp = conn.get_response('GetRolePolicy',
                                  {'RoleName': role_name,
                                   'PolicyName': policy_name})
-        policy_document_quoted = resp['get_role_policy_response'][
-            'get_role_policy_result']['policy_document']
-        policy_document_json = unquote_plus(policy_document_quoted)
-        policy_document = json.loads(policy_document_json)
 
-        policies_by_name[policy_name] = policy_document
+        policy = _unquote_json(_get_result(resp)['policy_document'])
 
-    return policies_by_name
+        policies.append(policy)
+
+    return policies

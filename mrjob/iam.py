@@ -15,7 +15,7 @@ idential to the ones it needs before attempting to create them.
 #
 # These didn't work as-is; had to change "Resource": "*" to "Resource": ["*"]
 import json
-from urllib import quote
+from logging import getLogger
 from urllib import unquote
 
 from mrjob.aws import random_identifier
@@ -23,6 +23,7 @@ from mrjob.aws import random_identifier
 # where to store roles created by mrjob
 MRJOB_SERVICE_ROLE_PATH = '/mrjob/service_role/'
 MRJOB_INSTANCE_PROFILE_PATH = '/mrjob/instance_profile/'
+
 
 # use this for service_role
 MRJOB_SERVICE_ROLE = {
@@ -39,6 +40,7 @@ MRJOB_SERVICE_ROLE = {
 
 # policy to add to MRJOB_SERVICE_ROLE
 MRJOB_SERVICE_ROLE_POLICY = {
+    "Version": "2012-10-17",
     "Statement": [{
         "Action": [
             "ec2:AuthorizeSecurityGroupIngress",
@@ -64,9 +66,11 @@ MRJOB_SERVICE_ROLE_POLICY = {
             "sdb:Select"
         ],
     "Effect": "Allow",
-    "Resource": ["*"]
+    "Resource": "*"
     }]
 }
+
+
 
 # Role to wrap in an instance profile
 MRJOB_INSTANCE_PROFILE_ROLE = {
@@ -83,7 +87,7 @@ MRJOB_INSTANCE_PROFILE_ROLE = {
   ]
 }
 
-# policies to attach to MRJOB_EMR_EC2_ROLE
+# policy to attach to MRJOB_INSTANCE_PROFILE_ROLE
 MRJOB_INSTANCE_PROFILE_POLICY = {
     "Statement": [{
         "Action": [
@@ -103,7 +107,10 @@ MRJOB_INSTANCE_PROFILE_POLICY = {
 }
 
 
-# TODO: handle paginated results
+
+
+log = getLogger(__name__)
+
 
 def _unquote_json(quoted_json_document):
     """URI-decode and then JSON-decode the given document."""
@@ -245,8 +252,12 @@ def get_or_create_mrjob_service_role(conn):
                                      target_role_with_policies):
             return role_name
 
-    return _create_mrjob_role_with_policies(
+    role_name = _create_mrjob_role_with_policies(
         conn, MRJOB_SERVICE_ROLE_PATH, *target_role_with_policies)
+
+    log.info('Auto-created service role %s' % role_name)
+
+    return role_name
 
 
 def get_or_create_mrjob_instance_profile(conn):
@@ -273,14 +284,16 @@ def get_or_create_mrjob_instance_profile(conn):
     _get_response(conn, 'AddRoleToInstanceProfile', {
         'InstanceProfileName': name, 'RoleName': name})
 
-    return profile_name
+    log.info('Auto-created instance profile %s' % name)
+
+    return name
 
 
 def _create_mrjob_role_with_policies(conn, path, role, policies):
     # create role
     role_name = 'mrjob-' + random_identifier()
 
-    resp = _get_response(conn, 'CreateRole', {
+    _get_response(conn, 'CreateRole', {
         'AssumeRolePolicyDocument': json.dumps(role),
         'Path': path,
         'RoleName': role_name})
@@ -292,7 +305,7 @@ def _create_mrjob_role_with_policies(conn, path, role, policies):
         else:
             policy_name = '%s-%d' % (role_name, i)
 
-        resp = _get_response(conn, 'PutRolePolicy', {
+        _get_response(conn, 'PutRolePolicy', {
             'PolicyDocument': json.dumps(policy),
             'PolicyName': policy_name,
             'RoleName': role_name})

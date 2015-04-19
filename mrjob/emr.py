@@ -92,6 +92,8 @@ from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import _get_bucket
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
+from mrjob.iam import get_or_create_mrjob_instance_profile
+from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
 from mrjob.logparsers import NODE_LOG_URI_RE
 from mrjob.logparsers import STEP_LOG_URI_RE
@@ -1368,16 +1370,19 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['emr_api_params']:
             args['api_params'] = self._opts['emr_api_params']
 
-        if self._opts['iam_instance_profile']:
-            if 'api_params' not in args:
-                args.setdefault('api_params', {})
-            args['api_params']['JobFlowRole'] = (
-                self._opts['iam_instance_profile'])
+        # instance profile and service role are required for accounts
+        # created after April 6, 2015. Doing this for old accounts as well;
+        # guessing that eventually all accounts will need this stuff anyway.
+        args.setdefault('api_params', {})
 
-        if self._opts['iam_service_role']:
-            if 'api_params' not in args:
-                args.setdefault('api_params', {})
-            args['api_params']['ServiceRole'] = self._opts['iam_service_role']
+        instance_profile = (self._opts['iam_instance_profile'] or
+            get_or_create_mrjob_instance_profile(self.make_iam_conn()))
+
+        args['api_params']['JobFlowRole'] = instance_profile
+
+        service_role = (self._opts['iam_service_role'] or
+            get_or_create_mrjob_service_role(self.make_iam_conn()))
+        args['api_params']['ServiceRole'] = service_role
 
         if steps:
             args['steps'] = steps
@@ -2566,3 +2571,20 @@ class EMRJobRunner(MRJobRunner):
                 self._address_of_master(),
                 self._opts['ec2_key_pair_file'])
         return self._ssh_slave_addrs
+
+    def make_iam_conn(self):
+        """Create a connection to S3.
+
+        :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a
+                 :py:class:`mrjob.retry.RetryWrapper`
+        """
+        # give a non-cryptic error message if boto isn't installed
+        if boto is None:
+            raise ImportError('You must install boto to connect to IAM')
+
+        log.debug('creating IAM connection')
+
+        raw_iam_conn = boto.connect_iam(
+            aws_access_key_id=self._aws_access_key_id,
+            aws_secret_access_key=self._aws_secret_access_key)
+        return wrap_aws_conn(raw_iam_conn)

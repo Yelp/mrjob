@@ -31,7 +31,7 @@ MRJOB_SERVICE_ROLE = {
         "Sid": "",
         "Effect": "Allow",
         "Principal": {
-            "Service": ["elasticmapreduce.amazonaws.com"]
+            "Service": "elasticmapreduce.amazonaws.com"
         },
         "Action": "sts:AssumeRole"
     }]
@@ -76,9 +76,7 @@ MRJOB_INSTANCE_PROFILE_ROLE = {
       "Sid": "",
       "Effect": "Allow",
       "Principal": {
-        "Service": [
-          "ec2.amazonaws.com"
-        ]
+        "Service": "ec2.amazonaws.com"
       },
       "Action": "sts:AssumeRole"
     }
@@ -226,9 +224,13 @@ def role_with_policies_matches(rp1, rp2):
     role1, policies1 = rp1
     role2, policies2 = rp2
 
+    # JSON-encode to allow sorting in Python 3
+    def dumps(x):
+        json.dumps(x, sort_keys=True)
+
     return (role1 == role2 and
-            sorted(json.dumps(p, sort_keys=True) for p in policies1) ==
-            sorted(json.dumps(p, sort_keys=True) for p in policies2))
+            sorted(dumps(p) for p in policies1) ==
+            sorted(dumps(p) for p in policies2))
 
 
 def get_or_create_mrjob_service_role(conn):

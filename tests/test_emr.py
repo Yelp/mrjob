@@ -595,7 +595,7 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
         self.assertTrue(job_flow.visibletoallusers, 'true')
 
 
-class IAMJobFlowRoleTestCase(MockEMRAndS3TestCase):
+class IAMInstanceProfileTestCase(MockEMRAndS3TestCase):
 
     def run_and_get_job_flow(self, *args):
         stdin = StringIO('foo\nbar\n')
@@ -612,8 +612,8 @@ class IAMJobFlowRoleTestCase(MockEMRAndS3TestCase):
         job_flow = self.run_and_get_job_flow()
         self.assertEqual(job_flow.iamjobflowrole, None)
 
-    def test_iamjobflowrole(self):
-        job_flow = self.run_and_get_job_flow('--iam-job-flow-role=EMRDefaultRole')
+    def test_iam_instance_profile(self):
+        job_flow = self.run_and_get_job_flow('--iam-instance-profile=EMRDefaultRole')
         self.assertEqual(job_flow.iamjobflowrole, 'EMRDefaultRole')
 
 

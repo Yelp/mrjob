@@ -388,6 +388,19 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     def __init__(self, alias, opts, conf_path):
         super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_path)
         self._fix_ec2_instance_opts()
+        self._fix_deprecated_opts()
+
+    def _fix_deprecated_opts(self):
+        # generalize this for other options
+
+        if self['iam_job_flow_role'] is not None:
+            log.warning('iam_job_flow_role is deprecated and wil be removed'
+                        ' in v0.5; use iam_instance_profile instead')
+
+            if self['iam_instance_profile'] is None:
+                self['iam_instance_profile'] = self['iam_job_flow_role']
+
+            self['iam_job_flow_role'] = None
 
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
@@ -1354,10 +1367,11 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['emr_api_params']:
             args['api_params'] = self._opts['emr_api_params']
 
-        if self._opts['iam_job_flow_role']:
+        if self._opts['iam_instance_profile']:
             if 'api_params' not in args:
                 args.setdefault('api_params', {})
-            args['api_params']['JobFlowRole'] = self._opts['iam_job_flow_role']
+            args['api_params']['JobFlowRole'] = (
+                self._opts['iam_instance_profile'])
 
         if self._opts['iam_service_role']:
             if 'api_params' not in args:

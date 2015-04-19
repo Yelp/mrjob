@@ -12,6 +12,8 @@ idential to the ones it needs before attempting to create them.
 
 # recommended IAM roles and policies for EMR, from:
 # http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles-defaultroles.html
+#
+# These didn't work as-is; had to change "Resource": "*" to "Resource": ["*"]
 import json
 from urllib import quote
 from urllib import unquote
@@ -19,8 +21,8 @@ from urllib import unquote
 from mrjob.aws import random_identifier
 
 # where to store roles created by mrjob
-MRJOB_SERVICE_ROLE_PATH = '/mrjob/emr/'
-MRJOB_INSTANCE_PROFILE_PATH = '/mrjob/ec2/'
+MRJOB_SERVICE_ROLE_PATH = '/mrjob/service_role/'
+MRJOB_INSTANCE_PROFILE_PATH = '/mrjob/instance_profile/'
 
 # use this for service_role
 MRJOB_SERVICE_ROLE = {
@@ -62,7 +64,7 @@ MRJOB_SERVICE_ROLE_POLICY = {
             "sdb:Select"
         ],
     "Effect": "Allow",
-    "Resource": "*"
+    "Resource": ["*"]
     }]
 }
 
@@ -98,7 +100,7 @@ MRJOB_INSTANCE_PROFILE_POLICY = {
             "sqs:*"
         ],
         "Effect": "Allow",
-        "Resource": "*"
+        "Resource": ["*"]
     }]
 }
 
@@ -110,11 +112,6 @@ def _unquote_json(quoted_json_document):
     json_document = unquote(quoted_json_document)
     return json.loads(json_document)
 
-def _quote_json(document):
-    """JSON-encode and then URI-encode the given document."""
-    json_document = json.dumps(document)
-    return quote(json_document)
-
 def _unwrap_response(resp):
     """Get the actual result from an IAM API response."""
     for resp_key, resp_data in resp.items():
@@ -123,7 +120,9 @@ def _unwrap_response(resp):
                 if result_key.endswith('_result'):
                     return result
 
-    raise ValueError
+            return {}  # PutRolePolicy has no response, for example
+
+    raise ValueError(resp)
 
 
 def _get_response(conn, action, params, *args, **kwargs):
@@ -205,10 +204,10 @@ def yield_policies_for_role(conn, role_name):
 
     conn should be a boto.iam.IAMConnection
     """
-    resps = _get_response(conn,
-                         'ListRolePolicies',
-                         {'RoleName': role_name},
-                         list_marker='PolicyNames')
+    resps = _get_responses(conn,
+                           'ListRolePolicies',
+                           {'RoleName': role_name},
+                           list_marker='PolicyNames')
 
     for resp in resps:
         policy_names = resp['policy_names']
@@ -280,7 +279,7 @@ def _create_mrjob_role_with_policies(conn, path, role, policies):
     role_name = 'mrjob-' + random_identifier()
 
     resp = _get_response(conn, 'CreateRole', {
-        'AssumeRolePolicyDocument': _quote_json(role),
+        'AssumeRolePolicyDocument': json.dumps(role),
         'Path': path,
         'RoleName': role_name})
 
@@ -291,15 +290,9 @@ def _create_mrjob_role_with_policies(conn, path, role, policies):
         else:
             policy_name = '%s-%d' % (role_name, i)
 
-        resp = _get_response(conn, 'CreatePolicy', {
-            'Path': path,
-            'PolicyDocument': _quote_json(policy),
-            'PolicyName': policy_name})
-
-        policy_arn = resp['policy']['arn']
-
-        _get_response(conn, 'AttachRolePolicy', {
-            'PolicyArn': policy_arn,
+        resp = _get_response(conn, 'PutRolePolicy', {
+            'PolicyDocument': json.dumps(policy),
+            'PolicyName': policy_name,
             'RoleName': role_name})
 
     return role_name

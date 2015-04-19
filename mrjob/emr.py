@@ -350,6 +350,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'enable_emr_debugging',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
+        'iam_instance_profile',
         'iam_job_flow_role',
         'iam_service_role',
         'max_hours_idle',

@@ -47,8 +47,8 @@ MRJOB_SERVICE_ROLE_POLICY = {
             "ec2:CancelSpotInstanceRequests",
             "ec2:CreateSecurityGroup",
             "ec2:CreateTags",
-            "ec2:DeleteTags",
             "ec2:Describe*",
+            "ec2:DeleteTags",
             "ec2:ModifyImageAttribute",
             "ec2:ModifyInstanceAttribute",
             "ec2:RequestSpotInstances",
@@ -60,8 +60,8 @@ MRJOB_SERVICE_ROLE_POLICY = {
             "iam:GetRolePolicy",
             "iam:ListInstanceProfiles",
             "s3:Get*",
-            "s3:CreateBucket",
             "s3:List*",
+            "s3:CreateBucket",
             "sdb:BatchPutAttributes",
             "sdb:Select"
         ],
@@ -233,11 +233,11 @@ def role_with_policies_matches(rp1, rp2):
 
     # JSON-encode to allow sorting in Python 3
     def dumps(x):
-        json.dumps(x, sort_keys=True)
+        return json.dumps(x, sort_keys=True)
 
     return (role1 == role2 and
-            sorted(dumps(p) for p in policies1) ==
-            sorted(dumps(p) for p in policies2))
+            sorted(dumps(p1) for p1 in policies1) ==
+            sorted(dumps(p2) for p2 in policies2))
 
 
 def get_or_create_mrjob_service_role(conn):
@@ -249,7 +249,7 @@ def get_or_create_mrjob_service_role(conn):
                 conn, path_prefix=MRJOB_SERVICE_ROLE_PATH)):
 
         if role_with_policies_matches(role_with_policies,
-                                     target_role_with_policies):
+                                      target_role_with_policies):
             return role_name
 
     role_name = _create_mrjob_role_with_policies(

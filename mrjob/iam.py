@@ -9,21 +9,20 @@ except they are assigned random mrjob-* names.
 There isn't really versioning; mrjob will simply check if there are IAM objects
 idential to the ones it needs before attempting to create them.
 """
-
-# recommended IAM roles and policies for EMR, from:
-# http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles-defaultroles.html
-#
-# These didn't work as-is; had to change "Resource": "*" to "Resource": ["*"]
 import json
 from logging import getLogger
 from urllib import unquote
 
 from mrjob.aws import random_identifier
 
-# where to store roles created by mrjob
-MRJOB_SERVICE_ROLE_PATH = '/mrjob/service_role/'
-MRJOB_INSTANCE_PROFILE_PATH = '/mrjob/instance_profile/'
-
+# Working IAM roles and policies for EMR; these should be identical
+# to the ones created by AWS CLI (`aws emr create-default-roles`), at least as
+# of 2015-04-20.
+#
+# AWS has recommended roles in their documentation, but they don't quite
+# work as-is:
+#
+# http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles-defaultroles.html
 
 # use this for service_role
 MRJOB_SERVICE_ROLE = {
@@ -154,21 +153,23 @@ def _get_responses(conn, action, params, *args, **kwargs):
             return
 
 
-def yield_instance_profiles_with_policies(conn, path_prefix=None):
+def yield_instance_profiles_with_policies(conn):
     """Yield (instance_proile_name, (role_document, [policy_documents])).
 
     This works just like yield_roles_with_policies(), except it
     gives the instance profile's name rather than the role name
     (instance profiles are just thin wrappers for roles).
     """
-    params = {}
-    if path_prefix is not None:
-        params['PathPrefix'] = path_prefix
+    # could support path_prefix here, but mrjob isn't using it
+
     resps = _get_responses(conn, 'ListInstanceProfiles', params,
                            list_marker='InstanceProfiles')
 
     for resp in resps:
         for profile_data in resp['instance_profiles']:
+            if path is not None and profile_data['path'] != path:
+                continue
+
             profile_name = profile_data['instance_profile_name']
             # doesn't look like boto can handle two list markers, hence
             # the extra "member" layer
@@ -179,15 +180,21 @@ def yield_instance_profiles_with_policies(conn, path_prefix=None):
             yield (profile_name, role_with_policies)
 
 
-def yield_roles_with_policies(conn, path_prefix=None):
-    """Yield (role_name, (role_document, [policy_documents]))."""
-    params = {}
-    if path_prefix is not None:
-        params['PathPrefix'] = path_prefix
+def yield_roles_with_policies(conn, path=None):
+    """Yield (role_name, (role_document, [policy_documents])).
+
+    path is an exact path to match.
+    """
+    # could support path_prefix here, but mrjob isn't using it, and EMR
+    # role policies apparently have to have a path of / anyways
+
     resps = _get_responses(conn, 'ListRoles', params, list_marker='Roles')
 
     for resp in resps:
         for role_data in resp['roles']:
+            if path and role_data['path'] != path:
+                continue
+
             yield _get_role_with_policies(conn, role_data)
 
 
@@ -235,6 +242,10 @@ def role_with_policies_matches(rp1, rp2):
     def dumps(x):
         return json.dumps(x, sort_keys=True)
 
+    # Could make this a bit more lenient. For example, it doesn't look
+    # like the ordering of lists in any of these documents matters. For
+    # now, I'm just making mrjob's defaults the same as the ones created
+    # by awscli
     return (role1 == role2 and
             sorted(dumps(p1) for p1 in policies1) ==
             sorted(dumps(p2) for p2 in policies2))
@@ -244,16 +255,19 @@ def get_or_create_mrjob_service_role(conn):
     target_role_with_policies = (
         MRJOB_SERVICE_ROLE, [MRJOB_SERVICE_ROLE_POLICY])
 
+    # As of 2015-04-20, it looks like EMR won't accept roles with a path
+    # other than '/' (the default). Looks like what's happening is that EMR
+    # forgets to include the path in the ARN.
+    #
+    # This doesn't affect instance profiles.
     for role_name, role_with_policies in (
-            yield_roles_with_policies(
-                conn, path_prefix=MRJOB_SERVICE_ROLE_PATH)):
-
+            yield_roles_with_policies(conn, path='/')):
         if role_with_policies_matches(role_with_policies,
                                       target_role_with_policies):
             return role_name
 
     role_name = _create_mrjob_role_with_policies(
-        conn, MRJOB_SERVICE_ROLE_PATH, *target_role_with_policies)
+        conn, *target_role_with_policies)
 
     log.info('Auto-created service role %s' % role_name)
 
@@ -264,9 +278,7 @@ def get_or_create_mrjob_instance_profile(conn):
     target_role_with_policies = (
         MRJOB_INSTANCE_PROFILE_ROLE, [MRJOB_INSTANCE_PROFILE_POLICY])
 
-    for profile_name, role_with_policies in (
-            yield_roles_with_policies(
-                conn, path_prefix=MRJOB_INSTANCE_PROFILE_PATH)):
+    for profile_name, role_with_policies in (yield_roles_with_policies(conn)):
 
         if role_with_policies_matches(role_with_policies,
                                      target_role_with_policies):
@@ -274,12 +286,10 @@ def get_or_create_mrjob_instance_profile(conn):
 
     # role and instance profile will have same randomly generated name
     name = _create_mrjob_role_with_policies(
-        conn, MRJOB_INSTANCE_PROFILE_PATH, *target_role_with_policies)
+        conn, *target_role_with_policies)
 
     # create an instance profile with the same name as the role
-    _get_response(conn, 'CreateInstanceProfile', {
-        'InstanceProfileName': name,
-        'Path': MRJOB_INSTANCE_PROFILE_PATH})
+    _get_response(conn, 'CreateInstanceProfile', {'InstanceProfileName': name})
 
     _get_response(conn, 'AddRoleToInstanceProfile', {
         'InstanceProfileName': name, 'RoleName': name})
@@ -289,13 +299,12 @@ def get_or_create_mrjob_instance_profile(conn):
     return name
 
 
-def _create_mrjob_role_with_policies(conn, path, role, policies):
+def _create_mrjob_role_with_policies(conn, role, policies):
     # create role
     role_name = 'mrjob-' + random_identifier()
 
     _get_response(conn, 'CreateRole', {
         'AssumeRolePolicyDocument': json.dumps(role),
-        'Path': path,
         'RoleName': role_name})
 
     for i, policy in enumerate(policies):

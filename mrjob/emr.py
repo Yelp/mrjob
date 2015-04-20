@@ -1377,7 +1377,6 @@ class EMRJobRunner(MRJobRunner):
 
         instance_profile = (self._opts['iam_instance_profile'] or
             get_or_create_mrjob_instance_profile(self.make_iam_conn()))
-
         args['api_params']['JobFlowRole'] = instance_profile
 
         service_role = (self._opts['iam_service_role'] or

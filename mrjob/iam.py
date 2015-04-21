@@ -129,10 +129,14 @@ def _unwrap_response(resp):
     raise ValueError(resp)
 
 
-def _get_response(conn, action, params, *args, **kwargs):
+def _get_response(conn, action, params, path='/', parent=None,
+                  verb='POST', list_marker='Set', **kwargs):
     """Replacement for conn.get_response(...) that unwraps the response
     from its containing elements."""
-    wrapped_resp = conn.get_response(action, params, *args, **kwargs)
+    # verb was GET in earlier versions of boto; always default to POST
+    wrapped_resp = conn.get_response(
+        action, params, path='/', parent=parent, verb=verb,
+        list_marker=list_marker, **kwargs)
     return _unwrap_response(wrapped_resp)
 
 
@@ -161,16 +165,13 @@ def yield_instance_profiles_with_policies(conn):
     (instance profiles are just thin wrappers for roles).
     """
     # could support path_prefix here, but mrjob isn't using it
-
-    resps = _get_responses(conn, 'ListInstanceProfiles', params,
+    resps = _get_responses(conn, 'ListInstanceProfiles', {},
                            list_marker='InstanceProfiles')
 
     for resp in resps:
         for profile_data in resp['instance_profiles']:
-            if path is not None and profile_data['path'] != path:
-                continue
-
             profile_name = profile_data['instance_profile_name']
+
             # doesn't look like boto can handle two list markers, hence
             # the extra "member" layer
             role_data = profile_data['roles']['member']
@@ -188,7 +189,7 @@ def yield_roles_with_policies(conn, path=None):
     # could support path_prefix here, but mrjob isn't using it, and EMR
     # role policies apparently have to have a path of / anyways
 
-    resps = _get_responses(conn, 'ListRoles', params, list_marker='Roles')
+    resps = _get_responses(conn, 'ListRoles', {}, list_marker='Roles')
 
     for resp in resps:
         for role_data in resp['roles']:

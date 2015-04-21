@@ -1375,11 +1375,13 @@ class EMRJobRunner(MRJobRunner):
         # guessing that eventually all accounts will need this stuff anyway.
         args.setdefault('api_params', {})
 
-        instance_profile = (self._opts['iam_instance_profile'] or
+        instance_profile = (
+            self._opts['iam_instance_profile'] or
             get_or_create_mrjob_instance_profile(self.make_iam_conn()))
         args['api_params']['JobFlowRole'] = instance_profile
 
-        service_role = (self._opts['iam_service_role'] or
+        service_role = (
+            self._opts['iam_service_role'] or
             get_or_create_mrjob_service_role(self.make_iam_conn()))
         args['api_params']['ServiceRole'] = service_role
 

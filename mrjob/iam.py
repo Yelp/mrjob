@@ -22,7 +22,7 @@ from mrjob.aws import random_identifier
 # AWS has recommended roles in their documentation, but they don't quite
 # work as-is:
 #
-# http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles-defaultroles.html
+# http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles-defaultroles.html  # noqa
 
 # use this for service_role
 MRJOB_SERVICE_ROLE = {
@@ -64,26 +64,22 @@ MRJOB_SERVICE_ROLE_POLICY = {
             "sdb:BatchPutAttributes",
             "sdb:Select"
         ],
-    "Effect": "Allow",
-    "Resource": "*"
+        "Effect": "Allow",
+        "Resource": "*"
     }]
 }
 
-
-
 # Role to wrap in an instance profile
 MRJOB_INSTANCE_PROFILE_ROLE = {
-  "Version": "2008-10-17",
-  "Statement": [
-    {
-      "Sid": "",
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "ec2.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
+    "Version": "2008-10-17",
+    "Statement": [{
+        "Sid": "",
+        "Effect": "Allow",
+        "Principal": {
+            "Service": "ec2.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+    }]
 }
 
 # policy to attach to MRJOB_INSTANCE_PROFILE_ROLE
@@ -105,9 +101,6 @@ MRJOB_INSTANCE_PROFILE_POLICY = {
     }]
 }
 
-
-
-
 log = getLogger(__name__)
 
 
@@ -115,6 +108,7 @@ def _unquote_json(quoted_json_document):
     """URI-decode and then JSON-decode the given document."""
     json_document = unquote(quoted_json_document)
     return json.loads(json_document)
+
 
 def _unwrap_response(resp):
     """Get the actual result from an IAM API response."""
@@ -202,7 +196,6 @@ def yield_roles_with_policies(conn, path=None):
             yield _get_role_with_policies(conn, role_data)
 
 
-
 def _get_role_with_policies(conn, role_data):
     """Returns (role_name, (role, policies))."""
     role_name = role_data['role_name']
@@ -212,7 +205,6 @@ def _get_role_with_policies(conn, role_data):
                 yield_policies_for_role(conn, role_name)]
 
     return (role_name, (role, policies))
-
 
 
 def yield_policies_for_role(conn, role_name):
@@ -285,7 +277,7 @@ def get_or_create_mrjob_instance_profile(conn):
     for profile_name, role_with_policies in (yield_roles_with_policies(conn)):
 
         if role_with_policies_matches(role_with_policies,
-                                     target_role_with_policies):
+                                      target_role_with_policies):
             return profile_name
 
     # role and instance profile will have same randomly generated name

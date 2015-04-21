@@ -568,7 +568,7 @@ class MockEmrConnection(object):
             creationdatetime=to_iso8601(now),
             ec2keyname=ec2_keyname,
             hadoopversion=hadoop_version,
-            iamjobflowrole=None,
+            jobflowrole=None,
             instancecount=str(num_instances),
             instancegroups=mock_groups,
             jobflowid=jobflow_id,
@@ -578,6 +578,7 @@ class MockEmrConnection(object):
             masterpublicdnsname='mockmaster',
             name=name,
             normalizedinstancehours='9999',  # just need this filled in for now
+            servicerole=None,
             state='STARTING',
             steps=[],
             api_params={},
@@ -601,7 +602,11 @@ class MockEmrConnection(object):
             if 'VisibleToAllUsers' in api_params:
                 job_flow.visibletoallusers = api_params['VisibleToAllUsers']
             if 'JobFlowRole' in api_params:
-                job_flow.iamjobflowrole = api_params['JobFlowRole']
+                job_flow.jobflowrole = api_params['JobFlowRole']
+            if 'ServiceRole' in api_params:
+                job_flow.servicerole = api_params['ServiceRole']
+
+        # we don't actually check if the roles exist or are valid
 
         self.mock_emr_job_flows[jobflow_id] = job_flow
 
@@ -1019,7 +1024,7 @@ class MockIAMConnection(object):
 
         profile_names = sorted(
             name for name, data in self.mock_iam_instance_profiles.items()
-            if data['path'].startswith('path_prefix'))
+            if data['path'].startswith(path_prefix))
 
         result = self._paginate(profile_names, 'instance_profile',
                                 marker=marker, max_items=max_items)
@@ -1087,9 +1092,11 @@ class MockIAMConnection(object):
         # find all matching profiles
         role_names = sorted(
             name for name, data in self.mock_iam_roles.items()
-            if data['path'].startswith('path_prefix'))
+            if data['path'].startswith(path_prefix))
 
-        result = self._paginate(role_names, 'roles',
+        roles = [self._describe_role(name) for name in role_names]
+
+        result = self._paginate(roles, 'roles',
                                 marker=marker, max_items=max_items)
 
         return self._wrap_result('list_roles', result)
@@ -1126,9 +1133,9 @@ class MockIAMConnection(object):
 
     def get_role_policy(self, role_name, policy_name):
         self._check_role_exists(role_name)
-        self._check_role_policy_exists(policy_name)
+        self._check_role_policy_exists(policy_name, role_name)
 
-        result = dict(policy_document=self._describe_role_policy(policy_name))
+        result = self._describe_role_policy(policy_name)
 
         return self._wrap_result('get_role_policy', result)
 
@@ -1154,7 +1161,7 @@ class MockIAMConnection(object):
         return self._wrap_result('put_role_policy')
 
     def _check_role_policy_exists(self, policy_name, role_name):
-        if (policy_name not in self.mock_iam_role_policies[policy_name] or
+        if (policy_name not in self.mock_iam_role_policies or
             self.mock_iam_role_policies[policy_name]['role_name'] != role_name):
 
             # the IAM API really does raise this error when the role policy

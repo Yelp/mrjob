@@ -610,7 +610,7 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
         self.assertTrue(job_flow.visibletoallusers, 'true')
 
 
-class IAMInstanceProfileTestCase(MockEMRAndS3TestCase):
+class IAMTestCase(MockEMRAndS3TestCase):
 
     def run_and_get_job_flow(self, *args):
         stdin = StringIO('foo\nbar\n')
@@ -623,13 +623,42 @@ class IAMInstanceProfileTestCase(MockEMRAndS3TestCase):
             emr_conn = runner.make_emr_conn()
             return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
 
-    def test_defaults(self):
+    def test_role_auto_creation(self):
         job_flow = self.run_and_get_job_flow()
-        self.assertEqual(job_flow.iamjobflowrole, None)
 
-    def test_iam_instance_profile(self):
-        job_flow = self.run_and_get_job_flow('--iam-instance-profile=EMRDefaultRole')
-        self.assertEqual(job_flow.iamjobflowrole, 'EMRDefaultRole')
+        # check instance_profile
+        instance_profile_name = job_flow.jobflowrole
+        self.assertIsNotNone(instance_profile_name)
+        self.assertTrue(instance_profile_name.startswith('mrjob-'))
+        self.assertIn(instance_profile_name, self.mock_iam_instance_profiles)
+        self.assertIn(instance_profile_name, self.mock_iam_roles)
+        self.assertIn(instance_profile_name, self.mock_iam_role_policies)
+
+        # check service_role
+        service_role_name = job_flow.servicerole
+        self.assertIsNotNone(service_role_name)
+        self.assertTrue(service_role_name.startswith('mrjob-'))
+        self.assertIn(service_role_name, self.mock_iam_roles)
+        self.assertIn(service_role_name, self.mock_iam_role_policies)
+
+        # instance_profile and service_role should be distinct
+        self.assertNotEqual(instance_profile_name, service_role_name)
+
+        # run again, and see if we reuse the roles
+        job_flow2 = self.run_and_get_job_flow()
+
+        self.assertEqual(job_flow2.jobflowrole, instance_profile_name)
+        self.assertEqual(job_flow2.servicerole, service_role_name)
+
+    def test_iam_instance_profile_option(self):
+        job_flow = self.run_and_get_job_flow(
+            '--iam-instance-profile=EMR_DefaultRole')
+        self.assertEqual(job_flow.jobflowrole, 'EMR_DefaultRole')
+
+    def test_iam_service_role_option(self):
+        job_flow = self.run_and_get_job_flow(
+            '--iam-service-role=EMR_EC2_DefaultRole')
+        self.assertEqual(job_flow.servicerole, 'EMR_EC2_DefaultRole')
 
 
 class EMRAPIParamsTestCase(MockEMRAndS3TestCase):

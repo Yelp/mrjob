@@ -667,6 +667,14 @@ class IAMTestCase(MockEMRAndS3TestCase):
 
         self.assertEqual(job_flow.jobflowrole, 'EMR_DefaultRole')
 
+    def test_deprecated_job_flow_role_option(self):
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow(
+                '--iam-job-flow-role', 'EMR_DefaultRole')
+            self.assertTrue(boto.connect_iam.called)
+
+            self.assertEqual(job_flow.jobflowrole, 'EMR_DefaultRole')
+
     def test_iam_service_role_option(self):
         job_flow = self.run_and_get_job_flow(
             '--iam-service-role', 'EMR_EC2_DefaultRole')

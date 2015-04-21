@@ -60,6 +60,7 @@ from mrjob.util import tar_and_gzip
 from tests.mockboto import DEFAULT_MAX_JOB_FLOWS_RETURNED
 from tests.mockboto import MockEmrConnection
 from tests.mockboto import MockEmrObject
+from tests.mockboto import MockIAMConnection
 from tests.mockboto import MockS3Connection
 from tests.mockboto import add_mock_s3_data
 from tests.mockboto import to_iso8601
@@ -140,18 +141,32 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         kwargs['simulation_iterator'] = self.simulation_iterator
         return MockEmrConnection(*args, **kwargs)
 
+    def _mock_boto_connect_iam(self, *args, **kwargs):
+        kwargs['mock_iam_instance_profiles'] = self.mock_iam_instance_profiles
+        kwargs['mock_iam_roles'] = self.mock_iam_roles
+        kwargs['mock_iam_role_policies'] = self.mock_iam_role_policies
+        return MockIAMConnection(*args, **kwargs)
+
     def setUp(self):
         # patch boto
-        self.mock_s3_fs = {}
-        self.mock_emr_job_flows = {}
         self.mock_emr_failures = {}
+        self.mock_emr_job_flows = {}
         self.mock_emr_output = {}
+        self.mock_iam_instance_profiles = {}
+        self.mock_iam_role_policies = {}
+        self.mock_iam_roles = {}
+        self.mock_s3_fs = {}
+
         self.simulation_iterator = itertools.repeat(
             None, self.MAX_SIMULATION_STEPS)
 
         p_s3 = patch.object(boto, 'connect_s3', self._mock_boto_connect_s3)
         self.addCleanup(p_s3.stop)
         p_s3.start()
+
+        p_iam = patch.object(boto, 'connect_iam', self._mock_boto_connect_iam)
+        self.addCleanup(p_iam.stop)
+        p_iam.start()
 
         p_emr = patch.object(
             boto.emr.connection, 'EmrConnection',
@@ -595,7 +610,15 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
         self.assertTrue(job_flow.visibletoallusers, 'true')
 
 
-class IAMJobFlowRoleTestCase(MockEMRAndS3TestCase):
+class IAMTestCase(MockEMRAndS3TestCase):
+
+    def setUp(self):
+        super(IAMTestCase, self).setUp()
+
+        # wrap connect_iam() so we can see if it was called
+        p_iam = patch.object(boto, 'connect_iam', wraps=boto.connect_iam)
+        self.addCleanup(p_iam.stop)
+        p_iam.start()
 
     def run_and_get_job_flow(self, *args):
         stdin = StringIO('foo\nbar\n')
@@ -608,13 +631,68 @@ class IAMJobFlowRoleTestCase(MockEMRAndS3TestCase):
             emr_conn = runner.make_emr_conn()
             return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
 
-    def test_defaults(self):
+    def test_role_auto_creation(self):
         job_flow = self.run_and_get_job_flow()
-        self.assertEqual(job_flow.iamjobflowrole, None)
+        self.assertTrue(boto.connect_iam.called)
 
-    def test_iamjobflowrole(self):
-        job_flow = self.run_and_get_job_flow('--iam-job-flow-role=EMRDefaultRole')
-        self.assertEqual(job_flow.iamjobflowrole, 'EMRDefaultRole')
+        # check instance_profile
+        instance_profile_name = job_flow.jobflowrole
+        self.assertIsNotNone(instance_profile_name)
+        self.assertTrue(instance_profile_name.startswith('mrjob-'))
+        self.assertIn(instance_profile_name, self.mock_iam_instance_profiles)
+        self.assertIn(instance_profile_name, self.mock_iam_roles)
+        self.assertIn(instance_profile_name, self.mock_iam_role_policies)
+
+        # check service_role
+        service_role_name = job_flow.servicerole
+        self.assertIsNotNone(service_role_name)
+        self.assertTrue(service_role_name.startswith('mrjob-'))
+        self.assertIn(service_role_name, self.mock_iam_roles)
+        self.assertIn(service_role_name, self.mock_iam_role_policies)
+
+        # instance_profile and service_role should be distinct
+        self.assertNotEqual(instance_profile_name, service_role_name)
+
+        # run again, and see if we reuse the roles
+        job_flow2 = self.run_and_get_job_flow()
+
+        self.assertEqual(job_flow2.jobflowrole, instance_profile_name)
+        self.assertEqual(job_flow2.servicerole, service_role_name)
+
+
+    def test_iam_instance_profile_option(self):
+        job_flow = self.run_and_get_job_flow(
+            '--iam-instance-profile', 'EMR_DefaultRole')
+        self.assertTrue(boto.connect_iam.called)
+
+        self.assertEqual(job_flow.jobflowrole, 'EMR_DefaultRole')
+
+    def test_deprecated_job_flow_role_option(self):
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow(
+                '--iam-job-flow-role', 'EMR_DefaultRole')
+            self.assertTrue(boto.connect_iam.called)
+
+            self.assertEqual(job_flow.jobflowrole, 'EMR_DefaultRole')
+
+    def test_iam_service_role_option(self):
+        job_flow = self.run_and_get_job_flow(
+            '--iam-service-role', 'EMR_EC2_DefaultRole')
+        self.assertTrue(boto.connect_iam.called)
+
+        self.assertEqual(job_flow.servicerole, 'EMR_EC2_DefaultRole')
+
+    def test_both_iam_options(self):
+        job_flow = self.run_and_get_job_flow(
+            '--iam-instance-profile', 'EMR_DefaultRole',
+            '--iam-service-role', 'EMR_EC2_DefaultRole')
+
+        # users with limited access may not be able to connect to the IAM API.
+        # This gives them a plan B
+        self.assertFalse(boto.connect_iam.called)
+
+        self.assertEqual(job_flow.jobflowrole, 'EMR_DefaultRole')
+        self.assertEqual(job_flow.servicerole, 'EMR_EC2_DefaultRole')
 
 
 class EMRAPIParamsTestCase(MockEMRAndS3TestCase):

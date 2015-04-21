@@ -439,10 +439,21 @@ def add_emr_opts(opt_group):
                   ' Rarely necessary.')),
 
         opt_group.add_option(
+            '--iam-instance-profile', dest='iam_instance_profile',
+            default=None,
+            help=('EC2 instance profile to use for the EMR cluster - see'
+                  ' "Configure IAM Roles for Amazon EMR" in AWS docs')),
+
+        opt_group.add_option(
             '--iam-job-flow-role', dest='iam_job_flow_role',
             default=None,
-            help=('IAM Job flow role to use for the EMR cluster - see AWS '
-                  'docs on EMR for info on using IAM roles with EMR')),
+            help='Deprecated alias for --iam-instance-profile'),
+
+        opt_group.add_option(
+            '--iam-service-role', dest='iam_service_role',
+            default=None,
+            help=('IAM Job flow role to use for the EMR cluster - see'
+                  ' "Configure IAM Roles for Amazon EMR" in AWS docs')),
 
         opt_group.add_option(
             '--max-hours-idle', dest='max_hours_idle',

@@ -1026,8 +1026,8 @@ class MockIAMConnection(object):
             name for name, data in self.mock_iam_instance_profiles.items()
             if data['path'].startswith(path_prefix))
 
-        profiles = [self._describe_instance_profile(name)
-                    for name in profile_names]
+        profiles = [self._describe_instance_profile(profile_name)
+                    for profile_name in profile_names]
 
         result = self._paginate(profiles, 'instance_profiles',
                                 marker=marker, max_items=max_items)
@@ -1097,7 +1097,7 @@ class MockIAMConnection(object):
             name for name, data in self.mock_iam_roles.items()
             if data['path'].startswith(path_prefix))
 
-        roles = [self._describe_role(name) for name in role_names]
+        roles = [self._describe_role(role_name) for role_name in role_names]
 
         result = self._paginate(roles, 'roles',
                                 marker=marker, max_items=max_items)

@@ -96,7 +96,7 @@ class MockS3Connection(object):
                  proxy_user=None, proxy_pass=None,
                  host=None, debug=0, https_connection_factory=None,
                  calling_format=None, path='/', provider='aws',
-                 bucket_class=None, mock_s3_fs=None, aws_security_token=None):
+                 bucket_class=None, mock_s3_fs=None, security_token=None):
         """Mock out a connection to S3. Most of these args are the same
         as for the real S3Connection, and are ignored.
 
@@ -354,7 +354,7 @@ class MockEmrConnection(object):
                  mock_emr_failures=None, mock_emr_output=None,
                  max_days_ago=DEFAULT_MAX_DAYS_AGO,
                  max_job_flows_returned=DEFAULT_MAX_JOB_FLOWS_RETURNED,
-                 simulation_iterator=None, aws_security_token=None):
+                 simulation_iterator=None, security_token=None):
         """Create a mock version of EmrConnection. Most of these args are
         the same as for the real EmrConnection, and are ignored.
 

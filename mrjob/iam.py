@@ -172,11 +172,14 @@ def yield_instance_profiles_with_policies(conn):
         for profile_data in resp['instance_profiles']:
             profile_name = profile_data['instance_profile_name']
 
-            # doesn't look like boto can handle two list markers, hence
-            # the extra "member" layer
-            role_data = profile_data['roles']['member']
-
-            _, role_with_policies = _get_role_with_policies(conn, role_data)
+            if profile_data['roles']:
+                # doesn't look like boto can handle two list markers, hence
+                # the extra "member" layer
+                role_data = profile_data['roles']['member']
+                _, role_with_policies = _get_role_with_policies(
+                    conn, role_data)
+            else:
+                role_with_policies = None
 
             yield (profile_name, role_with_policies)
 

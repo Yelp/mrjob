@@ -1026,7 +1026,10 @@ class MockIAMConnection(object):
             name for name, data in self.mock_iam_instance_profiles.items()
             if data['path'].startswith(path_prefix))
 
-        result = self._paginate(profile_names, 'instance_profile',
+        profiles = [self._describe_instance_profile(name)
+                    for name in profile_names]
+
+        result = self._paginate(profiles, 'instance_profiles',
                                 marker=marker, max_items=max_items)
 
         return self._wrap_result('list_instance_profiles', result)
@@ -1139,8 +1142,7 @@ class MockIAMConnection(object):
 
         return self._wrap_result('get_role_policy', result)
 
-    def list_role_policies(self, role_name, marker, max_items):
-
+    def list_role_policies(self, role_name, marker=None, max_items=None):
         policy_names = [
             name for name, data in sorted(self.mock_iam_role_policies.items())
             if data['role_name'] == role_name]
@@ -1153,7 +1155,7 @@ class MockIAMConnection(object):
     def put_role_policy(self, role_name, policy_name, policy_document):
         self._check_role_exists(role_name)
 
-        # PutRolePolicy will happily overwrite existing roles
+        # PutRolePolicy will happily overwrite existing role policies
         self.mock_iam_role_policies[policy_name] = dict(
             policy_document=quote(policy_document),
             role_name=role_name)

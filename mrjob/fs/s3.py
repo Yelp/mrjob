@@ -87,7 +87,7 @@ class S3Filesystem(Filesystem):
     """
 
     def __init__(self, aws_access_key_id, aws_secret_access_key, s3_endpoint,
-                 aws_security_token):
+                 aws_security_token=None):
         """
         :param aws_access_key_id: Your AWS access key ID
         :param aws_secret_access_key: Your AWS secret access key

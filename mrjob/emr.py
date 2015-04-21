@@ -2574,7 +2574,7 @@ class EMRJobRunner(MRJobRunner):
     def make_iam_conn(self):
         """Create a connection to S3.
 
-        :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a
+        :return: a :py:class:`boto.iam.connection.IAMConnection`, wrapped in a
                  :py:class:`mrjob.retry.RetryWrapper`
         """
         # give a non-cryptic error message if boto isn't installed

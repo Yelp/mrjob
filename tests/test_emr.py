@@ -60,6 +60,7 @@ from mrjob.util import tar_and_gzip
 from tests.mockboto import DEFAULT_MAX_JOB_FLOWS_RETURNED
 from tests.mockboto import MockEmrConnection
 from tests.mockboto import MockEmrObject
+from tests.mockboto import MockIAMConnection
 from tests.mockboto import MockS3Connection
 from tests.mockboto import add_mock_s3_data
 from tests.mockboto import to_iso8601
@@ -140,18 +141,32 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         kwargs['simulation_iterator'] = self.simulation_iterator
         return MockEmrConnection(*args, **kwargs)
 
+    def _mock_boto_connect_iam(self, *args, **kwargs):
+        kwargs['mock_iam_instance_profiles'] = self.mock_iam_instance_profiles
+        kwargs['mock_iam_roles'] = self.mock_iam_roles
+        kwargs['mock_iam_role_policies'] = self.mock_iam_role_policies
+        return MockIAMConnection(*args, **kwargs)
+
     def setUp(self):
         # patch boto
-        self.mock_s3_fs = {}
-        self.mock_emr_job_flows = {}
         self.mock_emr_failures = {}
+        self.mock_emr_job_flows = {}
         self.mock_emr_output = {}
+        self.mock_iam_instance_profiles = {}
+        self.mock_iam_role_policies = {}
+        self.mock_iam_roles = {}
+        self.mock_s3_fs = {}
+
         self.simulation_iterator = itertools.repeat(
             None, self.MAX_SIMULATION_STEPS)
 
         p_s3 = patch.object(boto, 'connect_s3', self._mock_boto_connect_s3)
         self.addCleanup(p_s3.stop)
         p_s3.start()
+
+        p_iam = patch.object(boto, 'connect_iam', self._mock_boto_connect_iam)
+        self.addCleanup(p_iam.stop)
+        p_iam.start()
 
         p_emr = patch.object(
             boto.emr.connection, 'EmrConnection',

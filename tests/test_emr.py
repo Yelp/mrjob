@@ -612,6 +612,14 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
 
 class IAMTestCase(MockEMRAndS3TestCase):
 
+    def setUp(self):
+        super(IAMTestCase, self).setUp()
+
+        # wrap connect_iam() so we can see if it was called
+        p_iam = patch.object(boto, 'connect_iam', wraps=boto.connect_iam)
+        self.addCleanup(p_iam.stop)
+        p_iam.start()
+
     def run_and_get_job_flow(self, *args):
         stdin = StringIO('foo\nbar\n')
         mr_job = MRTwoStepJob(
@@ -625,6 +633,7 @@ class IAMTestCase(MockEMRAndS3TestCase):
 
     def test_role_auto_creation(self):
         job_flow = self.run_and_get_job_flow()
+        self.assertTrue(boto.connect_iam.called)
 
         # check instance_profile
         instance_profile_name = job_flow.jobflowrole
@@ -650,14 +659,31 @@ class IAMTestCase(MockEMRAndS3TestCase):
         self.assertEqual(job_flow2.jobflowrole, instance_profile_name)
         self.assertEqual(job_flow2.servicerole, service_role_name)
 
+
     def test_iam_instance_profile_option(self):
         job_flow = self.run_and_get_job_flow(
-            '--iam-instance-profile=EMR_DefaultRole')
+            '--iam-instance-profile', 'EMR_DefaultRole')
+        self.assertTrue(boto.connect_iam.called)
+
         self.assertEqual(job_flow.jobflowrole, 'EMR_DefaultRole')
 
     def test_iam_service_role_option(self):
         job_flow = self.run_and_get_job_flow(
-            '--iam-service-role=EMR_EC2_DefaultRole')
+            '--iam-service-role', 'EMR_EC2_DefaultRole')
+        self.assertTrue(boto.connect_iam.called)
+
+        self.assertEqual(job_flow.servicerole, 'EMR_EC2_DefaultRole')
+
+    def test_both_iam_options(self):
+        job_flow = self.run_and_get_job_flow(
+            '--iam-instance-profile', 'EMR_DefaultRole',
+            '--iam-service-role', 'EMR_EC2_DefaultRole')
+
+        # users with limited access may not be able to connect to the IAM API.
+        # This gives them a plan B
+        self.assertFalse(boto.connect_iam.called)
+
+        self.assertEqual(job_flow.jobflowrole, 'EMR_DefaultRole')
         self.assertEqual(job_flow.servicerole, 'EMR_EC2_DefaultRole')
 
 

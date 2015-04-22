@@ -4,6 +4,30 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+0.4.4
+-----
+
+mrjob now automatically creates and uses IAM objects as necessary to comply
+with `new requirements from Amazon Web Services <http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles-creatingroles.html>`_.
+
+(You do not need to install the AWS CLI or run ``aws emr create-default-roles``
+as the link above describes; mrjob takes care of this for you.)
+
+.. warning::
+
+   The change that AWS made essentially broke all older versions of mrjob for
+   all new accounts. If the first time your AWS account created an Elastic
+   MapReduce cluster was on or after April 6, 2015, you should use at least
+   this version of mrjob.
+
+   If you *must* use an old version of mrjob with a new AWS account, see
+   `this thread <https://groups.google.com/forum/#!topic/mrjob/h7-1UYB7O20>`_
+   for a possible workaround.
+
+``--iam-job-flow-role`` has been renamed to ``--iam-instance-profile``.
+
+New ``--iam-service-role`` option.
+
 0.4.3
 -----
 

@@ -166,13 +166,26 @@ Job flow creation and configuration
     :switch: --iam-instance-profile
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``None``
+    :default: (automatic)
 
-    IAM instance profile to use on the EMR cluster. See
+    Name of an IAM instance profile to use for EC2 clusters created by EMR. See
     http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles.html
-    for more details on using IAM roles with EMR.
+    for more details on using IAM with EMR.
 
     .. versionadded:: 0.4.3
+
+.. mrjob-opt::
+    :config: iam_service_role
+    :switch: --iam-service-role
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: (automatic)
+
+    Name of an IAM role for the EMR service to use. See
+    http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles.html
+    for more details on using IAM with EMR.
+
+    .. versionadded:: 0.4.4
 
 .. mrjob-opt::
     :config: max_hours_idle

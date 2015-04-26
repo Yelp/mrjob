@@ -479,8 +479,8 @@ def _bunzip2_stream(fileobj, bufsize=1024):
         if not chunk:
             return
 
-        parts = d.decompress(chunk)
-        for part in parts:
+        part = d.decompress(chunk)
+        if part:
             yield part
 
 

@@ -44,6 +44,7 @@ import sys
 
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import urlparse
+from mrjob.py2 import IN_PY2
 
 
 def create_mock_hadoop_script(path):
@@ -76,7 +77,7 @@ def add_mock_hadoop_output(parts):
 
     for i, part in enumerate(parts):
         part_path = os.path.join(output_dir, 'part-%05d' % i)
-        with open(part_path, 'w') as part_file:
+        with open(part_path, 'wb') as part_file:
             for line in part:
                 part_file.write(line)
 
@@ -146,11 +147,17 @@ def main(stdin, stdout, stderr, argv, environ):
             cmd_log.flush()
 
     if len(argv) < 2:
-        stderr.write('Usage: hadoop [--config confdir] COMMAND\n')
+        stderr.write(b'Usage: hadoop [--config confdir] COMMAND\n')
         return 1
 
     cmd = argv[1]
     cmd_args = argv[2:]
+
+    # bytes/unicode compatibility
+    if hasattr(stdout, 'buffer'):
+        stdout = stdout.buffer
+    if hasattr(stderr, 'buffer'):
+        stderr = stderr.buffer
 
     return invoke_cmd(
         stdout, stderr, environ, 'hadoop_', cmd, cmd_args,
@@ -187,7 +194,7 @@ def hadoop_fs_cat(stdout, stderr, environ, *args):
             failed = True
         else:
             for path in paths:
-                with open(path) as f:
+                with open(path, 'rb') as f:
                     for line in f:
                         stdout.write(line)
 

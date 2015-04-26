@@ -78,7 +78,7 @@ class S3FSTestCase(SandboxedTestCase):
 
     def test_cat_bz2(self):
         remote_path = self.add_mock_s3_data(
-            'walrus', 'data/foo.bz2', bz2.compress('foo\n' * 1000))
+            'walrus', 'data/foo.bz2', bz2.compress(b'foo\n' * 1000))
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          ['foo\n'] * 1000)

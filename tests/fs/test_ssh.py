@@ -93,7 +93,7 @@ class SSHFSTestCase(MockSubprocessTestCase):
 
     def test_cat_bz2(self):
         self.make_master_file(os.path.join('data', 'foo.bz2'),
-                              bz2.compress('foo\n' * 1000))
+                              bz2.compress(b'foo\n' * 1000))
         remote_path = self.fs.path_join('ssh://testmaster/data', 'foo.bz2')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),

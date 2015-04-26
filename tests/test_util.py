@@ -472,14 +472,14 @@ class ReadFileTestCase(unittest.TestCase):
 
     def test_read_uncompressed_file_from_fileobj(self):
         input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as input_file:
-            input_file.write('bar\nfoo\n')
+        with open(input_path, 'wb') as input_file:
+            input_file.write(b'bar\nfoo\n')
 
         output = []
-        for line in read_file(input_path, fileobj=open(input_path)):
+        for line in read_file(input_path, fileobj=open(input_path, 'rb')):
             output.append(line)
 
-        self.assertEqual(output, ['bar\n', 'foo\n'])
+        self.assertEqual(output, [b'bar\n', b'foo\n'])
 
     def test_read_gz_file(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')

@@ -53,26 +53,26 @@ class BufferIteratorToLineIteratorTestCase(unittest.TestCase):
     def test_buffered_lines(self):
         self.assertEqual(
             list(buffer_iterator_to_line_iterator(chunk for chunk in
-                                                  ['The quick\nbrown fox\nju',
-                                                   'mped over\nthe lazy\ndog',
-                                                   's.\n'])),
-            ['The quick\n', 'brown fox\n', 'jumped over\n', 'the lazy\n',
-             'dogs.\n'])
+                                                  [b'The quick\nbrown fox\nju',
+                                                   b'mped over\nthe lazy\ndog',
+                                                   b's.\n'])),
+            [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
+             b'dogs.\n'])
 
     def test_add_trailing_newline(self):
         self.assertEqual(
             list(buffer_iterator_to_line_iterator(chunk for chunk in
-                                                  ['Alouette,\ngentille',
-                                                   ' Alouette.'])),
-            ['Alouette,\n', 'gentille Alouette.\n'])
+                                                  [b'Alouette,\ngentille',
+                                                   b' Alouette.'])),
+            [b'Alouette,\n', b'gentille Alouette.\n'])
 
     def test_long_lines(self):
-        super_long_line = 'a' * 10000 + '\n' + 'b' * 1000 + '\nlast\n'
+        super_long_line = b'a' * 10000 + b'\n' + b'b' * 1000 + b'\nlast\n'
         self.assertEqual(
             list(buffer_iterator_to_line_iterator(
                 chunk for chunk in
                 (super_long_line[0+i:1024+i] for i in range(0, len(super_long_line), 1024)))),
-            ['a' * 10000 + '\n', 'b' * 1000 + '\n', 'last\n'])
+            [b'a' * 10000 + b'\n', b'b' * 1000 + b'\n', b'last\n'])
 
 
 
@@ -495,15 +495,15 @@ class ReadFileTestCase(unittest.TestCase):
 
     def test_read_bz2_file(self):
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
-        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
-        input_bz2.write('bar\nbar\nfoo\n')
+        input_bz2 = bz2.BZ2File(input_bz2_path, 'wb')
+        input_bz2.write(b'bar\nbar\nfoo\n')
         input_bz2.close()
 
         output = []
         for line in read_file(input_bz2_path):
             output.append(line)
 
-        self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
+        self.assertEqual(output, [b'bar\n', b'bar\n', b'foo\n'])
 
     def test_read_large_bz2_file(self):
         # catch incorrect use of bz2 library (Issue #814)

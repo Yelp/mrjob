@@ -66,7 +66,7 @@ def buffer_iterator_to_line_iterator(iterator):
         This may append a newline to your last chunk of data. In v0.5.0
         it will not, for better compatibility with file objects.
     """
-    buf = ''
+    buf = b''
     search_offset = 0
     for chunk in iterator:
         buf += chunk
@@ -74,7 +74,7 @@ def buffer_iterator_to_line_iterator(iterator):
         # this is basically splitlines() without support for \r
         start = 0
         while True:
-            end = buf.find('\n', start + search_offset) + 1
+            end = buf.find(b'\n', start + search_offset) + 1
             if end:  # if find() returned -1, end would be 0
                 yield buf[start:end]
                 start = end
@@ -91,7 +91,7 @@ def buffer_iterator_to_line_iterator(iterator):
 
     if buf:
         # in v0.5.0, don't append the newline
-        yield buf + '\n'
+        yield buf + b'\n'
 
 
 def cmd_line(args):
@@ -426,7 +426,7 @@ def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
     try:
         # open path if we need to
         if fileobj is None:
-            f = open(path)
+            f = open(path, 'rb')
         else:
             f = fileobj
 

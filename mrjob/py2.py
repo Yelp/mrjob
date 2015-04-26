@@ -90,14 +90,14 @@ if IN_PY2:
     basestring = basestring
 else:
     basestring = str
-basestring  # quiet, pyflakes
+basestring
 
 # `long`, for `isinstance(..., (int, long))`
 if IN_PY2:
     long = long
 else:
     long = int
-long  # quiet, pyflakes
+long
 
 # `StringIO`, for mocking out `sys.stdout`, etc. You probably won't need
 # this outside of
@@ -112,17 +112,23 @@ if IN_PY2:
     from urllib2 import urlopen
 else:
     from urllib.request import urlopen
-urlopen  # quiet, pyflakes
+urlopen
 
 # urlparse() (in most cases you should use `mrjob.parse.urlparse()`)
 if IN_PY2:
+    from urllib import quote
+    from urllib import unquote
     from urlparse import urlparse
     from urlparse import ParseResult
 else:
+    from urllib.parse import quote
+    from urllib.parse import unquote
     from urllib.parse import urlparse
     from urllib.parse import ParseResult
-urlparse  # quiet, pyflakes
-ParseResult  # quiet, pyflakes
+quote
+unquote
+urlparse
+ParseResult
 
 # `xrange`, for `ReprProtocol`
 #
@@ -131,4 +137,4 @@ if IN_PY2:
     xrange = xrange
 else:
     xrange = range
-xrange  # quiet, pyflakes
+xrange

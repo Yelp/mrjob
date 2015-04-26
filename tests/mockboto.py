@@ -20,7 +20,6 @@ import hashlib
 import json
 from datetime import datetime
 from datetime import timedelta
-from urllib import quote
 
 try:
     from boto.emr.connection import EmrConnection
@@ -35,6 +34,7 @@ from mrjob.conf import combine_values
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import RFC1123
+from mrjob.py2 import quote
 
 DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
 DEFAULT_MAX_DAYS_AGO = 61

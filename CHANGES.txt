@@ -1,3 +1,10 @@
+v0.4.4, 2014-04-21 -- EMRgency!
+ * runners:
+   * EMR:
+     * Create IAM objects as needed (unbreaks mrjob for new accounts) (#999)
+     * --iam-job-flow-role renamed to --iam-instance-profile (#1001)
+     * new --iam-service-role option (#1005)
+
 v0.4.3, 2014-04-08 -- SO many bugfixes
  * jobs:
    * MRStep's constructor treats kwarg=None same as not setting it (#970)

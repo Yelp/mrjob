@@ -23,7 +23,6 @@ import re
 import signal
 import socket
 import time
-import urllib2
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta

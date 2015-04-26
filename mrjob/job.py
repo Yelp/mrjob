@@ -18,7 +18,6 @@ for more information."""
 # since MRJobs need to run in Amazon's generic EMR environment
 from __future__ import print_function
 
-import codecs
 import inspect
 import itertools
 import logging

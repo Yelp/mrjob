@@ -30,7 +30,6 @@ try:
 except ImportError:
     import unittest
 
-from mrjob.py2 import xrange
 from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar

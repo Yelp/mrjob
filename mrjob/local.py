@@ -17,9 +17,7 @@ them together. Useful for testing."""
 import logging
 from subprocess import Popen
 from subprocess import PIPE
-import sys
 
-from mrjob.conf import combine_dicts
 from mrjob.sim import SimMRJobRunner
 from mrjob.sim import SimRunnerOptionStore
 from mrjob.parse import find_python_traceback

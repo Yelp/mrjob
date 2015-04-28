@@ -33,6 +33,7 @@ except ImportError:
     boto = None
 
 from mrjob.conf import dump_mrjob_conf
+from mrjob.py2 import IN_PY2
 from mrjob.py2 import StringIO
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import log_to_stream
@@ -85,7 +86,10 @@ class RunnerOptionStoreTestCase(EmptyMrjobConfTestCase):
         self.assertEqual(opts['interpreter'], val)
 
     def test_interpreter_fallback(self):
-        self._assert_interp(['python'])
+        if IN_PY2:
+            self._assert_interp(['python'])
+        else:
+            self._assert_interp(['python3'])
 
     def test_interpreter_fallback_2(self):
         self._assert_interp(['python', '-v'], python_bin=['python', '-v'])

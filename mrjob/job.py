@@ -392,10 +392,14 @@ class MRJob(MRJobLauncher):
         if not isinstance(amount, (int, long)):
             raise TypeError('amount must be an integer, not %r' % (amount,))
 
+        # cast non-strings to strings (if people pass in exceptions, etc)
+        if not isinstance(group, basestring):
+            group = str(group)
+        if not isinstance(counter, basestring):
+            counter = str(counter)
+
         # Extra commas screw up hadoop and there's no way to escape them. So
         # replace them with the next best thing: semicolons!
-        #
-        # cast to str() because sometimes people pass in exceptions or whatever
         #
         # The relevant Hadoop code is incrCounter(), here:
         # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup  # noqa

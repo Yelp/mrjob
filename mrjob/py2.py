@@ -33,8 +33,11 @@ These things should always be strings:
 - streams that you print() to (e.g. ``sys.stdout`` if you mock it out)
 - streams that you log to
 - paths on filesystem
+- URIs
 - arguments to commands
 - option names
+- Hadoop counter names and groups
+- Hadoop status messages
 
 These things are strings because it makes for simpler code:
 

@@ -542,15 +542,18 @@ def _parse_counters_0_20(counter_string):
 
     for group_id, group_name, counter_str in groups:
         matches = _COUNTER_RE_0_20.findall(counter_str)
-        for counter_id, counter_name, counter_value in matches:
-            try:
-                group_name = counter_unescape(group_name)
-            except ValueError:
-                log.warning("Could not decode group name %s" % group_name)
 
+        try:
+            group_name = counter_unescape(group_name)
+        except ValueError:
+            group_name = _to_string(group_name)
+            log.warning("Could not decode group name %s" % group_name)
+
+        for counter_id, counter_name, counter_value in matches:
             try:
                 counter_name = counter_unescape(counter_name)
             except ValueError:
+                counter_name = _to_string(counter_name)
                 log.warning("Could not decode counter name %s" % counter_name)
 
             yield group_name, counter_name, int(counter_value)

@@ -361,10 +361,11 @@ sys.exit(13)
 
         runner._invoke_sort([self.a], self.out)
 
-        self.assertEqual(list(open(self.out)),
-                         ['A\n',
-                          'alligator\n',
-                          'apple\n'])
+        with open(self.out) as out_f:
+            self.assertEqual(list(out_f),
+                             ['A\n',
+                              'alligator\n',
+                              'apple\n'])
 
     def test_two_files(self):
         runner = MRJobRunner(conf_paths=[])
@@ -372,13 +373,14 @@ sys.exit(13)
 
         runner._invoke_sort([self.a, self.b], self.out)
 
-        self.assertEqual(list(open(self.out)),
-                         ['A\n',
-                          'B\n',
-                          'alligator\n',
-                          'apple\n',
-                          'ball\n',
-                          'banana\n'])
+        with open(self.out) as out_f:
+            self.assertEqual(list(out_f),
+                             ['A\n',
+                              'B\n',
+                              'alligator\n',
+                              'apple\n',
+                              'ball\n',
+                              'banana\n'])
 
     def test_windows_sort_on_one_file(self):
         self.use_simulated_windows_sort()

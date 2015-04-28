@@ -83,8 +83,14 @@ Miscellany
 We provide a ``long`` type (aliased to ``int`` on Python 3) so you can
 check if something is an integer: ``isinstance(..., (int, long))``.
 
-Any standard library function starting with "url" (e.g. ``urlparse()``) should
-be imported from this module.
+Any standard library function that deals with URLs (e.g. ``urlparse()``) should
+probably be imported from this module.
+
+You *usually* want to do ``from __future__ import print_function`` in modules
+where you use ``print()``. ``print(...)`` works fine, but
+``print(..., file=...)`` doesn't, and ``print()`` prints ``()`` on Python 2.
+
+You shouldn't need any other ``__future__`` imports.
 """
 import sys
 
@@ -113,26 +119,22 @@ else:
     from io import StringIO
 StringIO  # quiet, pyflakes
 
-# urlopen()
-if IN_PY2:
-    from urllib2 import urlopen
-else:
-    from urllib.request import urlopen
-urlopen
-
 # urlparse() (in most cases you should use ``mrjob.parse.urlparse()``)
 if IN_PY2:
     from urllib import quote
     from urllib import unquote
+    from urllib2 import urlopen
     from urlparse import urlparse
     from urlparse import ParseResult
 else:
     from urllib.parse import quote
     from urllib.parse import unquote
+    from urllib.request import urlopen
     from urllib.parse import urlparse
     from urllib.parse import ParseResult
 quote
 unquote
+urlopen
 urlparse
 ParseResult
 

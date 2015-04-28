@@ -217,11 +217,12 @@ def find_python_traceback(lines):
     """Scan a log file or other iterable for a Python traceback,
     and return it as a list of lines (bytes).
 
-    Essentially, we detect the start of the traceback, and consume lines until
-    we find a non-indented line.
-
     In logs from EMR, we find python tracebacks in ``task-attempts/*/stderr``
     """
+    # Essentially, we detect the start of the traceback, and continue
+    # until we find a non-indented line, with some special rules for exceptions
+    # from subprocesses.
+
     # Lines to pass back representing entire error found
     all_tb_lines = []
 
@@ -237,6 +238,9 @@ def find_python_traceback(lines):
     in_traceback = False
 
     for line in lines:
+        # don't return bytes in Python 3
+        line = _to_string(line)
+
         if in_traceback:
             tb_lines.append(line)
 
@@ -244,7 +248,7 @@ def find_python_traceback(lines):
             if line.lstrip() == line:
                 in_traceback = False
 
-                if line.startswith(b'subprocess.CalledProcessError'):
+                if line.startswith('subprocess.CalledProcessError'):
                     # CalledProcessError may mean that the subprocess printed
                     # errors to stderr which we can show the user
                     all_tb_lines += non_tb_lines
@@ -255,7 +259,7 @@ def find_python_traceback(lines):
                 tb_lines = []
                 non_tb_lines = []
         else:
-            if line.startswith(b'Traceback (most recent call last):'):
+            if line.startswith('Traceback (most recent call last):'):
                 tb_lines.append(line)
                 in_traceback = True
             else:

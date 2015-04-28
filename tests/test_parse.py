@@ -106,8 +106,8 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
         self.assertNotEqual(tb, None)
         assert isinstance(tb, list)
         # The first line ("Traceback...") is not skipped
-        self.assertIn(b"Traceback (most recent call last):", tb[0])
-        self.assertIn(b"TypeError: 'int' object is not iterable", tb[-1])
+        self.assertIn("Traceback (most recent call last):", tb[0])
+        self.assertIn("TypeError: 'int' object is not iterable", tb[-1])
 
         # PyPy doesn't support -v
         if hasattr(sys, 'pypy_version_info'):
@@ -116,7 +116,7 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
         # make sure we can find the same traceback in noise
         verbose_stdout, verbose_stderr = run(
             'python', '-v', '-c', "print(sorted(321))")
-        self.assertEqual(verbose_stdout, '')
+        self.assertEqual(verbose_stdout, b'')
         self.assertNotEqual(verbose_stderr, stderr)
         verbose_tb = find_python_traceback(BytesIO(verbose_stderr))
         self.assertEqual(verbose_tb, tb)
@@ -125,19 +125,19 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
         total_traceback = self.EXAMPLE_TRACEBACK + b'junk\n'
         tb = find_python_traceback(BytesIO(total_traceback))
         self.assertEqual(''.join(tb),
-                         self.EXAMPLE_TRACEBACK.encode('ascii'))
+                         self.EXAMPLE_TRACEBACK.decode('ascii'))
 
     def test_find_python_traceback_with_more_stderr(self):
         total_traceback = self.EXAMPLE_STDERR_TRACEBACK_1 + b'junk\n'
         tb = find_python_traceback(BytesIO(total_traceback))
         self.assertEqual(''.join(tb),
-                         self.EXAMPLE_STDERR_TRACEBACK_1.encode('ascii'))
+                         self.EXAMPLE_STDERR_TRACEBACK_1.decode('ascii'))
 
     def test_find_python_traceback_with_more_stderr_2(self):
         total_traceback = self.EXAMPLE_STDERR_TRACEBACK_2 + b'junk\n'
         tb = find_python_traceback(BytesIO(total_traceback))
         self.assertEqual(''.join(tb),
-                         self.EXAMPLE_STDERR_TRACEBACK_2.encode('ascii'))
+                         self.EXAMPLE_STDERR_TRACEBACK_2.decode('ascii'))
 
 
 class FindMiscTestCase(unittest.TestCase):

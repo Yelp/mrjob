@@ -435,26 +435,26 @@ def find_timeout_error(lines):
 
 
 # recognize hadoop streaming output
-_COUNTER_RE = re.compile(r'^reporter:counter:([^,]*),([^,]*),(-?\d+)$')
-_STATUS_RE = re.compile(r'^reporter:status:(.*)$')
+_COUNTER_RE = re.compile(br'^reporter:counter:([^,]*),([^,]*),(-?\d+)$')
+_STATUS_RE = re.compile(br'^reporter:status:(.*)$')
 
 
 def parse_mr_job_stderr(stderr, counters=None):
     """Parse counters and status messages out of MRJob output.
 
-    :param stderr: a filehandle, a list of lines, or a str containing data
-    :param counters: Counters so far, to update; a map from group to counter
-                     name to count.
+    :param stderr: a filehandle, a list of lines (bytes), or bytes
+    :param counters: Counters so far, to update; a map from group (str) to
+                     counter name (str) to count.
 
     Returns a dictionary with the keys *counters*, *statuses*, *other*:
 
     - *counters*: counters so far; same format as above
     - *statuses*: a list of status messages encountered
-    - *other*: lines that aren't either counters or status messages
+    - *other*: lines (bytes) that aren't either counters or status messages
     """
     # For the corresponding code in Hadoop Streaming, see ``incrCounter()`` in
     # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup  # noqa
-    if isinstance(stderr, str):
+    if isinstance(stderr, bytes):
         stderr = BytesIO(stderr)
 
     if counters is None:
@@ -463,17 +463,23 @@ def parse_mr_job_stderr(stderr, counters=None):
     other = []
 
     for line in stderr:
-        m = _COUNTER_RE.match(line.rstrip('\r\n'))
+        m = _COUNTER_RE.match(line.rstrip(b'\r\n'))
         if m:
             group, counter, amount_str = m.groups()
+
+            # don't leave these as bytes on Python 3
+            group = _to_string(group)
+            counter = _to_string(counter)
+
             counters.setdefault(group, {})
             counters[group].setdefault(counter, 0)
             counters[group][counter] += int(amount_str)
             continue
 
-        m = _STATUS_RE.match(line.rstrip('\r\n'))
+        m = _STATUS_RE.match(line.rstrip(b'\r\n'))
         if m:
-            statuses.append(m.group(1))
+            # don't leave as bytes on Python 3
+            statuses.append(_to_string(m.group(1)))
             continue
 
         other.append(line)

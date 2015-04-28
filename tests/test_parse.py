@@ -479,7 +479,7 @@ class ParseMRJobStderr(unittest.TestCase):
             {'counters': {'Foo': {'Bar': 3, 'Baz': 1},
                           'Quux Subsystem': {'Baz': 42}},
              'statuses': ['Baz', 'Baz'],
-             'other': ['Warning: deprecated metasyntactic variable: garply\n']
+             'other': [b'Warning: deprecated metasyntactic variable: garply\n']
             })
 
     def test_update_counters(self):
@@ -506,7 +506,7 @@ class ParseMRJobStderr(unittest.TestCase):
         # kind of poor practice to use negative counters, but Hadoop
         # Streaming supports it (negative numbers are integers too!)
         self.assertEqual(
-            parse_mr_job_stderr(['reporter:counter:Foo,Bar,-2\n']),
+            parse_mr_job_stderr([b'reporter:counter:Foo,Bar,-2\n']),
             {'counters': {'Foo': {'Bar': -2}},
              'statuses': [], 'other': []})
 

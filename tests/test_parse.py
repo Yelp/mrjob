@@ -233,6 +233,9 @@ class FindMiscTestCase(unittest.TestCase):
             find_job_log_multiline_error(line for line in LOG_LINES),
             SHOULD_EQUAL)
 
+
+class CountersTestCase(unittest.TestCase):
+
     TEST_COUNTERS_0_18 = (
         b'Job JOBID="job_201106061823_0001" FINISH_TIME="1307384737542"'
         b' JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1"'

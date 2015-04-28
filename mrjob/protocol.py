@@ -17,7 +17,8 @@ bytes for Hadoop to distribute to the next task or to write as output. For more
 information, see :ref:`job-protocols` and :ref:`writing-protocols`.
 """
 # This is one of the few places where efficiency really matters; to that end,
-# we maintain separate code for Python 2 and 3 where necessary.
+# we maintain separate code for Python 2 and 3 where necessary. Tests of
+# protocols should *not* have different code for different versions of Python.
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment

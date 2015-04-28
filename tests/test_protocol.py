@@ -310,7 +310,8 @@ class ReprValueProtocolTestCase(ProtocolTestCase):
         VALUE = {'foo': {'bar': 3}, 'baz': None, 'quz': ['a', 1]}
 
         self.assertEqual((None, VALUE), ReprValueProtocol().read(repr(VALUE)))
-        self.assertEqual(repr(VALUE), ReprValueProtocol().write(None, VALUE))
+        self.assertEqual(repr(VALUE).encode('ascii'),
+                         ReprValueProtocol().write(None, VALUE))
 
     def test_bad_data(self):
         self.assertCantDecode(ReprValueProtocol(), b'{@#$@#!^&*$%^')

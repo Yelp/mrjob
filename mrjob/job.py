@@ -408,7 +408,7 @@ class MRJob(MRJobLauncher):
 
         line = 'reporter:counter:%s,%s,%d\n' % (group, counter, amount)
         if not isinstance(line, bytes):
-            line = line.encode('utf-8')
+            line = line.encode('utf_8')
 
         self.stderr.write(line)
         self.stderr.flush()
@@ -422,7 +422,7 @@ class MRJob(MRJobLauncher):
         """
         line = 'reporter:status:%s\n' % (msg,)
         if not isinstance(line, bytes):
-            line = line.encode('utf-8')
+            line = line.encode('utf_8')
 
         self.stderr.write(line)
         self.stderr.flush()

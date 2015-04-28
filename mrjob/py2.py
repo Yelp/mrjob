@@ -111,8 +111,7 @@ else:
     long = int
 long
 
-# ``StringIO``, for mocking out ``sys.stdout``, etc. You probably won't need
-# this outside of
+# ``StringIO``. Useful for mocking out ``sys.stdout``, etc.
 if IN_PY2:
     from StringIO import StringIO
 else:

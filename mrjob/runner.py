@@ -929,11 +929,12 @@ class MRJobRunner(object):
         log.info('writing wrapper script to %s' % path)
 
         contents = self._setup_wrapper_script_content(setup)
-        for line in BytesIO(contents):
-            log.debug('WRAPPER: ' + line.rstrip('\r\n'))
+        for line in contents:
+            log.debug('WRAPPER: ' + line.rstrip('\n'))
 
         with open(path, 'w') as f:
-            f.write(contents)
+            for line in contents:
+                f.write(line)
 
         self._setup_wrapper_script_path = path
         self._working_dir_mgr.add('file', self._setup_wrapper_script_path)
@@ -986,16 +987,17 @@ class MRJobRunner(object):
 
     def _setup_wrapper_script_content(self, setup, mrjob_tar_gz_name=None):
         """Return a (Bourne) shell script that runs the setup commands and then
-        executes whatever is passed to it (this will be our mapper/reducer).
+        executes whatever is passed to it (this will be our mapper/reducer),
+        as a list of strings (one for each line, including newlines).
 
         We obtain a file lock so that two copies of the setup commands
         cannot run simultaneously on the same machine (this helps for running
         :command:`make` on a shared source code archive, for example).
         """
-        out = BytesIO()
+        out = []
 
         def writeln(line=''):
-            out.write(line + '\n')
+            out.append(line + '\n')
 
         # we're always going to execute this script as an argument to
         # sh, so there's no need to add a shebang (e.g. #!/bin/sh)
@@ -1047,7 +1049,7 @@ class MRJobRunner(object):
         writeln('cd $__mrjob_PWD')
         writeln('"$@"')
 
-        return out.getvalue()
+        return out
 
     def _get_input_paths(self):
         """Get the paths to input files, dumping STDIN to a local

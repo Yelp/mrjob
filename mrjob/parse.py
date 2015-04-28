@@ -22,6 +22,7 @@ import time
 from io import BytesIO
 
 from mrjob.compat import uses_020_counters
+from mrjob.py2 import IN_PY2
 from mrjob.py2 import ParseResult
 from mrjob.py2 import urlparse as urlparse_buggy
 
@@ -168,6 +169,30 @@ def parse_key_value_list(kv_string_list, error_fmt, error_func):
 
 _HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.(){}[\]"\\])')
 
+def _to_string(s):
+    """On Python 3, convert ``bytes`` to ``str`` (i.e. unicode).
+
+    (In Python 2, either ``str`` or ``unicode`` is acceptable as a string.)
+
+    Why this exists: we're going to need to print/log information about
+    stacktraces, counters, etc., which means on Python 3 we need these
+    things to be strings (unicode), not bytes.
+
+    We *suspect* that most logs we encounter will be UTF-8
+    encoded, but we don't want log parsing to crash in Python 3. So we first
+    try decoding in UTF-8, but fall back to latin-1.
+    """
+    if not isinstance(s, (bytes, str)):
+        raise TypeError
+
+    if IN_PY2 or isinstance(s, str):
+        return s
+
+    try:
+        return s.decode('utf_8')
+    except UnicodeDecodeError:
+        return s.decode('latin_1')
+
 
 def counter_unescape(escaped_string):
     """Fix names of counters and groups emitted by Hadoop 0.20+ logs, which
@@ -184,7 +209,10 @@ def counter_unescape(escaped_string):
 
 def find_python_traceback(lines):
     """Scan a log file or other iterable for a Python traceback,
-    and return it as a list of lines.
+    and return it as a list of lines (bytes).
+
+    Essentially, we detect the start of the traceback, and consume lines until
+    we find a non-indented line.
 
     In logs from EMR, we find python tracebacks in ``task-attempts/*/stderr``
     """
@@ -210,7 +238,7 @@ def find_python_traceback(lines):
             if line.lstrip() == line:
                 in_traceback = False
 
-                if line.startswith('subprocess.CalledProcessError'):
+                if line.startswith(b'subprocess.CalledProcessError'):
                     # CalledProcessError may mean that the subprocess printed
                     # errors to stderr which we can show the user
                     all_tb_lines += non_tb_lines
@@ -221,7 +249,7 @@ def find_python_traceback(lines):
                 tb_lines = []
                 non_tb_lines = []
         else:
-            if line.startswith('Traceback (most recent call last):'):
+            if line.startswith(b'Traceback (most recent call last):'):
                 tb_lines.append(line)
                 in_traceback = True
             else:
@@ -234,7 +262,7 @@ def find_python_traceback(lines):
 
 def find_hadoop_java_stack_trace(lines):
     """Scan a log file or other iterable for a java stack trace from Hadoop,
-    and return it as a list of lines.
+    and return it as a list of lines (bytes).
 
     In logs from EMR, we find java stack traces in ``task-attempts/*/syslog``
 
@@ -256,12 +284,12 @@ def find_hadoop_java_stack_trace(lines):
     (We omit the "Error running child" line from the results)
     """
     for line in lines:
-        if line.rstrip('\r\n').endswith("Error running child"):
+        if line.rstrip(b'\r\n').endswith(b"Error running child"):
             st_lines = []
             for line in lines:
                 st_lines.append(line)
                 for line in lines:
-                    if not line.startswith('        at '):
+                    if not line.startswith(b'        at '):
                         break
                     st_lines.append(line)
                 return st_lines
@@ -449,15 +477,17 @@ def parse_mr_job_stderr(stderr, counters=None):
 # We just want to pull out the counter string, which varies between
 # Hadoop versions.
 _KV_EXPR = r'\s+\w+=".*?"'  # this matches KEY="VALUE"
-_COUNTER_LINE_EXPR = r'^.*?JOBID=".*?_%s".*?\bCOUNTERS="%s".*?$' % \
-    ('(?P<step_num>\d+)', r'(?P<counters>.*?)')
-_COUNTER_LINE_RE = re.compile(_COUNTER_LINE_EXPR)
+_COUNTER_LINE_RE = re.compile(
+    br'^.*?JOBID=".*?_(?P<step_num>\d+)"'
+    br'.*?\b'
+    br'COUNTERS="(?P<counters>.*?)"'
+    br'.*?$')
 
 # 0.18-specific
 # see _parse_counters_0_18 for format
 # A counter looks like this: groupname.countername:countervalue
-_COUNTER_EXPR_0_18 = r'(,|^)(?P<group>[^,]+?)[.](?P<name>[^,]+):(?P<value>\d+)'
-_COUNTER_RE_0_18 = re.compile(_COUNTER_EXPR_0_18)
+_COUNTER_RE_0_18 = re.compile(
+    br'(,|^)(?P<group>[^,]+?)[.](?P<name>[^,]+):(?P<value>\d+)')
 
 # 0.20-specific
 
@@ -485,7 +515,9 @@ def _parse_counters_0_18(counter_string):
         log.warning('Cannot parse Hadoop counter string: %s' % counter_string)
 
     for m in groups:
-        yield m.group('group'), m.group('name'), int(m.group('value'))
+        yield (_to_string(m.group('group')),
+               _to_string(m.group('name')),
+               int(m.group('value')))
 
 
 def _parse_counters_0_20(counter_string):

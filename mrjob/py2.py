@@ -10,8 +10,8 @@ that all non-byte strings be unicode. But that doesn't really make sense for
 Python 2, where str (bytes) and unicode can be used interchangeably.
 
 So really our string datatypes fall into two categories, bytes, and
-"strings", which are either str (i.e., bytes) or unicode in Python 2, and
-str (i.e. unicode) in Python 3.
+"strings", which are either ``str`` (i.e., bytes) or ``unicode`` in Python 2,
+and ``str`` (i.e. unicode) in Python 3.
 
 These things should always be bytes:
 
@@ -38,6 +38,7 @@ These things should always be strings:
 - option names
 - Hadoop counter names and groups
 - Hadoop status messages
+- anything else we parse out of log files
 
 These things are strings because it makes for simpler code:
 

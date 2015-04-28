@@ -319,7 +319,7 @@ class FindMiscTestCase(unittest.TestCase):
 
     def test_find_counters_0_20_explicit(self):
         counters, step_num = parse_hadoop_counters_from_line(
-                                self.TEST_COUNTERS_0_20, hadoop_version='0.20')
+            self.TEST_COUNTERS_0_20, hadoop_version='0.20')
 
         self.assertIn('reducer time (processing): 2.51', counters['profile'])
         self.assertEqual(step_num, 3)

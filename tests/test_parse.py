@@ -124,17 +124,20 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
     def test_find_multiple_python_tracebacks(self):
         total_traceback = self.EXAMPLE_TRACEBACK + b'junk\n'
         tb = find_python_traceback(BytesIO(total_traceback))
-        self.assertEqual(''.join(tb), self.EXAMPLE_TRACEBACK)
+        self.assertEqual(''.join(tb),
+                         self.EXAMPLE_TRACEBACK.encode('ascii'))
 
     def test_find_python_traceback_with_more_stderr(self):
         total_traceback = self.EXAMPLE_STDERR_TRACEBACK_1 + b'junk\n'
         tb = find_python_traceback(BytesIO(total_traceback))
-        self.assertEqual(''.join(tb), self.EXAMPLE_STDERR_TRACEBACK_1)
+        self.assertEqual(''.join(tb),
+                         self.EXAMPLE_STDERR_TRACEBACK_1.encode('ascii'))
 
     def test_find_python_traceback_with_more_stderr_2(self):
         total_traceback = self.EXAMPLE_STDERR_TRACEBACK_2 + b'junk\n'
         tb = find_python_traceback(BytesIO(total_traceback))
-        self.assertEqual(''.join(tb), self.EXAMPLE_STDERR_TRACEBACK_2)
+        self.assertEqual(''.join(tb),
+                         self.EXAMPLE_STDERR_TRACEBACK_2.encode('ascii'))
 
 
 class FindMiscTestCase(unittest.TestCase):
@@ -233,7 +236,8 @@ class FindMiscTestCase(unittest.TestCase):
     TEST_COUNTERS_0_18 = (
         b'Job JOBID="job_201106061823_0001" FINISH_TIME="1307384737542"'
         b' JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1"'
-        b' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="%s"' % ','.join([
+        b' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="'
+        + b','.join([
             b'File Systems.S3N bytes read:3726',
             b'File Systems.Local bytes read:4164',
             b'File Systems.S3N bytes written:1663',
@@ -253,52 +257,55 @@ class FindMiscTestCase(unittest.TestCase):
             b'profile.reducer step 0 estimated IO time: 0.00:1',
             b'profile.mapper step 0 estimated IO time: 0.00:2',
             b'profile.reducer step 0 estimated CPU time: 0.00:1',
-            b'profile.mapper step ☃ estimated CPU time: 0.00:2'
-        ]))
+            u'profile.mapper step ♫ estimated CPU time: 0.00:2'.encode('utf_8')
+        ])
+        + b'"')
 
     TEST_COUNTERS_0_20 = (
         b'Job JOBID="job_201106092314_0003" FINISH_TIME="1307662284564"'
         b' JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1"'
-        b' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="%s" .' % ''.join([
-            b'{(org\.apache\.hadoop\.mapred\.JobInProgress$Counter)',
-            b'(Job Counters )',
-            b'[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]',
-            b'[(TOTAL_LAUNCHED_MAPS)(Launched map tasks)(2)]',
-            b'[(DATA_LOCAL_MAPS)(Data-local map tasks)(2)]}',
+        b' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="'
 
-            b'{(FileSystemCounters)(FileSystemCounters)',
-            b'[(FILE_BYTES_READ)(FILE_BYTES_READ)(10547174)]',
-            b'[(HDFS_BYTES_READ)(HDFS_BYTES_READ)(49661008)]',
-            b'[(FILE_BYTES_WRITTEN)(FILE_BYTES_WRITTEN)(21773078)]',
-            b'[(S3_BYTES_WRITTEN)(S3_BYTES_WRITTEN)(49526580)]}',
+        b'{(org\.apache\.hadoop\.mapred\.JobInProgress$Counter)'
+        b'(Job Counters )'
+        b'[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]'
+        b'[(TOTAL_LAUNCHED_MAPS)(Launched map tasks)(2)]'
+        b'[(DATA_LOCAL_MAPS)(Data-local map tasks)(2)]}'
 
-            b'{(org\.apache\.hadoop\.mapred\.Task$Counter)',
-            b'(Map-Reduce Framework)',
-            b'[(REDUCE_INPUT_GROUPS)(Reduce input groups)(18843)]',
-            b'[(COMBINE_OUTPUT_RECORDS)(Combine output records)(0)]',
-            b'[(MAP_INPUT_RECORDS)(Map input records)(29884)]',
-            b'[(REDUCE_SHUFFLE_BYTES)(Reduce shuffle bytes)(11225840)]',
-            b'[(REDUCE_OUTPUT_RECORDS)(Reduce output records)(29884)]',
-            b'[(SPILLED_RECORDS)(Spilled Records)(59768)]',
-            b'[(MAP_OUTPUT_BYTES)(Map output bytes)(50285563)]',
-            b'[(MAP_INPUT_BYTES)(Map input bytes)(49645726)]',
-            b'[(MAP_OUTPUT_RECORDS)(Map output records)(29884)]',
-            b'[(COMBINE_INPUT_RECORDS)(Combine input records)(0)]',
-            b'[(REDUCE_INPUT_RECORDS)(Reduce input records)(29884)]}',
-            b'{(profile)(profile)',
-            b'[(reducer time \\(processing\\): 2\.51)',
-            b'(reducer time \\(processing\\): 2\.51)(1)]',
-            b'[(mapper time \\(processing\\): 0\.50)',
-            b'(mapper time \\(processing\\): 0\.50)(1)]',
-            b'[(mapper time \\(other\\): 3\.78)',
-            b'(mapper time \\(other\\): 3\.78)(1)]',
-            b'[(mapper time \\(processing\\): 0\.46)',
-            b'(mapper time \\(processing\\): 0\.46)(1)]',
-            b'[(reducer time \\(other\\): 6\.31)',
-            b'(reducer time \\(other\\): 6\.31)(1)]',
-            b'[(mapper time \\(other\\): 3\.72)',
-            b'(mapper time \\(other\\): 3\.72)(1)]}',
-    ]))
+        b'{(FileSystemCounters)(FileSystemCounters)'
+        b'[(FILE_BYTES_READ)(FILE_BYTES_READ)(10547174)]'
+        b'[(HDFS_BYTES_READ)(HDFS_BYTES_READ)(49661008)]'
+        b'[(FILE_BYTES_WRITTEN)(FILE_BYTES_WRITTEN)(21773078)]'
+        b'[(S3_BYTES_WRITTEN)(S3_BYTES_WRITTEN)(49526580)]}'
+
+        b'{(org\.apache\.hadoop\.mapred\.Task$Counter)'
+        b'(Map-Reduce Framework)'
+        b'[(REDUCE_INPUT_GROUPS)(Reduce input groups)(18843)]'
+        b'[(COMBINE_OUTPUT_RECORDS)(Combine output records)(0)]'
+        b'[(MAP_INPUT_RECORDS)(Map input records)(29884)]'
+        b'[(REDUCE_SHUFFLE_BYTES)(Reduce shuffle bytes)(11225840)]'
+        b'[(REDUCE_OUTPUT_RECORDS)(Reduce output records)(29884)]'
+        b'[(SPILLED_RECORDS)(Spilled Records)(59768)]'
+        b'[(MAP_OUTPUT_BYTES)(Map output bytes)(50285563)]'
+        b'[(MAP_INPUT_BYTES)(Map input bytes)(49645726)]'
+        b'[(MAP_OUTPUT_RECORDS)(Map output records)(29884)]'
+        b'[(COMBINE_INPUT_RECORDS)(Combine input records)(0)]'
+        b'[(REDUCE_INPUT_RECORDS)(Reduce input records)(29884)]}'
+        b'{(profile)(profile)'
+        b'[(reducer time \\(processing\\): 2\.51)'
+        b'(reducer time \\(processing\\): 2\.51)(1)]'
+        b'[(mapper time \\(processing\\): 0\.50)'
+        b'(mapper time \\(processing\\): 0\.50)(1)]'
+        b'[(mapper time \\(other\\): 3\.78)'
+        b'(mapper time \\(other\\): 3\.78)(1)]'
+        b'[(mapper time \\(processing\\): 0\.46)'
+        b'(mapper time \\(processing\\): 0\.46)(1)]'
+        b'[(reducer time \\(other\\): 6\.31)'
+        b'(reducer time \\(other\\): 6\.31)(1)]'
+        b'[(mapper time \\(other\\): 3\.72)'
+        b'(mapper time \\(other\\): 3\.72)(1)]}'
+
+        b'" .')
 
     def test_find_counters_0_18_explicit(self):
         counters, step_num = parse_hadoop_counters_from_line(
@@ -307,7 +314,7 @@ class FindMiscTestCase(unittest.TestCase):
         self.assertEqual(
             counters['profile']['reducer step 0 estimated IO time: 0.00'], 1)
         self.assertEqual(
-            counters['profile']['mapper step ☃ estimated CPU time: 0.00'], 2)
+            counters['profile']['mapper step ♫ estimated CPU time: 0.00'], 2)
         self.assertEqual(step_num, 1)
 
     def test_find_counters_0_20_explicit(self):

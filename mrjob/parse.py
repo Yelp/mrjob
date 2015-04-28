@@ -302,12 +302,12 @@ def find_hadoop_java_stack_trace(lines):
                     if not line.startswith(b'        at '):
                         break
                     st_lines.append(line)
-                return st_lines
+                return [_to_string(line) for line in st_lines]
     else:
         return None
 
 
-_OPENING_FOR_READING_RE = re.compile("^.*: Opening '(.*)' for reading$")
+_OPENING_FOR_READING_RE = re.compile(br"^.*: Opening '(.*)' for reading$")
 
 
 def find_input_uri_for_mapper(lines):
@@ -325,13 +325,13 @@ def find_input_uri_for_mapper(lines):
     for line in lines:
         match = _OPENING_FOR_READING_RE.match(line)
         if match:
-            val = match.group(1)
+            val = _to_string(match.group(1))
     return val
 
 
 _HADOOP_STREAMING_ERROR_RE = re.compile(
-    r'^.*ERROR org\.apache\.hadoop\.streaming\.StreamJob \(main\): (.*)$')
-_HADOOP_STREAMING_ERROR_RE_2 = re.compile(r'^(.*does not exist.*)$')
+    br'^.*ERROR org\.apache\.hadoop\.streaming\.StreamJob \(main\): (.*)$')
+_HADOOP_STREAMING_ERROR_RE_2 = re.compile(br'^(.*does not exist.*)$')
 
 
 def find_interesting_hadoop_streaming_error(lines):
@@ -350,14 +350,14 @@ def find_interesting_hadoop_streaming_error(lines):
             _HADOOP_STREAMING_ERROR_RE.match(line) or
             _HADOOP_STREAMING_ERROR_RE_2.match(line))
         if match:
-            msg = match.group(1)
+            msg = _to_string(match.group(1))
             if msg != 'Job not Successful!':
                 return msg
     return None
 
 
 _MULTILINE_JOB_LOG_ERROR_RE = re.compile(
-    r'^\w+Attempt.*?TASK_STATUS="FAILED".*?ERROR="(?P<first_line>[^"]*)$')
+    br'^\w+Attempt.*?TASK_STATUS="FAILED".*?ERROR="(?P<first_line>[^"]*)$')
 
 
 def find_job_log_multiline_error(lines):
@@ -400,16 +400,16 @@ def find_job_log_multiline_error(lines):
             for line in lines:
                 st_lines.append(line)
                 for line in lines:
-                    if line.strip() == '"':
+                    if line.strip() == b'"':
                         break
                     st_lines.append(line)
-                return st_lines
+                return [_to_string(line) for line in st_lines]
     return None
 
 
 _TIMEOUT_ERROR_RE = re.compile(
-    r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+)'
-    r' seconds.*?"')
+    br'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+)'
+    br' seconds.*?"')
 
 
 def find_timeout_error(lines):

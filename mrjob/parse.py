@@ -178,9 +178,9 @@ def _to_string(s):
     stacktraces, counters, etc., which means on Python 3 we need these
     things to be strings (unicode), not bytes.
 
-    We *suspect* that most logs we encounter will be UTF-8
-    encoded, but we don't want log parsing to crash in Python 3. So we first
-    try decoding in UTF-8, but fall back to latin-1.
+    We *suspect* that most logs we encounter will be UTF-8 encoded (if not just
+    plain ASCII), but we don't want log parsing to crash in Python 3. So we
+    first try decoding in UTF-8, but fall back to latin-1.
     """
     if not isinstance(s, (bytes, str)):
         raise TypeError

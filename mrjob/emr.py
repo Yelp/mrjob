@@ -474,7 +474,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                 self._opt_priority['num_ec2_instances'] <=
                 max(self._opt_priority['num_ec2_core_instances'],
                     self._opt_priority['num_ec2_task_instances'])):
-                log.warn('Mixing num_ec2_instances and'
+                log.warning('Mixing num_ec2_instances and'
                          ' num_ec2_{core,task}_instances does not make sense;'
                          ' ignoring num_ec2_instances')
             # recalculate number of EC2 instances

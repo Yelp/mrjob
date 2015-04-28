@@ -874,7 +874,7 @@ class MRJob(MRJobLauncher):
         :py:attr:`INPUT_PROTOCOL`.
         """
         if not isinstance(self.INPUT_PROTOCOL, type):
-            log.warn('INPUT_PROTOCOL should be a class, not %s' %
+            log.warning('INPUT_PROTOCOL should be a class, not %s' %
                      self.INPUT_PROTOCOL)
         return self.INPUT_PROTOCOL()
 
@@ -884,7 +884,7 @@ class MRJob(MRJobLauncher):
         :py:attr:`INTERNAL_PROTOCOL`.
         """
         if not isinstance(self.INTERNAL_PROTOCOL, type):
-            log.warn('INTERNAL_PROTOCOL should be a class, not %s' %
+            log.warning('INTERNAL_PROTOCOL should be a class, not %s' %
                      self.INTERNAL_PROTOCOL)
         return self.INTERNAL_PROTOCOL()
 
@@ -894,7 +894,7 @@ class MRJob(MRJobLauncher):
         :py:attr:`OUTPUT_PROTOCOL`.
         """
         if not isinstance(self.OUTPUT_PROTOCOL, type):
-            log.warn('OUTPUT_PROTOCOL should be a class, not %s' %
+            log.warning('OUTPUT_PROTOCOL should be a class, not %s' %
                      self.OUTPUT_PROTOCOL)
         return self.OUTPUT_PROTOCOL()
 
@@ -1092,7 +1092,7 @@ class MRJob(MRJobLauncher):
             # hadoop_version should be a string
             elif (key == 'hadoop_version' and
                     isinstance(unfiltered_val, float)):
-                log.warn('hadoop_version should be a string, not %s' %
+                log.warning('hadoop_version should be a string, not %s' %
                          unfiltered_val)
                 filtered_val = format_hadoop_version(unfiltered_val)
             filtered_jobconf[key] = filtered_val

@@ -482,7 +482,7 @@ def _parse_counters_0_18(counter_string):
     # GroupName.CounterName:Value,Group1.Crackers:3,Group2.Nerf:243,...
     groups = _COUNTER_RE_0_18.finditer(counter_string)
     if groups is None:
-        log.warn('Cannot parse Hadoop counter string: %s' % counter_string)
+        log.warning('Cannot parse Hadoop counter string: %s' % counter_string)
 
     for m in groups:
         yield m.group('group'), m.group('name'), int(m.group('value'))
@@ -493,7 +493,7 @@ def _parse_counters_0_20(counter_string):
     # {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...}
     groups = _GROUP_RE_0_20.findall(counter_string)
     if not groups:
-        log.warn('Cannot parse Hadoop counter string: %s' % counter_string)
+        log.warning('Cannot parse Hadoop counter string: %s' % counter_string)
 
     for group_id, group_name, counter_str in groups:
         matches = _COUNTER_RE_0_20.findall(counter_str)
@@ -501,12 +501,12 @@ def _parse_counters_0_20(counter_string):
             try:
                 group_name = counter_unescape(group_name)
             except ValueError:
-                log.warn("Could not decode group name %s" % group_name)
+                log.warning("Could not decode group name %s" % group_name)
 
             try:
                 counter_name = counter_unescape(counter_name)
             except ValueError:
-                log.warn("Could not decode counter name %s" % counter_name)
+                log.warning("Could not decode counter name %s" % counter_name)
 
             yield group_name, counter_name, int(counter_value)
 

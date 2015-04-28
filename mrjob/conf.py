@@ -67,7 +67,7 @@ class OptionStore(dict):
     def validated_options(self, opts, error_fmt):
         unrecognized_opts = set(opts) - self.ALLOWED_KEYS
         if unrecognized_opts:
-            log.warn(error_fmt % ', '.join(sorted(unrecognized_opts)))
+            log.warning(error_fmt % ', '.join(sorted(unrecognized_opts)))
             return dict((k, v) for k, v in opts.items()
                         if k in self.ALLOWED_KEYS)
         else:
@@ -198,7 +198,7 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
 
         for include in includes:
             if include in already_loaded:
-                log.warn('%s tries to recursively include %s! (Already'
+                log.warning('%s tries to recursively include %s! (Already'
                          ' included:  %s)' % (
                              conf_path, conf['include'],
                              ', '.join(already_loaded)))

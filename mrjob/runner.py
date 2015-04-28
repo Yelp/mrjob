@@ -353,7 +353,7 @@ class MRJobRunner(object):
             if conf_paths is not None:
                 raise ValueError("Can't specify both conf_path and conf_paths")
             else:
-                log.warn("The conf_path argument to MRJobRunner() is"
+                log.warning("The conf_path argument to MRJobRunner() is"
                          " deprecated. Use conf_paths instead.")
                 if conf_path is False:
                     conf_paths = []
@@ -484,7 +484,7 @@ class MRJobRunner(object):
             raise AssertionError('Run the job before streaming output')
 
         if self._closed is True:
-            log.warn(
+            log.warning(
                 'WARNING! Trying to stream output from a closed runner, output'
                 ' will probably be empty.')
 

@@ -450,7 +450,7 @@ def parse_mr_job_stderr(stderr, counters=None):
 
     - *counters*: counters so far; same format as above
     - *statuses*: a list of status messages encountered
-    - *other*: lines (bytes) that aren't either counters or status messages
+    - *other*: lines (strings) that aren't either counters or status messages
     """
     # For the corresponding code in Hadoop Streaming, see ``incrCounter()`` in
     # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup  # noqa
@@ -482,7 +482,7 @@ def parse_mr_job_stderr(stderr, counters=None):
             statuses.append(_to_string(m.group(1)))
             continue
 
-        other.append(line)
+        other.append(_to_string(line))
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
 

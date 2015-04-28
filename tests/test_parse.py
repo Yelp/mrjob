@@ -479,7 +479,7 @@ class ParseMRJobStderr(unittest.TestCase):
             {'counters': {'Foo': {'Bar': 3, 'Baz': 1},
                           'Quux Subsystem': {'Baz': 42}},
              'statuses': ['Baz', 'Baz'],
-             'other': [b'Warning: deprecated metasyntactic variable: garply\n']
+             'other': ['Warning: deprecated metasyntactic variable: garply\n']
             })
 
     def test_update_counters(self):
@@ -500,7 +500,7 @@ class ParseMRJobStderr(unittest.TestCase):
         self.assertEqual(
             parse_mr_job_stderr(b'reporter:counter:Foo,Bar,2\nwoot\n'),
             {'counters': {'Foo': {'Bar': 2}},
-             'statuses': [], 'other': [b'woot\n']})
+             'statuses': [], 'other': ['woot\n']})
 
     def test_negative_counters(self):
         # kind of poor practice to use negative counters, but Hadoop
@@ -522,8 +522,10 @@ class ParseMRJobStderr(unittest.TestCase):
             b'reporter,counter:Foo,Bar,1\n',  # wrong format!
         ]
 
-        self.assertEqual(parse_mr_job_stderr(BAD_LINES),
-                         {'counters': {}, 'statuses': [], 'other': BAD_LINES})
+        self.assertEqual(
+            parse_mr_job_stderr(BAD_LINES),
+            {'counters': {}, 'statuses': [],
+             'other': [line.decode('ascii') for line in BAD_LINES]})
 
 
 class PortRangeListTestCase(unittest.TestCase):

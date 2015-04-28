@@ -604,7 +604,8 @@ class SetupTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as r:
-            r.run()
+            with no_handlers_for_logger('mrjob.local'):
+                r.run()
 
             path_to_size = dict(job.parse_output_line(line)
                                 for line in r.stream_output())

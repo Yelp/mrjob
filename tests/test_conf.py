@@ -151,7 +151,8 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         conf = {'runners': {'foo': {'qux': 'quux'}}}
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
-        dump_mrjob_conf(conf, open(conf_path, 'w'))
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf(conf, f)
         with no_handlers_for_logger('mrjob.conf'):
             self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
 
@@ -179,7 +180,9 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         conf = {'runners': {'foo': {'qux': 'quux'}}}
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
-        dump_mrjob_conf(conf, open(conf_path, 'w'))
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf(conf, f)
+
         with open(conf_path) as f:
             contents = f.read()
 

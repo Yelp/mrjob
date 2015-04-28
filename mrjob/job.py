@@ -64,6 +64,20 @@ _SORT_VALUES_PARTITIONER = \
     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
 
 
+def _im_func(f):
+    """Wrapper to get at the underlying function belonging to a method.
+
+    Python 2 is slightly different because classes have "unbound methods"
+    which wrap the underlying function, whereas on Python 3 they're just
+    functions. (Methods work the same way on both versions.)
+    """
+    # "im_func" is the old Python 2 name for __func__
+    if hasattr(f, '__func__'):
+        return f.__func__
+    else:
+        return f
+
+
 class UsageError(Exception):
     pass
 
@@ -325,11 +339,12 @@ class MRJob(MRJobLauncher):
 
         :return: a list of steps constructed with :py:meth:`mr`
         """
-        # Use mapper(), reducer() etc. only if they've been re-defined
-        kwargs = dict((func_name, getattr(self, func_name))
-                      for func_name in _JOB_STEP_FUNC_PARAMS
-                      if (getattr(self, func_name).__func__ is not
-                          getattr(MRJob, func_name).__func__))
+        # only include methods that have been redefined
+        kwargs = dict(
+            (func_name, getattr(self, func_name))
+            for func_name in _JOB_STEP_FUNC_PARAMS
+            if (_im_func(getattr(self, func_name)) is not
+                _im_func(getattr(MRJob, func_name))))
 
         # MRStep takes commands as strings, but the user defines them in the
         # class as functions that return strings, so call the functions.
@@ -640,8 +655,12 @@ class MRJob(MRJobLauncher):
     @classmethod
     def mr_job_script(cls):
         """Path of this script. This returns the file containing
-        this class."""
-        return inspect.getsourcefile(cls)
+        this class, or ``None`` if there isn't any (e.g. it was
+        defined from the command line interface.)"""
+        try:
+            return inspect.getsourcefile(cls)
+        except TypeError:
+            return None
 
     ### Other useful utilities ###
 

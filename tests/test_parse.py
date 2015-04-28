@@ -234,7 +234,7 @@ class FindMiscTestCase(unittest.TestCase):
             SHOULD_EQUAL)
 
 
-class CountersTestCase(unittest.TestCase):
+class CounterTestCase(unittest.TestCase):
 
     TEST_COUNTERS_0_18 = (
         b'Job JOBID="job_201106061823_0001" FINISH_TIME="1307384737542"'

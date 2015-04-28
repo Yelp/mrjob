@@ -30,6 +30,7 @@ try:
 except ImportError:
     import unittest
 
+from mrjob.aws import random_identifier
 from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
@@ -41,6 +42,8 @@ from mrjob.util import safeeval
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import tar_and_gzip
 from mrjob.util import unarchive
+
+from tests.sandbox import random_seed
 
 
 class BufferIteratorToLineIteratorTestCase(unittest.TestCase):
@@ -509,22 +512,24 @@ class ReadFileTestCase(unittest.TestCase):
         # catch incorrect use of bz2 library (Issue #814)
 
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
-        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
+        input_bz2 = bz2.BZ2File(input_bz2_path, 'wb')
 
         # can't just repeat same value, because we need the file to be
         # compressed! 50000 lines is too few to catch the bug.
-        random.seed(0)
-        for _ in range(100000):
-            input_bz2.write('%016x\n' % random.randint(0, 2 ** 64 - 1))
-        input_bz2.close()
+        with random_seed(0):
+            for _ in range(100000):
+                input_bz2.write((random_identifier() + '\n').encode('ascii'))
+            input_bz2.close()
 
-        random.seed(0)
-        num_lines = 0
-        for line in read_file(input_bz2_path):
-            self.assertEqual(line, '%016x\n' % random.randint(0, 2 ** 64 - 1))
-            num_lines += 1
+        # now expect to read back the same bytes
+        with random_seed(0):
+            num_lines = 0
+            for line in read_file(input_bz2_path):
+                self.assertEqual(line,
+                                 (random_identifier() + '\n').encode('ascii'))
+                num_lines += 1
 
-        self.assertEqual(num_lines, 100000)
+            self.assertEqual(num_lines, 100000)
 
     def test_read_gz_file_from_fileobj(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')

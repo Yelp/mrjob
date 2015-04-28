@@ -13,6 +13,8 @@
 # limitations under the License.
 import os
 import os.path
+import random
+from contextlib import contextmanager
 from tempfile import mkdtemp
 from shutil import rmtree
 
@@ -60,6 +62,19 @@ def mrjob_conf_patcher(substitute_conf=EMPTY_MRJOB_CONF):
 
     return patch.object(runner, 'load_opts_from_mrjob_confs',
                         mock_load_opts_from_mrjob_confs)
+
+
+@contextmanager
+def random_seed(seed):
+    """Temporarily change the seed of the random number generator."""
+    state = random.getstate()
+
+    random.seed(seed)
+
+    try:
+        yield
+    finally:
+        random.setstate(state)
 
 
 class EmptyMrjobConfTestCase(unittest.TestCase):

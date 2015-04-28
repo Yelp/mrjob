@@ -498,18 +498,26 @@ _COUNTER_RE_0_18 = re.compile(
 
 # capture one group including sub-counters
 # these look like: {(gid)(gname)[...][...][...]...}
-_COUNTER_LIST_EXPR = r'(?P<counter_list_str>\[.*?\])'
-_GROUP_RE_0_20 = re.compile(r'{\(%s\)\(%s\)%s}' % (r'(?P<group_id>.*?)',
-                                                   r'(?P<group_name>.*?)',
-                                                   _COUNTER_LIST_EXPR))
+_GROUP_RE_0_20 = re.compile(
+    br'{\('
+    br'(?P<group_id>.*?)'
+    br'\)\('
+    br'(?P<group_name>.*?)'
+    br'\)'
+    br'(?P<counter_list_str>\[.*?\])'
+    br'}')
 
 # capture a single counter from a group
 # this is what the ... is in _COUNTER_LIST_EXPR (incl. the brackets).
 # it looks like: [(cid)(cname)(value)]
-_COUNTER_0_20_EXPR = r'\[\(%s\)\(%s\)\(%s\)\]' % (r'(?P<counter_id>.*?)',
-                                                  r'(?P<counter_name>.*?)',
-                                                  r'(?P<counter_value>\d+)')
-_COUNTER_RE_0_20 = re.compile(_COUNTER_0_20_EXPR)
+_COUNTER_RE_0_20 = re.compile(
+    br'\[\('
+    br'(?P<counter_id>.*?)'
+    br'\)\('
+    br'(?P<counter_name>.*?)'
+    br'\)\('
+    br'(?P<counter_value>\d+)'
+    br'\)\]')
 
 
 def _parse_counters_0_18(counter_string):

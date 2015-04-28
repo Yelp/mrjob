@@ -741,6 +741,10 @@ class MRJobRunner(object):
                     raise Exception(
                         'error getting step information: \n%s' % stderr)
 
+                # on Python 3, convert stdout to str so we can json.loads() it
+                if not isinstance(stdout, str):
+                    stdout = stdout.decode('utf_8')
+
                 try:
                     steps = json.loads(stdout)
                 except JSONDecodeError:

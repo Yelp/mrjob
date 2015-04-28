@@ -42,6 +42,7 @@ from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
+from mrjob.py2 import basestring
 from mrjob.py2 import long
 from mrjob.util import read_input
 
@@ -640,11 +641,14 @@ class MRJob(MRJobLauncher):
 
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
-
-        We currently output something like ``MR M R``, but expect this to
-        change!
         """
-        print(json.dumps(self._steps_desc()), file=self.stdout)
+        # json only uses strings, but self.stdout only accepts bytes
+        steps_json = json.dumps(self._steps_desc())
+        if not isinstance(steps_json, bytes):
+            steps_json = steps_json.encode('utf_8')
+
+        self.stdout.write(steps_json)
+        self.stdout.write(b'\n')
 
     def _steps_desc(self):
         step_descs = []

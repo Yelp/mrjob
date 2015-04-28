@@ -41,11 +41,14 @@ class Point(object):
         return '%s.%s(%r, %r)' % (self.__module__, self.__class__.__name__,
                                   self.x, self.y)
 
-    def __cmp__(self, other):
+    def __eq__(self, other):
         if not isinstance(other, Point):
-            return 1
-        else:
-            return cmp((self.x, self.y), (other.x, other.y))
+            return False
+
+        return (self.x, self.y) == (other.x, other.y)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
 
 # keys and values that JSON protocols should encode/decode correctly

@@ -202,7 +202,7 @@ def counter_unescape(escaped_string):
     :param escaped_string: string from a counter log line
     :type escaped_string: str
     """
-    escaped_string = escaped_string.decode('string_escape')
+    escaped_string = escaped_string.decode('unicode_escape')
     escaped_string = _HADOOP_0_20_ESCAPED_CHARS_RE.sub(r'\1', escaped_string)
     return escaped_string
 

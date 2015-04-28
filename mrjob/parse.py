@@ -200,7 +200,8 @@ def counter_unescape(escaped_string):
     (e.g. ``().``).
 
     :param escaped_string: string from a counter log line
-    :type escaped_string: str
+    :type escaped_string: bytes
+    :return: str
     """
     if not IN_PY2:
         escaped_string = escaped_string.decode('unicode_escape')

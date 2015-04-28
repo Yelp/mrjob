@@ -486,15 +486,15 @@ class ReadFileTestCase(unittest.TestCase):
 
     def test_read_gz_file(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\nbar\n')
+        input_gz = gzip.GzipFile(input_gz_path, 'wb')
+        input_gz.write(b'foo\nbar\n')
         input_gz.close()
 
         output = []
         for line in read_file(input_gz_path):
             output.append(line)
 
-        self.assertEqual(output, ['foo\n', 'bar\n'])
+        self.assertEqual(output, [b'foo\n', b'bar\n'])
 
     def test_read_bz2_file(self):
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
@@ -533,26 +533,26 @@ class ReadFileTestCase(unittest.TestCase):
 
     def test_read_gz_file_from_fileobj(self):
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\nbar\n')
+        input_gz = gzip.GzipFile(input_gz_path, 'wb')
+        input_gz.write(b'foo\nbar\n')
         input_gz.close()
 
         output = []
-        with open(input_gz_path) as f:
+        with open(input_gz_path, 'rb') as f:
             for line in read_file(input_gz_path, fileobj=OnlyReadWrapper(f)):
                 output.append(line)
 
-        self.assertEqual(output, ['foo\n', 'bar\n'])
+        self.assertEqual(output, [b'foo\n', b'bar\n'])
 
     def test_read_bz2_file_from_fileobj(self):
         input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
-        input_bz2 = bz2.BZ2File(input_bz2_path, 'w')
-        input_bz2.write('bar\nbar\nfoo\n')
+        input_bz2 = bz2.BZ2File(input_bz2_path, 'wb')
+        input_bz2.write(b'bar\nbar\nfoo\n')
         input_bz2.close()
 
         output = []
-        with open(input_bz2_path) as f:
+        with open(input_bz2_path, 'rb') as f:
             for line in read_file(input_bz2_path, fileobj=OnlyReadWrapper(f)):
                 output.append(line)
 
-        self.assertEqual(output, ['bar\n', 'bar\n', 'foo\n'])
+        self.assertEqual(output, [b'bar\n', b'bar\n', b'foo\n'])

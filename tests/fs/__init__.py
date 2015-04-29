@@ -35,14 +35,13 @@ class MockSubprocessTestCase(SandboxedTestCase):
 
             def __init__(self, args, stdin=None, stdout=None, stderr=None):
                 self.args = args
-                self.stdin = stdin if stdin is not None else StringIO()
 
-                # discard incoming stdout/stderr objects
+                # ignore stdin/stdout/stderr
+                self.stdin = StringIO()
                 self.stdout = StringIO()
                 self.stderr = StringIO()
 
-                if stdin is None:
-                    self._run()
+                self._run()
 
             def _run(self):
                 # pre-emptively run the "process"

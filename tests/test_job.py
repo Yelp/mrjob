@@ -23,6 +23,7 @@ from subprocess import PIPE
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
 from mrjob.job import UsageError
+from mrjob.job import _im_func
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
@@ -213,15 +214,15 @@ class ProtocolsTestCase(TestCase):
         INTERNAL_PROTOCOL = ReprProtocol
 
     class MRTrivialJob(MRJob):
-        OUTPUT_PROTOCOL = ReprProtocol
+        OUTPUT_PROTOCOL = RawValueProtocol
 
         def mapper(self, key, value):
             yield key, value
 
     def assertMethodsEqual(self, fs, gs):
         # we're going to use this to match bound against unbound methods
-        self.assertEqual([f.__func__ for f in fs],
-                         [g.__func__ for g in gs])
+        self.assertEqual([_im_func(f) for f in fs],
+                         [_im_func(g) for g in gs])
 
     def test_default_protocols(self):
         mr_job = MRBoringJob()
@@ -259,22 +260,22 @@ class ProtocolsTestCase(TestCase):
         mr_job.run_mapper()
 
         self.assertEqual(mr_job.stdout.getvalue(),
-                         'null\t"foo"\n' +
-                         'null\t"bar"\n' +
-                         'null\t"baz"\n')
+                         b'null\t"foo"\n' +
+                         b'null\t"bar"\n' +
+                         b'null\t"baz"\n')
 
     def test_reducer_json_to_json(self):
         JSON_INPUT = BytesIO(b'"foo"\t"bar"\n' +
-                              '"foo"\t"baz"\n' +
-                              '"bar"\t"qux"\n')
+                             b'"foo"\t"baz"\n' +
+                             b'"bar"\t"qux"\n')
 
         mr_job = MRBoringJob(args=['--reducer'])
         mr_job.sandbox(stdin=JSON_INPUT)
         mr_job.run_reducer()
 
         self.assertEqual(mr_job.stdout.getvalue(),
-                         ('"foo"\t["bar", "baz"]\n' +
-                          '"bar"\t["qux"]\n'))
+                         (b'"foo"\t["bar", "baz"]\n' +
+                          b'"bar"\t["qux"]\n'))
 
     def test_output_protocol_with_no_final_reducer(self):
         # if there's no reducer, the last mapper should use the
@@ -286,9 +287,7 @@ class ProtocolsTestCase(TestCase):
         mr_job.run_mapper()
 
         self.assertEqual(mr_job.stdout.getvalue(),
-                         ("None\t'foo'\n" +
-                          "None\t'bar'\n" +
-                          "None\t'baz'\n"))
+                         RAW_INPUT.getvalue())
 
 
 class StrictProtocolsTestCase(EmptyMrjobConfTestCase):

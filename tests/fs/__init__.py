@@ -22,9 +22,6 @@ class MockSubprocessTestCase(SandboxedTestCase):
         """Main func should take the arguments
         (stdin, stdout, stderr, argv, environ_dict).
         """
-        self.command_log = []
-        self.io_log = []
-
         PopenClass = self._make_popen_class(main_func, env)
 
         original_popen = module.Popen
@@ -52,14 +49,9 @@ class MockSubprocessTestCase(SandboxedTestCase):
                 self.returncode = func(
                     self.stdin, self.stdout, self.stderr, self.args, env)
 
-                # log what happened
-                outer.command_log.append(self.args)
-
                 # store the result
                 self.stdout_result = self.stdout.getvalue()
                 self.stderr_result = self.stderr.getvalue()
-
-                outer.io_log.append((self.stdout_result, self.stderr_result))
 
                 # expose the results as readable file objects
                 self.stdout = StringIO(self.stdout_result)
@@ -75,7 +67,7 @@ class MockSubprocessTestCase(SandboxedTestCase):
                     if isinstance(x, bytes):
                         return x
                     else:
-                        return x.encode('utf_8')
+                        return x.encode('latin_1')
 
                 return (_to_bytes(self.stdout_result),
                         _to_bytes(self.stderr_result))

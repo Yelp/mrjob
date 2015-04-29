@@ -28,6 +28,7 @@ mockssh.
 """
 from __future__ import print_function
 
+import io
 import os
 import pipes
 import posixpath
@@ -163,9 +164,14 @@ def main(stdin, stdout, stderr, args, environ):
             return 1
 
         with open(local_dest, 'rb') as f:
-            # use stdout.buffer if available
-            stdout_buffer = getattr(stdout, 'buffer', stdout)
-            stdout_buffer.write(f.read())
+            contents = f.read()
+
+            if hasattr(stdout, 'buffer'):  # Python 3, real stdout
+                stdout.buffer.write(contents)
+            elif isinstance(stdout, io.StringIO):  # Python 3, fake stdout
+                stdout.write(contents.decode('latin_1'))
+            else:  # Python 2
+                stdout.write(contents)
             return 0
 
 

@@ -830,14 +830,14 @@ class StepNumTestCase(TestCase):
     def test_two_step_job_end_to_end(self):
         # represent input as a list so we can reuse it
         # also, leave off newline (MRJobRunner should fix it)
-        mapper0_input_lines = ['foo', 'bar']
+        mapper0_input_lines = [b'foo', b'bar']
 
         def test_mapper0(mr_job, input_lines):
             mr_job.sandbox(input_lines)
             mr_job.run_mapper(0)
             self.assertEqual(mr_job.stdout.getvalue(),
-                             'null\t"foo"\n' + '"foo"\tnull\n' +
-                             'null\t"bar"\n' + '"bar"\tnull\n')
+                             b'null\t"foo"\n' + b'"foo"\tnull\n' +
+                             b'null\t"bar"\n' + b'"bar"\tnull\n')
 
         mapper0 = MRTwoStepJob()
         test_mapper0(mapper0, mapper0_input_lines)
@@ -849,13 +849,13 @@ class StepNumTestCase(TestCase):
         # sort output of mapper0
         mapper0_output_input_lines = BytesIO(mapper0.stdout.getvalue())
         reducer0_input_lines = sorted(mapper0_output_input_lines,
-                                      key=lambda line: line.split('\t'))
+                                      key=lambda line: line.split(b'\t'))
 
         def test_reducer0(mr_job, input_lines):
             mr_job.sandbox(input_lines)
             mr_job.run_reducer(0)
             self.assertEqual(mr_job.stdout.getvalue(),
-                             '"bar"\t1\n' + '"foo"\t1\n' + 'null\t2\n')
+                             b'"bar"\t1\n' + b'"foo"\t1\n' + b'null\t2\n')
 
         reducer0 = MRTwoStepJob()
         test_reducer0(reducer0, reducer0_input_lines)
@@ -871,7 +871,7 @@ class StepNumTestCase(TestCase):
             mr_job.sandbox(input_lines)
             mr_job.run_mapper(1)
             self.assertEqual(mr_job.stdout.getvalue(),
-                             '1\t"bar"\n' + '1\t"foo"\n' + '2\tnull\n')
+                             b'1\t"bar"\n' + b'1\t"foo"\n' + b'2\tnull\n')
 
         mapper1 = MRTwoStepJob()
         test_mapper1(mapper1, mapper1_input_lines)

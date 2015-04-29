@@ -12,25 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-try:
-    from unittest2 import TestCase
-    TestCase  # pyflakes
-except ImportError:
-    from unittest import TestCase
-
-from mock import patch
-
 from mrjob import cmd
 from mrjob import launch
-from mrjob.tools.emr import (
-    audit_usage,
-    collect_emr_stats,
-    create_job_flow,
-    fetch_logs,
-    report_long_jobs,
-    s3_tmpwatch,
-    terminate_idle_job_flows,
-    terminate_job_flow)
+from mrjob.tools.emr import audit_usage
+from mrjob.tools.emr import collect_emr_stats
+from mrjob.tools.emr import create_job_flow
+from mrjob.tools.emr import fetch_logs
+from mrjob.tools.emr import report_long_jobs
+from mrjob.tools.emr import s3_tmpwatch
+from mrjob.tools.emr import terminate_idle_job_flows
+from mrjob.tools.emr import terminate_job_flow
+
+from tests.py2 import TestCase
+from tests.py2 import patch
 
 
 class CommandTestCase(TestCase):

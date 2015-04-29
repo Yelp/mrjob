@@ -17,17 +17,7 @@
 """Tests for InlineMRJobRunner"""
 import gzip
 import os
-import unittest
 from io import BytesIO
-
-try:
-    from unittest2 import TestCase
-    TestCase  # silence pyflakes warning
-except ImportError:
-    from unittest import TestCase
-
-import mock
-from mock import patch
 
 from mrjob import conf
 from mrjob.fs.base import Filesystem
@@ -41,6 +31,9 @@ from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
+from tests.py2 import TestCase
+from tests.py2 import mock
+from tests.py2 import patch
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
@@ -357,7 +350,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
             self.assertEqual(runner.counters()[1]['count']['mapper_init'], 4)
 
 
-class ErrorOnBadPathsTestCase(unittest.TestCase):
+class ErrorOnBadPathsTestCase(TestCase):
 
     def setUp(self):
         self.fs = mock.create_autospec(Filesystem)
@@ -370,7 +363,3 @@ class ErrorOnBadPathsTestCase(unittest.TestCase):
     def test_no_paths(self):
         self.fs.path_exists.return_value = False
         self.assertRaises(ValueError, _error_on_bad_paths, self.fs, self.paths)
-
-
-if __name__ == "__main__":
-    unittest.main()

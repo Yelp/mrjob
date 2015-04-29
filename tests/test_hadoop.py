@@ -20,14 +20,6 @@ from io import BytesIO
 from subprocess import CalledProcessError
 from subprocess import check_call
 
-from mock import patch
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
 from mrjob.hadoop import fully_qualify_hdfs_path
@@ -39,12 +31,14 @@ from tests.mockhadoop import add_mock_hadoop_output
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
+from tests.py2 import TestCase
+from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
 
-class TestFullyQualifyHDFSPath(unittest.TestCase):
+class TestFullyQualifyHDFSPath(TestCase):
 
     def test_empty(self):
         with patch('getpass.getuser') as getuser:

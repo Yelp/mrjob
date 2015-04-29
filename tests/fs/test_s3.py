@@ -20,21 +20,15 @@ try:
 except ImportError:
     boto = None
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-from mock import Mock
-from mock import patch
-
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import _get_bucket
 
 from tests.compress import gzip_compress
 from tests.mockboto import MockS3Connection
 from tests.mockboto import add_mock_s3_data
+from tests.py2 import Mock
+from tests.py2 import TestCase
+from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 
 
@@ -149,7 +143,7 @@ class S3FSTestCase(SandboxedTestCase):
         self.assertEqual(self.fs.path_exists(path), False)
 
 
-class GetBucketTestCase(unittest.TestCase):
+class GetBucketTestCase(TestCase):
 
     def assert_bucket_validation(self, boto_version, should_validate):
         with patch('boto.Version', boto_version):

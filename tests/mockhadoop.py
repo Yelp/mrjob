@@ -44,7 +44,6 @@ import sys
 
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import urlparse
-from mrjob.py2 import IN_PY2
 
 
 def create_mock_hadoop_script(path):

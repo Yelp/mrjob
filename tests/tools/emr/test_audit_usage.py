@@ -26,13 +26,8 @@ from mrjob.tools.emr.audit_usage import main
 from mrjob.tools.emr.audit_usage import percent
 
 from tests.mockboto import MockEmrObject
+from tests.py2 import TestCase
 from tests.test_emr import MockEMRAndS3TestCase
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
 
 
 class AuditUsageTestCase(MockEMRAndS3TestCase):
@@ -59,7 +54,7 @@ class AuditUsageTestCase(MockEMRAndS3TestCase):
         self.assertIn('j-MOCKJOBFLOW0', self.stdout.getvalue())
 
 
-class JobFlowToFullSummaryTestCase(unittest.TestCase):
+class JobFlowToFullSummaryTestCase(TestCase):
 
     maxDiff = None  # show whole diff when tests fail
 
@@ -772,7 +767,7 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
         })
 
 
-class SubdivideIntervalByDateTestCase(unittest.TestCase):
+class SubdivideIntervalByDateTestCase(TestCase):
 
     def test_zero_interval(self):
         self.assertEqual(
@@ -835,7 +830,7 @@ class SubdivideIntervalByDateTestCase(unittest.TestCase):
         )
 
 
-class SubdivideIntervalByHourTestCase(unittest.TestCase):
+class SubdivideIntervalByHourTestCase(TestCase):
 
     def test_zero_interval(self):
         self.assertEqual(
@@ -896,7 +891,7 @@ class SubdivideIntervalByHourTestCase(unittest.TestCase):
         )
 
 
-class PercentTestCase(unittest.TestCase):
+class PercentTestCase(TestCase):
 
     def test_basic(self):
         self.assertEqual(62.5, percent(5, 8))

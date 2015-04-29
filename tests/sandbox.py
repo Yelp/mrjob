@@ -18,17 +18,12 @@ from contextlib import contextmanager
 from tempfile import mkdtemp
 from shutil import rmtree
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-from mock import MagicMock
-from mock import patch
-
 import mrjob
 from mrjob import runner
+
+from tests.py2 import MagicMock
+from tests.py2 import TestCase
+from tests.py2 import patch
 
 
 # simple config that also silences 'no config options for runner' logging
@@ -77,7 +72,7 @@ def random_seed(seed):
         random.setstate(state)
 
 
-class EmptyMrjobConfTestCase(unittest.TestCase):
+class EmptyMrjobConfTestCase(TestCase):
 
     # set to None if you don't want load_opts_from_mrjob_confs patched
     MRJOB_CONF_CONTENTS = EMPTY_MRJOB_CONF

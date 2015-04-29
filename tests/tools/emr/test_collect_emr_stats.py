@@ -12,21 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Basic tests for collect_emr_stats script"""
-from mock import call
-from mock import patch
 from mrjob.tools.emr.collect_emr_stats import main
 from mrjob.tools.emr.collect_emr_stats import collect_active_job_flows
 from mrjob.tools.emr.collect_emr_stats import job_flows_to_stats
+
 from tests.mockboto import MockEmrObject
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
+from tests.py2 import TestCase
+from tests.py2 import call
+from tests.py2 import patch
 
 
-class CollectEMRStatsTestCase(unittest.TestCase):
+class CollectEMRStatsTestCase(TestCase):
 
     @patch('mrjob.tools.emr.collect_emr_stats.describe_all_job_flows')
     @patch('mrjob.tools.emr.collect_emr_stats.EMRJobRunner')

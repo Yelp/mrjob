@@ -13,13 +13,6 @@
 # limitations under the License.
 
 """Make sure all of our protocols work as advertised."""
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
@@ -28,6 +21,8 @@ from mrjob.protocol import RawProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
+
+from tests.py2 import TestCase
 
 
 class Point(object):
@@ -75,7 +70,7 @@ PICKLE_KEYS_AND_VALUES = REPR_KEYS_AND_VALUES + [
 ]
 
 
-class ProtocolTestCase(unittest.TestCase):
+class ProtocolTestCase(TestCase):
 
     def assertRoundTripOK(self, protocol, key, value):
         """Assert that we can encode and decode the given key and value,

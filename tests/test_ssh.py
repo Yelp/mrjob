@@ -14,21 +14,16 @@
 """Tests for mrjob.ssh"""
 from subprocess import PIPE
 
-from mock import Mock
-from mock import call
-from mock import patch
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-
 from mrjob import ssh
 
+from tests.py2 import Mock
+from tests.py2 import TestCase
+from tests.py2 import call
+from tests.py2 import patch
 
-class HadoopJobKillTestCase(unittest.TestCase):
+
+
+class HadoopJobKillTestCase(TestCase):
 
     SSH_ARGS = [
         'ssh_bin', '-i', 'key.pem', '-o', 'StrictHostKeyChecking=no',

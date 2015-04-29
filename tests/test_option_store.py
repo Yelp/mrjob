@@ -13,15 +13,8 @@
 # limitations under the License.
 """Test OptionStore's functionality"""
 import os
-
 from tempfile import mkdtemp
 from shutil import rmtree
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
 
 try:
     import boto
@@ -38,12 +31,13 @@ from mrjob.py2 import StringIO
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import log_to_stream
 
+from tests.py2 import TestCase
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 
 
-class TempdirTestCase(unittest.TestCase):
+class TempdirTestCase(TestCase):
     """Patch mrjob.conf, create a temp directory, and save the environment for
     each test
     """

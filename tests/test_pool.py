@@ -15,21 +15,15 @@
 from datetime import datetime
 from datetime import timedelta
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
 
 from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
+from tests.py2 import TestCase
 
 
-class EstTimeToEndOfHourTestCase(unittest.TestCase):
+class EstTimeToEndOfHourTestCase(TestCase):
 
     def test_empty(self):
         jf = MockEmrObject()
@@ -99,7 +93,7 @@ class EstTimeToEndOfHourTestCase(unittest.TestCase):
             timedelta(seconds=1))
 
 
-class TestPoolHashAndName(unittest.TestCase):
+class TestPoolHashAndName(TestCase):
 
     def test_empty(self):
         jf = MockEmrObject()

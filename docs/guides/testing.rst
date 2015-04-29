@@ -38,13 +38,6 @@ See :py:class:`~mrjob.local.LocalMRJobRunner` for reference about its behavior.
 Anatomy of a test case
 ----------------------
 
-mrjob's test cases use the :py:mod:`unittest2` module::
-
-    try:
-        import unittest2 as unittest
-    except ImportError:
-        import unittest
-
 You probably have your own job to test, but for this example we'll use a
 test of the ``*_init()`` methods from the mrjob test cases::
 
@@ -80,7 +73,9 @@ test of the ``*_init()`` methods from the mrjob test cases::
 Without using any mrjob features, we can write a simple test case to make
 sure our methods are behaving as expected::
 
-    class MRInitTestCase(unittest.TestCase):
+    from unittest import TestCase
+
+    class MRInitTestCase(TestCase):
 
         def test_mapper(self):
             j = MRInitJob()

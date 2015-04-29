@@ -16,14 +16,6 @@
 """Test configuration parsing and option combining"""
 import os
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-from mock import patch
-
 import mrjob.conf
 from mrjob.conf import combine_cmd_lists
 from mrjob.conf import combine_cmds
@@ -44,6 +36,9 @@ from mrjob.conf import real_mrjob_conf_path
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
+
+from tests.py2 import TestCase
+from tests.py2 import patch
 
 
 def load_mrjob_conf(conf_path=None):
@@ -207,7 +202,7 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
             self.assertIn('If your mrjob.conf is in YAML', e.msg)
 
 
-class CombineValuesTestCase(unittest.TestCase):
+class CombineValuesTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_values(), None)
@@ -234,7 +229,7 @@ class CombineValuesTestCase(unittest.TestCase):
         self.assertEqual(combine_values(set([1]), set()), set())
 
 
-class CombineDictsTestCase(unittest.TestCase):
+class CombineDictsTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_dicts(), {})
@@ -265,7 +260,7 @@ class CombineDictsTestCase(unittest.TestCase):
              'PS1': '\w> '})
 
 
-class CombineCmdsTestCase(unittest.TestCase):
+class CombineCmdsTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_cmds(), None)
@@ -296,7 +291,7 @@ class CombineCmdsTestCase(unittest.TestCase):
         self.assertEqual(combine_cmds(u'wunderbar!'), ['wunderbar!'])
 
 
-class CombineCmdsListsCase(unittest.TestCase):
+class CombineCmdsListsCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_cmd_lists(), [])
@@ -314,7 +309,7 @@ class CombineCmdsListsCase(unittest.TestCase):
             [['echo', 'Hello World!'], ['mkdir', '/tmp/baz']])
 
 
-class CombineEnvsTestCase(unittest.TestCase):
+class CombineEnvsTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_envs(), {})
@@ -345,7 +340,7 @@ class CombineEnvsTestCase(unittest.TestCase):
              'PS1': '\w> '})
 
 
-class CombineLocalEnvsTestCase(unittest.TestCase):
+class CombineLocalEnvsTestCase(TestCase):
 
     def setUp(self):
         self.set_os_pathsep()
@@ -375,7 +370,7 @@ class CombineLocalEnvsTestCase(unittest.TestCase):
              'PS1': '\w> '})
 
 
-class CombineListsTestCase(unittest.TestCase):
+class CombineListsTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_lists(), [])
@@ -384,7 +379,7 @@ class CombineListsTestCase(unittest.TestCase):
         self.assertEqual(combine_lists([1, 2], None, (3, 4)), [1, 2, 3, 4])
 
 
-class CombineOptsTestCase(unittest.TestCase):
+class CombineOptsTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(combine_opts(combiners={}), {})

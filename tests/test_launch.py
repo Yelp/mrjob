@@ -22,21 +22,16 @@ from optparse import OptionError
 from subprocess import Popen
 from subprocess import PIPE
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-from mock import Mock
-from mock import patch
-
 from mrjob.conf import combine_envs
 from mrjob.emr import EMRJobRunner
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
+
+from tests.py2 import Mock
+from tests.py2 import TestCase
+from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_pythonpath
 from tests.sandbox import patch_fs_s3
@@ -78,7 +73,7 @@ class MRCustomJobLauncher(MRJobLauncher):
 ### Test cases ###
 
 
-class MakeRunnerTestCase(unittest.TestCase):
+class MakeRunnerTestCase(TestCase):
 
     def test_local_runner(self):
         launcher = MRJobLauncher(args=['--no-conf', '-r', 'local', ''])
@@ -103,7 +98,7 @@ class MakeRunnerTestCase(unittest.TestCase):
                     self.assertIsInstance(runner, EMRJobRunner)
 
 
-class NoOutputTestCase(unittest.TestCase):
+class NoOutputTestCase(TestCase):
 
     def test_no_output(self):
         launcher = MRJobLauncher(args=['--no-conf', '--no-output', ''])
@@ -117,7 +112,7 @@ class NoOutputTestCase(unittest.TestCase):
             self.assertEqual(launcher.stderr.getvalue(), '')
 
 
-class CommandLineArgsTestCase(unittest.TestCase):
+class CommandLineArgsTestCase(TestCase):
 
     def test_shouldnt_exit_when_invoked_as_object(self):
         self.assertRaises(ValueError, MRJobLauncher, args=['--quux', 'baz'])
@@ -286,7 +281,7 @@ class CommandLineArgsTestCase(unittest.TestCase):
         self.assertRaises(ValueError, MRCustomJobLauncher, args=[])
 
 
-class TestToolLogging(unittest.TestCase):
+class TestToolLogging(TestCase):
     """ Verify the behavior of logging configuration for CLI tools
     """
     def test_default_options(self):

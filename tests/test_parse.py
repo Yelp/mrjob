@@ -18,12 +18,6 @@ from io import BytesIO
 from subprocess import PIPE
 from subprocess import Popen
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
 from mrjob.parse import counter_unescape
 from mrjob.parse import find_hadoop_java_stack_trace
 from mrjob.parse import find_input_uri_for_mapper
@@ -42,10 +36,11 @@ from mrjob.parse import urlparse
 from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
 
+from tests.py2 import TestCase
 from tests.quiet import no_handlers_for_logger
 
 
-class FindPythonTracebackTestCase(unittest.TestCase):
+class FindPythonTracebackTestCase(TestCase):
 
     EXAMPLE_TRACEBACK = b"""Traceback (most recent call last):
   File "mr_collect_per_search_info_remote.py", line 8, in <module>
@@ -140,7 +135,7 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
                          self.EXAMPLE_STDERR_TRACEBACK_2.decode('ascii'))
 
 
-class FindMiscTestCase(unittest.TestCase):
+class FindMiscTestCase(TestCase):
 
     # we can't generate the output that the other find_*() methods look
     # for, so just search over some static data
@@ -234,7 +229,7 @@ class FindMiscTestCase(unittest.TestCase):
             SHOULD_EQUAL)
 
 
-class CounterTestCase(unittest.TestCase):
+class CounterTestCase(TestCase):
 
     TEST_COUNTERS_0_18 = (
         b'Job JOBID="job_201106061823_0001" FINISH_TIME="1307384737542"'
@@ -458,7 +453,7 @@ class CounterTestCase(unittest.TestCase):
         self.assertEqual(counters, {'all_counters': {'c': 1}})
 
 
-class ParseMRJobStderr(unittest.TestCase):
+class ParseMRJobStderr(TestCase):
 
     def test_empty(self):
         self.assertEqual(parse_mr_job_stderr(BytesIO()),
@@ -528,7 +523,7 @@ class ParseMRJobStderr(unittest.TestCase):
              'other': [line.decode('ascii') for line in BAD_LINES]})
 
 
-class PortRangeListTestCase(unittest.TestCase):
+class PortRangeListTestCase(TestCase):
     def test_port_range_list(self):
         self.assertEqual(parse_port_range_list('1234'), [1234])
         self.assertEqual(parse_port_range_list('123,456,789'), [123, 456, 789])
@@ -546,7 +541,7 @@ class PortRangeListTestCase(unittest.TestCase):
                           'Athens:Alexandria')
 
 
-class URITestCase(unittest.TestCase):
+class URITestCase(TestCase):
     def test_uri_parsing(self):
         self.assertEqual(is_uri('notauri!'), False)
         self.assertEqual(is_uri('they://did/the/monster/mash'), True)

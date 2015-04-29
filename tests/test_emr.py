@@ -29,15 +29,6 @@ from datetime import datetime
 from datetime import timedelta
 from io import BytesIO
 
-from mock import patch
-from mock import Mock
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
 import mrjob
 import mrjob.emr
 from mrjob.fs.s3 import S3Filesystem
@@ -72,11 +63,15 @@ from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
+from tests.py2 import Mock
+from tests.py2 import TestCase
+from tests.py2 import patch
+from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import patch_fs_s3
-from tests.sandbox import SandboxedTestCase
 
 try:
     import boto
@@ -1980,7 +1975,7 @@ class TestSSHLs(MockEMRAndS3TestCase):
                           self.runner.ls('ssh://testmaster/does_not_exist'))
 
 
-class TestNoBoto(unittest.TestCase):
+class TestNoBoto(TestCase):
 
     def setUp(self):
         self.blank_out_boto()
@@ -3598,7 +3593,7 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
 
         self.assert_upload_succeeds(runner, data, expect_multipart=False)
 
-    @unittest.skipIf(filechunkio is None, 'need filechunkio')
+    @skipIf(filechunkio is None, 'need filechunkio')
     def test_large_file(self):
         # Real S3 has a minimum chunk size of 5MB, but I'd rather not
         # store that in memory (in our mock S3 filesystem)

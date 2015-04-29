@@ -16,19 +16,12 @@ import bz2
 import gzip
 import optparse
 import os
-import random
 import shutil
 from io import BytesIO
 from subprocess import PIPE
 from subprocess import Popen
 import tarfile
 import tempfile
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
 
 from mrjob.aws import random_identifier
 from mrjob.util import buffer_iterator_to_line_iterator
@@ -43,10 +36,11 @@ from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import tar_and_gzip
 from mrjob.util import unarchive
 
+from tests.py2 import TestCase
 from tests.sandbox import random_seed
 
 
-class BufferIteratorToLineIteratorTestCase(unittest.TestCase):
+class BufferIteratorToLineIteratorTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(
@@ -80,7 +74,7 @@ class BufferIteratorToLineIteratorTestCase(unittest.TestCase):
 
 
 
-class CmdLineTestCase(unittest.TestCase):
+class CmdLineTestCase(TestCase):
 
     def test_cmd_line(self):
         self.assertEqual(cmd_line(['cut', '-f', 2, '-d', ' ']),
@@ -93,7 +87,7 @@ class CmdLineTestCase(unittest.TestCase):
 # expand_path() is tested by tests.test_conf.CombineAndExpandPathsTestCase
 
 
-class FileExtTestCase(unittest.TestCase):
+class FileExtTestCase(TestCase):
 
     def test_file_ext(self):
         self.assertEqual(file_ext('foo.zip'), '.zip')
@@ -104,7 +98,7 @@ class FileExtTestCase(unittest.TestCase):
         self.assertEqual(file_ext('README.txt,v'), '.txt,v')
 
 
-class OptionScrapingTestCase(unittest.TestCase):
+class OptionScrapingTestCase(TestCase):
 
     def setUp(self):
         self.setup_options()
@@ -179,7 +173,7 @@ class OptionScrapingTestCase(unittest.TestCase):
             })
 
 
-class ReadInputTestCase(unittest.TestCase):
+class ReadInputTestCase(TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -265,7 +259,7 @@ class ReadInputTestCase(unittest.TestCase):
                           read_input(os.path.join(self.tmpdir, 'lions*')))
 
 
-class SafeEvalTestCase(unittest.TestCase):
+class SafeEvalTestCase(TestCase):
 
     def test_simple_data_structure(self):
         # try unrepr-ing a bunch of simple data structures
@@ -287,7 +281,7 @@ class SafeEvalTestCase(unittest.TestCase):
             safeeval('abs(a)', globals={'abs': abs}, locals={'a': a}))
 
 
-class ArchiveTestCase(unittest.TestCase):
+class ArchiveTestCase(TestCase):
 
     def setUp(self):
         self.setup_tmp_dir()
@@ -448,7 +442,7 @@ class OnlyReadWrapper(object):
         return self.fp.read(*args, **kwargs)
 
 
-class ReadFileTestCase(unittest.TestCase):
+class ReadFileTestCase(TestCase):
 
     def setUp(self):
         self.make_tmp_dir()

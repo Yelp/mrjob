@@ -22,17 +22,12 @@ import sys
 import tempfile
 from io import BytesIO
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
 import mrjob
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import read_file
+
 from tests.mr_cmd_job import CmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
@@ -41,6 +36,8 @@ from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.mr_word_count import MRWordCount
+from tests.py2 import TestCase
+from tests.py2 import skipIf
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -301,7 +298,7 @@ class TimeoutException(Exception):
     pass
 
 
-class LargeAmountsOfStderrTestCase(unittest.TestCase):
+class LargeAmountsOfStderrTestCase(TestCase):
 
     def setUp(self):
         self.set_alarm()
@@ -347,7 +344,7 @@ class LargeAmountsOfStderrTestCase(unittest.TestCase):
             raise AssertionError()
 
 
-class ExitWithoutExceptionTestCase(unittest.TestCase):
+class ExitWithoutExceptionTestCase(TestCase):
 
     def test_exit_42_job(self):
         mr_job = MRExit42Job(['--no-conf', '--runner=local'])
@@ -383,7 +380,7 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
         self.assertIn('--step-num=1', output)
         self.assertIn('--mapper', output)
 
-    @unittest.skipIf(hasattr(sys, 'pypy_version_info'),
+    @skipIf(hasattr(sys, 'pypy_version_info'),
                      "-v option doesn't work with pypy")
     def test_python_dash_v_as_python_bin(self):
         python_cmd = cmd_line([sys.executable or 'python', '-v'])
@@ -403,7 +400,7 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
                               ['1\tnull', '1\t"bar"'])
 
 
-class StepsPythonBinTestCase(unittest.TestCase):
+class StepsPythonBinTestCase(TestCase):
 
     def test_echo_as_steps_python_bin(self):
         mr_job = MRTwoStepJob(
@@ -436,7 +433,7 @@ class StepsPythonBinTestCase(unittest.TestCase):
             self.assertRaises(ValueError, runner._get_steps)
 
 
-class LocalBootstrapMrjobTestCase(unittest.TestCase):
+class LocalBootstrapMrjobTestCase(TestCase):
 
     def setUp(self):
         self.make_tmp_dir()

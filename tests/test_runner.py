@@ -25,28 +25,24 @@ import tempfile
 from io import BytesIO
 from subprocess import CalledProcessError
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-from mock import patch
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import JOB_NAME_RE
 from mrjob.runner import MRJobRunner
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
+
 from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
+from tests.py2 import TestCase
+from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
 
-class WithStatementTestCase(unittest.TestCase):
+class WithStatementTestCase(TestCase):
 
     def setUp(self):
         self.local_tmp_dir = None
@@ -90,7 +86,7 @@ class WithStatementTestCase(unittest.TestCase):
         self._test_cleanup_after_with_statement(['NONE', 'NONE'], True)
 
 
-class TestJobName(unittest.TestCase):
+class TestJobName(TestCase):
 
     def setUp(self):
         self.blank_out_environment()
@@ -189,7 +185,7 @@ class TestJobName(unittest.TestCase):
         self.assertEqual(match.group(2), 'ads')
 
 
-class CreateMrjobTarGzTestCase(unittest.TestCase):
+class CreateMrjobTarGzTestCase(TestCase):
 
     def test_create_mrjob_tar_gz(self):
         with no_handlers_for_logger('mrjob.runner'):
@@ -204,7 +200,7 @@ class CreateMrjobTarGzTestCase(unittest.TestCase):
                 self.assertIn('mrjob/job.py', contents)
 
 
-class TestStreamingOutput(unittest.TestCase):
+class TestStreamingOutput(TestCase):
 
     def setUp(self):
         self.make_tmp_dir()
@@ -255,7 +251,7 @@ class TestStreamingOutput(unittest.TestCase):
                          ['A', 'B', 'C'])
 
 
-class TestInvokeSort(unittest.TestCase):
+class TestInvokeSort(TestCase):
 
     def setUp(self):
         self.make_tmp_dir_and_set_up_files()

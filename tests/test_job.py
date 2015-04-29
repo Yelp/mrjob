@@ -20,12 +20,6 @@ from io import BytesIO
 from subprocess import Popen
 from subprocess import PIPE
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
 from mrjob.job import UsageError
@@ -44,6 +38,7 @@ from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import TestCase
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -116,7 +111,7 @@ class MRInitTestCase(EmptyMrjobConfTestCase):
         self.assertEqual(results[0], num_inputs * 10 * 10 * 2)
 
 
-class NoTzsetTestCase(unittest.TestCase):
+class NoTzsetTestCase(TestCase):
 
     def setUp(self):
         self.remove_time_tzset()
@@ -138,7 +133,7 @@ class NoTzsetTestCase(unittest.TestCase):
         MRJob()
 
 
-class CountersAndStatusTestCase(unittest.TestCase):
+class CountersAndStatusTestCase(TestCase):
 
     def test_counters_and_status(self):
         mr_job = MRJob().sandbox()
@@ -200,7 +195,7 @@ class CountersAndStatusTestCase(unittest.TestCase):
                           'girl; interrupted': {'movie': 1}})
 
 
-class ProtocolsTestCase(unittest.TestCase):
+class ProtocolsTestCase(TestCase):
     # not putting these in their own files because we're not going to invoke
     # it as a script anyway.
 
@@ -398,7 +393,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
                 job_args=['--no-strict-protocols'])
 
 
-class PickProtocolsTestCase(unittest.TestCase):
+class PickProtocolsTestCase(TestCase):
 
     def _yield_none(self, *args, **kwargs):
         yield None
@@ -554,7 +549,7 @@ class PickProtocolsTestCase(unittest.TestCase):
              (JSONProtocol, JSONValueProtocol)])
 
 
-class JobConfTestCase(unittest.TestCase):
+class JobConfTestCase(TestCase):
 
     class MRJobConfJob(MRJob):
         JOBCONF = {'mapred.foo': 'garply',
@@ -671,7 +666,7 @@ class MRSortValuesAndMoreJob(MRSortValuesJob):
     }
 
 
-class SortValuesTestCase(unittest.TestCase):
+class SortValuesTestCase(TestCase):
 
     def test_sort_values_sets_partitioner(self):
         mr_job = MRSortValuesJob()
@@ -744,7 +739,7 @@ class SortValuesRunnerTestCase(SandboxedTestCase):
                 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'])
 
 
-class HadoopFormatTestCase(unittest.TestCase):
+class HadoopFormatTestCase(TestCase):
 
     # MRHadoopFormatJob is imported above
 
@@ -782,7 +777,7 @@ class HadoopFormatTestCase(unittest.TestCase):
                          'mapred.EbcdicDb2EnterpriseXmlOutputFormat')
 
 
-class PartitionerTestCase(unittest.TestCase):
+class PartitionerTestCase(TestCase):
 
     class MRPartitionerJob(MRJob):
         PARTITIONER = 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
@@ -820,7 +815,7 @@ class PartitionerTestCase(unittest.TestCase):
                          'org.apache.hadoop.mapreduce.Partitioner')
 
 
-class IsMapperOrReducerTestCase(unittest.TestCase):
+class IsMapperOrReducerTestCase(TestCase):
 
     def test_is_mapper_or_reducer(self):
         self.assertEqual(MRJob().is_mapper_or_reducer(), False)
@@ -830,7 +825,7 @@ class IsMapperOrReducerTestCase(unittest.TestCase):
         self.assertEqual(MRJob(['--steps']).is_mapper_or_reducer(), False)
 
 
-class StepNumTestCase(unittest.TestCase):
+class StepNumTestCase(TestCase):
 
     def test_two_step_job_end_to_end(self):
         # represent input as a list so we can reuse it
@@ -923,7 +918,7 @@ class FileOptionsTestCase(SandboxedTestCase):
         self.assertEqual(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))
 
 
-class DeprecatedTestMethodsTestCase(unittest.TestCase):
+class DeprecatedTestMethodsTestCase(TestCase):
 
     def test_parse_output(self):
         # test parsing JSON
@@ -1017,7 +1012,7 @@ class RunJobTestCase(SandboxedTestCase):
                          ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])
 
 
-class BadMainTestCase(unittest.TestCase):
+class BadMainTestCase(TestCase):
     """Ensure that the user cannot do anything but just call MRYourJob.run()
     from __main__()"""
 
@@ -1027,7 +1022,7 @@ class BadMainTestCase(unittest.TestCase):
         sys.argv = sys.argv[:-1]
 
 
-class ProtocolTypeTestCase(unittest.TestCase):
+class ProtocolTypeTestCase(TestCase):
 
     class StrangeJob(MRJob):
 
@@ -1054,7 +1049,7 @@ class ProtocolTypeTestCase(unittest.TestCase):
             self.assertIn('OUTPUT_PROTOCOL should be a class', logs)
 
 
-class StepsTestCase(unittest.TestCase):
+class StepsTestCase(TestCase):
 
     class SteppyJob(MRJob):
 
@@ -1120,7 +1115,7 @@ class StepsTestCase(unittest.TestCase):
             MRStep(mapper=j.mapper))
 
 
-class DeprecatedStepConstructorMethodsTestCase(unittest.TestCase):
+class DeprecatedStepConstructorMethodsTestCase(TestCase):
 
     def test_jar(self):
         kwargs = {

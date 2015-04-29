@@ -27,12 +27,16 @@ try:
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',
-        'tests_require': ['mock'],
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
-    # unittest2 is a backport of unittest from Python 2.7
-    if sys.version_info < (2, 7):
-        setuptools_kwargs['tests_require'].append('unittest2')
+
+    # mock is included in Python 3 as unittest.mock
+    if sys.version_info < (3, 0):
+        setuptools_kwargs['tests_require'] = ['mock']
+
+        # unittest2 is a backport of unittest from Python 2.7
+        if sys.version_info < (2, 7):
+            setuptools_kwargs['tests_require'].append('unittest2')
 
     # boto
     if sys.version_info < (3, 0):

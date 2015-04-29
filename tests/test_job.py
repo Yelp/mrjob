@@ -35,6 +35,7 @@ from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
+from mrjob.py2 import StringIO
 from mrjob.step import _IDENTITY_MAPPER
 from mrjob.step import _IDENTITY_REDUCER
 from mrjob.step import JarStep
@@ -599,7 +600,7 @@ class JobConfTestCase(unittest.TestCase):
 
     def assert_hadoop_version(self, JobClass, version_string):
         mr_job = JobClass()
-        mock_log = BytesIO()
+        mock_log = StringIO()
         with no_handlers_for_logger('mrjob.job'):
             log_to_stream('mrjob.job', mock_log)
             self.assertEqual(mr_job.jobconf()['hadoop_version'],
@@ -898,7 +899,7 @@ class FileOptionsTestCase(SandboxedTestCase):
 
         os.environ['LOCAL_N_FILE_PATH'] = n_file_path
 
-        stdin = ['0\n', '1\n', '2\n']
+        stdin = [b'0\n', b'1\n', b'2\n']
 
         # use local runner so that the file is actually sent somewhere
         mr_job = MRTowerOfPowers(
@@ -1041,7 +1042,7 @@ class ProtocolTypeTestCase(unittest.TestCase):
 
     def test_attrs_should_be_classes(self):
         with no_handlers_for_logger('mrjob.job'):
-            stderr = BytesIO()
+            stderr = StringIO()
             log_to_stream('mrjob.job', stderr)
             job = self.StrangeJob()
             self.assertIsInstance(job.input_protocol(), JSONProtocol)

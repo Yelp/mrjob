@@ -361,7 +361,7 @@ class SimMRJobRunner(MRJobRunner):
             # together
             if keep_sorted:
                 def reducer_key(line):
-                    return line.split('\t')[0]
+                    return line.split(b'\t')[0]
 
                 # assume that input is a collection of key <tab> value pairs
                 # match all non-tab characters

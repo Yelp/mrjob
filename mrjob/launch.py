@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import codecs
 import logging
 import os
 import sys
@@ -209,9 +210,13 @@ class MRJobLauncher(object):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
+        # self.stderr is strictly binary, need to wrap it so it's possible
+        # to log to it in Python 3
+        log_stream = codecs.getwriter('utf_8')(self.stderr)
+
         self.set_up_logging(quiet=self.options.quiet,
                             verbose=self.options.verbose,
-                            stream=self.stderr)
+                            stream=log_stream)
 
         with self.make_runner() as runner:
             runner.run()

@@ -16,8 +16,6 @@ for more information."""
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-from __future__ import print_function
-
 import inspect
 import itertools
 import logging
@@ -704,7 +702,7 @@ class MRJob(MRJobLauncher):
         def read_lines():
             for line in self._read_input():
                 try:
-                    key, value = read(line.rstrip('\r\n'))
+                    key, value = read(line.rstrip(b'\r\n'))
                     yield key, value
                 except Exception as e:
                     if self.options.strict_protocols:
@@ -715,7 +713,8 @@ class MRJob(MRJobLauncher):
 
         def write_line(key, value):
             try:
-               print(write(key, value), file=self.stdout)
+                self.stdout.write(write(key, value))
+                self.stdout.write(b'\n')
             except Exception as e:
                 if self.options.strict_protocols:
                     raise

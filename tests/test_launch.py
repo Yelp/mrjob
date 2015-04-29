@@ -17,7 +17,6 @@ import logging
 import os
 import sys
 
-from io import BytesIO
 from optparse import OptionError
 from subprocess import Popen
 from subprocess import PIPE
@@ -28,6 +27,7 @@ from mrjob.hadoop import HadoopJobRunner
 from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
+from mrjob.py2 import StringIO
 
 from tests.py2 import Mock
 from tests.py2 import TestCase
@@ -108,8 +108,8 @@ class NoOutputTestCase(TestCase):
             _mock_context_mgr(m_make_runner, runner)
             runner.stream_output.return_value = ['a line']
             launcher.run_job()
-            self.assertEqual(launcher.stdout.getvalue(), '')
-            self.assertEqual(launcher.stderr.getvalue(), '')
+            self.assertEqual(launcher.stdout.getvalue(), b'')
+            self.assertEqual(launcher.stderr.getvalue(), b'')
 
 
 class CommandLineArgsTestCase(TestCase):
@@ -286,7 +286,7 @@ class TestToolLogging(TestCase):
     """
     def test_default_options(self):
         with no_handlers_for_logger('__main__'):
-            with patch.object(sys, 'stderr', BytesIO()) as stderr:
+            with patch.object(sys, 'stderr', StringIO()) as stderr:
                 MRJob.set_up_logging()
                 log = logging.getLogger('__main__')
                 log.info('INFO')
@@ -295,7 +295,7 @@ class TestToolLogging(TestCase):
 
     def test_verbose(self):
         with no_handlers_for_logger('__main__'):
-            with patch.object(sys, 'stderr', BytesIO()) as stderr:
+            with patch.object(sys, 'stderr', StringIO()) as stderr:
                 MRJob.set_up_logging(verbose=True)
                 log = logging.getLogger('__main__')
                 log.info('INFO')

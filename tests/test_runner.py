@@ -28,6 +28,7 @@ from subprocess import CalledProcessError
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import JOB_NAME_RE
+from mrjob.py2 import StringIO
 from mrjob.runner import MRJobRunner
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
@@ -248,7 +249,7 @@ class TestStreamingOutput(TestCase):
 
         runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
         self.assertEqual(sorted(runner.stream_output()),
-                         ['A', 'B', 'C'])
+                         [b'A', b'B', b'C'])
 
 
 class TestInvokeSort(TestCase):
@@ -765,17 +766,17 @@ class SetupTestCase(SandboxedTestCase):
         job.sandbox()
 
         with no_handlers_for_logger('mrjob.local'):
-            stderr = BytesIO()
+            stderr = StringIO()
             log_to_stream('mrjob.local', stderr)
 
             with job.make_runner() as r:
                 r.run()
 
-                output = ''.join(r.stream_output())
+                output = b''.join(r.stream_output())
 
                 # stray ouput should be in stderr, not the job's output
                 self.assertIn('stray output', stderr.getvalue())
-                self.assertNotIn('stray output', output)
+                self.assertNotIn(b'stray output', output)
 
 
 class ClosedRunnerTestCase(EmptyMrjobConfTestCase):

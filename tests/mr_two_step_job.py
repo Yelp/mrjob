@@ -16,42 +16,8 @@
 from mrjob.job import MRJob
 from mrjob.step import MRStep
 
-try:
-    import simplejson as json  # preferred because of C speedups
-    json  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import json  # built in to Python 2.6 and later
-
-
-class CustomRawValueProtocol(object):
-    """Just like :py:class:`mrjob.protocol.RawValueProtocol`, but using
-    instance methods instead of classmethods like we're supposed to
-    """
-
-    def read(self, line):
-        return (None, line)
-
-    def write(self, key, value):
-        return value
-
-
-class CustomJSONProtocol(object):
-    """Just like :py:class:`mrjob.protocol.JSONProtocol`, but using
-    instance methods instead of classmethods like we're supposed to
-    """
-
-    def read(self, line):
-        k, v = line.split('\t', 1)
-        return (json.loads(k), json.loads(v))
-
-    def write(self, key, value):
-        return '%s\t%s' % (json.dumps(key), json.dumps(value))
-
 
 class MRTwoStepJob(MRJob):
-
-    INPUT_PROTOCOL = CustomRawValueProtocol
-    INTERNAL_PROTOCOL = CustomJSONProtocol
 
     def mapper(self, key, value):
         yield key, value

@@ -18,7 +18,7 @@ import re
 from mrjob.compat import jobconf_from_env
 from mrjob.job import MRJob
 
-WORD_RE = re.compile(r"[\w']+")
+WORD_RE = re.compile(br"[\w']+")
 
 
 class MRWordCount(MRJob):

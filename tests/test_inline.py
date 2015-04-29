@@ -49,8 +49,8 @@ class InlineMRJobRunnerEndToEndTestCase(SandboxedTestCase):
             input_file.write('bar\nqux\n')
 
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\n')
+        input_gz = gzip.GzipFile(input_gz_path, 'wb')
+        input_gz.write(b'foo\n')
         input_gz.close()
 
         mr_job = MRTwoStepJob(
@@ -218,12 +218,12 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
 
     def test_input_files_and_setting_number_of_tasks(self):
         input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as input_file:
-            input_file.write('bar\nqux\nfoo\n')
+        with open(input_path, 'wb') as input_file:
+            input_file.write(b'bar\nqux\nfoo\n')
 
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\n')
+        input_gz = gzip.GzipFile(input_gz_path, 'wb')
+        input_gz.write(b'foo\n')
         input_gz.close()
 
         mr_job = MRWordCount(['-r', self.RUNNER,
@@ -249,11 +249,11 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
     def test_jobconf_simulated_by_runner(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'wb') as input_file:
-            input_file.write('foo\n')
+            input_file.write(b'foo\n')
 
         upload_path = os.path.join(self.tmp_dir, 'upload')
         with open(upload_path, 'wb') as upload_file:
-            upload_file.write('PAYLOAD')
+            upload_file.write(b'PAYLOAD')
 
         # use --no-bootstrap-mrjob so we don't have to worry about
         # mrjob.tar.gz and the setup wrapper script
@@ -291,16 +291,16 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
         expected_cache_files = (
             script_path + '#mr_test_jobconf.py',
             upload_path + '#upload')
-        self.assertItemsEqual(
-            results['mapreduce.job.cache.files'].split(','),
-            expected_cache_files)
+        self.assertEqual(
+            sorted(results['mapreduce.job.cache.files'].split(',')),
+            sorted(expected_cache_files))
         self.assertEqual(results['mapreduce.job.cache.local.archives'], '')
         expected_local_files = (
             os.path.join(working_dir, 'mr_test_jobconf.py'),
             os.path.join(working_dir, 'upload'))
-        self.assertItemsEqual(
-            results['mapreduce.job.cache.local.files'].split(','),
-            expected_local_files)
+        self.assertEqual(
+            sorted(results['mapreduce.job.cache.local.files'].split(',')),
+            sorted(expected_local_files))
         self.assertEqual(results['mapreduce.job.id'], runner._job_name)
 
         self.assertEqual(results['mapreduce.map.input.file'], input_path)

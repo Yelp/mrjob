@@ -968,26 +968,26 @@ class RunJobTestCase(SandboxedTestCase):
 
     def test_quiet(self):
         stdout, stderr, returncode = self.run_job(['-q'])
-        self.assertEqual(sorted(BytesIO(stdout)), ['1\t"foo"\n',
-                                                    '2\t"bar"\n',
-                                                    '3\tnull\n'])
-        self.assertEqual(stderr, '')
+        self.assertEqual(sorted(BytesIO(stdout)),
+                         [b'1\t"foo"\n', b'2\t"bar"\n', b'3\tnull\n'])
+
+        self.assertEqual(stderr, b'')
         self.assertEqual(returncode, 0)
 
     def test_verbose(self):
         stdout, stderr, returncode = self.run_job()
-        self.assertEqual(sorted(BytesIO(stdout)), ['1\t"foo"\n',
-                                                    '2\t"bar"\n',
-                                                    '3\tnull\n'])
+        self.assertEqual(sorted(BytesIO(stdout)),
+                         [b'1\t"foo"\n', b'2\t"bar"\n', b'3\tnull\n'])
+
         self.assertNotEqual(stderr, '')
         self.assertEqual(returncode, 0)
         normal_stderr = stderr
 
         stdout, stderr, returncode = self.run_job(['-v'])
-        self.assertEqual(sorted(BytesIO(stdout)), ['1\t"foo"\n',
-                                                    '2\t"bar"\n',
-                                                    '3\tnull\n'])
-        self.assertNotEqual(stderr, '')
+        self.assertEqual(sorted(BytesIO(stdout)),
+                         [b'1\t"foo"\n', b'2\t"bar"\n', b'3\tnull\n'])
+
+        self.assertNotEqual(stderr, b'')
         self.assertEqual(returncode, 0)
         self.assertGreater(len(stderr), len(normal_stderr))
 
@@ -996,8 +996,8 @@ class RunJobTestCase(SandboxedTestCase):
 
         args = ['--no-output', '--output-dir', self.tmp_dir]
         stdout, stderr, returncode = self.run_job(args)
-        self.assertEqual(stdout, '')
-        self.assertNotEqual(stderr, '')
+        self.assertEqual(stdout, b'')
+        self.assertNotEqual(stderr, b'')
         self.assertEqual(returncode, 0)
 
         # make sure the correct output is in the temp dir
@@ -1005,11 +1005,11 @@ class RunJobTestCase(SandboxedTestCase):
         output_lines = []
         for dirpath, _, filenames in os.walk(self.tmp_dir):
             for filename in filenames:
-                with open(os.path.join(dirpath, filename)) as output_f:
+                with open(os.path.join(dirpath, filename), 'rb') as output_f:
                     output_lines.extend(output_f)
 
         self.assertEqual(sorted(output_lines),
-                         ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])
+                         [b'1\t"foo"\n', b'2\t"bar"\n', b'3\tnull\n'])
 
 
 class BadMainTestCase(TestCase):

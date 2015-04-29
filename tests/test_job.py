@@ -317,12 +317,12 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             r.run()
 
             # good data should still get through
-            self.assertEqual(''.join(r.stream_output()), '"foo"\t["bar"]\n')
+            self.assertEqual(b''.join(r.stream_output()), b'"foo"\t["bar"]\n')
 
             # exception type varies between versions of json/simplejson,
             # so just make sure there were three exceptions of some sort
             counters = r.counters()[0]
-            self.assertEqual(counters.keys(), ['Undecodable input'])
+            self.assertEqual(sorted(counters), ['Undecodable input'])
             self.assertEqual(
                 sum(counters['Undecodable input'].values()), 3)
 
@@ -341,8 +341,8 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             r.run()
 
             # good data should still get through
-            self.assertEqual(''.join(r.stream_output()),
-                             'null\t["bar", "foo"]\n')
+            self.assertEqual(b''.join(r.stream_output()),
+                             b'null\t["bar", "foo"]\n')
 
             # exception type varies between versions of json/simplejson,
             # so just make sure there were three exceptions of some sort
@@ -949,8 +949,9 @@ class DeprecatedTestMethodsTestCase(TestCase):
         mr_job.increment_counter('Foo', 'Bar')
         mr_job.increment_counter('Foo', 'Baz', 20)
 
-        self.assertEqual(mr_job.parse_counters(),
-                         {'Foo': {'Bar': 2, 'Baz': 20}})
+        with logger_disabled('mrjob.job'):
+            self.assertEqual(mr_job.parse_counters(),
+                             {'Foo': {'Bar': 2, 'Baz': 20}})
 
 
 class RunJobTestCase(SandboxedTestCase):

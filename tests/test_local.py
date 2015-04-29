@@ -131,8 +131,8 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
             input_file.write('bar\nqux\nfoo\nbar\nqux\nfoo\n')
 
         input_path2 = os.path.join(self.tmp_dir, 'input2')
-        with open(input_path2, 'w') as input_file:
-            input_file.write('foo\nbar\nbar\n')
+        with open(input_path2, 'wb') as input_file:
+            input_file.write(b'foo\nbar\nbar\n')
 
         runner = LocalMRJobRunner(conf_paths=[])
 
@@ -145,20 +145,20 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
         # make sure all the data is preserved
         content = []
         for file_name in file_splits:
-            f = open(file_name)
-            content.extend(f.readlines())
+            with open(file_name, 'rb') as f:
+                content.extend(f.readlines())
 
         self.assertEqual(sorted(content),
-                         ['bar\n', 'bar\n', 'bar\n', 'bar\n', 'foo\n',
-                          'foo\n', 'foo\n', 'qux\n', 'qux\n'])
+                         [b'bar\n', b'bar\n', b'bar\n', b'bar\n', b'foo\n',
+                          b'foo\n', b'foo\n', b'qux\n', b'qux\n'])
 
     def test_get_file_splits_sorted_test(self):
         # set up input paths
         input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as input_file:
+        with open(input_path, 'wb') as input_file:
             input_file.write(
-                '1\tbar\n1\tbar\n1\tbar\n2\tfoo\n2\tfoo\n2\tfoo\n3\tqux\n'
-                '3\tqux\n3\tqux\n')
+                b'1\tbar\n1\tbar\n1\tbar\n2\tfoo\n2\tfoo\n2\tfoo\n3\tqux\n'
+                b'3\tqux\n3\tqux\n')
 
         runner = LocalMRJobRunner(conf_paths=[])
 
@@ -171,13 +171,13 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
         # make sure all the data is preserved in sorted order
         content = []
         for file_name in sorted(file_splits.keys()):
-            f = open(file_name, 'r')
-            content.extend(f.readlines())
+            with open(file_name, 'rb') as f:
+                content.extend(f.readlines())
 
         self.assertEqual(content,
-                         ['1\tbar\n', '1\tbar\n', '1\tbar\n',
-                          '2\tfoo\n', '2\tfoo\n', '2\tfoo\n',
-                          '3\tqux\n', '3\tqux\n', '3\tqux\n'])
+                         [b'1\tbar\n', b'1\tbar\n', b'1\tbar\n',
+                          b'2\tfoo\n', b'2\tfoo\n', b'2\tfoo\n',
+                          b'3\tqux\n', b'3\tqux\n', b'3\tqux\n'])
 
     def gz_test(self, dir_path_name):
         contents_gz = [b'bar\n', b'qux\n', b'foo\n', b'bar\n',
@@ -392,9 +392,13 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
         with no_handlers_for_logger():
             mr_job.run_job()
 
-        # expect debugging messages in stderr
-        self.assertIn(b'import mrjob', mr_job.stderr.getvalue())
-        self.assertIn(b'#', mr_job.stderr.getvalue())
+        # expect debugging messages in stderr.
+        stderr = mr_job.stderr.getvalue()
+
+        # stderr is huge, so don't use assertIn()
+        self.assertTrue(b'import mrjob' in stderr or     # Python 2
+                        br"import 'mrjob'" in stderr)  # Python 3
+        self.assertTrue(b'#' in stderr)
 
         # should still get expected results
         self.assertEqual(sorted(mr_job.stdout.getvalue().splitlines()),

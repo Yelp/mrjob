@@ -56,8 +56,8 @@ class MockSubprocessTestCase(SandboxedTestCase):
                 outer.command_log.append(self.args)
 
                 # store the result
-                self.stdout_result, self.stderr_result = (
-                    self.stdout.getvalue(), self.stderr.getvalue())
+                self.stdout_result = self.stdout.getvalue()
+                self.stderr_result = self.stderr.getvalue()
 
                 outer.io_log.append((self.stdout_result, self.stderr_result))
 
@@ -70,7 +70,15 @@ class MockSubprocessTestCase(SandboxedTestCase):
                     self.stdin = stdin
                     self._run()
 
-                return self.stdout_result, self.stderr_result
+                # need to return bytes
+                def _to_bytes(x):
+                    if isinstance(x, bytes):
+                        return x
+                    else:
+                        return x.encode('utf_8')
+
+                return (_to_bytes(self.stdout_result),
+                        _to_bytes(self.stderr_result))
 
             def wait(self):
                 return self.returncode

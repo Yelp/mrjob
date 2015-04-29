@@ -194,6 +194,8 @@ def hadoop_fs_cat(stdout, stderr, environ, *args):
         else:
             for path in paths:
                 with open(path, 'rb') as f:
+                    # use binary interface if available
+                    #stdout_buffer = getattr(stdout, 'buffer', stdout)
                     for line in f:
                         stdout.write(line)
 

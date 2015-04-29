@@ -161,8 +161,11 @@ def main(stdin, stdout, stderr, args, environ):
         if not os.path.exists(local_dest):
             print('No such file or directory:', local_dest, file=stderr)
             return 1
-        with open(local_dest, 'r') as f:
-            print(f.read(), end='', file=stdout)
+
+        with open(local_dest, 'rb') as f:
+            # use stdout.buffer if available
+            stdout_buffer = getattr(stdout, 'buffer', stdout)
+            stdout_buffer.write(f.read())
             return 0
 
 

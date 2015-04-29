@@ -34,15 +34,15 @@ class HadoopJobKillTestCase(TestCase):
     EXPECTED_LIST_CALL = SSH_ARGS + ['hadoop', 'job', '-list']
 
     GOOD_LIST_OUTPUT = (
-        "1 jobs currently running\n"
-        "JobId   State   StartTime   UserName    Priority    SchedulingInfo\n"
-        "job_201205162225_0003   4   1337208155510   hadoop  NORMAL  NA\n")
+        b"1 jobs currently running\n"
+        b"JobId   State   StartTime   UserName    Priority    SchedulingInfo\n"
+        b"job_201205162225_0003   4   1337208155510   hadoop  NORMAL  NA\n")
 
     EXPECTED_KILL_CALL = SSH_ARGS + [
         'hadoop', 'job', '-kill', 'job_201205162225_0003',
     ]
 
-    GOOD_KILL_OUTPUT = "Killed job job_201205162225_0003\n"
+    GOOD_KILL_OUTPUT = b"Killed job job_201205162225_0003\n"
 
     def test_expected(self):
 
@@ -50,7 +50,7 @@ class HadoopJobKillTestCase(TestCase):
 
         def fake_popen(*args, **kwargs):
             m = Mock()
-            m.communicate.return_value = (values.pop(0), '')
+            m.communicate.return_value = (values.pop(0), b'')
             return m
 
         with patch.object(ssh, 'Popen', side_effect=fake_popen) as m:
@@ -66,7 +66,7 @@ class HadoopJobKillTestCase(TestCase):
 
         def fake_popen(*args, **kwargs):
             m = Mock()
-            m.communicate.return_value = ("2 jobs currently running\n", '')
+            m.communicate.return_value = (b"2 jobs currently running\n", b'')
             return m
 
         with patch.object(ssh, 'Popen', side_effect=fake_popen):
@@ -77,7 +77,7 @@ class HadoopJobKillTestCase(TestCase):
 
         def fake_popen(*args, **kwargs):
             m = Mock()
-            m.communicate.return_value = ("0 jobs currently running\n", '')
+            m.communicate.return_value = (b"0 jobs currently running\n", b'')
             return m
 
         with patch.object(ssh, 'Popen', side_effect=fake_popen):
@@ -89,7 +89,7 @@ class HadoopJobKillTestCase(TestCase):
 
         def fake_popen(*args, **kwargs):
             m = Mock()
-            m.communicate.return_value = ("yah output, its gahbage\n", '')
+            m.communicate.return_value = (b"yah output, its gahbage\n", b'')
             return m
 
         with patch.object(ssh, 'Popen', side_effect=fake_popen):
@@ -98,11 +98,11 @@ class HadoopJobKillTestCase(TestCase):
 
     def test_junk_kill_output(self):
 
-        values = [self.GOOD_LIST_OUTPUT, "yah output, its gahbage\n"]
+        values = [self.GOOD_LIST_OUTPUT, b"yah output, its gahbage\n"]
 
         def fake_popen(*args, **kwargs):
             m = Mock()
-            m.communicate.return_value = (values.pop(0), '')
+            m.communicate.return_value = (values.pop(0), b'')
             return m
 
         with patch.object(ssh, 'Popen', side_effect=fake_popen):

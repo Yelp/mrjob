@@ -103,7 +103,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         remote_path = self.fs.path_join('hdfs:///data', 'foo.bz2')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         ['foo\n'] * 1000)
+                         [b'foo\n'] * 1000)
 
     def test_cat_gz(self):
         self.make_mock_file('data/foo.gz', gzip_compress('foo\n' * 10000))
@@ -111,7 +111,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         remote_path = self.fs.path_join('hdfs:///data', 'foo.gz')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         ['foo\n'] * 10000)
+                         [b'foo\n'] * 10000)
 
     def test_du(self):
         self.make_mock_file('data1', 'abcd')

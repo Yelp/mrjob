@@ -146,17 +146,11 @@ def main(stdin, stdout, stderr, argv, environ):
             cmd_log.flush()
 
     if len(argv) < 2:
-        stderr.write(b'Usage: hadoop [--config confdir] COMMAND\n')
+        print('Usage: hadoop [--config confdir] COMMAND\n', file=stderr)
         return 1
 
     cmd = argv[1]
     cmd_args = argv[2:]
-
-    # bytes/unicode compatibility
-    if hasattr(stdout, 'buffer'):
-        stdout = stdout.buffer
-    if hasattr(stderr, 'buffer'):
-        stderr = stderr.buffer
 
     return invoke_cmd(
         stdout, stderr, environ, 'hadoop_', cmd, cmd_args,
@@ -195,9 +189,9 @@ def hadoop_fs_cat(stdout, stderr, environ, *args):
             for path in paths:
                 with open(path, 'rb') as f:
                     # use binary interface if available
-                    #stdout_buffer = getattr(stdout, 'buffer', stdout)
+                    stdout_buffer = getattr(stdout, 'buffer', stdout)
                     for line in f:
-                        stdout.write(line)
+                        stdout_buffer.write(line)
 
     if failed:
         return -1

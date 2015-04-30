@@ -81,8 +81,10 @@ def add_mock_s3_data(mock_s3_fs, data, time_modified=None):
         mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
 
-        for key_name, bytes in key_name_to_bytes.items():
-            bucket['keys'][key_name] = (bytes, time_modified)
+        for key_name, key_data in key_name_to_bytes.items():
+            if not isinstance(key_data, bytes):
+                raise TypeError('key data must be bytes')
+            bucket['keys'][key_name] = (key_data, time_modified)
 
 
 class MockS3Connection(object):

@@ -3575,7 +3575,7 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
     def upload_data(self, runner, data):
         """Upload some bytes to S3"""
         data_path = os.path.join(self.tmp_dir, self.TEST_FILENAME)
-        with open(data_path, 'w') as fp:
+        with open(data_path, 'wb') as fp:
             fp.write(data)
 
         s3_conn = runner.make_s3_conn()
@@ -3594,7 +3594,7 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
 
     def test_small_file(self):
         runner = EMRJobRunner()
-        data = 'beavers mate for life'
+        data = b'beavers mate for life'
 
         self.assert_upload_succeeds(runner, data, expect_multipart=False)
 
@@ -3605,21 +3605,21 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
         runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)
         self.assertEqual(runner._get_upload_part_size(), 50)
 
-        data = 'Mew' * 20
+        data = b'Mew' * 20
         self.assert_upload_succeeds(runner, data, expect_multipart=True)
 
     def test_file_size_equals_part_size(self):
         runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)
         self.assertEqual(runner._get_upload_part_size(), 50)
 
-        data = 'o' * 50
+        data = b'o' * 50
         self.assert_upload_succeeds(runner, data, expect_multipart=False)
 
     def test_disable_multipart(self):
         runner = EMRJobRunner(s3_upload_part_size=0)
         self.assertEqual(runner._get_upload_part_size(), 0)
 
-        data = 'Mew' * 20
+        data = b'Mew' * 20
         self.assert_upload_succeeds(runner, data, expect_multipart=False)
 
     def test_no_filechunkio(self):
@@ -3627,7 +3627,7 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
             runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)
             self.assertEqual(runner._get_upload_part_size(), 50)
 
-            data = 'Mew' * 20
+            data = b'Mew' * 20
             with logger_disabled('mrjob.emr'):
                 self.assert_upload_succeeds(runner, data,
                                             expect_multipart=False)
@@ -3637,7 +3637,7 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
         runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)
         self.assertEqual(runner._get_upload_part_size(), 50)
 
-        data = 'Mew' * 20
+        data = b'Mew' * 20
 
         with patch.object(runner, '_upload_parts', side_effect=IOError):
             self.assertRaises(IOError, self.upload_data, runner, data)

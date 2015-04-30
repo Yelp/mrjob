@@ -64,6 +64,7 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import TestCase
+from tests.py2 import mock
 from tests.py2 import patch
 from tests.py2 import skipIf
 from tests.quiet import logger_disabled
@@ -3063,17 +3064,13 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
 
     @contextmanager
     def _test_mode(self, mode):
-        # disabled until we fix nested patch
-        from tests.py2 import unittest
-        raise unittest.SkipTest
-
         r = EMRJobRunner(conf_paths=[])
         with patch.multiple(r,
-                            _cleanup_job=Mock(),
-                            _cleanup_job_flow=Mock(),
-                            _cleanup_local_scratch=Mock(),
-                            _cleanup_logs=Mock(),
-                            _cleanup_remote_scratch=Mock()) as mock_dict:
+                            _cleanup_job=mock.DEFAULT,
+                            _cleanup_job_flow=mock.DEFAULT,
+                            _cleanup_local_scratch=mock.DEFAULT,
+                            _cleanup_logs=mock.DEFAULT,
+                            _cleanup_remote_scratch=mock.DEFAULT) as mock_dict:
             r.cleanup(mode=mode)
             yield mock_dict
 
@@ -3098,14 +3095,14 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             self.assertFalse(m['_cleanup_remote_scratch'].called)
             self.assertFalse(m['_cleanup_logs'].called)
             self.assertFalse(m['_cleanup_job_flow'].called)
-            self.assertFalse(m['_cleanup_jobs'].called)  # Only on failure
+            self.assertFalse(m['_cleanup_job'].called)  # Only on failure
 
     def test_cleanup_none(self):
         with self._test_mode('NONE') as m:
             self.assertFalse(m['_cleanup_local_scratch'].called)
             self.assertFalse(m['_cleanup_remote_scratch'].called)
             self.assertFalse(m['_cleanup_logs'].called)
-            self.assertFalse(m['_cleanup_jobs'].called)
+            self.assertFalse(m['_cleanup_job'].called)
             self.assertFalse(m['_cleanup_job_flow'].called)
 
     def test_job_cleanup_mechanics_succeed(self):

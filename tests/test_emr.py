@@ -3632,6 +3632,7 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
                 self.assert_upload_succeeds(runner, data,
                                             expect_multipart=False)
 
+    @skipIf(filechunkio is None, 'need filechunkio')
     def test_exception_while_uploading_large_file(self):
 
         runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)

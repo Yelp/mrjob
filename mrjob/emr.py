@@ -2451,6 +2451,9 @@ class EMRJobRunner(MRJobRunner):
 
         if self._opts['bootstrap_mrjob']:
             things_to_hash.append(mrjob.__version__)
+
+        # TODO: this depends on repr, so hash may not agree between
+        # Python 2 and Python 3. Probably better to just hash a JSON.
         return hash_object(things_to_hash)
 
     ### EMR-specific Stuff ###

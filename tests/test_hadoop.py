@@ -154,8 +154,9 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
                     'fs', '-put', input_to_upload, remote_input_path])
 
         # doesn't matter what the intermediate output is; just has to exist.
-        add_mock_hadoop_output([''])
-        add_mock_hadoop_output(['1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n'])
+        add_mock_hadoop_output([b''])
+        add_mock_hadoop_output([b'1\t"qux"\n2\t"bar"\n',
+                                b'2\t"foo"\n5\tnull\n'])
 
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
                                '--no-conf', '--hadoop-arg', '-libjar',
@@ -316,6 +317,10 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
             self.runner._args_for_streaming_step(0),
             self._old_basic_args + args)
 
+    def _python_bin(self):
+        """Return 'python' or 'python3' as appropriate."""
+        return ' '.join(self.runner._opts['python_bin'])
+
     def test_basic_mapper(self):
         self._assert_streaming_step(
             {
@@ -324,8 +329,10 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                     'type': 'script',
                 },
             },
-            ['-mapper', 'python my_job.py --step-num=0 --mapper',
-             '-jobconf', 'mapred.reduce.tasks=0'])
+            ['-mapper',
+             self._python_bin() + ' my_job.py --step-num=0 --mapper',
+             '-jobconf',
+             'mapred.reduce.tasks=0'])
 
     def test_basic_reducer(self):
         self._assert_streaming_step(
@@ -335,8 +342,10 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                     'type': 'script',
                 },
             },
-            ['-mapper', 'cat',
-             '-reducer', 'python my_job.py --step-num=0 --reducer'])
+            ['-mapper',
+             'cat',
+             '-reducer',
+             self._python_bin() + ' my_job.py --step-num=0 --reducer'])
 
     def test_pre_filters(self):
         self._assert_streaming_step(
@@ -356,14 +365,14 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 },
             },
             ["-mapper",
-             "bash -c 'grep anything | python my_job.py --step-num=0"
-                 " --mapper'",
+             "bash -c 'grep anything | " + self._python_bin() +
+             " my_job.py --step-num=0 --mapper'",
              "-combiner",
-             "bash -c 'grep nothing | python my_job.py --step-num=0"
-                 " --combiner'",
+             "bash -c 'grep nothing | " + self._python_bin() +
+             " my_job.py --step-num=0 --combiner'",
              "-reducer",
-             "bash -c 'grep something | python my_job.py --step-num=0"
-                 " --reducer'"])
+             "bash -c 'grep something | " + self._python_bin() +
+             " my_job.py --step-num=0 --reducer'"])
 
     def test_combiner_018(self):
         self._assert_streaming_step_old(
@@ -378,8 +387,8 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 },
             },
             ["-mapper",
-             "bash -c 'cat | sort | python my_job.py --step-num=0"
-                " --combiner'",
+             "bash -c 'cat | sort | " + self._python_bin() +
+             " my_job.py --step-num=0 --combiner'",
              '-jobconf', 'mapred.reduce.tasks=0'])
 
     def test_pre_filters_018(self):
@@ -400,12 +409,13 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 },
             },
             ['-mapper',
-             "bash -c 'grep anything | python my_job.py --step-num=0"
-                " --mapper | sort | grep nothing | python my_job.py"
-                " --step-num=0 --combiner'",
+             "bash -c 'grep anything | " + self._python_bin() +
+             " my_job.py --step-num=0"
+             " --mapper | sort | grep nothing | " + self._python_bin() +
+             " my_job.py --step-num=0 --combiner'",
              '-reducer',
-             "bash -c 'grep something | python my_job.py --step-num=0"
-                " --reducer'"])
+             "bash -c 'grep something | " + self._python_bin() +
+             " my_job.py --step-num=0 --reducer'"])
 
     def test_pre_filter_escaping(self):
         # ESCAPE ALL THE THINGS!!!
@@ -419,8 +429,9 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
             },
             ['-mapper',
              "bash -c 'bash -c '\\''grep"
-                 " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' |"
-                 " python my_job.py --step-num=0 --mapper'",
+             " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | " +
+             self._python_bin() +
+             " my_job.py --step-num=0 --mapper'",
              '-jobconf', 'mapred.reduce.tasks=0'])
 
 
@@ -475,7 +486,7 @@ class JarStepTestCase(MockHadoopTestCase):
             ['-r', 'hadoop', '--jar', fake_jar, input1, input2])
         job.sandbox()
 
-        add_mock_hadoop_output([''])  # need this for streaming step
+        add_mock_hadoop_output([b''])  # need this for streaming step
 
         with job.make_runner() as runner:
             runner.run()

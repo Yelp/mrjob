@@ -42,6 +42,7 @@ from mrjob.logparsers import HADOOP_JOB_LOG_URI_RE
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import best_error_from_logs
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
+from mrjob.parse import _to_string
 from mrjob.parse import is_uri
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
@@ -51,24 +52,24 @@ from mrjob.util import cmd_line
 log = logging.getLogger(__name__)
 
 # to filter out the log4j stuff that hadoop streaming prints out
-HADOOP_STREAMING_OUTPUT_RE = re.compile(r'^(\S+ \S+ \S+ \S+: )?(.*)$')
+HADOOP_STREAMING_OUTPUT_RE = re.compile(br'^(\S+ \S+ \S+ \S+: )?(.*)$')
 
 # used by mkdir()
-HADOOP_FILE_EXISTS_RE = re.compile(r'.*File exists.*')
+HADOOP_FILE_EXISTS_RE = re.compile(br'.*File exists.*')
 
 # used by ls()
 HADOOP_LSR_NO_SUCH_FILE = re.compile(
-    r'^lsr: Cannot access .*: No such file or directory.')
+    br'^lsr: Cannot access .*: No such file or directory.')
 
 # used by rm() (see below)
-HADOOP_RMR_NO_SUCH_FILE = re.compile(r'^rmr: hdfs://.*$')
+HADOOP_RMR_NO_SUCH_FILE = re.compile(br'^rmr: hdfs://.*$')
 
 # used to extract the job timestamp from stderr
 HADOOP_JOB_TIMESTAMP_RE = re.compile(
-    r'(INFO: )?Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
+    br'(INFO: )?Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
 
 # find version string in "Hadoop 0.20.203" etc.
-HADOOP_VERSION_RE = re.compile(r'^.*?(?P<version>(\d|\.)+).*?$')
+HADOOP_VERSION_RE = re.compile(br'^.*?(?P<version>(\d|\.)+).*?$')
 
 
 def find_hadoop_streaming_jar(path):
@@ -325,7 +326,7 @@ class HadoopJobRunner(MRJobRunner):
 
                 # there shouldn't be much output to STDOUT
                 for line in step_proc.stdout:
-                    log.error('STDOUT: ' + line.strip('\n'))
+                    log.error('STDOUT: ' + _to_string(line.strip(b'\n')))
 
                 returncode = step_proc.wait()
             else:
@@ -333,12 +334,12 @@ class HadoopJobRunner(MRJobRunner):
                 if pid == 0:  # we are the child process
                     os.execvp(step_args[0], step_args)
                 else:
-                    master = os.fdopen(master_fd)
-                    # reading from master gives us the subprocess's
-                    # stderr and stdout (it's a fake terminal)
-                    self._process_stderr_from_streaming(master)
-                    _, returncode = os.waitpid(pid, 0)
-                    master.close()
+                    with os.fdopen(master_fd, 'rb') as master:
+                        # reading from master gives us the subprocess's
+                        # stderr and stdout (it's a fake terminal)
+                        self._process_stderr_from_streaming(master)
+                        _, returncode = os.waitpid(pid, 0)
+                        master.close()
 
             if returncode == 0:
                 # parsing needs step number for whole job
@@ -387,9 +388,9 @@ class HadoopJobRunner(MRJobRunner):
 
         for line in treat_eio_as_eof(stderr):
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
-            log.info('HADOOP: ' + line)
+            log.info('HADOOP: ' + _to_string(line))
 
-            if 'Streaming Job Failed!' in line:
+            if b'Streaming Job Failed!' in line:
                 raise Exception(line)
 
             # The job identifier is printed to stderr. We only want to parse it

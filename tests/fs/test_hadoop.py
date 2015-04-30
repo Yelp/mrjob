@@ -106,7 +106,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
                          [b'foo\n'] * 1000)
 
     def test_cat_gz(self):
-        self.make_mock_file('data/foo.gz', gzip_compress('foo\n' * 10000))
+        self.make_mock_file('data/foo.gz', gzip_compress(b'foo\n' * 10000))
 
         remote_path = self.fs.path_join('hdfs:///data', 'foo.gz')
 

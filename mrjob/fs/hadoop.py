@@ -120,7 +120,7 @@ class HadoopFilesystem(Filesystem):
 
         try:
             return sum(int(line.split()[1])
-                       for line in stdout.split('\n')
+                       for line in stdout.split(b'\n')
                        if line.strip())
         except (ValueError, TypeError, IndexError):
             raise IOError(

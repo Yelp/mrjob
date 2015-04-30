@@ -378,7 +378,7 @@ class MockEmrConnection(object):
                                   failure message (or ``None`` for the default
                                   message)
         :param mock_emr_output: a map from ``(job flow ID, step_num)`` to a
-                                list of ``str``s representing file contents to
+                                list of ``bytes``s representing file contents to
                                 output when the job completes
         :type max_job_flows_returned: int
         :param max_job_flows_returned: the maximum number of job flows that
@@ -391,6 +391,12 @@ class MockEmrConnection(object):
                                     we simulate progress. If there is
                                     no next element, we bail out.
         """
+        # check this now; strs will cause problems later in Python 3
+        if mock_emr_output and any(
+                any(not isinstance(part, bytes) for part in parts)
+                for parts in mock_emr_output.values()):
+            raise TypeError('mock EMR output must be bytes')
+
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.mock_emr_job_flows = combine_values({}, mock_emr_job_flows)
         self.mock_emr_failures = combine_values({}, mock_emr_failures)
@@ -820,14 +826,14 @@ class MockEmrConnection(object):
             output_uri = self._get_step_output_uri(step)
             if output_uri and is_s3_uri(output_uri):
                 mock_output = self.mock_emr_output.get(
-                    (jobflow_id, step_num)) or ['']
+                    (jobflow_id, step_num)) or [b'']
 
                 bucket_name, key_name = parse_s3_uri(output_uri)
 
                 # write output to S3
-                for i, bytes in enumerate(mock_output):
+                for i, part in enumerate(mock_output):
                     add_mock_s3_data(self.mock_s3_fs, {
-                        bucket_name: {key_name + 'part-%05d' % i: bytes}})
+                        bucket_name: {key_name + 'part-%05d' % i: part}})
             elif (jobflow_id, step_num) in self.mock_emr_output:
                 raise AssertionError(
                     "can't use output for job flow ID %s, step %d "

@@ -41,6 +41,7 @@ from mrjob.emr import _lock_acquire_step_2
 from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import pool_hash_and_name
+from mrjob.py2 import IN_PY2
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
 from mrjob.util import bash_wrap
@@ -81,6 +82,12 @@ try:
     boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     boto = None
+
+# used to match command lines
+if IN_PY2:
+    PYTHON_BIN = 'python'
+else:
+    PYTHON_BIN = 'python3'
 
 
 class FastEMRTestCase(SandboxedTestCase):
@@ -262,7 +269,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             local_input_file.write('bar\nqux\n')
 
         remote_input_path = 's3://walrus/data/foo'
-        self.add_mock_s3_data({'walrus': {'data/foo': 'foo\n'}})
+        self.add_mock_s3_data({'walrus': {'data/foo': b'foo\n'}})
 
         # setup fake output
         self.mock_emr_output = {('j-MOCKJOBFLOW0', 1): [
@@ -386,7 +393,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.assertEqual(job_flow.state, 'TERMINATED')
 
     def _test_remote_scratch_cleanup(self, mode, scratch_len, log_len):
-        self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
+        self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': b'1\n'}})
         stdin = BytesIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
@@ -440,7 +447,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
                           'GARBAGE', 0, 0)
 
     def test_args_version_018(self):
-        self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
+        self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': b'1\n'}})
         # read from STDIN, a local file, and a remote file
         stdin = BytesIO(b'foo\nbar\n')
 
@@ -457,7 +464,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             self.assertNotIn('-combiner', step_args)
 
     def test_args_version_020_205(self):
-        self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
+        self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': b'1\n'}})
         # read from STDIN, a local file, and a remote file
         stdin = BytesIO(b'foo\nbar\n')
 
@@ -1379,21 +1386,21 @@ BUCKET_URI = 's3://' + BUCKET + '/'
 LOG_DIR = 'j-JOBFLOWID/'
 
 GARBAGE = \
-"""GarbageGarbageGarbage
+b"""GarbageGarbageGarbage
 """
 
-TRACEBACK_START = 'Traceback (most recent call last):\n'
+TRACEBACK_START = b'Traceback (most recent call last):\n'
 
 PY_EXCEPTION = \
-"""  File "<string>", line 1, in <module>
+b"""  File "<string>", line 1, in <module>
 TypeError: 'int' object is not iterable
 """
 
 CHILD_ERR_LINE = (
-    '2010-07-27 18:25:48,397 WARN'
-    ' org.apache.hadoop.mapred.TaskTracker (main): Error running child\n')
+    b'2010-07-27 18:25:48,397 WARN'
+    b' org.apache.hadoop.mapred.TaskTracker (main): Error running child\n')
 
-JAVA_STACK_TRACE = """java.lang.OutOfMemoryError: Java heap space
+JAVA_STACK_TRACE = b"""java.lang.OutOfMemoryError: Java heap space
         at org.apache.hadoop.mapred.IFile$Reader.readNextBlock(IFile.java:270)
         at org.apache.hadoop.mapred.IFile$Reader.next(IFile.java:332)
 """
@@ -1911,7 +1918,8 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
 class TestS3Ls(MockEMRAndS3TestCase):
 
     def test_s3_ls(self):
-        self.add_mock_s3_data({'walrus': {'one': '', 'two': '', 'three': ''}})
+        self.add_mock_s3_data(
+            {'walrus': {'one': b'', 'two': b'', 'three': b''}})
 
         runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
                               conf_paths=[])
@@ -2046,8 +2054,10 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
 
         # use all the bootstrap options
         runner = EMRJobRunner(conf_paths=[],
-                              bootstrap=['python ' + foo_py_path + '#bar.py',
-                                         's3://walrus/scripts/ohnoes.sh#'],
+                              bootstrap=[
+                                  PYTHON_BIN + ' ' +
+                                  foo_py_path + '#bar.py',
+                                  's3://walrus/scripts/ohnoes.sh#'],
                               bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
                               bootstrap_files=['/tmp/quz'],
                               bootstrap_mrjob=True,
@@ -2059,8 +2069,8 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         self.assertIsNotNone(runner._master_bootstrap_script_path)
         self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
 
-        lines = [line.rstrip() for line in
-                 open(runner._master_bootstrap_script_path)]
+        with open(runner._master_bootstrap_script_path) as f:
+            lines = [line.rstrip() for line in f]
 
         self.assertEqual(lines[0], '#!/bin/sh -ex')
 
@@ -2090,7 +2100,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         # check scripts get run
 
         # bootstrap
-        self.assertIn('python $__mrjob_PWD/bar.py', lines)
+        self.assertIn(PYTHON_BIN + ' $__mrjob_PWD/bar.py', lines)
         self.assertIn('$__mrjob_PWD/ohnoes.sh', lines)
         # bootstrap_cmds
         self.assertIn('echo "Hi!"', lines)
@@ -2099,13 +2109,13 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         # bootstrap_mrjob
         mrjob_tar_gz_name = runner._bootstrap_dir_mgr.name(
             'file', runner._mrjob_tar_gz_path)
-        self.assertIn("__mrjob_PYTHON_LIB=$(python -c 'from"
+        self.assertIn("__mrjob_PYTHON_LIB=$(" + PYTHON_BIN + " -c 'from"
                       " distutils.sysconfig import get_python_lib; print"
                       " get_python_lib()')", lines)
         self.assertIn('sudo tar xfz $__mrjob_PWD/' + mrjob_tar_gz_name +
                       ' -C $__mrjob_PYTHON_LIB', lines)
-        self.assertIn('sudo python -m compileall -f $__mrjob_PYTHON_LIB/mrjob'
-                      ' && true', lines)
+        self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
+                      ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
         self.assertIn('sudo apt-get install -y python-pip || '
                 'sudo yum install -y python-pip', lines)
@@ -2252,11 +2262,11 @@ class EMRNoMapperTest(MockEMRAndS3TestCase):
             local_input_file.write('bar\nqux\n')
 
         remote_input_path = 's3://walrus/data/foo'
-        self.add_mock_s3_data({'walrus': {'data/foo': 'foo\n'}})
+        self.add_mock_s3_data({'walrus': {'data/foo': b'foo\n'}})
 
         # setup fake output
         self.mock_emr_output = {('j-MOCKJOBFLOW0', 1): [
-            '1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n']}
+            b'1\t"qux"\n2\t"bar"\n', b'2\t"foo"\n5\tnull\n']}
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '-', local_input_path, remote_input_path])
@@ -3039,11 +3049,11 @@ class TestCatFallback(MockEMRAndS3TestCase):
     def test_ssh_cat(self):
         runner = EMRJobRunner(conf_paths=[])
         self.prepare_runner_for_ssh(runner)
-        mock_ssh_file('testmaster', 'etc/init.d', 'meow')
+        mock_ssh_file('testmaster', 'etc/init.d', b'meow')
 
         ssh_cat_gen = runner.cat(
             SSH_PREFIX + runner._address + '/etc/init.d')
-        self.assertEqual(list(ssh_cat_gen)[0].rstrip(), 'meow')
+        self.assertEqual(list(ssh_cat_gen)[0].rstrip(), b'meow')
         self.assertRaises(
             IOError, list,
             runner.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
@@ -3053,7 +3063,7 @@ class TestCatFallback(MockEMRAndS3TestCase):
         runner = EMRJobRunner(conf_paths=[])
         self.prepare_runner_for_ssh(runner)
 
-        error_message = 'cat: logs/err.log: No such file or directory\n'
+        error_message = b'cat: logs/err.log: No such file or directory\n'
         mock_ssh_file('testmaster', 'logs/err.log', error_message)
         self.assertEqual(
             list(runner.cat(SSH_PREFIX + runner._address + '/logs/err.log')),
@@ -3124,7 +3134,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             with patch.object(mrjob.emr, 'ssh_terminate_single_job',
                               side_effect=die_ssh):
                 r._cleanup_job()
-                self.assertIn('Unable to kill job', stderr.getvalue())
+                self.assertIn(b'Unable to kill job', stderr.getvalue())
 
     def test_job_cleanup_mechanics_io_fail(self):
         def die_io(*args, **kwargs):
@@ -3137,7 +3147,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
                 stderr = BytesIO()
                 log_to_stream('mrjob.emr', stderr)
                 r._cleanup_job()
-                self.assertIn('Unable to kill job', stderr.getvalue())
+                self.assertIn(b'Unable to kill job', stderr.getvalue())
 
     def test_dont_kill_if_successful(self):
         with no_handlers_for_logger('mrjob.emr'):
@@ -3311,7 +3321,7 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
                     'type': 'script',
                 },
             },
-            mapper="python my_job.py --step-num=0 --mapper",
+            mapper=(PYTHON_BIN + ' my_job.py --step-num=0 --mapper'),
             reducer=None,
         )
 
@@ -3324,7 +3334,8 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
                 },
             },
             mapper="cat",
-            reducer="python my_job.py --step-num=0 --reducer",
+            reducer=(PYTHON_BIN +
+                     ' my_job.py --step-num=0 --reducer'),
         )
 
     def test_pre_filters(self):
@@ -3344,12 +3355,15 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
                     'pre_filter': 'grep something',
                 },
             },
-            mapper=("bash -c 'grep anything | python my_job.py --step-num=0"
-                    " --mapper'"),
-            combiner=("bash -c 'grep nothing | python my_job.py --step-num=0"
-                    " --combiner'"),
-            reducer=("bash -c 'grep something | python my_job.py --step-num=0"
-                    " --reducer'"),
+            mapper=("bash -c 'grep anything | " +
+                    PYTHON_BIN +
+                    " my_job.py --step-num=0 --mapper'"),
+            combiner=("bash -c 'grep nothing | " +
+                      PYTHON_BIN +
+                      " my_job.py --step-num=0 --combiner'"),
+            reducer=("bash -c 'grep something | " +
+                     PYTHON_BIN +
+                     " my_job.py --step-num=0 --reducer'"),
         )
 
     def test_combiner_018(self):
@@ -3365,8 +3379,9 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
                     'type': 'script',
                 },
             },
-            mapper=("bash -c 'cat | sort | python my_job.py --step-num=0"
-                    " --combiner'"),
+            mapper=("bash -c 'cat | sort | " +
+                    PYTHON_BIN +
+                    " my_job.py --step-num=0 --combiner'"),
             reducer=None,
         )
 
@@ -3388,11 +3403,15 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
                     'pre_filter': 'grep something',
                 },
             },
-            mapper=("bash -c 'grep anything | python my_job.py --step-num=0"
-                    " --mapper | sort | grep nothing | python my_job.py"
-                    " --step-num=0 --combiner'"),
-            reducer=("bash -c 'grep something | python my_job.py --step-num=0"
-                    " --reducer'"),
+            mapper=("bash -c 'grep anything | " +
+                    PYTHON_BIN +
+                    " my_job.py --step-num=0"
+                    " --mapper | sort | grep nothing | " +
+                    PYTHON_BIN +
+                    " my_job.py --step-num=0 --combiner'"),
+            reducer=("bash -c 'grep something | " +
+                     PYTHON_BIN +
+                     " my_job.py --step-num=0 --reducer'"),
         )
 
     def test_pre_filter_escaping(self):
@@ -3407,8 +3426,9 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
             },
             mapper=(
                 "bash -c 'bash -c '\\''grep"
-                " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' |"
-                " python my_job.py --step-num=0 --mapper'"),
+                " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | " +
+                PYTHON_BIN +
+                " my_job.py --step-num=0 --mapper'"),
         )
 
 

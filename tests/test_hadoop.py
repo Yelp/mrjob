@@ -23,6 +23,7 @@ from subprocess import check_call
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
 from mrjob.hadoop import fully_qualify_hdfs_path
+from mrjob.py2 import IN_PY2
 from mrjob.util import bash_wrap
 from mrjob.util import shlex_split
 
@@ -36,6 +37,12 @@ from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+
+# used to match command lines
+if IN_PY2:
+    PYTHON_BIN = 'python'
+else:
+    PYTHON_BIN = 'python3'
 
 
 class TestFullyQualifyHDFSPath(TestCase):
@@ -317,10 +324,6 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
             self.runner._args_for_streaming_step(0),
             self._old_basic_args + args)
 
-    def _python_bin(self):
-        """Return 'python' or 'python3' as appropriate."""
-        return ' '.join(self.runner._opts['python_bin'])
-
     def test_basic_mapper(self):
         self._assert_streaming_step(
             {
@@ -330,7 +333,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 },
             },
             ['-mapper',
-             self._python_bin() + ' my_job.py --step-num=0 --mapper',
+             PYTHON_BIN + ' my_job.py --step-num=0 --mapper',
              '-jobconf',
              'mapred.reduce.tasks=0'])
 
@@ -345,7 +348,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
             ['-mapper',
              'cat',
              '-reducer',
-             self._python_bin() + ' my_job.py --step-num=0 --reducer'])
+             PYTHON_BIN + ' my_job.py --step-num=0 --reducer'])
 
     def test_pre_filters(self):
         self._assert_streaming_step(
@@ -365,13 +368,13 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 },
             },
             ["-mapper",
-             "bash -c 'grep anything | " + self._python_bin() +
+             "bash -c 'grep anything | " + PYTHON_BIN +
              " my_job.py --step-num=0 --mapper'",
              "-combiner",
-             "bash -c 'grep nothing | " + self._python_bin() +
+             "bash -c 'grep nothing | " + PYTHON_BIN +
              " my_job.py --step-num=0 --combiner'",
              "-reducer",
-             "bash -c 'grep something | " + self._python_bin() +
+             "bash -c 'grep something | " + PYTHON_BIN +
              " my_job.py --step-num=0 --reducer'"])
 
     def test_combiner_018(self):
@@ -387,7 +390,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 },
             },
             ["-mapper",
-             "bash -c 'cat | sort | " + self._python_bin() +
+             "bash -c 'cat | sort | " + PYTHON_BIN +
              " my_job.py --step-num=0 --combiner'",
              '-jobconf', 'mapred.reduce.tasks=0'])
 
@@ -409,12 +412,12 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 },
             },
             ['-mapper',
-             "bash -c 'grep anything | " + self._python_bin() +
+             "bash -c 'grep anything | " + PYTHON_BIN +
              " my_job.py --step-num=0"
-             " --mapper | sort | grep nothing | " + self._python_bin() +
+             " --mapper | sort | grep nothing | " + PYTHON_BIN +
              " my_job.py --step-num=0 --combiner'",
              '-reducer',
-             "bash -c 'grep something | " + self._python_bin() +
+             "bash -c 'grep something | " + PYTHON_BIN +
              " my_job.py --step-num=0 --reducer'"])
 
     def test_pre_filter_escaping(self):
@@ -430,7 +433,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
             ['-mapper',
              "bash -c 'bash -c '\\''grep"
              " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | " +
-             self._python_bin() +
+             PYTHON_BIN +
              " my_job.py --step-num=0 --mapper'",
              '-jobconf', 'mapred.reduce.tasks=0'])
 

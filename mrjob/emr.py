@@ -2027,11 +2027,12 @@ class EMRJobRunner(MRJobRunner):
 
         contents = self._master_bootstrap_script_content(
             self._bootstrap + mrjob_bootstrap + self._legacy_bootstrap)
-        for line in BytesIO(contents):
+        for line in contents:
             log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
         with open(path, 'w') as f:
-            f.write(contents)
+            for line in contents:
+                f.write(line)
 
         self._master_bootstrap_script_path = path
 
@@ -2099,10 +2100,10 @@ class EMRJobRunner(MRJobRunner):
     def _master_bootstrap_script_content(self, bootstrap):
         """Create the contents of the master bootstrap script.
         """
-        out = BytesIO()
+        out = []
 
         def writeln(line=''):
-            out.write(line + '\n')
+            out.append(line + '\n')
 
         # shebang
         sh_bin = self._opts['sh_bin']
@@ -2144,7 +2145,7 @@ class EMRJobRunner(MRJobRunner):
             writeln(line)
         writeln()
 
-        return out.getvalue()
+        return out
 
     ### EMR JOB MANAGEMENT UTILS ###
 

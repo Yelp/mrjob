@@ -65,13 +65,16 @@ def mock_ssh_file(host, path, contents):
     Returns the path of the resulting file on the filesystem for sanity
     checking.
     """
+    if not isinstance(contents, bytes):
+        raise TypeError('mock SSH file contents must be bytes')
+
     path = rel_posix_to_abs_local(host, path)
 
     basename, name = os.path.split(path)
     if not os.path.exists(basename):
         os.makedirs(basename)
 
-    with open(path, 'w') as f:
+    with open(path, 'wb') as f:
         f.write(contents)
     return path
 

@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import codecs
+from io import BytesIO
+
+from mrjob.py2 import IN_PY2
 from mrjob.py2 import StringIO
 
 from tests.sandbox import SandboxedTestCase
@@ -37,39 +41,46 @@ class MockSubprocessTestCase(SandboxedTestCase):
                 self.args = args
 
                 # ignore stdin/stdout/stderr
-                self.stdin = StringIO()
-                self.stdout = StringIO()
-                self.stderr = StringIO()
+                self.stdin = BytesIO()
+                self.stdout = BytesIO()
+                self.stderr = BytesIO()
 
                 self._run()
 
             def _run(self):
                 # pre-emptively run the "process"
-                self.returncode = func(
-                    self.stdin, self.stdout, self.stderr, self.args, env)
 
-                # store the result
-                self.stdout_result = self.stdout.getvalue()
-                self.stderr_result = self.stderr.getvalue()
+                # make fake versions of sys.stdout/stderr
+                # punting on stdin for now; tests don't care
+                stdout = self._stdwriter()
+                stderr = self._stdwriter()
+
+                self.returncode = func(
+                    self.stdin, stdout, stderr, self.args, env)
 
                 # expose the results as readable file objects
-                self.stdout = StringIO(self.stdout_result)
-                self.stderr = StringIO(self.stderr_result)
+                self.stdout = BytesIO(self._get_writer_value(stdout))
+                self.stderr = BytesIO(self._get_writer_value(stderr))
 
-            def communicate(self, stdin=None):
-                if stdin is not None:
-                    self.stdin = stdin
-                    self._run()
+            def _stdwriter(self):
+                """Make a fake stdout/err"""
+                if IN_PY2:
+                    return StringIO()
+                else:
+                    buf = BytesIO()
+                    writer = codecs.getwriter('utf_8')(buf)
+                    writer.buffer = buf
+                    return writer
 
-                # need to return bytes
-                def _to_bytes(x):
-                    if isinstance(x, bytes):
-                        return x
-                    else:
-                        return x.encode('latin_1')
+            def _get_writer_value(self, writer):
+                if IN_PY2:
+                    return writer.getvalue()
+                else:
+                    return writer.buffer.getvalue()
 
-                return (_to_bytes(self.stdout_result),
-                        _to_bytes(self.stderr_result))
+            def communicate(self, input=None):
+                # ignoring input for now
+                return self.stdout.getvalue(), self.stderr.getvalue()
 
             def wait(self):
                 return self.returncode

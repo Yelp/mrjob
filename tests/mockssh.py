@@ -163,17 +163,14 @@ def main(stdin, stdout, stderr, args, environ):
             print('No such file or directory:', local_dest, file=stderr)
             return 1
 
+        # in Python 3, binary data has to go to sys.stdout.buffer
+        stdout_buffer = getattr(stdout, 'buffer', stdout)
+
         with open(local_dest, 'rb') as f:
-            contents = f.read()
+            for line in f:
+                stdout_buffer.write(line)
 
-            if hasattr(stdout, 'buffer'):  # Python 3, real stdout
-                stdout.buffer.write(contents)
-            elif isinstance(stdout, io.StringIO):  # Python 3, fake stdout
-                stdout.write(contents.decode('latin_1'))
-            else:  # Python 2
-                stdout.write(contents)
-            return 0
-
+        return 0
 
     def run(host, remote_args, stdout, stderr, environ, slave_key_file=None):
         """Execute a command as a "host." Recursively call for slave if necessary.

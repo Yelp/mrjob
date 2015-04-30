@@ -148,7 +148,10 @@ def file_ext(path):
 def hash_object(obj):
     """Generate a hash (currently md5) of the ``repr`` of the object"""
     m = hashlib.md5()
-    m.update(repr(obj))
+    obj_repr = repr(obj)
+    if not isinstance(obj_repr, bytes):
+        obj_repr = obj_repr.encode('utf_8')
+    m.update(obj_repr)
     return m.hexdigest()
 
 

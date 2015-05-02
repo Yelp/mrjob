@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Basic tests for collect_emr_stats script"""
+from mrjob.py2 import StringIO
 from mrjob.tools.emr.collect_emr_stats import main
 from mrjob.tools.emr.collect_emr_stats import collect_active_job_flows
 from mrjob.tools.emr.collect_emr_stats import job_flows_to_stats
@@ -31,9 +32,9 @@ class CollectEMRStatsTestCase(TestCase):
         collect_active_job_flows(conf_paths=[])
 
         # check if args for calling describe_jobflows are correct
-        assert (mock_job_runner.call_count == 1)
+        self.assertEqual(mock_job_runner.call_count, 1)
         self.assertEqual(mock_job_runner.call_args_list, [call(conf_paths=[])])
-        assert (mock_describe_jobflows.call_count == 1)
+        self.assertEqual(mock_describe_jobflows.call_count, 1)
 
         # check if args for calling describe_jobflows are correct
         active_states = ['STARTING', 'BOOTSTRAPPING', 'WAITING', 'RUNNING']
@@ -61,6 +62,7 @@ class CollectEMRStatsTestCase(TestCase):
 
     @patch('mrjob.tools.emr.collect_emr_stats.job_flows_to_stats')
     @patch('mrjob.tools.emr.collect_emr_stats.collect_active_job_flows')
+    @patch('sys.stdout', StringIO())
     def test_main_no_conf(self, mock_collect_active_jobflows, mock_job_flows_to_stats):
 
         mock_collect_active_jobflows.return_value = []
@@ -68,6 +70,6 @@ class CollectEMRStatsTestCase(TestCase):
         main(['-q', '--no-conf'])
 
         # check if args for calling collect_active_jobflows are correct
-        assert (mock_collect_active_jobflows.call_count == 1)
+        self.assertEqual(mock_collect_active_jobflows.call_count, 1)
         self.assertEqual(mock_collect_active_jobflows.call_args_list, [call([])])
-        assert (mock_job_flows_to_stats.call_count == 1)
+        self.assertEqual(mock_job_flows_to_stats.call_count, 1)

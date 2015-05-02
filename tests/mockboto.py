@@ -195,9 +195,11 @@ class MockKey(object):
         return isinstance(self.read_mock_data(), MultiPartUploadCancelled)
 
     def write_mock_data(self, data):
-        # real boto allows unicode; it just UTF-8 encodes it
+        # real boto automatically UTF-8 encodes unicode, but mrjob should
+        # always pass bytes
         if not isinstance(data, bytes):
-            data = data.encode('utf_8')
+            #data = data.encode('utf_8')
+            raise TypeError('mock s3 data must be bytes')
 
         if self.name in self.bucket.mock_state():
             self.bucket.mock_state()[self.name] = (data, datetime.utcnow())

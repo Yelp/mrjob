@@ -2899,7 +2899,7 @@ class S3LockTestCase(MockEMRAndS3TestCase):
 
     def make_buckets(self):
         self.add_mock_s3_data({'locks': {
-            'expired_lock': 'x',
+            'expired_lock': b'x',
         }}, datetime.utcnow() - timedelta(minutes=30))
         self.lock_uri = 's3://locks/some_lock'
         self.expired_lock_uri = 's3://locks/expired_lock'
@@ -2948,7 +2948,7 @@ class S3LockTestCase(MockEMRAndS3TestCase):
         key2 = bucket.get_key(key_prefix)
 
         # and take the lock!
-        key2.set_contents_from_string('jf2')
+        key2.set_contents_from_string(b'jf2')
 
         self.assertFalse(_lock_acquire_step_2(key, 'jf1'), 'Lock should fail')
 

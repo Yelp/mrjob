@@ -281,7 +281,7 @@ def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
 
     if key is None or key_expired:
         key = bucket.new_key(key_prefix)
-        key.set_contents_from_string(job_name)
+        key.set_contents_from_string(job_name.encode('utf_8'))
         return key
     else:
         return None
@@ -289,7 +289,7 @@ def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
 
 def _lock_acquire_step_2(key, job_name):
     key_value = key.get_contents_as_string()
-    return (key_value == job_name)
+    return (key_value == job_name.encode('utf_8'))
 
 
 def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name,

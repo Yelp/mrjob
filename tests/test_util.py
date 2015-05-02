@@ -38,6 +38,7 @@ from mrjob.util import tar_and_gzip
 from mrjob.util import unarchive
 
 from tests.py2 import TestCase
+from tests.quiet import logger_disabled
 from tests.sandbox import random_seed
 
 
@@ -558,4 +559,5 @@ class HashObjectTestCase(TestCase):
 
     def test_works_at_all(self):
         # this was broken on Python 3
-        self.assertNotEqual(hash_object('foo'), hash_object({}))
+        with logger_disabled('mrjob.util'):
+            self.assertNotEqual(hash_object('foo'), hash_object({}))

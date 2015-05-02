@@ -1758,7 +1758,7 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
         ssh_lone_log_path = posixpath.join(
             SSH_LOG_ROOT, 'steps', '1', 'syslog')
         mock_ssh_file('testmaster', ssh_lone_log_path,
-                      HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + '\n')
+                      HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n')
 
         # Put a 'more interesting' error in S3 to make sure that the
         # 'less interesting' one from SSH is read and S3 is never
@@ -1792,7 +1792,7 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
         mock_ssh_file('testmaster!testslave0', ssh_log_path,
                       TRACEBACK_START + PY_EXCEPTION)
         mock_ssh_file('testmaster!testslave0', ssh_log_path_2,
-                      '')
+                      b'')
         failure = self.runner._find_probable_cause_of_failure([1, 2])
         self.assertEqual(failure['log_file_uri'],
                          SSH_PREFIX + 'testmaster!testslave0' + ssh_log_path)
@@ -3463,7 +3463,7 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             self.assertEqual(job_flow.steps[0].jar, jar_uri)
 
     def test_jar_on_s3(self):
-        self.add_mock_s3_data({'dubliners': {'whiskeyinthe.jar': ''}})
+        self.add_mock_s3_data({'dubliners': {'whiskeyinthe.jar': b''}})
         JAR_URI = 's3://dubliners/whiskeyinthe.jar'
 
         job = MRJustAJar(['-r', 'emr', '--jar', JAR_URI])

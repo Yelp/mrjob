@@ -27,31 +27,22 @@ from mrjob.tools.emr.audit_usage import percent
 
 from tests.mockboto import MockEmrObject
 from tests.py2 import TestCase
-from tests.test_emr import MockEMRAndS3TestCase
+from tests.tools.emr import ToolTestCase
 
 
-class AuditUsageTestCase(MockEMRAndS3TestCase):
-
-    def setUp(self):
-        super(AuditUsageTestCase, self).setUp()
-        # redirect print statements to self.stdout
-        self._real_stdout = sys.stdout
-        self.stdout = StringIO()
-        sys.stdout = self.stdout
-
-    def tearDown(self):
-        sys.stdout = self._real_stdout
-        super(AuditUsageTestCase, self).tearDown()
+class AuditUsageTestCase(ToolTestCase):
 
     def test_with_no_job_flows(self):
+        self.monkey_patch_stdout()
         main(['-q', '--no-conf'])  # just make sure it doesn't crash
 
     def test_with_one_job_flow(self):
         emr_conn = boto.emr.connection.EmrConnection()
         emr_conn.run_jobflow('no name', log_uri=None)
 
+        self.monkey_patch_stdout()
         main(['-q', '--no-conf'])
-        self.assertIn('j-MOCKJOBFLOW0', self.stdout.getvalue())
+        self.assertIn(b'j-MOCKJOBFLOW0', sys.stdout.getvalue())
 
 
 class JobFlowToFullSummaryTestCase(TestCase):

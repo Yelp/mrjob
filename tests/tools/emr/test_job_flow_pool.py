@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the job flow pooling tool"""
+import sys
 from optparse import OptionError
 
 from mrjob.emr import EMRJobRunner
@@ -61,7 +62,7 @@ class PoolingToolTestCase(ToolTestCase):
 
         pool_main()
 
-        value = self.stdout.getvalue()
+        value = sys.stdout.getvalue()
         self.assertIn('j-MOCKJOBFLOW0', value)
         self.assertIn('--\ndefault\n--', value)
 
@@ -79,7 +80,7 @@ class PoolingToolTestCase(ToolTestCase):
 
         pool_main()
 
-        value = self.stdout.getvalue()
+        value = sys.stdout.getvalue()
         self.assertIn('j-MOCKJOBFLOW0', value)
 
     def test_terminate_pool(self):
@@ -96,5 +97,5 @@ class PoolingToolTestCase(ToolTestCase):
 
         pool_main()
 
-        value = self.stdout.getvalue()
+        value = sys.stdout.getvalue()
         self.assertIn('j-MOCKJOBFLOW0', value)

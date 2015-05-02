@@ -1631,13 +1631,13 @@ class FindProbableCauseOfFailureTestCase(MockEMRAndS3TestCase):
 class CounterFetchingTestCase(MockEMRAndS3TestCase):
 
     COUNTER_LINE = (
-        'Job JOBID="job_201106092314_0001" FINISH_TIME="1307662284564"'
-        ' JOB_STATUS="SUCCESS" FINISHED_MAPS="0" FINISHED_REDUCES="0"'
-        ' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="%s" .' % ''.join([
-            '{(org\.apache\.hadoop\.mapred\.JobInProgress$Counter)',
-            '(Job Counters )',
-            '[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]}',
-    ]))
+        b'Job JOBID="job_201106092314_0001" FINISH_TIME="1307662284564"'
+        b' JOB_STATUS="SUCCESS" FINISHED_MAPS="0" FINISHED_REDUCES="0"'
+        b' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="'
+        b'{(org\.apache\.hadoop\.mapred\.JobInProgress$Counter)'
+        b'(Job Counters )'
+        b'[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]}'
+        b'" .')
 
     def setUp(self):
         super(CounterFetchingTestCase, self).setUp()
@@ -1657,7 +1657,7 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
     def test_empty_counters_running_job(self):
         self.runner._describe_jobflow().state = 'RUNNING'
         with no_handlers_for_logger():
-            stderr = BytesIO()
+            stderr = StringIO()
             log_to_stream('mrjob.emr', stderr)
             self.runner._fetch_counters([1], skip_s3_wait=True)
             self.assertIn('5 minutes', stderr.getvalue())
@@ -3130,12 +3130,12 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
 
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
-            stderr = BytesIO()
+            stderr = StringIO()
             log_to_stream('mrjob.emr', stderr)
             with patch.object(mrjob.emr, 'ssh_terminate_single_job',
                               side_effect=die_ssh):
                 r._cleanup_job()
-                self.assertIn(b'Unable to kill job', stderr.getvalue())
+                self.assertIn('Unable to kill job', stderr.getvalue())
 
     def test_job_cleanup_mechanics_io_fail(self):
         def die_io(*args, **kwargs):
@@ -3145,10 +3145,10 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             r = self._quick_runner()
             with patch.object(mrjob.emr, 'ssh_terminate_single_job',
                               side_effect=die_io):
-                stderr = BytesIO()
+                stderr = StringIO()
                 log_to_stream('mrjob.emr', stderr)
                 r._cleanup_job()
-                self.assertIn(b'Unable to kill job', stderr.getvalue())
+                self.assertIn('Unable to kill job', stderr.getvalue())
 
     def test_dont_kill_if_successful(self):
         with no_handlers_for_logger('mrjob.emr'):

@@ -397,7 +397,7 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
 
         # stderr is huge, so don't use assertIn()
         self.assertTrue(b'import mrjob' in stderr or     # Python 2
-                        br"import 'mrjob'" in stderr)  # Python 3
+                        b"import 'mrjob'" in stderr)  # Python 3
         self.assertTrue(b'#' in stderr)
 
         # should still get expected results

@@ -63,8 +63,8 @@ class PoolingToolTestCase(ToolTestCase):
         pool_main()
 
         value = sys.stdout.getvalue()
-        self.assertIn('j-MOCKJOBFLOW0', value)
-        self.assertIn('--\ndefault\n--', value)
+        self.assertIn(b'j-MOCKJOBFLOW0', value)
+        self.assertIn(b'--\ndefault\n--', value)
 
     def test_find_job_flow(self):
         jf_id = self.make_job_flow(pool_emr_job_flows=True)
@@ -81,7 +81,7 @@ class PoolingToolTestCase(ToolTestCase):
         pool_main()
 
         value = sys.stdout.getvalue()
-        self.assertIn('j-MOCKJOBFLOW0', value)
+        self.assertIn(b'j-MOCKJOBFLOW0', value)
 
     def test_terminate_pool(self):
         jf_id = self.make_job_flow(pool_emr_job_flows=True)
@@ -98,4 +98,4 @@ class PoolingToolTestCase(ToolTestCase):
         pool_main()
 
         value = sys.stdout.getvalue()
-        self.assertIn('j-MOCKJOBFLOW0', value)
+        self.assertIn(b'j-MOCKJOBFLOW0', value)

@@ -1,4 +1,5 @@
 # Copyright 2009-2012 Yelp
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@ from io import BytesIO
 from mrjob.py2 import IN_PY2
 from mrjob.py2 import StringIO
 
+from tests.py2 import mock_stdout_or_stderr
 from tests.sandbox import SandboxedTestCase
 
 
@@ -52,31 +54,15 @@ class MockSubprocessTestCase(SandboxedTestCase):
 
                 # make fake versions of sys.stdout/stderr
                 # punting on stdin for now; tests don't care
-                stdout = self._stdwriter()
-                stderr = self._stdwriter()
+                stdout = mock_stdout_or_stderr()
+                stderr = mock_stdout_or_stderr()
 
                 self.returncode = func(
                     self.stdin, stdout, stderr, self.args, env)
 
                 # expose the results as readable file objects
-                self.stdout = BytesIO(self._get_writer_value(stdout))
-                self.stderr = BytesIO(self._get_writer_value(stderr))
-
-            def _stdwriter(self):
-                """Make a fake stdout/err"""
-                if IN_PY2:
-                    return StringIO()
-                else:
-                    buf = BytesIO()
-                    writer = codecs.getwriter('utf_8')(buf)
-                    writer.buffer = buf
-                    return writer
-
-            def _get_writer_value(self, writer):
-                if IN_PY2:
-                    return writer.getvalue()
-                else:
-                    return writer.buffer.getvalue()
+                self.stdout = BytesIO(stdout.getvalue())
+                self.stderr = BytesIO(stderr.getvalue())
 
             def communicate(self, input=None):
                 # ignoring input for now

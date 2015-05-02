@@ -12,35 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import sys
+from io import BytesIO
 
 from mrjob.emr import EMRJobRunner
+from mrjob.py2 import IN_PY2
 from mrjob.py2 import StringIO
 
+from tests.py2 import mock_stdout_or_stderr
+from tests.py2 import patch
 from tests.test_emr import MockEMRAndS3TestCase
 
 
 class ToolTestCase(MockEMRAndS3TestCase):
 
-    def setUp(self):
-        super(ToolTestCase, self).setUp()
-        self._original_argv = sys.argv
-        self._original_stdout = sys.stdout
-        self.stdout = StringIO()
-        self.stderr = StringIO()
-
-    def tearDown(self):
-        super(ToolTestCase, self).tearDown()
-        sys.argv = self._original_argv
-        sys.stdout = self._original_stdout
-
     def monkey_patch_argv(self, *args):
-        sys.argv = [sys.argv[0]] + list(args)
+        p = patch('sys.argv', [sys.argv[0]] + list(args))
+        self.addCleanup(p.stop)
+        p.start()
 
     def monkey_patch_stdout(self):
-        sys.stdout = self.stdout
+        p = patch('sys.stdout', mock_stdout_or_stderr())
+        self.addCleanup(p.stop)
+        p.start()
 
     def monkey_patch_stderr(self):
-        sys.stderr = self.stderr
+        p = patch('sys.stderr', mock_stdout_or_stderr())
+        self.addCleanup(p.stop)
+        p.start()
 
     def make_job_flow(self, **kwargs):
         self.add_mock_s3_data({'walrus': {}})

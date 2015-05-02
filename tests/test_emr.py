@@ -42,6 +42,7 @@ from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import pool_hash_and_name
 from mrjob.py2 import IN_PY2
+from mrjob.py2 import StringIO
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
 from mrjob.util import bash_wrap
@@ -262,7 +263,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
     def test_end_to_end(self):
         # read from STDIN, a local file, and a remote file
-        stdin = BytesIO(b'foo\nbar\n')
+        stdin = StringIO(b'foo\nbar\n')
 
         local_input_path = os.path.join(self.tmp_dir, 'input')
         with open(local_input_path, 'w') as local_input_file:
@@ -364,7 +365,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
 
         with no_handlers_for_logger('mrjob.emr'):
-            stderr = BytesIO()
+            stderr = StringIO()
             log_to_stream('mrjob.emr', stderr)
 
             with mr_job.make_runner() as runner:
@@ -394,7 +395,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
     def _test_remote_scratch_cleanup(self, mode, scratch_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': b'1\n'}})
-        stdin = BytesIO(b'foo\nbar\n')
+        stdin = StringIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '--s3-log-uri', 's3://walrus/logs',
@@ -449,7 +450,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
     def test_args_version_018(self):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': b'1\n'}})
         # read from STDIN, a local file, and a remote file
-        stdin = BytesIO(b'foo\nbar\n')
+        stdin = StringIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '--hadoop-version=0.18', '--ami-version=1.0'])
@@ -466,7 +467,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
     def test_args_version_020_205(self):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': b'1\n'}})
         # read from STDIN, a local file, and a remote file
-        stdin = BytesIO(b'foo\nbar\n')
+        stdin = StringIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--ami-version=2.0'])
         mr_job.sandbox(stdin=stdin)
@@ -539,7 +540,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
             name='Development Job Flow', log_uri=None,
             keep_alive=True)
 
-        stdin = BytesIO(b'foo\nbar\n')
+        stdin = StringIO(b'foo\nbar\n')
         self.mock_emr_output = {(emr_job_flow_id, 1): [
             '1\t"bar"\n1\t"foo"\n2\tnull\n']}
 
@@ -623,7 +624,7 @@ class IAMTestCase(MockEMRAndS3TestCase):
         p_iam.start()
 
     def run_and_get_job_flow(self, *args):
-        stdin = BytesIO(b'foo\nbar\n')
+        stdin = StringIO(b'foo\nbar\n')
         mr_job = MRTwoStepJob(
             ['-r', 'emr', '-v'] + list(args))
         mr_job.sandbox(stdin=stdin)
@@ -961,7 +962,7 @@ class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
     def test_region_bucket_does_not_match(self):
         # aws_region specified, bucket specified with incorrect location
         with no_handlers_for_logger():
-            stderr = BytesIO()
+            stderr = StringIO()
             log = logging.getLogger('mrjob.emr')
             log.addHandler(logging.StreamHandler(stderr))
             log.setLevel(logging.WARNING)
@@ -1336,7 +1337,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
             task=(20, 'c1.medium', None))
 
     def test_mixing_instance_number_opts_on_cmd_line(self):
-        stderr = BytesIO()
+        stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.emr', stderr)
             self._test_instance_groups(
@@ -1352,7 +1353,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
                                num_ec2_core_instances=5,
                                num_ec2_task_instances=9)
 
-        stderr = BytesIO()
+        stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.emr', stderr)
             self._test_instance_groups(
@@ -1367,7 +1368,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self.set_in_mrjob_conf(num_ec2_core_instances=5,
                                num_ec2_task_instances=9)
 
-        stderr = BytesIO()
+        stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.emr', stderr)
             self._test_instance_groups(

@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import hashlib
 import logging
 import os
 import os.path
@@ -117,7 +117,6 @@ from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.util import cmd_line
-from mrjob.util import hash_object
 from mrjob.util import shlex_split
 
 
@@ -2027,11 +2026,12 @@ class EMRJobRunner(MRJobRunner):
 
         contents = self._master_bootstrap_script_content(
             self._bootstrap + mrjob_bootstrap + self._legacy_bootstrap)
-        for line in BytesIO(contents):
+        for line in contents:
             log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
         with open(path, 'w') as f:
-            f.write(contents)
+            for line in contents:
+                f.write(line)
 
         self._master_bootstrap_script_path = path
 
@@ -2099,10 +2099,10 @@ class EMRJobRunner(MRJobRunner):
     def _master_bootstrap_script_content(self, bootstrap):
         """Create the contents of the master bootstrap script.
         """
-        out = BytesIO()
+        out = []
 
         def writeln(line=''):
-            out.write(line + '\n')
+            out.append(line + '\n')
 
         # shebang
         sh_bin = self._opts['sh_bin']
@@ -2144,7 +2144,7 @@ class EMRJobRunner(MRJobRunner):
             writeln(line)
         writeln()
 
-        return out.getvalue()
+        return out
 
     ### EMR JOB MANAGEMENT UTILS ###
 
@@ -2450,7 +2450,14 @@ class EMRJobRunner(MRJobRunner):
 
         if self._opts['bootstrap_mrjob']:
             things_to_hash.append(mrjob.__version__)
-        return hash_object(things_to_hash)
+
+        things_json = json.dumps(things_to_hash, sort_keys=True)
+        if not isinstance(things_json, bytes):
+            things_json = things_json.encode('utf_8')
+
+        m = hashlib.md5()
+        m.update(things_json)
+        return m.hexdigest()
 
     ### EMR-specific Stuff ###
 

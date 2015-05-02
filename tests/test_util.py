@@ -28,6 +28,7 @@ from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import file_ext
+from mrjob.util import hash_object
 from mrjob.util import parse_and_save_options
 from mrjob.util import read_file
 from mrjob.util import read_input
@@ -37,6 +38,7 @@ from mrjob.util import tar_and_gzip
 from mrjob.util import unarchive
 
 from tests.py2 import TestCase
+from tests.quiet import logger_disabled
 from tests.sandbox import random_seed
 
 
@@ -473,8 +475,9 @@ class ReadFileTestCase(TestCase):
             input_file.write(b'bar\nfoo\n')
 
         output = []
-        for line in read_file(input_path, fileobj=open(input_path, 'rb')):
-            output.append(line)
+        with open(input_path, 'rb') as f:
+            for line in read_file(input_path, fileobj=f):
+                output.append(line)
 
         self.assertEqual(output, [b'bar\n', b'foo\n'])
 
@@ -550,3 +553,11 @@ class ReadFileTestCase(TestCase):
                 output.append(line)
 
         self.assertEqual(output, [b'bar\n', b'bar\n', b'foo\n'])
+
+
+class HashObjectTestCase(TestCase):
+
+    def test_works_at_all(self):
+        # this was broken on Python 3
+        with logger_disabled('mrjob.util'):
+            self.assertNotEqual(hash_object('foo'), hash_object({}))

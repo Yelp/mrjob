@@ -15,10 +15,7 @@
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-from collections import defaultdict
 import contextlib
-from copy import deepcopy
-from datetime import timedelta
 import glob
 import hashlib
 import itertools
@@ -30,6 +27,10 @@ import sys
 import tarfile
 import zipfile
 import zlib
+from collections import defaultdict
+from copy import deepcopy
+from datetime import timedelta
+from logging import getLogger
 
 try:
     import bz2
@@ -39,6 +40,8 @@ except ImportError:
 
 #: .. deprecated:: 0.4
 is_ironpython = "IronPython" in sys.version
+
+log = getLogger(__name__)
 
 
 class NullHandler(logging.Handler):
@@ -146,9 +149,16 @@ def file_ext(path):
 
 
 def hash_object(obj):
-    """Generate a hash (currently md5) of the ``repr`` of the object"""
+    """Generate a hash (currently md5) of the ``repr`` of the object.
+
+    .. deprecated:: 0.4.5
+    """
+    log.warning('hash_object() is deprecated and will be removed in v0.5')
     m = hashlib.md5()
-    m.update(repr(obj))
+    obj_repr = repr(obj)
+    if not isinstance(obj_repr, bytes):
+        obj_repr = obj_repr.encode('utf_8')
+    m.update(obj_repr)
     return m.hexdigest()
 
 

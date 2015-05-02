@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import hashlib
 import logging
 import os
 import os.path
@@ -117,7 +117,6 @@ from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.util import cmd_line
-from mrjob.util import hash_object
 from mrjob.util import shlex_split
 
 
@@ -2452,9 +2451,13 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['bootstrap_mrjob']:
             things_to_hash.append(mrjob.__version__)
 
-        # TODO: this depends on repr, so hash may not agree between
-        # Python 2 and Python 3. Probably better to just hash a JSON.
-        return hash_object(things_to_hash)
+        things_json = json.dumps(things_to_hash, sort_keys=True)
+        if not isinstance(things_json, bytes):
+            things_json = things_json.encode('utf_8')
+
+        m = hashlib.md5()
+        m.update(things_json)
+        return m.hexdigest()
 
     ### EMR-specific Stuff ###
 

@@ -1965,11 +1965,11 @@ class TestSSHLs(MockEMRAndS3TestCase):
         self.add_slave()
 
         mock_ssh_dir('testmaster', 'test')
-        mock_ssh_file('testmaster', posixpath.join('test', 'one'), '')
-        mock_ssh_file('testmaster', posixpath.join('test', 'two'), '')
+        mock_ssh_file('testmaster', posixpath.join('test', 'one'), b'')
+        mock_ssh_file('testmaster', posixpath.join('test', 'two'), b'')
         mock_ssh_dir('testmaster!testslave0', 'test')
         mock_ssh_file('testmaster!testslave0',
-                      posixpath.join('test', 'three'), '')
+                      posixpath.join('test', 'three'), b'')
 
         self.assertEqual(
             sorted(self.runner.ls('ssh://testmaster/test')),
@@ -3040,14 +3040,14 @@ class TestCatFallback(MockEMRAndS3TestCase):
 
     def test_s3_cat(self):
         self.add_mock_s3_data(
-            {'walrus': {'one': 'one_text',
-                        'two': 'two_text',
-                        'three': 'three_text'}})
+            {'walrus': {'one': b'one_text',
+                        'two': b'two_text',
+                        'three': b'three_text'}})
 
         runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
                               conf_paths=[])
 
-        self.assertEqual(list(runner.cat('s3://walrus/one')), ['one_text\n'])
+        self.assertEqual(list(runner.cat('s3://walrus/one')), [b'one_text\n'])
 
     def test_ssh_cat(self):
         runner = EMRJobRunner(conf_paths=[])

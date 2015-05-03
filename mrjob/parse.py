@@ -24,6 +24,7 @@ from io import BytesIO
 from mrjob.compat import uses_020_counters
 from mrjob.py2 import IN_PY2
 from mrjob.py2 import ParseResult
+from mrjob.py2 import to_string
 from mrjob.py2 import urlparse as urlparse_buggy
 
 try:
@@ -169,31 +170,6 @@ def parse_key_value_list(kv_string_list, error_fmt, error_func):
 
 _HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.(){}[\]"\\])')
 
-def _to_string(s):
-    """On Python 3, convert ``bytes`` to ``str`` (i.e. unicode).
-
-    (In Python 2, either ``str`` or ``unicode`` is acceptable as a string.)
-
-    Why this exists: we're going to need to print/log information about
-    stacktraces, counters, etc., which means on Python 3 we need these
-    things to be strings (unicode), not bytes.
-
-    We *suspect* that most logs we encounter will be UTF-8 encoded (if not just
-    plain ASCII), but we don't want log parsing to crash in Python 3. So we
-    first try decoding in UTF-8, but fall back to latin-1.
-    """
-    if not isinstance(s, (bytes, str)):
-        raise TypeError
-
-    if IN_PY2 or isinstance(s, str):
-        return s
-
-    try:
-        return s.decode('utf_8')
-    except UnicodeDecodeError:
-        return s.decode('latin_1')
-
-
 def counter_unescape(escaped_string):
     """Fix names of counters and groups emitted by Hadoop 0.20+ logs, which
     use escape sequences for more characters than most decoders know about
@@ -239,7 +215,7 @@ def find_python_traceback(lines):
 
     for line in lines:
         # don't return bytes in Python 3
-        line = _to_string(line)
+        line = to_string(line)
 
         if in_traceback:
             tb_lines.append(line)
@@ -302,7 +278,7 @@ def find_hadoop_java_stack_trace(lines):
                     if not line.startswith(b'        at '):
                         break
                     st_lines.append(line)
-                return [_to_string(line) for line in st_lines]
+                return [to_string(line) for line in st_lines]
     else:
         return None
 
@@ -325,7 +301,7 @@ def find_input_uri_for_mapper(lines):
     for line in lines:
         match = _OPENING_FOR_READING_RE.match(line)
         if match:
-            val = _to_string(match.group(1))
+            val = to_string(match.group(1))
     return val
 
 
@@ -350,7 +326,7 @@ def find_interesting_hadoop_streaming_error(lines):
             _HADOOP_STREAMING_ERROR_RE.match(line) or
             _HADOOP_STREAMING_ERROR_RE_2.match(line))
         if match:
-            msg = _to_string(match.group(1))
+            msg = to_string(match.group(1))
             if msg != 'Job not Successful!':
                 return msg
     return None
@@ -403,7 +379,7 @@ def find_job_log_multiline_error(lines):
                     if line.strip() == b'"':
                         break
                     st_lines.append(line)
-                return [_to_string(line) for line in st_lines]
+                return [to_string(line) for line in st_lines]
     return None
 
 
@@ -468,8 +444,8 @@ def parse_mr_job_stderr(stderr, counters=None):
             group, counter, amount_str = m.groups()
 
             # don't leave these as bytes on Python 3
-            group = _to_string(group)
-            counter = _to_string(counter)
+            group = to_string(group)
+            counter = to_string(counter)
 
             counters.setdefault(group, {})
             counters[group].setdefault(counter, 0)
@@ -479,10 +455,10 @@ def parse_mr_job_stderr(stderr, counters=None):
         m = _STATUS_RE.match(line.rstrip(b'\r\n'))
         if m:
             # don't leave as bytes on Python 3
-            statuses.append(_to_string(m.group(1)))
+            statuses.append(to_string(m.group(1)))
             continue
 
-        other.append(_to_string(line))
+        other.append(to_string(line))
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
 
@@ -539,8 +515,8 @@ def _parse_counters_0_18(counter_string):
         log.warning('Cannot parse Hadoop counter string: %s' % counter_string)
 
     for m in groups:
-        yield (_to_string(m.group('group')),
-               _to_string(m.group('name')),
+        yield (to_string(m.group('group')),
+               to_string(m.group('name')),
                int(m.group('value')))
 
 
@@ -558,14 +534,14 @@ def _parse_counters_0_20(counter_string):
             group_name = counter_unescape(group_name)
         except ValueError:
             log.warning("Could not decode group name %r" % group_name)
-            group_name = _to_string(group_name)
+            group_name = to_string(group_name)
 
         for counter_id, counter_name, counter_value in matches:
             try:
                 counter_name = counter_unescape(counter_name)
             except ValueError:
                 log.warning("Could not decode counter name %r" % counter_name)
-                counter_name = _to_string(counter_name)
+                counter_name = to_string(counter_name)
 
             yield group_name, counter_name, int(counter_value)
 

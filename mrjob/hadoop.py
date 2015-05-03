@@ -42,7 +42,7 @@ from mrjob.logparsers import HADOOP_JOB_LOG_URI_RE
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import best_error_from_logs
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
-from mrjob.parse import _to_string
+from mrjob.py2 import to_string
 from mrjob.parse import is_uri
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
@@ -326,7 +326,7 @@ class HadoopJobRunner(MRJobRunner):
 
                 # there shouldn't be much output to STDOUT
                 for line in step_proc.stdout:
-                    log.error('STDOUT: ' + _to_string(line.strip(b'\n')))
+                    log.error('STDOUT: ' + to_string(line.strip(b'\n')))
 
                 returncode = step_proc.wait()
             else:
@@ -388,7 +388,7 @@ class HadoopJobRunner(MRJobRunner):
 
         for line in treat_eio_as_eof(stderr):
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
-            log.info('HADOOP: ' + _to_string(line))
+            log.info('HADOOP: ' + to_string(line))
 
             if b'Streaming Job Failed!' in line:
                 raise Exception(line)

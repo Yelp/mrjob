@@ -61,6 +61,9 @@ We don't provide a ``unicode`` constant:
 - To convert ``bytes`` to ``unicode``, use ``.decode('utf_8')`.
 - Python 3.3+ has ``u''`` literals; please use sparingly
 
+If you need to convert bytes of unknown encoding to a "string" (e.g.
+to ``print()`` or log them), you can use ``to_string()``.
+
 Iterables
 ---------
 
@@ -145,3 +148,23 @@ if IN_PY2:
 else:
     xrange = range
 xrange
+
+
+def to_string(s):
+    """On Python 3, convert ``bytes`` to ``str`` (i.e. unicode).
+
+    (In Python 2, either ``str`` or ``unicode`` is acceptable as a string.)
+
+    Use this if you need to ``print()`` or log bytes of an unknown encoding,
+    or to parse strings out of bytes of unknown encoding (e.g. a log file).
+    """
+    if not isinstance(s, (bytes, str)):
+        raise TypeError
+
+    if IN_PY2 or isinstance(s, str):
+        return s
+
+    try:
+        return s.decode('utf_8')
+    except UnicodeDecodeError:
+        return s.decode('latin_1')

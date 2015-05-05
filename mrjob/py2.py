@@ -85,13 +85,10 @@ dictionary when you don't need a list is best practice, but it's also (in most
 cases) an over-optimization. We'd prefer clean code; just use ``.items()``
 and ``.values()``.
 
-If you *do* every need that extra efficiency ``for k in some_dict`` does not
-create a list in either version of Python, and you for performance-critical
-code, it's fine to write custom code for each Python version (use ``PY2``
-from this module to check which version you're in).
+If you *do* have concerns about memory usage, ``for k in some_dict`` does not
+create a list in either version of Python.
 
-Same goes for ``xrange``; just use ``range`` (this module provides ``xrange``
-solely to support ``ReprProtocol``).
+Same goes for ``xrange``; just use ``range``.
 
 Miscellany
 ----------
@@ -152,15 +149,6 @@ unquote
 urlopen
 urlparse
 ParseResult
-
-# ``xrange``, for ``ReprProtocol``
-#
-# Please just use ``range`` unless you really need the optimization.
-if PY2:
-    xrange = xrange
-else:
-    xrange = range
-xrange
 
 
 def to_text(s):

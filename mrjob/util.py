@@ -38,6 +38,9 @@ try:
 except ImportError:
     bz2 = None
 
+from mrjob.py2 import PY2
+
+
 #: .. deprecated:: 0.4
 is_ironpython = "IronPython" in sys.version
 
@@ -620,11 +623,17 @@ def safeeval(expr, globals=None, locals=None):
     values for those names (just like in :py:func:`eval`).
     """
     # blank out builtins, but keep None, True, and False
-    safe_globals = {'__builtins__': None, 'True': True, 'False': False,
-                    'None': None, 'set': set}
+    safe_globals = {
+        'False': False,
+        'None': None,
+        'True': True,
+        '__builtin__': None,
+        '__builtins__': None,
+        'set': set
+    }
 
     # xrange is range in Python 3
-    if hasattr(__builtins__, 'xrange'):
+    if PY2:
         safe_globals['xrange'] = xrange
     else:
         safe_globals['range'] = range

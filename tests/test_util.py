@@ -24,6 +24,7 @@ import tarfile
 import tempfile
 
 from mrjob.aws import random_identifier
+from mrjob.py2 import PY2
 from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
@@ -265,9 +266,6 @@ class SafeEvalTestCase(TestCase):
 
     def test_simple_data_structure(self):
         # try unrepr-ing a bunch of simple data structures
-
-
-
         for x in True, None, 1, range(5), {'foo': False, 'bar': 2}:
             self.assertEqual(x, safeeval(repr(x)))
 
@@ -281,6 +279,17 @@ class SafeEvalTestCase(TestCase):
         self.assertEqual(
             abs(a),
             safeeval('abs(a)', globals={'abs': abs}, locals={'a': a}))
+
+    def test_range_type(self):
+        if PY2:
+            # on Python 2, the range type is called xrange, and doesn't
+            # support equality
+            self.assertEqual(repr(safeeval('xrange(3)')), 'xrange(3)')
+        else:
+            self.assertEqual(safeeval('range(3)'), range(3))
+            # in Python 3, the repr includes the range start
+            self.assertEqual(repr(safeeval('range(0, 3)')), 'range(0, 3)')
+
 
 
 class ArchiveTestCase(TestCase):

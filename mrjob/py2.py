@@ -38,7 +38,7 @@ These things should always be bytes:
 
 Instead of using ``StringIO`` to deal with these, use ``io.BytesIO``.
 
-Not that both Python 2.6+ and Python 3.3+ have the ``bytes`` type and
+Note that both Python 2.6+ and Python 3.3+ have the ``bytes`` type and
 ``b''`` constants built-in.
 
 These things should always be text:

@@ -419,8 +419,8 @@ def parse_mr_job_stderr(stderr, counters=None):
     """Parse counters and status messages out of MRJob output.
 
     :param stderr: a filehandle, a list of lines (bytes), or bytes
-    :param counters: Counters so far, to update; a map from group (str) to
-                     counter name (str) to count.
+    :param counters: Counters so far, to update; a map from group (string to
+                     counter name (string) to count.
 
     Returns a dictionary with the keys *counters*, *statuses*, *other*:
 

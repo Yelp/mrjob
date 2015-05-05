@@ -39,7 +39,7 @@ import posixpath
 import re
 
 from mrjob.parse import is_uri
-from mrjob.py2 import basestring
+from mrjob.py2 import string_types
 from mrjob.util import expand_path
 
 
@@ -121,7 +121,7 @@ def parse_setup_cmd(cmd):
                       m.group('colon_or_equals'))
 
         if keep_as_is:
-            if tokens and isinstance(tokens[-1], basestring):
+            if tokens and isinstance(tokens[-1], string_types):
                 tokens[-1] += keep_as_is
             else:
                 tokens.append(keep_as_is)
@@ -422,7 +422,7 @@ class WorkingDirManager(object):
         if name is None:
             return
 
-        if not isinstance(name, basestring):
+        if not isinstance(name, string_types):
             raise TypeError('name must be a string or None: %r' % (name,))
 
         if '/' in name:

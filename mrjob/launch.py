@@ -35,7 +35,7 @@ from mrjob.options import add_runner_opts
 from mrjob.options import print_help_for_groups
 from mrjob.parse import parse_key_value_list
 from mrjob.parse import parse_port_range_list
-from mrjob.py2 import IN_PY2
+from mrjob.py2 import PY2
 from mrjob.runner import CLEANUP_CHOICES
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
@@ -116,7 +116,7 @@ class MRJobLauncher(object):
         # See sandbox(), below.
         #
         # These should always read/write bytes, not unicode
-        if IN_PY2:
+        if PY2:
             self.stdin = sys.stdin
             self.stdout = sys.stdout
             self.stderr = sys.stderr

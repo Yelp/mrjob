@@ -102,7 +102,7 @@ from mrjob.parse import iso8601_to_timestamp
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
-from mrjob.py2 import basestring
+from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
 from mrjob.retry import RetryGoRound
 from mrjob.runner import MRJobRunner
@@ -626,7 +626,7 @@ class EMRJobRunner(MRJobRunner):
                 if isinstance(maybe_path_dict, dict):
                     self._bootstrap_dir_mgr.add(**maybe_path_dict)
 
-        if not (isinstance(self._opts['additional_emr_info'], basestring) or
+        if not (isinstance(self._opts['additional_emr_info'], string_types) or
                 self._opts['additional_emr_info'] is None):
             self._opts['additional_emr_info'] = json.dumps(
                 self._opts['additional_emr_info'])
@@ -2080,7 +2080,7 @@ class EMRJobRunner(MRJobRunner):
                 "bootstrap_cmds is deprecated since v0.4.2 and will be"
                 " removed in v0.6.0. Consider using bootstrap instead.")
         for cmd in self._opts['bootstrap_cmds']:
-            if not isinstance(cmd, basestring):
+            if not isinstance(cmd, string_types):
                 cmd = cmd_line(cmd)
             bootstrap.append([cmd])
 

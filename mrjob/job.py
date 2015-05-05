@@ -40,8 +40,8 @@ from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
-from mrjob.py2 import basestring
-from mrjob.py2 import long
+from mrjob.py2 import integer_types
+from mrjob.py2 import string_types
 from mrjob.util import read_input
 
 
@@ -403,13 +403,13 @@ class MRJob(MRJobLauncher):
         with semicolons (commas confuse Hadoop streaming).
         """
         # don't allow people to pass in floats
-        if not isinstance(amount, (int, long)):
+        if not isinstance(amount, integer_types):
             raise TypeError('amount must be an integer, not %r' % (amount,))
 
         # cast non-strings to strings (if people pass in exceptions, etc)
-        if not isinstance(group, basestring):
+        if not isinstance(group, string_types):
             group = str(group)
-        if not isinstance(counter, basestring):
+        if not isinstance(counter, string_types):
             counter = str(counter)
 
         # Extra commas screw up hadoop and there's no way to escape them. So

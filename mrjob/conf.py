@@ -34,7 +34,7 @@ try:
 except ImportError:
     yaml = None
 
-from mrjob.py2 import basestring
+from mrjob.py2 import string_types
 from mrjob.util import expand_path
 from mrjob.util import shlex_split
 
@@ -193,7 +193,7 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
     inherited = []
     if conf.get('include', None):
         includes = conf['include']
-        if isinstance(includes, basestring):
+        if isinstance(includes, string_types):
             includes = [includes]
 
         for include in includes:
@@ -297,7 +297,7 @@ def combine_cmds(*cmds):
 
     if cmd is None:
         return None
-    elif isinstance(cmd, basestring):
+    elif isinstance(cmd, string_types):
         return shlex_split(cmd)
     else:
         return list(cmd)

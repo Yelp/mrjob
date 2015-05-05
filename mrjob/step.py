@@ -15,7 +15,7 @@
 # limitations under the License.
 import logging
 
-from mrjob.py2 import basestring
+from mrjob.py2 import string_types
 from mrjob.util import cmd_line
 
 
@@ -159,7 +159,7 @@ class MRStep(object):
     def _render_substep(self, cmd_key, pre_filter_key=None):
         if self._steps[cmd_key]:
             cmd = self._steps[cmd_key]
-            if not isinstance(cmd, basestring):
+            if not isinstance(cmd, string_types):
                 cmd = cmd_line(cmd)
             if (pre_filter_key and self._steps[pre_filter_key]):
                 raise ValueError('Cannot specify both %s and %s' % (

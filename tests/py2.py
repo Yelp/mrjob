@@ -10,7 +10,7 @@ import codecs
 import sys
 from io import BytesIO
 
-from mrjob.py2 import IN_PY2
+from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 
 # unittest2 is a backport of unittest in Python 2.7
@@ -23,7 +23,7 @@ TestCase = unittest.TestCase
 TestCase  # quiet pyflakes
 
 # mock is built into unittest in Python 3
-if IN_PY2:
+if PY2:
     import mock
 else:
     from unittest import mock
@@ -56,7 +56,7 @@ def mock_stdout_or_stderr():
     In either case, you can get the mock output (as bytes) by calling
     getvalue().
     """
-    if IN_PY2:
+    if PY2:
         return StringIO()
 
     buf = BytesIO()

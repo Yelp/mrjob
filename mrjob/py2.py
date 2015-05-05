@@ -52,7 +52,7 @@ Use the ``StringIO`` from this module to deal with strings (it's
 Please use ``%`` for format strings and not ``format()``, which is much more
 picky about mixing unicode and bytes.
 
-This module provides a ``basestring`` type so you can check if something
+This module provides a ``string_types`` tuple so you can check if something
 is a "string".
 
 We don't provide a ``unicode`` constant:
@@ -74,7 +74,7 @@ and ``.values()``.
 
 If you *do* every need that extra efficiency ``for k in some_dict`` does not
 create a list in either version of Python, and you for performance-critical
-code, it's fine to write custom code for each Python version (use ``IN_PY2``
+code, it's fine to write custom code for each Python version (use ``PY2``
 from this module to check which version you're in).
 
 Same goes for ``xrange``; just use ``range`` (this module provides ``xrange``
@@ -83,8 +83,8 @@ solely to support ``ReprProtocol``).
 Miscellany
 ----------
 
-We provide a ``long`` type (aliased to ``int`` on Python 3) so you can
-check if something is an integer: ``isinstance(..., (int, long))``.
+We provide an ``integer_types`` tuple so you can check if something is an
+integer: ``isinstance(..., integer_types)``.
 
 Any standard library function that deals with URLs (e.g. ``urlparse()``) should
 probably be imported from this module.
@@ -98,31 +98,31 @@ You shouldn't need any other ``__future__`` imports.
 import sys
 
 # use this to check if we're in Python 2
-IN_PY2 = (sys.version_info[0] == 2)
+PY2 = (sys.version_info[0] == 2)
 
-# ``basestring``, for ``isinstance(..., basestring)``
-if IN_PY2:
-    basestring = basestring
+# ``string_types``, for ``isinstance(..., string_types)``
+if PY2:
+    string_types = (basestring,)
 else:
-    basestring = str
-basestring
+    string_types = (str,)
+string_types
 
-# ``long``, for ``isinstance(..., (int, long))``
-if IN_PY2:
-    long = long
+# ``integer_types``, for ``isinstance(..., integer_types)``
+if PY2:
+    integer_types = (int, long)
 else:
-    long = int
-long
+    integer_types = (int,)
+integer_types
 
 # ``StringIO``. Useful for mocking out ``sys.stdout``, etc.
-if IN_PY2:
+if PY2:
     from StringIO import StringIO
 else:
     from io import StringIO
 StringIO  # quiet, pyflakes
 
 # urlparse() (in most cases you should use ``mrjob.parse.urlparse()``)
-if IN_PY2:
+if PY2:
     from urllib import quote
     from urllib import unquote
     from urllib2 import urlopen
@@ -143,7 +143,7 @@ ParseResult
 # ``xrange``, for ``ReprProtocol``
 #
 # Please just use ``range`` unless you really need the optimization.
-if IN_PY2:
+if PY2:
     xrange = xrange
 else:
     xrange = range
@@ -161,7 +161,7 @@ def to_string(s):
     if not isinstance(s, (bytes, str)):
         raise TypeError
 
-    if IN_PY2 or isinstance(s, str):
+    if PY2 or isinstance(s, str):
         return s
 
     try:

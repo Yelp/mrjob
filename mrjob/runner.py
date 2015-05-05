@@ -51,8 +51,8 @@ from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.local import LocalFilesystem
-from mrjob.py2 import IN_PY2
-from mrjob.py2 import basestring
+from mrjob.py2 import PY2
+from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
@@ -202,7 +202,7 @@ class RunnerOptionStore(OptionStore):
         # old API accepts strings for cleanup
         # new API wants lists
         for opt_key in ('cleanup', 'cleanup_on_failure'):
-            if isinstance(self[opt_key], basestring):
+            if isinstance(self[opt_key], string_types):
                 self[opt_key] = [self[opt_key]]
 
         def validate_cleanup(error_str, opt_list):
@@ -231,7 +231,7 @@ class RunnerOptionStore(OptionStore):
         """
         if local and sys.executable:
             return [sys.executable]
-        elif IN_PY2:
+        elif PY2:
             return ['python']
         else:
             # e.g. python3
@@ -405,7 +405,7 @@ class MRJobRunner(object):
 
         # Where to read input from (log files, etc.)
         self._input_paths = input_paths or ['-']  # by default read from stdin
-        if IN_PY2:
+        if PY2:
             self._stdin = stdin or sys.stdin
         else:
             self._stdin = stdin or sys.stdin.buffer
@@ -973,7 +973,7 @@ class MRJobRunner(object):
                 " in v0.6.0. Consider using setup instead.")
 
         for cmd in self._opts['setup_cmds']:
-            if not isinstance(cmd, basestring):
+            if not isinstance(cmd, string_types):
                 cmd = cmd_line(cmd)
             setup.append([cmd])
 

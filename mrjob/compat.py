@@ -19,7 +19,7 @@ from distutils.version import LooseVersion
 import logging
 import os
 
-from mrjob.py2 import basestring
+from mrjob.py2 import string_types
 
 # lists alternative names for jobconf variables
 # full listing thanks to translation table in
@@ -674,10 +674,10 @@ def uses_generic_jobconf(version):
 def version_gte(version, cmp_version_str):
     """Return ``True`` if version >= *cmp_version_str*."""
 
-    if not isinstance(version, basestring):
+    if not isinstance(version, string_types):
         raise TypeError('%r is not a string' % version)
 
-    if not isinstance(cmp_version_str, basestring):
+    if not isinstance(cmp_version_str, string_types):
         raise TypeError('%r is not a string' % cmp_version_str)
 
     return LooseVersion(version) >= LooseVersion(cmp_version_str)

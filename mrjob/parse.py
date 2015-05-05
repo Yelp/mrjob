@@ -22,7 +22,7 @@ import time
 from io import BytesIO
 
 from mrjob.compat import uses_020_counters
-from mrjob.py2 import IN_PY2
+from mrjob.py2 import PY2
 from mrjob.py2 import ParseResult
 from mrjob.py2 import to_string
 from mrjob.py2 import urlparse as urlparse_buggy
@@ -179,7 +179,7 @@ def counter_unescape(escaped_string):
     :type escaped_string: bytes
     :return: str
     """
-    if not IN_PY2:
+    if not PY2:
         escaped_string = escaped_string.decode('unicode_escape')
     else:
         # unicode is probably okay in Python 2, but keeping as str just in case

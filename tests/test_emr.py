@@ -41,7 +41,7 @@ from mrjob.emr import _lock_acquire_step_2
 from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import pool_hash_and_name
-from mrjob.py2 import IN_PY2
+from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
@@ -85,7 +85,7 @@ except ImportError:
     boto = None
 
 # used to match command lines
-if IN_PY2:
+if PY2:
     PYTHON_BIN = 'python'
 else:
     PYTHON_BIN = 'python3'

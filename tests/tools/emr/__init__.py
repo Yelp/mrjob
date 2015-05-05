@@ -15,7 +15,7 @@ import sys
 from io import BytesIO
 
 from mrjob.emr import EMRJobRunner
-from mrjob.py2 import IN_PY2
+from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 
 from tests.py2 import mock_stdout_or_stderr

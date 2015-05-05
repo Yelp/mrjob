@@ -22,7 +22,7 @@ from mrjob.sim import SimMRJobRunner
 from mrjob.sim import SimRunnerOptionStore
 from mrjob.parse import find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
-from mrjob.py2 import basestring
+from mrjob.py2 import string_types
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
 
@@ -238,7 +238,7 @@ class LocalMRJobRunner(SimMRJobRunner):
         :return: dict(proc=Popen, args=[process args], write_to=file)
         """
         log.info('> %s > %s' % (' | '.join(
-            args if isinstance(args, basestring) else cmd_line(args)
+            args if isinstance(args, string_types) else cmd_line(args)
             for args in procs_args), output_path))
 
         with open(output_path, 'wb') as write_to:

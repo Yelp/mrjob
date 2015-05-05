@@ -27,7 +27,7 @@ try:
 except ImportError:
     import pickle
 
-from mrjob.py2 import IN_PY2
+from mrjob.py2 import PY2
 from mrjob.util import safeeval
 
 try:
@@ -88,7 +88,7 @@ class JSONProtocol(_KeyCachingProtocol):
     Note that JSON has some limitations; dictionary keys must be strings,
     and there's no distinction between lists and tuples."""
 
-    if IN_PY2:
+    if PY2:
         def _loads(self, value):
             return json.loads(value)
 
@@ -106,7 +106,7 @@ class JSONValueProtocol(object):
     """Encode ``value`` as a JSON and discard ``key``
     (``key`` is read in as ``None``).
     """
-    if IN_PY2:
+    if PY2:
         def read(self, line):
             return (None, json.loads(line))
 
@@ -134,7 +134,7 @@ class PickleProtocol(_KeyCachingProtocol):
     # string_escape doesn't exist on Python 3 (you can't .decode() bytes).
     # Since efficiency matters for protocols, keeping separate code
     # for Python 2 and 3
-    if IN_PY2:
+    if PY2:
         def _loads(self, value):
             return pickle.loads(value.decode('string_escape'))
 
@@ -155,7 +155,7 @@ class PickleValueProtocol(object):
     (``key`` is read in as ``None``).
     """
     # see comment for PickleProtocol, above
-    if IN_PY2:
+    if PY2:
         def read(self, line):
             return (None, pickle.loads(line.decode('string_escape')))
 
@@ -216,7 +216,7 @@ class ReprProtocol(_KeyCachingProtocol):
     def _loads(self, value):
         return safeeval(value)
 
-    if IN_PY2:
+    if PY2:
         def _dumps(self, value):
             return repr(value)
     else:
@@ -233,7 +233,7 @@ class ReprValueProtocol(object):
     def read(self, line):
         return (None, safeeval(line))
 
-    if IN_PY2:
+    if PY2:
         def write(self, key, value):
             return repr(value)
     else:

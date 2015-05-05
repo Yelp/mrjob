@@ -23,7 +23,7 @@ from subprocess import check_call
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
 from mrjob.hadoop import fully_qualify_hdfs_path
-from mrjob.py2 import IN_PY2
+from mrjob.py2 import PY2
 from mrjob.util import bash_wrap
 from mrjob.util import shlex_split
 
@@ -39,7 +39,7 @@ from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
 # used to match command lines
-if IN_PY2:
+if PY2:
     PYTHON_BIN = 'python'
 else:
     PYTHON_BIN = 'python3'

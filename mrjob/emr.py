@@ -327,6 +327,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'aws_availability_zone',
         'aws_region',
         'aws_secret_access_key',
+        'aws_security_token',
         'bootstrap',
         'bootstrap_actions',
         'bootstrap_cmds',
@@ -409,6 +410,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
             'ami_version': 'latest',
+            'aws_security_token': None,
             'check_emr_status_every': 30,
             'cleanup_on_failure': ['JOB'],
             'ec2_core_instance_type': 'm1.small',
@@ -800,7 +802,8 @@ class EMRJobRunner(MRJobRunner):
 
             self._s3_fs = S3Filesystem(self._opts['aws_access_key_id'],
                                        self._opts['aws_secret_access_key'],
-                                       s3_endpoint)
+                                       s3_endpoint,
+                                       self._opts['aws_security_token'])
 
             if self._opts['ec2_key_pair_file']:
                 self._ssh_fs = SSHFilesystem(self._opts['ssh_bin'],
@@ -2479,7 +2482,8 @@ class EMRJobRunner(MRJobRunner):
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 region=boto.regioninfo.RegionInfo(
                     name=region_name, endpoint=endpoint,
-                    connection_cls=boto.emr.connection.EmrConnection))
+                    connection_cls=boto.emr.connection.EmrConnection),
+                security_token=self._opts['aws_security_token'])
 
             # Issue #778: EMR's odd endpoint hostnames mess up
             # HMAC v4 authentication in boto 2.10.0 thru 2.15.0.

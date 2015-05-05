@@ -159,7 +159,7 @@ def to_text(s):
     Use this if you need to ``print()`` or log bytes of an unknown encoding,
     or to parse strings out of bytes of unknown encoding (e.g. a log file).
     """
-    if not isinstance(s, string_types):
+    if not isinstance(s, string_types + (bytes,)):
         raise TypeError
 
     if PY2 or isinstance(s, str):

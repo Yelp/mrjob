@@ -339,7 +339,6 @@ class HadoopJobRunner(MRJobRunner):
                         # stderr and stdout (it's a fake terminal)
                         self._process_stderr_from_streaming(master)
                         _, returncode = os.waitpid(pid, 0)
-                        master.close()
 
             if returncode == 0:
                 # parsing needs step number for whole job

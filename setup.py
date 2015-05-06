@@ -30,8 +30,8 @@ try:
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
-    # mock is included in Python 3 as unittest.mock
-    if sys.version_info < (3, 0):
+    # mock is included in Python 3.3 as unittest.mock
+    if sys.version_info < (3, 3):
         setuptools_kwargs['tests_require'] = ['mock']
 
         # unittest2 is a backport of unittest from Python 2.7

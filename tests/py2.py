@@ -22,8 +22,8 @@ else:
 TestCase = unittest.TestCase
 TestCase  # quiet pyflakes
 
-# mock is built into unittest in Python 3
-if PY2:
+# mock is built into unittest in Python 3.3+
+if sys.version_info < (3, 3):
     import mock
 else:
     from unittest import mock

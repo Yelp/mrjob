@@ -23,7 +23,7 @@ that all non-byte strings be unicode. But that doesn't really make sense for
 Python 2, where str (bytes) and unicode can be used interchangeably.
 
 So really our string datatypes fall into two categories, bytes, and
-"text", which is either ``str`` (i.e., bytes) or ``unicode`` in Python 2,
+"strings", which is either ``str`` (i.e., bytes) or ``unicode`` in Python 2,
 and ``str`` (i.e. unicode) in Python 3.
 
 These things should always be bytes:
@@ -41,7 +41,7 @@ Instead of using ``StringIO`` to deal with these, use ``io.BytesIO``.
 Note that both Python 2.6+ and Python 3.3+ have the ``bytes`` type and
 ``b''`` constants built-in.
 
-These things should always be text:
+These things should always be strings:
 
 - streams that you print() to (e.g. ``sys.stdout`` if you mock it out)
 - streams that you log to
@@ -53,20 +53,20 @@ These things should always be text:
 - Hadoop status messages
 - anything else we parse out of log files
 
-These things are text because it makes for simpler code:
+These things are strings because it makes for simpler code:
 
 - contents of config files
 - contents of scripts output by mrjob (e.g. the setup wrapper script)
 - contents of empty files
 
-Use the ``StringIO`` from this module to deal with text (it's
+Use the ``StringIO`` from this module to deal with strings (it's
 ``StringIO.StringIO`` in Python 2 and ``io.StringIO`` in Python 3).
 
 Please use ``%`` for format strings and not ``format()``, which is much more
 picky about mixing unicode and bytes.
 
 This module provides a ``string_types`` tuple (name from the ``six`` library)
-so you can check if something is text.
+so you can check if something is a string.
 
 We don't provide a ``unicode`` constant:
 
@@ -74,8 +74,8 @@ We don't provide a ``unicode`` constant:
 - To convert ``bytes`` to ``unicode``, use ``.decode('utf_8')`.
 - Python 3.3+ has ``u''`` literals; please use sparingly
 
-If you need to convert bytes of unknown encoding to text (e.g. to ``print()``
-or log them), use ``to_text()``.
+If you need to convert bytes of unknown encoding to a string (e.g. to
+``print()`` or log them), use ``to_string()`` from this module.
 
 Iterables
 ---------
@@ -151,11 +151,10 @@ urlparse
 ParseResult
 
 
-def to_text(s):
-    """On Python 3, convert ``bytes`` to ``str`` (i.e. unicode).
+def to_string(s):
+    """Convert ``bytes`` to ``str``, leaving ``unicode`` unchanged.
 
-    (In Python 2, either ``str`` or ``unicode`` is acceptable as text, so
-    do nothing.)
+    (This means on Python 2, ``to_string()`` does nothing.)
 
     Use this if you need to ``print()`` or log bytes of an unknown encoding,
     or to parse strings out of bytes of unknown encoding (e.g. a log file).

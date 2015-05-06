@@ -23,7 +23,7 @@ import re
 from subprocess import Popen
 from subprocess import PIPE
 
-from mrjob.py2 import to_text
+from mrjob.py2 import to_string
 
 SSH_PREFIX = 'ssh://'
 SSH_LOG_ROOT = '/mnt/var/log/hadoop'
@@ -141,7 +141,7 @@ def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
 
     cmd = "hadoop dfsadmin -report | grep ^Name | cut -f2 -d: | cut -f2 -d' '"
     args = ['bash -c "%s"' % cmd]
-    ips = to_text(check_output(
+    ips = to_string(check_output(
         *ssh_run(ssh_bin, master_address, ec2_key_pair_file, args)))
     return [ip for ip in ips.split('\n') if ip]
 
@@ -177,7 +177,7 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
     """
-    out = to_text(check_output(*ssh_run_with_recursion(
+    out = to_string(check_output(*ssh_run_with_recursion(
         ssh_bin, address, ec2_key_pair_file, keyfile,
         ['find', '-L', path, '-type', 'f'])))
     if 'No such file or directory' in out:
@@ -198,7 +198,7 @@ def ssh_terminate_single_job(ssh_bin, address, ec2_key_pair_file):
 
     :return: ``True`` if successful, ``False`` if no job was running
     """
-    job_list_out = to_text(check_output(*ssh_run(
+    job_list_out = to_string(check_output(*ssh_run(
         ssh_bin, address, ec2_key_pair_file, ['hadoop', 'job', '-list'])))
     job_list_lines = job_list_out.splitlines()
 
@@ -218,9 +218,9 @@ def ssh_terminate_single_job(ssh_bin, address, ec2_key_pair_file):
     job_info_match = HADOOP_JOB_LIST_INFO_RE.match(job_list_lines[2])
     if not job_info_match:
         job_list_output_error()
-    job_id = to_text(job_info_match.group(1))
+    job_id = to_string(job_info_match.group(1))
 
-    job_kill_out = to_text(check_output(*ssh_run(
+    job_kill_out = to_string(check_output(*ssh_run(
         ssh_bin, address, ec2_key_pair_file,
         ['hadoop', 'job', '-kill', job_id])))
 

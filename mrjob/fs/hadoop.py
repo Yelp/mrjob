@@ -21,7 +21,7 @@ from subprocess import PIPE
 from subprocess import CalledProcessError
 
 from mrjob.fs.base import Filesystem
-from mrjob.py2 import to_text
+from mrjob.py2 import to_string
 from mrjob.parse import is_uri
 from mrjob.parse import urlparse
 from mrjob.util import cmd_line
@@ -85,7 +85,7 @@ class HadoopFilesystem(Filesystem):
         log_func = log.debug if proc.returncode == 0 else log.error
         if not return_stdout:
             for line in BytesIO(stdout):
-                log_func('STDOUT: ' + to_text(line.rstrip(b'\r\n')))
+                log_func('STDOUT: ' + to_string(line.rstrip(b'\r\n')))
 
         # check if STDERR is okay
         stderr_is_ok = False
@@ -97,7 +97,7 @@ class HadoopFilesystem(Filesystem):
 
         if not stderr_is_ok:
             for line in BytesIO(stderr):
-                log_func('STDERR: ' + to_text(line.rstrip(b'\r\n')))
+                log_func('STDERR: ' + to_string(line.rstrip(b'\r\n')))
 
         ok_returncodes = ok_returncodes or [0]
 
@@ -163,7 +163,7 @@ class HadoopFilesystem(Filesystem):
             if not path_index:
                 raise IOError("Could not locate path in string %r" % line)
 
-            path = to_text(line.split(b' ', path_index)[-1])
+            path = to_string(line.split(b' ', path_index)[-1])
             # handle fully qualified URIs from newer versions of Hadoop ls
             # (see Pull Request #577)
             if is_uri(path):

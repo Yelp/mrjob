@@ -5,9 +5,12 @@ python:
   - "pypy"
   - "3.3"
   - "3.4"
+  - "pypy3"
 matrix:
   allow_failures:
-    - python: pypy
+    - python:
+      - pypy
+      - pypy3
   fast_finish: true
 # command to install dependencies
 install:

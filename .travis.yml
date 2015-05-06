@@ -8,9 +8,8 @@ python:
   - "pypy3"
 matrix:
   allow_failures:
-    - python:
-      - pypy
-      - pypy3
+    - python: pypy
+    - python: pypy3
   fast_finish: true
 # command to install dependencies
 install:

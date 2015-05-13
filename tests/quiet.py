@@ -1,5 +1,6 @@
 # Copyright 2011-2012 Yelp
 # Copyright 2013 David Marin
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +24,9 @@ import logging
 class NullHandler(logging.Handler):
     def emit(self, record):
         pass
+
+# singleton, used by add_null_handler_to_root_logger()
+NULL_HANDLER = NullHandler()
 
 
 @contextmanager
@@ -80,3 +84,18 @@ def no_handlers_for_logger(name=None):
             log.handlers = old_handlers
         else:
             log.propagate = old_propagate
+
+
+def add_null_handler_to_root_logger():
+    """Add a NullHandler to the root logger, to suppress "no handlers for
+    logger..." message (in Python 2) and logging everything to stderr
+    (in Python 3).
+
+    If there's already a null handler in the root logger, do nothing.
+
+    When testing, we want to call this as early as possible. It's fine to
+    call it more than once.
+    """
+    log = logging.getLogger()
+    if NULL_HANDLER not in log.handlers:
+        log.addHandler(NULL_HANDLER)

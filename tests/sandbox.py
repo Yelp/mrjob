@@ -24,6 +24,7 @@ from mrjob import runner
 from tests.py2 import MagicMock
 from tests.py2 import TestCase
 from tests.py2 import patch
+from tests.quiet import add_null_handler_to_root_logger
 
 
 # simple config that also silences 'no config options for runner' logging
@@ -79,6 +80,8 @@ class EmptyMrjobConfTestCase(TestCase):
 
     def setUp(self):
         super(EmptyMrjobConfTestCase, self).setUp()
+
+        add_null_handler_to_root_logger()
 
         if self.MRJOB_CONF_CONTENTS is not None:
             patcher = mrjob_conf_patcher(self.MRJOB_CONF_CONTENTS)

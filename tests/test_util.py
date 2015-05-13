@@ -265,9 +265,9 @@ class ReadInputTestCase(TestCase):
 
 class SafeEvalTestCase(TestCase):
 
-    def test_simple_data_structure(self):
+    def test_simple_data_structures(self):
         # try unrepr-ing a bunch of simple data structures
-        for x in True, None, 1, range(5), {'foo': False, 'bar': 2}:
+        for x in True, None, 1, [0, 1, 2, 3, 4], {'foo': False, 'bar': 2}:
             self.assertEqual(x, safeeval(repr(x)))
 
     def test_no_mischief(self):

@@ -17,11 +17,12 @@ import gzip
 import optparse
 import os
 import shutil
+import sys
+import tarfile
+import tempfile
 from io import BytesIO
 from subprocess import PIPE
 from subprocess import Popen
-import tarfile
-import tempfile
 
 from mrjob.aws import random_identifier
 from mrjob.py2 import PY2
@@ -281,15 +282,20 @@ class SafeEvalTestCase(TestCase):
             safeeval('abs(a)', globals={'abs': abs}, locals={'a': a}))
 
     def test_range_type(self):
-        if PY2:
-            # on Python 2, the range type is called xrange, and doesn't
-            # support equality
-            self.assertEqual(repr(safeeval('xrange(3)')), 'xrange(3)')
-        else:
-            self.assertEqual(safeeval('range(3)'), range(3))
-            # in Python 3, the repr includes the range start
-            self.assertEqual(repr(safeeval('range(0, 3)')), 'range(0, 3)')
+        # ranges have different reprs on Python 2 vs. Python 3, and
+        # can't be checked for equality until Python 3.3+
 
+        if PY2:
+            range_type = xrange
+        else:
+            range_type = range
+
+        self.assertEqual(repr(safeeval(repr(range_type(3)))),
+                         repr(range_type(3)))
+
+        if sys.version_info >= (3, 3):
+            self.assertEqual(safeeval(repr(range_type(3))),
+                             range_type(3))
 
 
 class ArchiveTestCase(TestCase):

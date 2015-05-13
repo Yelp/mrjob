@@ -7,6 +7,8 @@ python:
   - "3.4"
   - "pypy3"
 matrix:
+  allow_failures:
+    - python: pypy3
   fast_finish: true
 # command to install dependencies
 install:

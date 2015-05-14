@@ -2598,7 +2598,14 @@ class EMRJobRunner(MRJobRunner):
 
         log.debug('creating IAM connection')
 
+        # boto 2.2.0's IamConnection doesn't support security_token,
+        # so only include it if set
+        kwargs = {}
+        if self._opts['aws_security_token']:
+            kwargs['security_token'] = self._opts['aws_security_token']
+
         raw_iam_conn = boto.connect_iam(
             aws_access_key_id=self._aws_access_key_id,
-            aws_secret_access_key=self._aws_secret_access_key)
+            aws_secret_access_key=self._aws_secret_access_key,
+            **kwargs)
         return wrap_aws_conn(raw_iam_conn)

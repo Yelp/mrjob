@@ -12,12 +12,15 @@ about setting these options.
 
 .. mrjob-opt::
     :config: aws_access_key_id
-    :switch: --aws-access-key-id
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``None``
 
-    "username" for Amazon web services.
+    "Username" for Amazon web services.
+
+    There isn't a command-line switch for this option because credentials are
+    supposed to be secret! Use the environment variable
+    :envvar:`AWS_ACCESS_KEY_ID` instead.
 
 .. mrjob-opt::
     :config: aws_secret_access_key
@@ -26,17 +29,26 @@ about setting these options.
     :set: emr
     :default: ``None``
 
-    your "password" on AWS
+    Your "password" on AWS.
+
+    There isn't a command-line switch for this option because credentials are
+    supposed to be secret! Use the environment variable
+    :envvar:`AWS_SECRET_ACCESS_KEY` instead.
 
 .. mrjob-opt::
     :config: aws_security_token
-    :switch: --aws-security-token
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``None``
 
     Temporary AWS session token, used along with :mrjob-opt:`aws_access_key_id`
     and :mrjob-opt:`aws_secret_access_key` when using temporary credentials.
+
+    There isn't a command-line switch for this option because credentials are
+    supposed to be secret! Use the environment variable
+    :envvar:`AWS_SECURITY_TOKEN` instead.
+
+    This option requires boto >= 2.5.0.
 
 .. mrjob-opt::
     :config: ec2_key_pair

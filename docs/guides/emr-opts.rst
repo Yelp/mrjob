@@ -30,12 +30,13 @@ about setting these options.
 
 .. mrjob-opt::
     :config: aws_security_token
-    :switch: --aws-security_token
+    :switch: --aws-security-token
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``None``
 
-    your temporary session token on AWS
+    Temporary AWS session token, used along with :mrjob-opt:`aws_access_key_id`
+    and :mrjob-opt:`aws_secret_access_key` when using temporary credentials.
 
 .. mrjob-opt::
     :config: ec2_key_pair

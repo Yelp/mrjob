@@ -3650,8 +3650,27 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
             self.assertTrue(s3_key.mock_multipart_upload_was_cancelled())
 
 
-#class SecurityTokenTestCase(TestCase):
+class SecurityTokenTestCase(MockEMRAndS3TestCase):
 
-#def test_emr_conn_no_token(self):
-#        with patch('boto.emr.connection.EmrConnection') as mock_emr:
-#            pass
+    def test_emr_conn_without_security_token(self):
+        with patch('boto.emr.connection.EmrConnection') as mock_emr:
+            runner = EMRJobRunner()
+            runner.make_emr_conn()
+
+            self.assertTrue(mock_emr.called)
+
+            # security_token shouldn't even be in kwargs
+            # (boto 2.2.0 doesn't allow it)
+            call_kwargs = mock_emr.call_args[1]
+            self.assertNotIn('security_token', call_kwargs)
+
+    def test_emr_conn_with_security_token(self):
+        with patch('boto.emr.connection.EmrConnection') as mock_emr:
+            runner = EMRJobRunner(aws_security_token='meow')
+            runner.make_emr_conn()
+
+            self.assertTrue(mock_emr.called)
+
+            call_kwargs = mock_emr.call_args[1]
+            self.assertIn('security_token', call_kwargs)
+            self.assertEquals(call_kwargs['security_token'], 'meow')

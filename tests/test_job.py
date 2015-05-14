@@ -14,27 +14,23 @@
 # limitations under the License.
 """Unit testing of MRJob."""
 import os
-from subprocess import Popen
-from subprocess import PIPE
-from StringIO import StringIO
 import sys
 import time
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
+from io import BytesIO
+from subprocess import Popen
+from subprocess import PIPE
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
 from mrjob.job import UsageError
+from mrjob.job import _im_func
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
+from mrjob.py2 import StringIO
 from mrjob.step import _IDENTITY_MAPPER
 from mrjob.step import _IDENTITY_REDUCER
 from mrjob.step import JarStep
@@ -43,6 +39,7 @@ from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import TestCase
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -96,11 +93,11 @@ class MRInitTestCase(EmptyMrjobConfTestCase):
     def test_mapper(self):
         j = MRInitJob()
         j.mapper_init()
-        self.assertEqual(j.mapper(None, None).next(), (None, j.sum_amount))
+        self.assertEqual(next(j.mapper(None, None)), (None, j.sum_amount))
 
     def test_init_funcs(self):
         num_inputs = 2
-        stdin = StringIO("x\n" * num_inputs)
+        stdin = BytesIO(b"x\n" * num_inputs)
         mr_job = MRInitJob(['-r', 'inline', '-'])
         mr_job.sandbox(stdin=stdin)
 
@@ -115,7 +112,7 @@ class MRInitTestCase(EmptyMrjobConfTestCase):
         self.assertEqual(results[0], num_inputs * 10 * 10 * 2)
 
 
-class NoTzsetTestCase(unittest.TestCase):
+class NoTzsetTestCase(TestCase):
 
     def setUp(self):
         self.remove_time_tzset()
@@ -137,7 +134,7 @@ class NoTzsetTestCase(unittest.TestCase):
         MRJob()
 
 
-class CountersAndStatusTestCase(unittest.TestCase):
+class CountersAndStatusTestCase(TestCase):
 
     def test_counters_and_status(self):
         mr_job = MRJob().sandbox()
@@ -199,7 +196,7 @@ class CountersAndStatusTestCase(unittest.TestCase):
                           'girl; interrupted': {'movie': 1}})
 
 
-class ProtocolsTestCase(unittest.TestCase):
+class ProtocolsTestCase(TestCase):
     # not putting these in their own files because we're not going to invoke
     # it as a script anyway.
 
@@ -217,15 +214,15 @@ class ProtocolsTestCase(unittest.TestCase):
         INTERNAL_PROTOCOL = ReprProtocol
 
     class MRTrivialJob(MRJob):
-        OUTPUT_PROTOCOL = ReprProtocol
+        OUTPUT_PROTOCOL = RawValueProtocol
 
         def mapper(self, key, value):
             yield key, value
 
     def assertMethodsEqual(self, fs, gs):
         # we're going to use this to match bound against unbound methods
-        self.assertEqual([f.im_func for f in fs],
-                         [g.im_func for g in gs])
+        self.assertEqual([_im_func(f) for f in fs],
+                         [_im_func(g) for g in gs])
 
     def test_default_protocols(self):
         mr_job = MRBoringJob()
@@ -256,43 +253,41 @@ class ProtocolsTestCase(unittest.TestCase):
                                 (ReprProtocol.read, JSONProtocol.write))
 
     def test_mapper_raw_value_to_json(self):
-        RAW_INPUT = StringIO('foo\nbar\nbaz\n')
+        RAW_INPUT = BytesIO(b'foo\nbar\nbaz\n')
 
         mr_job = MRBoringJob(['--mapper'])
         mr_job.sandbox(stdin=RAW_INPUT)
         mr_job.run_mapper()
 
         self.assertEqual(mr_job.stdout.getvalue(),
-                         'null\t"foo"\n' +
-                         'null\t"bar"\n' +
-                         'null\t"baz"\n')
+                         b'null\t"foo"\n' +
+                         b'null\t"bar"\n' +
+                         b'null\t"baz"\n')
 
     def test_reducer_json_to_json(self):
-        JSON_INPUT = StringIO('"foo"\t"bar"\n' +
-                              '"foo"\t"baz"\n' +
-                              '"bar"\t"qux"\n')
+        JSON_INPUT = BytesIO(b'"foo"\t"bar"\n' +
+                             b'"foo"\t"baz"\n' +
+                             b'"bar"\t"qux"\n')
 
         mr_job = MRBoringJob(args=['--reducer'])
         mr_job.sandbox(stdin=JSON_INPUT)
         mr_job.run_reducer()
 
         self.assertEqual(mr_job.stdout.getvalue(),
-                         ('"foo"\t["bar", "baz"]\n' +
-                          '"bar"\t["qux"]\n'))
+                         (b'"foo"\t["bar", "baz"]\n' +
+                          b'"bar"\t["qux"]\n'))
 
     def test_output_protocol_with_no_final_reducer(self):
         # if there's no reducer, the last mapper should use the
         # output protocol (in this case, repr)
-        RAW_INPUT = StringIO('foo\nbar\nbaz\n')
+        RAW_INPUT = BytesIO(b'foo\nbar\nbaz\n')
 
         mr_job = self.MRTrivialJob(['--mapper'])
         mr_job.sandbox(stdin=RAW_INPUT)
         mr_job.run_mapper()
 
         self.assertEqual(mr_job.stdout.getvalue(),
-                         ("None\t'foo'\n" +
-                          "None\t'bar'\n" +
-                          "None\t'baz'\n"))
+                         RAW_INPUT.getvalue())
 
 
 class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
@@ -303,51 +298,51 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
         def reducer(self, key, values):
             yield(key, list(values))
 
-    BAD_JSON_INPUT = ('BAD\tJSON\n' +
-                      '"foo"\t"bar"\n' +
-                      '"too"\t"many"\t"tabs"\n' +
-                      '"notabs"\n')
+    BAD_JSON_INPUT = (b'BAD\tJSON\n' +
+                      b'"foo"\t"bar"\n' +
+                      b'"too"\t"many"\t"tabs"\n' +
+                      b'"notabs"\n')
 
-    UNENCODABLE_RAW_INPUT = ('foo\n' +
-                             '\xaa\n' +
-                             'bar\n')
+    UNENCODABLE_RAW_INPUT = (b'foo\n' +
+                             b'\xaa\n' +
+                             b'bar\n')
 
     STRICT_MRJOB_CONF ={'runners': {'inline': {'strict_protocols': True}}}
 
     def assertJobHandlesUndecodableInput(self, job_args):
         job = self.MRBoringJSONJob(job_args)
-        job.sandbox(stdin=StringIO(self.BAD_JSON_INPUT))
+        job.sandbox(stdin=BytesIO(self.BAD_JSON_INPUT))
 
         with job.make_runner() as r:
             r.run()
 
             # good data should still get through
-            self.assertEqual(''.join(r.stream_output()), '"foo"\t["bar"]\n')
+            self.assertEqual(b''.join(r.stream_output()), b'"foo"\t["bar"]\n')
 
             # exception type varies between versions of json/simplejson,
             # so just make sure there were three exceptions of some sort
             counters = r.counters()[0]
-            self.assertEqual(counters.keys(), ['Undecodable input'])
+            self.assertEqual(sorted(counters), ['Undecodable input'])
             self.assertEqual(
-                sum(counters['Undecodable input'].itervalues()), 3)
+                sum(counters['Undecodable input'].values()), 3)
 
     def assertJobRaisesExceptionOnUndecodableInput(self, job_args):
         job = self.MRBoringJSONJob(job_args)
-        job.sandbox(stdin=StringIO(self.BAD_JSON_INPUT))
+        job.sandbox(stdin=BytesIO(self.BAD_JSON_INPUT))
 
         with job.make_runner() as r:
             self.assertRaises(Exception, r.run)
 
     def assertJobHandlesUnencodableOutput(self, job_args):
         job = MRBoringJob(job_args)
-        job.sandbox(stdin=StringIO(self.UNENCODABLE_RAW_INPUT))
+        job.sandbox(stdin=BytesIO(self.UNENCODABLE_RAW_INPUT))
 
         with job.make_runner() as r:
             r.run()
 
             # good data should still get through
-            self.assertEqual(''.join(r.stream_output()),
-                             'null\t["bar", "foo"]\n')
+            self.assertEqual(b''.join(r.stream_output()),
+                             b'null\t["bar", "foo"]\n')
 
             # exception type varies between versions of json/simplejson,
             # so just make sure there were three exceptions of some sort
@@ -357,7 +352,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
 
     def assertJobRaisesExceptionOnUnencodableOutput(self, job_args):
         job = MRBoringJob(job_args)
-        job.sandbox(stdin=StringIO(self.UNENCODABLE_RAW_INPUT))
+        job.sandbox(stdin=BytesIO(self.UNENCODABLE_RAW_INPUT))
 
         with job.make_runner() as r:
             self.assertRaises(Exception, r.run)
@@ -397,7 +392,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
                 job_args=['--no-strict-protocols'])
 
 
-class PickProtocolsTestCase(unittest.TestCase):
+class PickProtocolsTestCase(TestCase):
 
     def _yield_none(self, *args, **kwargs):
         yield None
@@ -553,7 +548,7 @@ class PickProtocolsTestCase(unittest.TestCase):
              (JSONProtocol, JSONValueProtocol)])
 
 
-class JobConfTestCase(unittest.TestCase):
+class JobConfTestCase(TestCase):
 
     class MRJobConfJob(MRJob):
         JOBCONF = {'mapred.foo': 'garply',
@@ -670,7 +665,7 @@ class MRSortValuesAndMoreJob(MRSortValuesJob):
     }
 
 
-class SortValuesTestCase(unittest.TestCase):
+class SortValuesTestCase(TestCase):
 
     def test_sort_values_sets_partitioner(self):
         mr_job = MRSortValuesJob()
@@ -743,7 +738,7 @@ class SortValuesRunnerTestCase(SandboxedTestCase):
                 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'])
 
 
-class HadoopFormatTestCase(unittest.TestCase):
+class HadoopFormatTestCase(TestCase):
 
     # MRHadoopFormatJob is imported above
 
@@ -781,7 +776,7 @@ class HadoopFormatTestCase(unittest.TestCase):
                          'mapred.EbcdicDb2EnterpriseXmlOutputFormat')
 
 
-class PartitionerTestCase(unittest.TestCase):
+class PartitionerTestCase(TestCase):
 
     class MRPartitionerJob(MRJob):
         PARTITIONER = 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
@@ -819,7 +814,7 @@ class PartitionerTestCase(unittest.TestCase):
                          'org.apache.hadoop.mapreduce.Partitioner')
 
 
-class IsMapperOrReducerTestCase(unittest.TestCase):
+class IsMapperOrReducerTestCase(TestCase):
 
     def test_is_mapper_or_reducer(self):
         self.assertEqual(MRJob().is_mapper_or_reducer(), False)
@@ -829,19 +824,19 @@ class IsMapperOrReducerTestCase(unittest.TestCase):
         self.assertEqual(MRJob(['--steps']).is_mapper_or_reducer(), False)
 
 
-class StepNumTestCase(unittest.TestCase):
+class StepNumTestCase(TestCase):
 
     def test_two_step_job_end_to_end(self):
         # represent input as a list so we can reuse it
         # also, leave off newline (MRJobRunner should fix it)
-        mapper0_input_lines = ['foo', 'bar']
+        mapper0_input_lines = [b'foo', b'bar']
 
         def test_mapper0(mr_job, input_lines):
             mr_job.sandbox(input_lines)
             mr_job.run_mapper(0)
             self.assertEqual(mr_job.stdout.getvalue(),
-                             'null\t"foo"\n' + '"foo"\tnull\n' +
-                             'null\t"bar"\n' + '"bar"\tnull\n')
+                             b'null\t"foo"\n' + b'"foo"\tnull\n' +
+                             b'null\t"bar"\n' + b'"bar"\tnull\n')
 
         mapper0 = MRTwoStepJob()
         test_mapper0(mapper0, mapper0_input_lines)
@@ -851,15 +846,15 @@ class StepNumTestCase(unittest.TestCase):
         test_mapper0(mapper0_no_step_num, mapper0_input_lines)
 
         # sort output of mapper0
-        mapper0_output_input_lines = StringIO(mapper0.stdout.getvalue())
+        mapper0_output_input_lines = BytesIO(mapper0.stdout.getvalue())
         reducer0_input_lines = sorted(mapper0_output_input_lines,
-                                      key=lambda line: line.split('\t'))
+                                      key=lambda line: line.split(b'\t'))
 
         def test_reducer0(mr_job, input_lines):
             mr_job.sandbox(input_lines)
             mr_job.run_reducer(0)
             self.assertEqual(mr_job.stdout.getvalue(),
-                             '"bar"\t1\n' + '"foo"\t1\n' + 'null\t2\n')
+                             b'"bar"\t1\n' + b'"foo"\t1\n' + b'null\t2\n')
 
         reducer0 = MRTwoStepJob()
         test_reducer0(reducer0, reducer0_input_lines)
@@ -869,13 +864,13 @@ class StepNumTestCase(unittest.TestCase):
         test_reducer0(reducer0_no_step_num, reducer0_input_lines)
 
         # mapper can use reducer0's output as-is
-        mapper1_input_lines = StringIO(reducer0.stdout.getvalue())
+        mapper1_input_lines = BytesIO(reducer0.stdout.getvalue())
 
         def test_mapper1(mr_job, input_lines):
             mr_job.sandbox(input_lines)
             mr_job.run_mapper(1)
             self.assertEqual(mr_job.stdout.getvalue(),
-                             '1\t"bar"\n' + '1\t"foo"\n' + '2\tnull\n')
+                             b'1\t"bar"\n' + b'1\t"foo"\n' + b'2\tnull\n')
 
         mapper1 = MRTwoStepJob()
         test_mapper1(mapper1, mapper1_input_lines)
@@ -898,7 +893,7 @@ class FileOptionsTestCase(SandboxedTestCase):
 
         os.environ['LOCAL_N_FILE_PATH'] = n_file_path
 
-        stdin = ['0\n', '1\n', '2\n']
+        stdin = [b'0\n', b'1\n', b'2\n']
 
         # use local runner so that the file is actually sent somewhere
         mr_job = MRTowerOfPowers(
@@ -922,13 +917,13 @@ class FileOptionsTestCase(SandboxedTestCase):
         self.assertEqual(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))
 
 
-class DeprecatedTestMethodsTestCase(unittest.TestCase):
+class DeprecatedTestMethodsTestCase(TestCase):
 
     def test_parse_output(self):
         # test parsing JSON
         mr_job = MRJob()
-        output = '0\t1\n"a"\t"b"\n'
-        mr_job.stdout = StringIO(output)
+        output = b'0\t1\n"a"\t"b"\n'
+        mr_job.stdout = BytesIO(output)
         with logger_disabled('mrjob.job'):
             self.assertEqual(mr_job.parse_output(), [(0, 1), ('a', 'b')])
 
@@ -938,8 +933,8 @@ class DeprecatedTestMethodsTestCase(unittest.TestCase):
     def test_parse_output_with_protocol_instance(self):
         # see if we can use the repr protocol
         mr_job = MRJob()
-        output = "0\t1\n['a', 'b']\tset(['c', 'd'])\n"
-        mr_job.stdout = StringIO(output)
+        output = b"0\t1\n['a', 'b']\tset(['c', 'd'])\n"
+        mr_job.stdout = BytesIO(output)
         with logger_disabled('mrjob.job'):
             self.assertEqual(mr_job.parse_output(ReprProtocol()),
                              [(0, 1), (['a', 'b'], set(['c', 'd']))])
@@ -954,8 +949,9 @@ class DeprecatedTestMethodsTestCase(unittest.TestCase):
         mr_job.increment_counter('Foo', 'Bar')
         mr_job.increment_counter('Foo', 'Baz', 20)
 
-        self.assertEqual(mr_job.parse_counters(),
-                         {'Foo': {'Bar': 2, 'Baz': 20}})
+        with logger_disabled('mrjob.job'):
+            self.assertEqual(mr_job.parse_counters(),
+                             {'Foo': {'Bar': 2, 'Baz': 20}})
 
 
 class RunJobTestCase(SandboxedTestCase):
@@ -967,31 +963,31 @@ class RunJobTestCase(SandboxedTestCase):
         env = combine_envs(os.environ,
                            {'PYTHONPATH': os.path.abspath('.')})
         proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
-        stdout, stderr = proc.communicate(input='foo\nbar\nbar\n')
+        stdout, stderr = proc.communicate(input=b'foo\nbar\nbar\n')
         return stdout, stderr, proc.returncode
 
     def test_quiet(self):
         stdout, stderr, returncode = self.run_job(['-q'])
-        self.assertEqual(sorted(StringIO(stdout)), ['1\t"foo"\n',
-                                                    '2\t"bar"\n',
-                                                    '3\tnull\n'])
-        self.assertEqual(stderr, '')
+        self.assertEqual(sorted(BytesIO(stdout)),
+                         [b'1\t"foo"\n', b'2\t"bar"\n', b'3\tnull\n'])
+
+        self.assertEqual(stderr, b'')
         self.assertEqual(returncode, 0)
 
     def test_verbose(self):
         stdout, stderr, returncode = self.run_job()
-        self.assertEqual(sorted(StringIO(stdout)), ['1\t"foo"\n',
-                                                    '2\t"bar"\n',
-                                                    '3\tnull\n'])
+        self.assertEqual(sorted(BytesIO(stdout)),
+                         [b'1\t"foo"\n', b'2\t"bar"\n', b'3\tnull\n'])
+
         self.assertNotEqual(stderr, '')
         self.assertEqual(returncode, 0)
         normal_stderr = stderr
 
         stdout, stderr, returncode = self.run_job(['-v'])
-        self.assertEqual(sorted(StringIO(stdout)), ['1\t"foo"\n',
-                                                    '2\t"bar"\n',
-                                                    '3\tnull\n'])
-        self.assertNotEqual(stderr, '')
+        self.assertEqual(sorted(BytesIO(stdout)),
+                         [b'1\t"foo"\n', b'2\t"bar"\n', b'3\tnull\n'])
+
+        self.assertNotEqual(stderr, b'')
         self.assertEqual(returncode, 0)
         self.assertGreater(len(stderr), len(normal_stderr))
 
@@ -1000,8 +996,8 @@ class RunJobTestCase(SandboxedTestCase):
 
         args = ['--no-output', '--output-dir', self.tmp_dir]
         stdout, stderr, returncode = self.run_job(args)
-        self.assertEqual(stdout, '')
-        self.assertNotEqual(stderr, '')
+        self.assertEqual(stdout, b'')
+        self.assertNotEqual(stderr, b'')
         self.assertEqual(returncode, 0)
 
         # make sure the correct output is in the temp dir
@@ -1009,14 +1005,14 @@ class RunJobTestCase(SandboxedTestCase):
         output_lines = []
         for dirpath, _, filenames in os.walk(self.tmp_dir):
             for filename in filenames:
-                with open(os.path.join(dirpath, filename)) as output_f:
+                with open(os.path.join(dirpath, filename), 'rb') as output_f:
                     output_lines.extend(output_f)
 
         self.assertEqual(sorted(output_lines),
-                         ['1\t"foo"\n', '2\t"bar"\n', '3\tnull\n'])
+                         [b'1\t"foo"\n', b'2\t"bar"\n', b'3\tnull\n'])
 
 
-class BadMainTestCase(unittest.TestCase):
+class BadMainTestCase(TestCase):
     """Ensure that the user cannot do anything but just call MRYourJob.run()
     from __main__()"""
 
@@ -1026,7 +1022,7 @@ class BadMainTestCase(unittest.TestCase):
         sys.argv = sys.argv[:-1]
 
 
-class ProtocolTypeTestCase(unittest.TestCase):
+class ProtocolTypeTestCase(TestCase):
 
     class StrangeJob(MRJob):
 
@@ -1053,7 +1049,7 @@ class ProtocolTypeTestCase(unittest.TestCase):
             self.assertIn('OUTPUT_PROTOCOL should be a class', logs)
 
 
-class StepsTestCase(unittest.TestCase):
+class StepsTestCase(TestCase):
 
     class SteppyJob(MRJob):
 
@@ -1119,7 +1115,7 @@ class StepsTestCase(unittest.TestCase):
             MRStep(mapper=j.mapper))
 
 
-class DeprecatedStepConstructorMethodsTestCase(unittest.TestCase):
+class DeprecatedStepConstructorMethodsTestCase(TestCase):
 
     def test_jar(self):
         kwargs = {

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the log flow fetcher"""
+import sys
 from optparse import OptionError
 
 from mrjob.emr import EMRJobRunner
@@ -70,8 +71,8 @@ class LogFetchingTestCase(ToolTestCase):
 
         perform_actions(make_args(find_failure=True), self.runner)
 
-        self.assertEqual(self.stdout.getvalue(),
-                         'No probable cause of failure found.\n')
+        self.assertEqual(sys.stdout.getvalue(),
+                         b'No probable cause of failure found.\n')
 
     def test_list(self):
         self.make_job_flow()
@@ -85,8 +86,8 @@ class LogFetchingTestCase(ToolTestCase):
 
         fetch_logs_main()
 
-        self.assertEqual(self.stdout.getvalue(),
-                         'Task attempts:\n\nSteps:\n\nJobs:\n\nNodes:\n\n')
+        self.assertEqual(sys.stdout.getvalue(),
+                         b'Task attempts:\n\nSteps:\n\nJobs:\n\nNodes:\n\n')
 
     def test_list_all(self):
         self.make_job_flow()
@@ -100,7 +101,7 @@ class LogFetchingTestCase(ToolTestCase):
 
         fetch_logs_main()
 
-        self.assertEqual(self.stdout.getvalue(), '\n')
+        self.assertEqual(sys.stdout.getvalue(), b'\n')
 
     def test_fetch_counters(self):
         self.make_job_flow()
@@ -111,4 +112,4 @@ class LogFetchingTestCase(ToolTestCase):
             'j-MOCKJOBFLOW0')
         self.monkey_patch_stdout()
         fetch_logs_main()
-        self.assertEqual(self.stdout.getvalue(), '')
+        self.assertEqual(sys.stdout.getvalue(), b'')

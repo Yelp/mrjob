@@ -13,24 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the hadoop job runner."""
-from StringIO import StringIO
 import getpass
 import os
 import pty
+from io import BytesIO
 from subprocess import CalledProcessError
 from subprocess import check_call
-
-from mock import patch
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
 
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
 from mrjob.hadoop import fully_qualify_hdfs_path
+from mrjob.py2 import PY2
 from mrjob.util import bash_wrap
 from mrjob.util import shlex_split
 
@@ -39,12 +32,20 @@ from tests.mockhadoop import add_mock_hadoop_output
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
+from tests.py2 import TestCase
+from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
+# used to match command lines
+if PY2:
+    PYTHON_BIN = 'python'
+else:
+    PYTHON_BIN = 'python3'
 
-class TestFullyQualifyHDFSPath(unittest.TestCase):
+
+class TestFullyQualifyHDFSPath(TestCase):
 
     def test_empty(self):
         with patch('getpass.getuser') as getuser:
@@ -146,7 +147,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
     def _test_end_to_end(self, args=()):
         # read from STDIN, a local file, and a remote file
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         local_input_path = os.path.join(self.tmp_dir, 'input')
         with open(local_input_path, 'w') as local_input_file:
@@ -160,8 +161,9 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
                     'fs', '-put', input_to_upload, remote_input_path])
 
         # doesn't matter what the intermediate output is; just has to exist.
-        add_mock_hadoop_output([''])
-        add_mock_hadoop_output(['1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n'])
+        add_mock_hadoop_output([b''])
+        add_mock_hadoop_output([b'1\t"qux"\n2\t"bar"\n',
+                                b'2\t"foo"\n5\tnull\n'])
 
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
                                '--no-conf', '--hadoop-arg', '-libjar',
@@ -274,7 +276,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
         super(StreamingArgsTestCase, self).setUp()
         self.runner = HadoopJobRunner(
             hadoop_bin='hadoop', hadoop_streaming_jar='streaming.jar',
-            mr_job_script='my_job.py', stdin=StringIO())
+            mr_job_script='my_job.py', stdin=BytesIO())
         self.runner._add_job_files_for_upload()
 
         self.runner._hadoop_version='0.20.204'
@@ -330,8 +332,10 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                     'type': 'script',
                 },
             },
-            ['-mapper', 'python my_job.py --step-num=0 --mapper',
-             '-jobconf', 'mapred.reduce.tasks=0'])
+            ['-mapper',
+             PYTHON_BIN + ' my_job.py --step-num=0 --mapper',
+             '-jobconf',
+             'mapred.reduce.tasks=0'])
 
     def test_basic_reducer(self):
         self._assert_streaming_step(
@@ -341,8 +345,10 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                     'type': 'script',
                 },
             },
-            ['-mapper', 'cat',
-             '-reducer', 'python my_job.py --step-num=0 --reducer'])
+            ['-mapper',
+             'cat',
+             '-reducer',
+             PYTHON_BIN + ' my_job.py --step-num=0 --reducer'])
 
     def test_pre_filters(self):
         self._assert_streaming_step(
@@ -362,14 +368,14 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 },
             },
             ["-mapper",
-             "bash -c 'grep anything | python my_job.py --step-num=0"
-                 " --mapper'",
+             "bash -c 'grep anything | " + PYTHON_BIN +
+             " my_job.py --step-num=0 --mapper'",
              "-combiner",
-             "bash -c 'grep nothing | python my_job.py --step-num=0"
-                 " --combiner'",
+             "bash -c 'grep nothing | " + PYTHON_BIN +
+             " my_job.py --step-num=0 --combiner'",
              "-reducer",
-             "bash -c 'grep something | python my_job.py --step-num=0"
-                 " --reducer'"])
+             "bash -c 'grep something | " + PYTHON_BIN +
+             " my_job.py --step-num=0 --reducer'"])
 
     def test_combiner_018(self):
         self._assert_streaming_step_old(
@@ -384,8 +390,8 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 },
             },
             ["-mapper",
-             "bash -c 'cat | sort | python my_job.py --step-num=0"
-                " --combiner'",
+             "bash -c 'cat | sort | " + PYTHON_BIN +
+             " my_job.py --step-num=0 --combiner'",
              '-jobconf', 'mapred.reduce.tasks=0'])
 
     def test_pre_filters_018(self):
@@ -406,12 +412,13 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 },
             },
             ['-mapper',
-             "bash -c 'grep anything | python my_job.py --step-num=0"
-                " --mapper | sort | grep nothing | python my_job.py"
-                " --step-num=0 --combiner'",
+             "bash -c 'grep anything | " + PYTHON_BIN +
+             " my_job.py --step-num=0"
+             " --mapper | sort | grep nothing | " + PYTHON_BIN +
+             " my_job.py --step-num=0 --combiner'",
              '-reducer',
-             "bash -c 'grep something | python my_job.py --step-num=0"
-                " --reducer'"])
+             "bash -c 'grep something | " + PYTHON_BIN +
+             " my_job.py --step-num=0 --reducer'"])
 
     def test_pre_filter_escaping(self):
         # ESCAPE ALL THE THINGS!!!
@@ -425,8 +432,9 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
             },
             ['-mapper',
              "bash -c 'bash -c '\\''grep"
-                 " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' |"
-                 " python my_job.py --step-num=0 --mapper'",
+             " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | " +
+             PYTHON_BIN +
+             " my_job.py --step-num=0 --mapper'",
              '-jobconf', 'mapred.reduce.tasks=0'])
 
 
@@ -481,7 +489,7 @@ class JarStepTestCase(MockHadoopTestCase):
             ['-r', 'hadoop', '--jar', fake_jar, input1, input2])
         job.sandbox()
 
-        add_mock_hadoop_output([''])  # need this for streaming step
+        add_mock_hadoop_output([b''])  # need this for streaming step
 
         with job.make_runner() as runner:
             runner.run()

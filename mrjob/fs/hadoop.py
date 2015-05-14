@@ -15,17 +15,13 @@
 import logging
 import posixpath
 import re
+from io import BytesIO
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
 
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
-
 from mrjob.fs.base import Filesystem
+from mrjob.py2 import to_string
 from mrjob.parse import is_uri
 from mrjob.parse import urlparse
 from mrjob.util import cmd_line
@@ -35,18 +31,18 @@ from mrjob.util import read_file
 log = logging.getLogger(__name__)
 
 # used by mkdir()
-HADOOP_FILE_EXISTS_RE = re.compile(r'.*File exists.*')
+HADOOP_FILE_EXISTS_RE = re.compile(br'.*File exists.*')
 
 # used by ls() and path_exists()
 _HADOOP_LS_NO_SUCH_FILE = re.compile(
-    r'^lsr?: Cannot access .*: No such file or directory.')
+    br'^lsr?: Cannot access .*: No such file or directory.')
 
 # Deprecated: removing this in v0.5 and prepending _ to the other constants
 HADOOP_LSR_NO_SUCH_FILE = re.compile(
-    r'^lsr: Cannot access .*: No such file or directory.')
+    br'^lsr: Cannot access .*: No such file or directory.')
 
 # used by rm() (see below)
-HADOOP_RMR_NO_SUCH_FILE = re.compile(r'^rmr: hdfs://.*$')
+HADOOP_RMR_NO_SUCH_FILE = re.compile(br'^rmr: hdfs://.*$')
 
 
 class HadoopFilesystem(Filesystem):
@@ -88,8 +84,8 @@ class HadoopFilesystem(Filesystem):
 
         log_func = log.debug if proc.returncode == 0 else log.error
         if not return_stdout:
-            for line in StringIO(stdout):
-                log_func('STDOUT: ' + line.rstrip('\r\n'))
+            for line in BytesIO(stdout):
+                log_func('STDOUT: ' + to_string(line.rstrip(b'\r\n')))
 
         # check if STDERR is okay
         stderr_is_ok = False
@@ -100,8 +96,8 @@ class HadoopFilesystem(Filesystem):
                     break
 
         if not stderr_is_ok:
-            for line in StringIO(stderr):
-                log_func('STDERR: ' + line.rstrip('\r\n'))
+            for line in BytesIO(stderr):
+                log_func('STDERR: ' + to_string(line.rstrip(b'\r\n')))
 
         ok_returncodes = ok_returncodes or [0]
 
@@ -124,7 +120,7 @@ class HadoopFilesystem(Filesystem):
 
         try:
             return sum(int(line.split()[1])
-                       for line in stdout.split('\n')
+                       for line in stdout.split(b'\n')
                        if line.strip())
         except (ValueError, TypeError, IndexError):
             raise IOError(
@@ -142,12 +138,12 @@ class HadoopFilesystem(Filesystem):
         except CalledProcessError:
             raise IOError("Could not ls %s" % path_glob)
 
-        for line in StringIO(stdout):
-            line = line.rstrip('\r\n')
-            fields = line.split(' ')
+        for line in BytesIO(stdout):
+            line = line.rstrip(b'\r\n')
+            fields = line.split(b' ')
 
             # Throw out directories
-            if fields[0].startswith('d'):
+            if fields[0].startswith(b'd'):
                 continue
 
             # Try to figure out which part of the line is the path
@@ -160,12 +156,14 @@ class HadoopFilesystem(Filesystem):
             # -rwxrwxrwx   1          3276 010-01-13 14:00 /foo/bar
             path_index = None
             for index, field in enumerate(fields):
-                if len(field) == 5 and field[2] == ':':
+                # look for time field, and pick one after that
+                # (can't use field[2] because that's an int in Python 3)
+                if len(field) == 5 and field[2:3] == b':':
                     path_index = (index + 1)
             if not path_index:
-                raise IOError("Could not locate path in string '%s'" % line)
+                raise IOError("Could not locate path in string %r" % line)
 
-            path = line.split(' ', path_index)[-1]
+            path = to_string(line.split(b' ', path_index)[-1])
             # handle fully qualified URIs from newer versions of Hadoop ls
             # (see Pull Request #577)
             if is_uri(path):

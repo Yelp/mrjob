@@ -15,10 +15,7 @@
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-from collections import defaultdict
 import contextlib
-from copy import deepcopy
-from datetime import timedelta
 import glob
 import hashlib
 import itertools
@@ -30,6 +27,10 @@ import sys
 import tarfile
 import zipfile
 import zlib
+from collections import defaultdict
+from copy import deepcopy
+from datetime import timedelta
+from logging import getLogger
 
 try:
     import bz2
@@ -37,8 +38,13 @@ try:
 except ImportError:
     bz2 = None
 
+from mrjob.py2 import PY2
+
+
 #: .. deprecated:: 0.4
 is_ironpython = "IronPython" in sys.version
+
+log = getLogger(__name__)
 
 
 class NullHandler(logging.Handler):
@@ -66,7 +72,7 @@ def buffer_iterator_to_line_iterator(iterator):
         This may append a newline to your last chunk of data. In v0.5.0
         it will not, for better compatibility with file objects.
     """
-    buf = ''
+    buf = b''
     search_offset = 0
     for chunk in iterator:
         buf += chunk
@@ -74,7 +80,7 @@ def buffer_iterator_to_line_iterator(iterator):
         # this is basically splitlines() without support for \r
         start = 0
         while True:
-            end = buf.find('\n', start + search_offset) + 1
+            end = buf.find(b'\n', start + search_offset) + 1
             if end:  # if find() returned -1, end would be 0
                 yield buf[start:end]
                 start = end
@@ -91,7 +97,7 @@ def buffer_iterator_to_line_iterator(iterator):
 
     if buf:
         # in v0.5.0, don't append the newline
-        yield buf + '\n'
+        yield buf + b'\n'
 
 
 def cmd_line(args):
@@ -146,9 +152,16 @@ def file_ext(path):
 
 
 def hash_object(obj):
-    """Generate a hash (currently md5) of the ``repr`` of the object"""
+    """Generate a hash (currently md5) of the ``repr`` of the object.
+
+    .. deprecated:: 0.4.5
+    """
+    log.warning('hash_object() is deprecated and will be removed in v0.5')
     m = hashlib.md5()
-    m.update(repr(obj))
+    obj_repr = repr(obj)
+    if not isinstance(obj_repr, bytes):
+        obj_repr = obj_repr.encode('utf_8')
+    m.update(obj_repr)
     return m.hexdigest()
 
 
@@ -344,7 +357,7 @@ def populate_option_groups_with_options(assignments, indexed_options):
                            :py:func:`util.scrape_options_and_index_by_dest`
     :param indexed_options: options to use when populating the parsers/groups
     """
-    for opt_group, opt_dest_list in assignments.iteritems():
+    for opt_group, opt_dest_list in assignments.items():
         new_options = []
         for option_dest in assignments[opt_group]:
             for option in indexed_options[option_dest]:
@@ -426,7 +439,7 @@ def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
     try:
         # open path if we need to
         if fileobj is None:
-            f = open(path)
+            f = open(path, 'rb')
         else:
             f = fileobj
 
@@ -479,8 +492,8 @@ def _bunzip2_stream(fileobj, bufsize=1024):
         if not chunk:
             return
 
-        parts = d.decompress(chunk)
-        for part in parts:
+        part = d.decompress(chunk)
+        if part:
             yield part
 
 
@@ -610,8 +623,20 @@ def safeeval(expr, globals=None, locals=None):
     values for those names (just like in :py:func:`eval`).
     """
     # blank out builtins, but keep None, True, and False
-    safe_globals = {'__builtins__': None, 'True': True, 'False': False,
-                    'None': None, 'set': set, 'xrange': xrange}
+    safe_globals = {
+        'False': False,
+        'None': None,
+        'True': True,
+        '__builtin__': None,
+        '__builtins__': None,
+        'set': set
+    }
+
+    # xrange is range in Python 3
+    if PY2:
+        safe_globals['xrange'] = xrange
+    else:
+        safe_globals['range'] = range
 
     # PyPy needs special magic
     def open(*args, **kwargs):

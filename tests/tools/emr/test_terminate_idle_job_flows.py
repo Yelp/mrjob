@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the idle job flow terminator"""
-from StringIO import StringIO
+import sys
 from datetime import datetime
 from datetime import timedelta
-import sys
 
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
+from mrjob.py2 import StringIO
 from mrjob.tools.emr.terminate_idle_job_flows import (
     inspect_and_maybe_terminate_job_flows,)
 from mrjob.tools.emr.terminate_idle_job_flows import is_job_flow_bootstrapping
@@ -128,7 +128,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         )
         self.add_mock_s3_data({
             'my_bucket': {
-                'locks/j-IDLE_AND_LOCKED/2': 'not_you',
+                'locks/j-IDLE_AND_LOCKED/2': b'not_you',
             },
         }, time_modified=datetime.utcnow())
 
@@ -142,7 +142,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         )
         self.add_mock_s3_data({
             'my_bucket': {
-                'locks/j-IDLE_AND_EXPIRED/2': 'not_you',
+                'locks/j-IDLE_AND_EXPIRED/2': b'not_you',
             },
         }, time_modified=datetime.utcnow()-timedelta(minutes=5))
 
@@ -264,13 +264,13 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         )
 
         # add job flow IDs and fake names to the mock job flows
-        for jfid, jf in self.mock_emr_job_flows.iteritems():
+        for jfid, jf in self.mock_emr_job_flows.items():
             jf.jobflowid = jfid
             jf.name = jfid[2:].replace('_', ' ').title() + ' Job Flow'
 
     def terminated_jfs(self):
         return sorted(jf.jobflowid
-                      for jf in self.mock_emr_job_flows.itervalues()
+                      for jf in self.mock_emr_job_flows.values()
                       if jf.state in ('SHUTTING_DOWN', 'TERMINATED'))
 
     def inspect_and_maybe_terminate_quietly(self, stdout=None, **kwargs):
@@ -335,7 +335,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
     def assertLockedByTerminate(self, jf, steps_ahead=1):
         contents = self._lock_contents(jf, steps_ahead=steps_ahead)
         self.assertNotEqual(contents, None)
-        self.assertIn('terminate', contents)
+        self.assertIn(b'terminate', contents)
 
     def assertLockedBySomethingElse(self, jf, steps_ahead=1):
         contents = self._lock_contents(jf, steps_ahead=steps_ahead)
@@ -609,6 +609,6 @@ Terminated job flow j-IDLE_AND_FAILED (Idle And Failed Job Flow); was idle for 3
 Terminated job flow j-HADOOP_DEBUGGING (Hadoop Debugging Job Flow); was idle for 2:00:00, 1:00:00 to end of hour
 Terminated job flow j-EMPTY (Empty Job Flow); was idle for 10:00:00, 1:00:00 to end of hour
 """
-        self.assertItemsEqual(
-            stdout.getvalue().splitlines(),
-            output.splitlines())
+        self.assertEqual(
+            sorted(stdout.getvalue().splitlines()),
+            sorted(output.splitlines()))

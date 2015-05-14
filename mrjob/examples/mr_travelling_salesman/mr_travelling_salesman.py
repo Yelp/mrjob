@@ -107,7 +107,7 @@ class MRSalesman(MRJob):
         with while mapping in step 2 and output but the step 2 mapper_final.
         """
         super(MRSalesman, self).__init__(*args, **kwargs)
-        self.shortest_length = sys.maxint
+        self.shortest_length = sys.maxsize
         self.shortest_path = []
         self.longest_length = 0
         self.longest_path = []

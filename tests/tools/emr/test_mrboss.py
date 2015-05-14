@@ -55,7 +55,7 @@ class MRBossTestCase(MockEMRAndS3TestCase):
         self.runner.cleanup()
 
     def test_one_node(self):
-        mock_ssh_file('testmaster', 'some_file', 'file contents')
+        mock_ssh_file('testmaster', 'some_file', b'file contents')
 
         run_on_all_nodes(self.runner, self.output_dir, ['cat', 'some_file'],
                          print_stderr=False)
@@ -69,8 +69,8 @@ class MRBossTestCase(MockEMRAndS3TestCase):
         self.add_slave()
         self.runner._opts['num_ec2_instances'] = 2
 
-        mock_ssh_file('testmaster', 'some_file', 'file contents 1')
-        mock_ssh_file('testmaster!testslave0', 'some_file', 'file contents 2')
+        mock_ssh_file('testmaster', 'some_file', b'file contents 1')
+        mock_ssh_file('testmaster!testslave0', 'some_file', b'file contents 2')
 
         self.runner.fs  # force initialization of _ssh_fs
         self.runner._enable_slave_ssh_access()

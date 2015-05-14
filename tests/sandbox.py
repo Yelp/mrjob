@@ -13,20 +13,18 @@
 # limitations under the License.
 import os
 import os.path
+import random
+from contextlib import contextmanager
 from tempfile import mkdtemp
 from shutil import rmtree
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-from mock import MagicMock
-from mock import patch
-
 import mrjob
 from mrjob import runner
+
+from tests.py2 import MagicMock
+from tests.py2 import TestCase
+from tests.py2 import patch
+from tests.quiet import add_null_handler_to_root_logger
 
 
 # simple config that also silences 'no config options for runner' logging
@@ -62,13 +60,28 @@ def mrjob_conf_patcher(substitute_conf=EMPTY_MRJOB_CONF):
                         mock_load_opts_from_mrjob_confs)
 
 
-class EmptyMrjobConfTestCase(unittest.TestCase):
+@contextmanager
+def random_seed(seed):
+    """Temporarily change the seed of the random number generator."""
+    state = random.getstate()
+
+    random.seed(seed)
+
+    try:
+        yield
+    finally:
+        random.setstate(state)
+
+
+class EmptyMrjobConfTestCase(TestCase):
 
     # set to None if you don't want load_opts_from_mrjob_confs patched
     MRJOB_CONF_CONTENTS = EMPTY_MRJOB_CONF
 
     def setUp(self):
         super(EmptyMrjobConfTestCase, self).setUp()
+
+        add_null_handler_to_root_logger()
 
         if self.MRJOB_CONF_CONTENTS is not None:
             patcher = mrjob_conf_patcher(self.MRJOB_CONF_CONTENTS)
@@ -104,7 +117,9 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
     def makefile(self, path, contents):
         self.makedirs(os.path.split(path)[0])
         abs_path = os.path.join(self.tmp_dir, path)
-        with open(abs_path, 'w') as f:
+
+        mode = 'wb' if isinstance(contents, bytes) else 'w'
+        with open(abs_path, mode) as f:
             f.write(contents)
         return abs_path
 
@@ -118,8 +133,11 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
         (Merely using the local runner won't require this, because it
         bootstraps mrjob by default.)
         """
-        mrjob_pythonpath = os.path.abspath(
-            os.path.join(os.path.dirname(mrjob.__file__), '..'))
-
         os.environ['PYTHONPATH'] = (
-            mrjob_pythonpath + ':' + os.environ.get('PYTHONPATH', ''))
+            mrjob_pythonpath() + ':' + os.environ.get('PYTHONPATH', ''))
+
+
+def mrjob_pythonpath():
+    """The directory containing the mrjob package that we've imported."""
+    return os.path.abspath(
+        os.path.join(os.path.dirname(mrjob.__file__), '..'))

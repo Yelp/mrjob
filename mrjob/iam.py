@@ -26,9 +26,9 @@ idential to the ones it needs before attempting to create them.
 """
 import json
 from logging import getLogger
-from urllib import unquote
 
 from mrjob.aws import random_identifier
+from mrjob.py2 import unquote
 
 # Working IAM roles and policies for EMR; these should be identical
 # to the ones created by AWS CLI (`aws emr create-default-roles`), at least as

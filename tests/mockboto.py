@@ -20,7 +20,6 @@ import hashlib
 import json
 from datetime import datetime
 from datetime import timedelta
-from urllib import quote
 
 try:
     from boto.emr.connection import EmrConnection
@@ -35,6 +34,7 @@ from mrjob.conf import combine_values
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import RFC1123
+from mrjob.py2 import quote
 
 DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
 DEFAULT_MAX_DAYS_AGO = 61
@@ -77,12 +77,14 @@ def add_mock_s3_data(mock_s3_fs, data, time_modified=None):
     time last modified."""
     if time_modified is None:
         time_modified = datetime.utcnow()
-    for bucket_name, key_name_to_bytes in data.iteritems():
+    for bucket_name, key_name_to_bytes in data.items():
         mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
         bucket = mock_s3_fs[bucket_name]
 
-        for key_name, bytes in key_name_to_bytes.iteritems():
-            bucket['keys'][key_name] = (bytes, time_modified)
+        for key_name, key_data in key_name_to_bytes.items():
+            if not isinstance(key_data, bytes):
+                raise TypeError('mock s3 data must be bytes')
+            bucket['keys'][key_name] = (key_data, time_modified)
 
 
 class MockS3Connection(object):
@@ -143,10 +145,8 @@ class MockBucket(object):
 
     def new_key(self, key_name):
         if key_name not in self.mock_state():
-            self.mock_state()[key_name] = (
-                '',
-                to_iso8601(datetime.utcnow())
-            )
+            self.mock_state()[key_name] = (b'',
+                    to_iso8601(datetime.utcnow()))
         return MockKey(bucket=self, name=key_name)
 
     def get_key(self, key_name):
@@ -178,9 +178,6 @@ class MockKey(object):
     """Mock out boto.s3.Key"""
 
     def __init__(self, bucket=None, name=None, date_to_str=None):
-        """You can optionally specify a 'data' argument, which will fill
-        the key with mock data.
-        """
         self.bucket = bucket
         self.name = name
         self.date_to_str = date_to_str or to_iso8601
@@ -198,17 +195,23 @@ class MockKey(object):
         return isinstance(self.read_mock_data(), MultiPartUploadCancelled)
 
     def write_mock_data(self, data):
+        # real boto automatically UTF-8 encodes unicode, but mrjob should
+        # always pass bytes
+        if not isinstance(data, bytes):
+            #data = data.encode('utf_8')
+            raise TypeError('mock s3 data must be bytes')
+
         if self.name in self.bucket.mock_state():
             self.bucket.mock_state()[self.name] = (data, datetime.utcnow())
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
     def get_contents_to_filename(self, path, headers=None):
-        with open(path, 'w') as f:
+        with open(path, 'wb') as f:
             f.write(self.read_mock_data())
 
     def set_contents_from_filename(self, path):
-        with open(path) as f:
+        with open(path, 'rb') as f:
             self.write_mock_data(f.read())
 
     def get_contents_as_string(self):
@@ -235,7 +238,11 @@ class MockKey(object):
         self._pos += len(chunk)
         return chunk
 
+    # need this for Python 2
     def next(self):
+        return self.__next__()
+
+    def __next__(self):
         chunk = self.read(SIMULATED_BUFFER_SIZE)
         if chunk:
             return chunk
@@ -273,8 +280,11 @@ class MockKey(object):
         return len(self.get_contents_as_string())
 
 
-class MultiPartUploadCancelled(str):
+class MultiPartUploadCancelled(bytes):
+    """Thin wrapper for key data, to mark that multipart upload
+    to this key was cancelled."""
     pass
+
 
 class MockMultiPartUpload(object):
 
@@ -297,11 +307,11 @@ class MockMultiPartUpload(object):
         self.parts[part_num] = fp.read()
 
     def complete_upload(self):
-        data = ''
+        data = b''
 
         if self.parts:
             num_parts = max(self.parts)
-            for part_num in xrange(1, num_parts + 1):
+            for part_num in range(1, num_parts + 1):
                 # S3 might be more graceful about missing parts. But we
                 # certainly don't want this to slip past testing
                 data += self.parts[part_num]
@@ -374,7 +384,7 @@ class MockEmrConnection(object):
                                   failure message (or ``None`` for the default
                                   message)
         :param mock_emr_output: a map from ``(job flow ID, step_num)`` to a
-                                list of ``str``s representing file contents to
+                                list of ``bytes``s representing file contents to
                                 output when the job completes
         :type max_job_flows_returned: int
         :param max_job_flows_returned: the maximum number of job flows that
@@ -387,6 +397,12 @@ class MockEmrConnection(object):
                                     we simulate progress. If there is
                                     no next element, we bail out.
         """
+        # check this now; strs will cause problems later in Python 3
+        if mock_emr_output and any(
+                any(not isinstance(part, bytes) for part in parts)
+                for parts in mock_emr_output.values()):
+            raise TypeError('mock EMR output must be bytes')
+
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.mock_emr_job_flows = combine_values({}, mock_emr_job_flows)
         self.mock_emr_failures = combine_values({}, mock_emr_failures)
@@ -647,7 +663,7 @@ class MockEmrConnection(object):
                     400, 'Bad Request', body=err_xml(
                     'Created-before field is before earliest allowed value'))
 
-        jfs = sorted(self.mock_emr_job_flows.itervalues(),
+        jfs = sorted(self.mock_emr_job_flows.values(),
                      key=lambda jf: jf.creationdatetime,
                      reverse=True)
 
@@ -744,7 +760,7 @@ class MockEmrConnection(object):
 
         if self.simulation_iterator:
             try:
-                self.simulation_iterator.next()
+                next(self.simulation_iterator)
             except StopIteration:
                 raise AssertionError(
                     'Simulated progress too many times; bailing out')
@@ -816,14 +832,14 @@ class MockEmrConnection(object):
             output_uri = self._get_step_output_uri(step)
             if output_uri and is_s3_uri(output_uri):
                 mock_output = self.mock_emr_output.get(
-                    (jobflow_id, step_num)) or ['']
+                    (jobflow_id, step_num)) or [b'']
 
                 bucket_name, key_name = parse_s3_uri(output_uri)
 
                 # write output to S3
-                for i, bytes in enumerate(mock_output):
+                for i, part in enumerate(mock_output):
                     add_mock_s3_data(self.mock_s3_fs, {
-                        bucket_name: {key_name + 'part-%05d' % i: bytes}})
+                        bucket_name: {key_name + 'part-%05d' % i: part}})
             elif (jobflow_id, step_num) in self.mock_emr_output:
                 raise AssertionError(
                     "can't use output for job flow ID %s, step %d "
@@ -847,7 +863,7 @@ class MockEmrObject(object):
     can set any attribute on."""
 
     def __init__(self, **kwargs):
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
     def __setattr__(self, key, value):
@@ -877,7 +893,7 @@ class MockEmrObject(object):
             self.__class__.__module__,
             self.__class__.__name__,
             ', '.join('%s=%r' % (k, v)
-                      for k, v in sorted(self.__dict__.iteritems()))))
+                      for k, v in sorted(self.__dict__.items()))))
 
 
 class MockIAMConnection(object):

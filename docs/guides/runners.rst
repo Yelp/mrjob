@@ -231,16 +231,12 @@ example below demonstrates the use of counters in a test case.
 
 ``test_counters.py``
 ::
-
-    try:
-        import unittest2 as unittest
-    except ImportError:
-        import unittest
+    from unittest import TestCase
 
     from tests.mr_counting_job import MRCountingJob
 
 
-    class CounterTestCase(unittest.TestCase):
+    class CounterTestCase(TestCase):
 
         def test_counters(self):
             stdin = StringIO('foo\nbar\n')

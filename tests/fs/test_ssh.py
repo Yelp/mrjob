@@ -75,37 +75,37 @@ class SSHFSTestCase(MockSubprocessTestCase):
     def test_ls_basic_2(self):
         self.make_master_file('f', 'contents')
         self.make_master_file('f2', 'contents')
-        self.assertItemsEqual(list(self.fs.ls('ssh://testmaster/')),
-                              ['ssh://testmaster/f', 'ssh://testmaster/f2'])
+        self.assertEqual(sorted(self.fs.ls('ssh://testmaster/')),
+                         ['ssh://testmaster/f', 'ssh://testmaster/f2'])
 
     def test_ls_recurse(self):
         self.make_master_file('f', 'contents')
         self.make_master_file('d/f2', 'contents')
-        self.assertItemsEqual(list(self.fs.ls('ssh://testmaster/')),
-                              ['ssh://testmaster/f', 'ssh://testmaster/d/f2'])
+        self.assertEqual(sorted(self.fs.ls('ssh://testmaster/')),
+                         ['ssh://testmaster/d/f2', 'ssh://testmaster/f'])
 
     def test_cat_uncompressed(self):
         self.make_master_file(os.path.join('data', 'foo'), 'foo\nfoo\n')
         remote_path = self.fs.path_join('ssh://testmaster/data', 'foo')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         ['foo\n', 'foo\n'])
+                         [b'foo\n', b'foo\n'])
 
     def test_cat_bz2(self):
         self.make_master_file(os.path.join('data', 'foo.bz2'),
-                              bz2.compress('foo\n' * 1000))
+                              bz2.compress(b'foo\n' * 1000))
         remote_path = self.fs.path_join('ssh://testmaster/data', 'foo.bz2')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         ['foo\n'] * 1000)
+                         [b'foo\n'] * 1000)
 
     def test_cat_gz(self):
         self.make_master_file(os.path.join('data', 'foo.gz'),
-                              gzip_compress('foo\n' * 10000))
+                              gzip_compress(b'foo\n' * 10000))
         remote_path = self.fs.path_join('ssh://testmaster/data', 'foo.gz')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         ['foo\n'] * 10000)
+                         [b'foo\n'] * 10000)
 
     def test_slave_cat(self):
         self.add_slave()
@@ -117,7 +117,7 @@ class SSHFSTestCase(MockSubprocessTestCase):
 
         self.make_master_file(self.ssh_key_name, 'key')
         self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         ['foo\n', 'foo\n'])
+                         [b'foo\n', b'foo\n'])
 
     def test_slave_ls(self):
         self.add_slave()

@@ -16,14 +16,6 @@
 
 import os
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-from mock import patch
-
 from mrjob.compat import jobconf_from_env
 from mrjob.compat import jobconf_from_dict
 from mrjob.compat import supports_combiners_in_hadoop_streaming
@@ -31,8 +23,11 @@ from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_generic_jobconf
 
+from tests.py2 import TestCase
+from tests.py2 import patch
 
-class GetJobConfValueTestCase(unittest.TestCase):
+
+class GetJobConfValueTestCase(TestCase):
 
     def setUp(self):
         p = patch.object(os, 'environ', {})
@@ -64,7 +59,7 @@ class GetJobConfValueTestCase(unittest.TestCase):
         self.assertEqual(jobconf_from_env('user.defined', 'beauty'), 'beauty')
 
 
-class JobConfFromDictTestCase(unittest.TestCase):
+class JobConfFromDictTestCase(TestCase):
 
     def test_get_old_hadoop_jobconf(self):
         jobconf = {'user.name': 'Edsger W. Dijkstra'}
@@ -92,7 +87,7 @@ class JobConfFromDictTestCase(unittest.TestCase):
             jobconf_from_dict({}, 'user.defined', 'beauty'), 'beauty')
 
 
-class CompatTestCase(unittest.TestCase):
+class CompatTestCase(TestCase):
 
     def test_translate_jobconf(self):
         self.assertEqual(translate_jobconf('user.name', '0.18'),

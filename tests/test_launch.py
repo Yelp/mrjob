@@ -12,23 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import cStringIO
 import inspect
 import logging
-from optparse import OptionError
 import os
-from subprocess import Popen
-from subprocess import PIPE
 import sys
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-from mock import Mock
-from mock import patch
+from optparse import OptionError
+from subprocess import Popen
+from subprocess import PIPE
 
 from mrjob.conf import combine_envs
 from mrjob.emr import EMRJobRunner
@@ -36,7 +27,13 @@ from mrjob.hadoop import HadoopJobRunner
 from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
+from mrjob.py2 import StringIO
+
+from tests.py2 import Mock
+from tests.py2 import TestCase
+from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import mrjob_pythonpath
 from tests.sandbox import patch_fs_s3
 
 
@@ -76,7 +73,7 @@ class MRCustomJobLauncher(MRJobLauncher):
 ### Test cases ###
 
 
-class MakeRunnerTestCase(unittest.TestCase):
+class MakeRunnerTestCase(TestCase):
 
     def test_local_runner(self):
         launcher = MRJobLauncher(args=['--no-conf', '-r', 'local', ''])
@@ -101,7 +98,7 @@ class MakeRunnerTestCase(unittest.TestCase):
                     self.assertIsInstance(runner, EMRJobRunner)
 
 
-class NoOutputTestCase(unittest.TestCase):
+class NoOutputTestCase(TestCase):
 
     def test_no_output(self):
         launcher = MRJobLauncher(args=['--no-conf', '--no-output', ''])
@@ -111,11 +108,11 @@ class NoOutputTestCase(unittest.TestCase):
             _mock_context_mgr(m_make_runner, runner)
             runner.stream_output.return_value = ['a line']
             launcher.run_job()
-            self.assertEqual(launcher.stdout.getvalue(), '')
-            self.assertEqual(launcher.stderr.getvalue(), '')
+            self.assertEqual(launcher.stdout.getvalue(), b'')
+            self.assertEqual(launcher.stderr.getvalue(), b'')
 
 
-class CommandLineArgsTestCase(unittest.TestCase):
+class CommandLineArgsTestCase(TestCase):
 
     def test_shouldnt_exit_when_invoked_as_object(self):
         self.assertRaises(ValueError, MRJobLauncher, args=['--quux', 'baz'])
@@ -123,12 +120,13 @@ class CommandLineArgsTestCase(unittest.TestCase):
     def test_should_exit_when_invoked_as_script(self):
         args = [sys.executable, inspect.getsourcefile(MRJobLauncher),
                 '--quux', 'baz']
+
         # add . to PYTHONPATH (in case mrjob isn't actually installed)
         env = combine_envs(os.environ,
-                           {'PYTHONPATH': os.path.abspath('.')})
+                           {'PYTHONPATH': mrjob_pythonpath()})
         proc = Popen(args, stderr=PIPE, stdout=PIPE, env=env)
-        proc.communicate()
-        self.assertEqual(proc.returncode, 2)
+        _, err = proc.communicate()
+        self.assertEqual(proc.returncode, 2, err)
 
     def test_custom_key_value_option_parsing(self):
         # simple example
@@ -283,12 +281,12 @@ class CommandLineArgsTestCase(unittest.TestCase):
         self.assertRaises(ValueError, MRCustomJobLauncher, args=[])
 
 
-class TestToolLogging(unittest.TestCase):
+class TestToolLogging(TestCase):
     """ Verify the behavior of logging configuration for CLI tools
     """
     def test_default_options(self):
         with no_handlers_for_logger('__main__'):
-            with patch.object(sys, 'stderr', cStringIO.StringIO()) as stderr:
+            with patch.object(sys, 'stderr', StringIO()) as stderr:
                 MRJob.set_up_logging()
                 log = logging.getLogger('__main__')
                 log.info('INFO')
@@ -297,7 +295,7 @@ class TestToolLogging(unittest.TestCase):
 
     def test_verbose(self):
         with no_handlers_for_logger('__main__'):
-            with patch.object(sys, 'stderr', cStringIO.StringIO()) as stderr:
+            with patch.object(sys, 'stderr', StringIO()) as stderr:
                 MRJob.set_up_logging(verbose=True)
                 log = logging.getLogger('__main__')
                 log.info('INFO')

@@ -131,13 +131,13 @@ class SimMRJobRunner(MRJobRunner):
         # create the working directory
         self.mkdir(working_dir)
 
-        files = self._working_dir_mgr.name_to_path('file').iteritems()
+        files = self._working_dir_mgr.name_to_path('file').items()
         # give all our files names, and symlink or unarchive them
         for name, path in files:
             dest = os.path.join(working_dir, name)
             self._symlink_to_file_or_copy(path, dest)
 
-        archives = self._working_dir_mgr.name_to_path('archive').iteritems()
+        archives = self._working_dir_mgr.name_to_path('archive').items()
         for name, path in archives:
             dest = os.path.join(working_dir, name)
             log.debug('unarchiving %s -> %s' % (path, dest))
@@ -361,7 +361,7 @@ class SimMRJobRunner(MRJobRunner):
             # together
             if keep_sorted:
                 def reducer_key(line):
-                    return line.split('\t')[0]
+                    return line.split(b'\t')[0]
 
                 # assume that input is a collection of key <tab> value pairs
                 # match all non-tab characters
@@ -382,7 +382,7 @@ class SimMRJobRunner(MRJobRunner):
             outfile = None
 
             try:
-                outfile = open(outfile_name, 'w')
+                outfile = open(outfile_name, 'wb')
 
                 # write each line to a file as long as we are within the limit
                 # (split_size)
@@ -394,7 +394,7 @@ class SimMRJobRunner(MRJobRunner):
 
                         outfile_name = create_outfile(path, total_bytes)
                         outfile.close()
-                        outfile = open(outfile_name, 'w')
+                        outfile = open(outfile_name, 'wb')
 
                         bytes_written = 0
 
@@ -438,7 +438,7 @@ class SimMRJobRunner(MRJobRunner):
 
         def to_env(jobconf):
             return dict((k.replace('.', '_'), str(v))
-                        for k, v in jobconf.iteritems())
+                        for k, v in jobconf.items())
 
         # keep the current environment because we need PATH to find binaries
         # and make PYTHONPATH work
@@ -470,12 +470,12 @@ class SimMRJobRunner(MRJobRunner):
         cache_local_archives = []
         cache_local_files = []
 
-        files = self._working_dir_mgr.name_to_path('file').iteritems()
+        files = self._working_dir_mgr.name_to_path('file').items()
         for name, path in files:
             cache_files.append('%s#%s' % (path, name))
             cache_local_files.append(os.path.join(working_dir, name))
 
-        archives = self._working_dir_mgr.name_to_path('archive').iteritems()
+        archives = self._working_dir_mgr.name_to_path('archive').items()
         for name, path in archives:
             cache_archives.append('%s#%s' % (path, name))
             cache_local_archives.append(os.path.join(working_dir, name))
@@ -511,7 +511,7 @@ class SimMRJobRunner(MRJobRunner):
 
         # translate to correct version
         version = self.get_hadoop_version()
-        j = dict((translate_jobconf(k, version), v) for k, v in j.iteritems())
+        j = dict((translate_jobconf(k, version), v) for k, v in j.items())
 
         return j
 

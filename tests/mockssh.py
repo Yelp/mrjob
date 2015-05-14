@@ -26,6 +26,9 @@ mrjob requires a single binary (no args) to stand in for ssh, so
 use create_mock_hadoop_script() to write out a shell script that runs
 mockssh.
 """
+from __future__ import print_function
+
+import io
 import os
 import pipes
 import posixpath
@@ -62,13 +65,16 @@ def mock_ssh_file(host, path, contents):
     Returns the path of the resulting file on the filesystem for sanity
     checking.
     """
+    if not isinstance(contents, bytes):
+        raise TypeError('mock SSH file contents must be bytes')
+
     path = rel_posix_to_abs_local(host, path)
 
     basename, name = os.path.split(path)
     if not os.path.exists(basename):
         os.makedirs(basename)
 
-    with open(path, 'w') as f:
+    with open(path, 'wb') as f:
         f.write(contents)
     return path
 
@@ -114,7 +120,7 @@ def main(stdin, stdout, stderr, args, environ):
         for kv_pair in environ['MOCK_SSH_ROOTS'].split(':'):
             m = _SLAVE_ADDR_RE.match(kv_pair)
             if m:
-                print >> stdout, m.group('slave')
+                print(m.group('slave'), file=stdout)
         return 0
 
     def receive_poor_mans_scp(host, args):
@@ -126,7 +132,7 @@ def main(stdin, stdout, stderr, args, environ):
                 f.writelines(stdin)
             return 0
         except IOError:
-            print >> stderr, 'No such file or directory:', dest
+            print('No such file or directory:', dest, file=stderr)
             return 1
 
 
@@ -140,16 +146,16 @@ def main(stdin, stdout, stderr, args, environ):
 
         prefix_length = len(path_for_host(host, environ))
         if not os.path.exists(local_dest):
-            print >> stderr, 'No such file or directory:', local_dest
+            print('No such file or directory:', local_dest, file=stderr)
             return 1
         if not os.path.isdir(local_dest):
-            print >> stdout, dest
+            print(dest, file=stdout)
         for root, dirs, files in os.walk(local_dest):
             components = root.split(os.sep)
             new_root = posixpath.join(*components)
             for filename in files:
-                print >> stdout, (
-                    '/' + posixpath.join(new_root, filename)[prefix_length:])
+                print((
+                    '/' + posixpath.join(new_root, filename)[prefix_length:]), file=stdout)
         return 0
 
 
@@ -157,12 +163,17 @@ def main(stdin, stdout, stderr, args, environ):
         """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_cat()`"""
         local_dest = rel_posix_to_abs_local(host, args[1], environ)
         if not os.path.exists(local_dest):
-            print >> stderr, 'No such file or directory:', local_dest
+            print('No such file or directory:', local_dest, file=stderr)
             return 1
-        with open(local_dest, 'r') as f:
-            print >> stdout, f.read(),
-            return 0
 
+        # in Python 3, binary data has to go to sys.stdout.buffer
+        stdout_buffer = getattr(stdout, 'buffer', stdout)
+
+        with open(local_dest, 'rb') as f:
+            for line in f:
+                stdout_buffer.write(line)
+
+        return 0
 
     def run(host, remote_args, stdout, stderr, environ, slave_key_file=None):
         """Execute a command as a "host." Recursively call for slave if necessary.
@@ -196,11 +207,11 @@ def main(stdin, stdout, stderr, args, environ):
             if not os.path.exists(
                 os.path.join(path_for_host(host, environ), slave_key_file)):
                 # This is word-for-word what SSH says.
-                print >> stderr, ('Warning: Identity file %s not accessible.'
+                print(('Warning: Identity file %s not accessible.'
                                   ' No such file or directory.' %
-                                  slave_key_file)
+                                  slave_key_file), file=stderr)
 
-                print >> stderr, 'Permission denied (publickey).'
+                print('Permission denied (publickey).', file=stderr)
                 return 1
 
             while not remote_args[remote_arg_pos].startswith('hadoop@'):
@@ -212,8 +223,8 @@ def main(stdin, stdout, stderr, args, environ):
             return run(slave_host, remote_args[remote_arg_pos + 1:],
                        stdin, stdout, stderr, slave_key_file)
 
-        print >> stderr, ("Command line not recognized: %s" %
-                          ' '.join(remote_args))
+        print(("Command line not recognized: %s" %
+                          ' '.join(remote_args)), file=stderr)
         return 1
 
     # Find where the user's commands begin
@@ -228,7 +239,7 @@ def main(stdin, stdout, stderr, args, environ):
     # verify existence of key pair file if necessary
     if environ.get('MOCK_SSH_VERIFY_KEY_FILE', 'false') == 'true' \
        and not os.path.exists(args[arg_pos]):
-        print >> stderr, 'Warning: Identity file',
+        print('Warning: Identity file', end='', file=stderr)
         args[arg_pos], 'not accessible: No such file or directory.'
         return 1
 

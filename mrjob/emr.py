@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import hashlib
 import logging
 import os
 import os.path
@@ -23,18 +23,12 @@ import re
 import signal
 import socket
 import time
-import urllib2
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
+from io import BytesIO
 from subprocess import Popen
 from subprocess import PIPE
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
 
 try:
     import simplejson as json  # preferred because of C speedups
@@ -108,6 +102,8 @@ from mrjob.parse import iso8601_to_timestamp
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
+from mrjob.py2 import string_types
+from mrjob.py2 import urlopen
 from mrjob.retry import RetryGoRound
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
@@ -121,7 +117,6 @@ from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.util import cmd_line
-from mrjob.util import hash_object
 from mrjob.util import shlex_split
 
 
@@ -286,7 +281,7 @@ def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
 
     if key is None or key_expired:
         key = bucket.new_key(key_prefix)
-        key.set_contents_from_string(job_name)
+        key.set_contents_from_string(job_name.encode('utf_8'))
         return key
     else:
         return None
@@ -294,7 +289,7 @@ def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
 
 def _lock_acquire_step_2(key, job_name):
     key_value = key.get_contents_as_string()
-    return (key_value == job_name)
+    return (key_value == job_name.encode('utf_8'))
 
 
 def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name,
@@ -427,7 +422,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             's3_upload_part_size': 100,  # 100 MB
             'sh_bin': ['/bin/sh', '-ex'],
             'ssh_bin': ['ssh'],
-            'ssh_bind_ports': range(40001, 40841),
+            'ssh_bind_ports': list(range(40001, 40841)),
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
             'visible_to_all_users': False,
@@ -480,7 +475,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                 self._opt_priority['num_ec2_instances'] <=
                 max(self._opt_priority['num_ec2_core_instances'],
                     self._opt_priority['num_ec2_task_instances'])):
-                log.warn('Mixing num_ec2_instances and'
+                log.warning('Mixing num_ec2_instances and'
                          ' num_ec2_{core,task}_instances does not make sense;'
                          ' ignoring num_ec2_instances')
             # recalculate number of EC2 instances
@@ -633,7 +628,7 @@ class EMRJobRunner(MRJobRunner):
                 if isinstance(maybe_path_dict, dict):
                     self._bootstrap_dir_mgr.add(**maybe_path_dict)
 
-        if not (isinstance(self._opts['additional_emr_info'], basestring) or
+        if not (isinstance(self._opts['additional_emr_info'], string_types) or
                 self._opts['additional_emr_info'] is None):
             self._opts['additional_emr_info'] = json.dumps(
                 self._opts['additional_emr_info'])
@@ -915,7 +910,7 @@ class EMRJobRunner(MRJobRunner):
 
         s3_conn = self.make_s3_conn()
 
-        for path, s3_uri in self._upload_mgr.path_to_uri().iteritems():
+        for path, s3_uri in self._upload_mgr.path_to_uri().items():
             log.debug('uploading %s -> %s' % (path, s3_uri))
             self._upload_contents(s3_uri, s3_conn, path)
 
@@ -944,7 +939,7 @@ class EMRJobRunner(MRJobRunner):
             s3_key.set_contents_from_filename(path)
 
     def _upload_parts(self, mpul, path, fsize, part_size):
-        offsets = xrange(0, fsize, part_size)
+        offsets = range(0, fsize, part_size)
 
         for i, offset in enumerate(offsets):
             part_num = i + 1
@@ -1255,7 +1250,7 @@ class EMRJobRunner(MRJobRunner):
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (
             self._job_name, self._opts['s3_log_uri'],
-            ', '.join('%s=%r' % (k, v) for k, v in args.iteritems())))
+            ', '.join('%s=%r' % (k, v) for k, v in args.items())))
         emr_job_flow_id = emr_conn.run_jobflow(
             self._job_name, self._opts['s3_log_uri'], **args)
 
@@ -1409,7 +1404,7 @@ class EMRJobRunner(MRJobRunner):
         steps we want to run."""
         # quick, add the other steps before the job spins up and
         # then shuts itself down (in practice this takes several minutes)
-        return [self._build_step(n) for n in xrange(self._num_steps())]
+        return [self._build_step(n) for n in range(self._num_steps())]
 
     def _build_step(self, step_num):
         step = self._get_step(step_num)
@@ -1631,7 +1626,7 @@ class EMRJobRunner(MRJobRunner):
 
                 if self._show_tracker_progress:
                     try:
-                        tracker_handle = urllib2.urlopen(self._tracker_url)
+                        tracker_handle = urlopen(self._tracker_url)
                         tracker_page = ''.join(tracker_handle.readlines())
                         tracker_handle.close()
                         # first two formatted percentages, map then reduce
@@ -2034,11 +2029,12 @@ class EMRJobRunner(MRJobRunner):
 
         contents = self._master_bootstrap_script_content(
             self._bootstrap + mrjob_bootstrap + self._legacy_bootstrap)
-        for line in StringIO(contents):
+        for line in contents:
             log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
         with open(path, 'w') as f:
-            f.write(contents)
+            for line in contents:
+                f.write(line)
 
         self._master_bootstrap_script_path = path
 
@@ -2087,7 +2083,7 @@ class EMRJobRunner(MRJobRunner):
                 "bootstrap_cmds is deprecated since v0.4.2 and will be"
                 " removed in v0.6.0. Consider using bootstrap instead.")
         for cmd in self._opts['bootstrap_cmds']:
-            if not isinstance(cmd, basestring):
+            if not isinstance(cmd, string_types):
                 cmd = cmd_line(cmd)
             bootstrap.append([cmd])
 
@@ -2106,10 +2102,10 @@ class EMRJobRunner(MRJobRunner):
     def _master_bootstrap_script_content(self, bootstrap):
         """Create the contents of the master bootstrap script.
         """
-        out = StringIO()
+        out = []
 
         def writeln(line=''):
-            out.write(line + '\n')
+            out.append(line + '\n')
 
         # shebang
         sh_bin = self._opts['sh_bin']
@@ -2126,7 +2122,7 @@ class EMRJobRunner(MRJobRunner):
         # download files using hadoop fs
         writeln('# download files and mark them executable')
         for name, path in sorted(
-                self._bootstrap_dir_mgr.name_to_path('file').iteritems()):
+                self._bootstrap_dir_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
             writeln('hadoop fs -copyToLocal %s $__mrjob_PWD/%s' %
                     (pipes.quote(uri), pipes.quote(name)))
@@ -2151,7 +2147,7 @@ class EMRJobRunner(MRJobRunner):
             writeln(line)
         writeln()
 
-        return out.getvalue()
+        return out
 
     ### EMR JOB MANAGEMENT UTILS ###
 
@@ -2359,7 +2355,7 @@ class EMRJobRunner(MRJobRunner):
                         int(ig.instancerequestcount))
 
             # check if there are enough compute units
-            for role, req_cu in role_to_req_cu.iteritems():
+            for role, req_cu in role_to_req_cu.items():
                 req_num_instances = role_to_req_num_instances[role]
                 # if we have at least as many units of the right type,
                 # don't bother counting compute units
@@ -2446,7 +2442,7 @@ class EMRJobRunner(MRJobRunner):
             # depending on insertion/deletion order.
             sorted(
                 (name, self.md5sum(path)) for name, path
-                in self._bootstrap_dir_mgr.name_to_path('file').iteritems()
+                in self._bootstrap_dir_mgr.name_to_path('file').items()
                 if not path == self._mrjob_tar_gz_path),
             self._opts['additional_emr_info'],
             self._bootstrap,
@@ -2457,7 +2453,14 @@ class EMRJobRunner(MRJobRunner):
 
         if self._opts['bootstrap_mrjob']:
             things_to_hash.append(mrjob.__version__)
-        return hash_object(things_to_hash)
+
+        things_json = json.dumps(things_to_hash, sort_keys=True)
+        if not isinstance(things_json, bytes):
+            things_json = things_json.encode('utf_8')
+
+        m = hashlib.md5()
+        m.update(things_json)
+        return m.hexdigest()
 
     ### EMR-specific Stuff ###
 

@@ -13,20 +13,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import codecs
 import logging
+import os
+import sys
+import time
+from io import BytesIO
 from optparse import Option
 from optparse import OptionError
 from optparse import OptionGroup
 from optparse import OptionParser
-import os
-import sys
-import time
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
 
 from mrjob.conf import combine_dicts
 from mrjob.options import add_basic_opts
@@ -39,6 +35,7 @@ from mrjob.options import add_runner_opts
 from mrjob.options import print_help_for_groups
 from mrjob.parse import parse_key_value_list
 from mrjob.parse import parse_port_range_list
+from mrjob.py2 import PY2
 from mrjob.runner import CLEANUP_CHOICES
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
@@ -117,9 +114,16 @@ class MRJobLauncher(object):
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
         # See sandbox(), below.
-        self.stdin = sys.stdin
-        self.stdout = sys.stdout
-        self.stderr = sys.stderr
+        #
+        # These should always read/write bytes, not unicode
+        if PY2:
+            self.stdin = sys.stdin
+            self.stdout = sys.stdout
+            self.stderr = sys.stderr
+        else:
+            self.stdin = sys.stdin.buffer
+            self.stdout = sys.stdout.buffer
+            self.stderr = sys.stderr.buffer
 
     @classmethod
     def _usage(cls):
@@ -206,9 +210,13 @@ class MRJobLauncher(object):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
+        # self.stderr is strictly binary, need to wrap it so it's possible
+        # to log to it in Python 3
+        log_stream = codecs.getwriter('utf_8')(self.stderr)
+
         self.set_up_logging(quiet=self.options.quiet,
                             verbose=self.options.verbose,
-                            stream=self.stderr)
+                            stream=log_stream)
 
         with self.make_runner() as runner:
             runner.run()
@@ -655,7 +663,7 @@ class MRJobLauncher(object):
         """Redirect stdin, stdout, and stderr for automated testing.
 
         You can set stdin, stdout, and stderr to file objects. By
-        default, they'll be set to empty ``StringIO`` objects.
+        default, they'll be set to empty ``BytesIO`` objects.
         You can then access the job's file handles through ``self.stdin``,
         ``self.stdout``, and ``self.stderr``. See :ref:`testing` for more
         information about testing.
@@ -666,11 +674,11 @@ class MRJobLauncher(object):
         ``stdin`` is empty by default. You can set it to anything that yields
         lines::
 
-            mr_job.sandbox(stdin=StringIO('some_data\\n'))
+            mr_job.sandbox(stdin=BytesIO(b'some_data\\n'))
 
         or, equivalently::
 
-            mr_job.sandbox(stdin=['some_data\\n'])
+            mr_job.sandbox(stdin=[b'some_data\\n'])
 
         For convenience, this sandbox() returns self, so you can do::
 
@@ -683,7 +691,7 @@ class MRJobLauncher(object):
 
         More complex testing example::
 
-            from StringIO import StringIO
+            from BytesIO import BytesIO
 
             from mrjob.parse import parse_mr_job_stderr
             from mrjob.protocol import JSONProtocol
@@ -691,16 +699,16 @@ class MRJobLauncher(object):
             mr_job = MRYourJob(args=[...])
 
             fake_input = '"foo"\\t"bar"\\n"foo"\\t"baz"\\n'
-            mr_job.sandbox(stdin=StringIO(fake_input))
+            mr_job.sandbox(stdin=BytesIO(fake_input))
 
             mr_job.run_reducer(link_num=0)
 
             self.assertEqual(mrjob.stdout.getvalue(), ...)
             self.assertEqual(parse_mr_job_stderr(mr_job.stderr), ...)
         """
-        self.stdin = stdin or StringIO()
-        self.stdout = stdout or StringIO()
-        self.stderr = stderr or StringIO()
+        self.stdin = stdin or BytesIO()
+        self.stdout = stdout or BytesIO()
+        self.stderr = stderr or BytesIO()
 
         return self
 

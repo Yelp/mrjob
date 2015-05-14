@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for LocalMRJobRunner"""
-from StringIO import StringIO
 import gzip
 import os
 import shutil
@@ -21,18 +20,14 @@ import signal
 import stat
 import sys
 import tempfile
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
+from io import BytesIO
 
 import mrjob
 from mrjob.local import LocalMRJobRunner
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import read_file
+
 from tests.mr_cmd_job import CmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
@@ -41,6 +36,8 @@ from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.mr_word_count import MRWordCount
+from tests.py2 import TestCase
+from tests.py2 import skipIf
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -52,7 +49,7 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
     def test_end_to_end(self):
         # read from STDIN, a regular file, and a .gz
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
@@ -60,8 +57,8 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
         input_gz_glob = os.path.join(self.tmp_dir, '*.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\n')
+        input_gz = gzip.GzipFile(input_gz_path, 'wb')
+        input_gz.write(b'foo\n')
         input_gz.close()
 
         mr_job = MRTwoStepJob(['-r', 'local', '-', input_path, input_gz_glob])
@@ -90,15 +87,15 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
     def test_end_to_end_multiple_tasks(self):
         # read from STDIN, a regular file, and a .gz
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as input_file:
-            input_file.write('bar\nqux\n')
+        with open(input_path, 'wb') as input_file:
+            input_file.write(b'bar\nqux\n')
 
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\n')
+        input_gz = gzip.GzipFile(input_gz_path, 'wb')
+        input_gz.write(b'foo\n')
         input_gz.close()
 
         mr_job = MRTwoStepJob(['-r', 'local',
@@ -134,8 +131,8 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
             input_file.write('bar\nqux\nfoo\nbar\nqux\nfoo\n')
 
         input_path2 = os.path.join(self.tmp_dir, 'input2')
-        with open(input_path2, 'w') as input_file:
-            input_file.write('foo\nbar\nbar\n')
+        with open(input_path2, 'wb') as input_file:
+            input_file.write(b'foo\nbar\nbar\n')
 
         runner = LocalMRJobRunner(conf_paths=[])
 
@@ -148,20 +145,20 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
         # make sure all the data is preserved
         content = []
         for file_name in file_splits:
-            f = open(file_name)
-            content.extend(f.readlines())
+            with open(file_name, 'rb') as f:
+                content.extend(f.readlines())
 
         self.assertEqual(sorted(content),
-                         ['bar\n', 'bar\n', 'bar\n', 'bar\n', 'foo\n',
-                          'foo\n', 'foo\n', 'qux\n', 'qux\n'])
+                         [b'bar\n', b'bar\n', b'bar\n', b'bar\n', b'foo\n',
+                          b'foo\n', b'foo\n', b'qux\n', b'qux\n'])
 
     def test_get_file_splits_sorted_test(self):
         # set up input paths
         input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as input_file:
+        with open(input_path, 'wb') as input_file:
             input_file.write(
-                '1\tbar\n1\tbar\n1\tbar\n2\tfoo\n2\tfoo\n2\tfoo\n3\tqux\n'
-                '3\tqux\n3\tqux\n')
+                b'1\tbar\n1\tbar\n1\tbar\n2\tfoo\n2\tfoo\n2\tfoo\n3\tqux\n'
+                b'3\tqux\n3\tqux\n')
 
         runner = LocalMRJobRunner(conf_paths=[])
 
@@ -174,26 +171,27 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
         # make sure all the data is preserved in sorted order
         content = []
         for file_name in sorted(file_splits.keys()):
-            f = open(file_name, 'r')
-            content.extend(f.readlines())
+            with open(file_name, 'rb') as f:
+                content.extend(f.readlines())
 
         self.assertEqual(content,
-                         ['1\tbar\n', '1\tbar\n', '1\tbar\n',
-                          '2\tfoo\n', '2\tfoo\n', '2\tfoo\n',
-                          '3\tqux\n', '3\tqux\n', '3\tqux\n'])
+                         [b'1\tbar\n', b'1\tbar\n', b'1\tbar\n',
+                          b'2\tfoo\n', b'2\tfoo\n', b'2\tfoo\n',
+                          b'3\tqux\n', b'3\tqux\n', b'3\tqux\n'])
 
     def gz_test(self, dir_path_name):
-        contents_gz = ['bar\n', 'qux\n', 'foo\n', 'bar\n', 'qux\n', 'foo\n']
-        contents_normal = ['foo\n', 'bar\n', 'bar\n']
+        contents_gz = [b'bar\n', b'qux\n', b'foo\n', b'bar\n',
+                       b'qux\n', b'foo\n']
+        contents_normal = [b'foo\n', b'bar\n', b'bar\n']
         all_contents_sorted = sorted(contents_gz + contents_normal)
 
         input_gz_path = os.path.join(dir_path_name, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write(''.join(contents_gz))
+        input_gz = gzip.GzipFile(input_gz_path, 'wb')
+        input_gz.write(b''.join(contents_gz))
         input_gz.close()
         input_path2 = os.path.join(dir_path_name, 'input2')
-        with open(input_path2, 'w') as input_file:
-            input_file.write(''.join(contents_normal))
+        with open(input_path2, 'wb') as input_file:
+            input_file.write(b''.join(contents_normal))
 
         runner = LocalMRJobRunner(conf_paths=[])
 
@@ -239,7 +237,7 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
         self.gz_test('')
 
     def test_multi_step_counters(self):
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         mr_job = MRCountingJob(['-r', 'local', '-'])
         mr_job.sandbox(stdin=stdin)
@@ -257,16 +255,16 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
         gz_path_2 = os.path.join(self.tmp_dir, '2.gz')
         path_3 = os.path.join(self.tmp_dir, '3')
 
-        input_gz_1 = gzip.GzipFile(gz_path_1, 'w')
-        input_gz_1.write('x\n')
+        input_gz_1 = gzip.GzipFile(gz_path_1, 'wb')
+        input_gz_1.write(b'x\n')
         input_gz_1.close()
 
-        input_gz_2 = gzip.GzipFile(gz_path_2, 'w')
-        input_gz_2.write('y\n')
+        input_gz_2 = gzip.GzipFile(gz_path_2, 'wb')
+        input_gz_2.write(b'y\n')
         input_gz_2.close()
 
-        with open(path_3, 'w') as f:
-            f.write('z')
+        with open(path_3, 'wb') as f:
+            f.write(b'z')
 
         mr_job = MRCountingJob(['--no-conf', '-r', 'local', gz_path_1,
                                gz_path_2, path_3])
@@ -301,7 +299,7 @@ class TimeoutException(Exception):
     pass
 
 
-class LargeAmountsOfStderrTestCase(unittest.TestCase):
+class LargeAmountsOfStderrTestCase(TestCase):
 
     def setUp(self):
         self.set_alarm()
@@ -336,18 +334,18 @@ class LargeAmountsOfStderrTestCase(unittest.TestCase):
             # look for expected output from MRVerboseJob
             stderr = mr_job.stderr.getvalue()
             self.assertIn(
-                "Counters from step 1:\n  Foo:\n    Bar: 10000", stderr)
-            self.assertIn('status: 0\n', stderr)
-            self.assertIn('status: 99\n', stderr)
-            self.assertNotIn('status: 100\n', stderr)
-            self.assertIn('STDERR: Qux\n', stderr)
+                b"Counters from step 1:\n  Foo:\n    Bar: 10000", stderr)
+            self.assertIn(b'status: 0\n', stderr)
+            self.assertIn(b'status: 99\n', stderr)
+            self.assertNotIn(b'status: 100\n', stderr)
+            self.assertIn(b'STDERR: Qux\n', stderr)
             # exception should appear in exception message
             self.assertIn('BOOM', repr(e))
         else:
             raise AssertionError()
 
 
-class ExitWithoutExceptionTestCase(unittest.TestCase):
+class ExitWithoutExceptionTestCase(TestCase):
 
     def test_exit_42_job(self):
         mr_job = MRExit42Job(['--no-conf', '--runner=local'])
@@ -375,35 +373,39 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
         with mr_job.make_runner() as runner:
             assert isinstance(runner, LocalMRJobRunner)
             runner.run()
-            output = ''.join(runner.stream_output())
+            output = b''.join(runner.stream_output())
 
         # the output should basically be the command we used to
         # run the last step, which in this case is a mapper
-        self.assertIn('mr_two_step_job.py', output)
-        self.assertIn('--step-num=1', output)
-        self.assertIn('--mapper', output)
+        self.assertIn(b'mr_two_step_job.py', output)
+        self.assertIn(b'--step-num=1', output)
+        self.assertIn(b'--mapper', output)
 
-    @unittest.skipIf(hasattr(sys, 'pypy_version_info'),
+    @skipIf(hasattr(sys, 'pypy_version_info'),
                      "-v option doesn't work with pypy")
     def test_python_dash_v_as_python_bin(self):
         python_cmd = cmd_line([sys.executable or 'python', '-v'])
         mr_job = MRTwoStepJob(['--python-bin', python_cmd, '--no-conf',
                                '-r', 'local'])
-        mr_job.sandbox(stdin=['bar\n'])
+        mr_job.sandbox(stdin=[b'bar\n'])
 
         with no_handlers_for_logger():
             mr_job.run_job()
 
-        # expect debugging messages in stderr
-        self.assertIn('import mrjob', mr_job.stderr.getvalue())
-        self.assertIn('#', mr_job.stderr.getvalue())
+        # expect debugging messages in stderr.
+        stderr = mr_job.stderr.getvalue()
+
+        # stderr is huge, so don't use assertIn()
+        self.assertTrue(b'import mrjob' in stderr or     # Python 2
+                        b"import 'mrjob'" in stderr)  # Python 3
+        self.assertTrue(b'#' in stderr)
 
         # should still get expected results
-        self.assertItemsEqual(mr_job.stdout.getvalue().splitlines(),
-                              ['1\tnull', '1\t"bar"'])
+        self.assertEqual(sorted(mr_job.stdout.getvalue().splitlines()),
+                         sorted([b'1\tnull', b'1\t"bar"']))
 
 
-class StepsPythonBinTestCase(unittest.TestCase):
+class StepsPythonBinTestCase(TestCase):
 
     def test_echo_as_steps_python_bin(self):
         mr_job = MRTwoStepJob(
@@ -436,7 +438,7 @@ class StepsPythonBinTestCase(unittest.TestCase):
             self.assertRaises(ValueError, runner._get_steps)
 
 
-class LocalBootstrapMrjobTestCase(unittest.TestCase):
+class LocalBootstrapMrjobTestCase(TestCase):
 
     def setUp(self):
         self.make_tmp_dir()
@@ -535,9 +537,9 @@ class CompatTestCase(EmptyMrjobConfTestCase):
 class CommandSubstepTestCase(SandboxedTestCase):
 
     def test_cat_mapper(self):
-        data = 'x\ny\nz\n'
+        data = b'x\ny\nz\n'
         job = CmdJob(['--mapper-cmd=cat', '--runner=local'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -549,12 +551,12 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
             r.run()
             lines = [line.strip() for line in list(r.stream_output())]
-            self.assertItemsEqual(lines, data.split())
+            self.assertEqual(sorted(lines), sorted(data.split()))
 
     def test_uniq_combiner(self):
-        data = 'x\nx\nx\nx\nx\nx\n'
+        data = b'x\nx\nx\nx\nx\nx\n'
         job = CmdJob(['--combiner-cmd=uniq', '--runner=local'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -572,12 +574,12 @@ class CommandSubstepTestCase(SandboxedTestCase):
             # there are 2 map tasks, each of which has 1 combiner, and all rows
             # are the same, so we should end up with just 2 values
 
-            self.assertEqual(''.join(r.stream_output()), 'x\nx\n')
+            self.assertEqual(b''.join(r.stream_output()), b'x\nx\n')
 
     def test_cat_reducer(self):
-        data = 'x\ny\nz\n'
+        data = b'x\ny\nz\n'
         job = CmdJob(['--reducer-cmd', 'cat -e', '--runner=local'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -593,10 +595,10 @@ class CommandSubstepTestCase(SandboxedTestCase):
             r.run()
 
             lines = list(r.stream_output())
-            self.assertItemsEqual(lines, ['x$\n', 'y$\n', 'z$\n'])
+            self.assertEqual(sorted(lines), [b'x$\n', b'y$\n', b'z$\n'])
 
     def test_multiple(self):
-        data = 'x\nx\nx\nx\nx\nx\n'
+        data = b'x\nx\nx\nx\nx\nx\n'
         mapper_cmd = 'cat -e'
         reducer_cmd = bash_wrap('wc -l | tr -Cd "[:digit:]"')
         job = CmdJob([
@@ -604,7 +606,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
             '--mapper-cmd', mapper_cmd,
             '--combiner-cmd', 'uniq',
             '--reducer-cmd', reducer_cmd])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -617,13 +619,13 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
             r.run()
 
-            self.assertEqual(list(r.stream_output()), ['2'])
+            self.assertEqual(list(r.stream_output()), [b'2'])
 
     def test_multiple_2(self):
-        data = 'x\ny\nz\n'
+        data = b'x\ny\nz\n'
         job = CmdJob(['--mapper-cmd=cat', '--reducer-cmd-2', 'wc -l',
                       '--runner=local', '--no-conf'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             r.run()
             self.assertEqual(sum(int(l) for l in r.stream_output()), 3)
@@ -632,9 +634,9 @@ class CommandSubstepTestCase(SandboxedTestCase):
 class FilterTestCase(SandboxedTestCase):
 
     def test_mapper_pre_filter(self):
-        data = 'x\ny\nz\n'
+        data = b'x\ny\nz\n'
         job = FilterJob(['--mapper-filter', 'cat -e', '--runner=local'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -647,12 +649,12 @@ class FilterTestCase(SandboxedTestCase):
             r.run()
 
             lines = [line.strip() for line in list(r.stream_output())]
-            self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
+            self.assertEqual(sorted(lines), [b'x$', b'y$', b'z$'])
 
     def test_combiner_pre_filter(self):
-        data = 'x\ny\nz\n'
+        data = b'x\ny\nz\n'
         job = FilterJob(['--combiner-filter', 'cat -e', '--runner=local'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -668,12 +670,12 @@ class FilterTestCase(SandboxedTestCase):
 
             r.run()
             lines = [line.strip() for line in list(r.stream_output())]
-            self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
+            self.assertEqual(sorted(lines), [b'x$', b'y$', b'z$'])
 
     def test_reducer_pre_filter(self):
-        data = 'x\ny\nz\n'
+        data = b'x\ny\nz\n'
         job = FilterJob(['--reducer-filter', 'cat -e', '--runner=local'])
-        job.sandbox(stdin=StringIO(data))
+        job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -689,4 +691,4 @@ class FilterTestCase(SandboxedTestCase):
             r.run()
 
             lines = [line.strip() for line in list(r.stream_output())]
-            self.assertItemsEqual(lines, ['x$', 'y$', 'z$'])
+            self.assertEqual(sorted(lines), [b'x$', b'y$', b'z$'])

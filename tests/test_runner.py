@@ -19,39 +19,31 @@ import os.path
 import shutil
 import signal
 import stat
-from subprocess import CalledProcessError
 import sys
 import tarfile
 import tempfile
+from io import BytesIO
+from subprocess import CalledProcessError
 
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-from mock import patch
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import JOB_NAME_RE
+from mrjob.py2 import StringIO
 from mrjob.runner import MRJobRunner
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
+
 from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
+from tests.py2 import TestCase
+from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
 
-class WithStatementTestCase(unittest.TestCase):
+class WithStatementTestCase(TestCase):
 
     def setUp(self):
         self.local_tmp_dir = None
@@ -95,7 +87,7 @@ class WithStatementTestCase(unittest.TestCase):
         self._test_cleanup_after_with_statement(['NONE', 'NONE'], True)
 
 
-class TestJobName(unittest.TestCase):
+class TestJobName(TestCase):
 
     def setUp(self):
         self.blank_out_environment()
@@ -194,7 +186,7 @@ class TestJobName(unittest.TestCase):
         self.assertEqual(match.group(2), 'ads')
 
 
-class CreateMrjobTarGzTestCase(unittest.TestCase):
+class CreateMrjobTarGzTestCase(TestCase):
 
     def test_create_mrjob_tar_gz(self):
         with no_handlers_for_logger('mrjob.runner'):
@@ -209,7 +201,7 @@ class CreateMrjobTarGzTestCase(unittest.TestCase):
                 self.assertIn('mrjob/job.py', contents)
 
 
-class TestStreamingOutput(unittest.TestCase):
+class TestStreamingOutput(TestCase):
 
     def setUp(self):
         self.make_tmp_dir()
@@ -257,10 +249,10 @@ class TestStreamingOutput(unittest.TestCase):
 
         runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
         self.assertEqual(sorted(runner.stream_output()),
-                         ['A', 'B', 'C'])
+                         [b'A', b'B', b'C'])
 
 
-class TestInvokeSort(unittest.TestCase):
+class TestInvokeSort(TestCase):
 
     def setUp(self):
         self.make_tmp_dir_and_set_up_files()
@@ -366,10 +358,11 @@ sys.exit(13)
 
         runner._invoke_sort([self.a], self.out)
 
-        self.assertEqual(list(open(self.out)),
-                         ['A\n',
-                          'alligator\n',
-                          'apple\n'])
+        with open(self.out) as out_f:
+            self.assertEqual(list(out_f),
+                             ['A\n',
+                              'alligator\n',
+                              'apple\n'])
 
     def test_two_files(self):
         runner = MRJobRunner(conf_paths=[])
@@ -377,13 +370,14 @@ sys.exit(13)
 
         runner._invoke_sort([self.a, self.b], self.out)
 
-        self.assertEqual(list(open(self.out)),
-                         ['A\n',
-                          'B\n',
-                          'alligator\n',
-                          'apple\n',
-                          'ball\n',
-                          'banana\n'])
+        with open(self.out) as out_f:
+            self.assertEqual(list(out_f),
+                             ['A\n',
+                              'B\n',
+                              'alligator\n',
+                              'apple\n',
+                              'ball\n',
+                              'banana\n'])
 
     def test_windows_sort_on_one_file(self):
         self.use_simulated_windows_sort()
@@ -609,7 +603,8 @@ class SetupTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as r:
-            r.run()
+            with no_handlers_for_logger('mrjob.local'):
+                r.run()
 
             path_to_size = dict(job.parse_output_line(line)
                                 for line in r.stream_output())
@@ -737,7 +732,7 @@ class SetupTestCase(SandboxedTestCase):
             '-r', 'local',
             '--setup', 'cat > stdin.txt',
         ])
-        job.sandbox(stdin=StringIO('some input\n'))
+        job.sandbox(stdin=BytesIO(b'some input\n'))
 
         # local mode doesn't currently pipe input into stdin
         # (see issue #567), so this test would hang if it failed
@@ -777,11 +772,11 @@ class SetupTestCase(SandboxedTestCase):
             with job.make_runner() as r:
                 r.run()
 
-                output = ''.join(r.stream_output())
+                output = b''.join(r.stream_output())
 
                 # stray ouput should be in stderr, not the job's output
                 self.assertIn('stray output', stderr.getvalue())
-                self.assertNotIn('stray output', output)
+                self.assertNotIn(b'stray output', output)
 
 
 class ClosedRunnerTestCase(EmptyMrjobConfTestCase):

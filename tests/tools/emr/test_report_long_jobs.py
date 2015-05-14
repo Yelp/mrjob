@@ -12,23 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Very basic tests for the audit_usage script"""
+import sys
 from datetime import datetime
 from datetime import timedelta
-from StringIO import StringIO
-import sys
 
 from mrjob.emr import EMRJobRunner
+from mrjob.py2 import StringIO
 from mrjob.tools.emr.report_long_jobs import find_long_running_jobs
 from mrjob.tools.emr.report_long_jobs import main
+
 from tests.mockboto import MockEmrObject
+from tests.py2 import TestCase
 from tests.test_emr import MockEMRAndS3TestCase
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
 
 JOB_FLOWS = [
     MockEmrObject(
@@ -174,7 +169,7 @@ class ReportLongJobsTestCase(MockEMRAndS3TestCase):
         self.assertEqual(len(lines), len(JOB_FLOWS_BY_ID) - 1)
 
 
-class FindLongRunningJobsTestCase(unittest.TestCase):
+class FindLongRunningJobsTestCase(TestCase):
 
     maxDiff = None  # show whole diff when tests fail
 

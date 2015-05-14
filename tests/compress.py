@@ -13,14 +13,14 @@
 # limitations under the License.
 """Utilities to compress data in memory."""
 import gzip
-from StringIO import StringIO
+from io import BytesIO
 
 
 # use bz2.compress() to compress bz2 data
 
 def gzip_compress(data):
     """return the gzip-compressed version of the given bytes."""
-    s = StringIO()
+    s = BytesIO()
     g = gzip.GzipFile(fileobj=s, mode='wb')
     g.write(data)
     g.close()

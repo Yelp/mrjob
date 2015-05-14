@@ -3648,3 +3648,10 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
 
             s3_key = runner.get_s3_key(self.TEST_S3_URI)
             self.assertTrue(s3_key.mock_multipart_upload_was_cancelled())
+
+
+#class SecurityTokenTestCase(TestCase):
+
+#def test_emr_conn_no_token(self):
+#        with patch('boto.emr.connection.EmrConnection') as mock_emr:
+#            pass

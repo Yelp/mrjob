@@ -2480,13 +2480,19 @@ class EMRJobRunner(MRJobRunner):
             # the page below requires an actual region name
             region_name = self._aws_region or 'us-east-1'
 
+            # boto 2.2.0's EmrConnection doesn't support security_token,
+            # so only include it if set
+            kwargs = {}
+            if self._opts['aws_security_token']:
+                kwargs['security_token'] = self._opts['aws_security_token']
+
             conn = boto.emr.connection.EmrConnection(
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 region=boto.regioninfo.RegionInfo(
                     name=region_name, endpoint=endpoint,
                     connection_cls=boto.emr.connection.EmrConnection),
-                security_token=self._opts['aws_security_token'])
+                **kwargs)
 
             # Issue #778: EMR's odd endpoint hostnames mess up
             # HMAC v4 authentication in boto 2.10.0 thru 2.15.0.

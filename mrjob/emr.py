@@ -2492,7 +2492,7 @@ class EMRJobRunner(MRJobRunner):
                 region=boto.regioninfo.RegionInfo(
                     name=region_name, endpoint=endpoint,
                     connection_cls=boto.emr.connection.EmrConnection),
-                **kwargs)
+                    **kwargs)
 
             # Issue #778: EMR's odd endpoint hostnames mess up
             # HMAC v4 authentication in boto 2.10.0 thru 2.15.0.

@@ -3652,6 +3652,7 @@ class SecurityTokenTestCase(MockEMRAndS3TestCase):
         super(SecurityTokenTestCase, self).setUp()
 
         self.mock_emr = self.start(patch('boto.emr.connection.EmrConnection'))
+        self.mock_iam = self.start(patch('boto.connect_iam'))
 
         # runner needs to do stuff with S3 on initialization
         self.mock_s3 = self.start(patch('boto.connect_s3',
@@ -3661,14 +3662,23 @@ class SecurityTokenTestCase(MockEMRAndS3TestCase):
         runner = EMRJobRunner()
 
         runner.make_emr_conn()
-        self.assertTrue(self.mock_emr.called)
 
+        self.assertTrue(self.mock_emr.called)
         # security_token shouldn't even be in kwargs
         # (boto 2.2.0 doesn't allow it)
         emr_kwargs = self.mock_emr.call_args[1]
         self.assertNotIn('security_token', emr_kwargs)
 
+        runner.make_iam_conn()
+
+        self.assertTrue(self.mock_iam.called)
+        # security_token shouldn't even be in kwargs
+        # (boto 2.2.0 doesn't allow it)
+        iam_kwargs = self.mock_iam.call_args[1]
+        self.assertNotIn('security_token', iam_kwargs)
+
         runner.make_s3_conn()
+
         self.assertTrue(self.mock_s3.called)
         # S3 could accept security token, even in boto 2.2.0
         s3_kwargs = self.mock_s3.call_args[1]
@@ -3679,13 +3689,21 @@ class SecurityTokenTestCase(MockEMRAndS3TestCase):
         runner = EMRJobRunner(aws_security_token='meow')
 
         runner.make_emr_conn()
-        self.assertTrue(self.mock_emr.called)
 
+        self.assertTrue(self.mock_emr.called)
         emr_kwargs = self.mock_emr.call_args[1]
         self.assertIn('security_token', emr_kwargs)
         self.assertEqual(emr_kwargs['security_token'], 'meow')
 
+        runner.make_iam_conn()
+
+        self.assertTrue(self.mock_iam.called)
+        iam_kwargs = self.mock_iam.call_args[1]
+        self.assertIn('security_token', iam_kwargs)
+        self.assertEqual(iam_kwargs['security_token'], 'meow')
+
         runner.make_s3_conn()
+
         self.assertTrue(self.mock_s3.called)
         s3_kwargs = self.mock_s3.call_args[1]
         self.assertIn('security_token', s3_kwargs)

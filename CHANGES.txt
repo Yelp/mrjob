@@ -1,4 +1,9 @@
-v0.4.4, 2014-04-21 -- EMRgency!
+v0.4.5, 2015-??-?? -- ???
+ * runners:
+   * EMR:
+     * aws_security_token for temporary credentials (#1003)
+
+v0.4.4, 2015-04-21 -- EMRgency!
  * runners:
    * EMR:
      * Create IAM objects as needed (unbreaks mrjob for new accounts) (#999)

@@ -18,6 +18,8 @@ Usage::
 
     python -m mrjob.tools.emr.job_flow_pool
 """
+from __future__ import print_function
+
 from optparse import OptionError
 from optparse import OptionGroup
 from optparse import OptionParser
@@ -76,18 +78,18 @@ minutes to the hour)
         ')',
     ]
 
-    print '%s: %s' % (jf.jobflowid, jf.name)
-    print ''.join(nosep_segments)
-    print jf.state
-    print
+    print('%s: %s' % (jf.jobflowid, jf.name))
+    print(''.join(nosep_segments))
+    print(jf.state)
+    print()
 
 
 def pprint_pools(runner):
     pools = get_pools(runner.make_emr_conn())
-    for pool_name, job_flows in pools.iteritems():
-        print '-' * len(pool_name)
-        print pool_name
-        print '-' * len(pool_name)
+    for pool_name, job_flows in pools.items():
+        print('-' * len(pool_name))
+        print(pool_name)
+        print('-' * len(pool_name))
         for job_flow in job_flows:
             pprint_job_flow(job_flow)
 
@@ -98,9 +100,9 @@ def terminate(runner, pool_name):
     try:
         for job_flow in pools[pool_name]:
             emr_conn.terminate_jobflow(job_flow.jobflowid)
-            print 'terminated %s' % job_flow.jobflowid
+            print('terminated %s' % job_flow.jobflowid)
     except KeyError:
-        print 'No job flows match pool name "%s"' % pool_name
+        print('No job flows match pool name "%s"' % pool_name)
 
 
 def main():
@@ -218,10 +220,10 @@ def perform_actions(options, runner):
 
         if sorted_job_flows:
             jf = sorted_job_flows[-1]
-            print 'You should use this one:'
+            print('You should use this one:')
             pprint_job_flow(jf)
         else:
-            print 'No idle job flows match criteria'
+            print('No idle job flows match criteria')
 
     if options.terminate:
         terminate(runner, options.terminate)

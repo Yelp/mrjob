@@ -13,11 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-try:
-    from unittest2 import TestCase
-    TestCase  # pyflakes
-except ImportError:
-    from unittest import TestCase
 
 from mrjob.iam import MRJOB_SERVICE_ROLE
 from mrjob.iam import MRJOB_SERVICE_ROLE_POLICY
@@ -27,6 +22,8 @@ from mrjob.iam import yield_roles_with_policies
 from mrjob.iam import yield_policies_for_role
 
 from tests.mockboto import MockIAMConnection
+from tests.py2 import TestCase
+
 
 # IAM stuff is mostly tested by test_emr.py, but we don't test what happens if
 # there are already enough IAM objects to cause pagination

@@ -13,16 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for mrjob.step"""
-try:
-    from unittest2 import TestCase
-    TestCase  # silency pyflakes
-except ImportError:
-    from unittest import TestCase
-
 from mrjob.step import _IDENTITY_MAPPER
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 
+from tests.py2 import TestCase
 from tests.quiet import logger_disabled
 
 

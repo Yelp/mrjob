@@ -14,22 +14,17 @@
 # limitations under the License.
 import os
 
-from mock import patch
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
 from mrjob.setup import UploadDirManager
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import name_uniquely
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 
+from tests.py2 import TestCase
+from tests.py2 import patch
 
-class ParseSetupCmdTestCase(unittest.TestCase):
+
+class ParseSetupCmdTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(parse_setup_cmd(''), [])
@@ -141,7 +136,7 @@ class ParseSetupCmdTestCase(unittest.TestCase):
             ValueError, parse_setup_cmd, 'foo\\')
 
 
-class ParseLegacyHashPathTestCase(unittest.TestCase):
+class ParseLegacyHashPathTestCase(TestCase):
 
     def test_empty(self):
         self.assertRaises(ValueError, parse_legacy_hash_path, 'archive', '')
@@ -212,7 +207,7 @@ class ParseLegacyHashPathTestCase(unittest.TestCase):
             parse_legacy_hash_path, 'file', 'foo#bar/baz')
 
 
-class NameUniqueTestCase(unittest.TestCase):
+class NameUniqueTestCase(TestCase):
 
     def test_no_empty_names(self):
         self.assertEqual(name_uniquely(''), '_')
@@ -281,7 +276,7 @@ class NameUniqueTestCase(unittest.TestCase):
             '.mrjob-1.conf')  # not '-1.mrjob.conf'
 
 
-class UploadDirManagerTestCase(unittest.TestCase):
+class UploadDirManagerTestCase(TestCase):
 
     def test_empty(self):
         sd = UploadDirManager('hdfs:///')
@@ -329,7 +324,7 @@ class UploadDirManagerTestCase(unittest.TestCase):
                          {'foo/bar.py': 's3://bucket/dir/bar.py'})
 
 
-class WorkingDirManagerTestCase(unittest.TestCase):
+class WorkingDirManagerTestCase(TestCase):
 
     def test_empty(self):
         wd = WorkingDirManager()

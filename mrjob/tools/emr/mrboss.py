@@ -29,6 +29,8 @@ Options::
   -q, --quiet           Don't print anything to stderr
   -v, --verbose         print more messages to stderr
 """
+from __future__ import print_function
+
 from optparse import OptionParser
 import os
 import sys
@@ -107,9 +109,9 @@ def run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
         )
 
         if print_stderr:
-            print '---'
-            print 'Command completed on %s.' % addr
-            print stderr,
+            print('---')
+            print('Command completed on %s.' % addr)
+            print(stderr, end=' ')
 
         if '!' in addr:
             base_dir = os.path.join(output_dir, 'slave ' + addr.split('!')[1])
@@ -119,10 +121,10 @@ def run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
         if not os.path.exists(base_dir):
             os.makedirs(base_dir)
 
-        with open(os.path.join(base_dir, 'stdout'), 'w') as f:
+        with open(os.path.join(base_dir, 'stdout'), 'wb') as f:
             f.write(stdout)
 
-        with open(os.path.join(base_dir, 'stderr'), 'w') as f:
+        with open(os.path.join(base_dir, 'stderr'), 'wb') as f:
             f.write(stderr)
 
 

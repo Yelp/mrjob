@@ -15,20 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for InlineMRJobRunner"""
-from StringIO import StringIO
-
 import gzip
 import os
-import unittest
-
-try:
-    from unittest2 import TestCase
-    TestCase  # silence pyflakes warning
-except ImportError:
-    from unittest import TestCase
-
-import mock
-from mock import patch
+from io import BytesIO
 
 from mrjob import conf
 from mrjob.fs.base import Filesystem
@@ -42,6 +31,9 @@ from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
+from tests.py2 import TestCase
+from tests.py2 import mock
+from tests.py2 import patch
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
@@ -50,15 +42,15 @@ class InlineMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
     def test_end_to_end(self):
         # read from STDIN, a regular file, and a .gz
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
             input_file.write('bar\nqux\n')
 
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\n')
+        input_gz = gzip.GzipFile(input_gz_path, 'wb')
+        input_gz.write(b'foo\n')
         input_gz.close()
 
         mr_job = MRTwoStepJob(
@@ -100,7 +92,7 @@ class InlineMRJobRunnerCmdenvTest(EmptyMrjobConfTestCase):
         old_env = os.environ.copy()
 
         mr_job = MRTestCmdenv(['--runner', 'inline', '--cmdenv=FOO=bar'])
-        mr_job.sandbox(stdin=StringIO('foo\n'))
+        mr_job.sandbox(stdin=BytesIO(b'foo\n'))
 
         results = []
 
@@ -162,7 +154,7 @@ class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
 
     def test_adding_2(self):
         mr_job = MRIncrementerJob(['-r', 'inline', '--times', '2'])
-        mr_job.sandbox(stdin=StringIO('0\n1\n2\n'))
+        mr_job.sandbox(stdin=BytesIO(b'0\n1\n2\n'))
 
         self.assertEqual(len(mr_job.steps()), 2)
 
@@ -194,7 +186,7 @@ class MRJobFileOptionsTestCase(TestCase):
 
     def test_with_input_file_option(self):
         mr_job = MRCustomFileOptionJob(['-r', 'inline', '--platform_file=tests/input/test_input_file.txt'])
-        mr_job.sandbox(stdin=StringIO('1\n'))
+        mr_job.sandbox(stdin=BytesIO(b'1\n'))
 
         with mr_job.make_runner() as runner:
             runner.run()
@@ -209,7 +201,7 @@ class NoMRJobConfTestCase(TestCase):
     def test_no_mrjob_confs(self):
         with patch.object(conf, 'real_mrjob_conf_path', return_value=None):
             mr_job = MRIncrementerJob(['-r', 'inline', '--times', '2'])
-            mr_job.sandbox(stdin=StringIO('0\n1\n2\n'))
+            mr_job.sandbox(stdin=BytesIO(b'0\n1\n2\n'))
 
             with mr_job.make_runner() as runner:
                 runner.run()
@@ -226,12 +218,12 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
 
     def test_input_files_and_setting_number_of_tasks(self):
         input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'w') as input_file:
-            input_file.write('bar\nqux\nfoo\n')
+        with open(input_path, 'wb') as input_file:
+            input_file.write(b'bar\nqux\nfoo\n')
 
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'w')
-        input_gz.write('foo\n')
+        input_gz = gzip.GzipFile(input_gz_path, 'wb')
+        input_gz.write(b'foo\n')
         input_gz.close()
 
         mr_job = MRWordCount(['-r', self.RUNNER,
@@ -257,11 +249,11 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
     def test_jobconf_simulated_by_runner(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'wb') as input_file:
-            input_file.write('foo\n')
+            input_file.write(b'foo\n')
 
         upload_path = os.path.join(self.tmp_dir, 'upload')
         with open(upload_path, 'wb') as upload_file:
-            upload_file.write('PAYLOAD')
+            upload_file.write(b'PAYLOAD')
 
         # use --no-bootstrap-mrjob so we don't have to worry about
         # mrjob.tar.gz and the setup wrapper script
@@ -299,16 +291,16 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
         expected_cache_files = (
             script_path + '#mr_test_jobconf.py',
             upload_path + '#upload')
-        self.assertItemsEqual(
-            results['mapreduce.job.cache.files'].split(','),
-            expected_cache_files)
+        self.assertEqual(
+            sorted(results['mapreduce.job.cache.files'].split(',')),
+            sorted(expected_cache_files))
         self.assertEqual(results['mapreduce.job.cache.local.archives'], '')
         expected_local_files = (
             os.path.join(working_dir, 'mr_test_jobconf.py'),
             os.path.join(working_dir, 'upload'))
-        self.assertItemsEqual(
-            results['mapreduce.job.cache.local.files'].split(','),
-            expected_local_files)
+        self.assertEqual(
+            sorted(results['mapreduce.job.cache.local.files'].split(',')),
+            sorted(expected_local_files))
         self.assertEqual(results['mapreduce.job.id'], runner._job_name)
 
         self.assertEqual(results['mapreduce.map.input.file'], input_path)
@@ -347,7 +339,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
             '-r', self.RUNNER, '--jobconf', 'mapred.map.tasks=2',
             ])
         # need at least two items of input to get two map tasks
-        mr_job.sandbox(StringIO('foo\nbar\n'))
+        mr_job.sandbox(BytesIO(b'foo\nbar\n'))
 
         with mr_job.make_runner() as runner:
             runner.run()
@@ -358,7 +350,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
             self.assertEqual(runner.counters()[1]['count']['mapper_init'], 4)
 
 
-class ErrorOnBadPathsTestCase(unittest.TestCase):
+class ErrorOnBadPathsTestCase(TestCase):
 
     def setUp(self):
         self.fs = mock.create_autospec(Filesystem)
@@ -371,7 +363,3 @@ class ErrorOnBadPathsTestCase(unittest.TestCase):
     def test_no_paths(self):
         self.fs.path_exists.return_value = False
         self.assertRaises(ValueError, _error_on_bad_paths, self.fs, self.paths)
-
-
-if __name__ == "__main__":
-    unittest.main()

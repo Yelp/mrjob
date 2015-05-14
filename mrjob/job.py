@@ -16,18 +16,12 @@ for more information."""
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-import codecs
 import inspect
 import itertools
 import logging
+from io import BytesIO
 from optparse import OptionGroup
 import sys
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
 
 try:
     import simplejson as json
@@ -46,6 +40,8 @@ from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
+from mrjob.py2 import integer_types
+from mrjob.py2 import string_types
 from mrjob.util import read_input
 
 
@@ -65,6 +61,20 @@ _SORT_VALUES_JOBCONF = {
 # partitioner for sort_values
 _SORT_VALUES_PARTITIONER = \
     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
+
+
+def _im_func(f):
+    """Wrapper to get at the underlying function belonging to a method.
+
+    Python 2 is slightly different because classes have "unbound methods"
+    which wrap the underlying function, whereas on Python 3 they're just
+    functions. (Methods work the same way on both versions.)
+    """
+    # "im_func" is the old Python 2 name for __func__
+    if hasattr(f, '__func__'):
+        return f.__func__
+    else:
+        return f
 
 
 class UsageError(Exception):
@@ -328,16 +338,17 @@ class MRJob(MRJobLauncher):
 
         :return: a list of steps constructed with :py:meth:`mr`
         """
-        # Use mapper(), reducer() etc. only if they've been re-defined
-        kwargs = dict((func_name, getattr(self, func_name))
-                      for func_name in _JOB_STEP_FUNC_PARAMS
-                      if (getattr(self, func_name).im_func is not
-                          getattr(MRJob, func_name).im_func))
+        # only include methods that have been redefined
+        kwargs = dict(
+            (func_name, getattr(self, func_name))
+            for func_name in _JOB_STEP_FUNC_PARAMS
+            if (_im_func(getattr(self, func_name)) is not
+                _im_func(getattr(MRJob, func_name))))
 
         # MRStep takes commands as strings, but the user defines them in the
         # class as functions that return strings, so call the functions.
         updates = {}
-        for k, v in kwargs.iteritems():
+        for k, v in kwargs.items():
             if k.endswith('_cmd'):
                 updates[k] = v()
 
@@ -379,12 +390,7 @@ class MRJob(MRJobLauncher):
         return JarStep(*args, **kwargs)
 
     def increment_counter(self, group, counter, amount=1):
-        """Increment a counter in Hadoop streaming by printing to stderr. If
-        the type of either **group** or **counter** is ``unicode``, then the
-        counter will be written as unicode. Otherwise, the counter will be
-        written as ASCII. Although writing non-ASCII will succeed, the
-        resulting counter names may not be displayed correctly at the end of
-        the job.
+        """Increment a counter in Hadoop streaming by printing to stderr.
 
         :type group: str
         :param group: counter group
@@ -397,28 +403,29 @@ class MRJob(MRJobLauncher):
         with semicolons (commas confuse Hadoop streaming).
         """
         # don't allow people to pass in floats
-        if not isinstance(amount, (int, long)):
+        if not isinstance(amount, integer_types):
             raise TypeError('amount must be an integer, not %r' % (amount,))
+
+        # cast non-strings to strings (if people pass in exceptions, etc)
+        if not isinstance(group, string_types):
+            group = str(group)
+        if not isinstance(counter, string_types):
+            counter = str(counter)
 
         # Extra commas screw up hadoop and there's no way to escape them. So
         # replace them with the next best thing: semicolons!
         #
-        # cast to str() because sometimes people pass in exceptions or whatever
-        #
         # The relevant Hadoop code is incrCounter(), here:
         # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup  # noqa
-        if isinstance(group, unicode) or isinstance(counter, unicode):
-            group = unicode(group).replace(',', ';')
-            counter = unicode(counter).replace(',', ';')
-            stderr = codecs.getwriter('utf-8')(self.stderr)
-        else:
-            group = str(group).replace(',', ';')
-            counter = str(counter).replace(',', ';')
-            stderr = self.stderr
+        group = group.replace(',', ';')
+        counter = counter.replace(',', ';')
 
-        stderr.write(
-            u'reporter:counter:%s,%s,%d\n' % (group, counter, amount))
-        stderr.flush()
+        line = 'reporter:counter:%s,%s,%d\n' % (group, counter, amount)
+        if not isinstance(line, bytes):
+            line = line.encode('utf_8')
+
+        self.stderr.write(line)
+        self.stderr.flush()
 
     def set_status(self, msg):
         """Set the job status in hadoop streaming by printing to stderr.
@@ -426,18 +433,13 @@ class MRJob(MRJobLauncher):
         This is also a good way of doing a keepalive for a job that goes a
         long time between outputs; Hadoop streaming usually times out jobs
         that give no output for longer than 10 minutes.
-
-        If the type of **msg** is ``unicode``, then the message will be written
-        as unicode. Otherwise, it will be written as ASCII.
         """
-        if isinstance(msg, unicode):
-            status = u'reporter:status:%s\n' % (msg,)
-            stderr = codecs.getwriter('utf-8')(self.stderr)
-        else:
-            status = 'reporter:status:%s\n' % (msg,)
-            stderr = self.stderr
-        stderr.write(status)
-        stderr.flush()
+        line = 'reporter:status:%s\n' % (msg,)
+        if not isinstance(line, bytes):
+            line = line.encode('utf_8')
+
+        self.stderr.write(line)
+        self.stderr.flush()
 
     ### Running the job ###
 
@@ -575,7 +577,7 @@ class MRJob(MRJobLauncher):
         # be careful to use generators for everything, to allow for
         # very large groupings of values
         for key, kv_pairs in itertools.groupby(read_lines(),
-                                               key=lambda(k, v): k):
+                                               key=lambda k_v: k_v[0]):
             values = (v for k, v in kv_pairs)
             for out_key, out_value in reducer(key, values) or ():
                 write_line(out_key, out_value)
@@ -620,7 +622,7 @@ class MRJob(MRJobLauncher):
         # be careful to use generators for everything, to allow for
         # very large groupings of values
         for key, kv_pairs in itertools.groupby(read_lines(),
-                                               key=lambda(k, v): k):
+                                               key=lambda k_v1: k_v1[0]):
             values = (v for k, v in kv_pairs)
             for out_key, out_value in combiner(key, values) or ():
                 write_line(out_key, out_value)
@@ -637,11 +639,14 @@ class MRJob(MRJobLauncher):
 
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
-
-        We currently output something like ``MR M R``, but expect this to
-        change!
         """
-        print >> self.stdout, json.dumps(self._steps_desc())
+        # json only uses strings, but self.stdout only accepts bytes
+        steps_json = json.dumps(self._steps_desc())
+        if not isinstance(steps_json, bytes):
+            steps_json = steps_json.encode('utf_8')
+
+        self.stdout.write(steps_json)
+        self.stdout.write(b'\n')
 
     def _steps_desc(self):
         step_descs = []
@@ -652,8 +657,12 @@ class MRJob(MRJobLauncher):
     @classmethod
     def mr_job_script(cls):
         """Path of this script. This returns the file containing
-        this class."""
-        return inspect.getsourcefile(cls)
+        this class, or ``None`` if there isn't any (e.g. it was
+        defined from the command line interface.)"""
+        try:
+            return inspect.getsourcefile(cls)
+        except TypeError:
+            return None
 
     ### Other useful utilities ###
 
@@ -693,7 +702,7 @@ class MRJob(MRJobLauncher):
         def read_lines():
             for line in self._read_input():
                 try:
-                    key, value = read(line.rstrip('\r\n'))
+                    key, value = read(line.rstrip(b'\r\n'))
                     yield key, value
                 except Exception as e:
                     if self.options.strict_protocols:
@@ -704,7 +713,8 @@ class MRJob(MRJobLauncher):
 
         def write_line(key, value):
             try:
-                print >> self.stdout, write(key, value)
+                self.stdout.write(write(key, value))
+                self.stdout.write(b'\n')
             except Exception as e:
                 if self.options.strict_protocols:
                     raise
@@ -890,7 +900,7 @@ class MRJob(MRJobLauncher):
         :py:attr:`INPUT_PROTOCOL`.
         """
         if not isinstance(self.INPUT_PROTOCOL, type):
-            log.warn('INPUT_PROTOCOL should be a class, not %s' %
+            log.warning('INPUT_PROTOCOL should be a class, not %s' %
                      self.INPUT_PROTOCOL)
         return self.INPUT_PROTOCOL()
 
@@ -900,7 +910,7 @@ class MRJob(MRJobLauncher):
         :py:attr:`INTERNAL_PROTOCOL`.
         """
         if not isinstance(self.INTERNAL_PROTOCOL, type):
-            log.warn('INTERNAL_PROTOCOL should be a class, not %s' %
+            log.warning('INTERNAL_PROTOCOL should be a class, not %s' %
                      self.INTERNAL_PROTOCOL)
         return self.INTERNAL_PROTOCOL()
 
@@ -910,7 +920,7 @@ class MRJob(MRJobLauncher):
         :py:attr:`OUTPUT_PROTOCOL`.
         """
         if not isinstance(self.OUTPUT_PROTOCOL, type):
-            log.warn('OUTPUT_PROTOCOL should be a class, not %s' %
+            log.warning('OUTPUT_PROTOCOL should be a class, not %s' %
                      self.OUTPUT_PROTOCOL)
         return self.OUTPUT_PROTOCOL()
 
@@ -1108,7 +1118,7 @@ class MRJob(MRJobLauncher):
             # hadoop_version should be a string
             elif (key == 'hadoop_version' and
                     isinstance(unfiltered_val, float)):
-                log.warn('hadoop_version should be a string, not %s' %
+                log.warning('hadoop_version should be a string, not %s' %
                          unfiltered_val)
                 filtered_val = format_hadoop_version(unfiltered_val)
             filtered_jobconf[key] = filtered_val
@@ -1189,7 +1199,7 @@ class MRJob(MRJobLauncher):
         if protocol is None:
             protocol = JSONProtocol()
 
-        lines = StringIO(self.stdout.getvalue())
+        lines = BytesIO(self.stdout.getvalue())
         return [protocol.read(line) for line in lines]
 
 

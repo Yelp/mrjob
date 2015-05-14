@@ -12,53 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Very basic tests for the audit_usage script"""
+import sys
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
-from StringIO import StringIO
-import sys
 
 import boto.emr.connection
+from mrjob.py2 import StringIO
 from mrjob.tools.emr.audit_usage import job_flow_to_full_summary
 from mrjob.tools.emr.audit_usage import subdivide_interval_by_date
 from mrjob.tools.emr.audit_usage import subdivide_interval_by_hour
 from mrjob.tools.emr.audit_usage import main
 from mrjob.tools.emr.audit_usage import percent
+
 from tests.mockboto import MockEmrObject
-from tests.test_emr import MockEMRAndS3TestCase
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
+from tests.py2 import TestCase
+from tests.tools.emr import ToolTestCase
 
 
-class AuditUsageTestCase(MockEMRAndS3TestCase):
-
-    def setUp(self):
-        super(AuditUsageTestCase, self).setUp()
-        # redirect print statements to self.stdout
-        self._real_stdout = sys.stdout
-        self.stdout = StringIO()
-        sys.stdout = self.stdout
-
-    def tearDown(self):
-        sys.stdout = self._real_stdout
-        super(AuditUsageTestCase, self).tearDown()
+class AuditUsageTestCase(ToolTestCase):
 
     def test_with_no_job_flows(self):
+        self.monkey_patch_stdout()
         main(['-q', '--no-conf'])  # just make sure it doesn't crash
 
     def test_with_one_job_flow(self):
         emr_conn = boto.emr.connection.EmrConnection()
         emr_conn.run_jobflow('no name', log_uri=None)
 
+        self.monkey_patch_stdout()
         main(['-q', '--no-conf'])
-        self.assertIn('j-MOCKJOBFLOW0', self.stdout.getvalue())
+        self.assertIn(b'j-MOCKJOBFLOW0', sys.stdout.getvalue())
 
 
-class JobFlowToFullSummaryTestCase(unittest.TestCase):
+class JobFlowToFullSummaryTestCase(TestCase):
 
     maxDiff = None  # show whole diff when tests fail
 
@@ -771,7 +758,7 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
         })
 
 
-class SubdivideIntervalByDateTestCase(unittest.TestCase):
+class SubdivideIntervalByDateTestCase(TestCase):
 
     def test_zero_interval(self):
         self.assertEqual(
@@ -834,7 +821,7 @@ class SubdivideIntervalByDateTestCase(unittest.TestCase):
         )
 
 
-class SubdivideIntervalByHourTestCase(unittest.TestCase):
+class SubdivideIntervalByHourTestCase(TestCase):
 
     def test_zero_interval(self):
         self.assertEqual(
@@ -895,7 +882,7 @@ class SubdivideIntervalByHourTestCase(unittest.TestCase):
         )
 
 
-class PercentTestCase(unittest.TestCase):
+class PercentTestCase(TestCase):
 
     def test_basic(self):
         self.assertEqual(62.5, percent(5, 8))

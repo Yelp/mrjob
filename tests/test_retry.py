@@ -11,18 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mock import Mock
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
 from mrjob.retry import RetryGoRound
 
+from tests.py2 import Mock
+from tests.py2 import TestCase
 
-class RetryGoRoundTestCase(unittest.TestCase):
+
+class RetryGoRoundTestCase(TestCase):
 
     def test_empty(self):
         self.assertRaises(

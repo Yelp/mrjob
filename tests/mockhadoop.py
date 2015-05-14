@@ -31,6 +31,8 @@ mrjob requires a single binary (no args) to stand in for hadoop, so
 use create_mock_hadoop_script() to write out a shell script that runs
 mockhadoop.
 """
+from __future__ import print_function
+
 import datetime
 import glob
 import os
@@ -62,7 +64,7 @@ def add_mock_hadoop_output(parts):
 
     Args:
     parts -- a list of the contents of parts files, which should be iterables
-        that return lines (e.g. lists, StringIOs).
+        that return lines (e.g. lists, BytesIOs).
 
     The environment variable MOCK_HADOOP_OUTPUT must be set.
     """
@@ -74,9 +76,8 @@ def add_mock_hadoop_output(parts):
 
     for i, part in enumerate(parts):
         part_path = os.path.join(output_dir, 'part-%05d' % i)
-        with open(part_path, 'w') as part_file:
-            for line in part:
-                part_file.write(line)
+        with open(part_path, 'wb') as part_file:
+                part_file.write(part)
 
 
 def get_mock_hadoop_output():
@@ -144,7 +145,7 @@ def main(stdin, stdout, stderr, argv, environ):
             cmd_log.flush()
 
     if len(argv) < 2:
-        stderr.write('Usage: hadoop [--config confdir] COMMAND\n')
+        print('Usage: hadoop [--config confdir] COMMAND\n', file=stderr)
         return 1
 
     cmd = argv[1]
@@ -185,9 +186,11 @@ def hadoop_fs_cat(stdout, stderr, environ, *args):
             failed = True
         else:
             for path in paths:
-                with open(path) as f:
+                with open(path, 'rb') as f:
+                    # use binary interface if available
+                    stdout_buffer = getattr(stdout, 'buffer', stdout)
                     for line in f:
-                        stdout.write(line)
+                        stdout_buffer.write(line)
 
     if failed:
         return -1
@@ -238,9 +241,9 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
         max_size = 0
 
         if not real_paths:
-            print >> stderr, (
+            print((
                 'lsr: Cannot access %s: No such file or directory.' %
-                hdfs_path_glob)
+                hdfs_path_glob), file=stderr)
             failed = True
         else:
             for real_path in real_paths:
@@ -256,7 +259,7 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
                     paths.append((real_path, scheme, netloc, 0))
 
         for path in paths:
-            print >> stdout, _hadoop_ls_line(*path + (max_size, environ))
+            print(_hadoop_ls_line(*path + (max_size, environ)), file=stdout)
 
     if failed:
         return -1
@@ -281,16 +284,16 @@ def hadoop_fs_ls(stdout, stderr, environ, *args):
         max_size = 0
 
         if not real_paths:
-            print >> stderr, (
+            print((
                 'ls: Cannot access %s: No such file or directory.' %
-                hdfs_path_glob)
+                hdfs_path_glob), file=stderr)
             failed = True
         else:
             for real_path in real_paths:
                 paths.append((real_path, scheme, netloc, 0))
 
         for path in paths:
-            print >> stdout, _hadoop_ls_line(*path + (max_size, environ))
+            print(_hadoop_ls_line(*path + (max_size, environ)), file=stdout)
 
     if failed:
         return -1
@@ -338,9 +341,9 @@ def hadoop_fs_dus(stdout, stderr, environ, *args):
         real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
         real_paths = glob.glob(real_path_glob)
         if not real_paths:
-            print >> stderr, (
+            print((
                 'lsr: Cannot access %s: No such file or directory.' %
-                hdfs_path_glob)
+                hdfs_path_glob), file=stderr)
             failed = True
         else:
             for real_path in real_paths:
@@ -352,7 +355,7 @@ def hadoop_fs_dus(stdout, stderr, environ, *args):
                                 os.path.join(dirpath, filename))
                 else:
                     total_size += os.path.getsize(real_path)
-                print >> stdout, "%s    %d" % (real_path, total_size)
+                print("%s    %d" % (real_path, total_size), file=stdout)
 
     if failed:
         return -1

@@ -19,16 +19,13 @@ from functools import wraps
 import logging
 import re
 import time
-from urlparse import ParseResult
-from urlparse import urlparse as urlparse_buggy
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
+from io import BytesIO
 
 from mrjob.compat import uses_020_counters
+from mrjob.py2 import PY2
+from mrjob.py2 import ParseResult
+from mrjob.py2 import to_string
+from mrjob.py2 import urlparse as urlparse_buggy
 
 try:
     import boto.utils
@@ -140,7 +137,7 @@ def parse_port_range_list(range_list_str):
     for range_str in range_list_str.split(','):
         if ':' in range_str:
             a, b = [int(x) for x in range_str.split(':')]
-            all_ranges.extend(xrange(a, b + 1))
+            all_ranges.extend(range(a, b + 1))
         else:
             all_ranges.append(int(range_str))
     return all_ranges
@@ -173,26 +170,35 @@ def parse_key_value_list(kv_string_list, error_fmt, error_func):
 
 _HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.(){}[\]"\\])')
 
-
 def counter_unescape(escaped_string):
     """Fix names of counters and groups emitted by Hadoop 0.20+ logs, which
     use escape sequences for more characters than most decoders know about
     (e.g. ``().``).
 
     :param escaped_string: string from a counter log line
-    :type escaped_string: str
+    :type escaped_string: bytes
+    :return: str
     """
-    escaped_string = escaped_string.decode('string_escape')
+    if not PY2:
+        escaped_string = escaped_string.decode('unicode_escape')
+    else:
+        # unicode is probably okay in Python 2, but keeping as str just in case
+        escaped_string = escaped_string.decode('string_escape')
+
     escaped_string = _HADOOP_0_20_ESCAPED_CHARS_RE.sub(r'\1', escaped_string)
     return escaped_string
 
 
 def find_python_traceback(lines):
     """Scan a log file or other iterable for a Python traceback,
-    and return it as a list of lines.
+    and return it as a list of lines (bytes).
 
     In logs from EMR, we find python tracebacks in ``task-attempts/*/stderr``
     """
+    # Essentially, we detect the start of the traceback, and continue
+    # until we find a non-indented line, with some special rules for exceptions
+    # from subprocesses.
+
     # Lines to pass back representing entire error found
     all_tb_lines = []
 
@@ -208,6 +214,9 @@ def find_python_traceback(lines):
     in_traceback = False
 
     for line in lines:
+        # don't return bytes in Python 3
+        line = to_string(line)
+
         if in_traceback:
             tb_lines.append(line)
 
@@ -239,7 +248,7 @@ def find_python_traceback(lines):
 
 def find_hadoop_java_stack_trace(lines):
     """Scan a log file or other iterable for a java stack trace from Hadoop,
-    and return it as a list of lines.
+    and return it as a list of lines (bytes).
 
     In logs from EMR, we find java stack traces in ``task-attempts/*/syslog``
 
@@ -261,20 +270,20 @@ def find_hadoop_java_stack_trace(lines):
     (We omit the "Error running child" line from the results)
     """
     for line in lines:
-        if line.rstrip('\r\n').endswith("Error running child"):
+        if line.rstrip(b'\r\n').endswith(b"Error running child"):
             st_lines = []
             for line in lines:
                 st_lines.append(line)
                 for line in lines:
-                    if not line.startswith('        at '):
+                    if not line.startswith(b'        at '):
                         break
                     st_lines.append(line)
-                return st_lines
+                return [to_string(line) for line in st_lines]
     else:
         return None
 
 
-_OPENING_FOR_READING_RE = re.compile("^.*: Opening '(.*)' for reading$")
+_OPENING_FOR_READING_RE = re.compile(br"^.*: Opening '(.*)' for reading$")
 
 
 def find_input_uri_for_mapper(lines):
@@ -292,13 +301,13 @@ def find_input_uri_for_mapper(lines):
     for line in lines:
         match = _OPENING_FOR_READING_RE.match(line)
         if match:
-            val = match.group(1)
+            val = to_string(match.group(1))
     return val
 
 
 _HADOOP_STREAMING_ERROR_RE = re.compile(
-    r'^.*ERROR org\.apache\.hadoop\.streaming\.StreamJob \(main\): (.*)$')
-_HADOOP_STREAMING_ERROR_RE_2 = re.compile(r'^(.*does not exist.*)$')
+    br'^.*ERROR org\.apache\.hadoop\.streaming\.StreamJob \(main\): (.*)$')
+_HADOOP_STREAMING_ERROR_RE_2 = re.compile(br'^(.*does not exist.*)$')
 
 
 def find_interesting_hadoop_streaming_error(lines):
@@ -317,14 +326,14 @@ def find_interesting_hadoop_streaming_error(lines):
             _HADOOP_STREAMING_ERROR_RE.match(line) or
             _HADOOP_STREAMING_ERROR_RE_2.match(line))
         if match:
-            msg = match.group(1)
+            msg = to_string(match.group(1))
             if msg != 'Job not Successful!':
                 return msg
     return None
 
 
 _MULTILINE_JOB_LOG_ERROR_RE = re.compile(
-    r'^\w+Attempt.*?TASK_STATUS="FAILED".*?ERROR="(?P<first_line>[^"]*)$')
+    br'^\w+Attempt.*?TASK_STATUS="FAILED".*?ERROR="(?P<first_line>[^"]*)$')
 
 
 def find_job_log_multiline_error(lines):
@@ -367,16 +376,16 @@ def find_job_log_multiline_error(lines):
             for line in lines:
                 st_lines.append(line)
                 for line in lines:
-                    if line.strip() == '"':
+                    if line.strip() == b'"':
                         break
                     st_lines.append(line)
-                return st_lines
+                return [to_string(line) for line in st_lines]
     return None
 
 
 _TIMEOUT_ERROR_RE = re.compile(
-    r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+)'
-    r' seconds.*?"')
+    br'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+)'
+    br' seconds.*?"')
 
 
 def find_timeout_error(lines):
@@ -402,27 +411,27 @@ def find_timeout_error(lines):
 
 
 # recognize hadoop streaming output
-_COUNTER_RE = re.compile(r'^reporter:counter:([^,]*),([^,]*),(-?\d+)$')
-_STATUS_RE = re.compile(r'^reporter:status:(.*)$')
+_COUNTER_RE = re.compile(br'^reporter:counter:([^,]*),([^,]*),(-?\d+)$')
+_STATUS_RE = re.compile(br'^reporter:status:(.*)$')
 
 
 def parse_mr_job_stderr(stderr, counters=None):
     """Parse counters and status messages out of MRJob output.
 
-    :param stderr: a filehandle, a list of lines, or a str containing data
-    :param counters: Counters so far, to update; a map from group to counter
-                     name to count.
+    :param stderr: a filehandle, a list of lines (bytes), or bytes
+    :param counters: Counters so far, to update; a map from group (string to
+                     counter name (string) to count.
 
     Returns a dictionary with the keys *counters*, *statuses*, *other*:
 
     - *counters*: counters so far; same format as above
     - *statuses*: a list of status messages encountered
-    - *other*: lines that aren't either counters or status messages
+    - *other*: lines (strings) that aren't either counters or status messages
     """
     # For the corresponding code in Hadoop Streaming, see ``incrCounter()`` in
     # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup  # noqa
-    if isinstance(stderr, str):
-        stderr = StringIO(stderr)
+    if isinstance(stderr, bytes):
+        stderr = BytesIO(stderr)
 
     if counters is None:
         counters = {}
@@ -430,20 +439,26 @@ def parse_mr_job_stderr(stderr, counters=None):
     other = []
 
     for line in stderr:
-        m = _COUNTER_RE.match(line.rstrip('\r\n'))
+        m = _COUNTER_RE.match(line.rstrip(b'\r\n'))
         if m:
             group, counter, amount_str = m.groups()
+
+            # don't leave these as bytes on Python 3
+            group = to_string(group)
+            counter = to_string(counter)
+
             counters.setdefault(group, {})
             counters[group].setdefault(counter, 0)
             counters[group][counter] += int(amount_str)
             continue
 
-        m = _STATUS_RE.match(line.rstrip('\r\n'))
+        m = _STATUS_RE.match(line.rstrip(b'\r\n'))
         if m:
-            statuses.append(m.group(1))
+            # don't leave as bytes on Python 3
+            statuses.append(to_string(m.group(1)))
             continue
 
-        other.append(line)
+        other.append(to_string(line))
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
 
@@ -454,32 +469,42 @@ def parse_mr_job_stderr(stderr, counters=None):
 # We just want to pull out the counter string, which varies between
 # Hadoop versions.
 _KV_EXPR = r'\s+\w+=".*?"'  # this matches KEY="VALUE"
-_COUNTER_LINE_EXPR = r'^.*?JOBID=".*?_%s".*?\bCOUNTERS="%s".*?$' % \
-    ('(?P<step_num>\d+)', r'(?P<counters>.*?)')
-_COUNTER_LINE_RE = re.compile(_COUNTER_LINE_EXPR)
+_COUNTER_LINE_RE = re.compile(
+    br'^.*?JOBID=".*?_(?P<step_num>\d+)"'
+    br'.*?\b'
+    br'COUNTERS="(?P<counters>.*?)"'
+    br'.*?$')
 
 # 0.18-specific
 # see _parse_counters_0_18 for format
 # A counter looks like this: groupname.countername:countervalue
-_COUNTER_EXPR_0_18 = r'(,|^)(?P<group>[^,]+?)[.](?P<name>[^,]+):(?P<value>\d+)'
-_COUNTER_RE_0_18 = re.compile(_COUNTER_EXPR_0_18)
+_COUNTER_RE_0_18 = re.compile(
+    br'(,|^)(?P<group>[^,]+?)[.](?P<name>[^,]+):(?P<value>\d+)')
 
 # 0.20-specific
 
 # capture one group including sub-counters
 # these look like: {(gid)(gname)[...][...][...]...}
-_COUNTER_LIST_EXPR = r'(?P<counter_list_str>\[.*?\])'
-_GROUP_RE_0_20 = re.compile(r'{\(%s\)\(%s\)%s}' % (r'(?P<group_id>.*?)',
-                                                   r'(?P<group_name>.*?)',
-                                                   _COUNTER_LIST_EXPR))
+_GROUP_RE_0_20 = re.compile(
+    br'{\('
+    br'(?P<group_id>.*?)'
+    br'\)\('
+    br'(?P<group_name>.*?)'
+    br'\)'
+    br'(?P<counter_list_str>\[.*?\])'
+    br'}')
 
 # capture a single counter from a group
 # this is what the ... is in _COUNTER_LIST_EXPR (incl. the brackets).
 # it looks like: [(cid)(cname)(value)]
-_COUNTER_0_20_EXPR = r'\[\(%s\)\(%s\)\(%s\)\]' % (r'(?P<counter_id>.*?)',
-                                                  r'(?P<counter_name>.*?)',
-                                                  r'(?P<counter_value>\d+)')
-_COUNTER_RE_0_20 = re.compile(_COUNTER_0_20_EXPR)
+_COUNTER_RE_0_20 = re.compile(
+    br'\[\('
+    br'(?P<counter_id>.*?)'
+    br'\)\('
+    br'(?P<counter_name>.*?)'
+    br'\)\('
+    br'(?P<counter_value>\d+)'
+    br'\)\]')
 
 
 def _parse_counters_0_18(counter_string):
@@ -487,10 +512,12 @@ def _parse_counters_0_18(counter_string):
     # GroupName.CounterName:Value,Group1.Crackers:3,Group2.Nerf:243,...
     groups = _COUNTER_RE_0_18.finditer(counter_string)
     if groups is None:
-        log.warn('Cannot parse Hadoop counter string: %s' % counter_string)
+        log.warning('Cannot parse Hadoop counter string: %s' % counter_string)
 
     for m in groups:
-        yield m.group('group'), m.group('name'), int(m.group('value'))
+        yield (to_string(m.group('group')),
+               to_string(m.group('name')),
+               int(m.group('value')))
 
 
 def _parse_counters_0_20(counter_string):
@@ -498,20 +525,23 @@ def _parse_counters_0_20(counter_string):
     # {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...}
     groups = _GROUP_RE_0_20.findall(counter_string)
     if not groups:
-        log.warn('Cannot parse Hadoop counter string: %s' % counter_string)
+        log.warning('Cannot parse Hadoop counter string: %s' % counter_string)
 
     for group_id, group_name, counter_str in groups:
         matches = _COUNTER_RE_0_20.findall(counter_str)
-        for counter_id, counter_name, counter_value in matches:
-            try:
-                group_name = counter_unescape(group_name)
-            except ValueError:
-                log.warn("Could not decode group name %s" % group_name)
 
+        try:
+            group_name = counter_unescape(group_name)
+        except ValueError:
+            log.warning("Could not decode group name %r" % group_name)
+            group_name = to_string(group_name)
+
+        for counter_id, counter_name, counter_value in matches:
             try:
                 counter_name = counter_unescape(counter_name)
             except ValueError:
-                log.warn("Could not decode counter name %s" % counter_name)
+                log.warning("Could not decode counter name %r" % counter_name)
+                counter_name = to_string(counter_name)
 
             yield group_name, counter_name, int(counter_value)
 

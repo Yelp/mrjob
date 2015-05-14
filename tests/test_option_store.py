@@ -13,16 +13,8 @@
 # limitations under the License.
 """Test OptionStore's functionality"""
 import os
-
 from tempfile import mkdtemp
 from shutil import rmtree
-from StringIO import StringIO
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
 
 try:
     import boto
@@ -34,14 +26,18 @@ except ImportError:
     boto = None
 
 from mrjob.conf import dump_mrjob_conf
+from mrjob.py2 import PY2
+from mrjob.py2 import StringIO
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import log_to_stream
+
+from tests.py2 import TestCase
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 
 
-class TempdirTestCase(unittest.TestCase):
+class TempdirTestCase(TestCase):
     """Patch mrjob.conf, create a temp directory, and save the environment for
     each test
     """
@@ -84,7 +80,10 @@ class RunnerOptionStoreTestCase(EmptyMrjobConfTestCase):
         self.assertEqual(opts['interpreter'], val)
 
     def test_interpreter_fallback(self):
-        self._assert_interp(['python'])
+        if PY2:
+            self._assert_interp(['python'])
+        else:
+            self._assert_interp(['python3'])
 
     def test_interpreter_fallback_2(self):
         self._assert_interp(['python', '-v'], python_bin=['python', '-v'])

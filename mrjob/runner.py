@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Base class for all runners."""
-
 import copy
 import datetime
 import getpass
@@ -25,17 +24,12 @@ import pprint
 import re
 import shutil
 import sys
+import tempfile
+from io import BytesIO
 from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
-import tempfile
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
 
 try:
     import simplejson as json
@@ -57,6 +51,8 @@ from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.local import LocalFilesystem
+from mrjob.py2 import PY2
+from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
@@ -206,7 +202,7 @@ class RunnerOptionStore(OptionStore):
         # old API accepts strings for cleanup
         # new API wants lists
         for opt_key in ('cleanup', 'cleanup_on_failure'):
-            if isinstance(self[opt_key], basestring):
+            if isinstance(self[opt_key], string_types):
                 self[opt_key] = [self[opt_key]]
 
         def validate_cleanup(error_str, opt_list):
@@ -227,15 +223,27 @@ class RunnerOptionStore(OptionStore):
         validate_cleanup(cleanup_failure_error,
                          self['cleanup_on_failure'])
 
+    def _default_python_bin(self, local=False):
+        """The default python command. If local is true, try to use
+        sys.executable. Otherwise use 'python' or 'python3' as appropriate.
+
+        This returns a single-item list (because it's a command).
+        """
+        if local and sys.executable:
+            return [sys.executable]
+        elif PY2:
+            return ['python']
+        else:
+            # e.g. python3
+            return ['python%d' % sys.version_info[0]]
+
     def _fix_interp_options(self):
         if not self['steps_python_bin']:
             self['steps_python_bin'] = (
-                self['python_bin'] or
-                [sys.executable] or
-                ['python'])
+                self['python_bin'] or self._default_python_bin(local=True))
 
         if not self['python_bin']:
-            self['python_bin'] = ['python']
+            self['python_bin'] = self._default_python_bin()
 
         if not self['steps_interpreter']:
             if self['interpreter']:
@@ -332,7 +340,7 @@ class MRJobRunner(object):
                             Hadoop streaming will use this to determine how
                             mapper output should be sorted and distributed
                             to reducers.
-        :param stdin: an iterable (can be a ``StringIO`` or even a list) to use
+        :param stdin: an iterable (can be a ``BytesIO`` or even a list) to use
                       as stdin. This is a hook for testing; if you set
                       ``stdin`` via :py:meth:`~mrjob.job.MRJob.sandbox`, it'll
                       get passed through to the runner. If for some reason
@@ -345,7 +353,7 @@ class MRJobRunner(object):
             if conf_paths is not None:
                 raise ValueError("Can't specify both conf_path and conf_paths")
             else:
-                log.warn("The conf_path argument to MRJobRunner() is"
+                log.warning("The conf_path argument to MRJobRunner() is"
                          " deprecated. Use conf_paths instead.")
                 if conf_path is False:
                     conf_paths = []
@@ -397,7 +405,10 @@ class MRJobRunner(object):
 
         # Where to read input from (log files, etc.)
         self._input_paths = input_paths or ['-']  # by default read from stdin
-        self._stdin = stdin or sys.stdin
+        if PY2:
+            self._stdin = stdin or sys.stdin
+        else:
+            self._stdin = stdin or sys.stdin.buffer
         self._stdin_path = None  # temp file containing dump from stdin
 
         # where a tarball of the mrjob library is stored locally
@@ -473,7 +484,7 @@ class MRJobRunner(object):
             raise AssertionError('Run the job before streaming output')
 
         if self._closed is True:
-            log.warn(
+            log.warning(
                 'WARNING! Trying to stream output from a closed runner, output'
                 ' will probably be empty.')
 
@@ -730,6 +741,10 @@ class MRJobRunner(object):
                     raise Exception(
                         'error getting step information: \n%s' % stderr)
 
+                # on Python 3, convert stdout to str so we can json.loads() it
+                if not isinstance(stdout, str):
+                    stdout = stdout.decode('utf_8')
+
                 try:
                     steps = json.loads(stdout)
                 except JSONDecodeError:
@@ -918,11 +933,12 @@ class MRJobRunner(object):
         log.info('writing wrapper script to %s' % path)
 
         contents = self._setup_wrapper_script_content(setup)
-        for line in StringIO(contents):
-            log.debug('WRAPPER: ' + line.rstrip('\r\n'))
+        for line in contents:
+            log.debug('WRAPPER: ' + line.rstrip('\n'))
 
         with open(path, 'w') as f:
-            f.write(contents)
+            for line in contents:
+                f.write(line)
 
         self._setup_wrapper_script_path = path
         self._working_dir_mgr.add('file', self._setup_wrapper_script_path)
@@ -957,7 +973,7 @@ class MRJobRunner(object):
                 " in v0.6.0. Consider using setup instead.")
 
         for cmd in self._opts['setup_cmds']:
-            if not isinstance(cmd, basestring):
+            if not isinstance(cmd, string_types):
                 cmd = cmd_line(cmd)
             setup.append([cmd])
 
@@ -975,16 +991,17 @@ class MRJobRunner(object):
 
     def _setup_wrapper_script_content(self, setup, mrjob_tar_gz_name=None):
         """Return a (Bourne) shell script that runs the setup commands and then
-        executes whatever is passed to it (this will be our mapper/reducer).
+        executes whatever is passed to it (this will be our mapper/reducer),
+        as a list of strings (one for each line, including newlines).
 
         We obtain a file lock so that two copies of the setup commands
         cannot run simultaneously on the same machine (this helps for running
         :command:`make` on a shared source code archive, for example).
         """
-        out = StringIO()
+        out = []
 
         def writeln(line=''):
-            out.write(line + '\n')
+            out.append(line + '\n')
 
         # we're always going to execute this script as an argument to
         # sh, so there's no need to add a shebang (e.g. #!/bin/sh)
@@ -1036,7 +1053,7 @@ class MRJobRunner(object):
         writeln('cd $__mrjob_PWD')
         writeln('"$@"')
 
-        return out.getvalue()
+        return out
 
     def _get_input_paths(self):
         """Get the paths to input files, dumping STDIN to a local
@@ -1048,11 +1065,11 @@ class MRJobRunner(object):
 
                 stdin_path = os.path.join(self._get_local_tmp_dir(), 'STDIN')
                 log.debug('dumping stdin to local file %s' % stdin_path)
-                with open(stdin_path, 'w') as stdin_file:
+                with open(stdin_path, 'wb') as stdin_file:
                     for line in self._stdin:
                         # catch missing newlines (often happens with test data)
-                        if not line.endswith('\n'):
-                            line += '\n'
+                        if not line.endswith(b'\n'):
+                            line += b'\n'
                         stdin_file.write(line)
 
                 self._stdin_path = stdin_path
@@ -1138,12 +1155,12 @@ class MRJobRunner(object):
         jobconf = self._jobconf_for_step(step_num)
 
         if uses_generic_jobconf(version):
-            for key, value in sorted(jobconf.iteritems()):
+            for key, value in sorted(jobconf.items()):
                 if value is not None:
                     args.extend(['-D', '%s=%s' % (key, value)])
         # old-style jobconf
         else:
-            for key, value in sorted(jobconf.iteritems()):
+            for key, value in sorted(jobconf.items()):
                 if value is not None:
                     args.extend(['-jobconf', '%s=%s' % (key, value)])
 
@@ -1152,7 +1169,7 @@ class MRJobRunner(object):
             args.extend(['-partitioner', self._partitioner])
 
         # cmdenv
-        for key, value in sorted(self._opts['cmdenv'].iteritems()):
+        for key, value in sorted(self._opts['cmdenv'].items()):
             args.append('-cmdenv')
             args.append('%s=%s' % (key, value))
 
@@ -1168,7 +1185,7 @@ class MRJobRunner(object):
 
     def _arg_hash_paths(self, type, upload_mgr):
         """Helper function for the *upload_args methods."""
-        for name, path in self._working_dir_mgr.name_to_path(type).iteritems():
+        for name, path in self._working_dir_mgr.name_to_path(type).items():
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 
@@ -1234,8 +1251,8 @@ class MRJobRunner(object):
 
         # assume we're using UNIX sort unless we know otherwise
         if (not self._sort_is_windows_sort) or len(input_paths) == 1:
-            with open(output_path, 'w') as output:
-                with open(err_path, 'w') as err:
+            with open(output_path, 'wb') as output:
+                with open(err_path, 'wb') as err:
                     args = ['sort'] + list(input_paths)
                     log.info('> %s' % cmd_line(args))
                     try:
@@ -1248,8 +1265,8 @@ class MRJobRunner(object):
         self._sort_is_windows_sort = True
 
         log.info('Piping files into sort for Windows compatibility')
-        with open(output_path, 'w') as output:
-            with open(err_path, 'w') as err:
+        with open(output_path, 'wb') as output:
+            with open(err_path, 'wb') as err:
                 args = ['sort']
                 log.info('> %s' % cmd_line(args))
                 proc = Popen(args, stdin=PIPE, stdout=output, stderr=err,
@@ -1257,7 +1274,7 @@ class MRJobRunner(object):
 
                 # shovel bytes into the sort process
                 for input_path in input_paths:
-                    with open(input_path, 'r') as input:
+                    with open(input_path, 'rb') as input:
                         while True:
                             buf = input.read(_BUFFER_SIZE)
                             if not buf:

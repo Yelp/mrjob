@@ -17,13 +17,12 @@ them together. Useful for testing."""
 import logging
 from subprocess import Popen
 from subprocess import PIPE
-import sys
 
-from mrjob.conf import combine_dicts
 from mrjob.sim import SimMRJobRunner
 from mrjob.sim import SimRunnerOptionStore
 from mrjob.parse import find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
+from mrjob.py2 import string_types
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
 
@@ -79,12 +78,9 @@ def _chain_procs(procs_args, **kwargs):
 
 class LocalRunnerOptionStore(SimRunnerOptionStore):
 
-    def default_options(self):
-        super_opts = super(LocalRunnerOptionStore, self).default_options()
-        return combine_dicts(super_opts, {
-            # prefer whatever interpreter we're currently using
-            'python_bin': [sys.executable or 'python'],
-        })
+    def _default_python_bin(self, local=False):
+        return super(LocalRunnerOptionStore, self)._default_python_bin(
+            local=True)
 
 
 class LocalMRJobRunner(SimMRJobRunner):
@@ -242,10 +238,10 @@ class LocalMRJobRunner(SimMRJobRunner):
         :return: dict(proc=Popen, args=[process args], write_to=file)
         """
         log.info('> %s > %s' % (' | '.join(
-            args if isinstance(args, basestring) else cmd_line(args)
+            args if isinstance(args, string_types) else cmd_line(args)
             for args in procs_args), output_path))
 
-        with open(output_path, 'w') as write_to:
+        with open(output_path, 'wb') as write_to:
             procs = _chain_procs(procs_args, stdout=write_to, stderr=PIPE,
                                  cwd=working_dir, env=env)
             return [{'args': a, 'proc': proc, 'write_to': write_to}

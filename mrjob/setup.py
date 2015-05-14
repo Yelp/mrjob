@@ -39,6 +39,7 @@ import posixpath
 import re
 
 from mrjob.parse import is_uri
+from mrjob.py2 import string_types
 from mrjob.util import expand_path
 
 
@@ -120,7 +121,7 @@ def parse_setup_cmd(cmd):
                       m.group('colon_or_equals'))
 
         if keep_as_is:
-            if tokens and isinstance(tokens[-1], basestring):
+            if tokens and isinstance(tokens[-1], string_types):
                 tokens[-1] += keep_as_is
             else:
                 tokens.append(keep_as_is)
@@ -376,7 +377,7 @@ class WorkingDirManager(object):
 
         if (type, path) not in self._typed_path_to_auto_name:
             # print useful error message
-            if (type, path) in self._name_to_typed_path.itervalues():
+            if (type, path) in self._name_to_typed_path.values():
                 raise ValueError('%s %r was never added without a name!' %
                                  (type, path))
             else:
@@ -405,7 +406,7 @@ class WorkingDirManager(object):
 
         return dict((name, typed_path[1])
                     for name, typed_path
-                    in self._name_to_typed_path.iteritems()
+                    in self._name_to_typed_path.items()
                     if typed_path[0] == type)
 
     def paths(self):
@@ -413,7 +414,7 @@ class WorkingDirManager(object):
         paths = set()
 
         paths.update(p for (t, p) in self._typed_path_to_auto_name)
-        paths.update(p for (t, p) in self._name_to_typed_path.itervalues())
+        paths.update(p for (t, p) in self._name_to_typed_path.values())
 
         return paths
 
@@ -421,7 +422,7 @@ class WorkingDirManager(object):
         if name is None:
             return
 
-        if not isinstance(name, basestring):
+        if not isinstance(name, string_types):
             raise TypeError('name must be a string or None: %r' % (name,))
 
         if '/' in name:

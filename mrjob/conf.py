@@ -21,8 +21,6 @@ from itertools import chain
 import logging
 import os
 
-from mrjob.util import expand_path
-
 try:
     import simplejson as json  # preferred because of C speedups
     json  # quiet "redefinition of unused ..." warning from pyflakes
@@ -36,7 +34,8 @@ try:
 except ImportError:
     yaml = None
 
-
+from mrjob.py2 import string_types
+from mrjob.util import expand_path
 from mrjob.util import shlex_split
 
 
@@ -68,8 +67,8 @@ class OptionStore(dict):
     def validated_options(self, opts, error_fmt):
         unrecognized_opts = set(opts) - self.ALLOWED_KEYS
         if unrecognized_opts:
-            log.warn(error_fmt % ', '.join(sorted(unrecognized_opts)))
-            return dict((k, v) for k, v in opts.iteritems()
+            log.warning(error_fmt % ', '.join(sorted(unrecognized_opts)))
+            return dict((k, v) for k, v in opts.items()
                         if k in self.ALLOWED_KEYS)
         else:
             return opts
@@ -194,12 +193,12 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
     inherited = []
     if conf.get('include', None):
         includes = conf['include']
-        if isinstance(includes, basestring):
+        if isinstance(includes, string_types):
             includes = [includes]
 
         for include in includes:
             if include in already_loaded:
-                log.warn('%s tries to recursively include %s! (Already'
+                log.warning('%s tries to recursively include %s! (Already'
                          ' included:  %s)' % (
                              conf_path, conf['include'],
                              ', '.join(already_loaded)))
@@ -298,7 +297,7 @@ def combine_cmds(*cmds):
 
     if cmd is None:
         return None
-    elif isinstance(cmd, basestring):
+    elif isinstance(cmd, string_types):
         return shlex_split(cmd)
     else:
         return list(cmd)
@@ -357,7 +356,7 @@ def _combine_envs_helper(envs, local):
     result = {}
     for env in envs:
         if env:
-            for key, value in env.iteritems():
+            for key, value in env.items():
                 if key.endswith('PATH') and result.get(key):
                     result[key] = value + pathsep + result[key]
                 else:
@@ -441,7 +440,7 @@ def calculate_opt_priority(opts, opt_dicts):
     opt_priority = dict((opt, -1) for opt in opts)
     for priority, opt_dict in enumerate(opt_dicts):
         if opt_dict:
-            for opt, value in opt_dict.iteritems():
+            for opt, value in opt_dict.items():
                 if value is not None:
                     opt_priority[opt] = priority
     return opt_priority

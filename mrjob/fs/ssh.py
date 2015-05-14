@@ -14,12 +14,7 @@
 import logging
 import posixpath
 
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
-
+from io import BytesIO
 from mrjob.fs.base import Filesystem
 from mrjob.ssh import ssh_cat
 from mrjob.ssh import ssh_ls
@@ -104,7 +99,7 @@ class SSHFilesystem(Filesystem):
             ssh_match.group('filesystem_path'),
             self.ssh_key_name,
         )
-        return read_file(filename, fileobj=StringIO(output))
+        return read_file(filename, fileobj=BytesIO(output))
 
     def mkdir(self, dest):
         raise IOError()  # not implemented

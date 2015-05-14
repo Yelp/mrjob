@@ -17,12 +17,7 @@
 process. Useful for debugging."""
 import logging
 import os
-
-try:
-    from cStringIO import StringIO
-    StringIO  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    from StringIO import StringIO
+from io import BytesIO
 
 from mrjob.job import MRJob
 from mrjob.parse import parse_mr_job_stderr
@@ -31,9 +26,9 @@ from mrjob.sim import SimRunnerOptionStore
 from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
 
-log = logging.getLogger(__name__)
-
 __author__ = 'Matthew Tai <mtai@adku.com>'
+
+log = logging.getLogger(__name__)
 
 # Deprecated in favor of class variables, remove in v0.5.0
 DEFAULT_MAP_TASKS = 1
@@ -144,9 +139,9 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         # Use custom stdin
         if has_combiner:
-            child_stdout = StringIO()
+            child_stdout = BytesIO()
         else:
-            child_stdout = open(output_path, 'w')
+            child_stdout = open(output_path, 'wb')
 
         with save_current_environment():
             with save_cwd():
@@ -159,7 +154,7 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         if has_combiner:
             sorted_lines = sorted(child_stdout.getvalue().splitlines())
-            combiner_stdin = StringIO('\n'.join(sorted_lines))
+            combiner_stdin = BytesIO(b'\n'.join(sorted_lines))
         else:
             child_stdout.flush()
 

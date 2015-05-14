@@ -16,10 +16,18 @@
 bytes for Hadoop to distribute to the next task or to write as output. For more
 information, see :ref:`job-protocols` and :ref:`writing-protocols`.
 """
+# This is one of the few places where efficiency really matters; to that end,
+# we maintain separate code for Python 2 and 3 where necessary. Tests of
+# protocols should *not* have different code for different versions of Python.
+
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-import cPickle
+try:
+    import cPickle as pickle  # Python 2 only
+except ImportError:
+    import pickle
 
+from mrjob.py2 import PY2
 from mrjob.util import safeeval
 
 try:
@@ -56,7 +64,7 @@ class _KeyCachingProtocol(object):
 
         :return: A tuple of ``(key, value)``."""
 
-        raw_key, raw_value = line.split('\t', 1)
+        raw_key, raw_value = line.split(b'\t', 1)
 
         if raw_key != self._last_key_encoded:
             self._last_key_encoded = raw_key
@@ -71,8 +79,7 @@ class _KeyCachingProtocol(object):
 
         :rtype: str
         :return: A line, without trailing newline."""
-        return '%s\t%s' % (self._dumps(key),
-                           self._dumps(value))
+        return self._dumps(key) + b'\t' + self._dumps(value)
 
 
 class JSONProtocol(_KeyCachingProtocol):
@@ -81,22 +88,36 @@ class JSONProtocol(_KeyCachingProtocol):
     Note that JSON has some limitations; dictionary keys must be strings,
     and there's no distinction between lists and tuples."""
 
-    def _loads(self, value):
-        return json.loads(value)
+    if PY2:
+        def _loads(self, value):
+            return json.loads(value)
 
-    def _dumps(self, value):
-        return json.dumps(value)
+        def _dumps(self, value):
+            return json.dumps(value)
+    else:
+        def _loads(self, value):
+            return json.loads(value.decode('latin_1'))
+
+        def _dumps(self, value):
+            return json.dumps(value).encode('latin_1')
 
 
 class JSONValueProtocol(object):
     """Encode ``value`` as a JSON and discard ``key``
     (``key`` is read in as ``None``).
     """
-    def read(self, line):
-        return (None, json.loads(line))
+    if PY2:
+        def read(self, line):
+            return (None, json.loads(line))
 
-    def write(self, key, value):
-        return json.dumps(value)
+        def write(self, key, value):
+            return json.dumps(value)
+    else:
+        def read(self, line):
+            return (None, json.loads(line.decode('latin_1')))
+
+        def write(self, key, value):
+            return json.dumps(value).encode('latin_1')
 
 
 class PickleProtocol(_KeyCachingProtocol):
@@ -110,25 +131,46 @@ class PickleProtocol(_KeyCachingProtocol):
     Ugly, but should work for any type.
     """
 
-    def _loads(self, value):
-        return cPickle.loads(value.decode('string_escape'))
+    # string_escape doesn't exist on Python 3 (you can't .decode() bytes).
+    # Since efficiency matters for protocols, keeping separate code
+    # for Python 2 and 3
+    if PY2:
+        def _loads(self, value):
+            return pickle.loads(value.decode('string_escape'))
 
-    def _dumps(self, value):
-        return cPickle.dumps(value).encode('string_escape')
+        def _dumps(self, value):
+            return pickle.dumps(value).encode('string_escape')
+    else:
+        def _loads(self, value):
+            return pickle.loads(
+                value.decode('unicode_escape').encode('latin_1'))
+
+        def _dumps(self, value):
+            return pickle.dumps(value).decode(
+                'latin_1').encode('unicode_escape')
 
 
 class PickleValueProtocol(object):
     """Encode ``value`` as a string-escaped pickle and discard ``key``
     (``key`` is read in as ``None``).
     """
-    def read(self, line):
-        return (None, cPickle.loads(line.decode('string_escape')))
+    # see comment for PickleProtocol, above
+    if PY2:
+        def read(self, line):
+            return (None, pickle.loads(line.decode('string_escape')))
 
-    def write(self, key, value):
-        return cPickle.dumps(value).encode('string_escape')
+        def write(self, key, value):
+            return pickle.dumps(value).encode('string_escape')
+    else:
+        def read(self, line):
+            return (None, pickle.loads(
+                line.decode('unicode_escape').encode('latin_1')))
+
+        def write(self, key, value):
+            return pickle.dumps(value).decode(
+                'latin_1').encode('unicode_escape')
 
 
-# This was added in 0.3, so no @classmethod for backwards compatibility
 class RawProtocol(object):
     """Encode ``(key, value)`` as ``key`` and ``value`` separated by
     a tab (``key`` and ``value`` should be bytestrings).
@@ -142,19 +184,19 @@ class RawProtocol(object):
     we don't check.
     """
     def read(self, line):
-        key_value = line.split('\t', 1)
+        key_value = line.split(b'\t', 1)
         if len(key_value) == 1:
             key_value.append(None)
 
         return tuple(key_value)
 
     def write(self, key, value):
-        return '\t'.join(x for x in (key, value) if x is not None)
+        return b'\t'.join(x for x in (key, value) if x is not None)
 
 
 class RawValueProtocol(object):
     """Read in a line as ``(None, line)``. Write out ``(key, value)``
-    as ``value``. ``value`` must be a ``str``.
+    as ``value``. ``value`` must be bytes.
 
     The default way for a job to read its initial input.
     """
@@ -174,8 +216,12 @@ class ReprProtocol(_KeyCachingProtocol):
     def _loads(self, value):
         return safeeval(value)
 
-    def _dumps(self, value):
-        return repr(value)
+    if PY2:
+        def _dumps(self, value):
+            return repr(value)
+    else:
+        def _dumps(self, value):
+            return repr(value).encode('utf_8')
 
 
 class ReprValueProtocol(object):
@@ -187,5 +233,9 @@ class ReprValueProtocol(object):
     def read(self, line):
         return (None, safeeval(line))
 
-    def write(self, key, value):
-        return repr(value)
+    if PY2:
+        def write(self, key, value):
+            return repr(value)
+    else:
+        def write(self, key, value):
+            return repr(value).encode('utf_8')

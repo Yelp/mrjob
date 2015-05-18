@@ -2113,8 +2113,8 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         mrjob_tar_gz_name = runner._bootstrap_dir_mgr.name(
             'file', runner._mrjob_tar_gz_path)
         self.assertIn("__mrjob_PYTHON_LIB=$(" + PYTHON_BIN + " -c 'from"
-                      " distutils.sysconfig import get_python_lib; print"
-                      " get_python_lib()')", lines)
+                      " distutils.sysconfig import get_python_lib;"
+                      " print(get_python_lib())')", lines)
         self.assertIn('sudo tar xfz $__mrjob_PWD/' + mrjob_tar_gz_name +
                       ' -C $__mrjob_PYTHON_LIB', lines)
         self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'

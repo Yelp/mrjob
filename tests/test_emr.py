@@ -2041,8 +2041,8 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         self.assertIsNotNone(runner._master_bootstrap_script_path)
         self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
 
-        lines = [line.rstrip() for line in
-                 open(runner._master_bootstrap_script_path)]
+        with open(runner._master_bootstrap_script_path) as f:
+            lines = [line.rstrip() for line in f]
 
         self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
 

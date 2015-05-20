@@ -3712,3 +3712,21 @@ class SecurityTokenTestCase(MockEMRAndS3TestCase):
         s3_kwargs = self.mock_s3.call_args[1]
         self.assertIn('security_token', s3_kwargs)
         self.assertEqual(s3_kwargs['security_token'], 'meow')
+
+
+class BootstrapPythonTestCase(MockEMRAndS3TestCase):
+
+    def test_default(self):
+        mr_job = MRTwoStepJob(['-r', 'emr'])
+        with mr_job.make_runner() as runner:
+            self.assertEqual(runner._opts['bootstrap_python'], None)
+
+    def test_bootstrap_python_switch(self):
+        mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap-python'])
+        with mr_job.make_runner() as runner:
+            self.assertEqual(runner._opts['bootstrap_python'], True)
+
+    def test_no_bootstrap_python_switch(self):
+        mr_job = MRTwoStepJob(['-r', 'emr', '--no-bootstrap-python'])
+        with mr_job.make_runner() as runner:
+            self.assertEqual(runner._opts['bootstrap_python'], False)

@@ -322,6 +322,36 @@ and install another Python binary.
     auto-upload/interpolation feature instead.
 
 .. mrjob-opt::
+   :config: bootstrap_python
+   :switch: --bootstrap-python, --no-bootstrap-python
+   :type: boolean
+   :set: emr
+   :default: (automatic)
+
+   Attempt to install a compatible version of Python at bootstrap time.
+   By default, this only triggers if same major version of Python
+   (e.g. 2 or 3) is not already available on your EMR AMI. In practice,
+   this means it always triggers by default for Python 3, and never for
+   Python 2.
+
+   This runs before other :mrjob-opt:`bootstrap` commands.
+
+   In Python 3, this option attempts to install Python 3.4 from a package
+   (``sudo yum install -y python34``).
+
+   Note that this will fail if you set :mrjob-opt:`ami_version` to something
+   earlier than 3.7.0. If you need to use an earlier AMI version with Python 3,
+   first set this option to false, and then use :mrjob-opt:`bootstrap` to
+   install it Python 3 some other way (e.g. downloading the source, compiling,
+   and installing it).
+
+   Currently, this does nothing in Python 2. In later versions of mrjob,
+   setting this to true might do more (e.g. installing the exact same version
+   of Python from source).
+
+   .. versionadded:: 0.5.0
+
+.. mrjob-opt::
     :config: bootstrap_python_packages
     :switch: --bootstrap-python-package
     :type: :ref:`path list <data-type-path-list>`

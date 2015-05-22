@@ -404,12 +404,12 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
-            'ami_version': 'latest',
+            'ami_version': '3.7.0',
             'aws_security_token': None,
             'check_emr_status_every': 30,
             'cleanup_on_failure': ['JOB'],
-            'ec2_core_instance_type': 'm1.small',
-            'ec2_master_instance_type': 'm1.small',
+            'ec2_core_instance_type': 'm1.medium',
+            'ec2_master_instance_type': 'm1.medium',
             'emr_job_flow_pool_name': 'default',
             'hadoop_streaming_jar_on_emr': (
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar'),

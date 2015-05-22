@@ -816,7 +816,7 @@ class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
     def test_latest_ami_version(self):
         job_flow = self.run_and_get_job_flow('--ami-version', 'latest')
         self.assertEqual(job_flow.amiversion, 'latest')
-        self.assertEqual(job_flow.hadoopversion, '0.20.205')
+        self.assertEqual(job_flow.hadoopversion, '1.0.3')
 
     def test_bad_ami_version(self):
         self.assertRaises(boto.exception.EmrResponseError,
@@ -1108,12 +1108,12 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
     def test_defaults(self):
         self._test_instance_groups(
             {},
-            master=(1, 'm1.small', None))
+            master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
             {'num_ec2_instances': 3},
-            core=(2, 'm1.small', None),
-            master=(1, 'm1.small', None))
+            core=(2, 'm1.medium', None),
+            master=(1, 'm1.medium', None))
 
     def test_single_instance(self):
         self._test_instance_groups(
@@ -1124,7 +1124,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self._test_instance_groups(
             {'ec2_instance_type': 'c1.xlarge', 'num_ec2_instances': 3},
             core=(2, 'c1.xlarge', None),
-            master=(1, 'm1.small', None))
+            master=(1, 'm1.medium', None))
 
     def test_explicit_master_and_slave_instance_types(self):
         self._test_instance_groups(
@@ -1135,7 +1135,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
             {'ec2_slave_instance_type': 'm2.xlarge',
              'num_ec2_instances': 3},
             core=(2, 'm2.xlarge', None),
-            master=(1, 'm1.small', None))
+            master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large',
@@ -1177,7 +1177,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self._test_instance_groups(
             {},
             core=(2, 'c1.xlarge', None),
-            master=(1, 'm1.small', None))
+            master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
             {'ec2_master_instance_type': 'm1.large',
@@ -1302,23 +1302,23 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         self._test_instance_groups(
             {'ec2_master_instance_bid_price': '0',
              },
-            master=(1, 'm1.small', None))
+            master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
             {'num_ec2_core_instances': 3,
              'ec2_core_instance_bid_price': '0.00',
              },
-            core=(3, 'm1.small', None),
-            master=(1, 'm1.small', None))
+            core=(3, 'm1.medium', None),
+            master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
             {'num_ec2_core_instances': 3,
              'num_ec2_task_instances': 5,
              'ec2_task_instance_bid_price': '',
              },
-            core=(3, 'm1.small', None),
-            master=(1, 'm1.small', None),
-            task=(5, 'm1.small', None))
+            core=(3, 'm1.medium', None),
+            master=(1, 'm1.medium', None),
+            task=(5, 'm1.medium', None))
 
     def test_pass_invalid_bid_prices_through_to_emr(self):
         self.assertRaises(
@@ -1333,7 +1333,7 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
              'num_ec2_task_instances': 20,
              },
             core=(5, 'c1.medium', None),
-            master=(1, 'm1.small', None),
+            master=(1, 'm1.medium', None),
             task=(20, 'c1.medium', None))
 
     def test_mixing_instance_number_opts_on_cmd_line(self):
@@ -1343,8 +1343,8 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
             self._test_instance_groups(
                 {'num_ec2_instances': 4,
                  'num_ec2_core_instances': 10},
-                core=(10, 'm1.small', None),
-                master=(1, 'm1.small', None))
+                core=(10, 'm1.medium', None),
+                master=(1, 'm1.medium', None))
 
         self.assertIn('does not make sense', stderr.getvalue())
 
@@ -1358,9 +1358,9 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
             log_to_stream('mrjob.emr', stderr)
             self._test_instance_groups(
                 {},
-                core=(5, 'm1.small', None),
-                master=(1, 'm1.small', None),
-                task=(9, 'm1.small', None))
+                core=(5, 'm1.medium', None),
+                master=(1, 'm1.medium', None),
+                task=(9, 'm1.medium', None))
 
         self.assertIn('does not make sense', stderr.getvalue())
 
@@ -1373,8 +1373,8 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
             log_to_stream('mrjob.emr', stderr)
             self._test_instance_groups(
                 {'num_ec2_instances': 3},
-                core=(2, 'm1.small', None),
-                master=(1, 'm1.small', None))
+                core=(2, 'm1.medium', None),
+                master=(1, 'm1.medium', None))
 
         self.assertNotIn('does not make sense', stderr.getvalue())
 
@@ -2470,7 +2470,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--ec2-instance-type', 'm1.small',
+            '--ec2-instance-type', 'm1.medium',
             '--num-ec2-instances', '20'])
 
     def test_join_job_flow_with_enough_cpu_and_memory(self):
@@ -2482,7 +2482,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         # since they're have enough memory and CPU
         self.assertJoins(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--ec2-instance-type', 'm1.small',
+            '--ec2-instance-type', 'm1.medium',
             '--num-ec2-instances', '10'])
 
     def test_dont_join_job_flow_with_instances_with_too_little_memory(self):
@@ -2501,7 +2501,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
             num_ec2_instances=10)
 
         # We implicitly want a MASTER instance with c1.xlarge. The pooled
-        # job flow has an m1.small master instance and 9 c1.xlarge core
+        # job flow has an m1.medium master instance and 9 c1.xlarge core
         # instances, which doesn't match.
         self.assertDoesNotJoin(job_flow_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',

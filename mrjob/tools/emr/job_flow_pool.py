@@ -51,7 +51,7 @@ def pprint_job_flow(jf):
     """Print a job flow to stdout in this form::
 
         job.flow.name
-        j-JOB_FLOW_ID: 2 instances (master=m1.small, slaves=m1.small, 20 \
+        j-JOB_FLOW_ID: 2 instances (master=m1.medium, slaves=m1.medium, 20 \
 minutes to the hour)
     """
     instance_count = int(jf.instancecount)

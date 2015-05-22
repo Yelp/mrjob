@@ -350,8 +350,8 @@ def add_emr_opts(opt_group):
 
         opt_group.add_option(
             '--ec2-instance-type', dest='ec2_instance_type', default=None,
-            help=('Type of EC2 instance(s) to launch (e.g. m1.small,'
-                  ' c1.xlarge, m2.xlarge). See'
+            help=('Type of EC2 instance(s) to launch (e.g. m1.medium,'
+                  ' c3.xlarge, r3.xlarge). See'
                   ' http://aws.amazon.com/ec2/instance-types/ for the full'
                   ' list.')),
 

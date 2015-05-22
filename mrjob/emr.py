@@ -327,6 +327,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'bootstrap_actions',
         'bootstrap_cmds',
         'bootstrap_files',
+        'bootstrap_python',
         'bootstrap_python_packages',
         'bootstrap_scripts',
         'check_emr_status_every',

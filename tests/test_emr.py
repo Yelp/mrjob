@@ -2128,7 +2128,8 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         self.assertIn('$__mrjob_PWD/s.sh', lines)
 
     def test_no_bootstrap_script_if_not_needed(self):
-        runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False)
+        runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,
+                              bootstrap_python=False)
 
         runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
@@ -2137,6 +2138,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_mrjob=False,
                               bootstrap_actions=['foo', 'bar baz'],
+                              bootstrap_python=False,
                               pool_emr_job_flows=False)
 
         runner._add_bootstrap_files_for_upload()
@@ -2145,6 +2147,7 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
         # using pooling doesn't require us to create a bootstrap script
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_mrjob=False,
+                              bootstrap_python=False,
                               pool_emr_job_flows=True)
 
         runner._add_bootstrap_files_for_upload()

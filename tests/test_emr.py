@@ -3729,9 +3729,9 @@ class BootstrapPythonTestCase(MockEMRAndS3TestCase):
                 self.assertEqual(runner._bootstrap, [])
             else:
                 self.assertEqual(runner._bootstrap_python(),
-                                 [['yum', 'install', '-y', 'python34']])
+                                 [['yum install -y python34']])
                 self.assertEqual(runner._bootstrap,
-                                 [['yum', 'install', '-y', 'python34']])
+                                 [['yum install -y python34']])
 
 
     def test_bootstrap_python_switch(self):
@@ -3751,9 +3751,9 @@ class BootstrapPythonTestCase(MockEMRAndS3TestCase):
                                   stderr.getvalue())
                 else:
                     self.assertEqual(runner._bootstrap_python(),
-                                     [['yum', 'install', '-y', 'python34']])
+                                     [['yum install -y python34']])
                     self.assertEqual(runner._bootstrap,
-                                     [['yum', 'install', '-y', 'python34']])
+                                     [['yum install -y python34']])
                     self.assertNotIn('bootstrap', stderr.getvalue())
 
     def test_no_bootstrap_python_switch(self):
@@ -3776,9 +3776,9 @@ class BootstrapPythonTestCase(MockEMRAndS3TestCase):
                     self.assertEqual(runner._bootstrap, [])
                 else:
                     self.assertEqual(runner._bootstrap_python(),
-                                     [['yum', 'install', '-y', 'python34']])
+                                     [['yum install -y python34']])
                     self.assertEqual(runner._bootstrap,
-                                     [['yum', 'install', '-y', 'python34']])
+                                     [['yum install -y python34']])
                     self.assertIn('will probably not work', stderr.getvalue())
 
     def test_ami_version_3_6_0(self):
@@ -3789,9 +3789,9 @@ class BootstrapPythonTestCase(MockEMRAndS3TestCase):
 
     def test_bootstrap_python_comes_before_bootstrap(self):
         with patch('mrjob.emr.EMRJobRunner._bootstrap_python',
-                   return_value=[['yum', 'install-python-already']]):
+                   return_value=[['yum install-python-already']]):
             mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])
 
             with mr_job.make_runner() as runner:
                 self.assertEqual(runner._bootstrap,
-                                 [['yum', 'install-python-already'], ['true']])
+                                 [['yum install-python-already'], ['true']])

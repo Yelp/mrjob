@@ -2042,8 +2042,8 @@ class EMRJobRunner(MRJobRunner):
         self._master_bootstrap_script_path = path
 
     def _bootstrap_python(self):
-        """Return a (possibly empty) list of parsed commands (i.e. lists
-        of arguments) to support the bootstrap_python option."""
+        """Return a (possibly empty) list of parsed commands (in the same
+        format as returned by parse_setup_cmd())'"""
         if PY2:
             if self._opts['bootstrap_python']:
                 log.warning('bootstrap_python does nothing in Python 2')
@@ -2059,7 +2059,7 @@ class EMRJobRunner(MRJobRunner):
                     ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
                     '-cookbook.html#upgrading-python-from-source')
 
-            return [['yum', 'install', '-y', 'python34']]
+            return [['yum install -y python34']]
 
         return []
 

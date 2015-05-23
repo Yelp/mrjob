@@ -2059,7 +2059,7 @@ class EMRJobRunner(MRJobRunner):
                     ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
                     '-cookbook.html#upgrading-python-from-source')
 
-            return [['yum install -y python34']]
+            return [['sudo yum install -y python34']]
 
         return []
 

@@ -137,12 +137,13 @@ compile, and install it:
         - cd Python-x.y.z
         - ./configure && make && sudo make install
         - cd ..
-        - sudo ln -sf /usr/bin/python /usr/local/bin/python-x.y
+        - sudo rm /usr/bin/python
+        - sudo ln -s /usr/local/bin/pythonx.y /usr/bin/python
         bootstrap_python: false  # don't try to auto-install Python
         python_bin: python  # make this config work in Python 3 too
 
 Replace *x.y.z* with the version of Python you want. Note that the
-python binary we symlink to is named *python-x.y*, not *python-x.y.z*.
+python binary we symlink to is named *pythonx.y*, not *pythonx.y.z*.
 
 :mrjob-opt:`bootstrap_mrjob` runs *last*, so mrjob *will* get bootstrapped
 into your newly upgraded version of Python. If you use other

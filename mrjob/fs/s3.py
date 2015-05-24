@@ -322,6 +322,9 @@ class S3Filesystem(Filesystem):
         You may optionally pass in an existing S3 connection through
         ``s3_conn``.
         """
+        log.warning(
+            'get_s3_folder_keys() is deprecated and will be removed in v0.5.0')
+
         if not s3_conn:
             s3_conn = self.make_s3_conn()
 

@@ -594,7 +594,7 @@ def print_report(stats, now=None):
     print()
 
     print('* All usage is measured in Normalized Instance Hours, which are')
-    print('  roughly equivalent to running an m1.small instance for an hour.')
+    print('  roughly equivalent to running an m1.medium instance for an hour.')
     print("  Billing is estimated, and may not match Amazon's system exactly.")
     print()
 

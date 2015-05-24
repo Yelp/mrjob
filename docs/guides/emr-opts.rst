@@ -87,7 +87,7 @@ Job flow creation and configuration
     :switch: --ami-version
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``'latest'``
+    :default: ``'3.7.0'``
 
     EMR AMI version to use. This controls which Hadoop version(s) are
     available and which version of Python is installed, among other things;
@@ -405,20 +405,20 @@ Number and type of instances
     :switch: --ec2-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``'m1.small'``
+    :default: ``'m1.medium'``
 
     What sort of EC2 instance(s) to use on the nodes that actually run tasks
     (see http://aws.amazon.com/ec2/instance-types/).  When you run multiple
     instances (see :mrjob-opt:`num_ec2_instances`), the master node is just
     coordinating the other nodes, so usually the default instance type
-    (``m1.small``) is fine, and using larger instances is wasteful.
+    (``m1.medium``) is fine, and using larger instances is wasteful.
 
 .. mrjob-opt::
     :config: ec2_core_instance_type
     :switch: --ec2-core-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``'m1.small'``
+    :default: ``'m1.medium'``
 
     like :mrjob-opt:`ec2_instance_type`, but only for the core (also know as
     "slave") Hadoop nodes; these nodes run tasks and host HDFS. Usually you
@@ -440,7 +440,7 @@ Number and type of instances
     :switch: --ec2-master-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``'m1.small'``
+    :default: ``'m1.medium'``
 
     like :mrjob-opt:`ec2_instance_type`, but only for the master Hadoop node.
     This node hosts the task tracker and HDFS, and runs tasks if there are no

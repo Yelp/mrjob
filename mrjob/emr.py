@@ -74,6 +74,7 @@ from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import random_identifier
 from mrjob.aws import s3_endpoint_for_region
 from mrjob.aws import s3_location_constraint_for_region
+from mrjob.compat import version_gte
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -102,6 +103,7 @@ from mrjob.parse import iso8601_to_timestamp
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
+from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
 from mrjob.retry import RetryGoRound
@@ -405,12 +407,12 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
-            'ami_version': 'latest',
+            'ami_version': '3.7.0',
             'aws_security_token': None,
             'check_emr_status_every': 30,
             'cleanup_on_failure': ['JOB'],
-            'ec2_core_instance_type': 'm1.small',
-            'ec2_master_instance_type': 'm1.small',
+            'ec2_core_instance_type': 'm1.medium',
+            'ec2_master_instance_type': 'm1.medium',
             'emr_job_flow_pool_name': 'default',
             'hadoop_streaming_jar_on_emr': (
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar'),
@@ -621,7 +623,7 @@ class EMRJobRunner(MRJobRunner):
             self._bootstrap_dir_mgr.add(**parse_legacy_hash_path(
                 'file', path, must_name='bootstrap_files'))
 
-        self._bootstrap = self._parse_bootstrap()
+        self._bootstrap = self._bootstrap_python() + self._parse_bootstrap()
         self._legacy_bootstrap = self._parse_legacy_bootstrap()
 
         for cmd in self._bootstrap + self._legacy_bootstrap:
@@ -2038,6 +2040,28 @@ class EMRJobRunner(MRJobRunner):
                 f.write(line)
 
         self._master_bootstrap_script_path = path
+
+    def _bootstrap_python(self):
+        """Return a (possibly empty) list of parsed commands (in the same
+        format as returned by parse_setup_cmd())'"""
+        if PY2:
+            if self._opts['bootstrap_python']:
+                log.warning('bootstrap_python does nothing in Python 2')
+        # Python 3
+        elif (self._opts['bootstrap_python'] or
+            self._opts['bootstrap_python'] is None):
+
+            if (self._opts['ami_version'] == 'latest' or
+                not version_gte(self._opts['ami_version'], '3.7.0')):
+                log.warning(
+                    'bootstrapping Python 3 will probably not work on'
+                    ' AMIs prior to 3.7.0. For an alternative, see:'
+                    ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
+                    '-cookbook.html#upgrading-python-from-source')
+
+            return [['sudo yum install -y python34']]
+
+        return []
 
     def _parse_bootstrap(self):
         """Parse the *bootstrap* option with

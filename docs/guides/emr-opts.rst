@@ -29,6 +29,15 @@ about setting these options.
     your "password" on AWS
 
 .. mrjob-opt::
+    :config: aws_security_token
+    :switch: --aws-security_token
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: ``None``
+
+    your temporary session token on AWS
+
+.. mrjob-opt::
     :config: ec2_key_pair
     :switch: --ec2-key-pair
     :type: :ref:`string <data-type-string>`

@@ -86,7 +86,8 @@ class S3Filesystem(Filesystem):
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
 
-    def __init__(self, aws_access_key_id, aws_secret_access_key, s3_endpoint):
+    def __init__(self, aws_access_key_id, aws_secret_access_key, s3_endpoint,
+                 aws_security_token=None):
         """
         :param aws_access_key_id: Your AWS access key ID
         :param aws_secret_access_key: Your AWS secret access key
@@ -97,6 +98,7 @@ class S3Filesystem(Filesystem):
         self._s3_endpoint = s3_endpoint
         self._aws_access_key_id = aws_access_key_id
         self._aws_secret_access_key = aws_secret_access_key
+        self._aws_security_token = aws_security_token
 
     def can_handle_path(self, path):
         return is_s3_uri(path)
@@ -235,7 +237,8 @@ class S3Filesystem(Filesystem):
         raw_s3_conn = boto.connect_s3(
             aws_access_key_id=self._aws_access_key_id,
             aws_secret_access_key=self._aws_secret_access_key,
-            host=self._s3_endpoint)
+            host=self._s3_endpoint,
+            security_token=self._aws_security_token)
         return wrap_aws_conn(raw_s3_conn)
 
     def get_s3_key(self, uri, s3_conn=None):

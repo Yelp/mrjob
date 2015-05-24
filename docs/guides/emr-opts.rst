@@ -342,10 +342,9 @@ and install another Python binary.
    Note that this will fail if you set :mrjob-opt:`ami_version` to something
    earlier than 3.7.0. If you need to use an earlier AMI version with Python 3,
    first set this option to false, and then use :mrjob-opt:`bootstrap` to
-   install it Python 3 some other way (e.g. downloading the source, compiling,
-   and installing it).
+   install Python 3; see :ref:`bootstrap-python-source`.
 
-   Currently, this does nothing in Python 2. In later versions of mrjob,
+   Currently, this option does nothing in Python 2. In later versions of mrjob,
    setting this to true might do more (e.g. installing the exact same version
    of Python from source).
 

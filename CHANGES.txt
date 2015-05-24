@@ -5,6 +5,7 @@ v0.4.5, 2015-??-?? -- ???
  * runners:
    * EMR:
      * aws_security_token for temporary credentials (#1003)
+ * more efficient decoding of bz2 files
 
 v0.4.4, 2015-04-21 -- EMRgency!
  * runners:

@@ -1394,8 +1394,9 @@ class EMRJobRunner(MRJobRunner):
         except boto.exception.BotoServerError as ex:
             if ex.code != 'AccessDenied':
                 raise
-            log.warning('Trying fallback instance profile: %s' %
-                        FALLBACK_INSTANCE_PROFILE)
+            log.warning(
+                "Can't access IAM API, trying default instance profile: %s" %
+                FALLBACK_INSTANCE_PROFILE)
             return FALLBACK_INSTANCE_PROFILE
 
     def _service_role(self):
@@ -1405,8 +1406,9 @@ class EMRJobRunner(MRJobRunner):
         except boto.exception.BotoServerError as ex:
             if ex.code != 'AccessDenied':
                 raise
-            log.warning('Trying fallback service role: %s' %
-                        FALLBACK_SERVICE_ROLE)
+            log.warning(
+                "Can't access IAM API, trying default service role: %s" %
+                FALLBACK_SERVICE_ROLE)
             return FALLBACK_SERVICE_ROLE
 
     @property
@@ -1684,26 +1686,39 @@ class EMRJobRunner(MRJobRunner):
             msg = 'Job on job flow %s failed with status %s: %s' % (
                 job_flow.jobflowid, job_state, reason)
             log.error(msg)
-            if self._s3_job_log_uri:
-                log.info('Logs are in %s' % self._s3_job_log_uri)
-            # look for a Python traceback
-            cause = self._find_probable_cause_of_failure(
-                step_nums, sorted(lg_step_num_mapping.values()))
-            if cause:
-                # log cause, and put it in exception
-                cause_msg = []  # lines to log and put in exception
-                cause_msg.append('Probable cause of failure (from %s):' %
-                                 cause['log_file_uri'])
-                cause_msg.extend(line.strip('\n') for line in cause['lines'])
-                if cause['input_uri']:
-                    cause_msg.append('(while reading from %s)' %
-                                     cause['input_uri'])
+            # check for invalid fallback IAM roles
+            if any(reason.rstrip().endswith('/%s is invalid' % role)
+                   for role in (FALLBACK_INSTANCE_PROFILE,
+                                FALLBACK_SERVICE_ROLE)):
+                msg += (
+                    '\n\n'
+                    'Ask your admin to create the default EMR roles'
+                    ' by following:\n\n'
+                    '    http://docs.aws.amazon.com/ElasticMapReduce/latest'
+                    '/DeveloperGuide/emr-iam-roles-creatingroles.html\n')
+            else:
+                if self._s3_job_log_uri:
+                    log.info('Logs are in %s' % self._s3_job_log_uri)
+                # look for a Python traceback
+                cause = self._find_probable_cause_of_failure(
+                    step_nums, sorted(lg_step_num_mapping.values()))
+                if cause:
+                    # log cause, and put it in exception
+                    cause_msg = []  # lines to log and put in exception
+                    cause_msg.append('Probable cause of failure (from %s):' %
+                                     cause['log_file_uri'])
+                    cause_msg.extend(
+                        line.strip('\n') for line in cause['lines'])
 
-                for line in cause_msg:
-                    log.error(line)
+                    if cause['input_uri']:
+                        cause_msg.append('(while reading from %s)' %
+                                         cause['input_uri'])
 
-                # add cause_msg to exception message
-                msg += '\n' + '\n'.join(cause_msg) + '\n'
+                    for line in cause_msg:
+                        log.error(line)
+
+                    # add cause_msg to exception message
+                    msg += '\n' + '\n'.join(cause_msg) + '\n'
 
             raise Exception(msg)
 

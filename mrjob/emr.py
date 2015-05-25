@@ -92,6 +92,8 @@ from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import _get_bucket
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
+from mrjob.iam import FALLBACK_INSTANCE_PROFILE
+from mrjob.iam import FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
@@ -1374,24 +1376,38 @@ class EMRJobRunner(MRJobRunner):
             args['api_params'] = self._opts['emr_api_params']
 
         # instance profile and service role are required for accounts
-        # created after April 6, 2015. Doing this for old accounts as well;
-        # guessing that eventually all accounts will need this stuff anyway.
-        args.setdefault('api_params', {})
-
-        instance_profile = (
-            self._opts['iam_instance_profile'] or
-            get_or_create_mrjob_instance_profile(self.make_iam_conn()))
-        args['api_params']['JobFlowRole'] = instance_profile
-
-        service_role = (
-            self._opts['iam_service_role'] or
-            get_or_create_mrjob_service_role(self.make_iam_conn()))
-        args['api_params']['ServiceRole'] = service_role
+        # created after April 6, 2015, and will eventually be required
+        # for all accounts
+        api_params = args.setdefault('api_params', {})
+        api_params['JobFlowRole'] = self._instance_profile()
+        api_params['ServiceRole'] = self._service_role()
 
         if steps:
             args['steps'] = steps
 
         return args
+
+    def _instance_profile(self):
+        try:
+            return (self._opts['iam_instance_profile'] or
+                    get_or_create_mrjob_instance_profile(self.make_iam_conn()))
+        except boto.exception.BotoServerError as ex:
+            if ex.code != 'AccessDenied':
+                raise
+            log.warning('Trying fallback instance profile: %s' %
+                        FALLBACK_INSTANCE_PROFILE)
+            return FALLBACK_INSTANCE_PROFILE
+
+    def _service_role(self):
+        try:
+            return (self._opts['iam_service_role'] or
+                    get_or_create_mrjob_service_role(self.make_iam_conn()))
+        except boto.exception.BotoServerError as ex:
+            if ex.code != 'AccessDenied':
+                raise
+            log.warning('Trying fallback service role: %s' %
+                        FALLBACK_SERVICE_ROLE)
+            return FALLBACK_SERVICE_ROLE
 
     @property
     def _action_on_failure(self):

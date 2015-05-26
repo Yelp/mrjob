@@ -1392,7 +1392,7 @@ class EMRJobRunner(MRJobRunner):
             return (self._opts['iam_instance_profile'] or
                     get_or_create_mrjob_instance_profile(self.make_iam_conn()))
         except boto.exception.BotoServerError as ex:
-            if ex.code != 'AccessDenied':
+            if ex.status != 403:
                 raise
             log.warning(
                 "Can't access IAM API, trying default instance profile: %s" %
@@ -1404,7 +1404,7 @@ class EMRJobRunner(MRJobRunner):
             return (self._opts['iam_service_role'] or
                     get_or_create_mrjob_service_role(self.make_iam_conn()))
         except boto.exception.BotoServerError as ex:
-            if ex.code != 'AccessDenied':
+            if ex.status != 403:
                 raise
             log.warning(
                 "Can't access IAM API, trying default service role: %s" %

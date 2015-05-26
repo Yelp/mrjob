@@ -662,37 +662,50 @@ class IAMTestCase(MockEMRAndS3TestCase):
 
     def test_iam_instance_profile_option(self):
         job_flow = self.run_and_get_job_flow(
-            '--iam-instance-profile', 'EMR_DefaultRole')
+            '--iam-instance-profile', 'EMR_EC2_DefaultRole')
         self.assertTrue(boto.connect_iam.called)
 
-        self.assertEqual(job_flow.jobflowrole, 'EMR_DefaultRole')
+        self.assertEqual(job_flow.jobflowrole, 'EMR_EC2_DefaultRole')
 
     def test_deprecated_job_flow_role_option(self):
         with logger_disabled('mrjob.emr'):
             job_flow = self.run_and_get_job_flow(
-                '--iam-job-flow-role', 'EMR_DefaultRole')
+                '--iam-job-flow-role', 'EMR_EC2_DefaultRole')
             self.assertTrue(boto.connect_iam.called)
 
-            self.assertEqual(job_flow.jobflowrole, 'EMR_DefaultRole')
+            self.assertEqual(job_flow.jobflowrole, 'EMR_EC2_DefaultRole')
 
     def test_iam_service_role_option(self):
         job_flow = self.run_and_get_job_flow(
-            '--iam-service-role', 'EMR_EC2_DefaultRole')
+            '--iam-service-role', 'EMR_DefaultRole')
         self.assertTrue(boto.connect_iam.called)
 
-        self.assertEqual(job_flow.servicerole, 'EMR_EC2_DefaultRole')
+        self.assertEqual(job_flow.servicerole, 'EMR_DefaultRole')
 
     def test_both_iam_options(self):
         job_flow = self.run_and_get_job_flow(
-            '--iam-instance-profile', 'EMR_DefaultRole',
-            '--iam-service-role', 'EMR_EC2_DefaultRole')
+            '--iam-instance-profile', 'EMR_EC2_DefaultRole',
+            '--iam-service-role', 'EMR_DefaultRole')
 
         # users with limited access may not be able to connect to the IAM API.
         # This gives them a plan B
         self.assertFalse(boto.connect_iam.called)
 
-        self.assertEqual(job_flow.jobflowrole, 'EMR_DefaultRole')
-        self.assertEqual(job_flow.servicerole, 'EMR_EC2_DefaultRole')
+        self.assertEqual(job_flow.jobflowrole, 'EMR_EC2_DefaultRole')
+        self.assertEqual(job_flow.servicerole, 'EMR_DefaultRole')
+
+    def test_no_iam_access(self):
+        ex = boto.exception.BotoServerError(403, 'Forbidden')
+        self.assertIsInstance(boto.connect_iam, Mock)
+        boto.connect_iam.side_effect = ex
+
+        with logger_disabled('mrjob.emr'):
+            job_flow = self.run_and_get_job_flow()
+
+        self.assertTrue(boto.connect_iam.called)
+
+        self.assertEqual(job_flow.jobflowrole, 'EMR_EC2_DefaultRole')
+        self.assertEqual(job_flow.servicerole, 'EMR_DefaultRole')
 
 
 class EMRAPIParamsTestCase(MockEMRAndS3TestCase):

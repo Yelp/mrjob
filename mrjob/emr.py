@@ -1570,6 +1570,7 @@ class EMRJobRunner(MRJobRunner):
         # keep track of when we launched our job
         self._emr_job_start = time.time()
 
+    # TODO: break this method up; it's too big to write tests for
     def _wait_for_job_to_complete(self):
         """Wait for the job to complete, and raise an exception if
         the job failed.

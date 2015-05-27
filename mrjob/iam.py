@@ -116,6 +116,16 @@ MRJOB_INSTANCE_PROFILE_POLICY = {
     }]
 }
 
+# if we can't create or find our own service role, use the one
+# created by the AWS console and CLI
+FALLBACK_SERVICE_ROLE = 'EMR_DefaultRole'
+
+# if we can't create or find our own instance profile, use the one
+# created by the AWS console and CLI
+FALLBACK_INSTANCE_PROFILE = 'EMR_EC2_DefaultRole'
+
+
+
 log = getLogger(__name__)
 
 

@@ -81,9 +81,10 @@ FALLBACK_SERVICE_ROLE = 'EMR_DefaultRole'
 FALLBACK_INSTANCE_PROFILE = 'EMR_EC2_DefaultRole'
 
 
-
 log = getLogger(__name__)
 
+
+# Utilities for all API calls
 
 def _unquote_json(quoted_json_document):
     """URI-decode and then JSON-decode the given document."""
@@ -132,26 +133,54 @@ def _get_responses(conn, action, params, *args, **kwargs):
             return
 
 
+# Auto-created roles/profiles
+
 def get_or_create_mrjob_service_role(conn):
-    # As of 2015-04-20, it looks like EMR won't accept roles with a path
-    # other than '/' (the default). Looks like what's happening is that EMR
-    # forgets to include the path in the ARN.
-    #
-    # This doesn't affect instance profiles
-    for role_name, role in _yield_roles(conn):
-        if role != MRJOB_SERVICE_ROLE:
+    """Look for a usable service role for EMR, and if there is none,
+    create one."""
+
+    for role_name, role_document in _yield_roles(conn):
+        if role_document != MRJOB_SERVICE_ROLE:
             continue
 
         policy_arns = list(_yield_attached_role_policies(conn, role_name))
         if policy_arns == [EMR_SERVICE_ROLE_POLICY_ARN]:
             return role_name
 
-    role_name = _create_mrjob_role_with_attached_policy(
+    name = _create_mrjob_role_with_attached_policy(
         conn, MRJOB_SERVICE_ROLE, EMR_SERVICE_ROLE_POLICY_ARN)
 
-    log.info('Auto-created service role %s' % role_name)
+    log.info('Auto-created service role %s' % name)
 
-    return role_name
+    return name
+
+
+def get_or_create_mrjob_instance_profile(conn):
+    """Look for a usable instance profile for EMR, and if there is none,
+    create one."""
+
+    for profile_name, role_name, role_document in (
+            _yield_instance_profiles(conn)):
+
+        if role_document != MRJOB_INSTANCE_PROFILE_ROLE:
+            continue
+
+        policy_arns = list(_yield_attached_role_policies(conn, role_name))
+        if policy_arns == [EMR_INSTANCE_PROFILE_POLICY_ARN]:
+            return role_name
+
+    name = _create_mrjob_role_with_attached_policy(
+        conn, MRJOB_INSTANCE_PROFILE_ROLE, EMR_INSTANCE_PROFILE_POLICY_ARN)
+
+    # create an instance profile with the same name as the role
+    _get_response(conn, 'CreateInstanceProfile', {'InstanceProfileName': name})
+
+    _get_response(conn, 'AddRoleToInstanceProfile', {
+        'InstanceProfileName': name, 'RoleName': name})
+
+    log.info('Auto-created instance profile %s' % name)
+
+    return name
 
 
 def _yield_roles(conn):
@@ -160,10 +189,32 @@ def _yield_roles(conn):
 
     for resp in resps:
         for role_data in resp['roles']:
-            role_name = role_data['role_name']
-            role = _unquote_json(role_data['assume_role_policy_document'])
+            yield _get_role_name_and_document(role_data)
 
-            yield (role_name, role)
+
+def _yield_instance_profiles(conn):
+    """Yield (profile_name, role_name, role_document).
+
+    role_name and role_document are None for empty instance profiles
+    """
+    resps = _get_responses(conn, 'ListInstanceProfiles', {},
+                           list_marker='InstanceProfiles')
+
+    for resp in resps:
+        for profile_data in resp['instance_profiles']:
+            profile_name = profile_data['instance_profile_name']
+
+            if profile_data['roles']:
+                # doesn't look like boto can handle two list markers, hence
+                # the extra "member" layer
+                role_data = profile_data['roles']['member']
+                role_name, role_document = _get_role_name_and_document(
+                    role_data)
+            else:
+                role_name = None
+                role_document = None
+
+            yield (profile_name, role_name, role_document)
 
 
 def _yield_attached_role_policies(conn, role_name):
@@ -179,37 +230,19 @@ def _yield_attached_role_policies(conn, role_name):
             yield policy_data['policy_arn']
 
 
-def get_or_create_mrjob_instance_profile(conn):
-    target_role_with_policies = (
-        MRJOB_INSTANCE_PROFILE_ROLE, [MRJOB_INSTANCE_PROFILE_POLICY])
+def _get_role_name_and_document(role_data):
+    role_name = role_data['role_name']
+    role_document = _unquote_json(role_data['assume_role_policy_document'])
 
-    for profile_name, role_with_policies in (yield_roles_with_policies(conn)):
-
-        if role_with_policies_matches(role_with_policies,
-                                      target_role_with_policies):
-            return profile_name
-
-    # role and instance profile will have same randomly generated name
-    name = _create_mrjob_role_with_policies(
-        conn, *target_role_with_policies)
-
-    # create an instance profile with the same name as the role
-    _get_response(conn, 'CreateInstanceProfile', {'InstanceProfileName': name})
-
-    _get_response(conn, 'AddRoleToInstanceProfile', {
-        'InstanceProfileName': name, 'RoleName': name})
-
-    log.info('Auto-created instance profile %s' % name)
-
-    return name
+    return (role_name, role_document)
 
 
-def _create_mrjob_role_with_attached_policy(conn, role, policy_arn):
+def _create_mrjob_role_with_attached_policy(conn, role_document, policy_arn):
     # create role
     role_name = 'mrjob-' + random_identifier()
 
     _get_response(conn, 'CreateRole', {
-        'AssumeRolePolicyDocument': json.dumps(role),
+        'AssumeRolePolicyDocument': json.dumps(role_document),
         'RoleName': role_name})
 
     _get_response(conn, 'AttachRolePolicy', {
@@ -387,9 +420,6 @@ def role_with_policies_matches(rp1, rp2):
     return (role1 == role2 and
             sorted(dumps(p1) for p1 in policies1) ==
             sorted(dumps(p2) for p2 in policies2))
-
-
-
 
 
 def _create_mrjob_role_with_policies(conn, role, policies):

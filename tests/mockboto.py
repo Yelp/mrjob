@@ -980,7 +980,8 @@ class MockIAMConnection(object):
                 params['PolicyDocument'])
 
         else:
-            raise ValueError
+            raise NotImplementedError(
+                'mockboto does not implement the %s API call' % action)
 
     # instance profiles
 

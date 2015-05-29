@@ -33,11 +33,11 @@ master nodes to view live progress, see the job tracker in your browser, and
 fetch error logs quickly.
 
 * Go to https://console.aws.amazon.com/ec2/home
-* Make sure the **Region** dropdown (upper left) matches the region you want 
+* Make sure the **Region** dropdown (upper left) matches the region you want
   to run jobs in (usually "US East").
 * Click on **Key Pairs** (lower left)
 * Click on **Create Key Pair** (center).
-* Name your key pair ``EMR`` (any name will work but that's what we're using 
+* Name your key pair ``EMR`` (any name will work but that's what we're using
   in this example)
 * Save :file:`EMR.pem` wherever you like (``~/.ssh`` is a good place)
 * Run ``chmod og-rwx /path/to/EMR.pem`` so that ``ssh`` will be happy
@@ -115,7 +115,7 @@ Instances perform one of three roles:
 
 There's a special case where your job flow *only* has a single master instance, in which case the master instance schedules tasks, runs them, and hosts HDFS.
 
-By default, :py:mod:`mrjob` runs a single ``m1.small``, which is a cheap but not very powerful instance type. This can be quite adequate for testing your code on a small subset of your data, but otherwise give little advantage over running a job locally. To get more performance out of your job, you can either add more instances, use more powerful instances, or both.
+By default, :py:mod:`mrjob` runs a single ``m1.medium``, which is a cheap but not very powerful instance type. This can be quite adequate for testing your code on a small subset of your data, but otherwise give little advantage over running a job locally. To get more performance out of your job, you can either add more instances, use more powerful instances, or both.
 
 Here are some things to consider when tuning your instance settings:
 
@@ -129,8 +129,8 @@ Here are some things to consider when tuning your instance settings:
   job is often the best solution, but if you can't, consider using a high-memory
   instance type.
 * Larger instance types are usually a better deal if you have the workload
-  to justify them. For example, a ``c1.xlarge`` costs about 10 times as much
-  as an ``m1.small``, but it has about 20 times as much processing power
+  to justify them. For example, a ``c1.xlarge`` costs about 6 times as much
+  as an ``m1.medium``, but it has about 8 times as much processing power
   (and more memory).
 
 The basic way to control type and number of instances is with the
@@ -147,8 +147,8 @@ or in :py:mod:`mrjob.conf`, like this::
         num_ec2_instances: 5
 
 In most cases, your master instance type doesn't need to be larger
-than``m1.small`` to schedule tasks, so *ec2_instance_type* only applies to
-instances that actually run tasks. (In this example, there are 1 ``m1.small``
+than ``m1.medium`` to schedule tasks, so *ec2_instance_type* only applies to
+instances that actually run tasks. (In this example, there are 1 ``m1.medium``
 master instance, and 4 ``c1.medium`` core instances.) You *will* need a larger
 master instance if you have a very large number of input files; in this case,
 use the *ec2_master_instance_type* option.

@@ -5,15 +5,15 @@ Bootstrapping allows you to configure EMR machines to your needs.
 
 AMI 2.x and AMI 3.x version differences
 -----------------------------------------------
-AMI versions 2.x are based on `Debian 6.0.2 (Squeeze) 
+AMI versions 2.x are based on `Debian 6.0.2 (Squeeze)
 <http://www.debian.org/News/2011/20110625>`_.  The package management system is ``apt-get``. Any package distributed with Debian Squeeze should be available.
 
-AMI versions 3.x are based on `Amazon Linux Release 2012.09 
+AMI versions 3.x are based on `Amazon Linux Release 2012.09
 <https://aws.amazon.com/amazon-linux-ami/2012.09-release-notes/>`_. This major bump changed the package management system to ``yum``. You can view the list of RPM packages Amazon distributed with the 2012.09.1 release `here
-<https://aws.amazon.com/amazon-linux-ami/2012.09-packages/>`_.
+<https://aws.amazon.com/amazon-linux-ami/2012.09-packages/>`__.
 
-You can follow the AMI changelog `here 
-<http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-plan-ami.html>`_.
+You can follow the AMI changelog `here
+<http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-plan-ami.html>`__.
 
 Installing Python packages with pip
 -----------------------------------
@@ -84,7 +84,7 @@ for custom-built packages):
     --bootstrap 'sudo pip install $MY_PYTHON_PKGS/*.tar.gz#'
 
 Installing Debian packages on AMI 2.x:
---------------------------
+--------------------------------------
 
 As we did with :command:`pip`, you can use ``apt-get`` to install any
 package from the Debian archive. For example, to install Python 3:
@@ -100,7 +100,7 @@ If you have particular ``.deb`` files you want to install, do:
     --bootstrap 'sudo dpkg -i path/to/packages/*.deb#'
 
 Installing RPM Packages on AMI 3.x:
---------------------------
+-----------------------------------
 
 Conversely, while running on an AMI 3.x you can install the Python 3 RPM archive by using ``yum``:
 
@@ -114,27 +114,38 @@ Likewise, if you have a particular ``.rpm`` files you want to install, do:
 
     --bootstrap 'sudo yum install -y path/to/packages/*.rpm#'
 
-Upgrading Python from source
-----------------------------
+.. _bootstrap-python-source:
 
-To upgrade Python on EMR, you will probably have to build it from source
-(Debian packages tend to lag the current versions of software, and EMR
-AMIs tend to lag the current version of Debian).
+Installing Python from source
+-----------------------------
 
-First, download the latest version of the Python source `here <http://www.python.org/getit/>`_.
+If you're using an AMI version before 3.7.0, and you want to use Python 2.7,
+or any version of Python 3 there is not an easy way to upgrade
+Python from a package (okay, technically, the 2.x AMIs have a Python 3.1
+package, but that's not helpful.)
 
-Then add this to your :file:`mrjob.conf`:
+Here's what to add to your :file:`mrjob.conf` to download the Python source,
+compile, and install it:
 
 .. code-block:: yaml
 
     runners:
       emr:
         bootstrap:
-        - tar xfz path/to/Python-x.y.z.tgz#
+        - wget -S -T 10 -t 5 https://www.python.org/ftp/python/x.y.z/Python-x.y.z.tgz
+        - tar xvfz Python-x.y.z.tgz
         - cd Python-x.y.z
         - ./configure && make && sudo make install
+        - cd ..
+        - sudo rm /usr/bin/python
+        - sudo ln -s /usr/local/bin/pythonx.y /usr/bin/python
+        bootstrap_python: false  # don't try to auto-install Python
+        python_bin: python  # make this config work in Python 3 too
 
-:mrjob-opt:`bootstrap_mrjob` runs *last*, so mrjob will get bootstrapped
+Replace *x.y.z* with the version of Python you want. Note that the
+python binary we symlink to is named *pythonx.y*, not *pythonx.y.z*.
+
+:mrjob-opt:`bootstrap_mrjob` runs *last*, so mrjob *will* get bootstrapped
 into your newly upgraded version of Python. If you use other
 bootstrap commands to install/upgrade Python libraries, you should also
 run them *after* upgrading Python.

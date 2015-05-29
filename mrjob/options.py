@@ -328,6 +328,13 @@ def add_emr_opts(opt_group):
                   ' feature. You can use --bootstrap-file more than once.')),
 
         opt_group.add_option(
+            '--bootstrap-python', dest='bootstrap_python',
+            action='store_true', default=None,
+            help=('Attempt to install a compatible version of Python'
+                  ' at boostrap time. Currently this only does anything'
+                  ' for Python 3, for which it is enabled by default.')),
+
+        opt_group.add_option(
             '--bootstrap-python-package', dest='bootstrap_python_packages',
             action='append', default=[],
             help=('Path to a Python module to install on EMR. These should be'
@@ -350,8 +357,8 @@ def add_emr_opts(opt_group):
 
         opt_group.add_option(
             '--ec2-instance-type', dest='ec2_instance_type', default=None,
-            help=('Type of EC2 instance(s) to launch (e.g. m1.small,'
-                  ' c1.xlarge, m2.xlarge). See'
+            help=('Type of EC2 instance(s) to launch (e.g. m1.medium,'
+                  ' c3.xlarge, r3.xlarge). See'
                   ' http://aws.amazon.com/ec2/instance-types/ for the full'
                   ' list.')),
 
@@ -467,6 +474,12 @@ def add_emr_opts(opt_group):
             help=("If --max-hours-idle is set, control how close to the end"
                   " of an EC2 billing hour the job flow can automatically"
                   " terminate itself (default is 5 minutes).")),
+
+        opt_group.add_option(
+            '--no-bootstrap-python', dest='bootstrap_python',
+            action='store_false', default=None,
+            help=("Don't automatically try to install a compatible version"
+                  " of Python at bootstrap time.")),
 
         opt_group.add_option(
             '--no-pool-emr-job-flows', dest='pool_emr_job_flows',

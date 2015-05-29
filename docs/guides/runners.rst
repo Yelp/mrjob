@@ -231,6 +231,7 @@ example below demonstrates the use of counters in a test case.
 
 ``test_counters.py``
 ::
+
     from unittest import TestCase
 
     from tests.mr_counting_job import MRCountingJob

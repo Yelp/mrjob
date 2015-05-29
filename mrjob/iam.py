@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# -*- coding: utf-8 -*-
 # Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -52,7 +51,35 @@ MRJOB_SERVICE_ROLE = {
     }]
 }
 
+# Role to wrap in an instance profile
+MRJOB_INSTANCE_PROFILE_ROLE = {
+    "Version": "2008-10-17",
+    "Statement": [{
+        "Sid": "",
+        "Effect": "Allow",
+        "Principal": {
+            "Service": "ec2.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+    }]
+}
+
+# the built-in, managed policy to attach to MRJOB_SERVICE_ROLE
+EMR_SERVICE_ROLE_POLICY = 'AmazonElasticMapReduceRole'
+
+# the built-in, managed policy to attach to MRJOB_INSTANCE_PROFILE_ROLE
+EMR_INSTANCE_PROFILE_POLICY = 'AmazonElasticMapReduceforEC2Role'
+
+# if we can't create or find our own service role, use the one
+# created by the AWS console and CLI
+FALLBACK_SERVICE_ROLE = 'EMR_DefaultRole'
+
+# if we can't create or find our own instance profile, use the one
+# created by the AWS console and CLI
+FALLBACK_INSTANCE_PROFILE = 'EMR_EC2_DefaultRole'
+
 # policy to add to MRJOB_SERVICE_ROLE
+# Deprecated in v0.4.5, will be removed in v0.5.0
 MRJOB_SERVICE_ROLE_POLICY = {
     "Version": "2012-10-17",
     "Statement": [{
@@ -84,19 +111,6 @@ MRJOB_SERVICE_ROLE_POLICY = {
     }]
 }
 
-# Role to wrap in an instance profile
-MRJOB_INSTANCE_PROFILE_ROLE = {
-    "Version": "2008-10-17",
-    "Statement": [{
-        "Sid": "",
-        "Effect": "Allow",
-        "Principal": {
-            "Service": "ec2.amazonaws.com"
-        },
-        "Action": "sts:AssumeRole"
-    }]
-}
-
 # policy to attach to MRJOB_INSTANCE_PROFILE_ROLE
 MRJOB_INSTANCE_PROFILE_POLICY = {
     "Statement": [{
@@ -115,14 +129,6 @@ MRJOB_INSTANCE_PROFILE_POLICY = {
         "Resource": ["*"]
     }]
 }
-
-# if we can't create or find our own service role, use the one
-# created by the AWS console and CLI
-FALLBACK_SERVICE_ROLE = 'EMR_DefaultRole'
-
-# if we can't create or find our own instance profile, use the one
-# created by the AWS console and CLI
-FALLBACK_INSTANCE_PROFILE = 'EMR_EC2_DefaultRole'
 
 
 

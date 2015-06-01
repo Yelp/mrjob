@@ -909,7 +909,8 @@ class MockIAMConnection(object):
                  debug=0, https_connection_factory=None, path='/',
                  security_token=None, validate_certs=True, profile_name=None,
                  mock_iam_instance_profiles=None, mock_iam_roles=None,
-                 mock_iam_role_policies=None):
+                 mock_iam_role_policies=None,
+                 mock_iam_role_attached_policies=None):
         """Mock out connection to IAM.
 
         mock_iam_instance_profiles maps profile name to a dictionary containing:
@@ -926,14 +927,19 @@ class MockIAMConnection(object):
             policy_document -- JSON-then-URI-encoded policy doc
             role_name -- name of single role for this policy (always defined)
 
-        We don't currently support role IDs or ARNs because our code doesn't
-        use them.
+        mock_iam_role_attached_policies maps role to a list of ARNs for
+        attached (managed) policies.
+
+        We don't track which managed policies exist or what their contents are.
+        We also don't support role IDs.
         """
         self.mock_iam_instance_profiles = combine_values(
             {}, mock_iam_instance_profiles)
         self.mock_iam_roles = combine_values({}, mock_iam_roles)
         self.mock_iam_role_policies = combine_values(
             {}, mock_iam_role_policies)
+        self.mock_iam_role_attached_policies = combine_values(
+            {}, mock_iam_role_attached_policies)
 
     def get_response(self, action, params, path='/', parent=None,
                      verb='POST', list_marker='Set'):
@@ -944,6 +950,10 @@ class MockIAMConnection(object):
             return self.add_role_to_instance_profile(
                 params['InstanceProfileName'],
                 params['RoleName'])
+
+        elif action == 'AttachRolePolicy':
+            return self._attach_role_policy(params['RoleName'],
+                                            params['PolicyArn'])
 
         elif action == 'CreateInstanceProfile':
             return self.create_instance_profile(
@@ -960,6 +970,12 @@ class MockIAMConnection(object):
             return self.get_role_policy(
                 params['RoleName'],
                 params['PolicyName'])
+
+        elif action == 'ListAttachedRolePolicies':
+            if list_marker != 'AttachedPolicies':
+                raise ValueError
+
+            return self._list_attached_role_policies(params['RoleName'])
 
         elif action == 'ListInstanceProfiles':
             if list_marker != 'InstanceProfiles':
@@ -996,8 +1012,10 @@ class MockIAMConnection(object):
                 params['PolicyName'],
                 params['PolicyDocument'])
 
+
         else:
-            raise ValueError
+            raise NotImplementedError(
+                'mockboto does not implement the %s API call' % action)
 
     # instance profiles
 
@@ -1151,7 +1169,7 @@ class MockIAMConnection(object):
             path=role_data['path']
         )
 
-    # role policies
+    # (inline) role policies
 
     def get_role_policy(self, role_name, policy_name):
         self._check_role_exists(role_name)
@@ -1200,6 +1218,28 @@ class MockIAMConnection(object):
             policy_name=policy_name,
             role_name=policy_data['role_name'],
         )
+
+    # attached (managed) role policies
+
+    # boto does not yet have methods for these
+
+    def _attach_role_policy(self, role_name, policy_arn):
+        self._check_role_exists(role_name)
+
+        arns = self.mock_iam_role_attached_policies.setdefault(role_name, [])
+        if policy_arn not in arns:
+            arns.append(policy_arn)
+
+        return self._wrap_result('attach_role_policy')
+
+    def _list_attached_role_policies(self, role_name):
+        self._check_role_exists(role_name)
+
+        arns = self.mock_iam_role_attached_policies.get(role_name, [])
+
+        return self._wrap_result('list_attached_role_policies',
+                                 {'attached_policies': [
+                                     {'policy_arn': arn} for arn in arns]})
 
     # other utilities
 

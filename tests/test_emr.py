@@ -148,6 +148,8 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         kwargs['mock_iam_instance_profiles'] = self.mock_iam_instance_profiles
         kwargs['mock_iam_roles'] = self.mock_iam_roles
         kwargs['mock_iam_role_policies'] = self.mock_iam_role_policies
+        kwargs['mock_iam_role_attached_policies'] = (
+            self.mock_iam_role_attached_policies)
         return MockIAMConnection(*args, **kwargs)
 
     def setUp(self):
@@ -156,6 +158,7 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         self.mock_emr_job_flows = {}
         self.mock_emr_output = {}
         self.mock_iam_instance_profiles = {}
+        self.mock_iam_role_attached_policies = {}
         self.mock_iam_role_policies = {}
         self.mock_iam_roles = {}
         self.mock_s3_fs = {}
@@ -644,14 +647,16 @@ class IAMTestCase(MockEMRAndS3TestCase):
         self.assertTrue(instance_profile_name.startswith('mrjob-'))
         self.assertIn(instance_profile_name, self.mock_iam_instance_profiles)
         self.assertIn(instance_profile_name, self.mock_iam_roles)
-        self.assertIn(instance_profile_name, self.mock_iam_role_policies)
+        self.assertIn(instance_profile_name,
+                      self.mock_iam_role_attached_policies)
 
         # check service_role
         service_role_name = job_flow.servicerole
         self.assertIsNotNone(service_role_name)
         self.assertTrue(service_role_name.startswith('mrjob-'))
         self.assertIn(service_role_name, self.mock_iam_roles)
-        self.assertIn(service_role_name, self.mock_iam_role_policies)
+        self.assertIn(service_role_name,
+                      self.mock_iam_role_attached_policies)
 
         # instance_profile and service_role should be distinct
         self.assertNotEqual(instance_profile_name, service_role_name)

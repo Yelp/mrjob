@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# -*- coding: utf-8 -*-
 # Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -52,38 +51,6 @@ MRJOB_SERVICE_ROLE = {
     }]
 }
 
-# policy to add to MRJOB_SERVICE_ROLE
-MRJOB_SERVICE_ROLE_POLICY = {
-    "Version": "2012-10-17",
-    "Statement": [{
-        "Action": [
-            "ec2:AuthorizeSecurityGroupIngress",
-            "ec2:CancelSpotInstanceRequests",
-            "ec2:CreateSecurityGroup",
-            "ec2:CreateTags",
-            "ec2:Describe*",
-            "ec2:DeleteTags",
-            "ec2:ModifyImageAttribute",
-            "ec2:ModifyInstanceAttribute",
-            "ec2:RequestSpotInstances",
-            "ec2:RunInstances",
-            "ec2:TerminateInstances",
-            "iam:PassRole",
-            "iam:ListRolePolicies",
-            "iam:GetRole",
-            "iam:GetRolePolicy",
-            "iam:ListInstanceProfiles",
-            "s3:Get*",
-            "s3:List*",
-            "s3:CreateBucket",
-            "sdb:BatchPutAttributes",
-            "sdb:Select"
-        ],
-        "Effect": "Allow",
-        "Resource": "*"
-    }]
-}
-
 # Role to wrap in an instance profile
 MRJOB_INSTANCE_PROFILE_ROLE = {
     "Version": "2008-10-17",
@@ -97,24 +64,13 @@ MRJOB_INSTANCE_PROFILE_ROLE = {
     }]
 }
 
-# policy to attach to MRJOB_INSTANCE_PROFILE_ROLE
-MRJOB_INSTANCE_PROFILE_POLICY = {
-    "Statement": [{
-        "Action": [
-            "cloudwatch:*",
-            "dynamodb:*",
-            "ec2:Describe*",
-            "elasticmapreduce:Describe*",
-            "rds:Describe*",
-            "s3:*",
-            "sdb:*",
-            "sns:*",
-            "sqs:*"
-        ],
-        "Effect": "Allow",
-        "Resource": ["*"]
-    }]
-}
+# the built-in, managed policy to attach to MRJOB_SERVICE_ROLE
+EMR_SERVICE_ROLE_POLICY_ARN = (
+    'arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceRole')
+
+# the built-in, managed policy to attach to MRJOB_INSTANCE_PROFILE_ROLE
+EMR_INSTANCE_PROFILE_POLICY_ARN = (
+    'arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceforEC2Role')
 
 # if we can't create or find our own service role, use the one
 # created by the AWS console and CLI
@@ -125,9 +81,10 @@ FALLBACK_SERVICE_ROLE = 'EMR_DefaultRole'
 FALLBACK_INSTANCE_PROFILE = 'EMR_EC2_DefaultRole'
 
 
-
 log = getLogger(__name__)
 
+
+# Utilities for all API calls
 
 def _unquote_json(quoted_json_document):
     """URI-decode and then JSON-decode the given document."""
@@ -176,6 +133,231 @@ def _get_responses(conn, action, params, *args, **kwargs):
             return
 
 
+# Auto-created roles/profiles
+
+def get_or_create_mrjob_service_role(conn):
+    """Look for a usable service role for EMR, and if there is none,
+    create one."""
+
+    for role_name, role_document in _yield_roles(conn):
+        if role_document != MRJOB_SERVICE_ROLE:
+            continue
+
+        policy_arns = list(_yield_attached_role_policies(conn, role_name))
+        if policy_arns == [EMR_SERVICE_ROLE_POLICY_ARN]:
+            return role_name
+
+    name = _create_mrjob_role_with_attached_policy(
+        conn, MRJOB_SERVICE_ROLE, EMR_SERVICE_ROLE_POLICY_ARN)
+
+    log.info('Auto-created service role %s' % name)
+
+    return name
+
+
+def get_or_create_mrjob_instance_profile(conn):
+    """Look for a usable instance profile for EMR, and if there is none,
+    create one."""
+
+    for profile_name, role_name, role_document in (
+            _yield_instance_profiles(conn)):
+
+        if role_document != MRJOB_INSTANCE_PROFILE_ROLE:
+            continue
+
+        policy_arns = list(_yield_attached_role_policies(conn, role_name))
+        if policy_arns == [EMR_INSTANCE_PROFILE_POLICY_ARN]:
+            return role_name
+
+    name = _create_mrjob_role_with_attached_policy(
+        conn, MRJOB_INSTANCE_PROFILE_ROLE, EMR_INSTANCE_PROFILE_POLICY_ARN)
+
+    # create an instance profile with the same name as the role
+    _get_response(conn, 'CreateInstanceProfile', {'InstanceProfileName': name})
+
+    _get_response(conn, 'AddRoleToInstanceProfile', {
+        'InstanceProfileName': name, 'RoleName': name})
+
+    log.info('Auto-created instance profile %s' % name)
+
+    return name
+
+
+def _yield_roles(conn):
+    """Yield (role_name, role_document)."""
+    resps = _get_responses(conn, 'ListRoles', {}, list_marker='Roles')
+
+    for resp in resps:
+        for role_data in resp['roles']:
+            yield _get_role_name_and_document(role_data)
+
+
+def _yield_instance_profiles(conn):
+    """Yield (profile_name, role_name, role_document).
+
+    role_name and role_document are None for empty instance profiles
+    """
+    resps = _get_responses(conn, 'ListInstanceProfiles', {},
+                           list_marker='InstanceProfiles')
+
+    for resp in resps:
+        for profile_data in resp['instance_profiles']:
+            profile_name = profile_data['instance_profile_name']
+
+            if profile_data['roles']:
+                # doesn't look like boto can handle two list markers, hence
+                # the extra "member" layer
+                role_data = profile_data['roles']['member']
+                role_name, role_document = _get_role_name_and_document(
+                    role_data)
+            else:
+                role_name = None
+                role_document = None
+
+            yield (profile_name, role_name, role_document)
+
+
+def _yield_attached_role_policies(conn, role_name):
+    """Yield the ARNs for policies attached to the given role."""
+    # allowing for multiple responses might be overkill, as currently
+    # (2015-05-29) only two policies are allowed per role.
+    resps = _get_responses(conn, 'ListAttachedRolePolicies',
+                           {'RoleName': role_name},
+                           list_marker='AttachedPolicies')
+
+    for resp in resps:
+        for policy_data in resp['attached_policies']:
+            yield policy_data['policy_arn']
+
+
+def _get_role_name_and_document(role_data):
+    role_name = role_data['role_name']
+    role_document = _unquote_json(role_data['assume_role_policy_document'])
+
+    return (role_name, role_document)
+
+
+def _create_mrjob_role_with_attached_policy(conn, role_document, policy_arn):
+    # create role
+    role_name = 'mrjob-' + random_identifier()
+
+    _get_response(conn, 'CreateRole', {
+        'AssumeRolePolicyDocument': json.dumps(role_document),
+        'RoleName': role_name})
+
+    _get_response(conn, 'AttachRolePolicy', {
+        'PolicyArn': policy_arn,
+        'RoleName': role_name})
+
+    return role_name
+
+
+# DEPRECATED STUFF
+
+# all this is deprecated as of v0.4.5, to be removed in v0.5.0
+
+# v0.4.4 used built-in role policies, but the built-in managed ones
+# are a better idea. See #1026
+
+# policy to add to MRJOB_SERVICE_ROLE
+MRJOB_SERVICE_ROLE_POLICY = {
+    "Version": "2012-10-17",
+    "Statement": [{
+        "Action": [
+            "ec2:AuthorizeSecurityGroupIngress",
+            "ec2:CancelSpotInstanceRequests",
+            "ec2:CreateSecurityGroup",
+            "ec2:CreateTags",
+            "ec2:Describe*",
+            "ec2:DeleteTags",
+            "ec2:ModifyImageAttribute",
+            "ec2:ModifyInstanceAttribute",
+            "ec2:RequestSpotInstances",
+            "ec2:RunInstances",
+            "ec2:TerminateInstances",
+            "iam:PassRole",
+            "iam:ListRolePolicies",
+            "iam:GetRole",
+            "iam:GetRolePolicy",
+            "iam:ListInstanceProfiles",
+            "s3:Get*",
+            "s3:List*",
+            "s3:CreateBucket",
+            "sdb:BatchPutAttributes",
+            "sdb:Select"
+        ],
+        "Effect": "Allow",
+        "Resource": "*"
+    }]
+}
+
+# policy to attach to MRJOB_INSTANCE_PROFILE_ROLE
+MRJOB_INSTANCE_PROFILE_POLICY = {
+    "Statement": [{
+        "Action": [
+            "cloudwatch:*",
+            "dynamodb:*",
+            "ec2:Describe*",
+            "elasticmapreduce:Describe*",
+            "rds:Describe*",
+            "s3:*",
+            "sdb:*",
+            "sns:*",
+            "sqs:*"
+        ],
+        "Effect": "Allow",
+        "Resource": ["*"]
+    }]
+}
+
+
+def yield_roles_with_policies(conn, path=None):
+    """Yield (role_name, (role_document, [policy_documents])).
+
+    path is an exact path to match.
+    """
+    log.warning('yield_roles_with_policies() is deprecated'
+                ' and will be removed in v0.5.0')
+
+    # could support path_prefix here, but mrjob isn't using it, and EMR
+    # role policies apparently have to have a path of / anyways
+
+    resps = _get_responses(conn, 'ListRoles', {}, list_marker='Roles')
+
+    for resp in resps:
+        for role_data in resp['roles']:
+            if path and role_data['path'] != path:
+                continue
+
+            yield _get_role_with_policies(conn, role_data)
+
+
+def yield_policies_for_role(conn, role_name):
+    """Given a role name, yield (policy_name, policy_document)
+
+    conn should be a boto.iam.IAMConnection
+    """
+    log.warning('yield_policies_for_role() is deprecated'
+                ' and will be removed in v0.5.0')
+
+    resps = _get_responses(conn,
+                           'ListRolePolicies',
+                           {'RoleName': role_name},
+                           list_marker='PolicyNames')
+
+    for resp in resps:
+        policy_names = resp['policy_names']
+
+        for policy_name in policy_names:
+            resp = _get_response(conn,
+                                 'GetRolePolicy',
+                                 {'RoleName': role_name,
+                                  'PolicyName': policy_name})
+
+            policy = _unquote_json(resp['policy_document'])
+            yield (policy_name, policy)
+
+
 def yield_instance_profiles_with_policies(conn):
     """Yield (instance_proile_name, (role_document, [policy_documents])).
 
@@ -183,6 +365,10 @@ def yield_instance_profiles_with_policies(conn):
     gives the instance profile's name rather than the role name
     (instance profiles are just thin wrappers for roles).
     """
+    log.warning('yield_instance_profiles_with_policies() is deprecated'
+                ' and will be removed in v0.5.0')
+
+
     # could support path_prefix here, but mrjob isn't using it
     resps = _get_responses(conn, 'ListInstanceProfiles', {},
                            list_marker='InstanceProfiles')
@@ -203,22 +389,6 @@ def yield_instance_profiles_with_policies(conn):
             yield (profile_name, role_with_policies)
 
 
-def yield_roles_with_policies(conn, path=None):
-    """Yield (role_name, (role_document, [policy_documents])).
-
-    path is an exact path to match.
-    """
-    # could support path_prefix here, but mrjob isn't using it, and EMR
-    # role policies apparently have to have a path of / anyways
-
-    resps = _get_responses(conn, 'ListRoles', {}, list_marker='Roles')
-
-    for resp in resps:
-        for role_data in resp['roles']:
-            if path and role_data['path'] != path:
-                continue
-
-            yield _get_role_with_policies(conn, role_data)
 
 
 def _get_role_with_policies(conn, role_data):
@@ -232,30 +402,10 @@ def _get_role_with_policies(conn, role_data):
     return (role_name, (role, policies))
 
 
-def yield_policies_for_role(conn, role_name):
-    """Given a role name, yield (policy_name, policy_document)
-
-    conn should be a boto.iam.IAMConnection
-    """
-    resps = _get_responses(conn,
-                           'ListRolePolicies',
-                           {'RoleName': role_name},
-                           list_marker='PolicyNames')
-
-    for resp in resps:
-        policy_names = resp['policy_names']
-
-        for policy_name in policy_names:
-            resp = _get_response(conn,
-                                 'GetRolePolicy',
-                                 {'RoleName': role_name,
-                                  'PolicyName': policy_name})
-
-            policy = _unquote_json(resp['policy_document'])
-            yield (policy_name, policy)
-
-
 def role_with_policies_matches(rp1, rp2):
+    log.warning('role_with_policies_matches() is deprecated'
+                ' and will be removed in v0.5.0')
+
     role1, policies1 = rp1
     role2, policies2 = rp2
 
@@ -270,54 +420,6 @@ def role_with_policies_matches(rp1, rp2):
     return (role1 == role2 and
             sorted(dumps(p1) for p1 in policies1) ==
             sorted(dumps(p2) for p2 in policies2))
-
-
-def get_or_create_mrjob_service_role(conn):
-    target_role_with_policies = (
-        MRJOB_SERVICE_ROLE, [MRJOB_SERVICE_ROLE_POLICY])
-
-    # As of 2015-04-20, it looks like EMR won't accept roles with a path
-    # other than '/' (the default). Looks like what's happening is that EMR
-    # forgets to include the path in the ARN.
-    #
-    # This doesn't affect instance profiles.
-    for role_name, role_with_policies in (
-            yield_roles_with_policies(conn, path='/')):
-        if role_with_policies_matches(role_with_policies,
-                                      target_role_with_policies):
-            return role_name
-
-    role_name = _create_mrjob_role_with_policies(
-        conn, *target_role_with_policies)
-
-    log.info('Auto-created service role %s' % role_name)
-
-    return role_name
-
-
-def get_or_create_mrjob_instance_profile(conn):
-    target_role_with_policies = (
-        MRJOB_INSTANCE_PROFILE_ROLE, [MRJOB_INSTANCE_PROFILE_POLICY])
-
-    for profile_name, role_with_policies in (yield_roles_with_policies(conn)):
-
-        if role_with_policies_matches(role_with_policies,
-                                      target_role_with_policies):
-            return profile_name
-
-    # role and instance profile will have same randomly generated name
-    name = _create_mrjob_role_with_policies(
-        conn, *target_role_with_policies)
-
-    # create an instance profile with the same name as the role
-    _get_response(conn, 'CreateInstanceProfile', {'InstanceProfileName': name})
-
-    _get_response(conn, 'AddRoleToInstanceProfile', {
-        'InstanceProfileName': name, 'RoleName': name})
-
-    log.info('Auto-created instance profile %s' % name)
-
-    return name
 
 
 def _create_mrjob_role_with_policies(conn, role, policies):

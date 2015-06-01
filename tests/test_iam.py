@@ -22,9 +22,9 @@ except ImportError:
 from mrjob.iam import MRJOB_SERVICE_ROLE
 from mrjob.iam import MRJOB_SERVICE_ROLE_POLICY
 from mrjob.iam import _unwrap_response
-from mrjob.iam import yield_instance_profiles_with_policies
-from mrjob.iam import yield_roles_with_policies
-from mrjob.iam import yield_policies_for_role
+from mrjob.iam import _yield_instance_profiles
+from mrjob.iam import _yield_roles
+from mrjob.iam import _yield_attached_role_policies
 
 from tests.mockboto import MockIAMConnection
 
@@ -44,7 +44,7 @@ class PaginationTestCase(TestCase):
             conn.list_instance_profiles())['instance_profiles']
         self.assertEqual(len(instance_profiles_page), max_items)
 
-        instance_profiles = list(yield_instance_profiles_with_policies(conn))
+        instance_profiles = list(_yield_instance_profiles(conn))
         self.assertEqual(len(instance_profiles), 2 * max_items)
 
     def test_many_roles(self):
@@ -58,22 +58,5 @@ class PaginationTestCase(TestCase):
             conn.list_roles())['roles']
         self.assertEqual(len(roles_page), max_items)
 
-        roles = list(yield_roles_with_policies(conn))
+        roles = list(_yield_roles(conn))
         self.assertEqual(len(roles), 2 * max_items)
-
-    def test_many_role_policies(self):
-        conn = MockIAMConnection()
-        max_items = conn.DEFAULT_MAX_ITEMS
-
-        conn.create_role('r', MRJOB_SERVICE_ROLE)
-
-        for i in range(2 * max_items):
-            conn.put_role_policy('r', 'rp-%03d' % i,
-                                 json.dumps(MRJOB_SERVICE_ROLE_POLICY))
-
-        policies_page = _unwrap_response(
-            conn.list_role_policies('r'))['policy_names']
-        self.assertEqual(len(policies_page), max_items)
-
-        policies = list(yield_policies_for_role(conn, 'r'))
-        self.assertEqual(len(policies), 2 * max_items)

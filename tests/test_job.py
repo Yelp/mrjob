@@ -304,6 +304,9 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
                       b'"too"\t"many"\t"tabs"\n' +
                       b'"notabs"\n')
 
+    # TODO: this test doesn't work at all on Python 3 without ujson.
+    # json.dumps() doesn't take bytes, even properly encoded ones
+
     # this must be unencodable by ujson as well (i.e. non-UTF-8 bytes)
     UNENCODABLE_RAW_INPUT = (b'foo\n' +
                              b'\xe9\n' +

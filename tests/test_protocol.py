@@ -23,9 +23,10 @@ from mrjob.protocol import RawProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
-from mrjob.protocol import _json_is_ujson
 
 from tests.py2 import TestCase
+from tests.py2 import patch
+from tests.sandbox import SandboxedTestCase
 
 
 class Point(object):
@@ -95,6 +96,14 @@ class ProtocolTestCase(TestCase):
         self.assertRaises(Exception, protocol.read, data)
 
 
+class BuiltInJSONModuleTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(BuiltInJSONModuleTestCase, self).setUp()
+
+        self.start(patch('mrjob.protocol.json', json))
+
+
 class JSONProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
@@ -135,17 +144,24 @@ class JSONProtocolTestCase(ProtocolTestCase):
         # only unicodes (or bytes in utf-8) are allowed
         self.assertCantEncode(JSONProtocol(), b'0\xa2', b'\xe9')
 
-        if not _json_is_ujson:
-            # ujson has fallback ways of encoding all sorts of things
 
-            # dictionaries have to have strings as keys
-            self.assertCantEncode(JSONProtocol(), {(1, 2): 3}, None)
+class BuiltInJSONModuleJSONProtocolTestCase(
+        BuiltInJSONModuleTestCase, JSONProtocolTestCase):
 
-            # sets don't exist in JSON
-            self.assertCantEncode(JSONProtocol(), set([1]), set())
+    def test_bad_keys_and_values(self):
+        super(BuiltInJSONModuleJSONProtocolTestCase, self
+              ).test_bad_keys_and_values()
 
-            # Point class has no representation in JSON
-            self.assertCantEncode(JSONProtocol(), Point(2, 3), Point(1, 4))
+        # ujson will happily encode these, but json will not
+
+        # dictionaries have to have strings as keys
+        self.assertCantEncode(JSONProtocol(), {(1, 2): 3}, None)
+
+        # sets don't exist in JSON
+        self.assertCantEncode(JSONProtocol(), set([1]), set())
+
+        # Point class has no representation in JSON
+        self.assertCantEncode(JSONProtocol(), Point(2, 3), Point(1, 4))
 
 
 class JSONValueProtocolTestCase(ProtocolTestCase):
@@ -186,17 +202,24 @@ class JSONValueProtocolTestCase(ProtocolTestCase):
         # only unicodes (or bytes in utf-8) are allowed
         self.assertCantEncode(JSONValueProtocol(), None, b'\xe9')
 
-        if not _json_is_ujson:
-            # ujson has fallback ways of encoding all sorts of things
 
-            # dictionaries have to have strings as keys
-            self.assertCantEncode(JSONValueProtocol(), None, {(1, 2): 3})
+class BuiltInJSONModuleJSONValueProtocolTestCase(
+        BuiltInJSONModuleTestCase, JSONValueProtocolTestCase):
 
-            # sets don't exist in JSON
-            self.assertCantEncode(JSONValueProtocol(), None, set())
+    def test_bad_keys_and_values(self):
+        super(BuiltInJSONModuleJSONValueProtocolTestCase, self
+              ).test_bad_keys_and_values()
 
-            # Point class has no representation in JSON
-            self.assertCantEncode(JSONValueProtocol(), None, Point(1, 4))
+        # ujson will happily encode these, but json will not
+
+        # dictionaries have to have strings as keys
+        self.assertCantEncode(JSONValueProtocol(), None, {(1, 2): 3})
+
+        # sets don't exist in JSON
+        self.assertCantEncode(JSONValueProtocol(), None, set())
+
+        # Point class has no representation in JSON
+        self.assertCantEncode(JSONValueProtocol(), None, Point(1, 4))
 
 
 class PickleProtocolTestCase(ProtocolTestCase):

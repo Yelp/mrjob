@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import platform
 import sys
 
 import mrjob
@@ -23,12 +24,15 @@ try:
         'install_requires': [
             'PyYAML',
             'filechunkio',
-            'ujson',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
+
+    # ujson is recommended, but requires CPython
+    if platform.python_implementation() == 'CPython':
+        setuptools_kwargs['install_requires'].append('ujson')
 
     # mock is included in Python 3.3 as unittest.mock
     if sys.version_info < (3, 3):

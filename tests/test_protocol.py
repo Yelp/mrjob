@@ -13,6 +13,8 @@
 # limitations under the License.
 
 """Make sure all of our protocols work as advertised."""
+import json
+
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
@@ -21,6 +23,7 @@ from mrjob.protocol import RawProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
+from mrjob.protocol import _json_is_ujson
 
 from tests.py2 import TestCase
 
@@ -106,9 +109,12 @@ class JSONProtocolTestCase(ProtocolTestCase):
         KEY = ['a', 1]
         VALUE = {'foo': 'bar'}
         ENCODED = b'["a", 1]\t{"foo": "bar"}'
+        # ujson uses minimal whitespace
+        ENCODED_WITHOUT_WHITESPACE = ENCODED.replace(b' ', b'')
 
         self.assertEqual((KEY, VALUE), JSONProtocol().read(ENCODED))
-        self.assertEqual(ENCODED, JSONProtocol().write(KEY, VALUE))
+        self.assertIn(JSONProtocol().write(KEY, VALUE),
+                      (ENCODED, ENCODED_WITHOUT_WHITESPACE))
 
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
@@ -126,17 +132,20 @@ class JSONProtocolTestCase(ProtocolTestCase):
         self.assertCantDecode(JSONProtocol(), b'{@#$@#!^&*$%^')
 
     def test_bad_keys_and_values(self):
-        # dictionaries have to have strings as keys
-        self.assertCantEncode(JSONProtocol(), {(1, 2): 3}, None)
-
         # only unicodes (or bytes in utf-8) are allowed
         self.assertCantEncode(JSONProtocol(), b'0\xa2', b'\xe9')
 
-        # sets don't exist in JSON
-        self.assertCantEncode(JSONProtocol(), set([1]), set())
+        if not _json_is_ujson:
+            # ujson has fallback ways of encoding all sorts of things
 
-        # Point class has no representation in JSON
-        self.assertCantEncode(JSONProtocol(), Point(2, 3), Point(1, 4))
+            # dictionaries have to have strings as keys
+            self.assertCantEncode(JSONProtocol(), {(1, 2): 3}, None)
+
+            # sets don't exist in JSON
+            self.assertCantEncode(JSONProtocol(), set([1]), set())
+
+            # Point class has no representation in JSON
+            self.assertCantEncode(JSONProtocol(), Point(2, 3), Point(1, 4))
 
 
 class JSONValueProtocolTestCase(ProtocolTestCase):
@@ -152,9 +161,11 @@ class JSONValueProtocolTestCase(ProtocolTestCase):
     def test_uses_json_format(self):
         VALUE = {'foo': 'bar'}
         ENCODED = b'{"foo": "bar"}'
+        ENCODED_WITHOUT_WHITESPACE = ENCODED.replace(b' ', b'')
 
         self.assertEqual((None, VALUE), JSONValueProtocol().read(ENCODED))
-        self.assertEqual(ENCODED, JSONValueProtocol().write(None, VALUE))
+        self.assertIn(JSONValueProtocol().write(None, VALUE),
+                      (ENCODED, ENCODED_WITHOUT_WHITESPACE))
 
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
@@ -172,17 +183,20 @@ class JSONValueProtocolTestCase(ProtocolTestCase):
         self.assertCantDecode(JSONValueProtocol(), b'{@#$@#!^&*$%^')
 
     def test_bad_keys_and_values(self):
-        # dictionaries have to have strings as keys
-        self.assertCantEncode(JSONValueProtocol(), None, {(1, 2): 3})
-
         # only unicodes (or bytes in utf-8) are allowed
         self.assertCantEncode(JSONValueProtocol(), None, b'\xe9')
 
-        # sets don't exist in JSON
-        self.assertCantEncode(JSONValueProtocol(), None, set())
+        if not _json_is_ujson:
+            # ujson has fallback ways of encoding all sorts of things
 
-        # Point class has no representation in JSON
-        self.assertCantEncode(JSONValueProtocol(), None, Point(1, 4))
+            # dictionaries have to have strings as keys
+            self.assertCantEncode(JSONValueProtocol(), None, {(1, 2): 3})
+
+            # sets don't exist in JSON
+            self.assertCantEncode(JSONValueProtocol(), None, set())
+
+            # Point class has no representation in JSON
+            self.assertCantEncode(JSONValueProtocol(), None, Point(1, 4))
 
 
 class PickleProtocolTestCase(ProtocolTestCase):

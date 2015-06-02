@@ -31,10 +31,12 @@ from mrjob.py2 import PY2
 from mrjob.util import safeeval
 
 try:
-    import simplejson as json  # preferred because of C speedups
+    import ujson as json
     json  # quiet "redefinition of unused ..." warning from pyflakes
+    _json_is_ujson = True
 except ImportError:
-    import json  # built in to Python 2.6 and later
+    import json
+    _json_is_ujson = False
 
 
 class _KeyCachingProtocol(object):
@@ -88,36 +90,40 @@ class JSONProtocol(_KeyCachingProtocol):
     Note that JSON has some limitations; dictionary keys must be strings,
     and there's no distinction between lists and tuples."""
 
-    if PY2:
+    if PY2 or _json_is_ujson:
         def _loads(self, value):
             return json.loads(value)
+    else:
+        # Python 3's json module does not accept bytes
+        def _loads(self, value):
+            return json.loads(value.decode('utf_8'))
 
+    if PY2:
         def _dumps(self, value):
             return json.dumps(value)
     else:
-        def _loads(self, value):
-            return json.loads(value.decode('latin_1'))
-
         def _dumps(self, value):
-            return json.dumps(value).encode('latin_1')
+            return json.dumps(value).encode('utf_8')
 
 
 class JSONValueProtocol(object):
     """Encode ``value`` as a JSON and discard ``key``
     (``key`` is read in as ``None``).
     """
-    if PY2:
+    if PY2 or _json_is_ujson:
         def read(self, line):
             return (None, json.loads(line))
+    else:
+        # Python 3's json module does not accept bytes
+        def read(self, line):
+            return (None, json.loads(line.decode('utf_8')))
 
+    if PY2:
         def write(self, key, value):
             return json.dumps(value)
     else:
-        def read(self, line):
-            return (None, json.loads(line.decode('latin_1')))
-
         def write(self, key, value):
-            return json.dumps(value).encode('latin_1')
+            return json.dumps(value).encode('utf_8')
 
 
 class PickleProtocol(_KeyCachingProtocol):

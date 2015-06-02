@@ -21,9 +21,9 @@ try:
     # arguments that distutils doesn't understand
     setuptools_kwargs = {
         'install_requires': [
-            'filechunkio',
             'PyYAML',
-            'simplejson>=2.0.9',
+            'filechunkio',
+            'ujson',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',

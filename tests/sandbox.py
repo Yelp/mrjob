@@ -106,8 +106,6 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
         self.addCleanup(os.environ.update, old_environ)
         self.addCleanup(os.environ.clear)
 
-        # make sure mrjob is in PYTHONPATH so subprocesses can find it
-
     def makedirs(self, path):
         abs_path = os.path.join(self.tmp_dir, path)
         if not os.path.isdir(abs_path):

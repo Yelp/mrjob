@@ -23,7 +23,9 @@ from mrjob.protocol import RawProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
+from mrjob.protocol import _json_is_ujson
 from mrjob.py2 import PY2
+from mrjob.py2 import to_string
 
 from tests.py2 import TestCase
 from tests.py2 import patch
@@ -98,13 +100,21 @@ class ProtocolTestCase(TestCase):
         self.assertRaises(Exception, protocol.read, data)
 
 
-@skipIf(not PY2, "Python 3's json module doesn't accept bytes")
 class BuiltInJSONModuleTestCase(SandboxedTestCase):
 
     def setUp(self):
         super(BuiltInJSONModuleTestCase, self).setUp()
 
         self.start(patch('mrjob.protocol.json', json))
+
+        if not PY2 and _json_is_ujson:
+            # in Python 3, if ujson is available, we pass bytes directly
+            # to loads(). json.loads() only accepts strs, so wrap it
+            json_loads = json.loads
+            def load_bytes(obj, *args, **kwargs):
+                return json_loads(obj.decode('utf_8'), *args, **kwargs)
+
+            self.start(patch.object(json, 'loads', load_bytes))
 
 
 class JSONProtocolTestCase(ProtocolTestCase):

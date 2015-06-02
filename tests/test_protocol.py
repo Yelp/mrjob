@@ -23,9 +23,11 @@ from mrjob.protocol import RawProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
+from mrjob.py2 import PY2
 
 from tests.py2 import TestCase
 from tests.py2 import patch
+from tests.py2 import skipIf
 from tests.sandbox import SandboxedTestCase
 
 
@@ -96,6 +98,7 @@ class ProtocolTestCase(TestCase):
         self.assertRaises(Exception, protocol.read, data)
 
 
+@skipIf(not PY2, "Python 3's json module doesn't accept bytes")
 class BuiltInJSONModuleTestCase(SandboxedTestCase):
 
     def setUp(self):

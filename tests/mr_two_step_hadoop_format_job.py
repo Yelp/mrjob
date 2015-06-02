@@ -1,6 +1,7 @@
 # Copyright 2009-2010 Yelp
 # Copyright 2012 Yelp and Contributors
 # Copyright 2013 David Marin
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Trivial multi-step job, useful for testing runners."""
+import json
 from mrjob.job import MRJob
 from mrjob.step import MRStep
-
-try:
-    import simplejson as json  # preferred because of C speedups
-    json  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import json  # built in to Python 2.6 and later
 
 
 class CustomRawValueProtocol(object):

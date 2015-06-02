@@ -18,20 +18,14 @@ for more information."""
 # since MRJobs need to run in Amazon's generic EMR environment
 import inspect
 import itertools
+import json
 import logging
+import sys
 from io import BytesIO
 from optparse import OptionGroup
-import sys
-
-try:
-    import simplejson as json
-    json  # silence, pyflakes!
-except ImportError:
-    import json
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
-
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol

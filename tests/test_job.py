@@ -319,7 +319,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             # good data should still get through
             self.assertEqual(b''.join(r.stream_output()), b'"foo"\t["bar"]\n')
 
-            # exception type varies between versions of json/simplejson,
+            # exception type varies between JSON implementations,
             # so just make sure there were three exceptions of some sort
             counters = r.counters()[0]
             self.assertEqual(sorted(counters), ['Undecodable input'])
@@ -344,8 +344,6 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertEqual(b''.join(r.stream_output()),
                              b'null\t["bar", "foo"]\n')
 
-            # exception type varies between versions of json/simplejson,
-            # so just make sure there were three exceptions of some sort
             counters = r.counters()[0]
             self.assertEqual(counters,
                              {'Unencodable output': {'UnicodeDecodeError': 1}})

@@ -16,6 +16,7 @@
 import copy
 import datetime
 import getpass
+import json
 import logging
 import os
 import os.path
@@ -30,13 +31,6 @@ from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
-
-try:
-    import simplejson as json
-    JSONDecodeError = json.JSONDecodeError
-except:
-    import json
-    JSONDecodeError = ValueError
 
 from mrjob.compat import add_translated_jobconf_for_hadoop_version
 from mrjob.compat import supports_combiners_in_hadoop_streaming
@@ -747,7 +741,7 @@ class MRJobRunner(object):
 
                 try:
                     steps = json.loads(stdout)
-                except JSONDecodeError:
+                except ValueError:
                     raise ValueError("Bad --steps response: \n%s" % stdout)
 
                 # verify that this is a proper step description

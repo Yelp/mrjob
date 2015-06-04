@@ -304,11 +304,14 @@ Job execution context
     :switch: --strict-protocols, --no-strict-protocols
     :type: boolean
     :set: all
-    :default: ``None``
+    :default: ``True``
 
-    If this is true, the job will raise an exception when encountering
-    input or output that can't be handled by its protocols (the default
-    is to increment a counter and continue).
+    If you set this to false, when jobs encounter unencodable input or output,
+    they'll increment a counter rather than simply raising an exception.
+
+    .. warning::
+
+        "Loose" protocols are going away in v0.6.0.
 
 Other
 -----

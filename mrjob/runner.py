@@ -184,12 +184,13 @@ class RunnerOptionStore(OptionStore):
         return combine_dicts(super_opts, {
             'base_tmp_dir': tempfile.gettempdir(),
             'bootstrap_mrjob': True,
+            'check_input_paths': True,
             'cleanup': ['ALL'],
             'cleanup_on_failure': ['NONE'],
             'hadoop_version': '0.20',
             'owner': owner,
             'sh_bin': ['sh', '-ex'],
-            'check_input_paths': True
+            'strict_protocols': True,
         })
 
     def _validate_cleanup(self):
@@ -887,16 +888,17 @@ class MRJobRunner(object):
 
     def _get_strict_protocols_args(self):
         """Arguments used to control protocol behavior in the job.
+
+        This just adds --no-strict-protocols when strict_protocols
+        is false.
         """
         # These are only in the runner so that we can default them from
         # mrjob.conf, which will allow us to eventually remove them.
         # See issue #726.
-        if self._opts['strict_protocols']:
-            return ['--strict-protocols']
-        elif self._opts['strict_protocols'] is None:
-            return []
-        else:
+        if not self._opts['strict_protocols']:
             return ['--no-strict-protocols']
+        else:
+            return []
 
     def _create_setup_wrapper_script(self, dest='setup-wrapper.sh'):
         """Create the wrapper script, and write it into our local temp

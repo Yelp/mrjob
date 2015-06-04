@@ -18,8 +18,8 @@ The emitted email addresses can then be unconfirmed or handled in some other
 way.
 """
 import datetime
+import json
 import re
-import simplejson
 import time
 
 from mrjob.job import MRJob
@@ -142,7 +142,7 @@ class MRPostfixBounce(MRJob):
         super(MRPostfixBounce, self).load_options(args=args)
         if self.is_mapper_or_reducer():
             with open(self.options.bounce_processing_rules) as bounce_rules_f:
-                self.bounce_processing_rules = simplejson.load(bounce_rules_f)
+                self.bounce_processing_rules = json.load(bounce_rules_f)
 
     def mapper(self, _, line):
         postfix_log_dict = process_log_line(line)

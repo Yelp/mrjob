@@ -28,17 +28,12 @@ mapper.
 """
 __author__ = 'Jordan Andersen <jordandandersen@gmail.com>'
 
+import json
+import numpy
+import sys
 from mrjob.job import MRJob
 from mrjob.step import MRStep
 from scipy.misc.common import factorial
-import sys
-import numpy
-
-try:
-    import simplejson as json
-    json  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import json
 
 
 def map_int_to_tour(num_nodes, i, start_node):

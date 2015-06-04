@@ -775,18 +775,8 @@ class MRJob(MRJobLauncher):
             step_key = self._step_key(step_num, step_type)
 
             if step_key not in step_map:
-                # It's unlikely that we will encounter this logic in real life,
-                # but if asked what the protocol of a non-script step is, we
-                # should just say RawValueProtocol because we have no idea what
-                # the jars or commands are doing with our precious data.
-                # If --strict-protocols, though, we won't stand for these
-                # shenanigans!
-                if self.options.strict_protocols:
-                    raise ValueError(
-                        "Can't pick a protocol for a non-script step")
-                else:
-                    p = RawValueProtocol()
-                    return p, p
+                raise ValueError(
+                    "Can't pick a protocol for a non-script step")
 
             real_num = step_map[step_key]
             if real_num == (len(step_map) - 1):

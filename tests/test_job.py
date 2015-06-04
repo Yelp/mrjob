@@ -273,8 +273,9 @@ class ProtocolsTestCase(TestCase):
         mr_job.sandbox(stdin=JSON_INPUT)
         mr_job.run_reducer()
 
-        self.assertEqual(mr_job.stdout.getvalue(),
-                         (b'"foo"\t["bar", "baz"]\n' +
+        # ujson doesn't add whitespace to JSON
+        self.assertEqual(mr_job.stdout.getvalue().replace(b' ', b''),
+                         (b'"foo"\t["bar","baz"]\n' +
                           b'"bar"\t["qux"]\n'))
 
     def test_output_protocol_with_no_final_reducer(self):
@@ -303,8 +304,12 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
                       b'"too"\t"many"\t"tabs"\n' +
                       b'"notabs"\n')
 
+    # TODO: this test doesn't work at all on Python 3 without ujson.
+    # json.dumps() doesn't take bytes, even properly encoded ones
+
+    # this must be unencodable by ujson as well (i.e. non-UTF-8 bytes)
     UNENCODABLE_RAW_INPUT = (b'foo\n' +
-                             b'\xaa\n' +
+                             b'\xe9\n' +
                              b'bar\n')
 
     STRICT_MRJOB_CONF ={'runners': {'inline': {'strict_protocols': True}}}
@@ -341,12 +346,15 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             r.run()
 
             # good data should still get through
-            self.assertEqual(b''.join(r.stream_output()),
-                             b'null\t["bar", "foo"]\n')
+            self.assertEqual(b''.join(r.stream_output()).replace(b' ', b''),
+                             b'null\t["bar","foo"]\n')
 
             counters = r.counters()[0]
-            self.assertEqual(counters,
-                             {'Unencodable output': {'UnicodeDecodeError': 1}})
+
+            # there should be one Unencodable output error. Exception
+            # type may vary by json implementation
+            self.assertEqual(list(counters), ['Unencodable output'])
+            self.assertEqual(list(counters['Unencodable output'].values()), [1])
 
     def assertJobRaisesExceptionOnUnencodableOutput(self, job_args):
         job = MRBoringJob(job_args)

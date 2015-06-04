@@ -365,7 +365,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertRaises(Exception, r.run)
 
     def test_undecodable_input(self):
-        self.assertJobHandlesUndecodableInput(job_args=[])
+        self.assertJobRaisesExceptionOnUndecodableInput(job_args=[])
 
     def test_undecodable_input_strict(self):
         self.assertJobRaisesExceptionOnUndecodableInput(
@@ -382,7 +382,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
                 job_args=['--no-strict-protocols'])
 
     def test_unencodable_output(self):
-        self.assertJobHandlesUnencodableOutput(job_args=[])
+        self.assertJobRaisesExceptionOnUnencodableOutput(job_args=[])
 
     def test_unencodable_output_strict(self):
         self.assertJobRaisesExceptionOnUnencodableOutput(

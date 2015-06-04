@@ -99,7 +99,7 @@ You could do something like this in your :file:`mrjob.conf`:
         setup:
         - virtualenv venv
         - . venv/bin/activate
-        - pip install mr3po simplejson
+        - pip install mr3po
 
 However, now the locking feature that protects :command:`make` becomes a
 liability; each task on the same node has its own virtualenv, but one task has
@@ -116,7 +116,7 @@ machine, something like this:
         - VENV=/tmp/$mapreduce_job_id
         - if [ ! -e $VENV ]; then virtualenv $VENV; fi
         - . $VENV/bin/activate
-        - pip install mr3po simplejson
+        - pip install mr3po
 
 With older versions of Hadoop (0.20 and earlier, and the 1.x series), you'd
 want to use ``$mapred_job_id``.

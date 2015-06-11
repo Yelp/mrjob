@@ -135,6 +135,13 @@ class PickleProtocol(_KeyCachingProtocol):
     Streaming.
 
     Ugly, but should work for any type.
+
+    .. warning::
+
+        Pickling is only *backwards*-compatible across Python versions. If your
+        job uses this as an output protocol, you should use at least the same
+        version of Python to parse the job's output. Vice versa for using this
+        as an input protocol.
     """
 
     # string_escape doesn't exist on Python 3 (you can't .decode() bytes).
@@ -159,8 +166,9 @@ class PickleProtocol(_KeyCachingProtocol):
 class PickleValueProtocol(object):
     """Encode ``value`` as a string-escaped pickle and discard ``key``
     (``key`` is read in as ``None``).
+
+    See :py:class:`PickleProtocol` for details.
     """
-    # see comment for PickleProtocol, above
     if PY2:
         def read(self, line):
             return (None, pickle.loads(line.decode('string_escape')))
@@ -217,6 +225,12 @@ class ReprProtocol(_KeyCachingProtocol):
     """Encode ``(key, value)`` as two reprs separated by a tab.
 
     This only works for basic types (we use :py:func:`mrjob.util.safeeval`).
+
+    .. warning::
+
+        The repr format changes between different versions of Python (for
+        example, braces for sets in Python 2.7, and different string contants
+        in Python 3). Plan accordingly.
     """
 
     def _loads(self, value):
@@ -234,7 +248,7 @@ class ReprValueProtocol(object):
     """Encode ``value`` as a repr and discard ``key`` (``key`` is read
     in as None).
 
-    This only works for basic types (we use :py:func:`mrjob.util.safeeval`).
+    See :py:class:`ReprProtocol` for details.
     """
     def read(self, line):
         return (None, safeeval(line))

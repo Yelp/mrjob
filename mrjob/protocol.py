@@ -22,6 +22,8 @@ information, see :ref:`job-protocols` and :ref:`writing-protocols`.
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
+import json
+
 try:
     import cPickle as pickle  # Python 2 only
 except ImportError:
@@ -31,12 +33,10 @@ from mrjob.py2 import PY2
 from mrjob.util import safeeval
 
 try:
-    import ujson as json
-    json  # quiet "redefinition of unused ..." warning from pyflakes
-    _json_is_ujson = True
+    import ujson
+    ujson  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
-    import json
-    _json_is_ujson = False
+    ujson = None
 
 
 class _KeyCachingProtocol(object):
@@ -84,46 +84,90 @@ class _KeyCachingProtocol(object):
         return self._dumps(key) + b'\t' + self._dumps(value)
 
 
-class JSONProtocol(_KeyCachingProtocol):
-    """Encode ``(key, value)`` as two JSONs separated by a tab.
+# JSONProtocol (below) is just an alias, but we treat it as a class for the
+# purpose of documentation. It encodes key and value as two JSONs separated
+# by a tab. Same for JSONValueProtocol, except it encodes only the value (key
+# is read as ``None``).
 
-    Note that JSON has some limitations; dictionary keys must be strings,
-    and there's no distinction between lists and tuples."""
+class StandardJSONProtocol(_KeyCachingProtocol):
+    """Implements :py:class:`JSONProtocol` using Python's built-in JSON
+    library.
 
-    if PY2 or _json_is_ujson:
+    Note that the built-in library is (appropriately) strict about the JSON
+    standard; it won't accept dictionaries with non-string keys, sets, or
+    (on Python 3) bytestrings.
+    """
+    if PY2:
         def _loads(self, value):
             return json.loads(value)
+
+        def _dumps(self, value):
+            return json.dumps(value)
     else:
-        # Python 3's json module does not accept bytes
         def _loads(self, value):
+            # Python 3's json module does not accept bytes
             return json.loads(value.decode('utf_8'))
 
-    if PY2:
-        def _dumps(self, value):
-            return json.dumps(value)
-    else:
         def _dumps(self, value):
             return json.dumps(value).encode('utf_8')
 
 
-class JSONValueProtocol(object):
-    """Encode ``value`` as a JSON and discard ``key``
-    (``key`` is read in as ``None``).
+class StandardJSONValueProtocol(object):
+    """Implements :py:class:`JSONValueProtocol` using Python's built-in JSON
+    library.
     """
-    if PY2 or _json_is_ujson:
+    if PY2:
         def read(self, line):
             return (None, json.loads(line))
+
+        def write(self, key, value):
+            return json.dumps(value).encode('utf_8')
     else:
-        # Python 3's json module does not accept bytes
         def read(self, line):
+            # Python 3's json module does not accept bytes
             return (None, json.loads(line.decode('utf_8')))
+
+        def write(self, key, value):
+            return json.dumps(value)
+
+
+class UltraJSONProtocol(_KeyCachingProtocol):
+    """Implements :py:class:`JSONProtocol` using the :py:mod:`ujson` library.
+    """
+    def _loads(self, value):
+        # ujson can handle bytes even in Python 3
+        return ujson.loads(value)
+
+    if PY2:
+        def _dumps(self, value):
+            return ujson.dumps(value)
+    else:
+        def _dumps(self, value):
+            return ujson.dumps(value).encode('utf_8')
+
+
+class UltraJSONValueProtocol(object):
+    """Implements :py:class:`JSONValueProtocol` using the :py:mod:`ujson`
+    library.
+    """
+    def read(self, line):
+        # ujson can handle bytes even in Python 3
+        return (None, ujson.loads(line))
 
     if PY2:
         def write(self, key, value):
-            return json.dumps(value)
+            return ujson.dumps(value).encode('utf_8')
     else:
         def write(self, key, value):
-            return json.dumps(value).encode('utf_8')
+            return ujson.dumps(value)
+
+
+if ujson:
+    JSONProtocol = UltraJSONProtocol
+    JSONValueProtocol = UltraJSONValueProtocol
+else:
+    JSONProtocol = StandardJSONProtocol
+    JSONValueProtocol = StandardJSONValueProtocol
 
 
 class PickleProtocol(_KeyCachingProtocol):

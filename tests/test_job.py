@@ -26,11 +26,14 @@ from mrjob.job import MRJob
 from mrjob.job import UsageError
 from mrjob.job import _im_func
 from mrjob.parse import parse_mr_job_stderr
+from mrjob.protocol import BytesValueProtocol
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
+from mrjob.protocol import ReprValueProtocol
+from mrjob.protocol import StandardJSONProtocol
 from mrjob.py2 import StringIO
 from mrjob.step import _IDENTITY_MAPPER
 from mrjob.step import _IDENTITY_REDUCER
@@ -202,7 +205,7 @@ class ProtocolsTestCase(TestCase):
     # it as a script anyway.
 
     class MRBoringJob2(MRBoringJob):
-        INPUT_PROTOCOL = JSONProtocol
+        INPUT_PROTOCOL = StandardJSONProtocol
         INTERNAL_PROTOCOL = PickleProtocol
         OUTPUT_PROTOCOL = ReprProtocol
 
@@ -227,10 +230,14 @@ class ProtocolsTestCase(TestCase):
 
     def test_default_protocols(self):
         mr_job = MRBoringJob()
-        self.assertMethodsEqual(mr_job.pick_protocols(0, 'mapper'),
-                                (RawValueProtocol.read, JSONProtocol.write))
-        self.assertMethodsEqual(mr_job.pick_protocols(0, 'reducer'),
-                               (JSONProtocol.read, JSONProtocol.write))
+
+        self.assertMethodsEqual(
+            mr_job.pick_protocols(0, 'mapper'),
+            (RawValueProtocol.read, JSONProtocol.write))
+
+        self.assertMethodsEqual(
+            mr_job.pick_protocols(0, 'reducer'),
+            (StandardJSONProtocol.read, JSONProtocol.write))
 
     def test_explicit_default_protocols(self):
         mr_job2 = self.MRBoringJob2().sandbox()
@@ -294,8 +301,16 @@ class ProtocolsTestCase(TestCase):
 
 class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
 
+    class MRBoringReprAndJSONJob(MRBoringJob):
+        # allowing reading in bytes that can't be JSON-encoded
+        INPUT_PROTOCOL = ReprValueProtocol
+        INTERNAL_PROTOCOL = StandardJSONProtocol
+        OUTPUT_PROTOCOL = StandardJSONProtocol
+
     class MRBoringJSONJob(MRJob):
-        INPUT_PROTOCOL = JSONProtocol
+        INPUT_PROTOCOL = StandardJSONProtocol
+        INTERNAL_PROTOCOL = StandardJSONProtocol
+        OUTPUT_PROTOCOL = StandardJSONProtocol
 
         def reducer(self, key, values):
             yield(key, list(values))
@@ -305,13 +320,9 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
                       b'"too"\t"many"\t"tabs"\n' +
                       b'"notabs"\n')
 
-    # TODO: this test doesn't work at all on Python 3 without ujson.
-    # json.dumps() doesn't take bytes, even properly encoded ones
-
-    # this must be unencodable by ujson as well (i.e. non-UTF-8 bytes)
-    UNENCODABLE_RAW_INPUT = (b'foo\n' +
-                             b'\xe9\n' +
-                             b'bar\n')
+    UNENCODABLE_REPR_INPUT = (b"'foo'\n" +
+                              b'set()\n' +
+                              b"'bar'\n")
 
     STRICT_MRJOB_CONF ={'runners': {'inline': {'strict_protocols': True}}}
 
@@ -340,15 +351,15 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertRaises(Exception, r.run)
 
     def assertJobHandlesUnencodableOutput(self, job_args):
-        job = MRBoringJob(job_args)
-        job.sandbox(stdin=BytesIO(self.UNENCODABLE_RAW_INPUT))
+        job = self.MRBoringReprAndJSONJob(job_args)
+        job.sandbox(stdin=BytesIO(self.UNENCODABLE_REPR_INPUT))
 
         with job.make_runner() as r:
             r.run()
 
             # good data should still get through
-            self.assertEqual(b''.join(r.stream_output()).replace(b' ', b''),
-                             b'null\t["bar","foo"]\n')
+            self.assertEqual(b''.join(r.stream_output()),
+                             b'null\t["bar", "foo"]\n')
 
             counters = r.counters()[0]
 
@@ -358,8 +369,8 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertEqual(list(counters['Unencodable output'].values()), [1])
 
     def assertJobRaisesExceptionOnUnencodableOutput(self, job_args):
-        job = MRBoringJob(job_args)
-        job.sandbox(stdin=BytesIO(self.UNENCODABLE_RAW_INPUT))
+        job = self.MRBoringReprAndJSONJob(job_args)
+        job.sandbox(stdin=BytesIO(self.UNENCODABLE_REPR_INPUT))
 
         with job.make_runner() as r:
             self.assertRaises(Exception, r.run)

@@ -1,4 +1,5 @@
 # Copyright 2009-2013 Yelp and Contributors
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +14,8 @@
 # limitations under the License.
 
 """Make sure all of our protocols work as advertised."""
+from mrjob.protocol import BytesProtocol
+from mrjob.protocol import BytesValueProtocol
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
@@ -23,9 +26,12 @@ from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
 from mrjob.protocol import StandardJSONProtocol
 from mrjob.protocol import StandardJSONValueProtocol
+from mrjob.protocol import TextProtocol
+from mrjob.protocol import TextValueProtocol
 from mrjob.protocol import UltraJSONProtocol
 from mrjob.protocol import UltraJSONValueProtocol
 from mrjob.protocol import ujson
+from mrjob.py2 import PY2
 
 from tests.py2 import TestCase
 from tests.py2 import skipIf
@@ -274,51 +280,127 @@ class PickleValueProtocolTestCase(ProtocolTestCase):
     # no tests of what encoded data looks like; pickle is an opaque protocol
 
 
-class RawValueProtocolTestCase(ProtocolTestCase):
+class RawProtocolAliasesTestCase(TestCase):
+
+    def test_raw_protocol_aliases(self):
+        if PY2:
+            self.assertEqual(RawProtocol, BytesProtocol)
+            self.assertEqual(RawValueProtocol, BytesValueProtocol)
+        else:
+            self.assertEqual(RawProtocol, TextProtocol)
+            self.assertEqual(RawValueProtocol, TextValueProtocol)
+
+
+
+class BytesValueProtocolTestCase(ProtocolTestCase):
 
     def test_dumps_keys(self):
-        self.assertEqual(RawValueProtocol().write(b'foo', b'bar'), b'bar')
+        self.assertEqual(BytesValueProtocol().write(b'foo', b'bar'), b'bar')
 
     def test_reads_raw_line(self):
-        self.assertEqual(RawValueProtocol().read(b'foobar'), (None, b'foobar'))
+        self.assertEqual(BytesValueProtocol().read(b'foobar'),
+                         (None, b'foobar'))
 
     def test_bytestrings(self):
-        self.assertRoundTripOK(RawValueProtocol(), None, b'\xe90\c1a')
+        self.assertRoundTripOK(BytesValueProtocol(), None, b'\xe90\c1a')
 
     def test_no_strip(self):
-        self.assertEqual(RawValueProtocol().read(b'foo\t \n\n'),
+        self.assertEqual(BytesValueProtocol().read(b'foo\t \n\n'),
                          (None, b'foo\t \n\n'))
 
 
-class RawProtocolTestCase(ProtocolTestCase):
+class TextValueProtocolTestCase(ProtocolTestCase):
+
+    def test_dumps_keys(self):
+        self.assertEqual(TextValueProtocol().write(u'foo', u'bar'), b'bar')
+
+    def test_converts_raw_line_to_unicode(self):
+        self.assertEqual(TextValueProtocol().read(b'foobar'),
+                         (None, u'foobar'))
+
+    def test_utf_8_decode(self):
+        self.assertEqual(TextValueProtocol().read(b'caf\xc3\xa9'),
+                         (None, u'caf\xe9'))
+
+    def test_fall_back_to_latin_1(self):
+        self.assertEqual(TextValueProtocol().read(b'caf\xe9'),
+                         (None, u'caf\xe9'))
+
+    def test_no_strip(self):
+        self.assertEqual(TextValueProtocol().read(b'foo\t \n\n'),
+                         (None, u'foo\t \n\n'))
+
+
+class BytesProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
-        self.assertRoundTripOK(RawProtocol(), b'foo', b'bar')
-        self.assertRoundTripOK(RawProtocol(), b'foo', None)
-        self.assertRoundTripOK(RawProtocol(), b'foo', b'')
-        self.assertRoundTripOK(RawProtocol(), b'caf\xe9', b'\xe90\c1a')
+        self.assertRoundTripOK(BytesProtocol(), b'foo', b'bar')
+        self.assertRoundTripOK(BytesProtocol(), b'foo', None)
+        self.assertRoundTripOK(BytesProtocol(), b'foo', b'')
+        self.assertRoundTripOK(BytesProtocol(), b'caf\xe9', b'\xe90\c1a')
 
     def test_no_tabs(self):
-        self.assertEqual(RawProtocol().write(b'foo', None), b'foo')
-        self.assertEqual(RawProtocol().write(None, b'foo'), b'foo')
-        self.assertEqual(RawProtocol().read(b'foo'), (b'foo', None))
+        self.assertEqual(BytesProtocol().write(b'foo', None), b'foo')
+        self.assertEqual(BytesProtocol().write(None, b'foo'), b'foo')
+        self.assertEqual(BytesProtocol().read(b'foo'), (b'foo', None))
 
-        self.assertEqual(RawProtocol().write(b'', None), b'')
-        self.assertEqual(RawProtocol().write(None, None), b'')
-        self.assertEqual(RawProtocol().write(None, b''), b'')
-        self.assertEqual(RawProtocol().read(b''), (b'', None))
+        self.assertEqual(BytesProtocol().write(b'', None), b'')
+        self.assertEqual(BytesProtocol().write(None, None), b'')
+        self.assertEqual(BytesProtocol().write(None, b''), b'')
+        self.assertEqual(BytesProtocol().read(b''), (b'', None))
 
     def test_extra_tabs(self):
-        self.assertEqual(RawProtocol().write(b'foo', b'bar\tbaz'),
+        self.assertEqual(BytesProtocol().write(b'foo', b'bar\tbaz'),
                          b'foo\tbar\tbaz')
-        self.assertEqual(RawProtocol().write(b'foo\tbar', b'baz'),
+        self.assertEqual(BytesProtocol().write(b'foo\tbar', b'baz'),
                          b'foo\tbar\tbaz')
-        self.assertEqual(RawProtocol().read(b'foo\tbar\tbaz'),
+        self.assertEqual(BytesProtocol().read(b'foo\tbar\tbaz'),
                          (b'foo', b'bar\tbaz'))
 
     def test_no_strip(self):
-        self.assertEqual(RawProtocol().read(b'foo\t \n\n'),
+        self.assertEqual(BytesProtocol().read(b'foo\t \n\n'),
                          (b'foo', b' \n\n'))
+
+
+class TextProtocolTestCase(ProtocolTestCase):
+
+    def test_round_trip(self):
+        self.assertRoundTripOK(TextProtocol(), u'foo', u'bar')
+        self.assertRoundTripOK(TextProtocol(), u'foo', None)
+        self.assertRoundTripOK(TextProtocol(), u'foo', u'')
+        self.assertRoundTripOK(TextProtocol(), u'caf\xe9', u'\Xe90\c1a')
+
+    def test_no_tabs(self):
+        self.assertEqual(TextProtocol().write(u'foo', None), b'foo')
+        self.assertEqual(TextProtocol().write(None, u'foo'), b'foo')
+        self.assertEqual(TextProtocol().read(b'foo'), (u'foo', None))
+
+        self.assertEqual(TextProtocol().write(u'', None), b'')
+        self.assertEqual(TextProtocol().write(None, None), b'')
+        self.assertEqual(TextProtocol().write(None, u''), b'')
+        self.assertEqual(TextProtocol().read(b''), (u'', None))
+
+    def test_extra_tabs(self):
+        self.assertEqual(TextProtocol().write(u'foo', u'bar\tbaz'),
+                         b'foo\tbar\tbaz')
+        self.assertEqual(TextProtocol().write(u'foo\tbar', u'baz'),
+                         b'foo\tbar\tbaz')
+        self.assertEqual(TextProtocol().read(b'foo\tbar\tbaz'),
+                         (u'foo', u'bar\tbaz'))
+
+    def test_no_strip(self):
+        self.assertEqual(TextProtocol().read(b'foo\t \n\n'),
+                         (u'foo', u' \n\n'))
+
+    def test_utf_8(self):
+        self.assertEqual(TextProtocol().read(b'caf\xc3\xa9\tol\xc3\xa9'),
+                         (u'caf\xe9', u'ol\xe9'))
+
+    def test_latin_1_fallback(self):
+        # we fall back to latin-1 for the whole line, not individual fields
+        self.assertEqual(TextProtocol().read(b'caf\xe9\tol\xc3\xa9'),
+                         (u'caf\xe9', u'ol\xc3\xa9'))
+
 
 
 class ReprProtocolTestCase(ProtocolTestCase):

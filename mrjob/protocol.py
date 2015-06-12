@@ -13,9 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Protocols deserialize and serialize the input and output of tasks to raw
-bytes for Hadoop to distribute to the next task or to write as output. For more
-information, see :ref:`job-protocols` and :ref:`writing-protocols`.
+"""Protocols translate raw bytes into key, value pairs.
+
+Typically, protocols encode a key and value into bytes, and join them together
+with a tab character.
+
+However, protocols with ``Value`` in their name ignore
+keys and simply read/write values (with key read in as ``None``), allowing
+you to read and write data in arbitrary formats.
+
+For more information, see :ref:`job-protocols` and :ref:`writing-protocols`.
 """
 # This is one of the few places where efficiency really matters; to that end,
 # we maintain separate code for Python 2 and 3 where necessary. Tests of

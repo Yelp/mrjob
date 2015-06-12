@@ -348,14 +348,15 @@ You can specify which protocols your job uses like this::
         INTERNAL_PROTOCOL = mrjob.protocol.JSONProtocol
         OUTPUT_PROTOCOL = mrjob.protocol.JSONProtocol
 
-The default input protocol is |RawValueProtocol|, which reads and writes lines
-of raw text with no key. So by default, the first step in your job sees
-``(None, <text of the line>)`` for each line of input.
+The default input protocol is |RawValueProtocol|, which just reads in a line
+as a ``str``. (The line won't have a trailing newline character because
+:py:class:`~mrjob.job.MRJob` strips it.) So by default, the first step in your
+job sees ``(None, line)`` for each line of input [#py3]_.
 
-The default output and internal protocols are both |JSONProtocol|, which reads
-and writes JSON strings separated by a tab character. (Hadoop Streaming uses
-the tab character to separate keys and values within one line when it sorts
-your data [#hc]_.)
+The default output and internal protocols are both |JSONProtocol| [#json]_,
+which reads and writes JSON strings separated by a tab character. (By default,
+Hadoop Streaming uses the tab character to separate keys and values within one
+line when it sorts your data.)
 
 If your head hurts a bit, think of it this way: use |RawValueProtocol| when you
 want to read or write lines of raw text. Use |JSONProtocol| when you want to
@@ -364,29 +365,20 @@ read or write key-value pairs where the key and value are JSON-enoded bytes.
 .. note::
 
     Hadoop Streaming does not understand JSON, or mrjob protocols. It simply
-    groups lines by doing a string comparison on the keys.
+    groups lines by doing a string comparison on whatever comes before the
+    first tab character.
 
-Here are all the protocols mrjob includes:
-
-* :py:class:`~mrjob.protocol.JSONProtocol` /
-  :py:class:`~mrjob.protocol.JSONValueProtocol`: JSON
-* :py:class:`~mrjob.protocol.PickleProtocol` /
-  :py:class:`~mrjob.protocol.PickleValueProtocol`: pickle
-* :py:class:`~mrjob.protocol.RawProtocol` /
-  :py:class:`~mrjob.protocol.RawValueProtocol`: raw string
-* :py:class:`~mrjob.protocol.ReprProtocol` /
-  :py:class:`~mrjob.protocol.ReprValueProtocol`: serialize with ``repr()``,
-  deserialize with :py:func:`mrjob.util.safeeval`
-
-The :py:class:`*ValueProtocol` protocols assume the input lines don't have
-keys, and don't write a key as output.
+See :py:mod:`mrjob.protocol` for the full list of protocols built-in to mrjob.
 
 .. rubric:: Footnotes
 
-.. [#hc] This behavior is configurable, but there is currently no
-    mrjob-specific documentation. `GitHub pull requests
-    <http://www.github.com/yelp/mrjob>`_ are always
-    appreciated.
+.. [#py3] Experienced Pythonistas might notice that a ``str`` is a bytestring
+    on Python 2, but Unicode on Python 3. That's right! |RawValueProtocol| is
+    an alias for one of two different protocols depending on your Python
+    version.
+
+.. [#json] |JSONProtocol| is an alias for one of two different implementations;
+    we try to use the (much faster) :py:mod:`ujson` library if it is available.
 
 Data flow walkthrough by example
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -531,9 +523,12 @@ Writing custom protocols
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 A protocol is an object with methods ``read(self, line)`` and ``write(self,
-key, value)``. The ``read()`` method takes a string and returns a 2-tuple of
-decoded objects, and ``write()`` takes the key and value and returns the line
+key, value)``. The ``read()`` method takes a bytestring and returns a 2-tuple
+of decoded objects, and ``write()`` takes the key and value and returns bytes
 to be passed back to Hadoop Streaming or as output.
+
+Protocols don't have to worry about adding or stripping newlines; this
+is handled automatically by :py:class:`~mrjob.job.MRJob`.
 
 Here is a simplified version of mrjob's JSON protocol::
 

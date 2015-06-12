@@ -12,11 +12,12 @@ class MRWordFreqCountTestCase(TestCase):
         self.assertEqual(run_job(MRWordFreqCount()), {})
 
     def test_the_wheels_on_the_bus(self):
-        RAW_INPUT = b"""The wheels on the bus go round and round,
-        Round and round,
-        Round and round,
+        RAW_INPUT = b"""
         The wheels on the bus go round and round,
-        All through the town."""
+        round and round, round and round
+        The wheels on the bus go round and round,
+        all through the town.
+        """
 
         EXPECTED_OUTPUT = {
             u'all': 1,

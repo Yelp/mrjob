@@ -119,8 +119,8 @@ class NoTzsetTestCase(TestCase):
         self.remove_time_tzset()
 
     def tearDown(self):
+        """Test systems without time.tzset() (e.g. Windows). See Issue #46."""
         self.restore_time_tzset()
-    """Test systems without time.tzset() (e.g. Windows). See Issue #46."""
 
     def remove_time_tzset(self):
         if hasattr(time, 'tzset'):

@@ -52,6 +52,13 @@ JSON
         make your job *dependent* on :py:mod:`ujson`, rather than just using
         it as a speedup.
 
+    .. note::
+
+        :py:mod:`ujson` also differs from the standard implementation in that
+        it doesn't  add spaces to its JSONs (``{"foo":"bar"}`` versus
+        ``{"foo": "bar"}``). This probably won't affect anything but test
+        cases.
+
 .. autoclass:: StandardJSONProtocol
 .. autoclass:: UltraJSONProtocol
 

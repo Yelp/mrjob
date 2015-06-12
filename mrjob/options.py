@@ -270,6 +270,12 @@ def add_hadoop_opts(opt_group):
             help='hadoop binary. Defaults to $HADOOP_HOME/bin/hadoop'),
 
         opt_group.add_option(
+            '--hadoop-home', dest='hadoop_home',
+            default=None,
+            help='Alternative to setting the HADOOP_HOME environment variable.'),
+
+
+        opt_group.add_option(
             '--hdfs-scratch-dir', dest='hdfs_scratch_dir',
             default=None,
             help='Scratch space on HDFS (default is tmp/)'),

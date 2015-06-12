@@ -86,7 +86,9 @@ class _KeyCachingProtocol(object):
 
 # JSONProtocol (below) is just an alias, but we treat it as a class for the
 # purpose of documentation. It encodes key and value as two JSONs separated
-# by a tab. Same for JSONValueProtocol, except it encodes only the value (key
+# by a tab.
+#
+# Same for JSONValueProtocol, except it encodes only the value (key
 # is read as ``None``).
 
 class StandardJSONProtocol(_KeyCachingProtocol):
@@ -162,6 +164,7 @@ class UltraJSONValueProtocol(object):
             return ujson.dumps(value).encode('utf_8')
 
 
+# use ujson by default if available
 if ujson:
     JSONProtocol = UltraJSONProtocol
     JSONValueProtocol = UltraJSONValueProtocol
@@ -229,7 +232,13 @@ class PickleValueProtocol(object):
                 'latin_1').encode('unicode_escape')
 
 
-class RawProtocol(object):
+# RawValueProtocol (below) is just an alias, but we treat it as a class for the
+# purpose of documentation. All it does is output the value (key is read as
+# ``None``).
+#
+# Same for RawProtocol, except it encodes key and value, separated by a tab.
+
+class BytesProtocol(object):
     """Encode ``(key, value)`` as ``key`` and ``value`` separated by
     a tab (``key`` and ``value`` should be bytestrings).
 
@@ -252,17 +261,91 @@ class RawProtocol(object):
         return b'\t'.join(x for x in (key, value) if x is not None)
 
 
-class RawValueProtocol(object):
+class BytesValueProtocol(object):
     """Read in a line as ``(None, line)``. Write out ``(key, value)``
     as ``value``. ``value`` must be bytes.
 
-    The default way for a job to read its initial input.
+    .. warning::
+
+        Typical usage on Python 2 is to have your mapper parse (byte) strings
+        out of your input files, and then include them in the output to the
+        reducer. Since this output is JSON-encoded, it will fail if the
+        bytestrings are not UTF-8 decodable. If this is an issue, consider
+        using :py:class:`TextValueProtocol` instead.
     """
     def read(self, line):
         return (None, line)
 
     def write(self, key, value):
         return value
+
+
+class TextProtocol(object):
+    """UTF-8 ``key`` and ``value`` and join them with a tab. When decoding
+    input, attempt to UTF-8 decode, falling back to latin-1.
+    a tab (``key`` and ``value`` should be bytestrings).
+
+    If ``key`` or ``value`` is ``None``, don't include a tab. When decoding a
+    line with no tab in it, ``value`` will be ``None``.
+
+    When reading from a line with multiple tabs, we break on the first one.
+
+    Your key should probably not be ``None`` or have tab characters in it, but
+    we don't check.
+    """
+    def read(self, line):
+        try:
+            line = line.decode('utf_8')
+        except UnicodeDecodeError:
+            line = line.decode('latin_1')
+
+        key_value = line.split(u'\t', 1)
+        if len(key_value) == 1:
+            key_value.append(None)
+
+        return tuple(key_value)
+
+    def write(self, key, value):
+        return b'\t'.join(
+            x.encode('utf_8') for x in (key, value) if x is not None)
+
+
+class TextValueProtocol(object):
+    """UTF-8-encode ``value`` as a line, discarding ``key``. When reading
+    input, read ``key`` as ``None`` and attempt to UTF-8 decode the line into
+    ``value``, falling back to latin-1.
+
+    This is a good solution for reading log files which are most ASCII but
+    may have some other bytes of unknown encoding. If you wish to enforce
+    a particular encoding, use :py:class:`BytesValueProtocol` instead::
+
+        class MREncodingEnforcer(MRJob):
+
+            INPUT_PROTOCOL = BytesValueProtocol
+
+            def mapper(self, _, value):
+                value = value.decode('utf_8')
+                ...
+    """
+    def read(self, line):
+        try:
+            return (None, line.decode('utf_8'))
+        except UnicodeDecodeError:
+            return (None, line.decode('latin_1'))
+
+    def write(self, key, value):
+        return value.encode('utf_8')
+
+
+# RawValueProtocol is the default way of reading input. Historically
+# (in Python 2), it's always read raw bytes, but Python 3 is pickier about
+# bytes, so we use TextValueProcotol (unicode) instead.
+if PY2:
+    RawProtocol = BytesProtocol
+    RawValueProtocol = BytesValueProtocol
+else:
+    RawProtocol = TextProtocol
+    RawValueProtocol = TextValueProtocol
 
 
 class ReprProtocol(_KeyCachingProtocol):

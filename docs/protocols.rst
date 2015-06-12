@@ -3,10 +3,32 @@ mrjob.protocol - input and output
 .. automodule:: mrjob.protocol
 
 
-Raw Bytes
----------
-.. autoclass:: RawProtocol
-.. autoclass:: RawValueProtocol
+Strings
+-------
+.. py:class:: RawValueProtocol
+
+    Just output ``value`` (a ``str``), and discard
+    ``key`` (``key`` is read in as ``None``).
+
+    **This is the default protocol used by jobs to read input.**
+
+    This is an alias for :py:class:`RawValueProtocol` on Python 2 and
+    :py:class:`TextValueProtocol` on Python 3.
+
+.. autoclass:: BytesValueProtocol
+.. autoclass:: TextValueProtocol
+
+.. py:class:: RawProtocol
+
+    Output ``key`` (``str``) and ``value`` (``str``),
+    separated by a tab character.
+
+    This is an alias for :py:class:`BytesProtocol` on Python 2 and
+    :py:class:`TextProtocol` on Python 3.
+
+.. autoclass:: BytesProtocol
+.. autoclass:: TextProtocol
+
 
 JSON
 ----

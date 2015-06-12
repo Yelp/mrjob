@@ -239,8 +239,8 @@ class PickleValueProtocol(object):
 # Same for RawProtocol, except it encodes key and value, separated by a tab.
 
 class BytesProtocol(object):
-    """Encode ``(key, value)`` as ``key`` and ``value`` separated by
-    a tab (``key`` and ``value`` should be bytestrings).
+    """Encode ``(key, value)`` (bytestrings) as ``key`` and ``value``
+    separated by a tab.
 
     If ``key`` or ``value`` is ``None``, don't include a tab. When decoding a
     line with no tab in it, ``value`` will be ``None``.
@@ -262,16 +262,18 @@ class BytesProtocol(object):
 
 
 class BytesValueProtocol(object):
-    """Read in a line as ``(None, line)``. Write out ``(key, value)``
-    as ``value``. ``value`` must be bytes.
+    """Read line (without trailing newline) directly into ``value`` (``key``
+    is always ``None``). Output ``value`` (bytes) directly, discarding ``key``.
+
+    **This is the default protocol used by jobs to read input on Python 2.**
 
     .. warning::
 
         Typical usage on Python 2 is to have your mapper parse (byte) strings
         out of your input files, and then include them in the output to the
-        reducer. Since this output is JSON-encoded, it will fail if the
-        bytestrings are not UTF-8 decodable. If this is an issue, consider
-        using :py:class:`TextValueProtocol` instead.
+        reducer. Since this output is then (by default) JSON-encoded, encoding
+        will fail if the bytestrings are not UTF-8 decodable. If this is an
+        issue, consider using :py:class:`TextValueProtocol` instead.
     """
     def read(self, line):
         return (None, line)
@@ -281,9 +283,9 @@ class BytesValueProtocol(object):
 
 
 class TextProtocol(object):
-    """UTF-8 ``key`` and ``value`` and join them with a tab. When decoding
-    input, attempt to UTF-8 decode, falling back to latin-1.
-    a tab (``key`` and ``value`` should be bytestrings).
+    """UTF-8 encode ``key`` and ``value`` (unicode strings) and join them
+    with a tab character. When reading input, we fall back to latin-1 if
+    we can't UTF-8 decode the line.
 
     If ``key`` or ``value`` is ``None``, don't include a tab. When decoding a
     line with no tab in it, ``value`` will be ``None``.
@@ -311,13 +313,17 @@ class TextProtocol(object):
 
 
 class TextValueProtocol(object):
-    """UTF-8-encode ``value`` as a line, discarding ``key``. When reading
-    input, read ``key`` as ``None`` and attempt to UTF-8 decode the line into
-    ``value``, falling back to latin-1.
+    """Attempt to UTF-8 decode line (without trailing newline) into ``value``,
+    falling back to latin-1. (``key`` is always ``None``). Output ``value``
+    UTF-8 encoded, discarding ``key``.
 
-    This is a good solution for reading log files which are most ASCII but
-    may have some other bytes of unknown encoding. If you wish to enforce
-    a particular encoding, use :py:class:`BytesValueProtocol` instead::
+    **This is the default protocol used by jobs to read input on Python 3.**
+
+    This is a good solution for reading text files which are mostly ASCII but
+    may have some other bytes of unknown encoding (e.g. logs).
+
+    If you wish to enforce a particular encoding, use
+    :py:class:`BytesValueProtocol` instead::
 
         class MREncodingEnforcer(MRJob):
 

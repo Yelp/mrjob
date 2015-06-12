@@ -150,8 +150,7 @@ class RunnerOptionStore(OptionStore):
         """
         :param alias: Runner alias (e.g. ``'local'``)
         :param opts: Options from the command line
-        :param conf_paths: Either a file path or an iterable of paths to config
-                           files
+        :param conf_paths: An iterable of paths to config files
         """
         super(RunnerOptionStore, self).__init__()
 

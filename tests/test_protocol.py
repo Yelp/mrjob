@@ -13,8 +13,6 @@
 # limitations under the License.
 
 """Make sure all of our protocols work as advertised."""
-import json
-
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
@@ -23,14 +21,14 @@ from mrjob.protocol import RawProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
-from mrjob.protocol import _json_is_ujson
-from mrjob.py2 import PY2
-from mrjob.py2 import to_string
+from mrjob.protocol import StandardJSONProtocol
+from mrjob.protocol import StandardJSONValueProtocol
+from mrjob.protocol import UltraJSONProtocol
+from mrjob.protocol import UltraJSONValueProtocol
+from mrjob.protocol import ujson
 
 from tests.py2 import TestCase
-from tests.py2 import patch
 from tests.py2 import skipIf
-from tests.sandbox import SandboxedTestCase
 
 
 class Point(object):
@@ -100,139 +98,147 @@ class ProtocolTestCase(TestCase):
         self.assertRaises(Exception, protocol.read, data)
 
 
-class BuiltInJSONModuleTestCase(SandboxedTestCase):
+class JSONProtocolAliasesTestCase(TestCase):
 
-    def setUp(self):
-        super(BuiltInJSONModuleTestCase, self).setUp()
-
-        self.start(patch('mrjob.protocol.json', json))
-
-        if not PY2 and _json_is_ujson:
-            # in Python 3, if ujson is available, we pass bytes directly
-            # to loads(). json.loads() only accepts strs, so wrap it
-            json_loads = json.loads
-            def load_bytes(obj, *args, **kwargs):
-                return json_loads(obj.decode('utf_8'), *args, **kwargs)
-
-            self.start(patch.object(json, 'loads', load_bytes))
+    def test_use_ujson_if_installed(self):
+        if ujson:
+            self.assertEqual(JSONProtocol, UltraJSONProtocol)
+            self.assertEqual(JSONValueProtocol, UltraJSONValueProtocol)
+        else:
+            self.assertEqual(JSONProtocol, StandardJSONProtocol)
+            self.assertEqual(JSONValueProtocol, StandardJSONValueProtocol)
 
 
-class JSONProtocolTestCase(ProtocolTestCase):
+class StandardJSONProtocolTestCase(ProtocolTestCase):
+
+    PROTOCOL = StandardJSONProtocol()
 
     def test_round_trip(self):
         for k, v in JSON_KEYS_AND_VALUES:
-            self.assertRoundTripOK(JSONProtocol(), k, v)
+            self.assertRoundTripOK(self.PROTOCOL, k, v)
 
     def test_round_trip_with_trailing_tab(self):
         for k, v in JSON_KEYS_AND_VALUES:
-            self.assertRoundTripWithTrailingTabOK(JSONProtocol(), k, v)
+            self.assertRoundTripWithTrailingTabOK(self.PROTOCOL, k, v)
 
     def test_uses_json_format(self):
         KEY = ['a', 1]
         VALUE = {'foo': 'bar'}
         ENCODED = b'["a", 1]\t{"foo": "bar"}'
-        # ujson uses minimal whitespace
-        ENCODED_WITHOUT_WHITESPACE = ENCODED.replace(b' ', b'')
 
-        self.assertEqual((KEY, VALUE), JSONProtocol().read(ENCODED))
-        self.assertIn(JSONProtocol().write(KEY, VALUE),
-                      (ENCODED, ENCODED_WITHOUT_WHITESPACE))
+        self.assertEqual((KEY, VALUE), self.PROTOCOL.read(ENCODED))
+        self.assertEqual(self.PROTOCOL.write(KEY, VALUE), ENCODED)
 
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
         self.assertEqual(
             ([1, 2], [3, 4]),
-            JSONProtocol().read(JSONProtocol().write((1, 2), (3, 4))))
+            self.PROTOCOL.read(self.PROTOCOL.write((1, 2), (3, 4))))
 
     def test_numerical_keys_become_strs(self):
         # JSON should convert numbers to strings when they are dict keys
         self.assertEqual(
             ({'1': 2}, {'3': 4}),
-            JSONProtocol().read(JSONProtocol().write({1: 2}, {3: 4})))
+            self.PROTOCOL.read(self.PROTOCOL.write({1: 2}, {3: 4})))
 
     def test_bad_data(self):
-        self.assertCantDecode(JSONProtocol(), b'{@#$@#!^&*$%^')
+        self.assertCantDecode(self.PROTOCOL, b'{@#$@#!^&*$%^')
 
     def test_bad_keys_and_values(self):
         # only unicodes (or bytes in utf-8) are allowed
-        self.assertCantEncode(JSONProtocol(), b'0\xa2', b'\xe9')
-
-
-class BuiltInJSONModuleJSONProtocolTestCase(
-        BuiltInJSONModuleTestCase, JSONProtocolTestCase):
-
-    def test_bad_keys_and_values(self):
-        super(BuiltInJSONModuleJSONProtocolTestCase, self
-              ).test_bad_keys_and_values()
-
-        # ujson will happily encode these, but json will not
+        self.assertCantEncode(self.PROTOCOL, b'0\xa2', b'\xe9')
 
         # dictionaries have to have strings as keys
-        self.assertCantEncode(JSONProtocol(), {(1, 2): 3}, None)
+        self.assertCantEncode(self.PROTOCOL, {(1, 2): 3}, None)
 
         # sets don't exist in JSON
-        self.assertCantEncode(JSONProtocol(), set([1]), set())
+        self.assertCantEncode(self.PROTOCOL, set([1]), set())
 
         # Point class has no representation in JSON
-        self.assertCantEncode(JSONProtocol(), Point(2, 3), Point(1, 4))
+        self.assertCantEncode(self.PROTOCOL, Point(2, 3), Point(1, 4))
 
 
-class JSONValueProtocolTestCase(ProtocolTestCase):
+@skipIf(ujson is None, 'ujson module not installed')
+class UltraJSONProtocolTestCase(StandardJSONProtocolTestCase):
+
+    PROTOCOL = UltraJSONProtocol()
+
+    def test_uses_json_format(self):
+        KEY = ['a', 1]
+        VALUE = {'foo': 'bar'}
+        ENCODED = b'["a",1]\t{"foo":"bar"}'  # no whitespace for ujson
+
+        self.assertEqual((KEY, VALUE), self.PROTOCOL.read(ENCODED))
+        self.assertEqual(self.PROTOCOL.write(KEY, VALUE), ENCODED)
+
+    def test_bad_keys_and_values(self):
+        # seems like the only thing ujson won't encode is non-UTF-8 bytes
+        self.assertCantEncode(self.PROTOCOL, b'0\xa2', b'\xe9')
+
+
+class StandardJSONValueProtocolTestCase(ProtocolTestCase):
+
+    PROTOCOL = StandardJSONValueProtocol()
 
     def test_round_trip(self):
         for _, v in JSON_KEYS_AND_VALUES:
-            self.assertRoundTripOK(JSONValueProtocol(), None, v)
+            self.assertRoundTripOK(self.PROTOCOL, None, v)
 
     def test_round_trip_with_trailing_tab(self):
         for _, v in JSON_KEYS_AND_VALUES:
-            self.assertRoundTripWithTrailingTabOK(JSONValueProtocol(), None, v)
+            self.assertRoundTripWithTrailingTabOK(self.PROTOCOL, None, v)
 
     def test_uses_json_format(self):
         VALUE = {'foo': 'bar'}
         ENCODED = b'{"foo": "bar"}'
-        ENCODED_WITHOUT_WHITESPACE = ENCODED.replace(b' ', b'')
 
-        self.assertEqual((None, VALUE), JSONValueProtocol().read(ENCODED))
-        self.assertIn(JSONValueProtocol().write(None, VALUE),
-                      (ENCODED, ENCODED_WITHOUT_WHITESPACE))
+        self.assertEqual((None, VALUE), self.PROTOCOL.read(ENCODED))
+        self.assertEqual(self.PROTOCOL.write(None, VALUE), ENCODED)
 
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
         self.assertEqual(
             (None, [3, 4]),
-            JSONValueProtocol().read(JSONValueProtocol().write(None, (3, 4))))
+            self.PROTOCOL.read(self.PROTOCOL.write(None, (3, 4))))
 
     def test_numerical_keys_become_strs(self):
         # JSON should convert numbers to strings when they are dict keys
         self.assertEqual(
             (None, {'3': 4}),
-            JSONValueProtocol().read(JSONValueProtocol().write(None, {3: 4})))
+            self.PROTOCOL.read(self.PROTOCOL.write(None, {3: 4})))
 
     def test_bad_data(self):
-        self.assertCantDecode(JSONValueProtocol(), b'{@#$@#!^&*$%^')
+        self.assertCantDecode(self.PROTOCOL, b'{@#$@#!^&*$%^')
 
     def test_bad_keys_and_values(self):
-        # only unicodes (or bytes in utf-8) are allowed
-        self.assertCantEncode(JSONValueProtocol(), None, b'\xe9')
-
-
-class BuiltInJSONModuleJSONValueProtocolTestCase(
-        BuiltInJSONModuleTestCase, JSONValueProtocolTestCase):
-
-    def test_bad_keys_and_values(self):
-        super(BuiltInJSONModuleJSONValueProtocolTestCase, self
-              ).test_bad_keys_and_values()
-
-        # ujson will happily encode these, but json will not
+        # seems like the only thing ujson won't encode is non-UTF-8 bytes
+        self.assertCantEncode(self.PROTOCOL, None, b'\xe9')
 
         # dictionaries have to have strings as keys
-        self.assertCantEncode(JSONValueProtocol(), None, {(1, 2): 3})
+        self.assertCantEncode(self.PROTOCOL, None, {(1, 2): 3})
 
         # sets don't exist in JSON
-        self.assertCantEncode(JSONValueProtocol(), None, set())
+        self.assertCantEncode(self.PROTOCOL, None, set())
 
         # Point class has no representation in JSON
-        self.assertCantEncode(JSONValueProtocol(), None, Point(1, 4))
+        self.assertCantEncode(self.PROTOCOL, None, Point(1, 4))
+
+
+@skipIf(ujson is None, 'ujson module not installed')
+class UltraJSONValueProtocolTestCase(StandardJSONValueProtocolTestCase):
+
+    PROTOCOL = UltraJSONValueProtocol()
+
+    def test_uses_json_format(self):
+        VALUE = {'foo': 'bar'}
+        ENCODED = b'{"foo":"bar"}'  # no whitespace in ujson
+
+        self.assertEqual((None, VALUE), self.PROTOCOL.read(ENCODED))
+        self.assertEqual(self.PROTOCOL.write(None, VALUE), ENCODED)
+
+    def test_bad_keys_and_values(self):
+        # seems like the only thing ujson won't encode is non-UTF-8 bytes
+        self.assertCantEncode(self.PROTOCOL, None, b'\xe9')
 
 
 class PickleProtocolTestCase(ProtocolTestCase):

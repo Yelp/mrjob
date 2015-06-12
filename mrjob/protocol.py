@@ -121,14 +121,14 @@ class StandardJSONValueProtocol(object):
             return (None, json.loads(line))
 
         def write(self, key, value):
-            return json.dumps(value).encode('utf_8')
+            return json.dumps(value)
     else:
         def read(self, line):
             # Python 3's json module does not accept bytes
             return (None, json.loads(line.decode('utf_8')))
 
         def write(self, key, value):
-            return json.dumps(value)
+            return json.dumps(value).encode('utf_8')
 
 
 class UltraJSONProtocol(_KeyCachingProtocol):
@@ -156,10 +156,10 @@ class UltraJSONValueProtocol(object):
 
     if PY2:
         def write(self, key, value):
-            return ujson.dumps(value).encode('utf_8')
+            return ujson.dumps(value)
     else:
         def write(self, key, value):
-            return ujson.dumps(value)
+            return ujson.dumps(value).encode('utf_8')
 
 
 if ujson:

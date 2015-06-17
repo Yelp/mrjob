@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import hashlib
+import json
 import logging
 import os
 import os.path
@@ -29,12 +30,6 @@ from datetime import timedelta
 from io import BytesIO
 from subprocess import Popen
 from subprocess import PIPE
-
-try:
-    import simplejson as json  # preferred because of C speedups
-    json  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import json  # built in to Python 2.6 and later
 
 try:
     import boto

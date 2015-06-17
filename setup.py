@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import platform
 import sys
 
 import mrjob
@@ -20,10 +21,13 @@ try:
     setup  # quiet "redefinition of unused ..." warning from pyflakes
     # arguments that distutils doesn't understand
     setuptools_kwargs = {
+        'extras_require': {
+            # highly recommended, but requires a compiler
+            'ujson': ['ujson'],
+        },
         'install_requires': [
-            'filechunkio',
             'PyYAML',
-            'simplejson>=2.0.9',
+            'filechunkio',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',

@@ -18,20 +18,14 @@ for more information."""
 # since MRJobs need to run in Amazon's generic EMR environment
 import inspect
 import itertools
+import json
 import logging
+import sys
 from io import BytesIO
 from optparse import OptionGroup
-import sys
-
-try:
-    import simplejson as json
-    json  # silence, pyflakes!
-except ImportError:
-    import json
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
-
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
@@ -509,10 +503,10 @@ class MRJob(MRJobLauncher):
         :type step_num: int
         :param step_num: which step to run (0-indexed)
 
-        If we encounter a line that can't be decoded by our input protocol,
-        or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception. If
-        --strict-protocols is set, then an exception is raised
+        If --no-strict-protocols is set, and we encounter a line that can't
+        be decoded by our input protocol or a tuple that can't be encoded
+        by our output protocol, we'll increment a counter rather than
+        raising an exception. This will be going away in v0.6.0.
 
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
@@ -781,18 +775,8 @@ class MRJob(MRJobLauncher):
             step_key = self._step_key(step_num, step_type)
 
             if step_key not in step_map:
-                # It's unlikely that we will encounter this logic in real life,
-                # but if asked what the protocol of a non-script step is, we
-                # should just say RawValueProtocol because we have no idea what
-                # the jars or commands are doing with our precious data.
-                # If --strict-protocols, though, we won't stand for these
-                # shenanigans!
-                if self.options.strict_protocols:
-                    raise ValueError(
-                        "Can't pick a protocol for a non-script step")
-                else:
-                    p = RawValueProtocol()
-                    return p, p
+                raise ValueError(
+                    "Can't pick a protocol for a non-script step")
 
             real_num = step_map[step_key]
             if real_num == (len(step_map) - 1):

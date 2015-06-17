@@ -1,5 +1,6 @@
 # -*- encoding: utf-8 -*-
 # Copyright 2009-2013 Yelp and Contributors
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,11 +26,14 @@ from mrjob.job import MRJob
 from mrjob.job import UsageError
 from mrjob.job import _im_func
 from mrjob.parse import parse_mr_job_stderr
+from mrjob.protocol import BytesValueProtocol
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
+from mrjob.protocol import ReprValueProtocol
+from mrjob.protocol import StandardJSONProtocol
 from mrjob.py2 import StringIO
 from mrjob.step import _IDENTITY_MAPPER
 from mrjob.step import _IDENTITY_REDUCER
@@ -118,8 +122,8 @@ class NoTzsetTestCase(TestCase):
         self.remove_time_tzset()
 
     def tearDown(self):
+        """Test systems without time.tzset() (e.g. Windows). See Issue #46."""
         self.restore_time_tzset()
-    """Test systems without time.tzset() (e.g. Windows). See Issue #46."""
 
     def remove_time_tzset(self):
         if hasattr(time, 'tzset'):
@@ -201,7 +205,7 @@ class ProtocolsTestCase(TestCase):
     # it as a script anyway.
 
     class MRBoringJob2(MRBoringJob):
-        INPUT_PROTOCOL = JSONProtocol
+        INPUT_PROTOCOL = StandardJSONProtocol
         INTERNAL_PROTOCOL = PickleProtocol
         OUTPUT_PROTOCOL = ReprProtocol
 
@@ -226,10 +230,14 @@ class ProtocolsTestCase(TestCase):
 
     def test_default_protocols(self):
         mr_job = MRBoringJob()
-        self.assertMethodsEqual(mr_job.pick_protocols(0, 'mapper'),
-                                (RawValueProtocol.read, JSONProtocol.write))
-        self.assertMethodsEqual(mr_job.pick_protocols(0, 'reducer'),
-                               (JSONProtocol.read, JSONProtocol.write))
+
+        self.assertMethodsEqual(
+            mr_job.pick_protocols(0, 'mapper'),
+            (RawValueProtocol.read, JSONProtocol.write))
+
+        self.assertMethodsEqual(
+            mr_job.pick_protocols(0, 'reducer'),
+            (StandardJSONProtocol.read, JSONProtocol.write))
 
     def test_explicit_default_protocols(self):
         mr_job2 = self.MRBoringJob2().sandbox()
@@ -273,8 +281,9 @@ class ProtocolsTestCase(TestCase):
         mr_job.sandbox(stdin=JSON_INPUT)
         mr_job.run_reducer()
 
-        self.assertEqual(mr_job.stdout.getvalue(),
-                         (b'"foo"\t["bar", "baz"]\n' +
+        # ujson doesn't add whitespace to JSON
+        self.assertEqual(mr_job.stdout.getvalue().replace(b' ', b''),
+                         (b'"foo"\t["bar","baz"]\n' +
                           b'"bar"\t["qux"]\n'))
 
     def test_output_protocol_with_no_final_reducer(self):
@@ -292,8 +301,16 @@ class ProtocolsTestCase(TestCase):
 
 class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
 
+    class MRBoringReprAndJSONJob(MRBoringJob):
+        # allowing reading in bytes that can't be JSON-encoded
+        INPUT_PROTOCOL = ReprValueProtocol
+        INTERNAL_PROTOCOL = StandardJSONProtocol
+        OUTPUT_PROTOCOL = StandardJSONProtocol
+
     class MRBoringJSONJob(MRJob):
-        INPUT_PROTOCOL = JSONProtocol
+        INPUT_PROTOCOL = StandardJSONProtocol
+        INTERNAL_PROTOCOL = StandardJSONProtocol
+        OUTPUT_PROTOCOL = StandardJSONProtocol
 
         def reducer(self, key, values):
             yield(key, list(values))
@@ -303,9 +320,9 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
                       b'"too"\t"many"\t"tabs"\n' +
                       b'"notabs"\n')
 
-    UNENCODABLE_RAW_INPUT = (b'foo\n' +
-                             b'\xaa\n' +
-                             b'bar\n')
+    UNENCODABLE_REPR_INPUT = (b"'foo'\n" +
+                              b'set()\n' +
+                              b"'bar'\n")
 
     STRICT_MRJOB_CONF ={'runners': {'inline': {'strict_protocols': True}}}
 
@@ -319,7 +336,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             # good data should still get through
             self.assertEqual(b''.join(r.stream_output()), b'"foo"\t["bar"]\n')
 
-            # exception type varies between versions of json/simplejson,
+            # exception type varies between JSON implementations,
             # so just make sure there were three exceptions of some sort
             counters = r.counters()[0]
             self.assertEqual(sorted(counters), ['Undecodable input'])
@@ -334,8 +351,8 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertRaises(Exception, r.run)
 
     def assertJobHandlesUnencodableOutput(self, job_args):
-        job = MRBoringJob(job_args)
-        job.sandbox(stdin=BytesIO(self.UNENCODABLE_RAW_INPUT))
+        job = self.MRBoringReprAndJSONJob(job_args)
+        job.sandbox(stdin=BytesIO(self.UNENCODABLE_REPR_INPUT))
 
         with job.make_runner() as r:
             r.run()
@@ -344,21 +361,22 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertEqual(b''.join(r.stream_output()),
                              b'null\t["bar", "foo"]\n')
 
-            # exception type varies between versions of json/simplejson,
-            # so just make sure there were three exceptions of some sort
             counters = r.counters()[0]
-            self.assertEqual(counters,
-                             {'Unencodable output': {'UnicodeDecodeError': 1}})
+
+            # there should be one Unencodable output error. Exception
+            # type may vary by json implementation
+            self.assertEqual(list(counters), ['Unencodable output'])
+            self.assertEqual(list(counters['Unencodable output'].values()), [1])
 
     def assertJobRaisesExceptionOnUnencodableOutput(self, job_args):
-        job = MRBoringJob(job_args)
-        job.sandbox(stdin=BytesIO(self.UNENCODABLE_RAW_INPUT))
+        job = self.MRBoringReprAndJSONJob(job_args)
+        job.sandbox(stdin=BytesIO(self.UNENCODABLE_REPR_INPUT))
 
         with job.make_runner() as r:
             self.assertRaises(Exception, r.run)
 
     def test_undecodable_input(self):
-        self.assertJobHandlesUndecodableInput(job_args=[])
+        self.assertJobRaisesExceptionOnUndecodableInput(job_args=[])
 
     def test_undecodable_input_strict(self):
         self.assertJobRaisesExceptionOnUndecodableInput(
@@ -375,7 +393,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
                 job_args=['--no-strict-protocols'])
 
     def test_unencodable_output(self):
-        self.assertJobHandlesUnencodableOutput(job_args=[])
+        self.assertJobRaisesExceptionOnUnencodableOutput(job_args=[])
 
     def test_unencodable_output_strict(self):
         self.assertJobRaisesExceptionOnUnencodableOutput(
@@ -397,7 +415,7 @@ class PickProtocolsTestCase(TestCase):
     def _yield_none(self, *args, **kwargs):
         yield None
 
-    def _make_job(self, steps_desc, strict_protocols=False):
+    def _make_job(self, steps):
 
         class CustomJob(MRJob):
 
@@ -405,124 +423,121 @@ class PickProtocolsTestCase(TestCase):
             INTERNAL_PROTOCOL = JSONProtocol
             OUTPUT_PROTOCOL = JSONValueProtocol
 
-            def _steps_desc(self):
-                return steps_desc
+            def steps(self):
+                return steps
 
         args = ['--no-conf']
 
-        # tests that only use script steps should use strict_protocols so bad
-        # internal behavior causes exceptions
-        if strict_protocols:
-            args.append('--strict-protocols')
-
         return CustomJob(args)
 
-    def _assert_script_protocols(self, steps_desc, expected_protocols,
-                                 strict_protocols=False):
+    def _assert_script_protocols(self, steps, expected_protocols):
         """Given a list of (read_protocol_class, write_protocol_class) tuples
         for *each substep*, assert that the given _steps_desc() output for each
         substep matches the protocols in order
         """
-        j = self._make_job(steps_desc, strict_protocols)
-        for i, step in enumerate(steps_desc):
-            if step['type'] == 'jar':
-                expect_read, expect_write = expected_protocols.pop(0)
-                # step_type for a non-script step is undefined, and in general
-                # these values should just be RawValueProtocol instances, but
-                # we'll leave those checks to the actual tests.
-                actual_read, actual_write = j._pick_protocol_instances(i, '?')
-                self.assertIsInstance(actual_read, expect_read)
-                self.assertIsInstance(actual_write, expect_write)
+        j = self._make_job(steps)
+        for i, step in enumerate(steps):
+            expected_step = expected_protocols[i]
+            step_desc = step.description(i)
+
+            if step_desc['type'] == 'jar':
+                # step_type for a non-script step is undefined
+                self.assertIsNone(expected_step)
             else:
                 for substep_key in ('mapper', 'combiner', 'reducer'):
-                    if substep_key in step:
-                        expect_read, expect_write = expected_protocols.pop(0)
-                        actual_read, actual_write = j._pick_protocol_instances(
-                            i, substep_key)
-                        self.assertIsInstance(actual_read, expect_read)
-                        self.assertIsInstance(actual_write, expect_write)
+                    if substep_key in step_desc:
+                        self.assertIn(substep_key, expected_step)
+                        expected_substep = expected_step[substep_key]
+
+                        try:
+                            actual_read, actual_write = (
+                                j._pick_protocol_instances(i, substep_key))
+                        except ValueError:
+                            self.assertIsNone(expected_substep)
+                        else:
+                            expected_read, expected_write = expected_substep
+                            self.assertIsInstance(actual_read, expected_read)
+                            self.assertIsInstance(actual_write, expected_write)
+                    else:
+                        self.assertNotIn(substep_key, expected_step)
 
     def test_single_mapper(self):
         self._assert_script_protocols(
-            [MRStep(mapper=self._yield_none).description(0)],
-            [(PickleProtocol, JSONValueProtocol)],
-            strict_protocols=True)
+            [MRStep(mapper=self._yield_none)],
+            [dict(mapper=(PickleProtocol, JSONValueProtocol))])
 
     def test_single_reducer(self):
         # MRStep transparently adds mapper
         self._assert_script_protocols(
-            [MRStep(reducer=self._yield_none).description(0)],
-            [(PickleProtocol, JSONProtocol),
-             (JSONProtocol, JSONValueProtocol)],
-            strict_protocols=True)
+            [MRStep(reducer=self._yield_none)],
+            [dict(mapper=(PickleProtocol, JSONProtocol),
+                  reducer=(JSONProtocol, JSONValueProtocol))])
 
     def test_mapper_combiner(self):
         self._assert_script_protocols(
             [MRStep(mapper=self._yield_none,
-                    combiner=self._yield_none).description(0)],
-            [(PickleProtocol, JSONValueProtocol),
-             (JSONValueProtocol, JSONValueProtocol)],
-            strict_protocols=True)
+                    combiner=self._yield_none)],
+            [dict(mapper=(PickleProtocol, JSONValueProtocol),
+                  combiner=(JSONValueProtocol, JSONValueProtocol))])
 
     def test_mapper_combiner_reducer(self):
         self._assert_script_protocols(
             [MRStep(
                 mapper=self._yield_none,
                 combiner=self._yield_none,
-                reducer=self._yield_none).description(0)],
-            [(PickleProtocol, JSONProtocol),
-             (JSONProtocol, JSONProtocol),
-             (JSONProtocol, JSONValueProtocol)],
-            strict_protocols=True)
+                reducer=self._yield_none)],
+            [dict(mapper=(PickleProtocol, JSONProtocol),
+                  combiner=(JSONProtocol, JSONProtocol),
+                  reducer=(JSONProtocol, JSONValueProtocol))])
 
     def test_begin_jar_step(self):
         self._assert_script_protocols(
-            [JarStep(jar='binks_jar.jar').description(0),
+            [JarStep(jar='binks_jar.jar'),
              MRStep(
                  mapper=self._yield_none,
                  combiner=self._yield_none,
-                 reducer=self._yield_none).description(1)],
-            [(RawValueProtocol, RawValueProtocol),
-             (PickleProtocol, JSONProtocol),
-             (JSONProtocol, JSONProtocol),
-             (JSONProtocol, JSONValueProtocol)])
+                 reducer=self._yield_none)],
+            [None,
+             dict(mapper=(PickleProtocol, JSONProtocol),
+                  combiner=(JSONProtocol, JSONProtocol),
+                  reducer=(JSONProtocol, JSONValueProtocol))])
 
     def test_end_jar_step(self):
         self._assert_script_protocols(
             [MRStep(
                 mapper=self._yield_none,
                 combiner=self._yield_none,
-                reducer=self._yield_none).description(0),
-             JarStep(jar='binks_jar.jar').description(1)],
-            [(PickleProtocol, JSONProtocol),
-             (JSONProtocol, JSONProtocol),
-             (JSONProtocol, JSONValueProtocol),
-             (RawValueProtocol, RawValueProtocol)])
+                reducer=self._yield_none),
+             JarStep(jar='binks_jar.jar')],
+            [dict(mapper=(PickleProtocol, JSONProtocol),
+                  combiner=(JSONProtocol, JSONProtocol),
+                  reducer=(JSONProtocol, JSONValueProtocol)),
+             None])
 
     def test_middle_jar_step(self):
         self._assert_script_protocols(
             [MRStep(
                 mapper=self._yield_none,
-                combiner=self._yield_none).description(0),
-             JarStep(jar='binks_jar.jar').description(1),
-             MRStep(reducer=self._yield_none).description(2)],
-            [(PickleProtocol, JSONProtocol),
-             (JSONProtocol, JSONProtocol),
-             (RawValueProtocol, RawValueProtocol),
-             (JSONProtocol, JSONValueProtocol)])
+                combiner=self._yield_none),
+             JarStep(jar='binks_jar.jar'),
+             MRStep(reducer=self._yield_none)],
+            [dict(mapper=(PickleProtocol, JSONProtocol),
+                  combiner=(JSONProtocol, JSONProtocol)),
+             None,
+             dict(reducer=(JSONProtocol, JSONValueProtocol))])
 
     def test_single_mapper_cmd(self):
         self._assert_script_protocols(
-            [MRStep(mapper_cmd='cat').description(0)],
-            [(RawValueProtocol, RawValueProtocol)])
+            [MRStep(mapper_cmd='cat')],
+            [dict(mapper=None)])
 
     def test_single_mapper_cmd_with_script_combiner(self):
         self._assert_script_protocols(
             [MRStep(
                 mapper_cmd='cat',
-                combiner=self._yield_none).description(0)],
-            [(RawValueProtocol, RawValueProtocol),
-             (RawValueProtocol, RawValueProtocol)])
+                combiner=self._yield_none)],
+            [dict(mapper=None,
+                  combiner=(RawValueProtocol, RawValueProtocol))])
 
     def test_single_mapper_cmd_with_script_reducer(self):
         # reducer is only script step so it uses INPUT_PROTOCOL and
@@ -530,22 +545,22 @@ class PickProtocolsTestCase(TestCase):
         self._assert_script_protocols(
             [MRStep(
                 mapper_cmd='cat',
-                reducer=self._yield_none).description(0)],
-            [(RawValueProtocol, RawValueProtocol),
-             (PickleProtocol, JSONValueProtocol)])
+                reducer=self._yield_none)],
+            [dict(mapper=None,
+                  reducer=(PickleProtocol, JSONValueProtocol))])
 
     def test_multistep(self):
         # reducer is only script step so it uses INPUT_PROTOCOL and
         # OUTPUT_PROTOCOL
         self._assert_script_protocols(
             [MRStep(mapper_cmd='cat',
-                    reducer=self._yield_none).description(0),
-             JarStep(jar='binks_jar.jar').description(1),
-             MRStep(mapper=self._yield_none).description(2)],
-            [(RawValueProtocol, RawValueProtocol),
-             (PickleProtocol, JSONProtocol),
-             (RawValueProtocol, RawValueProtocol),
-             (JSONProtocol, JSONValueProtocol)])
+                    reducer=self._yield_none),
+             JarStep(jar='binks_jar.jar'),
+             MRStep(mapper=self._yield_none)],
+            [dict(mapper=None,
+                  reducer=(PickleProtocol, JSONProtocol)),
+             None,
+             dict(mapper=(JSONProtocol, JSONValueProtocol))])
 
 
 class JobConfTestCase(TestCase):

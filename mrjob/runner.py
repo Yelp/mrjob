@@ -16,6 +16,7 @@
 import copy
 import datetime
 import getpass
+import json
 import logging
 import os
 import os.path
@@ -30,13 +31,6 @@ from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
-
-try:
-    import simplejson as json
-    JSONDecodeError = json.JSONDecodeError
-except:
-    import json
-    JSONDecodeError = ValueError
 
 from mrjob.compat import add_translated_jobconf_for_hadoop_version
 from mrjob.compat import supports_combiners_in_hadoop_streaming
@@ -189,12 +183,13 @@ class RunnerOptionStore(OptionStore):
         return combine_dicts(super_opts, {
             'base_tmp_dir': tempfile.gettempdir(),
             'bootstrap_mrjob': True,
+            'check_input_paths': True,
             'cleanup': ['ALL'],
             'cleanup_on_failure': ['NONE'],
             'hadoop_version': '0.20',
             'owner': owner,
             'sh_bin': ['sh', '-ex'],
-            'check_input_paths': True
+            'strict_protocols': True,
         })
 
     def _validate_cleanup(self):
@@ -746,7 +741,7 @@ class MRJobRunner(object):
 
                 try:
                     steps = json.loads(stdout)
-                except JSONDecodeError:
+                except ValueError:
                     raise ValueError("Bad --steps response: \n%s" % stdout)
 
                 # verify that this is a proper step description
@@ -892,16 +887,17 @@ class MRJobRunner(object):
 
     def _get_strict_protocols_args(self):
         """Arguments used to control protocol behavior in the job.
+
+        This just adds --no-strict-protocols when strict_protocols
+        is false.
         """
         # These are only in the runner so that we can default them from
         # mrjob.conf, which will allow us to eventually remove them.
         # See issue #726.
-        if self._opts['strict_protocols']:
-            return ['--strict-protocols']
-        elif self._opts['strict_protocols'] is None:
-            return []
-        else:
+        if not self._opts['strict_protocols']:
             return ['--no-strict-protocols']
+        else:
+            return []
 
     def _create_setup_wrapper_script(self, dest='setup-wrapper.sh'):
         """Create the wrapper script, and write it into our local temp

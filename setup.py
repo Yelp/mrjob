@@ -21,6 +21,10 @@ try:
     setup  # quiet "redefinition of unused ..." warning from pyflakes
     # arguments that distutils doesn't understand
     setuptools_kwargs = {
+        'extras_require': {
+            # highly recommended, but requires a compiler
+            'ujson': ['ujson'],
+        },
         'install_requires': [
             'PyYAML',
             'filechunkio',
@@ -29,10 +33,6 @@ try:
         'test_suite': 'tests.suite.load_tests',
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
-
-    # ujson is recommended, but requires CPython
-    if platform.python_implementation() == 'CPython':
-        setuptools_kwargs['install_requires'].append('ujson')
 
     # mock is included in Python 3.3 as unittest.mock
     if sys.version_info < (3, 3):

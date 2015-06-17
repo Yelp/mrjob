@@ -8,8 +8,9 @@ python:
   - "pypy3"
 matrix:
   fast_finish: true
-# command to install dependencies
+# command to install dependencies. We definitely want to test against
+# ujson, but it isn't available on PyPy.
 install:
-  - "pip install . --use-mirrors"
+  - "pip install .; pip install ujson || true"
 # command to run tests
 script: python setup.py test

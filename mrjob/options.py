@@ -120,7 +120,7 @@ def add_runner_opts(opt_group, default_runner='local'):
 
         opt_group.add_option(
             '--interpreter', dest='interpreter', default=None,
-            help=("Interpreter to run your script, e.g. python or ruby.")),
+            help=('Non-python interpreter to run your script, e.g. "ruby".')),
 
         opt_group.add_option(
             '--job-name', dest='job_name', default=None,
@@ -155,9 +155,9 @@ def add_runner_opts(opt_group, default_runner='local'):
 
         opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
-            help=("Deprecated. Name/path of alternate python binary for"
-                  " wrapper script and Python mappers/reducers. You can"
-                  " include arguments, e.g. --python-bin 'python -v'")),
+            help=('Name/path of alternate python binary for Python'
+                  ' mappers/reducers. You can'
+                  ' include arguments, e.g. --python-bin "python -v"')),
 
         opt_group.add_option(
             '-r', '--runner', dest='runner', default=default_runner,
@@ -192,13 +192,13 @@ def add_runner_opts(opt_group, default_runner='local'):
 
         opt_group.add_option(
             '--steps-interpreter', dest='steps_interpreter', default=None,
-            help=("Name/path of alternate interpreter binary to use to query"
+            help=("Name/path of alternate (non-Python) binary to use to query"
                   " the job about its steps, if different from --interpreter."
                   " Rarely needed.")),
 
         opt_group.add_option(
             '--steps-python-bin', dest='steps_python_bin', default=None,
-            help=('Deprecated. Name/path of alternate python binary to use to'
+            help=('Name/path of alternate python binary to use to'
                   ' query the job about its steps, if different from the'
                   ' current Python interpreter. Rarely needed.')),
     ]

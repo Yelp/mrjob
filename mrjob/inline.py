@@ -112,6 +112,8 @@ class InlineMRJobRunner(SimMRJobRunner):
         """Redefine this so that we can get step descriptions without
         calling a subprocess."""
         if self._steps is None:
+            self._warn_if_strict_protocols_not_set()
+
             job_args = ['--steps'] + self._mr_job_extra_args(local=True)
             self._steps = self._mrjob_cls(args=job_args)._steps_desc()
 

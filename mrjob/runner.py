@@ -722,7 +722,7 @@ class MRJobRunner(object):
             if not self._script_path:
                 self._steps = []
             else:
-                args = (self._executable(True) + ['--steps'] +
+                args = (self.interpreter(True) + ['--steps'] +
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))
                 # add . to PYTHONPATH (in case mrjob isn't actually installed)
@@ -765,7 +765,7 @@ class MRJobRunner(object):
         """Get the number of steps (calls :py:meth:`get_steps`)."""
         return len(self._get_steps())
 
-    def _executable(self, steps=False):
+    def interpreter(self, steps=False):
         # default behavior is to always use an interpreter. local, emr, and
         # hadoop runners check for executable script paths and prepend the
         # working_dir, discarding the interpreter if possible.
@@ -778,7 +778,7 @@ class MRJobRunner(object):
     def _script_args_for_step(self, step_num, mrc):
         assert self._script_path
 
-        args = self._executable() + [
+        args = self.interpreter() + [
             '--step-num=%d' % step_num,
             '--%s' % mrc,
         ] + self._mr_job_extra_args()

@@ -765,15 +765,18 @@ class MRJobRunner(object):
         """Get the number of steps (calls :py:meth:`get_steps`)."""
         return len(self._get_steps())
 
-    def _executable(self, steps=False):
-        # default behavior is to always use an interpreter. local, emr, and
-        # hadoop runners check for executable script paths and prepend the
-        # working_dir, discarding the interpreter if possible.
+    def _interpreter(self, steps=False):
         if steps:
-            return self._opts['steps_interpreter'] + [self._script_path]
+            return self._opts['steps_interpreter']
         else:
-            return (self._opts['interpreter'] +
-                    [self._working_dir_mgr.name('file', self._script_path)])
+            return self._opts['interpreter']
+
+    def _executable(self, steps=False):
+        if steps:
+            return self._interpreter(steps=True) + [self._script_path]
+        else:
+            return self._interpreter() + [
+                self._working_dir_mgr.name('file', self._script_path)]
 
     def _script_args_for_step(self, step_num, mrc):
         assert self._script_path

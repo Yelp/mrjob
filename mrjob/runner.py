@@ -180,7 +180,6 @@ class RunnerOptionStore(OptionStore):
 
         return combine_dicts(super_opts, {
             'base_tmp_dir': tempfile.gettempdir(),
-            'bootstrap_mrjob': True,
             'check_input_paths': True,
             'cleanup': ['ALL'],
             'cleanup_on_failure': ['NONE'],
@@ -909,7 +908,7 @@ class MRJobRunner(object):
 
         setup = self._setup
 
-        if self._opts['bootstrap_mrjob'] and self.BOOTSTRAP_MRJOB_IN_SETUP:
+        if self._bootstrap_mrjob() and self.BOOTSTRAP_MRJOB_IN_SETUP:
             # patch setup to add mrjob.tar.gz to PYTYHONPATH
             mrjob_tar_gz = self._create_mrjob_tar_gz()
             path_dict = {'type': 'archive', 'name': None, 'path': mrjob_tar_gz}
@@ -1044,6 +1043,13 @@ class MRJobRunner(object):
         writeln('"$@"')
 
         return out
+
+    def _bootstrap_mrjob(self):
+        """Should we bootstrap mrjob?"""
+        if self._opts['bootstrap_mrjob'] is None:
+            return self._opts['interpreter'] is None
+        else:
+            return bool(self._opts['bootstrap_mrjob'])
 
     def _get_input_paths(self):
         """Get the paths to input files, dumping STDIN to a local

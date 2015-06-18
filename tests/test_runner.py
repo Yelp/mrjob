@@ -836,3 +836,24 @@ class InterpreterTestCase(TestCase):
                              steps_python_bin=['python', '-v'])
         self.assertEqual(runner._interpreter(), ['ruby'])
         self.assertEqual(runner._interpreter(steps=True), ['ruby'])
+
+
+class BootstrapMRJobTestCase(TestCase):
+    # this just tests _bootstrap_mrjob() (i.e. whether to bootstrap mrjob);
+    # actual testing of bootstrapping is in test_local
+
+    def test_default(self):
+        runner = MRJobRunner()
+        self.assertEqual(runner._bootstrap_mrjob(), True)
+
+    def test_no_bootstrap_mrjob(self):
+        runner = MRJobRunner(bootstrap_mrjob=False)
+        self.assertEqual(runner._bootstrap_mrjob(), False)
+
+    def test_interpreter(self):
+        runner = MRJobRunner(interpreter=['ruby'])
+        self.assertEqual(runner._bootstrap_mrjob(), False)
+
+    def test_bootstrap_mrjob_overrides_interpreter(self):
+        runner = MRJobRunner(interpreter=['ruby'], bootstrap_mrjob=True)
+        self.assertEqual(runner._bootstrap_mrjob(), True)

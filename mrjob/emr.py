@@ -862,7 +862,7 @@ class EMRJobRunner(MRJobRunner):
         persistent -- set by make_persistent_job_flow()
         """
         # lazily create mrjob.tar.gz
-        if self._opts['bootstrap_mrjob']:
+        if self._bootstrap_mrjob():
             self._create_mrjob_tar_gz()
             self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path)
 
@@ -2023,12 +2023,12 @@ class EMRJobRunner(MRJobRunner):
         # Also don't bother if we're not bootstrapping
         if not (self._bootstrap or self._legacy_bootstrap or
                 self._opts['bootstrap_files'] or
-                self._opts['bootstrap_mrjob']):
+                self._bootstrap_mrjob()):
             return
 
         # create mrjob.tar.gz if we need it, and add commands to install it
         mrjob_bootstrap = []
-        if self._opts['bootstrap_mrjob']:
+        if self._bootstrap_mrjob():
             # _add_bootstrap_files_for_upload() should have done this
             assert self._mrjob_tar_gz_path
             path_dict = {
@@ -2500,10 +2500,10 @@ class EMRJobRunner(MRJobRunner):
             self._bootstrap,
             self._bootstrap_actions,
             self._opts['bootstrap_cmds'],
-            self._opts['bootstrap_mrjob'],
+            self._bootstrap_mrjob(),
         ]
 
-        if self._opts['bootstrap_mrjob']:
+        if self._bootstrap_mrjob():
             things_to_hash.append(mrjob.__version__)
 
         things_json = json.dumps(things_to_hash, sort_keys=True)

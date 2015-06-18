@@ -200,9 +200,15 @@ Job execution context
     :set: all
     :default: ``None``
 
-    Interpreter to launch your script with (e.g. ``'ruby'``). Change this if
-    you're using a language other than Python. This will also be used to
-    query the script about steps unless you set :mrjob-opt:`steps_interpreter`.
+    Non-Python command to launch your script with (e.g. ``'ruby'``).
+    This will also be used to query the script about steps unless you set
+    :mrjob-opt:`steps_interpreter`.
+
+    If you want to use an alternate Python command to run the job, use
+    :mrjob-opt:`python_bin`.
+
+    This takes precedence over :mrjob-opt:`python_bin` and
+    :mrjob-opt:`steps_python_bin`.
 
 .. mrjob-opt::
     :config: python_bin
@@ -214,6 +220,12 @@ Job execution context
     Name/path of alternate Python binary for wrapper scripts and
     mappers/reducers (e.g. ``'python -v'``). This defaults to ``'python'`` if
     you're in Python 2 and ``'python3'`` if you're in Python 3.
+
+    This option also affects which Python binary is used for file locking in
+    :mrjob-opt:`setup` scripts, so it might be useful to set even if you're
+    using a non-Python :mrjob-opt:`interpreter`. It's also used by
+    :py:class:`~mrjob.emr.EMRJobRunner` to compile mrjob after bootstrapping it
+    (see :mrjob-opt:`bootstrap_mrjob`).
 
     Unlike :mrjob-opt:`interpreter`, this does not affect the binary used to
     query the job about its steps (use :mrjob-opt:`steps_python_bin`).
@@ -300,8 +312,13 @@ Job execution context
     :set: all
     :default: current Python interpreter
 
-    Name/path of alternate (non-Python) binary to use to query the job about
-    its steps.
+    Alternate (non-Python) command to use to query the job about
+    its steps. Usually it's good enough to set :mrjob-opt:`interpreter`.
+
+    If you want to use an alternate Python command to get the job's steps,
+    use :mrjob-opt:`steps_python_bin`.
+
+    This takes precedence over :mrjob-opt:`steps_python_bin`.
 
 .. mrjob-opt::
     :config: steps_python_bin

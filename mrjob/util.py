@@ -88,7 +88,7 @@ def buffer_iterator_to_line_iterator(iterator):
             if leftovers:
                 leftovers.append(chunk[start:end])
                 yield b''.join(leftovers)
-                del leftovers[:]  # clear out the leftovers list
+                leftovers = []
             else:
                 yield chunk[start:end]
 

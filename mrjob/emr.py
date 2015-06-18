@@ -1359,13 +1359,19 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['additional_emr_info']:
             args['additional_info'] = self._opts['additional_emr_info']
 
-        args['visible_to_all_users'] = self._opts['visible_to_all_users']
+        # boto's connect_emr() has keyword args for these, but they override
+        # emr_api_params, which is not what we want.
+        api_params = {}
 
-        args['job_flow_role'] = self._instance_profile()
-        args['service_role'] = self._service_role()
+        api_params['VisibleToAllUsers'] = self._opts['visible_to_all_users']
+
+        api_params['JobFlowRole'] = self._instance_profile()
+        api_params['ServiceRole'] = self._service_role()
 
         if self._opts['emr_api_params']:
-            args['api_params'] = self._opts['emr_api_params']
+            api_params.update(self._opts['emr_api_params'])
+
+        args['api_params'] = api_params
 
         if steps:
             args['steps'] = steps

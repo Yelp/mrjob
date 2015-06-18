@@ -618,7 +618,8 @@ class MockEmrConnection(object):
         if api_params:
             job_flow.api_params = api_params
             if 'VisibleToAllUsers' in api_params:
-                job_flow.visibletoallusers = api_params['VisibleToAllUsers']
+                job_flow.visibletoallusers = str(bool(
+                    api_params['VisibleToAllUsers'])).lower()
             if 'JobFlowRole' in api_params:
                 job_flow.jobflowrole = api_params['JobFlowRole']
             if 'ServiceRole' in api_params:

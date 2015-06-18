@@ -167,8 +167,6 @@ class RunnerOptionStore(OptionStore):
 
         self._validate_cleanup()
 
-        self._fix_interp_options()
-
         log.debug('Active configuration:')
         log.debug(pprint.pformat(self))
 
@@ -216,37 +214,6 @@ class RunnerOptionStore(OptionStore):
             ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_failure_error,
                          self['cleanup_on_failure'])
-
-    def _default_python_bin(self, local=False):
-        """The default python command. If local is true, try to use
-        sys.executable. Otherwise use 'python' or 'python3' as appropriate.
-
-        This returns a single-item list (because it's a command).
-        """
-        if local and sys.executable:
-            return [sys.executable]
-        elif PY2:
-            return ['python']
-        else:
-            # e.g. python3
-            return ['python%d' % sys.version_info[0]]
-
-    def _fix_interp_options(self):
-        if not self['steps_python_bin']:
-            self['steps_python_bin'] = (
-                self['python_bin'] or self._default_python_bin(local=True))
-
-        if not self['python_bin']:
-            self['python_bin'] = self._default_python_bin()
-
-        if not self['steps_interpreter']:
-            if self['interpreter']:
-                self['steps_interpreter'] = self['interpreter']
-            else:
-                self['steps_interpreter'] = self['steps_python_bin']
-
-        if not self['interpreter']:
-            self['interpreter'] = self['python_bin']
 
 
 class MRJobRunner(object):
@@ -767,9 +734,14 @@ class MRJobRunner(object):
 
     def _interpreter(self, steps=False):
         if steps:
-            return self._opts['steps_interpreter']
+            return (self._opts['steps_interpreter'] or
+                    self._opts['interpreter'] or
+                    self._opts['steps_python_bin'] or
+                    self._default_python_bin(local=True))
         else:
-            return self._opts['interpreter']
+            return (self._opts['interpreter'] or
+                    self._opts['python_bin'] or
+                    self._default_python_bin(local=False))
 
     def _executable(self, steps=False):
         if steps:
@@ -777,6 +749,20 @@ class MRJobRunner(object):
         else:
             return self._interpreter() + [
                 self._working_dir_mgr.name('file', self._script_path)]
+
+    def _default_python_bin(self, local=False):
+        """The default python command. If local is true, try to use
+        sys.executable. Otherwise use 'python' or 'python3' as appropriate.
+
+        This returns a single-item list (because it's a command).
+        """
+        if local and sys.executable:
+            return [sys.executable]
+        elif PY2:
+            return ['python']
+        else:
+            # e.g. python3
+            return ['python%d' % sys.version_info[0]]
 
     def _script_args_for_step(self, step_num, mrc):
         assert self._script_path

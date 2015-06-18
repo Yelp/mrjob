@@ -28,6 +28,7 @@ from subprocess import CalledProcessError
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import JOB_NAME_RE
+from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.runner import MRJobRunner
 from mrjob.util import log_to_stream
@@ -787,3 +788,51 @@ class ClosedRunnerTestCase(EmptyMrjobConfTestCase):
             # do nothing
             self.assertFalse(runner._closed)
         self.assertTrue(runner._closed)
+
+
+class InterpreterTestCase(TestCase):
+
+    def default_python_bin(self):
+        return ['python'] if PY2 else ['python3']
+
+    def test_default(self):
+        runner = MRJobRunner()
+        self.assertEqual(runner._interpreter(),
+                         self.default_python_bin())
+        self.assertEqual(runner._interpreter(steps=True),
+                         [sys.executable])
+
+    def test_python_bin(self):
+        runner = MRJobRunner(python_bin=['python', '-v'])
+        self.assertEqual(runner._interpreter(), ['python', '-v'])
+        self.assertEqual(runner._interpreter(steps=True), [sys.executable])
+
+    def test_steps_python_bin(self):
+        runner = MRJobRunner(steps_python_bin=['python', '-v'])
+        self.assertEqual(runner._interpreter(),
+                         self.default_python_bin())
+        self.assertEqual(runner._interpreter(steps=True), ['python', '-v'])
+
+    def test_interpreter(self):
+        runner = MRJobRunner(interpreter=['ruby'])
+        self.assertEqual(runner._interpreter(), ['ruby'])
+        self.assertEqual(runner._interpreter(steps=True), ['ruby'])
+
+    def test_steps_interpreter(self):
+        # including whether steps_interpreter overrides interpreter
+        runner = MRJobRunner(interpreter=['ruby', '-v'],
+                             steps_interpreter=['ruby'])
+        self.assertEqual(runner._interpreter(), ['ruby', '-v'])
+        self.assertEqual(runner._interpreter(steps=True), ['ruby'])
+
+    def test_interpreter_overrides_python_bin(self):
+        runner = MRJobRunner(interpreter=['ruby'],
+                             python_bin=['python', '-v'])
+        self.assertEqual(runner._interpreter(), ['ruby'])
+        self.assertEqual(runner._interpreter(steps=True), ['ruby'])
+
+    def test_interpreter_overrides_steps_python_bin(self):
+        runner = MRJobRunner(interpreter=['ruby'],
+                             steps_python_bin=['python', '-v'])
+        self.assertEqual(runner._interpreter(), ['ruby'])
+        self.assertEqual(runner._interpreter(steps=True), ['ruby'])

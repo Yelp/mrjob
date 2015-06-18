@@ -31,7 +31,6 @@ from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
-from time import sleep
 
 from mrjob.compat import add_translated_jobconf_for_hadoop_version
 from mrjob.compat import supports_combiners_in_hadoop_streaming
@@ -676,20 +675,6 @@ class MRJobRunner(object):
             label, owner,
             now.strftime('%Y%m%d.%H%M%S'), now.microsecond)
 
-    def _warn_if_strict_protocols_not_set(self):
-        """If strict_protocols isn't set, warn about changing defaults
-        in v0.5.0. Call this from _get_steps()."""
-        if self._opts['strict_protocols'] is None:
-            log.warning('')
-            log.warning(
-                "PLEASE NOTE:"
-                " Starting in mrjob v0.5.0, protocols will be strict by"
-                " default. It's recommended you run your job with"
-                " --strict-protocols or set up mrjob.conf as described at"
-                " https://pythonhosted.org/mrjob/whats-new.html"
-                "#ready-for-strict-protocols")
-            log.warning('')
-
     def _get_steps(self):
         """Call the job script to find out how many steps it has, and whether
         there are mappers and reducers for each step. Validate its
@@ -700,8 +685,6 @@ class MRJobRunner(object):
         Results are cached, so call this as many times as you want.
         """
         if self._steps is None:
-            self._warn_if_strict_protocols_not_set()
-
             if not self._script_path:
                 self._steps = []
             else:

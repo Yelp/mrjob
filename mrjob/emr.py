@@ -425,7 +425,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ssh_bind_ports': list(range(40001, 40841)),
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
-            'visible_to_all_users': False,
+            'visible_to_all_users': True,
         })
 
     def _fix_ec2_instance_opts(self):
@@ -1359,21 +1359,13 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['additional_emr_info']:
             args['additional_info'] = self._opts['additional_emr_info']
 
-        if (self._opts['visible_to_all_users'] and
-            'VisibleToAllUsers' not in self._opts['emr_api_params']):  # noqa
+        args['visible_to_all_users'] = self._opts['visible_to_all_users']
 
-            self._opts['emr_api_params']['VisibleToAllUsers'] = (
-                'true' if self._opts['visible_to_all_users'] else 'false')
+        args['job_flow_role'] = self._instance_profile()
+        args['service_role'] = self._service_role()
 
         if self._opts['emr_api_params']:
             args['api_params'] = self._opts['emr_api_params']
-
-        # instance profile and service role are required for accounts
-        # created after April 6, 2015, and will eventually be required
-        # for all accounts
-        api_params = args.setdefault('api_params', {})
-        api_params['JobFlowRole'] = self._instance_profile()
-        api_params['ServiceRole'] = self._service_role()
 
         if steps:
             args['steps'] = steps

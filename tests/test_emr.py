@@ -609,11 +609,27 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
 
     def test_defaults(self):
         job_flow = self.run_and_get_job_flow()
+        self.assertEqual(job_flow.visibletoallusers, 'true')
+
+    def test_no_visible(self):
+        job_flow = self.run_and_get_job_flow('--no-visible-to-all-users')
         self.assertEqual(job_flow.visibletoallusers, 'false')
 
-    def test_visible(self):
-        job_flow = self.run_and_get_job_flow('--visible-to-all-users')
-        self.assertTrue(job_flow.visibletoallusers, 'true')
+    def test_force_to_bool(self):
+        # make sure mockboto doesn't always convert to bool
+        api_param_job_flow = self.run_and_get_job_flow(
+            '--emr-api-param', 'VisibleToAllUsers=1')
+        self.assertEqual(api_param_job_flow.visibletoallusers, '1')
+
+        VISIBLE_MRJOB_CONF = {'runners': {'emr': {
+            'check_emr_status_every': 0.00,
+            's3_sync_wait_time': 0.00,
+            'visible_to_all_users': 1,  # should be True
+        }}}
+
+        with mrjob_conf_patcher(VISIBLE_MRJOB_CONF):
+            visible_job_flow = self.run_and_get_job_flow()
+            self.assertEqual(visible_job_flow.visibletoallusers, 'true')
 
 
 class IAMTestCase(MockEMRAndS3TestCase):

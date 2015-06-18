@@ -26,6 +26,7 @@ try:
             'ujson': ['ujson'],
         },
         'install_requires': [
+            'boto>=2.35.0',
             'PyYAML',
             'filechunkio',
         ],
@@ -41,16 +42,6 @@ try:
         # unittest2 is a backport of unittest from Python 2.7
         if sys.version_info < (2, 7):
             setuptools_kwargs['tests_require'].append('unittest2')
-
-    # boto
-    if sys.version_info < (3, 0):
-        # Officially, the 0.4.x series of mrjob supports boto back to v2.2.0
-        setuptools_kwargs['install_requires'].append('boto>=2.2.0')
-    else:
-        # boto didn't support Python 3 until v2.32.1. Since Python 3 support
-        # is new as of mrjob v0.4.5, there's no backward compatibility issue,
-        # so we might as well require the latest version of boto.
-        setuptools_kwargs['install_requires'].append('boto>=2.38.0')
 
 except ImportError:
     from distutils.core import setup

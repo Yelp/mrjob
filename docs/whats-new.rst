@@ -49,6 +49,8 @@ have the `filechunkio` module installed. You can change the limit/part size
 with the ``--s3-upload-part-size`` option, or disable multipart upload by
 setting this option to 0.
 
+.. _ready-for-strict-protocols:
+
 You can now require protocols to be strict from :ref:`mrjob.conf <mrjob.conf>`;
 this means unencodable input/output will result in an exception rather
 than the job quietly incrementing a counter. It is recommended you set this

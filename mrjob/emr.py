@@ -2040,7 +2040,7 @@ class EMRJobRunner(MRJobRunner):
                 "__mrjob_PYTHON_LIB=$(%s -c "
                 "'from distutils.sysconfig import get_python_lib;"
                 " print(get_python_lib())')" %
-                cmd_line(self._opts['python_bin'])])
+                cmd_line(self._python_bin())])
             # un-tar mrjob.tar.gz
             mrjob_bootstrap.append(
                 ['sudo tar xfz ', path_dict, ' -C $__mrjob_PYTHON_LIB'])
@@ -2050,7 +2050,7 @@ class EMRJobRunner(MRJobRunner):
             # sh_bin were 'sh -e')
             mrjob_bootstrap.append(
                 ['sudo %s -m compileall -f $__mrjob_PYTHON_LIB/mrjob && true' %
-                 cmd_line(self._opts['python_bin'])])
+                 cmd_line(self._python_bin())])
 
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)

@@ -66,38 +66,36 @@ def bash_wrap(cmd_str):
 def buffer_iterator_to_line_iterator(iterator):
     """boto's file iterator splits by buffer size instead of by newline. This
     wrapper puts them back into lines.
-
-    .. warning::
-
-        This may append a newline to your last chunk of data. In v0.5.0
-        it will not, for better compatibility with file objects.
     """
-    buf = b''
-    search_offset = 0
+    # we want to optimize for:
+    #
+    # chunks bigger than lines
+    # chunks that are lines (idempotency)
+
+    # list of chunks with no final newline
+    leftovers = []
+
     for chunk in iterator:
-        buf += chunk
-
-        # this is basically splitlines() without support for \r
         start = 0
-        while True:
-            end = buf.find(b'\n', start + search_offset) + 1
-            if end:  # if find() returned -1, end would be 0
-                yield buf[start:end]
-                start = end
-                # reset the search offset
-                search_offset = 0
-            else:
-                # this will happen eventually
-                buf = buf[start:]
 
-                # set search offset so we do not need to scan this part of
-                # the buffer again
-                search_offset = len(buf)
+        while start < len(chunk):
+            end = chunk.find(b'\n', start) + 1
+
+            if end == 0:  # no newlines found
+                leftovers.append(chunk[start:])
                 break
 
-    if buf:
-        # in v0.5.0, don't append the newline
-        yield buf + b'\n'
+            if leftovers:
+                leftovers.append(chunk[start:end])
+                yield b''.join(leftovers)
+                del leftovers[:]  # clear out the leftovers list
+            else:
+                yield chunk[start:end]
+
+            start = end
+
+    if leftovers:
+        yield b''.join(leftovers)
 
 
 def cmd_line(args):

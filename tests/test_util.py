@@ -60,19 +60,33 @@ class BufferIteratorToLineIteratorTestCase(TestCase):
             [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
              b'dogs.\n'])
 
-    def test_add_trailing_newline(self):
+    def test_empty_chunks(self):
+        self.assertEqual(
+            list(buffer_iterator_to_line_iterator(chunk for chunk in
+                                                  [b'',
+                                                   b'The quick\nbrown fox\nju',
+                                                   b'', b'', b'',
+                                                   b'mped over\nthe lazy\ndog',
+                                                   b'',
+                                                   b's.\n',
+                                                   b''])),
+            [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
+             b'dogs.\n'])
+
+    def test_no_trailing_newline(self):
         self.assertEqual(
             list(buffer_iterator_to_line_iterator(chunk for chunk in
                                                   [b'Alouette,\ngentille',
                                                    b' Alouette.'])),
-            [b'Alouette,\n', b'gentille Alouette.\n'])
+            [b'Alouette,\n', b'gentille Alouette.'])
 
     def test_long_lines(self):
         super_long_line = b'a' * 10000 + b'\n' + b'b' * 1000 + b'\nlast\n'
         self.assertEqual(
             list(buffer_iterator_to_line_iterator(
                 chunk for chunk in
-                (super_long_line[0+i:1024+i] for i in range(0, len(super_long_line), 1024)))),
+                (super_long_line[0+i:1024+i]
+                 for i in range(0, len(super_long_line), 1024)))),
             [b'a' * 10000 + b'\n', b'b' * 1000 + b'\n', b'last\n'])
 
 

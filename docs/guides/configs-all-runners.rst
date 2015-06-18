@@ -201,7 +201,8 @@ Job execution context
     :default: ``None``
 
     Interpreter to launch your script with (e.g. ``'ruby'``). Change this if
-    you're using a language other than Python.
+    you're using a language other than Python. This will also be used to
+    query the script about steps unless you set :mrjob-opt:`steps_interpreter`.
 
 .. mrjob-opt::
     :config: python_bin
@@ -211,8 +212,11 @@ Job execution context
     :default: (automatic)
 
     Name/path of alternate Python binary for wrapper scripts and
-    mappers/reducers. This defaults to ``'python'`` if you're in Python 2
-    and ``'python3'`` if you're in Python 3.
+    mappers/reducers (e.g. ``'python -v'``). This defaults to ``'python'`` if
+    you're in Python 2 and ``'python3'`` if you're in Python 3.
+
+    Unlike :mrjob-opt:`interpreter`, this does not affect the binary used to
+    query the job about its steps (use :mrjob-opt:`steps_python_bin`).
 
 .. mrjob-opt::
     :config: setup
@@ -297,21 +301,18 @@ Job execution context
     :default: current Python interpreter
 
     Name/path of alternate (non-Python) binary to use to query the job about
-    its steps. Defaults to :mrjob-opt:`interpreter`, if set.
+    its steps.
 
 .. mrjob-opt::
     :config: steps_python_bin
     :switch: --steps-python-bin
     :type: :ref:`command <data-type-command>`
     :set: all
-    :default: current Python interpreter
+    :default: (current Python interpreter)
 
     Name/path of alternate python binary to use to query the job about its
-    steps. Rarely needed. Defaults to ``sys.executable`` (the current Python
-    interpreter).
-
-    Unlike :mrjob-opt:`steps_interpreter`, this is unaffected by changes to
-    :mrjob-opt:`python_bin`.
+    steps. Rarely needed. If not set, we use ``sys.executable`` (the current
+    Python interpreter).
 
 .. mrjob-opt::
     :config: strict_protocols

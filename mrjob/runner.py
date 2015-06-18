@@ -736,12 +736,10 @@ class MRJobRunner(object):
         if steps:
             return (self._opts['steps_interpreter'] or
                     self._opts['interpreter'] or
-                    self._opts['steps_python_bin'] or
-                    self._default_python_bin(local=True))
+                    self._python_bin(steps=True))
         else:
             return (self._opts['interpreter'] or
-                    self._opts['python_bin'] or
-                    self._default_python_bin(local=False))
+                    self._python_bin())
 
     def _executable(self, steps=False):
         if steps:
@@ -749,6 +747,14 @@ class MRJobRunner(object):
         else:
             return self._interpreter() + [
                 self._working_dir_mgr.name('file', self._script_path)]
+
+    def _python_bin(self, steps=False):
+        if steps:
+            return (self._opts['steps_python_bin'] or
+                    self._default_python_bin(local=True))
+        else:
+            return (self._opts['python_bin'] or
+                    self._default_python_bin())
 
     def _default_python_bin(self, local=False):
         """The default python command. If local is true, try to use
@@ -1003,7 +1009,7 @@ class MRJobRunner(object):
         writeln('exec 9>/tmp/wrapper.lock.%s' % self._job_name)
         # would use flock(1), but it's not always available
         writeln("%s -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'" %
-                cmd_line(self._opts['python_bin']))
+                cmd_line(self._python_bin()))
         writeln()
 
         writeln('# setup commands')

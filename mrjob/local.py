@@ -281,5 +281,5 @@ class LocalMRJobRunner(SimMRJobRunner):
                 yield line
 
     def _default_python_bin(self, local=False):
-        return super(LocalRunnerOptionStore, self)._default_python_bin(
+        return super(LocalMRJobRunner, self)._default_python_bin(
             local=True)

@@ -76,13 +76,6 @@ def _chain_procs(procs_args, **kwargs):
     return procs
 
 
-class LocalRunnerOptionStore(SimRunnerOptionStore):
-
-    def _default_python_bin(self, local=False):
-        return super(LocalRunnerOptionStore, self)._default_python_bin(
-            local=True)
-
-
 class LocalMRJobRunner(SimMRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing purposes.
     Invoked when you run your job with ``-r local``.
@@ -98,8 +91,6 @@ class LocalMRJobRunner(SimMRJobRunner):
 
     """
     alias = 'local'
-
-    OPTION_STORE_CLASS = LocalRunnerOptionStore
 
     def __init__(self, **kwargs):
         """Arguments to this constructor may also appear in :file:`mrjob.conf`
@@ -288,3 +279,7 @@ class LocalMRJobRunner(SimMRJobRunner):
             for line in parsed['other']:
                 log.error('STDERR: %s' % line.rstrip('\r\n'))
                 yield line
+
+    def _default_python_bin(self, local=False):
+        return super(LocalMRJobRunner, self)._default_python_bin(
+            local=True)

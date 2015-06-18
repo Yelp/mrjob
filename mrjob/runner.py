@@ -167,8 +167,6 @@ class RunnerOptionStore(OptionStore):
 
         self._validate_cleanup()
 
-        self._fix_interp_options()
-
         log.debug('Active configuration:')
         log.debug(pprint.pformat(self))
 
@@ -182,7 +180,6 @@ class RunnerOptionStore(OptionStore):
 
         return combine_dicts(super_opts, {
             'base_tmp_dir': tempfile.gettempdir(),
-            'bootstrap_mrjob': True,
             'check_input_paths': True,
             'cleanup': ['ALL'],
             'cleanup_on_failure': ['NONE'],
@@ -216,37 +213,6 @@ class RunnerOptionStore(OptionStore):
             ', '.join(CLEANUP_CHOICES))
         validate_cleanup(cleanup_failure_error,
                          self['cleanup_on_failure'])
-
-    def _default_python_bin(self, local=False):
-        """The default python command. If local is true, try to use
-        sys.executable. Otherwise use 'python' or 'python3' as appropriate.
-
-        This returns a single-item list (because it's a command).
-        """
-        if local and sys.executable:
-            return [sys.executable]
-        elif PY2:
-            return ['python']
-        else:
-            # e.g. python3
-            return ['python%d' % sys.version_info[0]]
-
-    def _fix_interp_options(self):
-        if not self['steps_python_bin']:
-            self['steps_python_bin'] = (
-                self['python_bin'] or self._default_python_bin(local=True))
-
-        if not self['python_bin']:
-            self['python_bin'] = self._default_python_bin()
-
-        if not self['steps_interpreter']:
-            if self['interpreter']:
-                self['steps_interpreter'] = self['interpreter']
-            else:
-                self['steps_interpreter'] = self['steps_python_bin']
-
-        if not self['interpreter']:
-            self['interpreter'] = self['python_bin']
 
 
 class MRJobRunner(object):
@@ -765,15 +731,43 @@ class MRJobRunner(object):
         """Get the number of steps (calls :py:meth:`get_steps`)."""
         return len(self._get_steps())
 
-    def _executable(self, steps=False):
-        # default behavior is to always use an interpreter. local, emr, and
-        # hadoop runners check for executable script paths and prepend the
-        # working_dir, discarding the interpreter if possible.
+    def _interpreter(self, steps=False):
         if steps:
-            return self._opts['steps_interpreter'] + [self._script_path]
+            return (self._opts['steps_interpreter'] or
+                    self._opts['interpreter'] or
+                    self._python_bin(steps=True))
         else:
-            return (self._opts['interpreter'] +
-                    [self._working_dir_mgr.name('file', self._script_path)])
+            return (self._opts['interpreter'] or
+                    self._python_bin())
+
+    def _executable(self, steps=False):
+        if steps:
+            return self._interpreter(steps=True) + [self._script_path]
+        else:
+            return self._interpreter() + [
+                self._working_dir_mgr.name('file', self._script_path)]
+
+    def _python_bin(self, steps=False):
+        if steps:
+            return (self._opts['steps_python_bin'] or
+                    self._default_python_bin(local=True))
+        else:
+            return (self._opts['python_bin'] or
+                    self._default_python_bin())
+
+    def _default_python_bin(self, local=False):
+        """The default python command. If local is true, try to use
+        sys.executable. Otherwise use 'python' or 'python3' as appropriate.
+
+        This returns a single-item list (because it's a command).
+        """
+        if local and sys.executable:
+            return [sys.executable]
+        elif PY2:
+            return ['python']
+        else:
+            # e.g. python3
+            return ['python%d' % sys.version_info[0]]
 
     def _script_args_for_step(self, step_num, mrc):
         assert self._script_path
@@ -914,7 +908,7 @@ class MRJobRunner(object):
 
         setup = self._setup
 
-        if self._opts['bootstrap_mrjob'] and self.BOOTSTRAP_MRJOB_IN_SETUP:
+        if self._bootstrap_mrjob() and self.BOOTSTRAP_MRJOB_IN_SETUP:
             # patch setup to add mrjob.tar.gz to PYTYHONPATH
             mrjob_tar_gz = self._create_mrjob_tar_gz()
             path_dict = {'type': 'archive', 'name': None, 'path': mrjob_tar_gz}
@@ -1014,7 +1008,7 @@ class MRJobRunner(object):
         writeln('exec 9>/tmp/wrapper.lock.%s' % self._job_name)
         # would use flock(1), but it's not always available
         writeln("%s -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'" %
-                cmd_line(self._opts['python_bin']))
+                cmd_line(self._python_bin()))
         writeln()
 
         writeln('# setup commands')
@@ -1049,6 +1043,13 @@ class MRJobRunner(object):
         writeln('"$@"')
 
         return out
+
+    def _bootstrap_mrjob(self):
+        """Should we bootstrap mrjob?"""
+        if self._opts['bootstrap_mrjob'] is None:
+            return self._opts['interpreter'] is None
+        else:
+            return bool(self._opts['bootstrap_mrjob'])
 
     def _get_input_paths(self):
         """Get the paths to input files, dumping STDIN to a local

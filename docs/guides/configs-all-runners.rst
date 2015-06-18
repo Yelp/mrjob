@@ -1,3 +1,4 @@
+================================
 Options available to all runners
 ================================
 
@@ -19,7 +20,7 @@ initialized programmatically.
 .. _configs-making-files-available:
 
 Making files available to tasks
--------------------------------
+===============================
 
 Most jobs have dependencies of some sort - Python packages, Debian packages,
 data files, etc. This section covers options available to all runners that
@@ -38,10 +39,12 @@ options related to file uploading.
     :switch: --bootstrap-mrjob, --no-bootstrap-mrjob
     :type: boolean
     :set: all
-    :default: ``True``
+    :default: (automatic)
 
     Should we automatically tar up the mrjob library and install it when we run
-    job?  Set this to ``False`` if you've already installed ``mrjob`` on your
+    job? By default, we do unless :mrjob:`interpreter` is set.
+
+    Set this to ``False`` if you've already installed ``mrjob`` on your
     Hadoop cluster or install it by some other method.
 
 .. mrjob-opt::
@@ -90,7 +93,7 @@ options related to file uploading.
     :envvar:`PYTHONPATH`.
 
 Temp files and cleanup
-----------------------
+======================
 
 .. mrjob-opt::
     :config: base_tmp_dir
@@ -170,7 +173,7 @@ Temp files and cleanup
     conjunction with ``--output-dir`` to store output only in HDFS or S3.
 
 Job execution context
----------------------
+=====================
 
 .. mrjob-opt::
     :config: cmdenv
@@ -197,21 +200,37 @@ Job execution context
     :switch: --interpreter
     :type: :ref:`string <data-type-string>`
     :set: all
-    :default: value of :mrjob-opt:`python_bin` (``'python'``)
+    :default: ``None``
 
-    Interpreter to launch your script with. Defaults to the value of
-    **python_bin**, which is deprecated. Change this if you're using a
-    language besides Python 2.6-2.7.
+    Non-Python command to launch your script with (e.g. ``'ruby'``).
+    This will also be used to query the script about steps unless you set
+    :mrjob-opt:`steps_interpreter`.
+
+    If you want to use an alternate Python command to run the job, use
+    :mrjob-opt:`python_bin`.
+
+    This takes precedence over :mrjob-opt:`python_bin` and
+    :mrjob-opt:`steps_python_bin`.
 
 .. mrjob-opt::
     :config: python_bin
     :switch: --python-bin
     :type: :ref:`command <data-type-command>`
     :set: all
-    :default: ``'python'``
+    :default: (automatic)
 
-    Deprecated (use :mrjob-opt:`interpreter` instead). Name/path of alternate
-    Python binary for wrapper scripts and mappers/reducers.
+    Name/path of alternate Python binary for wrapper scripts and
+    mappers/reducers (e.g. ``'python -v'``). This defaults to ``'python'`` if
+    you're in Python 2 and ``'python3'`` if you're in Python 3.
+
+    This option also affects which Python binary is used for file locking in
+    :mrjob-opt:`setup` scripts, so it might be useful to set even if you're
+    using a non-Python :mrjob-opt:`interpreter`. It's also used by
+    :py:class:`~mrjob.emr.EMRJobRunner` to compile mrjob after bootstrapping it
+    (see :mrjob-opt:`bootstrap_mrjob`).
+
+    Unlike :mrjob-opt:`interpreter`, this does not affect the binary used to
+    query the job about its steps (use :mrjob-opt:`steps_python_bin`).
 
 .. mrjob-opt::
     :config: setup
@@ -289,15 +308,30 @@ Job execution context
     an error, use ``'sh -e'``.
 
 .. mrjob-opt::
-    :config: steps_python_bin
-    :switch: --steps-python-bin
+    :config: steps_interpreter
+    :switch: --steps-interpreter
     :type: :ref:`command <data-type-command>`
     :set: all
     :default: current Python interpreter
 
+    Alternate (non-Python) command to use to query the job about
+    its steps. Usually it's good enough to set :mrjob-opt:`interpreter`.
+
+    If you want to use an alternate Python command to get the job's steps,
+    use :mrjob-opt:`steps_python_bin`.
+
+    This takes precedence over :mrjob-opt:`steps_python_bin`.
+
+.. mrjob-opt::
+    :config: steps_python_bin
+    :switch: --steps-python-bin
+    :type: :ref:`command <data-type-command>`
+    :set: all
+    :default: (current Python interpreter)
+
     Name/path of alternate python binary to use to query the job about its
-    steps. Rarely needed. Defaults to ``sys.executable`` (the current Python
-    interpreter).
+    steps. Rarely needed. If not set, we use ``sys.executable`` (the current
+    Python interpreter).
 
 .. mrjob-opt::
     :config: strict_protocols
@@ -314,7 +348,7 @@ Job execution context
         "Loose" protocols are going away in v0.6.0.
 
 Other
------
+=====
 
 .. mrjob-opt::
     :config: conf_paths
@@ -350,7 +384,7 @@ Other
 
 
 Options ignored by the local and inline runners
------------------------------------------------
+===============================================
 
 These options are ignored because they require a real instance of Hadoop:
 
@@ -362,7 +396,7 @@ These options are ignored because they require a real instance of Hadoop:
 
 
 Options ignored by the inline runner
-------------------------------------
+====================================
 
 These options are ignored because the ``inline`` runner does not invoke the job
 as a subprocess:

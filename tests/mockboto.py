@@ -600,7 +600,7 @@ class MockEmrConnection(object):
             state='STARTING',
             steps=[],
             api_params={},
-            visibletoallusers='false',  # can only be set with api_params
+            visibletoallusers='false',
         )
 
         if slave_instance_type is not None:
@@ -618,8 +618,8 @@ class MockEmrConnection(object):
         if api_params:
             job_flow.api_params = api_params
             if 'VisibleToAllUsers' in api_params:
-                job_flow.visibletoallusers = str(bool(
-                    api_params['VisibleToAllUsers'])).lower()
+                job_flow.visibletoallusers = str(
+                    api_params['VisibleToAllUsers']).lower()
             if 'JobFlowRole' in api_params:
                 job_flow.jobflowrole = api_params['JobFlowRole']
             if 'ServiceRole' in api_params:

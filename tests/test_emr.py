@@ -613,7 +613,18 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
 
     def test_no_visible(self):
         job_flow = self.run_and_get_job_flow('--no-visible-to-all-users')
-        self.assertTrue(job_flow.visibletoallusers, 'false')
+        self.assertEqual(job_flow.visibletoallusers, 'false')
+
+    def test_force_to_bool(self):
+        UGLY_MRJOB_CONF = {'runners': {'emr': {
+            'check_emr_status_every': 0.00,
+            's3_sync_wait_time': 0.00,
+            'visible_to_all_users': 1,
+        }}}
+
+        with mrjob_conf_patcher(UGLY_MRJOB_CONF):
+            job_flow = self.run_and_get_job_flow()
+            self.assertEqual(job_flow.visibletoallusers, 'true')
 
 
 class IAMTestCase(MockEMRAndS3TestCase):

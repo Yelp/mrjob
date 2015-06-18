@@ -616,7 +616,7 @@ def add_emr_opts(opt_group):
 
         opt_group.add_option(
             '--no-visible-to-all-users', dest='visible_to_all_users',
-            default=None, action='store_true',
+            default=None, action='store_false',
             help='Hide your job flow from other IAM users on the same AWS'
                  ' account.'
         ),

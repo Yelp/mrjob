@@ -464,7 +464,7 @@ class LocalBootstrapMrjobTestCase(TestCase):
 
             with mr_job.make_runner() as runner:
                 # sanity check
-                self.assertEqual(runner.get_opts()['bootstrap_mrjob'], True)
+                self.assertEqual(runner._bootstrap_mrjob(), True)
                 local_tmp_dir = os.path.realpath(runner._get_local_tmp_dir())
 
                 runner.run()

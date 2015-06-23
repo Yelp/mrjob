@@ -1,4 +1,5 @@
 # Copyright 2009-2013 Yelp and Contributors
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +14,8 @@
 # limitations under the License.
 
 """Make sure all of our protocols work as advertised."""
+from mrjob.protocol import BytesProtocol
+from mrjob.protocol import BytesValueProtocol
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
@@ -21,8 +24,17 @@ from mrjob.protocol import RawProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
+from mrjob.protocol import StandardJSONProtocol
+from mrjob.protocol import StandardJSONValueProtocol
+from mrjob.protocol import TextProtocol
+from mrjob.protocol import TextValueProtocol
+from mrjob.protocol import UltraJSONProtocol
+from mrjob.protocol import UltraJSONValueProtocol
+from mrjob.protocol import ujson
+from mrjob.py2 import PY2
 
 from tests.py2 import TestCase
+from tests.py2 import skipIf
 
 
 class Point(object):
@@ -92,97 +104,147 @@ class ProtocolTestCase(TestCase):
         self.assertRaises(Exception, protocol.read, data)
 
 
-class JSONProtocolTestCase(ProtocolTestCase):
+class JSONProtocolAliasesTestCase(TestCase):
+
+    def test_use_ujson_if_installed(self):
+        if ujson:
+            self.assertEqual(JSONProtocol, UltraJSONProtocol)
+            self.assertEqual(JSONValueProtocol, UltraJSONValueProtocol)
+        else:
+            self.assertEqual(JSONProtocol, StandardJSONProtocol)
+            self.assertEqual(JSONValueProtocol, StandardJSONValueProtocol)
+
+
+class StandardJSONProtocolTestCase(ProtocolTestCase):
+
+    PROTOCOL = StandardJSONProtocol()
 
     def test_round_trip(self):
         for k, v in JSON_KEYS_AND_VALUES:
-            self.assertRoundTripOK(JSONProtocol(), k, v)
+            self.assertRoundTripOK(self.PROTOCOL, k, v)
 
     def test_round_trip_with_trailing_tab(self):
         for k, v in JSON_KEYS_AND_VALUES:
-            self.assertRoundTripWithTrailingTabOK(JSONProtocol(), k, v)
+            self.assertRoundTripWithTrailingTabOK(self.PROTOCOL, k, v)
 
     def test_uses_json_format(self):
         KEY = ['a', 1]
         VALUE = {'foo': 'bar'}
         ENCODED = b'["a", 1]\t{"foo": "bar"}'
 
-        self.assertEqual((KEY, VALUE), JSONProtocol().read(ENCODED))
-        self.assertEqual(ENCODED, JSONProtocol().write(KEY, VALUE))
+        self.assertEqual((KEY, VALUE), self.PROTOCOL.read(ENCODED))
+        self.assertEqual(self.PROTOCOL.write(KEY, VALUE), ENCODED)
 
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
         self.assertEqual(
             ([1, 2], [3, 4]),
-            JSONProtocol().read(JSONProtocol().write((1, 2), (3, 4))))
+            self.PROTOCOL.read(self.PROTOCOL.write((1, 2), (3, 4))))
 
     def test_numerical_keys_become_strs(self):
         # JSON should convert numbers to strings when they are dict keys
         self.assertEqual(
             ({'1': 2}, {'3': 4}),
-            JSONProtocol().read(JSONProtocol().write({1: 2}, {3: 4})))
+            self.PROTOCOL.read(self.PROTOCOL.write({1: 2}, {3: 4})))
 
     def test_bad_data(self):
-        self.assertCantDecode(JSONProtocol(), b'{@#$@#!^&*$%^')
+        self.assertCantDecode(self.PROTOCOL, b'{@#$@#!^&*$%^')
 
     def test_bad_keys_and_values(self):
-        # dictionaries have to have strings as keys
-        self.assertCantEncode(JSONProtocol(), {(1, 2): 3}, None)
-
         # only unicodes (or bytes in utf-8) are allowed
-        self.assertCantEncode(JSONProtocol(), b'0\xa2', b'\xe9')
+        self.assertCantEncode(self.PROTOCOL, b'0\xa2', b'\xe9')
+
+        # dictionaries have to have strings as keys
+        self.assertCantEncode(self.PROTOCOL, {(1, 2): 3}, None)
 
         # sets don't exist in JSON
-        self.assertCantEncode(JSONProtocol(), set([1]), set())
+        self.assertCantEncode(self.PROTOCOL, set([1]), set())
 
         # Point class has no representation in JSON
-        self.assertCantEncode(JSONProtocol(), Point(2, 3), Point(1, 4))
+        self.assertCantEncode(self.PROTOCOL, Point(2, 3), Point(1, 4))
 
 
-class JSONValueProtocolTestCase(ProtocolTestCase):
+@skipIf(ujson is None, 'ujson module not installed')
+class UltraJSONProtocolTestCase(StandardJSONProtocolTestCase):
+
+    PROTOCOL = UltraJSONProtocol()
+
+    def test_uses_json_format(self):
+        KEY = ['a', 1]
+        VALUE = {'foo': 'bar'}
+        ENCODED = b'["a",1]\t{"foo":"bar"}'  # no whitespace for ujson
+
+        self.assertEqual((KEY, VALUE), self.PROTOCOL.read(ENCODED))
+        self.assertEqual(self.PROTOCOL.write(KEY, VALUE), ENCODED)
+
+    def test_bad_keys_and_values(self):
+        # seems like the only thing ujson won't encode is non-UTF-8 bytes
+        self.assertCantEncode(self.PROTOCOL, b'0\xa2', b'\xe9')
+
+
+class StandardJSONValueProtocolTestCase(ProtocolTestCase):
+
+    PROTOCOL = StandardJSONValueProtocol()
 
     def test_round_trip(self):
         for _, v in JSON_KEYS_AND_VALUES:
-            self.assertRoundTripOK(JSONValueProtocol(), None, v)
+            self.assertRoundTripOK(self.PROTOCOL, None, v)
 
     def test_round_trip_with_trailing_tab(self):
         for _, v in JSON_KEYS_AND_VALUES:
-            self.assertRoundTripWithTrailingTabOK(JSONValueProtocol(), None, v)
+            self.assertRoundTripWithTrailingTabOK(self.PROTOCOL, None, v)
 
     def test_uses_json_format(self):
         VALUE = {'foo': 'bar'}
         ENCODED = b'{"foo": "bar"}'
 
-        self.assertEqual((None, VALUE), JSONValueProtocol().read(ENCODED))
-        self.assertEqual(ENCODED, JSONValueProtocol().write(None, VALUE))
+        self.assertEqual((None, VALUE), self.PROTOCOL.read(ENCODED))
+        self.assertEqual(self.PROTOCOL.write(None, VALUE), ENCODED)
 
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
         self.assertEqual(
             (None, [3, 4]),
-            JSONValueProtocol().read(JSONValueProtocol().write(None, (3, 4))))
+            self.PROTOCOL.read(self.PROTOCOL.write(None, (3, 4))))
 
     def test_numerical_keys_become_strs(self):
         # JSON should convert numbers to strings when they are dict keys
         self.assertEqual(
             (None, {'3': 4}),
-            JSONValueProtocol().read(JSONValueProtocol().write(None, {3: 4})))
+            self.PROTOCOL.read(self.PROTOCOL.write(None, {3: 4})))
 
     def test_bad_data(self):
-        self.assertCantDecode(JSONValueProtocol(), b'{@#$@#!^&*$%^')
+        self.assertCantDecode(self.PROTOCOL, b'{@#$@#!^&*$%^')
 
     def test_bad_keys_and_values(self):
-        # dictionaries have to have strings as keys
-        self.assertCantEncode(JSONValueProtocol(), None, {(1, 2): 3})
+        # seems like the only thing ujson won't encode is non-UTF-8 bytes
+        self.assertCantEncode(self.PROTOCOL, None, b'\xe9')
 
-        # only unicodes (or bytes in utf-8) are allowed
-        self.assertCantEncode(JSONValueProtocol(), None, b'\xe9')
+        # dictionaries have to have strings as keys
+        self.assertCantEncode(self.PROTOCOL, None, {(1, 2): 3})
 
         # sets don't exist in JSON
-        self.assertCantEncode(JSONValueProtocol(), None, set())
+        self.assertCantEncode(self.PROTOCOL, None, set())
 
         # Point class has no representation in JSON
-        self.assertCantEncode(JSONValueProtocol(), None, Point(1, 4))
+        self.assertCantEncode(self.PROTOCOL, None, Point(1, 4))
+
+
+@skipIf(ujson is None, 'ujson module not installed')
+class UltraJSONValueProtocolTestCase(StandardJSONValueProtocolTestCase):
+
+    PROTOCOL = UltraJSONValueProtocol()
+
+    def test_uses_json_format(self):
+        VALUE = {'foo': 'bar'}
+        ENCODED = b'{"foo":"bar"}'  # no whitespace in ujson
+
+        self.assertEqual((None, VALUE), self.PROTOCOL.read(ENCODED))
+        self.assertEqual(self.PROTOCOL.write(None, VALUE), ENCODED)
+
+    def test_bad_keys_and_values(self):
+        # seems like the only thing ujson won't encode is non-UTF-8 bytes
+        self.assertCantEncode(self.PROTOCOL, None, b'\xe9')
 
 
 class PickleProtocolTestCase(ProtocolTestCase):
@@ -218,51 +280,127 @@ class PickleValueProtocolTestCase(ProtocolTestCase):
     # no tests of what encoded data looks like; pickle is an opaque protocol
 
 
-class RawValueProtocolTestCase(ProtocolTestCase):
+class RawProtocolAliasesTestCase(TestCase):
+
+    def test_raw_protocol_aliases(self):
+        if PY2:
+            self.assertEqual(RawProtocol, BytesProtocol)
+            self.assertEqual(RawValueProtocol, BytesValueProtocol)
+        else:
+            self.assertEqual(RawProtocol, TextProtocol)
+            self.assertEqual(RawValueProtocol, TextValueProtocol)
+
+
+
+class BytesValueProtocolTestCase(ProtocolTestCase):
 
     def test_dumps_keys(self):
-        self.assertEqual(RawValueProtocol().write(b'foo', b'bar'), b'bar')
+        self.assertEqual(BytesValueProtocol().write(b'foo', b'bar'), b'bar')
 
     def test_reads_raw_line(self):
-        self.assertEqual(RawValueProtocol().read(b'foobar'), (None, b'foobar'))
+        self.assertEqual(BytesValueProtocol().read(b'foobar'),
+                         (None, b'foobar'))
 
     def test_bytestrings(self):
-        self.assertRoundTripOK(RawValueProtocol(), None, b'\xe90\c1a')
+        self.assertRoundTripOK(BytesValueProtocol(), None, b'\xe90\c1a')
 
     def test_no_strip(self):
-        self.assertEqual(RawValueProtocol().read(b'foo\t \n\n'),
+        self.assertEqual(BytesValueProtocol().read(b'foo\t \n\n'),
                          (None, b'foo\t \n\n'))
 
 
-class RawProtocolTestCase(ProtocolTestCase):
+class TextValueProtocolTestCase(ProtocolTestCase):
+
+    def test_dumps_keys(self):
+        self.assertEqual(TextValueProtocol().write(u'foo', u'bar'), b'bar')
+
+    def test_converts_raw_line_to_unicode(self):
+        self.assertEqual(TextValueProtocol().read(b'foobar'),
+                         (None, u'foobar'))
+
+    def test_utf_8_decode(self):
+        self.assertEqual(TextValueProtocol().read(b'caf\xc3\xa9'),
+                         (None, u'caf\xe9'))
+
+    def test_fall_back_to_latin_1(self):
+        self.assertEqual(TextValueProtocol().read(b'caf\xe9'),
+                         (None, u'caf\xe9'))
+
+    def test_no_strip(self):
+        self.assertEqual(TextValueProtocol().read(b'foo\t \n\n'),
+                         (None, u'foo\t \n\n'))
+
+
+class BytesProtocolTestCase(ProtocolTestCase):
 
     def test_round_trip(self):
-        self.assertRoundTripOK(RawProtocol(), b'foo', b'bar')
-        self.assertRoundTripOK(RawProtocol(), b'foo', None)
-        self.assertRoundTripOK(RawProtocol(), b'foo', b'')
-        self.assertRoundTripOK(RawProtocol(), b'caf\xe9', b'\xe90\c1a')
+        self.assertRoundTripOK(BytesProtocol(), b'foo', b'bar')
+        self.assertRoundTripOK(BytesProtocol(), b'foo', None)
+        self.assertRoundTripOK(BytesProtocol(), b'foo', b'')
+        self.assertRoundTripOK(BytesProtocol(), b'caf\xe9', b'\xe90\c1a')
 
     def test_no_tabs(self):
-        self.assertEqual(RawProtocol().write(b'foo', None), b'foo')
-        self.assertEqual(RawProtocol().write(None, b'foo'), b'foo')
-        self.assertEqual(RawProtocol().read(b'foo'), (b'foo', None))
+        self.assertEqual(BytesProtocol().write(b'foo', None), b'foo')
+        self.assertEqual(BytesProtocol().write(None, b'foo'), b'foo')
+        self.assertEqual(BytesProtocol().read(b'foo'), (b'foo', None))
 
-        self.assertEqual(RawProtocol().write(b'', None), b'')
-        self.assertEqual(RawProtocol().write(None, None), b'')
-        self.assertEqual(RawProtocol().write(None, b''), b'')
-        self.assertEqual(RawProtocol().read(b''), (b'', None))
+        self.assertEqual(BytesProtocol().write(b'', None), b'')
+        self.assertEqual(BytesProtocol().write(None, None), b'')
+        self.assertEqual(BytesProtocol().write(None, b''), b'')
+        self.assertEqual(BytesProtocol().read(b''), (b'', None))
 
     def test_extra_tabs(self):
-        self.assertEqual(RawProtocol().write(b'foo', b'bar\tbaz'),
+        self.assertEqual(BytesProtocol().write(b'foo', b'bar\tbaz'),
                          b'foo\tbar\tbaz')
-        self.assertEqual(RawProtocol().write(b'foo\tbar', b'baz'),
+        self.assertEqual(BytesProtocol().write(b'foo\tbar', b'baz'),
                          b'foo\tbar\tbaz')
-        self.assertEqual(RawProtocol().read(b'foo\tbar\tbaz'),
+        self.assertEqual(BytesProtocol().read(b'foo\tbar\tbaz'),
                          (b'foo', b'bar\tbaz'))
 
     def test_no_strip(self):
-        self.assertEqual(RawProtocol().read(b'foo\t \n\n'),
+        self.assertEqual(BytesProtocol().read(b'foo\t \n\n'),
                          (b'foo', b' \n\n'))
+
+
+class TextProtocolTestCase(ProtocolTestCase):
+
+    def test_round_trip(self):
+        self.assertRoundTripOK(TextProtocol(), u'foo', u'bar')
+        self.assertRoundTripOK(TextProtocol(), u'foo', None)
+        self.assertRoundTripOK(TextProtocol(), u'foo', u'')
+        self.assertRoundTripOK(TextProtocol(), u'caf\xe9', u'\Xe90\c1a')
+
+    def test_no_tabs(self):
+        self.assertEqual(TextProtocol().write(u'foo', None), b'foo')
+        self.assertEqual(TextProtocol().write(None, u'foo'), b'foo')
+        self.assertEqual(TextProtocol().read(b'foo'), (u'foo', None))
+
+        self.assertEqual(TextProtocol().write(u'', None), b'')
+        self.assertEqual(TextProtocol().write(None, None), b'')
+        self.assertEqual(TextProtocol().write(None, u''), b'')
+        self.assertEqual(TextProtocol().read(b''), (u'', None))
+
+    def test_extra_tabs(self):
+        self.assertEqual(TextProtocol().write(u'foo', u'bar\tbaz'),
+                         b'foo\tbar\tbaz')
+        self.assertEqual(TextProtocol().write(u'foo\tbar', u'baz'),
+                         b'foo\tbar\tbaz')
+        self.assertEqual(TextProtocol().read(b'foo\tbar\tbaz'),
+                         (u'foo', u'bar\tbaz'))
+
+    def test_no_strip(self):
+        self.assertEqual(TextProtocol().read(b'foo\t \n\n'),
+                         (u'foo', u' \n\n'))
+
+    def test_utf_8(self):
+        self.assertEqual(TextProtocol().read(b'caf\xc3\xa9\tol\xc3\xa9'),
+                         (u'caf\xe9', u'ol\xe9'))
+
+    def test_latin_1_fallback(self):
+        # we fall back to latin-1 for the whole line, not individual fields
+        self.assertEqual(TextProtocol().read(b'caf\xe9\tol\xc3\xa9'),
+                         (u'caf\xe9', u'ol\xc3\xa9'))
+
 
 
 class ReprProtocolTestCase(ProtocolTestCase):

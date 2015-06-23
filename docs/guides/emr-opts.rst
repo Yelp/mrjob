@@ -140,7 +140,7 @@ Job flow creation and configuration
 
     .. code-block:: sh
 
-        --emr-api-param Instance.Ec2SubnetId=someID
+        --emr-api-param Instances.Ec2SubnetId=someID
 
     and to suppress a value that would normally be passed to the API, use
     ``--no-emr-api-param``:
@@ -157,7 +157,7 @@ Job flow creation and configuration
         runners:
           emr:
             emr_api_params:
-              Instance.Ec2SubnetId: someID
+              Instances.Ec2SubnetId: someID
               VisibleToAllUsers: null
 
     .. versionadded:: 0.4.3
@@ -236,14 +236,22 @@ Job flow creation and configuration
 
 .. mrjob-opt::
     :config: visible_to_all_users
-    :switch: --visible-to-all-users
+    :switch: --visible-to-all-users, --no-visible-to-all-users
     :type: boolean
     :set: emr
-    :default: ``False``
+    :default: ``True``
 
-    If ``True``, EMR job flows will be visible to all IAM users. If ``False``,
-    the job flow will only be visible to the IAM user that created it. This parameter
-    can be overridden by :mrjob-opt:`emr_api_params` with key ``VisibleToAllUsers``.
+    If true (the default) EMR job flows will be visible to all IAM users.
+    Otherwise, the job flow will only be visible to the IAM user that created
+    it.
+
+    .. warning::
+
+        You should almost certainly not set this to ``False`` if you are
+        :ref:`pooling-job-flows` with other users; other users will
+        not be able to reuse your job flows, and
+        :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows` won't be
+        able to shut them down when they become idle.
 
     .. versionadded:: 0.4.1
 

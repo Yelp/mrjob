@@ -42,11 +42,11 @@ def add_protocol_opts(opt_group):
     """
     return [
         opt_group.add_option(
-            '--strict-protocols', dest='strict_protocols', default=None,
+            '--strict-protocols', dest='strict_protocols', default=True,
             action='store_true', help='If something violates an input/output '
-            'protocol then raise an exception'),
+            'protocol then raise an exception (the default)'),
         opt_group.add_option(
-            '--no-strict-protocols', dest='strict_protocols', default=None,
+            '--no-strict-protocols', dest='strict_protocols', default=True,
             action='store_false', help='If something violates an input/output '
             'protocol then increment a counter and continue'),
     ]
@@ -120,7 +120,7 @@ def add_runner_opts(opt_group, default_runner='local'):
 
         opt_group.add_option(
             '--interpreter', dest='interpreter', default=None,
-            help=("Interpreter to run your script, e.g. python or ruby.")),
+            help=('Non-python command to run your script, e.g. "ruby".')),
 
         opt_group.add_option(
             '--job-name', dest='job_name', default=None,
@@ -155,9 +155,9 @@ def add_runner_opts(opt_group, default_runner='local'):
 
         opt_group.add_option(
             '--python-bin', dest='python_bin', default=None,
-            help=("Deprecated. Name/path of alternate python binary for"
-                  " wrapper script and Python mappers/reducers. You can"
-                  " include arguments, e.g. --python-bin 'python -v'")),
+            help=('Alternate python command for Python'
+                  ' mappers/reducers. You can'
+                  ' include arguments, e.g. --python-bin "python -v"')),
 
         opt_group.add_option(
             '-r', '--runner', dest='runner', default=default_runner,
@@ -192,15 +192,14 @@ def add_runner_opts(opt_group, default_runner='local'):
 
         opt_group.add_option(
             '--steps-interpreter', dest='steps_interpreter', default=None,
-            help=("Name/path of alternate interpreter binary to use to query"
-                  " the job about its steps, if different from --interpreter."
-                  " Rarely needed.")),
+            help=("Non-Python command to use to query the job about its"
+                  " steps, if different from --interpreter.")),
 
         opt_group.add_option(
             '--steps-python-bin', dest='steps_python_bin', default=None,
-            help=('Deprecated. Name/path of alternate python binary to use to'
+            help=('Name/path of alternate python command to use to'
                   ' query the job about its steps, if different from the'
-                  ' current Python interpreter. Rarely needed.')),
+                  ' current Python interpreter.')),
     ]
 
 
@@ -611,15 +610,17 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--visible-to-all-users', dest='visible_to_all_users',
             default=None, action='store_true',
-            help='Whether the job flow is visible to all IAM users of the AWS'
-                 ' account associated with the job flow. If this value is set'
-                 ' to True, all IAM users of that AWS account can view and'
-                 ' (if they have the proper policy permissions set) manage'
-                 ' the job flow. If it is set to False, only the IAM user'
-                 ' that created the job flow can view and manage it.'
-                 ' This option can be overridden by'
-                 ' --emr-api-param VisibleToAllUsers=true|false.'
+            help='Make your job flow is visible to all IAM users on the same'
+                 ' AWS account (the default).'
         ),
+
+        opt_group.add_option(
+            '--no-visible-to-all-users', dest='visible_to_all_users',
+            default=None, action='store_false',
+            help='Hide your job flow from other IAM users on the same AWS'
+                 ' account.'
+        ),
+
     ]
 
 

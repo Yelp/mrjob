@@ -609,11 +609,27 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
 
     def test_defaults(self):
         job_flow = self.run_and_get_job_flow()
+        self.assertEqual(job_flow.visibletoallusers, 'true')
+
+    def test_no_visible(self):
+        job_flow = self.run_and_get_job_flow('--no-visible-to-all-users')
         self.assertEqual(job_flow.visibletoallusers, 'false')
 
-    def test_visible(self):
-        job_flow = self.run_and_get_job_flow('--visible-to-all-users')
-        self.assertTrue(job_flow.visibletoallusers, 'true')
+    def test_force_to_bool(self):
+        # make sure mockboto doesn't always convert to bool
+        api_param_job_flow = self.run_and_get_job_flow(
+            '--emr-api-param', 'VisibleToAllUsers=1')
+        self.assertEqual(api_param_job_flow.visibletoallusers, '1')
+
+        VISIBLE_MRJOB_CONF = {'runners': {'emr': {
+            'check_emr_status_every': 0.00,
+            's3_sync_wait_time': 0.00,
+            'visible_to_all_users': 1,  # should be True
+        }}}
+
+        with mrjob_conf_patcher(VISIBLE_MRJOB_CONF):
+            visible_job_flow = self.run_and_get_job_flow()
+            self.assertEqual(visible_job_flow.visibletoallusers, 'true')
 
 
 class IAMTestCase(MockEMRAndS3TestCase):
@@ -742,12 +758,12 @@ class EMRAPIParamsTestCase(MockEMRAndS3TestCase):
     def test_no_emr_api_param_command_line_switch(self):
         job = MRWordCount([
             '-r', 'emr',
-            '--emr-api-param', 'Instance.Ec2SubnetId=someID',
+            '--emr-api-param', 'Instances.Ec2SubnetId=someID',
             '--no-emr-api-param', 'VisibleToAllUsers'])
 
         with job.make_runner() as runner:
             self.assertEqual(runner._opts['emr_api_params'],
-                             {'Instance.Ec2SubnetId': 'someID',
+                             {'Instances.Ec2SubnetId': 'someID',
                               'VisibleToAllUsers': None})
 
     def test_no_emr_api_params_is_not_a_real_option(self):
@@ -774,7 +790,7 @@ class EMRAPIParamsTestCase(MockEMRAndS3TestCase):
             'check_emr_status_every': 0.00,
             's3_sync_wait_time': 0.00,
             'emr_api_params': {
-                'Instance.Ec2SubnetId': 'someID',
+                'Instances.Ec2SubnetId': 'someID',
                 'VisibleToAllUsers': None,
                 'Name': 'eaten_by_a_whale',
             },
@@ -782,13 +798,13 @@ class EMRAPIParamsTestCase(MockEMRAndS3TestCase):
 
         job = MRWordCount([
             '-r', 'emr',
-            '--no-emr-api-param', 'Instance.Ec2SubnetId',
+            '--no-emr-api-param', 'Instances.Ec2SubnetId',
             '--emr-api-param', 'VisibleToAllUsers=true'])
 
         with mrjob_conf_patcher(API_PARAMS_MRJOB_CONF):
             with job.make_runner() as runner:
                 self.assertEqual(runner._opts['emr_api_params'],
-                    {'Instance.Ec2SubnetId': None,
+                    {'Instances.Ec2SubnetId': None,
                      'VisibleToAllUsers': 'true',
                      'Name': 'eaten_by_a_whale'})
 

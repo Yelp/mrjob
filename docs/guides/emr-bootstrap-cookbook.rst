@@ -36,7 +36,7 @@ Then install the packages you want:
 
 .. code-block:: sh
 
-    --bootstrap 'sudo pip install --upgrade mr3po simplejson'
+    --bootstrap 'sudo pip install --upgrade mr3po ujson'
 
 To support both AMI 2.x and AMI 3.x:
 
@@ -54,16 +54,17 @@ Or, equivalently, in :file:`mrjob.conf`:
         - sudo apt-get install -y python-pip || sudo yum install -y python-pip
         - sudo pip install boto mr3po
 
-Upgrading simplejson
---------------------
+Installing ujson
+----------------
 
-mrjob relies on simplejson for rapid encoding and decoding of data.
+mrjob can use Python's built-in JSON library, but the ujson library is much
+faster.
 
-To use the latest (fastest) version, do:
+To use the latest (fastest) version of ujson, do:
 
 .. code-block:: sh
 
-    --bootstrap 'sudo pip install --upgrade simplejson'
+    --bootstrap 'sudo pip install --upgrade ujson'
 
 Other ways to use pip to install Python packages
 ------------------------------------------------

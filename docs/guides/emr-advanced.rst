@@ -136,21 +136,21 @@ Custom Python packages
 ----------------------
 
 There are a couple of ways to install Python packages that are not in the
-standard library. If there is a Debian package and you are running on AMI 2.x, you can add a call to 
+standard library. If there is a Debian package and you are running on AMI 2.x, you can add a call to
 ``apt-get`` as a ``bootstrap_cmd``::
 
     runners:
       emr:
         bootstrap_cmds:
-        - sudo apt-get install -y python-simplejson
+        - sudo apt-get install -y python-dateutil
 
-Otherwise, if you are running on AMI 3.x and have an RPM package you would like to install you can use 
+Otherwise, if you are running on AMI 3.x and have an RPM package you would like to install you can use
 ``yum`` as a ``bootstrap_cmd``::
 
     runners:
       emr:
         bootstrap_cmds:
-        - sudo yum install -y python-simplejson
+        - sudo yum install -y python-dateutil
 
 If there is no Debian or RPM package or you prefer to use your own tarballs for some
 other reason, you can specify tarballs in ``bootstrap_python_packages``, which

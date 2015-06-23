@@ -73,25 +73,6 @@ class TempdirTestCase(TestCase):
         return [os.path.join(self.tmp_dir, path) for path in paths]
 
 
-class RunnerOptionStoreTestCase(EmptyMrjobConfTestCase):
-
-    def _assert_interp(self, val, **kwargs):
-        opts = RunnerOptionStore('inline', kwargs, [])
-        self.assertEqual(opts['interpreter'], val)
-
-    def test_interpreter_fallback(self):
-        if PY2:
-            self._assert_interp(['python'])
-        else:
-            self._assert_interp(['python3'])
-
-    def test_interpreter_fallback_2(self):
-        self._assert_interp(['python', '-v'], python_bin=['python', '-v'])
-
-    def test_interpreter(self):
-        self._assert_interp(['ruby'], interpreter=['ruby'])
-
-
 class ConfigFilesTestCase(TempdirTestCase):
 
     def save_conf(self, name, conf):

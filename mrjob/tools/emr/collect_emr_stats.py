@@ -34,16 +34,11 @@ Options::
   -p, --pretty-print    Pretty print the collected stats.
   --no-conf             Don't load mrjob.conf even if it's available
 """
-
+import json
 from datetime import datetime
 from logging import getLogger
 from optparse import OptionParser
 from time import mktime
-
-try:
-    import simplejson as json
-except ImportError:
-    import json
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows

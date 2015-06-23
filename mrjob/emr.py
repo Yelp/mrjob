@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import hashlib
+import json
 import logging
 import os
 import os.path
@@ -29,12 +30,6 @@ from datetime import timedelta
 from io import BytesIO
 from subprocess import Popen
 from subprocess import PIPE
-
-try:
-    import simplejson as json  # preferred because of C speedups
-    json  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import json  # built in to Python 2.6 and later
 
 try:
     import boto
@@ -430,7 +425,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ssh_bind_ports': list(range(40001, 40841)),
             'ssh_tunnel_to_job_tracker': False,
             'ssh_tunnel_is_open': False,
-            'visible_to_all_users': False,
+            'visible_to_all_users': True,
         })
 
     def _fix_ec2_instance_opts(self):
@@ -867,7 +862,7 @@ class EMRJobRunner(MRJobRunner):
         persistent -- set by make_persistent_job_flow()
         """
         # lazily create mrjob.tar.gz
-        if self._opts['bootstrap_mrjob']:
+        if self._bootstrap_mrjob():
             self._create_mrjob_tar_gz()
             self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path)
 
@@ -1364,21 +1359,20 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['additional_emr_info']:
             args['additional_info'] = self._opts['additional_emr_info']
 
-        if (self._opts['visible_to_all_users'] and
-            'VisibleToAllUsers' not in self._opts['emr_api_params']):  # noqa
+        # boto's connect_emr() has keyword args for these, but they override
+        # emr_api_params, which is not what we want.
+        api_params = {}
 
-            self._opts['emr_api_params']['VisibleToAllUsers'] = (
-                'true' if self._opts['visible_to_all_users'] else 'false')
+        api_params['VisibleToAllUsers'] = bool(
+            self._opts['visible_to_all_users'])
 
-        if self._opts['emr_api_params']:
-            args['api_params'] = self._opts['emr_api_params']
-
-        # instance profile and service role are required for accounts
-        # created after April 6, 2015, and will eventually be required
-        # for all accounts
-        api_params = args.setdefault('api_params', {})
         api_params['JobFlowRole'] = self._instance_profile()
         api_params['ServiceRole'] = self._service_role()
+
+        if self._opts['emr_api_params']:
+            api_params.update(self._opts['emr_api_params'])
+
+        args['api_params'] = api_params
 
         if steps:
             args['steps'] = steps
@@ -2028,12 +2022,12 @@ class EMRJobRunner(MRJobRunner):
         # Also don't bother if we're not bootstrapping
         if not (self._bootstrap or self._legacy_bootstrap or
                 self._opts['bootstrap_files'] or
-                self._opts['bootstrap_mrjob']):
+                self._bootstrap_mrjob()):
             return
 
         # create mrjob.tar.gz if we need it, and add commands to install it
         mrjob_bootstrap = []
-        if self._opts['bootstrap_mrjob']:
+        if self._bootstrap_mrjob():
             # _add_bootstrap_files_for_upload() should have done this
             assert self._mrjob_tar_gz_path
             path_dict = {
@@ -2045,7 +2039,7 @@ class EMRJobRunner(MRJobRunner):
                 "__mrjob_PYTHON_LIB=$(%s -c "
                 "'from distutils.sysconfig import get_python_lib;"
                 " print(get_python_lib())')" %
-                cmd_line(self._opts['python_bin'])])
+                cmd_line(self._python_bin())])
             # un-tar mrjob.tar.gz
             mrjob_bootstrap.append(
                 ['sudo tar xfz ', path_dict, ' -C $__mrjob_PYTHON_LIB'])
@@ -2055,7 +2049,7 @@ class EMRJobRunner(MRJobRunner):
             # sh_bin were 'sh -e')
             mrjob_bootstrap.append(
                 ['sudo %s -m compileall -f $__mrjob_PYTHON_LIB/mrjob && true' %
-                 cmd_line(self._opts['python_bin'])])
+                 cmd_line(self._python_bin())])
 
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
@@ -2505,10 +2499,10 @@ class EMRJobRunner(MRJobRunner):
             self._bootstrap,
             self._bootstrap_actions,
             self._opts['bootstrap_cmds'],
-            self._opts['bootstrap_mrjob'],
+            self._bootstrap_mrjob(),
         ]
 
-        if self._opts['bootstrap_mrjob']:
+        if self._bootstrap_mrjob():
             things_to_hash.append(mrjob.__version__)
 
         things_json = json.dumps(things_to_hash, sort_keys=True)

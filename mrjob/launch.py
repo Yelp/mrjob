@@ -502,6 +502,7 @@ class MRJobLauncher(object):
         """
         return {
             'bootstrap_mrjob': self.options.bootstrap_mrjob,
+            'check_input_paths': self.options.check_input_paths,
             'cleanup': self.options.cleanup,
             'cleanup_on_failure': self.options.cleanup_on_failure,
             'cmdenv': self.options.cmdenv,

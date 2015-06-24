@@ -42,7 +42,7 @@ options related to file uploading.
     :default: (automatic)
 
     Should we automatically tar up the mrjob library and install it when we run
-    job? By default, we do unless :mrjob:`interpreter` is set.
+    job? By default, we do unless :mrjob-opt:`interpreter` is set.
 
     Set this to ``False`` if you've already installed ``mrjob`` on your
     Hadoop cluster or install it by some other method.

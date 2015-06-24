@@ -140,7 +140,7 @@ Job flow creation and configuration
 
     .. code-block:: sh
 
-        --emr-api-param Instance.Ec2SubnetId=someID
+        --emr-api-param Instances.Ec2SubnetId=someID
 
     and to suppress a value that would normally be passed to the API, use
     ``--no-emr-api-param``:
@@ -157,7 +157,7 @@ Job flow creation and configuration
         runners:
           emr:
             emr_api_params:
-              Instance.Ec2SubnetId: someID
+              Instances.Ec2SubnetId: someID
               VisibleToAllUsers: null
 
     .. versionadded:: 0.4.3

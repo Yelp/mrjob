@@ -550,6 +550,16 @@ class HadoopArgsTestCase(EmptyMrjobConfTestCase):
             self.assertEqual(hadoop_args[:2], ['-libjar', 'qux.jar'])
             self.assertEqual(len(hadoop_args), 12)
 
+    def test_check_input_paths_enabled_by_default(self):
+        job = MRWordCount()
+        with job.make_runner() as runner:
+            self.assertTrue(runner._opts['check_input_paths'])
+
+    def test_check_input_paths_disabled(self):
+        job = MRWordCount(['--no-check-input-paths'])
+        with job.make_runner() as runner:
+            self.assertFalse(runner._opts['check_input_paths'])
+
 
 class SetupTestCase(SandboxedTestCase):
 

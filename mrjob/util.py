@@ -63,43 +63,31 @@ def bash_wrap(cmd_str):
     return "bash -c '%s'" % cmd_str.replace("'", "'\\''")
 
 
-def yield_lines(chunks):
-    """Take an iterator that yield chunks of data (bytes), and yield
-    the same data a line at a time.
+def bunzip2_stream(fileobj, bufsize=1024):
+    """Decompress gzipped data on the fly.
 
-    This does not add a trailing newline.
+    :param fileobj: object supporting ``read()``
+    :param bufsize: number of bytes to read from *fileobj* at a time.
 
-    This method optimizes for:
-     * chunks bigger than lines (e.g. reading test files)
-     * chunks that are lines (idempotency)
+    .. warning::
+
+        This yields decompressed chunks; it does *not* split on lines. To get
+        lines, wrap this in :py:func:`yield_lines`.
     """
-    # list of chunks with no final newline
-    leftovers = []
+    if bz2 is None:
+        raise Exception(
+            'bz2 module was not successfully imported (likely not installed).')
 
-    for chunk in chunks:
-        start = 0
+    d = bz2.BZ2Decompressor()
 
-        while start < len(chunk):
-            end = chunk.find(b'\n', start) + 1
+    while True:
+        chunk = fileobj.read(bufsize)
+        if not chunk:
+            return
 
-            if end == 0:  # no newlines found
-                leftovers.append(chunk[start:])
-                break
-
-            if leftovers:
-                leftovers.append(chunk[start:end])
-                yield b''.join(leftovers)
-                leftovers = []
-            else:
-                yield chunk[start:end]
-
-            start = end
-
-    if leftovers:
-        yield b''.join(leftovers)
-
-#: Deprecated alias for :py:func:`yield_lines`, will be removed in v0.6.0
-buffer_iterator_to_line_iterator = yield_lines
+        part = d.decompress(chunk)
+        if part:
+            yield part
 
 
 def cmd_line(args):
@@ -471,33 +459,6 @@ def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
                 cleanup()
 
 
-def bunzip2_stream(fileobj, bufsize=1024):
-    """Decompress gzipped data on the fly.
-
-    :param fileobj: object supporting ``read()``
-    :param bufsize: number of bytes to read from *fileobj* at a time.
-
-    .. warning::
-
-        This yields decompressed chunks; it does *not* split on lines. To get
-        lines, wrap this in :py:func:`yield_lines`.
-    """
-    if bz2 is None:
-        raise Exception(
-            'bz2 module was not successfully imported (likely not installed).')
-
-    d = bz2.BZ2Decompressor()
-
-    while True:
-        chunk = fileobj.read(bufsize)
-        if not chunk:
-            return
-
-        part = d.decompress(chunk)
-        if part:
-            yield part
-
-
 def gunzip_stream(fileobj, bufsize=1024):
     """Decompress gzipped data on the fly.
 
@@ -723,3 +684,44 @@ def unarchive(archive_path, dest):
                         dest_file.write(archive.read(name))
     else:
         raise IOError('Unknown archive type: %s' % (archive_path,))
+
+
+
+
+def yield_lines(chunks):
+    """Take an iterator that yield chunks of data (bytes), and yield
+    the same data a line at a time.
+
+    This does not add a trailing newline.
+
+    This method optimizes for:
+     * chunks bigger than lines (e.g. reading test files)
+     * chunks that are lines (idempotency)
+    """
+    # list of chunks with no final newline
+    leftovers = []
+
+    for chunk in chunks:
+        start = 0
+
+        while start < len(chunk):
+            end = chunk.find(b'\n', start) + 1
+
+            if end == 0:  # no newlines found
+                leftovers.append(chunk[start:])
+                break
+
+            if leftovers:
+                leftovers.append(chunk[start:end])
+                yield b''.join(leftovers)
+                leftovers = []
+            else:
+                yield chunk[start:end]
+
+            start = end
+
+    if leftovers:
+        yield b''.join(leftovers)
+
+#: Deprecated alias for :py:func:`yield_lines`, will be removed in v0.6.0
+buffer_iterator_to_line_iterator = yield_lines

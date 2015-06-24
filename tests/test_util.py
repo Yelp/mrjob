@@ -1,4 +1,4 @@
-# Copyright 2009-2013 Yelp and Contributors
+# Copyright 2009-2015 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ from mrjob.util import safeeval
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import tar_and_gzip
 from mrjob.util import unarchive
+from mrjob.util import yield_lines
 
 from tests.py2 import TestCase
 from tests.quiet import logger_disabled
@@ -48,48 +49,49 @@ class BufferIteratorToLineIteratorTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(
-            list(buffer_iterator_to_line_iterator(_ for _ in ())),
+            list(yield_lines(_ for _ in ())),
             [])
 
     def test_buffered_lines(self):
         self.assertEqual(
-            list(buffer_iterator_to_line_iterator(chunk for chunk in
-                                                  [b'The quick\nbrown fox\nju',
-                                                   b'mped over\nthe lazy\ndog',
-                                                   b's.\n'])),
+            list(yield_lines(chunk for chunk in
+                             [b'The quick\nbrown fox\nju',
+                              b'mped over\nthe lazy\ndog',
+                              b's.\n'])),
             [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
              b'dogs.\n'])
 
     def test_empty_chunks(self):
         self.assertEqual(
-            list(buffer_iterator_to_line_iterator(chunk for chunk in
-                                                  [b'',
-                                                   b'The quick\nbrown fox\nju',
-                                                   b'', b'', b'',
-                                                   b'mped over\nthe lazy\ndog',
-                                                   b'',
-                                                   b's.\n',
-                                                   b''])),
+            list(yield_lines(chunk for chunk in
+                             [b'',
+                              b'The quick\nbrown fox\nju',
+                              b'', b'', b'',
+                              b'mped over\nthe lazy\ndog',
+                              b'',
+                              b's.\n',
+                              b''])),
             [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
              b'dogs.\n'])
 
     def test_no_trailing_newline(self):
         self.assertEqual(
-            list(buffer_iterator_to_line_iterator(chunk for chunk in
-                                                  [b'Alouette,\ngentille',
-                                                   b' Alouette.'])),
+            list(yield_lines(chunk for chunk in
+                             [b'Alouette,\ngentille',
+                              b' Alouette.'])),
             [b'Alouette,\n', b'gentille Alouette.'])
 
     def test_long_lines(self):
         super_long_line = b'a' * 10000 + b'\n' + b'b' * 1000 + b'\nlast\n'
         self.assertEqual(
-            list(buffer_iterator_to_line_iterator(
+            list(yield_lines(
                 chunk for chunk in
                 (super_long_line[0+i:1024+i]
                  for i in range(0, len(super_long_line), 1024)))),
             [b'a' * 10000 + b'\n', b'b' * 1000 + b'\n', b'last\n'])
 
-
+    def test_old_alias(self):
+        self.assertEqual(buffer_iterator_to_line_iterator, yield_lines)
 
 
 class CmdLineTestCase(TestCase):

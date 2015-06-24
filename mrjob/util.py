@@ -63,7 +63,7 @@ def bash_wrap(cmd_str):
     return "bash -c '%s'" % cmd_str.replace("'", "'\\''")
 
 
-def buffer_iterator_to_line_iterator(iterator):
+def yield_lines(iterator):
     """boto's file iterator splits by buffer size instead of by newline. This
     wrapper puts them back into lines.
     """
@@ -96,6 +96,9 @@ def buffer_iterator_to_line_iterator(iterator):
 
     if leftovers:
         yield b''.join(leftovers)
+
+# old deprecated alias, will be removed in v0.6.0
+buffer_iterator_to_line_iterator = yield_lines
 
 
 def cmd_line(args):
@@ -442,19 +445,19 @@ def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
             f = fileobj
 
         if path.endswith('.gz'):
-            lines = buffer_iterator_to_line_iterator(gunzip_stream(f))
+            lines = yield_lines(gunzip_stream(f))
         elif path.endswith('.bz2'):
             if bz2 is None:
                 raise Exception('bz2 module was not successfully imported'
                                 ' (likely not installed).')
             else:
-                lines = bunzip2_stream(f)
+                lines = yield_lines(bunzip2_stream(f))
         else:
             if yields_lines:
                 lines = f
             else:
                 # handle boto.s3.Key, which yields chunks of bytes, not lines
-                lines = buffer_iterator_to_line_iterator(f)
+                lines = yield_lines(f)
 
         for line in lines:
             yield line
@@ -467,17 +470,14 @@ def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
                 cleanup()
 
 
-def _bunzip2_stream(fileobj, bufsize=1024):
+def bunzip2_stream(fileobj, bufsize=1024):
     """Decompress gzipped data on the fly.
 
     :param fileobj: object supporting ``read()``
     :param bufsize: number of bytes to read from *fileobj* at a time.
 
     This yields decompressed chunks; it does *not* split on lines. To get
-    lines, wrap this in :py:func:`buffer_iterator_to_line_iterator`.
-
-    This will replace :py:func:`bunzip2_stream` in v0.5.0 as part of
-    an effort to be less line-based (see #715).
+    lines, wrap this in :py:func:`yield_lines`.
     """
     if bz2 is None:
         raise Exception(
@@ -495,23 +495,6 @@ def _bunzip2_stream(fileobj, bufsize=1024):
             yield part
 
 
-def bunzip2_stream(fileobj, bufsize=1024):
-    """Decompress gzipped data on the fly.
-
-    :param fileobj: object supporting ``read()``
-    :param bufsize: number of bytes to read from *fileobj* at a time.
-
-    .. warning::
-
-        This yields lines for backwards compatibility only; in v0.5.0
-        it will yield arbitrary chunks of data as part of supporting
-        non-line-based protocols (see `Issue #715
-        <https://github.com/Yelp/mrjob/issues/715>`_). If you want lines,
-        wrap this in :py:func:`buffer_iterator_to_line_iterator`.
-    """
-    return buffer_iterator_to_line_iterator(_bunzip2_stream(fileobj, bufsize))
-
-
 def gunzip_stream(fileobj, bufsize=1024):
     """Decompress gzipped data on the fly.
 
@@ -522,7 +505,7 @@ def gunzip_stream(fileobj, bufsize=1024):
     .. warning::
 
         This yields decompressed chunks; it does *not* split on lines. To get
-        lines, wrap this in :py:func:`buffer_iterator_to_line_iterator`.
+        lines, wrap this in :py:func:`yield_lines`.
     """
     # see Issue #601 for why we need this.
 

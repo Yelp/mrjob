@@ -63,19 +63,20 @@ def bash_wrap(cmd_str):
     return "bash -c '%s'" % cmd_str.replace("'", "'\\''")
 
 
-def yield_lines(iterator):
-    """boto's file iterator splits by buffer size instead of by newline. This
-    wrapper puts them back into lines.
-    """
-    # we want to optimize for:
-    #
-    # chunks bigger than lines
-    # chunks that are lines (idempotency)
+def yield_lines(chunks):
+    """Take an iterator that yield chunks of data (bytes), and yield
+    the same data a line at a time.
 
+    This does not add a trailing newline.
+
+    This method optimizes for:
+     * chunks bigger than lines (e.g. reading test files)
+     * chunks that are lines (idempotency)
+    """
     # list of chunks with no final newline
     leftovers = []
 
-    for chunk in iterator:
+    for chunk in chunks:
         start = 0
 
         while start < len(chunk):
@@ -97,7 +98,7 @@ def yield_lines(iterator):
     if leftovers:
         yield b''.join(leftovers)
 
-# old deprecated alias, will be removed in v0.6.0
+#: Deprecated alias for :py:func:`yield_lines`, will be removed in v0.6.0
 buffer_iterator_to_line_iterator = yield_lines
 
 
@@ -476,8 +477,10 @@ def bunzip2_stream(fileobj, bufsize=1024):
     :param fileobj: object supporting ``read()``
     :param bufsize: number of bytes to read from *fileobj* at a time.
 
-    This yields decompressed chunks; it does *not* split on lines. To get
-    lines, wrap this in :py:func:`yield_lines`.
+    .. warning::
+
+        This yields decompressed chunks; it does *not* split on lines. To get
+        lines, wrap this in :py:func:`yield_lines`.
     """
     if bz2 is None:
         raise Exception(

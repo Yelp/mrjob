@@ -390,7 +390,7 @@ class MRJobRunner(object):
         """:py:class:`~mrjob.fs.base.Filesystem` object for the local
         filesystem. Methods on :py:class:`~mrjob.fs.base.Filesystem` objects
         will be forwarded to :py:class:`~mrjob.runner.MRJobRunner` until mrjob
-        0.5, but **this behavior is deprecated.**
+        0.6.0, but **this behavior is deprecated.**
         """
         if self._fs is None:
             self._fs = LocalFilesystem()

@@ -181,7 +181,7 @@ class HadoopJobRunner(MRJobRunner):
 
         self._hdfs_tmp_dir = fully_qualify_hdfs_path(
             posixpath.join(
-                self._opts['hdfs_scratch_dir'], self._job_name))
+                self._opts['hdfs_scratch_dir'], self._job_key))
 
         # Keep track of local files to upload to HDFS. We'll add them
         # to this manager just before we need them.

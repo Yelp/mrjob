@@ -38,7 +38,7 @@ from mrjob.emr import filechunkio
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
-from mrjob.parse import JOB_NAME_RE
+from mrjob.parse import JOB_KEY_RE
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import pool_hash_and_name
 from mrjob.py2 import PY2
@@ -315,7 +315,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             emr_conn = runner.make_emr_conn()
             job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
             self.assertEqual(job_flow.state, 'COMPLETED')
-            name_match = JOB_NAME_RE.match(job_flow.name)
+            name_match = JOB_KEY_RE.match(job_flow.name)
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
             self.assertEqual(name_match.group(2), getpass.getuser())
 
@@ -1728,10 +1728,10 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
     def test_zero_log_generating_steps(self):
         mock_steps = [
             MockEmrObject(jar='x.jar',
-                          name=self.runner._job_name,
+                          name=self.runner._job_key,
                           state='COMPLETED'),
             MockEmrObject(jar='x.jar',
-                          name=self.runner._job_name,
+                          name=self.runner._job_key,
                           state='COMPLETED'),
         ]
         mock_jobflow = MockEmrObject(state='COMPLETED',
@@ -1744,16 +1744,16 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
     def test_interleaved_log_generating_steps(self):
         mock_steps = [
             MockEmrObject(jar='x.jar',
-                          name=self.runner._job_name,
+                          name=self.runner._job_key,
                           state='COMPLETED'),
             MockEmrObject(jar='hadoop.streaming.jar',
-                          name=self.runner._job_name,
+                          name=self.runner._job_key,
                           state='COMPLETED'),
             MockEmrObject(jar='x.jar',
-                          name=self.runner._job_name,
+                          name=self.runner._job_key,
                           state='COMPLETED'),
             MockEmrObject(jar='hadoop.streaming.jar',
-                          name=self.runner._job_name,
+                          name=self.runner._job_key,
                           state='COMPLETED'),
         ]
         mock_jobflow = MockEmrObject(state='COMPLETED',
@@ -3277,9 +3277,9 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
         self.jobs = []
         self.future_jobs = []
 
-    def add_job_flow(self, job_names, job_list):
+    def add_job_flow(self, job_keys, job_list):
         """Puts a fake job flow into a list of jobs for testing."""
-        for name in job_names:
+        for name in job_keys:
             jf = Mock()
             jf.state = 'WAITING'
             jf.jobflowid = name

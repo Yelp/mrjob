@@ -123,12 +123,6 @@ def add_runner_opts(opt_group, default_runner='local'):
             help=('Non-python command to run your script, e.g. "ruby".')),
 
         opt_group.add_option(
-            '--job-name', dest='job_name', default=None,
-            help='Specify the job name manually instead of asking mrjob for '
-                 'a unique name. Use this option if you want to give the job '
-                 'a descriptive name.'),
-
-        opt_group.add_option(
             '--no-bootstrap-mrjob', dest='bootstrap_mrjob',
             action='store_false', default=None,
             help=("Don't automatically tar up the mrjob library and install it"
@@ -236,12 +230,11 @@ def add_hadoop_emr_opts(opt_group):
 
         opt_group.add_option(
             '--label', dest='label', default=None,
-            help='custom prefix for job name, to help us identify the job'),
+            help='alternate label for the job, to help us identify it'),
 
         opt_group.add_option(
             '--owner', dest='owner', default=None,
-            help='custom username to use, to help us identify who ran the'
-            ' job'),
+            help='user who ran the job (if different from the current user)'),
 
         opt_group.add_option(
             '--partitioner', dest='partitioner', default=None,

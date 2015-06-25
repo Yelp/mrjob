@@ -263,7 +263,7 @@ def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
     return s3_tmp_uri + 'locks/' + emr_job_flow_id + '/' + str(step_num)
 
 
-def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
+def _lock_acquire_step_1(s3_conn, lock_uri, job_key, mins_to_expiration=None):
     bucket_name, key_prefix = parse_s3_uri(lock_uri)
     bucket = _get_bucket(s3_conn, bucket_name)
     key = bucket.get_key(key_prefix)
@@ -280,26 +280,26 @@ def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
 
     if key is None or key_expired:
         key = bucket.new_key(key_prefix)
-        key.set_contents_from_string(job_name.encode('utf_8'))
+        key.set_contents_from_string(job_key.encode('utf_8'))
         return key
     else:
         return None
 
 
-def _lock_acquire_step_2(key, job_name):
+def _lock_acquire_step_2(key, job_key):
     key_value = key.get_contents_as_string()
-    return (key_value == job_name.encode('utf_8'))
+    return (key_value == job_key.encode('utf_8'))
 
 
-def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name,
+def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_key,
                             mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
-    key = _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration)
+    key = _lock_acquire_step_1(s3_conn, lock_uri, job_key, mins_to_expiration)
     if key is not None:
         time.sleep(sync_wait_time)
-        success = _lock_acquire_step_2(key, job_name)
+        success = _lock_acquire_step_2(key, job_key)
         if success:
             return True
 
@@ -577,8 +577,8 @@ class EMRJobRunner(MRJobRunner):
 
         self._fix_s3_scratch_and_log_uri_opts()
 
-        # pick a tmp dir based on the job name
-        self._s3_tmp_uri = self._opts['s3_scratch_uri'] + self._job_name + '/'
+        # use job key to make a unique tmp dir
+        self._s3_tmp_uri = self._opts['s3_scratch_uri'] + self._job_key + '/'
 
         # pick/validate output dir
         if self._output_dir:
@@ -781,7 +781,7 @@ class EMRJobRunner(MRJobRunner):
 
     @property
     def _ssh_key_name(self):
-        return self._job_name + '.pem'
+        return self._job_key + '.pem'
 
     @property
     def fs(self):
@@ -1248,10 +1248,10 @@ class EMRJobRunner(MRJobRunner):
 
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (
-            self._job_name, self._opts['s3_log_uri'],
+            self._job_key, self._opts['s3_log_uri'],
             ', '.join('%s=%r' % (k, v) for k, v in args.items())))
         emr_job_flow_id = emr_conn.run_jobflow(
-            self._job_name, self._opts['s3_log_uri'], **args)
+            self._job_key, self._opts['s3_log_uri'], **args)
 
          # keep track of when we started our job
         self._emr_job_start = time.time()
@@ -1433,7 +1433,7 @@ class EMRJobRunner(MRJobRunner):
     def _build_streaming_step(self, step_num):
         streaming_step_kwargs = {
             'name': '%s: Step %d of %d' % (
-                self._job_name, step_num + 1, self._num_steps()),
+                self._job_key, step_num + 1, self._num_steps()),
             'input': self._step_input_uris(step_num),
             'output': self._step_output_uri(step_num),
             'jar': self._get_streaming_jar(),
@@ -1480,7 +1480,7 @@ class EMRJobRunner(MRJobRunner):
 
         return boto.emr.JarStep(
             name='%s: Step %d of %d' % (
-                self._job_name, step_num + 1, self._num_steps()),
+                self._job_key, step_num + 1, self._num_steps()),
             jar=jar,
             main_class=step['main_class'],
             step_args=step_args,
@@ -1598,7 +1598,7 @@ class EMRJobRunner(MRJobRunner):
                     latest_lg_step_num += 1
 
                 # ignore steps belonging to other jobs
-                if not step.name.startswith(self._job_name):
+                if not step.name.startswith(self._job_key):
                     continue
 
                 step_nums.append(i + 1)
@@ -1722,7 +1722,7 @@ class EMRJobRunner(MRJobRunner):
         else:
             # put intermediate data in HDFS
             return ['hdfs:///tmp/mrjob/%s/step-output/%s/' % (
-                self._job_name, step_num)]
+                self._job_key, step_num)]
 
     def _step_output_uri(self, step_num):
         if step_num == len(self._get_steps()) - 1:
@@ -1730,7 +1730,7 @@ class EMRJobRunner(MRJobRunner):
         else:
             # put intermediate data in HDFS
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
-                self._job_name, step_num + 1)
+                self._job_key, step_num + 1)
 
     ### LOG FETCHING/PARSING ###
 
@@ -2449,7 +2449,7 @@ class EMRJobRunner(MRJobRunner):
                 job_flow = sorted_tagged_job_flows[-1]
                 status = attempt_to_acquire_lock(
                     s3_conn, self._lock_uri(job_flow),
-                    self._opts['s3_sync_wait_time'], self._job_name)
+                    self._opts['s3_sync_wait_time'], self._job_key)
                 if status:
                     return sorted_tagged_job_flows[-1]
                 else:

@@ -518,7 +518,6 @@ class MRJobLauncher(object):
             'input_paths': self.args,
             'interpreter': self.options.interpreter,
             'jobconf': self.jobconf(),
-            'job_name': self.options.job_name,
             'mr_job_script': self._script_path,
             'label': self.options.label,
             'output_dir': self.options.output_dir,

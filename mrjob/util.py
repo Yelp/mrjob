@@ -318,9 +318,7 @@ def _process_long_opt(option_parser, rargs, values, dests):
 
 
 def parse_and_save_options(option_parser, args):
-    """DEPRECATED. To be removed in v0.5.
-
-    Duplicate behavior of :py:class:`OptionParser`, but capture the strings
+    """Duplicate behavior of :py:class:`OptionParser`, but capture the strings
     required to reproduce the same values. Ref. optparse.py lines 1414-1548
     (python 2.6.5)
     """

@@ -43,7 +43,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
-from mrjob.parse import JOB_NAME_RE
+from mrjob.parse import JOB_KEY_RE
 from mrjob.parse import STEP_NAME_RE
 from mrjob.parse import iso8601_to_datetime
 from mrjob.util import strip_microseconds
@@ -166,7 +166,7 @@ def job_flows_to_stats(job_flows, now=None):
                         start_to_nih[start] += nih
             s[key] = start_to_nih
 
-    # break down by label ("job name") and owner ("user")
+    # break out by label (usually script name) and owner (usually current user)
     for key in ('label', 'owner'):
         for nih_type in ('nih_used', 'nih_billed', 'nih_bbnu'):
             key_to_nih = {}
@@ -303,7 +303,7 @@ def job_flow_to_basic_summary(job_flow, now=None):
         if len(args) == 2 and args[0].startswith('pool-'):
             jf['pool'] = args[1]
 
-    m = JOB_NAME_RE.match(getattr(job_flow, 'name', ''))
+    m = JOB_KEY_RE.match(getattr(job_flow, 'name', ''))
     if m:
         jf['label'], jf['owner'] = m.group(1), m.group(2)
     else:
@@ -546,8 +546,8 @@ def subdivide_interval_by_hour(start, end):
 def get_job_flows(conf_paths, max_days_ago=None, now=None):
     """Get relevant job flow information from EMR.
 
-    :param str conf_path: Alternate path to read :py:mod:`mrjob.conf` from, or
-                          ``False`` to ignore all config files.
+    :param str conf_paths: List of alternate paths to read configs from, or
+                           ``[]`` to ignore all config files.
     :param float max_days_ago: If set, don't fetch job flows created longer
                                than this many days ago.
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.

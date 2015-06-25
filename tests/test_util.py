@@ -29,9 +29,7 @@ from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
-from mrjob.util import extract_dir_for_tar
 from mrjob.util import file_ext
-from mrjob.util import hash_object
 from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
 from mrjob.util import read_file
@@ -408,16 +406,6 @@ class ArchiveTestCase(TestCase):
 
         self.ensure_expected_results(excluded_files=['baz'])
 
-    def test_extract_dir_for_tar(self):
-        join = os.path.join
-        tar_and_gzip(dir=join(self.tmp_dir, 'a'),
-                     out_path=join(self.tmp_dir, 'not_a.tar.gz'),
-                     prefix='b')
-
-        self.assertEqual(
-            extract_dir_for_tar(join(self.tmp_dir, 'not_a.tar.gz')),
-            'b')
-
     def archive_and_unarchive(self, extension, archive_template,
                               added_files=[]):
         join = os.path.join
@@ -599,11 +587,3 @@ class ReadFileTestCase(TestCase):
                 output.append(line)
 
         self.assertEqual(output, [b'bar\n', b'bar\n', b'foo\n'])
-
-
-class HashObjectTestCase(TestCase):
-
-    def test_works_at_all(self):
-        # this was broken on Python 3
-        with logger_disabled('mrjob.util'):
-            self.assertNotEqual(hash_object('foo'), hash_object({}))

@@ -74,10 +74,8 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
 #: * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
 #:    on cleanup
-#: * ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL``. Not supported for
-#:   ``cleanup_on_failure``.
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
-                   'SCRATCH', 'JOB', 'IF_SUCCESSFUL', 'JOB_FLOW']
+                   'SCRATCH', 'JOB', 'JOB_FLOW']
 
 _STEP_RE = re.compile(r'^M?C?R?$')
 
@@ -93,6 +91,7 @@ class RunnerOptionStore(OptionStore):
     ALLOWED_KEYS = OptionStore.ALLOWED_KEYS.union(set([
         'base_tmp_dir',
         'bootstrap_mrjob',
+        'check_input_paths',
         'cleanup',
         'cleanup_on_failure',
         'cmdenv',
@@ -101,7 +100,6 @@ class RunnerOptionStore(OptionStore):
         'hadoop_version',
         'interpreter',
         'jobconf',
-        'job_name',
         'label',
         'owner',
         'python_archives',
@@ -115,7 +113,6 @@ class RunnerOptionStore(OptionStore):
         'strict_protocols',
         'upload_archives',
         'upload_files',
-        'check_input_paths',
     ]))
 
     COMBINERS = combine_dicts(OptionStore.COMBINERS, {
@@ -200,12 +197,6 @@ class RunnerOptionStore(OptionStore):
             for choice in opt_list:
                 if choice not in CLEANUP_CHOICES:
                     raise ValueError(error_str % choice)
-
-                if choice == 'IS_SUCCESSFUL':
-                    log.warning('IS_SUCCESSFUL cleanup option is deprecated'
-                                ' and will be removed in v0.5.0. Use ALL'
-                                ' instead.')
-
             if 'NONE' in opt_list and len(set(opt_list)) > 1:
                 raise ValueError(
                     'Cannot clean up both nothing and something!')
@@ -237,11 +228,11 @@ class MRJobRunner(object):
 
     ### methods to call from your batch script ###
 
-    def __init__(self, mr_job_script=None, conf_path=None,
+    def __init__(self, mr_job_script=None, conf_paths=None,
                  extra_args=None, file_upload_args=None,
                  hadoop_input_format=None, hadoop_output_format=None,
                  input_paths=None, output_dir=None, partitioner=None,
-                 stdin=None, conf_paths=None, **opts):
+                 stdin=None, **opts):
         """All runners take the following keyword arguments:
 
         :type mr_job_script: str
@@ -250,10 +241,6 @@ class MRJobRunner(object):
                               you won't actually be able to :py:meth:`run` the
                               job, but other utilities (e.g. :py:meth:`ls`)
                               will work.
-        :type conf_path: str, None, or False
-        :param conf_path: Deprecated. Alternate path to read configs from, or
-                          ``False`` to ignore all config files. Use
-                          *conf_paths* instead.
         :type conf_paths: None or list
         :param conf_paths: List of config files to combine and use, or None to
                            search for mrjob.conf in the default locations.
@@ -315,17 +302,6 @@ class MRJobRunner(object):
         """
         self._ran_job = False
 
-        if conf_path is not None:
-            if conf_paths is not None:
-                raise ValueError("Can't specify both conf_path and conf_paths")
-            else:
-                log.warning('The conf_path argument to MRJobRunner() is'
-                            ' deprecated and will be removed in v0.5.0. Use'
-                            ' conf_paths instead.')
-                if conf_path is False:
-                    conf_paths = []
-                else:
-                    conf_paths = [conf_path]
         self._opts = self.OPTION_STORE_CLASS(self.alias, opts, conf_paths)
         self._fs = None
 
@@ -336,7 +312,7 @@ class MRJobRunner(object):
             self._working_dir_mgr.add('file', self._script_path)
 
         # give this job a unique name
-        self._job_name = self._make_unique_job_name(
+        self._job_key = self._make_unique_job_key(
             label=self._opts['label'], owner=self._opts['owner'])
 
         # we'll create the wrapper script later
@@ -413,7 +389,7 @@ class MRJobRunner(object):
         """:py:class:`~mrjob.fs.base.Filesystem` object for the local
         filesystem. Methods on :py:class:`~mrjob.fs.base.Filesystem` objects
         will be forwarded to :py:class:`~mrjob.runner.MRJobRunner` until mrjob
-        0.5, but **this behavior is deprecated.**
+        0.6.0, but **this behavior is deprecated.**
         """
         if self._fs is None:
             self._fs = LocalFilesystem()
@@ -610,11 +586,20 @@ class MRJobRunner(object):
         """Get options set for this runner, as a dict."""
         return copy.deepcopy(self._opts)
 
-    def get_job_name(self):
-        """Get the unique name for the job run by this runner.
+    def get_job_key(self):
+        """Get the unique key for the job run by this runner.
         This has the format ``label.owner.date.time.microseconds``
         """
-        return self._job_name
+        return self._job_key
+
+    def get_job_name(self):
+        """Alias for :py:meth:`get_job_key`. Will be removed in v0.6.0.
+
+        .. deprecated:: 0.5.0
+        """
+        log.warn('get_job_name() has been renamed to get_job_key().'
+                 ' get_job_name() will be removed in v0.6.0')
+        return self.get_job_key()
 
     def get_output_dir(self):
         """Find the directory containing the job output. If the job hasn't
@@ -652,7 +637,7 @@ class MRJobRunner(object):
         """Create a tmp directory on the local filesystem that will be
         cleaned up by self.cleanup()"""
         if not self._local_tmp_dir:
-            path = os.path.join(self._opts['base_tmp_dir'], self._job_name)
+            path = os.path.join(self._opts['base_tmp_dir'], self._job_key)
             log.info('creating tmp directory %s' % path)
             if os.path.isdir(path):
                 shutil.rmtree(path)
@@ -661,7 +646,7 @@ class MRJobRunner(object):
 
         return self._local_tmp_dir
 
-    def _make_unique_job_name(self, label=None, owner=None):
+    def _make_unique_job_key(self, label=None, owner=None):
         """Come up with a useful unique ID for this job.
 
         We use this to choose the output directory, etc. for the job.
@@ -1012,7 +997,7 @@ class MRJobRunner(object):
         # and then release the lock by closing the file descriptor.
         # File descriptors 10 and higher are used internally by the shell,
         # so 9 is as out-of-the-way as we can get.
-        writeln('exec 9>/tmp/wrapper.lock.%s' % self._job_name)
+        writeln('exec 9>/tmp/wrapper.lock.%s' % self._job_key)
         # would use flock(1), but it's not always available
         writeln("%s -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'" %
                 cmd_line(self._python_bin()))

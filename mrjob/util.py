@@ -40,10 +40,6 @@ except ImportError:
 
 from mrjob.py2 import PY2
 
-
-#: .. deprecated:: 0.4
-is_ironpython = "IronPython" in sys.version
-
 log = getLogger(__name__)
 
 
@@ -191,29 +187,6 @@ def cmd_line(args):
     return ' '.join(pipes.quote(x) for x in args)
 
 
-def extract_dir_for_tar(archive_path, compression='gz'):
-    """.. deprecated:: 0.4.0
-
-    Get the name of the directory the tar at *archive_path* extracts into.
-
-    :type archive_path: str
-    :param archive_path: path to archive file
-    :type compression: str
-    :param compression: Compression type to use. This can be one of ``''``,
-                        ``bz2``, or ``gz``.
-    """
-    log.warning(
-        'extract_dir_for_tar() is deprecated and will be removed in v0.5.0')
-
-    # Open the file for read-only streaming (no random seeks)
-    tar = tarfile.open(archive_path, mode='r|%s' % compression)
-    # Grab the first item
-    first_member = tar.next()
-    tar.close()
-    # Return the first path component of the item's name
-    return first_member.name.split('/')[0]
-
-
 def expand_path(path):
     """Resolve ``~`` (home dir) and environment variables in *path*.
 
@@ -263,20 +236,6 @@ def gunzip_stream(fileobj, bufsize=1024):
         data = d.decompress(chunk)
         if data:
             yield data
-
-
-def hash_object(obj):
-    """Generate a hash (currently md5) of the ``repr`` of the object.
-
-    .. deprecated:: 0.4.5
-    """
-    log.warning('hash_object() is deprecated and will be removed in v0.5')
-    m = hashlib.md5()
-    obj_repr = repr(obj)
-    if not isinstance(obj_repr, bytes):
-        obj_repr = obj_repr.encode('utf_8')
-    m.update(obj_repr)
-    return m.hexdigest()
 
 
 def log_to_null(name=None):
@@ -359,9 +318,7 @@ def _process_long_opt(option_parser, rargs, values, dests):
 
 
 def parse_and_save_options(option_parser, args):
-    """DEPRECATED. To be removed in v0.5.
-
-    Duplicate behavior of :py:class:`OptionParser`, but capture the strings
+    """Duplicate behavior of :py:class:`OptionParser`, but capture the strings
     required to reproduce the same values. Ref. optparse.py lines 1414-1548
     (python 2.6.5)
     """

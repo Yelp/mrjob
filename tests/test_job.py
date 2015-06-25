@@ -932,43 +932,6 @@ class FileOptionsTestCase(SandboxedTestCase):
         self.assertEqual(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))
 
 
-class DeprecatedTestMethodsTestCase(TestCase):
-
-    def test_parse_output(self):
-        # test parsing JSON
-        mr_job = MRJob()
-        output = b'0\t1\n"a"\t"b"\n'
-        mr_job.stdout = BytesIO(output)
-        with logger_disabled('mrjob.job'):
-            self.assertEqual(mr_job.parse_output(), [(0, 1), ('a', 'b')])
-
-        # verify that stdout is not cleared
-        self.assertEqual(mr_job.stdout.getvalue(), output)
-
-    def test_parse_output_with_protocol_instance(self):
-        # see if we can use the repr protocol
-        mr_job = MRJob()
-        output = b"0\t1\n['a', 'b']\tset(['c', 'd'])\n"
-        mr_job.stdout = BytesIO(output)
-        with logger_disabled('mrjob.job'):
-            self.assertEqual(mr_job.parse_output(ReprProtocol()),
-                             [(0, 1), (['a', 'b'], set(['c', 'd']))])
-
-        # verify that stdout is not cleared
-        self.assertEqual(mr_job.stdout.getvalue(), output)
-
-    def test_parse_counters(self):
-        mr_job = MRJob().sandbox()
-
-        mr_job.increment_counter('Foo', 'Bar')
-        mr_job.increment_counter('Foo', 'Bar')
-        mr_job.increment_counter('Foo', 'Baz', 20)
-
-        with logger_disabled('mrjob.job'):
-            self.assertEqual(mr_job.parse_counters(),
-                             {'Foo': {'Bar': 2, 'Baz': 20}})
-
-
 class RunJobTestCase(SandboxedTestCase):
 
     def run_job(self, args=()):
@@ -1130,17 +1093,7 @@ class StepsTestCase(TestCase):
             MRStep(mapper=j.mapper))
 
 
-class DeprecatedStepConstructorMethodsTestCase(TestCase):
-
-    def test_jar(self):
-        kwargs = {
-            'jar': 'binks.jar.jar',
-            'main_class': 'MyMainMan',
-            'args': ['argh', 'argh'],
-        }
-
-        with logger_disabled('mrjob.job'):
-            self.assertEqual(MRJob.jar(**kwargs), JarStep(**kwargs))
+class DeprecatedMRMethodTestCase(TestCase):
 
     def test_mr(self):
         kwargs = {
@@ -1150,9 +1103,3 @@ class DeprecatedStepConstructorMethodsTestCase(TestCase):
 
         with logger_disabled('mrjob.job'):
             self.assertEqual(MRJob.mr(**kwargs), MRStep(**kwargs))
-
-    def test_mr_positional_arguments(self):
-        with logger_disabled('mrjob.job'):
-            self.assertEqual(
-                MRJob.mr(_IDENTITY_MAPPER, _IDENTITY_REDUCER),
-                MRStep(mapper=_IDENTITY_MAPPER, reducer=_IDENTITY_REDUCER))

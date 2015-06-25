@@ -301,15 +301,15 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
         self.assertEqual(
             sorted(results['mapreduce.job.cache.local.files'].split(',')),
             sorted(expected_local_files))
-        self.assertEqual(results['mapreduce.job.id'], runner._job_name)
+        self.assertEqual(results['mapreduce.job.id'], runner._job_key)
 
         self.assertEqual(results['mapreduce.map.input.file'], input_path)
         self.assertEqual(results['mapreduce.map.input.length'], '4')
         self.assertEqual(results['mapreduce.map.input.start'], '0')
         self.assertEqual(results['mapreduce.task.attempt.id'],
-                       'attempt_%s_mapper_000000_0' % runner._job_name)
+                       'attempt_%s_mapper_000000_0' % runner._job_key)
         self.assertEqual(results['mapreduce.task.id'],
-                       'task_%s_mapper_000000' % runner._job_name)
+                       'task_%s_mapper_000000' % runner._job_key)
         self.assertEqual(results['mapreduce.task.ismap'], 'true')
         self.assertEqual(results['mapreduce.task.output.dir'],
                          runner._output_dir)

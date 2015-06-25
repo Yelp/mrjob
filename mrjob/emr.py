@@ -139,40 +139,6 @@ WAIT_FOR_SSH_TO_FAIL = 1.0
 # amount of time to wait between checks for available pooled job flows
 JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 
-# Deprecated as of v0.4.1 (will be removed in v0.5).
-# Use mrjob.aws.emr_endpoint_for_region() instead
-REGION_TO_EMR_ENDPOINT = {
-    'us-east-1': 'elasticmapreduce.us-east-1.amazonaws.com',
-    'us-west-1': 'elasticmapreduce.us-west-1.amazonaws.com',
-    'us-west-2': 'elasticmapreduce.us-west-2.amazonaws.com',
-    'EU': 'elasticmapreduce.eu-west-1.amazonaws.com',  # for compatibility
-    'eu-west-1': 'elasticmapreduce.eu-west-1.amazonaws.com',
-    'ap-southeast-1': 'elasticmapreduce.ap-southeast-1.amazonaws.com',
-    'ap-northeast-1': 'elasticmapreduce.ap-northeast-1.amazonaws.com',
-    'sa-east-1': 'elasticmapreduce.sa-east-1.amazonaws.com',
-    '': 'elasticmapreduce.amazonaws.com',  # when no region specified
-}
-
-# Deprecated as of v0.4.1 (will be removed in v0.5).
-# Use mrjob.aws.s3_endpoint_for_region() instead
-REGION_TO_S3_ENDPOINT = {
-    'us-east-1': 's3.amazonaws.com',  # no region-specific endpoint
-    'us-west-1': 's3-us-west-1.amazonaws.com',
-    'us-west-2': 's3-us-west-2.amazonaws.com',
-    'EU': 's3-eu-west-1.amazonaws.com',
-    'eu-west-1': 's3-eu-west-1.amazonaws.com',
-    'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com',
-    'ap-northeast-1': 's3-ap-northeast-1.amazonaws.com',
-    'sa-east-1': 's3-sa-east-1.amazonaws.com',
-    '': 's3.amazonaws.com',
-}
-
-# Deprecated as of v0.4.1 (will be removed in v0.5).
-# Use mrjob.aws.s3_location_constraint_for_region() instead
-REGION_TO_S3_LOCATION_CONSTRAINT = {
-    'us-east-1': '',
-}
-
 # bootstrap action which automatically terminates idle job flows
 _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
     os.path.dirname(mrjob.__file__),
@@ -263,7 +229,7 @@ def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
     return s3_tmp_uri + 'locks/' + emr_job_flow_id + '/' + str(step_num)
 
 
-def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
+def _lock_acquire_step_1(s3_conn, lock_uri, job_key, mins_to_expiration=None):
     bucket_name, key_prefix = parse_s3_uri(lock_uri)
     bucket = _get_bucket(s3_conn, bucket_name)
     key = bucket.get_key(key_prefix)
@@ -280,26 +246,26 @@ def _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration=None):
 
     if key is None or key_expired:
         key = bucket.new_key(key_prefix)
-        key.set_contents_from_string(job_name.encode('utf_8'))
+        key.set_contents_from_string(job_key.encode('utf_8'))
         return key
     else:
         return None
 
 
-def _lock_acquire_step_2(key, job_name):
+def _lock_acquire_step_2(key, job_key):
     key_value = key.get_contents_as_string()
-    return (key_value == job_name.encode('utf_8'))
+    return (key_value == job_key.encode('utf_8'))
 
 
-def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_name,
+def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_key,
                             mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
-    key = _lock_acquire_step_1(s3_conn, lock_uri, job_name, mins_to_expiration)
+    key = _lock_acquire_step_1(s3_conn, lock_uri, job_key, mins_to_expiration)
     if key is not None:
         time.sleep(sync_wait_time)
-        success = _lock_acquire_step_2(key, job_name)
+        success = _lock_acquire_step_2(key, job_key)
         if success:
             return True
 
@@ -349,7 +315,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
         'iam_instance_profile',
-        'iam_job_flow_role',
         'iam_service_role',
         'max_hours_idle',
         'mins_to_end_of_hour',
@@ -384,22 +349,9 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_api_params': combine_dicts
     })
 
-    def __init__(self, alias, opts, conf_path):
-        super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_path)
+    def __init__(self, alias, opts, conf_paths):
+        super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_paths)
         self._fix_ec2_instance_opts()
-        self._fix_deprecated_opts()
-
-    def _fix_deprecated_opts(self):
-        # generalize this for other options
-
-        if self['iam_job_flow_role'] is not None:
-            log.warning('iam_job_flow_role is deprecated and wil be removed'
-                        ' in v0.5; use iam_instance_profile instead')
-
-            if self['iam_instance_profile'] is None:
-                self['iam_instance_profile'] = self['iam_job_flow_role']
-
-            self['iam_job_flow_role'] = None
 
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
@@ -577,8 +529,8 @@ class EMRJobRunner(MRJobRunner):
 
         self._fix_s3_scratch_and_log_uri_opts()
 
-        # pick a tmp dir based on the job name
-        self._s3_tmp_uri = self._opts['s3_scratch_uri'] + self._job_name + '/'
+        # use job key to make a unique tmp dir
+        self._s3_tmp_uri = self._opts['s3_scratch_uri'] + self._job_key + '/'
 
         # pick/validate output dir
         if self._output_dir:
@@ -781,7 +733,7 @@ class EMRJobRunner(MRJobRunner):
 
     @property
     def _ssh_key_name(self):
-        return self._job_name + '.pem'
+        return self._job_key + '.pem'
 
     @property
     def fs(self):
@@ -1248,10 +1200,10 @@ class EMRJobRunner(MRJobRunner):
 
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (
-            self._job_name, self._opts['s3_log_uri'],
+            self._job_key, self._opts['s3_log_uri'],
             ', '.join('%s=%r' % (k, v) for k, v in args.items())))
         emr_job_flow_id = emr_conn.run_jobflow(
-            self._job_name, self._opts['s3_log_uri'], **args)
+            self._job_key, self._opts['s3_log_uri'], **args)
 
          # keep track of when we started our job
         self._emr_job_start = time.time()
@@ -1433,7 +1385,7 @@ class EMRJobRunner(MRJobRunner):
     def _build_streaming_step(self, step_num):
         streaming_step_kwargs = {
             'name': '%s: Step %d of %d' % (
-                self._job_name, step_num + 1, self._num_steps()),
+                self._job_key, step_num + 1, self._num_steps()),
             'input': self._step_input_uris(step_num),
             'output': self._step_output_uri(step_num),
             'jar': self._get_streaming_jar(),
@@ -1480,7 +1432,7 @@ class EMRJobRunner(MRJobRunner):
 
         return boto.emr.JarStep(
             name='%s: Step %d of %d' % (
-                self._job_name, step_num + 1, self._num_steps()),
+                self._job_key, step_num + 1, self._num_steps()),
             jar=jar,
             main_class=step['main_class'],
             step_args=step_args,
@@ -1598,7 +1550,7 @@ class EMRJobRunner(MRJobRunner):
                     latest_lg_step_num += 1
 
                 # ignore steps belonging to other jobs
-                if not step.name.startswith(self._job_name):
+                if not step.name.startswith(self._job_key):
                     continue
 
                 step_nums.append(i + 1)
@@ -1722,7 +1674,7 @@ class EMRJobRunner(MRJobRunner):
         else:
             # put intermediate data in HDFS
             return ['hdfs:///tmp/mrjob/%s/step-output/%s/' % (
-                self._job_name, step_num)]
+                self._job_key, step_num)]
 
     def _step_output_uri(self, step_num):
         if step_num == len(self._get_steps()) - 1:
@@ -1730,7 +1682,7 @@ class EMRJobRunner(MRJobRunner):
         else:
             # put intermediate data in HDFS
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
-                self._job_name, step_num + 1)
+                self._job_key, step_num + 1)
 
     ### LOG FETCHING/PARSING ###
 
@@ -2449,7 +2401,7 @@ class EMRJobRunner(MRJobRunner):
                 job_flow = sorted_tagged_job_flows[-1]
                 status = attempt_to_acquire_lock(
                     s3_conn, self._lock_uri(job_flow),
-                    self._opts['s3_sync_wait_time'], self._job_name)
+                    self._opts['s3_sync_wait_time'], self._job_key)
                 if status:
                     return sorted_tagged_job_flows[-1]
                 else:

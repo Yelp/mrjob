@@ -624,7 +624,7 @@ class JobFlowToFullSummaryTestCase(TestCase):
         })
 
     def test_pooled_job_flow(self):
-        # same as test case above with different job names
+        # same as test case above with different job keys
         job_flow = MockEmrObject(
             bootstrapactions=[
                 MockEmrObject(args=[]),

@@ -40,10 +40,6 @@ except ImportError:
 
 from mrjob.py2 import PY2
 
-
-#: .. deprecated:: 0.4
-is_ironpython = "IronPython" in sys.version
-
 log = getLogger(__name__)
 
 

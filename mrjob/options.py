@@ -123,12 +123,6 @@ def add_runner_opts(opt_group, default_runner='local'):
             help=('Non-python command to run your script, e.g. "ruby".')),
 
         opt_group.add_option(
-            '--job-name', dest='job_name', default=None,
-            help='Specify the job name manually instead of asking mrjob for '
-                 'a unique name. Use this option if you want to give the job '
-                 'a descriptive name.'),
-
-        opt_group.add_option(
             '--no-bootstrap-mrjob', dest='bootstrap_mrjob',
             action='store_false', default=None,
             help=("Don't automatically tar up the mrjob library and install it"

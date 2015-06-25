@@ -93,6 +93,7 @@ class RunnerOptionStore(OptionStore):
     ALLOWED_KEYS = OptionStore.ALLOWED_KEYS.union(set([
         'base_tmp_dir',
         'bootstrap_mrjob',
+        'check_input_paths',
         'cleanup',
         'cleanup_on_failure',
         'cmdenv',
@@ -101,7 +102,6 @@ class RunnerOptionStore(OptionStore):
         'hadoop_version',
         'interpreter',
         'jobconf',
-        'job_name',
         'label',
         'owner',
         'python_archives',
@@ -115,7 +115,6 @@ class RunnerOptionStore(OptionStore):
         'strict_protocols',
         'upload_archives',
         'upload_files',
-        'check_input_paths',
     ]))
 
     COMBINERS = combine_dicts(OptionStore.COMBINERS, {

@@ -349,7 +349,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
         'iam_instance_profile',
-        'iam_job_flow_role',
         'iam_service_role',
         'max_hours_idle',
         'mins_to_end_of_hour',
@@ -387,19 +386,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     def __init__(self, alias, opts, conf_path):
         super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_path)
         self._fix_ec2_instance_opts()
-        self._fix_deprecated_opts()
-
-    def _fix_deprecated_opts(self):
-        # generalize this for other options
-
-        if self['iam_job_flow_role'] is not None:
-            log.warning('iam_job_flow_role is deprecated and wil be removed'
-                        ' in v0.5; use iam_instance_profile instead')
-
-            if self['iam_instance_profile'] is None:
-                self['iam_instance_profile'] = self['iam_job_flow_role']
-
-            self['iam_job_flow_role'] = None
 
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()

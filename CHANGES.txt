@@ -5,6 +5,8 @@ v0.5.0, 2015-??-?? -- ???
  * runners:
    * All runners:
      * removed deprecated IS_SUCCESSFUL cleanup option (use ALL)
+   * EMR:
+     * removed deprecated iam_job_flow_role option (use iam_instance_profile)
  * deprecated alias mrjob.compat.get_jobconf_value() removed
 
 v0.4.5, 2015-??-?? -- IAM Fortified

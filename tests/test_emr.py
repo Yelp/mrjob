@@ -3076,7 +3076,7 @@ class TestCatFallback(MockEMRAndS3TestCase):
         runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
                               conf_paths=[])
 
-        self.assertEqual(list(runner.cat('s3://walrus/one')), [b'one_text\n'])
+        self.assertEqual(list(runner.cat('s3://walrus/one')), [b'one_text'])
 
     def test_ssh_cat(self):
         runner = EMRJobRunner(conf_paths=[])

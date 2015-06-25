@@ -311,8 +311,9 @@ class MRJobRunner(object):
             if conf_paths is not None:
                 raise ValueError("Can't specify both conf_path and conf_paths")
             else:
-                log.warning("The conf_path argument to MRJobRunner() is"
-                         " deprecated. Use conf_paths instead.")
+                log.warning('The conf_path argument to MRJobRunner() is'
+                            ' deprecated and will be removed in v0.5.0. Use'
+                            ' conf_paths instead.')
                 if conf_path is False:
                     conf_paths = []
                 else:

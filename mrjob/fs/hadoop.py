@@ -37,10 +37,6 @@ HADOOP_FILE_EXISTS_RE = re.compile(br'.*File exists.*')
 _HADOOP_LS_NO_SUCH_FILE = re.compile(
     br'^lsr?: Cannot access .*: No such file or directory.')
 
-# Deprecated: removing this in v0.5 and prepending _ to the other constants
-HADOOP_LSR_NO_SUCH_FILE = re.compile(
-    br'^lsr: Cannot access .*: No such file or directory.')
-
 # used by rm() (see below)
 HADOOP_RMR_NO_SUCH_FILE = re.compile(br'^rmr: hdfs://.*$')
 

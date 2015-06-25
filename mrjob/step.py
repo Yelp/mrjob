@@ -240,10 +240,6 @@ class MRStep(object):
         return substep_descs
 
 
-# for backwards compatibility; remove in v0.5.0
-MRJobStep = MRStep
-
-
 class JarStep(object):
     """Represents a running a custom Jar as a step.
 

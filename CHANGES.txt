@@ -1,14 +1,16 @@
 v0.5.0, 2015-??-?? -- ???
  * jobs:
-   * deprecated self.mr() no longer takes positional arguments (#814)
-   * removed deprecated self.jar() (use mrjob.step.JarStep)
+   * mr() no longer takes positional arguments (#814)
+   * removed jar() (use mrjob.step.JarStep)
+   * removed testing methods parse_counters() and parse_output()
  * runners:
    * All runners:
-     * removed deprecated IS_SUCCESSFUL cleanup option (use ALL)
+     * removed IS_SUCCESSFUL cleanup option (use ALL)
    * EMR:
-     * removed deprecated iam_job_flow_role option (use iam_instance_profile)
-     * removed deprecated get_s3_folder_keys()
- * deprecated alias mrjob.compat.get_jobconf_value() removed
+     * removed iam_job_flow_role option (use iam_instance_profile)
+     * removed get_s3_folder_keys()
+ * removed mrjob.compat.get_jobconf_value() (use jobconf_from_env())
+
 
 v0.4.5, 2015-??-?? -- IAM Fortified
  * runners:

@@ -26,11 +26,13 @@ from subprocess import Popen
 
 from mrjob.aws import random_identifier
 from mrjob.py2 import PY2
+from mrjob.py2 import StringIO
 from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
 from mrjob.util import extract_dir_for_tar
 from mrjob.util import file_ext
 from mrjob.util import hash_object
+from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
 from mrjob.util import read_file
 from mrjob.util import read_input
@@ -42,6 +44,7 @@ from mrjob.util import to_lines
 
 from tests.py2 import TestCase
 from tests.quiet import logger_disabled
+from tests.quiet import no_handlers_for_logger
 from tests.sandbox import random_seed
 
 
@@ -55,30 +58,30 @@ class ToLinesTestCase(TestCase):
     def test_buffered_lines(self):
         self.assertEqual(
             list(to_lines(chunk for chunk in
-                             [b'The quick\nbrown fox\nju',
-                              b'mped over\nthe lazy\ndog',
-                              b's.\n'])),
+                          [b'The quick\nbrown fox\nju',
+                           b'mped over\nthe lazy\ndog',
+                           b's.\n'])),
             [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
              b'dogs.\n'])
 
     def test_empty_chunks(self):
         self.assertEqual(
             list(to_lines(chunk for chunk in
-                             [b'',
-                              b'The quick\nbrown fox\nju',
-                              b'', b'', b'',
-                              b'mped over\nthe lazy\ndog',
-                              b'',
-                              b's.\n',
-                              b''])),
+                          [b'',
+                           b'The quick\nbrown fox\nju',
+                           b'', b'', b'',
+                           b'mped over\nthe lazy\ndog',
+                           b'',
+                           b's.\n',
+                           b''])),
             [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
              b'dogs.\n'])
 
     def test_no_trailing_newline(self):
         self.assertEqual(
             list(to_lines(chunk for chunk in
-                             [b'Alouette,\ngentille',
-                              b' Alouette.'])),
+                          [b'Alouette,\ngentille',
+                           b' Alouette.'])),
             [b'Alouette,\n', b'gentille Alouette.'])
 
     def test_long_lines(self):
@@ -90,8 +93,20 @@ class ToLinesTestCase(TestCase):
                  for i in range(0, len(super_long_line), 1024)))),
             [b'a' * 10000 + b'\n', b'b' * 1000 + b'\n', b'last\n'])
 
-    def test_old_alias(self):
-        self.assertEqual(buffer_iterator_to_line_iterator, to_lines)
+    def test_deprecated_alias(self):
+        with no_handlers_for_logger('mrjob.util'):
+            stderr = StringIO()
+            log_to_stream('mrjob.util', stderr)
+
+            self.assertEqual(
+                list(buffer_iterator_to_line_iterator(chunk for chunk in
+                          [b'The quick\nbrown fox\nju',
+                           b'mped over\nthe lazy\ndog',
+                           b's.\n'])),
+            [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
+             b'dogs.\n'])
+
+            self.assertIn('has been renamed', stderr.getvalue())
 
 
 class CmdLineTestCase(TestCase):

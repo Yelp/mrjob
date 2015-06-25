@@ -63,6 +63,16 @@ def bash_wrap(cmd_str):
     return "bash -c '%s'" % cmd_str.replace("'", "'\\''")
 
 
+def buffer_iterator_to_line_iterator(chunks):
+    """Alias for :py:func:`to_lines()`. Will be removed in v0.6.0.
+
+    .. deprecated:: 0.5.0
+    """
+    log.warning('buffer_iterator_to_line_iterator() has been renamed to'
+                ' to_lines(). This alias will be removed in v0.6.0')
+    return to_lines(chunks)
+
+
 def bunzip2_stream(fileobj, bufsize=1024):
     """Decompress gzipped data on the fly.
 
@@ -685,9 +695,6 @@ def to_lines(chunks):
 
     if leftovers:
         yield b''.join(leftovers)
-
-#: Deprecated alias for :py:func:`to_lines`, will be removed in v0.6.0
-buffer_iterator_to_line_iterator = to_lines
 
 
 def unarchive(archive_path, dest):

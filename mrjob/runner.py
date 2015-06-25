@@ -213,6 +213,12 @@ class RunnerOptionStore(OptionStore):
             for choice in opt_list:
                 if choice not in CLEANUP_CHOICES:
                     raise ValueError(error_str % choice)
+
+                if choice == 'IS_SUCCESSFUL':
+                    log.warning('IS_SUCCESSFUL cleanup option is deprecated'
+                                ' and will be removed in v0.5.0. Use ALL'
+                                ' instead.')
+
             if 'NONE' in opt_list and len(set(opt_list)) > 1:
                 raise ValueError(
                     'Cannot clean up both nothing and something!')

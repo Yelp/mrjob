@@ -594,8 +594,20 @@ def jobconf_from_env(variable, default=None):
 
     return default
 
-# old, deprecated name for get_jobconf_value().
-get_jobconf_value = jobconf_from_env
+
+def get_jobconf_value(variable, default=None):
+    """Alias for :py:func:`jobconf_from_env`. Will be removed in v0.5.0.
+
+    .. deprecated:: 0.4.1
+    """
+    # may be used several times in a job, only warn once
+    if not getattr(get_jobconf_value, '_warned', None):
+        log.warning('get_jobconf_value() has been renamed to'
+                    ' jobconf_from_env(). get_jobconf_value() will be removed'
+                    ' in v0.5.0')
+        get_jobconf_value._warned = True
+
+    return jobconf_from_env(variable, default=default)
 
 
 def jobconf_from_dict(jobconf, name, default=None):

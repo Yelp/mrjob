@@ -173,6 +173,39 @@ Job flow creation and configuration
     ``us-west-1.elasticmapreduce.amazonaws.com``).
 
 .. mrjob-opt::
+    :config: emr_tags
+    :switch: --emr-tag
+    :type: :ref:`dict <data-type-plain-dict>`
+    :set: emr
+    :default: ``{}``
+
+    Metadata tags to apply to the EMR cluster after creating a
+    job flow. See `Tagging Amazon EMR Clusters`_ for more information
+    on applying metadata tags to EMR clusters.
+
+    .. _`Tagging Amazon EMR Clusters`:
+        http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-plan-tags.html
+
+    Tag names and values are strings. On the command line, to set a tag
+    use ``--emr-tag KEY=VALUE``:
+
+    .. code-block:: sh
+
+        --emr-tag team=development
+
+    In the config file, ``emr_tags`` is a dict:
+
+    .. code-block:: yaml
+
+        runners:
+          emr:
+            emr_tags:
+              team: development
+              project: mrjob
+
+    .. versionadded:: 0.5.0
+
+.. mrjob-opt::
     :config: hadoop_streaming_jar_on_emr
     :switch: --hadoop-streaming-jar-on-emr
     :type: :ref:`string <data-type-string>`

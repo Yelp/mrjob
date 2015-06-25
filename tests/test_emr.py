@@ -3767,7 +3767,6 @@ class BootstrapPythonTestCase(MockEMRAndS3TestCase):
                 self.assertEqual(runner._bootstrap,
                                  [['sudo yum install -y python34']])
 
-
     def test_bootstrap_python_switch(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap-python'])
 
@@ -3830,3 +3829,50 @@ class BootstrapPythonTestCase(MockEMRAndS3TestCase):
                 self.assertEqual(
                     runner._bootstrap,
                     [['sudo yum install-python-already'], ['true']])
+
+
+class EMRTagsTestCase(MockEMRAndS3TestCase):
+    def test_emr_tags_option_dict(self):
+        job = MRWordCount([
+            '-r', 'emr',
+            '--emr-tag', 'tag_one=foo',
+            '--emr-tag', 'tag_two=bar'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_tags'],
+                            {'tag_one': 'foo', 'tag_two': 'bar'})
+
+    def test_emr_tags_get_created(self):
+        # use a Mock object for the 'add_tags' method in MockEmrConnection and
+        # add a __name__ attribute to it, in oder to avoid problems with
+        # mrjob's retry machinery
+        emr_add_tags_mock = Mock()
+        emr_add_tags_mock.__name__ = 'add_tags'
+        with patch.object(MockEmrConnection, 'add_tags', emr_add_tags_mock):
+            job_flow = self.run_and_get_job_flow('--emr-tag', 'tag_one=foo',
+                                                 '--emr-tag', 'tag_two=bar')
+
+            # assert that 'add_tags' was called once with the proper parameters
+            self.assertEqual(emr_add_tags_mock.call_count, 1)
+            emr_add_tags_mock.assert_called_with(
+                job_flow.jobflowid, {'tag_one': 'foo', 'tag_two': 'bar'})
+
+    def test_command_line_overrides_config(self):
+        EMR_TAGS_MRJOB_CONF = {'runners': {'emr': {
+            'check_emr_status_every': 0.00,
+            's3_sync_wait_time': 0.00,
+            'emr_tags': {
+                'tag_one': 'foo',
+                'tag_two': None,
+                'tag_three': 'bar',
+            },
+        }}}
+
+        job = MRWordCount(['-r', 'emr', '--emr-tag', 'tag_two=qwerty'])
+
+        with mrjob_conf_patcher(EMR_TAGS_MRJOB_CONF):
+            with job.make_runner() as runner:
+                self.assertEqual(runner._opts['emr_tags'],
+                    {'tag_one': 'foo',
+                     'tag_two': 'qwerty',
+                     'tag_three': 'bar'})

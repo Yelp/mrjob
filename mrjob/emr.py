@@ -627,12 +627,6 @@ class EMRJobRunner(MRJobRunner):
             bucket_name, _ = parse_s3_uri(self._opts['s3_scratch_uri'])
             bucket_loc = _get_bucket(s3_conn, bucket_name).get_location()
 
-            # make sure they can communicate if both specified
-            if (bucket_loc and self._opts['aws_region'] != bucket_loc):
-                log.warning('warning: aws_region (%s) does not match bucket'
-                            ' region (%s). Your EC2 instances may not be able'
-                            ' to reach your S3 buckets.' %
-                            (self._opts['aws_region'], bucket_loc))
         # set s3_scratch_uri by checking for existing buckets
         else:
             self._set_s3_scratch_uri(s3_conn)

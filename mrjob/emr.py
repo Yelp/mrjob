@@ -2456,28 +2456,13 @@ class EMRJobRunner(MRJobRunner):
             raise ImportError('You must install boto to connect to EMR')
 
         def emr_conn_for_endpoint(endpoint):
-            # boto 2.2.0's EmrConnection doesn't support security_token,
-            # so only include it if set
-            kwargs = {}
-            if self._opts['aws_security_token']:
-                kwargs['security_token'] = self._opts['aws_security_token']
-
             conn = boto.emr.connection.EmrConnection(
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 region=boto.regioninfo.RegionInfo(
                     name=self._opts['aws_region'], endpoint=endpoint,
                     connection_cls=boto.emr.connection.EmrConnection),
-                    **kwargs)
-
-            # Issue #778: EMR's odd endpoint hostnames mess up
-            # HMAC v4 authentication in boto 2.10.0 thru 2.15.0.
-            # This basically applies the fix in boto 2.16.0
-            if not getattr(conn, 'auth_region_name', None):
-                conn.auth_region_name = self._opts['aws_region']
-
-            if not getattr(conn, 'auth_service_name', None):
-                conn.auth_service_name = 'elasticmapreduce'
+                security_token=self._opts['aws_security_token'])
 
             return conn
 
@@ -2543,12 +2528,7 @@ class EMRJobRunner(MRJobRunner):
                 raise IOError(
                     'Cannot ssh to master; job flow is not waiting or running')
         except boto.exception.S3ResponseError:
-            # This error is raised by some versions of boto when the jobflow
-            # doesn't exist
-            raise IOError('Could not get job flow information')
-        except boto.exception.EmrResponseError:
-            # This error is raised by other version of boto when the jobflow
-            # doesn't exist (some time before 2.4)
+            # jobflow doesn't exist
             raise IOError('Could not get job flow information')
 
         self._address = jobflow.masterpublicdnsname
@@ -2574,14 +2554,9 @@ class EMRJobRunner(MRJobRunner):
 
         log.debug('creating IAM connection')
 
-        # boto 2.2.0's IamConnection doesn't support security_token,
-        # so only include it if set
-        kwargs = {}
-        if self._opts['aws_security_token']:
-            kwargs['security_token'] = self._opts['aws_security_token']
-
         raw_iam_conn = boto.connect_iam(
             aws_access_key_id=self._aws_access_key_id,
             aws_secret_access_key=self._aws_secret_access_key,
-            **kwargs)
+            security_token=self._opts['aws_security_token'])
+
         return wrap_aws_conn(raw_iam_conn)

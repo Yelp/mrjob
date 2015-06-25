@@ -38,6 +38,7 @@ try:
     import boto.emr.connection
     import boto.emr.instance_group
     import boto.exception
+    import boto.https_connection
     import boto.regioninfo
     import boto.utils
     boto  # quiet "redefinition of unused ..." warning from pyflakes
@@ -51,13 +52,6 @@ try:
 except ImportError:
     # that's cool; filechunkio is only for multipart uploading
     filechunkio = None
-
-# need this to retry on SSL errors (see Issue #621)
-try:
-    from boto.https_connection import InvalidCertificateException
-    InvalidCertificateException  # quiet pyflakes warning
-except ImportError:
-    InvalidCertificateException = None
 
 import mrjob
 import mrjob.step
@@ -2496,14 +2490,15 @@ class EMRJobRunner(MRJobRunner):
         # Issue #621: if we're using a region-specific endpoint,
         # try both the canonical version of the hostname and the one
         # that matches the SSL cert
-        if not self._opts['emr_endpoint'] and InvalidCertificateException:
+        if not self._opts['emr_endpoint']:
 
             ssl_host = emr_ssl_host_for_region(self._opts['aws_region'])
             fallback_conn = emr_conn_for_endpoint(ssl_host)
 
             conn = RetryGoRound(
                 [conn, fallback_conn],
-                lambda ex: isinstance(ex, InvalidCertificateException))
+                lambda ex: isinstance(
+                    ex, boto.https_connection.InvalidCertificateException))
 
         return wrap_aws_conn(conn)
 

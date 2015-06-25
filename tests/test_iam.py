@@ -12,14 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
-
 from mrjob.iam import MRJOB_SERVICE_ROLE
-from mrjob.iam import MRJOB_SERVICE_ROLE_POLICY
 from mrjob.iam import _unwrap_response
 from mrjob.iam import _yield_instance_profiles
 from mrjob.iam import _yield_roles
-from mrjob.iam import _yield_attached_role_policies
 
 from tests.mockboto import MockIAMConnection
 from tests.py2 import TestCase

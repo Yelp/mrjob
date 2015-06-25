@@ -2,6 +2,7 @@ v0.5.0, 2015-??-?? -- ???
  * jobs:
    * mr() no longer takes positional arguments (#814)
    * removed jar() (use mrjob.step.JarStep)
+   * JarStep() only takes "args" and "main_class" keyword args
    * removed testing methods parse_counters() and parse_output()
  * runners:
    * All runners:

@@ -38,7 +38,7 @@ from mrjob.emr import filechunkio
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
-from mrjob.parse import JOB_NAME_RE
+from mrjob.parse import JOB_KEY_RE
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import pool_hash_and_name
 from mrjob.py2 import PY2
@@ -315,7 +315,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             emr_conn = runner.make_emr_conn()
             job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
             self.assertEqual(job_flow.state, 'COMPLETED')
-            name_match = JOB_NAME_RE.match(job_flow.name)
+            name_match = JOB_KEY_RE.match(job_flow.name)
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
             self.assertEqual(name_match.group(2), getpass.getuser())
 

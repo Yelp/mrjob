@@ -30,10 +30,6 @@ __author__ = 'Matthew Tai <mtai@adku.com>'
 
 log = logging.getLogger(__name__)
 
-# Deprecated in favor of class variables, remove in v0.5.0
-DEFAULT_MAP_TASKS = 1
-DEFAULT_REDUCE_TASKS = 1
-
 
 class InlineMRJobRunner(SimMRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` in the same process, so it's easy

@@ -383,8 +383,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_api_params': combine_dicts
     })
 
-    def __init__(self, alias, opts, conf_path):
-        super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_path)
+    def __init__(self, alias, opts, conf_paths):
+        super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_paths)
         self._fix_ec2_instance_opts()
 
     def default_options(self):

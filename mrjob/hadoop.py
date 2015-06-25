@@ -124,8 +124,8 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         'hdfs_scratch_dir': combine_paths,
     })
 
-    def __init__(self, alias, opts, conf_path):
-        super(HadoopRunnerOptionStore, self).__init__(alias, opts, conf_path)
+    def __init__(self, alias, opts, conf_paths):
+        super(HadoopRunnerOptionStore, self).__init__(alias, opts, conf_paths)
 
         # fix hadoop_home
         if not self['hadoop_home']:

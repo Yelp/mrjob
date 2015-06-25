@@ -399,13 +399,13 @@ sys.exit(13)
                               runner._invoke_sort, [self.a, self.b], self.out)
 
     def test_environment_variables_non_windows(self):
-        runner = MRJobRunner(conf_path=False)
+        runner = MRJobRunner(conf_paths=[])
         self.addCleanup(runner.cleanup)
 
         self.environment_variable_checks(runner, ['TEMP', 'TMPDIR'])
 
     def test_environment_variables_windows(self):
-        runner = MRJobRunner(conf_path=False)
+        runner = MRJobRunner(conf_paths=[])
         self.addCleanup(runner.cleanup)
 
         runner._sort_is_windows_sort = True

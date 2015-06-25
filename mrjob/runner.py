@@ -229,11 +229,11 @@ class MRJobRunner(object):
 
     ### methods to call from your batch script ###
 
-    def __init__(self, mr_job_script=None, conf_path=None,
+    def __init__(self, mr_job_script=None, conf_paths=None,
                  extra_args=None, file_upload_args=None,
                  hadoop_input_format=None, hadoop_output_format=None,
                  input_paths=None, output_dir=None, partitioner=None,
-                 stdin=None, conf_paths=None, **opts):
+                 stdin=None, **opts):
         """All runners take the following keyword arguments:
 
         :type mr_job_script: str
@@ -242,10 +242,6 @@ class MRJobRunner(object):
                               you won't actually be able to :py:meth:`run` the
                               job, but other utilities (e.g. :py:meth:`ls`)
                               will work.
-        :type conf_path: str, None, or False
-        :param conf_path: Deprecated. Alternate path to read configs from, or
-                          ``False`` to ignore all config files. Use
-                          *conf_paths* instead.
         :type conf_paths: None or list
         :param conf_paths: List of config files to combine and use, or None to
                            search for mrjob.conf in the default locations.
@@ -307,17 +303,6 @@ class MRJobRunner(object):
         """
         self._ran_job = False
 
-        if conf_path is not None:
-            if conf_paths is not None:
-                raise ValueError("Can't specify both conf_path and conf_paths")
-            else:
-                log.warning('The conf_path argument to MRJobRunner() is'
-                            ' deprecated and will be removed in v0.5.0. Use'
-                            ' conf_paths instead.')
-                if conf_path is False:
-                    conf_paths = []
-                else:
-                    conf_paths = [conf_path]
         self._opts = self.OPTION_STORE_CLASS(self.alias, opts, conf_paths)
         self._fs = None
 

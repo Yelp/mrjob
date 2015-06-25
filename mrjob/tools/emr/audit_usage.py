@@ -546,8 +546,8 @@ def subdivide_interval_by_hour(start, end):
 def get_job_flows(conf_paths, max_days_ago=None, now=None):
     """Get relevant job flow information from EMR.
 
-    :param str conf_path: Alternate path to read :py:mod:`mrjob.conf` from, or
-                          ``False`` to ignore all config files.
+    :param str conf_paths: List of alternate paths to read configs from, or
+                           ``[]`` to ignore all config files.
     :param float max_days_ago: If set, don't fetch job flows created longer
                                than this many days ago.
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.

@@ -115,6 +115,9 @@ def extract_dir_for_tar(archive_path, compression='gz'):
     :param compression: Compression type to use. This can be one of ``''``,
                         ``bz2``, or ``gz``.
     """
+    log.warning(
+        'extract_dir_for_tar() is deprecated and will be removed in v0.5.0')
+
     # Open the file for read-only streaming (no random seeks)
     tar = tarfile.open(archive_path, mode='r|%s' % compression)
     # Grab the first item

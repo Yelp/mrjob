@@ -236,8 +236,15 @@ class MRStep(object):
         return substep_descs
 
 
-# for backwards compatibility; remove in v0.5.0
-MRJobStep = MRStep
+def MRJobStep(**kwargs):
+    """Deprecated alias for :py:class:`MRStep`. Will be removed in v0.5.0.
+
+    .. deprecated:: 0.4.2
+    """
+    log.warning('MRJobStep has been renamed to MRStep. The old name will'
+                ' be removed in v0.5.0.')
+
+    return MRStep(**kwargs)
 
 
 class JarStep(object):

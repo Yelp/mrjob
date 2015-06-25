@@ -74,10 +74,8 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
 #: * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
 #:    on cleanup
-#: * ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL``. Not supported for
-#:   ``cleanup_on_failure``.
 CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
-                   'SCRATCH', 'JOB', 'IF_SUCCESSFUL', 'JOB_FLOW']
+                   'SCRATCH', 'JOB', 'JOB_FLOW']
 
 _STEP_RE = re.compile(r'^M?C?R?$')
 
@@ -200,12 +198,6 @@ class RunnerOptionStore(OptionStore):
             for choice in opt_list:
                 if choice not in CLEANUP_CHOICES:
                     raise ValueError(error_str % choice)
-
-                if choice == 'IS_SUCCESSFUL':
-                    log.warning('IS_SUCCESSFUL cleanup option is deprecated'
-                                ' and will be removed in v0.5.0. Use ALL'
-                                ' instead.')
-
             if 'NONE' in opt_list and len(set(opt_list)) > 1:
                 raise ValueError(
                     'Cannot clean up both nothing and something!')

@@ -10,9 +10,11 @@ v0.5.0, 2015-??-?? -- ???
      * removed iam_job_flow_role option (use iam_instance_profile)
      * removed get_s3_folder_keys()
  * removed mrjob.compat.get_jobconf_value() (use jobconf_from_env())
- * renamed mrjob.util.buffer_iterator_to_line_iterator() to to_lines()
-   * to_lines() no longer appends a newline to data (#819)
- * mrjob.util.gunzip_stream() now yields chunks, not lines
+ * mrjob.util:
+   * renamed buffer_iterator_to_line_iterator() to to_lines()
+     * to_lines() no longer appends a newline to data (#819)
+   * removed extract_dir_for_tar()
+   * gunzip_stream() now yields chunks, not lines
 
 v0.4.5, 2015-??-?? -- IAM Fortified
  * runners:

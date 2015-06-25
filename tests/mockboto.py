@@ -124,7 +124,7 @@ class MockS3Connection(object):
         if bucket_name in self.mock_s3_fs:
             raise boto.exception.S3CreateError(409, 'Conflict')
         else:
-            self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': ''}
+            self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': location}
 
 
 class MockBucket(object):

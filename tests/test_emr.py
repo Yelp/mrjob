@@ -904,6 +904,21 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
             self.assertEqual(flow.steps[0].name, 'Setup Hadoop Debugging')
 
 
+class RegionTestCase(MockEMRAndS3TestCase):
+
+    def test_default(self):
+        runner = EMRJobRunner()
+        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
+
+    def test_explicit_region(self):
+        runner = EMRJobRunner(aws_region='us-east-1')
+        self.assertEqual(runner._opts['aws_region'], 'us-east-1')
+
+    def test_cannot_be_empty(self):
+        runner = EMRJobRunner(aws_region='')
+        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
+
+
 class ScratchBucketAndRegionTestCase(MockEMRAndS3TestCase):
 
     def test_region_nobucket_nolocation(self):

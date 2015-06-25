@@ -145,6 +145,10 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
     'bootstrap',
     'terminate_idle_job_flow.sh')
 
+# default AWS region to use for EMR. Using us-west-2 because it is the default
+# for new (since October 10, 2012) accounts (see #1025)
+_DEFAULT_AWS_REGION = 'us-west-2'
+
 
 def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
@@ -351,12 +355,18 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
     def __init__(self, alias, opts, conf_paths):
         super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_paths)
+
+        # don't allow aws_region to be ''
+        if not self['aws_region']:
+            self['aws_region'] = _DEFAULT_AWS_REGION
+
         self._fix_ec2_instance_opts()
 
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
             'ami_version': '3.7.0',
+            'aws_region': _DEFAULT_AWS_REGION,
             'check_emr_status_every': 30,
             'cleanup_on_failure': ['JOB'],
             'ec2_core_instance_type': 'm1.medium',
@@ -518,10 +528,6 @@ class EMRJobRunner(MRJobRunner):
         """
         super(EMRJobRunner, self).__init__(**kwargs)
 
-        # make aws_region an instance variable; we might want to set it
-        # based on the scratch bucket
-        self._aws_region = self._opts['aws_region'] or ''
-
         # if we're going to create a bucket to use as temp space, we don't
         # want to actually create it until we run the job (Issue #50).
         # This variable helps us create the bucket as needed
@@ -628,19 +634,11 @@ class EMRJobRunner(MRJobRunner):
             bucket_loc = _get_bucket(s3_conn, bucket_name).get_location()
 
             # make sure they can communicate if both specified
-            if (self._aws_region and bucket_loc and
-                    self._aws_region != bucket_loc):
+            if (bucket_loc and self._opts['aws_region'] != bucket_loc):
                 log.warning('warning: aws_region (%s) does not match bucket'
                             ' region (%s). Your EC2 instances may not be able'
                             ' to reach your S3 buckets.' %
-                            (self._aws_region, bucket_loc))
-
-            # otherwise derive aws_region from bucket_loc
-            elif bucket_loc and not self._aws_region:
-                log.info(
-                    "inferring aws_region from scratch bucket's region (%s)" %
-                    bucket_loc)
-                self._aws_region = bucket_loc
+                            (self._opts['aws_region'], bucket_loc))
         # set s3_scratch_uri by checking for existing buckets
         else:
             self._set_s3_scratch_uri(s3_conn)
@@ -670,31 +668,15 @@ class EMRJobRunner(MRJobRunner):
             scratch_bucket_location = scratch_bucket.get_location()
 
             if scratch_bucket_location:
-                if scratch_bucket_location == self._aws_region:
+                if scratch_bucket_location == self._opts['aws_region']:
                     # Regions are both specified and match
                     log.info("using existing scratch bucket %s" %
                              scratch_bucket_name)
                     self._opts['s3_scratch_uri'] = (
                         's3://%s/tmp/' % scratch_bucket_name)
                     return
-                elif not self._aws_region:
-                    # aws_region not specified, so set it based on this
-                    #   bucket's location and use this bucket
-                    self._aws_region = scratch_bucket_location
-                    log.info("inferring aws_region from scratch bucket's"
-                             " region (%s)" % self._aws_region)
-                    self._opts['s3_scratch_uri'] = (
-                        's3://%s/tmp/' % scratch_bucket_name)
-                    return
-                elif scratch_bucket_location != self._aws_region:
+                elif scratch_bucket_location != self._opts['aws_region']:
                     continue
-            elif not self._aws_region:
-                # Only use regionless buckets if the job flow is regionless
-                log.info("using existing scratch bucket %s" %
-                         scratch_bucket_name)
-                self._opts['s3_scratch_uri'] = (
-                    's3://%s/tmp/' % scratch_bucket_name)
-                return
 
         # That may have all failed. If so, pick a name.
         scratch_bucket_name = 'mrjob-' + random_identifier()
@@ -717,7 +699,8 @@ class EMRJobRunner(MRJobRunner):
             s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as scratch space' %
                      self._s3_temp_bucket_to_create)
-            location = s3_location_constraint_for_region(self._aws_region)
+            location = s3_location_constraint_for_region(
+                self._opts['aws_region'])
             s3_conn.create_bucket(
                 self._s3_temp_bucket_to_create, location=location)
             self._s3_temp_bucket_to_create = None
@@ -744,7 +727,7 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['s3_endpoint']:
                 s3_endpoint = self._opts['s3_endpoint']
             else:
-                s3_endpoint = s3_endpoint_for_region(self._aws_region)
+                s3_endpoint = s3_endpoint_for_region(self._opts['aws_region'])
 
             self._s3_fs = S3Filesystem(self._opts['aws_access_key_id'],
                                        self._opts['aws_secret_access_key'],
@@ -2479,9 +2462,6 @@ class EMRJobRunner(MRJobRunner):
             raise ImportError('You must install boto to connect to EMR')
 
         def emr_conn_for_endpoint(endpoint):
-            # the page below requires an actual region name
-            region_name = self._aws_region or 'us-east-1'
-
             # boto 2.2.0's EmrConnection doesn't support security_token,
             # so only include it if set
             kwargs = {}
@@ -2492,7 +2472,7 @@ class EMRJobRunner(MRJobRunner):
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 region=boto.regioninfo.RegionInfo(
-                    name=region_name, endpoint=endpoint,
+                    name=self._opts['aws_region'], endpoint=endpoint,
                     connection_cls=boto.emr.connection.EmrConnection),
                     **kwargs)
 
@@ -2500,7 +2480,7 @@ class EMRJobRunner(MRJobRunner):
             # HMAC v4 authentication in boto 2.10.0 thru 2.15.0.
             # This basically applies the fix in boto 2.16.0
             if not getattr(conn, 'auth_region_name', None):
-                conn.auth_region_name = region_name
+                conn.auth_region_name = self._opts['aws_region']
 
             if not getattr(conn, 'auth_service_name', None):
                 conn.auth_service_name = 'elasticmapreduce'
@@ -2508,7 +2488,7 @@ class EMRJobRunner(MRJobRunner):
             return conn
 
         endpoint = (self._opts['emr_endpoint'] or
-                    emr_endpoint_for_region(self._aws_region))
+                    emr_endpoint_for_region(self._opts['aws_region']))
 
         log.debug('creating EMR connection (to %s)' % endpoint)
         conn = emr_conn_for_endpoint(endpoint)
@@ -2516,10 +2496,9 @@ class EMRJobRunner(MRJobRunner):
         # Issue #621: if we're using a region-specific endpoint,
         # try both the canonical version of the hostname and the one
         # that matches the SSL cert
-        if (self._aws_region and not self._opts['emr_endpoint'] and
-                InvalidCertificateException):
+        if not self._opts['emr_endpoint'] and InvalidCertificateException:
 
-            ssl_host = emr_ssl_host_for_region(self._aws_region)
+            ssl_host = emr_ssl_host_for_region(self._opts['aws_region'])
             fallback_conn = emr_conn_for_endpoint(ssl_host)
 
             conn = RetryGoRound(

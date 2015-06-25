@@ -52,6 +52,90 @@ class NullHandler(logging.Handler):
         pass
 
 
+def args_for_opt_dest_subset(option_parser, args, dests=None):
+    """For the given :py:class:`OptionParser` and list of command line
+    arguments *args*, yield values in *args* that correspond to option
+    destinations in the set of strings *dests*. If *dests* is None, return
+    *args* as parsed by :py:class:`OptionParser`.
+    """
+    for dest, value in _args_for_opt_dest_subset(option_parser, args, dests):
+        yield value
+
+
+def _process_short_opts(option_parser, rargs, values, dests):
+    """Mimic function of the same name in ``OptionParser``, capturing the
+    arguments consumed in *arg_map*
+    """
+    arg = rargs.pop(0)
+    stop = False
+    i = 1
+    for ch in arg[1:]:
+        opt = "-" + ch
+        option = option_parser._short_opt.get(opt)
+        i += 1                      # we have consumed a character
+
+        # Store the 'before' value of *rargs*
+        rargs_before_processing = [x for x in rargs]
+
+        # We won't see a difference in rargs for things like '-pJSON', so
+        # handle that edge case explicitly.
+        args_from_smashed_short_opt = []
+
+        if option.takes_value():
+            # Any characters left in arg?  Pretend they're the
+            # next arg, and stop consuming characters of arg.
+            if i < len(arg):
+                rargs.insert(0, arg[i:])
+                args_from_smashed_short_opt.append(arg[i:])
+                stop = True
+
+            nargs = option.nargs
+            if nargs == 1:
+                value = rargs.pop(0)
+            else:
+                value = tuple(rargs[0:nargs])
+                del rargs[0:nargs]
+
+        else:                       # option doesn't take a value
+            value = None
+
+        option.process(opt, value, values, option_parser)
+
+        if dests is None or option.dest in dests:
+            # Measure rargs before and after processing. Yield difference.
+            length_difference = len(rargs_before_processing) - len(rargs)
+            for item in ([opt] + args_from_smashed_short_opt +
+                         rargs_before_processing[:length_difference]):
+                yield option.dest, item
+
+        if stop:
+            break
+
+
+def _args_for_opt_dest_subset(option_parser, args, dests=None):
+    """See docs for :py:func:`args_for_opt_dest_subset()`. This function allows
+    us to write a compatibility wrapper for the old API
+    (:py:func:`parse_and_save_options()`).
+    """
+    values = deepcopy(option_parser.get_default_values())
+    rargs = [x for x in args]
+    option_parser.rargs = rargs
+    while rargs:
+        arg = rargs[0]
+        if arg == '--':
+            del rargs[0]
+            return
+        elif arg[0:2] == '--':
+            for item in _process_long_opt(option_parser, rargs, values, dests):
+                yield item
+        elif arg[:1] == '-' and len(arg) > 1:
+            for item in _process_short_opts(option_parser, rargs, values,
+                                            dests):
+                yield item
+        else:
+            del rargs[0]
+
+
 def bash_wrap(cmd_str):
     """Escape single quotes in a shell command string and wrap it with ``bash
     -c '<string>'``.
@@ -151,6 +235,33 @@ def file_ext(path):
     return filename[dot_index:]
 
 
+def gunzip_stream(fileobj, bufsize=1024):
+    """Decompress gzipped data on the fly.
+
+    :param fileobj: object supporting ``read()``
+    :param bufsize: number of bytes to read from *fileobj* at a time. The
+                    default is the same as in :py:mod:`gzip`.
+
+    .. warning::
+
+        This yields decompressed chunks; it does *not* split on lines. To get
+        lines, wrap this in :py:func:`to_lines`.
+    """
+    # see Issue #601 for why we need this.
+
+    # we need this flag to read gzip rather than raw zlib, but it's not
+    # actually defined in zlib, so we define it here.
+    READ_GZIP_DATA = 16
+    d = zlib.decompressobj(READ_GZIP_DATA | zlib.MAX_WBITS)
+    while True:
+        chunk = fileobj.read(bufsize)
+        if not chunk:
+            return
+        data = d.decompress(chunk)
+        if data:
+            yield data
+
+
 def hash_object(obj):
     """Generate a hash (currently md5) of the ``repr`` of the object.
 
@@ -244,90 +355,6 @@ def _process_long_opt(option_parser, rargs, values, dests):
             yield option.dest, item
 
 
-def _process_short_opts(option_parser, rargs, values, dests):
-    """Mimic function of the same name in ``OptionParser``, capturing the
-    arguments consumed in *arg_map*
-    """
-    arg = rargs.pop(0)
-    stop = False
-    i = 1
-    for ch in arg[1:]:
-        opt = "-" + ch
-        option = option_parser._short_opt.get(opt)
-        i += 1                      # we have consumed a character
-
-        # Store the 'before' value of *rargs*
-        rargs_before_processing = [x for x in rargs]
-
-        # We won't see a difference in rargs for things like '-pJSON', so
-        # handle that edge case explicitly.
-        args_from_smashed_short_opt = []
-
-        if option.takes_value():
-            # Any characters left in arg?  Pretend they're the
-            # next arg, and stop consuming characters of arg.
-            if i < len(arg):
-                rargs.insert(0, arg[i:])
-                args_from_smashed_short_opt.append(arg[i:])
-                stop = True
-
-            nargs = option.nargs
-            if nargs == 1:
-                value = rargs.pop(0)
-            else:
-                value = tuple(rargs[0:nargs])
-                del rargs[0:nargs]
-
-        else:                       # option doesn't take a value
-            value = None
-
-        option.process(opt, value, values, option_parser)
-
-        if dests is None or option.dest in dests:
-            # Measure rargs before and after processing. Yield difference.
-            length_difference = len(rargs_before_processing) - len(rargs)
-            for item in ([opt] + args_from_smashed_short_opt +
-                         rargs_before_processing[:length_difference]):
-                yield option.dest, item
-
-        if stop:
-            break
-
-
-def _args_for_opt_dest_subset(option_parser, args, dests=None):
-    """See docs for :py:func:`args_for_opt_dest_subset()`. This function allows
-    us to write a compatibility wrapper for the old API
-    (:py:func:`parse_and_save_options()`).
-    """
-    values = deepcopy(option_parser.get_default_values())
-    rargs = [x for x in args]
-    option_parser.rargs = rargs
-    while rargs:
-        arg = rargs[0]
-        if arg == '--':
-            del rargs[0]
-            return
-        elif arg[0:2] == '--':
-            for item in _process_long_opt(option_parser, rargs, values, dests):
-                yield item
-        elif arg[:1] == '-' and len(arg) > 1:
-            for item in _process_short_opts(option_parser, rargs, values,
-                                            dests):
-                yield item
-        else:
-            del rargs[0]
-
-
-def args_for_opt_dest_subset(option_parser, args, dests=None):
-    """For the given :py:class:`OptionParser` and list of command line
-    arguments *args*, yield values in *args* that correspond to option
-    destinations in the set of strings *dests*. If *dests* is None, return
-    *args* as parsed by :py:class:`OptionParser`.
-    """
-    for dest, value in _args_for_opt_dest_subset(option_parser, args, dests):
-        yield value
-
-
 def parse_and_save_options(option_parser, args):
     """DEPRECATED. To be removed in v0.5.
 
@@ -368,52 +395,6 @@ def populate_option_groups_with_options(assignments, indexed_options):
         # Sort alphabetically for help
         opt_group.option_list = sorted(opt_group.option_list,
                                        key=lambda item: item.get_opt_string())
-
-
-def read_input(path, stdin=None):
-    """Stream input the way Hadoop would.
-
-    - Resolve globs (``foo_*.gz``).
-    - Decompress ``.gz`` and ``.bz2`` files.
-    - If path is ``'-'``, read from stdin
-    - If path is a directory, recursively read its contents.
-
-    You can redefine *stdin* for ease of testing. *stdin* can actually be
-    any iterable that yields lines (e.g. a list).
-    """
-    if stdin is None:
-        stdin = sys.stdin
-
-    # handle '-' (special case)
-    if path == '-':
-        for line in stdin:
-            yield line
-        return
-
-    # resolve globs
-    paths = glob.glob(path)
-    if not paths:
-        raise IOError(2, 'No such file or directory: %r' % path)
-    elif len(paths) > 1:
-        for path in paths:
-            for line in read_input(path, stdin=stdin):
-                yield line
-        return
-    else:
-        path = paths[0]
-
-    # recurse through directories
-    if os.path.isdir(path):
-        for dirname, _, filenames in os.walk(path):
-            for filename in filenames:
-                for line in read_input(os.path.join(dirname, filename),
-                                       stdin=stdin):
-                    yield line
-        return
-
-    # read from files
-    for line in read_file(path):
-        yield line
 
 
 def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
@@ -469,31 +450,87 @@ def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
                 cleanup()
 
 
-def gunzip_stream(fileobj, bufsize=1024):
-    """Decompress gzipped data on the fly.
+def read_input(path, stdin=None):
+    """Stream input the way Hadoop would.
 
-    :param fileobj: object supporting ``read()``
-    :param bufsize: number of bytes to read from *fileobj* at a time. The
-                    default is the same as in :py:mod:`gzip`.
+    - Resolve globs (``foo_*.gz``).
+    - Decompress ``.gz`` and ``.bz2`` files.
+    - If path is ``'-'``, read from stdin
+    - If path is a directory, recursively read its contents.
 
-    .. warning::
-
-        This yields decompressed chunks; it does *not* split on lines. To get
-        lines, wrap this in :py:func:`to_lines`.
+    You can redefine *stdin* for ease of testing. *stdin* can actually be
+    any iterable that yields lines (e.g. a list).
     """
-    # see Issue #601 for why we need this.
+    if stdin is None:
+        stdin = sys.stdin
 
-    # we need this flag to read gzip rather than raw zlib, but it's not
-    # actually defined in zlib, so we define it here.
-    READ_GZIP_DATA = 16
-    d = zlib.decompressobj(READ_GZIP_DATA | zlib.MAX_WBITS)
-    while True:
-        chunk = fileobj.read(bufsize)
-        if not chunk:
-            return
-        data = d.decompress(chunk)
-        if data:
-            yield data
+    # handle '-' (special case)
+    if path == '-':
+        for line in stdin:
+            yield line
+        return
+
+    # resolve globs
+    paths = glob.glob(path)
+    if not paths:
+        raise IOError(2, 'No such file or directory: %r' % path)
+    elif len(paths) > 1:
+        for path in paths:
+            for line in read_input(path, stdin=stdin):
+                yield line
+        return
+    else:
+        path = paths[0]
+
+    # recurse through directories
+    if os.path.isdir(path):
+        for dirname, _, filenames in os.walk(path):
+            for filename in filenames:
+                for line in read_input(os.path.join(dirname, filename),
+                                       stdin=stdin):
+                    yield line
+        return
+
+    # read from files
+    for line in read_file(path):
+        yield line
+
+
+# Thanks to http://lybniz2.sourceforge.net/safeeval.html for
+# explaining how to do this!
+def safeeval(expr, globals=None, locals=None):
+    """Like eval, but with nearly everything in the environment
+    blanked out, so that it's difficult to cause mischief.
+
+    *globals* and *locals* are optional dictionaries mapping names to
+    values for those names (just like in :py:func:`eval`).
+    """
+    # blank out builtins, but keep None, True, and False
+    safe_globals = {
+        'False': False,
+        'None': None,
+        'True': True,
+        '__builtin__': None,
+        '__builtins__': None,
+        'set': set
+    }
+
+    # xrange is range in Python 3
+    if PY2:
+        safe_globals['xrange'] = xrange
+    else:
+        safe_globals['range'] = range
+
+    # PyPy needs special magic
+    def open(*args, **kwargs):
+        raise NameError("name 'open' is not defined")
+    safe_globals['open'] = open
+
+    # add the user-specified global variables
+    if globals:
+        safe_globals.update(globals)
+
+    return eval(expr, safe_globals, locals)
 
 
 @contextlib.contextmanager
@@ -566,43 +603,6 @@ def scrape_options_into_new_groups(source_groups, assignments):
     """
     all_options = scrape_options_and_index_by_dest(*source_groups)
     return populate_option_groups_with_options(assignments, all_options)
-
-
-# Thanks to http://lybniz2.sourceforge.net/safeeval.html for
-# explaining how to do this!
-def safeeval(expr, globals=None, locals=None):
-    """Like eval, but with nearly everything in the environment
-    blanked out, so that it's difficult to cause mischief.
-
-    *globals* and *locals* are optional dictionaries mapping names to
-    values for those names (just like in :py:func:`eval`).
-    """
-    # blank out builtins, but keep None, True, and False
-    safe_globals = {
-        'False': False,
-        'None': None,
-        'True': True,
-        '__builtin__': None,
-        '__builtins__': None,
-        'set': set
-    }
-
-    # xrange is range in Python 3
-    if PY2:
-        safe_globals['xrange'] = xrange
-    else:
-        safe_globals['range'] = range
-
-    # PyPy needs special magic
-    def open(*args, **kwargs):
-        raise NameError("name 'open' is not defined")
-    safe_globals['open'] = open
-
-    # add the user-specified global variables
-    if globals:
-        safe_globals.update(globals)
-
-    return eval(expr, safe_globals, locals)
 
 
 def shlex_split(s):

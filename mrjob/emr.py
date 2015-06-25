@@ -139,40 +139,6 @@ WAIT_FOR_SSH_TO_FAIL = 1.0
 # amount of time to wait between checks for available pooled job flows
 JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 
-# Deprecated as of v0.4.1 (will be removed in v0.5).
-# Use mrjob.aws.emr_endpoint_for_region() instead
-REGION_TO_EMR_ENDPOINT = {
-    'us-east-1': 'elasticmapreduce.us-east-1.amazonaws.com',
-    'us-west-1': 'elasticmapreduce.us-west-1.amazonaws.com',
-    'us-west-2': 'elasticmapreduce.us-west-2.amazonaws.com',
-    'EU': 'elasticmapreduce.eu-west-1.amazonaws.com',  # for compatibility
-    'eu-west-1': 'elasticmapreduce.eu-west-1.amazonaws.com',
-    'ap-southeast-1': 'elasticmapreduce.ap-southeast-1.amazonaws.com',
-    'ap-northeast-1': 'elasticmapreduce.ap-northeast-1.amazonaws.com',
-    'sa-east-1': 'elasticmapreduce.sa-east-1.amazonaws.com',
-    '': 'elasticmapreduce.amazonaws.com',  # when no region specified
-}
-
-# Deprecated as of v0.4.1 (will be removed in v0.5).
-# Use mrjob.aws.s3_endpoint_for_region() instead
-REGION_TO_S3_ENDPOINT = {
-    'us-east-1': 's3.amazonaws.com',  # no region-specific endpoint
-    'us-west-1': 's3-us-west-1.amazonaws.com',
-    'us-west-2': 's3-us-west-2.amazonaws.com',
-    'EU': 's3-eu-west-1.amazonaws.com',
-    'eu-west-1': 's3-eu-west-1.amazonaws.com',
-    'ap-southeast-1': 's3-ap-southeast-1.amazonaws.com',
-    'ap-northeast-1': 's3-ap-northeast-1.amazonaws.com',
-    'sa-east-1': 's3-sa-east-1.amazonaws.com',
-    '': 's3.amazonaws.com',
-}
-
-# Deprecated as of v0.4.1 (will be removed in v0.5).
-# Use mrjob.aws.s3_location_constraint_for_region() instead
-REGION_TO_S3_LOCATION_CONSTRAINT = {
-    'us-east-1': '',
-}
-
 # bootstrap action which automatically terminates idle job flows
 _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
     os.path.dirname(mrjob.__file__),

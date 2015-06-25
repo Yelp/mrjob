@@ -182,10 +182,10 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
 
         super(MockEMRAndS3TestCase, self).setUp()
 
-    def add_mock_s3_data(self, data, time_modified=None):
+    def add_mock_s3_data(self, data, time_modified=None, location=None):
         """Update self.mock_s3_fs with a map from bucket name
         to key name to data."""
-        add_mock_s3_data(self.mock_s3_fs, data, time_modified)
+        add_mock_s3_data(self.mock_s3_fs, data, time_modified, location)
 
     def prepare_runner_for_ssh(self, runner, num_slaves=0):
         # TODO: Refactor this abomination of a test harness
@@ -912,89 +912,81 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
             self.assertEqual(flow.steps[0].name, 'Setup Hadoop Debugging')
 
 
-class BucketRegionTestCase(MockEMRAndS3TestCase):
-
-    def setUp(self):
-        super(BucketRegionTestCase, self).setUp()
-        self.make_dummy_data()
-
-    def make_dummy_data(self):
-        self.add_mock_s3_data({'mrjob-1': {}})
-        s3c = boto.connect_s3()
-        self.bucket1 = s3c.get_bucket('mrjob-1')
-        self.bucket1_uri = 's3://mrjob-1/tmp/'
+class ScratchBucketAndRegionTestCase(MockEMRAndS3TestCase):
 
     def test_region_nobucket_nolocation(self):
         # aws_region specified, no bucket specified, default bucket has no
         # location
+        self.add_mock_s3_data({'mrjob-1': {}})
+
         j = EMRJobRunner(aws_region='PUPPYLAND',
                          s3_endpoint='PUPPYLAND',
                          conf_paths=[])
-        self.assertNotEqual(j._opts['s3_scratch_uri'], self.bucket1_uri)
+        self.assertNotEqual(j._opts['s3_scratch_uri'], 's3://mrjob-1/tmp/')
 
     def test_region_nobucket_nomatchexists(self):
         # aws_region specified, no bucket specified, no buckets have matching
         # region
-        self.bucket1.set_location('PUPPYLAND')
+        self.add_mock_s3_data({'mrjob-1': {}}, location='PUPPYLAND')
+
         j = EMRJobRunner(aws_region='KITTYLAND',
                          s3_endpoint='KITTYLAND',
                          conf_paths=[])
-        self.assertNotEqual(j._opts['s3_scratch_uri'], self.bucket1_uri)
+
+        self.assertNotEqual(j._opts['s3_scratch_uri'], 's3://mrjob-1/tmp/')
 
     def test_noregion_nobucket_nolocation(self):
         # aws_region not specified, no bucket specified, default bucket has no
         # location
+        self.add_mock_s3_data({'mrjob-1': {}})
+
         j = EMRJobRunner(conf_paths=[])
-        self.assertEqual(j._opts['s3_scratch_uri'], self.bucket1_uri)
+        self.assertEqual(j._opts['s3_scratch_uri'], 's3://mrjob-1/tmp/')
 
     def test_noregion_bucket_nolocation(self):
         # aws_region not specified, bucket specified without location
+        self.add_mock_s3_data({'mrjob-1': {}})
+
         j = EMRJobRunner(conf_paths=[],
-                         s3_scratch_uri=self.bucket1_uri)
-        self.assertEqual(j._opts['s3_scratch_uri'], self.bucket1_uri)
+                         s3_scratch_uri='s3://mrjob-1/tmp')
+        self.assertEqual(j._opts['s3_scratch_uri'], 's3://mrjob-1/tmp/')
 
     def test_noregion_bucket_location(self):
         # aws_region not specified, bucket specified with location
-        self.bucket1.set_location('PUPPYLAND')
+        self.add_mock_s3_data({'mrjob-1': {}}, location='PUPPYLAND')
+
         j = EMRJobRunner(conf_paths=[])
         self.assertEqual(j._aws_region, 'PUPPYLAND')
-
-
-class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
-
-    def setUp(self):
-        super(ExtraBucketRegionTestCase, self).setUp()
-        self.make_dummy_data()
-
-    def make_dummy_data(self):
-        self.add_mock_s3_data({'mrjob-1': {}})
-        s3c = boto.connect_s3()
-        self.bucket1 = s3c.get_bucket('mrjob-1')
-        self.bucket1_uri = 's3://mrjob-1/tmp/'
-
-        self.add_mock_s3_data({'mrjob-2': {}})
-        self.bucket2 = s3c.get_bucket('mrjob-2')
-        self.bucket2.set_location('KITTYLAND')
-        self.bucket2_uri = 's3://mrjob-2/tmp/'
 
     def test_region_nobucket_matchexists(self):
         # aws_region specified, no bucket specified, bucket exists with
         # matching region
+        self.add_mock_s3_data({'mrjob-1': {}})
+        self.add_mock_s3_data({'mrjob-2': {}}, location='KITTYLAND')
+
         j = EMRJobRunner(aws_region='KITTYLAND',
                          s3_endpoint='KITTYLAND',
                          conf_paths=[])
-        self.assertEqual(j._opts['s3_scratch_uri'], self.bucket2_uri)
+
+        self.assertEqual(j._opts['s3_scratch_uri'], 's3://mrjob-2/tmp/')
 
     def test_region_bucket_match(self):
         # aws_region specified, bucket specified with matching location
+        self.add_mock_s3_data({'mrjob-1': {}})
+        self.add_mock_s3_data({'mrjob-2': {}}, location='KITTYLAND')
+
         j = EMRJobRunner(aws_region='PUPPYLAND',
                          s3_endpoint='PUPPYLAND',
-                         s3_scratch_uri=self.bucket1_uri,
+                         s3_scratch_uri='s3://mrjob-1/tmp',
                          conf_paths=[])
-        self.assertEqual(j._opts['s3_scratch_uri'], self.bucket1_uri)
+
+        self.assertEqual(j._opts['s3_scratch_uri'], 's3://mrjob-1/tmp/')
 
     def test_region_bucket_does_not_match(self):
         # aws_region specified, bucket specified with incorrect location
+        self.add_mock_s3_data({'mrjob-1': {}})
+        self.add_mock_s3_data({'mrjob-2': {}}, location='KITTYLAND')
+
         with no_handlers_for_logger():
             stderr = StringIO()
             log = logging.getLogger('mrjob.emr')
@@ -1003,7 +995,7 @@ class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
 
             EMRJobRunner(aws_region='PUPPYLAND',
                          s3_endpoint='PUPPYLAND',
-                         s3_scratch_uri=self.bucket2_uri,
+                         s3_scratch_uri='s3://mrjob-2/tmp/',
                          conf_paths=[])
 
             self.assertIn('does not match bucket region', stderr.getvalue())

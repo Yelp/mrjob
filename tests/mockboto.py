@@ -71,20 +71,23 @@ def err_xml(message, type='Sender', code='ValidationError'):
 
 ### S3 ###
 
-def add_mock_s3_data(mock_s3_fs, data, time_modified=None):
+def add_mock_s3_data(mock_s3_fs, data, time_modified=None, location=None):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
     key to contents) with a map from bucket name to key name to data and
     time last modified."""
     if time_modified is None:
         time_modified = datetime.utcnow()
     for bucket_name, key_name_to_bytes in data.items():
-        mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
-        bucket = mock_s3_fs[bucket_name]
+        bucket = mock_s3_fs.setdefault(bucket_name,
+                                       {'keys': {}, 'location': ''})
 
         for key_name, key_data in key_name_to_bytes.items():
             if not isinstance(key_data, bytes):
                 raise TypeError('mock s3 data must be bytes')
             bucket['keys'][key_name] = (key_data, time_modified)
+
+        if location is not None:
+            bucket['location'] = location
 
 
 class MockS3Connection(object):
@@ -157,9 +160,6 @@ class MockBucket(object):
 
     def get_location(self):
         return self.connection.mock_s3_fs[self.name]['location']
-
-    def set_location(self, new_location):
-        self.connection.mock_s3_fs[self.name]['location'] = new_location
 
     def list(self, prefix=''):
         for key_name in sorted(self.mock_state()):

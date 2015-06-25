@@ -1,6 +1,6 @@
 v0.5.0, 2015-??-?? -- ???
- * renamed mrjob.util.buffer_iterator_to_line_iterator() to yield_lines()
- * yield_lines() no longer appends a newline to data (#819)
+ * renamed mrjob.util.buffer_iterator_to_line_iterator() to to_lines()
+ * to_lines() no longer appends a newline to data (#819)
  * mrjob.util.gunzip_stream() now yields chunks, not lines
 
 v0.4.5, 2015-??-?? -- IAM Fortified

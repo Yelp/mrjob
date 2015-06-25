@@ -72,7 +72,7 @@ def bunzip2_stream(fileobj, bufsize=1024):
     .. warning::
 
         This yields decompressed chunks; it does *not* split on lines. To get
-        lines, wrap this in :py:func:`yield_lines`.
+        lines, wrap this in :py:func:`to_lines`.
     """
     if bz2 is None:
         raise Exception(
@@ -434,19 +434,19 @@ def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
             f = fileobj
 
         if path.endswith('.gz'):
-            lines = yield_lines(gunzip_stream(f))
+            lines = to_lines(gunzip_stream(f))
         elif path.endswith('.bz2'):
             if bz2 is None:
                 raise Exception('bz2 module was not successfully imported'
                                 ' (likely not installed).')
             else:
-                lines = yield_lines(bunzip2_stream(f))
+                lines = to_lines(bunzip2_stream(f))
         else:
             if yields_lines:
                 lines = f
             else:
                 # handle boto.s3.Key, which yields chunks of bytes, not lines
-                lines = yield_lines(f)
+                lines = to_lines(f)
 
         for line in lines:
             yield line
@@ -469,7 +469,7 @@ def gunzip_stream(fileobj, bufsize=1024):
     .. warning::
 
         This yields decompressed chunks; it does *not* split on lines. To get
-        lines, wrap this in :py:func:`yield_lines`.
+        lines, wrap this in :py:func:`to_lines`.
     """
     # see Issue #601 for why we need this.
 
@@ -650,6 +650,46 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
     tar_gz.close()
 
 
+def to_lines(chunks):
+    """Take in data as a sequence of bytes, and yield it, one line at a time.
+
+    Only breaks lines on ``\\n`` (not ``\\r``), and does not add
+    a trailing newline.
+
+    Optimizes for:
+
+    * chunks bigger than lines (e.g. reading test files)
+    * chunks that are lines (idempotency)
+    """
+    # list of chunks with no final newline
+    leftovers = []
+
+    for chunk in chunks:
+        start = 0
+
+        while start < len(chunk):
+            end = chunk.find(b'\n', start) + 1
+
+            if end == 0:  # no newlines found
+                leftovers.append(chunk[start:])
+                break
+
+            if leftovers:
+                leftovers.append(chunk[start:end])
+                yield b''.join(leftovers)
+                leftovers = []
+            else:
+                yield chunk[start:end]
+
+            start = end
+
+    if leftovers:
+        yield b''.join(leftovers)
+
+#: Deprecated alias for :py:func:`to_lines`, will be removed in v0.6.0
+buffer_iterator_to_line_iterator = to_lines
+
+
 def unarchive(archive_path, dest):
     """Extract the contents of a tar or zip file at *archive_path* into the
     directory *dest*.
@@ -684,44 +724,3 @@ def unarchive(archive_path, dest):
                         dest_file.write(archive.read(name))
     else:
         raise IOError('Unknown archive type: %s' % (archive_path,))
-
-
-
-
-def yield_lines(chunks):
-    """Take an iterator that yield chunks of data (bytes), and yield
-    the same data a line at a time.
-
-    This does not add a trailing newline.
-
-    This method optimizes for:
-     * chunks bigger than lines (e.g. reading test files)
-     * chunks that are lines (idempotency)
-    """
-    # list of chunks with no final newline
-    leftovers = []
-
-    for chunk in chunks:
-        start = 0
-
-        while start < len(chunk):
-            end = chunk.find(b'\n', start) + 1
-
-            if end == 0:  # no newlines found
-                leftovers.append(chunk[start:])
-                break
-
-            if leftovers:
-                leftovers.append(chunk[start:end])
-                yield b''.join(leftovers)
-                leftovers = []
-            else:
-                yield chunk[start:end]
-
-            start = end
-
-    if leftovers:
-        yield b''.join(leftovers)
-
-#: Deprecated alias for :py:func:`yield_lines`, will be removed in v0.6.0
-buffer_iterator_to_line_iterator = yield_lines

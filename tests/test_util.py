@@ -38,23 +38,23 @@ from mrjob.util import safeeval
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import tar_and_gzip
 from mrjob.util import unarchive
-from mrjob.util import yield_lines
+from mrjob.util import to_lines
 
 from tests.py2 import TestCase
 from tests.quiet import logger_disabled
 from tests.sandbox import random_seed
 
 
-class BufferIteratorToLineIteratorTestCase(TestCase):
+class ToLinesTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(
-            list(yield_lines(_ for _ in ())),
+            list(to_lines(_ for _ in ())),
             [])
 
     def test_buffered_lines(self):
         self.assertEqual(
-            list(yield_lines(chunk for chunk in
+            list(to_lines(chunk for chunk in
                              [b'The quick\nbrown fox\nju',
                               b'mped over\nthe lazy\ndog',
                               b's.\n'])),
@@ -63,7 +63,7 @@ class BufferIteratorToLineIteratorTestCase(TestCase):
 
     def test_empty_chunks(self):
         self.assertEqual(
-            list(yield_lines(chunk for chunk in
+            list(to_lines(chunk for chunk in
                              [b'',
                               b'The quick\nbrown fox\nju',
                               b'', b'', b'',
@@ -76,7 +76,7 @@ class BufferIteratorToLineIteratorTestCase(TestCase):
 
     def test_no_trailing_newline(self):
         self.assertEqual(
-            list(yield_lines(chunk for chunk in
+            list(to_lines(chunk for chunk in
                              [b'Alouette,\ngentille',
                               b' Alouette.'])),
             [b'Alouette,\n', b'gentille Alouette.'])
@@ -84,14 +84,14 @@ class BufferIteratorToLineIteratorTestCase(TestCase):
     def test_long_lines(self):
         super_long_line = b'a' * 10000 + b'\n' + b'b' * 1000 + b'\nlast\n'
         self.assertEqual(
-            list(yield_lines(
+            list(to_lines(
                 chunk for chunk in
                 (super_long_line[0+i:1024+i]
                  for i in range(0, len(super_long_line), 1024)))),
             [b'a' * 10000 + b'\n', b'b' * 1000 + b'\n', b'last\n'])
 
     def test_old_alias(self):
-        self.assertEqual(buffer_iterator_to_line_iterator, yield_lines)
+        self.assertEqual(buffer_iterator_to_line_iterator, to_lines)
 
 
 class CmdLineTestCase(TestCase):

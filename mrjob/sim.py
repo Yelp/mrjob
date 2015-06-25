@@ -461,7 +461,7 @@ class SimMRJobRunner(MRJobRunner):
         # translate them at the very end.
         j = {}
 
-        j['mapreduce.job.id'] = self._job_name
+        j['mapreduce.job.id'] = self._job_key
         j['mapreduce.task.output.dir'] = self._output_dir
         j['mapreduce.job.local.dir'] = working_dir
         # archives and files for jobconf
@@ -490,10 +490,10 @@ class SimMRJobRunner(MRJobRunner):
 
         # task and attempt IDs
         j['mapreduce.task.id'] = 'task_%s_%s_%05d%d' % (
-            self._job_name, step_type.lower(), step_num, task_num)
+            self._job_key, step_type.lower(), step_num, task_num)
         # (we only have one attempt)
         j['mapreduce.task.attempt.id'] = 'attempt_%s_%s_%05d%d_0' % (
-            self._job_name, step_type.lower(), step_num, task_num)
+            self._job_key, step_type.lower(), step_num, task_num)
 
         # not actually sure what's correct for combiners here. It'll definitely
         # be true if we're just using pipes to simulate a combiner though

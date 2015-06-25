@@ -328,7 +328,7 @@ class MRJobRunner(object):
             self._working_dir_mgr.add('file', self._script_path)
 
         # give this job a unique name
-        self._job_name = self._make_unique_job_name(
+        self._job_key = self._make_unique_job_key(
             label=self._opts['label'], owner=self._opts['owner'])
 
         # we'll create the wrapper script later
@@ -602,11 +602,11 @@ class MRJobRunner(object):
         """Get options set for this runner, as a dict."""
         return copy.deepcopy(self._opts)
 
-    def get_job_name(self):
+    def get_job_key(self):
         """Get the unique name for the job run by this runner.
         This has the format ``label.owner.date.time.microseconds``
         """
-        return self._job_name
+        return self._job_key
 
     def get_output_dir(self):
         """Find the directory containing the job output. If the job hasn't
@@ -644,7 +644,7 @@ class MRJobRunner(object):
         """Create a tmp directory on the local filesystem that will be
         cleaned up by self.cleanup()"""
         if not self._local_tmp_dir:
-            path = os.path.join(self._opts['base_tmp_dir'], self._job_name)
+            path = os.path.join(self._opts['base_tmp_dir'], self._job_key)
             log.info('creating tmp directory %s' % path)
             if os.path.isdir(path):
                 shutil.rmtree(path)
@@ -653,7 +653,7 @@ class MRJobRunner(object):
 
         return self._local_tmp_dir
 
-    def _make_unique_job_name(self, label=None, owner=None):
+    def _make_unique_job_key(self, label=None, owner=None):
         """Come up with a useful unique ID for this job.
 
         We use this to choose the output directory, etc. for the job.
@@ -1004,7 +1004,7 @@ class MRJobRunner(object):
         # and then release the lock by closing the file descriptor.
         # File descriptors 10 and higher are used internally by the shell,
         # so 9 is as out-of-the-way as we can get.
-        writeln('exec 9>/tmp/wrapper.lock.%s' % self._job_name)
+        writeln('exec 9>/tmp/wrapper.lock.%s' % self._job_key)
         # would use flock(1), but it's not always available
         writeln("%s -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'" %
                 cmd_line(self._python_bin()))

@@ -1728,10 +1728,10 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
     def test_zero_log_generating_steps(self):
         mock_steps = [
             MockEmrObject(jar='x.jar',
-                          name=self.runner._job_name,
+                          name=self.runner._job_key,
                           state='COMPLETED'),
             MockEmrObject(jar='x.jar',
-                          name=self.runner._job_name,
+                          name=self.runner._job_key,
                           state='COMPLETED'),
         ]
         mock_jobflow = MockEmrObject(state='COMPLETED',
@@ -1744,16 +1744,16 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
     def test_interleaved_log_generating_steps(self):
         mock_steps = [
             MockEmrObject(jar='x.jar',
-                          name=self.runner._job_name,
+                          name=self.runner._job_key,
                           state='COMPLETED'),
             MockEmrObject(jar='hadoop.streaming.jar',
-                          name=self.runner._job_name,
+                          name=self.runner._job_key,
                           state='COMPLETED'),
             MockEmrObject(jar='x.jar',
-                          name=self.runner._job_name,
+                          name=self.runner._job_key,
                           state='COMPLETED'),
             MockEmrObject(jar='hadoop.streaming.jar',
-                          name=self.runner._job_name,
+                          name=self.runner._job_key,
                           state='COMPLETED'),
         ]
         mock_jobflow = MockEmrObject(state='COMPLETED',
@@ -3277,9 +3277,9 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
         self.jobs = []
         self.future_jobs = []
 
-    def add_job_flow(self, job_names, job_list):
+    def add_job_flow(self, job_keys, job_list):
         """Puts a fake job flow into a list of jobs for testing."""
-        for name in job_names:
+        for name in job_keys:
             jf = Mock()
             jf.state = 'WAITING'
             jf.jobflowid = name

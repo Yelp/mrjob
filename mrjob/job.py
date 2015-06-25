@@ -351,37 +351,13 @@ class MRJob(MRJobLauncher):
         return [MRStep(**kwargs)]
 
     @classmethod
-    def mr(cls, *args, **kwargs):
-        """A deprecated wrapper for :py:class:`~mrjob.step.MRStep`, plus
-        a little logic to support deprecated use of positional arguments.
+    def mr(cls, **kwargs):
+        """A deprecated wrapper for :py:class:`~mrjob.step.MRStep`.
         """
-        if args:
-            log.warning('Using positional arguments to MRJob.mr() is'
-                        ' deprecated and will be removed in v0.5.0')
-        else:
-            log.warning('mr() is deprecated and will be removed in v0.6.0.'
-                        ' Use mrjob.step.MRStep directly instead.')
-
-        if len(args) > 0:
-            kwargs['mapper'] = args[0]
-
-        if len(args) > 1:
-            kwargs['reducer'] = args[1]
-
-        if len(args) > 2:
-            raise ValueError('mr() can take at most two positional arguments.')
+        log.warning('mr() is deprecated and will be removed in v0.6.0.'
+                    ' Use mrjob.step.MRStep directly instead.')
 
         return MRStep(**kwargs)
-
-    @classmethod
-    def jar(cls, *args, **kwargs):
-        """Alias for :py:class:`~mrjob.step.JarStep`.
-
-        .. deprecated:: 0.4.2
-        """
-        log.warning('MRJob.jar() is deprecated and will be removed in'
-                    ' v0.5.0. Use mrjob.step.JarStep directly.')
-        return JarStep(*args, **kwargs)
 
     def increment_counter(self, group, counter, amount=1):
         """Increment a counter in Hadoop streaming by printing to stderr.

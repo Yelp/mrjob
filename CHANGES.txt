@@ -1,4 +1,7 @@
 v0.5.0, 2015-??-?? -- ???
+ * jobs:
+   * deprecated self.mr() no longer takes positional arguments (#814)
+   * removed deprecated self.jar() (use mrjob.step.JarStep)
  * runners:
    * All runners:
      * removed deprecated IS_SUCCESSFUL cleanup option (use ALL)

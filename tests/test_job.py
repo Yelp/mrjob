@@ -1130,17 +1130,7 @@ class StepsTestCase(TestCase):
             MRStep(mapper=j.mapper))
 
 
-class DeprecatedStepConstructorMethodsTestCase(TestCase):
-
-    def test_jar(self):
-        kwargs = {
-            'jar': 'binks.jar.jar',
-            'main_class': 'MyMainMan',
-            'args': ['argh', 'argh'],
-        }
-
-        with logger_disabled('mrjob.job'):
-            self.assertEqual(MRJob.jar(**kwargs), JarStep(**kwargs))
+class DeprecatedMRMethodTestCase(TestCase):
 
     def test_mr(self):
         kwargs = {
@@ -1150,9 +1140,3 @@ class DeprecatedStepConstructorMethodsTestCase(TestCase):
 
         with logger_disabled('mrjob.job'):
             self.assertEqual(MRJob.mr(**kwargs), MRStep(**kwargs))
-
-    def test_mr_positional_arguments(self):
-        with logger_disabled('mrjob.job'):
-            self.assertEqual(
-                MRJob.mr(_IDENTITY_MAPPER, _IDENTITY_REDUCER),
-                MRStep(mapper=_IDENTITY_MAPPER, reducer=_IDENTITY_REDUCER))

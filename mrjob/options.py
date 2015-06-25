@@ -230,12 +230,11 @@ def add_hadoop_emr_opts(opt_group):
 
         opt_group.add_option(
             '--label', dest='label', default=None,
-            help='custom prefix for job name, to help us identify the job'),
+            help='alternate label for the job, to help us identify it'),
 
         opt_group.add_option(
             '--owner', dest='owner', default=None,
-            help='custom username to use, to help us identify who ran the'
-            ' job'),
+            help='user who ran the job (if different from the current user)'),
 
         opt_group.add_option(
             '--partitioner', dest='partitioner', default=None,

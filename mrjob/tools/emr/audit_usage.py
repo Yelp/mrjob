@@ -166,7 +166,7 @@ def job_flows_to_stats(job_flows, now=None):
                         start_to_nih[start] += nih
             s[key] = start_to_nih
 
-    # break down by label ("job name") and owner ("user")
+    # break out by label (usually script name) and owner (usually current user)
     for key in ('label', 'owner'):
         for nih_type in ('nih_used', 'nih_billed', 'nih_bbnu'):
             key_to_nih = {}

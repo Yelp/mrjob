@@ -578,7 +578,7 @@ class EMRJobRunner(MRJobRunner):
 
         self._fix_s3_scratch_and_log_uri_opts()
 
-        # pick a tmp dir based on the job name
+        # use job key to make a unique tmp dir
         self._s3_tmp_uri = self._opts['s3_scratch_uri'] + self._job_key + '/'
 
         # pick/validate output dir

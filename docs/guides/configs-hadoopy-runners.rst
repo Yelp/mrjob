@@ -68,7 +68,7 @@ Options available to hadoop and emr runners
     :set: all
     :default: script's module name, or ``no_script``
 
-    Description of this job to use as the part of its name.
+    Alternate label for the job
 
 .. mrjob-opt::
     :config: owner
@@ -77,7 +77,7 @@ Options available to hadoop and emr runners
     :set: all
     :default: :py:func:`getpass.getuser`, or ``no_user`` if that fails
 
-    Who is running this job. Used solely to set the job name.
+    Who is running this job (if different from the current user)
 
 .. mrjob-opt::
     :config: partitioner

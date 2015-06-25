@@ -607,6 +607,14 @@ def add_emr_opts(opt_group):
                  ' This option can be overridden by'
                  ' --emr-api-param VisibleToAllUsers=true|false.'
         ),
+
+        opt_group.add_option(
+            '--emr-tag', dest='emr_tags',
+            default=[], action='append',
+            help='Metadata tags to apply to the EMR cluster; '
+                 'should take the form KEY=VALUE. You can use --emr-tag '
+                 'multiple times.'
+        ),
     ]
 
 

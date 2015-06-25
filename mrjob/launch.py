@@ -460,6 +460,15 @@ class MRJobLauncher(object):
         for param in self.options.no_emr_api_params:
             self.options.emr_api_params[param] = None
 
+        # emr_tags
+        emr_tags_err = (
+            'emr-tag argument "%s" is not of the form KEY=VALUE')
+
+        self.options.emr_tags = parse_key_value_list(
+            self.options.emr_tags,
+            emr_tags_err,
+            self.option_parser.error)
+
         def parse_commas(cleanup_str):
             cleanup_error = ('cleanup option %s is not one of ' +
                              ', '.join(CLEANUP_CHOICES))

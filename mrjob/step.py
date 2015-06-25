@@ -32,8 +32,11 @@ _HADOOP_OPTS = ('jobconf',)
 
 # params to specify how to run the step. need at least one of these
 _JOB_STEP_FUNC_PARAMS = _MAPPER_FUNCS + _COMBINER_FUNCS + _REDUCER_FUNCS
-# all allowable step params
+# all allowable MRStep params
 _JOB_STEP_PARAMS = _JOB_STEP_FUNC_PARAMS + _HADOOP_OPTS
+
+# all allowable JarStep constructor keyword args
+_JAR_STEP_KWARGS = ['args', 'main_class']
 
 
 log = logging.getLogger(__name__)
@@ -91,8 +94,8 @@ class MRStep(object):
         # limit which keyword args can be specified
         bad_kwargs = sorted(set(kwargs) - set(_JOB_STEP_PARAMS))
         if bad_kwargs:
-            raise TypeError(
-                'mr() got an unexpected keyword argument %r' % bad_kwargs[0])
+            raise TypeError('MRStep() got an unexpected keyword argument %r' %
+                            bad_kwargs[0])
 
         if not set(kwargs) & set(_JOB_STEP_FUNC_PARAMS):
             raise ValueError("Step has no mappers and no reducers")
@@ -237,17 +240,6 @@ class MRStep(object):
         return substep_descs
 
 
-def MRJobStep(**kwargs):
-    """Deprecated alias for :py:class:`MRStep`. Will be removed in v0.5.0.
-
-    .. deprecated:: 0.4.2
-    """
-    log.warning('MRJobStep has been renamed to MRStep. The old name will'
-                ' be removed in v0.5.0.')
-
-    return MRStep(**kwargs)
-
-
 class JarStep(object):
     """Represents a running a custom Jar as a step.
 
@@ -260,8 +252,7 @@ class JarStep(object):
     #: with the step's output path
     OUTPUT = '<output>'
 
-    # in v0.5.0, replace "*args" with "jar"
-    def __init__(self, *args, **kwargs):
+    def __init__(self, jar, **kwargs):
         """Define a Java JAR step.
 
         Accepts the following keyword arguments:
@@ -274,35 +265,19 @@ class JarStep(object):
                            in the jar's manifest file.
         :param args: (optional) A list of arguments to the jar
 
+        *jar* can also be passed as a positional argument
+
         See :ref:`non-hadoop-streaming-jar-steps` for sample usage.
         """
-        if args:
-            self._init_deprecated(*args, **kwargs)
-        else:
-            self._init_kwargs(**kwargs)
-
-    def _init_deprecated(
-            self, name, jar, main_class=None, step_args=None, args=None):
-        log.warning('Positional arguments to JarStep() (other than'
-                    ' jar) are deprecated and will be removed in v0.5.0')
+        bad_kwargs = sorted(set(kwargs) - set(_JAR_STEP_KWARGS))
+        if bad_kwargs:
+            raise TypeError('JarStep() got an unexpected keyword argument %r' %
+                            bad_kwargs[0])
 
         self.jar = jar
-        self.main_class = main_class
-        self.args = args or step_args or []
 
-    def _init_kwargs(
-            self, jar, main_class=None, args=None, step_args=None, name=None):
-        # deprecated arguments
-        if step_args:
-            log.warning('step_args argument to JarStep() has been'
-                        ' renamed to args, and will be removed in v0.5.0')
-        if name:
-            log.warning('name argument to JarStep() has no effect, and will'
-                        ' be removed in v0.5.0')
-
-        self.jar = jar
-        self.main_class = main_class
-        self.args = args or step_args or []
+        self.args = kwargs.get('args') or []
+        self.main_class = kwargs.get('main_class')
 
     def __repr__(self):
         repr_args = []

@@ -26,5 +26,4 @@ S3 Utilities
 .. automethod:: S3Filesystem.make_s3_conn
 .. automethod:: S3Filesystem.get_s3_key
 .. automethod:: S3Filesystem.get_s3_keys
-.. automethod:: S3Filesystem.get_s3_folder_keys
 .. automethod:: S3Filesystem.make_s3_key

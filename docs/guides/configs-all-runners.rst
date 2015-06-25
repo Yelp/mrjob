@@ -126,8 +126,6 @@ Temp files and cleanup
     * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
     * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
         on cleanup
-    * ``'IF_SUCCESSFUL'`` (deprecated): same as ``ALL``. Not supported for
-        ``cleanup_on_failure``.
 
     In the config file::
 

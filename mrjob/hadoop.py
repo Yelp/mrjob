@@ -54,16 +54,6 @@ log = logging.getLogger(__name__)
 # to filter out the log4j stuff that hadoop streaming prints out
 HADOOP_STREAMING_OUTPUT_RE = re.compile(br'^(\S+ \S+ \S+ \S+: )?(.*)$')
 
-# used by mkdir()
-HADOOP_FILE_EXISTS_RE = re.compile(br'.*File exists.*')
-
-# used by ls()
-HADOOP_LSR_NO_SUCH_FILE = re.compile(
-    br'^lsr: Cannot access .*: No such file or directory.')
-
-# used by rm() (see below)
-HADOOP_RMR_NO_SUCH_FILE = re.compile(br'^rmr: hdfs://.*$')
-
 # used to extract the job timestamp from stderr
 HADOOP_JOB_TIMESTAMP_RE = re.compile(
     br'(INFO: )?Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
@@ -124,8 +114,8 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         'hdfs_scratch_dir': combine_paths,
     })
 
-    def __init__(self, alias, opts, conf_path):
-        super(HadoopRunnerOptionStore, self).__init__(alias, opts, conf_path)
+    def __init__(self, alias, opts, conf_paths):
+        super(HadoopRunnerOptionStore, self).__init__(alias, opts, conf_paths)
 
         # fix hadoop_home
         if not self['hadoop_home']:

@@ -15,6 +15,7 @@ v0.5.0, 2015-??-?? -- ???
      * to_lines() no longer appends a newline to data (#819)
    * removed extract_dir_for_tar()
    * gunzip_stream() now yields chunks, not lines
+   * removed hash_object()
 
 v0.4.5, 2015-??-?? -- IAM Fortified
  * runners:

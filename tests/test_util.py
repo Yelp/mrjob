@@ -30,7 +30,6 @@ from mrjob.py2 import StringIO
 from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
-from mrjob.util import hash_object
 from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
 from mrjob.util import read_file
@@ -588,11 +587,3 @@ class ReadFileTestCase(TestCase):
                 output.append(line)
 
         self.assertEqual(output, [b'bar\n', b'bar\n', b'foo\n'])
-
-
-class HashObjectTestCase(TestCase):
-
-    def test_works_at_all(self):
-        # this was broken on Python 3
-        with logger_disabled('mrjob.util'):
-            self.assertNotEqual(hash_object('foo'), hash_object({}))

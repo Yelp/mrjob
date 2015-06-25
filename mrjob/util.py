@@ -238,20 +238,6 @@ def gunzip_stream(fileobj, bufsize=1024):
             yield data
 
 
-def hash_object(obj):
-    """Generate a hash (currently md5) of the ``repr`` of the object.
-
-    .. deprecated:: 0.4.5
-    """
-    log.warning('hash_object() is deprecated and will be removed in v0.5')
-    m = hashlib.md5()
-    obj_repr = repr(obj)
-    if not isinstance(obj_repr, bytes):
-        obj_repr = obj_repr.encode('utf_8')
-    m.update(obj_repr)
-    return m.hexdigest()
-
-
 def log_to_null(name=None):
     """Set up a null handler for the given stream, to suppress
     "no handlers could be found" warnings."""

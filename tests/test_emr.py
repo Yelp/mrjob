@@ -952,6 +952,35 @@ class ScratchBucketTestCase(MockEMRAndS3TestCase):
     def test_default(self):
         self.assert_scratch(self.NEW_BUCKET, 'us-west-2')
 
+    def test_us_west_1(self):
+        self.assert_scratch(self.NEW_BUCKET, 'us-west-1',
+                            aws_region='us-west-1')
+
+    def test_us_east_1(self):
+        # location should be blank
+        self.assert_scratch(self.NEW_BUCKET, '',
+                            aws_region='us-east-1')
+
+    def test_reuse_mrjob_bucket_in_same_region(self):
+        self.add_mock_s3_data({'mrjob-1': {}}, location='us-west-2')
+
+        self.assert_scratch('s3://mrjob-1/tmp/', 'us-west-2')
+
+    def test_ignore_mrjob_bucket_in_different_region(self):
+        self.add_mock_s3_data({'mrjob-1': {}}, location='')
+
+        self.assert_scratch(self.NEW_BUCKET, 'us-west-2')
+
+    def test_ignore_non_mrjob_bucket_in_different_region(self):
+        self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
+
+        self.assert_scratch(self.NEW_BUCKET, 'us-west-2')
+
+    def test_reuse_mrjob_bucket_in_us_east_1(self):
+        self.add_mock_s3_data({'mrjob-1': {}}, location='')
+
+        self.assert_scratch('s3://mrjob-1/tmp/', '', aws_region='us-east-1')
+
 
 class ScratchBucketAndRegionTestCase(MockEMRAndS3TestCase):
 

@@ -70,13 +70,11 @@ def wrap_aws_conn(raw_conn):
 
 
 def _get_bucket(s3_conn, bucket_name):
-    """Wrapper for s3_conn.get_bucket().
-
-    This only validate buckets in boto >= 2.25.0, which features quick
-    validation using HEAD requests (see Issue #865).
-    """
-    return s3_conn.get_bucket(bucket_name,
-                              validate=version_gte(boto.Version, '2.25.0'))
+    """Wrapper for s3_conn.get_bucket()."""
+    # TODO: not removing this wrapper because I'm going to replace it with
+    # S3Filesystem.get_bucket(), which will connect to the endpoint
+    # appropriate for the bucket (see #1028)
+    return s3_conn.get_bucket(bucket_name)
 
 
 class S3Filesystem(Filesystem):

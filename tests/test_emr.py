@@ -3690,56 +3690,37 @@ class SecurityTokenTestCase(MockEMRAndS3TestCase):
         self.mock_s3 = self.start(patch('boto.connect_s3',
                                         wraps=boto.connect_s3))
 
-    def test_connections_without_security_token(self):
-        runner = EMRJobRunner()
-
-        runner.make_emr_conn()
-
-        self.assertTrue(self.mock_emr.called)
-        # security_token shouldn't even be in kwargs
-        # (boto 2.2.0 doesn't allow it)
-        emr_kwargs = self.mock_emr.call_args[1]
-        self.assertNotIn('security_token', emr_kwargs)
-
-        runner.make_iam_conn()
-
-        self.assertTrue(self.mock_iam.called)
-        # security_token shouldn't even be in kwargs
-        # (boto 2.2.0 doesn't allow it)
-        iam_kwargs = self.mock_iam.call_args[1]
-        self.assertNotIn('security_token', iam_kwargs)
-
-        runner.make_s3_conn()
-
-        self.assertTrue(self.mock_s3.called)
-        # S3 could accept security token, even in boto 2.2.0
-        s3_kwargs = self.mock_s3.call_args[1]
-        self.assertIn('security_token', s3_kwargs)
-        self.assertEqual(s3_kwargs['security_token'], None)
-
-    def test_connections_with_security_token(self):
-        runner = EMRJobRunner(aws_security_token='meow')
-
+    def assert_conns_use_security_token(self, runner, security_token):
         runner.make_emr_conn()
 
         self.assertTrue(self.mock_emr.called)
         emr_kwargs = self.mock_emr.call_args[1]
         self.assertIn('security_token', emr_kwargs)
-        self.assertEqual(emr_kwargs['security_token'], 'meow')
+        self.assertEqual(emr_kwargs['security_token'], security_token)
 
         runner.make_iam_conn()
 
         self.assertTrue(self.mock_iam.called)
         iam_kwargs = self.mock_iam.call_args[1]
         self.assertIn('security_token', iam_kwargs)
-        self.assertEqual(iam_kwargs['security_token'], 'meow')
+        self.assertEqual(iam_kwargs['security_token'], security_token)
 
         runner.make_s3_conn()
 
         self.assertTrue(self.mock_s3.called)
         s3_kwargs = self.mock_s3.call_args[1]
         self.assertIn('security_token', s3_kwargs)
-        self.assertEqual(s3_kwargs['security_token'], 'meow')
+        self.assertEqual(s3_kwargs['security_token'], security_token)
+
+    def test_connections_without_security_token(self):
+        runner = EMRJobRunner()
+
+        self.assert_conns_use_security_token(runner, None)
+
+    def test_connections_with_security_token(self):
+        runner = EMRJobRunner(aws_security_token='meow')
+
+        self.assert_conns_use_security_token(runner, 'meow')
 
 
 class BootstrapPythonTestCase(MockEMRAndS3TestCase):

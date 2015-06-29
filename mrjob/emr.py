@@ -653,18 +653,16 @@ class EMRJobRunner(MRJobRunner):
         #   infer aws_region if no aws_region is specified
         for scratch_bucket in mrjob_buckets:
             scratch_bucket_name = scratch_bucket.name
-            scratch_bucket_location = scratch_bucket.get_location()
 
-            if scratch_bucket_location:
-                if scratch_bucket_location == self._opts['aws_region']:
-                    # Regions are both specified and match
-                    log.info("using existing scratch bucket %s" %
-                             scratch_bucket_name)
-                    self._opts['s3_scratch_uri'] = (
-                        's3://%s/tmp/' % scratch_bucket_name)
-                    return
-                elif scratch_bucket_location != self._opts['aws_region']:
-                    continue
+            if (scratch_bucket.get_location() ==
+                s3_location_constraint_for_region(self._opts['aws_region'])):
+
+                # Regions are both specified and match
+                log.info("using existing scratch bucket %s" %
+                         scratch_bucket_name)
+                self._opts['s3_scratch_uri'] = ('s3://%s/tmp/' %
+                                                scratch_bucket_name)
+                return
 
         # That may have all failed. If so, pick a name.
         scratch_bucket_name = 'mrjob-' + random_identifier()

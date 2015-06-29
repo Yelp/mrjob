@@ -158,7 +158,7 @@ _S3_REGION_ENDPOINT = 's3-%(region)s.amazonaws.com'
 _S3_REGIONLESS_ENDPOINT = 's3.amazonaws.com'
 
 # us-east-1 doesn't have its own endpoint or need bucket location constraints
-_S3_REGIONS_WITH_NO_LOCATION_CONSTRAINT = ['us-east-1']
+_S3_REGION_WITH_NO_LOCATION_CONSTRAINT = 'us-east-1'
 
 
 # "EU" is an alias for the eu-west-1 region
@@ -201,7 +201,7 @@ def s3_endpoint_for_region(region):
     """Get the host for S3 in the given AWS region."""
     region = _fix_region(region)
 
-    if not region or region in _S3_REGIONS_WITH_NO_LOCATION_CONSTRAINT:
+    if not region or region == _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
         return _S3_REGIONLESS_ENDPOINT
     else:
         return _S3_REGION_ENDPOINT % {'region': region}
@@ -212,7 +212,7 @@ def s3_location_constraint_for_region(region):
     services can connect to it in the given region."""
     region = _fix_region(region)
 
-    if not region or region in _S3_REGIONS_WITH_NO_LOCATION_CONSTRAINT:
+    if not region or region == _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
         return ''
     else:
         return region

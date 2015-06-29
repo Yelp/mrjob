@@ -309,6 +309,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_endpoint',
         'emr_job_flow_id',
         'emr_job_flow_pool_name',
+        'emr_tags',
         'enable_emr_debugging',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
@@ -344,7 +345,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         's3_log_uri': combine_paths,
         's3_scratch_uri': combine_paths,
         'ssh_bin': combine_cmds,
-        'emr_api_params': combine_dicts
+        'emr_api_params': combine_dicts,
+        'emr_tags': combine_dicts
     })
 
     def __init__(self, alias, opts, conf_paths):
@@ -1481,6 +1483,14 @@ class EMRJobRunner(MRJobRunner):
 
         # keep track of when we launched our job
         self._emr_job_start = time.time()
+
+        # set EMR tags for the job, if any
+        tags = self._opts['emr_tags']
+        if tags:
+            log.info('Setting EMR tags: %s' %
+                ', '.join('%s=%s' % (tag, value) for tag, value in tags.items())
+            )
+            emr_conn.add_tags(self._emr_job_flow_id, tags)
 
     # TODO: break this method up; it's too big to write tests for
     def _wait_for_job_to_complete(self):

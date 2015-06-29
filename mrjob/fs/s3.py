@@ -24,7 +24,7 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
-from mrjob.compat import version_gte
+from mrjob.aws import s3_endpoint_for_region
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
@@ -69,14 +69,6 @@ def wrap_aws_conn(raw_conn):
                         max_tries=EMR_MAX_TRIES)
 
 
-def _get_bucket(s3_conn, bucket_name):
-    """Wrapper for s3_conn.get_bucket()."""
-    # TODO: not removing this wrapper because I'm going to replace it with
-    # S3Filesystem.get_bucket(), which will connect to the endpoint
-    # appropriate for the bucket (see #1028)
-    return s3_conn.get_bucket(bucket_name)
-
-
 class S3Filesystem(Filesystem):
     """Filesystem for Amazon S3 URIs. Typically you will get one of these via
     ``EMRJobRunner().fs``, composed with
@@ -89,8 +81,7 @@ class S3Filesystem(Filesystem):
         """
         :param aws_access_key_id: Your AWS access key ID
         :param aws_secret_access_key: Your AWS secret access key
-        :param s3_endpoint: S3 endpoint to access, e.g.
-                            ``s3-us-west-2.amazonaws.com``
+        :param s3_endpoint: If set, always use this endpoint
         """
         super(S3Filesystem, self).__init__()
         self._s3_endpoint = s3_endpoint
@@ -151,7 +142,7 @@ class S3Filesystem(Filesystem):
         s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        bucket = _get_bucket(s3_conn, bucket_name)
+        bucket = self.get_bucket(bucket_name, s3_conn)
         for key in bucket.list(key_name):
             yield s3_key_to_uri(key)
 
@@ -220,8 +211,15 @@ class S3Filesystem(Filesystem):
     # Try to use the more general filesystem interface unless you really
     # need to do something S3-specific (e.g. setting file permissions)
 
-    def make_s3_conn(self):
+    def make_s3_conn(self, region=''):
         """Create a connection to S3.
+
+        :param region: region to use to choose S3 endpoint.
+
+        If you are doing anything with buckets other than creating them
+        or fetching basic metadata (name and location), it's best to use
+        :py:meth:`get_bucket` because it chooses the appropriate S3 endpoint
+        automatically.
 
         :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a
                  :py:class:`mrjob.retry.RetryWrapper`
@@ -230,14 +228,34 @@ class S3Filesystem(Filesystem):
         if boto is None:
             raise ImportError('You must install boto to connect to S3')
 
-        log.debug('creating S3 connection (to %s)' % self._s3_endpoint)
+        # self._s3_endpoint overrides region
+        host = self._s3_endpoint or s3_endpoint_for_region(region)
+
+        log.debug('creating S3 connection (to %s)' % host)
 
         raw_s3_conn = boto.connect_s3(
             aws_access_key_id=self._aws_access_key_id,
             aws_secret_access_key=self._aws_secret_access_key,
-            host=self._s3_endpoint,
+            host=host,
             security_token=self._aws_security_token)
         return wrap_aws_conn(raw_s3_conn)
+
+    def get_bucket(self, bucket_name, s3_conn=None):
+        """Get the bucket, connecting through the appropriate endpoint."""
+        if not s3_conn:
+            s3_conn = self.make_s3_conn()
+
+        bucket = s3_conn.get_bucket(bucket_name)
+        location = bucket.get_location()
+
+        # connect to bucket on proper endpoint
+        if (not self._s3_endpoint and
+            s3_endpoint_for_region(location) != s3_conn.endpoint):
+
+            s3_conn = self.make_s3_conn(location)
+            bucket = s3_conn.get_bucket(bucket_name)
+
+        return bucket
 
     def get_s3_key(self, uri, s3_conn=None):
         """Get the boto Key object matching the given S3 uri, or
@@ -253,7 +271,7 @@ class S3Filesystem(Filesystem):
         bucket_name, key_name = parse_s3_uri(uri)
 
         try:
-            bucket = _get_bucket(s3_conn, bucket_name)
+            bucket = self.get_bucket(bucket_name, s3_conn)
         except boto.exception.S3ResponseError as e:
             if e.status != 404:
                 raise e
@@ -276,7 +294,7 @@ class S3Filesystem(Filesystem):
             s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        return _get_bucket(s3_conn, bucket_name).new_key(key_name)
+        return self.get_bucket(bucket_name, s3_conn).new_key(key_name)
 
     def get_s3_keys(self, uri, s3_conn=None):
         """Get a stream of boto Key objects for each key inside
@@ -290,6 +308,6 @@ class S3Filesystem(Filesystem):
             s3_conn = self.make_s3_conn()
 
         bucket_name, key_prefix = parse_s3_uri(uri)
-        bucket = _get_bucket(s3_conn, bucket_name)
+        bucket = self.get_bucket(bucket_name, s3_conn)
         for key in bucket.list(key_prefix):
             yield key

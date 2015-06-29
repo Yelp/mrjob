@@ -61,7 +61,6 @@ from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import random_identifier
-from mrjob.aws import s3_endpoint_for_region
 from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import version_gte
 from mrjob.compat import supports_new_distributed_cache_options
@@ -73,7 +72,6 @@ from mrjob.conf import combine_paths
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
-from mrjob.fs.s3 import _get_bucket
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob.iam import FALLBACK_INSTANCE_PROFILE
@@ -227,9 +225,9 @@ def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
     return s3_tmp_uri + 'locks/' + emr_job_flow_id + '/' + str(step_num)
 
 
-def _lock_acquire_step_1(s3_conn, lock_uri, job_key, mins_to_expiration=None):
+def _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration=None):
     bucket_name, key_prefix = parse_s3_uri(lock_uri)
-    bucket = _get_bucket(s3_conn, bucket_name)
+    bucket = s3_fs.get_bucket(bucket_name)
     key = bucket.get_key(key_prefix)
 
     # EMRJobRunner should start using a job flow within about a second of
@@ -255,19 +253,17 @@ def _lock_acquire_step_2(key, job_key):
     return (key_value == job_key.encode('utf_8'))
 
 
-def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_key,
+def attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
                             mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
-    key = _lock_acquire_step_1(s3_conn, lock_uri, job_key, mins_to_expiration)
-    if key is not None:
-        time.sleep(sync_wait_time)
-        success = _lock_acquire_step_2(key, job_key)
-        if success:
-            return True
+    key = _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration)
+    if key is None:
+        return False
 
-    return False
+    time.sleep(sync_wait_time)
+    return _lock_acquire_step_2(key, job_key)
 
 
 class LogFetchError(Exception):
@@ -623,15 +619,9 @@ class EMRJobRunner(MRJobRunner):
 
         Helper for __init__.
         """
-        s3_conn = self.make_s3_conn()
-        # check s3_scratch_uri against aws_region if specified
-        if self._opts['s3_scratch_uri']:
-            bucket_name, _ = parse_s3_uri(self._opts['s3_scratch_uri'])
-            bucket_loc = _get_bucket(s3_conn, bucket_name).get_location()
-
         # set s3_scratch_uri by checking for existing buckets
-        else:
-            self._set_s3_scratch_uri(s3_conn)
+        if not self._opts['s3_scratch_uri']:
+            self._set_s3_scratch_uri()
             log.info('using %s as our scratch dir on S3' %
                      self._opts['s3_scratch_uri'])
 
@@ -645,8 +635,9 @@ class EMRJobRunner(MRJobRunner):
         else:
             self._opts['s3_log_uri'] = self._opts['s3_scratch_uri'] + 'logs/'
 
-    def _set_s3_scratch_uri(self, s3_conn):
+    def _set_s3_scratch_uri(self):
         """Helper for _fix_s3_scratch_and_log_uri_opts"""
+        s3_conn = self.fs.make_s3_conn()
         buckets = s3_conn.get_all_buckets()
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
 
@@ -712,14 +703,9 @@ class EMRJobRunner(MRJobRunner):
         local filesystem.
         """
         if self._fs is None:
-            if self._opts['s3_endpoint']:
-                s3_endpoint = self._opts['s3_endpoint']
-            else:
-                s3_endpoint = s3_endpoint_for_region(self._opts['aws_region'])
-
             self._s3_fs = S3Filesystem(self._opts['aws_access_key_id'],
                                        self._opts['aws_secret_access_key'],
-                                       s3_endpoint,
+                                       self._opts['s3_endpoint'],
                                        self._opts['aws_security_token'])
 
             if self._opts['ec2_key_pair_file']:
@@ -2379,7 +2365,7 @@ class EMRJobRunner(MRJobRunner):
             if sorted_tagged_job_flows:
                 job_flow = sorted_tagged_job_flows[-1]
                 status = attempt_to_acquire_lock(
-                    s3_conn, self._lock_uri(job_flow),
+                    self.fs, self._lock_uri(job_flow),
                     self._opts['s3_sync_wait_time'], self._job_key)
                 if status:
                     return sorted_tagged_job_flows[-1]

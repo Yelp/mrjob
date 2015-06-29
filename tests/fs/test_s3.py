@@ -21,7 +21,6 @@ except ImportError:
     boto = None
 
 from mrjob.fs.s3 import S3Filesystem
-from mrjob.fs.s3 import _get_bucket
 
 from tests.compress import gzip_compress
 from tests.mockboto import MockS3Connection

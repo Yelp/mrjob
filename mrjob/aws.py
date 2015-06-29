@@ -198,7 +198,11 @@ def emr_ssl_host_for_region(region):
 
 
 def s3_endpoint_for_region(region):
-    """Get the host for S3 in the given AWS region."""
+    """Get the host for S3 in the given AWS region.
+
+    This will accept ``''`` for region as well, so it's fine to
+    use location constraint in place of region.
+    """
     region = _fix_region(region)
 
     if not region or region == _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:

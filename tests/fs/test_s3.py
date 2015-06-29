@@ -142,25 +142,3 @@ class S3FSTestCase(SandboxedTestCase):
 
         self.fs.rm(path)
         self.assertEqual(self.fs.path_exists(path), False)
-
-
-class GetBucketTestCase(TestCase):
-
-    def assert_bucket_validation(self, boto_version, should_validate):
-        with patch('boto.Version', boto_version):
-            s3_conn = Mock()
-            _get_bucket(s3_conn, 'walrus')
-            s3_conn.get_bucket.assert_called_once_with(
-                'walrus', validate=should_validate)
-
-    def test_boto_2_2_0(self):
-        self.assert_bucket_validation('2.2.0', False)
-
-    def test_boto_2_3_0(self):
-        # original version check used string comparison, which
-        # would determine that 2.3.0 >= 2.25.0
-        self.assertGreaterEqual('2.3.0', '2.25.0')
-        self.assert_bucket_validation('2.3.0', False)
-
-    def test_boto_2_25_0(self):
-        self.assert_bucket_validation('2.25.0', True)

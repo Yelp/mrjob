@@ -637,8 +637,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _set_s3_scratch_uri(self):
         """Helper for _fix_s3_scratch_and_log_uri_opts"""
-        s3_conn = self.fs.make_s3_conn()
-        buckets = s3_conn.get_all_buckets()
+        buckets = self.fs.make_s3_conn().get_all_buckets()
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
 
         # Loop over buckets until we find one that is not region-
@@ -816,19 +815,17 @@ class EMRJobRunner(MRJobRunner):
 
         log.info('Copying non-input files into %s' % self._upload_mgr.prefix)
 
-        s3_conn = self.make_s3_conn()
-
         for path, s3_uri in self._upload_mgr.path_to_uri().items():
             log.debug('uploading %s -> %s' % (path, s3_uri))
-            self._upload_contents(s3_uri, s3_conn, path)
+            self._upload_contents(s3_uri, path)
 
-    def _upload_contents(self, s3_uri, s3_conn, path):
+    def _upload_contents(self, s3_uri, path):
         """Uploads the file at the given path to S3, possibly using
         multipart upload."""
         fsize = os.stat(path).st_size
         part_size = self._get_upload_part_size()
 
-        s3_key = self.make_s3_key(s3_uri, s3_conn)
+        s3_key = self.fs.make_s3_key(s3_uri)
 
         if self._should_use_multipart_upload(fsize, part_size, path):
             log.debug("Starting multipart upload of %s" % (path,))
@@ -2351,11 +2348,11 @@ class EMRJobRunner(MRJobRunner):
         """
         exclude = set()
         emr_conn = self.make_emr_conn()
-        s3_conn = self.make_s3_conn()
         max_wait_time = self._opts['pool_wait_minutes']
         now = datetime.now()
         end_time = now + timedelta(minutes=max_wait_time)
         time_sleep = timedelta(seconds=JOB_FLOW_SLEEP_INTERVAL)
+
         log.info("Attempting to find an available job flow...")
         while now <= end_time:
             sorted_tagged_job_flows = self.usable_job_flows(

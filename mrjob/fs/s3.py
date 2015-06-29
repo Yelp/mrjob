@@ -76,11 +76,13 @@ class S3Filesystem(Filesystem):
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
 
-    def __init__(self, aws_access_key_id, aws_secret_access_key, s3_endpoint,
-                 aws_security_token=None):
+    def __init__(self, aws_access_key_id, aws_secret_access_key,
+                 aws_security_token=None, s3_endpoint=None):
         """
         :param aws_access_key_id: Your AWS access key ID
         :param aws_secret_access_key: Your AWS secret access key
+        :param aws_security_token: security token for use with temporary
+                                   AWS credentials
         :param s3_endpoint: If set, always use this endpoint
         """
         super(S3Filesystem, self).__init__()
@@ -139,15 +141,14 @@ class S3Filesystem(Filesystem):
 
     def _s3_ls(self, uri):
         """Helper for ls(); doesn't bother with globbing or directories"""
-        s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        bucket = self.get_bucket(bucket_name, s3_conn)
+        bucket = self.get_bucket(bucket_name)
         for key in bucket.list(key_name):
             yield s3_key_to_uri(key)
 
-    def md5sum(self, path, s3_conn=None):
-        k = self.get_s3_key(path, s3_conn=s3_conn)
+    def md5sum(self, path):
+        k = self.get_s3_key(path)
         return k.etag.strip('"')
 
     def _cat_file(self, filename):
@@ -183,7 +184,7 @@ class S3Filesystem(Filesystem):
         """Remove all files matching the given glob."""
         s3_conn = self.make_s3_conn()
         for uri in self.ls(path_glob):
-            key = self.get_s3_key(uri, s3_conn)
+            key = self.get_s3_key(uri)
             if key:
                 log.debug('deleting ' + uri)
                 key.delete()
@@ -240,10 +241,9 @@ class S3Filesystem(Filesystem):
             security_token=self._aws_security_token)
         return wrap_aws_conn(raw_s3_conn)
 
-    def get_bucket(self, bucket_name, s3_conn=None):
+    def get_bucket(self, bucket_name):
         """Get the bucket, connecting through the appropriate endpoint."""
-        if not s3_conn:
-            s3_conn = self.make_s3_conn()
+        s3_conn = self.make_s3_conn()
 
         bucket = s3_conn.get_bucket(bucket_name)
         location = bucket.get_location()
@@ -257,21 +257,16 @@ class S3Filesystem(Filesystem):
 
         return bucket
 
-    def get_s3_key(self, uri, s3_conn=None):
+    def get_s3_key(self, uri):
         """Get the boto Key object matching the given S3 uri, or
         return None if that key doesn't exist.
 
         uri is an S3 URI: ``s3://foo/bar``
-
-        You may optionally pass in an existing s3 connection through
-        ``s3_conn``.
         """
-        if not s3_conn:
-            s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
         try:
-            bucket = self.get_bucket(bucket_name, s3_conn)
+            bucket = self.get_bucket(bucket_name)
         except boto.exception.S3ResponseError as e:
             if e.status != 404:
                 raise e
@@ -281,33 +276,23 @@ class S3Filesystem(Filesystem):
 
         return key
 
-    def make_s3_key(self, uri, s3_conn=None):
+    def make_s3_key(self, uri):
         """Create the given S3 key, and return the corresponding
         boto Key object.
 
         uri is an S3 URI: ``s3://foo/bar``
-
-        You may optionally pass in an existing S3 connection through
-        ``s3_conn``.
         """
-        if not s3_conn:
-            s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        return self.get_bucket(bucket_name, s3_conn).new_key(key_name)
+        return self.get_bucket(bucket_name).new_key(key_name)
 
-    def get_s3_keys(self, uri, s3_conn=None):
+    def get_s3_keys(self, uri):
         """Get a stream of boto Key objects for each key inside
         the given dir on S3.
 
         uri is an S3 URI: ``s3://foo/bar``
-
-        You may optionally pass in an existing S3 connection through s3_conn
         """
-        if not s3_conn:
-            s3_conn = self.make_s3_conn()
-
         bucket_name, key_prefix = parse_s3_uri(uri)
-        bucket = self.get_bucket(bucket_name, s3_conn)
+        bucket = self.get_bucket(bucket_name)
         for key in bucket.list(key_prefix):
             yield key

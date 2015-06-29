@@ -84,7 +84,7 @@ class SSHFilesystem(Filesystem):
             if line and not line.endswith('/'):
                 yield SSH_PREFIX + addr + line
 
-    def md5sum(self, path, s3_conn=None):
+    def md5sum(self, path):
         raise IOError()  # not implemented
 
     def _cat_file(self, filename):

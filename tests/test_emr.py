@@ -2892,25 +2892,23 @@ class S3LockTestCase(MockEMRAndS3TestCase):
     def test_key_race_condition(self):
         # Test case where one attempt puts the key in existence
         runner = EMRJobRunner(conf_paths=[])
-        s3_conn = runner.make_s3_conn()
 
-        key = _lock_acquire_step_1(s3_conn, self.lock_uri, 'jf1')
+        key = _lock_acquire_step_1(runner.fs, self.lock_uri, 'jf1')
         self.assertNotEqual(key, None)
 
-        key2 = _lock_acquire_step_1(s3_conn, self.lock_uri, 'jf2')
+        key2 = _lock_acquire_step_1(runner.fs, self.lock_uri, 'jf2')
         self.assertEqual(key2, None)
 
     def test_read_race_condition(self):
         # test case where both try to create the key
         runner = EMRJobRunner(conf_paths=[])
-        s3_conn = runner.make_s3_conn()
 
-        key = _lock_acquire_step_1(s3_conn, self.lock_uri, 'jf1')
+        key = _lock_acquire_step_1(runner.fs, self.lock_uri, 'jf1')
         self.assertNotEqual(key, None)
 
         # acquire the key by subversive means to simulate contention
         bucket_name, key_prefix = parse_s3_uri(self.lock_uri)
-        bucket = s3_conn.get_bucket(bucket_name)
+        bucket = runner.fs.get_bucket(bucket_name)
         key2 = bucket.get_key(key_prefix)
 
         # and take the lock!
@@ -3547,9 +3545,7 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
         with open(data_path, 'wb') as fp:
             fp.write(data)
 
-        s3_conn = runner.make_s3_conn()
-
-        runner._upload_contents(self.TEST_S3_URI, s3_conn, data_path)
+        runner._upload_contents(self.TEST_S3_URI, data_path)
 
     def assert_upload_succeeds(self, runner, data, expect_multipart):
         """Write the data to a temp file, and then upload it to (mock) S3,

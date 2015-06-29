@@ -36,7 +36,7 @@ class S3FSTestCase(SandboxedTestCase):
     def setUp(self):
         self.sandbox_boto()
         self.addCleanup(self.unsandbox_boto)
-        self.fs = S3Filesystem('key_id', 'secret', 'nowhere')
+        self.fs = S3Filesystem('key_id', 'secret')
 
     def sandbox_boto(self):
         self.mock_s3_fs = {}

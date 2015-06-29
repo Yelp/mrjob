@@ -497,42 +497,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             runner._wait_for_job_flow_termination()
 
 
-class S3ScratchURITestCase(MockEMRAndS3TestCase):
-
-    def test_pick_scratch_uri(self):
-        self.add_mock_s3_data({'mrjob-walrus': {}, 'zebra': {}})
-        runner = EMRJobRunner(conf_paths=[])
-
-        self.assertEqual(runner._opts['s3_scratch_uri'],
-                         's3://mrjob-walrus/tmp/')
-
-    def test_create_scratch_uri(self):
-        # "walrus" bucket will be ignored; it doesn't start with "mrjob-"
-        self.add_mock_s3_data({'walrus': {}, 'zebra': {}})
-
-        runner = EMRJobRunner(conf_paths=[], s3_sync_wait_time=0.00)
-
-        # bucket name should be mrjob- plus 16 random hex digits
-        s3_scratch_uri = runner._opts['s3_scratch_uri']
-        self.assertEqual(s3_scratch_uri[:11], 's3://mrjob-')
-        self.assertEqual(s3_scratch_uri[27:], '/tmp/')
-
-        # bucket shouldn't actually exist yet
-        scratch_bucket, _ = parse_s3_uri(s3_scratch_uri)
-        self.assertNotIn(scratch_bucket, self.mock_s3_fs.keys())
-
-        # need to do something to ensure that the bucket actually gets
-        # created. let's launch a (mock) job flow
-        job_flow_id = runner.make_persistent_job_flow()
-        self.assertIn(scratch_bucket, self.mock_s3_fs.keys())
-        runner.make_emr_conn().terminate_jobflow(job_flow_id)
-
-        # once our scratch bucket is created, we should re-use it
-        runner2 = EMRJobRunner(conf_paths=[])
-        s3_scratch_uri = runner._opts['s3_scratch_uri']
-        self.assertEqual(runner2._opts['s3_scratch_uri'], s3_scratch_uri)
-
-
 class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
     def test_attach_to_existing_job_flow(self):

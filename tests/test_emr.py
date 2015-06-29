@@ -1840,31 +1840,31 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
 
 class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
 
-    def test_no_region(self):
+    def test_default_region(self):
         runner = EMRJobRunner(conf_paths=[])
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.us-west-2.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3.amazonaws.com')
-        self.assertEqual(runner._aws_region, '')
+                         's3-us-west-2.amazonaws.com')
+        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
 
     def test_none_region(self):
         # blank region should be treated the same as no region
         runner = EMRJobRunner(conf_paths=[], aws_region=None)
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.us-west-2.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3.amazonaws.com')
-        self.assertEqual(runner._aws_region, '')
+                         's3-us-west-2.amazonaws.com')
+        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
 
     def test_blank_region(self):
         # blank region should be treated the same as no region
         runner = EMRJobRunner(conf_paths=[], aws_region='')
         self.assertEqual(runner.make_emr_conn().endpoint,
-                         'elasticmapreduce.amazonaws.com')
+                         'elasticmapreduce.us-west-2.amazonaws.com')
         self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3.amazonaws.com')
-        self.assertEqual(runner._aws_region, '')
+                         's3-us-west-2.amazonaws.com')
+        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
 
     def test_eu(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='EU')

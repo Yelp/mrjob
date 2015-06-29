@@ -48,8 +48,6 @@ about setting these options.
     supposed to be secret! Use the environment variable
     :envvar:`AWS_SECURITY_TOKEN` instead.
 
-    This option requires boto >= 2.5.0.
-
 .. mrjob-opt::
     :config: ec2_key_pair
     :switch: --ec2-key-pair
@@ -115,7 +113,7 @@ Job flow creation and configuration
     :switch: --aws-region
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: infer from scrach bucket region
+    :default: ``'us-west-2'``
 
     region to connect to S3 and EMR on (e.g.  ``us-west-1``). If you want to
     use separate regions for S3 and EMR, set :mrjob-opt:`emr_endpoint` and
@@ -607,13 +605,7 @@ Choosing/creating a job flow to join
 
 S3 paths and options
 --------------------
-MRJob uses boto to manipulate/access S3. Older versions of boto prior to 2.25.0
-would enumerate all keys in a bucket by default to validate existence, slowing
-down MRJob and inflating costs. 2.25.0 and above use a HEAD request to validate
-a bucket.
-
-MRJob will validate a bucket using the constant in mrjob.utils.VALIDATE_BUCKET,
-which is set to True if boto.Version >= '2.25.0'
+MRJob uses boto to manipulate/access S3.
 
 .. mrjob-opt::
     :config: s3_endpoint

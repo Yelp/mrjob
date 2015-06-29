@@ -110,8 +110,18 @@ class MockS3Connection(object):
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.endpoint = host or 's3.amazonaws.com'
 
+    def _region(self):
+        """Infer region from self.endpoint. Return '' if on regionless
+        endpoint."""
+        return self.endpoint.split('.')[0][3:]
+
     def get_bucket(self, bucket_name, validate=True, headers=None):
         if bucket_name in self.mock_s3_fs:
+            # can't access buckets through wrong region's endpoint
+            region = self._region()
+            if region and self.mock_s3_fs[bucket_name]['location'] != region:
+                raise boto.exception.S3ResponseError(301, 'Moved Permanently')
+
             return MockBucket(connection=self, name=bucket_name)
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
@@ -123,8 +133,13 @@ class MockS3Connection(object):
                       policy=None):
         if bucket_name in self.mock_s3_fs:
             raise boto.exception.S3CreateError(409, 'Conflict')
-        else:
-            self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': location}
+
+        # for region endpoints, location constraint must match
+        region = self._region()
+        if region and region != location:
+            raise boto.exception.S3CreateError(409, 'Bad Request')
+
+        self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': location}
 
 
 class MockBucket(object):

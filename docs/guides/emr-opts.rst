@@ -48,8 +48,6 @@ about setting these options.
     supposed to be secret! Use the environment variable
     :envvar:`AWS_SECURITY_TOKEN` instead.
 
-    This option requires boto >= 2.5.0.
-
 .. mrjob-opt::
     :config: ec2_key_pair
     :switch: --ec2-key-pair
@@ -115,11 +113,11 @@ Job flow creation and configuration
     :switch: --aws-region
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: infer from scrach bucket region
+    :default: ``'us-west-2'``
 
-    region to connect to S3 and EMR on (e.g.  ``us-west-1``). If you want to
-    use separate regions for S3 and EMR, set :mrjob-opt:`emr_endpoint` and
-    :mrjob-opt:`s3_endpoint`.
+    region to run EMR jobs on (e.g.  ``us-west-1``). Also used by mrjob
+    to create temporary buckets if you don't set :mrjob-opt:`s3_scratch_uri`
+    explicitly.
 
 .. mrjob-opt::
     :config: emr_api_params
@@ -169,8 +167,10 @@ Job flow creation and configuration
     :set: emr
     :default: infer from :mrjob-opt:`aws_region`
 
-    optional host to connect to when communicating with S3 (e.g.
+    Force mrjob to connect to EMR on this endpoint (e.g.
     ``us-west-1.elasticmapreduce.amazonaws.com``).
+
+    Mostly exists as a workaround for network issues.
 
 .. mrjob-opt::
     :config: emr_tags
@@ -640,23 +640,23 @@ Choosing/creating a job flow to join
 
 S3 paths and options
 --------------------
-MRJob uses boto to manipulate/access S3. Older versions of boto prior to 2.25.0
-would enumerate all keys in a bucket by default to validate existence, slowing
-down MRJob and inflating costs. 2.25.0 and above use a HEAD request to validate
-a bucket.
-
-MRJob will validate a bucket using the constant in mrjob.utils.VALIDATE_BUCKET,
-which is set to True if boto.Version >= '2.25.0'
+MRJob uses boto to manipulate/access S3.
 
 .. mrjob-opt::
     :config: s3_endpoint
     :switch: --s3-endpoint
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: infer from :mrjob-opt:`aws_region`
+    :default: (automatic)
 
-    Host to connect to when communicating with S3 (e.g.
-    ``s3-us-west-1.amazonaws.com``).
+    Force mrjob to connect to S3 on this endpoint, rather than letting it
+    choose the appropriate endpoint for each S3 bucket.
+
+    Mostly exists as a workaround for network issues.
+
+    .. warning:: If you set this to a region-specific endpoint
+                 (e.g. ``'s3-us-west-1.amazonaws.com'``) mrjob will not
+                 be able to access buckets located in other regions.
 
 .. mrjob-opt::
     :config: s3_log_uri
@@ -675,10 +675,15 @@ which is set to True if boto.Version >= '2.25.0'
     :switch: --s3-scratch-uri
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``tmp/mrjob`` in the first bucket belonging to you
+    :default: (automatic)
 
     S3 directory (URI ending in ``/``) to use as scratch space, e.g.
     ``s3://yourbucket/tmp/``.
+
+    By default, mrjob looks for a bucket belong to you whose name starts with
+    ``mrjob-`` and which matches :mrjob-opt:`aws_region`. If it can't find
+    one, it creates one with a random name. This option is then set to `tmp/`
+    in this bucket (e.g. ``s3://mrjob-01234567890abcdef/tmp/``).
 
 .. mrjob-opt::
     :config: s3_sync_wait_time

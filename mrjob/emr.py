@@ -316,6 +316,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
         'iam_instance_profile',
+        'iam_endpoint',
         'iam_service_role',
         'max_hours_idle',
         'mins_to_end_of_hour',
@@ -2608,7 +2609,9 @@ class EMRJobRunner(MRJobRunner):
         if boto is None:
             raise ImportError('You must install boto to connect to IAM')
 
-        log.debug('creating IAM connection')
+        host = self._opts['iam_endpoint'] or 'iam.amazonaws.com'
+
+        log.debug('creating IAM connection to %s' % host)
 
         # boto 2.2.0's IamConnection doesn't support security_token,
         # so only include it if set
@@ -2619,5 +2622,6 @@ class EMRJobRunner(MRJobRunner):
         raw_iam_conn = boto.connect_iam(
             aws_access_key_id=self._aws_access_key_id,
             aws_secret_access_key=self._aws_secret_access_key,
+            host=host,
             **kwargs)
         return wrap_aws_conn(raw_iam_conn)

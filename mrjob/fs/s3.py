@@ -189,15 +189,6 @@ class S3Filesystem(Filesystem):
                 log.debug('deleting ' + uri)
                 key.delete()
 
-            # special case: when deleting a directory, also clean up
-            # the _$folder$ files that EMR creates.
-            if uri.endswith('/'):
-                folder_uri = uri[:-1] + '_$folder$'
-                folder_key = self.get_s3_key(folder_uri, s3_conn)
-                if folder_key:
-                    log.debug('deleting ' + folder_uri)
-                    folder_key.delete()
-
     def touchz(self, dest):
         """Make an empty file in the given location. Raises an error if
         a non-empty file already exists in that location."""

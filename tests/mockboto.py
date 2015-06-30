@@ -921,7 +921,6 @@ class MockIAMConnection(object):
                  debug=0, https_connection_factory=None, path='/',
                  security_token=None, validate_certs=True, profile_name=None,
                  mock_iam_instance_profiles=None, mock_iam_roles=None,
-                 mock_iam_role_policies=None,
                  mock_iam_role_attached_policies=None):
         """Mock out connection to IAM.
 
@@ -935,10 +934,6 @@ class MockIAMConnection(object):
             create_date -- ISO creation datetime
             path -- IAM path
 
-        mock_iam_role_policies maps policy name to a dictionary containing:
-            policy_document -- JSON-then-URI-encoded policy doc
-            role_name -- name of single role for this policy (always defined)
-
         mock_iam_role_attached_policies maps role to a list of ARNs for
         attached (managed) policies.
 
@@ -948,8 +943,6 @@ class MockIAMConnection(object):
         self.mock_iam_instance_profiles = combine_values(
             {}, mock_iam_instance_profiles)
         self.mock_iam_roles = combine_values({}, mock_iam_roles)
-        self.mock_iam_role_policies = combine_values(
-            {}, mock_iam_role_policies)
         self.mock_iam_role_attached_policies = combine_values(
             {}, mock_iam_role_attached_policies)
 
@@ -978,11 +971,6 @@ class MockIAMConnection(object):
                 json.loads(params['AssumeRolePolicyDocument']),
                 path=params.get('Path'))
 
-        elif action == 'GetRolePolicy':
-            return self.get_role_policy(
-                params['RoleName'],
-                params['PolicyName'])
-
         elif action == 'ListAttachedRolePolicies':
             if list_marker != 'AttachedPolicies':
                 raise ValueError
@@ -998,15 +986,6 @@ class MockIAMConnection(object):
                 marker=params.get('Marker'),
                 max_items=params.get('MaxItems'))
 
-        elif action == 'ListRolePolicies':
-            if list_marker != 'PolicyNames':
-                raise ValueError
-
-            return self.list_role_policies(
-                params['RoleName'],
-                marker=params.get('Marker'),
-                max_items=params.get('MaxItems'))
-
         elif action == 'ListRoles':
             if list_marker != 'Roles':
                 raise ValueError
@@ -1015,15 +994,6 @@ class MockIAMConnection(object):
                 path_prefix=params.get('PathPrefix'),
                 marker=params.get('Marker'),
                 max_items=params.get('MaxItems'))
-
-        elif action == 'PutRolePolicy':
-            # boto apparently doesn't make any attempt to
-            # JSON-encode the role policy for you!
-            return self.put_role_policy(
-                params['RoleName'],
-                params['PolicyName'],
-                params['PolicyDocument'])
-
 
         else:
             raise NotImplementedError(
@@ -1179,56 +1149,6 @@ class MockIAMConnection(object):
             create_date=role_data['create_date'],
             role_name=role_name,
             path=role_data['path']
-        )
-
-    # (inline) role policies
-
-    def get_role_policy(self, role_name, policy_name):
-        self._check_role_exists(role_name)
-        self._check_role_policy_exists(policy_name, role_name)
-
-        result = self._describe_role_policy(policy_name)
-
-        return self._wrap_result('get_role_policy', result)
-
-    def list_role_policies(self, role_name, marker=None, max_items=None):
-        policy_names = [
-            name for name, data in sorted(self.mock_iam_role_policies.items())
-            if data['role_name'] == role_name]
-
-        result = self._paginate(policy_names, 'policy_names',
-                                marker=marker, max_items=max_items)
-
-        return self._wrap_result('list_role_policies', result)
-
-    def put_role_policy(self, role_name, policy_name, policy_document):
-        self._check_role_exists(role_name)
-
-        # PutRolePolicy will happily overwrite existing role policies
-        self.mock_iam_role_policies[policy_name] = dict(
-            policy_document=quote(policy_document),
-            role_name=role_name)
-
-        return self._wrap_result('put_role_policy')
-
-    def _check_role_policy_exists(self, policy_name, role_name):
-        if (policy_name not in self.mock_iam_role_policies or
-            self.mock_iam_role_policies[policy_name]['role_name'] != role_name):
-
-            # the IAM API really does raise this error when the role policy
-            # exists but has a different role name
-            raise boto.exception.BotoServerError(
-                404, 'Not Found', body=err_xml(
-                    ('The role policy with name %s cannot be found.' %
-                     role_name), code='NoSuchEntity'))
-
-    def _describe_role_policy(self, policy_name):
-        policy_data = self.mock_iam_role_policies[policy_name]
-
-        return dict(
-            policy_document=policy_data['policy_document'],
-            policy_name=policy_name,
-            role_name=policy_data['role_name'],
         )
 
     # attached (managed) role policies

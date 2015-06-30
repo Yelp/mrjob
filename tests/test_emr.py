@@ -147,7 +147,6 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
     def _mock_boto_connect_iam(self, *args, **kwargs):
         kwargs['mock_iam_instance_profiles'] = self.mock_iam_instance_profiles
         kwargs['mock_iam_roles'] = self.mock_iam_roles
-        kwargs['mock_iam_role_policies'] = self.mock_iam_role_policies
         kwargs['mock_iam_role_attached_policies'] = (
             self.mock_iam_role_attached_policies)
         return MockIAMConnection(*args, **kwargs)
@@ -159,7 +158,6 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         self.mock_emr_output = {}
         self.mock_iam_instance_profiles = {}
         self.mock_iam_role_attached_policies = {}
-        self.mock_iam_role_policies = {}
         self.mock_iam_roles = {}
         self.mock_s3_fs = {}
 

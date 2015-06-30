@@ -710,7 +710,7 @@ class EMRJobRunner(MRJobRunner):
 
             if self._opts['ec2_key_pair_file']:
                 self._ssh_fs = SSHFilesystem(
-                    ssh_fs=self._opts['ssh_bin'],
+                    ssh_bin=self._opts['ssh_bin'],
                     ec2_key_pair_file=self._opts['ec2_key_pair_file'],
                     key_name=self._ssh_key_name)
 

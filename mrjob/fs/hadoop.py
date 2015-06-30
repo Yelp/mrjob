@@ -179,6 +179,9 @@ class HadoopFilesystem(Filesystem):
             for line in cat_proc.stderr:
                 log.error('STDERR: ' + line)
 
+            cat_proc.stdout.close()
+            cat_proc.stderr.close()
+
             returncode = cat_proc.wait()
 
             if returncode != 0:

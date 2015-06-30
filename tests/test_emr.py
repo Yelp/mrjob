@@ -38,6 +38,7 @@ from mrjob.emr import filechunkio
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
+from mrjob.job import MRJob
 from mrjob.parse import JOB_KEY_RE
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import pool_hash_and_name
@@ -3868,3 +3869,26 @@ class EMRTagsTestCase(MockEMRAndS3TestCase):
                     {'tag_one': 'foo',
                      'tag_two': 'qwerty',
                      'tag_three': 'bar'})
+
+
+class IAMEndpointTestCase(MockEMRAndS3TestCase):
+
+    def test_default(self):
+        runner = EMRJobRunner()
+
+        iam_conn = runner.make_iam_conn()
+        self.assertEqual(iam_conn.host, 'iam.amazonaws.com')
+
+    def test_explicit_iam_endpoint(self):
+        runner = EMRJobRunner(iam_endpoint='iam.us-gov.amazonaws.com')
+
+        iam_conn = runner.make_iam_conn()
+        self.assertEqual(iam_conn.host, 'iam.us-gov.amazonaws.com')
+
+    def test_iam_endpoint_option(self):
+        mr_job = MRJob(
+            ['-r', 'emr', '--iam-endpoint', 'iam.us-gov.amazonaws.com'])
+
+        with mr_job.make_runner() as runner:
+            iam_conn = runner.make_iam_conn()
+            self.assertEqual(iam_conn.host, 'iam.us-gov.amazonaws.com')

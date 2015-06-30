@@ -34,7 +34,6 @@ Multi-step jobs
 
 .. automethod:: MRJob.steps
 .. automethod:: MRJob.mr
-.. automethod:: MRJob.jar
 
 Running the job
 ---------------

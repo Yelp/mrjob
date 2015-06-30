@@ -1271,8 +1271,8 @@ class EMRJobRunner(MRJobRunner):
         # emr_api_params, which is not what we want.
         api_params = {}
 
-        api_params['VisibleToAllUsers'] = bool(
-            self._opts['visible_to_all_users'])
+        api_params['VisibleToAllUsers'] = str(bool(
+            self._opts['visible_to_all_users'])).lower()
 
         api_params['JobFlowRole'] = self._instance_profile()
         api_params['ServiceRole'] = self._service_role()

@@ -633,8 +633,14 @@ class MockEmrConnection(object):
         if api_params:
             job_flow.api_params = api_params
             if 'VisibleToAllUsers' in api_params:
-                job_flow.visibletoallusers = str(
-                    api_params['VisibleToAllUsers']).lower()
+                visible = api_params['VisibleToAllUsers']
+                if visible not in ('true', 'false'):
+                    raise boto.exception.EmrResponseError(
+                        400, 'Bad Request', err_xml(
+                            'boolean must follow xsd1.1 definition',
+                            code='MalformedInput'))
+
+                job_flow.visibletoallusers = visible
             if 'JobFlowRole' in api_params:
                 job_flow.jobflowrole = api_params['JobFlowRole']
             if 'ServiceRole' in api_params:

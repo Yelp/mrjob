@@ -1052,7 +1052,8 @@ class MockIAMConnection(object):
 
     def create_role(self, role_name, assume_role_policy_document, path=None):
         # real boto has a default for assume_role_policy_document; not
-        # supporting this for now        self._check_path(path)
+        # supporting this for now
+        self._check_path(path)
         self._check_role_does_not_exist(role_name)
 
         # there's no validation of assume_role_policy_document; not entirely

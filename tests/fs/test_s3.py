@@ -122,3 +122,52 @@ class S3FSTestCase(MockEMRAndS3TestCase):
         self.assertEqual(self.fs.path_exists('s3://walrus/data/foo'), True)
         self.fs.rm('s3://walrus/data/foo')
         self.assertEqual(self.fs.path_exists('s3://walrus/data/foo'), False)
+
+
+class S3FSRegionTestCase(MockEMRAndS3TestCase):
+
+    def test_default_endpoint(self):
+        fs = S3Filesystem('key_id', 'secret')
+
+        s3_conn = fs.make_s3_conn()
+        self.assertEqual(s3_conn.endpoint, 's3.amazonaws.com')
+
+    def test_force_s3_endpoint(self):
+        fs = S3Filesystem('key_id', 'secret',
+                          s3_endpoint='s3-us-west-1.amazonaws.com')
+
+        s3_conn = fs.make_s3_conn()
+        self.assertEqual(s3_conn.endpoint, 's3-us-west-1.amazonaws.com')
+
+    def test_endpoint_for_bucket_in_us_west_2(self):
+        self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
+
+        fs = S3Filesystem('key_id', 'secret')
+
+        bucket = fs.get_bucket('walrus')
+        self.assertEqual(bucket.connection.endpoint,
+                         's3-us-west-2.amazonaws.com')
+
+    def test_endpoint_for_bucket_in_us_east_1(self):
+        # location constraint for us-east-1 is '', not 'us-east-1'
+        self.add_mock_s3_data({'walrus': {}}, location='')
+
+        fs = S3Filesystem('key_id', 'secret')
+
+        bucket = fs.get_bucket('walrus')
+        self.assertEqual(bucket.connection.endpoint, 's3.amazonaws.com')
+
+    def test_buckets_from_forced_s3_endpoint(self):
+        self.add_mock_s3_data({'walrus-east': {}}, location='us-east-2')
+        self.add_mock_s3_data({'walrus-west': {}}, location='us-west-2')
+
+        fs = S3Filesystem('key_id', 'secret',
+                          s3_endpoint='s3-us-east-2.amazonaws.com')
+
+        bucket_east = fs.get_bucket('walrus-east')
+        self.assertEqual(bucket_east.connection.endpoint,
+                         's3-us-east-2.amazonaws.com')
+
+        # can't access this bucket from wrong endpoint!
+        self.assertRaises(boto.exception.S3ResponseError,
+                          fs.get_bucket, 'walrus-west')

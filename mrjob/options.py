@@ -526,9 +526,10 @@ def add_emr_opts(opt_group):
 
         opt_group.add_option(
             '--s3-endpoint', dest='s3_endpoint', default=None,
-            help=('Force mrjob to connect to S3 on this endpoint (e.g.'
-                  ' s3-us-west-1.amazonaws.com), rather than letting it'
-                  ' choose the appropriate endpoint for each S3 bucket.')),
+            help=("Force mrjob to connect to S3 on this endpoint (e.g."
+                  " s3-us-west-1.amazonaws.com). You usually shouldn't"
+                  " set this; by default mrjob will choose the correct"
+                  " endpoint for each S3 bucket based on its location.")),
 
         opt_group.add_option(
             '--s3-log-uri', dest='s3_log_uri', default=None,

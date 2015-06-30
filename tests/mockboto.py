@@ -71,20 +71,23 @@ def err_xml(message, type='Sender', code='ValidationError'):
 
 ### S3 ###
 
-def add_mock_s3_data(mock_s3_fs, data, time_modified=None):
+def add_mock_s3_data(mock_s3_fs, data, time_modified=None, location=None):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
     key to contents) with a map from bucket name to key name to data and
     time last modified."""
     if time_modified is None:
         time_modified = datetime.utcnow()
     for bucket_name, key_name_to_bytes in data.items():
-        mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
-        bucket = mock_s3_fs[bucket_name]
+        bucket = mock_s3_fs.setdefault(bucket_name,
+                                       {'keys': {}, 'location': ''})
 
         for key_name, key_data in key_name_to_bytes.items():
             if not isinstance(key_data, bytes):
                 raise TypeError('mock s3 data must be bytes')
             bucket['keys'][key_name] = (key_data, time_modified)
+
+        if location is not None:
+            bucket['location'] = location
 
 
 class MockS3Connection(object):
@@ -105,10 +108,20 @@ class MockS3Connection(object):
         """
         # use mock_s3_fs even if it's {}
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
-        self.endpoint = host or 's3.amazonaws.com'
+        self.host = host or 's3.amazonaws.com'
+
+    def _region(self):
+        """Infer region from self.host. Return '' if on regionless
+        endpoint."""
+        return self.host.split('.')[0][3:]
 
     def get_bucket(self, bucket_name, validate=True, headers=None):
         if bucket_name in self.mock_s3_fs:
+            # can't access buckets through wrong region's endpoint
+            region = self._region()
+            if region and self.mock_s3_fs[bucket_name]['location'] != region:
+                raise boto.exception.S3ResponseError(301, 'Moved Permanently')
+
             return MockBucket(connection=self, name=bucket_name)
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
@@ -120,8 +133,13 @@ class MockS3Connection(object):
                       policy=None):
         if bucket_name in self.mock_s3_fs:
             raise boto.exception.S3CreateError(409, 'Conflict')
-        else:
-            self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': ''}
+
+        # for region endpoints, location constraint must match
+        region = self._region()
+        if region and region != location:
+            raise boto.exception.S3CreateError(409, 'Bad Request')
+
+        self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': location}
 
 
 class MockBucket(object):
@@ -157,9 +175,6 @@ class MockBucket(object):
 
     def get_location(self):
         return self.connection.mock_s3_fs[self.name]['location']
-
-    def set_location(self, new_location):
-        self.connection.mock_s3_fs[self.name]['location'] = new_location
 
     def list(self, prefix=''):
         for key_name in sorted(self.mock_state()):
@@ -411,16 +426,16 @@ class MockEmrConnection(object):
         self.max_job_flows_returned = max_job_flows_returned
         self.simulation_iterator = simulation_iterator
         if region is not None:
-            self.endpoint = region.endpoint
+            self.host = region.endpoint
         else:
-            self.endpoint = 'elasticmapreduce.amazonaws.com'
+            self.host = 'elasticmapreduce.amazonaws.com'
 
     def _enforce_strict_ssl(self):
         if (self.STRICT_SSL and
-            not self.endpoint.endswith('elasticmapreduce.amazonaws.com')):
+            not self.host.endswith('elasticmapreduce.amazonaws.com')):
             from boto.https_connection import InvalidCertificateException
             raise InvalidCertificateException(
-                self.endpoint, None, 'hostname mismatch')
+                self.host, None, 'hostname mismatch')
 
     def run_jobflow(self,
                     name, log_uri, ec2_keyname=None, availability_zone=None,

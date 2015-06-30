@@ -395,7 +395,8 @@ sys.exit(13)
         self.addCleanup(runner.cleanup)
 
         with no_handlers_for_logger():
-            self.assertRaises(CalledProcessError,
+            # sometimes we get a broken pipe error (IOError) on PyPy
+            self.assertRaises((CalledProcessError, IOError),
                               runner._invoke_sort, [self.a, self.b], self.out)
 
     def test_environment_variables_non_windows(self):

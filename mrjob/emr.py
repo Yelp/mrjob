@@ -702,10 +702,11 @@ class EMRJobRunner(MRJobRunner):
         local filesystem.
         """
         if self._fs is None:
-            self._s3_fs = S3Filesystem(self._opts['aws_access_key_id'],
-                                       self._opts['aws_secret_access_key'],
-                                       self._opts['s3_endpoint'],
-                                       self._opts['aws_security_token'])
+            self._s3_fs = S3Filesystem(
+                aws_access_key_id=self._opts['aws_access_key_id'],
+                aws_secret_access_key=self._opts['aws_secret_access_key'],
+                aws_security_token=self._opts['aws_security_token'],
+                s3_endpoint=self._opts['s3_endpoint'])
 
             if self._opts['ec2_key_pair_file']:
                 self._ssh_fs = SSHFilesystem(self._opts['ssh_bin'],

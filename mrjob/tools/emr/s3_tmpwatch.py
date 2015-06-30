@@ -91,7 +91,7 @@ def s3_cleanup(glob_path, time_old, dry_run=False, conf_paths=None):
 
     for path in runner.ls(glob_path):
         bucket_name, key_name = parse_s3_uri(path)
-        bucket = self.fs.get_bucket(bucket_name)
+        bucket = runner.fs.get_bucket(bucket_name)
 
         for key in bucket.list(key_name):
             last_modified = iso8601_to_datetime(key.last_modified)

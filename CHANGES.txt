@@ -10,6 +10,7 @@ v0.5.0, 2015-??-?? -- ???
    * All runners:
      * removed IS_SUCCESSFUL cleanup option (use ALL)
    * EMR:
+     * added iam_endpoint option (#1067)
      * removed iam_job_flow_role option (use iam_instance_profile)
      * removed get_s3_folder_keys()
  * removed mrjob.compat.get_jobconf_value() (use jobconf_from_env())

@@ -924,12 +924,12 @@ class MockIAMConnection(object):
                  mock_iam_role_attached_policies=None):
         """Mock out connection to IAM.
 
-        mock_iam_instance_profiles maps profile name to a dictionary containing:
+        mock_iam_instance_profiles maps profile name to a dict containing:
             create_date -- ISO creation datetime
             path -- IAM path
             role_name -- name of single role for this instance profile, or None
 
-        mock_iam_roles maps role name to a dictionary containing:
+        mock_iam_roles maps role name to a dict containing:
             assume_role_policy_document -- a JSON-then-URI-encoded policy doc
             create_date -- ISO creation datetime
             path -- IAM path

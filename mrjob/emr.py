@@ -709,9 +709,11 @@ class EMRJobRunner(MRJobRunner):
                 s3_endpoint=self._opts['s3_endpoint'])
 
             if self._opts['ec2_key_pair_file']:
-                self._ssh_fs = SSHFilesystem(self._opts['ssh_bin'],
-                                             self._opts['ec2_key_pair_file'],
-                                             self._ssh_key_name)
+                self._ssh_fs = SSHFilesystem(
+                    ssh_fs=self._opts['ssh_bin'],
+                    ec2_key_pair_file=self._opts['ec2_key_pair_file'],
+                    key_name=self._ssh_key_name)
+
                 self._fs = CompositeFilesystem(self._ssh_fs, self._s3_fs,
                                                LocalFilesystem())
             else:

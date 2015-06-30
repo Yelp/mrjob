@@ -87,7 +87,7 @@ class InlineMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
     def test_missing_input(self):
         runner = InlineMRJobRunner(input_paths=['/some/bogus/file/path'])
-        self.assertRaises(runner._run)
+        self.assertRaises(Exception, runner._run)
 
 
 class InlineMRJobRunnerCmdenvTest(EmptyMrjobConfTestCase):

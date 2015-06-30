@@ -28,116 +28,97 @@ from tests.mockboto import add_mock_s3_data
 from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
-from tests.sandbox import SandboxedTestCase
+from tests.test_emr import MockEMRAndS3TestCase
 
 
-class S3FSTestCase(SandboxedTestCase):
+class S3FSTestCase(MockEMRAndS3TestCase):
 
     def setUp(self):
-        self.sandbox_boto()
-        self.addCleanup(self.unsandbox_boto)
+        super(S3FSTestCase, self).setUp()
         self.fs = S3Filesystem('key_id', 'secret')
 
-    def sandbox_boto(self):
-        self.mock_s3_fs = {}
-
-        def mock_boto_connect_s3(*args, **kwargs):
-            kwargs['mock_s3_fs'] = self.mock_s3_fs
-            return MockS3Connection(*args, **kwargs)
-
-        self._real_boto_connect_s3 = boto.connect_s3
-        boto.connect_s3 = mock_boto_connect_s3
-
-        # copy the old environment just to be polite
-        self._old_environ = os.environ.copy()
-
-    def unsandbox_boto(self):
-        boto.connect_s3 = self._real_boto_connect_s3
-
-    def add_mock_s3_data(self, bucket, path, contents, time_modified=None):
-        """Update self.mock_s3_fs with a map from bucket name
-        to key name to data."""
-        add_mock_s3_data(self.mock_s3_fs,
-                         {bucket: {path: contents}},
-                         time_modified)
-        return 's3://%s/%s' % (bucket, path)
-
     def test_cat_uncompressed(self):
-        remote_path = self.add_mock_s3_data(
-            'walrus', 'data/foo', b'foo\nfoo\n')
+        self.add_mock_s3_data(
+            {'walrus': {'data/foo': b'foo\nfoo\n'}})
 
-        self.assertEqual(list(self.fs._cat_file(remote_path)),
+        self.assertEqual(list(self.fs._cat_file('s3://walrus/data/foo')),
                          [b'foo\n', b'foo\n'])
 
     def test_cat_bz2(self):
-        remote_path = self.add_mock_s3_data(
-            'walrus', 'data/foo.bz2', bz2.compress(b'foo\n' * 1000))
+        self.add_mock_s3_data(
+            {'walrus': {'data/foo.bz2': bz2.compress(b'foo\n' * 1000)}})
 
-        self.assertEqual(list(self.fs._cat_file(remote_path)),
+        self.assertEqual(list(self.fs._cat_file('s3://walrus/data/foo.bz2')),
                          [b'foo\n'] * 1000)
 
     def test_cat_gz(self):
-        remote_path = self.add_mock_s3_data(
-            'walrus', 'data/foo.gz', gzip_compress(b'foo\n' * 10000))
+        self.add_mock_s3_data(
+            {'walrus': {'data/foo.gz': gzip_compress(b'foo\n' * 10000)}})
 
-        self.assertEqual(list(self.fs._cat_file(remote_path)),
+        self.assertEqual(list(self.fs._cat_file('s3://walrus/data/foo.gz')),
                          [b'foo\n'] * 10000)
 
     def test_ls_basic(self):
-        remote_path = self.add_mock_s3_data(
-            'walrus', 'data/foo', b'foo\nfoo\n')
+        self.add_mock_s3_data(
+            {'walrus': {'data/foo': b'foo\nfoo\n'}})
 
-        self.assertEqual(list(self.fs.ls(remote_path)), [remote_path])
-        self.assertEqual(list(self.fs.ls('s3://walrus/')), [remote_path])
+        self.assertEqual(list(self.fs.ls('s3://walrus/data/foo')),
+                         ['s3://walrus/data/foo'])
+        self.assertEqual(list(self.fs.ls('s3://walrus/')),
+                         ['s3://walrus/data/foo'])
 
     def test_ls_recurse(self):
+        self.add_mock_s3_data(
+            {'walrus': {'data/bar': b'bar\nbar\n',
+                        'data/bar/baz': b'baz\nbaz\n',
+                        'data/foo': b'foo\nfoo\n'}})
+
         paths = [
-            self.add_mock_s3_data('walrus', 'data/bar', b'bar\nbar\n'),
-            self.add_mock_s3_data('walrus', 'data/bar/baz', b'baz\nbaz\n'),
-            self.add_mock_s3_data('walrus', 'data/foo', b'foo\nfoo\n'),
+            's3://walrus/data/bar',
+            's3://walrus/data/bar/baz',
+            's3://walrus/data/foo',
         ]
 
         self.assertEqual(list(self.fs.ls('s3://walrus/')), paths)
         self.assertEqual(list(self.fs.ls('s3://walrus/*')), paths)
 
     def test_ls_glob(self):
-        paths = [
-            self.add_mock_s3_data('walrus', 'data/bar', b'bar\nbar\n'),
-            self.add_mock_s3_data('walrus', 'data/bar/baz', b'baz\nbaz\n'),
-            self.add_mock_s3_data('walrus', 'data/foo', b'foo\nfoo\n'),
-        ]
+        self.add_mock_s3_data(
+            {'walrus': {'data/bar': b'bar\nbar\n',
+                        'data/bar/baz': b'baz\nbaz\n',
+                        'data/foo': b'foo\nfoo\n'}})
 
-        self.assertEqual(list(self.fs.ls('s3://walrus/*/baz')), [paths[1]])
+        self.assertEqual(list(self.fs.ls('s3://walrus/*/baz')),
+                         ['s3://walrus/data/bar/baz'])
 
     def test_ls_s3n(self):
-        paths = [
-            self.add_mock_s3_data('walrus', 'data/bar', b'abc123'),
-            self.add_mock_s3_data('walrus', 'data/baz', b'123abc')
-        ]
+        self.add_mock_s3_data(
+            {'walrus': {'data/bar': b'abc123',
+                        'data/baz': b'123abc'}})
 
         self.assertEqual(list(self.fs.ls('s3n://walrus/data/*')),
-                         [p.replace('s3://', 's3n://') for p in paths])
+                         ['s3n://walrus/data/bar',
+                          's3n://walrus/data/baz'])
 
     def test_du(self):
-        paths = [
-            self.add_mock_s3_data('walrus', 'data/foo', b'abcd'),
-            self.add_mock_s3_data('walrus', 'data/bar/baz', b'defg'),
-        ]
+        self.add_mock_s3_data({
+            'walrus': {'data/foo': b'abcde',
+                       'data/bar/baz': b'fgh'}})
+
         self.assertEqual(self.fs.du('s3://walrus/'), 8)
-        self.assertEqual(self.fs.du(paths[0]), 4)
-        self.assertEqual(self.fs.du(paths[1]), 4)
+        self.assertEqual(self.fs.du('s3://walrus/data/foo'), 5)
+        self.assertEqual(self.fs.du('s3://walrus/data/bar/baz'), 3)
 
-    def test_path_exists_no(self):
-        path = os.path.join('s3://walrus/data/foo')
-        self.assertEqual(self.fs.path_exists(path), False)
-
-    def test_path_exists_yes(self):
-        path = self.add_mock_s3_data('walrus', 'data/foo', b'abcd')
-        self.assertEqual(self.fs.path_exists(path), True)
+    def test_path_exists(self):
+        self.add_mock_s3_data({
+            'walrus': {'data/foo': b'abcd'}})
+        self.assertEqual(self.fs.path_exists('s3://walrus/data/foo'), True)
+        self.assertEqual(self.fs.path_exists('s3://walrus/data/bar'), False)
 
     def test_rm(self):
-        path = self.add_mock_s3_data('walrus', 'data/foo', b'abcd')
-        self.assertEqual(self.fs.path_exists(path), True)
+        self.add_mock_s3_data({
+            'walrus': {'data/foo': b'abcd'}})
 
-        self.fs.rm(path)
-        self.assertEqual(self.fs.path_exists(path), False)
+        self.assertEqual(self.fs.path_exists('s3://walrus/data/foo'), True)
+        self.fs.rm('s3://walrus/data/foo')
+        self.assertEqual(self.fs.path_exists('s3://walrus/data/foo'), False)

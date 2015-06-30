@@ -108,12 +108,12 @@ class MockS3Connection(object):
         """
         # use mock_s3_fs even if it's {}
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
-        self.endpoint = host or 's3.amazonaws.com'
+        self.host = host or 's3.amazonaws.com'
 
     def _region(self):
-        """Infer region from self.endpoint. Return '' if on regionless
+        """Infer region from self.host. Return '' if on regionless
         endpoint."""
-        return self.endpoint.split('.')[0][3:]
+        return self.host.split('.')[0][3:]
 
     def get_bucket(self, bucket_name, validate=True, headers=None):
         if bucket_name in self.mock_s3_fs:
@@ -426,16 +426,16 @@ class MockEmrConnection(object):
         self.max_job_flows_returned = max_job_flows_returned
         self.simulation_iterator = simulation_iterator
         if region is not None:
-            self.endpoint = region.endpoint
+            self.host = region.endpoint
         else:
-            self.endpoint = 'elasticmapreduce.amazonaws.com'
+            self.host = 'elasticmapreduce.amazonaws.com'
 
     def _enforce_strict_ssl(self):
         if (self.STRICT_SSL and
-            not self.endpoint.endswith('elasticmapreduce.amazonaws.com')):
+            not self.host.endswith('elasticmapreduce.amazonaws.com')):
             from boto.https_connection import InvalidCertificateException
             raise InvalidCertificateException(
-                self.endpoint, None, 'hostname mismatch')
+                self.host, None, 'hostname mismatch')
 
     def run_jobflow(self,
                     name, log_uri, ec2_keyname=None, availability_zone=None,

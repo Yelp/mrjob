@@ -953,6 +953,8 @@ class MockIAMConnection(object):
         self.mock_iam_role_attached_policies = combine_values(
             {}, mock_iam_role_attached_policies)
 
+        self.host = host
+
     def get_response(self, action, params, path='/', parent=None,
                      verb='POST', list_marker='Set'):
         # mrjob.iam currently only calls get_response(), to support old

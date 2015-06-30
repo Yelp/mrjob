@@ -948,52 +948,18 @@ class MockIAMConnection(object):
 
     def get_response(self, action, params, path='/', parent=None,
                      verb='POST', list_marker='Set'):
-        # mrjob.iam currently only calls get_response(), to support old
-        # versions of boto. In real boto, the other methods call
-        # this one, but in mockboto, this method fans out to the other ones
-        if action == 'AddRoleToInstanceProfile':
-            return self.add_role_to_instance_profile(
-                params['InstanceProfileName'],
-                params['RoleName'])
+        # this only supports actions for which there is no method
+        # in boto's IAMConnection
 
-        elif action == 'AttachRolePolicy':
+        if action == 'AttachRolePolicy':
             return self._attach_role_policy(params['RoleName'],
                                             params['PolicyArn'])
-
-        elif action == 'CreateInstanceProfile':
-            return self.create_instance_profile(
-                params['InstanceProfileName'],
-                path=params.get('Path'))
-
-        elif action == 'CreateRole':
-            return self.create_role(
-                params['RoleName'],
-                json.loads(params['AssumeRolePolicyDocument']),
-                path=params.get('Path'))
 
         elif action == 'ListAttachedRolePolicies':
             if list_marker != 'AttachedPolicies':
                 raise ValueError
 
             return self._list_attached_role_policies(params['RoleName'])
-
-        elif action == 'ListInstanceProfiles':
-            if list_marker != 'InstanceProfiles':
-                raise ValueError
-
-            return self.list_instance_profiles(
-                path_prefix=params.get('PathPrefix'),
-                marker=params.get('Marker'),
-                max_items=params.get('MaxItems'))
-
-        elif action == 'ListRoles':
-            if list_marker != 'Roles':
-                raise ValueError
-
-            return self.list_roles(
-                path_prefix=params.get('PathPrefix'),
-                marker=params.get('Marker'),
-                max_items=params.get('MaxItems'))
 
         else:
             raise NotImplementedError(
@@ -1086,18 +1052,14 @@ class MockIAMConnection(object):
 
     def create_role(self, role_name, assume_role_policy_document, path=None):
         # real boto has a default for assume_role_policy_document; not
-        # supporting this for now. It also allows assume_role_policy_document
-        # to be a string, which we don't.
-
-        self._check_path(path)
+        # supporting this for now        self._check_path(path)
         self._check_role_does_not_exist(role_name)
 
         # there's no validation of assume_role_policy_document; not entirely
         # sure what the rules are
 
         self.mock_iam_roles[role_name] = dict(
-            assume_role_policy_document=quote(json.dumps(
-                assume_role_policy_document)),
+            assume_role_policy_document=assume_role_policy_document,
             create_date=to_iso8601(datetime.utcnow()),
             path=(path or self.DEFAULT_PATH),
             policy_names=[],
@@ -1164,8 +1126,15 @@ class MockIAMConnection(object):
 
         return self._wrap_result('attach_role_policy')
 
-    def _list_attached_role_policies(self, role_name):
+    def _list_attached_role_policies(
+            self, role_name, marker=None, max_items=None):
+
         self._check_role_exists(role_name)
+
+        # in theory, pagination is supported, but in practice each role
+        # can have a maximum of two policies attached
+        if marker or max_items:
+            raise NotImplementedError()
 
         arns = self.mock_iam_role_attached_policies.get(role_name, [])
 
@@ -1187,7 +1156,7 @@ class MockIAMConnection(object):
 
     def _paginate(self, items, name, marker=None, max_items=None):
         """Given a list of items, return a dictionary mapping
-        *names* to a slice of items, with additional keys
+        *name* to a slice of items, with additional keys
         'is_truncated' and, if 'is_truncated' is true, 'marker'.
         """
         max_items = max_items or self.DEFAULT_MAX_ITEMS

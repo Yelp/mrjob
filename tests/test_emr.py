@@ -681,7 +681,6 @@ class IAMTestCase(MockEMRAndS3TestCase):
         self.assertEqual(job_flow2.jobflowrole, instance_profile_name)
         self.assertEqual(job_flow2.servicerole, service_role_name)
 
-
     def test_iam_instance_profile_option(self):
         job_flow = self.run_and_get_job_flow(
             '--iam-instance-profile', 'EMR_EC2_DefaultRole')

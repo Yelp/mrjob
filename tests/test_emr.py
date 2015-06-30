@@ -617,9 +617,9 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
 
     def test_force_to_bool(self):
         # make sure mockboto doesn't always convert to bool
-        api_param_job_flow = self.run_and_get_job_flow(
+        self.assertRaises(boto.exception.EmrResponseError,
+            self.run_and_get_job_flow,
             '--emr-api-param', 'VisibleToAllUsers=1')
-        self.assertEqual(api_param_job_flow.visibletoallusers, '1')
 
         VISIBLE_MRJOB_CONF = {'runners': {'emr': {
             'check_emr_status_every': 0.00,

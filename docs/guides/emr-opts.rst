@@ -115,9 +115,9 @@ Job flow creation and configuration
     :set: emr
     :default: ``'us-west-2'``
 
-    region to connect to S3 and EMR on (e.g.  ``us-west-1``). If you want to
-    use separate regions for S3 and EMR, set :mrjob-opt:`emr_endpoint` and
-    :mrjob-opt:`s3_endpoint`.
+    region to run EMR jobs on (e.g.  ``us-west-1``). Also used by mrjob
+    to create temporary buckets if you don't set :mrjob-opt:`s3_scratch_uri`
+    explicitly.
 
 .. mrjob-opt::
     :config: emr_api_params
@@ -167,8 +167,10 @@ Job flow creation and configuration
     :set: emr
     :default: infer from :mrjob-opt:`aws_region`
 
-    optional host to connect to when communicating with S3 (e.g.
+    Force mrjob to connect to EMR on this endpoint (e.g.
     ``us-west-1.elasticmapreduce.amazonaws.com``).
+
+    Mostly exists as a workaround for network issues.
 
 .. mrjob-opt::
     :config: emr_tags
@@ -645,10 +647,16 @@ MRJob uses boto to manipulate/access S3.
     :switch: --s3-endpoint
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: infer from :mrjob-opt:`aws_region`
+    :default: (automatic)
 
-    Host to connect to when communicating with S3 (e.g.
-    ``s3-us-west-1.amazonaws.com``).
+    Force mrjob to connect to S3 on this endpoint, rather than letting it
+    choose the appropriate endpoint for each S3 bucket.
+
+    Mostly exists as a workaround for network issues.
+
+    .. warning:: If you set this to a region-specific endpoint
+                 (e.g. ``'s3-us-west-1.amazonaws.com'``) mrjob will not
+                 be able to access buckets located in other regions.
 
 .. mrjob-opt::
     :config: s3_log_uri
@@ -667,10 +675,15 @@ MRJob uses boto to manipulate/access S3.
     :switch: --s3-scratch-uri
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``tmp/mrjob`` in the first bucket belonging to you
+    :default: (automatic)
 
     S3 directory (URI ending in ``/``) to use as scratch space, e.g.
     ``s3://yourbucket/tmp/``.
+
+    By default, mrjob looks for a bucket belong to you whose name starts with
+    ``mrjob-`` and which matches :mrjob-opt:`aws_region`. If it can't find
+    one, it creates one with a random name. This option is then set to `tmp/`
+    in this bucket (e.g. ``s3://mrjob-01234567890abcdef/tmp/``).
 
 .. mrjob-opt::
     :config: s3_sync_wait_time

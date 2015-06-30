@@ -35,7 +35,7 @@ class S3FSTestCase(MockEMRAndS3TestCase):
 
     def setUp(self):
         super(S3FSTestCase, self).setUp()
-        self.fs = S3Filesystem('key_id', 'secret')
+        self.fs = S3Filesystem()
 
     def test_cat_uncompressed(self):
         self.add_mock_s3_data(
@@ -127,14 +127,13 @@ class S3FSTestCase(MockEMRAndS3TestCase):
 class S3FSRegionTestCase(MockEMRAndS3TestCase):
 
     def test_default_endpoint(self):
-        fs = S3Filesystem('key_id', 'secret')
+        fs = S3Filesystem()
 
         s3_conn = fs.make_s3_conn()
         self.assertEqual(s3_conn.endpoint, 's3.amazonaws.com')
 
     def test_force_s3_endpoint(self):
-        fs = S3Filesystem('key_id', 'secret',
-                          s3_endpoint='s3-us-west-1.amazonaws.com')
+        fs = S3Filesystem(s3_endpoint='s3-us-west-1.amazonaws.com')
 
         s3_conn = fs.make_s3_conn()
         self.assertEqual(s3_conn.endpoint, 's3-us-west-1.amazonaws.com')
@@ -142,7 +141,7 @@ class S3FSRegionTestCase(MockEMRAndS3TestCase):
     def test_endpoint_for_bucket_in_us_west_2(self):
         self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
 
-        fs = S3Filesystem('key_id', 'secret')
+        fs = S3Filesystem()
 
         bucket = fs.get_bucket('walrus')
         self.assertEqual(bucket.connection.endpoint,
@@ -152,7 +151,7 @@ class S3FSRegionTestCase(MockEMRAndS3TestCase):
         # location constraint for us-east-1 is '', not 'us-east-1'
         self.add_mock_s3_data({'walrus': {}}, location='')
 
-        fs = S3Filesystem('key_id', 'secret')
+        fs = S3Filesystem()
 
         bucket = fs.get_bucket('walrus')
         self.assertEqual(bucket.connection.endpoint, 's3.amazonaws.com')
@@ -161,8 +160,7 @@ class S3FSRegionTestCase(MockEMRAndS3TestCase):
         self.add_mock_s3_data({'walrus-east': {}}, location='us-east-2')
         self.add_mock_s3_data({'walrus-west': {}}, location='us-west-2')
 
-        fs = S3Filesystem('key_id', 'secret',
-                          s3_endpoint='s3-us-east-2.amazonaws.com')
+        fs = S3Filesystem(s3_endpoint='s3-us-east-2.amazonaws.com')
 
         bucket_east = fs.get_bucket('walrus-east')
         self.assertEqual(bucket_east.connection.endpoint,

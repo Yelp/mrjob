@@ -76,7 +76,7 @@ class S3Filesystem(Filesystem):
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
 
-    def __init__(self, aws_access_key_id, aws_secret_access_key,
+    def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
                  aws_security_token=None, s3_endpoint=None):
         """
         :param aws_access_key_id: Your AWS access key ID

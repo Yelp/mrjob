@@ -16,6 +16,7 @@ v0.5.0, 2015-??-?? -- ???
      * mrjob works correctly across AWS regions:
        * connect to each S3 bucket on appropriate endpoint (#1028)
        * create/select temp bucket in same region as EMR jobs (#687)
+     * added iam_endpoint option (#1067)
      * removed s3_conn args from methods in EMRJobRunner and S3Filesystem
      * removed iam_job_flow_role option (use iam_instance_profile)
      * removed support for _$folder$ keys, which EMR no longer creates

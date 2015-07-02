@@ -217,6 +217,18 @@ Job flow creation and configuration
     necessary to set this by hand.
 
 .. mrjob-opt::
+    :config: iam_endpoint
+    :switch: --iam-endpoint
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: (automatic)
+
+    Force mrjob to connect to IAM on this endpoint (e.g.
+    ``iam.us-gov.amazonaws.com``).
+
+    Mostly exists as a workaround for network issues.
+
+.. mrjob-opt::
     :config: iam_instance_profile
     :switch: --iam-instance-profile
     :type: :ref:`string <data-type-string>`

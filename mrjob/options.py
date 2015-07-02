@@ -444,6 +444,11 @@ def add_emr_opts(opt_group):
                   ' Rarely necessary.')),
 
         opt_group.add_option(
+            '--iam-endpoint', dest='iam_endpoint', default=None,
+            help=('Force mrjob to connect to IAM on this endpoint'
+                  ' (e.g. iam.us-gov.amazonaws.com)')),
+
+        opt_group.add_option(
             '--iam-instance-profile', dest='iam_instance_profile',
             default=None,
             help=('EC2 instance profile to use for the EMR cluster - see'

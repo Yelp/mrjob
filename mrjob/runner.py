@@ -917,9 +917,9 @@ class MRJobRunner(object):
         for line in contents:
             log.debug('WRAPPER: ' + line.rstrip('\n'))
 
-        with open(path, 'w') as f:
+        with open(path, 'wb') as f:
             for line in contents:
-                f.write(line)
+                f.write(line.encode('utf-8'))
 
         self._setup_wrapper_script_path = path
         self._working_dir_mgr.add('file', self._setup_wrapper_script_path)

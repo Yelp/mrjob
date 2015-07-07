@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+ # -*- coding: utf-8 -*-
 # Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -142,12 +142,17 @@ class MockEMRAndS3TestCase(SandboxedTestCase):
             mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
             return self.fake_mrjob_tgz_path
 
-        self.simple_patch(EMRJobRunner, '_create_mrjob_tar_gz',
-                     fake_create_mrjob_tar_gz, autospec=True)
+        self.start(patch.object(
+            EMRJobRunner, '_create_mrjob_tar_gz',
+            fake_create_mrjob_tar_gz))
 
-        self.simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
-        self.simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
-        self.simple_patch(time, 'sleep')
+        self.start(patch.object(
+            EMRJobRunner, '_wait_for_s3_eventual_consistency'))
+
+        self.start(patch.object(
+            EMRJobRunner, '_wait_for_job_flow_termination'))
+
+        self.start(patch.object(time, 'sleep'))
 
     def add_mock_s3_data(self, data, time_modified=None, location=None):
         """Update self.mock_s3_fs with a map from bucket name
@@ -221,13 +226,6 @@ class MockEMRAndS3TestCase(SandboxedTestCase):
             runner.run()
             emr_conn = runner.make_emr_conn()
             return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
-
-    def simple_patch(self, obj, attr, side_effect=None, autospec=False,
-                     return_value=None):
-        patcher = patch.object(obj, attr, side_effect=side_effect,
-                               autospec=autospec, return_value=return_value)
-        patcher.start()
-        self.addCleanup(patcher.stop)
 
     def _mock_boto_connect_s3(self, *args, **kwargs):
         kwargs['mock_s3_fs'] = self.mock_s3_fs
@@ -3177,17 +3175,17 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
                 future_job = self.future_jobs.pop(0)
                 self.jobs.append(future_job)
 
-        self.simple_patch(EMRJobRunner, 'make_emr_conn')
-        self.simple_patch(S3Filesystem, 'make_s3_conn',
-                          side_effect=self._mock_boto_connect_s3)
-        self.simple_patch(EMRJobRunner, 'usable_job_flows',
-            side_effect=side_effect_usable_job_flows)
-        self.simple_patch(EMRJobRunner, '_lock_uri',
-            side_effect=side_effect_lock_uri)
-        self.simple_patch(mrjob.emr, 'attempt_to_acquire_lock',
-            side_effect=side_effect_acquire_lock)
-        self.simple_patch(time, 'sleep',
-            side_effect=side_effect_time_sleep)
+        self.start(patch.object(EMRJobRunner, 'make_emr_conn'))
+        self.start(patch.object(S3Filesystem, 'make_s3_conn',
+                                side_effect=self._mock_boto_connect_s3))
+        self.start(patch.object(EMRJobRunner, 'usable_job_flows',
+                                side_effect=side_effect_usable_job_flows))
+        self.start(patch.object(EMRJobRunner, '_lock_uri',
+                                side_effect=side_effect_lock_uri))
+        self.start(patch.object(mrjob.emr, 'attempt_to_acquire_lock',
+                                side_effect=side_effect_acquire_lock))
+        self.start(patch.object(time, 'sleep',
+                                side_effect=side_effect_time_sleep))
 
     def tearDown(self):
         super(JobWaitTestCase, self).tearDown()
@@ -3254,14 +3252,14 @@ class BuildStreamingStepTestCase(MockEMRAndS3TestCase):
         self.runner._steps = []  # don't actually run `my_job.py --steps`
         self.runner._add_job_files_for_upload()
 
-        self.simple_patch(
-            self.runner, '_step_input_uris', return_value=['input'])
-        self.simple_patch(
-            self.runner, '_step_output_uri', return_value=['output'])
-        self.simple_patch(
-            self.runner, '_get_streaming_jar', return_value=['streaming.jar'])
+        self.start(patch.object(
+            self.runner, '_step_input_uris', return_value=['input']))
+        self.start(patch.object(
+            self.runner, '_step_output_uri', return_value=['output']))
+        self.start(patch.object(
+            self.runner, '_get_streaming_jar', return_value=['streaming.jar']))
 
-        self.simple_patch(boto.emr, 'StreamingStep', dict)
+        self.start(patch.object(boto.emr, 'StreamingStep', dict))
         self.runner._inferred_hadoop_version = '0.20'
 
     def _assert_streaming_step(self, step, **kwargs):

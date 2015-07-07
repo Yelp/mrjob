@@ -114,9 +114,9 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         'hadoop_tmp_dir': combine_paths,
     })
 
-    DEPRECATED_ALIASES = {
+    DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.COMBINERS, {
         'hdfs_scratch_dir': 'hadoop_tmp_dir',
-    }
+    })
 
     def __init__(self, alias, opts, conf_paths):
         super(HadoopRunnerOptionStore, self).__init__(alias, opts, conf_paths)

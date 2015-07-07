@@ -105,14 +105,18 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'hadoop_bin',
         'hadoop_home',
-        'hdfs_scratch_dir',
+        'hadoop_tmp_dir',
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
         'hadoop_bin': combine_cmds,
         'hadoop_home': combine_paths,
-        'hdfs_scratch_dir': combine_paths,
+        'hadoop_tmp_dir': combine_paths,
     })
+
+    DEPRECATED_ALIASES = {
+        'hdfs_scratch_dir': 'hadoop_tmp_dir',
+    }
 
     def __init__(self, alias, opts, conf_paths):
         super(HadoopRunnerOptionStore, self).__init__(alias, opts, conf_paths)
@@ -147,7 +151,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         super_opts = super(HadoopRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
             'hadoop_home': os.environ.get('HADOOP_HOME'),
-            'hdfs_scratch_dir': 'tmp/mrjob',
+            'hadoop_tmp_dir': 'tmp/mrjob',
         })
 
 
@@ -171,7 +175,7 @@ class HadoopJobRunner(MRJobRunner):
 
         self._hdfs_tmp_dir = fully_qualify_hdfs_path(
             posixpath.join(
-                self._opts['hdfs_scratch_dir'], self._job_key))
+                self._opts['hadoop_tmp_dir'], self._job_key))
 
         # Keep track of local files to upload to HDFS. We'll add them
         # to this manager just before we need them.

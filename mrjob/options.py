@@ -266,11 +266,15 @@ def add_hadoop_opts(opt_group):
             default=None,
             help='Alternative to setting the HADOOP_HOME environment variable.'),
 
+        opt_group.add_option(
+            '--hadoop-tmp-dir', dest='hdfs_tmp_dir',
+            default=None,
+            help='Temp space on HDFS (default is tmp/mrjob)'),
 
         opt_group.add_option(
             '--hdfs-scratch-dir', dest='hdfs_scratch_dir',
             default=None,
-            help='Scratch space on HDFS (default is tmp/)'),
+            help='Deprecated alias for --hadoop-tmp-dir'),
     ]
 
 

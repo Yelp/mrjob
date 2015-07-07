@@ -148,9 +148,9 @@ Temp files and cleanup
     :envvar:`TMPDIR` or any other environment variable respected by
     :py:func:`tempfile.gettempdir`.
 
-    .. note::
+    .. versionchanged:: 0.5.0
 
-       This option was named ``base_tmp_dir`` until v0.5.0.
+       This option used to be named ``base_tmp_dir``.
 
 .. mrjob-opt::
    :config: output_dir

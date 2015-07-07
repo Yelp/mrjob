@@ -25,13 +25,17 @@ try:
 except ImportError:
     boto = None
 
+import mrjob.hadoop
 from mrjob.conf import dump_mrjob_conf
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
+from mrjob.emr import EMRRunnerOptionStore
+from mrjob.hadoop import HadoopRunnerOptionStore
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import log_to_stream
 
 from tests.py2 import TestCase
+from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -322,12 +326,60 @@ class TestExtraKwargs(ConfigFilesTestCase):
 
 class DeprecatedAliasesTestCase(ConfigFilesTestCase):
 
-    def test_base_tmp_dir(self):
+    def test_runner_option_store(self):
         stderr = StringIO()
         with no_handlers_for_logger('mrjob.conf'):
             log_to_stream('mrjob.conf', stderr)
             opts = RunnerOptionStore(
                 'inline', dict(base_tmp_dir='/scratch'), [])
 
-            self.assertIn('Deprecated option base_tmp_dir has been renamed to'
-                          ' local_tmp_dir', stderr.getvalue())
+            self.assertEqual(opts['local_tmp_dir'], '/scratch')
+            self.assertNotIn('base_tmp_dir', opts)
+            self.assertIn('Deprecated option base_tmp_dir has been renamed'
+                          ' to local_tmp_dir', stderr.getvalue())
+
+    def test_hadoop_runner_option_store(self):
+        stderr = StringIO()
+        with no_handlers_for_logger('mrjob.conf'):
+            log_to_stream('mrjob.conf', stderr)
+
+            # HadoopRunnerOptionStore really wants to find the streaming jar
+            with patch.object(mrjob.hadoop, 'find_hadoop_streaming_jar',
+                              return_value='found'):
+                opts = HadoopRunnerOptionStore(
+                    'hadoop',
+                    dict(base_tmp_dir='/scratch',
+                         hadoop_home='required',
+                         hdfs_scratch_dir='hdfs:///scratch'),
+                    [])
+
+            self.assertEqual(opts['local_tmp_dir'], '/scratch')
+            self.assertNotIn('base_tmp_dir', opts)
+            self.assertIn('Deprecated option base_tmp_dir has been renamed'
+                          ' to local_tmp_dir', stderr.getvalue())
+
+            self.assertEqual(opts['hadoop_tmp_dir'], 'hdfs:///scratch')
+            self.assertNotIn('hdfs_scratch_dir', opts)
+            self.assertIn('Deprecated option hdfs_scratch_dir has been renamed'
+                          ' to hadoop_tmp_dir', stderr.getvalue())
+
+    def test_emr_runner_option_store(self):
+        stderr = StringIO()
+        with no_handlers_for_logger('mrjob.conf'):
+            log_to_stream('mrjob.conf', stderr)
+
+            opts = EMRRunnerOptionStore(
+                'emr',
+                dict(base_tmp_dir='/scratch',
+                     s3_scratch_uri='s3://bucket/walrus'),
+                    [])
+
+            self.assertEqual(opts['local_tmp_dir'], '/scratch')
+            self.assertNotIn('base_tmp_dir', opts)
+            self.assertIn('Deprecated option base_tmp_dir has been renamed'
+                          ' to local_tmp_dir', stderr.getvalue())
+
+            self.assertEqual(opts['s3_tmp_dir'], 's3://bucket/walrus')
+            self.assertNotIn('s3_scratch_uri', opts)
+            self.assertIn('Deprecated option s3_scratch_uri has been renamed'
+                          ' to s3_tmp_dir', stderr.getvalue())

@@ -16,9 +16,14 @@
 This is by no means a complete mock of boto, just what we need for tests.
 """
 import hashlib
-import json
+import itertools
+import os
+import shutil
+import tempfile
+import time
 from datetime import datetime
 from datetime import timedelta
+from io import BytesIO
 
 try:
     from boto.emr.connection import EmrConnection
@@ -30,10 +35,17 @@ except ImportError:
     boto = None
 
 from mrjob.conf import combine_values
+from mrjob.emr import EMRJobRunner
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import RFC1123
-from mrjob.py2 import quote
+from mrjob.ssh import SSH_LOG_ROOT
+
+from tests.mockssh import create_mock_ssh_script
+from tests.mockssh import mock_ssh_dir
+from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import patch
+from tests.sandbox import SandboxedTestCase
 
 DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
 DEFAULT_MAX_DAYS_AGO = 61
@@ -67,6 +79,163 @@ def err_xml(message, type='Sender', code='ValidationError'):
   </Error>
   <RequestId>eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee</RequestId>
 </ErrorResponse>""" % (type, code, message)
+
+
+### Test Case ###
+
+class MockBotoTestCase(SandboxedTestCase):
+
+    MAX_SIMULATION_STEPS = 100
+
+    @classmethod
+    def setUpClass(cls):
+        # we don't care what's in this file, just want mrjob to stop creating
+        # and deleting a complicated archive.
+        cls.fake_mrjob_tgz_path = tempfile.mkstemp(
+            prefix='fake_mrjob_', suffix='.tar.gz')[1]
+
+    @classmethod
+    def tearDownClass(cls):
+        if os.path.exists(cls.fake_mrjob_tgz_path):
+            os.remove(cls.fake_mrjob_tgz_path)
+
+    def setUp(self):
+        # patch boto
+        self.mock_emr_failures = {}
+        self.mock_emr_job_flows = {}
+        self.mock_emr_output = {}
+        self.mock_iam_instance_profiles = {}
+        self.mock_iam_role_attached_policies = {}
+        self.mock_iam_roles = {}
+        self.mock_s3_fs = {}
+
+        self.simulation_iterator = itertools.repeat(
+            None, self.MAX_SIMULATION_STEPS)
+
+        p_s3 = patch.object(boto, 'connect_s3', self._mock_boto_connect_s3)
+        self.addCleanup(p_s3.stop)
+        p_s3.start()
+
+        p_iam = patch.object(boto, 'connect_iam', self._mock_boto_connect_iam)
+        self.addCleanup(p_iam.stop)
+        p_iam.start()
+
+        p_emr = patch.object(
+            boto.emr.connection, 'EmrConnection',
+            self._mock_boto_emr_EmrConnection)
+        self.addCleanup(p_emr.stop)
+        p_emr.start()
+
+        super(MockBotoTestCase, self).setUp()
+
+        # patch slow things
+        def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
+            mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
+            return self.fake_mrjob_tgz_path
+
+        self.start(patch.object(
+            EMRJobRunner, '_create_mrjob_tar_gz',
+            fake_create_mrjob_tar_gz))
+
+        self.start(patch.object(
+            EMRJobRunner, '_wait_for_s3_eventual_consistency'))
+
+        self.start(patch.object(
+            EMRJobRunner, '_wait_for_job_flow_termination'))
+
+        self.start(patch.object(time, 'sleep'))
+
+    def add_mock_s3_data(self, data, time_modified=None, location=None):
+        """Update self.mock_s3_fs with a map from bucket name
+        to key name to data."""
+        add_mock_s3_data(self.mock_s3_fs, data, time_modified, location)
+
+    def prepare_runner_for_ssh(self, runner, num_slaves=0):
+        # TODO: Refactor this abomination of a test harness
+
+        # Set up environment variables
+        os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
+
+        # Create temporary directories and add them to MOCK_SSH_ROOTS
+        master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
+        os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % master_ssh_root
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
+
+        if not hasattr(self, 'slave_ssh_roots'):
+            self.slave_ssh_roots = []
+
+        self.addCleanup(self.teardown_ssh, master_ssh_root)
+
+        # Make the fake binary
+        os.mkdir(os.path.join(master_ssh_root, 'bin'))
+        self.ssh_bin = os.path.join(master_ssh_root, 'bin', 'ssh')
+        create_mock_ssh_script(self.ssh_bin)
+
+        # Make a fake keyfile so that the 'file exists' requirements are
+        # satsified
+        self.keyfile_path = os.path.join(master_ssh_root, 'key.pem')
+        with open(self.keyfile_path, 'w') as f:
+            f.write('I AM DEFINITELY AN SSH KEY FILE')
+
+        # Tell the runner to use the fake binary
+        runner._opts['ssh_bin'] = [self.ssh_bin]
+        # Inject master node hostname so it doesn't try to 'emr --describe' it
+        runner._address = 'testmaster'
+        # Also pretend to have an SSH key pair file
+        runner._opts['ec2_key_pair_file'] = self.keyfile_path
+
+        # re-initialize fs
+        runner._fs = None
+        runner._ssh_fs = None
+        runner._s3_fs = None
+        #runner.fs
+
+    def add_slave(self):
+        """Add a mocked slave to the cluster. Caller is responsible for setting
+        runner._opts['num_ec2_instances'] to the correct number.
+        """
+        slave_num = len(self.slave_ssh_roots)
+        new_dir = tempfile.mkdtemp(prefix='slave_%d_ssh_root.' % slave_num)
+        self.slave_ssh_roots.append(new_dir)
+        os.environ['MOCK_SSH_ROOTS'] += (':testmaster!testslave%d=%s'
+                                         % (slave_num, new_dir))
+
+    def teardown_ssh(self, master_ssh_root):
+        shutil.rmtree(master_ssh_root)
+        for path in self.slave_ssh_roots:
+            shutil.rmtree(path)
+
+    def run_and_get_job_flow(self, *args):
+        # set up a job flow without caring about what the job is or what its
+        # inputs are.
+        stdin = BytesIO(b'foo\nbar\n')
+        mr_job = MRTwoStepJob(
+            ['-r', 'emr', '-v'] + list(args))
+        mr_job.sandbox(stdin=stdin)
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            emr_conn = runner.make_emr_conn()
+            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+
+    def _mock_boto_connect_s3(self, *args, **kwargs):
+        kwargs['mock_s3_fs'] = self.mock_s3_fs
+        return MockS3Connection(*args, **kwargs)
+
+    def _mock_boto_emr_EmrConnection(self, *args, **kwargs):
+        kwargs['mock_s3_fs'] = self.mock_s3_fs
+        kwargs['mock_emr_job_flows'] = self.mock_emr_job_flows
+        kwargs['mock_emr_failures'] = self.mock_emr_failures
+        kwargs['mock_emr_output'] = self.mock_emr_output
+        kwargs['simulation_iterator'] = self.simulation_iterator
+        return MockEmrConnection(*args, **kwargs)
+
+    def _mock_boto_connect_iam(self, *args, **kwargs):
+        kwargs['mock_iam_instance_profiles'] = self.mock_iam_instance_profiles
+        kwargs['mock_iam_roles'] = self.mock_iam_roles
+        kwargs['mock_iam_role_attached_policies'] = (
+            self.mock_iam_role_attached_policies)
+        return MockIAMConnection(*args, **kwargs)
 
 
 ### S3 ###

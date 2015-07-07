@@ -28,10 +28,10 @@ from tests.mockboto import add_mock_s3_data
 from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
-from tests.test_emr import MockEMRAndS3TestCase
+from tests.mockboto import MockBotoTestCase
 
 
-class S3FSTestCase(MockEMRAndS3TestCase):
+class S3FSTestCase(MockBotoTestCase):
 
     def setUp(self):
         super(S3FSTestCase, self).setUp()
@@ -124,7 +124,7 @@ class S3FSTestCase(MockEMRAndS3TestCase):
         self.assertEqual(self.fs.path_exists('s3://walrus/data/foo'), False)
 
 
-class S3FSRegionTestCase(MockEMRAndS3TestCase):
+class S3FSRegionTestCase(MockBotoTestCase):
 
     def test_default_endpoint(self):
         fs = S3Filesystem()

@@ -28,10 +28,10 @@ from mrjob.emr import EMRJobRunner
 from mrjob.parse import parse_s3_uri
 from mrjob.tools.emr.s3_tmpwatch import s3_cleanup
 from tests.mockboto import MockKey
-from tests.test_emr import MockEMRAndS3TestCase
+from tests.mockboto import MockBotoTestCase
 
 
-class S3TmpWatchTestCase(MockEMRAndS3TestCase):
+class S3TmpWatchTestCase(MockBotoTestCase):
 
     def setUp(self):
         super(S3TmpWatchTestCase, self).setUp()

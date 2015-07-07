@@ -33,10 +33,10 @@ from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
 from tests.mockboto import MockEmrConnection
 from tests.mockboto import MockS3Connection
-from tests.test_emr import MockEMRAndS3TestCase
+from tests.mockboto import MockBotoTestCase
 
 
-class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
+class JobFlowInspectionTestCase(MockBotoTestCase):
 
     def setUp(self):
         super(JobFlowInspectionTestCase, self).setUp()

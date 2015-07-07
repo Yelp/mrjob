@@ -88,6 +88,15 @@ class EmptyMrjobConfTestCase(TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
+    def start(self, patcher):
+        """Add the given patcher to this test case's cleanup actions,
+        then start it, and return the mock it returns. Example:
+
+        mock_turtle = self.start(patch('foo.bar.turtle'))
+        """
+        self.addCleanup(patcher.stop)
+        return patcher.start()
+
 
 class SandboxedTestCase(EmptyMrjobConfTestCase):
     """Patch mrjob.conf, create a temp directory, and save the environment for
@@ -133,15 +142,6 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
         """
         os.environ['PYTHONPATH'] = (
             mrjob_pythonpath() + ':' + os.environ.get('PYTHONPATH', ''))
-
-    def start(self, patcher):
-        """Add the given patcher to this test case's cleanup actions,
-        then start it, and return the mock it returns. Example:
-
-        mock_turtle = self.start(patch('foo.bar.turtle'))
-        """
-        self.addCleanup(patcher.stop)
-        return patcher.start()
 
 
 def mrjob_pythonpath():

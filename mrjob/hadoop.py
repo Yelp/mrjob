@@ -318,6 +318,9 @@ class HadoopJobRunner(MRJobRunner):
                 for line in step_proc.stdout:
                     log.error('STDOUT: ' + to_string(line.strip(b'\n')))
 
+                step_proc.stdout.close()
+                step_proc.stderr.close()
+
                 returncode = step_proc.wait()
             else:
                 # we have PTYs

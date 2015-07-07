@@ -946,6 +946,10 @@ class EMRJobRunner(MRJobRunner):
             if ssh_proc.returncode is None:
                 self._ssh_proc = ssh_proc
                 break
+            else:
+                ssh_proc.stdin.close()
+                ssh_proc.stdout.close()
+                ssh_proc.stderr.close()
 
         if not self._ssh_proc:
             log.warning('Failed to open ssh tunnel to job tracker')
@@ -993,6 +997,11 @@ class EMRJobRunner(MRJobRunner):
             if self._ssh_proc.returncode is None:
                 log.info('Killing our SSH tunnel (pid %d)' %
                          self._ssh_proc.pid)
+
+                self._ssh_proc.stdin.close()
+                self._ssh_proc.stdout.close()
+                self._ssh_proc.stderr.close()
+
                 try:
                     os.kill(self._ssh_proc.pid, signal.SIGKILL)
                     self._ssh_proc = None

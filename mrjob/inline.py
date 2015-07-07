@@ -133,28 +133,30 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         has_combiner = (step_type == 'mapper' and 'combiner' in step)
 
-        # Use custom stdin
-        if has_combiner:
-            child_stdout = BytesIO()
-        else:
-            child_stdout = open(output_path, 'wb')
+        try:
+            # Use custom stdout
+            if has_combiner:
+                child_stdout = BytesIO()
+            else:
+                child_stdout = open(output_path, 'wb')
 
-        with save_current_environment():
-            with save_cwd():
-                os.environ.update(env)
-                os.chdir(working_dir)
+            with save_current_environment():
+                with save_cwd():
+                    os.environ.update(env)
+                    os.chdir(working_dir)
 
-                child_instance = self._mrjob_cls(args=child_args)
-                child_instance.sandbox(stdin=child_stdin, stdout=child_stdout)
-                child_instance.execute()
+                    child_instance = self._mrjob_cls(args=child_args)
+                    child_instance.sandbox(stdin=child_stdin,
+                                           stdout=child_stdout)
+                    child_instance.execute()
 
-        if has_combiner:
-            sorted_lines = sorted(child_stdout.getvalue().splitlines())
-            combiner_stdin = BytesIO(b'\n'.join(sorted_lines))
-        else:
-            child_stdout.flush()
-
-        child_stdout.close()
+            if has_combiner:
+                sorted_lines = sorted(child_stdout.getvalue().splitlines())
+                combiner_stdin = BytesIO(b'\n'.join(sorted_lines))
+            else:
+                child_stdout.flush()
+        finally:
+            child_stdout.close()
 
         while len(self._counters) <= step_num:
             self._counters.append({})

@@ -722,7 +722,7 @@ class TmpBucketTestCase(MockBotoTestCase):
         existing_bucket_names = set(self.mock_s3_fs)
 
         runner = EMRJobRunner(conf_paths=[], **runner_kwargs)
-        runner._create_s3_temp_bucket_if_needed()
+        runner._create_s3_tmp_bucket_if_needed()
 
         bucket_name, path = parse_s3_uri(runner._opts['s3_tmp_dir'])
 

@@ -528,7 +528,7 @@ class EMRJobRunner(MRJobRunner):
         # if we're going to create a bucket to use as temp space, we don't
         # want to actually create it until we run the job (Issue #50).
         # This variable helps us create the bucket as needed
-        self._s3_temp_bucket_to_create = None
+        self._s3_tmp_bucket_to_create = None
 
         self._fix_s3_tmp_and_log_uri_opts()
 
@@ -663,7 +663,7 @@ class EMRJobRunner(MRJobRunner):
 
         # That may have all failed. If so, pick a name.
         tmp_bucket_name = 'mrjob-' + random_identifier()
-        self._s3_temp_bucket_to_create = tmp_bucket_name
+        self._s3_tmp_bucket_to_create = tmp_bucket_name
         log.info("creating new temp bucket %s" % tmp_bucket_name)
         self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
 
@@ -676,17 +676,17 @@ class EMRJobRunner(MRJobRunner):
             self._s3_job_log_uri = '%s%s/' % (
                 log_uri.replace('s3n://', 's3://'), self._emr_job_flow_id)
 
-    def _create_s3_temp_bucket_if_needed(self):
+    def _create_s3_tmp_bucket_if_needed(self):
         """Make sure temp bucket exists"""
-        if self._s3_temp_bucket_to_create:
+        if self._s3_tmp_bucket_to_create:
             s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as temp space' %
-                     self._s3_temp_bucket_to_create)
+                     self._s3_tmp_bucket_to_create)
             location = s3_location_constraint_for_region(
                 self._opts['aws_region'])
             s3_conn.create_bucket(
-                self._s3_temp_bucket_to_create, location=location)
-            self._s3_temp_bucket_to_create = None
+                self._s3_tmp_bucket_to_create, location=location)
+            self._s3_tmp_bucket_to_create = None
 
     def _check_and_fix_s3_dir(self, s3_uri):
         """Helper for __init__"""
@@ -819,7 +819,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _upload_local_files_to_s3(self):
         """Copy local files tracked by self._upload_mgr to S3."""
-        self._create_s3_temp_bucket_if_needed()
+        self._create_s3_tmp_bucket_if_needed()
 
         log.info('Copying non-input files into %s' % self._upload_mgr.prefix)
 
@@ -1455,7 +1455,7 @@ class EMRJobRunner(MRJobRunner):
     def _launch_emr_job(self):
         """Create an empty jobflow on EMR, and set self._emr_job_flow_id to
         the ID for that job."""
-        self._create_s3_temp_bucket_if_needed()
+        self._create_s3_tmp_bucket_if_needed()
         emr_conn = self.make_emr_conn()
 
         # try to find a job flow from the pool. basically auto-fill

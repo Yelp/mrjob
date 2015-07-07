@@ -241,8 +241,9 @@ class LocalMRJobRunner(SimMRJobRunner):
             proc.stderr, step_num=step_num)
         tb_lines = find_python_traceback(stderr_lines)
 
-        proc.stdin.close()
-        proc.stdout.close()
+        # proc.stdout isn't always defined
+        if proc.stdout:
+            proc.stdout.close()
         proc.stderr.close()
 
         returncode = proc.wait()

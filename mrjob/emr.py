@@ -627,7 +627,7 @@ class EMRJobRunner(MRJobRunner):
         # set s3_tmp_dir by checking for existing buckets
         if not self._opts['s3_tmp_dir']:
             self._set_s3_tmp_dir()
-            log.info('using %s as our scratch dir on S3' %
+            log.info('using %s as our temp dir on S3' %
                      self._opts['s3_tmp_dir'])
 
         self._opts['s3_tmp_dir'] = self._check_and_fix_s3_dir(
@@ -648,24 +648,24 @@ class EMRJobRunner(MRJobRunner):
         # Loop over buckets until we find one that is not region-
         #   restricted, matches aws_region, or can be used to
         #   infer aws_region if no aws_region is specified
-        for scratch_bucket in mrjob_buckets:
-            scratch_bucket_name = scratch_bucket.name
+        for tmp_bucket in mrjob_buckets:
+            tmp_bucket_name = tmp_bucket.name
 
-            if (scratch_bucket.get_location() ==
+            if (tmp_bucket.get_location() ==
                 s3_location_constraint_for_region(self._opts['aws_region'])):
 
                 # Regions are both specified and match
-                log.info("using existing scratch bucket %s" %
-                         scratch_bucket_name)
+                log.info("using existing temp bucket %s" %
+                         tmp_bucket_name)
                 self._opts['s3_tmp_dir'] = ('s3://%s/tmp/' %
-                                                scratch_bucket_name)
+                                                tmp_bucket_name)
                 return
 
         # That may have all failed. If so, pick a name.
-        scratch_bucket_name = 'mrjob-' + random_identifier()
-        self._s3_temp_bucket_to_create = scratch_bucket_name
-        log.info("creating new scratch bucket %s" % scratch_bucket_name)
-        self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % scratch_bucket_name
+        tmp_bucket_name = 'mrjob-' + random_identifier()
+        self._s3_temp_bucket_to_create = tmp_bucket_name
+        log.info("creating new temp bucket %s" % tmp_bucket_name)
+        self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
 
     def _set_s3_job_log_uri(self, job_flow):
         """Given a job flow description, set self._s3_job_log_uri. This allows
@@ -680,7 +680,7 @@ class EMRJobRunner(MRJobRunner):
         """Make sure temp bucket exists"""
         if self._s3_temp_bucket_to_create:
             s3_conn = self.make_s3_conn()
-            log.info('creating S3 bucket %r to use as scratch space' %
+            log.info('creating S3 bucket %r to use as temp space' %
                      self._s3_temp_bucket_to_create)
             location = s3_location_constraint_for_region(
                 self._opts['aws_region'])

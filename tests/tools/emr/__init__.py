@@ -20,10 +20,10 @@ from mrjob.py2 import StringIO
 
 from tests.py2 import mock_stdout_or_stderr
 from tests.py2 import patch
-from tests.test_emr import MockEMRAndS3TestCase
+from tests.mockboto import MockBotoTestCase
 
 
-class ToolTestCase(MockEMRAndS3TestCase):
+class ToolTestCase(MockBotoTestCase):
 
     def monkey_patch_argv(self, *args):
         p = patch('sys.argv', [sys.argv[0]] + list(args))

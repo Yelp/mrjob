@@ -23,7 +23,7 @@ from mrjob.tools.emr.report_long_jobs import main
 
 from tests.mockboto import MockEmrObject
 from tests.py2 import TestCase
-from tests.test_emr import MockEMRAndS3TestCase
+from tests.mockboto import MockBotoTestCase
 
 JOB_FLOWS = [
     MockEmrObject(
@@ -144,7 +144,7 @@ JOB_FLOWS = [
 JOB_FLOWS_BY_ID = dict((jf.jobflowid, jf) for jf in JOB_FLOWS)
 
 
-class ReportLongJobsTestCase(MockEMRAndS3TestCase):
+class ReportLongJobsTestCase(MockBotoTestCase):
 
     def setUp(self):
         super(ReportLongJobsTestCase, self).setUp()

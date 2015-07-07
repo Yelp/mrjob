@@ -20,12 +20,12 @@ import tempfile
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.mrboss import run_on_all_nodes
 from tests.mockssh import mock_ssh_file
-from tests.test_emr import MockEMRAndS3TestCase
+from tests.mockboto import MockBotoTestCase
 from tests.test_emr import BUCKET_URI
 from tests.test_emr import LOG_DIR
 
 
-class MRBossTestCase(MockEMRAndS3TestCase):
+class MRBossTestCase(MockBotoTestCase):
 
     def setUp(self):
         super(MRBossTestCase, self).setUp()

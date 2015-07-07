@@ -236,8 +236,8 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
-            s3_scratch_uri = runner._opts['s3_scratch_uri']
-            scratch_bucket, _ = parse_s3_uri(s3_scratch_uri)
+            s3_tmp_dir = runner._opts['s3_tmp_dir']
+            scratch_bucket, _ = parse_s3_uri(s3_tmp_dir)
 
             runner.run()
 
@@ -712,11 +712,11 @@ class RegionTestCase(MockBotoTestCase):
         self.assertEqual(runner._opts['aws_region'], 'us-west-2')
 
 
-class ScratchBucketTestCase(MockBotoTestCase):
+class TmpBucketTestCase(MockBotoTestCase):
 
-    def assert_new_scratch_bucket(self, location, **runner_kwargs):
+    def assert_new_tmp_bucket(self, location, **runner_kwargs):
         """Assert that if we create an EMRJobRunner with the given keyword
-        args, it'll create a new scratch bucket with the given location
+        args, it'll create a new tmp bucket with the given location
         constraint.
         """
         existing_bucket_names = set(self.mock_s3_fs)
@@ -724,7 +724,7 @@ class ScratchBucketTestCase(MockBotoTestCase):
         runner = EMRJobRunner(conf_paths=[], **runner_kwargs)
         runner._create_s3_temp_bucket_if_needed()
 
-        bucket_name, path = parse_s3_uri(runner._opts['s3_scratch_uri'])
+        bucket_name, path = parse_s3_uri(runner._opts['s3_tmp_dir'])
 
         self.assertTrue(bucket_name.startswith('mrjob-'))
         self.assertNotIn(bucket_name, existing_bucket_names)
@@ -733,34 +733,34 @@ class ScratchBucketTestCase(MockBotoTestCase):
         self.assertEqual(self.mock_s3_fs[bucket_name]['location'], location)
 
     def test_default(self):
-        self.assert_new_scratch_bucket('us-west-2')
+        self.assert_new_tmp_bucket('us-west-2')
 
     def test_us_west_1(self):
-        self.assert_new_scratch_bucket('us-west-1',
+        self.assert_new_tmp_bucket('us-west-1',
                                        aws_region='us-west-1')
 
     def test_us_east_1(self):
         # location should be blank
-        self.assert_new_scratch_bucket('',
+        self.assert_new_tmp_bucket('',
                                        aws_region='us-east-1')
 
     def test_reuse_mrjob_bucket_in_same_region(self):
         self.add_mock_s3_data({'mrjob-1': {}}, location='us-west-2')
 
         runner = EMRJobRunner()
-        self.assertEqual(runner._opts['s3_scratch_uri'],
+        self.assertEqual(runner._opts['s3_tmp_dir'],
                          's3://mrjob-1/tmp/')
 
     def test_ignore_mrjob_bucket_in_different_region(self):
         # this tests 687
         self.add_mock_s3_data({'mrjob-1': {}}, location='')
 
-        self.assert_new_scratch_bucket('us-west-2')
+        self.assert_new_tmp_bucket('us-west-2')
 
     def test_ignore_non_mrjob_bucket_in_different_region(self):
         self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
 
-        self.assert_new_scratch_bucket('us-west-2')
+        self.assert_new_tmp_bucket('us-west-2')
 
     def test_reuse_mrjob_bucket_in_us_east_1(self):
         # us-east-1 is special because the location "constraint" for its
@@ -769,27 +769,27 @@ class ScratchBucketTestCase(MockBotoTestCase):
 
         runner = EMRJobRunner(aws_region='us-east-1')
 
-        self.assertEqual(runner._opts['s3_scratch_uri'],
+        self.assertEqual(runner._opts['s3_tmp_dir'],
                          's3://mrjob-1/tmp/')
 
-    def test_explicit_scratch_uri(self):
+    def test_explicit_tmp_uri(self):
         self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
 
-        runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp/')
+        runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp/')
 
-        self.assertEqual(runner._opts['s3_scratch_uri'],
+        self.assertEqual(runner._opts['s3_tmp_dir'],
                          's3://walrus/tmp/')
 
-    def test_cross_region_explicit_scratch_uri(self):
+    def test_cross_region_explicit_tmp_uri(self):
         self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
 
         runner = EMRJobRunner(aws_region='us-west-1',
-                              s3_scratch_uri='s3://walrus/tmp/')
+                              s3_tmp_dir='s3://walrus/tmp/')
 
-        self.assertEqual(runner._opts['s3_scratch_uri'],
+        self.assertEqual(runner._opts['s3_tmp_dir'],
                          's3://walrus/tmp/')
 
-        # scratch bucket shouldn't influence aws_region (it did in 0.4.x)
+        # tmp bucket shouldn't influence aws_region (it did in 0.4.x)
         self.assertEqual(runner._opts['aws_region'], 'us-west-1')
 
 
@@ -1260,7 +1260,7 @@ class FindProbableCauseOfFailureTestCase(MockBotoTestCase):
     def make_runner(self):
         self.add_mock_s3_data({'walrus': {}})
         self.runner = EMRJobRunner(s3_sync_wait_time=0,
-                                   s3_scratch_uri='s3://walrus/tmp',
+                                   s3_tmp_dir='s3://walrus/tmp',
                                    conf_paths=[])
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
 
@@ -1464,7 +1464,7 @@ class CounterFetchingTestCase(MockBotoTestCase):
         self.add_mock_s3_data({'walrus': {}})
         kwargs = {
             'conf_paths': [],
-            's3_scratch_uri': 's3://walrus/',
+            's3_tmp_dir': 's3://walrus/',
             's3_sync_wait_time': 0}
         with EMRJobRunner(**kwargs) as runner:
             self.job_flow_id = runner.make_persistent_job_flow()
@@ -1555,7 +1555,7 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
         # Make sure that SSH and S3 are accessed when we expect them to be
         self.add_mock_s3_data({'walrus': {}})
 
-        self.runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp')
+        self.runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp')
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
         self.prepare_runner_for_ssh(self.runner)
 
@@ -1721,7 +1721,7 @@ class TestS3Ls(MockBotoTestCase):
         self.add_mock_s3_data(
             {'walrus': {'one': b'', 'two': b'', 'three': b''}})
 
-        runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
+        runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp',
                               conf_paths=[])
 
         self.assertEqual(set(runner._s3_ls('s3://walrus/')),
@@ -1802,7 +1802,7 @@ class TestNoBoto(TestCase):
 
     def test_init(self):
         # merely creating an EMRJobRunner should raise an exception
-        # because it'll need to connect to S3 to set s3_scratch_uri
+        # because it'll need to connect to S3 to set s3_tmp_dir
         self.assertRaises(ImportError, EMRJobRunner, conf_paths=[])
 
 
@@ -2835,7 +2835,7 @@ class TestCatFallback(MockBotoTestCase):
                         'two': b'two_text',
                         'three': b'three_text'}})
 
-        runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp',
+        runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp',
                               conf_paths=[])
 
         self.assertEqual(list(runner.cat('s3://walrus/one')), [b'one_text'])

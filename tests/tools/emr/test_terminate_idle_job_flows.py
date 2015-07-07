@@ -280,7 +280,7 @@ class JobFlowInspectionTestCase(MockBotoTestCase):
         if 'now' not in kwargs:
             kwargs['now'] = self.now
 
-        kwargs['s3_scratch_uri'] = 's3://my_bucket/'
+        kwargs['s3_tmp_dir'] = 's3://my_bucket/'
         kwargs['s3_sync_wait_time'] = 0
         kwargs['max_mins_locked'] = 1
 

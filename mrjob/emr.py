@@ -220,9 +220,9 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
     return all_job_flows
 
 
-def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
+def make_lock_uri(s3_tmp_dir, emr_job_flow_id, step_num):
     """Generate the URI to lock the job flow ``emr_job_flow_id``"""
-    return s3_tmp_uri + 'locks/' + emr_job_flow_id + '/' + str(step_num)
+    return s3_tmp_dir + 'locks/' + emr_job_flow_id + '/' + str(step_num)
 
 
 def _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration=None):
@@ -321,8 +321,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'pool_wait_minutes',
         's3_endpoint',
         's3_log_uri',
-        's3_scratch_uri',
         's3_sync_wait_time',
+        's3_tmp_dir',
         's3_upload_part_size',
         'ssh_bin',
         'ssh_bind_ports',
@@ -340,10 +340,14 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'bootstrap_scripts': combine_path_lists,
         'ec2_key_pair_file': combine_paths,
         's3_log_uri': combine_paths,
-        's3_scratch_uri': combine_paths,
+        's3_tmp_dir': combine_paths,
         'ssh_bin': combine_cmds,
         'emr_api_params': combine_dicts,
         'emr_tags': combine_dicts
+    })
+
+    DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
+        's3_scratch_uri': 's3_tmp_dir',
     })
 
     def __init__(self, alias, opts, conf_paths):
@@ -526,16 +530,16 @@ class EMRJobRunner(MRJobRunner):
         # This variable helps us create the bucket as needed
         self._s3_temp_bucket_to_create = None
 
-        self._fix_s3_scratch_and_log_uri_opts()
+        self._fix_s3_tmp_and_log_uri_opts()
 
         # use job key to make a unique tmp dir
-        self._s3_tmp_uri = self._opts['s3_scratch_uri'] + self._job_key + '/'
+        self._s3_tmp_dir = self._opts['s3_tmp_dir'] + self._job_key + '/'
 
         # pick/validate output dir
         if self._output_dir:
             self._output_dir = self._check_and_fix_s3_dir(self._output_dir)
         else:
-            self._output_dir = self._s3_tmp_uri + 'output/'
+            self._output_dir = self._s3_tmp_dir + 'output/'
 
         # check AMI version
         if self._opts['ami_version'].startswith('1.'):
@@ -547,7 +551,7 @@ class EMRJobRunner(MRJobRunner):
 
         # manage local files that we want to upload to S3. We'll add them
         # to this manager just before we need them.
-        s3_files_dir = self._s3_tmp_uri + 'files/'
+        s3_files_dir = self._s3_tmp_dir + 'files/'
         self._upload_mgr = UploadDirManager(s3_files_dir)
 
         # add the bootstrap files to a list of files to upload
@@ -614,30 +618,30 @@ class EMRJobRunner(MRJobRunner):
         # init hadoop version cache
         self._inferred_hadoop_version = None
 
-    def _fix_s3_scratch_and_log_uri_opts(self):
-        """Fill in s3_scratch_uri and s3_log_uri (in self._opts) if they
+    def _fix_s3_tmp_and_log_uri_opts(self):
+        """Fill in s3_tmp_dir and s3_log_uri (in self._opts) if they
         aren't already set.
 
         Helper for __init__.
         """
-        # set s3_scratch_uri by checking for existing buckets
-        if not self._opts['s3_scratch_uri']:
-            self._set_s3_scratch_uri()
+        # set s3_tmp_dir by checking for existing buckets
+        if not self._opts['s3_tmp_dir']:
+            self._set_s3_tmp_dir()
             log.info('using %s as our scratch dir on S3' %
-                     self._opts['s3_scratch_uri'])
+                     self._opts['s3_tmp_dir'])
 
-        self._opts['s3_scratch_uri'] = self._check_and_fix_s3_dir(
-            self._opts['s3_scratch_uri'])
+        self._opts['s3_tmp_dir'] = self._check_and_fix_s3_dir(
+            self._opts['s3_tmp_dir'])
 
         # set s3_log_uri
         if self._opts['s3_log_uri']:
             self._opts['s3_log_uri'] = self._check_and_fix_s3_dir(
                 self._opts['s3_log_uri'])
         else:
-            self._opts['s3_log_uri'] = self._opts['s3_scratch_uri'] + 'logs/'
+            self._opts['s3_log_uri'] = self._opts['s3_tmp_dir'] + 'logs/'
 
-    def _set_s3_scratch_uri(self):
-        """Helper for _fix_s3_scratch_and_log_uri_opts"""
+    def _set_s3_tmp_dir(self):
+        """Helper for _fix_s3_tmp_and_log_uri_opts"""
         buckets = self.fs.make_s3_conn().get_all_buckets()
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
 
@@ -653,7 +657,7 @@ class EMRJobRunner(MRJobRunner):
                 # Regions are both specified and match
                 log.info("using existing scratch bucket %s" %
                          scratch_bucket_name)
-                self._opts['s3_scratch_uri'] = ('s3://%s/tmp/' %
+                self._opts['s3_tmp_dir'] = ('s3://%s/tmp/' %
                                                 scratch_bucket_name)
                 return
 
@@ -661,7 +665,7 @@ class EMRJobRunner(MRJobRunner):
         scratch_bucket_name = 'mrjob-' + random_identifier()
         self._s3_temp_bucket_to_create = scratch_bucket_name
         log.info("creating new scratch bucket %s" % scratch_bucket_name)
-        self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
+        self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % scratch_bucket_name
 
     def _set_s3_job_log_uri(self, job_flow):
         """Given a job flow description, set self._s3_job_log_uri. This allows
@@ -1022,11 +1026,11 @@ class EMRJobRunner(MRJobRunner):
 
     def _cleanup_remote_scratch(self):
         # delete all the files we created
-        if self._s3_tmp_uri:
+        if self._s3_tmp_dir:
             try:
-                log.info('Removing all files in %s' % self._s3_tmp_uri)
-                self.rm(self._s3_tmp_uri)
-                self._s3_tmp_uri = None
+                log.info('Removing all files in %s' % self._s3_tmp_dir)
+                self.rm(self._s3_tmp_dir)
+                self._s3_tmp_dir = None
             except Exception as e:
                 log.exception(e)
 
@@ -2396,7 +2400,7 @@ class EMRJobRunner(MRJobRunner):
         return None
 
     def _lock_uri(self, job_flow):
-        return make_lock_uri(self._opts['s3_scratch_uri'],
+        return make_lock_uri(self._opts['s3_tmp_dir'],
                              job_flow.jobflowid,
                              len(job_flow.steps) + 1)
 

@@ -122,8 +122,8 @@ def make_option_parser():
             'pool_emr_job_flows',
             's3_endpoint',
             's3_log_uri',
-            's3_scratch_uri',
             's3_sync_wait_time',
+            's3_tmp_dir',
         ),
     }
 

@@ -546,7 +546,7 @@ def add_emr_opts(opt_group):
 
         opt_group.add_option(
             '--s3-scratch-uri', dest='s3_scratch_uri', default=None,
-            help='URI on S3 to use as our temp directory.'),
+            help='Deprecated alias for --s3-tmp-dir.'),
 
         opt_group.add_option(
             '--s3-sync-wait-time', dest='s3_sync_wait_time', default=None,
@@ -554,6 +554,10 @@ def add_emr_opts(opt_group):
             help=('How long to wait for S3 to reach eventual consistency. This'
                   ' is typically less than a second (zero in us-west) but the'
                   ' default is 5.0 to be safe.')),
+
+        opt_group.add_option(
+            '--s3-tmp-dir', dest='s3_tmp_dir', default=None,
+            help='URI on S3 to use as our temp directory.'),
 
         opt_group.add_option(
             '--s3-upload-part-size', dest='s3_upload_part_size', default=None,

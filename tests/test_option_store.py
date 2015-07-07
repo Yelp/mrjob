@@ -318,3 +318,16 @@ class TestExtraKwargs(ConfigFilesTestCase):
                 'inline', {'local_tmp_dir': '/var/tmp', 'foo': 'bar'}, [])
             self.assertEqual(opts['local_tmp_dir'], '/var/tmp')
             self.assertNotIn('bar', opts)
+
+
+class DeprecatedAliasesTestCase(ConfigFilesTestCase):
+
+    def test_base_tmp_dir(self):
+        stderr = StringIO()
+        with no_handlers_for_logger('mrjob.conf'):
+            log_to_stream('mrjob.conf', stderr)
+            opts = RunnerOptionStore(
+                'inline', dict(base_tmp_dir='/scratch'), [])
+
+            self.assertIn('Deprecated option base_tmp_dir has been renamed to'
+                          ' local_tmp_dir', stderr.getvalue())

@@ -133,7 +133,7 @@ class RunnerOptionStore(OptionStore):
         'upload_files': combine_path_lists,
     })
 
-    DEPRECATED_ALISES = {
+    DEPRECATED_ALIASES = {
         'base_tmp_dir': 'local_tmp_dir',
     }
 

@@ -95,15 +95,6 @@ options related to file uploading.
 Temp files and cleanup
 ======================
 
-.. mrjob-opt::
-    :config: base_tmp_dir
-    :switch: --base-tmp-dir
-    :type: :ref:`path <data-type-path>`
-    :set: all
-    :default: value of :py:func:`tempfile.gettempdir`
-
-    Path to put local temp dirs inside.
-
 .. _configs-all-runners-cleanup:
 
 .. mrjob-opt::
@@ -144,6 +135,18 @@ Temp files and cleanup
 
     Which kinds of directories to clean up when a job fails. Valid choices are
     the same as **cleanup**.
+
+.. mrjob-opt::
+    :config: local_tmp_dir
+    :type: :ref:`path <data-type-path>`
+    :set: all
+    :default: value of :py:func:`tempfile.gettempdir`
+
+    Alternate local temp directory.
+
+    There isn't a command-line switch for this option; just set
+    :envvar:`TMPDIR` or any other environment variable respected by
+    :py:func:`tempfile.gettempdir`.
 
 .. mrjob-opt::
    :config: output_dir

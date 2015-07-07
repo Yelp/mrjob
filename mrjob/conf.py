@@ -71,7 +71,7 @@ class OptionStore(dict):
             if k in self.DEPRECATED_ALIASES:
                 aliased_opt = self.DEPRECATED_ALIASES[k]
 
-                log.warning('Deprecated option %s%s; use %s instead' % (
+                log.warning('Deprecated option %s%s has been renamed to %s' % (
                     k, from_where, aliased_opt))
                 if opts.get(aliased_opt) is None:
                     results[aliased_opt] = v

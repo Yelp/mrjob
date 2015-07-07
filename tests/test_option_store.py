@@ -91,7 +91,6 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
     BASIC_CONF = {
         'runners': {
             'inline': {
-                'base_tmp_dir': '/tmp',
                 'cmdenv': {
                     'A_PATH': 'A',
                     'SOMETHING': 'X',
@@ -103,6 +102,7 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                 'jobconf': {
                     'lorax_speaks_for': 'trees',
                 },
+                'local_tmp_dir': '/tmp',
                 'python_bin': 'py3k',
                 'setup_scripts': ['/myscript.py'],
             }
@@ -114,7 +114,6 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
             'include': os.path.join(self.tmp_dir, 'mrjob.conf'),
             'runners': {
                 'inline': {
-                    'base_tmp_dir': '/var/tmp',
                     'bootstrap_mrjob': False,
                     'cmdenv': {
                         'A_PATH': 'B',
@@ -129,6 +128,7 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                         'lorax_speaks_for': 'mazda',
                         'dr_seuss_is': 'awesome',
                     },
+                    'local_tmp_dir': '/var/tmp',
                     'python_bin': 'py4k',
                     'setup_scripts': ['/yourscript.py'],
                 }
@@ -172,8 +172,8 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                          ['thing1', 'thing2'])
 
     def test_combine_paths(self):
-        self.assertEqual(self.opts_1['base_tmp_dir'], '/tmp')
-        self.assertEqual(self.opts_2['base_tmp_dir'], '/var/tmp')
+        self.assertEqual(self.opts_1['local_tmp_dir'], '/tmp')
+        self.assertEqual(self.opts_2['local_tmp_dir'], '/var/tmp')
 
     def test_combine_path_lists(self):
         self.assertEqual(self.opts_1['setup_scripts'], ['/myscript.py'])
@@ -201,7 +201,7 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
                           stderr.getvalue())
 
     def test_empty_runner_error(self):
-        conf = dict(runner=dict(local=dict(base_tmp_dir='/tmp')))
+        conf = dict(runner=dict(local=dict(local_tmp_dir='/tmp')))
         path = self.save_conf('basic', conf)
 
         stderr = StringIO()
@@ -222,7 +222,7 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
         conf = {
             'runners': {
                 'inline': {
-                    'base_tmp_dir': "include_file1_base_tmp_dir"
+                    'local_tmp_dir': "include_file1_local_tmp_dir"
                 }
             }
         }
@@ -233,7 +233,7 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
         conf = {
             'runners': {
                 'inline': {
-                    'base_tmp_dir': "include_file2_base_tmp_dir"
+                    'local_tmp_dir': "include_file2_local_tmp_dir"
                 }
             }
         }
@@ -315,6 +315,6 @@ class TestExtraKwargs(ConfigFilesTestCase):
     def test_extra_kwargs_passed_in_directly_okay(self):
         with logger_disabled('mrjob.runner'):
             opts = RunnerOptionStore(
-                'inline', {'base_tmp_dir': '/var/tmp', 'foo': 'bar'}, [])
-            self.assertEqual(opts['base_tmp_dir'], '/var/tmp')
+                'inline', {'local_tmp_dir': '/var/tmp', 'foo': 'bar'}, [])
+            self.assertEqual(opts['local_tmp_dir'], '/var/tmp')
             self.assertNotIn('bar', opts)

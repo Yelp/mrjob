@@ -346,7 +346,7 @@ sys.exit(13)
             runner._invoke_sort([self.a], self.out)
             for key in environment_check_list:
                 self.assertEqual(environment_vars.get(key, None),
-                                 runner._opts['base_tmp_dir'])
+                                 runner._opts['local_tmp_dir'])
 
     def test_no_files(self):
         runner = MRJobRunner(conf_paths=[])

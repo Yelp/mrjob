@@ -202,4 +202,4 @@ See :doc:`configs-basics` for in-depth information. Here is an example file::
       python_archives:
         - a_library_I_use_on_emr.tar.gz
     inline:
-      base_tmp_dir: $HOME/.tmp
+      local_tmp_dir: $HOME/.tmp

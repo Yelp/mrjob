@@ -89,7 +89,6 @@ class RunnerOptionStore(OptionStore):
     # tests.test_runner.
 
     ALLOWED_KEYS = OptionStore.ALLOWED_KEYS.union(set([
-        'base_tmp_dir',
         'bootstrap_mrjob',
         'check_input_paths',
         'cleanup',
@@ -101,6 +100,7 @@ class RunnerOptionStore(OptionStore):
         'interpreter',
         'jobconf',
         'label',
+        'local_tmp_dir',
         'owner',
         'python_archives',
         'python_bin',
@@ -116,11 +116,11 @@ class RunnerOptionStore(OptionStore):
     ]))
 
     COMBINERS = combine_dicts(OptionStore.COMBINERS, {
-        'base_tmp_dir': combine_paths,
         'cmdenv': combine_envs,
         'hadoop_extra_args': combine_lists,
         'interpreter': combine_cmds,
         'jobconf': combine_dicts,
+        'local_tmp_dir': combine_paths,
         'python_archives': combine_path_lists,
         'python_bin': combine_cmds,
         'setup': combine_lists,
@@ -132,6 +132,10 @@ class RunnerOptionStore(OptionStore):
         'upload_archives': combine_path_lists,
         'upload_files': combine_path_lists,
     })
+
+    DEPRECATED_ALISES = {
+        'base_tmp_dir': 'local_tmp_dir',
+    }
 
     def __init__(self, alias, opts, conf_paths):
         """
@@ -157,7 +161,6 @@ class RunnerOptionStore(OptionStore):
         if (len(self.cascading_dicts) > 2 and
                 all(len(d) == 0 for d in self.cascading_dicts[2:-1]) and
                 (len(conf_paths or []) > 0)):
-            import pdb; pdb.set_trace()
             log.warning('No configs specified for %s runner' % alias)
 
         self.populate_values_from_cascading_dicts()
@@ -176,11 +179,11 @@ class RunnerOptionStore(OptionStore):
             owner = None
 
         return combine_dicts(super_opts, {
-            'base_tmp_dir': tempfile.gettempdir(),
             'check_input_paths': True,
             'cleanup': ['ALL'],
             'cleanup_on_failure': ['NONE'],
             'hadoop_version': '0.20',
+            'local_tmp_dir': tempfile.gettempdir(),
             'owner': owner,
             'sh_bin': ['sh', '-ex'],
             'strict_protocols': True,
@@ -637,7 +640,7 @@ class MRJobRunner(object):
         """Create a tmp directory on the local filesystem that will be
         cleaned up by self.cleanup()"""
         if not self._local_tmp_dir:
-            path = os.path.join(self._opts['base_tmp_dir'], self._job_key)
+            path = os.path.join(self._opts['local_tmp_dir'], self._job_key)
             log.info('creating tmp directory %s' % path)
             if os.path.isdir(path):
                 shutil.rmtree(path)
@@ -1227,11 +1230,11 @@ class MRJobRunner(object):
         env = os.environ.copy()
         env['LC_ALL'] = 'C'
 
-        # Make sure that the base tmp dir environment variables are changed if
+        # Make sure that the tmp dir environment variables are changed if
         # the default is changed.
-        env['TMP'] = self._opts['base_tmp_dir']
-        env['TMPDIR'] = self._opts['base_tmp_dir']
-        env['TEMP'] = self._opts['base_tmp_dir']
+        env['TMP'] = self._opts['local_tmp_dir']
+        env['TMPDIR'] = self._opts['local_tmp_dir']
+        env['TEMP'] = self._opts['local_tmp_dir']
 
         log.info('writing to %s' % output_path)
 

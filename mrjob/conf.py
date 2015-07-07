@@ -62,9 +62,7 @@ class OptionStore(dict):
         """Default options for this :py:class:`OptionStore`"""
         return {}
 
-    def validated_options(self, opts, source=None):
-        from_where = ' from %s' % source if source else ''
-
+    def validated_options(self, opts, from_where=''):
         results = {}
 
         for k, v in sorted(opts.items()):

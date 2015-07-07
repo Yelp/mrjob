@@ -383,3 +383,27 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
             self.assertNotIn('s3_scratch_uri', opts)
             self.assertIn('Deprecated option s3_scratch_uri has been renamed'
                           ' to s3_tmp_dir', stderr.getvalue())
+
+    def test_cleanup_options(self):
+        stderr = StringIO()
+        with no_handlers_for_logger('mrjob.runner'):
+            log_to_stream('mrjob.runner', stderr)
+            opts = RunnerOptionStore(
+                'inline',
+                dict(cleanup=['LOCAL_SCRATCH', 'REMOTE_SCRATCH'],
+                     cleanup_on_failure=['SCRATCH']),
+                [])
+
+            self.assertEqual(opts['cleanup'], ['LOCAL_TMP', 'REMOTE_TMP'])
+            self.assertIn(
+                'Deprecated cleanup option LOCAL_SCRATCH has been renamed'
+                ' to LOCAL_TMP', stderr.getvalue())
+            self.assertIn(
+                'Deprecated cleanup option REMOTE_SCRATCH has been renamed'
+                ' to REMOTE_TMP', stderr.getvalue())
+
+            # should quietly convert string to list
+            self.assertEqual(opts['cleanup_on_failure'], ['TMP'])
+            self.assertIn(
+                'Deprecated cleanup_on_failure option SCRATCH has been renamed'
+                ' to TMP', stderr.getvalue())

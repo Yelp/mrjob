@@ -66,16 +66,34 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #:
 #: * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job flow
 #:   if on EMR and the job is not done when cleanup is run.
-#: * ``'LOCAL_SCRATCH'``: delete local scratch only
-#: * ``'LOGS'``: delete logs only
-#: * ``'NONE'``: delete nothing
-#: * ``'REMOTE_SCRATCH'``: delete remote scratch only
-#: * ``'SCRATCH'``: delete local and remote scratch, but not logs
 #: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
 #: * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
 #:    on cleanup
-CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
-                   'SCRATCH', 'JOB', 'JOB_FLOW']
+#: * ``'LOCAL_TMP'``: delete local scratch only
+#: * ``'LOGS'``: delete logs only
+#: * ``'NONE'``: delete nothing
+#: * ``'REMOTE_TMP'``: delete remote scratch only
+#: * ``'TMP'``: delete local and remote scratch, but not logs
+#:
+#: .. versionchanged:: 0.5.0
+#:
+#:     Options ending in ``TMP`` used to end in ``SCRATCH``.
+CLEANUP_CHOICES = [
+    'ALL',
+    'JOB',
+    'JOB_FLOW',
+    'LOCAL_TMP',
+    'LOGS',
+    'NONE',
+    'REMOTE_TMP',
+    'TMP',
+]
+
+_CLEANUP_DEPRECATED_ALIASES = {
+    'LOCAL_SCRATCH': 'LOCAL_TMP',
+    'REMOTE_SCRATCH': 'REMOTE_TMP',
+    'SCRATCH': 'TMP',
+}
 
 _STEP_RE = re.compile(r'^M?C?R?$')
 
@@ -154,7 +172,7 @@ class RunnerOptionStore(OptionStore):
 
         for path, mrjob_conf_opts in unsanitized_opt_dicts:
             self.cascading_dicts.append(self.validated_options(
-                mrjob_conf_opts, path))
+                mrjob_conf_opts, from_where=('from %s' % path)))
 
         self.cascading_dicts.append(opts)
 
@@ -164,8 +182,6 @@ class RunnerOptionStore(OptionStore):
             log.warning('No configs specified for %s runner' % alias)
 
         self.populate_values_from_cascading_dicts()
-
-        self._validate_cleanup()
 
         log.debug('Active configuration:')
         log.debug(pprint.pformat(self))
@@ -189,30 +205,46 @@ class RunnerOptionStore(OptionStore):
             'strict_protocols': True,
         })
 
-    def _validate_cleanup(self):
-        # old API accepts strings for cleanup
-        # new API wants lists
-        for opt_key in ('cleanup', 'cleanup_on_failure'):
-            if isinstance(self[opt_key], string_types):
-                self[opt_key] = [self[opt_key]]
+    def validated_options(self, opts, from_where=''):
+        opts = super(RunnerOptionStore, self).validated_options(
+            opts, from_where)
 
-        def validate_cleanup(error_str, opt_list):
-            for choice in opt_list:
-                if choice not in CLEANUP_CHOICES:
-                    raise ValueError(error_str % choice)
-            if 'NONE' in opt_list and len(set(opt_list)) > 1:
-                raise ValueError(
-                    'Cannot clean up both nothing and something!')
+        self._fix_cleanup_opt('cleanup', opts, from_where)
+        self._fix_cleanup_opt('cleanup_on_failure', opts, from_where)
 
-        cleanup_error = ('cleanup must be one of %s, not %%s' %
-                         ', '.join(CLEANUP_CHOICES))
-        validate_cleanup(cleanup_error, self['cleanup'])
+        return opts
 
-        cleanup_failure_error = (
-            'cleanup_on_failure must be one of %s, not %%s' %
-            ', '.join(CLEANUP_CHOICES))
-        validate_cleanup(cleanup_failure_error,
-                         self['cleanup_on_failure'])
+    def _fix_cleanup_opt(self, opt_key, opts, from_where=''):
+        if opt_key not in opts:
+            return
+
+        opt_list = opts[opt_key]
+
+        # runner expects list of string, not string
+        if isinstance(opt_list, string_types):
+            opt_list = [opt_list]
+
+        if 'NONE' in opt_list and len(set(opt_list)) > 1:
+            raise ValueError('Cannot clean up both nothing and something!')
+
+        def handle_cleanup_opt(opt):
+            if opt in CLEANUP_CHOICES:
+                return opt
+
+            if opt in _CLEANUP_DEPRECATED_ALIASES:
+                aliased_opt = _CLEANUP_DEPRECATED_ALIASES[opt]
+                log.warning(
+                    'Deprecated %s option %s%s has been renamed to %s' % (
+                        opt_key, opt, from_where, aliased_opt))
+                return aliased_opt
+
+            raise ValueError('%s must be one of %s, not %s' % (
+                opt_key, ', '.join(CLEANUP_CHOICES), opt))
+
+        opt_list = [handle_cleanup_opt(opt) for opt in opt_list]
+
+        opts[opt_key] = opt_list
+
 
 
 class MRJobRunner(object):

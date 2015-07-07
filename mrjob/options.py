@@ -288,11 +288,11 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--aws-availability-zone', dest='aws_availability_zone',
             default=None,
-            help='Availability zone to run the job flow on'),
+            help='Availability zone to run EMR jobs in.'),
 
         opt_group.add_option(
             '--aws-region', dest='aws_region', default=None,
-            help='Region to connect to S3 and EMR on (e.g. us-west-1).'),
+            help=('Region to run EMR jobs in. Default is us-west-2')),
 
         opt_group.add_option(
             '--bootstrap', dest='bootstrap', action='append',
@@ -413,7 +413,7 @@ def add_emr_opts(opt_group):
 
         opt_group.add_option(
             '--emr-endpoint', dest='emr_endpoint', default=None,
-            help=('Optional host to connect to when communicating with S3'
+            help=('Force mrjob to connect to EMR on this endpoint'
                   ' (e.g. us-west-1.elasticmapreduce.amazonaws.com). Default'
                   ' is to infer this from aws_region.')),
 
@@ -442,6 +442,11 @@ def add_emr_opts(opt_group):
             dest='hadoop_streaming_jar_on_emr', default=None,
             help=('Local path of the hadoop streaming jar on the EMR node.'
                   ' Rarely necessary.')),
+
+        opt_group.add_option(
+            '--iam-endpoint', dest='iam_endpoint', default=None,
+            help=('Force mrjob to connect to IAM on this endpoint'
+                  ' (e.g. iam.us-gov.amazonaws.com)')),
 
         opt_group.add_option(
             '--iam-instance-profile', dest='iam_instance_profile',
@@ -526,9 +531,10 @@ def add_emr_opts(opt_group):
 
         opt_group.add_option(
             '--s3-endpoint', dest='s3_endpoint', default=None,
-            help=('Host to connect to when communicating with S3 (e.g.'
-                  ' s3-us-west-1.amazonaws.com). Default is to infer this from'
-                  ' region (see --aws-region).')),
+            help=("Force mrjob to connect to S3 on this endpoint (e.g."
+                  " s3-us-west-1.amazonaws.com). You usually shouldn't"
+                  " set this; by default mrjob will choose the correct"
+                  " endpoint for each S3 bucket based on its location.")),
 
         opt_group.add_option(
             '--s3-log-uri', dest='s3_log_uri', default=None,

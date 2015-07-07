@@ -1,4 +1,5 @@
 v0.5.0, 2015-??-?? -- ???
+ * requires boto 2.35.0 or newer (#980)
  * jobs:
    * mr() no longer takes positional arguments (#814)
    * removed jar() (use mrjob.step.JarStep)
@@ -10,8 +11,15 @@ v0.5.0, 2015-??-?? -- ???
    * All runners:
      * removed IS_SUCCESSFUL cleanup option (use ALL)
    * EMR:
+     * default AWS region is us-west-2 (#1025)
+     * aws_region is no longer inferred from s3_scratch_uri
+     * mrjob works correctly across AWS regions:
+       * connect to each S3 bucket on appropriate endpoint (#1028)
+       * create/select temp bucket in same region as EMR jobs (#687)
+     * added iam_endpoint option (#1067)
+     * removed s3_conn args from methods in EMRJobRunner and S3Filesystem
      * removed iam_job_flow_role option (use iam_instance_profile)
-     * removed get_s3_folder_keys()
+     * removed support for _$folder$ keys, which EMR no longer creates
  * removed mrjob.compat.get_jobconf_value() (use jobconf_from_env())
  * mrjob.util:
    * renamed buffer_iterator_to_line_iterator() to to_lines()

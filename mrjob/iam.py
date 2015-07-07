@@ -105,31 +105,22 @@ def _unwrap_response(resp):
     raise ValueError(resp)
 
 
-def _get_response(conn, action, params, path='/', parent=None,
-                  verb='POST', list_marker='Set', **kwargs):
-    """Replacement for conn.get_response(...) that unwraps the response
-    from its containing elements."""
-    # verb was GET in earlier versions of boto; always default to POST
-    wrapped_resp = conn.get_response(
-        action, params, path='/', parent=parent, verb=verb,
-        list_marker=list_marker, **kwargs)
-    return _unwrap_response(wrapped_resp)
+def _repeat(api_call, *args, **kwargs):
+    """Make the same API call repeatedly until we've seen every page
+    of the response (sets *marker* automatically).
 
-
-def _get_responses(conn, action, params, *args, **kwargs):
-    """_get_reponse(), with pagination. Yields one or more unwrapped responses.
+    Yields one or more unwrapped responses.
     """
-    params = params.copy()
+    marker = None
 
     while True:
-        resp = _get_response(conn, action, params, *args, **kwargs)
+        raw_resp = api_call(*args, marker=marker, **kwargs)
+        resp = _unwrap_response(raw_resp)
         yield resp
 
         # go to next page, if any
         marker = resp.get('marker')
-        if marker:
-            params['Marker'] = marker
-        else:
+        if not marker:
             return
 
 
@@ -158,7 +149,6 @@ def get_or_create_mrjob_service_role(conn):
 def get_or_create_mrjob_instance_profile(conn):
     """Look for a usable instance profile for EMR, and if there is none,
     create one."""
-
     for profile_name, role_name, role_document in (
             _yield_instance_profiles(conn)):
 
@@ -173,10 +163,8 @@ def get_or_create_mrjob_instance_profile(conn):
         conn, MRJOB_INSTANCE_PROFILE_ROLE, EMR_INSTANCE_PROFILE_POLICY_ARN)
 
     # create an instance profile with the same name as the role
-    _get_response(conn, 'CreateInstanceProfile', {'InstanceProfileName': name})
-
-    _get_response(conn, 'AddRoleToInstanceProfile', {
-        'InstanceProfileName': name, 'RoleName': name})
+    conn.create_instance_profile(name)
+    conn.add_role_to_instance_profile(name, name)
 
     log.info('Auto-created instance profile %s' % name)
 
@@ -185,9 +173,7 @@ def get_or_create_mrjob_instance_profile(conn):
 
 def _yield_roles(conn):
     """Yield (role_name, role_document)."""
-    resps = _get_responses(conn, 'ListRoles', {}, list_marker='Roles')
-
-    for resp in resps:
+    for resp in _repeat(conn.list_roles):
         for role_data in resp['roles']:
             yield _get_role_name_and_document(role_data)
 
@@ -197,10 +183,7 @@ def _yield_instance_profiles(conn):
 
     role_name and role_document are None for empty instance profiles
     """
-    resps = _get_responses(conn, 'ListInstanceProfiles', {},
-                           list_marker='InstanceProfiles')
-
-    for resp in resps:
+    for resp in _repeat(conn.list_instance_profiles):
         for profile_data in resp['instance_profiles']:
             profile_name = profile_data['instance_profile_name']
 
@@ -221,11 +204,7 @@ def _yield_attached_role_policies(conn, role_name):
     """Yield the ARNs for policies attached to the given role."""
     # allowing for multiple responses might be overkill, as currently
     # (2015-05-29) only two policies are allowed per role.
-    resps = _get_responses(conn, 'ListAttachedRolePolicies',
-                           {'RoleName': role_name},
-                           list_marker='AttachedPolicies')
-
-    for resp in resps:
+    for resp in _repeat(_list_attached_role_policies, conn, role_name):
         for policy_data in resp['attached_policies']:
             yield policy_data['policy_arn']
 
@@ -241,12 +220,25 @@ def _create_mrjob_role_with_attached_policy(conn, role_document, policy_arn):
     # create role
     role_name = 'mrjob-' + random_identifier()
 
-    _get_response(conn, 'CreateRole', {
-        'AssumeRolePolicyDocument': json.dumps(role_document),
-        'RoleName': role_name})
-
-    _get_response(conn, 'AttachRolePolicy', {
-        'PolicyArn': policy_arn,
-        'RoleName': role_name})
+    conn.create_role(role_name, json.dumps(role_document))
+    _attach_role_policy(conn, role_name, policy_arn)
 
     return role_name
+
+
+# methods which should eventually be added to boto's IAMConnection
+
+def _list_attached_role_policies(conn, role_name, marker=None, max_items=None):
+    params = {'RoleName': role_name}
+    if marker is not None:
+        params['Marker'] = marker
+    if max_items is not None:
+        params['MaxItems'] = max_items
+    return conn.get_response('ListAttachedRolePolicies', params,
+                             list_marker='AttachedPolicies')
+
+def _attach_role_policy(conn, role_name, policy_arn):
+    params = {'PolicyArn': policy_arn,
+              'RoleName': role_name}
+
+    return conn.get_response('AttachRolePolicy', params)

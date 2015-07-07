@@ -38,6 +38,7 @@ try:
     import boto.emr.connection
     import boto.emr.instance_group
     import boto.exception
+    import boto.https_connection
     import boto.regioninfo
     import boto.utils
     boto  # quiet "redefinition of unused ..." warning from pyflakes
@@ -52,13 +53,6 @@ except ImportError:
     # that's cool; filechunkio is only for multipart uploading
     filechunkio = None
 
-# need this to retry on SSL errors (see Issue #621)
-try:
-    from boto.https_connection import InvalidCertificateException
-    InvalidCertificateException  # quiet pyflakes warning
-except ImportError:
-    InvalidCertificateException = None
-
 import mrjob
 import mrjob.step
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
@@ -67,7 +61,6 @@ from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import random_identifier
-from mrjob.aws import s3_endpoint_for_region
 from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import version_gte
 from mrjob.compat import supports_new_distributed_cache_options
@@ -79,7 +72,6 @@ from mrjob.conf import combine_paths
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
-from mrjob.fs.s3 import _get_bucket
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob.iam import FALLBACK_INSTANCE_PROFILE
@@ -144,6 +136,10 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
     os.path.dirname(mrjob.__file__),
     'bootstrap',
     'terminate_idle_job_flow.sh')
+
+# default AWS region to use for EMR. Using us-west-2 because it is the default
+# for new (since October 10, 2012) accounts (see #1025)
+_DEFAULT_AWS_REGION = 'us-west-2'
 
 
 def s3_key_to_uri(s3_key):
@@ -229,9 +225,9 @@ def make_lock_uri(s3_tmp_uri, emr_job_flow_id, step_num):
     return s3_tmp_uri + 'locks/' + emr_job_flow_id + '/' + str(step_num)
 
 
-def _lock_acquire_step_1(s3_conn, lock_uri, job_key, mins_to_expiration=None):
+def _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration=None):
     bucket_name, key_prefix = parse_s3_uri(lock_uri)
-    bucket = _get_bucket(s3_conn, bucket_name)
+    bucket = s3_fs.get_bucket(bucket_name)
     key = bucket.get_key(key_prefix)
 
     # EMRJobRunner should start using a job flow within about a second of
@@ -257,19 +253,17 @@ def _lock_acquire_step_2(key, job_key):
     return (key_value == job_key.encode('utf_8'))
 
 
-def attempt_to_acquire_lock(s3_conn, lock_uri, sync_wait_time, job_key,
+def attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
                             mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
-    key = _lock_acquire_step_1(s3_conn, lock_uri, job_key, mins_to_expiration)
-    if key is not None:
-        time.sleep(sync_wait_time)
-        success = _lock_acquire_step_2(key, job_key)
-        if success:
-            return True
+    key = _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration)
+    if key is None:
+        return False
 
-    return False
+    time.sleep(sync_wait_time)
+    return _lock_acquire_step_2(key, job_key)
 
 
 class LogFetchError(Exception):
@@ -316,6 +310,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
         'iam_instance_profile',
+        'iam_endpoint',
         'iam_service_role',
         'max_hours_idle',
         'mins_to_end_of_hour',
@@ -353,12 +348,18 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
     def __init__(self, alias, opts, conf_paths):
         super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_paths)
+
+        # don't allow aws_region to be ''
+        if not self['aws_region']:
+            self['aws_region'] = _DEFAULT_AWS_REGION
+
         self._fix_ec2_instance_opts()
 
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
             'ami_version': '3.7.0',
+            'aws_region': _DEFAULT_AWS_REGION,
             'check_emr_status_every': 30,
             'cleanup_on_failure': ['JOB'],
             'ec2_core_instance_type': 'm1.medium',
@@ -520,10 +521,6 @@ class EMRJobRunner(MRJobRunner):
         """
         super(EMRJobRunner, self).__init__(**kwargs)
 
-        # make aws_region an instance variable; we might want to set it
-        # based on the scratch bucket
-        self._aws_region = self._opts['aws_region'] or ''
-
         # if we're going to create a bucket to use as temp space, we don't
         # want to actually create it until we run the job (Issue #50).
         # This variable helps us create the bucket as needed
@@ -623,29 +620,9 @@ class EMRJobRunner(MRJobRunner):
 
         Helper for __init__.
         """
-        s3_conn = self.make_s3_conn()
-        # check s3_scratch_uri against aws_region if specified
-        if self._opts['s3_scratch_uri']:
-            bucket_name, _ = parse_s3_uri(self._opts['s3_scratch_uri'])
-            bucket_loc = _get_bucket(s3_conn, bucket_name).get_location()
-
-            # make sure they can communicate if both specified
-            if (self._aws_region and bucket_loc and
-                    self._aws_region != bucket_loc):
-                log.warning('warning: aws_region (%s) does not match bucket'
-                            ' region (%s). Your EC2 instances may not be able'
-                            ' to reach your S3 buckets.' %
-                            (self._aws_region, bucket_loc))
-
-            # otherwise derive aws_region from bucket_loc
-            elif bucket_loc and not self._aws_region:
-                log.info(
-                    "inferring aws_region from scratch bucket's region (%s)" %
-                    bucket_loc)
-                self._aws_region = bucket_loc
         # set s3_scratch_uri by checking for existing buckets
-        else:
-            self._set_s3_scratch_uri(s3_conn)
+        if not self._opts['s3_scratch_uri']:
+            self._set_s3_scratch_uri()
             log.info('using %s as our scratch dir on S3' %
                      self._opts['s3_scratch_uri'])
 
@@ -659,9 +636,9 @@ class EMRJobRunner(MRJobRunner):
         else:
             self._opts['s3_log_uri'] = self._opts['s3_scratch_uri'] + 'logs/'
 
-    def _set_s3_scratch_uri(self, s3_conn):
+    def _set_s3_scratch_uri(self):
         """Helper for _fix_s3_scratch_and_log_uri_opts"""
-        buckets = s3_conn.get_all_buckets()
+        buckets = self.fs.make_s3_conn().get_all_buckets()
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
 
         # Loop over buckets until we find one that is not region-
@@ -669,33 +646,15 @@ class EMRJobRunner(MRJobRunner):
         #   infer aws_region if no aws_region is specified
         for scratch_bucket in mrjob_buckets:
             scratch_bucket_name = scratch_bucket.name
-            scratch_bucket_location = scratch_bucket.get_location()
 
-            if scratch_bucket_location:
-                if scratch_bucket_location == self._aws_region:
-                    # Regions are both specified and match
-                    log.info("using existing scratch bucket %s" %
-                             scratch_bucket_name)
-                    self._opts['s3_scratch_uri'] = (
-                        's3://%s/tmp/' % scratch_bucket_name)
-                    return
-                elif not self._aws_region:
-                    # aws_region not specified, so set it based on this
-                    #   bucket's location and use this bucket
-                    self._aws_region = scratch_bucket_location
-                    log.info("inferring aws_region from scratch bucket's"
-                             " region (%s)" % self._aws_region)
-                    self._opts['s3_scratch_uri'] = (
-                        's3://%s/tmp/' % scratch_bucket_name)
-                    return
-                elif scratch_bucket_location != self._aws_region:
-                    continue
-            elif not self._aws_region:
-                # Only use regionless buckets if the job flow is regionless
+            if (scratch_bucket.get_location() ==
+                s3_location_constraint_for_region(self._opts['aws_region'])):
+
+                # Regions are both specified and match
                 log.info("using existing scratch bucket %s" %
                          scratch_bucket_name)
-                self._opts['s3_scratch_uri'] = (
-                    's3://%s/tmp/' % scratch_bucket_name)
+                self._opts['s3_scratch_uri'] = ('s3://%s/tmp/' %
+                                                scratch_bucket_name)
                 return
 
         # That may have all failed. If so, pick a name.
@@ -719,7 +678,8 @@ class EMRJobRunner(MRJobRunner):
             s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as scratch space' %
                      self._s3_temp_bucket_to_create)
-            location = s3_location_constraint_for_region(self._aws_region)
+            location = s3_location_constraint_for_region(
+                self._opts['aws_region'])
             s3_conn.create_bucket(
                 self._s3_temp_bucket_to_create, location=location)
             self._s3_temp_bucket_to_create = None
@@ -743,20 +703,18 @@ class EMRJobRunner(MRJobRunner):
         local filesystem.
         """
         if self._fs is None:
-            if self._opts['s3_endpoint']:
-                s3_endpoint = self._opts['s3_endpoint']
-            else:
-                s3_endpoint = s3_endpoint_for_region(self._aws_region)
-
-            self._s3_fs = S3Filesystem(self._opts['aws_access_key_id'],
-                                       self._opts['aws_secret_access_key'],
-                                       s3_endpoint,
-                                       self._opts['aws_security_token'])
+            self._s3_fs = S3Filesystem(
+                aws_access_key_id=self._opts['aws_access_key_id'],
+                aws_secret_access_key=self._opts['aws_secret_access_key'],
+                aws_security_token=self._opts['aws_security_token'],
+                s3_endpoint=self._opts['s3_endpoint'])
 
             if self._opts['ec2_key_pair_file']:
-                self._ssh_fs = SSHFilesystem(self._opts['ssh_bin'],
-                                             self._opts['ec2_key_pair_file'],
-                                             self._ssh_key_name)
+                self._ssh_fs = SSHFilesystem(
+                    ssh_bin=self._opts['ssh_bin'],
+                    ec2_key_pair_file=self._opts['ec2_key_pair_file'],
+                    key_name=self._ssh_key_name)
+
                 self._fs = CompositeFilesystem(self._ssh_fs, self._s3_fs,
                                                LocalFilesystem())
             else:
@@ -861,19 +819,17 @@ class EMRJobRunner(MRJobRunner):
 
         log.info('Copying non-input files into %s' % self._upload_mgr.prefix)
 
-        s3_conn = self.make_s3_conn()
-
         for path, s3_uri in self._upload_mgr.path_to_uri().items():
             log.debug('uploading %s -> %s' % (path, s3_uri))
-            self._upload_contents(s3_uri, s3_conn, path)
+            self._upload_contents(s3_uri, path)
 
-    def _upload_contents(self, s3_uri, s3_conn, path):
+    def _upload_contents(self, s3_uri, path):
         """Uploads the file at the given path to S3, possibly using
         multipart upload."""
         fsize = os.stat(path).st_size
         part_size = self._get_upload_part_size()
 
-        s3_key = self.make_s3_key(s3_uri, s3_conn)
+        s3_key = self.fs.make_s3_key(s3_uri)
 
         if self._should_use_multipart_upload(fsize, part_size, path):
             log.debug("Starting multipart upload of %s" % (path,))
@@ -2405,11 +2361,11 @@ class EMRJobRunner(MRJobRunner):
         """
         exclude = set()
         emr_conn = self.make_emr_conn()
-        s3_conn = self.make_s3_conn()
         max_wait_time = self._opts['pool_wait_minutes']
         now = datetime.now()
         end_time = now + timedelta(minutes=max_wait_time)
         time_sleep = timedelta(seconds=JOB_FLOW_SLEEP_INTERVAL)
+
         log.info("Attempting to find an available job flow...")
         while now <= end_time:
             sorted_tagged_job_flows = self.usable_job_flows(
@@ -2419,7 +2375,7 @@ class EMRJobRunner(MRJobRunner):
             if sorted_tagged_job_flows:
                 job_flow = sorted_tagged_job_flows[-1]
                 status = attempt_to_acquire_lock(
-                    s3_conn, self._lock_uri(job_flow),
+                    self.fs, self._lock_uri(job_flow),
                     self._opts['s3_sync_wait_time'], self._job_key)
                 if status:
                     return sorted_tagged_job_flows[-1]
@@ -2498,36 +2454,18 @@ class EMRJobRunner(MRJobRunner):
             raise ImportError('You must install boto to connect to EMR')
 
         def emr_conn_for_endpoint(endpoint):
-            # the page below requires an actual region name
-            region_name = self._aws_region or 'us-east-1'
-
-            # boto 2.2.0's EmrConnection doesn't support security_token,
-            # so only include it if set
-            kwargs = {}
-            if self._opts['aws_security_token']:
-                kwargs['security_token'] = self._opts['aws_security_token']
-
             conn = boto.emr.connection.EmrConnection(
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 region=boto.regioninfo.RegionInfo(
-                    name=region_name, endpoint=endpoint,
+                    name=self._opts['aws_region'], endpoint=endpoint,
                     connection_cls=boto.emr.connection.EmrConnection),
-                    **kwargs)
-
-            # Issue #778: EMR's odd endpoint hostnames mess up
-            # HMAC v4 authentication in boto 2.10.0 thru 2.15.0.
-            # This basically applies the fix in boto 2.16.0
-            if not getattr(conn, 'auth_region_name', None):
-                conn.auth_region_name = region_name
-
-            if not getattr(conn, 'auth_service_name', None):
-                conn.auth_service_name = 'elasticmapreduce'
+                security_token=self._opts['aws_security_token'])
 
             return conn
 
         endpoint = (self._opts['emr_endpoint'] or
-                    emr_endpoint_for_region(self._aws_region))
+                    emr_endpoint_for_region(self._opts['aws_region']))
 
         log.debug('creating EMR connection (to %s)' % endpoint)
         conn = emr_conn_for_endpoint(endpoint)
@@ -2535,15 +2473,15 @@ class EMRJobRunner(MRJobRunner):
         # Issue #621: if we're using a region-specific endpoint,
         # try both the canonical version of the hostname and the one
         # that matches the SSL cert
-        if (self._aws_region and not self._opts['emr_endpoint'] and
-                InvalidCertificateException):
+        if not self._opts['emr_endpoint']:
 
-            ssl_host = emr_ssl_host_for_region(self._aws_region)
+            ssl_host = emr_ssl_host_for_region(self._opts['aws_region'])
             fallback_conn = emr_conn_for_endpoint(ssl_host)
 
             conn = RetryGoRound(
                 [conn, fallback_conn],
-                lambda ex: isinstance(ex, InvalidCertificateException))
+                lambda ex: isinstance(
+                    ex, boto.https_connection.InvalidCertificateException))
 
         return wrap_aws_conn(conn)
 
@@ -2588,12 +2526,7 @@ class EMRJobRunner(MRJobRunner):
                 raise IOError(
                     'Cannot ssh to master; job flow is not waiting or running')
         except boto.exception.S3ResponseError:
-            # This error is raised by some versions of boto when the jobflow
-            # doesn't exist
-            raise IOError('Could not get job flow information')
-        except boto.exception.EmrResponseError:
-            # This error is raised by other version of boto when the jobflow
-            # doesn't exist (some time before 2.4)
+            # jobflow doesn't exist
             raise IOError('Could not get job flow information')
 
         self._address = jobflow.masterpublicdnsname
@@ -2617,16 +2550,14 @@ class EMRJobRunner(MRJobRunner):
         if boto is None:
             raise ImportError('You must install boto to connect to IAM')
 
-        log.debug('creating IAM connection')
+        host = self._opts['iam_endpoint'] or 'iam.amazonaws.com'
 
-        # boto 2.2.0's IamConnection doesn't support security_token,
-        # so only include it if set
-        kwargs = {}
-        if self._opts['aws_security_token']:
-            kwargs['security_token'] = self._opts['aws_security_token']
+        log.debug('creating IAM connection to %s' % host)
 
         raw_iam_conn = boto.connect_iam(
             aws_access_key_id=self._aws_access_key_id,
             aws_secret_access_key=self._aws_secret_access_key,
-            **kwargs)
+            host=host,
+            security_token=self._opts['aws_security_token'])
+
         return wrap_aws_conn(raw_iam_conn)

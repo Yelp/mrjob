@@ -53,7 +53,6 @@ except ImportError:
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import iso8601_to_datetime
-from mrjob.fs.s3 import _get_bucket
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 from mrjob.parse import parse_s3_uri
@@ -86,14 +85,13 @@ def s3_cleanup(glob_path, time_old, dry_run=False, conf_paths=None):
        deleted without actually deleting them
        """
     runner = EMRJobRunner(conf_paths=conf_paths)
-    s3_conn = runner.make_s3_conn()
 
     log.info('Deleting all files in %s that are older than %s' %
              (glob_path, time_old))
 
     for path in runner.ls(glob_path):
         bucket_name, key_name = parse_s3_uri(path)
-        bucket = _get_bucket(s3_conn, bucket_name)
+        bucket = runner.fs.get_bucket(bucket_name)
 
         for key in bucket.list(key_name):
             last_modified = iso8601_to_datetime(key.last_modified)

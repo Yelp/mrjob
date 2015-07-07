@@ -38,6 +38,7 @@ from mrjob.emr import filechunkio
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
+from mrjob.job import MRJob
 from mrjob.parse import JOB_KEY_RE
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import pool_hash_and_name
@@ -147,7 +148,6 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
     def _mock_boto_connect_iam(self, *args, **kwargs):
         kwargs['mock_iam_instance_profiles'] = self.mock_iam_instance_profiles
         kwargs['mock_iam_roles'] = self.mock_iam_roles
-        kwargs['mock_iam_role_policies'] = self.mock_iam_role_policies
         kwargs['mock_iam_role_attached_policies'] = (
             self.mock_iam_role_attached_policies)
         return MockIAMConnection(*args, **kwargs)
@@ -159,7 +159,6 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         self.mock_emr_output = {}
         self.mock_iam_instance_profiles = {}
         self.mock_iam_role_attached_policies = {}
-        self.mock_iam_role_policies = {}
         self.mock_iam_roles = {}
         self.mock_s3_fs = {}
 
@@ -182,10 +181,10 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
 
         super(MockEMRAndS3TestCase, self).setUp()
 
-    def add_mock_s3_data(self, data, time_modified=None):
+    def add_mock_s3_data(self, data, time_modified=None, location=None):
         """Update self.mock_s3_fs with a map from bucket name
         to key name to data."""
-        add_mock_s3_data(self.mock_s3_fs, data, time_modified)
+        add_mock_s3_data(self.mock_s3_fs, data, time_modified, location)
 
     def prepare_runner_for_ssh(self, runner, num_slaves=0):
         # TODO: Refactor this abomination of a test harness
@@ -497,42 +496,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             runner._wait_for_job_flow_termination()
 
 
-class S3ScratchURITestCase(MockEMRAndS3TestCase):
-
-    def test_pick_scratch_uri(self):
-        self.add_mock_s3_data({'mrjob-walrus': {}, 'zebra': {}})
-        runner = EMRJobRunner(conf_paths=[])
-
-        self.assertEqual(runner._opts['s3_scratch_uri'],
-                         's3://mrjob-walrus/tmp/')
-
-    def test_create_scratch_uri(self):
-        # "walrus" bucket will be ignored; it doesn't start with "mrjob-"
-        self.add_mock_s3_data({'walrus': {}, 'zebra': {}})
-
-        runner = EMRJobRunner(conf_paths=[], s3_sync_wait_time=0.00)
-
-        # bucket name should be mrjob- plus 16 random hex digits
-        s3_scratch_uri = runner._opts['s3_scratch_uri']
-        self.assertEqual(s3_scratch_uri[:11], 's3://mrjob-')
-        self.assertEqual(s3_scratch_uri[27:], '/tmp/')
-
-        # bucket shouldn't actually exist yet
-        scratch_bucket, _ = parse_s3_uri(s3_scratch_uri)
-        self.assertNotIn(scratch_bucket, self.mock_s3_fs.keys())
-
-        # need to do something to ensure that the bucket actually gets
-        # created. let's launch a (mock) job flow
-        job_flow_id = runner.make_persistent_job_flow()
-        self.assertIn(scratch_bucket, self.mock_s3_fs.keys())
-        runner.make_emr_conn().terminate_jobflow(job_flow_id)
-
-        # once our scratch bucket is created, we should re-use it
-        runner2 = EMRJobRunner(conf_paths=[])
-        s3_scratch_uri = runner._opts['s3_scratch_uri']
-        self.assertEqual(runner2._opts['s3_scratch_uri'], s3_scratch_uri)
-
-
 class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
     def test_attach_to_existing_job_flow(self):
@@ -682,7 +645,6 @@ class IAMTestCase(MockEMRAndS3TestCase):
 
         self.assertEqual(job_flow2.jobflowrole, instance_profile_name)
         self.assertEqual(job_flow2.servicerole, service_role_name)
-
 
     def test_iam_instance_profile_option(self):
         job_flow = self.run_and_get_job_flow(
@@ -904,101 +866,100 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
             self.assertEqual(flow.steps[0].name, 'Setup Hadoop Debugging')
 
 
-class BucketRegionTestCase(MockEMRAndS3TestCase):
+class RegionTestCase(MockEMRAndS3TestCase):
 
-    def setUp(self):
-        super(BucketRegionTestCase, self).setUp()
-        self.make_dummy_data()
+    def test_default(self):
+        runner = EMRJobRunner()
+        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
 
-    def make_dummy_data(self):
-        self.add_mock_s3_data({'mrjob-1': {}})
-        s3c = boto.connect_s3()
-        self.bucket1 = s3c.get_bucket('mrjob-1')
-        self.bucket1_uri = 's3://mrjob-1/tmp/'
+    def test_explicit_region(self):
+        runner = EMRJobRunner(aws_region='us-east-1')
+        self.assertEqual(runner._opts['aws_region'], 'us-east-1')
 
-    def test_region_nobucket_nolocation(self):
-        # aws_region specified, no bucket specified, default bucket has no
-        # location
-        j = EMRJobRunner(aws_region='PUPPYLAND',
-                         s3_endpoint='PUPPYLAND',
-                         conf_paths=[])
-        self.assertNotEqual(j._opts['s3_scratch_uri'], self.bucket1_uri)
-
-    def test_region_nobucket_nomatchexists(self):
-        # aws_region specified, no bucket specified, no buckets have matching
-        # region
-        self.bucket1.set_location('PUPPYLAND')
-        j = EMRJobRunner(aws_region='KITTYLAND',
-                         s3_endpoint='KITTYLAND',
-                         conf_paths=[])
-        self.assertNotEqual(j._opts['s3_scratch_uri'], self.bucket1_uri)
-
-    def test_noregion_nobucket_nolocation(self):
-        # aws_region not specified, no bucket specified, default bucket has no
-        # location
-        j = EMRJobRunner(conf_paths=[])
-        self.assertEqual(j._opts['s3_scratch_uri'], self.bucket1_uri)
-
-    def test_noregion_bucket_nolocation(self):
-        # aws_region not specified, bucket specified without location
-        j = EMRJobRunner(conf_paths=[],
-                         s3_scratch_uri=self.bucket1_uri)
-        self.assertEqual(j._opts['s3_scratch_uri'], self.bucket1_uri)
-
-    def test_noregion_bucket_location(self):
-        # aws_region not specified, bucket specified with location
-        self.bucket1.set_location('PUPPYLAND')
-        j = EMRJobRunner(conf_paths=[])
-        self.assertEqual(j._aws_region, 'PUPPYLAND')
+    def test_cannot_be_empty(self):
+        runner = EMRJobRunner(aws_region='')
+        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
 
 
-class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
+class ScratchBucketTestCase(MockEMRAndS3TestCase):
 
-    def setUp(self):
-        super(ExtraBucketRegionTestCase, self).setUp()
-        self.make_dummy_data()
+    def assert_new_scratch_bucket(self, location, **runner_kwargs):
+        """Assert that if we create an EMRJobRunner with the given keyword
+        args, it'll create a new scratch bucket with the given location
+        constraint.
+        """
+        existing_bucket_names = set(self.mock_s3_fs)
 
-    def make_dummy_data(self):
-        self.add_mock_s3_data({'mrjob-1': {}})
-        s3c = boto.connect_s3()
-        self.bucket1 = s3c.get_bucket('mrjob-1')
-        self.bucket1_uri = 's3://mrjob-1/tmp/'
+        runner = EMRJobRunner(conf_paths=[], **runner_kwargs)
+        runner._create_s3_temp_bucket_if_needed()
 
-        self.add_mock_s3_data({'mrjob-2': {}})
-        self.bucket2 = s3c.get_bucket('mrjob-2')
-        self.bucket2.set_location('KITTYLAND')
-        self.bucket2_uri = 's3://mrjob-2/tmp/'
+        bucket_name, path = parse_s3_uri(runner._opts['s3_scratch_uri'])
 
-    def test_region_nobucket_matchexists(self):
-        # aws_region specified, no bucket specified, bucket exists with
-        # matching region
-        j = EMRJobRunner(aws_region='KITTYLAND',
-                         s3_endpoint='KITTYLAND',
-                         conf_paths=[])
-        self.assertEqual(j._opts['s3_scratch_uri'], self.bucket2_uri)
+        self.assertTrue(bucket_name.startswith('mrjob-'))
+        self.assertNotIn(bucket_name, existing_bucket_names)
+        self.assertEqual(path, 'tmp/')
 
-    def test_region_bucket_match(self):
-        # aws_region specified, bucket specified with matching location
-        j = EMRJobRunner(aws_region='PUPPYLAND',
-                         s3_endpoint='PUPPYLAND',
-                         s3_scratch_uri=self.bucket1_uri,
-                         conf_paths=[])
-        self.assertEqual(j._opts['s3_scratch_uri'], self.bucket1_uri)
+        self.assertEqual(self.mock_s3_fs[bucket_name]['location'], location)
 
-    def test_region_bucket_does_not_match(self):
-        # aws_region specified, bucket specified with incorrect location
-        with no_handlers_for_logger():
-            stderr = StringIO()
-            log = logging.getLogger('mrjob.emr')
-            log.addHandler(logging.StreamHandler(stderr))
-            log.setLevel(logging.WARNING)
+    def test_default(self):
+        self.assert_new_scratch_bucket('us-west-2')
 
-            EMRJobRunner(aws_region='PUPPYLAND',
-                         s3_endpoint='PUPPYLAND',
-                         s3_scratch_uri=self.bucket2_uri,
-                         conf_paths=[])
+    def test_us_west_1(self):
+        self.assert_new_scratch_bucket('us-west-1',
+                                       aws_region='us-west-1')
 
-            self.assertIn('does not match bucket region', stderr.getvalue())
+    def test_us_east_1(self):
+        # location should be blank
+        self.assert_new_scratch_bucket('',
+                                       aws_region='us-east-1')
+
+    def test_reuse_mrjob_bucket_in_same_region(self):
+        self.add_mock_s3_data({'mrjob-1': {}}, location='us-west-2')
+
+        runner = EMRJobRunner()
+        self.assertEqual(runner._opts['s3_scratch_uri'],
+                         's3://mrjob-1/tmp/')
+
+    def test_ignore_mrjob_bucket_in_different_region(self):
+        # this tests 687
+        self.add_mock_s3_data({'mrjob-1': {}}, location='')
+
+        self.assert_new_scratch_bucket('us-west-2')
+
+    def test_ignore_non_mrjob_bucket_in_different_region(self):
+        self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
+
+        self.assert_new_scratch_bucket('us-west-2')
+
+    def test_reuse_mrjob_bucket_in_us_east_1(self):
+        # us-east-1 is special because the location "constraint" for its
+        # buckets is '', not 'us-east-1'
+        self.add_mock_s3_data({'mrjob-1': {}}, location='')
+
+        runner = EMRJobRunner(aws_region='us-east-1')
+
+        self.assertEqual(runner._opts['s3_scratch_uri'],
+                         's3://mrjob-1/tmp/')
+
+    def test_explicit_scratch_uri(self):
+        self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
+
+        runner = EMRJobRunner(s3_scratch_uri='s3://walrus/tmp/')
+
+        self.assertEqual(runner._opts['s3_scratch_uri'],
+                         's3://walrus/tmp/')
+
+    def test_cross_region_explicit_scratch_uri(self):
+        self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
+
+        runner = EMRJobRunner(aws_region='us-west-1',
+                              s3_scratch_uri='s3://walrus/tmp/')
+
+        self.assertEqual(runner._opts['s3_scratch_uri'],
+                         's3://walrus/tmp/')
+
+        # scratch bucket shouldn't influence aws_region (it did in 0.4.x)
+        self.assertEqual(runner._opts['aws_region'], 'us-west-1')
 
 
 class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
@@ -1839,108 +1800,87 @@ class LogFetchingFallbackTestCase(MockEMRAndS3TestCase):
                          'attempt_201007271720_0002_m_000126_0/stderr')
 
 
-class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
+class TestEMREndpoints(MockEMRAndS3TestCase):
 
-    def test_no_region(self):
+    def test_default_region(self):
         runner = EMRJobRunner(conf_paths=[])
-        self.assertEqual(runner.make_emr_conn().endpoint,
-                         'elasticmapreduce.amazonaws.com')
-        self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3.amazonaws.com')
-        self.assertEqual(runner._aws_region, '')
+        self.assertEqual(runner.make_emr_conn().host,
+                         'elasticmapreduce.us-west-2.amazonaws.com')
+        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
 
     def test_none_region(self):
         # blank region should be treated the same as no region
         runner = EMRJobRunner(conf_paths=[], aws_region=None)
-        self.assertEqual(runner.make_emr_conn().endpoint,
-                         'elasticmapreduce.amazonaws.com')
-        self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3.amazonaws.com')
-        self.assertEqual(runner._aws_region, '')
+        self.assertEqual(runner.make_emr_conn().host,
+                         'elasticmapreduce.us-west-2.amazonaws.com')
+        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
 
     def test_blank_region(self):
         # blank region should be treated the same as no region
         runner = EMRJobRunner(conf_paths=[], aws_region='')
-        self.assertEqual(runner.make_emr_conn().endpoint,
-                         'elasticmapreduce.amazonaws.com')
-        self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3.amazonaws.com')
-        self.assertEqual(runner._aws_region, '')
+        self.assertEqual(runner.make_emr_conn().host,
+                         'elasticmapreduce.us-west-2.amazonaws.com')
+        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
 
     def test_eu(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='EU')
-        self.assertEqual(runner.make_emr_conn().endpoint,
+        self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.eu-west-1.amazonaws.com')
-        self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3-eu-west-1.amazonaws.com')
 
     def test_eu_case_insensitive(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='eu')
-        self.assertEqual(runner.make_emr_conn().endpoint,
+        self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.eu-west-1.amazonaws.com')
-        self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3-eu-west-1.amazonaws.com')
 
     def test_us_east_1(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='us-east-1')
-        self.assertEqual(runner.make_emr_conn().endpoint,
+        self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-east-1.amazonaws.com')
-        self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3.amazonaws.com')
 
     def test_us_west_1(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='us-west-1')
-        self.assertEqual(runner.make_emr_conn().endpoint,
+        self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-west-1.amazonaws.com')
-        self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3-us-west-1.amazonaws.com')
 
     def test_us_west_1_case_insensitive(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='US-West-1')
-        self.assertEqual(runner.make_emr_conn().endpoint,
+        self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-west-1.amazonaws.com')
-        self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3-us-west-1.amazonaws.com')
 
     def test_ap_southeast_1(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='ap-southeast-1')
-        self.assertEqual(runner.make_emr_conn().endpoint,
+        self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.ap-southeast-1.amazonaws.com')
-        self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3-ap-southeast-1.amazonaws.com')
 
     def test_previously_unknown_region(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='lolcatnia-1')
-        self.assertEqual(runner.make_emr_conn().endpoint,
+        self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.lolcatnia-1.amazonaws.com')
-        self.assertEqual(runner.make_s3_conn().endpoint,
-                         's3-lolcatnia-1.amazonaws.com')
 
     def test_explicit_endpoints(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='EU',
                               s3_endpoint='s3-proxy', emr_endpoint='emr-proxy')
-        self.assertEqual(runner.make_emr_conn().endpoint, 'emr-proxy')
-        self.assertEqual(runner.make_s3_conn().endpoint, 's3-proxy')
+        self.assertEqual(runner.make_emr_conn().host, 'emr-proxy')
 
     def test_ssl_fallback_host(self):
         runner = EMRJobRunner(conf_paths=[], aws_region='us-west-1')
 
         with patch.object(MockEmrConnection, 'STRICT_SSL', True):
             emr_conn = runner.make_emr_conn()
-            self.assertEqual(emr_conn.endpoint,
+            self.assertEqual(emr_conn.host,
                              'elasticmapreduce.us-west-1.amazonaws.com')
             # this should still work
             self.assertEqual(emr_conn.describe_jobflows(), [])
             # but it's only because we've switched to the alternate hostname
-            self.assertEqual(emr_conn.endpoint,
+            self.assertEqual(emr_conn.host,
                              'us-west-1.elasticmapreduce.amazonaws.com')
 
         # without SSL issues, we should stay on the same endpoint
         emr_conn = runner.make_emr_conn()
-        self.assertEqual(emr_conn.endpoint,
+        self.assertEqual(emr_conn.host,
                          'elasticmapreduce.us-west-1.amazonaws.com')
         self.assertEqual(emr_conn.describe_jobflows(), [])
-        self.assertEqual(emr_conn.endpoint,
+        self.assertEqual(emr_conn.host,
                          'elasticmapreduce.us-west-1.amazonaws.com')
 
 
@@ -2033,12 +1973,6 @@ class TestNoBoto(TestCase):
         # merely creating an EMRJobRunner should raise an exception
         # because it'll need to connect to S3 to set s3_scratch_uri
         self.assertRaises(ImportError, EMRJobRunner, conf_paths=[])
-
-    def test_init_with_s3_scratch_uri(self):
-        # this also raises an exception because we have to check
-        # the bucket location
-        self.assertRaises(ImportError, EMRJobRunner,
-                          conf_paths=[], s3_scratch_uri='s3://foo/tmp')
 
 
 class TestMasterBootstrapScript(MockEMRAndS3TestCase):
@@ -2936,44 +2870,41 @@ class S3LockTestCase(MockEMRAndS3TestCase):
     def test_lock(self):
         # Most basic test case
         runner = EMRJobRunner(conf_paths=[])
-        s3_conn = runner.make_s3_conn()
 
         self.assertEqual(
-            True, attempt_to_acquire_lock(s3_conn, self.lock_uri, 0, 'jf1'))
+            True, attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf1'))
 
         self.assertEqual(
-            False, attempt_to_acquire_lock(s3_conn, self.lock_uri, 0, 'jf2'))
+            False, attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf2'))
 
     def test_lock_expiration(self):
         runner = EMRJobRunner(conf_paths=[])
-        s3_conn = runner.make_s3_conn()
+
         did_lock = attempt_to_acquire_lock(
-            s3_conn, self.expired_lock_uri, 0, 'jf1',
+            runner.fs, self.expired_lock_uri, 0, 'jf1',
             mins_to_expiration=5)
         self.assertEqual(True, did_lock)
 
     def test_key_race_condition(self):
         # Test case where one attempt puts the key in existence
         runner = EMRJobRunner(conf_paths=[])
-        s3_conn = runner.make_s3_conn()
 
-        key = _lock_acquire_step_1(s3_conn, self.lock_uri, 'jf1')
+        key = _lock_acquire_step_1(runner.fs, self.lock_uri, 'jf1')
         self.assertNotEqual(key, None)
 
-        key2 = _lock_acquire_step_1(s3_conn, self.lock_uri, 'jf2')
+        key2 = _lock_acquire_step_1(runner.fs, self.lock_uri, 'jf2')
         self.assertEqual(key2, None)
 
     def test_read_race_condition(self):
         # test case where both try to create the key
         runner = EMRJobRunner(conf_paths=[])
-        s3_conn = runner.make_s3_conn()
 
-        key = _lock_acquire_step_1(s3_conn, self.lock_uri, 'jf1')
+        key = _lock_acquire_step_1(runner.fs, self.lock_uri, 'jf1')
         self.assertNotEqual(key, None)
 
         # acquire the key by subversive means to simulate contention
         bucket_name, key_prefix = parse_s3_uri(self.lock_uri)
-        bucket = s3_conn.get_bucket(bucket_name)
+        bucket = runner.fs.get_bucket(bucket_name)
         key2 = bucket.get_key(key_prefix)
 
         # and take the lock!
@@ -3610,9 +3541,7 @@ class MultiPartUploadTestCase(MockEMRAndS3TestCase):
         with open(data_path, 'wb') as fp:
             fp.write(data)
 
-        s3_conn = runner.make_s3_conn()
-
-        runner._upload_contents(self.TEST_S3_URI, s3_conn, data_path)
+        runner._upload_contents(self.TEST_S3_URI, data_path)
 
     def assert_upload_succeeds(self, runner, data, expect_multipart):
         """Write the data to a temp file, and then upload it to (mock) S3,
@@ -3691,56 +3620,37 @@ class SecurityTokenTestCase(MockEMRAndS3TestCase):
         self.mock_s3 = self.start(patch('boto.connect_s3',
                                         wraps=boto.connect_s3))
 
-    def test_connections_without_security_token(self):
-        runner = EMRJobRunner()
-
-        runner.make_emr_conn()
-
-        self.assertTrue(self.mock_emr.called)
-        # security_token shouldn't even be in kwargs
-        # (boto 2.2.0 doesn't allow it)
-        emr_kwargs = self.mock_emr.call_args[1]
-        self.assertNotIn('security_token', emr_kwargs)
-
-        runner.make_iam_conn()
-
-        self.assertTrue(self.mock_iam.called)
-        # security_token shouldn't even be in kwargs
-        # (boto 2.2.0 doesn't allow it)
-        iam_kwargs = self.mock_iam.call_args[1]
-        self.assertNotIn('security_token', iam_kwargs)
-
-        runner.make_s3_conn()
-
-        self.assertTrue(self.mock_s3.called)
-        # S3 could accept security token, even in boto 2.2.0
-        s3_kwargs = self.mock_s3.call_args[1]
-        self.assertIn('security_token', s3_kwargs)
-        self.assertEqual(s3_kwargs['security_token'], None)
-
-    def test_connections_with_security_token(self):
-        runner = EMRJobRunner(aws_security_token='meow')
-
+    def assert_conns_use_security_token(self, runner, security_token):
         runner.make_emr_conn()
 
         self.assertTrue(self.mock_emr.called)
         emr_kwargs = self.mock_emr.call_args[1]
         self.assertIn('security_token', emr_kwargs)
-        self.assertEqual(emr_kwargs['security_token'], 'meow')
+        self.assertEqual(emr_kwargs['security_token'], security_token)
 
         runner.make_iam_conn()
 
         self.assertTrue(self.mock_iam.called)
         iam_kwargs = self.mock_iam.call_args[1]
         self.assertIn('security_token', iam_kwargs)
-        self.assertEqual(iam_kwargs['security_token'], 'meow')
+        self.assertEqual(iam_kwargs['security_token'], security_token)
 
         runner.make_s3_conn()
 
         self.assertTrue(self.mock_s3.called)
         s3_kwargs = self.mock_s3.call_args[1]
         self.assertIn('security_token', s3_kwargs)
-        self.assertEqual(s3_kwargs['security_token'], 'meow')
+        self.assertEqual(s3_kwargs['security_token'], security_token)
+
+    def test_connections_without_security_token(self):
+        runner = EMRJobRunner()
+
+        self.assert_conns_use_security_token(runner, None)
+
+    def test_connections_with_security_token(self):
+        runner = EMRJobRunner(aws_security_token='meow')
+
+        self.assert_conns_use_security_token(runner, 'meow')
 
 
 class BootstrapPythonTestCase(MockEMRAndS3TestCase):
@@ -3868,3 +3778,26 @@ class EMRTagsTestCase(MockEMRAndS3TestCase):
                     {'tag_one': 'foo',
                      'tag_two': 'qwerty',
                      'tag_three': 'bar'})
+
+
+class IAMEndpointTestCase(MockEMRAndS3TestCase):
+
+    def test_default(self):
+        runner = EMRJobRunner()
+
+        iam_conn = runner.make_iam_conn()
+        self.assertEqual(iam_conn.host, 'iam.amazonaws.com')
+
+    def test_explicit_iam_endpoint(self):
+        runner = EMRJobRunner(iam_endpoint='iam.us-gov.amazonaws.com')
+
+        iam_conn = runner.make_iam_conn()
+        self.assertEqual(iam_conn.host, 'iam.us-gov.amazonaws.com')
+
+    def test_iam_endpoint_option(self):
+        mr_job = MRJob(
+            ['-r', 'emr', '--iam-endpoint', 'iam.us-gov.amazonaws.com'])
+
+        with mr_job.make_runner() as runner:
+            iam_conn = runner.make_iam_conn()
+            self.assertEqual(iam_conn.host, 'iam.us-gov.amazonaws.com')

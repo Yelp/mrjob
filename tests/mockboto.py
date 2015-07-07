@@ -71,20 +71,23 @@ def err_xml(message, type='Sender', code='ValidationError'):
 
 ### S3 ###
 
-def add_mock_s3_data(mock_s3_fs, data, time_modified=None):
+def add_mock_s3_data(mock_s3_fs, data, time_modified=None, location=None):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
     key to contents) with a map from bucket name to key name to data and
     time last modified."""
     if time_modified is None:
         time_modified = datetime.utcnow()
     for bucket_name, key_name_to_bytes in data.items():
-        mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
-        bucket = mock_s3_fs[bucket_name]
+        bucket = mock_s3_fs.setdefault(bucket_name,
+                                       {'keys': {}, 'location': ''})
 
         for key_name, key_data in key_name_to_bytes.items():
             if not isinstance(key_data, bytes):
                 raise TypeError('mock s3 data must be bytes')
             bucket['keys'][key_name] = (key_data, time_modified)
+
+        if location is not None:
+            bucket['location'] = location
 
 
 class MockS3Connection(object):
@@ -105,10 +108,20 @@ class MockS3Connection(object):
         """
         # use mock_s3_fs even if it's {}
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
-        self.endpoint = host or 's3.amazonaws.com'
+        self.host = host or 's3.amazonaws.com'
+
+    def _region(self):
+        """Infer region from self.host. Return '' if on regionless
+        endpoint."""
+        return self.host.split('.')[0][3:]
 
     def get_bucket(self, bucket_name, validate=True, headers=None):
         if bucket_name in self.mock_s3_fs:
+            # can't access buckets through wrong region's endpoint
+            region = self._region()
+            if region and self.mock_s3_fs[bucket_name]['location'] != region:
+                raise boto.exception.S3ResponseError(301, 'Moved Permanently')
+
             return MockBucket(connection=self, name=bucket_name)
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
@@ -120,8 +133,13 @@ class MockS3Connection(object):
                       policy=None):
         if bucket_name in self.mock_s3_fs:
             raise boto.exception.S3CreateError(409, 'Conflict')
-        else:
-            self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': ''}
+
+        # for region endpoints, location constraint must match
+        region = self._region()
+        if region and region != location:
+            raise boto.exception.S3CreateError(409, 'Bad Request')
+
+        self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': location}
 
 
 class MockBucket(object):
@@ -157,9 +175,6 @@ class MockBucket(object):
 
     def get_location(self):
         return self.connection.mock_s3_fs[self.name]['location']
-
-    def set_location(self, new_location):
-        self.connection.mock_s3_fs[self.name]['location'] = new_location
 
     def list(self, prefix=''):
         for key_name in sorted(self.mock_state()):
@@ -411,16 +426,16 @@ class MockEmrConnection(object):
         self.max_job_flows_returned = max_job_flows_returned
         self.simulation_iterator = simulation_iterator
         if region is not None:
-            self.endpoint = region.endpoint
+            self.host = region.endpoint
         else:
-            self.endpoint = 'elasticmapreduce.amazonaws.com'
+            self.host = 'elasticmapreduce.amazonaws.com'
 
     def _enforce_strict_ssl(self):
         if (self.STRICT_SSL and
-            not self.endpoint.endswith('elasticmapreduce.amazonaws.com')):
+            not self.host.endswith('elasticmapreduce.amazonaws.com')):
             from boto.https_connection import InvalidCertificateException
             raise InvalidCertificateException(
-                self.endpoint, None, 'hostname mismatch')
+                self.host, None, 'hostname mismatch')
 
     def run_jobflow(self,
                     name, log_uri, ec2_keyname=None, availability_zone=None,
@@ -921,23 +936,18 @@ class MockIAMConnection(object):
                  debug=0, https_connection_factory=None, path='/',
                  security_token=None, validate_certs=True, profile_name=None,
                  mock_iam_instance_profiles=None, mock_iam_roles=None,
-                 mock_iam_role_policies=None,
                  mock_iam_role_attached_policies=None):
         """Mock out connection to IAM.
 
-        mock_iam_instance_profiles maps profile name to a dictionary containing:
+        mock_iam_instance_profiles maps profile name to a dict containing:
             create_date -- ISO creation datetime
             path -- IAM path
             role_name -- name of single role for this instance profile, or None
 
-        mock_iam_roles maps role name to a dictionary containing:
+        mock_iam_roles maps role name to a dict containing:
             assume_role_policy_document -- a JSON-then-URI-encoded policy doc
             create_date -- ISO creation datetime
             path -- IAM path
-
-        mock_iam_role_policies maps policy name to a dictionary containing:
-            policy_document -- JSON-then-URI-encoded policy doc
-            role_name -- name of single role for this policy (always defined)
 
         mock_iam_role_attached_policies maps role to a list of ARNs for
         attached (managed) policies.
@@ -948,82 +958,25 @@ class MockIAMConnection(object):
         self.mock_iam_instance_profiles = combine_values(
             {}, mock_iam_instance_profiles)
         self.mock_iam_roles = combine_values({}, mock_iam_roles)
-        self.mock_iam_role_policies = combine_values(
-            {}, mock_iam_role_policies)
         self.mock_iam_role_attached_policies = combine_values(
             {}, mock_iam_role_attached_policies)
 
+        self.host = host
+
     def get_response(self, action, params, path='/', parent=None,
                      verb='POST', list_marker='Set'):
-        # mrjob.iam currently only calls get_response(), to support old
-        # versions of boto. In real boto, the other methods call
-        # this one, but in mockboto, this method fans out to the other ones
-        if action == 'AddRoleToInstanceProfile':
-            return self.add_role_to_instance_profile(
-                params['InstanceProfileName'],
-                params['RoleName'])
+        # this only supports actions for which there is no method
+        # in boto's IAMConnection
 
-        elif action == 'AttachRolePolicy':
+        if action == 'AttachRolePolicy':
             return self._attach_role_policy(params['RoleName'],
                                             params['PolicyArn'])
-
-        elif action == 'CreateInstanceProfile':
-            return self.create_instance_profile(
-                params['InstanceProfileName'],
-                path=params.get('Path'))
-
-        elif action == 'CreateRole':
-            return self.create_role(
-                params['RoleName'],
-                json.loads(params['AssumeRolePolicyDocument']),
-                path=params.get('Path'))
-
-        elif action == 'GetRolePolicy':
-            return self.get_role_policy(
-                params['RoleName'],
-                params['PolicyName'])
 
         elif action == 'ListAttachedRolePolicies':
             if list_marker != 'AttachedPolicies':
                 raise ValueError
 
             return self._list_attached_role_policies(params['RoleName'])
-
-        elif action == 'ListInstanceProfiles':
-            if list_marker != 'InstanceProfiles':
-                raise ValueError
-
-            return self.list_instance_profiles(
-                path_prefix=params.get('PathPrefix'),
-                marker=params.get('Marker'),
-                max_items=params.get('MaxItems'))
-
-        elif action == 'ListRolePolicies':
-            if list_marker != 'PolicyNames':
-                raise ValueError
-
-            return self.list_role_policies(
-                params['RoleName'],
-                marker=params.get('Marker'),
-                max_items=params.get('MaxItems'))
-
-        elif action == 'ListRoles':
-            if list_marker != 'Roles':
-                raise ValueError
-
-            return self.list_roles(
-                path_prefix=params.get('PathPrefix'),
-                marker=params.get('Marker'),
-                max_items=params.get('MaxItems'))
-
-        elif action == 'PutRolePolicy':
-            # boto apparently doesn't make any attempt to
-            # JSON-encode the role policy for you!
-            return self.put_role_policy(
-                params['RoleName'],
-                params['PolicyName'],
-                params['PolicyDocument'])
-
 
         else:
             raise NotImplementedError(
@@ -1116,9 +1069,7 @@ class MockIAMConnection(object):
 
     def create_role(self, role_name, assume_role_policy_document, path=None):
         # real boto has a default for assume_role_policy_document; not
-        # supporting this for now. It also allows assume_role_policy_document
-        # to be a string, which we don't.
-
+        # supporting this for now
         self._check_path(path)
         self._check_role_does_not_exist(role_name)
 
@@ -1126,8 +1077,7 @@ class MockIAMConnection(object):
         # sure what the rules are
 
         self.mock_iam_roles[role_name] = dict(
-            assume_role_policy_document=quote(json.dumps(
-                assume_role_policy_document)),
+            assume_role_policy_document=assume_role_policy_document,
             create_date=to_iso8601(datetime.utcnow()),
             path=(path or self.DEFAULT_PATH),
             policy_names=[],
@@ -1181,56 +1131,6 @@ class MockIAMConnection(object):
             path=role_data['path']
         )
 
-    # (inline) role policies
-
-    def get_role_policy(self, role_name, policy_name):
-        self._check_role_exists(role_name)
-        self._check_role_policy_exists(policy_name, role_name)
-
-        result = self._describe_role_policy(policy_name)
-
-        return self._wrap_result('get_role_policy', result)
-
-    def list_role_policies(self, role_name, marker=None, max_items=None):
-        policy_names = [
-            name for name, data in sorted(self.mock_iam_role_policies.items())
-            if data['role_name'] == role_name]
-
-        result = self._paginate(policy_names, 'policy_names',
-                                marker=marker, max_items=max_items)
-
-        return self._wrap_result('list_role_policies', result)
-
-    def put_role_policy(self, role_name, policy_name, policy_document):
-        self._check_role_exists(role_name)
-
-        # PutRolePolicy will happily overwrite existing role policies
-        self.mock_iam_role_policies[policy_name] = dict(
-            policy_document=quote(policy_document),
-            role_name=role_name)
-
-        return self._wrap_result('put_role_policy')
-
-    def _check_role_policy_exists(self, policy_name, role_name):
-        if (policy_name not in self.mock_iam_role_policies or
-            self.mock_iam_role_policies[policy_name]['role_name'] != role_name):
-
-            # the IAM API really does raise this error when the role policy
-            # exists but has a different role name
-            raise boto.exception.BotoServerError(
-                404, 'Not Found', body=err_xml(
-                    ('The role policy with name %s cannot be found.' %
-                     role_name), code='NoSuchEntity'))
-
-    def _describe_role_policy(self, policy_name):
-        policy_data = self.mock_iam_role_policies[policy_name]
-
-        return dict(
-            policy_document=policy_data['policy_document'],
-            policy_name=policy_name,
-            role_name=policy_data['role_name'],
-        )
-
     # attached (managed) role policies
 
     # boto does not yet have methods for these
@@ -1244,8 +1144,15 @@ class MockIAMConnection(object):
 
         return self._wrap_result('attach_role_policy')
 
-    def _list_attached_role_policies(self, role_name):
+    def _list_attached_role_policies(
+            self, role_name, marker=None, max_items=None):
+
         self._check_role_exists(role_name)
+
+        # in theory, pagination is supported, but in practice each role
+        # can have a maximum of two policies attached
+        if marker or max_items:
+            raise NotImplementedError()
 
         arns = self.mock_iam_role_attached_policies.get(role_name, [])
 
@@ -1267,7 +1174,7 @@ class MockIAMConnection(object):
 
     def _paginate(self, items, name, marker=None, max_items=None):
         """Given a list of items, return a dictionary mapping
-        *names* to a slice of items, with additional keys
+        *name* to a slice of items, with additional keys
         'is_truncated' and, if 'is_truncated' is true, 'marker'.
         """
         max_items = max_items or self.DEFAULT_MAX_ITEMS

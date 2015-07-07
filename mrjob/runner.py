@@ -156,7 +156,8 @@ class RunnerOptionStore(OptionStore):
 
         if (len(self.cascading_dicts) > 2 and
                 all(len(d) == 0 for d in self.cascading_dicts[2:-1]) and
-                (len(conf_paths or []) > 0 or len(opts) == 0)):
+                (len(conf_paths or []) > 0)):
+            import pdb; pdb.set_trace()
             log.warning('No configs specified for %s runner' % alias)
 
         self.populate_values_from_cascading_dicts()

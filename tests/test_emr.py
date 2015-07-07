@@ -92,7 +92,9 @@ else:
     PYTHON_BIN = 'python3'
 
 
-class FastEMRTestCase(SandboxedTestCase):
+class MockEMRAndS3TestCase(SandboxedTestCase):
+
+    MAX_SIMULATION_STEPS = 100
 
     @classmethod
     def setUpClass(cls):
@@ -105,52 +107,6 @@ class FastEMRTestCase(SandboxedTestCase):
     def tearDownClass(cls):
         if os.path.exists(cls.fake_mrjob_tgz_path):
             os.remove(cls.fake_mrjob_tgz_path)
-
-    def setUp(self):
-        super(FastEMRTestCase, self).setUp()
-
-        # patch slow things
-        def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
-            mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
-            return self.fake_mrjob_tgz_path
-
-        self.simple_patch(EMRJobRunner, '_create_mrjob_tar_gz',
-                     fake_create_mrjob_tar_gz, autospec=True)
-
-        self.simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
-        self.simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
-        self.simple_patch(time, 'sleep')
-
-    def simple_patch(self, obj, attr, side_effect=None, autospec=False,
-                     return_value=None):
-        patcher = patch.object(obj, attr, side_effect=side_effect,
-                               autospec=autospec, return_value=return_value)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-
-class MockEMRAndS3TestCase(FastEMRTestCase):
-
-    MAX_SIMULATION_STEPS = 100
-
-    def _mock_boto_connect_s3(self, *args, **kwargs):
-        kwargs['mock_s3_fs'] = self.mock_s3_fs
-        return MockS3Connection(*args, **kwargs)
-
-    def _mock_boto_emr_EmrConnection(self, *args, **kwargs):
-        kwargs['mock_s3_fs'] = self.mock_s3_fs
-        kwargs['mock_emr_job_flows'] = self.mock_emr_job_flows
-        kwargs['mock_emr_failures'] = self.mock_emr_failures
-        kwargs['mock_emr_output'] = self.mock_emr_output
-        kwargs['simulation_iterator'] = self.simulation_iterator
-        return MockEmrConnection(*args, **kwargs)
-
-    def _mock_boto_connect_iam(self, *args, **kwargs):
-        kwargs['mock_iam_instance_profiles'] = self.mock_iam_instance_profiles
-        kwargs['mock_iam_roles'] = self.mock_iam_roles
-        kwargs['mock_iam_role_attached_policies'] = (
-            self.mock_iam_role_attached_policies)
-        return MockIAMConnection(*args, **kwargs)
 
     def setUp(self):
         # patch boto
@@ -180,6 +136,18 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         p_emr.start()
 
         super(MockEMRAndS3TestCase, self).setUp()
+
+        # patch slow things
+        def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
+            mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
+            return self.fake_mrjob_tgz_path
+
+        self.simple_patch(EMRJobRunner, '_create_mrjob_tar_gz',
+                     fake_create_mrjob_tar_gz, autospec=True)
+
+        self.simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
+        self.simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
+        self.simple_patch(time, 'sleep')
 
     def add_mock_s3_data(self, data, time_modified=None, location=None):
         """Update self.mock_s3_fs with a map from bucket name
@@ -253,6 +221,32 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
             runner.run()
             emr_conn = runner.make_emr_conn()
             return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+
+    def simple_patch(self, obj, attr, side_effect=None, autospec=False,
+                     return_value=None):
+        patcher = patch.object(obj, attr, side_effect=side_effect,
+                               autospec=autospec, return_value=return_value)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _mock_boto_connect_s3(self, *args, **kwargs):
+        kwargs['mock_s3_fs'] = self.mock_s3_fs
+        return MockS3Connection(*args, **kwargs)
+
+    def _mock_boto_emr_EmrConnection(self, *args, **kwargs):
+        kwargs['mock_s3_fs'] = self.mock_s3_fs
+        kwargs['mock_emr_job_flows'] = self.mock_emr_job_flows
+        kwargs['mock_emr_failures'] = self.mock_emr_failures
+        kwargs['mock_emr_output'] = self.mock_emr_output
+        kwargs['simulation_iterator'] = self.simulation_iterator
+        return MockEmrConnection(*args, **kwargs)
+
+    def _mock_boto_connect_iam(self, *args, **kwargs):
+        kwargs['mock_iam_instance_profiles'] = self.mock_iam_instance_profiles
+        kwargs['mock_iam_roles'] = self.mock_iam_roles
+        kwargs['mock_iam_role_attached_policies'] = (
+            self.mock_iam_role_attached_policies)
+        return MockIAMConnection(*args, **kwargs)
 
 
 class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
@@ -3250,7 +3244,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
         self.assertEqual(self.sleep_counter, 2)
 
 
-class BuildStreamingStepTestCase(FastEMRTestCase):
+class BuildStreamingStepTestCase(MockEMRAndS3TestCase):
 
     def setUp(self):
         super(BuildStreamingStepTestCase, self).setUp()

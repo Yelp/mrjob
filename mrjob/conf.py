@@ -46,7 +46,10 @@ class OptionStore(dict):
 
     #: Mapping of key to function used to combine multiple values to override,
     #: augment, etc. Leave blank for :py:func:`combine_values()`.
-    COMBINERS = dict()
+    COMBINERS = {}
+
+    #: Mapping from old name for an option to its new name
+    DEPRECATED_ALIASES = {}
 
     def __init__(self):
         super(OptionStore, self).__init__()
@@ -59,14 +62,25 @@ class OptionStore(dict):
         """Default options for this :py:class:`OptionStore`"""
         return {}
 
-    def validated_options(self, opts, error_fmt):
-        unrecognized_opts = set(opts) - self.ALLOWED_KEYS
-        if unrecognized_opts:
-            log.warning(error_fmt % ', '.join(sorted(unrecognized_opts)))
-            return dict((k, v) for k, v in opts.items()
-                        if k in self.ALLOWED_KEYS)
-        else:
-            return opts
+    def validated_options(self, opts, source=None):
+        from_where = ' from %s' % source if source else ''
+
+        results = {}
+
+        for k, v in sorted(opts.items()):
+            if k in self.DEPRECATED_ALIASES:
+                aliased_opt = self.DEPRECATED_ALIASES[k]
+
+                log.warning('Deprecated option %s%s; use %s instead' % (
+                    k, from_where, aliased_opt))
+                if opts.get(aliased_opt) is None:
+                    results[aliased_opt] = v
+            elif k in self.ALLOWED_KEYS:
+                results[k] = v
+            else:
+                log.warning('Unexpected option %s%s' % (k, from_where))
+
+        return results
 
     def populate_values_from_cascading_dicts(self):
         """When ``cascading_dicts`` has been built, use it to populate the

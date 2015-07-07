@@ -854,17 +854,18 @@ class BootstrapMRJobTestCase(TestCase):
     # actual testing of bootstrapping is in test_local
 
     def test_default(self):
-        runner = MRJobRunner()
+        runner = MRJobRunner(conf_paths=[])
         self.assertEqual(runner._bootstrap_mrjob(), True)
 
     def test_no_bootstrap_mrjob(self):
-        runner = MRJobRunner(bootstrap_mrjob=False)
+        runner = MRJobRunner(conf_paths=[], bootstrap_mrjob=False)
         self.assertEqual(runner._bootstrap_mrjob(), False)
 
     def test_interpreter(self):
-        runner = MRJobRunner(interpreter=['ruby'])
+        runner = MRJobRunner(conf_paths=[], interpreter=['ruby'])
         self.assertEqual(runner._bootstrap_mrjob(), False)
 
     def test_bootstrap_mrjob_overrides_interpreter(self):
-        runner = MRJobRunner(interpreter=['ruby'], bootstrap_mrjob=True)
+        runner = MRJobRunner(
+            conf_paths=[], interpreter=['ruby'], bootstrap_mrjob=True)
         self.assertEqual(runner._bootstrap_mrjob(), True)

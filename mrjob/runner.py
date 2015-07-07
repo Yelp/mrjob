@@ -215,7 +215,7 @@ class RunnerOptionStore(OptionStore):
         return opts
 
     def _fix_cleanup_opt(self, opt_key, opts, from_where=''):
-        if opt_key not in opts:
+        if opts.get(opt_key) is None:
             return
 
         opt_list = opts[opt_key]

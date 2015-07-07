@@ -107,16 +107,16 @@ Temp files and cleanup
     List of which kinds of directories to delete when a job succeeds. Valid
     choices are:
 
-    * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job flow
+    * ``'ALL'``: delete logs and local and remote temp files; stop job flow
         if on EMR and the job is not done when cleanup is run.
-    * ``'LOCAL_SCRATCH'``: delete local scratch only
-    * ``'LOGS'``: delete logs only
-    * ``'NONE'``: delete nothing
-    * ``'REMOTE_SCRATCH'``: delete remote scratch only
-    * ``'SCRATCH'``: delete local and remote scratch, but not logs
     * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
     * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
         on cleanup
+    * ``'LOCAL_TMP'``: delete local temp files only
+    * ``'LOGS'``: delete logs only
+    * ``'NONE'``: delete nothing
+    * ``'REMOTE_TMP'``: delete remote temp files only
+    * ``'TMP'``: delete local and remote temp files, but not logs
 
     In the config file::
 
@@ -125,6 +125,10 @@ Temp files and cleanup
     On the command line::
 
         --cleanup=LOGS,JOB
+
+    .. versionchanged:: 0.5.0
+
+       Options ending in ``TMP`` used to end in ``SCRATCH``
 
 .. mrjob-opt::
    :config: cleanup_on_failure

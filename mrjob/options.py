@@ -97,13 +97,13 @@ def add_runner_opts(opt_group, default_runner='local'):
         opt_group.add_option(
             '--cleanup', dest='cleanup', default=None,
             help=('Comma-separated list of which directories to delete when'
-                  ' a job succeeds, e.g. SCRATCH,LOGS. Choices:'
+                  ' a job succeeds, e.g. TMP,LOGS. Choices:'
                   ' %s (default: ALL)' % ', '.join(CLEANUP_CHOICES))),
 
         opt_group.add_option(
             '--cleanup-on-failure', dest='cleanup_on_failure', default=None,
             help=('Comma-separated list of which directories to delete when'
-                  ' a job fails, e.g. SCRATCH,LOGS. Choices:'
+                  ' a job fails, e.g. TMP,LOGS. Choices:'
                   ' %s (default: NONE)' % ', '.join(CLEANUP_CHOICES))),
 
         opt_group.add_option(

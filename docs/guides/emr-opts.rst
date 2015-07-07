@@ -689,7 +689,7 @@ MRJob uses boto to manipulate/access S3.
     :set: emr
     :default: (automatic)
 
-    S3 directory (URI ending in ``/``) to use as scratch space, e.g.
+    S3 directory (URI ending in ``/``) to use as temp space, e.g.
     ``s3://yourbucket/tmp/``.
 
     By default, mrjob looks for a bucket belong to you whose name starts with

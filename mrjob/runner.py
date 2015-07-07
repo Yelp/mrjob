@@ -64,16 +64,16 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 #: cleanup options:
 #:
-#: * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job flow
+#: * ``'ALL'``: delete logs and local and remote temp files; stop job flow
 #:   if on EMR and the job is not done when cleanup is run.
 #: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
 #: * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
 #:    on cleanup
-#: * ``'LOCAL_TMP'``: delete local scratch only
+#: * ``'LOCAL_TMP'``: delete local temp files only
 #: * ``'LOGS'``: delete logs only
 #: * ``'NONE'``: delete nothing
-#: * ``'REMOTE_TMP'``: delete remote scratch only
-#: * ``'TMP'``: delete local and remote scratch, but not logs
+#: * ``'REMOTE_TMP'``: delete remote temp files only
+#: * ``'TMP'``: delete local and remote temp files, but not logs
 #:
 #: .. versionchanged:: 0.5.0
 #:
@@ -493,7 +493,7 @@ class MRJobRunner(object):
         else:
             return mode or self._opts['cleanup']
 
-    def _cleanup_local_scratch(self):
+    def _cleanup_local_tmp(self):
         """Cleanup any files/directories on the local machine we created while
         running this job. Should be safe to run this at any time, or multiple
         times.
@@ -501,7 +501,7 @@ class MRJobRunner(object):
         This particular function removes any local tmp directories
         added to the list self._local_tmp_dirs
 
-        This won't remove output_dir if it's outside of our scratch dir.
+        This won't remove output_dir if it's outside of our tmp dir.
         """
         if self._local_tmp_dir:
             log.info('removing tmp directory %s' % self._local_tmp_dir)
@@ -512,7 +512,7 @@ class MRJobRunner(object):
 
         self._local_tmp_dir = None
 
-    def _cleanup_remote_scratch(self):
+    def _cleanup_remote_tmp(self):
         """Cleanup any files/directories on the remote machine (S3) we created
         while running this job. Should be safe to run this at any time, or
         multiple times.
@@ -533,7 +533,7 @@ class MRJobRunner(object):
         pass  # this only happens on EMR
 
     def cleanup(self, mode=None):
-        """Clean up running jobs, scratch dirs, and logs, subject to the
+        """Clean up running jobs, temp files, and logs, subject to the
         *cleanup* option passed to the constructor.
 
         If you create your runner in a :keyword:`with` block,
@@ -559,11 +559,11 @@ class MRJobRunner(object):
             if mode_has('JOB', 'ALL'):
                 self._cleanup_job()
 
-        if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH'):
-            self._cleanup_local_scratch()
+        if mode_has('ALL', 'TMP', 'LOCAL_TMP'):
+            self._cleanup_local_tmp()
 
-        if mode_has('ALL', 'SCRATCH', 'REMOTE_SCRATCH'):
-            self._cleanup_remote_scratch()
+        if mode_has('ALL', 'TMP', 'REMOTE_TMP'):
+            self._cleanup_remote_tmp()
 
         if mode_has('ALL', 'LOGS'):
             self._cleanup_logs()

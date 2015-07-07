@@ -1024,7 +1024,7 @@ class EMRJobRunner(MRJobRunner):
             except Exception as e:
                 log.exception(e)
 
-    def _cleanup_remote_scratch(self):
+    def _cleanup_remote_tmp(self):
         # delete all the files we created
         if self._s3_tmp_dir:
             try:

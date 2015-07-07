@@ -226,7 +226,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         job_flow = emr_conn.describe_jobflow(job_flow_id)
         self.assertEqual(job_flow.state, 'TERMINATED')
 
-    def _test_remote_scratch_cleanup(self, mode, scratch_len, log_len):
+    def _test_remote_tmp_cleanup(self, mode, tmp_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': b'1\n'}})
         stdin = BytesIO(b'foo\nbar\n')
 
@@ -237,7 +237,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
         with mr_job.make_runner() as runner:
             s3_tmp_dir = runner._opts['s3_tmp_dir']
-            scratch_bucket, _ = parse_s3_uri(s3_tmp_dir)
+            tmp_bucket, _ = parse_s3_uri(s3_tmp_dir)
 
             runner.run()
 
@@ -247,37 +247,37 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             list(runner.stream_output())
 
         conn = runner.make_s3_conn()
-        bucket = conn.get_bucket(scratch_bucket)
-        self.assertEqual(len(list(bucket.list())), scratch_len)
+        bucket = conn.get_bucket(tmp_bucket)
+        self.assertEqual(len(list(bucket.list())), tmp_len)
 
         bucket = conn.get_bucket(log_bucket)
         self.assertEqual(len(list(bucket.list())), log_len)
 
     def test_cleanup_all(self):
-        self._test_remote_scratch_cleanup('ALL', 0, 0)
+        self._test_remote_tmp_cleanup('ALL', 0, 0)
 
-    def test_cleanup_scratch(self):
-        self._test_remote_scratch_cleanup('SCRATCH', 0, 1)
+    def test_cleanup_tmp(self):
+        self._test_remote_tmp_cleanup('TMP', 0, 1)
 
     def test_cleanup_remote(self):
-        self._test_remote_scratch_cleanup('REMOTE_SCRATCH', 0, 1)
+        self._test_remote_tmp_cleanup('REMOTE_TMP', 0, 1)
 
     def test_cleanup_local(self):
-        self._test_remote_scratch_cleanup('LOCAL_SCRATCH', 5, 1)
+        self._test_remote_tmp_cleanup('LOCAL_TMP', 5, 1)
 
     def test_cleanup_logs(self):
-        self._test_remote_scratch_cleanup('LOGS', 5, 0)
+        self._test_remote_tmp_cleanup('LOGS', 5, 0)
 
     def test_cleanup_none(self):
-        self._test_remote_scratch_cleanup('NONE', 5, 1)
+        self._test_remote_tmp_cleanup('NONE', 5, 1)
 
     def test_cleanup_combine(self):
-        self._test_remote_scratch_cleanup('LOGS,REMOTE_SCRATCH', 0, 0)
+        self._test_remote_tmp_cleanup('LOGS,REMOTE_TMP', 0, 0)
 
     def test_cleanup_error(self):
-        self.assertRaises(ValueError, self._test_remote_scratch_cleanup,
-                          'NONE,LOGS,REMOTE_SCRATCH', 0, 0)
-        self.assertRaises(ValueError, self._test_remote_scratch_cleanup,
+        self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
+                          'NONE,LOGS,REMOTE_TMP', 0, 0)
+        self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
                           'GARBAGE', 0, 0)
 
     def test_args_version_018(self):
@@ -2872,9 +2872,9 @@ class CleanUpJobTestCase(MockBotoTestCase):
         with patch.multiple(r,
                             _cleanup_job=mock.DEFAULT,
                             _cleanup_job_flow=mock.DEFAULT,
-                            _cleanup_local_scratch=mock.DEFAULT,
+                            _cleanup_local_tmp=mock.DEFAULT,
                             _cleanup_logs=mock.DEFAULT,
-                            _cleanup_remote_scratch=mock.DEFAULT) as mock_dict:
+                            _cleanup_remote_tmp=mock.DEFAULT) as mock_dict:
             r.cleanup(mode=mode)
             yield mock_dict
 
@@ -2889,22 +2889,22 @@ class CleanUpJobTestCase(MockBotoTestCase):
         with self._test_mode('ALL') as m:
             self.assertFalse(m['_cleanup_job_flow'].called)
             self.assertFalse(m['_cleanup_job'].called)
-            self.assertTrue(m['_cleanup_local_scratch'].called)
-            self.assertTrue(m['_cleanup_remote_scratch'].called)
+            self.assertTrue(m['_cleanup_local_tmp'].called)
+            self.assertTrue(m['_cleanup_remote_tmp'].called)
             self.assertTrue(m['_cleanup_logs'].called)
 
     def test_cleanup_job(self):
         with self._test_mode('JOB') as m:
-            self.assertFalse(m['_cleanup_local_scratch'].called)
-            self.assertFalse(m['_cleanup_remote_scratch'].called)
+            self.assertFalse(m['_cleanup_local_tmp'].called)
+            self.assertFalse(m['_cleanup_remote_tmp'].called)
             self.assertFalse(m['_cleanup_logs'].called)
             self.assertFalse(m['_cleanup_job_flow'].called)
             self.assertFalse(m['_cleanup_job'].called)  # Only on failure
 
     def test_cleanup_none(self):
         with self._test_mode('NONE') as m:
-            self.assertFalse(m['_cleanup_local_scratch'].called)
-            self.assertFalse(m['_cleanup_remote_scratch'].called)
+            self.assertFalse(m['_cleanup_local_tmp'].called)
+            self.assertFalse(m['_cleanup_remote_tmp'].called)
             self.assertFalse(m['_cleanup_logs'].called)
             self.assertFalse(m['_cleanup_job'].called)
             self.assertFalse(m['_cleanup_job_flow'].called)

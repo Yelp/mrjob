@@ -503,8 +503,8 @@ class HadoopJobRunner(MRJobRunner):
             return posixpath.join(
                 self._hdfs_tmp_dir, 'step-output', str(step_num + 1))
 
-    def _cleanup_local_scratch(self):
-        super(HadoopJobRunner, self)._cleanup_local_scratch()
+    def _cleanup_local_tmp(self):
+        super(HadoopJobRunner, self)._cleanup_local_tmp()
 
         if self._hdfs_tmp_dir:
             log.info('deleting %s from HDFS' % self._hdfs_tmp_dir)

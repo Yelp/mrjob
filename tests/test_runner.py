@@ -66,14 +66,14 @@ class WithStatementTestCase(TestCase):
     def test_cleanup_all(self):
         self._test_cleanup_after_with_statement(['ALL'], False)
 
-    def test_cleanup_scratch(self):
-        self._test_cleanup_after_with_statement(['SCRATCH'], False)
+    def test_cleanup_tmp(self):
+        self._test_cleanup_after_with_statement(['TMP'], False)
 
-    def test_cleanup_local_scratch(self):
-        self._test_cleanup_after_with_statement(['LOCAL_SCRATCH'], False)
+    def test_cleanup_local_tmp(self):
+        self._test_cleanup_after_with_statement(['LOCAL_TMP'], False)
 
-    def test_cleanup_remote_scratch(self):
-        self._test_cleanup_after_with_statement(['REMOTE_SCRATCH'], True)
+    def test_cleanup_remote_tmp(self):
+        self._test_cleanup_after_with_statement(['REMOTE_TMP'], True)
 
     def test_cleanup_none(self):
         self._test_cleanup_after_with_statement(['NONE'], True)

@@ -45,6 +45,12 @@ from optparse import OptionError
 from optparse import OptionParser
 import sys
 
+try:
+    import boto.exception
+    boto
+exceptImportError:
+    boto = None
+
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import LogFetchError
 from mrjob.job import MRJob
@@ -90,10 +96,12 @@ def perform_actions(options, runner):
         cat_all(runner)
 
     if options.get_counters:
-        desc = runner._describe_jobflow()
-        runner._set_s3_job_log_uri(desc)
+        cluster = runner._describe_cluster()
+        runner._set_s3_job_log_uri(cluster)
+
+        steps = runner._list_steps_for_cluster()
         runner._fetch_counters(
-            xrange(1, len(desc.steps) + 1), skip_s3_wait=True)
+            xrange(1, len(steps) + 1), skip_s3_wait=True)
         runner.print_counters()
 
     if options.find_failure:
@@ -271,12 +279,8 @@ def find_failure(runner, step_num):
     if step_num:
         step_nums = [step_num]
     else:
-        job_flow = runner._describe_jobflow()
-        if job_flow:
-            step_nums = range(1, len(job_flow.steps) + 1)
-        else:
-            print 'You do not have access to that job flow.'
-            sys.exit(1)
+        steps = runner._list_steps_for_cluster()
+        step_nums = range(1, len(job_flow.steps) + 1)
 
     cause = runner._find_probable_cause_of_failure(step_nums)
     if cause:

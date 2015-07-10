@@ -1838,7 +1838,7 @@ class EMRJobRunner(MRJobRunner):
     def _ls_s3_logs(self, relative_path):
         """List logs over S3 by path relative to log root directory"""
         if not self._s3_job_log_uri:
-            self._set_s3_job_log_uri(self._describe_jobflow())
+            self._set_s3_job_log_uri(self._describe_cluster())
 
         if not self._s3_job_log_uri:
             raise LogFetchError('Could not determine S3 job log URI')
@@ -1869,7 +1869,7 @@ class EMRJobRunner(MRJobRunner):
     def ls_all_logs_s3(self):
         """List all log files in the S3 log root directory"""
         if not self._s3_job_log_uri:
-            self._set_s3_job_log_uri(self._describe_jobflow())
+            self._set_s3_job_log_uri(self._describe_cluster())
         return self.ls(self._s3_job_log_uri)
 
     ## LOG PARSING ##
@@ -1934,7 +1934,7 @@ class EMRJobRunner(MRJobRunner):
                                                  self.get_hadoop_version())
 
             if not results:
-                cluster = self._describe_jobflow()
+                cluster = self._describe_cluster()
                 if not self._cluster_is_done(cluster):
                     log.info("Counters may not have been uploaded to S3 yet."
                              " Try again in 5 minutes with:"
@@ -2560,10 +2560,6 @@ class EMRJobRunner(MRJobRunner):
 
         return wrap_aws_conn(conn)
 
-    def _describe_jobflow(self, emr_conn=None):
-        emr_conn = emr_conn or self.make_emr_conn()
-        return emr_conn.describe_jobflow(self._emr_job_flow_id)
-
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()
         return _boto_emr.describe_cluster(emr_conn, self._emr_job_flow_id)
@@ -2600,8 +2596,12 @@ class EMRJobRunner(MRJobRunner):
                 )
 
             # infer the version from the job flow
-            self._inferred_hadoop_version = (
-                self._describe_jobflow().hadoopversion)
+            cluster = self._describe_cluster()
+            for a in cluster.applications:
+                if a.name == 'hadoop':
+                    self._inferred_hadoop_version = a.version
+                break
+
             # warn if the hadoop version specified does not match the
             # inferred hadoop_version
             hadoop_version = self._opts['hadoop_version']
@@ -2618,24 +2618,21 @@ class EMRJobRunner(MRJobRunner):
         # cache address of master to avoid redundant calls to describe_jobflow
         # also convenient for testing (pretend we can SSH when we really can't
         # by setting this to something not False)
-        if self._address:
-            return self._address
+        if not self._address:
+            try:
+                cluster = self._describe_cluster()
+                if cluster.status.state not in ('RUNNING', 'WAITING'):
+                    raise IOError('Cannot ssh to master;'
+                                  ' job flow not waiting or running')
+                self._address = cluster.masterpublicdnsname
+            except boto.exception.S3ResponseError:
+                # Raised when cluster doesn't exist
+                raise IOError('Could not get job flow information')
+            except boto.exception.EmrResponseError:
+                # Raised by very old versions of boto (sometime before 2.4)
+                # when cluster doesn't exist
+                raise IOError('Could not get job flow information')
 
-        try:
-            jobflow = self._describe_jobflow(emr_conn)
-            if jobflow.state not in ('WAITING', 'RUNNING'):
-                raise IOError(
-                    'Cannot ssh to master; job flow is not waiting or running')
-        except boto.exception.S3ResponseError:
-            # This error is raised by some versions of boto when the jobflow
-            # doesn't exist
-            raise IOError('Could not get job flow information')
-        except boto.exception.EmrResponseError:
-            # This error is raised by other version of boto when the jobflow
-            # doesn't exist (some time before 2.4)
-            raise IOError('Could not get job flow information')
-
-        self._address = jobflow.masterpublicdnsname
         return self._address
 
     def _addresses_of_slaves(self):

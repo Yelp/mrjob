@@ -16,9 +16,14 @@
 """
 from datetime import datetime
 from datetime import timedelta
+from logging import getLogger
 
 from mrjob.parse import iso8601_to_datetime
 
+log = getLogger(__name__)
+
+
+### deprecated functions, used to support the old DescribeJobFlows API call ###
 
 def est_time_to_hour(job_flow, now=None):
     """How long before job reaches the end of the next full hour since it
@@ -27,6 +32,9 @@ def est_time_to_hour(job_flow, now=None):
     If it happens to be exactly a whole number of hours, we return
     one hour, not zero.
     """
+    log.warning(
+        'est_time_to_hour() is deprecated and will be removed in v0.5.0')
+
     if now is None:
         now = datetime.utcnow()
 
@@ -49,6 +57,9 @@ def est_time_to_hour(job_flow, now=None):
 def pool_hash_and_name(job_flow):
     """Return the hash and pool name for the given job flow, or
     ``(None, None)`` if it isn't pooled."""
+    log.warning(
+        'pool_hash_and_name() is deprecated and will be removed in v0.5.0')
+
     bootstrap_actions = getattr(job_flow, 'bootstrapactions', None)
     if bootstrap_actions:
         for bootstrap_action in bootstrap_actions:

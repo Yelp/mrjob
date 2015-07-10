@@ -195,7 +195,7 @@ def s3_key_to_uri(s3_key):
 
 def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
                            created_after=None, created_before=None):
-    """Iteratively call ``EmrConnection.describe_job_flows()`` until we really
+    """Iteratively call ``EmrConnection.describe_jobflows()`` until we really
     get all the available job flow information. Currently, 2 months of data
     is available through the EMR API.
 

@@ -48,7 +48,7 @@ import sys
 try:
     import boto.exception
     boto
-exceptImportError:
+except ImportError:
     boto = None
 
 from mrjob.emr import EMRJobRunner

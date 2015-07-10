@@ -189,6 +189,24 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
     'terminate_idle_job_flow.sh')
 
 
+def _repeat(api_call, *args, **kwargs):
+    """Make the same API call repeatedly until we've seen every page
+    of the response (sets *marker* automatically).
+
+    Yields one or more responses.
+    """
+    marker = None
+
+    while True:
+        resp = api_call(*args, marker=marker, **kwargs)
+        yield resp
+
+        # go to next page, if any
+        marker = getattr(resp, 'marker', None)
+        if not marker:
+            return
+
+
 def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
@@ -2564,27 +2582,19 @@ class EMRJobRunner(MRJobRunner):
         emr_conn = self.make_emr_conn()
         return _boto_emr.describe_cluster(emr_conn, self._emr_job_flow_id)
 
-    def _list_steps_for_cluster(self, step_states=None):
+    def _list_steps_for_cluster(self):
         """Get all steps for our cluster, potentially making multiple API calls
 
         :type step_states: list
         :param step_states: Filter by step states
         """
         emr_conn = self.make_emr_conn()
-
-        steps = []
-        marker = None
-
-        while True:
-            resp = _boto_emr.list_steps(emr_conn,
-                                        self._emr_job_flow_id,
-                                        step_states=step_states,
-                                        marker=marker)
+        for resp in _repeat(_boto_emr.list_steps,
+                            emr_conn,
+                            self._emr_job_flow_id):
             steps.extend(getattr(resp, 'steps', []))
-            marker = getattr(resp, 'marker', '')
 
-            if not marker:
-                return steps
+        return steps
 
     def get_hadoop_version(self):
         if not self._inferred_hadoop_version:

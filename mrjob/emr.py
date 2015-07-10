@@ -109,8 +109,8 @@ from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime
 from mrjob.parse import iso8601_to_timestamp
 from mrjob.parse import parse_s3_uri
-from mrjob.pool import est_time_to_hour
-from mrjob.pool import pool_hash_and_name
+from mrjob.pool import _est_time_to_hour
+from mrjob.pool import _pool_hash_and_name
 from mrjob.retry import RetryGoRound
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
@@ -189,6 +189,11 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
     'terminate_idle_job_flow.sh')
 
 
+def s3_key_to_uri(s3_key):
+    """Convert a boto Key object into an ``s3://`` URI"""
+    return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
+
+
 def _repeat(api_call, *args, **kwargs):
     """Make the same API call repeatedly until we've seen every page
     of the response (sets *marker* automatically).
@@ -207,9 +212,34 @@ def _repeat(api_call, *args, **kwargs):
             return
 
 
-def s3_key_to_uri(s3_key):
-    """Convert a boto Key object into an ``s3://`` URI"""
-    return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
+def _list_all_clusters(emr_conn, *args, **kwargs):
+    """Make successive API calls, yielding clusters."""
+    for resp in _repeat(_boto_emr.list_clusters, emr_conn, *args, **kwargs):
+        for cluster in getattr(resp, 'clusters', []):
+            yield cluster
+
+
+def _list_all_bootstrap_actions(emr_conn, cluster_id, *args, **kwargs):
+    for resp in _repeat(
+            _boto_emr.list_bootstrap_actions,
+            emr_conn, cluster_id, *args, **kwargs):
+        for action in getattr(resp, 'actions', []):
+            yield action
+
+
+def _list_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
+    for resp in _repeat(
+            _boto_emr.list_instance_groups,
+            emr_conn, cluster_id, *args, **kwargs):
+        for group in getattr(resp, 'instancegroups', []):
+            yield group
+
+
+def _list_all_steps(emr_conn, cluster_id, *args, **kwargs):
+    for resp in _repeat(_boto_emr.list_steps,
+                        emr_conn, cluster_id, *args, **kwargs):
+        for step in getattr(resp, 'steps', []):
+            yield step
 
 
 def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
@@ -230,6 +260,9 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
     :type created_before: datetime
     :param created_before: Bound on job flow creation time
     """
+    log.warning(
+        'describe_all_job_flows() is deprecated and will be removed in v0.5.0')
+
     all_job_flows = []
     ids_seen = set()
 
@@ -566,7 +599,7 @@ class EMRJobRunner(MRJobRunner):
         from mrjob.emr import EMRJobRunner
 
         emr_conn = EMRJobRunner().make_emr_conn()
-        job_flows = emr_conn.describe_jobflows()
+        clusters = emr_conn.list_clusters()
         ...
     """
     alias = 'emr'
@@ -1563,9 +1596,9 @@ class EMRJobRunner(MRJobRunner):
         # try to find a job flow from the pool. basically auto-fill
         # 'emr_job_flow_id' if possible and then follow normal behavior.
         if self._opts['pool_emr_job_flows'] and not self._emr_job_flow_id:
-            job_flow = self.find_job_flow(num_steps=len(self._get_steps()))
-            if job_flow:
-                self._emr_job_flow_id = job_flow.jobflowid
+            cluster_id = self._find_cluster(num_steps=len(self._get_steps()))
+            if cluster_id:
+                self._emr_job_flow_id = cluster_id
 
         # create a job flow if we're not already using an existing one
         if not self._emr_job_flow_id:
@@ -2236,21 +2269,21 @@ class EMRJobRunner(MRJobRunner):
     def get_emr_job_flow_id(self):
         return self._emr_job_flow_id
 
-    def usable_job_flows(self, emr_conn=None, exclude=None, num_steps=1):
-        """Get job flows that this runner can use.
+    def _usable_clusters(self, emr_conn=None, exclude=None, num_steps=1):
+        """Get clusters that this runner can join.
 
-        We basically expect to only join available job flows with the exact
+        We basically expect to only join available clusters with the exact
         same setup as our own, that is:
 
         - same bootstrap setup (including mrjob version)
-        - have the same Hadoop and AMI version
+        - have the same AMI version
         - same number and type of instances
 
-        However, we allow joining job flows where for each role, every instance
+        However, we allow joining clusters where for each role, every instance
         has at least as much memory as we require, and the total number of
         compute units is at least what we require.
 
-        There also must be room for our job in the job flow (job flows top out
+        There also must be room for our job in the cluster (clusters top out
         at 256 steps).
 
         We then sort by:
@@ -2260,8 +2293,8 @@ class EMRJobRunner(MRJobRunner):
 
         The most desirable job flows come *last* in the list.
 
-        :return: list of (job_minutes_float,
-                 :py:class:`botoemr.emrobject.JobFlow`)
+        :return: tuple of (:py:class:`botoemr.emrobject.Cluster`,
+                           num_steps_in_cluster)
         """
         emr_conn = emr_conn or self.make_emr_conn()
         exclude = exclude or set()
@@ -2297,63 +2330,60 @@ class EMRJobRunner(MRJobRunner):
                 EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(instance_type,
                                                        float('Inf')))
 
-        sort_keys_and_job_flows = []
-        # no point in showing this warning multiple times
-        # make this a list so we can set it from within add_if_match()
-        warned_about_ami_version_latest = []
+        # list of (sort_key, cluster_id, num_steps)
+        key_cluster_steps_list = []
 
-        def add_if_match(job_flow):
+        def add_if_match(cluster):
             # this may be a retry due to locked job flows
-            if job_flow.jobflowid in exclude:
+            if cluster.id in exclude:
                 return
 
             # only take persistent job flows
-            if job_flow.keepjobflowalivewhennosteps != 'true':
+            if cluster.autoterminate != 'false':
                 return
 
             # match pool name, and (bootstrap) hash
-            hash, name = pool_hash_and_name(job_flow)
-            if req_hash != hash:
+            bootstrap_actions = _list_all_bootstrap_actions(
+                emr_conn, cluster.id)
+            pool_hash, pool_name = _pool_hash_and_name(bootstrap_actions)
+
+            if req_hash != pool_hash:
                 return
 
-            if self._opts['emr_job_flow_pool_name'] != name:
+            if self._opts['emr_job_flow_pool_name'] != pool_name:
                 return
 
-            if self._opts['hadoop_version']:
-                # match hadoop version
-                if job_flow.hadoopversion != self._opts['hadoop_version']:
+            if self._opts['ami_version'] == 'latest':
+                # look for other clusters where "latest" was requested
+                if getattr(cluster, 'requestedamiversion', '' ) != 'latest':
                     return
-
-            if self._opts['ami_version'] != 'latest':
-                # match AMI version
-                job_flow_ami_version = getattr(job_flow, 'amiversion', None)
+            else:
+                # match actual AMI version
+                ami_version = getattr(cluster, 'runningamiversion', '')
                 # Support partial matches, e.g. let a request for
                 # '2.4' pass if the version is '2.4.2'. The version
                 # extracted from the existing job flow should always
                 # be a full major.minor.patch, so checking matching
                 # prefixes should be sufficient.
-                if not job_flow_ami_version.startswith(
-                        self._opts['ami_version']):
+                if not ami_version.startswith(self._opts['ami_version']):
                     return
-            else:
-                if not warned_about_ami_version_latest:
-                    log.warning(
-                        "When AMI version is set to 'latest', job flow pooling"
-                        " can result in the job being added to a pool using an"
-                        " older AMI version")
-                    # warned_about_... = True would just set a local variable
-                    warned_about_ami_version_latest.append(True)
+
+            steps = list(_list_all_steps(emr_conn, cluster.id))
 
             # there is a hard limit of 256 steps per job flow
-            if len(job_flow.steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
+            if len(steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
                 return
 
             # in rare cases, job flow can be WAITING *and* have incomplete
             # steps. We could just check for PENDING steps, but we're
             # trying to be defensive about EMR adding a new step state.
-            for step in job_flow.steps:
-                if (getattr(step, 'enddatetime', None) is None and
-                        getattr(step, 'state', None) != 'CANCELLED'):
+            for step in steps:
+                if ((getattr(step.status, 'timeline') is None or
+                     getattr(step.status.timeline, 'enddatetime', None)
+                     is None) and
+                    getattr(step.status, 'state', None) not in
+                    ('CANCELLED', 'INTERRUPTED')):
+
                     return
 
             # total compute units per group
@@ -2364,8 +2394,8 @@ class EMRJobRunner(MRJobRunner):
 
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
-            for ig in job_flow.instancegroups:
-                role = ig.instancerole.lower()
+            for ig in list(_list_all_instance_groups(emr_conn, cluster.id)):
+                role = ig.instancegrouptype.lower()
 
                 # unknown, new kind of role; bail out!
                 if role not in ('core', 'master', 'task'):
@@ -2402,7 +2432,7 @@ class EMRJobRunner(MRJobRunner):
                 # we started our own job flow from scratch. (This can happen if
                 # the previous job finished while some task instances were
                 # still being provisioned.)
-                cu = (int(ig.instancerequestcount) *
+                cu = (int(ig.requestedinstancecount) *
                       EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(
                           ig.instancetype, 0.0))
                 role_to_cu.setdefault(role, 0.0)
@@ -2411,7 +2441,7 @@ class EMRJobRunner(MRJobRunner):
                 # track number of instances of the same type
                 if ig.instancetype == req_instance_type:
                     role_to_matched_instances[role] += (
-                        int(ig.instancerequestcount))
+                        int(ig.requestedinstancecount))
 
             # check if there are enough compute units
             for role, req_cu in role_to_req_cu.iteritems():
@@ -2426,17 +2456,19 @@ class EMRJobRunner(MRJobRunner):
             # make a sort key
             sort_key = (role_to_cu['core'] + role_to_cu['task'],
                         role_to_cu['master'],
-                        est_time_to_hour(job_flow))
+                        _est_time_to_hour(cluster))
 
-            sort_keys_and_job_flows.append((sort_key, job_flow))
+            key_cluster_steps_list.append((sort_key, cluster.id, len(steps)))
 
-        for job_flow in emr_conn.describe_jobflows(states=['WAITING']):
-            add_if_match(job_flow)
+        for cluster in list(_list_all_clusters(
+                emr_conn, cluster_states=['WAITING'])):
+            add_if_match(cluster)
 
-        return [job_flow for (sort_key, job_flow)
-                in sorted(sort_keys_and_job_flows)]
+        return [(cluster_id, cluster_num_steps) for
+                (sort_key, cluster_id, cluster_num_steps)
+                in sorted(key_cluster_steps_list)]
 
-    def find_job_flow(self, num_steps=1):
+    def _find_cluster(self, num_steps=1):
         """Find a job flow that can host this runner. Prefer flows with more
         compute units. Break ties by choosing flow with longest idle time.
         Return ``None`` if no suitable flows exist.
@@ -2450,19 +2482,19 @@ class EMRJobRunner(MRJobRunner):
         time_sleep = timedelta(seconds=JOB_FLOW_SLEEP_INTERVAL)
         log.info("Attempting to find an available job flow...")
         while now <= end_time:
-            sorted_tagged_job_flows = self.usable_job_flows(
+            cluster_info_list = self._usable_clusters(
                 emr_conn=emr_conn,
                 exclude=exclude,
                 num_steps=num_steps)
-            if sorted_tagged_job_flows:
-                job_flow = sorted_tagged_job_flows[-1]
+            if cluster_info_list:
+                cluster_id, num_steps = cluster_info_list[-1]
                 status = attempt_to_acquire_lock(
-                    s3_conn, self._lock_uri(job_flow),
+                    s3_conn, self._lock_uri(cluster_id, num_steps),
                     self._opts['s3_sync_wait_time'], self._job_name)
                 if status:
-                    return sorted_tagged_job_flows[-1]
+                    return cluster_id
                 else:
-                    exclude.add(job_flow.jobflowid)
+                    exclude.add(cluster_id)
             elif max_wait_time == 0:
                 return None
             else:
@@ -2477,10 +2509,10 @@ class EMRJobRunner(MRJobRunner):
                 now += time_sleep
         return None
 
-    def _lock_uri(self, job_flow):
+    def _lock_uri(self, cluster_id, num_steps):
         return make_lock_uri(self._opts['s3_scratch_uri'],
-                             job_flow.jobflowid,
-                             len(job_flow.steps) + 1)
+                             cluster_id,
+                             num_steps + 1)
 
     def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to
@@ -2584,17 +2616,9 @@ class EMRJobRunner(MRJobRunner):
 
     def _list_steps_for_cluster(self):
         """Get all steps for our cluster, potentially making multiple API calls
-
-        :type step_states: list
-        :param step_states: Filter by step states
         """
         emr_conn = self.make_emr_conn()
-        for resp in _repeat(_boto_emr.list_steps,
-                            emr_conn,
-                            self._emr_job_flow_id):
-            steps.extend(getattr(resp, 'steps', []))
-
-        return steps
+        return list(_list_all_steps(emr_conn, self._emr_job_flow_id))
 
     def get_hadoop_version(self):
         if not self._inferred_hadoop_version:

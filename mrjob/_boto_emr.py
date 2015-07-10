@@ -83,7 +83,26 @@ def list_clusters(emr_conn, created_after=None, created_before=None,
     return emr_conn.get_object('ListClusters', params, ClusterSummaryList)
 
 
-def list_steps(self, cluster_id, step_states=None, marker=None):
+def list_instance_groups(emr_conn, cluster_id, marker=None):
+    """
+    List EC2 instance groups in a cluster
+
+    :type cluster_id: str
+    :param cluster_id: The cluster id of interest
+    :type marker: str
+    :param marker: Pagination marker
+    """
+    params = {
+        'ClusterId': cluster_id
+    }
+
+    if marker:
+        params['Marker'] = marker
+
+    return emr_conn.get_object('ListInstanceGroups', params, InstanceGroupList)
+
+
+def list_steps(emr_conn, cluster_id, step_states=None, marker=None):
     """
     List cluster steps
 
@@ -102,9 +121,9 @@ def list_steps(self, cluster_id, step_states=None, marker=None):
         params['Marker'] = marker
 
     if step_states:
-        self.build_list_params(params, step_states, 'StepStateList.member')
+        emr_conn.build_list_params(params, step_states, 'StepStateList.member')
 
-    return self.get_object('ListSteps', params, StepSummaryList)
+    return emr_conn.get_object('ListSteps', params, StepSummaryList)
 
 
 # from boto/emr/emrobject.py
@@ -280,6 +299,47 @@ class Ec2InstanceAttributes(EmrObject):
         'Ec2AvailabilityZone',
         'IamInstanceProfile'
     ])
+
+
+class InstanceGroupInfo(EmrObject):
+    Fields = set([
+        'Id',
+        'Name',
+        'Market',
+        'InstanceGroupType',
+        'BidPrice',
+        'InstanceType',
+        'RequestedInstanceCount',
+        'RunningInstanceCount'
+    ])
+
+    def __init__(self, connection=None):
+        self.connection = connection
+        self.status = None
+
+    def startElement(self, name, attrs, connection):
+        if name == 'Status':
+            self.status = ClusterStatus()
+            return self.status
+        else:
+            return None
+
+
+class InstanceGroupList(EmrObject):
+    Fields = set([
+        'Marker'
+    ])
+
+    def __init__(self, connection=None):
+        self.connection = connection
+        self.instancegroups = None
+
+    def startElement(self, name, attrs, connection):
+        if name == 'InstanceGroups':
+            self.instancegroups = ResultSet([('member', InstanceGroupInfo)])
+            return self.instancegroups
+        else:
+            return None
 
 
 class KeyValue(EmrObject):

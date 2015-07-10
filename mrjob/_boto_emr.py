@@ -215,7 +215,11 @@ class ClusterTimeline(EmrObject):
     Fields = set([
         'CreationDateTime',
         'ReadyDateTime',
-        'EndDateTime'
+        'EndDateTime',
+        # !!! steps have StartDateTime, not ReadyDateTime
+        # !!! The underlying problem is that there is no separate StepsTimeline
+        # !!! class; see https://github.com/boto/boto/issues/3268
+        'StartDateTime',
     ])
 
 

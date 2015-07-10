@@ -51,6 +51,7 @@ try:
     import boto.exception
     import boto.regioninfo
     import boto.utils
+    from mrjob import _boto_emr
     boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
@@ -1186,26 +1187,24 @@ class EMRJobRunner(MRJobRunner):
                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
-    def _job_flow_is_done(self, job_flow):
-        return job_flow.state in ('TERMINATED', 'COMPLETED', 'FAILED',
-                                  'SHUTTING_DOWN')
+    def _cluster_is_done(self, cluster):
+        return cluster.status.state in (
+            'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS')
 
     def _wait_for_job_flow_termination(self):
-        try:
-            jobflow = self._describe_jobflow()
-        except boto.exception.S3ResponseError:
-            # mockboto throws this for some reason
-            return
-        if (jobflow.keepjobflowalivewhennosteps == 'true' and
-                jobflow.state == 'WAITING'):
+        cluster = self._describe_cluster()
+
+        if (cluster.status.state == 'WAITING' and
+            cluster.autoterminate != 'true'):
             raise Exception('Operation requires job flow to terminate, but'
                             ' it may never do so.')
-        while not self._job_flow_is_done(jobflow):
+
+        while not self._cluster_is_done(cluster):
             msg = 'Waiting for job flow to terminate (currently %s)' % (
-                jobflow.state)
+                cluster.status.state)
             log.info(msg)
             time.sleep(self._opts['check_emr_status_every'])
-            jobflow = self._describe_jobflow()
+            cluster = self._describe_cluster()
 
     def _create_instance_group(self, role, instance_type, count, bid_price):
         """Helper method for creating instance groups. For use when
@@ -1928,12 +1927,12 @@ class EMRJobRunner(MRJobRunner):
                                                  self.get_hadoop_version())
 
             if not results:
-                job_flow = self._describe_jobflow()
-                if not self._job_flow_is_done(job_flow):
+                cluster = self._describe_jobflow()
+                if not self._cluster_is_done(cluster):
                     log.info("Counters may not have been uploaded to S3 yet."
                              " Try again in 5 minutes with:"
                              " mrjob fetch-logs --counters %s" %
-                             job_flow.jobflowid)
+                             cluster.id)
             return results
         except LogFetchError as e:
             log.info("Unable to fetch counters: %s" % e)
@@ -2557,6 +2556,10 @@ class EMRJobRunner(MRJobRunner):
     def _describe_jobflow(self, emr_conn=None):
         emr_conn = emr_conn or self.make_emr_conn()
         return emr_conn.describe_jobflow(self._emr_job_flow_id)
+
+    def _describe_cluster(self):
+        emr_conn - self.make_emr_conn()
+        return _boto_emr.describe_cluster(emr_conn, self._emr_job_flow_id)
 
     def get_hadoop_version(self):
         if not self._inferred_hadoop_version:

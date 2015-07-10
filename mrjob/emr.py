@@ -758,11 +758,11 @@ class EMRJobRunner(MRJobRunner):
         log.info("creating new scratch bucket %s" % scratch_bucket_name)
         self._opts['s3_scratch_uri'] = 's3://%s/tmp/' % scratch_bucket_name
 
-    def _set_s3_job_log_uri(self, job_flow):
+    def _set_s3_job_log_uri(self, cluster):
         """Given a job flow description, set self._s3_job_log_uri. This allows
         us to call self.ls(), etc. without running the job.
         """
-        log_uri = getattr(job_flow, 'loguri', '')
+        log_uri = getattr(cluster, 'loguri', '')
         if log_uri:
             self._s3_job_log_uri = '%s%s/' % (
                 log_uri.replace('s3n://', 's3://'), self._emr_job_flow_id)
@@ -1583,25 +1583,28 @@ class EMRJobRunner(MRJobRunner):
                       self._opts['check_emr_status_every'])
             time.sleep(self._opts['check_emr_status_every'])
 
-            job_flow = self._describe_jobflow()
+            cluster = self._describe_cluster()
 
-            self._set_s3_job_log_uri(job_flow)
+            self._set_s3_job_log_uri(cluster)
 
-            job_state = job_flow.state
-            reason = getattr(job_flow, 'laststatechangereason', '')
+            job_state = cluster.status.state
+            reason = getattr(
+                getattr(cluster.status, 'statechangereason', None),
+                'message', '')
 
             # find all steps belonging to us, and get their state
             step_states = []
             running_step_name = ''
             total_step_time = 0.0
             step_nums = []  # step numbers belonging to us. 1-indexed
+            # "lg_step" stands for "log generating step"
             lg_step_num_mapping = {}
 
-            steps = job_flow.steps or []
+            steps = self._list_steps_for_cluster()
             latest_lg_step_num = 0
             for i, step in enumerate(steps):
                 if LOG_GENERATING_STEP_NAME_RE.match(
-                        posixpath.basename(getattr(step, 'jar', ''))):
+                        posixpath.basename(getattr(step.config, 'jar', ''))):
                     latest_lg_step_num += 1
 
                 # ignore steps belonging to other jobs
@@ -1610,18 +1613,21 @@ class EMRJobRunner(MRJobRunner):
 
                 step_nums.append(i + 1)
                 if LOG_GENERATING_STEP_NAME_RE.match(
-                        posixpath.basename(getattr(step, 'jar', ''))):
+                        posixpath.basename(getattr(step.config, 'jar', ''))):
                     lg_step_num_mapping[i + 1] = latest_lg_step_num
 
-                step.state = step.state
-                step_states.append(step.state)
-                if step.state == 'RUNNING':
+                step_states.append(step.status.state)
+                if step.status.state == 'RUNNING':
                     running_step_name = step.name
 
-                if (hasattr(step, 'startdatetime') and
-                        hasattr(step, 'enddatetime')):
-                    start_time = iso8601_to_timestamp(step.startdatetime)
-                    end_time = iso8601_to_timestamp(step.enddatetime)
+                if (hasattr(step.status, 'timeline') and
+                    hasattr(step.status.timeline, 'startdatetime') and
+                    hasattr(step.status.timeline, 'enddatetime')):
+
+                    start_time = iso8601_to_timestamp(
+                        step.status.timeline.startdatetime)
+                    end_time = iso8601_to_timestamp(
+                        step.status.timeline.enddatetime)
                     total_step_time += end_time - start_time
 
             if not step_states:
@@ -1633,7 +1639,8 @@ class EMRJobRunner(MRJobRunner):
                 break
 
             # if any step fails, give up
-            if any(state in ('FAILED', 'CANCELLED') for state in step_states):
+            if any(state in ('CANCELLED', 'FAILED', 'INTERRUPTED')
+                   for state in step_states):
                 break
 
             # (the other step states are PENDING and RUNNING)
@@ -1641,7 +1648,7 @@ class EMRJobRunner(MRJobRunner):
             # keep track of how long we've been waiting
             running_time = time.time() - self._emr_job_start
 
-            # otherwise, we can print a status message
+            # if a step is still running, we can print a status message
             if running_step_name:
                 log.info('Job launched %.1fs ago, status %s: %s (%s)' %
                          (running_time, job_state, reason, running_step_name))
@@ -1663,7 +1670,7 @@ class EMRJobRunner(MRJobRunner):
                         self._show_tracker_progress = False
                 # once a step is running, it's safe to set up the ssh tunnel to
                 # the job tracker
-                job_host = getattr(job_flow, 'masterpublicdnsname', None)
+                job_host = getattr(cluster, 'masterpublicdnsname', None)
                 if job_host and self._opts['ssh_tunnel_to_job_tracker']:
                     self.setup_ssh_tunnel_to_job_tracker(job_host)
 
@@ -1683,7 +1690,7 @@ class EMRJobRunner(MRJobRunner):
             self.print_counters(range(1, len(step_nums) + 1))
         else:
             msg = 'Job on job flow %s failed with status %s: %s' % (
-                job_flow.jobflowid, job_state, reason)
+                cluster.id, job_state, reason)
             log.error(msg)
             # check for invalid fallback IAM roles
             if any(reason.rstrip().endswith('/%s is invalid' % role)
@@ -2558,8 +2565,30 @@ class EMRJobRunner(MRJobRunner):
         return emr_conn.describe_jobflow(self._emr_job_flow_id)
 
     def _describe_cluster(self):
-        emr_conn - self.make_emr_conn()
+        emr_conn = self.make_emr_conn()
         return _boto_emr.describe_cluster(emr_conn, self._emr_job_flow_id)
+
+    def _list_steps_for_cluster(self, step_states=None):
+        """Get all steps for our cluster, potentially making multiple API calls
+
+        :type step_states: list
+        :param step_states: Filter by step states
+        """
+        emr_conn = self.make_emr_conn()
+
+        steps = []
+        marker = None
+
+        while True:
+            resp = _boto_emr.list_steps(emr_conn,
+                                        self._emr_job_flow_id,
+                                        step_states=step_states,
+                                        marker=marker)
+            steps.extend(getattr(resp, 'steps', []))
+            marker = getattr(resp, 'marker', '')
+
+            if not marker:
+                return steps
 
     def get_hadoop_version(self):
         if not self._inferred_hadoop_version:

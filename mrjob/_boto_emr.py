@@ -34,6 +34,25 @@ def describe_cluster(emr_conn, cluster_id):
     return emr_conn.get_object('DescribeCluster', params, Cluster)
 
 
+def list_bootstrap_actions(self, cluster_id, marker=None):
+    """
+    Get a list of bootstrap actions for an Elastic MapReduce cluster
+
+    :type cluster_id: str
+    :param cluster_id: The cluster id of interest
+    :type marker: str
+    :param marker: Pagination marker
+    """
+    params = {
+        'ClusterId': cluster_id
+    }
+
+    if marker:
+        params['Marker'] = marker
+
+    return self.get_object('ListBootstrapActions', params, BootstrapActionList)
+
+
 def list_clusters(emr_conn, created_after=None, created_before=None,
                   cluster_states=None, marker=None):
     """
@@ -105,6 +124,37 @@ class Arg(EmrObject):
 
     def endElement(self, name, value, connection):
         self.value = value
+
+
+class BootstrapAction(EmrObject):
+    Fields = set([
+        'Args',
+        'Name',
+        'Path',
+        'ScriptPath',
+    ])
+
+    def startElement(self, name, attrs, connection):
+        if name == 'Args':
+            self.args = ResultSet([('member', Arg)])
+            return self.args
+
+
+class BootstrapActionList(EmrObject):
+    Fields = set([
+        'Marker'
+    ])
+
+    def __init__(self, connection=None):
+        self.connection = connection
+        self.actions = None
+
+    def startElement(self, name, attrs, connection):
+        if name == 'BootstrapActions':
+            self.actions = ResultSet([('member', BootstrapAction)])
+            return self.actions
+        else:
+            return None
 
 
 class Cluster(EmrObject):

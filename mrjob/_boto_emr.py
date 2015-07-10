@@ -64,6 +64,30 @@ def list_clusters(emr_conn, created_after=None, created_before=None,
     return emr_conn.get_object('ListClusters', params, ClusterSummaryList)
 
 
+def list_steps(self, cluster_id, step_states=None, marker=None):
+    """
+    List cluster steps
+
+    :type cluster_id: str
+    :param cluster_id: The cluster id of interest
+    :type step_states: list
+    :param step_states: Filter by step states
+    :type marker: str
+    :param marker: Pagination marker
+    """
+    params = {
+        'ClusterId': cluster_id
+    }
+
+    if marker:
+        params['Marker'] = marker
+
+    if step_states:
+        self.build_list_params(params, step_states, 'StepStateList.member')
+
+    return self.get_object('ListSteps', params, StepSummaryList)
+
+
 # from boto/emr/emrobject.py
 
 class Application(EmrObject):
@@ -73,6 +97,14 @@ class Application(EmrObject):
         'Args',
         'AdditionalInfo'
     ])
+
+
+class Arg(EmrObject):
+    def __init__(self, connection=None):
+        self.value = None
+
+    def endElement(self, name, value, connection):
+        self.value = value
 
 
 class Cluster(EmrObject):
@@ -201,3 +233,64 @@ class KeyValue(EmrObject):
         'Key',
         'Value',
     ])
+
+
+class StepConfig(EmrObject):
+    Fields = set([
+        'Jar',
+        'MainClass'
+    ])
+
+    def __init__(self, connection=None):
+        self.connection = connection
+        self.properties = None
+        self.args = None
+
+    def startElement(self, name, attrs, connection):
+        if name == 'Properties':
+            self.properties = ResultSet([('member', KeyValue)])
+            return self.properties
+        elif name == 'Args':
+            self.args = ResultSet([('member', Arg)])
+            return self.args
+        else:
+            return None
+
+
+class StepSummary(EmrObject):
+    Fields = set([
+        'Id',
+        'Name'
+    ])
+
+    def __init__(self, connection=None):
+        self.connection = connection
+        self.status = None
+        self.config = None
+
+    def startElement(self, name, attrs, connection):
+        if name == 'Status':
+            self.status = ClusterStatus()
+            return self.status
+        elif name == 'Config':
+            self.config = StepConfig()
+            return self.config
+        else:
+            return None
+
+
+class StepSummaryList(EmrObject):
+    Fields = set([
+        'Marker'
+    ])
+
+    def __init__(self, connection=None):
+        self.connection = connection
+        self.steps = None
+
+    def startElement(self, name, attrs, connection):
+        if name == 'Steps':
+            self.steps = ResultSet([('member', StepSummary)])
+            return self.steps
+        else:
+            return None

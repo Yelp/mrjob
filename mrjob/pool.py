@@ -22,6 +22,35 @@ from mrjob.parse import iso8601_to_datetime
 
 log = getLogger(__name__)
 
+### current versions of these functions, using "cluster" API calls ###
+
+# these are "hidden" because there's no need to access them directly
+
+def _est_time_to_hour(cluster, now=None):
+    """How long before job reaches the end of the next full hour since it
+    began. This is important for billing purposes.
+
+    If it happens to be exactly a whole number of hours, we return
+    one hour, not zero.
+    """
+    if now is None:
+        now = datetime.utcnow()
+
+    creationdatetime = getattr(job_flow, 'creationdatetime', None)
+    startdatetime = getattr(job_flow, 'startdatetime', None)
+
+    if creationdatetime:
+        if startdatetime:
+            start = iso8601_to_datetime(startdatetime)
+        else:
+            start = iso8601_to_datetime(job_flow.creationdatetime)
+    else:
+        # do something reasonable if creationdatetime isn't set
+        return timedelta(minutes=60)
+
+    run_time = now - start
+    return timedelta(seconds=((-run_time).seconds % 3600.0 or 3600.0))
+
 
 ### deprecated functions, used to support the old DescribeJobFlows API call ###
 
@@ -38,14 +67,16 @@ def est_time_to_hour(job_flow, now=None):
     if now is None:
         now = datetime.utcnow()
 
-    creationdatetime = getattr(job_flow, 'creationdatetime', None)
-    startdatetime = getattr(job_flow, 'startdatetime', None)
+    timeline = getattr(
+        getattr(cluster, 'status', None), 'timeline', None)
 
-    if creationdatetime:
-        if startdatetime:
-            start = iso8601_to_datetime(startdatetime)
-        else:
-            start = iso8601_to_datetime(job_flow.creationdatetime)
+    creationdatetime = getattr(timeline, 'creationdatetime', None)
+    startdatetime = getattr(timeline, 'startdatetime', None)
+
+    if startdatetime:
+        start = iso8601_to_datetime(startdatetime)
+    elif creationdatetime:
+        start = iso8601_to_datetime(creationdatetime)
     else:
         # do something reasonable if creationdatetime isn't set
         return timedelta(minutes=60)

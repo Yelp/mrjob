@@ -15,11 +15,9 @@
 import json
 
 from mrjob.iam import MRJOB_SERVICE_ROLE
-from mrjob.iam import MRJOB_SERVICE_ROLE_POLICY
 from mrjob.iam import _unwrap_response
 from mrjob.iam import _yield_instance_profiles
 from mrjob.iam import _yield_roles
-from mrjob.iam import _yield_attached_role_policies
 
 from tests.mockboto import MockIAMConnection
 from tests.py2 import TestCase
@@ -49,10 +47,9 @@ class PaginationTestCase(TestCase):
         max_items = conn.DEFAULT_MAX_ITEMS
 
         for i in range(2 * max_items):
-            conn.create_role('r-%03d' % i, MRJOB_SERVICE_ROLE)
+            conn.create_role('r-%03d' % i, json.dumps(MRJOB_SERVICE_ROLE))
 
-        roles_page = _unwrap_response(
-            conn.list_roles())['roles']
+        roles_page = _unwrap_response(conn.list_roles())['roles']
         self.assertEqual(len(roles_page), max_items)
 
         roles = list(_yield_roles(conn))

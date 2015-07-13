@@ -27,7 +27,7 @@ from subprocess import CalledProcessError
 
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner
-from mrjob.parse import JOB_NAME_RE
+from mrjob.parse import JOB_KEY_RE
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.runner import MRJobRunner
@@ -125,7 +125,7 @@ class TestJobName(TestCase):
 
     def test_empty(self):
         runner = InlineMRJobRunner(conf_paths=[])
-        match = JOB_NAME_RE.match(runner.get_job_name())
+        match = JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'no_script')
         self.assertEqual(match.group(2), getpass.getuser())
@@ -133,14 +133,14 @@ class TestJobName(TestCase):
     def test_empty_no_user(self):
         self.getuser_should_fail = True
         runner = InlineMRJobRunner(conf_paths=[])
-        match = JOB_NAME_RE.match(runner.get_job_name())
+        match = JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'no_script')
         self.assertEqual(match.group(2), 'no_user')
 
     def test_auto_label(self):
         runner = MRTwoStepJob(['--no-conf']).make_runner()
-        match = JOB_NAME_RE.match(runner.get_job_name())
+        match = JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'mr_two_step_job')
         self.assertEqual(match.group(2), getpass.getuser())
@@ -148,7 +148,7 @@ class TestJobName(TestCase):
     def test_auto_owner(self):
         os.environ['USER'] = 'mcp'
         runner = InlineMRJobRunner(conf_paths=[])
-        match = JOB_NAME_RE.match(runner.get_job_name())
+        match = JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'no_script')
         self.assertEqual(match.group(2), 'mcp')
@@ -158,7 +158,7 @@ class TestJobName(TestCase):
 
         os.environ['USER'] = 'mcp'
         runner = MRTwoStepJob(['--no-conf']).make_runner()
-        match = JOB_NAME_RE.match(runner.get_job_name())
+        match = JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'mr_two_step_job')
         self.assertEqual(match.group(2), 'mcp')
@@ -173,7 +173,7 @@ class TestJobName(TestCase):
     def test_owner_and_label_switches(self):
         runner_opts = ['--no-conf', '--owner=ads', '--label=ads_chain']
         runner = MRTwoStepJob(runner_opts).make_runner()
-        match = JOB_NAME_RE.match(runner.get_job_name())
+        match = JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'ads_chain')
         self.assertEqual(match.group(2), 'ads')
@@ -181,7 +181,7 @@ class TestJobName(TestCase):
     def test_owner_and_label_kwargs(self):
         runner = InlineMRJobRunner(conf_paths=[],
                                    owner='ads', label='ads_chain')
-        match = JOB_NAME_RE.match(runner.get_job_name())
+        match = JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'ads_chain')
         self.assertEqual(match.group(2), 'ads')
@@ -395,17 +395,18 @@ sys.exit(13)
         self.addCleanup(runner.cleanup)
 
         with no_handlers_for_logger():
-            self.assertRaises(CalledProcessError,
+            # sometimes we get a broken pipe error (IOError) on PyPy
+            self.assertRaises((CalledProcessError, IOError),
                               runner._invoke_sort, [self.a, self.b], self.out)
 
     def test_environment_variables_non_windows(self):
-        runner = MRJobRunner(conf_path=False)
+        runner = MRJobRunner(conf_paths=[])
         self.addCleanup(runner.cleanup)
 
         self.environment_variable_checks(runner, ['TEMP', 'TMPDIR'])
 
     def test_environment_variables_windows(self):
-        runner = MRJobRunner(conf_path=False)
+        runner = MRJobRunner(conf_paths=[])
         self.addCleanup(runner.cleanup)
 
         runner._sort_is_windows_sort = True

@@ -322,7 +322,7 @@ def terminate_and_notify(runner, to_terminate, dry_run=False,
                 runner._lock_uri(jf),
                 runner._opts['s3_sync_wait_time'],
                 '%s (%s)' % (msg,
-                             runner._make_unique_job_name(label='terminate')),
+                             runner._make_unique_job_key(label='terminate')),
                 mins_to_expiration=max_mins_locked,
             )
             if status:

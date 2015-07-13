@@ -30,10 +30,6 @@ __author__ = 'Matthew Tai <mtai@adku.com>'
 
 log = logging.getLogger(__name__)
 
-# Deprecated in favor of class variables, remove in v0.5.0
-DEFAULT_MAP_TASKS = 1
-DEFAULT_REDUCE_TASKS = 1
-
 
 class InlineMRJobRunner(SimMRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` in the same process, so it's easy
@@ -137,28 +133,30 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         has_combiner = (step_type == 'mapper' and 'combiner' in step)
 
-        # Use custom stdin
-        if has_combiner:
-            child_stdout = BytesIO()
-        else:
-            child_stdout = open(output_path, 'wb')
+        try:
+            # Use custom stdout
+            if has_combiner:
+                child_stdout = BytesIO()
+            else:
+                child_stdout = open(output_path, 'wb')
 
-        with save_current_environment():
-            with save_cwd():
-                os.environ.update(env)
-                os.chdir(working_dir)
+            with save_current_environment():
+                with save_cwd():
+                    os.environ.update(env)
+                    os.chdir(working_dir)
 
-                child_instance = self._mrjob_cls(args=child_args)
-                child_instance.sandbox(stdin=child_stdin, stdout=child_stdout)
-                child_instance.execute()
+                    child_instance = self._mrjob_cls(args=child_args)
+                    child_instance.sandbox(stdin=child_stdin,
+                                           stdout=child_stdout)
+                    child_instance.execute()
 
-        if has_combiner:
-            sorted_lines = sorted(child_stdout.getvalue().splitlines())
-            combiner_stdin = BytesIO(b'\n'.join(sorted_lines))
-        else:
-            child_stdout.flush()
-
-        child_stdout.close()
+            if has_combiner:
+                sorted_lines = sorted(child_stdout.getvalue().splitlines())
+                combiner_stdin = BytesIO(b'\n'.join(sorted_lines))
+            else:
+                child_stdout.flush()
+        finally:
+            child_stdout.close()
 
         while len(self._counters) <= step_num:
             self._counters.append({})

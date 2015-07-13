@@ -30,11 +30,6 @@ from mrjob.util import shlex_split
 log = logging.getLogger(__name__)
 
 
-# Deprecated in favor of class variables, remove in v0.5.0
-DEFAULT_MAP_TASKS = 2
-DEFAULT_REDUCE_TASKS = 2
-
-
 def _chain_procs(procs_args, **kwargs):
     """Input: List of lists of command line arguments.
 
@@ -240,11 +235,18 @@ class LocalMRJobRunner(SimMRJobRunner):
 
     def _wait_for_process(self, proc_dict, step_num):
         # handle counters, status msgs, and other stuff on stderr
+        proc = proc_dict['proc']
+
         stderr_lines = self._process_stderr_from_script(
-            proc_dict['proc'].stderr, step_num=step_num)
+            proc.stderr, step_num=step_num)
         tb_lines = find_python_traceback(stderr_lines)
 
-        returncode = proc_dict['proc'].wait()
+        # proc.stdout isn't always defined
+        if proc.stdout:
+            proc.stdout.close()
+        proc.stderr.close()
+
+        returncode = proc.wait()
 
         if returncode != 0:
             self.print_counters([step_num + 1])

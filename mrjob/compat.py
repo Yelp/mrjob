@@ -594,9 +594,6 @@ def jobconf_from_env(variable, default=None):
 
     return default
 
-# old, deprecated name for get_jobconf_value().
-get_jobconf_value = jobconf_from_env
-
 
 def jobconf_from_dict(jobconf, name, default=None):
     """Get the value of a jobconf variable from the given dictionary.

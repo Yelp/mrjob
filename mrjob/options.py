@@ -123,12 +123,6 @@ def add_runner_opts(opt_group, default_runner='local'):
             help=('Non-python command to run your script, e.g. "ruby".')),
 
         opt_group.add_option(
-            '--job-name', dest='job_name', default=None,
-            help='Specify the job name manually instead of asking mrjob for '
-                 'a unique name. Use this option if you want to give the job '
-                 'a descriptive name.'),
-
-        opt_group.add_option(
             '--no-bootstrap-mrjob', dest='bootstrap_mrjob',
             action='store_false', default=None,
             help=("Don't automatically tar up the mrjob library and install it"
@@ -236,12 +230,11 @@ def add_hadoop_emr_opts(opt_group):
 
         opt_group.add_option(
             '--label', dest='label', default=None,
-            help='custom prefix for job name, to help us identify the job'),
+            help='alternate label for the job, to help us identify it'),
 
         opt_group.add_option(
             '--owner', dest='owner', default=None,
-            help='custom username to use, to help us identify who ran the'
-            ' job'),
+            help='user who ran the job (if different from the current user)'),
 
         opt_group.add_option(
             '--partitioner', dest='partitioner', default=None,
@@ -295,11 +288,11 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--aws-availability-zone', dest='aws_availability_zone',
             default=None,
-            help='Availability zone to run the job flow on'),
+            help='Availability zone to run EMR jobs in.'),
 
         opt_group.add_option(
             '--aws-region', dest='aws_region', default=None,
-            help='Region to connect to S3 and EMR on (e.g. us-west-1).'),
+            help=('Region to run EMR jobs in. Default is us-west-2')),
 
         opt_group.add_option(
             '--bootstrap', dest='bootstrap', action='append',
@@ -420,7 +413,7 @@ def add_emr_opts(opt_group):
 
         opt_group.add_option(
             '--emr-endpoint', dest='emr_endpoint', default=None,
-            help=('Optional host to connect to when communicating with S3'
+            help=('Force mrjob to connect to EMR on this endpoint'
                   ' (e.g. us-west-1.elasticmapreduce.amazonaws.com). Default'
                   ' is to infer this from aws_region.')),
 
@@ -451,15 +444,15 @@ def add_emr_opts(opt_group):
                   ' Rarely necessary.')),
 
         opt_group.add_option(
+            '--iam-endpoint', dest='iam_endpoint', default=None,
+            help=('Force mrjob to connect to IAM on this endpoint'
+                  ' (e.g. iam.us-gov.amazonaws.com)')),
+
+        opt_group.add_option(
             '--iam-instance-profile', dest='iam_instance_profile',
             default=None,
             help=('EC2 instance profile to use for the EMR cluster - see'
                   ' "Configure IAM Roles for Amazon EMR" in AWS docs')),
-
-        opt_group.add_option(
-            '--iam-job-flow-role', dest='iam_job_flow_role',
-            default=None,
-            help='Deprecated alias for --iam-instance-profile'),
 
         opt_group.add_option(
             '--iam-service-role', dest='iam_service_role',
@@ -538,9 +531,10 @@ def add_emr_opts(opt_group):
 
         opt_group.add_option(
             '--s3-endpoint', dest='s3_endpoint', default=None,
-            help=('Host to connect to when communicating with S3 (e.g.'
-                  ' s3-us-west-1.amazonaws.com). Default is to infer this from'
-                  ' region (see --aws-region).')),
+            help=("Force mrjob to connect to S3 on this endpoint (e.g."
+                  " s3-us-west-1.amazonaws.com). You usually shouldn't"
+                  " set this; by default mrjob will choose the correct"
+                  " endpoint for each S3 bucket based on its location.")),
 
         opt_group.add_option(
             '--s3-log-uri', dest='s3_log_uri', default=None,

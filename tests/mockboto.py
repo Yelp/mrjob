@@ -16,9 +16,14 @@
 This is by no means a complete mock of boto, just what we need for tests.
 """
 import hashlib
-import json
+import itertools
+import os
+import shutil
+import tempfile
+import time
 from datetime import datetime
 from datetime import timedelta
+from io import BytesIO
 
 try:
     from boto.emr.connection import EmrConnection
@@ -30,10 +35,17 @@ except ImportError:
     boto = None
 
 from mrjob.conf import combine_values
+from mrjob.emr import EMRJobRunner
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import RFC1123
-from mrjob.py2 import quote
+from mrjob.ssh import SSH_LOG_ROOT
+
+from tests.mockssh import create_mock_ssh_script
+from tests.mockssh import mock_ssh_dir
+from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import patch
+from tests.sandbox import SandboxedTestCase
 
 DEFAULT_MAX_JOB_FLOWS_RETURNED = 500
 DEFAULT_MAX_DAYS_AGO = 61
@@ -69,22 +81,182 @@ def err_xml(message, type='Sender', code='ValidationError'):
 </ErrorResponse>""" % (type, code, message)
 
 
+### Test Case ###
+
+class MockBotoTestCase(SandboxedTestCase):
+
+    MAX_SIMULATION_STEPS = 100
+
+    @classmethod
+    def setUpClass(cls):
+        # we don't care what's in this file, just want mrjob to stop creating
+        # and deleting a complicated archive.
+        cls.fake_mrjob_tgz_path = tempfile.mkstemp(
+            prefix='fake_mrjob_', suffix='.tar.gz')[1]
+
+    @classmethod
+    def tearDownClass(cls):
+        if os.path.exists(cls.fake_mrjob_tgz_path):
+            os.remove(cls.fake_mrjob_tgz_path)
+
+    def setUp(self):
+        # patch boto
+        self.mock_emr_failures = {}
+        self.mock_emr_job_flows = {}
+        self.mock_emr_output = {}
+        self.mock_iam_instance_profiles = {}
+        self.mock_iam_role_attached_policies = {}
+        self.mock_iam_roles = {}
+        self.mock_s3_fs = {}
+
+        self.simulation_iterator = itertools.repeat(
+            None, self.MAX_SIMULATION_STEPS)
+
+        p_s3 = patch.object(boto, 'connect_s3', self._mock_boto_connect_s3)
+        self.addCleanup(p_s3.stop)
+        p_s3.start()
+
+        p_iam = patch.object(boto, 'connect_iam', self._mock_boto_connect_iam)
+        self.addCleanup(p_iam.stop)
+        p_iam.start()
+
+        p_emr = patch.object(
+            boto.emr.connection, 'EmrConnection',
+            self._mock_boto_emr_EmrConnection)
+        self.addCleanup(p_emr.stop)
+        p_emr.start()
+
+        super(MockBotoTestCase, self).setUp()
+
+        # patch slow things
+        def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
+            mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
+            return self.fake_mrjob_tgz_path
+
+        self.start(patch.object(
+            EMRJobRunner, '_create_mrjob_tar_gz',
+            fake_create_mrjob_tar_gz))
+
+        self.start(patch.object(
+            EMRJobRunner, '_wait_for_s3_eventual_consistency'))
+
+        self.start(patch.object(
+            EMRJobRunner, '_wait_for_job_flow_termination'))
+
+        self.start(patch.object(time, 'sleep'))
+
+    def add_mock_s3_data(self, data, time_modified=None, location=None):
+        """Update self.mock_s3_fs with a map from bucket name
+        to key name to data."""
+        add_mock_s3_data(self.mock_s3_fs, data, time_modified, location)
+
+    def prepare_runner_for_ssh(self, runner, num_slaves=0):
+        # TODO: Refactor this abomination of a test harness
+
+        # Set up environment variables
+        os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
+
+        # Create temporary directories and add them to MOCK_SSH_ROOTS
+        master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
+        os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % master_ssh_root
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
+
+        if not hasattr(self, 'slave_ssh_roots'):
+            self.slave_ssh_roots = []
+
+        self.addCleanup(self.teardown_ssh, master_ssh_root)
+
+        # Make the fake binary
+        os.mkdir(os.path.join(master_ssh_root, 'bin'))
+        self.ssh_bin = os.path.join(master_ssh_root, 'bin', 'ssh')
+        create_mock_ssh_script(self.ssh_bin)
+
+        # Make a fake keyfile so that the 'file exists' requirements are
+        # satsified
+        self.keyfile_path = os.path.join(master_ssh_root, 'key.pem')
+        with open(self.keyfile_path, 'w') as f:
+            f.write('I AM DEFINITELY AN SSH KEY FILE')
+
+        # Tell the runner to use the fake binary
+        runner._opts['ssh_bin'] = [self.ssh_bin]
+        # Inject master node hostname so it doesn't try to 'emr --describe' it
+        runner._address = 'testmaster'
+        # Also pretend to have an SSH key pair file
+        runner._opts['ec2_key_pair_file'] = self.keyfile_path
+
+        # re-initialize fs
+        runner._fs = None
+        runner._ssh_fs = None
+        runner._s3_fs = None
+        #runner.fs
+
+    def add_slave(self):
+        """Add a mocked slave to the cluster. Caller is responsible for setting
+        runner._opts['num_ec2_instances'] to the correct number.
+        """
+        slave_num = len(self.slave_ssh_roots)
+        new_dir = tempfile.mkdtemp(prefix='slave_%d_ssh_root.' % slave_num)
+        self.slave_ssh_roots.append(new_dir)
+        os.environ['MOCK_SSH_ROOTS'] += (':testmaster!testslave%d=%s'
+                                         % (slave_num, new_dir))
+
+    def teardown_ssh(self, master_ssh_root):
+        shutil.rmtree(master_ssh_root)
+        for path in self.slave_ssh_roots:
+            shutil.rmtree(path)
+
+    def run_and_get_job_flow(self, *args):
+        # set up a job flow without caring about what the job is or what its
+        # inputs are.
+        stdin = BytesIO(b'foo\nbar\n')
+        mr_job = MRTwoStepJob(
+            ['-r', 'emr', '-v'] + list(args))
+        mr_job.sandbox(stdin=stdin)
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            emr_conn = runner.make_emr_conn()
+            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+
+    def _mock_boto_connect_s3(self, *args, **kwargs):
+        kwargs['mock_s3_fs'] = self.mock_s3_fs
+        return MockS3Connection(*args, **kwargs)
+
+    def _mock_boto_emr_EmrConnection(self, *args, **kwargs):
+        kwargs['mock_s3_fs'] = self.mock_s3_fs
+        kwargs['mock_emr_job_flows'] = self.mock_emr_job_flows
+        kwargs['mock_emr_failures'] = self.mock_emr_failures
+        kwargs['mock_emr_output'] = self.mock_emr_output
+        kwargs['simulation_iterator'] = self.simulation_iterator
+        return MockEmrConnection(*args, **kwargs)
+
+    def _mock_boto_connect_iam(self, *args, **kwargs):
+        kwargs['mock_iam_instance_profiles'] = self.mock_iam_instance_profiles
+        kwargs['mock_iam_roles'] = self.mock_iam_roles
+        kwargs['mock_iam_role_attached_policies'] = (
+            self.mock_iam_role_attached_policies)
+        return MockIAMConnection(*args, **kwargs)
+
+
 ### S3 ###
 
-def add_mock_s3_data(mock_s3_fs, data, time_modified=None):
+def add_mock_s3_data(mock_s3_fs, data, time_modified=None, location=None):
     """Update mock_s3_fs (which is just a dictionary mapping bucket to
     key to contents) with a map from bucket name to key name to data and
     time last modified."""
     if time_modified is None:
         time_modified = datetime.utcnow()
     for bucket_name, key_name_to_bytes in data.items():
-        mock_s3_fs.setdefault(bucket_name, {'keys': {}, 'location': ''})
-        bucket = mock_s3_fs[bucket_name]
+        bucket = mock_s3_fs.setdefault(bucket_name,
+                                       {'keys': {}, 'location': ''})
 
         for key_name, key_data in key_name_to_bytes.items():
             if not isinstance(key_data, bytes):
                 raise TypeError('mock s3 data must be bytes')
             bucket['keys'][key_name] = (key_data, time_modified)
+
+        if location is not None:
+            bucket['location'] = location
 
 
 class MockS3Connection(object):
@@ -105,10 +277,20 @@ class MockS3Connection(object):
         """
         # use mock_s3_fs even if it's {}
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
-        self.endpoint = host or 's3.amazonaws.com'
+        self.host = host or 's3.amazonaws.com'
+
+    def _region(self):
+        """Infer region from self.host. Return '' if on regionless
+        endpoint."""
+        return self.host.split('.')[0][3:]
 
     def get_bucket(self, bucket_name, validate=True, headers=None):
         if bucket_name in self.mock_s3_fs:
+            # can't access buckets through wrong region's endpoint
+            region = self._region()
+            if region and self.mock_s3_fs[bucket_name]['location'] != region:
+                raise boto.exception.S3ResponseError(301, 'Moved Permanently')
+
             return MockBucket(connection=self, name=bucket_name)
         else:
             raise boto.exception.S3ResponseError(404, 'Not Found')
@@ -120,8 +302,13 @@ class MockS3Connection(object):
                       policy=None):
         if bucket_name in self.mock_s3_fs:
             raise boto.exception.S3CreateError(409, 'Conflict')
-        else:
-            self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': ''}
+
+        # for region endpoints, location constraint must match
+        region = self._region()
+        if region and region != location:
+            raise boto.exception.S3CreateError(409, 'Bad Request')
+
+        self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': location}
 
 
 class MockBucket(object):
@@ -157,9 +344,6 @@ class MockBucket(object):
 
     def get_location(self):
         return self.connection.mock_s3_fs[self.name]['location']
-
-    def set_location(self, new_location):
-        self.connection.mock_s3_fs[self.name]['location'] = new_location
 
     def list(self, prefix=''):
         for key_name in sorted(self.mock_state()):
@@ -411,16 +595,16 @@ class MockEmrConnection(object):
         self.max_job_flows_returned = max_job_flows_returned
         self.simulation_iterator = simulation_iterator
         if region is not None:
-            self.endpoint = region.endpoint
+            self.host = region.endpoint
         else:
-            self.endpoint = 'elasticmapreduce.amazonaws.com'
+            self.host = 'elasticmapreduce.amazonaws.com'
 
     def _enforce_strict_ssl(self):
         if (self.STRICT_SSL and
-            not self.endpoint.endswith('elasticmapreduce.amazonaws.com')):
+            not self.host.endswith('elasticmapreduce.amazonaws.com')):
             from boto.https_connection import InvalidCertificateException
             raise InvalidCertificateException(
-                self.endpoint, None, 'hostname mismatch')
+                self.host, None, 'hostname mismatch')
 
     def run_jobflow(self,
                     name, log_uri, ec2_keyname=None, availability_zone=None,
@@ -618,8 +802,14 @@ class MockEmrConnection(object):
         if api_params:
             job_flow.api_params = api_params
             if 'VisibleToAllUsers' in api_params:
-                job_flow.visibletoallusers = str(
-                    api_params['VisibleToAllUsers']).lower()
+                visible = api_params['VisibleToAllUsers']
+                if visible not in ('true', 'false'):
+                    raise boto.exception.EmrResponseError(
+                        400, 'Bad Request', err_xml(
+                            'boolean must follow xsd1.1 definition',
+                            code='MalformedInput'))
+
+                job_flow.visibletoallusers = visible
             if 'JobFlowRole' in api_params:
                 job_flow.jobflowrole = api_params['JobFlowRole']
             if 'ServiceRole' in api_params:
@@ -915,23 +1105,18 @@ class MockIAMConnection(object):
                  debug=0, https_connection_factory=None, path='/',
                  security_token=None, validate_certs=True, profile_name=None,
                  mock_iam_instance_profiles=None, mock_iam_roles=None,
-                 mock_iam_role_policies=None,
                  mock_iam_role_attached_policies=None):
         """Mock out connection to IAM.
 
-        mock_iam_instance_profiles maps profile name to a dictionary containing:
+        mock_iam_instance_profiles maps profile name to a dict containing:
             create_date -- ISO creation datetime
             path -- IAM path
             role_name -- name of single role for this instance profile, or None
 
-        mock_iam_roles maps role name to a dictionary containing:
+        mock_iam_roles maps role name to a dict containing:
             assume_role_policy_document -- a JSON-then-URI-encoded policy doc
             create_date -- ISO creation datetime
             path -- IAM path
-
-        mock_iam_role_policies maps policy name to a dictionary containing:
-            policy_document -- JSON-then-URI-encoded policy doc
-            role_name -- name of single role for this policy (always defined)
 
         mock_iam_role_attached_policies maps role to a list of ARNs for
         attached (managed) policies.
@@ -942,82 +1127,25 @@ class MockIAMConnection(object):
         self.mock_iam_instance_profiles = combine_values(
             {}, mock_iam_instance_profiles)
         self.mock_iam_roles = combine_values({}, mock_iam_roles)
-        self.mock_iam_role_policies = combine_values(
-            {}, mock_iam_role_policies)
         self.mock_iam_role_attached_policies = combine_values(
             {}, mock_iam_role_attached_policies)
 
+        self.host = host
+
     def get_response(self, action, params, path='/', parent=None,
                      verb='POST', list_marker='Set'):
-        # mrjob.iam currently only calls get_response(), to support old
-        # versions of boto. In real boto, the other methods call
-        # this one, but in mockboto, this method fans out to the other ones
-        if action == 'AddRoleToInstanceProfile':
-            return self.add_role_to_instance_profile(
-                params['InstanceProfileName'],
-                params['RoleName'])
+        # this only supports actions for which there is no method
+        # in boto's IAMConnection
 
-        elif action == 'AttachRolePolicy':
+        if action == 'AttachRolePolicy':
             return self._attach_role_policy(params['RoleName'],
                                             params['PolicyArn'])
-
-        elif action == 'CreateInstanceProfile':
-            return self.create_instance_profile(
-                params['InstanceProfileName'],
-                path=params.get('Path'))
-
-        elif action == 'CreateRole':
-            return self.create_role(
-                params['RoleName'],
-                json.loads(params['AssumeRolePolicyDocument']),
-                path=params.get('Path'))
-
-        elif action == 'GetRolePolicy':
-            return self.get_role_policy(
-                params['RoleName'],
-                params['PolicyName'])
 
         elif action == 'ListAttachedRolePolicies':
             if list_marker != 'AttachedPolicies':
                 raise ValueError
 
             return self._list_attached_role_policies(params['RoleName'])
-
-        elif action == 'ListInstanceProfiles':
-            if list_marker != 'InstanceProfiles':
-                raise ValueError
-
-            return self.list_instance_profiles(
-                path_prefix=params.get('PathPrefix'),
-                marker=params.get('Marker'),
-                max_items=params.get('MaxItems'))
-
-        elif action == 'ListRolePolicies':
-            if list_marker != 'PolicyNames':
-                raise ValueError
-
-            return self.list_role_policies(
-                params['RoleName'],
-                marker=params.get('Marker'),
-                max_items=params.get('MaxItems'))
-
-        elif action == 'ListRoles':
-            if list_marker != 'Roles':
-                raise ValueError
-
-            return self.list_roles(
-                path_prefix=params.get('PathPrefix'),
-                marker=params.get('Marker'),
-                max_items=params.get('MaxItems'))
-
-        elif action == 'PutRolePolicy':
-            # boto apparently doesn't make any attempt to
-            # JSON-encode the role policy for you!
-            return self.put_role_policy(
-                params['RoleName'],
-                params['PolicyName'],
-                params['PolicyDocument'])
-
 
         else:
             raise NotImplementedError(
@@ -1110,9 +1238,7 @@ class MockIAMConnection(object):
 
     def create_role(self, role_name, assume_role_policy_document, path=None):
         # real boto has a default for assume_role_policy_document; not
-        # supporting this for now. It also allows assume_role_policy_document
-        # to be a string, which we don't.
-
+        # supporting this for now
         self._check_path(path)
         self._check_role_does_not_exist(role_name)
 
@@ -1120,8 +1246,7 @@ class MockIAMConnection(object):
         # sure what the rules are
 
         self.mock_iam_roles[role_name] = dict(
-            assume_role_policy_document=quote(json.dumps(
-                assume_role_policy_document)),
+            assume_role_policy_document=assume_role_policy_document,
             create_date=to_iso8601(datetime.utcnow()),
             path=(path or self.DEFAULT_PATH),
             policy_names=[],
@@ -1175,56 +1300,6 @@ class MockIAMConnection(object):
             path=role_data['path']
         )
 
-    # (inline) role policies
-
-    def get_role_policy(self, role_name, policy_name):
-        self._check_role_exists(role_name)
-        self._check_role_policy_exists(policy_name, role_name)
-
-        result = self._describe_role_policy(policy_name)
-
-        return self._wrap_result('get_role_policy', result)
-
-    def list_role_policies(self, role_name, marker=None, max_items=None):
-        policy_names = [
-            name for name, data in sorted(self.mock_iam_role_policies.items())
-            if data['role_name'] == role_name]
-
-        result = self._paginate(policy_names, 'policy_names',
-                                marker=marker, max_items=max_items)
-
-        return self._wrap_result('list_role_policies', result)
-
-    def put_role_policy(self, role_name, policy_name, policy_document):
-        self._check_role_exists(role_name)
-
-        # PutRolePolicy will happily overwrite existing role policies
-        self.mock_iam_role_policies[policy_name] = dict(
-            policy_document=quote(policy_document),
-            role_name=role_name)
-
-        return self._wrap_result('put_role_policy')
-
-    def _check_role_policy_exists(self, policy_name, role_name):
-        if (policy_name not in self.mock_iam_role_policies or
-            self.mock_iam_role_policies[policy_name]['role_name'] != role_name):
-
-            # the IAM API really does raise this error when the role policy
-            # exists but has a different role name
-            raise boto.exception.BotoServerError(
-                404, 'Not Found', body=err_xml(
-                    ('The role policy with name %s cannot be found.' %
-                     role_name), code='NoSuchEntity'))
-
-    def _describe_role_policy(self, policy_name):
-        policy_data = self.mock_iam_role_policies[policy_name]
-
-        return dict(
-            policy_document=policy_data['policy_document'],
-            policy_name=policy_name,
-            role_name=policy_data['role_name'],
-        )
-
     # attached (managed) role policies
 
     # boto does not yet have methods for these
@@ -1238,8 +1313,15 @@ class MockIAMConnection(object):
 
         return self._wrap_result('attach_role_policy')
 
-    def _list_attached_role_policies(self, role_name):
+    def _list_attached_role_policies(
+            self, role_name, marker=None, max_items=None):
+
         self._check_role_exists(role_name)
+
+        # in theory, pagination is supported, but in practice each role
+        # can have a maximum of two policies attached
+        if marker or max_items:
+            raise NotImplementedError()
 
         arns = self.mock_iam_role_attached_policies.get(role_name, [])
 
@@ -1261,7 +1343,7 @@ class MockIAMConnection(object):
 
     def _paginate(self, items, name, marker=None, max_items=None):
         """Given a list of items, return a dictionary mapping
-        *names* to a slice of items, with additional keys
+        *name* to a slice of items, with additional keys
         'is_truncated' and, if 'is_truncated' is true, 'marker'.
         """
         max_items = max_items or self.DEFAULT_MAX_ITEMS

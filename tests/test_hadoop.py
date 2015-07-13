@@ -280,16 +280,16 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
         self.runner._add_job_files_for_upload()
 
         self.runner._hadoop_version='0.20.204'
-        self.simple_patch(self.runner, '_new_upload_args',
-                          return_value=['new_upload_args'])
-        self.simple_patch(self.runner, '_old_upload_args',
-                          return_value=['old_upload_args'])
-        self.simple_patch(self.runner, '_hadoop_args_for_step',
-                          return_value=['hadoop_args_for_step'])
-        self.simple_patch(self.runner, '_hdfs_step_input_files',
-                          return_value=['hdfs_step_input_files'])
-        self.simple_patch(self.runner, '_hdfs_step_output_dir',
-                          return_value='hdfs_step_output_dir')
+        self.start(patch.object(self.runner, '_new_upload_args',
+                                return_value=['new_upload_args']))
+        self.start(patch.object(self.runner, '_old_upload_args',
+                                return_value=['old_upload_args']))
+        self.start(patch.object(self.runner, '_hadoop_args_for_step',
+                                return_value=['hadoop_args_for_step']))
+        self.start(patch.object(self.runner, '_hdfs_step_input_files',
+                                return_value=['hdfs_step_input_files']))
+        self.start(patch.object(self.runner, '_hdfs_step_output_dir',
+                                return_value='hdfs_step_output_dir'))
         self.runner._script_path = 'my_job.py'
 
         self._new_basic_args = [
@@ -304,12 +304,6 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
              '-input', 'hdfs_step_input_files',
              '-output', 'hdfs_step_output_dir',
              'old_upload_args']
-
-    def simple_patch(self, obj, attr, side_effect=None, return_value=None):
-        patcher = patch.object(obj, attr, side_effect=side_effect,
-                               return_value=return_value)
-        patcher.start()
-        self.addCleanup(patcher.stop)
 
     def _assert_streaming_step(self, step, args):
         self.runner._steps = [step]

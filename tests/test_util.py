@@ -1,4 +1,4 @@
-# Copyright 2009-2013 Yelp and Contributors
+# Copyright 2009-2015 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,11 +26,11 @@ from subprocess import Popen
 
 from mrjob.aws import random_identifier
 from mrjob.py2 import PY2
+from mrjob.py2 import StringIO
 from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
-from mrjob.util import extract_dir_for_tar
 from mrjob.util import file_ext
-from mrjob.util import hash_object
+from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
 from mrjob.util import read_file
 from mrjob.util import read_input
@@ -38,44 +38,73 @@ from mrjob.util import safeeval
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import tar_and_gzip
 from mrjob.util import unarchive
+from mrjob.util import to_lines
 
 from tests.py2 import TestCase
 from tests.quiet import logger_disabled
+from tests.quiet import no_handlers_for_logger
 from tests.sandbox import random_seed
 
 
-class BufferIteratorToLineIteratorTestCase(TestCase):
+class ToLinesTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(
-            list(buffer_iterator_to_line_iterator(_ for _ in ())),
+            list(to_lines(_ for _ in ())),
             [])
 
     def test_buffered_lines(self):
         self.assertEqual(
-            list(buffer_iterator_to_line_iterator(chunk for chunk in
-                                                  [b'The quick\nbrown fox\nju',
-                                                   b'mped over\nthe lazy\ndog',
-                                                   b's.\n'])),
+            list(to_lines(chunk for chunk in
+                          [b'The quick\nbrown fox\nju',
+                           b'mped over\nthe lazy\ndog',
+                           b's.\n'])),
             [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
              b'dogs.\n'])
 
-    def test_add_trailing_newline(self):
+    def test_empty_chunks(self):
         self.assertEqual(
-            list(buffer_iterator_to_line_iterator(chunk for chunk in
-                                                  [b'Alouette,\ngentille',
-                                                   b' Alouette.'])),
-            [b'Alouette,\n', b'gentille Alouette.\n'])
+            list(to_lines(chunk for chunk in
+                          [b'',
+                           b'The quick\nbrown fox\nju',
+                           b'', b'', b'',
+                           b'mped over\nthe lazy\ndog',
+                           b'',
+                           b's.\n',
+                           b''])),
+            [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
+             b'dogs.\n'])
+
+    def test_no_trailing_newline(self):
+        self.assertEqual(
+            list(to_lines(chunk for chunk in
+                          [b'Alouette,\ngentille',
+                           b' Alouette.'])),
+            [b'Alouette,\n', b'gentille Alouette.'])
 
     def test_long_lines(self):
         super_long_line = b'a' * 10000 + b'\n' + b'b' * 1000 + b'\nlast\n'
         self.assertEqual(
-            list(buffer_iterator_to_line_iterator(
+            list(to_lines(
                 chunk for chunk in
-                (super_long_line[0+i:1024+i] for i in range(0, len(super_long_line), 1024)))),
+                (super_long_line[0+i:1024+i]
+                 for i in range(0, len(super_long_line), 1024)))),
             [b'a' * 10000 + b'\n', b'b' * 1000 + b'\n', b'last\n'])
 
+    def test_deprecated_alias(self):
+        with no_handlers_for_logger('mrjob.util'):
+            stderr = StringIO()
+            log_to_stream('mrjob.util', stderr)
 
+            self.assertEqual(
+                list(buffer_iterator_to_line_iterator(chunk for chunk in
+                          [b'The quick\nbrown fox\nju',
+                           b'mped over\nthe lazy\ndog',
+                           b's.\n'])),
+            [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
+             b'dogs.\n'])
+
+            self.assertIn('has been renamed', stderr.getvalue())
 
 
 class CmdLineTestCase(TestCase):
@@ -377,16 +406,6 @@ class ArchiveTestCase(TestCase):
 
         self.ensure_expected_results(excluded_files=['baz'])
 
-    def test_extract_dir_for_tar(self):
-        join = os.path.join
-        tar_and_gzip(dir=join(self.tmp_dir, 'a'),
-                     out_path=join(self.tmp_dir, 'not_a.tar.gz'),
-                     prefix='b')
-
-        self.assertEqual(
-            extract_dir_for_tar(join(self.tmp_dir, 'not_a.tar.gz')),
-            'b')
-
     def archive_and_unarchive(self, extension, archive_template,
                               added_files=[]):
         join = os.path.join
@@ -568,11 +587,3 @@ class ReadFileTestCase(TestCase):
                 output.append(line)
 
         self.assertEqual(output, [b'bar\n', b'bar\n', b'foo\n'])
-
-
-class HashObjectTestCase(TestCase):
-
-    def test_works_at_all(self):
-        # this was broken on Python 3
-        with logger_disabled('mrjob.util'):
-            self.assertNotEqual(hash_object('foo'), hash_object({}))

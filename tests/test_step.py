@@ -60,40 +60,6 @@ class JarStepTestCase(TestCase):
         self.assertEqual(JarStep(**kwargs).description(0), expected)
 
 
-class JarStepDeprecatedArgumentsTestCase(TestCase):
-
-    def test_positional(self):
-        with logger_disabled('mrjob.step'):
-            self.assertEqual(
-                JarStep('foo', 'bell.jar', 'First', ['one', '2']),
-                JarStep(jar='bell.jar', main_class='First', args=['one', '2'])
-            )
-
-    def test_mixed(self):
-        with logger_disabled('mrjob.step'):
-            self.assertEqual(
-                JarStep('foo', jar='bell.jar', args=['3', 'four']),
-                JarStep(jar='bell.jar', args=['3', 'four'])
-            )
-
-    def test_step_args_kwarg(self):
-        with logger_disabled('mrjob.step'):
-            self.assertEqual(
-                JarStep(jar='bell.jar', step_args=['5', 'six']),
-                JarStep(jar='bell.jar', args=['5', 'six'])
-            )
-
-    def test_name_kwarg(self):
-        with logger_disabled('mrjob.step'):
-            self.assertEqual(
-                JarStep(jar='pickle.jar', name='Bubbies'),
-                JarStep(jar='pickle.jar')
-            )
-
-    def test_bad_kwarg(self):
-        self.assertRaises(TypeError, JarStep, foo='bar')
-
-
 class MRStepInitTestCase(TestCase):
 
     ### Basic behavior ###

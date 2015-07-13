@@ -24,7 +24,7 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
-from mrjob.compat import version_gte
+from mrjob.aws import s3_endpoint_for_region
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
@@ -69,16 +69,6 @@ def wrap_aws_conn(raw_conn):
                         max_tries=EMR_MAX_TRIES)
 
 
-def _get_bucket(s3_conn, bucket_name):
-    """Wrapper for s3_conn.get_bucket().
-
-    This only validate buckets in boto >= 2.25.0, which features quick
-    validation using HEAD requests (see Issue #865).
-    """
-    return s3_conn.get_bucket(bucket_name,
-                              validate=version_gte(boto.Version, '2.25.0'))
-
-
 class S3Filesystem(Filesystem):
     """Filesystem for Amazon S3 URIs. Typically you will get one of these via
     ``EMRJobRunner().fs``, composed with
@@ -86,13 +76,14 @@ class S3Filesystem(Filesystem):
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
 
-    def __init__(self, aws_access_key_id, aws_secret_access_key, s3_endpoint,
-                 aws_security_token=None):
+    def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
+                 aws_security_token=None, s3_endpoint=None):
         """
         :param aws_access_key_id: Your AWS access key ID
         :param aws_secret_access_key: Your AWS secret access key
-        :param s3_endpoint: S3 endpoint to access, e.g.
-                            ``s3-us-west-2.amazonaws.com``
+        :param aws_security_token: security token for use with temporary
+                                   AWS credentials
+        :param s3_endpoint: If set, always use this endpoint
         """
         super(S3Filesystem, self).__init__()
         self._s3_endpoint = s3_endpoint
@@ -150,15 +141,14 @@ class S3Filesystem(Filesystem):
 
     def _s3_ls(self, uri):
         """Helper for ls(); doesn't bother with globbing or directories"""
-        s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        bucket = _get_bucket(s3_conn, bucket_name)
+        bucket = self.get_bucket(bucket_name)
         for key in bucket.list(key_name):
             yield s3_key_to_uri(key)
 
-    def md5sum(self, path, s3_conn=None):
-        k = self.get_s3_key(path, s3_conn=s3_conn)
+    def md5sum(self, path):
+        k = self.get_s3_key(path)
         return k.etag.strip('"')
 
     def _cat_file(self, filename):
@@ -194,19 +184,10 @@ class S3Filesystem(Filesystem):
         """Remove all files matching the given glob."""
         s3_conn = self.make_s3_conn()
         for uri in self.ls(path_glob):
-            key = self.get_s3_key(uri, s3_conn)
+            key = self.get_s3_key(uri)
             if key:
                 log.debug('deleting ' + uri)
                 key.delete()
-
-            # special case: when deleting a directory, also clean up
-            # the _$folder$ files that EMR creates.
-            if uri.endswith('/'):
-                folder_uri = uri[:-1] + '_$folder$'
-                folder_key = self.get_s3_key(folder_uri, s3_conn)
-                if folder_key:
-                    log.debug('deleting ' + folder_uri)
-                    folder_key.delete()
 
     def touchz(self, dest):
         """Make an empty file in the given location. Raises an error if
@@ -222,8 +203,15 @@ class S3Filesystem(Filesystem):
     # Try to use the more general filesystem interface unless you really
     # need to do something S3-specific (e.g. setting file permissions)
 
-    def make_s3_conn(self):
+    def make_s3_conn(self, region=''):
         """Create a connection to S3.
+
+        :param region: region to use to choose S3 endpoint.
+
+        If you are doing anything with buckets other than creating them
+        or fetching basic metadata (name and location), it's best to use
+        :py:meth:`get_bucket` because it chooses the appropriate S3 endpoint
+        automatically.
 
         :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a
                  :py:class:`mrjob.retry.RetryWrapper`
@@ -232,30 +220,44 @@ class S3Filesystem(Filesystem):
         if boto is None:
             raise ImportError('You must install boto to connect to S3')
 
-        log.debug('creating S3 connection (to %s)' % self._s3_endpoint)
+        # self._s3_endpoint overrides region
+        host = self._s3_endpoint or s3_endpoint_for_region(region)
+
+        log.debug('creating S3 connection (to %s)' % host)
 
         raw_s3_conn = boto.connect_s3(
             aws_access_key_id=self._aws_access_key_id,
             aws_secret_access_key=self._aws_secret_access_key,
-            host=self._s3_endpoint,
+            host=host,
             security_token=self._aws_security_token)
         return wrap_aws_conn(raw_s3_conn)
 
-    def get_s3_key(self, uri, s3_conn=None):
+    def get_bucket(self, bucket_name):
+        """Get the bucket, connecting through the appropriate endpoint."""
+        s3_conn = self.make_s3_conn()
+
+        bucket = s3_conn.get_bucket(bucket_name)
+        location = bucket.get_location()
+
+        # connect to bucket on proper endpoint
+        if (not self._s3_endpoint and
+            s3_endpoint_for_region(location) != s3_conn.host):
+
+            s3_conn = self.make_s3_conn(location)
+            bucket = s3_conn.get_bucket(bucket_name)
+
+        return bucket
+
+    def get_s3_key(self, uri):
         """Get the boto Key object matching the given S3 uri, or
         return None if that key doesn't exist.
 
         uri is an S3 URI: ``s3://foo/bar``
-
-        You may optionally pass in an existing s3 connection through
-        ``s3_conn``.
         """
-        if not s3_conn:
-            s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
         try:
-            bucket = _get_bucket(s3_conn, bucket_name)
+            bucket = self.get_bucket(bucket_name)
         except boto.exception.S3ResponseError as e:
             if e.status != 404:
                 raise e
@@ -265,75 +267,23 @@ class S3Filesystem(Filesystem):
 
         return key
 
-    def make_s3_key(self, uri, s3_conn=None):
+    def make_s3_key(self, uri):
         """Create the given S3 key, and return the corresponding
         boto Key object.
 
         uri is an S3 URI: ``s3://foo/bar``
-
-        You may optionally pass in an existing S3 connection through
-        ``s3_conn``.
         """
-        if not s3_conn:
-            s3_conn = self.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(uri)
 
-        return _get_bucket(s3_conn, bucket_name).new_key(key_name)
+        return self.get_bucket(bucket_name).new_key(key_name)
 
-    def get_s3_keys(self, uri, s3_conn=None):
+    def get_s3_keys(self, uri):
         """Get a stream of boto Key objects for each key inside
         the given dir on S3.
 
         uri is an S3 URI: ``s3://foo/bar``
-
-        You may optionally pass in an existing S3 connection through s3_conn
         """
-        if not s3_conn:
-            s3_conn = self.make_s3_conn()
-
         bucket_name, key_prefix = parse_s3_uri(uri)
-        bucket = _get_bucket(s3_conn, bucket_name)
+        bucket = self.get_bucket(bucket_name)
         for key in bucket.list(key_prefix):
             yield key
-
-    def get_s3_folder_keys(self, uri, s3_conn=None):
-        """.. deprecated:: 0.4.0
-
-        Background: EMR used to fake directories on S3 by creating special
-        ``*_$folder$`` keys in S3. That is no longer true, so this method is
-        deprecated.
-
-        For example if your job outputs ``s3://walrus/tmp/output/part-00000``,
-        EMR will also create these keys:
-
-        - ``s3://walrus/tmp_$folder$``
-        - ``s3://walrus/tmp/output_$folder$``
-
-        If you want to grant another Amazon user access to your files so they
-        can use them in S3, you must grant read access on the actual keys,
-        plus any ``*_$folder$`` keys that "contain" your keys; otherwise
-        EMR will error out with a permissions error.
-
-        This gets all the ``*_$folder$`` keys associated with the given URI,
-        as boto Key objects.
-
-        This does not support globbing.
-
-        You may optionally pass in an existing S3 connection through
-        ``s3_conn``.
-        """
-        log.warning(
-            'get_s3_folder_keys() is deprecated and will be removed in v0.5.0')
-
-        if not s3_conn:
-            s3_conn = self.make_s3_conn()
-
-        bucket_name, key_name = parse_s3_uri(uri)
-        bucket = _get_bucket(s3_conn, bucket_name)
-
-        dirs = key_name.split('/')
-        for i in range(len(dirs)):
-            folder_name = '/'.join(dirs[:i]) + '_$folder$'
-            key = bucket.get_key(folder_name)
-            if key:
-                yield key

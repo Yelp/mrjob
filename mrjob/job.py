@@ -351,37 +351,13 @@ class MRJob(MRJobLauncher):
         return [MRStep(**kwargs)]
 
     @classmethod
-    def mr(cls, *args, **kwargs):
-        """A deprecated wrapper for :py:class:`~mrjob.step.MRStep`, plus
-        a little logic to support deprecated use of positional arguments.
+    def mr(cls, **kwargs):
+        """A deprecated wrapper for :py:class:`~mrjob.step.MRStep`.
         """
-        if args:
-            log.warning('Using positional arguments to MRJob.mr() is'
-                        ' deprecated and will be removed in v0.5.0')
-        else:
-            log.warning('mr() is deprecated and will be removed in v0.6.0.'
-                        ' Use mrjob.step.MRStep directly instead.')
-
-        if len(args) > 0:
-            kwargs['mapper'] = args[0]
-
-        if len(args) > 1:
-            kwargs['reducer'] = args[1]
-
-        if len(args) > 2:
-            raise ValueError('mr() can take at most two positional arguments.')
+        log.warning('mr() is deprecated and will be removed in v0.6.0.'
+                    ' Use mrjob.step.MRStep directly instead.')
 
         return MRStep(**kwargs)
-
-    @classmethod
-    def jar(cls, *args, **kwargs):
-        """Alias for :py:class:`~mrjob.step.JarStep`.
-
-        .. deprecated:: 0.4.2
-        """
-        log.warning('MRJob.jar() is deprecated and will be removed in'
-                    ' v0.5.0. Use mrjob.step.JarStep directly.')
-        return JarStep(*args, **kwargs)
 
     def increment_counter(self, group, counter, amount=1):
         """Increment a counter in Hadoop streaming by printing to stderr.
@@ -1136,55 +1112,6 @@ class MRJob(MRJobLauncher):
     #:
     #: .. versionadded:: 0.4.1
     SORT_VALUES = None
-
-    ### Testing ###
-
-    def parse_counters(self, counters=None):
-        """.. deprecated:: 0.4.2
-
-        Parse the counters from the given sandboxed job's ``self.stderr``;
-        superseded :py:func:`mrjob.parse.parse_mr_job_stderr`.
-
-        This was only useful for testing individual mappers/reducers
-        without a runner; normally you'd just use
-        :py:meth:`runner.counters() <mrjob.runner.MRJobRunner.counters()>`.
-        """
-        if self.stderr == sys.stderr:
-            raise AssertionError('You must call sandbox() first;'
-                                 ' parse_counters() is for testing only.')
-
-        log.warning(
-            'parse_counters() is deprecated and will be removed in v0.5.0')
-
-        stderr_results = parse_mr_job_stderr(self.stderr.getvalue(), counters)
-        return stderr_results['counters']
-
-    def parse_output(self, protocol=None):
-        """.. deprecated:: 0.4.2
-
-        Parse the output from the given sandboxed job's ``self.stdout``.
-
-        This was only useful for testing individual mappers/reducers
-        without using a runner; normally you'd just use
-        :py:meth:`runner.stream_output()
-        <mrjob.runner.MRJobRunner.stream_output()>`
-
-        :type protocol: protocol
-        :param protocol: A protocol instance to use. Defaults to
-                         ``JSONProtocol()``.
-        """
-        if self.stdout == sys.stdout:
-            raise AssertionError('You must call sandbox() first;'
-                                 ' parse_output() is for testing only.')
-
-        log.warning(
-            'parse_output() is deprecated and will be removed in v0.5.0')
-
-        if protocol is None:
-            protocol = JSONProtocol()
-
-        lines = BytesIO(self.stdout.getvalue())
-        return [protocol.read(line) for line in lines]
 
 
 if __name__ == '__main__':

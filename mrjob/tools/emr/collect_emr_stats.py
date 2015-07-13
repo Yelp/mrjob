@@ -97,8 +97,8 @@ def pretty_print(stats):
 def collect_active_job_flows(conf_paths):
     """Collect active job flow information from EMR.
 
-    :param str conf_path: Alternate path to read :py:mod:`mrjob.conf` from,
-                          or ``False`` to ignore all config files
+    :param str conf_paths: List of alternate paths to read configs from, or
+                           or ``[]`` to ignore all config files
 
     Return a list of job flows
     """

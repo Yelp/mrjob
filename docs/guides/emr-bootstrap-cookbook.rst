@@ -151,7 +151,7 @@ into your newly upgraded version of Python. If you use other
 bootstrap commands to install/upgrade Python libraries, you should also
 run them *after* upgrading Python.
 
-When to use bootsrap, and when to use setup
+When to use bootstrap, and when to use setup
 -------------------------------------------
 
 You can use :mrjob-opt:`bootstrap` and :mrjob-opt:`setup` together.

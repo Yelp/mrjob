@@ -450,6 +450,9 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
     def _fix_deprecated_opts(self):
         # generalize this for other options
+        if self['hadoop_version'] is not None:
+            log.warning('hadoop_version no longer does anything on EMR'
+                        ' and will be removed in v0.5.0')
 
         if self['iam_job_flow_role'] is not None:
             log.warning('iam_job_flow_role is deprecated and wil be removed'
@@ -720,7 +723,7 @@ class EMRJobRunner(MRJobRunner):
         self._show_tracker_progress = False
 
         # init hadoop version cache
-        self._inferred_hadoop_version = None
+        self._hadoop_version = None
 
     def _fix_s3_scratch_and_log_uri_opts(self):
         """Fill in s3_scratch_uri and s3_log_uri (in self._opts) if they
@@ -1325,7 +1328,6 @@ class EMRJobRunner(MRJobRunner):
         args = {}
 
         args['ami_version'] = self._opts['ami_version']
-        args['hadoop_version'] = self._opts['hadoop_version']
 
         if self._opts['aws_availability_zone']:
             args['availability_zone'] = self._opts['aws_availability_zone']
@@ -1502,10 +1504,11 @@ class EMRJobRunner(MRJobRunner):
             'action_on_failure': self._action_on_failure,
         }
 
-        streaming_step_kwargs.update(self._cache_kwargs())
+        step_args = []
+        step_args.extend(self._upload_args(self._upload_mgr))
+        step_args.extend(self._hadoop_args_for_step(step_num))
 
-        streaming_step_kwargs['step_args'].extend(
-            self._hadoop_args_for_step(step_num))
+        streaming_step_kwargs['step_args'] = step_args
 
         mapper, combiner, reducer = (
             self._hadoop_streaming_commands(step_num))
@@ -1547,43 +1550,6 @@ class EMRJobRunner(MRJobRunner):
             main_class=step['main_class'],
             step_args=step_args,
             action_on_failure=self._action_on_failure)
-
-    def _cache_kwargs(self):
-        """Returns
-        ``{'step_args': [..], 'cache_files': [..], 'cache_archives': [..])``,
-        populating each according to the correct behavior for the current
-        Hadoop version.
-
-        For < 0.20, populate cache_files and cache_archives.
-        For >= 0.20, populate step_args.
-
-        step_args should be inserted into the step arguments before anything
-            else.
-
-        cache_files and cache_archives should be passed as arguments to
-            StreamingStep.
-        """
-        version = self.get_hadoop_version()
-
-        step_args = []
-        cache_files = []
-        cache_archives = []
-
-        if supports_new_distributed_cache_options(version):
-            # boto doesn't support non-deprecated 0.20 options, so insert
-            # them ourselves
-            step_args.extend(self._new_upload_args(self._upload_mgr))
-        else:
-            cache_files.extend(
-                self._arg_hash_paths('file', self._upload_mgr))
-            cache_archives.extend(
-                self._arg_hash_paths('archive', self._upload_mgr))
-
-        return {
-            'step_args': step_args,
-            'cache_files': cache_files,
-            'cache_archives': cache_archives,
-        }
 
     def _get_streaming_jar(self):
         if self._opts['hadoop_streaming_jar']:
@@ -2625,7 +2591,7 @@ class EMRJobRunner(MRJobRunner):
         return list(_list_all_steps(emr_conn, self._emr_job_flow_id))
 
     def get_hadoop_version(self):
-        if not self._inferred_hadoop_version:
+        if not self._hadoop_version:
             if not self._emr_job_flow_id:
                 raise AssertionError(
                     "We infer the hadoop version from the job flow. "
@@ -2637,19 +2603,10 @@ class EMRJobRunner(MRJobRunner):
             cluster = self._describe_cluster()
             for a in cluster.applications:
                 if a.name == 'hadoop':
-                    self._inferred_hadoop_version = a.version
+                    self._hadoop_version = a.version
                 break
 
-            # warn if the hadoop version specified does not match the
-            # inferred hadoop_version
-            hadoop_version = self._opts['hadoop_version']
-            if (hadoop_version and
-                    hadoop_version != self._inferred_hadoop_version):
-                log.warning(
-                    "Specified hadoop version (%s) does not match"
-                    " job flow hadoop version (%s)" % (
-                        hadoop_version, self._inferred_hadoop_version))
-        return self._inferred_hadoop_version
+        return self._hadoop_version
 
     def _address_of_master(self, emr_conn=None):
         """Get the address of the master node so we can SSH to it"""

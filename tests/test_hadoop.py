@@ -278,9 +278,9 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
         self.runner._add_job_files_for_upload()
 
         self.runner._hadoop_version='0.20.204'
-        self.simple_patch(self.runner, '_new_upload_args',
+        self.simple_patch(self.runner, '_upload_args',
                           return_value=['new_upload_args'])
-        self.simple_patch(self.runner, '_old_upload_args',
+        self.simple_patch(self.runner, '_pre_0_20_upload_args',
                           return_value=['old_upload_args'])
         self.simple_patch(self.runner, '_hadoop_args_for_step',
                           return_value=['hadoop_args_for_step'])

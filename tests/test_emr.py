@@ -265,7 +265,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.add_mock_s3_data({'walrus': {'data/foo': 'foo\n'}})
 
         # setup fake output
-        self.mock_emr_output = {('j-MOCKJOBFLOW0', 1): [
+        self.mock_emr_output = {('j-MOCKCLUSTER0', 1): [
             '1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n']}
 
         mr_job = MRHadoopFormatJob(['-r', 'emr', '-v',
@@ -303,7 +303,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             emr_conn = runner.make_emr_conn()
             cluster = emr_conn.describe_cluster(runner.get_emr_cluster_id())
-            self.assertEqual(cluster.status.state, 'COMPLETED')
+            self.assertEqual(cluster.status.state, 'TERMINATED')
             name_match = JOB_NAME_RE.match(cluster.name)
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
             self.assertEqual(name_match.group(2), getpass.getuser())
@@ -356,7 +356,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         mr_job.sandbox()
 
         self.add_mock_s3_data({'walrus': {}})
-        self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
+        self.mock_emr_failures = {('j-MOCKCLUSTER0', 0): None}
 
         with no_handlers_for_logger('mrjob.emr'):
             stderr = StringIO()
@@ -367,7 +367,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
                 self.assertRaises(Exception, runner.run)
                 # make sure job flow ID printed in error string
-                self.assertIn('Job on job flow j-MOCKJOBFLOW0 failed',
+                self.assertIn('Job on job flow j-MOCKCLUSTER0 failed',
                               stderr.getvalue())
 
                 emr_conn = runner.make_emr_conn()
@@ -388,7 +388,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.assertEqual(job_flow.state, 'TERMINATED')
 
     def _test_remote_scratch_cleanup(self, mode, scratch_len, log_len):
-        self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
+        self.add_mock_s3_data({'walrus': {'logs/j-MOCKCLUSTER0/1': '1\n'}})
         stdin = StringIO('foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
@@ -536,7 +536,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
         mr_job.sandbox()
 
         self.add_mock_s3_data({'walrus': {}})
-        self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
+        self.mock_emr_failures = {('j-MOCKCLUSTER0', 0): None}
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
@@ -1575,7 +1575,7 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
 
     def test_present_counters_running_job(self):
         self.add_mock_s3_data({'walrus': {
-            'logs/j-MOCKJOBFLOW0/jobs/job_0_1_hadoop_streamjob1.jar':
+            'logs/j-MOCKCLUSTER0/jobs/job_0_1_hadoop_streamjob1.jar':
             self.COUNTER_LINE}})
         self.runner._describe_jobflow().state = 'RUNNING'
         self.runner._fetch_counters([1], skip_s3_wait=True)
@@ -1584,7 +1584,7 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
 
     def test_present_counters_terminated_job(self):
         self.add_mock_s3_data({'walrus': {
-            'logs/j-MOCKJOBFLOW0/jobs/job_0_1_hadoop_streamjob1.jar':
+            'logs/j-MOCKCLUSTER0/jobs/job_0_1_hadoop_streamjob1.jar':
             self.COUNTER_LINE}})
         self.runner._describe_jobflow().state = 'TERMINATED'
         self.runner._fetch_counters([1], skip_s3_wait=True)
@@ -1593,7 +1593,7 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
 
     def test_present_counters_step_mismatch(self):
         self.add_mock_s3_data({'walrus': {
-            'logs/j-MOCKJOBFLOW0/jobs/job_0_1_hadoop_streamjob1.jar':
+            'logs/j-MOCKCLUSTER0/jobs/job_0_1_hadoop_streamjob1.jar':
             self.COUNTER_LINE}})
         self.runner._describe_jobflow().state = 'RUNNING'
         self.runner._fetch_counters([2], {2: 1}, skip_s3_wait=True)
@@ -2174,7 +2174,7 @@ class EMRNoMapperTest(MockEMRAndS3TestCase):
         self.add_mock_s3_data({'walrus': {'data/foo': 'foo\n'}})
 
         # setup fake output
-        self.mock_emr_output = {('j-MOCKJOBFLOW0', 1): [
+        self.mock_emr_output = {('j-MOCKCLUSTER0', 1): [
             '1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n']}
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
@@ -2701,7 +2701,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
                                '--pool-emr-job-flow'])
         mr_job.sandbox()
 
-        self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
+        self.mock_emr_failures = {('j-MOCKCLUSTER0', 0): None}
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
@@ -2736,7 +2736,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
                                '--pool-emr-job-flow'])
         mr_job.sandbox()
 
-        self.mock_emr_failures = {('j-MOCKJOBFLOW0', 0): None}
+        self.mock_emr_failures = {('j-MOCKCLUSTER0', 0): None}
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
@@ -3102,7 +3102,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
             with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
-                r._opts['emr_job_flow_id'] = 'j-MOCKJOBFLOW0'
+                r._opts['emr_job_flow_id'] = 'j-MOCKCLUSTER0'
                 r._cleanup_job_flow()
                 self.assertTrue(m().terminate_jobflow.called)
 

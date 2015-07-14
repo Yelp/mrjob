@@ -55,7 +55,7 @@ class AuditUsageTestCase(MockEMRAndS3TestCase):
         emr_conn.run_jobflow('no name', log_uri=None)
 
         main(['-q', '--no-conf'])
-        self.assertIn('j-MOCKJOBFLOW0', self.stdout.getvalue())
+        self.assertIn('j-MOCKCLUSTER0', self.stdout.getvalue())
 
 
 class JobFlowToFullSummaryTestCase(unittest.TestCase):

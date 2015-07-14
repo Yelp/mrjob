@@ -68,5 +68,5 @@ class JobFlowInspectionTestCase(ToolTestCase):
         self.monkey_patch_stdout()
         create_job_flow_main()
         self.assertEqual(list(self.mock_emr_job_flows.keys()),
-                         ['j-MOCKJOBFLOW0'])
-        self.assertEqual(self.stdout.getvalue(), 'j-MOCKJOBFLOW0\n')
+                         ['j-MOCKCLUSTER0'])
+        self.assertEqual(self.stdout.getvalue(), 'j-MOCKCLUSTER0\n')

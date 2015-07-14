@@ -737,6 +737,8 @@ class MockEmrConnection(object):
         return self._get_mock_cluster(cluster_id)
 
     def list_bootstrap_actions(self, cluster_id, marker=None):
+        self._enforce_strict_ssl()
+
         if marker is not None:
             raise NotImplementedError(
                 'marker not simulated for ListBootstrapActions')
@@ -747,6 +749,7 @@ class MockEmrConnection(object):
 
     def list_clusters(self, created_after=None, created_before=None,
                       cluster_states=None, marker=None):
+        self._enforce_strict_ssl()
 
         # summaries of cluster state, to return
         cluster_summaries = []
@@ -785,6 +788,8 @@ class MockEmrConnection(object):
         return MockEmrObject(clusters=cluster_summaries, marker=cluster_id)
 
     def list_instance_groups(self, cluster_id, marker=None):
+        self._enforce_strict_ssl()
+
         if marker is not None:
             raise NotImplementedError(
                 'marker not simulated for ListBootstrapActions')
@@ -794,6 +799,8 @@ class MockEmrConnection(object):
         return MockEmrObject(instancegroups=cluster._instancegroups)
 
     def list_steps(self, cluster_id, step_states=None, marker=None):
+        self._enforce_strict_ssl()
+
         if marker is not None:
             raise NotImplementedError(
                 'marker not simulated for ListBootstrapActions')
@@ -941,7 +948,7 @@ class MockEmrConnection(object):
 
             # start PENDING step
             if step.status.state == u'PENDING':
-                step.status.state == u'RUNNING'
+                step.status.state = u'RUNNING'
                 step.status.timeline.startdatetime = to_iso8601(now)
                 return
 
@@ -954,13 +961,13 @@ class MockEmrConnection(object):
                 step.status.state = u'FAILED'
 
             # found currently running step! going to handle it, then exit
-            if step.state == u'PENDING':
-                step.state = u'RUNNING'
-                step.startdatetime = to_iso8601(now)
+            if step.status.state == u'PENDING':
+                step.status.state = u'RUNNING'
+                step.status.timeline.startdatetime = to_iso8601(now)
                 return
 
-            assert step.state == u'RUNNING'
-            step.enddatetime = to_iso8601(now)
+            assert step.status.state == u'RUNNING'
+            step.status.timeline.enddatetime = to_iso8601(now)
 
             # check if we're supposed to have an error
             if (cluster_id, step_num) in self.mock_emr_failures:

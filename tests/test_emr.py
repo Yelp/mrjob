@@ -302,16 +302,18 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             self.assertTrue(any(runner.ls(runner.get_output_dir())))
 
             emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
-            self.assertEqual(job_flow.state, 'COMPLETED')
-            name_match = JOB_NAME_RE.match(job_flow.name)
+            cluster = emr_conn.describe_cluster(runner.get_emr_job_flow_id())
+            self.assertEqual(cluster.status.state, 'COMPLETED')
+            name_match = JOB_NAME_RE.match(cluster.name)
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
             self.assertEqual(name_match.group(2), getpass.getuser())
 
             # make sure our input and output formats are attached to
             # the correct steps
-            step_0_args = [arg.value for arg in job_flow.steps[0].args]
-            step_1_args = [arg.value for arg in job_flow.steps[1].args]
+            steps = emr_conn.list_steps(runner.get_emr_job_flow_id()).steps
+
+            step_0_args = [arg.value for arg in steps[0].config.args]
+            step_1_args = [arg.value for arg in steps[1].config.args]
 
             self.assertIn('-inputformat', step_0_args)
             self.assertNotIn('-outputformat', step_0_args)
@@ -342,12 +344,12 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         # job should get terminated
         emr_conn = runner.make_emr_conn()
-        job_flow_id = runner.get_emr_job_flow_id()
+        cluster_id = runner.get_emr_job_flow_id()
         for _ in xrange(10):
-            emr_conn.simulate_progress(job_flow_id)
+            emr_conn.simulate_progress(cluster_id)
 
-        job_flow = emr_conn.describe_jobflow(job_flow_id)
-        self.assertEqual(job_flow.state, 'TERMINATED')
+        cluster = emr_conn.describe_cluster(cluster_id)
+        self.assertEqual(cluster.status.state, 'TERMINATED')
 
     def test_failed_job(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '-v'])
@@ -439,39 +441,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.assertRaises(ValueError, self._test_remote_scratch_cleanup,
                           'GARBAGE', 0, 0)
 
-    def test_args_version_018(self):
-        self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
-        # read from STDIN, a local file, and a remote file
-        stdin = StringIO('foo\nbar\n')
-
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--hadoop-version=0.18', '--ami-version=1.0'])
-        mr_job.sandbox(stdin=stdin)
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-            step_args = [arg.value for arg in
-                         runner._describe_jobflow().steps[0].args]
-            self.assertNotIn('-files', step_args)
-            self.assertIn('-cacheFile', step_args)
-            self.assertNotIn('-combiner', step_args)
-
-    def test_args_version_020_205(self):
-        self.add_mock_s3_data({'walrus': {'logs/j-MOCKJOBFLOW0/1': '1\n'}})
-        # read from STDIN, a local file, and a remote file
-        stdin = StringIO('foo\nbar\n')
-
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--ami-version=2.0'])
-        mr_job.sandbox(stdin=stdin)
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-            step_args = [arg.value for arg in
-                         runner._describe_jobflow().steps[0].args]
-            self.assertIn('-files', step_args)
-            self.assertNotIn('-cacheFile', step_args)
-            self.assertIn('-combiner', step_args)
-
     def test_wait_for_job_flow_termination(self):
         # Test regression from #338 where _wait_for_job_flow_termination
         # would raise an IndexError whenever the job flow wasn't already
@@ -481,8 +450,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         with mr_job.make_runner() as runner:
             runner._add_job_files_for_upload()
             runner._launch_emr_job()
-            jf = runner._describe_jobflow()
-            jf.keepjobflowalivewhennosteps = 'false'
+            cluster = runner._describe_cluster
             runner._wait_for_job_flow_termination()
 
 

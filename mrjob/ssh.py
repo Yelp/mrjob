@@ -44,7 +44,7 @@ def _ssh_args(ssh_bin, address, ec2_key_pair_file):
     and adds the ``hadoop`` username.
     """
     if ec2_key_pair_file is None:
-        raise ValueError('SSH key file path cannot be None')
+        raise IOError('SSH key file path is None')
     return ssh_bin + [
         '-i', ec2_key_pair_file,
         '-o', 'StrictHostKeyChecking=no',

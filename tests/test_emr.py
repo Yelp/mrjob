@@ -56,7 +56,6 @@ from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
-from tests.mockboto import DEFAULT_MAX_JOB_FLOWS_RETURNED
 from tests.mockboto import MockEmrConnection
 from tests.mockboto import MockEmrObject
 from tests.mockboto import MockIAMConnection
@@ -132,7 +131,7 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
 
     def _mock_boto_emr_EmrConnection(self, *args, **kwargs):
         kwargs['mock_s3_fs'] = self.mock_s3_fs
-        kwargs['mock_emr_job_flows'] = self.mock_emr_job_flows
+        kwargs['mock_emr_clusters'] = self.mock_emr_clusters
         kwargs['mock_emr_failures'] = self.mock_emr_failures
         kwargs['mock_emr_output'] = self.mock_emr_output
         return MockEmrConnection(*args, **kwargs)
@@ -148,7 +147,7 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
     def setUp(self):
         # patch boto
         self.mock_emr_failures = {}
-        self.mock_emr_job_flows = {}
+        self.mock_emr_clusters = {}
         self.mock_emr_output = {}
         self.mock_iam_instance_profiles = {}
         self.mock_iam_role_attached_policies = {}
@@ -981,70 +980,6 @@ class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
                          conf_paths=[])
 
             self.assertIn('does not match bucket region', stderr.getvalue())
-
-
-class DescribeAllJobFlowsTestCase(MockEMRAndS3TestCase):
-
-    def test_can_get_more_job_flows_than_limit(self):
-        now = datetime.utcnow()
-
-        NUM_JOB_FLOWS = 2222
-        self.assertGreater(NUM_JOB_FLOWS, DEFAULT_MAX_JOB_FLOWS_RETURNED)
-
-        for i in range(NUM_JOB_FLOWS):
-            job_flow_id = 'j-%04d' % i
-            self.mock_emr_job_flows[job_flow_id] = MockEmrObject(
-                creationdatetime=to_iso8601(
-                    now - timedelta(minutes=i)),
-                jobflowid=job_flow_id)
-
-        # add a mock object without the jobflowid attribute
-        mock_job_flow_id = 5555
-        self.mock_emr_job_flows[mock_job_flow_id] = MockEmrObject(
-                        creationdatetime=to_iso8601(now))
-
-        emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-
-        # ordinary describe_jobflows() hits the limit on number of job flows
-        some_job_flows = emr_conn.describe_jobflows()
-        self.assertEqual(len(some_job_flows), DEFAULT_MAX_JOB_FLOWS_RETURNED)
-
-        all_job_flows = describe_all_job_flows(emr_conn)
-        self.assertEqual(len(all_job_flows), NUM_JOB_FLOWS)
-        self.assertEqual(sorted(jf.jobflowid for jf in all_job_flows),
-                         [('j-%04d' % i) for i in range(NUM_JOB_FLOWS)])
-
-    def test_no_params_hole(self):
-        # Issue #346: If we (incorrectly) include no parameters to
-        # DescribeJobFlows on our initial call, we'll skip over
-        # j-THREEWEEKSAGO, since it's neither currently active, nor
-        # in the last 2 weeks.
-
-        now = datetime.utcnow()
-
-        self.mock_emr_job_flows['j-THREEWEEKSAGO'] = MockEmrObject(
-            creationdatetime=to_iso8601(now - timedelta(weeks=3)),
-            jobflowid='j-THREEWEEKSAGO',
-            state='COMPLETED',
-        )
-
-        self.mock_emr_job_flows['j-LONGRUNNING'] = MockEmrObject(
-            creationdatetime=to_iso8601(now - timedelta(weeks=4)),
-            jobflowid='j-LONGRUNNING',
-            state='RUNNING',
-        )
-
-        emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-
-        # ordinary describe_jobflows() misses j-THREEWEEKSAGO
-        some_job_flows = emr_conn.describe_jobflows()
-        self.assertEqual(sorted(jf.jobflowid for jf in some_job_flows),
-                         ['j-LONGRUNNING'])
-
-        # describe_all_job_flows() should work around this
-        all_job_flows = describe_all_job_flows(emr_conn)
-        self.assertEqual(sorted(jf.jobflowid for jf in all_job_flows),
-                         ['j-LONGRUNNING', 'j-THREEWEEKSAGO'])
 
 
 class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
@@ -2613,7 +2548,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
 
         # fill the job flow
-        self.mock_emr_job_flows[job_flow_id].steps = 255 * [
+        self.mock_emr_clusters[job_flow_id].steps = 255 * [
             MockEmrObject(
                 state='COMPLETED',
                 name='dummy',
@@ -2630,7 +2565,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
         dummy_runner, job_flow_id = self.make_pooled_job_flow('pool1')
 
         # fill the job flow
-        self.mock_emr_job_flows[job_flow_id].steps = 255 * [
+        self.mock_emr_clusters[job_flow_id].steps = 255 * [
             MockEmrObject(
                 state='COMPLETED',
                 name='dummy',
@@ -2648,7 +2583,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
     def test_dont_join_idle_with_pending_steps(self):
         dummy_runner, job_flow_id = self.make_pooled_job_flow()
 
-        self.mock_emr_job_flows[job_flow_id].steps = [
+        self.mock_emr_clusters[job_flow_id].steps = [
             MockEmrObject(
                 state='PENDING',
                 mock_no_progress=True,
@@ -2662,7 +2597,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
     def test_do_join_idle_with_cancelled_steps(self):
         dummy_runner, job_flow_id = self.make_pooled_job_flow()
 
-        self.mock_emr_job_flows[job_flow_id].steps = [
+        self.mock_emr_clusters[job_flow_id].steps = [
             MockEmrObject(
                 state='FAILED',
                 name='step 1 of 2',

@@ -35,6 +35,7 @@ from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import RFC1123
 
+# list_clusters() only returns this many results at a time
 DEFAULT_MAX_CLUSTERS_RETURNED = 50
 
 # Size of each chunk returned by the MockKey iterator
@@ -674,7 +675,8 @@ class MockEmrConnection(object):
         elif action == 'ListClusters':
             created_after = self._unpack_datetime(params.get('CreatedAfter'))
             created_before = self._unpack_datetime(params.get('CreatedBefore'))
-            cluster_states = self._unpack_list_param('ClusterStates.member')
+            cluster_states = self._unpack_list_param('ClusterStates.member',
+                                                     params)
 
             return self.list_clusters(created_after=created_after,
                                       created_before=created_before,
@@ -685,11 +687,12 @@ class MockEmrConnection(object):
             return self.list_instance_groups(cluster_id, marker=marker)
 
         elif action == 'ListSteps':
-            step_states = self._unpack_list_param('StepStateList.member')
+            step_states = self._unpack_list_param('StepStateList.member',
+                                                  params)
 
-            return self._list_steps(cluster_id,
-                                    marker=marker,
-                                    step_states=step_states)
+            return self.list_steps(cluster_id,
+                                   marker=marker,
+                                   step_states=step_states)
 
         else:
             raise NotImplementedError(
@@ -790,14 +793,19 @@ class MockEmrConnection(object):
 
         return MockEmrObject(instancegroups=cluster._instancegroups)
 
-    def list_steps(self, cluster_id, marker=None):
+    def list_steps(self, cluster_id, step_states=None, marker=None):
         if marker is not None:
             raise NotImplementedError(
                 'marker not simulated for ListBootstrapActions')
 
         cluster = self._get_mock_cluster(cluster_id)
 
-        return MockEmrObject(steps=cluster._steps)
+        steps_listed = []
+        for step in cluster._steps:
+            if step_states is None or step.status.state in step_states:
+                steps_listed.append(step)
+
+        return MockEmrObject(steps=steps_listed)
 
     def add_jobflow_steps(self, jobflow_id, steps, now=None):
         self._enforce_strict_ssl()

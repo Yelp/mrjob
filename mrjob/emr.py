@@ -1192,29 +1192,33 @@ class EMRJobRunner(MRJobRunner):
             # we're taking down the job flow, don't bother
             return
 
-        error_msg = ('Unable to kill job without terminating job flow and'
-                     ' job is still running. You may wish to terminate it'
-                     ' yourself with "python -m mrjob.tools.emr.terminate_job_'
-                     'flow %s".' % self._emr_job_flow_id)
-
         try:
             addr = self._address_of_master()
         except IOError:
+            # if we can't get the address of the master node, job probably
+            # isn't running
             return
 
         if not self._ran_job:
-            try:
-                log.info("Attempting to terminate job...")
-                had_job = ssh_terminate_single_job(
-                    self._opts['ssh_bin'],
-                    addr,
-                    self._opts['ec2_key_pair_file'])
-                if had_job:
-                    log.info("Succeeded in terminating job")
-                else:
-                    log.info("Job appears to have already been terminated")
-            except IOError:
-                log.info(error_msg)
+            if self._opts['ec2_key_pair_file']:
+                try:
+                    log.info("Attempting to terminate job...")
+                    had_job = ssh_terminate_single_job(
+                        self._opts['ssh_bin'],
+                        addr,
+                        self._opts['ec2_key_pair_file'])
+                    if had_job:
+                        log.info("Succeeded in terminating job")
+                    else:
+                        log.info("Job appears to have already been terminated")
+                    return
+                except IOError:
+                    pass
+
+            log.info('Unable to kill job without terminating job flow and'
+                     ' job is still running. You may wish to terminate it'
+                     ' yourself with "python -m mrjob.tools.emr.terminate_job_'
+                     'flow %s".' % self._emr_job_flow_id)
 
     def _cleanup_job_flow(self):
         if not self._emr_job_flow_id:

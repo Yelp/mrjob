@@ -848,7 +848,10 @@ class MockEmrConnection(object):
 
         cluster = self._get_mock_cluster(jobflow_id)
 
-        # TODO: maybe raise exception if already terminated?
+        # already terminated
+        if cluster.status.state in (
+                u'TERMINATED', u'TERMINATED_WITH_ERRORS'):
+            return
 
         # mark cluster as shutting down
         cluster.status.state = u'TERMINATING'

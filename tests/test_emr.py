@@ -371,21 +371,22 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
                               stderr.getvalue())
 
                 emr_conn = runner.make_emr_conn()
-                job_flow_id = runner.get_emr_cluster_id()
+                cluster_id = runner.get_emr_cluster_id()
                 for _ in xrange(10):
-                    emr_conn.simulate_progress(job_flow_id)
+                    emr_conn.simulate_progress(cluster_id)
 
-                job_flow = emr_conn.describe_jobflow(job_flow_id)
-                self.assertEqual(job_flow.state, 'FAILED')
+                job_flow = emr_conn.describe_jobflow(cluster_id)
+                self.assertEqual(cluster.status.state,
+                                 'TERMINATED_WITH_ERRORS')
 
             # job should get terminated on cleanup
             emr_conn = runner.make_emr_conn()
-            job_flow_id = runner.get_emr_cluster_id()
+            cluster_id = runner.get_emr_cluster_id()
             for _ in xrange(10):
-                emr_conn.simulate_progress(job_flow_id)
+                emr_conn.simulate_progress(cluster_id)
 
-        job_flow = emr_conn.describe_jobflow(job_flow_id)
-        self.assertEqual(job_flow.state, 'TERMINATED')
+        cluster = emr_conn.describe_cluster(job_flow_id)
+        self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')
 
     def _test_remote_scratch_cleanup(self, mode, scratch_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKCLUSTER0/1': '1\n'}})

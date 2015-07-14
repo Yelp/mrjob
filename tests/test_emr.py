@@ -849,7 +849,7 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
         with mr_job.make_runner() as runner:
             runner.run()
             flow = runner.make_emr_conn().describe_jobflow(
-                runner._emr_job_flow_id)
+                runner._emr_cluster_id)
             self.assertEqual(flow.steps[0].name, 'Setup Hadoop Debugging')
 
 
@@ -2995,7 +2995,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
 
     def _quick_runner(self):
         r = EMRJobRunner(conf_paths=[])
-        r._emr_job_flow_id = 'j-ESSEOWENS'
+        r._emr_cluster_id = 'j-ESSEOWENS'
         r._address = 'Albuquerque, NM'
         r._ran_job = False
         return r

@@ -701,7 +701,7 @@ class EMRJobRunner(MRJobRunner):
         self._master_bootstrap_script_path = None
 
         # the ID assigned by EMR to this job (might be None)
-        self._emr_job_flow_id = self._opts['emr_job_flow_id']
+        self._emr_cluster_id = self._opts['emr_job_flow_id']
 
         # when did our particular task start?
         self._emr_job_start = None
@@ -819,7 +819,7 @@ class EMRJobRunner(MRJobRunner):
         log_uri = getattr(cluster, 'loguri', '')
         if log_uri:
             self._s3_job_log_uri = '%s%s/' % (
-                log_uri.replace('s3n://', 's3://'), self._emr_job_flow_id)
+                log_uri.replace('s3n://', 's3://'), self._emr_cluster_id)
 
     def _create_s3_temp_bucket_if_needed(self):
         """Make sure temp bucket exists"""
@@ -1120,7 +1120,7 @@ class EMRJobRunner(MRJobRunner):
         random_state = random.getstate()
         try:
             # seed random port selection on job flow ID
-            random.seed(self._emr_job_flow_id)
+            random.seed(self._emr_cluster_id)
             num_picks = min(MAX_SSH_RETRIES, len(self._opts['ssh_bind_ports']))
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
         finally:
@@ -1155,11 +1155,11 @@ class EMRJobRunner(MRJobRunner):
         # own already, but that's fine)
         # don't stop it if it was created due to --pool because the user
         # probably wants to use it again
-        if self._emr_job_flow_id and not self._opts['emr_job_flow_id'] \
+        if self._emr_cluster_id and not self._opts['emr_job_flow_id'] \
                 and not self._opts['pool_emr_job_flows']:
-            log.info('Terminating job flow: %s' % self._emr_job_flow_id)
+            log.info('Terminating job flow: %s' % self._emr_cluster_id)
             try:
-                self.make_emr_conn().terminate_jobflow(self._emr_job_flow_id)
+                self.make_emr_conn().terminate_jobflow(self._emr_cluster_id)
             except Exception as e:
                 log.exception(e)
 
@@ -1189,7 +1189,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _cleanup_job(self):
         # kill the job if we won't be taking down the whole job flow
-        if not (self._emr_job_flow_id or
+        if not (self._emr_cluster_id or
                 self._opts['emr_job_flow_id'] or
                 self._opts['pool_emr_job_flows']):
             # we're taking down the job flow, don't bother
@@ -1221,22 +1221,22 @@ class EMRJobRunner(MRJobRunner):
             log.info('Unable to kill job without terminating job flow and'
                      ' job is still running. You may wish to terminate it'
                      ' yourself with "python -m mrjob.tools.emr.terminate_job_'
-                     'flow %s".' % self._emr_job_flow_id)
+                     'flow %s".' % self._emr_cluster_id)
 
     def _cleanup_job_flow(self):
-        if not self._emr_job_flow_id:
+        if not self._emr_cluster_id:
             # If we don't have a job flow, then we can't terminate it.
             return
 
         emr_conn = self.make_emr_conn()
         try:
             log.info("Attempting to terminate job flow")
-            emr_conn.terminate_jobflow(self._emr_job_flow_id)
+            emr_conn.terminate_jobflow(self._emr_cluster_id)
         except Exception as e:
             # Something happened with boto and the user should know.
             log.exception(e)
             return
-        log.info('Job flow %s successfully terminated' % self._emr_job_flow_id)
+        log.info('Job flow %s successfully terminated' % self._emr_cluster_id)
 
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.
@@ -1558,33 +1558,33 @@ class EMRJobRunner(MRJobRunner):
             return self._opts['hadoop_streaming_jar_on_emr']
 
     def _launch_emr_job(self):
-        """Create an empty jobflow on EMR, and set self._emr_job_flow_id to
+        """Create an empty jobflow on EMR, and set self._emr_cluster_id to
         the ID for that job."""
         self._create_s3_temp_bucket_if_needed()
         emr_conn = self.make_emr_conn()
 
         # try to find a job flow from the pool. basically auto-fill
         # 'emr_job_flow_id' if possible and then follow normal behavior.
-        if self._opts['pool_emr_job_flows'] and not self._emr_job_flow_id:
+        if self._opts['pool_emr_job_flows'] and not self._emr_cluster_id:
             cluster_id = self._find_cluster(num_steps=len(self._get_steps()))
             if cluster_id:
-                self._emr_job_flow_id = cluster_id
+                self._emr_cluster_id = cluster_id
 
         # create a job flow if we're not already using an existing one
-        if not self._emr_job_flow_id:
-            self._emr_job_flow_id = self._create_job_flow(
+        if not self._emr_cluster_id:
+            self._emr_cluster_id = self._create_job_flow(
                 persistent=False)
             log.info('Created new job flow %s' %
-                     self._emr_job_flow_id)
+                     self._emr_cluster_id)
         else:
             log.info('Adding our job to existing job flow %s' %
-                     self._emr_job_flow_id)
+                     self._emr_cluster_id)
 
         # define out steps
         steps = self._build_steps()
         log.debug('Calling add_jobflow_steps(%r, %r)' % (
-            self._emr_job_flow_id, steps))
-        emr_conn.add_jobflow_steps(self._emr_job_flow_id, steps)
+            self._emr_cluster_id, steps))
+        emr_conn.add_jobflow_steps(self._emr_cluster_id, steps)
 
         # keep track of when we launched our job
         self._emr_job_start = time.time()
@@ -2219,10 +2219,10 @@ class EMRJobRunner(MRJobRunner):
 
         You can also fetch the job ID by calling self.get_emr_job_flow_id()
         """
-        if (self._emr_job_flow_id):
+        if (self._emr_cluster_id):
             raise AssertionError(
                 'This runner is already associated with job flow ID %s' %
-                (self._emr_job_flow_id))
+                (self._emr_cluster_id))
 
         log.info('Creating persistent job flow to run several jobs in...')
 
@@ -2232,12 +2232,12 @@ class EMRJobRunner(MRJobRunner):
         # don't allow user to call run()
         self._ran_job = True
 
-        self._emr_job_flow_id = self._create_job_flow(persistent=True)
+        self._emr_cluster_id = self._create_job_flow(persistent=True)
 
-        return self._emr_job_flow_id
+        return self._emr_cluster_id
 
     def get_emr_job_flow_id(self):
-        return self._emr_job_flow_id
+        return self._emr_cluster_id
 
     def _usable_clusters(self, emr_conn=None, exclude=None, num_steps=1):
         """Get clusters that this runner can join.
@@ -2582,17 +2582,17 @@ class EMRJobRunner(MRJobRunner):
 
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()
-        return _boto_emr.describe_cluster(emr_conn, self._emr_job_flow_id)
+        return _boto_emr.describe_cluster(emr_conn, self._emr_cluster_id)
 
     def _list_steps_for_cluster(self):
         """Get all steps for our cluster, potentially making multiple API calls
         """
         emr_conn = self.make_emr_conn()
-        return list(_list_all_steps(emr_conn, self._emr_job_flow_id))
+        return list(_list_all_steps(emr_conn, self._emr_cluster_id))
 
     def get_hadoop_version(self):
         if not self._hadoop_version:
-            if not self._emr_job_flow_id:
+            if not self._emr_cluster_id:
                 raise AssertionError(
                     "We infer the hadoop version from the job flow. "
                     "The job flow must created before the hadoop version "

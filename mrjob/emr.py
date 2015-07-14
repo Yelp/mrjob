@@ -2237,7 +2237,13 @@ class EMRJobRunner(MRJobRunner):
         return self._emr_cluster_id
 
     def get_emr_job_flow_id(self):
+        # deprecate this in v0.5.0
+        return self.get_emr_cluster_id()
+
+    # TODO: add to docs
+    def get_emr_cluster_id(self):
         return self._emr_cluster_id
+
 
     def _usable_clusters(self, emr_conn=None, exclude=None, num_steps=1):
         """Get clusters that this runner can join.

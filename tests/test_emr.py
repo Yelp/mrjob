@@ -19,7 +19,6 @@ import copy
 from datetime import datetime
 from datetime import timedelta
 import getpass
-import itertools
 import logging
 import os
 import os.path
@@ -127,8 +126,6 @@ class FastEMRTestCase(SandboxedTestCase):
 
 class MockEMRAndS3TestCase(FastEMRTestCase):
 
-    MAX_SIMULATION_STEPS = 100
-
     def _mock_boto_connect_s3(self, *args, **kwargs):
         kwargs['mock_s3_fs'] = self.mock_s3_fs
         return MockS3Connection(*args, **kwargs)
@@ -138,7 +135,6 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         kwargs['mock_emr_job_flows'] = self.mock_emr_job_flows
         kwargs['mock_emr_failures'] = self.mock_emr_failures
         kwargs['mock_emr_output'] = self.mock_emr_output
-        kwargs['simulation_iterator'] = self.simulation_iterator
         return MockEmrConnection(*args, **kwargs)
 
     def _mock_boto_connect_iam(self, *args, **kwargs):
@@ -159,9 +155,6 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         self.mock_iam_role_policies = {}
         self.mock_iam_roles = {}
         self.mock_s3_fs = {}
-
-        self.simulation_iterator = itertools.repeat(
-            None, self.MAX_SIMULATION_STEPS)
 
         p_s3 = patch.object(boto, 'connect_s3', self._mock_boto_connect_s3)
         self.addCleanup(p_s3.stop)

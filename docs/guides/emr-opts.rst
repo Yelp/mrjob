@@ -179,8 +179,8 @@ Job flow creation and configuration
     :set: emr
     :default: ``{}``
 
-    Metadata tags to apply to the EMR cluster after creating a
-    job flow. See `Tagging Amazon EMR Clusters`_ for more information
+    Metadata tags to apply to the EMR cluster after its
+    creation. See `Tagging Amazon EMR Clusters`_ for more information
     on applying metadata tags to EMR clusters.
 
     .. _`Tagging Amazon EMR Clusters`:

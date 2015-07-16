@@ -2224,7 +2224,7 @@ class EMRJobRunner(MRJobRunner):
         You can also fetch the job ID by calling self.get_emr_job_flow_id()
         """
         # deprecated this in v0.5.0
-        return self.make_persistent_cluster(self)
+        return self.make_persistent_cluster()
 
     def make_persistent_cluster(self):
         if (self._cluster_id):

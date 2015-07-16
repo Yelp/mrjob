@@ -712,10 +712,10 @@ class MockEmrConnection(object):
         marker = params.get('Marker')
 
         if action == 'DescribeCluster':
-            return self.describe_cluster(cluster_id)
+            return self._describe_cluster(cluster_id)
 
         elif action == 'ListBootstrapActions':
-            return self.list_bootstrap_actions(cluster_id, marker=marker)
+            return self._list_bootstrap_actions(cluster_id, marker=marker)
 
         elif action == 'ListClusters':
             created_after = self._unpack_datetime(params.get('CreatedAfter'))
@@ -723,21 +723,21 @@ class MockEmrConnection(object):
             cluster_states = self._unpack_list_param('ClusterStates.member',
                                                      params)
 
-            return self.list_clusters(created_after=created_after,
-                                      created_before=created_before,
-                                      cluster_states=cluster_states,
-                                      marker=marker)
+            return self._list_clusters(created_after=created_after,
+                                       created_before=created_before,
+                                       cluster_states=cluster_states,
+                                       marker=marker)
 
         elif action == 'ListInstanceGroups':
-            return self.list_instance_groups(cluster_id, marker=marker)
+            return self._list_instance_groups(cluster_id, marker=marker)
 
         elif action == 'ListSteps':
             step_states = self._unpack_list_param('StepStateList.member',
                                                   params)
 
-            return self.list_steps(cluster_id,
-                                   marker=marker,
-                                   step_states=step_states)
+            return self._list_steps(cluster_id,
+                                    marker=marker,
+                                    step_states=step_states)
 
         else:
             raise NotImplementedError(
@@ -774,14 +774,17 @@ class MockEmrConnection(object):
 
         return self.mock_emr_clusters[cluster_id]
 
-    def describe_cluster(self, cluster_id):
+    # "cluster" API calls missing from boto 2.2.0.
+    # In v0.5.0, remove the underscores
+
+    def _describe_cluster(self, cluster_id):
         self._enforce_strict_ssl()
 
         self.simulate_progress(cluster_id)
 
         return self._get_mock_cluster(cluster_id)
 
-    def list_bootstrap_actions(self, cluster_id, marker=None):
+    def _list_bootstrap_actions(self, cluster_id, marker=None):
         self._enforce_strict_ssl()
 
         if marker is not None:
@@ -792,7 +795,7 @@ class MockEmrConnection(object):
 
         return MockEmrObject(actions=cluster._bootstrapactions)
 
-    def list_clusters(self, created_after=None, created_before=None,
+    def _list_clusters(self, created_after=None, created_before=None,
                       cluster_states=None, marker=None):
         self._enforce_strict_ssl()
 
@@ -832,7 +835,7 @@ class MockEmrConnection(object):
 
         return MockEmrObject(clusters=cluster_summaries, marker=cluster_id)
 
-    def list_instance_groups(self, cluster_id, marker=None):
+    def _list_instance_groups(self, cluster_id, marker=None):
         self._enforce_strict_ssl()
 
         if marker is not None:
@@ -843,7 +846,7 @@ class MockEmrConnection(object):
 
         return MockEmrObject(instancegroups=cluster._instancegroups)
 
-    def list_steps(self, cluster_id, step_states=None, marker=None):
+    def _list_steps(self, cluster_id, step_states=None, marker=None):
         self._enforce_strict_ssl()
 
         if marker is not None:

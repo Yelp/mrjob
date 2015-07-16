@@ -244,11 +244,10 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         return mr_job.make_runner()
 
     def run_and_get_cluster(self, *args):
-        # not sure why we include -v
+        # TODO: not sure why we include -v
         with self.make_runner('-v', args) as runner:
             runner.run()
-            emr_conn = runner.make_emr_conn()
-            return emr_conn.describe_cluster(runner.get_cluster_id())
+            return runner._describe_cluster()
 
 
 class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
@@ -307,8 +306,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             self.assertTrue(os.path.exists(local_tmp_dir))
             self.assertTrue(any(runner.ls(runner.get_output_dir())))
 
-            emr_conn = runner.make_emr_conn()
-            cluster = emr_conn.describe_cluster(runner.get_cluster_id())
+            cluster = runner._describe_cluster()
             self.assertEqual(cluster.status.state, 'TERMINATED')
             name_match = JOB_NAME_RE.match(cluster.name)
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
@@ -316,6 +314,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
+            emr_conn = runner.make_emr_conn()
             steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
 
             step_0_args = [arg.value for arg in steps[0].config.args]
@@ -354,7 +353,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         for _ in xrange(10):
             emr_conn.simulate_progress(cluster_id)
 
-        cluster = emr_conn.describe_cluster(cluster_id)
+        cluster = runner._describe_cluster()
         self.assertEqual(cluster.status.state, 'TERMINATED')
 
     def test_failed_job(self):
@@ -381,7 +380,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
                 for _ in xrange(10):
                     emr_conn.simulate_progress(cluster_id)
 
-                cluster = emr_conn.describe_cluster(cluster_id)
+                cluster = _runner.describe_cluster()
                 self.assertEqual(cluster.status.state,
                                  'TERMINATED_WITH_ERRORS')
 
@@ -390,7 +389,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             for _ in xrange(10):
                 emr_conn.simulate_progress(cluster_id)
 
-        cluster = emr_conn.describe_cluster(runner.get_cluster_id())
+        cluster = runner._describe_cluster()
         self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')
 
     def _test_remote_scratch_cleanup(self, mode, scratch_len, log_len):

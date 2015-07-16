@@ -81,7 +81,6 @@ from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import random_identifier
 from mrjob.aws import s3_endpoint_for_region
 from mrjob.aws import s3_location_constraint_for_region
-from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
@@ -722,7 +721,8 @@ class EMRJobRunner(MRJobRunner):
         # turn off tracker progress until tunnel is up
         self._show_tracker_progress = False
 
-        # init hadoop version cache
+        # init hadoop, ami version caches
+        self._ami_version = None
         self._hadoop_version = None
 
     def _fix_s3_scratch_and_log_uri_opts(self):
@@ -2596,22 +2596,28 @@ class EMRJobRunner(MRJobRunner):
         return list(_list_all_steps(emr_conn, self._cluster_id))
 
     def get_hadoop_version(self):
-        if not self._hadoop_version:
-            if not self._cluster_id:
-                raise AssertionError(
-                    "We infer the hadoop version from the job flow. "
-                    "The job flow must created before the hadoop version "
-                    "can be inferred"
-                )
-
-            # infer the version from the job flow
-            cluster = self._describe_cluster()
-            for a in cluster.applications:
-                if a.name == 'hadoop':
-                    self._hadoop_version = a.version
-                break
-
+        if self._hadoop_version is None:
+            self._store_cluster_info()
         return self._hadoop_version
+
+    def get_ami_version(self):
+        if self._ami_version is None:
+            self._store_cluster_info()
+        return self._ami_version
+
+    def _store_cluster_info(self):
+        """Set self._ami_version and self._hadoop_version."""
+        if not self._cluster_id:
+            raise AssertionError('cluster has not yet been created')
+
+        cluster = self._describe_cluster()
+
+        self._ami_version = cluster.runningamiversion
+        for a in cluster.applications:
+            if a.name == 'hadoop':
+                self._hadoop_version = a.version
+
+        # TODO: could get masterpublicdnsname too
 
     def _address_of_master(self, emr_conn=None):
         """Get the address of the master node so we can SSH to it"""

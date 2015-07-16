@@ -30,6 +30,7 @@ try:
 except ImportError:
     boto = None
 
+from mrjob.compat import version_gte
 from mrjob.conf import combine_values
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
@@ -41,21 +42,34 @@ DEFAULT_MAX_CLUSTERS_RETURNED = 50
 # Size of each chunk returned by the MockKey iterator
 SIMULATED_BUFFER_SIZE = 256
 
-# the AMI version the EMR API picks if you don't specify one
-# (for old accounts; for new ones, it's 3.7.0)
-DEFAULT_AMI_VERSION = '1.0.0'
-
-# the AMI version given if you specify "latest"
-LATEST_AMI_VERSION = '2.4.2'
+# what partial versions and "latest" map to, as of 2015-07-15
+AMI_VERSION_ALIASES = {
+    None: '1.0.0',  # API does this for old accounts
+    '2.0': '2.0.6',
+    '2.1': '2.1.4',
+    '2.2': '2.2.4',
+    '2.3': '2.3.6',
+    '2.4': '2.4.11',
+    '3.0': '3.0.4',
+    '3.1': '3.1.4',
+    '3.2': '3.2.3',
+    '3.3': '3.3.2',
+    '3.4': '3.4.0',
+    '3.5': '3.5.0',
+    '3.6': '3.6.0',
+    '3.7': '3.7.0',
+    '3.8': '3.8.0',
+    'latest': '2.4.2',
+}
 
 # versions of hadoop for each AMI
-AMI_VERSION_TO_HADOOP_VERSION = {
-    '1.0': '0.20',
-    '1.0.0': '0.20',
-    '2.0': '0.20.205',
-    '2.0.0': '0.20.205',
-    '2.4.2': '0.20.205',
-}
+AMI_HADOOP_VERSION_UPDATES = [
+    ('1.0.0', '0.20'),
+    ('2.0.0', '0.20.205'),
+    ('2.2.0', '1.0.3'),
+    ('3.0.0', '2.2.0'),
+    ('3.1.0', '2.4.0'),
+]
 
 # extra step to use when debugging_step=True is passed to run_jobflow()
 DEBUGGING_STEP = JarStep(
@@ -456,26 +470,48 @@ class MockEmrConnection(object):
         if job_flow_role is None:
             job_flow_role = api_params.get('JobFlowRole')
 
+        if job_flow_role is None:
+            raise boto.exception.EmrResponseError(
+                400, 'Bad Request', body=err_xml(
+                    'InstanceProfile is required for creating cluster'))
+
         if service_role is None:
             service_role = api_params.get('ServiceRole')
+
+        if service_role is None:
+            raise boto.exception.EmrResponseError(
+                400, 'Bad Request', body=err_xml(
+                    'ServiceRole is required for creating cluster'))
 
         if visible_to_all_users is None:
             visible_to_all_users = (
                 api_params.get('VisibleToAllUsers') == 'true')
 
-        # Handle empty, "latest" AMI version
-        if ami_version is None:
-            running_ami_version = DEFAULT_AMI_VERSION
-        elif ami_version == 'latest':
-            running_ami_version = LATEST_AMI_VERSION
-        else:
-            running_ami_version = ami_version
+        # API no longer allows you to explicitly specify 1.x versions
+        if ami_version and ami_version.startswith('1.'):
+            raise boto.exception.EmrResponseError(
+                400, 'Bad Request', body=err_xml(
+                    'Job flow role is not compatible with the supplied'
+                    ' AMI version'))
+
+        # pick running AMI version
+        running_ami_version = AMI_VERSION_ALIASES.get(ami_version, ami_version)
 
         # determine Hadoop version
-        if running_ami_version not in AMI_VERSION_TO_HADOOP_VERSION:
-            raise boto.exception.EmrResponseError(400, 'Bad Request')
+        for av, hv in reversed(AMI_HADOOP_VERSION_UPDATES):
+            if version_gte(running_ami_version, av):
+                running_hadoop_version = hv
+                break
+        else:
+            running_hadoop_version = hv
 
-        hadoop_version = AMI_VERSION_TO_HADOOP_VERSION[running_ami_version]
+        # if hadoop_version is set, it should match
+        if not (hadoop_version is None or
+                hadoop_version == running_hadoop_version):
+            raise boto.exception.EmrResponseError(
+                400, 'Bad Request', body=err_xml(
+                    'The requested AMI version does not support the requested'
+                    ' Hadoop version'))
 
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunner uses
@@ -487,7 +523,7 @@ class MockEmrConnection(object):
         cluster = MockEmrObject(
             applications=[MockEmrObject(
                 name='hadoop',
-                version=hadoop_version,
+                version=running_hadoop_version,
             )],
             autoterminate=(u'false' if keep_alive else u'true'),
             ec2instanceattributes=MockEmrObject(
@@ -525,6 +561,15 @@ class MockEmrConnection(object):
             cluster._instancegroups = (
                 self._build_instance_groups_from_type_and_count(
                     master_instance_type, slave_instance_type, num_instances))
+
+        # 3.x AMIs don't support m1.small
+        if running_ami_version.startswith('3.') and any(
+                ig.instancetype == 'm1.small'
+                for ig in cluster._instancegroups):
+            raise boto.exception.EmrResponseError(
+                400, 'Bad Request', body=err_xml(
+                    'm1.small instance type is not supported with AMI'
+                    ' version %s' % running_ami_version))
 
         # will handle steps arg in a moment
         cluster._steps = []

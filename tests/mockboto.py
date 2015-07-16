@@ -551,9 +551,18 @@ class MockEmrConnection(object):
             visibletoallusers=('true' if visible_to_all_users else 'false')
         )
 
+        # this other information we want to store about the cluster doesn't
+        # actually get returned by DescribeCluster, so we keep it in
+        # "hidden" fields.
+
+        # need api_params for testing purposes
+        cluster._api_params = api_params
+
+        # bootstrap actions
         cluster._bootstrapactions = self._build_bootstrap_actions(
             bootstrap_actions)
 
+        # instance groups
         if instance_groups:
             cluster._instancegroups = (
                 self._build_instance_groups_from_list(instance_groups))

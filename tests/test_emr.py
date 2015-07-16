@@ -246,7 +246,7 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
 
     def run_and_get_cluster(self, *args):
         # TODO: not sure why we include -v
-        with self.make_runner('-v', args) as runner:
+        with self.make_runner('-v', *args) as runner:
             runner.run()
             return runner._describe_cluster()
 
@@ -683,25 +683,31 @@ class IAMTestCase(MockEMRAndS3TestCase):
 class EMRAPIParamsTestCase(MockEMRAndS3TestCase):
 
     def test_param_set(self):
-        cluster = self.run_and_get_cluster('--emr-api-param', 'Test.API=a', '--emr-api-param', 'Test.API2=b')
-        self.assertTrue('Test.API' in job_flow.api_params)
-        self.assertTrue('Test.API2' in job_flow.api_params)
-        self.assertEqual(job_flow.api_params['Test.API'], 'a')
-        self.assertEqual(job_flow.api_params['Test.API2'], 'b')
+        cluster = self.run_and_get_cluster(
+            '--emr-api-param', 'Test.API=a', '--emr-api-param', 'Test.API2=b')
+        self.assertTrue('Test.API' in cluster._api_params)
+        self.assertTrue('Test.API2' in cluster._api_params)
+        self.assertEqual(cluster._api_params['Test.API'], 'a')
+        self.assertEqual(cluster._api_params['Test.API2'], 'b')
 
     def test_param_unset(self):
-        cluster = self.run_and_get_cluster('--no-emr-api-param', 'Test.API', '--no-emr-api-param', 'Test.API2')
-        self.assertTrue('Test.API' in job_flow.api_params)
-        self.assertTrue('Test.API2' in job_flow.api_params)
-        self.assertIsNone(job_flow.api_params['Test.API'])
-        self.assertIsNone(job_flow.api_params['Test.API2'])
+        cluster = self.run_and_get_cluster(
+            '--no-emr-api-param', 'Test.API', '--no-emr-api-param', 'Test.API2')
+        self.assertTrue('Test.API' in cluster._api_params)
+        self.assertTrue('Test.API2' in cluster._api_params)
+        self.assertIsNone(cluster._api_params['Test.API'])
+        self.assertIsNone(cluster._api_params['Test.API2'])
 
     def test_invalid_param(self):
-        self.assertRaises(ValueError, self.run_and_get_cluster, '--emr-api-param', 'Test.API')
+        self.assertRaises(
+            ValueError, self.run_and_get_cluster,
+            '--emr-api-param', 'Test.API')
 
     def test_overrides(self):
-        cluster = self.run_and_get_cluster('--emr-api-param', 'VisibleToAllUsers=false', '--visible-to-all-users')
-        self.assertEqual(job_flow.visibletoallusers, 'false')
+        cluster = self.run_and_get_cluster(
+            '--emr-api-param', 'VisibleToAllUsers=false',
+            '--visible-to-all-users')
+        self.assertEqual(cluster.visibletoallusers, 'false')
 
     def test_no_emr_api_param_command_line_switch(self):
         job = MRWordCount([

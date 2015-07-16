@@ -47,6 +47,7 @@ from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
 from mrjob.emr import _yield_all_bootstrap_actions
+from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_instance_groups
 from mrjob.emr import _yield_all_steps
 from mrjob.parse import JOB_NAME_RE
@@ -1782,7 +1783,7 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
             self.assertEqual(emr_conn.endpoint,
                              'elasticmapreduce.us-west-1.amazonaws.com')
             # this should still work
-            self.assertEqual(emr_conn.describe_jobflows(), [])
+            self.assertEqual(list(_yield_all_clusters(emr_conn)), [])
             # but it's only because we've switched to the alternate hostname
             self.assertEqual(emr_conn.endpoint,
                              'us-west-1.elasticmapreduce.amazonaws.com')
@@ -1791,7 +1792,7 @@ class TestEMRandS3Endpoints(MockEMRAndS3TestCase):
         emr_conn = runner.make_emr_conn()
         self.assertEqual(emr_conn.endpoint,
                          'elasticmapreduce.us-west-1.amazonaws.com')
-        self.assertEqual(emr_conn.describe_jobflows(), [])
+        self.assertEqual(list(_yield_all_clusters(emr_conn)), [])
         self.assertEqual(emr_conn.endpoint,
                          'elasticmapreduce.us-west-1.amazonaws.com')
 

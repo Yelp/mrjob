@@ -1538,15 +1538,18 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
             's3_scratch_uri': 's3://walrus/',
             's3_sync_wait_time': 0}
         with EMRJobRunner(**kwargs) as runner:
-            self.job_flow_id = runner.make_persistent_job_flow()
-        self.runner = EMRJobRunner(emr_job_flow_id=self.job_flow_id, **kwargs)
+            cluster_id = runner.make_persistent_cluster()
+
+        self.runner = EMRJobRunner(emr_job_flow_id=cluster_id, **kwargs)
+        self.mock_cluster = self.mock_emr_clusters[cluster_id]
 
     def tearDown(self):
         super(CounterFetchingTestCase, self).tearDown()
         self.runner.cleanup()
 
     def test_empty_counters_running_job(self):
-        self.runner._describe_jobflow().state = 'RUNNING'
+        self.mock_cluster.status.state = 'RUNNING'
+
         with no_handlers_for_logger():
             stderr = StringIO()
             log_to_stream('mrjob.emr', stderr)
@@ -1557,7 +1560,8 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
         self.add_mock_s3_data({'walrus': {
             'logs/j-MOCKCLUSTER0/jobs/job_0_1_hadoop_streamjob1.jar':
             self.COUNTER_LINE}})
-        self.runner._describe_jobflow().state = 'RUNNING'
+        self.mock_cluster.status.state = 'RUNNING'
+
         self.runner._fetch_counters([1], skip_s3_wait=True)
         self.assertEqual(self.runner.counters(),
                          [{'Job Counters ': {'Launched reduce tasks': 1}}])
@@ -1566,7 +1570,8 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
         self.add_mock_s3_data({'walrus': {
             'logs/j-MOCKCLUSTER0/jobs/job_0_1_hadoop_streamjob1.jar':
             self.COUNTER_LINE}})
-        self.runner._describe_jobflow().state = 'TERMINATED'
+        self.mock_cluster.status.state = 'TERMINATED'
+
         self.runner._fetch_counters([1], skip_s3_wait=True)
         self.assertEqual(self.runner.counters(),
                          [{'Job Counters ': {'Launched reduce tasks': 1}}])
@@ -1575,46 +1580,41 @@ class CounterFetchingTestCase(MockEMRAndS3TestCase):
         self.add_mock_s3_data({'walrus': {
             'logs/j-MOCKCLUSTER0/jobs/job_0_1_hadoop_streamjob1.jar':
             self.COUNTER_LINE}})
-        self.runner._describe_jobflow().state = 'RUNNING'
+        self.mock_cluster.status.state = 'RUNNING'
+
         self.runner._fetch_counters([2], {2: 1}, skip_s3_wait=True)
         self.assertEqual(self.runner.counters(),
                          [{'Job Counters ': {'Launched reduce tasks': 1}}])
 
-    def test_zero_log_generating_steps(self):
-        mock_steps = [
-            MockEmrObject(jar='x.jar',
-                          name=self.runner._job_name,
-                          state='COMPLETED'),
-            MockEmrObject(jar='x.jar',
-                          name=self.runner._job_name,
-                          state='COMPLETED'),
+    def _mock_step(self, jar):
+        return MockEmrObject(
+            config=MockEmrObject(jar=jar),
+            name=self.runner._job_name,
+            status=MockEmrObject(state='COMPLETED'))
+
+    def test_no_log_generating_steps(self):
+        self.mock_cluster.status.state = 'TERMINATED'
+        self.mock_cluster._steps = [
+            self._mock_step(jar='x.jar'),
+            self._mock_step(jar='x.jar'),
         ]
-        mock_jobflow = MockEmrObject(state='COMPLETED',
-                                    steps=mock_steps)
-        self.runner._describe_jobflow = Mock(return_value=mock_jobflow)
+
         self.runner._fetch_counters_s3 = Mock(return_value={})
+
         self.runner._wait_for_job_to_complete()
         self.runner._fetch_counters_s3.assert_called_with([], False)
 
     def test_interleaved_log_generating_steps(self):
-        mock_steps = [
-            MockEmrObject(jar='x.jar',
-                          name=self.runner._job_name,
-                          state='COMPLETED'),
-            MockEmrObject(jar='hadoop.streaming.jar',
-                          name=self.runner._job_name,
-                          state='COMPLETED'),
-            MockEmrObject(jar='x.jar',
-                          name=self.runner._job_name,
-                          state='COMPLETED'),
-            MockEmrObject(jar='hadoop.streaming.jar',
-                          name=self.runner._job_name,
-                          state='COMPLETED'),
+        self.mock_cluster.status.state = 'TERMINATED'
+        self.mock_cluster._steps = [
+            self._mock_step(jar='x.jar'),
+            self._mock_step(jar='hadoop.streaming.jar'),
+            self._mock_step(jar='x.jar'),
+            self._mock_step(jar='hadoop.streaming.jar'),
         ]
-        mock_jobflow = MockEmrObject(state='COMPLETED',
-                                    steps=mock_steps)
-        self.runner._describe_jobflow = Mock(return_value=mock_jobflow)
+
         self.runner._fetch_counters_s3 = Mock(return_value={})
+
         self.runner._wait_for_job_to_complete()
         self.runner._fetch_counters_s3.assert_called_with([1, 2], False)
 

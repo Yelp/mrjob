@@ -592,23 +592,13 @@ class IAMTestCase(MockEMRAndS3TestCase):
         self.addCleanup(p_iam.stop)
         p_iam.start()
 
-    def run_and_get_cluster(self, *args):
-        stdin = StringIO('foo\nbar\n')
-        mr_job = MRTwoStepJob(
-            ['-r', 'emr', '-v'] + list(args))
-        mr_job.sandbox(stdin=stdin)
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-            emr_conn = runner.make_emr_conn()
-            return emr_conn.describe_jobflow(runner.get_cluster_id())
-
     def test_role_auto_creation(self):
         cluster = self.run_and_get_cluster()
         self.assertTrue(boto.connect_iam.called)
 
         # check instance_profile
-        instance_profile_name = job_flow.jobflowrole
+        instance_profile_name = (
+            cluster.ec2instanceattributes.iaminstanceprofile)
         self.assertIsNotNone(instance_profile_name)
         self.assertTrue(instance_profile_name.startswith('mrjob-'))
         self.assertIn(instance_profile_name, self.mock_iam_instance_profiles)
@@ -617,7 +607,7 @@ class IAMTestCase(MockEMRAndS3TestCase):
                       self.mock_iam_role_attached_policies)
 
         # check service_role
-        service_role_name = job_flow.servicerole
+        service_role_name = cluster.servicerole
         self.assertIsNotNone(service_role_name)
         self.assertTrue(service_role_name.startswith('mrjob-'))
         self.assertIn(service_role_name, self.mock_iam_roles)
@@ -628,18 +618,19 @@ class IAMTestCase(MockEMRAndS3TestCase):
         self.assertNotEqual(instance_profile_name, service_role_name)
 
         # run again, and see if we reuse the roles
-        job_flow2 = self.run_and_get_cluster()
+        cluster2 = self.run_and_get_cluster()
 
-        self.assertEqual(job_flow2.jobflowrole, instance_profile_name)
-        self.assertEqual(job_flow2.servicerole, service_role_name)
-
+        self.assertEqual(cluster2.ec2instanceattributes.iaminstanceprofile,
+                         instance_profile_name)
+        self.assertEqual(cluster2.servicerole, service_role_name)
 
     def test_iam_instance_profile_option(self):
         cluster = self.run_and_get_cluster(
             '--iam-instance-profile', 'EMR_EC2_DefaultRole')
         self.assertTrue(boto.connect_iam.called)
 
-        self.assertEqual(job_flow.jobflowrole, 'EMR_EC2_DefaultRole')
+        self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
+                         'EMR_EC2_DefaultRole')
 
     def test_deprecated_job_flow_role_option(self):
         with logger_disabled('mrjob.emr'):
@@ -647,14 +638,15 @@ class IAMTestCase(MockEMRAndS3TestCase):
                 '--iam-job-flow-role', 'EMR_EC2_DefaultRole')
             self.assertTrue(boto.connect_iam.called)
 
-            self.assertEqual(job_flow.jobflowrole, 'EMR_EC2_DefaultRole')
+            self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
+                             'EMR_EC2_DefaultRole')
 
     def test_iam_service_role_option(self):
         cluster = self.run_and_get_cluster(
             '--iam-service-role', 'EMR_DefaultRole')
         self.assertTrue(boto.connect_iam.called)
 
-        self.assertEqual(job_flow.servicerole, 'EMR_DefaultRole')
+        self.assertEqual(cluster.servicerole, 'EMR_DefaultRole')
 
     def test_both_iam_options(self):
         cluster = self.run_and_get_cluster(
@@ -665,8 +657,9 @@ class IAMTestCase(MockEMRAndS3TestCase):
         # This gives them a plan B
         self.assertFalse(boto.connect_iam.called)
 
-        self.assertEqual(job_flow.jobflowrole, 'EMR_EC2_DefaultRole')
-        self.assertEqual(job_flow.servicerole, 'EMR_DefaultRole')
+        self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
+                         'EMR_EC2_DefaultRole')
+        self.assertEqual(cluster.servicerole, 'EMR_DefaultRole')
 
     def test_no_iam_access(self):
         ex = boto.exception.BotoServerError(403, 'Forbidden')
@@ -678,8 +671,9 @@ class IAMTestCase(MockEMRAndS3TestCase):
 
         self.assertTrue(boto.connect_iam.called)
 
-        self.assertEqual(job_flow.jobflowrole, 'EMR_EC2_DefaultRole')
-        self.assertEqual(job_flow.servicerole, 'EMR_DefaultRole')
+        self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
+                         'EMR_EC2_DefaultRole')
+        self.assertEqual(cluster.servicerole, 'EMR_DefaultRole')
 
 
 class EMRAPIParamsTestCase(MockEMRAndS3TestCase):

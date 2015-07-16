@@ -656,7 +656,8 @@ class MockEmrConnection(object):
                             'A master instance group must specify a single'
                             ' instance'))
 
-                mock_groups.append(emr_group)
+            # add mock instance group
+            mock_groups.append(emr_group)
 
         # TASK roles require CORE roles (to host HDFS)
         if 'TASK' in roles and 'CORE' not in roles:

@@ -44,9 +44,10 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import filechunkio
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
-from mrjob.emr import _yield_all_steps
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
+from mrjob.emr import _yield_all_instance_groups
+from mrjob.emr import _yield_all_steps
 from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import pool_hash_and_name
@@ -932,6 +933,8 @@ class ExtraBucketRegionTestCase(MockEMRAndS3TestCase):
 
 class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
 
+    maxDiff = None
+
     def _test_instance_groups(self, opts, **expected):
         """Run a job with the given option dictionary, and check for
         for instance, number, and optional bid price for each instance role.
@@ -941,53 +944,35 @@ class EC2InstanceGroupTestCase(MockEMRAndS3TestCase):
         <role>=(num_instances, instance_type, bid_price)
         """
         runner = EMRJobRunner(**opts)
+        cluster_id = runner.make_persistent_job_flow()
 
-        job_flow_id = runner.make_persistent_job_flow()
-        job_flow = runner.make_emr_conn().describe_jobflow(job_flow_id)
-
-        # convert expected to a dict of dicts
-        role_to_expected = {}
-        for role, (num, instance_type, bid_price) in expected.iteritems():
-            info = {
-                'instancerequestcount': str(num),
-                'instancetype': instance_type,
-            }
-            if bid_price:
-                info['market'] = 'SPOT'
-                info['bidprice'] = bid_price
-            else:
-                info['market'] = 'ON_DEMAND'
-
-            role_to_expected[role.upper()] = info
+        emr_conn = runner.make_emr_conn()
+        instance_groups = list(
+            _yield_all_instance_groups(emr_conn, cluster_id))
 
         # convert actual instance groups to dicts
         role_to_actual = {}
-        for ig in job_flow.instancegroups:
-            info = {}
-            for field in ('bidprice', 'instancerequestcount',
-                          'instancetype', 'market'):
-                if hasattr(ig, field):
-                    info[field] = getattr(ig, field)
-            role_to_actual[ig.instancerole] = info
+        for ig in instance_groups:
+            info = dict(
+                (field, getattr(ig, field, None))
+                for field in ('bidprice', 'instancetype',
+                              'market', 'requestedinstancecount'))
 
-        self.assertEqual(role_to_expected, role_to_actual)
+            role_to_actual[ig.instancegrouptype] = info
 
-        # also check master/slave and # of instance types
-        # this is mostly a sanity check of mockboto
-        expected_master_instance_type = role_to_expected.get(
-            'MASTER', {}).get('instancetype')
-        self.assertEqual(expected_master_instance_type,
-                         getattr(job_flow, 'masterinstancetype', None))
+        # convert expected to dicts
+        role_to_expected = {}
+        for role, (num, instance_type, bid_price) in expected.iteritems():
+            info = dict(
+                bidprice=(unicode(bid_price) if bid_price else None),
+                instancetype=unicode(instance_type),
+                market=(u'SPOT' if bid_price else u'ON_DEMAND'),
+                requestedinstancecount=unicode(num),
+            )
 
-        expected_slave_instance_type = role_to_expected.get(
-            'CORE', {}).get('instancetype')
-        self.assertEqual(expected_slave_instance_type,
-                         getattr(job_flow, 'slaveinstancetype', None))
+            role_to_expected[unicode(role.upper())] = info
 
-        expected_instance_count = str(sum(
-            int(info['instancerequestcount'])
-            for info in role_to_expected.itervalues()))
-        self.assertEqual(expected_instance_count, job_flow.instancecount)
+        self.assertEqual(role_to_actual, role_to_expected)
 
     def set_in_mrjob_conf(self, **kwargs):
         emr_opts = copy.deepcopy(self.MRJOB_CONF_CONTENTS)

@@ -876,10 +876,12 @@ class EMRJobRunner(MRJobRunner):
         return self._fs
 
     def _run(self):
-        self._prepare_for_launch()
-
-        self._launch_emr_job()
+        self._launch()
         self._wait_for_job_to_complete()
+
+    def _launch(self):
+        self._prepare_for_launch()
+        self._launch_emr_job()
 
     def _prepare_for_launch(self):
         self._check_input_exists()

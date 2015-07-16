@@ -957,21 +957,6 @@ class MockEmrConnection(object):
 
             assert step.status.state == u'RUNNING'
 
-            # finish RUNNING step
-
-            # failure
-            if (cluster_id, step_num) in self.mock_emr_failures:
-                step.status.state = u'FAILED'
-
-            # found currently running step! going to handle it, then exit
-            if step.status.state == u'PENDING':
-                step.status.state = u'RUNNING'
-                step.status.timeline.startdatetime = to_iso8601(now)
-                return
-
-            assert step.status.state == u'RUNNING'
-            step.status.timeline.enddatetime = to_iso8601(now)
-
             # check if we're supposed to have an error
             if (cluster_id, step_num) in self.mock_emr_failures:
                 step.status.state = u'FAILED'

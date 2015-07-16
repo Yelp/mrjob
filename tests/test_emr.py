@@ -375,17 +375,16 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
                 for _ in xrange(10):
                     emr_conn.simulate_progress(cluster_id)
 
-                job_flow = emr_conn.describe_jobflow(cluster_id)
+                cluster = emr_conn.describe_cluster(cluster_id)
                 self.assertEqual(cluster.status.state,
                                  'TERMINATED_WITH_ERRORS')
 
             # job should get terminated on cleanup
-            emr_conn = runner.make_emr_conn()
             cluster_id = runner.get_cluster_id()
             for _ in xrange(10):
                 emr_conn.simulate_progress(cluster_id)
 
-        cluster = emr_conn.describe_cluster(job_flow_id)
+        cluster = emr_conn.describe_cluster(runner.get_cluster_id())
         self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')
 
     def _test_remote_scratch_cleanup(self, mode, scratch_len, log_len):

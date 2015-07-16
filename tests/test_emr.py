@@ -112,7 +112,7 @@ class FastEMRTestCase(SandboxedTestCase):
                      fake_create_mrjob_tar_gz, autospec=True)
 
         self.simple_patch(EMRJobRunner, '_wait_for_s3_eventual_consistency')
-        self.simple_patch(EMRJobRunner, '_wait_for_job_flow_termination')
+        self.simple_patch(EMRJobRunner, '_wait_for_cluster_to_terminate')
         self.simple_patch(time, 'sleep')
 
     def simple_patch(self, obj, attr, side_effect=None, autospec=False,
@@ -447,8 +447,9 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         self.assertRaises(ValueError, self._test_remote_scratch_cleanup,
                           'GARBAGE', 0, 0)
 
-    def test_wait_for_job_flow_termination(self):
-        # Test regression from #338 where _wait_for_job_flow_termination
+    def test_wait_for_cluster_to_terminate(self):
+        # Test regression from #338 where _wait_for_cluster_to_terminate()
+        # (called _wait_for_job_flow_termination() at the time)
         # would raise an IndexError whenever the job flow wasn't already
         # finished
         mr_job = MRTwoStepJob(['-r', 'emr'])
@@ -457,7 +458,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             runner._add_job_files_for_upload()
             runner._launch_emr_job()
             cluster = runner._describe_cluster
-            runner._wait_for_job_flow_termination()
+            runner._wait_for_cluster_to_terminate()
 
 
 class S3ScratchURITestCase(MockEMRAndS3TestCase):

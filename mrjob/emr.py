@@ -1253,7 +1253,7 @@ class EMRJobRunner(MRJobRunner):
         return cluster.status.state in (
             'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS')
 
-    def _wait_for_job_flow_termination(self):
+    def _wait_for_cluster_to_terminate(self):
         cluster = self._describe_cluster()
 
         if (cluster.status.state == 'WAITING' and
@@ -2032,7 +2032,7 @@ class EMRJobRunner(MRJobRunner):
             lg_step_nums = step_nums
         log.info('Scanning S3 logs for probable cause of failure')
         self._wait_for_s3_eventual_consistency()
-        self._wait_for_job_flow_termination()
+        self._wait_for_cluster_to_terminate()
 
         task_attempt_logs = self.ls_task_attempt_logs_s3(step_nums)
         step_logs = self.ls_step_logs_s3(step_nums)

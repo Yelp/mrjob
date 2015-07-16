@@ -468,7 +468,7 @@ class MockEmrConnection(object):
 
         # default fields that can be set from api_params
         if job_flow_role is None:
-            job_flow_role = api_params.get('JobFlowRole')
+            job_flow_role = (api_params or {}).get('JobFlowRole')
 
         if job_flow_role is None:
             raise boto.exception.EmrResponseError(
@@ -476,7 +476,7 @@ class MockEmrConnection(object):
                     'InstanceProfile is required for creating cluster'))
 
         if service_role is None:
-            service_role = api_params.get('ServiceRole')
+            service_role = (api_params or {}).get('ServiceRole')
 
         if service_role is None:
             raise boto.exception.EmrResponseError(
@@ -485,7 +485,7 @@ class MockEmrConnection(object):
 
         if visible_to_all_users is None:
             visible_to_all_users = (
-                api_params.get('VisibleToAllUsers') == 'true')
+                (api_params or {}).get('VisibleToAllUsers') == 'true')
 
         # API no longer allows you to explicitly specify 1.x versions
         if ami_version and ami_version.startswith('1.'):

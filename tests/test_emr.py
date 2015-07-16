@@ -381,7 +381,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
                 for _ in xrange(10):
                     emr_conn.simulate_progress(cluster_id)
 
-                cluster = _runner.describe_cluster()
+                cluster = runner._describe_cluster()
                 self.assertEqual(cluster.status.state,
                                  'TERMINATED_WITH_ERRORS')
 

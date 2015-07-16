@@ -497,22 +497,23 @@ class S3ScratchURITestCase(MockEMRAndS3TestCase):
         self.assertEqual(runner2._opts['s3_scratch_uri'], s3_scratch_uri)
 
 
-class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
+class ExistingClusterTestCase(MockEMRAndS3TestCase):
 
-    def test_attach_to_existing_job_flow(self):
+    def test_attach_to_existing_cluster(self):
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
         # set log_uri to None, so that when we describe the job flow, it
         # won't have the loguri attribute, to test Issue #112
-        emr_job_flow_id = emr_conn.run_jobflow(
-            name='Development Job Flow', log_uri=None,
-            keep_alive=True)
+        cluster_id = emr_conn.run_jobflow(
+            name='Development Cluster', log_uri=None,
+            keep_alive=True, job_flow_role='fake-instance-profile',
+            service_role='fake-service-role')
 
         stdin = StringIO('foo\nbar\n')
-        self.mock_emr_output = {(emr_job_flow_id, 1): [
+        self.mock_emr_output = {(cluster_id, 1): [
             '1\t"bar"\n1\t"foo"\n2\tnull\n']}
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--emr-job-flow-id', emr_job_flow_id])
+                               '--emr-job-flow-id', cluster_id])
         mr_job.sandbox(stdin=stdin)
 
         results = []
@@ -534,16 +535,17 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
         # set log_uri to None, so that when we describe the job flow, it
         # won't have the loguri attribute, to test Issue #112
-        emr_job_flow_id = emr_conn.run_jobflow(
-            name='Development Job Flow', log_uri=None,
-            keep_alive=True)
+        cluster_id = emr_conn.run_jobflow(
+            name='Development Cluster', log_uri=None,
+            keep_alive=True, job_flow_role='fake-instance-profile',
+            service_role='fake-service-role')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--emr-job-flow-id', emr_job_flow_id])
+                               '--emr-job-flow-id', cluster_id])
         mr_job.sandbox()
 
         self.add_mock_s3_data({'walrus': {}})
-        self.mock_emr_failures = {('j-MOCKCLUSTER0', 0): None}
+        self.mock_emr_failures = set([('j-MOCKCLUSTER0', 0)])
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
@@ -552,21 +554,21 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
                 self.assertRaises(Exception, runner.run)
 
             emr_conn = runner.make_emr_conn()
-            job_flow_id = runner.get_cluster_id()
+            cluster_id = runner.get_cluster_id()
             for _ in xrange(10):
-                emr_conn.simulate_progress(job_flow_id)
+                emr_conn.simulate_progress(cluster_id)
 
-            job_flow = emr_conn.describe_jobflow(job_flow_id)
-            self.assertEqual(job_flow.state, 'WAITING')
+            cluster = runner._describe_cluster()
+            self.assertEqual(cluster.status.state, 'WAITING')
 
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
-        job_flow_id = runner.get_cluster_id()
+        cluster_id = runner.get_cluster_id()
         for _ in xrange(10):
-            emr_conn.simulate_progress(job_flow_id)
+            emr_conn.simulate_progress(cluster_id)
 
-        job_flow = emr_conn.describe_jobflow(job_flow_id)
-        self.assertEqual(job_flow.state, 'WAITING')
+        cluster = runner._describe_cluster()
+        self.assertEqual(cluster.status.state, 'WAITING')
 
 
 class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):

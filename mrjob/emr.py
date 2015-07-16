@@ -258,6 +258,8 @@ def describe_all_job_flows(emr_conn, states=None, jobflow_ids=None,
     :param created_after: Bound on job flow creation time
     :type created_before: datetime
     :param created_before: Bound on job flow creation time
+
+    .. deprecated:: 0.4.5
     """
     log.warning(
         'describe_all_job_flows() is deprecated and will be removed in v0.5.0')
@@ -2601,6 +2603,7 @@ class EMRJobRunner(MRJobRunner):
         return self._hadoop_version
 
     def get_ami_version(self):
+        """Get the AMI that our job flow is running."""
         if self._ami_version is None:
             self._store_cluster_info()
         return self._ami_version

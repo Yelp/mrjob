@@ -4,6 +4,7 @@ v0.4.5, 2015-??-?? -- IAM Fortified
      * aws_security_token for temporary credentials (#1003)
      * Use AWS managed policies when creating IAM objects (#1026)
      * Fall back to default role/instance profile when no IAM access (#1008)
+     * added get_ami_version() method
  * more efficient decoding of bz2 files
 
 v0.4.4, 2015-04-21 -- EMRgency!

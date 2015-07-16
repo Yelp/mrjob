@@ -44,6 +44,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import filechunkio
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
+from mrjob.emr import _list_all_steps
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
 from mrjob.parse import JOB_NAME_RE
@@ -315,7 +316,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            steps = emr_conn.list_steps(runner.get_cluster_id()).steps
+            steps = list(_list_all_steps(emr_conn, runner.get_cluster_id()))
 
             step_0_args = [arg.value for arg in steps[0].config.args]
             step_1_args = [arg.value for arg in steps[1].config.args]
@@ -767,7 +768,7 @@ class AMIAndHadoopVersionTestCase(MockEMRAndS3TestCase):
     def test_ami_version_1_0_no_longer_supported(self):
         with self.make_runner('--ami-version', '1.0') as runner:
             self.assertRaises(boto.exception.EmrResponseError,
-                              runner.run)
+                              runner._launch)
 
     def test_ami_version_2_0(self):
         with self.make_runner('--ami-version', '2.0') as runner:
@@ -813,28 +814,24 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
     }}}
 
     def test_availability_zone_config(self):
-        # Confirm that the mrjob.conf option 'aws_availability_zone' was
-        #   propagated through to the job flow
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v'])
-        mr_job.sandbox()
+        with self.make_runner() as runner:
+            runner.run()
 
-        with mr_job.make_runner() as runner:
+            cluster = runner._describe_cluster()
+            self.assertEqual(cluster.ec2instanceattributes.ec2availabilityzone,
+                             'PUPPYLAND')
+
+
+class EnableDebuggingTestCase(MockEMRAndS3TestCase):
+
+    def test_debugging_works(self):
+        with self.make_runner('--enable-emr-debugging') as runner:
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            job_flow_id = runner.get_cluster_id()
-            job_flow = emr_conn.describe_jobflow(job_flow_id)
-            self.assertEqual(job_flow.availabilityzone, 'PUPPYLAND')
+            steps = list(_list_all_steps(emr_conn, runner.get_cluster_id()))
 
-    def test_debugging_works(self):
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--enable-emr-debugging'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-            flow = runner.make_emr_conn().describe_jobflow(
-                runner._cluster_id)
-            self.assertEqual(flow.steps[0].name, 'Setup Hadoop Debugging')
+            self.assertEqual(steps[0].name, 'Setup Hadoop Debugging')
 
 
 class BucketRegionTestCase(MockEMRAndS3TestCase):

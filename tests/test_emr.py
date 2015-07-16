@@ -44,7 +44,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import filechunkio
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
-from mrjob.emr import _list_all_steps
+from mrjob.emr import _yield_all_steps
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
 from mrjob.parse import JOB_NAME_RE
@@ -316,7 +316,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            steps = list(_list_all_steps(emr_conn, runner.get_cluster_id()))
+            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
 
             step_0_args = [arg.value for arg in steps[0].config.args]
             step_1_args = [arg.value for arg in steps[1].config.args]
@@ -829,7 +829,7 @@ class EnableDebuggingTestCase(MockEMRAndS3TestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = list(_list_all_steps(emr_conn, runner.get_cluster_id()))
+            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
 
             self.assertEqual(steps[0].name, 'Setup Hadoop Debugging')
 

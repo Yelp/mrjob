@@ -211,14 +211,14 @@ def _repeat(api_call, *args, **kwargs):
             return
 
 
-def _list_all_clusters(emr_conn, *args, **kwargs):
+def _yield_all_clusters(emr_conn, *args, **kwargs):
     """Make successive API calls, yielding clusters."""
     for resp in _repeat(_boto_emr.list_clusters, emr_conn, *args, **kwargs):
         for cluster in getattr(resp, 'clusters', []):
             yield cluster
 
 
-def _list_all_bootstrap_actions(emr_conn, cluster_id, *args, **kwargs):
+def _yield_all_bootstrap_actions(emr_conn, cluster_id, *args, **kwargs):
     for resp in _repeat(
             _boto_emr.list_bootstrap_actions,
             emr_conn, cluster_id, *args, **kwargs):
@@ -226,7 +226,7 @@ def _list_all_bootstrap_actions(emr_conn, cluster_id, *args, **kwargs):
             yield action
 
 
-def _list_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
+def _yield_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
     for resp in _repeat(
             _boto_emr.list_instance_groups,
             emr_conn, cluster_id, *args, **kwargs):
@@ -234,7 +234,7 @@ def _list_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
             yield group
 
 
-def _list_all_steps(emr_conn, cluster_id, *args, **kwargs):
+def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
     for resp in _repeat(_boto_emr.list_steps,
                         emr_conn, cluster_id, *args, **kwargs):
         for step in getattr(resp, 'steps', []):
@@ -2322,7 +2322,7 @@ class EMRJobRunner(MRJobRunner):
                 return
 
             # match pool name, and (bootstrap) hash
-            bootstrap_actions = _list_all_bootstrap_actions(
+            bootstrap_actions = _yield_all_bootstrap_actions(
                 emr_conn, cluster.id)
             pool_hash, pool_name = _pool_hash_and_name(bootstrap_actions)
 
@@ -2347,7 +2347,7 @@ class EMRJobRunner(MRJobRunner):
                 if not ami_version.startswith(self._opts['ami_version']):
                     return
 
-            steps = list(_list_all_steps(emr_conn, cluster.id))
+            steps = list(_yield_all_steps(emr_conn, cluster.id))
 
             # there is a hard limit of 256 steps per job flow
             if len(steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
@@ -2373,7 +2373,7 @@ class EMRJobRunner(MRJobRunner):
 
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
-            for ig in list(_list_all_instance_groups(emr_conn, cluster.id)):
+            for ig in list(_yield_all_instance_groups(emr_conn, cluster.id)):
                 role = ig.instancegrouptype.lower()
 
                 # unknown, new kind of role; bail out!
@@ -2439,7 +2439,7 @@ class EMRJobRunner(MRJobRunner):
 
             key_cluster_steps_list.append((sort_key, cluster.id, len(steps)))
 
-        for cluster in list(_list_all_clusters(
+        for cluster in list(_yield_all_clusters(
                 emr_conn, cluster_states=['WAITING'])):
             add_if_match(cluster)
 
@@ -2597,7 +2597,7 @@ class EMRJobRunner(MRJobRunner):
         """Get all steps for our cluster, potentially making multiple API calls
         """
         emr_conn = self.make_emr_conn()
-        return list(_list_all_steps(emr_conn, self._cluster_id))
+        return list(_yield_all_steps(emr_conn, self._cluster_id))
 
     def get_hadoop_version(self):
         if self._hadoop_version is None:

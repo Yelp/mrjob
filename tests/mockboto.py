@@ -517,7 +517,7 @@ class MockEmrConnection(object):
         # need to fill in the fields that EMRJobRunner uses
         steps = steps or []
 
-        cluster_id = u'j-MOCKCLUSTER%d' % len(self.mock_emr_clusters)
+        cluster_id = 'j-MOCKCLUSTER%d' % len(self.mock_emr_clusters)
         assert cluster_id not in self.mock_emr_clusters
 
         cluster = MockEmrObject(
@@ -525,7 +525,7 @@ class MockEmrConnection(object):
                 name='hadoop',
                 version=running_hadoop_version,
             )],
-            autoterminate=(u'false' if keep_alive else u'true'),
+            autoterminate=('false' if keep_alive else 'true'),
             ec2instanceattributes=MockEmrObject(
                 ec2availabilityzone=availability_zone,
                 ec2keyname=ec2_keyname,
@@ -534,21 +534,21 @@ class MockEmrConnection(object):
             id=cluster_id,
             loguri=log_uri,
             # TODO: set this later, once cluster is running
-            masterpublicdnsname=u'mockmaster',
+            masterpublicdnsname='mockmaster',
             name=name,
-            normalizedinstancehours=u'0',
+            normalizedinstancehours='0',
             requestedamiversion=ami_version,
             runningamiversion=running_ami_version,
             servicerole=service_role,
             status=MockEmrObject(
-                state=u'STARTING',
+                state='STARTING',
                 statechangereason=MockEmrObject(),
                 timeline=MockEmrObject(
                     creationdatetime=to_iso8601(now)),
             ),
             tags=[],
-            terminationprotected=u'false',
-            visibletoallusers=(u'true' if visible_to_all_users else u'false')
+            terminationprotected='false',
+            visibletoallusers=('true' if visible_to_all_users else 'false')
         )
 
         cluster._bootstrapactions = self._build_bootstrap_actions(
@@ -606,14 +606,14 @@ class MockEmrConnection(object):
                         'An instance group must have at least one instance'))
 
             emr_group = MockEmrObject(
-                id=u'ig-FAKE',
+                id='ig-FAKE',
                 instancegrouptype=instance_group.role,
                 instancetype=instance_group.type,
                 market=instance_group.market,
                 name=instance_group.name,
                 requestedinstancecount=unicode(instance_group.num_instances),
-                runninginstancecount=u'0',
-                status=MockEmrObject(state=u'PROVISIONING'),
+                runninginstancecount='0',
+                status=MockEmrObject(state='PROVISIONING'),
             )
 
             if instance_group.market == 'SPOT':
@@ -875,7 +875,7 @@ class MockEmrConnection(object):
             # there's also a "properties" field, but boto doesn't handle it
 
             step_status = MockEmrObject(
-                state=u'PENDING',
+                state='PENDING',
                 timeline=MockEmrObject(
                     creationdatetime=to_iso8601(now)),
             )
@@ -895,22 +895,22 @@ class MockEmrConnection(object):
 
         # already terminated
         if cluster.status.state in (
-                u'TERMINATED', u'TERMINATED_WITH_ERRORS'):
+                'TERMINATED', 'TERMINATED_WITH_ERRORS'):
             return
 
         # mark cluster as shutting down
-        cluster.status.state = u'TERMINATING'
+        cluster.status.state = 'TERMINATING'
         cluster.status.statechangereason = MockEmrObject(
-            code=u'USER_REQUEST',
-            message=u'Terminated by user request',
+            code='USER_REQUEST',
+            message='Terminated by user request',
         )
 
         for step in cluster._steps:
-            if step.status.state == u'PENDING':
-                step.status.state = u'CANCELLED'
-            elif step.status.state == u'RUNNING':
+            if step.status.state == 'PENDING':
+                step.status.state = 'CANCELLED'
+            elif step.status.state == 'RUNNING':
                 # pretty sure this is what INTERRUPTED is for
-                step.status.state = u'INTERRUPTED'
+                step.status.state = 'INTERRUPTED'
 
     def _get_step_output_uri(self, step_args):
         """Figure out the output dir for a step by parsing step.args
@@ -947,45 +947,45 @@ class MockEmrConnection(object):
         # (for the cluster, instance groups, and steps). Add this as needed.
 
         # if job is STARTING, move it along to BOOTSTRAPPING
-        if cluster.status.state == u'STARTING':
-            cluster.status.state = u'BOOTSTRAPPING'
+        if cluster.status.state == 'STARTING':
+            cluster.status.state = 'BOOTSTRAPPING'
             # instances are now provisioned
             for ig in cluster._instancegroups:
                 ig.runninginstancecount = ig.requestedinstancecount,
-                ig.status.state = u'BOOTSTRAPPING'
+                ig.status.state = 'BOOTSTRAPPING'
 
             return
 
         # if job is BOOTSTRAPPING, move it along to RUNNING
-        if cluster.status.state == u'BOOTSTRAPPING':
-            cluster.status.state = u'RUNNING'
+        if cluster.status.state == 'BOOTSTRAPPING':
+            cluster.status.state = 'RUNNING'
             for ig in cluster._instancegroups:
-                ig.status.state = u'RUNNING'
+                ig.status.state = 'RUNNING'
 
             return
 
         # if job is TERMINATING, move along to terminated
-        if cluster.status.state == u'TERMINATING':
+        if cluster.status.state == 'TERMINATING':
             if cluster.status.statechangereason.code == 'STEP_FAILURE':
-                cluster.status.state = u'TERMINATED_WITH_ERRORS'
+                cluster.status.state = 'TERMINATED_WITH_ERRORS'
             else:
-                cluster.status.state = u'TERMINATED'
+                cluster.status.state = 'TERMINATED'
 
             return
 
         # if job is done, nothing to do
-        if cluster.status.state in (u'TERMINATED', u'TERMINATED_WITH_ERRORS'):
+        if cluster.status.state in ('TERMINATED', 'TERMINATED_WITH_ERRORS'):
             return
 
         # at this point, should be RUNNING or WAITING
-        assert cluster.status.state in (u'RUNNING', u'WAITING')
+        assert cluster.status.state in ('RUNNING', 'WAITING')
 
         # try to find the next step, and advance it
 
         for step_num, step in enumerate(cluster._steps):
             # skip steps that are already done
             if step.status.state in (
-                    u'COMPLETED', u'FAILED', u'CANCELLED', u'INTERRUPTED'):
+                    'COMPLETED', 'FAILED', 'CANCELLED', 'INTERRUPTED'):
                 continue
 
             # allow steps to get stuck
@@ -995,24 +995,24 @@ class MockEmrConnection(object):
             # found currently running step! handle it, then exit
 
             # start PENDING step
-            if step.status.state == u'PENDING':
-                step.status.state = u'RUNNING'
+            if step.status.state == 'PENDING':
+                step.status.state = 'RUNNING'
                 step.status.timeline.startdatetime = to_iso8601(now)
                 return
 
-            assert step.status.state == u'RUNNING'
+            assert step.status.state == 'RUNNING'
 
             # check if we're supposed to have an error
             if (cluster_id, step_num) in self.mock_emr_failures:
-                step.status.state = u'FAILED'
+                step.status.state = 'FAILED'
 
                 if step.actiononfailure in (
-                    u'TERMINATE_CLUSTER', u'TERMINATE_JOB_FLOW'):
+                    'TERMINATE_CLUSTER', 'TERMINATE_JOB_FLOW'):
 
-                    cluster.status.state = u'TERMINATING'
-                    cluster.status.statechangereason.code = u'STEP_FAILURE'
+                    cluster.status.state = 'TERMINATING'
+                    cluster.status.statechangereason.code = 'STEP_FAILURE'
                     cluster.status.statechangereason.message = (
-                        u'Shut down as step failed')
+                        'Shut down as step failed')
 
                 return
 
@@ -1042,14 +1042,14 @@ class MockEmrConnection(object):
             return
 
         # no pending steps. should we wait, or shut down?
-        if cluster.autoterminate == u'true':
-            cluster.status.state = u'TERMINATING'
-            cluster.status.statechangereason.code = u'ALL_STEPS_COMPLETED'
+        if cluster.autoterminate == 'true':
+            cluster.status.state = 'TERMINATING'
+            cluster.status.statechangereason.code = 'ALL_STEPS_COMPLETED'
             cluster.status.statechangereason.message = (
                 'Steps Completed')
         else:
             # just wait
-            cluster.status.state = u'WAITING'
+            cluster.status.state = 'WAITING'
             cluster.status.statechangereason = MockEmrObject()
 
         return
@@ -1066,6 +1066,9 @@ class MockEmrObject(object):
                 setattr(self, key, value)
 
     def __setattr__(self, key, value):
+        if isinstance(value, bytes):
+            value = value.decode('utf_8')
+
         self.__dict__[key] = value
 
     def __eq__(self, other):

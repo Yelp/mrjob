@@ -3210,7 +3210,7 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
             self.runner, '_get_streaming_jar', return_value=['streaming.jar'])
 
         self.simple_patch(boto.emr, 'StreamingStep', dict)
-        self.runner._inferred_hadoop_version = '0.20'
+        self.runner._hadoop_version = '0.20'
 
     def _assert_streaming_step(self, step, **kwargs):
         self.runner._steps = [step]
@@ -3263,49 +3263,6 @@ class BuildStreamingStepTestCase(FastEMRTestCase):
                     " --mapper'"),
             combiner=("bash -c 'grep nothing | python my_job.py --step-num=0"
                     " --combiner'"),
-            reducer=("bash -c 'grep something | python my_job.py --step-num=0"
-                    " --reducer'"),
-        )
-
-    def test_combiner_018(self):
-        self.runner._inferred_hadoop_version = '0.18'
-        self._assert_streaming_step(
-            {
-                'type': 'streaming',
-                'mapper': {
-                    'type': 'command',
-                    'command': 'cat',
-                },
-                'combiner': {
-                    'type': 'script',
-                },
-            },
-            mapper=("bash -c 'cat | sort | python my_job.py --step-num=0"
-                    " --combiner'"),
-            reducer=None,
-        )
-
-    def test_pre_filters_018(self):
-        self.runner._inferred_hadoop_version = '0.18'
-        self._assert_streaming_step(
-            {
-                'type': 'streaming',
-                'mapper': {
-                    'type': 'script',
-                    'pre_filter': 'grep anything',
-                },
-                'combiner': {
-                    'type': 'script',
-                    'pre_filter': 'grep nothing',
-                },
-                'reducer': {
-                    'type': 'script',
-                    'pre_filter': 'grep something',
-                },
-            },
-            mapper=("bash -c 'grep anything | python my_job.py --step-num=0"
-                    " --mapper | sort | grep nothing | python my_job.py"
-                    " --step-num=0 --combiner'"),
             reducer=("bash -c 'grep something | python my_job.py --step-num=0"
                     " --reducer'"),
         )

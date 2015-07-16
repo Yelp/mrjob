@@ -242,7 +242,7 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         with mr_job.make_runner() as runner:
             runner.run()
             emr_conn = runner.make_emr_conn()
-            return emr_conn.describe_jobflow(runner.get_emr_cluster_id())
+            return emr_conn.describe_jobflow(runner.get_cluster_id())
 
 
 class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
@@ -302,7 +302,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             self.assertTrue(any(runner.ls(runner.get_output_dir())))
 
             emr_conn = runner.make_emr_conn()
-            cluster = emr_conn.describe_cluster(runner.get_emr_cluster_id())
+            cluster = emr_conn.describe_cluster(runner.get_cluster_id())
             self.assertEqual(cluster.status.state, 'TERMINATED')
             name_match = JOB_NAME_RE.match(cluster.name)
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
@@ -310,7 +310,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            steps = emr_conn.list_steps(runner.get_emr_cluster_id()).steps
+            steps = emr_conn.list_steps(runner.get_cluster_id()).steps
 
             step_0_args = [arg.value for arg in steps[0].config.args]
             step_1_args = [arg.value for arg in steps[1].config.args]
@@ -344,7 +344,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
         # job should get terminated
         emr_conn = runner.make_emr_conn()
-        cluster_id = runner.get_emr_cluster_id()
+        cluster_id = runner.get_cluster_id()
         for _ in xrange(10):
             emr_conn.simulate_progress(cluster_id)
 
@@ -371,7 +371,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
                               stderr.getvalue())
 
                 emr_conn = runner.make_emr_conn()
-                cluster_id = runner.get_emr_cluster_id()
+                cluster_id = runner.get_cluster_id()
                 for _ in xrange(10):
                     emr_conn.simulate_progress(cluster_id)
 
@@ -381,7 +381,7 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
 
             # job should get terminated on cleanup
             emr_conn = runner.make_emr_conn()
-            cluster_id = runner.get_emr_cluster_id()
+            cluster_id = runner.get_cluster_id()
             for _ in xrange(10):
                 emr_conn.simulate_progress(cluster_id)
 
@@ -546,7 +546,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
                 self.assertRaises(Exception, runner.run)
 
             emr_conn = runner.make_emr_conn()
-            job_flow_id = runner.get_emr_cluster_id()
+            job_flow_id = runner.get_cluster_id()
             for _ in xrange(10):
                 emr_conn.simulate_progress(job_flow_id)
 
@@ -555,7 +555,7 @@ class ExistingJobFlowTestCase(MockEMRAndS3TestCase):
 
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
-        job_flow_id = runner.get_emr_cluster_id()
+        job_flow_id = runner.get_cluster_id()
         for _ in xrange(10):
             emr_conn.simulate_progress(job_flow_id)
 
@@ -593,7 +593,7 @@ class IAMTestCase(MockEMRAndS3TestCase):
         with mr_job.make_runner() as runner:
             runner.run()
             emr_conn = runner.make_emr_conn()
-            return emr_conn.describe_jobflow(runner.get_emr_cluster_id())
+            return emr_conn.describe_jobflow(runner.get_cluster_id())
 
     def test_role_auto_creation(self):
         job_flow = self.run_and_get_job_flow()
@@ -839,7 +839,7 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            job_flow_id = runner.get_emr_cluster_id()
+            job_flow_id = runner.get_cluster_id()
             job_flow = emr_conn.describe_jobflow(job_flow_id)
             self.assertEqual(job_flow.availabilityzone, 'PUPPYLAND')
 
@@ -850,7 +850,7 @@ class AvailabilityZoneTestCase(MockEMRAndS3TestCase):
         with mr_job.make_runner() as runner:
             runner.run()
             flow = runner.make_emr_conn().describe_jobflow(
-                runner._emr_cluster_id)
+                runner._cluster_id)
             self.assertEqual(flow.steps[0].name, 'Setup Hadoop Debugging')
 
 
@@ -2219,7 +2219,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
             self.prepare_runner_for_ssh(runner)
             runner.run()
 
-            job_flow_id = runner.get_emr_cluster_id()
+            job_flow_id = runner.get_cluster_id()
 
         return job_flow_id
 
@@ -2260,7 +2260,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
             # Make sure that the runner made a pooling-enabled job flow
             emr_conn = runner.make_emr_conn()
-            job_flow_id = runner.get_emr_cluster_id()
+            job_flow_id = runner.get_cluster_id()
             job_flow = emr_conn.describe_jobflow(job_flow_id)
             jf_hash, jf_name = pool_hash_and_name(job_flow)
             self.assertEqual(jf_hash, runner._pool_hash())
@@ -2711,7 +2711,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
                 self.assertRaises(Exception, runner.run)
 
             emr_conn = runner.make_emr_conn()
-            job_flow_id = runner.get_emr_cluster_id()
+            job_flow_id = runner.get_cluster_id()
             for _ in xrange(10):
                 emr_conn.simulate_progress(job_flow_id)
 
@@ -2720,7 +2720,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
-        job_flow_id = runner.get_emr_cluster_id()
+        job_flow_id = runner.get_cluster_id()
         for _ in xrange(10):
             emr_conn.simulate_progress(job_flow_id)
 
@@ -2745,7 +2745,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(Exception, runner.run)
 
-            self.assertEqual(runner.get_emr_cluster_id(), job_flow_id)
+            self.assertEqual(runner.get_cluster_id(), job_flow_id)
 
             emr_conn = runner.make_emr_conn()
             for _ in xrange(10):
@@ -2756,7 +2756,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
-        job_flow_id = runner.get_emr_cluster_id()
+        job_flow_id = runner.get_cluster_id()
         for _ in xrange(10):
             emr_conn.simulate_progress(job_flow_id)
 
@@ -2793,7 +2793,7 @@ class PoolingDisablingTestCase(MockEMRAndS3TestCase):
             self.prepare_runner_for_ssh(runner)
             runner.run()
 
-            job_flow_id = runner.get_emr_cluster_id()
+            job_flow_id = runner.get_cluster_id()
             jf = runner.make_emr_conn().describe_jobflow(job_flow_id)
             self.assertEqual(jf.keepjobflowalivewhennosteps, 'false')
 
@@ -2864,7 +2864,7 @@ class MaxHoursIdleTestCase(MockEMRAndS3TestCase):
 
     def assertRanIdleTimeoutScriptWith(self, runner, args):
         emr_conn = runner.make_emr_conn()
-        job_flow = emr_conn.describe_jobflow(runner.get_emr_cluster_id())
+        job_flow = emr_conn.describe_jobflow(runner.get_cluster_id())
         action = job_flow.bootstrapactions[-1]
         self.assertEqual(action.name, 'idle timeout')
         self.assertEqual(
@@ -2874,7 +2874,7 @@ class MaxHoursIdleTestCase(MockEMRAndS3TestCase):
 
     def assertDidNotUseIdleTimeoutScript(self, runner):
         emr_conn = runner.make_emr_conn()
-        job_flow = emr_conn.describe_jobflow(runner.get_emr_cluster_id())
+        job_flow = emr_conn.describe_jobflow(runner.get_cluster_id())
         action_names = [ba.name for ba in job_flow.bootstrapactions]
         self.assertNotIn('idle timeout', action_names)
         # idle timeout script should not even be uploaded
@@ -2996,7 +2996,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
 
     def _quick_runner(self):
         r = EMRJobRunner(conf_paths=[])
-        r._emr_cluster_id = 'j-ESSEOWENS'
+        r._cluster_id = 'j-ESSEOWENS'
         r._address = 'Albuquerque, NM'
         r._ran_job = False
         return r
@@ -3370,7 +3370,7 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             self.assertTrue(runner.ls(jar_uri))
 
             emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_emr_cluster_id())
+            job_flow = emr_conn.describe_jobflow(runner.get_cluster_id())
             self.assertEqual(len(job_flow.steps), 1)
             self.assertEqual(job_flow.steps[0].jar, jar_uri)
 
@@ -3385,7 +3385,7 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_emr_cluster_id())
+            job_flow = emr_conn.describe_jobflow(runner.get_cluster_id())
             self.assertEqual(len(job_flow.steps), 1)
             self.assertEqual(job_flow.steps[0].jar, JAR_URI)
 
@@ -3398,7 +3398,7 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_emr_cluster_id())
+            job_flow = emr_conn.describe_jobflow(runner.get_cluster_id())
             self.assertEqual(len(job_flow.steps), 1)
             self.assertEqual(job_flow.steps[0].jar,
                              '/home/hadoop/hadoop-examples.jar')
@@ -3419,7 +3419,7 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_emr_cluster_id())
+            job_flow = emr_conn.describe_jobflow(runner.get_cluster_id())
 
             self.assertEqual(len(job_flow.steps), 2)
             jar_step, streaming_step = job_flow.steps

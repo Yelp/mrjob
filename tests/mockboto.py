@@ -760,6 +760,17 @@ class MockEmrConnection(object):
 
         return datetime.strptime(iso_dt, boto.utils.ISO8601)
 
+    def build_list_params(self, params, items, label):
+        """Our _boto_emr shim needs this.
+
+        Remove this in v0.5.0 (see #1081)
+        """
+        if isinstance(items, (bytes, unicode)):
+            items = [items]
+        for i in range(1, len(items) + 1):
+            params['%s.%d' % (label, i)] = items[i - 1]
+
+
     def _unpack_list_param(self, label, params):
         """Undo EmrConnection.build_list_params().
 

@@ -2361,7 +2361,7 @@ class EMRJobRunner(MRJobRunner):
             # steps. We could just check for PENDING steps, but we're
             # trying to be defensive about EMR adding a new step state.
             for step in steps:
-                if ((getattr(step.status, 'timeline') is None or
+                if ((getattr(step.status, 'timeline', None) is None or
                      getattr(step.status.timeline, 'enddatetime', None)
                      is None) and
                     getattr(step.status, 'state', None) not in
@@ -2443,8 +2443,9 @@ class EMRJobRunner(MRJobRunner):
 
             key_cluster_steps_list.append((sort_key, cluster.id, len(steps)))
 
-        for cluster in list(_yield_all_clusters(
-                emr_conn, cluster_states=['WAITING'])):
+        for cluster_summary in _yield_all_clusters(
+                emr_conn, cluster_states=['WAITING']):
+            cluster = _boto_emr.describe_cluster(emr_conn, cluster_summary.id)
             add_if_match(cluster)
 
         return [(cluster_id, cluster_num_steps) for

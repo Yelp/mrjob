@@ -46,6 +46,7 @@ from mrjob.emr import filechunkio
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
+from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_instance_groups
 from mrjob.emr import _yield_all_steps
 from mrjob.parse import JOB_NAME_RE
@@ -575,11 +576,11 @@ class VisibleToAllUsersTestCase(MockEMRAndS3TestCase):
 
     def test_defaults(self):
         cluster = self.run_and_get_cluster()
-        self.assertEqual(job_flow.visibletoallusers, 'false')
+        self.assertEqual(cluster.visibletoallusers, 'false')
 
     def test_visible(self):
         cluster = self.run_and_get_cluster('--visible-to-all-users')
-        self.assertTrue(job_flow.visibletoallusers, 'true')
+        self.assertTrue(cluster.visibletoallusers, 'true')
 
 
 class IAMTestCase(MockEMRAndS3TestCase):
@@ -2035,34 +2036,33 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
                               bootstrap_actions=bootstrap_actions,
                               s3_sync_wait_time=0.00)
 
-        job_flow_id = runner.make_persistent_job_flow()
+        cluster_id = runner.make_persistent_job_flow()
 
         emr_conn = runner.make_emr_conn()
-        job_flow = emr_conn.describe_jobflow(job_flow_id)
-        actions = job_flow.bootstrapactions
+        actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
 
         self.assertEqual(len(actions), 3)
 
         self.assertEqual(
-            actions[0].path,
+            actions[0].scriptpath,
             's3://elasticmapreduce/bootstrap-actions/configure-hadoop')
         self.assertEqual(
             actions[0].args[0].value,
             '-m,mapred.tasktracker.map.tasks.maximum=1')
         self.assertEqual(actions[0].name, 'action 0')
 
-        self.assertEqual(actions[1].path, 's3://foo/bar')
+        self.assertEqual(actions[1].scriptpath, 's3://foo/bar')
         self.assertEqual(actions[1].args, [])
         self.assertEqual(actions[1].name, 'action 1')
 
         # check for master bootstrap script
-        self.assertTrue(actions[2].path.startswith('s3://mrjob-'))
-        self.assertTrue(actions[2].path.endswith('b.py'))
+        self.assertTrue(actions[2].scriptpath.startswith('s3://mrjob-'))
+        self.assertTrue(actions[2].scriptpath.endswith('b.py'))
         self.assertEqual(actions[2].args, [])
         self.assertEqual(actions[2].name, 'master')
 
         # make sure master bootstrap script is on S3
-        self.assertTrue(runner.path_exists(actions[2].path))
+        self.assertTrue(runner.path_exists(actions[2].scriptpath))
 
     def test_bootstrap_mrjob_uses_python_bin(self):
         # use all the bootstrap options
@@ -2090,28 +2090,27 @@ class TestMasterBootstrapScript(MockEMRAndS3TestCase):
                               bootstrap_actions=bootstrap_actions,
                               s3_sync_wait_time=0.00)
 
-        job_flow_id = runner.make_persistent_job_flow()
+        cluster_id = runner.make_persistent_job_flow()
 
         emr_conn = runner.make_emr_conn()
-        job_flow = emr_conn.describe_jobflow(job_flow_id)
-        actions = job_flow.bootstrapactions
+        actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
 
         self.assertEqual(len(actions), 2)
 
-        self.assertTrue(actions[0].path.startswith('s3://mrjob-'))
-        self.assertTrue(actions[0].path.endswith('/apt-install.sh'))
+        self.assertTrue(actions[0].scriptpath.startswith('s3://mrjob-'))
+        self.assertTrue(actions[0].scriptpath.endswith('/apt-install.sh'))
         self.assertEqual(actions[0].name, 'action 0')
         self.assertEqual(actions[0].args[0].value, 'python-scipy')
         self.assertEqual(actions[0].args[1].value, 'mysql-server')
 
         # check for master boostrap script
-        self.assertTrue(actions[1].path.startswith('s3://mrjob-'))
-        self.assertTrue(actions[1].path.endswith('b.py'))
+        self.assertTrue(actions[1].scriptpath.startswith('s3://mrjob-'))
+        self.assertTrue(actions[1].scriptpath.endswith('b.py'))
         self.assertEqual(actions[1].args, [])
         self.assertEqual(actions[1].name, 'master')
 
         # make sure master bootstrap script is on S3
-        self.assertTrue(runner.path_exists(actions[1].path))
+        self.assertTrue(runner.path_exists(actions[1].scriptpath))
 
 
 class EMRNoMapperTest(MockEMRAndS3TestCase):

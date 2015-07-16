@@ -3275,9 +3275,10 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             self.assertTrue(runner.ls(jar_uri))
 
             emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_cluster_id())
-            self.assertEqual(len(job_flow.steps), 1)
-            self.assertEqual(job_flow.steps[0].jar, jar_uri)
+            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(steps[0].config.jar, jar_uri)
 
     def test_jar_on_s3(self):
         self.add_mock_s3_data({'dubliners': {'whiskeyinthe.jar': ''}})
@@ -3290,9 +3291,10 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_cluster_id())
-            self.assertEqual(len(job_flow.steps), 1)
-            self.assertEqual(job_flow.steps[0].jar, JAR_URI)
+            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(steps[0].config.jar, JAR_URI)
 
     def test_jar_inside_emr(self):
         job = MRJustAJar(['-r', 'emr', '--jar',
@@ -3303,9 +3305,10 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_cluster_id())
-            self.assertEqual(len(job_flow.steps), 1)
-            self.assertEqual(job_flow.steps[0].jar,
+            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(steps[0].config.jar,
                              '/home/hadoop/hadoop-examples.jar')
 
     def test_input_output_interpolation(self):
@@ -3324,15 +3327,16 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            job_flow = emr_conn.describe_jobflow(runner.get_cluster_id())
+            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
 
-            self.assertEqual(len(job_flow.steps), 2)
-            jar_step, streaming_step = job_flow.steps
+            self.assertEqual(len(steps), 2)
+            jar_step, streaming_step = steps
 
             # on EMR, the jar gets uploaded
-            self.assertEqual(jar_step.jar, runner._upload_mgr.uri(fake_jar))
+            self.assertEqual(jar_step.config.jar,
+                             runner._upload_mgr.uri(fake_jar))
 
-            jar_args = [arg.value for arg in jar_step.args]
+            jar_args = [arg.value for arg in jar_step.config.args]
             self.assertEqual(len(jar_args), 3)
             self.assertEqual(jar_args[0], 'stuff')
 
@@ -3343,7 +3347,8 @@ class JarStepTestCase(MockEMRAndS3TestCase):
 
             # check output of jar is input of next step
             jar_output_arg = jar_args[2]
-            streaming_args = [arg.value for arg in streaming_step.args]
+
+            streaming_args = [arg.value for arg in streaming_step.config.args]
             streaming_input_arg = streaming_args[
                 streaming_args.index('-input') + 1]
             self.assertEqual(jar_output_arg, streaming_input_arg)

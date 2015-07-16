@@ -2975,7 +2975,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             yield mocks
 
     def _quick_runner(self):
-        r = EMRJobRunner(conf_paths=[])
+        r = EMRJobRunner(conf_paths=[], ec2_key_pair_file='fake.pem')
         r._cluster_id = 'j-ESSEOWENS'
         r._address = 'Albuquerque, NM'
         r._ran_job = False
@@ -3026,7 +3026,7 @@ class CleanUpJobTestCase(MockEMRAndS3TestCase):
             with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
                 r._cleanup_job()
             self.assertTrue(m.called)
-            m.assert_any_call(['ssh'], 'Albuquerque, NM', None)
+            m.assert_any_call(['ssh'], 'Albuquerque, NM', 'fake.pem')
 
     def test_job_cleanup_mechanics_ssh_fail(self):
         def die_ssh(*args, **kwargs):

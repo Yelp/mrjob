@@ -53,7 +53,7 @@ class PoolingToolTestCase(ToolTestCase):
              'owner': None})
 
     def test_list_job_flows(self):
-        self.make_job_flow(pool_emr_job_flows=True)
+        self.make_cluster(pool_emr_job_flows=True)
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '-a')
@@ -66,7 +66,7 @@ class PoolingToolTestCase(ToolTestCase):
         self.assertIn('--\ndefault\n--', value)
 
     def test_find_job_flow(self):
-        jf_id = self.make_job_flow(pool_emr_job_flows=True)
+        jf_id = self.make_cluster(pool_emr_job_flows=True)
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
 
         for i in range(3):
@@ -83,7 +83,7 @@ class PoolingToolTestCase(ToolTestCase):
         self.assertIn('j-MOCKCLUSTER0', value)
 
     def test_terminate_pool(self):
-        jf_id = self.make_job_flow(pool_emr_job_flows=True)
+        jf_id = self.make_cluster(pool_emr_job_flows=True)
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
 
         for i in range(3):

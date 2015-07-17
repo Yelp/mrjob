@@ -65,7 +65,7 @@ class LogFetchingTestCase(ToolTestCase):
              'emr_job_flow_id': 'j-MOCKCLUSTER0'})
 
     def test_find_failure(self):
-        self.make_job_flow()
+        self.make_cluster()
         self.monkey_patch_stdout()
 
         perform_actions(make_args(find_failure=True), self.runner)
@@ -74,7 +74,7 @@ class LogFetchingTestCase(ToolTestCase):
                          'No probable cause of failure found.\n')
 
     def test_list(self):
-        self.make_job_flow()
+        self.make_cluster()
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '-l',
@@ -89,7 +89,7 @@ class LogFetchingTestCase(ToolTestCase):
                          'Task attempts:\n\nSteps:\n\nJobs:\n\nNodes:\n\n')
 
     def test_list_all(self):
-        self.make_job_flow()
+        self.make_cluster()
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '-L',
@@ -103,7 +103,7 @@ class LogFetchingTestCase(ToolTestCase):
         self.assertEqual(self.stdout.getvalue(), '\n')
 
     def test_fetch_counters(self):
-        self.make_job_flow()
+        self.make_cluster()
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '--counters',

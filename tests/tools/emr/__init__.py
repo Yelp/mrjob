@@ -42,7 +42,7 @@ class ToolTestCase(MockEMRAndS3TestCase):
     def monkey_patch_stderr(self):
         sys.stderr = self.stderr
 
-    def make_job_flow(self, **kwargs):
+    def make_cluster(self, **kwargs):
         self.add_mock_s3_data({'walrus': {}})
         kwargs.update(dict(
             conf_paths=[],

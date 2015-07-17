@@ -27,7 +27,7 @@ class TerminateToolTestCase(ToolTestCase):
         self.assertEqual(True, True)
 
     def test_terminate_job_flow(self):
-        cluster_id = self.make_job_flow(pool_emr_job_flows=True)
+        cluster_id = self.make_cluster(pool_emr_job_flows=True)
         self.monkey_patch_argv('--quiet', '--no-conf', 'j-MOCKCLUSTER0')
 
         terminate_main()

@@ -302,8 +302,8 @@ def cluster_to_basic_summary(cluster, now=None):
     bcs['ready'] = to_datetime(getattr(timeline, 'readydatetime', None))
     bcs['end'] = to_datetime(getattr(timeline, 'enddatetime', None))
 
-    if bcs['ready']:
-        bcs['ran'] = (bcs['end'] or now) - bcs['ready']
+    if bcs['created']:
+        bcs['ran'] = (bcs['end'] or now) - bcs['created']
     else:
         bcs['ran'] = timedelta(0)
 
@@ -386,7 +386,7 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
     # will be less than normalizedinstancehours in the job flow, but it
     # also keeps stats stable for steps that have already finished.
     if bcs['end']:
-        cluster_end_billing = bcs['ready'] + timedelta(hours=full_hours)
+        cluster_end_billing = bcs['created'] + timedelta(hours=full_hours)
     else:
         cluster_end_billing = now
 

@@ -2741,9 +2741,8 @@ class PoolingDisablingTestCase(MockEMRAndS3TestCase):
             self.prepare_runner_for_ssh(runner)
             runner.run()
 
-            job_flow_id = runner.get_cluster_id()
-            jf = runner.make_emr_conn().describe_jobflow(job_flow_id)
-            self.assertEqual(jf.keepjobflowalivewhennosteps, 'false')
+            cluster = runner._describe_cluster()
+            self.assertEqual(cluster.autoterminate, 'true')
 
 
 class S3LockTestCase(MockEMRAndS3TestCase):
@@ -2812,18 +2811,24 @@ class MaxHoursIdleTestCase(MockEMRAndS3TestCase):
 
     def assertRanIdleTimeoutScriptWith(self, runner, args):
         emr_conn = runner.make_emr_conn()
-        job_flow = emr_conn.describe_jobflow(runner.get_cluster_id())
-        action = job_flow.bootstrapactions[-1]
+        cluster_id = runner.get_cluster_id()
+
+        actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
+        action = actions[-1]
+
         self.assertEqual(action.name, 'idle timeout')
         self.assertEqual(
-            action.path,
+            action.scriptpath,
             runner._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
         self.assertEqual([arg.value for arg in action.args], args)
 
     def assertDidNotUseIdleTimeoutScript(self, runner):
         emr_conn = runner.make_emr_conn()
-        job_flow = emr_conn.describe_jobflow(runner.get_cluster_id())
-        action_names = [ba.name for ba in job_flow.bootstrapactions]
+        cluster_id = runner.get_cluster_id()
+
+        actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
+        action_names = [a.name for a in actions]
+
         self.assertNotIn('idle timeout', action_names)
         # idle timeout script should not even be uploaded
         self.assertNotIn(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH,

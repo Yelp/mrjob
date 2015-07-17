@@ -70,7 +70,7 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             name='mr_exciting.woo.20100605.235850.000000',
             normalizedinstancehours='10',
             status=MockEmrObject(
-                state='COMPLETED',
+                state='TERMINATED',
                 timeline=MockEmrObject(
                     creationdatetime='2010-06-06T00:00:00Z',
                     enddatetime='2010-06-06T00:30:00Z',
@@ -96,7 +96,7 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             'pool': None,
             'ran': timedelta(minutes=30),
             'ready': datetime(2010, 6, 6, 0, 15),
-            'state': u'COMPLETED',
+            'state': u'TERMINATED',
             'usage': [{
                 'date_to_nih_bbnu': {date(2010, 6, 6): 7.5},
                 'date_to_nih_billed': {date(2010, 6, 6): 10.0},
@@ -299,35 +299,37 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
 
     def test_cluster_with_no_steps_split_over_midnight(self):
         cluster = MockEmrObject(
-            creationdatetime='2010-06-05T23:59:00Z',
-            enddatetime='2010-06-06T01:15:00Z',  # 2 hours are billed
-            jobflowid='j-ISFORJOY',
+            id='j-ISFORJOY',
             name='mr_exciting.woo.20100605.232950.000000',
             normalizedinstancehours='20',
-            readydatetime='2010-06-05T23:45:00Z',  # only 15 minutes "used"
-            startdatetime='2010-06-05T23:30:00Z',
-            state='COMPLETED',
+            status=MockEmrObject(
+                state='TERMINATED',
+                timeline=MockEmrObject(
+                    creationdatetime='2010-06-05T23:30:00Z',
+                    enddatetime='2010-06-06T01:15:00Z',  # 2 hours billed
+                    readydatetime='2010-06-05T23:45:00Z',  # 15 minutes "used"
+                ),
+            ),
         )
 
         summary = cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 5, 23, 59),
+            'created': datetime(2010, 6, 5, 23, 30),
             'end': datetime(2010, 6, 6, 1, 15),
-            'id': 'j-ISFORJOY',
-            'label': 'mr_exciting',
-            'name': 'mr_exciting.woo.20100605.232950.000000',
+            'id': u'j-ISFORJOY',
+            'label': u'mr_exciting',
+            'name': u'mr_exciting.woo.20100605.232950.000000',
             'nih': 20.0,
             'nih_bbnu': 17.5,
             'nih_billed': 20.0,
             'nih_used': 2.5,
             'num_steps': 0,
-            'owner': 'woo',
+            'owner': u'woo',
             'pool': None,
             'ran': timedelta(hours=1, minutes=45),
             'ready': datetime(2010, 6, 5, 23, 45),
-            'start': datetime(2010, 6, 5, 23, 30),
-            'state': 'COMPLETED',
+            'state': u'TERMINATED',
             'usage': [{
                 'date_to_nih_bbnu': {date(2010, 6, 5): 2.5,
                                      date(2010, 6, 6): 15.0},
@@ -343,11 +345,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                                        datetime(2010, 6, 6, 0): 10.0,
                                        datetime(2010, 6, 6, 1): 5.0},
                 'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5},
-                'label': 'mr_exciting',
+                'label': u'mr_exciting',
                 'nih_bbnu': 17.5,
                 'nih_billed': 20.0,
                 'nih_used': 2.5,
-                'owner': 'woo',
+                'owner': u'woo',
                 'start': datetime(2010, 6, 5, 23, 30),
                 'step_num': None,
             }],
@@ -515,7 +517,7 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             normalizedinstancehours='20',
             readydatetime='2010-06-05T23:45:00Z',
             startdatetime='2010-06-05T23:30:00Z',
-            state='COMPLETED',
+            state='TERMINATED',
             steps=[
                 MockEmrObject(
                     name='mr_exciting.woo.20100605.232850.000000: Step 1 of 3',
@@ -553,7 +555,7 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             'ran': timedelta(hours=1, minutes=45),
             'ready': datetime(2010, 6, 5, 23, 45),
             'start': datetime(2010, 6, 5, 23, 30),
-            'state': 'COMPLETED',
+            'state': 'TERMINATED',
             'usage': [{
             # bootstrapping
                 'date_to_nih_used': {date(2010, 6, 5): 2.5},
@@ -649,7 +651,7 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             normalizedinstancehours='20',
             readydatetime='2010-06-05T23:45:00Z',
             startdatetime='2010-06-05T23:30:00Z',
-            state='COMPLETED',
+            state='TERMINATED',
             steps=[
                 MockEmrObject(
                     name='mr_exciting.woo.20100605.232950.000000: Step 1 of 1',
@@ -687,7 +689,7 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             'ran': timedelta(hours=1, minutes=45),
             'ready': datetime(2010, 6, 5, 23, 45),
             'start': datetime(2010, 6, 5, 23, 30),
-            'state': 'COMPLETED',
+            'state': 'TERMINATED',
             'usage': [{
             # bootstrapping
                 'date_to_nih_used': {date(2010, 6, 5): 2.5},

@@ -47,15 +47,15 @@ def main(cl_args=None):
 
     if len(args) != 1:
         option_parser.error('This tool takes exactly one argument.')
-    emr_job_flow_id = args[0]
+    cluster_id = args[0]
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     # create the persistent job
     runner = EMRJobRunner(conf_paths=options.conf_paths)
-    log.debug('Terminating job flow %s' % emr_job_flow_id)
-    runner.make_emr_conn().terminate_jobflow(emr_job_flow_id)
-    log.info('Terminated job flow %s' % emr_job_flow_id)
+    log.debug('Terminating job flow %s' % cluster_id)
+    runner.make_emr_conn().terminate_jobflow(cluster_id)
+    log.info('Terminated job flow %s' % cluster_id)
 
 
 def make_option_parser():

@@ -35,8 +35,8 @@ def main(args=None):
     """Run the create_job_flow tool with arguments from ``sys.argv`` and
     printing to ``sys.stdout``."""
     runner = EMRJobRunner(**runner_kwargs(args))
-    emr_job_flow_id = runner.make_persistent_job_flow()
-    print emr_job_flow_id
+    cluster_id = runner.make_persistent_cluster()
+    print cluster_id
 
 
 def runner_kwargs(cl_args=None):

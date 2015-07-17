@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the job flow termination tool"""
+from mrjob import _boto_emr
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.terminate_job_flow import main as terminate_main
 from mrjob.tools.emr.terminate_job_flow import make_option_parser
@@ -26,11 +27,11 @@ class TerminateToolTestCase(ToolTestCase):
         self.assertEqual(True, True)
 
     def test_terminate_job_flow(self):
-        jf_id = self.make_job_flow(pool_emr_job_flows=True)
+        cluster_id = self.make_job_flow(pool_emr_job_flows=True)
         self.monkey_patch_argv('--quiet', '--no-conf', 'j-MOCKCLUSTER0')
 
         terminate_main()
 
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-        self.assertEqual(emr_conn.describe_jobflow(jf_id).state,
-                         'TERMINATED')
+        cluster = _boto_emr.describe_cluster(emr_conn, cluster_id)
+        self.assertEqual(cluster.status.state, 'TERMINATED')

@@ -282,8 +282,6 @@ def cluster_to_basic_summary(cluster, now=None):
       the job flow hasn't started.
     * *ready*: UTC `datetime.datetime` that the job flow finished
       bootstrapping, or ``None``
-    * *start*: UTC `datetime.datetime` that the job flow became available, or
-      ``None``
     * *state*: The job flow's state as a string (e.g. ``'RUNNING'``)
     """
     if now is None:
@@ -309,11 +307,12 @@ def cluster_to_basic_summary(cluster, now=None):
 
     bcs['state'] = getattr(status, 'state', None)
 
-    bcs['num_steps'] = len(cluster.steps)
+    bcs['num_steps'] = len(getattr(cluster, 'steps', ()))
 
     bcs['pool'] = None
-    if cluster.bootstrapactions:
-        args = [arg.value for arg in cluster.bootstrapactions[-1].args]
+    bootstrap_actions = getattr(cluster, 'bootstrapactions', None)
+    if bootstrap_actions:
+        args = [arg.value for arg in bootstrap_actions[-1].args]
         if len(args) == 2 and args[0].startswith('pool-'):
             bcs['pool'] = args[1]
 
@@ -372,7 +371,7 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
     if now is None:
         now = datetime.utcnow()
 
-    if not bcs['ready']:
+    if not bcs['created']:
         return []
 
     # Figure out billing rate per second for the job, given that
@@ -398,11 +397,11 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
         'label': bcs['label'],
         'owner': bcs['owner'],
         'start': bcs['created'],
-        'end': bcs['ready'] or now,
+        'end': bcs['ready'] or bcs['end'] or now,
         'step_num': None,
     })
 
-    for step in cluster.steps:
+    for step in getattr(cluster, 'steps', ()):
         step_status = getattr(step, 'status', None)
         step_timeline = getattr(step_status, 'timeline', None)
 

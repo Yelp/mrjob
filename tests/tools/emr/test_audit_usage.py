@@ -66,7 +66,6 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
 
     def test_basic_cluster_with_no_steps(self):
         cluster = MockEmrObject(
-            bootstrapactions=[],
             id='j-ISFORJAGUAR',
             name='mr_exciting.woo.20100605.235850.000000',
             normalizedinstancehours='10',
@@ -78,7 +77,6 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                     readydatetime='2010-06-06T00:15:00Z',
                 ),
             ),
-            steps=[],
         )
 
         summary = cluster_to_full_summary(cluster)
@@ -119,36 +117,39 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
         })
 
     def test_still_running_cluster_with_no_steps(self):
+
         cluster = MockEmrObject(
-            creationdatetime='2010-06-05T23:59:00Z',
-            jobflowid='j-ISFORJUICE',
+            id='j-ISFORJUICE',
             name='mr_exciting.woo.20100605.235850.000000',
             normalizedinstancehours='10',
-            readydatetime='2010-06-06T00:15:00Z',
-            startdatetime='2010-06-06T00:00:00Z',
-            state='WAITING',
+            status=MockEmrObject(
+                state='WAITING',
+                timeline=MockEmrObject(
+                    creationdatetime='2010-06-06T00:00:00Z',
+                    readydatetime='2010-06-06T00:15:00Z',
+                ),
+            ),
         )
 
         summary = cluster_to_full_summary(
             cluster, now=datetime(2010, 6, 6, 0, 30))
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 5, 23, 59),
+            'created': datetime(2010, 6, 6, 0, 0),
             'end': None,
-            'id': 'j-ISFORJUICE',
-            'label': 'mr_exciting',
-            'name': 'mr_exciting.woo.20100605.235850.000000',
+            'id': u'j-ISFORJUICE',
+            'label': u'mr_exciting',
+            'name': u'mr_exciting.woo.20100605.235850.000000',
             'nih': 10.0,
             'nih_bbnu': 2.5,
             'nih_billed': 5.0,
             'nih_used': 2.5,
             'num_steps': 0,
-            'owner': 'woo',
+            'owner': u'woo',
             'pool': None,
             'ran': timedelta(minutes=30),
             'ready': datetime(2010, 6, 6, 0, 15),
-            'start': datetime(2010, 6, 6, 0, 0),
-            'state': 'WAITING',
+            'state': u'WAITING',
             'usage': [{
                 'date_to_nih_bbnu': {date(2010, 6, 6): 2.5},
                 'date_to_nih_billed': {date(2010, 6, 6): 5.0},
@@ -158,11 +159,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'hour_to_nih_bbnu': {datetime(2010, 6, 6, 0): 2.5},
                 'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 5.0},
                 'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
-                'label': 'mr_exciting',
+                'label': u'mr_exciting',
                 'nih_bbnu': 2.5,
                 'nih_billed': 5.0,
                 'nih_used': 2.5,
-                'owner': 'woo',
+                'owner': u'woo',
                 'start': datetime(2010, 6, 6, 0, 0),
                 'step_num': None,
             }],
@@ -170,34 +171,36 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
 
     def test_still_bootstrapping_cluster_with_no_steps(self):
         cluster = MockEmrObject(
-            creationdatetime='2010-06-05T23:59:00Z',
-            jobflowid='j-ISFORJOKE',
+            id='j-ISFORJOKE',
             name='mr_exciting.woo.20100605.235850.000000',
             normalizedinstancehours='10',
-            startdatetime='2010-06-06T00:00:00Z',
-            state='BOOTSTRAPPING',
+            status=MockEmrObject(
+                state='BOOTSTRAPPING',
+                timeline=MockEmrObject(
+                    creationdatetime='2010-06-06T00:00:00Z',
+                ),
+            ),
         )
 
         summary = cluster_to_full_summary(
             cluster, now=datetime(2010, 6, 6, 0, 30))
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 5, 23, 59),
+            'created': datetime(2010, 6, 6, 0, 0),
             'end': None,
-            'id': 'j-ISFORJOKE',
-            'label': 'mr_exciting',
-            'name': 'mr_exciting.woo.20100605.235850.000000',
+            'id': u'j-ISFORJOKE',
+            'label': u'mr_exciting',
+            'name': u'mr_exciting.woo.20100605.235850.000000',
             'nih': 10.0,
             'nih_bbnu': 0.0,
             'nih_billed': 5.0,
             'nih_used': 5.0,
             'num_steps': 0,
-            'owner': 'woo',
+            'owner': u'woo',
             'pool': None,
             'ran': timedelta(minutes=30),
             'ready': None,
-            'start': datetime(2010, 6, 6, 0, 0),
-            'state': 'BOOTSTRAPPING',
+            'state': u'BOOTSTRAPPING',
             'usage': [{
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 6): 5.0},
@@ -207,79 +210,66 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'hour_to_nih_bbnu': {},
                 'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 5.0},
                 'hour_to_nih_used': {datetime(2010, 6, 6, 0): 5.0},
-                'label': 'mr_exciting',
+                'label': u'mr_exciting',
                 'nih_bbnu': 0.0,
                 'nih_billed': 5.0,
                 'nih_used': 5.0,
-                'owner': 'woo',
+                'owner': u'woo',
                 'start': datetime(2010, 6, 6, 0, 0),
                 'step_num': None,
             }],
         })
 
-    def test_cluster_that_hasnt_yet_started(self):
+    def test_cluster_that_was_terminated_before_ready(self):
         cluster = MockEmrObject(
-            creationdatetime='2010-06-05T23:59:00Z',
-            jobflowid='j-ISFORJUMP',
+            id='j-ISFORJOURNEY',
             name='mr_exciting.woo.20100605.235850.000000',
-            normalizedinstancehours='10',
-            state='STARTING',
+            normalizedinstancehours='1',
+            status=MockEmrObject(
+                state='TERMINATED',
+                timeline=MockEmrObject(
+                    creationdatetime='2010-06-06T00:00:00Z',
+                    enddatetime='2010-06-06T00:30:00Z',
+                ),
+            ),
         )
 
         summary = cluster_to_full_summary(
-            cluster, now=datetime(2010, 6, 6, 0, 30))
+            cluster, now=datetime(2010, 6, 6, 1))
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 5, 23, 59),
-            'end': None,
-            'id': 'j-ISFORJUMP',
-            'label': 'mr_exciting',
-            'name': 'mr_exciting.woo.20100605.235850.000000',
-            'nih': 10.0,
-            'nih_bbnu': 0.0,
-            'nih_billed': 0.0,
-            'nih_used': 0.0,
+            'created': datetime(2010, 6, 6, 0, 0),
+            'end': datetime(2010, 6, 6, 0, 30),
+            'id': u'j-ISFORJOURNEY',
+            'label': u'mr_exciting',
+            'name': u'mr_exciting.woo.20100605.235850.000000',
+            'nih': 1.0,
+            'nih_bbnu': 0.5,
+            'nih_billed': 1.0,
+            'nih_used': 0.5,
             'num_steps': 0,
-            'owner': 'woo',
+            'owner': u'woo',
             'pool': None,
-            'ran': timedelta(0),
+            'ran': timedelta(minutes=30),
             'ready': None,
-            'start': None,
-            'state': 'STARTING',
-            'usage': [],
-        })
-
-    def test_cluster_that_was_terminated_before_starting(self):
-        cluster = MockEmrObject(
-            creationdatetime='2010-06-05T23:59:00Z',
-            enddatetime='2010-06-06T00:01:00Z',
-            jobflowid='j-ISFORJOURNEY',
-            name='mr_exciting.woo.20100605.235850.000000',
-            normalizedinstancehours='0',
-            state='TERMINATED',
-        )
-
-        summary = cluster_to_full_summary(
-            cluster, now=datetime(2010, 6, 6, 0, 30))
-
-        self.assertEqual(summary, {
-            'created': datetime(2010, 6, 5, 23, 59),
-            'end': datetime(2010, 6, 6, 0, 1),
-            'id': 'j-ISFORJOURNEY',
-            'label': 'mr_exciting',
-            'name': 'mr_exciting.woo.20100605.235850.000000',
-            'nih': 0.0,
-            'nih_bbnu': 0.0,
-            'nih_billed': 0.0,
-            'nih_used': 0.0,
-            'num_steps': 0,
-            'owner': 'woo',
-            'pool': None,
-            'ran': timedelta(0),
-            'ready': None,
-            'start': None,
-            'state': 'TERMINATED',
-            'usage': [],
+            'state': u'TERMINATED',
+            'usage': [{
+                'date_to_nih_bbnu': {date(2010, 6, 6): 0.5},
+                'date_to_nih_billed': {date(2010, 6, 6): 1.0},
+                'date_to_nih_used': {date(2010, 6, 6): 0.5},
+                'end': datetime(2010, 6, 6, 0, 30),
+                'end_billing': datetime(2010, 6, 6, 1, 0),
+                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 0, 0): 0.5},
+                'hour_to_nih_billed': {datetime(2010, 6, 6, 0, 0): 1.0},
+                'hour_to_nih_used': {datetime(2010, 6, 6, 0, 0): 0.5},
+                'label': u'mr_exciting',
+                'nih_bbnu': 0.5,
+                'nih_billed': 1.0,
+                'nih_used': 0.5,
+                'owner': u'woo',
+                'start': datetime(2010, 6, 6, 0, 0),
+                'step_num': None,
+             }],
         })
 
     def test_cluster_with_no_fields(self):
@@ -303,7 +293,6 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             'pool': None,
             'ran': timedelta(0),
             'ready': None,
-            'start': None,
             'state': None,
             'usage': [],
         })

@@ -439,19 +439,26 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
 
     def test_cluster_with_one_cancelled_step(self):
         cluster = MockEmrObject(
-            creationdatetime='2010-06-06T03:59:00Z',
-            enddatetime='2010-06-06T05:30:00Z',
-            jobflowid='j-ISFORJACUZZI',
+            id='j-ISFORJACUZZI',
             name='mr_exciting.woo.20100606.035855.000000',
             normalizedinstancehours='20',
-            readydatetime='2010-06-06T04:15:00Z',
-            startdatetime='2010-06-06T04:00:00Z',
-            state='RUNNING',
+            status=MockEmrObject(
+                state='RUNNING',
+                timeline=MockEmrObject(
+                    creationdatetime='2010-06-06T04:00:00Z',
+                    enddatetime='2010-06-06T05:30:00Z',
+                    readydatetime='2010-06-06T04:15:00Z',
+                ),
+            ),
             # step doesn't have end time even though job flow does
             steps=[
                 MockEmrObject(
                     name='mr_exciting.woo.20100606.035855.000000: Step 1 of 3',
-                    startdatetime='2010-06-06T04:15:00Z',
+                    status=MockEmrObject(
+                        timeline=MockEmrObject(
+                            startdatetime='2010-06-06T04:15:00Z',
+                        ),
+                    ),
                 ),
             ]
         )
@@ -459,22 +466,21 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
         summary = cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 6, 3, 59),
+            'created': datetime(2010, 6, 6, 4, 0),
             'end': datetime(2010, 6, 6, 5, 30),
-            'id': 'j-ISFORJACUZZI',
-            'label': 'mr_exciting',
-            'name': 'mr_exciting.woo.20100606.035855.000000',
+            'id': u'j-ISFORJACUZZI',
+            'label': u'mr_exciting',
+            'name': u'mr_exciting.woo.20100606.035855.000000',
             'nih': 20.0,
             'nih_bbnu': 17.5,
             'nih_billed': 20.0,
             'nih_used': 2.5,
             'num_steps': 1,
-            'owner': 'woo',
+            'owner': u'woo',
             'pool': None,
             'ran': timedelta(hours=1, minutes=30),
             'ready': datetime(2010, 6, 6, 4, 15),
-            'start': datetime(2010, 6, 6, 4, 0),
-            'state': 'RUNNING',
+            'state': u'RUNNING',
             'usage': [{
             # bootstrapping
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
@@ -485,11 +491,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'hour_to_nih_used': {datetime(2010, 6, 6, 4): 2.5},
                 'hour_to_nih_bbnu': {},
                 'hour_to_nih_billed': {datetime(2010, 6, 6, 4): 2.5},
-                'label': 'mr_exciting',
+                'label': u'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
                 'nih_billed': 2.5,
-                'owner': 'woo',
+                'owner': u'woo',
                 'start': datetime(2010, 6, 6, 4, 0),
                 'step_num': None,
             }, {
@@ -504,11 +510,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                                      datetime(2010, 6, 6, 5): 10.0},
                 'hour_to_nih_billed': {datetime(2010, 6, 6, 4): 7.5,
                                        datetime(2010, 6, 6, 5): 10.0},
-                'label': 'mr_exciting',
+                'label': u'mr_exciting',
                 'nih_used': 0.0,
                 'nih_bbnu': 17.5,
                 'nih_billed': 17.5,
-                'owner': 'woo',
+                'owner': u'woo',
                 'start': datetime(2010, 6, 6, 4, 15),
                 'step_num': 1,
             }],
@@ -516,29 +522,44 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
 
     def test_multi_step_cluster(self):
         cluster = MockEmrObject(
-            creationdatetime='2010-06-05T23:29:00Z',
-            enddatetime='2010-06-06T01:15:00Z',  # 2 hours are billed
-            jobflowid='j-ISFORJOB',
+            id='j-ISFORJOB',
             name='mr_exciting.woo.20100605.232850.000000',
             normalizedinstancehours='20',
-            readydatetime='2010-06-05T23:45:00Z',
-            startdatetime='2010-06-05T23:30:00Z',
-            state='TERMINATED',
+            status=MockEmrObject(
+                state='TERMINATED',
+                timeline=MockEmrObject(
+                    creationdatetime='2010-06-05T23:30:00Z',
+                    enddatetime='2010-06-06T01:15:00Z',  # 2 hours are billed
+                    readydatetime='2010-06-05T23:45:00Z',
+                ),
+            ),
             steps=[
                 MockEmrObject(
                     name='mr_exciting.woo.20100605.232850.000000: Step 1 of 3',
-                    startdatetime='2010-06-05T23:45:00Z',
-                    enddatetime='2010-06-06T00:15:00Z',
+                    status=MockEmrObject(
+                        timeline=MockEmrObject(
+                            startdatetime='2010-06-05T23:45:00Z',
+                            enddatetime='2010-06-06T00:15:00Z',
+                        ),
+                    ),
                 ),
                 MockEmrObject(
                     name='mr_exciting.woo.20100605.232850.000000: Step 2 of 3',
-                    startdatetime='2010-06-06T00:30:00Z',
-                    enddatetime='2010-06-06T00:45:00Z',
+                    status=MockEmrObject(
+                        timeline=MockEmrObject(
+                            startdatetime='2010-06-06T00:30:00Z',
+                            enddatetime='2010-06-06T00:45:00Z',
+                        ),
+                    ),
                 ),
                 MockEmrObject(
                     name='mr_exciting.woo.20100605.232850.000000: Step 3 of 3',
-                    startdatetime='2010-06-06T00:45:00Z',
-                    enddatetime='2010-06-06T01:00:00Z',
+                    status=MockEmrObject(
+                        timeline=MockEmrObject(
+                            startdatetime='2010-06-06T00:45:00Z',
+                            enddatetime='2010-06-06T01:00:00Z',
+                        ),
+                    ),
                 ),
             ],
         )
@@ -546,22 +567,21 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
         summary = cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 5, 23, 29),
+            'created': datetime(2010, 6, 5, 23, 30),
             'end': datetime(2010, 6, 6, 1, 15),
-            'id': 'j-ISFORJOB',
-            'label': 'mr_exciting',
-            'name': 'mr_exciting.woo.20100605.232850.000000',
+            'id': u'j-ISFORJOB',
+            'label': u'mr_exciting',
+            'name': u'mr_exciting.woo.20100605.232850.000000',
             'nih': 20.0,
             'nih_bbnu': 7.5,
             'nih_billed': 20.0,
             'nih_used': 12.5,
             'num_steps': 3,
-            'owner': 'woo',
+            'owner': u'woo',
             'pool': None,
             'ran': timedelta(hours=1, minutes=45),
             'ready': datetime(2010, 6, 5, 23, 45),
-            'start': datetime(2010, 6, 5, 23, 30),
-            'state': 'TERMINATED',
+            'state': u'TERMINATED',
             'usage': [{
             # bootstrapping
                 'date_to_nih_used': {date(2010, 6, 5): 2.5},
@@ -572,11 +592,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'hour_to_nih_bbnu': {},
                 'hour_to_nih_billed': {datetime(2010, 6, 5, 23): 2.5},
                 'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5},
-                'label': 'mr_exciting',
+                'label': u'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
                 'nih_billed': 2.5,
-                'owner': 'woo',
+                'owner': u'woo',
                 'start': datetime(2010, 6, 5, 23, 30),
                 'step_num': None,
             }, {
@@ -593,11 +613,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                                        datetime(2010, 6, 6, 0): 5.0},
                 'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5,
                                      datetime(2010, 6, 6, 0): 2.5},
-                'label': 'mr_exciting',
+                'label': u'mr_exciting',
                 'nih_used': 5.0,
                 'nih_bbnu': 2.5,
                 'nih_billed': 7.5,
-                'owner': 'woo',
+                'owner': u'woo',
                 'start': datetime(2010, 6, 5, 23, 45),
                 'step_num': 1,
             }, {
@@ -610,11 +630,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'hour_to_nih_bbnu': {},
                 'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 2.5},
                 'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
-                'label': 'mr_exciting',
+                'label': u'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
                 'nih_billed': 2.5,
-                'owner': 'woo',
+                'owner': u'woo',
                 'start': datetime(2010, 6, 6, 0, 30),
                 'step_num': 2,
             },
@@ -629,11 +649,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 2.5,
                                        datetime(2010, 6, 6, 1): 5.0},
                 'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
-                'label': 'mr_exciting',
+                'label': u'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 5.0,
                 'nih_billed': 7.5,
-                'owner': 'woo',
+                'owner': u'woo',
                 'start': datetime(2010, 6, 6, 0, 45),
                 'step_num': 3,
             }],
@@ -650,29 +670,45 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                     MockEmrObject(value='reflecting'),
                 ]),
             ],
-            creationdatetime='2010-06-05T23:29:00Z',
-            enddatetime='2010-06-06T01:15:00Z',  # 2 hours are billed
-            jobflowid='j-ISFORJOB',
+            id='j-ISFORJOB',
             name='mr_exciting.woo.20100605.232850.000000',
             normalizedinstancehours='20',
-            readydatetime='2010-06-05T23:45:00Z',
-            startdatetime='2010-06-05T23:30:00Z',
             state='TERMINATED',
+            status=MockEmrObject(
+                state='TERMINATED',
+                timeline=MockEmrObject(
+                    creationdatetime='2010-06-05T23:30:00Z',
+                    enddatetime='2010-06-06T01:15:00Z',  # 2 hours are billed
+                    readydatetime='2010-06-05T23:45:00Z',
+                ),
+            ),
             steps=[
                 MockEmrObject(
                     name='mr_exciting.woo.20100605.232950.000000: Step 1 of 1',
-                    startdatetime='2010-06-05T23:45:00Z',
-                    enddatetime='2010-06-06T00:15:00Z',
+                    status=MockEmrObject(
+                        timeline=MockEmrObject(
+                            startdatetime='2010-06-05T23:45:00Z',
+                            enddatetime='2010-06-06T00:15:00Z',
+                        ),
+                    ),
                 ),
                 MockEmrObject(
                     name='mr_whatever.meh.20100606.002000.000000: Step 1 of 2',
-                    startdatetime='2010-06-06T00:30:00Z',
-                    enddatetime='2010-06-06T00:45:00Z',
+                    status=MockEmrObject(
+                        timeline=MockEmrObject(
+                            startdatetime='2010-06-06T00:30:00Z',
+                            enddatetime='2010-06-06T00:45:00Z',
+                        ),
+                    ),
                 ),
                 MockEmrObject(
                     name='mr_whatever.meh.20100606.002000.000000: Step 2 of 2',
-                    startdatetime='2010-06-06T00:45:00Z',
-                    enddatetime='2010-06-06T01:00:00Z',
+                    status=MockEmrObject(
+                        timeline=MockEmrObject(
+                            startdatetime='2010-06-06T00:45:00Z',
+                            enddatetime='2010-06-06T01:00:00Z',
+                        ),
+                    ),
                 ),
             ],
         )
@@ -680,21 +716,20 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
         summary = cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 5, 23, 29),
+            'created': datetime(2010, 6, 5, 23, 30),
             'end': datetime(2010, 6, 6, 1, 15),
-            'id': 'j-ISFORJOB',
-            'label': 'mr_exciting',
-            'name': 'mr_exciting.woo.20100605.232850.000000',
+            'id': u'j-ISFORJOB',
+            'label': u'mr_exciting',
+            'name': u'mr_exciting.woo.20100605.232850.000000',
             'nih': 20.0,
             'nih_bbnu': 7.5,
             'nih_billed': 20.0,
             'nih_used': 12.5,
             'num_steps': 3,
-            'owner': 'woo',
-            'pool': 'reflecting',
+            'owner': u'woo',
+            'pool': u'reflecting',
             'ran': timedelta(hours=1, minutes=45),
             'ready': datetime(2010, 6, 5, 23, 45),
-            'start': datetime(2010, 6, 5, 23, 30),
             'state': 'TERMINATED',
             'usage': [{
             # bootstrapping
@@ -706,11 +741,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'hour_to_nih_bbnu': {},
                 'hour_to_nih_billed': {datetime(2010, 6, 5, 23): 2.5},
                 'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5},
-                'label': 'mr_exciting',
+                'label': u'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
                 'nih_billed': 2.5,
-                'owner': 'woo',
+                'owner': u'woo',
                 'start': datetime(2010, 6, 5, 23, 30),
                 'step_num': None,
             }, {
@@ -727,11 +762,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                                        datetime(2010, 6, 6, 0): 5.0},
                 'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5,
                                      datetime(2010, 6, 6, 0): 2.5},
-                'label': 'mr_exciting',
+                'label': u'mr_exciting',
                 'nih_used': 5.0,
                 'nih_bbnu': 2.5,
                 'nih_billed': 7.5,
-                'owner': 'woo',
+                'owner': u'woo',
                 'start': datetime(2010, 6, 5, 23, 45),
                 'step_num': 1,
             }, {
@@ -744,11 +779,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'hour_to_nih_bbnu': {},
                 'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 2.5},
                 'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
-                'label': 'mr_whatever',
+                'label': u'mr_whatever',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
                 'nih_billed': 2.5,
-                'owner': 'meh',
+                'owner': u'meh',
                 'start': datetime(2010, 6, 6, 0, 30),
                 'step_num': 1,
             },
@@ -763,11 +798,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
                 'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 2.5,
                                        datetime(2010, 6, 6, 1): 5.0},
                 'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
-                'label': 'mr_whatever',
+                'label': u'mr_whatever',
                 'nih_used': 2.5,
                 'nih_bbnu': 5.0,
                 'nih_billed': 7.5,
-                'owner': 'meh',
+                'owner': u'meh',
                 'start': datetime(2010, 6, 6, 0, 45),
                 'step_num': 2,
             }],

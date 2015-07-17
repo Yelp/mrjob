@@ -757,13 +757,13 @@ def print_report(stats, now=None):
     # Details
     print 'Details for all job flows:'
     print
-    print (' id              state         created             steps'
+    print (' id              state                  created             steps'
            '        time ran     billed    waste   user   name')
 
     all_clusters = sorted(s['clusters'], key=lambda cs: cs['created'],
                            reverse=True)
     for cs in all_clusters:
-        print ' %-15s %-13s %19s %3d %17s %9.2f %9.2f %8s %s' % (
+        print ' %-15s %-22s %19s %3d %17s %9.2f %9.2f %8s %s' % (
             cs['id'], cs['state'], cs['created'], cs['num_steps'],
             strip_microseconds(cs['ran']), cs['nih_used'], cs['nih_bbnu'],
             (cs['owner'] or ''), (cs['label'] or ('not started by mrjob')))

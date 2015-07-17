@@ -1,4 +1,5 @@
 # Copyright 2011 Yelp
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +20,7 @@ from StringIO import StringIO
 import sys
 
 import boto.emr.connection
-from mrjob.tools.emr.audit_usage import job_flow_to_full_summary
+from mrjob.tools.emr.audit_usage import cluster_to_full_summary
 from mrjob.tools.emr.audit_usage import subdivide_interval_by_date
 from mrjob.tools.emr.audit_usage import subdivide_interval_by_hour
 from mrjob.tools.emr.audit_usage import main
@@ -52,7 +53,8 @@ class AuditUsageTestCase(MockEMRAndS3TestCase):
 
     def test_with_one_job_flow(self):
         emr_conn = boto.emr.connection.EmrConnection()
-        emr_conn.run_jobflow('no name', log_uri=None)
+        emr_conn.run_jobflow('no name', job_flow_role='fake-instance-profile',
+                             service_role='fake-service-role')
 
         main(['-q', '--no-conf'])
         self.assertIn('j-MOCKCLUSTER0', self.stdout.getvalue())
@@ -62,22 +64,27 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
 
     maxDiff = None  # show whole diff when tests fail
 
-    def test_basic_job_flow_with_no_steps(self):
-        job_flow = MockEmrObject(
-            creationdatetime='2010-06-05T23:59:00Z',
-            enddatetime='2010-06-06T00:30:00Z',
-            jobflowid='j-ISFORJAGUAR',
+    def test_basic_cluster_with_no_steps(self):
+        cluster = MockEmrObject(
+            bootstrapactions=[],
+            id='j-ISFORJAGUAR',
             name='mr_exciting.woo.20100605.235850.000000',
             normalizedinstancehours='10',
-            readydatetime='2010-06-06T00:15:00Z',
-            startdatetime='2010-06-06T00:00:00Z',
-            state='COMPLETED',
+            status=MockEmrObject(
+                state='COMPLETED',
+                timeline=MockEmrObject(
+                    creationdatetime='2010-06-06T00:00:00Z',
+                    enddatetime='2010-06-06T00:30:00Z',
+                    readydatetime='2010-06-06T00:15:00Z',
+                ),
+            ),
+            steps=[],
         )
 
-        summary = job_flow_to_full_summary(job_flow)
+        summary = cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 5, 23, 59),
+            'created': datetime(2010, 6, 6, 0, 0),
             'end': datetime(2010, 6, 6, 0, 30),
             'id': 'j-ISFORJAGUAR',
             'label': 'mr_exciting',
@@ -91,7 +98,6 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             'pool': None,
             'ran': timedelta(minutes=30),
             'ready': datetime(2010, 6, 6, 0, 15),
-            'start': datetime(2010, 6, 6, 0, 0),
             'state': 'COMPLETED',
             'usage': [{
                 'date_to_nih_bbnu': {date(2010, 6, 6): 7.5},
@@ -112,8 +118,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             }],
         })
 
-    def test_still_running_job_flow_with_no_steps(self):
-        job_flow = MockEmrObject(
+    def test_still_running_cluster_with_no_steps(self):
+        cluster = MockEmrObject(
             creationdatetime='2010-06-05T23:59:00Z',
             jobflowid='j-ISFORJUICE',
             name='mr_exciting.woo.20100605.235850.000000',
@@ -123,8 +129,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             state='WAITING',
         )
 
-        summary = job_flow_to_full_summary(
-            job_flow, now=datetime(2010, 6, 6, 0, 30))
+        summary = cluster_to_full_summary(
+            cluster, now=datetime(2010, 6, 6, 0, 30))
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 5, 23, 59),
@@ -162,8 +168,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             }],
         })
 
-    def test_still_bootstrapping_job_flow_with_no_steps(self):
-        job_flow = MockEmrObject(
+    def test_still_bootstrapping_cluster_with_no_steps(self):
+        cluster = MockEmrObject(
             creationdatetime='2010-06-05T23:59:00Z',
             jobflowid='j-ISFORJOKE',
             name='mr_exciting.woo.20100605.235850.000000',
@@ -172,8 +178,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             state='BOOTSTRAPPING',
         )
 
-        summary = job_flow_to_full_summary(
-            job_flow, now=datetime(2010, 6, 6, 0, 30))
+        summary = cluster_to_full_summary(
+            cluster, now=datetime(2010, 6, 6, 0, 30))
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 5, 23, 59),
@@ -211,8 +217,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             }],
         })
 
-    def test_job_flow_that_hasnt_yet_started(self):
-        job_flow = MockEmrObject(
+    def test_cluster_that_hasnt_yet_started(self):
+        cluster = MockEmrObject(
             creationdatetime='2010-06-05T23:59:00Z',
             jobflowid='j-ISFORJUMP',
             name='mr_exciting.woo.20100605.235850.000000',
@@ -220,8 +226,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             state='STARTING',
         )
 
-        summary = job_flow_to_full_summary(
-            job_flow, now=datetime(2010, 6, 6, 0, 30))
+        summary = cluster_to_full_summary(
+            cluster, now=datetime(2010, 6, 6, 0, 30))
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 5, 23, 59),
@@ -243,8 +249,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             'usage': [],
         })
 
-    def test_job_flow_that_was_terminated_before_starting(self):
-        job_flow = MockEmrObject(
+    def test_cluster_that_was_terminated_before_starting(self):
+        cluster = MockEmrObject(
             creationdatetime='2010-06-05T23:59:00Z',
             enddatetime='2010-06-06T00:01:00Z',
             jobflowid='j-ISFORJOURNEY',
@@ -253,8 +259,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             state='TERMINATED',
         )
 
-        summary = job_flow_to_full_summary(
-            job_flow, now=datetime(2010, 6, 6, 0, 30))
+        summary = cluster_to_full_summary(
+            cluster, now=datetime(2010, 6, 6, 0, 30))
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 5, 23, 59),
@@ -276,11 +282,11 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             'usage': [],
         })
 
-    def test_job_flow_with_no_fields(self):
+    def test_cluster_with_no_fields(self):
         # this shouldn't happen in practice; just a robustness check
-        job_flow = MockEmrObject()
+        cluster = MockEmrObject()
 
-        summary = job_flow_to_full_summary(job_flow)
+        summary = cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
             'created': None,
@@ -302,8 +308,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             'usage': [],
         })
 
-    def test_job_flow_with_no_steps_split_over_midnight(self):
-        job_flow = MockEmrObject(
+    def test_cluster_with_no_steps_split_over_midnight(self):
+        cluster = MockEmrObject(
             creationdatetime='2010-06-05T23:59:00Z',
             enddatetime='2010-06-06T01:15:00Z',  # 2 hours are billed
             jobflowid='j-ISFORJOY',
@@ -314,7 +320,7 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             state='COMPLETED',
         )
 
-        summary = job_flow_to_full_summary(job_flow)
+        summary = cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 5, 23, 59),
@@ -358,8 +364,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             }],
         })
 
-    def test_job_flow_with_one_still_running_step(self):
-        job_flow = MockEmrObject(
+    def test_cluster_with_one_still_running_step(self):
+        cluster = MockEmrObject(
             creationdatetime='2010-06-06T03:59:00Z',
             jobflowid='j-ISFORJUNGLE',
             name='mr_exciting.woo.20100606.035855.000000',
@@ -375,8 +381,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             ]
         )
 
-        summary = job_flow_to_full_summary(
-            job_flow, now=datetime(2010, 6, 6, 5, 30))
+        summary = cluster_to_full_summary(
+            cluster, now=datetime(2010, 6, 6, 5, 30))
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 6, 3, 59),
@@ -434,8 +440,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             }],
         })
 
-    def test_job_flow_with_one_cancelled_step(self):
-        job_flow = MockEmrObject(
+    def test_cluster_with_one_cancelled_step(self):
+        cluster = MockEmrObject(
             creationdatetime='2010-06-06T03:59:00Z',
             enddatetime='2010-06-06T05:30:00Z',
             jobflowid='j-ISFORJACUZZI',
@@ -453,7 +459,7 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             ]
         )
 
-        summary = job_flow_to_full_summary(job_flow)
+        summary = cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 6, 3, 59),
@@ -511,8 +517,8 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             }],
         })
 
-    def test_multi_step_job_flow(self):
-        job_flow = MockEmrObject(
+    def test_multi_step_cluster(self):
+        cluster = MockEmrObject(
             creationdatetime='2010-06-05T23:29:00Z',
             enddatetime='2010-06-06T01:15:00Z',  # 2 hours are billed
             jobflowid='j-ISFORJOB',
@@ -540,7 +546,7 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             ],
         )
 
-        summary = job_flow_to_full_summary(job_flow)
+        summary = cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 5, 23, 29),
@@ -636,9 +642,9 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             }],
         })
 
-    def test_pooled_job_flow(self):
+    def test_pooled_cluster(self):
         # same as test case above with different job names
-        job_flow = MockEmrObject(
+        cluster = MockEmrObject(
             bootstrapactions=[
                 MockEmrObject(args=[]),
                 MockEmrObject(args=[
@@ -674,7 +680,7 @@ class JobFlowToFullSummaryTestCase(unittest.TestCase):
             ],
         )
 
-        summary = job_flow_to_full_summary(job_flow)
+        summary = cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 5, 23, 29),

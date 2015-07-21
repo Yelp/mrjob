@@ -21,15 +21,25 @@ Usage::
 Options::
 
   -h, --help            show this help message and exit
-  -v, --verbose         print more messages to stderr
-  -q, --quiet           Don't log status messages; just print the report.
-  -c CONF_PATH, --conf-path=CONF_PATH
+  --aws-region=AWS_REGION
+                        Region to connect to S3 and EMR on (e.g. us-west-1).
+  -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
+  --emr-endpoint=EMR_ENDPOINT
+                        Optional host to connect to when communicating with S3
+                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
+                        Default is to infer this from aws_region.
   --max-days-ago=MAX_DAYS_AGO
                         Max number of days ago to look at jobs. By default, we
                         go back as far as EMR supports (currently about 2
                         months)
+  -q, --quiet           Don't print anything to stderr
+  --s3-endpoint=S3_ENDPOINT
+                        Host to connect to when communicating with S3 (e.g. s3
+                        -us-west-1.amazonaws.com). Default is to infer this
+                        from region (see --aws-region).
+  -v, --verbose         print more messages to stderr
 """
 from datetime import datetime
 from datetime import timedelta
@@ -42,6 +52,7 @@ from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 from mrjob.options import add_emr_connect_opts
+from mrjob.options import alphabetize_options
 from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import STEP_NAME_RE
 from mrjob.parse import iso8601_to_datetime
@@ -85,6 +96,8 @@ def make_option_parser():
 
     add_basic_opts(option_parser)
     add_emr_connect_opts(option_parser)
+
+    alphabetize_options(option_parser)
 
     return option_parser
 

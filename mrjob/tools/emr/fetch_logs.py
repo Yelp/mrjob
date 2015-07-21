@@ -52,6 +52,8 @@ Options::
                         How long to wait for S3 to reach eventual consistency.
                         This is typically less than a second (zero in us-west)
                         but the default is 5.0 to be safe.
+  --ssh-bin=SSH_BIN     Name/path of ssh binary. Arguments are allowed (e.g.
+                        --ssh-bin 'ssh -v')
   -s STEP_NUM, --step-num=STEP_NUM
                         Limit results to a single step. To be used with --list
                         and --cat.
@@ -189,7 +191,7 @@ def make_option_parser():
     add_emr_connect_opts(option_parser)
 
     scrape_options_into_new_groups(MRJob().all_option_groups(), {
-        option_parser: ('ec2_key_pair_file', 's3_sync_wait_time')
+        option_parser: ('ec2_key_pair_file', 's3_sync_wait_time', 'ssh_bin')
     })
 
     alphabetize_options(option_parser)

@@ -634,3 +634,7 @@ def print_help_for_groups(*args):
     option_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
     option_parser.option_groups = args
     option_parser.print_help()
+
+
+def alphabetize_options(opt_group):
+    opt_group.option_list.sort(key=lambda opt: opt.dest)

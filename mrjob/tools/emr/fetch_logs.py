@@ -137,6 +137,8 @@ def make_option_parser():
 
     option_parser = OptionParser(usage=usage, description=description)
 
+    add_basic_opts(option_parser)
+
     option_parser.add_option('-f', '--find-failure', dest='find_failure',
                              action='store_true', default=False,
                              help=('Search the logs for information about why'
@@ -165,17 +167,12 @@ def make_option_parser():
                              action='store_true', default=False,
                              help='Show counters from the job flow')
 
-    assignments = {
-        option_parser: ('conf_paths', 'quiet', 'verbose',
-                        'ec2_key_pair_file', 's3_sync_wait_time')
-    }
+    add_emr_connect_opts(option_parser)
 
-    mr_job = MRJob()
-    job_option_groups = (mr_job.option_parser, mr_job.mux_opt_group,
-                         mr_job.proto_opt_group, mr_job.runner_opt_group,
-                         mr_job.hadoop_emr_opt_group, mr_job.emr_opt_group,
-                         mr_job.hadoop_opts_opt_group)
-    scrape_options_into_new_groups(job_option_groups, assignments)
+    scrape_options_into_new_groups(MRJob().all_option_groups(), {
+        option_parser: ('ec2_key_pair_file', 's3_sync_wait_time')
+    })
+
     return option_parser
 
 

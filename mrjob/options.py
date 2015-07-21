@@ -286,7 +286,7 @@ def add_emr_opts(opt_group):
     """Options for ``emr`` runner"""
     return (add_emr_connect_opts(opt_group) +
             add_emr_launch_opts(opt_group) +
-            add_emr_monitor_opts(opt_group))
+            add_emr_run_opts(opt_group))
 
 
 def add_emr_connect_opts(opt_group):
@@ -310,7 +310,7 @@ def add_emr_connect_opts(opt_group):
     ]
 
 
-def add_emr_monitor_opts(opt_group):
+def add_emr_run_opts(opt_group):
     """Options for monitoring a running job on EMR."""
     return [
         opt_group.add_option(

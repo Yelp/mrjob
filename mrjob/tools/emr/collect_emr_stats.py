@@ -49,6 +49,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
+from mrjob.options import add_emr_connect_opts
 
 log = getLogger(__name__)
 
@@ -69,6 +70,7 @@ def main(args):
         action="store_true", dest="pretty_print", default=False,
         help=('Pretty print the collected stats'))
     add_basic_opts(option_parser)
+    add_emr_connect_opts(option_parser)
 
     options, args = option_parser.parse_args(args)
     if args:

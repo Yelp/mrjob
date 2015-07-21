@@ -41,6 +41,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
+from mrjob.options import add_emr_connect_opts
 from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import STEP_NAME_RE
 from mrjob.parse import iso8601_to_datetime
@@ -83,6 +84,7 @@ def make_option_parser():
               ' as far as EMR supports (currently about 2 months)'))
 
     add_basic_opts(option_parser)
+    add_emr_connect_opts(option_parser)
 
     return option_parser
 

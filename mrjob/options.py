@@ -20,6 +20,7 @@ made public until at least 0.4 if not later or never.
 from optparse import OptionParser
 from optparse import SUPPRESS_USAGE
 
+from mrjob.parse import parse_key_value_list
 from mrjob.runner import CLEANUP_CHOICES
 
 
@@ -311,7 +312,7 @@ def add_emr_connect_opts(opt_group):
 
 
 def add_emr_run_opts(opt_group):
-    """Options for monitoring a running job on EMR."""
+    """Options for running and monitoring a job on EMR."""
     return [
         opt_group.add_option(
             '--check-emr-status-every', dest='check_emr_status_every',
@@ -329,6 +330,22 @@ def add_emr_run_opts(opt_group):
             help=('Action to take when a step fails'
                   ' (e.g. TERMINATE_CLUSTER | CANCEL_AND_WAIT | CONTINUE)')),
 
+        opt_group.add_option(
+            '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
+            help='ID of an existing EMR job flow to use'),
+
+        opt_group.add_option(
+            '--hadoop-streaming-jar-on-emr',
+            dest='hadoop_streaming_jar_on_emr', default=None,
+            help=('Local path of the hadoop streaming jar on the EMR node.'
+                  ' Rarely necessary.')),
+
+        opt_group.add_option(
+            '--pool-wait-minutes', dest='pool_wait_minutes', default=0,
+            type='int',
+            help=('Wait for a number of minutes for a job flow to finish'
+                  ' if a job finishes, pick up their job flow. Otherwise'
+                  ' create a new one. (default 0)')),
 
         opt_group.add_option(
             '--ssh-bin', dest='ssh_bin', default=None,
@@ -362,7 +379,7 @@ def add_emr_run_opts(opt_group):
 
 
 def add_emr_launch_opts(opt_group):
-    """Options for launching a cluster or running a job."""
+    """Options for launching a cluster (including bootstrapping)."""
     return [
         opt_group.add_option(
             '--additional-emr-info', dest='additional_emr_info', default=None,
@@ -391,16 +408,6 @@ def add_emr_launch_opts(opt_group):
                  ' when creating a cluster. Should take the form KEY=VALUE.'
                  ' You can use --emr-api-param multiple times.'
         ),
-
-        opt_group.add_option(
-            '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
-            help='ID of an existing EMR job flow to use'),
-
-        opt_group.add_option(
-            '--hadoop-streaming-jar-on-emr',
-            dest='hadoop_streaming_jar_on_emr', default=None,
-            help=('Local path of the hadoop streaming jar on the EMR node.'
-                  ' Rarely necessary.')),
 
         opt_group.add_option(
             '--iam-instance-profile', dest='iam_instance_profile',
@@ -453,13 +460,6 @@ def add_emr_launch_opts(opt_group):
             default=None,
             help=('Specify a pool name to join. Set to "default" if not'
                   ' specified.')),
-
-        opt_group.add_option(
-            '--pool-wait-minutes', dest='pool_wait_minutes', default=0,
-            type='int',
-            help=('Wait for a number of minutes for a job flow to finish'
-                  ' if a job finishes, pick up their job flow. Otherwise'
-                  ' create a new one. (default 0)')),
 
         opt_group.add_option(
             '--s3-log-uri', dest='s3_log_uri', default=None,
@@ -652,3 +652,20 @@ def print_help_for_groups(*args):
 
 def alphabetize_options(opt_group):
     opt_group.option_list.sort(key=lambda opt: opt.dest)
+
+
+def parse_emr_api_params(options, option_parser):
+    """Parse dict out of emr_api_params and no_emr_api_params options."""
+    emr_api_err = (
+        'emr-api-params argument "%s" is not of the form KEY=VALUE')
+
+    emr_api_params = parse_key_value_list(
+        options.emr_api_params,
+        emr_api_err,
+        option_parser.error)
+
+    # no_emr_api_params just exists to modify emr_api_params
+    for param in options.no_emr_api_params:
+        emr_api_params[param] = None
+
+    return emr_api_params

@@ -109,8 +109,6 @@ Options::
                         Optional host to connect to when communicating with S3
                         (e.g. us-west-1.elasticmapreduce.amazonaws.com).
                         Default is to infer this from aws_region.
-  --emr-job-flow-id=EMR_JOB_FLOW_ID
-                        ID of an existing EMR job flow to use
   --pool-name=EMR_JOB_FLOW_POOL_NAME
                         Specify a pool name to join. Set to "default" if not
                         specified.
@@ -118,9 +116,6 @@ Options::
                         Disable storage of Hadoop logs in SimpleDB
   --enable-emr-debugging
                         Enable storage of Hadoop logs in SimpleDB
-  --hadoop-streaming-jar-on-emr=HADOOP_STREAMING_JAR_ON_EMR
-                        Local path of the hadoop streaming jar on the EMR
-                        node. Rarely necessary.
   --iam-instance-profile=IAM_INSTANCE_PROFILE
                         EC2 instance profile to use for the EMR cluster - see
                         "Configure IAM Roles for Amazon EMR" in AWS docs
@@ -163,10 +158,6 @@ Options::
                         mrjob.tools.emr.terminate_idle_job_flows in your
                         crontab; job flows left idle can quickly become
                         expensive!
-  --pool-wait-minutes=POOL_WAIT_MINUTES
-                        Wait for a number of minutes for a job flow to finish
-                        if a job finishes, pick up their job flow. Otherwise
-                        create a new one. (default 0)
   -q, --quiet           Don't print anything to stderr
   --s3-endpoint=S3_ENDPOINT
                         Host to connect to when communicating with S3 (e.g. s3
@@ -203,6 +194,7 @@ from mrjob.options import add_basic_opts
 from mrjob.options import add_emr_connect_opts
 from mrjob.options import add_emr_launch_opts
 from mrjob.options import alphabetize_options
+from mrjob.options import parse_emr_api_params
 from mrjob.util import scrape_options_into_new_groups
 
 
@@ -221,6 +213,8 @@ def runner_kwargs(cl_args=None):
     # parser command-line args
     option_parser = make_option_parser()
     options, args = option_parser.parse_args(cl_args)
+    # fake custom emr_api_params option
+    options.emr_api_params = parse_emr_api_params(options, option_parser)
 
     if args:
         option_parser.error('takes no arguments')
@@ -229,8 +223,11 @@ def runner_kwargs(cl_args=None):
 
     # create the persistent job
     kwargs = options.__dict__.copy()
+
     del kwargs['quiet']
     del kwargs['verbose']
+    del kwargs['no_emr_api_params']
+
     return kwargs
 
 

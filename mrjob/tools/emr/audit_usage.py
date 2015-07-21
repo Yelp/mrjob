@@ -54,8 +54,6 @@ from optparse import OptionParser
 from mrjob import _boto_emr
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _yield_all_clusters
-from mrjob.emr import _yield_all_bootstrap_actions
-from mrjob.emr import _yield_all_steps
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 from mrjob.options import add_emr_connect_opts
@@ -81,9 +79,8 @@ def main(args):
     now = datetime.utcnow()
 
     log.info('getting job flow history...')
-    # TODO make this a list after testing is done
-    clusters = yield_clusters(
-        options.conf_paths, options.max_days_ago, now=now)
+    clusters = list(yield_clusters(
+        options.conf_paths, options.max_days_ago, now=now))
 
     log.info('compiling job flow stats...')
     stats = clusters_to_stats(clusters, now=now)
@@ -596,16 +593,10 @@ def yield_clusters(conf_paths, max_days_ago=None, now=None):
     if max_days_ago is not None:
         created_after = now - timedelta(days=max_days_ago)
 
-    for cluster_summary in _yield_all_clusters(
-            emr_conn, created_after=created_after):
-        cluster_id = cluster_summary.id
-
-        cluster = _boto_emr.describe_cluster(emr_conn, cluster_id)
-        cluster.steps = list(_yield_all_steps(emr_conn, cluster_id))
-        cluster.bootstrapactions = list(
-            _yield_all_bootstrap_actions(emr_conn, cluster_id))
-
-        yield cluster
+    return _yield_all_clusters(
+            emr_conn,
+            created_after=created_after,
+            include=('bootstrapactions', 'cluster', 'steps')):
 
 
 def print_report(stats, now=None):

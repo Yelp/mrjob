@@ -36,6 +36,7 @@ from mrjob.options import add_hadoop_emr_opts
 from mrjob.options import add_hadoop_shared_opts
 from mrjob.options import add_protocol_opts
 from mrjob.options import add_runner_opts
+from mrjob.options import alphabetize_options
 from mrjob.options import print_help_for_groups
 from mrjob.parse import parse_key_value_list
 from mrjob.parse import parse_port_range_list
@@ -96,6 +97,9 @@ class MRJobLauncher(object):
                                           option_class=self.OPTION_CLASS,
                                           add_help_option=False)
         self.configure_options()
+
+        for opt_group in self.all_option_groups():
+            alphabetize_options(opt_group)
 
         # don't pass None to parse_args unless we're actually running
         # the MRJob script

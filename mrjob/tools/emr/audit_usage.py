@@ -82,7 +82,7 @@ def main(args):
 
     log.info('getting job flow history...')
     clusters = list(yield_clusters(
-        max_days_ago=options.max_days_ago, now=now, **runner_kwargs(options))
+        max_days_ago=options.max_days_ago, now=now, **runner_kwargs(options)))
 
     log.info('compiling job flow stats...')
     stats = clusters_to_stats(clusters, now=now)

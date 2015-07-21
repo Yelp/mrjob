@@ -196,7 +196,6 @@ Options::
                         --emr-api-param VisibleToAllUsers=true|false.
 """
 from optparse import OptionParser
-from optparse import OptionGroup
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob

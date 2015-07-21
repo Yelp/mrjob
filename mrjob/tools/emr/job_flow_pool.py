@@ -120,6 +120,7 @@ Options::
                         pool "default")
   -v, --verbose         print more messages to stderr
 """
+from logging import getLogger
 from optparse import OptionError
 from optparse import OptionParser
 
@@ -133,6 +134,9 @@ from mrjob.options import add_emr_instance_opts
 from mrjob.options import alphabetize_options
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import strip_microseconds
+
+
+log = getLogger('mrjob.emr.tools.job_flow_pool')
 
 
 def get_pools(emr_conn):

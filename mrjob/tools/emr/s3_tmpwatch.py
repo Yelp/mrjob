@@ -83,13 +83,13 @@ def main(cl_args=None):
 
     for path in args[1:]:
         s3_cleanup(path, time_old,
-                   conf_paths=options.conf_paths,
-                   dry_run=options.test)
+                   dry_run=options.text,
+                   **runner_kwargs(options))
 
 
-def s3_cleanup(glob_path, time_old, options):
+def s3_cleanup(glob_path, time_old, dry_run=False, **runner_kwargs):
     """Delete all files older than *time_old* in *path*."""
-    runner = EMRJobRunner(**runner_kwargs(options))
+    runner = EMRJobRunner(**runner_kwargs)
     s3_conn = runner.make_s3_conn()
 
     log.info('Deleting all files in %s that are older than %s' %
@@ -105,7 +105,7 @@ def s3_cleanup(glob_path, time_old, options):
             if age > time_old:
                 # Delete it
                 log.info('Deleting %s; is %s old' % (key.name, age))
-                if not options.test:
+                if not dry_run:
                     key.delete()
 
 

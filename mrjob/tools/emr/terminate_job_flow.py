@@ -24,12 +24,23 @@ Terminate an existing EMR job flow.
 Options::
 
   -h, --help            show this help message and exit
-  -v, --verbose         print more messages to stderr
-  -q, --quiet           don't print anything
-  -c CONF_PATH, --conf-path=CONF_PATH
+  --aws-region=AWS_REGION
+                        Region to connect to S3 and EMR on (e.g. us-west-1).
+  -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
-
+  --emr-endpoint=EMR_ENDPOINT
+                        Optional host to connect to when communicating with S3
+                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
+                        Default is to infer this from aws_region.
+  -q, --quiet           Don't print anything to stderr
+  --s3-endpoint=S3_ENDPOINT
+                        Host to connect to when communicating with S3 (e.g. s3
+                        -us-west-1.amazonaws.com). Default is to infer this
+                        from region (see --aws-region).
+  -t, --test            Don't actually delete any files; just log that we
+                        would
+  -v, --verbose         print more messages to stderr
 """
 import logging
 from optparse import OptionParser
@@ -37,6 +48,8 @@ from optparse import OptionParser
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
+from mrjob.options import add_emr_connect_opts
+from mrjob.options import alphabetize_options
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +66,7 @@ def main(cl_args=None):
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     # create the persistent job
-    runner = EMRJobRunner(conf_paths=options.conf_paths)
+    runner = EMRJobRunner(**runner_kwargs(options))
     log.debug('Terminating job flow %s' % cluster_id)
     runner.make_emr_conn().terminate_jobflow(cluster_id)
     log.info('Terminated job flow %s' % cluster_id)
@@ -71,8 +84,19 @@ def make_option_parser():
         help="Don't actually delete any files; just log that we would")
 
     add_basic_opts(option_parser)
+    add_emr_connect_opts(option_parser)
+    alphabetize_options(option_parser)
 
     return option_parser
+
+
+def runner_kwargs(options):
+    kwargs = options.__dict__.copy()
+    for unused_arg in ('quiet', 'verbose', 'test'):
+        del kwargs[unused_arg]
+
+    return kwargs
+
 
 
 if __name__ == '__main__':

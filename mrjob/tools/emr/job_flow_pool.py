@@ -17,16 +17,126 @@ running a job with the specified options.
 Usage::
 
     python -m mrjob.tools.emr.job_flow_pool
+
+Options::
+
+  -h, --help            show this help message and exit
+  --ami-version=AMI_VERSION
+                        AMI Version to use, e.g. "2.4.11" (default "latest").
+  --aws-region=AWS_REGION
+                        Region to connect to S3 and EMR on (e.g. us-west-1).
+  --bootstrap=BOOTSTRAP
+                        A shell command to set up libraries etc. before any
+                        steps (e.g. "sudo apt-get -qy install python3"). You
+                        may interpolate files available via URL or locally
+                        with Hadoop Distributed Cache syntax ("sudo dpkg -i
+                        foo.deb#")
+  --bootstrap-action=BOOTSTRAP_ACTIONS
+                        Raw bootstrap action scripts to run before any of the
+                        other bootstrap steps. You can use --bootstrap-action
+                        more than once. Local scripts will be automatically
+                        uploaded to S3. To add arguments, just use quotes:
+                        "foo.sh arg1 arg2"
+  --bootstrap-cmd=BOOTSTRAP_CMDS
+                        Commands to run on the master node to set up
+                        libraries, etc. You can use --bootstrap-cmd more than
+                        once. Use mrjob.conf to specify arguments as a list to
+                        be run directly.
+  --bootstrap-file=BOOTSTRAP_FILES
+                        File to upload to the master node before running
+                        bootstrap_cmds (for example, debian packages). These
+                        will be made public on S3 due to a limitation of the
+                        bootstrap feature. You can use --bootstrap-file more
+                        than once.
+  --bootstrap-mrjob     Automatically tar up the mrjob library and install it
+                        when we run the mrjob. This is the default. Use --no-
+                        bootstrap-mrjob if you've already installed mrjob on
+                        your Hadoop cluster.
+  --no-bootstrap-mrjob  Don't automatically tar up the mrjob library and
+                        install it when we run this job. Use this if you've
+                        already installed mrjob on your Hadoop cluster.
+  --bootstrap-python-package=BOOTSTRAP_PYTHON_PACKAGES
+                        Path to a Python module to install on EMR. These
+                        should be standard python module tarballs where you
+                        can cd into a subdirectory and run ``sudo python
+                        setup.py install``. You can use --bootstrap-python-
+                        package more than once.
+  --bootstrap-script=BOOTSTRAP_SCRIPTS
+                        Script to upload and then run on the master node (a
+                        combination of bootstrap_cmds and bootstrap_files).
+                        These are run after the command from bootstrap_cmds.
+                        You can use --bootstrap-script more than once.
+  -c CONF_PATHS, --conf-path=CONF_PATHS
+                        Path to alternate mrjob.conf file to read from
+  --no-conf             Don't load mrjob.conf even if it's available
+  --ec2-core-instance-bid-price=EC2_CORE_INSTANCE_BID_PRICE
+                        Bid price to specify for core (or "slave") nodes when
+                        setting them up as EC2 spot instances (you probably
+                        only want to set a bid price for task instances).
+  --ec2-core-instance-type=EC2_CORE_INSTANCE_TYPE, --ec2-slave-instance-type=EC2_CORE_INSTANCE_TYPE
+                        Type of EC2 instance for core (or "slave") nodes only
+  --ec2-master-instance-bid-price=EC2_MASTER_INSTANCE_BID_PRICE
+                        Bid price to specify for the master node when setting
+                        it up as an EC2 spot instance (you probably only want
+                        to set a bid price for task instances).
+  --ec2-master-instance-type=EC2_MASTER_INSTANCE_TYPE
+                        Type of EC2 instance for master node only
+  --ec2-task-instance-bid-price=EC2_TASK_INSTANCE_BID_PRICE
+                        Bid price to specify for task nodes when setting them
+                        up as EC2 spot instances.
+  --ec2-task-instance-type=EC2_TASK_INSTANCE_TYPE
+                        Type of EC2 instance for task nodes only
+  --emr-endpoint=EMR_ENDPOINT
+                        Optional host to connect to when communicating with S3
+                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
+                        Default is to infer this from aws_region.
+  --pool-name=EMR_JOB_FLOW_POOL_NAME
+                        Specify a pool name to join. Set to "default" if not
+                        specified.
+  --disable-emr-debugging
+                        Disable storage of Hadoop logs in SimpleDB
+  --enable-emr-debugging
+                        Enable storage of Hadoop logs in SimpleDB
+  -f, --find            Find a job flow matching the pool name, bootstrap
+                        configuration, and instance number/type as specified
+                        on the command line and in the configuration files
+  -a, --all             List all available job flows without filtering by
+                        configuration
+  --num-ec2-core-instances=NUM_EC2_CORE_INSTANCES
+                        Number of EC2 instances to start as core (or "slave")
+                        nodes. Incompatible with --num-ec2-instances.
+  --num-ec2-instances=NUM_EC2_INSTANCES
+                        Total number of EC2 instances to launch
+  --num-ec2-task-instances=NUM_EC2_TASK_INSTANCES
+                        Number of EC2 instances to start as task nodes.
+                        Incompatible with --num-ec2-instances.
+  -q, --quiet           Don't print anything to stderr
+  --s3-endpoint=S3_ENDPOINT
+                        Host to connect to when communicating with S3 (e.g. s3
+                        -us-west-1.amazonaws.com). Default is to infer this
+                        from region (see --aws-region).
+  -t JOB_FLOW_ID, --terminate=JOB_FLOW_ID
+                        Terminate all job flows in the given pool (defaults to
+                        pool "default")
+  -v, --verbose         print more messages to stderr
 """
+from logging import getLogger
 from optparse import OptionError
-from optparse import OptionGroup
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _est_time_to_hour
 from mrjob.job import MRJob
+from mrjob.options import add_basic_opts
+from mrjob.options import add_emr_connect_opts
+from mrjob.options import add_emr_bootstrap_opts
+from mrjob.options import add_emr_instance_opts
+from mrjob.options import alphabetize_options
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import strip_microseconds
+
+
+log = getLogger('mrjob.emr.tools.job_flow_pool')
 
 
 def get_pools(emr_conn):
@@ -112,6 +222,8 @@ def main():
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
+    log.warning('job_flow_pool is deprecated and is going away in v0.5.0')
+
     with EMRJobRunner(**runner_kwargs(options)) as runner:
         perform_actions(options, runner)
 
@@ -123,45 +235,6 @@ def make_option_parser():
         ' running a job with the specified options.')
     option_parser = OptionParser(usage=usage, description=description)
 
-    def make_option_group(halp):
-        g = OptionGroup(option_parser, halp)
-        option_parser.add_option_group(g)
-        return g
-
-    ec2_opt_group = make_option_group('EC2 instance configuration')
-    hadoop_opt_group = make_option_group('Hadoop configuration')
-    job_opt_group = make_option_group('Job flow configuration')
-
-    assignments = {
-        option_parser: (
-            'conf_paths',
-            'emr_job_flow_pool_name',
-            'quiet',
-            'verbose',
-        ),
-        ec2_opt_group: (
-            'aws_availability_zone',
-            'ec2_instance_type',
-            'ec2_key_pair',
-            'ec2_key_pair_file',
-            'ec2_master_instance_type',
-            'ec2_core_instance_type',
-            'emr_endpoint',
-            'num_ec2_instances',
-        ),
-        hadoop_opt_group: (
-            'hadoop_version',
-            'label',
-            'owner',
-        ),
-        job_opt_group: (
-            'bootstrap_actions',
-            'bootstrap_cmds',
-            'bootstrap_files',
-            'bootstrap_mrjob',
-            'bootstrap_python_packages',
-        ),
-    }
 
     option_parser.add_option('-a', '--all', action='store_true',
                              default=False, dest='list_all',
@@ -179,9 +252,19 @@ def make_option_parser():
                              help=('Terminate all job flows in the given pool'
                                    ' (defaults to pool "default")'))
 
-    # Scrape options from MRJob and index them by dest
-    mr_job = MRJob()
-    scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
+    add_basic_opts(option_parser)
+    add_emr_connect_opts(option_parser)
+    add_emr_instance_opts(option_parser)
+    add_emr_bootstrap_opts(option_parser)
+
+    scrape_options_into_new_groups(MRJob().all_option_groups(), {
+        option_parser: (
+            'bootstrap_mrjob',
+            'emr_job_flow_pool_name',
+        ),
+    })
+
+    alphabetize_options(option_parser)
     return option_parser
 
 

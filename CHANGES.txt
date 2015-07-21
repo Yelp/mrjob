@@ -6,6 +6,10 @@ v0.4.5, 2015-??-?? -- IAM Fortified
      * Fall back to default role/instance profile when no IAM access (#1008)
      * added get_ami_version() method
      * hadoop_version option no longer has any effect (#1017)
+   * EMR tools:
+     * added switches for options formerly only available from mrjob.conf (#1087)
+     * mrboss is available from command line tool: mrjob boss [args]
+     * job_flow_pool is deprecated
  * more efficient decoding of bz2 files
 
 v0.4.4, 2015-04-21 -- EMRgency!

@@ -369,65 +369,9 @@ def add_emr_launch_opts(opt_group):
             help='A JSON string for selecting additional features on EMR'),
 
         opt_group.add_option(
-            '--ami-version', dest='ami_version', default=None,
-            help=('AMI Version to use, e.g. "2.4.11" (default "latest").')),
-
-        opt_group.add_option(
             '--aws-availability-zone', dest='aws_availability_zone',
             default=None,
             help='Availability zone to run the job flow on'),
-
-        opt_group.add_option(
-            '--bootstrap', dest='bootstrap', action='append',
-            help=('A shell command to set up libraries etc. before any steps'
-                  ' (e.g. "sudo apt-get -qy install python3"). You may'
-                  ' interpolate files available via URL or locally with Hadoop'
-                  ' Distributed Cache syntax ("sudo dpkg -i foo.deb#")')),
-
-        opt_group.add_option(
-            '--bootstrap-action', dest='bootstrap_actions', action='append',
-            default=[],
-            help=('Raw bootstrap action scripts to run before any of the other'
-                  ' bootstrap steps. You can use --bootstrap-action more than'
-                  ' once. Local scripts will be automatically uploaded to S3.'
-                  ' To add arguments, just use quotes: "foo.sh arg1 arg2"')),
-
-        opt_group.add_option(
-            '--bootstrap-cmd', dest='bootstrap_cmds', action='append',
-            default=[],
-            help=('Commands to run on the master node to set up libraries,'
-                  ' etc. You can use --bootstrap-cmd more than once. Use'
-                  ' mrjob.conf to specify arguments as a list to be run'
-                  ' directly.')),
-
-        opt_group.add_option(
-            '--bootstrap-file', dest='bootstrap_files', action='append',
-            default=[],
-            help=('File to upload to the master node before running'
-                  ' bootstrap_cmds (for example, debian packages). These will'
-                  ' be made public on S3 due to a limitation of the bootstrap'
-                  ' feature. You can use --bootstrap-file more than once.')),
-
-        opt_group.add_option(
-            '--bootstrap-python-package', dest='bootstrap_python_packages',
-            action='append', default=[],
-            help=('Path to a Python module to install on EMR. These should be'
-                  ' standard python module tarballs where you can cd into a'
-                  ' subdirectory and run ``sudo python setup.py install``. You'
-                  ' can use --bootstrap-python-package more than once.')),
-
-        opt_group.add_option(
-            '--bootstrap-script', dest='bootstrap_scripts', action='append',
-            default=[],
-            help=('Script to upload and then run on the master node (a'
-                  ' combination of bootstrap_cmds and bootstrap_files). These'
-                  ' are run after the command from bootstrap_cmds. You can use'
-                  ' --bootstrap-script more than once.')),
-
-        opt_group.add_option(
-            '--disable-emr-debugging', dest='enable_emr_debugging',
-            action='store_false',
-            help='Disable storage of Hadoop logs in SimpleDB'),
 
         opt_group.add_option(
             '--ec2-instance-type', dest='ec2_instance_type', default=None,
@@ -440,49 +384,6 @@ def add_emr_launch_opts(opt_group):
             '--ec2-key-pair', dest='ec2_key_pair', default=None,
             help='Name of the SSH key pair you set up for EMR'),
 
-        # EMR instance types
-        opt_group.add_option(
-            '--ec2-core-instance-type', '--ec2-slave-instance-type',
-            dest='ec2_core_instance_type', default=None,
-            help='Type of EC2 instance for core (or "slave") nodes only'),
-
-        opt_group.add_option(
-            '--ec2-master-instance-type', dest='ec2_master_instance_type',
-            default=None,
-            help='Type of EC2 instance for master node only'),
-
-        opt_group.add_option(
-            '--ec2-task-instance-type', dest='ec2_task_instance_type',
-            default=None,
-            help='Type of EC2 instance for task nodes only'),
-
-        # EMR instance bid prices
-        opt_group.add_option(
-            '--ec2-core-instance-bid-price',
-            dest='ec2_core_instance_bid_price', default=None,
-            help=(
-                'Bid price to specify for core (or "slave") nodes when'
-                ' setting them up as EC2 spot instances (you probably only'
-                ' want to set a bid price for task instances).')
-        ),
-
-        opt_group.add_option(
-            '--ec2-master-instance-bid-price',
-            dest='ec2_master_instance_bid_price', default=None,
-            help=(
-                'Bid price to specify for the master node when setting it up '
-                'as an EC2 spot instance (you probably only want to set '
-                'a bid price for task instances).')
-        ),
-
-        opt_group.add_option(
-            '--ec2-task-instance-bid-price',
-            dest='ec2_task_instance_bid_price', default=None,
-            help=(
-                'Bid price to specify for task nodes when '
-                'setting them up as EC2 spot instances.')
-        ),
-
         opt_group.add_option(
             '--emr-api-param', dest='emr_api_params',
             default=[], action='append',
@@ -494,11 +395,6 @@ def add_emr_launch_opts(opt_group):
         opt_group.add_option(
             '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
             help='ID of an existing EMR job flow to use'),
-
-        opt_group.add_option(
-            '--enable-emr-debugging', dest='enable_emr_debugging',
-            default=None, action='store_true',
-            help='Enable storage of Hadoop logs in SimpleDB'),
 
         opt_group.add_option(
             '--hadoop-streaming-jar-on-emr',
@@ -540,27 +436,6 @@ def add_emr_launch_opts(opt_group):
             '--no-pool-emr-job-flows', dest='pool_emr_job_flows',
             action='store_false',
             help="Don't try to run our job on a pooled job flow."),
-
-        opt_group.add_option(
-            '--num-ec2-instances', dest='num_ec2_instances', default=None,
-            type='int',
-            help='Total number of EC2 instances to launch '),
-
-        # NB: EMR instance counts are only applicable for slave/core and
-        # task, since a master count > 1 causes the EMR API to return the
-        # ValidationError "A master instance group must specify a single
-        # instance".
-        opt_group.add_option(
-            '--num-ec2-core-instances', dest='num_ec2_core_instances',
-            default=None, type='int',
-            help=('Number of EC2 instances to start as core (or "slave") '
-                  'nodes. Incompatible with --num-ec2-instances.')),
-
-        opt_group.add_option(
-            '--num-ec2-task-instances', dest='num_ec2_task_instances',
-            default=None, type='int',
-            help=('Number of EC2 instances to start as task '
-                  'nodes. Incompatible with --num-ec2-instances.')),
 
         opt_group.add_option(
             '--pool-emr-job-flows', dest='pool_emr_job_flows',
@@ -626,6 +501,145 @@ def add_emr_launch_opts(opt_group):
                  ' that created the job flow can view and manage it.'
                  ' This option can be overridden by'
                  ' --emr-api-param VisibleToAllUsers=true|false.'
+        ),
+    ] + add_emr_bootstrap_opts(opt_group) + add_emr_instance_opts(opt_group)
+
+
+def add_emr_bootstrap_opts(opt_group):
+    """Add options having to do with bootstrapping (other than
+    :mrjob-opt:`bootstrap_mrjob`, which is shared with other runners)."""
+    return [
+
+        opt_group.add_option(
+            '--bootstrap', dest='bootstrap', action='append',
+            help=('A shell command to set up libraries etc. before any steps'
+                  ' (e.g. "sudo apt-get -qy install python3"). You may'
+                  ' interpolate files available via URL or locally with Hadoop'
+                  ' Distributed Cache syntax ("sudo dpkg -i foo.deb#")')),
+
+        opt_group.add_option(
+            '--bootstrap-action', dest='bootstrap_actions', action='append',
+            default=[],
+            help=('Raw bootstrap action scripts to run before any of the other'
+                  ' bootstrap steps. You can use --bootstrap-action more than'
+                  ' once. Local scripts will be automatically uploaded to S3.'
+                  ' To add arguments, just use quotes: "foo.sh arg1 arg2"')),
+
+        opt_group.add_option(
+            '--bootstrap-cmd', dest='bootstrap_cmds', action='append',
+            default=[],
+            help=('Commands to run on the master node to set up libraries,'
+                  ' etc. You can use --bootstrap-cmd more than once. Use'
+                  ' mrjob.conf to specify arguments as a list to be run'
+                  ' directly.')),
+
+        opt_group.add_option(
+            '--bootstrap-file', dest='bootstrap_files', action='append',
+            default=[],
+            help=('File to upload to the master node before running'
+                  ' bootstrap_cmds (for example, debian packages). These will'
+                  ' be made public on S3 due to a limitation of the bootstrap'
+                  ' feature. You can use --bootstrap-file more than once.')),
+
+        opt_group.add_option(
+            '--bootstrap-python-package', dest='bootstrap_python_packages',
+            action='append', default=[],
+            help=('Path to a Python module to install on EMR. These should be'
+                  ' standard python module tarballs where you can cd into a'
+                  ' subdirectory and run ``sudo python setup.py install``. You'
+                  ' can use --bootstrap-python-package more than once.')),
+
+        opt_group.add_option(
+            '--bootstrap-script', dest='bootstrap_scripts', action='append',
+            default=[],
+            help=('Script to upload and then run on the master node (a'
+                  ' combination of bootstrap_cmds and bootstrap_files). These'
+                  ' are run after the command from bootstrap_cmds. You can use'
+                  ' --bootstrap-script more than once.')),
+
+        opt_group.add_option(
+            '--disable-emr-debugging', dest='enable_emr_debugging',
+            action='store_false',
+            help='Disable storage of Hadoop logs in SimpleDB'),
+
+        opt_group.add_option(
+            '--enable-emr-debugging', dest='enable_emr_debugging',
+            default=None, action='store_true',
+            help='Enable storage of Hadoop logs in SimpleDB'),
+    ]
+
+
+def add_emr_instance_opts(opt_group):
+    """Add options having to do with instance creation"""
+    return [
+        # AMI
+        opt_group.add_option(
+            '--ami-version', dest='ami_version', default=None,
+            help=('AMI Version to use, e.g. "2.4.11" (default "latest").')),
+
+        # instance types
+        opt_group.add_option(
+            '--ec2-core-instance-type', '--ec2-slave-instance-type',
+            dest='ec2_core_instance_type', default=None,
+            help='Type of EC2 instance for core (or "slave") nodes only'),
+
+        opt_group.add_option(
+            '--ec2-master-instance-type', dest='ec2_master_instance_type',
+            default=None,
+            help='Type of EC2 instance for master node only'),
+
+        opt_group.add_option(
+            '--ec2-task-instance-type', dest='ec2_task_instance_type',
+            default=None,
+            help='Type of EC2 instance for task nodes only'),
+
+        # instance number
+        opt_group.add_option(
+            '--num-ec2-instances', dest='num_ec2_instances', default=None,
+            type='int',
+            help='Total number of EC2 instances to launch '),
+
+        # NB: EMR instance counts are only applicable for slave/core and
+        # task, since a master count > 1 causes the EMR API to return the
+        # ValidationError "A master instance group must specify a single
+        # instance".
+        opt_group.add_option(
+            '--num-ec2-core-instances', dest='num_ec2_core_instances',
+            default=None, type='int',
+            help=('Number of EC2 instances to start as core (or "slave") '
+                  'nodes. Incompatible with --num-ec2-instances.')),
+
+        opt_group.add_option(
+            '--num-ec2-task-instances', dest='num_ec2_task_instances',
+            default=None, type='int',
+            help=('Number of EC2 instances to start as task '
+                  'nodes. Incompatible with --num-ec2-instances.')),
+
+        # bid price
+        opt_group.add_option(
+            '--ec2-core-instance-bid-price',
+            dest='ec2_core_instance_bid_price', default=None,
+            help=(
+                'Bid price to specify for core (or "slave") nodes when'
+                ' setting them up as EC2 spot instances (you probably only'
+                ' want to set a bid price for task instances).')
+        ),
+
+        opt_group.add_option(
+            '--ec2-master-instance-bid-price',
+            dest='ec2_master_instance_bid_price', default=None,
+            help=(
+                'Bid price to specify for the master node when setting it up '
+                'as an EC2 spot instance (you probably only want to set '
+                'a bid price for task instances).')
+        ),
+
+        opt_group.add_option(
+            '--ec2-task-instance-bid-price',
+            dest='ec2_task_instance_bid_price', default=None,
+            help=(
+                'Bid price to specify for task nodes when '
+                'setting them up as EC2 spot instances.')
         ),
     ]
 

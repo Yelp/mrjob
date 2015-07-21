@@ -14,10 +14,13 @@
 """Inspect available job flow pools or identify job flows suitable for
 running a job with the specified options.
 
+.. deprecated:: 0.4.5
+
 Usage::
 
     python -m mrjob.tools.emr.job_flow_pool
 """
+from logging import getLogger
 from optparse import OptionError
 from optparse import OptionGroup
 from optparse import OptionParser
@@ -27,6 +30,8 @@ from mrjob.emr import est_time_to_hour
 from mrjob.job import MRJob
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import strip_microseconds
+
+log = getLogger('mrjob.tools.emr.job_flow_pool')
 
 
 def get_pools(emr_conn):
@@ -111,6 +116,8 @@ def main():
         option_parser.error('This tool takes no arguments.')
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
+
+    log.warning('job_flow_pool is deprecated and will be removed in v0.5.0')
 
     with EMRJobRunner(**runner_kwargs(options)) as runner:
         perform_actions(options, runner)

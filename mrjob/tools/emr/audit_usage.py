@@ -75,7 +75,7 @@ def main(args):
 
     log.info('getting job flow history...')
     job_flows = get_job_flows(
-        options.conf_paths, options.max_days_ago, now=now)
+        max_days_ago=options.max_days_ago, now=now, **runner_kwargs(options))
 
     log.info('compiling job flow stats...')
     stats = job_flows_to_stats(job_flows, now=now)
@@ -100,6 +100,14 @@ def make_option_parser():
     alphabetize_options(option_parser)
 
     return option_parser
+
+
+def runner_kwargs(options):
+    kwargs = options.__dict__.copy()
+    for unused_arg in ('quiet', 'verbose', 'max_days_ago'):
+        del kwargs[unused_arg]
+
+    return kwargs
 
 
 def job_flows_to_stats(job_flows, now=None):
@@ -556,7 +564,7 @@ def subdivide_interval_by_hour(start, end):
     return hour_to_secs
 
 
-def get_job_flows(conf_paths, max_days_ago=None, now=None):
+def get_job_flows(max_days_ago=None, now=None, **runner_kwargs):
     """Get relevant job flow information from EMR.
 
     :param str conf_path: Alternate path to read :py:mod:`mrjob.conf` from, or
@@ -569,7 +577,7 @@ def get_job_flows(conf_paths, max_days_ago=None, now=None):
     if now is None:
         now = datetime.utcnow()
 
-    emr_conn = EMRJobRunner(conf_paths=conf_paths).make_emr_conn()
+    emr_conn = EMRJobRunner(**runner_kwargs).make_emr_conn()
 
     # if --max-days-ago is set, only look at recent jobs
     created_after = None

@@ -24,18 +24,34 @@ Usage::
 
 Options::
 
-  -a, --cat             Cat log files MRJob finds relevant
+  -h, --help            show this help message and exit
+  --aws-region=AWS_REGION
+                        Region to connect to S3 and EMR on (e.g. us-west-1).
   -A, --cat-all         Cat all log files to JOB_FLOW_ID/
-  -c CONF_PATH, --conf-path=CONF_PATH
+  -a, --cat             Cat log files MRJob finds relevant
+  -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
-  --counters            Show counters from the job flow
+  --no-conf             Don't load mrjob.conf even if it's available
   --ec2-key-pair-file=EC2_KEY_PAIR_FILE
                         Path to file containing SSH key for EMR
-  -h, --help            show this help message and exit
-  -l, --list            List log files MRJob finds relevant
+  --emr-endpoint=EMR_ENDPOINT
+                        Optional host to connect to when communicating with S3
+                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
+                        Default is to infer this from aws_region.
+  -f, --find-failure    Search the logs for information about why the job
+                        failed
+  --counters            Show counters from the job flow
   -L, --list-all        List all log files
-  --no-conf             Don't load mrjob.conf even if it's available
+  -l, --list            List log files MRJob finds relevant
   -q, --quiet           Don't print anything to stderr
+  --s3-endpoint=S3_ENDPOINT
+                        Host to connect to when communicating with S3 (e.g. s3
+                        -us-west-1.amazonaws.com). Default is to infer this
+                        from region (see --aws-region).
+  --s3-sync-wait-time=S3_SYNC_WAIT_TIME
+                        How long to wait for S3 to reach eventual consistency.
+                        This is typically less than a second (zero in us-west)
+                        but the default is 5.0 to be safe.
   -s STEP_NUM, --step-num=STEP_NUM
                         Limit results to a single step. To be used with --list
                         and --cat.
@@ -52,6 +68,9 @@ from mrjob.logparsers import TASK_ATTEMPT_LOGS
 from mrjob.logparsers import STEP_LOGS
 from mrjob.logparsers import JOB_LOGS
 from mrjob.logparsers import NODE_LOGS
+from mrjob.options import add_basic_opts
+from mrjob.options import add_emr_connect_opts
+from mrjob.options import alphabetize_options
 from mrjob.util import scrape_options_into_new_groups
 
 
@@ -172,6 +191,8 @@ def make_option_parser():
     scrape_options_into_new_groups(MRJob().all_option_groups(), {
         option_parser: ('ec2_key_pair_file', 's3_sync_wait_time')
     })
+
+    alphabetize_options(option_parser)
 
     return option_parser
 

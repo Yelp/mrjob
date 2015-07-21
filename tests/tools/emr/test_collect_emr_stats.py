@@ -1,4 +1,4 @@
-# Copyright 2014 Yelp
+# Copyright 2014-2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,21 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Basic tests for collect_emr_stats script"""
+import sys
+from StringIO import StringIO
+
 from mock import call
 from mock import patch
 from mrjob.tools.emr.collect_emr_stats import main
 from mrjob.tools.emr.collect_emr_stats import collect_active_job_flows
 from mrjob.tools.emr.collect_emr_stats import job_flows_to_stats
 from tests.mockboto import MockEmrObject
-
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
+from tests.test_emr import MockEMRAndS3TestCase
 
 
-class CollectEMRStatsTestCase(unittest.TestCase):
+class CollectEMRStatsTestCase(MockEMRAndS3TestCase):
+
+    def setUp(self):
+        super(CollectEMRStatsTestCase, self).setUp()
+        # redirect print statements to self.stdout
+        self._real_stdout = sys.stdout
+        self.stdout = StringIO()
+        sys.stdout = self.stdout
+
+    def tearDown(self):
+        sys.stdout = self._real_stdout
+        super(CollectEMRStatsTestCase, self).tearDown()
+
+    def test_without_mocks(self):
+        # make sure we're actually making correct calls to EMR
+        main(['-q'])
+
 
     @patch('mrjob.tools.emr.collect_emr_stats.describe_all_job_flows')
     @patch('mrjob.tools.emr.collect_emr_stats.EMRJobRunner')

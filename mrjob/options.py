@@ -284,6 +284,85 @@ def add_hadoop_opts(opt_group):
 
 def add_emr_opts(opt_group):
     """Options for ``emr`` runner"""
+    return (add_emr_connect_opts(opt_group) +
+            add_emr_launch_opts(opt_group) +
+            add_emr_monitor_opts(opt_group))
+
+
+def add_emr_connect_opts(opt_group):
+    """Options for connecting to the EMR API."""
+    return [
+        opt_group.add_option(
+            '--aws-region', dest='aws_region', default=None,
+            help='Region to connect to S3 and EMR on (e.g. us-west-1).'),
+
+        opt_group.add_option(
+            '--emr-endpoint', dest='emr_endpoint', default=None,
+            help=('Optional host to connect to when communicating with S3'
+                  ' (e.g. us-west-1.elasticmapreduce.amazonaws.com). Default'
+                  ' is to infer this from aws_region.')),
+
+        opt_group.add_option(
+            '--s3-endpoint', dest='s3_endpoint', default=None,
+            help=('Host to connect to when communicating with S3 (e.g.'
+                  ' s3-us-west-1.amazonaws.com). Default is to infer this from'
+                  ' region (see --aws-region).')),
+    ]
+
+
+def add_emr_monitor_opts(opt_group):
+    """Options for monitoring a running job on EMR."""
+    return [
+        opt_group.add_option(
+            '--check-emr-status-every', dest='check_emr_status_every',
+            default=None, type='int',
+            help='How often (in seconds) to check status of your EMR job'),
+
+        # --ec2-key-pair is used to launch the job, not to monitor it
+        opt_group.add_option(
+            '--ec2-key-pair-file', dest='ec2_key_pair_file', default=None,
+            help='Path to file containing SSH key for EMR'),
+
+        opt_group.add_option(
+            '--emr-action-on-failure', dest='emr_action_on_failure',
+            default=None,
+            help=('Action to take when a step fails'
+                  ' (e.g. TERMINATE_CLUSTER | CANCEL_AND_WAIT | CONTINUE)')),
+
+
+        opt_group.add_option(
+            '--ssh-bin', dest='ssh_bin', default=None,
+            help=("Name/path of ssh binary. Arguments are allowed (e.g."
+                  " --ssh-bin 'ssh -v')")),
+
+        opt_group.add_option(
+            '--ssh-bind-ports', dest='ssh_bind_ports', default=None,
+            help=('A list of port ranges that are safe to listen on, delimited'
+                  ' by colons and commas, with syntax like'
+                  ' 2000[:2001][,2003,2005:2008,etc].'
+                  ' Defaults to 40001:40840.')),
+
+        opt_group.add_option(
+            '--ssh-tunnel-is-closed', dest='ssh_tunnel_is_open',
+            default=None, action='store_false',
+            help='Make ssh tunnel accessible from localhost only'),
+
+        opt_group.add_option(
+            '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',
+            default=None, action='store_true',
+            help=('Make ssh tunnel accessible from remote hosts (not just'
+                  ' localhost).')),
+
+        opt_group.add_option(
+            '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
+            default=None, action='store_true',
+            help='Open up an SSH tunnel to the Hadoop job tracker'),
+
+    ]
+
+
+def add_emr_launch_opts(opt_group):
+    """Options for launching a cluster or running a job."""
     return [
         opt_group.add_option(
             '--additional-emr-info', dest='additional_emr_info', default=None,
@@ -297,10 +376,6 @@ def add_emr_opts(opt_group):
             '--aws-availability-zone', dest='aws_availability_zone',
             default=None,
             help='Availability zone to run the job flow on'),
-
-        opt_group.add_option(
-            '--aws-region', dest='aws_region', default=None,
-            help='Region to connect to S3 and EMR on (e.g. us-west-1).'),
 
         opt_group.add_option(
             '--bootstrap', dest='bootstrap', action='append',
@@ -350,9 +425,9 @@ def add_emr_opts(opt_group):
                   ' --bootstrap-script more than once.')),
 
         opt_group.add_option(
-            '--check-emr-status-every', dest='check_emr_status_every',
-            default=None, type='int',
-            help='How often (in seconds) to check status of your EMR job'),
+            '--disable-emr-debugging', dest='enable_emr_debugging',
+            action='store_false',
+            help='Disable storage of Hadoop logs in SimpleDB'),
 
         opt_group.add_option(
             '--ec2-instance-type', dest='ec2_instance_type', default=None,
@@ -364,10 +439,6 @@ def add_emr_opts(opt_group):
         opt_group.add_option(
             '--ec2-key-pair', dest='ec2_key_pair', default=None,
             help='Name of the SSH key pair you set up for EMR'),
-
-        opt_group.add_option(
-            '--ec2-key-pair-file', dest='ec2_key_pair_file', default=None,
-            help='Path to file containing SSH key for EMR'),
 
         # EMR instance types
         opt_group.add_option(
@@ -413,30 +484,21 @@ def add_emr_opts(opt_group):
         ),
 
         opt_group.add_option(
-            '--emr-endpoint', dest='emr_endpoint', default=None,
-            help=('Optional host to connect to when communicating with S3'
-                  ' (e.g. us-west-1.elasticmapreduce.amazonaws.com). Default'
-                  ' is to infer this from aws_region.')),
+            '--emr-api-param', dest='emr_api_params',
+            default=[], action='append',
+            help='Additional parameters to pass directly to the EMR API '
+                 ' when creating a cluster. Should take the form KEY=VALUE.'
+                 ' You can use --emr-api-param multiple times.'
+        ),
 
         opt_group.add_option(
             '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
             help='ID of an existing EMR job flow to use'),
 
         opt_group.add_option(
-            '--emr-action-on-failure', dest='emr_action_on_failure',
-            default=None,
-            help=('Action to take when a step fails'
-                  ' (e.g. TERMINATE_CLUSTER | CANCEL_AND_WAIT | CONTINUE)')),
-
-        opt_group.add_option(
             '--enable-emr-debugging', dest='enable_emr_debugging',
             default=None, action='store_true',
             help='Enable storage of Hadoop logs in SimpleDB'),
-
-        opt_group.add_option(
-            '--disable-emr-debugging', dest='enable_emr_debugging',
-            action='store_false',
-            help='Disable storage of Hadoop logs in SimpleDB'),
 
         opt_group.add_option(
             '--hadoop-streaming-jar-on-emr',
@@ -525,12 +587,6 @@ def add_emr_opts(opt_group):
                   ' create a new one. (default 0)')),
 
         opt_group.add_option(
-            '--s3-endpoint', dest='s3_endpoint', default=None,
-            help=('Host to connect to when communicating with S3 (e.g.'
-                  ' s3-us-west-1.amazonaws.com). Default is to infer this from'
-                  ' region (see --aws-region).')),
-
-        opt_group.add_option(
             '--s3-log-uri', dest='s3_log_uri', default=None,
             help='URI on S3 to write logs into'),
 
@@ -551,42 +607,6 @@ def add_emr_opts(opt_group):
             help=('Upload files to S3 in parts no bigger than this many'
                   ' megabytes. Default is 100 MiB. Set to 0 to disable'
                   ' multipart uploading entirely.')),
-
-        opt_group.add_option(
-            '--ssh-bin', dest='ssh_bin', default=None,
-            help=("Name/path of ssh binary. Arguments are allowed (e.g."
-                  " --ssh-bin 'ssh -v')")),
-
-        opt_group.add_option(
-            '--ssh-bind-ports', dest='ssh_bind_ports', default=None,
-            help=('A list of port ranges that are safe to listen on, delimited'
-                  ' by colons and commas, with syntax like'
-                  ' 2000[:2001][,2003,2005:2008,etc].'
-                  ' Defaults to 40001:40840.')),
-
-        opt_group.add_option(
-            '--ssh-tunnel-is-closed', dest='ssh_tunnel_is_open',
-            default=None, action='store_false',
-            help='Make ssh tunnel accessible from localhost only'),
-
-        opt_group.add_option(
-            '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',
-            default=None, action='store_true',
-            help=('Make ssh tunnel accessible from remote hosts (not just'
-                  ' localhost).')),
-
-        opt_group.add_option(
-            '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
-            default=None, action='store_true',
-            help='Open up an SSH tunnel to the Hadoop job tracker'),
-
-        opt_group.add_option(
-            '--emr-api-param', dest='emr_api_params',
-            default=[], action='append',
-            help='Additional parameters to pass directly to the EMR API; '
-                 'should take the form KEY=VALUE. You can use --emr-api-param'
-                 ' multiple times.'
-        ),
 
         opt_group.add_option(
             '--no-emr-api-param', dest='no_emr_api_params',

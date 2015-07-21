@@ -23,13 +23,16 @@ Suggested usage: run this as a cron job with the ``-q`` option::
 Options::
 
   -h, --help            show this help message and exit
-  -v, --verbose         Print more messages
-  -q, --quiet           Don't print anything to stderr; just print IDs of
-                        terminated job flows and idle time information to
-                        stdout. Use twice to print absolutely nothing.
-  -c CONF_PATH, --conf-path=CONF_PATH
+  --aws-region=AWS_REGION
+                        Region to connect to S3 and EMR on (e.g. us-west-1).
+  -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
+  --dry-run             Don't actually kill idle jobs; just log that we would
+  --emr-endpoint=EMR_ENDPOINT
+                        Optional host to connect to when communicating with S3
+                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
+                        Default is to infer this from aws_region.
   --max-hours-idle=MAX_HOURS_IDLE
                         Max number of hours a job flow can go without
                         bootstrapping, running a step, or having a new step
@@ -37,15 +40,25 @@ Options::
                         steps which EMR has failed to start. Make sure you set
                         this higher than the amount of time your jobs can take
                         to start instances and bootstrap.
+  --max-mins-locked=MAX_MINS_LOCKED
+                        Max number of minutes a job flow can be locked while
+                        idle.
   --mins-to-end-of-hour=MINS_TO_END_OF_HOUR
                         Terminate job flows that are within this many minutes
                         of the end of a full hour since the job started
                         running AND have no pending steps.
-  --unpooled-only       Only terminate un-pooled job flows
-  --pooled-only         Only terminate pooled job flows
   --pool-name=POOL_NAME
                         Only terminate job flows in the given named pool.
-  --dry-run             Don't actually kill idle jobs; just log that we would
+  --pooled-only         Only terminate pooled job flows
+  -q, --quiet           Don't print anything to stderr
+  --s3-endpoint=S3_ENDPOINT
+                        Host to connect to when communicating with S3 (e.g. s3
+                        -us-west-1.amazonaws.com). Default is to infer this
+                        from region (see --aws-region).
+  -t, --test            Don't actually delete any files; just log that we
+                        would
+  --unpooled-only       Only terminate un-pooled job flows
+  -v, --verbose         print more messages to stderr
 """
 from datetime import datetime
 from datetime import timedelta
@@ -58,6 +71,8 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
+from mrjob.options import add_emr_connect_opts
+from mrjob.options import alphabetize_options
 from mrjob.parse import iso8601_to_datetime
 from mrjob.pool import est_time_to_hour
 from mrjob.pool import pool_hash_and_name
@@ -83,7 +98,6 @@ def main(cl_args=None):
                          verbose=options.verbose)
 
     inspect_and_maybe_terminate_job_flows(
-        conf_paths=options.conf_paths,
         dry_run=options.dry_run,
         max_hours_idle=options.max_hours_idle,
         mins_to_end_of_hour=options.mins_to_end_of_hour,
@@ -93,11 +107,23 @@ def main(cl_args=None):
         pooled_only=options.pooled_only,
         max_mins_locked=options.max_mins_locked,
         quiet=(options.quiet > 1),
+        **runner_kwargs(options)
     )
 
 
+def runner_kwargs(options):
+    kwargs = options.__dict__.copy()
+    for unused_arg in ('quiet', 'verbose', 'max_hours_idle',
+                       'max_mins_locked',
+                       'mins_to_end_of_hour', 'unpooled_only',
+                       'pooled_only', 'pool_name', 'dry_run',
+                       'test'):
+        del kwargs[unused_arg]
+
+    return kwargs
+
+
 def inspect_and_maybe_terminate_job_flows(
-    conf_paths=None,
     dry_run=False,
     max_hours_idle=None,
     mins_to_end_of_hour=None,
@@ -117,7 +143,7 @@ def inspect_and_maybe_terminate_job_flows(
     if max_hours_idle is None and mins_to_end_of_hour is None:
         max_hours_idle = DEFAULT_MAX_HOURS_IDLE
 
-    runner = EMRJobRunner(conf_paths=conf_paths, **kwargs)
+    runner = EMRJobRunner(**kwargs)
     emr_conn = runner.make_emr_conn()
 
     log.info(
@@ -383,6 +409,8 @@ def make_option_parser():
         help="Don't actually delete any files; just log that we would")
 
     add_basic_opts(option_parser)
+    add_emr_connect_opts(option_parser)
+    alphabetize_options(option_parser)
 
     return option_parser
 

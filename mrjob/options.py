@@ -391,13 +391,6 @@ def add_emr_launch_opts(opt_group):
             help='Availability zone to run the job flow on'),
 
         opt_group.add_option(
-            '--ec2-instance-type', dest='ec2_instance_type', default=None,
-            help=('Type of EC2 instance(s) to launch (e.g. m1.small,'
-                  ' c1.xlarge, m2.xlarge). See'
-                  ' http://aws.amazon.com/ec2/instance-types/ for the full'
-                  ' list.')),
-
-        opt_group.add_option(
             '--ec2-key-pair', dest='ec2_key_pair', default=None,
             help='Name of the SSH key pair you set up for EMR'),
 
@@ -582,6 +575,13 @@ def add_emr_instance_opts(opt_group):
             '--ec2-core-instance-type', '--ec2-slave-instance-type',
             dest='ec2_core_instance_type', default=None,
             help='Type of EC2 instance for core (or "slave") nodes only'),
+
+        opt_group.add_option(
+            '--ec2-instance-type', dest='ec2_instance_type', default=None,
+            help=('Type of EC2 instance(s) to launch (e.g. m1.small,'
+                  ' c1.xlarge, m2.xlarge). See'
+                  ' http://aws.amazon.com/ec2/instance-types/ for the full'
+                  ' list.')),
 
         opt_group.add_option(
             '--ec2-master-instance-type', dest='ec2_master_instance_type',

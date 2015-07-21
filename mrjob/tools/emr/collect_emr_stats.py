@@ -19,30 +19,22 @@
     number of Amazon EC2 instances used to execute these jobflows.
     The instance counts are not separated by instance type.
 
+    .. deprecated:: 0.4.5
+
 Usage::
 
-    mrjob collect-emr-active-stats > report
+    mrjob collect-emr-stats > report
     python -m mrjob.tools.emr.collect_emr_stats > report
 
 Options::
 
-  -h, --help            show this help message and exit
-  --aws-region=AWS_REGION
-                        Region to connect to S3 and EMR on (e.g. us-west-1).
-  -c CONF_PATHS, --conf-path=CONF_PATHS
+  -h, --help            Show this help message and exit
+  -v, --verbose         Print more messages to stderr
+  -q, --quiet           Don't log status messages; just print the report.
+  -c CONF_PATH, --conf-path=CONF_PATH
                         Path to alternate mrjob.conf file to read from
+  -p, --pretty-print    Pretty print the collected stats.
   --no-conf             Don't load mrjob.conf even if it's available
-  --emr-endpoint=EMR_ENDPOINT
-                        Optional host to connect to when communicating with S3
-                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
-                        Default is to infer this from aws_region.
-  -p, --pretty-print    Pretty print the collected stats
-  -q, --quiet           Don't print anything to stderr
-  --s3-endpoint=S3_ENDPOINT
-                        Host to connect to when communicating with S3 (e.g. s3
-                        -us-west-1.amazonaws.com). Default is to infer this
-                        from region (see --aws-region).
-  -v, --verbose         print more messages to stderr
 """
 
 from datetime import datetime
@@ -59,10 +51,8 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
-from mrjob.options import add_emr_connect_opts
-from mrjob.options import alphabetize_options
 
-log = getLogger(__name__)
+log = getLogger('mrjob.tools.emr.collect_emr_stats')
 
 
 def main(args):
@@ -81,14 +71,16 @@ def main(args):
         action="store_true", dest="pretty_print", default=False,
         help=('Pretty print the collected stats'))
     add_basic_opts(option_parser)
-    add_emr_connect_opts(option_parser)
-    alphabetize_options(option_parser)
 
     options, args = option_parser.parse_args(args)
     if args:
         option_parser.error('takes no arguments')
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
+
+    log.warning(
+        'collect_emr_stats is deprecated and will be removed in v0.5.0')
+
     log.info('collecting EMR active jobflows...')
     job_flows = collect_active_job_flows(options.conf_paths)
     log.info('compiling stats from collected jobflows...')

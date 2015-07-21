@@ -81,9 +81,8 @@ def main(args):
     now = datetime.utcnow()
 
     log.info('getting job flow history...')
-    # TODO make this a list after testing is done
-    clusters = yield_clusters(
-        options.conf_paths, options.max_days_ago, now=now)
+    clusters = list(yield_clusters(
+        max_days_ago=options.max_days_ago, now=now, **runner_kwargs(options))
 
     log.info('compiling job flow stats...')
     stats = clusters_to_stats(clusters, now=now)
@@ -108,6 +107,14 @@ def make_option_parser():
     alphabetize_options(option_parser)
 
     return option_parser
+
+
+def runner_kwargs(options):
+    kwargs = options.__dict__.copy()
+    for unused_arg in ('quiet', 'verbose', 'max_days_ago'):
+        del kwargs[unused_arg]
+
+    return kwargs
 
 
 def clusters_to_stats(clusters, now=None):
@@ -574,22 +581,20 @@ def subdivide_interval_by_hour(start, end):
     return hour_to_secs
 
 
-def yield_clusters(conf_paths, max_days_ago=None, now=None):
-    """Get information from EMR about each relevant cluster. Yields results
-    of :py:meth:`boto.emr.EmrConnection.describe_cluster` with additional
-    ``bootstrapactions`` and ``steps`` fields patched in
+def yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
+    """Get relevant job flow information from EMR.
 
-    :param str conf_path: Alternate path to read :py:mod:`mrjob.conf` from, or
-                          ``False`` to ignore all config files.
     :param float max_days_ago: If set, don't fetch job flows created longer
                                than this many days ago.
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
+    :param runner_kwargs: keyword args to pass through to
+                          :py:class:`~mrjob.emr.EMRJobRunner`
     """
     if now is None:
         now = datetime.utcnow()
 
-    emr_conn = EMRJobRunner(conf_paths=conf_paths).make_emr_conn()
+    emr_conn = EMRJobRunner(**runner_kwargs).make_emr_conn()
 
     # if --max-days-ago is set, only look at recent jobs
     created_after = None

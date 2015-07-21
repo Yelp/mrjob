@@ -25,8 +25,6 @@ from tests.tools.emr import ToolTestCase
 
 class PoolingToolTestCase(ToolTestCase):
 
-    maxDiff = None
-
     def test_bad_args(self):
         self.monkey_patch_argv('bad_arg')
         self.assertRaises(OptionError, parse_args, make_option_parser())
@@ -35,32 +33,24 @@ class PoolingToolTestCase(ToolTestCase):
         self.monkey_patch_argv('--verbose')
         self.assertEqual(
             runner_kwargs(parse_args(make_option_parser())),
-            {
-                'ami_version': None,
-                'aws_region': None,
-                'bootstrap': None,
-                'bootstrap_actions': [],
-                'bootstrap_cmds': [],
-                'bootstrap_files': [],
-                'bootstrap_mrjob': None,
-                'bootstrap_python_packages': [],
-                'bootstrap_scripts': [],
-                'conf_paths': None,
-                'ec2_core_instance_bid_price': None,
-                'ec2_core_instance_type': None,
-                'ec2_instance_type': None,
-                'ec2_master_instance_bid_price': None,
-                'ec2_master_instance_type': None,
-                'ec2_task_instance_bid_price': None,
-                'ec2_task_instance_type': None,
-                'emr_endpoint': None,
-                'emr_job_flow_pool_name': None,
-                'enable_emr_debugging': None,
-                'num_ec2_core_instances': None,
-                'num_ec2_instances': None,
-                'num_ec2_task_instances': None,
-                's3_endpoint': None,
-             })
+            {'aws_availability_zone': None,
+             'bootstrap_actions': [],
+             'bootstrap_cmds': [],
+             'bootstrap_files': [],
+             'bootstrap_mrjob': None,
+             'bootstrap_python_packages': [],
+             'conf_paths': None,
+             'ec2_core_instance_type': None,
+             'ec2_instance_type': None,
+             'ec2_key_pair': None,
+             'ec2_key_pair_file': None,
+             'ec2_master_instance_type': None,
+             'emr_endpoint': None,
+             'emr_job_flow_pool_name': None,
+             'hadoop_version': None,
+             'label': None,
+             'num_ec2_instances': None,
+             'owner': None})
 
     def test_list_job_flows(self):
         self.make_cluster(pool_emr_job_flows=True)

@@ -210,45 +210,12 @@ def _repeat(api_call, *args, **kwargs):
         if not marker:
             return
 
-def _yield_all_clusters(emr_conn, cluster_id, include=None, *args, **kwargs):
-    """Make successive API calls to
-    :py:meth:`boto.emr.EmrConnection.list_clusters`, to get all clusters.
 
-    *args* and *kwargs* are passed through to
-    py:meth:`~boto.emr.EmrConnection.list_clusters`, to allow filtering by
-    time, etc.
-
-    You can include more information (and make more API calls) by setting
-    *include*, a sequence of the following strings:
-
-    * ``boostrapactions``: set the ``boostrapactions`` field to a list of
-      bootstrap actions
-    * ``cluster``: yield cluster details rather than cluster summaries
-    * ``instancegroups``: set the ``instancegroups`` field to a list of
-      instance groups
-    * ``steps``: set the ``steps`` field to a list of steps.
-    """
+def _yield_all_clusters(emr_conn, *args, **kwargs):
+    """Make successive API calls, yielding clusters."""
     for resp in _repeat(_boto_emr.list_clusters, emr_conn, *args, **kwargs):
         for cluster in getattr(resp, 'clusters', []):
-
-        if 'cluster' in include:
-            # use full cluster description rather than summary
-            cluster = _boto_emr.describe_cluster(emr_conn, cluster.id)
-
-        for field in sorted(set(include or ())):
-            if field == 'bootstrapactions':
-                cluster.bootstrapactions = list(
-                    _yield_all_bootstrap_actions(emr_conn, cluster.id))
-            elif field == 'instancegroups':
-                cluster.instancegroups = list(
-                        _yield_all_instance_groups(emr_conn, cluster.id))
-            elif field == 'steps':
-                cluster.steps = list(
-                    _yield_all_steps(emr_conn, cluster.id))
-            else field != 'cluster':
-                raise ValueError
-
-        yield cluster
+            yield cluster
 
 
 def _yield_all_bootstrap_actions(emr_conn, cluster_id, *args, **kwargs):
@@ -2349,14 +2316,10 @@ class EMRJobRunner(MRJobRunner):
         # list of (sort_key, cluster_id, num_steps)
         key_cluster_steps_list = []
 
-        def add_if_match(cluster_summary):
-            cluster_id = cluster_summary.id
-
+        def add_if_match(cluster):
             # this may be a retry due to locked job flows
-            if cluster_id in exclude:
+            if cluster.id in exclude:
                 return
-
-            cluster = _boto_emr.describe_cluster(emr_conn, cluster_id)
 
             # only take persistent job flows
             if cluster.autoterminate != 'false':
@@ -2364,7 +2327,7 @@ class EMRJobRunner(MRJobRunner):
 
             # match pool name, and (bootstrap) hash
             bootstrap_actions = _yield_all_bootstrap_actions(
-                emr_conn, cluster_id)
+                emr_conn, cluster.id)
             pool_hash, pool_name = _pool_hash_and_name(bootstrap_actions)
 
             if req_hash != pool_hash:
@@ -2388,7 +2351,7 @@ class EMRJobRunner(MRJobRunner):
                 if not ami_version.startswith(self._opts['ami_version']):
                     return
 
-            steps = list(_yield_all_steps(emr_conn, cluster_id))
+            steps = list(_yield_all_steps(emr_conn, cluster.id))
 
             # there is a hard limit of 256 steps per job flow
             if len(steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
@@ -2414,7 +2377,7 @@ class EMRJobRunner(MRJobRunner):
 
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
-            for ig in list(_yield_all_instance_groups(emr_conn, cluster_id)):
+            for ig in list(_yield_all_instance_groups(emr_conn, cluster.id)):
                 role = ig.instancegrouptype.lower()
 
                 # unknown, new kind of role; bail out!
@@ -2478,11 +2441,12 @@ class EMRJobRunner(MRJobRunner):
                         role_to_cu['master'],
                         _est_time_to_hour(cluster))
 
-            key_cluster_steps_list.append((sort_key, cluster_id, len(steps)))
+            key_cluster_steps_list.append((sort_key, cluster.id, len(steps)))
 
-        for cluster_summary in _yield_all_clusters(emr_conn,
-                                                   cluster_states=['WAITING']):
-            add_if_match(cluster_summary)
+        for cluster_summary in _yield_all_clusters(
+                emr_conn, cluster_states=['WAITING']):
+            cluster = _boto_emr.describe_cluster(emr_conn, cluster_summary.id)
+            add_if_match(cluster)
 
         return [(cluster_id, cluster_num_steps) for
                 (sort_key, cluster_id, cluster_num_steps)

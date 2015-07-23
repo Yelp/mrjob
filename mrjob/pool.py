@@ -26,7 +26,7 @@ log = getLogger(__name__)
 
 # these are "hidden" because there's no need to access them directly
 
-def _est_time_to_hour(cluster, now=None):
+def _est_time_to_hour(cluster_summary, now=None):
     """How long before job reaches the end of the next full hour since it
     began. This is important for billing purposes.
 
@@ -37,14 +37,11 @@ def _est_time_to_hour(cluster, now=None):
         now = datetime.utcnow()
 
     timeline = getattr(
-        getattr(cluster, 'status', None), 'timeline', None)
+        getattr(cluster_summary, 'status', None), 'timeline', None)
 
     creationdatetime = getattr(timeline, 'creationdatetime', None)
-    startdatetime = getattr(timeline, 'startdatetime', None)
 
-    if startdatetime:
-        start = iso8601_to_datetime(startdatetime)
-    elif creationdatetime:
+    if creationdatetime:
         start = iso8601_to_datetime(creationdatetime)
     else:
         # do something reasonable if creationdatetime isn't set

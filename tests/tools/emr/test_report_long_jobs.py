@@ -32,6 +32,18 @@ except ImportError:
 
 CLUSTERS = [
     MockEmrObject(
+        id='j-STARTING',
+        name='mr_grieving',
+        normalizedinstancehours='0',
+        status=MockEmrObject(
+            state='STARTING',
+            timeline=MockEmrObject(
+                creationdatetime='2010-06-06T00:05:00Z',
+            ),
+        ),
+        _steps=[],
+    ),
+    MockEmrObject(
         id='j-BOOTSTRAPPING',
         name='mr_grieving',
         normalizedinstancehours='0',
@@ -272,6 +284,18 @@ class FindLongRunningJobsTestCase(MockEMRAndS3TestCase):
             min_time=min_time,
             now=now)
 
+    def test_starting(self):
+        self.assertEqual(
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-STARTING']],
+                min_time=timedelta(hours=1),
+                now=datetime(2010, 6, 6, 4)
+            )),
+            [{'cluster_id': u'j-STARTING',
+              'name': u'mr_grieving',
+              'state': u'STARTING',
+              'time': timedelta(hours=3, minutes=55)}])
+
     def test_bootstrapping(self):
         self.assertEqual(
             list(self.find_long_running_jobs(
@@ -406,7 +430,11 @@ class FindLongRunningJobsTestCase(MockEMRAndS3TestCase):
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
-            [{'cluster_id': u'j-BOOTSTRAPPING',
+            [{'cluster_id': u'j-STARTING',
+              'name': u'mr_grieving',
+              'state': u'STARTING',
+              'time': timedelta(hours=3, minutes=55)},
+             {'cluster_id': u'j-BOOTSTRAPPING',
               'name': u'mr_grieving',
               'state': u'BOOTSTRAPPING',
               'time': timedelta(hours=3, minutes=55)},

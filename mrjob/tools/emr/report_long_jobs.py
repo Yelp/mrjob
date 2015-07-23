@@ -163,7 +163,7 @@ def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
                 if time_running >= min_time:
                     yield({'cluster_id': cs.id,
                            'name': step.name,
-                           'state': step.state,
+                           'state': step.status.state,
                            'time': time_running})
 
         # sometimes EMR says it's "RUNNING" but doesn't actually run steps!
@@ -172,7 +172,7 @@ def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
 
             # PENDING job should have run starting when the job flow
             # became ready, or the previous step completed
-            start_timestamp = cs.status.timeline.startdatetime
+            start_timestamp = cs.status.timeline.readydatetime
             for step in steps:
                 if step.status.state == 'COMPLETED':
                     start_timestamp = step.status.timeline.enddatetime
@@ -183,7 +183,7 @@ def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
             if time_pending >= min_time:
                 yield({'cluster_id': cs.id,
                        'name': step.name,
-                       'state': step.state,
+                       'state': step.status.state,
                        'time': time_pending})
 
 

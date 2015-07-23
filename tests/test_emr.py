@@ -127,18 +127,18 @@ class FastEMRTestCase(SandboxedTestCase):
 
 class MockEMRAndS3TestCase(FastEMRTestCase):
 
-    def _mock_boto_connect_s3(self, *args, **kwargs):
+    def connect_s3(self, *args, **kwargs):
         kwargs['mock_s3_fs'] = self.mock_s3_fs
         return MockS3Connection(*args, **kwargs)
 
-    def _mock_boto_emr_EmrConnection(self, *args, **kwargs):
+    def connect_emr(self, *args, **kwargs):
         kwargs['mock_s3_fs'] = self.mock_s3_fs
         kwargs['mock_emr_clusters'] = self.mock_emr_clusters
         kwargs['mock_emr_failures'] = self.mock_emr_failures
         kwargs['mock_emr_output'] = self.mock_emr_output
         return MockEmrConnection(*args, **kwargs)
 
-    def _mock_boto_connect_iam(self, *args, **kwargs):
+    def connect_iam(self, *args, **kwargs):
         kwargs['mock_iam_instance_profiles'] = self.mock_iam_instance_profiles
         kwargs['mock_iam_roles'] = self.mock_iam_roles
         kwargs['mock_iam_role_policies'] = self.mock_iam_role_policies
@@ -157,17 +157,17 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         self.mock_iam_roles = {}
         self.mock_s3_fs = {}
 
-        p_s3 = patch.object(boto, 'connect_s3', self._mock_boto_connect_s3)
+        p_s3 = patch.object(boto, 'connect_s3', self.connect_s3)
         self.addCleanup(p_s3.stop)
         p_s3.start()
 
-        p_iam = patch.object(boto, 'connect_iam', self._mock_boto_connect_iam)
+        p_iam = patch.object(boto, 'connect_iam', self.connect_iam)
         self.addCleanup(p_iam.stop)
         p_iam.start()
 
         p_emr = patch.object(
             boto.emr.connection, 'EmrConnection',
-            self._mock_boto_emr_EmrConnection)
+            self.connect_emr)
         self.addCleanup(p_emr.stop)
         p_emr.start()
 

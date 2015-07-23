@@ -441,6 +441,7 @@ class MockEmrConnection(object):
             raise InvalidCertificateException(
                 self.endpoint, None, 'hostname mismatch')
 
+    # TODO: *now* is not a param to the real run_jobflow(), rename to _now
     def run_jobflow(self,
                     name, log_uri=None, ec2_keyname=None,
                     availability_zone=None,
@@ -458,7 +459,8 @@ class MockEmrConnection(object):
                     api_params=None,
                     visible_to_all_users=None,
                     job_flow_role=None,
-                    service_role=None):
+                    service_role=None,
+                    _id=None):
         """Mock of run_jobflow().
         """
         self._enforce_strict_ssl()
@@ -517,7 +519,7 @@ class MockEmrConnection(object):
         # need to fill in the fields that EMRJobRunner uses
         steps = steps or []
 
-        cluster_id = 'j-MOCKCLUSTER%d' % len(self.mock_emr_clusters)
+        cluster_id = _id or 'j-MOCKCLUSTER%d' % len(self.mock_emr_clusters)
         assert cluster_id not in self.mock_emr_clusters
 
         cluster = MockEmrObject(
@@ -847,8 +849,9 @@ class MockEmrConnection(object):
 
             cluster_summaries.append(MockEmrObject(
                 id=cluster.id,
-                name=cluster.name,
-                normalizedinstancehours=cluster.normalizedinstancehours,
+                name=getattr(cluster, 'name', None),
+                normalizedinstancehours=getattr(
+                    cluster, 'normalizedinstancehours', None),
                 status=cluster.status))
         else:
             # we went through all clusters, no need to call again

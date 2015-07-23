@@ -303,7 +303,6 @@ def time_last_active(cluster_summary, steps):
     Things we look at:
 
     * ``cluster.creationdatetime`` (always set)
-    * ``cluster.startdatetime``
     * ``cluster.readydatetime`` (i.e. when bootstrapping finished)
     * ``step.creationdatetime`` for any step
     * ``step.startdatetime`` for any step

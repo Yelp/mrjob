@@ -17,24 +17,15 @@ from datetime import timedelta
 from StringIO import StringIO
 import sys
 
-from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.report_long_jobs import find_long_running_jobs
 from mrjob.tools.emr.report_long_jobs import main
 from tests.mockboto import MockEmrObject
 from tests.test_emr import MockEMRAndS3TestCase
 
-try:
-    import unittest2 as unittest
-    unittest  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    import unittest
-
-
 CLUSTERS = [
     MockEmrObject(
         id='j-STARTING',
         name='mr_grieving',
-        normalizedinstancehours='0',
         status=MockEmrObject(
             state='STARTING',
             timeline=MockEmrObject(
@@ -46,7 +37,6 @@ CLUSTERS = [
     MockEmrObject(
         id='j-BOOTSTRAPPING',
         name='mr_grieving',
-        normalizedinstancehours='0',
         status=MockEmrObject(
             state='BOOTSTRAPPING',
             timeline=MockEmrObject(
@@ -58,7 +48,6 @@ CLUSTERS = [
     MockEmrObject(
         id='j-RUNNING1STEP',
         name='mr_grieving',
-        normalizedinstancehours='0',
         status=MockEmrObject(
             state='RUNNING',
             timeline=MockEmrObject(
@@ -81,7 +70,6 @@ CLUSTERS = [
     MockEmrObject(
         id='j-RUNNING2STEPS',
         name='mr_grieving',
-        normalizedinstancehours='0',
         status=MockEmrObject(
             state='RUNNING',
             timeline=MockEmrObject(
@@ -114,7 +102,6 @@ CLUSTERS = [
     MockEmrObject(
         id='j-RUNNINGANDPENDING',
         name='mr_grieving',
-        normalizedinstancehours='0',
         status=MockEmrObject(
             state='RUNNING',
             timeline=MockEmrObject(
@@ -153,7 +140,6 @@ CLUSTERS = [
     MockEmrObject(
         id='j-PENDING1STEP',
         name='mr_grieving',
-        normalizedinstancehours='0',
         status=MockEmrObject(
             state='RUNNING',
             timeline=MockEmrObject(
@@ -173,7 +159,6 @@ CLUSTERS = [
     MockEmrObject(
         id='j-PENDING2STEPS',
         name='mr_grieving',
-        normalizedinstancehours='0',
         status=MockEmrObject(
             state='RUNNING',
             timeline=MockEmrObject(
@@ -203,7 +188,6 @@ CLUSTERS = [
     MockEmrObject(
         id='j-COMPLETED',
         name='mr_grieving',
-        normalizedinstancehours='0',
         status=MockEmrObject(
             state='COMPLETED',
             timeline=MockEmrObject(
@@ -233,7 +217,6 @@ CLUSTER_SUMMARIES_BY_ID = dict(
     (cluster.id, MockEmrObject(
         id=cluster.id,
         name=cluster.name,
-        normalizedinstancehours=cluster.normalizedinstancehours,
         status=cluster.status))
     for cluster in CLUSTERS)
 

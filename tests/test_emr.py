@@ -178,6 +178,11 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
         to key name to data."""
         add_mock_s3_data(self.mock_s3_fs, data, time_modified)
 
+    def add_mock_emr_cluster(self, cluster):
+        if cluster.id in self.mock_emr_clusters:
+            raise ValueError('mock cluster %s already exists' % cluster.id)
+        self.mock_emr_clusters[cluster.id] = cluster
+
     def prepare_runner_for_ssh(self, runner, num_slaves=0):
         # TODO: Refactor this abomination of a test harness
 
@@ -459,7 +464,6 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
         with mr_job.make_runner() as runner:
             runner._add_job_files_for_upload()
             runner._launch_emr_job()
-            cluster = runner._describe_cluster
             runner._wait_for_cluster_to_terminate()
 
 
@@ -3112,13 +3116,6 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
         super(JobWaitTestCase, self).tearDown()
         self.mock_cluster_ids = []
         self.future_mock_cluster_ids = []
-
-    def add_fake_cluster(self, cluster_ids, cluster_list):
-        """Puts a fake job flow into a list of jobs for testing."""
-        for cluster_id in cluster_ids:
-            cluster = Mock()
-            cluster.id = cluster_id
-            job_list.append(jf)
 
     def test_no_waiting_for_job_pool_fail(self):
         self.mock_cluster_ids.append('j-fail-lock')

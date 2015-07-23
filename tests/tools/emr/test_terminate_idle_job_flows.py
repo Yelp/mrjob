@@ -31,8 +31,6 @@ from mrjob.tools.emr.terminate_idle_job_flows import time_last_active
 
 from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
-from tests.mockboto import MockEmrConnection
-from tests.mockboto import MockS3Connection
 from tests.test_emr import MockEMRAndS3TestCase
 
 
@@ -46,6 +44,13 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.now = datetime.utcnow().replace(microsecond=0)
         self.add_mock_s3_data({'my_bucket': {}})
 
+        # create a timestamp the given number of *hours*, *minutes*, etc.
+        # in the past. If any *kwargs* are None, return None.
+        def ago(**kwargs):
+            if any(v is None for v in kwargs.values()):
+                return None
+            return to_iso8601(self.now - timedelta(**kwargs))
+
         # Build a step object easily
         # also make it respond to .args()
         def step(jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
@@ -58,182 +63,224 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
                  name='Streaming Step',
                  action_on_failure='TERMINATE_CLUSTER',
                  **kwargs):
-            if create_hours_ago:
-                kwargs['creationdatetime'] = to_iso8601(
-                    self.now - timedelta(hours=create_hours_ago))
-            if start_hours_ago:
-                kwargs['startdatetime'] = to_iso8601(
-                    self.now - timedelta(hours=start_hours_ago))
-            if end_hours_ago:
-                kwargs['enddatetime'] = to_iso8601(
-                    self.now - timedelta(hours=end_hours_ago))
-            kwargs['args'] = [MockEmrObject(value=a) for a in args]
+
             return MockEmrObject(
-                jar=jar, state=state, name=name,
-                action_on_failure=action_on_failure, **kwargs)
+                hadoopjarstep=MockEmrObject(
+                    args=[MockEmrObject(value=a) for a in args],
+                    jar=jar,
+                    action_on_failure=action_on_failure,
+                ),
+                status=MockEmrObject(
+                    state=state,
+                    timeline=MockEmrObject(
+                        creationdatetime=ago(hours=create_hours_ago),
+                        enddatetime=ago(hours=end_hours_ago),
+                        startdatetime=ago(hours=start_hours_ago),
+                    ),
+                )
+            )
+
 
         # empty job
-        self.mock_emr_job_flows['j-EMPTY'] = MockEmrObject(
-            creationdatetime=to_iso8601(self.now - timedelta(hours=10)),
-            state='STARTING',
-            steps=[],
-        )
+        self.add_mock_emr_cluster(MockEmrObject(
+            id = 'j-EMPTY',
+            status=MockEmrObject(
+                state='STARTING',
+                timeline=MockEmrObject(
+                    creationdatetime=ago(hours=10)
+                ),
+            ),
+            _steps=[],
+        ))
 
         # job that's bootstrapping
-        self.mock_emr_job_flows['j-BOOTSTRAPPING'] = MockEmrObject(
-            creationdatetime=to_iso8601(self.now - timedelta(hours=10)),
-            startdatetime=to_iso8601(
-                self.now - timedelta(hours=9, minutes=55)),
-            state='BOOTSTRAPPING',
-            steps=[step(create_hours_ago=10, state='PENDING')],
-        )
+        self.add_mock_emr_cluster(MockEmrObject(
+            id='j-BOOTSTRAPPING',
+            status=MockEmrObject(
+                state='BOOTSTRAPPING',
+                timeline=MockEmrObject(
+                    creationdatetime=ago(hours=10),
+                ),
+            ),
+            _steps=[step(create_hours_ago=10, state='PENDING')],
+        ))
 
         # currently running job
-        self.mock_emr_job_flows['j-CURRENTLY_RUNNING'] = MockEmrObject(
-            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
-            readydatetime=to_iso8601(self.now - timedelta(hours=4,
-                                                          minutes=10)),
-            startdatetime=to_iso8601(self.now - timedelta(hours=4,
-                                                          minutes=15)),
-            state='RUNNING',
-            steps=[step(start_hours_ago=4, state='RUNNING')],
+        self.add_mock_emr_cluster(MockEmrObject(
+            id='j-CURRENTLY_RUNNING',
+            status=MockEmrObject(
+                state='RUNNING',
+                timeline=MockEmrObject(
+                    creationdatetime=ago(hours=6),
+                    readydatetime=ago(hours=4, minutes=10))
+                ),
+            ),
+            _steps=[step(start_hours_ago=4, state='RUNNING')],
         )
 
         # finished job flow
-        self.mock_emr_job_flows['j-DONE'] = MockEmrObject(
-            creationdatetime=to_iso8601(self.now - timedelta(hours=10)),
-            enddatetime=to_iso8601(self.now - timedelta(hours=5)),
-            readydatetime=to_iso8601(self.now - timedelta(hours=8)),
-            startdatetime=to_iso8601(self.now - timedelta(hours=9)),
-            state='COMPLETE',
-            steps=[step(start_hours_ago=8, end_hours_ago=6)],
-        )
+        self.add_mock_emr_cluster(MockEmrObject(
+            id='j-DONE',
+            status=MockEmrObject(
+                state='TERMINATED',
+                timeline=MockEmrObject(
+                    creationdatetime=ago(hours=10),
+                    readydatetime=ago(hours=8),
+                    enddatetime=ago(hours=5),
+                ),
+            ),
+            _steps=[step(start_hours_ago=8, end_hours_ago=6)],
+        ))
 
         # idle job flow
-        self.mock_emr_job_flows['j-DONE_AND_IDLE'] = MockEmrObject(
-            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
-            readydatetime=to_iso8601(self.now - timedelta(hours=5, minutes=5)),
-            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
-            state='WAITING',
-            steps=[step(start_hours_ago=4, end_hours_ago=2)],
-        )
+        self.add_mock_emr_cluster(MockEmrObject(
+            id='j-DONE_AND_IDLE',
+            status=MockEmrObject(
+                state='WAITING',
+                timeline=MockEmrObject(
+                    creationdatetime=ago(hours=6),
+                    readydatetime=ago(hours=5, minutes=5),
+                ),
+            ),
+            _steps=[step(start_hours_ago=4, end_hours_ago=2)],
+        ))
 
         # idle job flow with an active lock
-        self.mock_emr_job_flows['j-IDLE_AND_LOCKED'] = MockEmrObject(
-            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
-            readydatetime=to_iso8601(self.now - timedelta(hours=5, minutes=5)),
-            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
-            state='WAITING',
-            steps=[step(start_hours_ago=4, end_hours_ago=2)],
-        )
+        self.add_mock_emr_cluster(MockEmrObject(
+            id='j-IDLE_AND_LOCKED',
+            status=MockEmrObject(
+                state='WAITING',
+                timeline=MockEmrObject(
+                    creationdatetime=ago(hours=6),
+                    readydatetime=ago(hours=5, minutes=5),
+                ),
+            ),
+            _steps=[step(start_hours_ago=4, end_hours_ago=2)],
+        ))
         self.add_mock_s3_data({
             'my_bucket': {
                 'locks/j-IDLE_AND_LOCKED/2': 'not_you',
             },
-        }, time_modified=datetime.utcnow())
+        }, time_modified=self.now)
 
         # idle job flow with an expired lock
-        self.mock_emr_job_flows['j-IDLE_AND_EXPIRED'] = MockEmrObject(
-            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
-            readydatetime=to_iso8601(self.now - timedelta(hours=5, minutes=5)),
-            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
-            state='WAITING',
-            steps=[step(start_hours_ago=4, end_hours_ago=2)],
-        )
+        self.add_mock_emr_cluster(MockEmrObject(
+            id='j-IDLE_AND_EXPIRED',
+            status=MockEmrObject(
+                state='WAITING',
+                timeline=MockEmrObject(
+                    creationdatetime=ago(hours=6),
+                    readydatetime=ago(hours=5, minutes=5),
+                ),
+            ),
+            _steps=[step(start_hours_ago=4, end_hours_ago=2)],
+        ))
         self.add_mock_s3_data({
             'my_bucket': {
                 'locks/j-IDLE_AND_EXPIRED/2': 'not_you',
             },
-        }, time_modified=datetime.utcnow()-timedelta(minutes=5))
+        }, time_modified=ago(minutes=5))
 
         # idle job flow with an expired lock
-        self.mock_emr_job_flows['j-IDLE_BUT_INCOMPLETE_STEPS'] = MockEmrObject(
-            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
-            readydatetime=to_iso8601(self.now - timedelta(hours=5, minutes=5)),
-            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
-            state='WAITING',
-            steps=[step(start_hours_ago=4, end_hours_ago=None)],
-        )
+        self.add_mock_emr_cluster(MockEmrObject(
+            id='j-IDLE_BUT_INCOMPLETE_STEPS',
+            status=MockEmrObject(
+                state='WAITING',
+                timeline=MockEmrObject(
+                    creationdatetime=ago(hours=6),
+                    readydatetime=ago(hours=5, minutes=5),
+                ),
+            ),
+            _steps=[step(start_hours_ago=4, end_hours_ago=None)],
+        ))
 
         # hive job flow (looks completed but isn't)
-        self.mock_emr_job_flows['j-HIVE'] = MockEmrObject(
-            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
-            readydatetime=to_iso8601(self.now - timedelta(hours=5, minutes=5)),
-            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
-            state='WAITING',
-            steps=[step(
+        self.add_mock_emr_cluster(MockEmrObject(
+            id='j-HIVE',
+            status=MockEmrObject(
+                state='WAITING',
+                timeline=MockEmrObject(
+                    creationdatetime=ago(hours=6),
+                    readydatetime=ago(hours=5, minutes=5),
+                ),
+            ),
+            _steps=[step(
                 start_hours_ago=4,
                 end_hours_ago=4,
                 jar=('s3://us-east-1.elasticmapreduce/libs/script-runner/'
                      'script-runner.jar'),
                 args=[],
             )],
-        )
+        ))
 
         # custom hadoop streaming jar
-        self.mock_emr_job_flows['j-CUSTOM_DONE_AND_IDLE'] = MockEmrObject(
-            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
-            readydatetime=to_iso8601(self.now - timedelta(hours=5, minutes=5)),
-            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
-            state='WAITING',
-            steps=[step(
+        self.add_mock_emr_cluster(MockEmrObject(
+            id='j-CUSTOM_DONE_AND_IDLE',
+            status=MockEmrObject(
+                state='WAITING',
+                timeline=MockEmrObject(
+                    creationdatetime=ago(hours=6),
+                    readydatetime=ago(hours=5, minutes=5),
+                ),
+            ),
+            _steps=[step(
                 start_hours_ago=4,
                 end_hours_ago=4,
                 jar=('s3://my_bucket/tmp/somejob/files/'
                      'oddjob-0.0.3-SNAPSHOT-standalone.jar'),
                 args=[],
             )],
-        )
+        ))
 
-        mock_conn = MockEmrConnection()
+        mock_emr_conn = self.connect_emr()
 
         # hadoop debugging without any other steps
-        jobflow_id = mock_conn.run_jobflow(name='j-DEBUG_ONLY',
-                                           log_uri='',
-                                           enable_debugging=True,
-                                           now=self.now -
-                                               timedelta(hours=3, minutes=5))
-        jf = mock_conn.describe_jobflow(jobflow_id)
-        self.mock_emr_job_flows['j-DEBUG_ONLY'] = jf
-        jf.state = 'WAITING'
-        jf.startdatetime = to_iso8601(
-            self.now - timedelta(hours=3))
-        jf.readydatetime = to_iso8601(
-            self.now - timedelta(hours=2, minutes=55))
-        jf.steps[0].enddatetime = to_iso8601(self.now - timedelta(hours=2))
+        mock_emr_conn.run_jobflow(_id='j-DEBUG_ONLY',
+                                  name='DEBUG_ONLY',
+                                  enable_debugging=True,
+                                  now=ago(hours=3, minutes=5))
+        j_debug_only = self.mock_emr_clusters['j-DEBUG_ONLY']
+        j_debug_only.status.state = 'WAITING'
+        j_debug_only.status.timeline.readydatetime = ago(hours=2, minutes=55)
+        j_debug_only._steps[0].status.timeline.enddatetime = ago(hours=2)
 
         # hadoop debugging + actual job
         # same jar as hive but with different args
-        jobflow_id = mock_conn.run_jobflow(name='j-HADOOP_DEBUGGING',
-                                           log_uri='',
-                                           enable_debugging=True,
-                                           now=self.now -
-                                           timedelta(hours=6))
-        jf = mock_conn.describe_jobflow(jobflow_id)
-        self.mock_emr_job_flows['j-HADOOP_DEBUGGING'] = jf
-        jf.steps.append(step())
-        jf.state = 'WAITING'
-        jf.startdatetime = to_iso8601(self.now - timedelta(hours=5))
-        jf.readydatetime = to_iso8601(
-            self.now - timedelta(hours=4, minutes=55))
+        mock_emr_conn.run_jobflow(_id='j-HADOOP_DEBUGGING',
+                                  name='HADOOP_DEBUGGING',
+                                  enable_debugging=True,
+                                  now=ago(hours=6))
+        j_hadoop_debugging = self.mock_emr_clusters['j-HADOOP_DEBUGGING']
+        j_hadoop_debugging._steps.append(step())
+        j_hadoop_debugging.status.state = 'WAITING'
+        j_hadoop_debugging.status.timeline.readydatetime = ago(
+            hours=4, minutes=55)
+
         # Need to reset times manually because mockboto resets them
-        jf.steps[0].enddatetime = to_iso8601(self.now - timedelta(hours=5))
-        jf.steps[1].startdatetime = to_iso8601(self.now - timedelta(hours=4))
-        jf.steps[1].enddatetime = to_iso8601(self.now - timedelta(hours=2))
+        j_hadoop_debugging._steps[0].status.timeline.enddatetime = ago(hours=5)
+        j_hadoop_debugging._steps[1].status.timeline.startdatetime = ago(
+            hours=4)
+        j_hadoop_debugging._steps[1].status.timeline.enddatetime = ago(hours=2)
 
         # should skip cancelled steps
-        self.mock_emr_job_flows['j-IDLE_AND_FAILED'] = MockEmrObject(
-            state='WAITING',
-            creationdatetime=to_iso8601(self.now - timedelta(hours=6)),
-            readydatetime=to_iso8601(self.now - timedelta(hours=5, minutes=5)),
-            startdatetime=to_iso8601(self.now - timedelta(hours=5)),
-            steps=[
+        self.add_mock_emr_cluster(MockEmrObject(
+            id='j-IDLE_AND_FAILED',
+            status=MockEmrObject(
+                state='WAITING',
+                timeline=MockEmrObject(
+                    creationdatetime=ago(hours=6),
+                    readydatetime=ago(hours=5, minutes=5),
+                ),
+            ),
+            _steps=[
                 step(start_hours_ago=4, end_hours_ago=3, state='FAILED'),
                 step(
                     state='CANCELLED',
                 )
             ],
-        )
+        ))
+
+        # TODO: start here
 
         # pooled job flow reaching end of full hour
         self.mock_emr_job_flows['j-POOLED'] = MockEmrObject(
@@ -322,7 +369,7 @@ class JobFlowInspectionTestCase(MockEMRAndS3TestCase):
         self.assertEqual(streaming, is_job_flow_streaming(jf))
 
     def _lock_contents(self, jf, steps_ahead=0):
-        conn = MockS3Connection(mock_s3_fs=self.mock_s3_fs)
+        conn = self.connect_s3()
         bucket = conn.get_bucket('my_bucket')
         lock_key_name = 'locks/%s/%d' % (
             jf.jobflowid, len(jf.steps) + steps_ahead)

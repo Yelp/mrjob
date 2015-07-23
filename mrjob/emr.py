@@ -212,7 +212,7 @@ def _repeat(api_call, *args, **kwargs):
 
 
 def _yield_all_clusters(emr_conn, *args, **kwargs):
-    """Make successive API calls, yielding clusters."""
+    """Make successive API calls, yielding cluster summaries."""
     for resp in _repeat(_boto_emr.list_clusters, emr_conn, *args, **kwargs):
         for cluster in getattr(resp, 'clusters', []):
             yield cluster

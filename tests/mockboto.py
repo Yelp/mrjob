@@ -943,8 +943,8 @@ class MockEmrConnection(object):
         and looking for an -output argument."""
         # parse in reverse order, in case there are multiple -output args
         for i, arg in reversed(list(enumerate(step_args[:-1]))):
-            if arg.value == '-output':
-                return step_args[i + 1].value
+            if arg == '-output':
+                return step_args[i + 1]
         else:
             return None
 

@@ -336,8 +336,8 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             emr_conn = runner.make_emr_conn()
             steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
 
-            step_0_args = [arg.value for arg in steps[0].config.args]
-            step_1_args = [arg.value for arg in steps[1].config.args]
+            step_0_args = steps[0].config.args
+            step_1_args = steps[1].config.args
 
             self.assertIn('-inputformat', step_0_args)
             self.assertNotIn('-outputformat', step_0_args)
@@ -3113,7 +3113,7 @@ class JobWaitTestCase(MockEMRAndS3TestCase):
 
         self.simple_patch(EMRJobRunner, 'make_emr_conn')
         self.simple_patch(S3Filesystem, 'make_s3_conn',
-                          side_effect=self._mock_boto_connect_s3)
+                          side_effect=self.connect_s3)
         self.simple_patch(EMRJobRunner, '_usable_clusters',
             side_effect=side_effect_usable_clusters)
         self.simple_patch(EMRJobRunner, '_lock_uri',
@@ -3347,7 +3347,7 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             self.assertEqual(jar_step.config.jar,
                              runner._upload_mgr.uri(fake_jar))
 
-            jar_args = [arg.value for arg in jar_step.config.args]
+            jar_args = jar_step.config.args
             self.assertEqual(len(jar_args), 3)
             self.assertEqual(jar_args[0], 'stuff')
 
@@ -3359,7 +3359,7 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             # check output of jar is input of next step
             jar_output_arg = jar_args[2]
 
-            streaming_args = [arg.value for arg in streaming_step.config.args]
+            streaming_args = streaming_step.config.args
             streaming_input_arg = streaming_args[
                 streaming_args.index('-input') + 1]
             self.assertEqual(jar_output_arg, streaming_input_arg)

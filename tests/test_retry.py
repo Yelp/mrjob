@@ -144,7 +144,7 @@ class RetryWrapperTestCase(TestCase):
             backoff=0.0001,
             max_tries=2
         )
-                         
+
         self.assertEqual(a.f(), 1)
         self.assertEqual(a1.f.call_count, 2)
 
@@ -172,4 +172,3 @@ class RetryWrapperTestCase(TestCase):
         )
         a.f()
         self.assertEqual(a1.f.call_count, 3)
-        

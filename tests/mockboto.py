@@ -816,7 +816,8 @@ class MockEmrConnection(object):
 
         cluster = self._get_mock_cluster(cluster_id)
 
-        return MockEmrObject(actions=cluster._bootstrapactions)
+        return MockEmrObject(actions=getattr(
+            cluster, '_bootstrapactions', []))
 
     def _list_clusters(self, created_after=None, created_before=None,
                       cluster_states=None, marker=None):
@@ -868,7 +869,8 @@ class MockEmrConnection(object):
 
         cluster = self._get_mock_cluster(cluster_id)
 
-        return MockEmrObject(instancegroups=cluster._instancegroups)
+        return MockEmrObject(instancegroups=getattr(
+            cluster, '_instancegroups', []))
 
     def _list_steps(self, cluster_id, step_states=None, marker=None):
         self._enforce_strict_ssl()
@@ -880,7 +882,7 @@ class MockEmrConnection(object):
         cluster = self._get_mock_cluster(cluster_id)
 
         steps_listed = []
-        for step in cluster._steps:
+        for step in getattr(cluster, '_steps', ()):
             if step_states is None or step.status.state in step_states:
                 steps_listed.append(step)
 
@@ -893,6 +895,9 @@ class MockEmrConnection(object):
             now = datetime.utcnow()
 
         cluster = self._get_mock_cluster(jobflow_id)
+
+        if not hasattr(cluster, '_steps'):
+            cluster._steps = []
 
         for step in steps:
             step_config = MockEmrObject(

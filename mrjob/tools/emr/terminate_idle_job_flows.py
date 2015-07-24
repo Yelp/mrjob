@@ -99,7 +99,7 @@ def main(cl_args=None):
     MRJob.set_up_logging(quiet=options.quiet,
                          verbose=options.verbose)
 
-    inspect_and_maybe_terminate_job_flows(
+    inspect_and_maybe_terminate_clusters(
         dry_run=options.dry_run,
         max_hours_idle=options.max_hours_idle,
         mins_to_end_of_hour=options.mins_to_end_of_hour,
@@ -125,7 +125,7 @@ def runner_kwargs(options):
     return kwargs
 
 
-def inspect_and_maybe_terminate_job_flows(
+def inspect_and_maybe_terminate_clusters(
     dry_run=False,
     max_hours_idle=None,
     mins_to_end_of_hour=None,

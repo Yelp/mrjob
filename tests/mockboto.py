@@ -1080,6 +1080,12 @@ class MockEmrConnection(object):
 
         return
 
+    def add_tags(self, resource_id, tags):
+        """Simulate successful creation of new metadata tags for the specified
+        resource id.
+        """
+        return bool(resource_id and tags)
+
 
 class MockEmrObject(object):
     """Mock out boto.emr.EmrObject. This is just a generic object that you

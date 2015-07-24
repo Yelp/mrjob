@@ -403,6 +403,13 @@ def add_emr_launch_opts(opt_group):
         ),
 
         opt_group.add_option(
+            '--emr-tag', dest='emr_tags',
+            default=[], action='append',
+            help='Metadata tags to apply to the EMR cluster; '
+                 'should take the form KEY=VALUE. You can use --emr-tag '
+                 'multiple times.'
+
+        opt_group.add_option(
             '--iam-instance-profile', dest='iam_instance_profile',
             default=None,
             help=('EC2 instance profile to use for the EMR cluster - see'

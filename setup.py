@@ -23,7 +23,7 @@ try:
     # arguments that distutils doesn't understand
     setuptools_kwargs = {
         'install_requires': [
-            'boto>=2.2.0',
+            'boto>=2.6.0',
             'filechunkio',
             'PyYAML',
             'simplejson>=2.0.9',

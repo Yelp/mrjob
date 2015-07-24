@@ -3682,23 +3682,20 @@ class SecurityTokenTestCase(MockEMRAndS3TestCase):
         runner.make_emr_conn()
 
         self.assertTrue(self.mock_emr.called)
-        # security_token shouldn't even be in kwargs
-        # (boto 2.2.0 doesn't allow it)
         emr_kwargs = self.mock_emr.call_args[1]
-        self.assertNotIn('security_token', emr_kwargs)
+        self.assertIn('security_token', emr_kwargs)
+        self.assertEqual(emr_kwargs['security_token'], None)
 
         runner.make_iam_conn()
 
         self.assertTrue(self.mock_iam.called)
-        # security_token shouldn't even be in kwargs
-        # (boto 2.2.0 doesn't allow it)
         iam_kwargs = self.mock_iam.call_args[1]
-        self.assertNotIn('security_token', iam_kwargs)
+        self.assertIn('security_token', iam_kwargs)
+        self.assertEqual(iam_kwargs['security_token'], None)
 
         runner.make_s3_conn()
 
         self.assertTrue(self.mock_s3.called)
-        # S3 could accept security token, even in boto 2.2.0
         s3_kwargs = self.mock_s3.call_args[1]
         self.assertIn('security_token', s3_kwargs)
         self.assertEqual(s3_kwargs['security_token'], None)

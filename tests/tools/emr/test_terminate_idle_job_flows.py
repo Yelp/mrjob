@@ -36,6 +36,8 @@ from tests.test_emr import MockEMRAndS3TestCase
 
 class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
 
+    maxDiff = None
+
     def setUp(self):
         super(JobFlowTerminationTestCase, self).setUp()
         self.create_fake_clusters()
@@ -56,7 +58,7 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
         def step(jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
                  args=['-mapper', 'my_job.py --mapper',
                        '-reducer', 'my_job.py --reducer'],
-                 state='COMPLETE',
+                 state='COMPLETED',
                  create_hours_ago=None,
                  start_hours_ago=None,
                  end_hours_ago=None,
@@ -235,7 +237,7 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
 
         # hadoop debugging without any other steps
         mock_emr_conn.run_jobflow(_id='j-DEBUG_ONLY',
-                                  name='DEBUG ONLY',
+                                  name='DEBUG_ONLY',
                                   enable_debugging=True,
                                   now=self.now - timedelta(hours=3),
                                   job_flow_role='fake-instance-profile',
@@ -244,12 +246,13 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
         j_debug_only = self.mock_emr_clusters['j-DEBUG_ONLY']
         j_debug_only.status.state = 'WAITING'
         j_debug_only.status.timeline.readydatetime = ago(hours=2, minutes=55)
+        j_debug_only._steps[0].status.state = 'COMPLETED'
         j_debug_only._steps[0].status.timeline.enddatetime = ago(hours=2)
 
         # hadoop debugging + actual job
         # same jar as hive but with different args
         mock_emr_conn.run_jobflow(_id='j-HADOOP_DEBUGGING',
-                                  name='HADOOP DEBUGGING',
+                                  name='HADOOP_DEBUGGING',
                                   enable_debugging=True,
                                   now=self.now - timedelta(hours=6),
                                   job_flow_role='fake-instance-profile',
@@ -262,6 +265,7 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
             hours=4, minutes=55)
 
         # Need to reset times manually because mockboto resets them
+        j_hadoop_debugging._steps[0].status.state = 'COMPLETED'
         j_hadoop_debugging._steps[0].status.timeline.enddatetime = ago(hours=5)
         j_hadoop_debugging._steps[1].status.timeline.startdatetime = ago(
             hours=4)
@@ -320,7 +324,7 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
 
     def ids_of_terminated_clusters(self):
         return sorted(
-            cluster_id
+            str(cluster_id)
             for cluster_id, cluster in self.mock_emr_clusters.items()
             if cluster_id != 'j-DONE' and
                cluster.status.state in (
@@ -569,7 +573,7 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
 
         self.assert_terminated_job_flows_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
-                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
+                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE',
                           'j-POOLED'])
@@ -602,7 +606,7 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
         self.assert_terminated_job_flows_locked_by_terminate()
 
         self.assertEqual(self.ids_of_terminated_clusters(),
-                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
+                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
                           'j-IDLE_AND_FAILED', 'j-POOLED'])
 
@@ -629,7 +633,7 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
         self.assert_terminated_job_flows_locked_by_terminate()
 
         self.assertEqual(self.ids_of_terminated_clusters(),
-                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
+                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
 
@@ -637,7 +641,7 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
             unpooled_only=True, max_hours_idle=0.01)
 
         self.assertEqual(self.ids_of_terminated_clusters(),
-                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE', 'j-EMPTY',
+                         ['j-DEBUG_ONLY', 'j-DONE_AND_IDLE',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
 
@@ -668,14 +672,13 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
         stdout = StringIO()
         self.maybe_terminate_quietly(
             stdout=stdout, max_hours_idle=0.01)
-        output = """Terminated job flow j-POOLED (Pooled Job Flow); was idle for 0:50:00, 0:05:00 to end of hour
-Terminated job flow j-PENDING_BUT_IDLE (Pending But Idle Job Flow); was pending for 2:50:00, 0:05:00 to end of hour
-Terminated job flow j-DEBUG_ONLY (Debug Only Job Flow); was idle for 2:00:00, 1:00:00 to end of hour
-Terminated job flow j-DONE_AND_IDLE (Done And Idle Job Flow); was idle for 2:00:00, 1:00:00 to end of hour
-Terminated job flow j-IDLE_AND_EXPIRED (Idle And Expired Job Flow); was idle for 2:00:00, 1:00:00 to end of hour
-Terminated job flow j-IDLE_AND_FAILED (Idle And Failed Job Flow); was idle for 3:00:00, 1:00:00 to end of hour
-Terminated job flow j-HADOOP_DEBUGGING (Hadoop Debugging Job Flow); was idle for 2:00:00, 1:00:00 to end of hour
-Terminated job flow j-EMPTY (Empty Job Flow); was idle for 10:00:00, 1:00:00 to end of hour
+        output = u"""Terminated job flow j-POOLED (POOLED); was idle for 0:50:00, 0:05:00 to end of hour
+Terminated job flow j-PENDING_BUT_IDLE (PENDING_BUT_IDLE); was pending for 2:50:00, 1:00:00 to end of hour
+Terminated job flow j-DEBUG_ONLY (DEBUG_ONLY); was idle for 2:00:00, 1:00:00 to end of hour
+Terminated job flow j-DONE_AND_IDLE (DONE_AND_IDLE); was idle for 2:00:00, 1:00:00 to end of hour
+Terminated job flow j-IDLE_AND_EXPIRED (IDLE_AND_EXPIRED); was idle for 2:00:00, 1:00:00 to end of hour
+Terminated job flow j-IDLE_AND_FAILED (IDLE_AND_FAILED); was idle for 3:00:00, 1:00:00 to end of hour
+Terminated job flow j-HADOOP_DEBUGGING (HADOOP_DEBUGGING); was idle for 2:00:00, 1:00:00 to end of hour
 """
         self.assertItemsEqual(
             stdout.getvalue().splitlines(),

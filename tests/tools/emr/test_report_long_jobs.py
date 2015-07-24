@@ -238,13 +238,15 @@ class ReportLongJobsTestCase(MockEMRAndS3TestCase):
         main(['-q', '--no-conf'])  # just make sure it doesn't crash
 
     def test_with_all_clusters(self):
-        self.mock_emr_clusters.update(CLUSTERS_BY_ID)
-        emr_conn = self.connect_emr()
+        for cluster in CLUSTERS:
+            self.add_mock_emr_cluster(cluster)
 
+        emr_conn = self.connect_emr()
         emr_conn.run_jobflow('no name',
                              job_flow_role='fake-instance-profile',
                              service_role='fake-service-role')
         main(['-q', '--no-conf'])
+
         lines = [line for line in StringIO(self.stdout.getvalue())]
         self.assertEqual(len(lines), len(CLUSTERS_BY_ID) - 1)
 
@@ -256,7 +258,8 @@ class FindLongRunningJobsTestCase(MockEMRAndS3TestCase):
     def setUp(self):
         super(FindLongRunningJobsTestCase, self).setUp()
 
-        self.mock_emr_clusters.update(CLUSTERS_BY_ID)
+        for cluster in CLUSTERS:
+            self.add_mock_emr_cluster(cluster)
 
     def find_long_running_jobs(self, cluster_summaries, min_time, now):
         emr_conn = self.connect_emr()

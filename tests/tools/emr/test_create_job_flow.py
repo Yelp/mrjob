@@ -49,6 +49,7 @@ class JobFlowInspectionTestCase(ToolTestCase):
              'emr_api_params': {},
              'emr_endpoint': None,
              'emr_job_flow_pool_name': None,
+             'emr_tags': {},
              'enable_emr_debugging': None,
              'iam_instance_profile': None,
              'iam_job_flow_role': None,

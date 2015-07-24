@@ -430,6 +430,8 @@ class MRJobLauncher(object):
 
         self._process_args(args)
 
+        # TODO: break this out into separate function
+
         # parse custom options here to avoid setting a custom Option subclass
         # and confusing users
         if self.options.ssh_bind_ports:

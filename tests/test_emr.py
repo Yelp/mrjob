@@ -2191,7 +2191,7 @@ class PoolMatchingTestCase(MockEMRAndS3TestCase):
 
         mock_cluster.status.state = 'WAITING'
         start = datetime.now() - timedelta(minutes=minutes_ago)
-        mock_cluster.status.timeline.startdatetime = (
+        mock_cluster.status.timeline.creationdatetime = (
             start.strftime(boto.utils.ISO8601))
         return runner, cluster_id
 

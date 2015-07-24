@@ -439,11 +439,11 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'bootstrap_python_packages': combine_path_lists,
         'bootstrap_scripts': combine_path_lists,
         'ec2_key_pair_file': combine_paths,
+        'emr_api_params': combine_dicts,
+        'emr_tags': combine_dicts,
         's3_log_uri': combine_paths,
         's3_scratch_uri': combine_paths,
         'ssh_bin': combine_cmds,
-        'emr_api_params': combine_dicts,
-        'emr_tags': combine_dicts
     })
 
     def __init__(self, alias, opts, conf_path):
@@ -1601,7 +1601,7 @@ class EMRJobRunner(MRJobRunner):
             log.info('Setting EMR tags: %s' %
                 ', '.join('%s=%s' % (tag, value) for tag, value in tags.items())
             )
-            emr_conn.add_tags(self._emr_job_flow_id, tags)
+            emr_conn.add_tags(self._cluster_id, tags)
 
     # TODO: break this method up; it's too big to write tests for
     def _wait_for_job_to_complete(self):

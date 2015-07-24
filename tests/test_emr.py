@@ -3564,13 +3564,13 @@ class EMRTagsTestCase(MockEMRAndS3TestCase):
         emr_add_tags_mock = Mock()
         emr_add_tags_mock.__name__ = 'add_tags'
         with patch.object(MockEmrConnection, 'add_tags', emr_add_tags_mock):
-            job_flow = self.run_and_get_job_flow('--emr-tag', 'tag_one=foo',
-                                                 '--emr-tag', 'tag_two=bar')
+            cluster = self.run_and_get_cluster('--emr-tag', 'tag_one=foo',
+                                               '--emr-tag', 'tag_two=bar')
 
             # assert that 'add_tags' was called once with the proper parameters
             self.assertEqual(emr_add_tags_mock.call_count, 1)
             emr_add_tags_mock.assert_called_with(
-                job_flow.jobflowid, {'tag_one': 'foo', 'tag_two': 'bar'})
+                cluster.id, {'tag_one': 'foo', 'tag_two': 'bar'})
 
     def test_command_line_overrides_config(self):
         EMR_TAGS_MRJOB_CONF = {'runners': {'emr': {

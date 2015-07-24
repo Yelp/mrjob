@@ -20,6 +20,7 @@ except ImportError:
     import unittest
 
 from mrjob.retry import RetryGoRound
+from mrjob.retry import RetryWrapper
 
 
 class RetryGoRoundTestCase(unittest.TestCase):
@@ -123,3 +124,56 @@ class RetryGoRoundTestCase(unittest.TestCase):
         a1.f.assert_called_once_with('foo', bar='baz')
         a2.f.assert_called_once_with('foo', bar='baz')
         self.assertEqual(a.f.__name__, 'f')
+
+
+class RetryWrapperTestCase(unittest.TestCase):
+    def test_success(self):
+        a1 = Mock()
+        a1.f = Mock(__name__='f', side_effect=None)
+        a = RetryWrapper(
+            a1,
+            retry_if=lambda x: True,
+            backoff=0.0001,
+            max_tries=2
+        )
+
+        a.f()
+        a1.f.assert_called_once_with()
+
+    def test_failure(self):
+        a1 = Mock()
+        a1.f = Mock(__name__='f', side_effect=[IOError, 1])
+        a = RetryWrapper(
+            a1,
+            retry_if=lambda x: True,
+            backoff=0.0001,
+            max_tries=2
+        )
+
+        self.assertEqual(a.f(), 1)
+        self.assertEqual(a1.f.call_count, 2)
+
+    def test_failure_raises_if_all_tries_fail(self):
+        a1 = Mock()
+        a1.f = Mock(__name__='f', side_effect=[IOError, IOError])
+        a = RetryWrapper(
+            a1,
+            retry_if=lambda x: True,
+            backoff=0.0001,
+            max_tries=2
+        )
+        with self.assertRaises(IOError):
+            a.f()
+        self.assertEqual(a1.f.call_count, 2)
+
+    def test_try_till_success(self):
+        a1 = Mock()
+        a1.f = Mock(__name__='f', side_effect=[IOError, IOError, None])
+        a = RetryWrapper(
+            a1,
+            retry_if=lambda x: True,
+            backoff=0.0001,
+            max_tries=0
+        )
+        a.f()
+        self.assertEqual(a1.f.call_count, 3)

@@ -21,6 +21,7 @@ from optparse import OptionParser
 from optparse import SUPPRESS_USAGE
 
 from mrjob.parse import parse_key_value_list
+from mrjob.parse import parse_port_range_list
 from mrjob.runner import CLEANUP_CHOICES
 
 
@@ -661,18 +662,65 @@ def alphabetize_options(opt_group):
     opt_group.option_list.sort(key=lambda opt: opt.dest)
 
 
-def parse_emr_api_params(options, option_parser):
-    """Parse dict out of emr_api_params and no_emr_api_params options."""
-    emr_api_err = (
-        'emr-api-params argument "%s" is not of the form KEY=VALUE')
+def fix_custom_options(options, option_parser):
+    """Update *options* to handle KEY=VALUE options, etc."""
+    if hasattr(options, 'cmdenv'):
+        cmdenv_err = '--cmdenv argument %r is not of the form KEY=VALUE'
+        options.cmdenv = parse_key_value_list(options.cmdenv,
+                                              cmdenv_err,
+                                              option_parser.error)
 
-    emr_api_params = parse_key_value_list(
-        options.emr_api_params,
-        emr_api_err,
-        option_parser.error)
+    def parse_commas(cleanup_str):
+        cleanup_error = ('cleanup option %s is not one of ' +
+                         ', '.join(CLEANUP_CHOICES))
+        new_cleanup_options = []
+        for choice in cleanup_str.split(','):
+            if choice in CLEANUP_CHOICES:
+                new_cleanup_options.append(choice)
+            else:
+                option_parser.error(cleanup_error % choice)
+        if ('NONE' in new_cleanup_options and
+                len(set(new_cleanup_options)) > 1):
+            option_parser.error(
+                'Cannot clean up both nothing and something!')
 
-    # no_emr_api_params just exists to modify emr_api_params
-    for param in options.no_emr_api_params:
-        emr_api_params[param] = None
+        return new_cleanup_options
 
-    return emr_api_params
+    if getattr(options, 'cleanup', None):
+        options.cleanup = parse_commas(options.cleanup)
+
+    if getattr(options, 'cleanup_on_failure', None):
+        options.cleanup_on_failure = parse_commas(options.cleanup_on_failure)
+
+    if hasattr(options, 'emr_api_params'):
+        emr_api_err = (
+            '--emr-api-params argument %r is not of the form KEY=VALUE')
+        options.emr_api_params = parse_key_value_list(options.emr_api_params,
+                                                      emr_api_err,
+                                                      option_parser.error)
+
+        if hasattr(options, 'no_emr_api_params'):
+                for param in options.no_emr_api_params:
+                    options.emr_api_params[param] = None
+
+
+    if hasattr(options, 'emr_tags'):
+        emr_tag_err = '--emr-tag argument %r is not of the form KEY=VALUE'
+        options.emr_tags = parse_key_value_list(options.emr_tags,
+                                                emr_tag_err,
+                                                option_parser.error)
+
+    if hasattr(options, 'jobconf'):
+        jobconf_err = '--jobconf argument %r is not of the form KEY=VALUE'
+        options.jobconf = parse_key_value_list(options.jobconf,
+                                              jobconf_err,
+                                              option_parser.error)
+
+
+    if getattr(options, 'ssh_bind_ports', None):
+        try:
+            ports = parse_port_range_list(options.ssh_bind_ports)
+        except ValueError as e:
+            option_parser.error('invalid port range list %r: \n%s' %
+                                (options.ssh_bind_ports, e.args[0]))
+            options.ssh_bind_ports = ports

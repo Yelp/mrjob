@@ -194,7 +194,7 @@ from mrjob.options import add_basic_opts
 from mrjob.options import add_emr_connect_opts
 from mrjob.options import add_emr_launch_opts
 from mrjob.options import alphabetize_options
-from mrjob.options import parse_emr_api_params
+from mrjob.options import fix_custom_options
 from mrjob.parse import parse_key_value_list
 from mrjob.util import scrape_options_into_new_groups
 
@@ -214,13 +214,9 @@ def runner_kwargs(cl_args=None):
     # parser command-line args
     option_parser = make_option_parser()
     options, args = option_parser.parse_args(cl_args)
-    # fake custom emr_api_params option
-    options.emr_api_params = parse_emr_api_params(options, option_parser)
 
-    options.emr_tags = parse_key_value_list(
-        options.emr_tags,
-        'emr-tag argument "%s" is not of the form KEY=VALUE',
-        option_parser.error)
+    # fix emr_api_params and emr_tags
+    fix_custom_options(options, option_parser)
 
     if args:
         option_parser.error('takes no arguments')

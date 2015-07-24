@@ -37,11 +37,8 @@ from mrjob.options import add_hadoop_shared_opts
 from mrjob.options import add_protocol_opts
 from mrjob.options import add_runner_opts
 from mrjob.options import alphabetize_options
-from mrjob.options import parse_emr_api_params
+from mrjob.options import fix_custom_options
 from mrjob.options import print_help_for_groups
-from mrjob.parse import parse_key_value_list
-from mrjob.parse import parse_port_range_list
-from mrjob.runner import CLEANUP_CHOICES
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
@@ -430,60 +427,7 @@ class MRJobLauncher(object):
 
         self._process_args(args)
 
-        # parse custom options here to avoid setting a custom Option subclass
-        # and confusing users
-        if self.options.ssh_bind_ports:
-            try:
-                ports = parse_port_range_list(self.options.ssh_bind_ports)
-            except ValueError as e:
-                self.option_parser.error('invalid port range list "%s": \n%s' %
-                                         (self.options.ssh_bind_ports,
-                                          e.args[0]))
-            self.options.ssh_bind_ports = ports
-
-        cmdenv_err = 'cmdenv argument "%s" is not of the form KEY=VALUE'
-        self.options.cmdenv = parse_key_value_list(self.options.cmdenv,
-                                                   cmdenv_err,
-                                                   self.option_parser.error)
-
-        jobconf_err = 'jobconf argument "%s" is not of the form KEY=VALUE'
-        self.options.jobconf = parse_key_value_list(self.options.jobconf,
-                                                    jobconf_err,
-                                                    self.option_parser.error)
-
-        # emr_api_params
-        self.options.emr_api_params = parse_emr_api_params(
-            self.options, self.option_parser)
-
-        # emr_tags
-        emr_tags_err = (
-            'emr-tag argument "%s" is not of the form KEY=VALUE')
-
-        self.options.emr_tags = parse_key_value_list(
-            self.options.emr_tags,
-            emr_tags_err,
-            self.option_parser.error)
-
-        def parse_commas(cleanup_str):
-            cleanup_error = ('cleanup option %s is not one of ' +
-                             ', '.join(CLEANUP_CHOICES))
-            new_cleanup_options = []
-            for choice in cleanup_str.split(','):
-                if choice in CLEANUP_CHOICES:
-                    new_cleanup_options.append(choice)
-                else:
-                    self.option_parser.error(cleanup_error % choice)
-            if ('NONE' in new_cleanup_options and
-                    len(set(new_cleanup_options)) > 1):
-                self.option_parser.error(
-                    'Cannot clean up both nothing and something!')
-            return new_cleanup_options
-
-        if self.options.cleanup is not None:
-            self.options.cleanup = parse_commas(self.options.cleanup)
-        if self.options.cleanup_on_failure is not None:
-            self.options.cleanup_on_failure = parse_commas(
-                self.options.cleanup_on_failure)
+        fix_custom_options(self.options, self.option_parser)
 
     def job_runner_kwargs(self):
         """Keyword arguments used to create runners when

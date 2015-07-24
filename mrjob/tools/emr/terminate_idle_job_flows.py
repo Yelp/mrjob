@@ -99,7 +99,7 @@ def main(cl_args=None):
     MRJob.set_up_logging(quiet=options.quiet,
                          verbose=options.verbose)
 
-    inspect_and_maybe_terminate_clusters(
+    maybe_terminate_clusters(
         dry_run=options.dry_run,
         max_hours_idle=options.max_hours_idle,
         mins_to_end_of_hour=options.mins_to_end_of_hour,
@@ -125,7 +125,7 @@ def runner_kwargs(options):
     return kwargs
 
 
-def inspect_and_maybe_terminate_clusters(
+def maybe_terminate_clusters(
     dry_run=False,
     max_hours_idle=None,
     mins_to_end_of_hour=None,
@@ -191,7 +191,7 @@ def inspect_and_maybe_terminate_clusters(
         # cluster is idle
         time_idle = now - time_last_active(cluster_summary, steps)
         time_to_end_of_hour = _est_time_to_hour(cluster_summary, now=now)
-        is_pending = any(step.status.state == 'PENDING' for step in steps)
+        is_pending = cluster_has_pending_steps(steps)
 
         bootstrap_actions = list(_yield_all_bootstrap_actions(
             emr_conn, cluster_id))
@@ -266,8 +266,7 @@ def is_cluster_non_streaming(steps):
         return False
 
     for step in steps:
-        args = [a.value for a in step.args]
-        for arg in args:
+        for arg in step.config.args:
             # This is hadoop streaming
             if arg == '-mapper':
                 return False
@@ -288,6 +287,9 @@ def is_cluster_bootstrapping(cluster_summary):
     return (cluster_summary.status.state != 'STARTING' and
             not hasattr(cluster_summary.status.timeline, 'readydatetime'))
 
+def is_cluster_running(steps):
+    return any(is_step_running(step) for step in steps)
+
 
 def is_step_running(step):
     """Return true if the given job flow step is currently running."""
@@ -295,6 +297,10 @@ def is_step_running(step):
             ('CANCELLED', 'INTERRUPTED') and
             hasattr(step.status.timeline, 'startdatetime') and
             not hasattr(step.status.timeline, 'enddatetime'))
+
+
+def cluster_has_pending_steps(steps):
+    return any(step.status.state == 'PENDING' for step in steps)
 
 
 def time_last_active(cluster_summary, steps):

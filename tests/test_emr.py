@@ -181,6 +181,17 @@ class MockEMRAndS3TestCase(FastEMRTestCase):
     def add_mock_emr_cluster(self, cluster):
         if cluster.id in self.mock_emr_clusters:
             raise ValueError('mock cluster %s already exists' % cluster.id)
+
+        for field in ('_bootstrapactions', '_instancegroups', '_steps'):
+            if not hasattr(cluster, field):
+                setattr(cluster, field, [])
+
+        if not hasattr(cluster, 'name'):
+            cluster.name = cluster.id[2:]
+
+        if not hasattr(cluster, 'normalizedinstancehours'):
+            cluster.normalizedinstancehours = '0'
+
         self.mock_emr_clusters[cluster.id] = cluster
 
     def prepare_runner_for_ssh(self, runner, num_slaves=0):

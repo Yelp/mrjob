@@ -816,8 +816,7 @@ class MockEmrConnection(object):
 
         cluster = self._get_mock_cluster(cluster_id)
 
-        return MockEmrObject(actions=getattr(
-            cluster, '_bootstrapactions', []))
+        return MockEmrObject(actions=cluster._bootstrapactions)
 
     def _list_clusters(self, created_after=None, created_before=None,
                       cluster_states=None, marker=None):
@@ -850,9 +849,8 @@ class MockEmrConnection(object):
 
             cluster_summaries.append(MockEmrObject(
                 id=cluster.id,
-                name=getattr(cluster, 'name', None),
-                normalizedinstancehours=getattr(
-                    cluster, 'normalizedinstancehours', None),
+                name=cluster.name,
+                normalizedinstancehours=cluster.normalizedinstancehours,
                 status=cluster.status))
         else:
             # we went through all clusters, no need to call again
@@ -869,8 +867,7 @@ class MockEmrConnection(object):
 
         cluster = self._get_mock_cluster(cluster_id)
 
-        return MockEmrObject(instancegroups=getattr(
-            cluster, '_instancegroups', []))
+        return MockEmrObject(instancegroups=cluster._instancegroups)
 
     def _list_steps(self, cluster_id, step_states=None, marker=None):
         self._enforce_strict_ssl()
@@ -882,7 +879,7 @@ class MockEmrConnection(object):
         cluster = self._get_mock_cluster(cluster_id)
 
         steps_listed = []
-        for step in getattr(cluster, '_steps', ()):
+        for step in cluster._steps:
             if step_states is None or step.status.state in step_states:
                 steps_listed.append(step)
 
@@ -896,12 +893,9 @@ class MockEmrConnection(object):
 
         cluster = self._get_mock_cluster(jobflow_id)
 
-        if not hasattr(cluster, '_steps'):
-            cluster._steps = []
-
         for step in steps:
             step_config = MockEmrObject(
-                args=[MockEmrObject(value=arg) for arg in step.args()],
+                args=step.args(),
                 jar=step.jar(),
                 mainclass=step.main_class())
             # there's also a "properties" field, but boto doesn't handle it

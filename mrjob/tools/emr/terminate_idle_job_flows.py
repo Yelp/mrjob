@@ -300,6 +300,7 @@ def is_step_running(step):
 
 
 def cluster_has_pending_steps(steps):
+    """Does *cluster* have any steps in the ``PENDING`` state?"""
     return any(step.status.state == 'PENDING' for step in steps)
 
 
@@ -334,15 +335,6 @@ def time_last_active(cluster_summary, steps):
     last_timestamp = max(timestamps)
 
     return iso8601_to_datetime(last_timestamp)
-
-
-def cluster_has_pending_steps(cluster):
-    """Return ``True`` if *cluster* has any steps in the ``PENDING``
-    state."""
-    steps = getattr(cluster, 'steps', None) or []
-
-    return any(getattr(step, 'state', None) == 'PENDING'
-               for step in steps)
 
 
 def terminate_and_notify(runner, cluster_id, cluster_name, num_steps,

@@ -203,7 +203,7 @@ Job flow creation and configuration
               team: development
               project: mrjob
 
-    .. versionadded:: 0.5.0
+    .. versionadded:: 0.4.5
 
 .. mrjob-opt::
     :config: hadoop_streaming_jar_on_emr

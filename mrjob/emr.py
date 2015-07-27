@@ -2612,7 +2612,10 @@ class EMRJobRunner(MRJobRunner):
         return self._hadoop_version
 
     def get_ami_version(self):
-        """Get the AMI that our job flow is running."""
+        """Get the AMI that our job flow is running.
+
+        .. versionadded:: 0.4.5
+        """
         if self._ami_version is None:
             self._store_cluster_info()
         return self._ami_version

@@ -44,28 +44,36 @@ def make_args(step_num=1, list_relevant=False, list_all=False,
 
 class LogFetchingTestCase(ToolTestCase):
 
+    maxDiff = None
+
     def setUp(self):
         super(LogFetchingTestCase, self).setUp()
 
         self.runner = EMRJobRunner(conf_paths=[],
                                    s3_sync_wait_time=0,
-                                   emr_job_flow_id='j-MOCKJOBFLOW0')
+                                   emr_job_flow_id='j-MOCKCLUSTER0')
 
     def test_bad_args(self):
         self.monkey_patch_argv()
         self.assertRaises(OptionError, parse_args, (make_option_parser(),))
 
     def test_runner_kwargs(self):
-        self.monkey_patch_argv('--quiet', 'j-MOCKJOBFLOW0')
+        self.monkey_patch_argv('--quiet', 'j-MOCKCLUSTER0')
         self.assertEqual(
             runner_kwargs(parse_args(make_option_parser())),
-            {'conf_paths': None,
-             'ec2_key_pair_file': None,
-             's3_sync_wait_time': None,
-             'emr_job_flow_id': 'j-MOCKJOBFLOW0'})
+            {
+                'aws_region': None,
+                'conf_paths': None,
+                'ec2_key_pair_file': None,
+                'emr_endpoint': None,
+                'emr_job_flow_id': 'j-MOCKCLUSTER0',
+                's3_endpoint': None,
+                's3_sync_wait_time': None,
+                'ssh_bin': None,
+            })
 
     def test_find_failure(self):
-        self.make_job_flow()
+        self.make_cluster()
         self.monkey_patch_stdout()
 
         perform_actions(make_args(find_failure=True), self.runner)
@@ -74,12 +82,12 @@ class LogFetchingTestCase(ToolTestCase):
                          'No probable cause of failure found.\n')
 
     def test_list(self):
-        self.make_job_flow()
+        self.make_cluster()
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '-l',
             '--s3-sync-wait-time=0',
-            'j-MOCKJOBFLOW0')
+            'j-MOCKCLUSTER0')
 
         self.monkey_patch_stdout()
 
@@ -89,12 +97,12 @@ class LogFetchingTestCase(ToolTestCase):
                          'Task attempts:\n\nSteps:\n\nJobs:\n\nNodes:\n\n')
 
     def test_list_all(self):
-        self.make_job_flow()
+        self.make_cluster()
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '-L',
             '--s3-sync-wait-time=0',
-            'j-MOCKJOBFLOW0')
+            'j-MOCKCLUSTER0')
 
         self.monkey_patch_stdout()
 
@@ -103,12 +111,12 @@ class LogFetchingTestCase(ToolTestCase):
         self.assertEqual(self.stdout.getvalue(), '\n')
 
     def test_fetch_counters(self):
-        self.make_job_flow()
+        self.make_cluster()
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '--counters',
             '--s3-sync-wait-time=0',
-            'j-MOCKJOBFLOW0')
+            'j-MOCKCLUSTER0')
         self.monkey_patch_stdout()
         fetch_logs_main()
         self.assertEqual(self.stdout.getvalue(), '')

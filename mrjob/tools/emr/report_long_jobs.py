@@ -22,14 +22,24 @@ Suggested usage: run this as a daily cron job with the ``-q`` option::
 Options::
 
   -h, --help            show this help message and exit
-  -v, --verbose         print more messages to stderr
-  -q, --quiet           Don't log status messages; just print the report.
-  -c CONF_PATH, --conf-path=CONF_PATH
+  --aws-region=AWS_REGION
+                        Region to connect to S3 and EMR on (e.g. us-west-1).
+  -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
+  --emr-endpoint=EMR_ENDPOINT
+                        Optional host to connect to when communicating with S3
+                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
+                        Default is to infer this from aws_region.
   --min-hours=MIN_HOURS
                         Minimum number of hours a job can run before we report
                         it. Default: 24.0
+  -q, --quiet           Don't print anything to stderr
+  --s3-endpoint=S3_ENDPOINT
+                        Host to connect to when communicating with S3 (e.g. s3
+                        -us-west-1.amazonaws.com). Default is to infer this
+                        from region (see --aws-region).
+  -v, --verbose         print more messages to stderr
 """
 from datetime import datetime
 from datetime import timedelta
@@ -38,9 +48,12 @@ from optparse import OptionParser
 import sys
 
 from mrjob.emr import EMRJobRunner
-from mrjob.emr import describe_all_job_flows
+from mrjob.emr import _yield_all_clusters
+from mrjob.emr import _yield_all_steps
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
+from mrjob.options import add_emr_connect_opts
+from mrjob.options import alphabetize_options
 from mrjob.parse import iso8601_to_datetime
 from mrjob.util import strip_microseconds
 
@@ -63,21 +76,33 @@ def main(args, now=None):
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     log.info('getting information about running jobs')
-    emr_conn = EMRJobRunner(conf_paths=options.conf_paths).make_emr_conn()
-    job_flows = describe_all_job_flows(
-        emr_conn, states=['BOOTSTRAPPING', 'RUNNING'])
+    emr_conn = EMRJobRunner(**runner_kwargs(options)).make_emr_conn()
+    cluster_summaries = _yield_all_clusters(
+        emr_conn, cluster_states=['STARTING', 'BOOTSTRAPPING', 'RUNNING'])
 
     min_time = timedelta(hours=options.min_hours)
 
-    job_info = find_long_running_jobs(job_flows, min_time, now=now)
+    job_info = find_long_running_jobs(
+        emr_conn, cluster_summaries, min_time, now=now)
 
     print_report(job_info)
 
 
-def find_long_running_jobs(job_flows, min_time, now=None):
+def runner_kwargs(options):
+    """Given the command line options, return the arguments to
+    :py:class:`EMRJobRunner`
+    """
+    kwargs = options.__dict__.copy()
+    for unused_arg in ('quiet', 'verbose', 'min_hours'):
+        del kwargs[unused_arg]
+
+    return kwargs
+
+
+def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
     """Identify jobs that have been running or pending for a long time.
 
-    :param job_flows: a list of :py:class:`boto.emr.emrobject.JobFlow`
+    :param clusters: a list of :py:class:`boto.emr.emrobject.JobFlow`
                       objects to inspect.
     :param min_time: a :py:class:`datetime.timedelta`: report jobs running or
                      pending longer than this
@@ -89,50 +114,56 @@ def find_long_running_jobs(job_flows, min_time, now=None):
 
     * *job_flow_id*: the job flow's unique ID (e.g. ``j-SOMEJOBFLOW``)
     * *name*: name of the step, or the job flow when bootstrapping
-    * *step_state*: state of the step, either ``'RUNNING'`` or ``'PENDING'``
+    * *state*: state of the step (``'RUNNING'`` or ``'PENDING'``) or, if there
+               is no step, the cluster (``'STARTING'`` or ``'BOOTSTRAPPING'``)
     * *time*: amount of time step was running or pending, as a
               :py:class:`datetime.timedelta`
     """
     if now is None:
         now = datetime.utcnow()
 
-    for jf in job_flows:
+    for cs in cluster_summaries:
 
         # special case for jobs that are taking a long time to bootstrap
-        if jf.state == 'BOOTSTRAPPING':
-            start_timestamp = jf.startdatetime
-            start = iso8601_to_datetime(start_timestamp)
+        if cs.status.state in ('STARTING', 'BOOTSTRAPPING'):
+            # there isn't a way to tell when the cluster stopped being
+            # provisioned and started bootstrapping, so just measure
+            # from cluster creation time
+            created_timestamp = cs.status.timeline.creationdatetime
+            created = iso8601_to_datetime(created_timestamp)
 
-            time_running = now - start
+            time_running = now - created
 
             if time_running >= min_time:
-                # we tell bootstrapping info by step_state being empty,
-                # and only use job_flow_id and time in the report
-                yield({'job_flow_id': jf.jobflowid,
-                       'name': jf.name,
-                       'step_state': '',
+                yield({'cluster_id': cs.id,
+                       'name': cs.name,
+                       'state': cs.status.state,
                        'time': time_running})
 
         # the default case: running job flows
-        if jf.state != 'RUNNING':
+        if cs.status.state != 'RUNNING':
             continue
 
-        running_steps = [step for step in jf.steps if step.state == 'RUNNING']
-        pending_steps = [step for step in jf.steps if step.state == 'PENDING']
+        steps = list(_yield_all_steps(emr_conn, cs.id))
+
+        running_steps = [
+            step for step in steps if step.status.state == 'RUNNING']
+        pending_steps = [
+            step for step in steps if step.status.state == 'PENDING']
 
         if running_steps:
-            # should be only one, but if not, we should know
+            # should be only one, but if not, we should know about it
             for step in running_steps:
 
-                start_timestamp = step.startdatetime
+                start_timestamp = step.status.timeline.startdatetime
                 start = iso8601_to_datetime(start_timestamp)
 
                 time_running = now - start
 
                 if time_running >= min_time:
-                    yield({'job_flow_id': jf.jobflowid,
+                    yield({'cluster_id': cs.id,
                            'name': step.name,
-                           'step_state': step.state,
+                           'state': step.status.state,
                            'time': time_running})
 
         # sometimes EMR says it's "RUNNING" but doesn't actually run steps!
@@ -141,18 +172,18 @@ def find_long_running_jobs(job_flows, min_time, now=None):
 
             # PENDING job should have run starting when the job flow
             # became ready, or the previous step completed
-            start_timestamp = jf.readydatetime
-            for step in jf.steps:
-                if step.state == 'COMPLETED':
-                    start_timestamp = step.enddatetime
+            start_timestamp = cs.status.timeline.readydatetime
+            for step in steps:
+                if step.status.state == 'COMPLETED':
+                    start_timestamp = step.status.timeline.enddatetime
 
             start = iso8601_to_datetime(start_timestamp)
             time_pending = now - start
 
             if time_pending >= min_time:
-                yield({'job_flow_id': jf.jobflowid,
+                yield({'cluster_id': cs.id,
                        'name': step.name,
-                       'step_state': step.state,
+                       'state': step.status.state,
                        'time': time_pending})
 
 
@@ -162,16 +193,10 @@ def print_report(job_info):
     on a single (long) line.
     """
     for ji in job_info:
-        # BOOTSTRAPPING case
-        if not ji['step_state']:
-            print '%-15s BOOTSTRAPPING for %17s (%s)' % (
-                ji['job_flow_id'], format_timedelta(ji['time']),
-                ji['name'])
-        else:
-            print '%-15s       %7s for %17s (%s)' % (
-                ji['job_flow_id'],
-                ji['step_state'], format_timedelta(ji['time']),
-                ji['name'])
+        print '%-15s %13s for %17s (%s)' % (
+            ji['cluster_id'],
+            ji['state'], format_timedelta(ji['time']),
+            ji['name'])
 
 
 def format_timedelta(time):
@@ -203,6 +228,9 @@ def make_option_parser():
               ' Default: %default'))
 
     add_basic_opts(option_parser)
+    add_emr_connect_opts(option_parser)
+
+    alphabetize_options(option_parser)
 
     return option_parser
 

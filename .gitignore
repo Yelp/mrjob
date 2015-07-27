@@ -16,3 +16,4 @@
 .tox
 .coverage
 *,cover
+j-*

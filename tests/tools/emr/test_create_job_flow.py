@@ -20,6 +20,8 @@ from tests.tools.emr import ToolTestCase
 
 class JobFlowInspectionTestCase(ToolTestCase):
 
+    maxDiff = None
+
     def test_runner_kwargs(self):
         self.monkey_patch_argv('--quiet')
         self.assertEqual(
@@ -28,11 +30,13 @@ class JobFlowInspectionTestCase(ToolTestCase):
              'ami_version': None,
              'aws_availability_zone': None,
              'aws_region': None,
+             'bootstrap': None,
              'bootstrap_actions': [],
              'bootstrap_cmds': [],
              'bootstrap_files': [],
              'bootstrap_mrjob': None,
              'bootstrap_python_packages': [],
+             'bootstrap_scripts': [],
              'conf_paths': None,
              'ec2_core_instance_bid_price': None,
              'ec2_core_instance_type': None,
@@ -42,10 +46,14 @@ class JobFlowInspectionTestCase(ToolTestCase):
              'ec2_master_instance_type': None,
              'ec2_task_instance_bid_price': None,
              'ec2_task_instance_type': None,
+             'emr_api_params': {},
              'emr_endpoint': None,
              'emr_job_flow_pool_name': None,
+             'emr_tags': {},
              'enable_emr_debugging': None,
-             'hadoop_version': None,
+             'iam_instance_profile': None,
+             'iam_job_flow_role': None,
+             'iam_service_role': None,
              'label': None,
              'mins_to_end_of_hour': None,
              'max_hours_idle': None,
@@ -57,7 +65,10 @@ class JobFlowInspectionTestCase(ToolTestCase):
              's3_endpoint': None,
              's3_log_uri': None,
              's3_scratch_uri': None,
-             's3_sync_wait_time': None})
+             's3_sync_wait_time': None,
+             's3_upload_part_size': None,
+             'visible_to_all_users': None,
+             })
 
     def test_create_job_flow(self):
         self.add_mock_s3_data({'walrus': {}})
@@ -67,6 +78,6 @@ class JobFlowInspectionTestCase(ToolTestCase):
             '--s3-scratch-uri', 's3://walrus/tmp')
         self.monkey_patch_stdout()
         create_job_flow_main()
-        self.assertEqual(list(self.mock_emr_job_flows.keys()),
-                         ['j-MOCKJOBFLOW0'])
-        self.assertEqual(self.stdout.getvalue(), 'j-MOCKJOBFLOW0\n')
+        self.assertEqual(list(self.mock_emr_clusters.keys()),
+                         ['j-MOCKCLUSTER0'])
+        self.assertEqual(self.stdout.getvalue(), 'j-MOCKCLUSTER0\n')

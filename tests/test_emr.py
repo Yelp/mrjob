@@ -336,8 +336,8 @@ class EMRJobRunnerEndToEndTestCase(MockEMRAndS3TestCase):
             emr_conn = runner.make_emr_conn()
             steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
 
-            step_0_args = steps[0].config.args
-            step_1_args = steps[1].config.args
+            step_0_args = [a.value for a in steps[0].config.args]
+            step_1_args = [a.value for a in steps[1].config.args]
 
             self.assertIn('-inputformat', step_0_args)
             self.assertNotIn('-outputformat', step_0_args)

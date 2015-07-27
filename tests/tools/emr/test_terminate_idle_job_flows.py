@@ -69,7 +69,7 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
             return MockEmrObject(
                 config=MockEmrObject(
                     actiononfailure=action_on_failure,
-                    args=list(args),
+                    args=[MockEmrObject(value=a) for a in args],
                     jar=jar,
                 ),
                 status=MockEmrObject(

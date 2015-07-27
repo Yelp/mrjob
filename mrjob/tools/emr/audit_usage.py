@@ -21,15 +21,25 @@ Usage::
 Options::
 
   -h, --help            show this help message and exit
-  -v, --verbose         print more messages to stderr
-  -q, --quiet           Don't log status messages; just print the report.
-  -c CONF_PATH, --conf-path=CONF_PATH
+  --aws-region=AWS_REGION
+                        Region to connect to S3 and EMR on (e.g. us-west-1).
+  -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
+  --emr-endpoint=EMR_ENDPOINT
+                        Optional host to connect to when communicating with S3
+                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
+                        Default is to infer this from aws_region.
   --max-days-ago=MAX_DAYS_AGO
                         Max number of days ago to look at jobs. By default, we
                         go back as far as EMR supports (currently about 2
                         months)
+  -q, --quiet           Don't print anything to stderr
+  --s3-endpoint=S3_ENDPOINT
+                        Host to connect to when communicating with S3 (e.g. s3
+                        -us-west-1.amazonaws.com). Default is to infer this
+                        from region (see --aws-region).
+  -v, --verbose         print more messages to stderr
 """
 from datetime import datetime
 from datetime import timedelta
@@ -41,6 +51,8 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
+from mrjob.options import add_emr_connect_opts
+from mrjob.options import alphabetize_options
 from mrjob.parse import JOB_NAME_RE
 from mrjob.parse import STEP_NAME_RE
 from mrjob.parse import iso8601_to_datetime
@@ -63,7 +75,7 @@ def main(args):
 
     log.info('getting job flow history...')
     job_flows = get_job_flows(
-        options.conf_paths, options.max_days_ago, now=now)
+        max_days_ago=options.max_days_ago, now=now, **runner_kwargs(options))
 
     log.info('compiling job flow stats...')
     stats = job_flows_to_stats(job_flows, now=now)
@@ -83,8 +95,19 @@ def make_option_parser():
               ' as far as EMR supports (currently about 2 months)'))
 
     add_basic_opts(option_parser)
+    add_emr_connect_opts(option_parser)
+
+    alphabetize_options(option_parser)
 
     return option_parser
+
+
+def runner_kwargs(options):
+    kwargs = options.__dict__.copy()
+    for unused_arg in ('quiet', 'verbose', 'max_days_ago'):
+        del kwargs[unused_arg]
+
+    return kwargs
 
 
 def job_flows_to_stats(job_flows, now=None):
@@ -541,7 +564,7 @@ def subdivide_interval_by_hour(start, end):
     return hour_to_secs
 
 
-def get_job_flows(conf_paths, max_days_ago=None, now=None):
+def get_job_flows(max_days_ago=None, now=None, **runner_kwargs):
     """Get relevant job flow information from EMR.
 
     :param str conf_path: Alternate path to read :py:mod:`mrjob.conf` from, or
@@ -554,7 +577,7 @@ def get_job_flows(conf_paths, max_days_ago=None, now=None):
     if now is None:
         now = datetime.utcnow()
 
-    emr_conn = EMRJobRunner(conf_paths=conf_paths).make_emr_conn()
+    emr_conn = EMRJobRunner(**runner_kwargs).make_emr_conn()
 
     # if --max-days-ago is set, only look at recent jobs
     created_after = None

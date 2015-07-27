@@ -4,6 +4,10 @@ v0.4.5, 2015-??-?? -- IAM Fortified
      * aws_security_token for temporary credentials (#1003)
      * Use AWS managed policies when creating IAM objects (#1026)
      * Fall back to default role/instance profile when no IAM access (#1008)
+   * EMR tools:
+     * added switches for options formerly only available from mrjob.conf
+     * mrboss is available from command line tool: mrjob boss [args]
+     * collect_emr_stats and job_flow_pool are deprecated
  * more efficient decoding of bz2 files
 
 v0.4.4, 2015-04-21 -- EMRgency!

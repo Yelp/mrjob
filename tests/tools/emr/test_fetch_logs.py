@@ -44,6 +44,8 @@ def make_args(step_num=1, list_relevant=False, list_all=False,
 
 class LogFetchingTestCase(ToolTestCase):
 
+    maxDiff = None
+
     def setUp(self):
         super(LogFetchingTestCase, self).setUp()
 
@@ -59,10 +61,16 @@ class LogFetchingTestCase(ToolTestCase):
         self.monkey_patch_argv('--quiet', 'j-MOCKJOBFLOW0')
         self.assertEqual(
             runner_kwargs(parse_args(make_option_parser())),
-            {'conf_paths': None,
-             'ec2_key_pair_file': None,
-             's3_sync_wait_time': None,
-             'emr_job_flow_id': 'j-MOCKJOBFLOW0'})
+            {
+                'aws_region': None,
+                'conf_paths': None,
+                'ec2_key_pair_file': None,
+                'emr_endpoint': None,
+                'emr_job_flow_id': 'j-MOCKJOBFLOW0',
+                's3_endpoint': None,
+                's3_sync_wait_time': None,
+                'ssh_bin': None,
+            })
 
     def test_find_failure(self):
         self.make_job_flow()

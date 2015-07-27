@@ -1,4 +1,5 @@
 # Copyright 2009-2013 Yelp and Contributors
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -195,7 +196,6 @@ from mrjob.options import add_emr_connect_opts
 from mrjob.options import add_emr_launch_opts
 from mrjob.options import alphabetize_options
 from mrjob.options import fix_custom_options
-from mrjob.parse import parse_key_value_list
 from mrjob.util import scrape_options_into_new_groups
 
 
@@ -203,8 +203,8 @@ def main(args=None):
     """Run the create_job_flow tool with arguments from ``sys.argv`` and
     printing to ``sys.stdout``."""
     runner = EMRJobRunner(**runner_kwargs(args))
-    emr_job_flow_id = runner.make_persistent_job_flow()
-    print emr_job_flow_id
+    cluster_id = runner.make_persistent_cluster()
+    print cluster_id
 
 
 def runner_kwargs(cl_args=None):

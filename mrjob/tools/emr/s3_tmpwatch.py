@@ -50,12 +50,6 @@ from datetime import timedelta
 import logging
 from optparse import OptionParser
 
-try:
-    import boto.utils
-    boto  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    boto = None
-
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import iso8601_to_datetime
 from mrjob.fs.s3 import _get_bucket

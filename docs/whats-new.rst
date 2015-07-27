@@ -4,6 +4,65 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+0.4.5
+-----
+
+This release moves mrjob off the deprecated `DescribeJobFlows <http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_DescribeJobFlows.html>`_
+EMR API call.
+
+.. warning::
+
+    AWS *again* broke older versions mrjob for at least some new accounts, by
+    returning 400s for the deprecated `DescribeJobFlows <http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_DescribeJobFlows.html>`_
+    API call. If you have a newer AWS account (circa July 2015), you must
+    use at least this version of mrjob.
+
+The new API does not provide a way to tell when a job flow (now called
+a "cluster") stopped provisioning instances and started bootstrapping, so the
+clock for our estimates of when we are close to the end of a billing hour now
+start at cluster creation time, and are thus more conservative.
+
+Related to this change, :py:mod:`~mrjob.emr.tools.terminate_idle_job_flows`
+no longer considers job flows in the ``STARTING`` state idle; use
+:py:mod:`~mrjob.emr.tools.report_long_jobs` to catch jobs stuck in
+this state.
+
+:py:mod:`~mrjob.emr.tools.terminate_idle_job_flows` performs much better
+on large numbers of job flows. Formerly, it collected all job flow information
+first, but now it terminates idle job flows as soon as it identifies them.
+
+:py:mod:`~mrjob.emr.tools.collect_emr_stats` and
+:py:mod:`~mrjob.emr.tools.job_flow_pool` have *not* been ported to the
+new API and will be removed in v0.5.0.
+
+Added an :mrjob-opt:`aws_security_token` option to allow you to run
+mrjob on EMR using temporary AWS credentials.
+
+Added an :mrjob-opt:`emr_tags` option to allow you to tag EMR job flows
+at creation time.
+
+:py:class:`~mrjob.emr.EMRJobRunner` now has a
+:py:meth:`~mrjob.emr.EMRJobRunner.get_ami_version` method.
+
+The :mrjob-opt:`hadoop_version` option no longer has any effect in EMR. This
+option only every did anything on the 1.x AMIs, which mrjob no longer supports.
+
+Added many missing switches to the EMR tools (accessible from the
+:command:`mrjob` command). Formerly, you had to use a
+config file to get at these options.
+
+You can now access the :py:mod:`~mrjob.emr.tools.mrboss` tool from the
+command line: :command:`mrjob boss <args>`.
+
+Previous 0.4.x releases have worked with boto as old as 2.2.0, but this one
+requires at least boto 2.6.0 (which is still more than two years old). In any
+case, it's recommended that you just use the latest version of boto.
+
+This branch has a number of additional deprecation warnings, to help prepare
+you for mrjob v0.5.0. Please heed them; a lot of deprecated things really are
+going to be completely removed.
+
+
 0.4.4
 -----
 

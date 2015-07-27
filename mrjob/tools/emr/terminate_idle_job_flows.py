@@ -269,10 +269,10 @@ def is_cluster_non_streaming(steps):
     for step in steps:
         for arg in step.config.args:
             # This is hadoop streaming
-            if arg == '-mapper':
+            if arg.value == '-mapper':
                 return False
             # This is a debug jar associated with hadoop streaming
-            if DEBUG_JAR_RE.match(arg):
+            if DEBUG_JAR_RE.match(arg.value):
                 return False
     else:
         # job has at least one step, and none are streaming steps

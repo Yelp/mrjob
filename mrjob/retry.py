@@ -148,7 +148,7 @@ class RetryWrapper(object):
                     return f(*args, **kwargs)
                 except Exception as ex:
                     if (self.__retry_if(ex) and
-                        (tries < self.__max_tries - 1 or 
+                        (tries < self.__max_tries - 1 or
                          not self.__max_tries)):
                         log.info('Got retriable error: %r' % ex)
                         log.info('Backing off for %.1f seconds' % backoff)

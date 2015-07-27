@@ -125,18 +125,16 @@ def runner_kwargs(options):
     return kwargs
 
 
-def maybe_terminate_clusters(
-    dry_run=False,
-    max_hours_idle=None,
-    mins_to_end_of_hour=None,
-    now=None,
-    pool_name=None,
-    pooled_only=False,
-    unpooled_only=False,
-    max_mins_locked=None,
-    quiet=False,
-    **kwargs):
-
+def maybe_terminate_clusters(dry_run=False,
+                             max_hours_idle=None,
+                             mins_to_end_of_hour=None,
+                             now=None,
+                             pool_name=None,
+                             pooled_only=False,
+                             unpooled_only=False,
+                             max_mins_locked=None,
+                             quiet=False,
+                             **kwargs):
     if now is None:
         now = datetime.utcnow()
 
@@ -286,6 +284,7 @@ def is_cluster_bootstrapping(cluster_summary):
     """Return ``True`` if *cluster_summary* is currently bootstrapping."""
     return (cluster_summary.status.state != 'STARTING' and
             not hasattr(cluster_summary.status.timeline, 'readydatetime'))
+
 
 def is_cluster_running(steps):
     return any(is_step_running(step) for step in steps)

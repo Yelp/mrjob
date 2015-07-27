@@ -368,7 +368,6 @@ def yield_instance_profiles_with_policies(conn):
     log.warning('yield_instance_profiles_with_policies() is deprecated'
                 ' and will be removed in v0.5.0')
 
-
     # could support path_prefix here, but mrjob isn't using it
     resps = _get_responses(conn, 'ListInstanceProfiles', {},
                            list_marker='InstanceProfiles')
@@ -387,8 +386,6 @@ def yield_instance_profiles_with_policies(conn):
                 role_with_policies = None
 
             yield (profile_name, role_with_policies)
-
-
 
 
 def _get_role_with_policies(conn, role_data):

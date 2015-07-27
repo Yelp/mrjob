@@ -1259,7 +1259,7 @@ class EMRJobRunner(MRJobRunner):
         cluster = self._describe_cluster()
 
         if (cluster.status.state == 'WAITING' and
-            cluster.autoterminate != 'true'):
+                cluster.autoterminate != 'true'):
             raise Exception('Operation requires job flow to terminate, but'
                             ' it may never do so.')
 
@@ -1598,9 +1598,8 @@ class EMRJobRunner(MRJobRunner):
         # set EMR tags for the job, if any
         tags = self._opts['emr_tags']
         if tags:
-            log.info('Setting EMR tags: %s' %
-                ', '.join('%s=%s' % (tag, value) for tag, value in tags.items())
-            )
+            log.info('Setting EMR tags: %s' % ', '.join(
+                '%s=%s' % (tag, value) for tag, value in tags.items()))
             emr_conn.add_tags(self._cluster_id, tags)
 
     # TODO: break this method up; it's too big to write tests for
@@ -1656,8 +1655,8 @@ class EMRJobRunner(MRJobRunner):
                     running_step_name = step.name
 
                 if (hasattr(step.status, 'timeline') and
-                    hasattr(step.status.timeline, 'startdatetime') and
-                    hasattr(step.status.timeline, 'enddatetime')):
+                        hasattr(step.status.timeline, 'startdatetime') and
+                        hasattr(step.status.timeline, 'enddatetime')):
 
                     start_time = iso8601_to_timestamp(
                         step.status.timeline.startdatetime)
@@ -2348,7 +2347,7 @@ class EMRJobRunner(MRJobRunner):
 
             if self._opts['ami_version'] == 'latest':
                 # look for other clusters where "latest" was requested
-                if getattr(cluster, 'requestedamiversion', '' ) != 'latest':
+                if getattr(cluster, 'requestedamiversion', '') != 'latest':
                     return
             else:
                 # match actual AMI version
@@ -2375,8 +2374,7 @@ class EMRJobRunner(MRJobRunner):
                      getattr(step.status.timeline, 'enddatetime', None)
                      is None) and
                     getattr(step.status, 'state', None) not in
-                    ('CANCELLED', 'INTERRUPTED')):
-
+                        ('CANCELLED', 'INTERRUPTED')):
                     return
 
             # total compute units per group

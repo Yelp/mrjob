@@ -83,7 +83,8 @@ Options::
                         Bid price to specify for core (or "slave") nodes when
                         setting them up as EC2 spot instances (you probably
                         only want to set a bid price for task instances).
-  --ec2-core-instance-type=EC2_CORE_INSTANCE_TYPE, --ec2-slave-instance-type=EC2_CORE_INSTANCE_TYPE
+  --ec2-core-instance-type=EC2_CORE_INSTANCE_TYPE,
+  --ec2-slave-instance-type=EC2_CORE_INSTANCE_TYPE
                         Type of EC2 instance for core (or "slave") nodes only
   --ec2-instance-type=EC2_INSTANCE_TYPE
                         Type of EC2 instance(s) to launch (e.g. m1.small,

@@ -22,6 +22,7 @@ from mrjob.parse import iso8601_to_datetime
 
 log = getLogger(__name__)
 
+
 ### current versions of these functions, using "cluster" API calls ###
 
 # these are "hidden" because there's no need to access them directly
@@ -61,7 +62,6 @@ def _pool_hash_and_name(bootstrap_actions):
                 return args[0][5:], args[1]
 
     return (None, None)
-
 
 
 ### deprecated functions, used to support the old DescribeJobFlows API call ###

@@ -78,7 +78,8 @@ def list_clusters(emr_conn, created_after=None, created_before=None,
         params['Marker'] = marker
 
     if cluster_states:
-        emr_conn.build_list_params(params, cluster_states, 'ClusterStates.member')
+        emr_conn.build_list_params(
+            params, cluster_states, 'ClusterStates.member')
 
     return emr_conn.get_object('ListClusters', params, ClusterSummaryList)
 

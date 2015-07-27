@@ -274,8 +274,7 @@ def add_hadoop_opts(opt_group):
         opt_group.add_option(
             '--hadoop-home', dest='hadoop_home',
             default=None,
-            help='Alternative to setting the HADOOP_HOME environment variable.'),
-
+            help='Alternative to setting $HADOOP_HOME'),
 
         opt_group.add_option(
             '--hdfs-scratch-dir', dest='hdfs_scratch_dir',
@@ -703,7 +702,6 @@ def fix_custom_options(options, option_parser):
                 for param in options.no_emr_api_params:
                     options.emr_api_params[param] = None
 
-
     if hasattr(options, 'emr_tags'):
         emr_tag_err = '--emr-tag argument %r is not of the form KEY=VALUE'
         options.emr_tags = parse_key_value_list(options.emr_tags,
@@ -713,9 +711,8 @@ def fix_custom_options(options, option_parser):
     if hasattr(options, 'jobconf'):
         jobconf_err = '--jobconf argument %r is not of the form KEY=VALUE'
         options.jobconf = parse_key_value_list(options.jobconf,
-                                              jobconf_err,
-                                              option_parser.error)
-
+                                               jobconf_err,
+                                               option_parser.error)
 
     if getattr(options, 'ssh_bind_ports', None):
         try:

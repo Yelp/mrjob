@@ -895,7 +895,7 @@ class MockEmrConnection(object):
 
         for step in steps:
             step_config = MockEmrObject(
-                args=step.args(),
+                args=[MockEmrObject(value=a) for a in step.args()],
                 jar=step.jar(),
                 mainclass=step.main_class())
             # there's also a "properties" field, but boto doesn't handle it
@@ -943,8 +943,8 @@ class MockEmrConnection(object):
         and looking for an -output argument."""
         # parse in reverse order, in case there are multiple -output args
         for i, arg in reversed(list(enumerate(step_args[:-1]))):
-            if arg == '-output':
-                return step_args[i + 1]
+            if arg.value == '-output':
+                return step_args[i + 1].value
         else:
             return None
 

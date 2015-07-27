@@ -26,8 +26,8 @@ from optparse import OptionGroup
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
-from mrjob.emr import est_time_to_hour
 from mrjob.job import MRJob
+from mrjob.pool import est_time_to_hour
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import strip_microseconds
 

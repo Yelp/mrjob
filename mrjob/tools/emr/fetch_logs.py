@@ -63,12 +63,6 @@ from optparse import OptionError
 from optparse import OptionParser
 import sys
 
-try:
-    import boto.exception
-    boto
-except ImportError:
-    boto = None
-
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import LogFetchError
 from mrjob.job import MRJob

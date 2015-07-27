@@ -1,20 +1,25 @@
-v0.4.5, 2015-??-?? -- IAM Fortified
+v0.4.5, 2015-07-28 -- DescribeJobFlows begone
+ * boto>=2.6.0 is required (used to be 2.2.0)
  * runners:
    * EMR:
+     * moved off deprecated DescribeJobFlows API (#876)
+       * time-to-end-of-hour now uses creation time, not "start" time
      * aws_security_token for temporary credentials (#1003)
      * Use AWS managed policies when creating IAM objects (#1026)
      * Fall back to default role/instance profile when no IAM access (#1008)
+     * added emr_tags option (#1058)
      * added get_ami_version() method
      * hadoop_version option no longer has any effect (#1017)
-     * moved off deprecated DescribeJobFlows API (#876)
-       * time-to-end-of-hour now uses creation time, not "start" time
+   * Hadoop:
+     * --hadoop-home switch now works (#1037)
  * EMR tools:
    * added switches for AWS connection options etc. (#1087)
    * mrboss is available from command line tool: mrjob boss [args]
-   * terminate_idle_job_flows does not wait to terminate jobs (#910)
+   * terminate_idle_job_flows less prone to race condition (#910)
    * job flows stuck in STARTING state now considered long-running, not idle
    * collect_emr_stats and job_flow_pool are deprecated
  * more efficient decoding of bz2 files
+ * mrjob.retry.RetryWrapper raises exception when out of tries (#1093)
 
 v0.4.4, 2015-04-21 -- EMRgency!
  * runners:

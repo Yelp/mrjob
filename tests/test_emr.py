@@ -3347,7 +3347,7 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             self.assertEqual(jar_step.config.jar,
                              runner._upload_mgr.uri(fake_jar))
 
-            jar_args = jar_step.config.args
+            jar_args = [a.value for a in jar_step.config.args]
             self.assertEqual(len(jar_args), 3)
             self.assertEqual(jar_args[0], 'stuff')
 
@@ -3359,7 +3359,7 @@ class JarStepTestCase(MockEMRAndS3TestCase):
             # check output of jar is input of next step
             jar_output_arg = jar_args[2]
 
-            streaming_args = streaming_step.config.args
+            streaming_args = [a.value for a in streaming_step.config.args]
             streaming_input_arg = streaming_args[
                 streaming_args.index('-input') + 1]
             self.assertEqual(jar_output_arg, streaming_input_arg)

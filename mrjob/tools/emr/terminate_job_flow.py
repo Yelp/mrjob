@@ -1,4 +1,5 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2012 Yelp
+# Copyright 2013 David Marin and Steve Johnson
 # Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

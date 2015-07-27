@@ -30,7 +30,6 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
 import tempfile
-from time import sleep
 
 try:
     from cStringIO import StringIO

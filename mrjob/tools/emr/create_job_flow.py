@@ -196,7 +196,6 @@ from mrjob.options import add_emr_connect_opts
 from mrjob.options import add_emr_launch_opts
 from mrjob.options import alphabetize_options
 from mrjob.options import fix_custom_options
-from mrjob.parse import parse_key_value_list
 from mrjob.util import scrape_options_into_new_groups
 
 

@@ -61,7 +61,6 @@ Options::
 """
 from optparse import OptionError
 from optparse import OptionParser
-import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import LogFetchError
@@ -294,7 +293,7 @@ def find_failure(runner, step_num):
         step_nums = [step_num]
     else:
         steps = runner._list_steps_for_cluster()
-        step_nums = range(1, len(job_flow.steps) + 1)
+        step_nums = range(1, len(steps) + 1)
 
     cause = runner._find_probable_cause_of_failure(step_nums)
     if cause:

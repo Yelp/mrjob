@@ -1,5 +1,7 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 David Marin
+# Copyright 2014 Shusen Liu
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -280,9 +282,9 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
         self.runner._add_job_files_for_upload()
 
         self.runner._hadoop_version='0.20.204'
-        self.start(patch.object(self.runner, '_new_upload_args',
+        self.start(patch.object(self.runner, '_upload_args',
                                 return_value=['new_upload_args']))
-        self.start(patch.object(self.runner, '_old_upload_args',
+        self.start(patch.object(self.runner, '_pre_0_20__upload_args',
                                 return_value=['old_upload_args']))
         self.start(patch.object(self.runner, '_hadoop_args_for_step',
                                 return_value=['hadoop_args_for_step']))

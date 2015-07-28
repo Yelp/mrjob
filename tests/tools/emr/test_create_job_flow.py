@@ -16,6 +16,7 @@
 from mrjob.tools.emr.create_job_flow import main as create_job_flow_main
 from mrjob.tools.emr.create_job_flow import runner_kwargs
 
+from tests.mockboto import MockEmrObject
 from tests.tools.emr import ToolTestCase
 
 
@@ -82,3 +83,25 @@ class JobFlowInspectionTestCase(ToolTestCase):
         self.assertEqual(list(self.mock_emr_clusters.keys()),
                          ['j-MOCKCLUSTER0'])
         self.assertEqual(self.stdout.getvalue(), 'j-MOCKCLUSTER0\n')
+
+    # emr_tags was supported as a switch but not actually being applied
+    # to the cluster; see #1085
+    def test_emr_tags(self):
+        self.add_mock_s3_data({'walrus': {}})
+        self.monkey_patch_argv(
+            '--quiet', '--no-conf',
+            '--s3-sync-wait-time', '0',
+            '--s3-scratch-uri', 's3://walrus/tmp',
+            '--emr-tag', 'tag_one=foo',
+            '--emr-tag', 'tag_two=bar',
+        )
+        self.monkey_patch_stdout()
+        create_job_flow_main()
+        self.assertEqual(list(self.mock_emr_clusters.keys()),
+                         ['j-MOCKCLUSTER0'])
+
+        mock_cluster = self.mock_emr_clusters['j-MOCKCLUSTER0']
+        self.assertEqual(mock_cluster.tags, [
+            MockEmrObject(key='tag_one', value='foo'),
+            MockEmrObject(key='tag_two', value='bar'),
+        ])

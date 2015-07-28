@@ -670,18 +670,55 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
             stdout=stdout, max_hours_idle=0.01, quiet=True)
         self.assertEqual(stdout.getvalue(), '')
 
+
+    EXPECTED_STDOUT_LINES = [
+        'Terminated job flow j-POOLED (POOLED);'
+        ' was idle for 0:50:00, 0:05:00 to end of hour',
+        'Terminated job flow j-PENDING_BUT_IDLE (PENDING_BUT_IDLE);'
+        ' was pending for 2:50:00, 1:00:00 to end of hour',
+        'Terminated job flow j-DEBUG_ONLY (DEBUG_ONLY);'
+        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        'Terminated job flow j-DONE_AND_IDLE (DONE_AND_IDLE);'
+        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        'Terminated job flow j-IDLE_AND_EXPIRED (IDLE_AND_EXPIRED);'
+        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        'Terminated job flow j-IDLE_AND_FAILED (IDLE_AND_FAILED);'
+        ' was idle for 3:00:00, 1:00:00 to end of hour',
+        'Terminated job flow j-HADOOP_DEBUGGING (HADOOP_DEBUGGING);'
+        ' was idle for 2:00:00, 1:00:00 to end of hour',
+    ]
+
     def test_its_not_very_quiet(self):
         stdout = StringIO()
         self.maybe_terminate_quietly(
             stdout=stdout, max_hours_idle=0.01)
-        output = u"""Terminated job flow j-POOLED (POOLED); was idle for 0:50:00, 0:05:00 to end of hour
-Terminated job flow j-PENDING_BUT_IDLE (PENDING_BUT_IDLE); was pending for 2:50:00, 1:00:00 to end of hour
-Terminated job flow j-DEBUG_ONLY (DEBUG_ONLY); was idle for 2:00:00, 1:00:00 to end of hour
-Terminated job flow j-DONE_AND_IDLE (DONE_AND_IDLE); was idle for 2:00:00, 1:00:00 to end of hour
-Terminated job flow j-IDLE_AND_EXPIRED (IDLE_AND_EXPIRED); was idle for 2:00:00, 1:00:00 to end of hour
-Terminated job flow j-IDLE_AND_FAILED (IDLE_AND_FAILED); was idle for 3:00:00, 1:00:00 to end of hour
-Terminated job flow j-HADOOP_DEBUGGING (HADOOP_DEBUGGING); was idle for 2:00:00, 1:00:00 to end of hour
-"""
-        self.assertItemsEqual(
-            stdout.getvalue().splitlines(),
-            output.splitlines())
+
+        self.assertEqual(set(stdout.getvalue().splitlines()),
+                         set(self.EXPECTED_STDOUT_LINES))
+
+        # should have actually terminated clusters
+        self.assertEqual(self.ids_of_terminated_clusters(), [
+            'j-DEBUG_ONLY',
+            'j-DONE_AND_IDLE',
+            'j-HADOOP_DEBUGGING',
+            'j-IDLE_AND_EXPIRED',
+            'j-IDLE_AND_FAILED',
+            'j-PENDING_BUT_IDLE',
+            'j-POOLED',
+        ])
+
+    def test_dry_run(self):
+        stdout = StringIO()
+        self.maybe_terminate_quietly(
+            stdout=stdout, max_hours_idle=0.01, dry_run=True)
+
+        # dry_run doesn't actually try to lock
+        expected_stdout_lines = self.EXPECTED_STDOUT_LINES + [
+            'Terminated job flow j-IDLE_AND_LOCKED (IDLE_AND_LOCKED);'
+            ' was idle for 2:00:00, 1:00:00 to end of hour']
+
+        self.assertEqual(set(stdout.getvalue().splitlines()),
+                         set(expected_stdout_lines))
+
+        # shouldn't *actually* terminate clusters
+        self.assertEqual(self.ids_of_terminated_clusters(), [])

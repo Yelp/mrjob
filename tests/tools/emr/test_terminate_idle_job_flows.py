@@ -712,9 +712,13 @@ class JobFlowTerminationTestCase(MockEMRAndS3TestCase):
         self.maybe_terminate_quietly(
             stdout=stdout, max_hours_idle=0.01, dry_run=True)
 
+        # dry_run doesn't actually try to lock
+        expected_stdout_lines = self.EXPECTED_STDOUT_LINES + [
+            'Terminated job flow j-IDLE_AND_LOCKED (IDLE_AND_LOCKED);'
+            ' was idle for 2:00:00, 1:00:00 to end of hour']
 
         self.assertEqual(set(stdout.getvalue().splitlines()),
-                         set(self.EXPECTED_STDOUT_LINES))
+                         set(expected_stdout_lines))
 
         # shouldn't *actually* terminate clusters
         self.assertEqual(self.ids_of_terminated_clusters(), [])

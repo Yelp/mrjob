@@ -351,7 +351,9 @@ def terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
         strip_microseconds(time_to_end_of_hour))
 
     did_terminate = False
-    if not dry_run:
+    if dry_run:
+        did_terminate = True
+    else:
         status = attempt_to_acquire_lock(
             runner.make_s3_conn(),
             runner._lock_uri(cluster_id, num_steps),

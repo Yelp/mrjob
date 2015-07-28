@@ -3584,14 +3584,14 @@ class EMRTagsTestCase(MockEMRAndS3TestCase):
             MockEmrObject(key='tag_two', value='bar'),
         ])
 
-    def test_empty_tag_value(self):
+    def test_blank_tag_value(self):
         cluster = self.run_and_get_cluster('--emr-tag', 'tag_one=foo',
                                            '--emr-tag', 'tag_two=')
 
         # tags should be in alphabetical order by key
         self.assertEqual(cluster.tags, [
             MockEmrObject(key='tag_one', value='foo'),
-            MockEmrObject(key='tag_two'),
+            MockEmrObject(key='tag_two', value=''),
         ])
 
     def test_tag_values_can_be_none(self):
@@ -3600,7 +3600,7 @@ class EMRTagsTestCase(MockEMRAndS3TestCase):
 
         mock_cluster = self.mock_emr_clusters[cluster_id]
         self.assertEqual(mock_cluster.tags, [
-            MockEmrObject(key='tag_one'),
+            MockEmrObject(key='tag_one', value=''),
         ])
 
     def test_persistent_cluster(self):

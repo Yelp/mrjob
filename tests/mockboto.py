@@ -851,16 +851,14 @@ class MockEmrConnection(object):
                     code='InvalidRequestException'))
 
         for key, value in sorted(tags.items()):
+            value = value or ''
+
             for tag_obj in cluster.tags:
                 if tag_obj.key == key:
-                    if value:
-                        tag_obj.value == value
-                    elif hasattr(tag_obj.value):
-                        del tag_obj.value
-                    break
+                    tag_obj.value == value
             else:
                 cluster.tags.append(MockEmrObject(
-                    key=key, value=(value or None)))
+                    key=key, value=value))
 
         return True
 

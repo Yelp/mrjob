@@ -3594,6 +3594,15 @@ class EMRTagsTestCase(MockEMRAndS3TestCase):
             MockEmrObject(key='tag_two'),
         ])
 
+    def test_tag_values_can_be_none(self):
+        runner = EMRJobRunner(conf_paths=[], emr_tags={'tag_one': None})
+        cluster_id = runner.make_persistent_cluster()
+
+        mock_cluster = self.mock_emr_clusters[cluster_id]
+        self.assertEqual(mock_cluster.tags, [
+            MockEmrObject(key='tag_one'),
+        ])
+
     def test_persistent_cluster(self):
         args = ['--emr-tag', 'tag_one=foo',
                 '--emr-tag', 'tag_two=bar']

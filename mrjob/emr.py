@@ -1335,7 +1335,7 @@ class EMRJobRunner(MRJobRunner):
         tags = self._opts['emr_tags']
         if tags:
             log.info('Setting EMR tags: %s' % ', '.join(
-                '%s=%s' % (tag, value) for tag, value in tags.items()))
+                '%s=%s' % (tag, value or '') for tag, value in tags.items()))
             _boto_emr.add_tags(emr_conn, emr_job_flow_id, tags)
 
         return emr_job_flow_id

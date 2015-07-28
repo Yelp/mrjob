@@ -1307,6 +1307,9 @@ class EMRJobRunner(MRJobRunner):
         """Create an empty job flow on EMR, and return the ID of that
         job.
 
+        If the ``emr_tags`` option is set, also tags the cluster (which
+        is a separate API call).
+
         persistent -- if this is true, create the job flow with the keep_alive
             option, indicating the job will have to be manually terminated.
         """
@@ -1327,6 +1330,14 @@ class EMRJobRunner(MRJobRunner):
         self._emr_job_start = time.time()
 
         log.info('Job flow created with ID: %s' % emr_job_flow_id)
+
+        # set EMR tags for the cluster, if any
+        tags = self._opts['emr_tags']
+        if tags:
+            log.info('Setting EMR tags: %s' % ', '.join(
+                '%s=%s' % (tag, value) for tag, value in tags.items()))
+            _boto_emr.add_tags(emr_conn, emr_job_flow_id, tags)
+
         return emr_job_flow_id
 
     def _job_flow_args(self, persistent=False, steps=None):
@@ -1594,13 +1605,6 @@ class EMRJobRunner(MRJobRunner):
 
         # keep track of when we launched our job
         self._emr_job_start = time.time()
-
-        # set EMR tags for the job, if any
-        tags = self._opts['emr_tags']
-        if tags:
-            log.info('Setting EMR tags: %s' % ', '.join(
-                '%s=%s' % (tag, value) for tag, value in tags.items()))
-            _boto_emr.add_tags(emr_conn, self._cluster_id, tags)
 
     # TODO: break this method up; it's too big to write tests for
     def _wait_for_job_to_complete(self):

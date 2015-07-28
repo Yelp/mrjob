@@ -13,13 +13,43 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Code from boto 2.35.0 to support "cluster" EMR API calls"""
+"""Code from boto 2.35.0 to support "cluster" EMR API calls and tags"""
 import boto.utils
 from boto.emr.emrobject import EmrObject
 from boto.resultset import ResultSet
 
 
 # from boto/emr/connection.py (these are EMRConnection methods in boto)
+def add_tags(emr_conn, resource_id, tags):
+    """
+    Create new metadata tags for the specified resource id.
+
+    :type resource_id: str
+    :param resource_id: The cluster id
+
+    :type tags: dict
+    :param tags: A dictionary containing the name/value pairs.
+                 If you want to create only a tag name, the
+                 value for that tag should be the empty string
+                 (e.g. '') or None.
+    """
+    params = {
+        'ResourceId': resource_id,
+    }
+    params.update(_build_tag_list(tags))
+    return emr_conn.get_status('AddTags', params, verb='POST')
+
+
+def _build_tag_list(tags):
+    params = {}
+    for i, key_value in enumerate(sorted(tags.items()), start=1):
+        key, value = key_value
+        current_prefix = 'Tags.member.%s' % i
+        params['%s.Key' % current_prefix] = key
+        if value:
+            params['%s.Value' % current_prefix] = value
+    return params
+
 
 def describe_cluster(emr_conn, cluster_id):
     """

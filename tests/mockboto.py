@@ -712,9 +712,7 @@ class MockEmrConnection(object):
 
     def get_object(self, action, params, cls):
         """mrjob._mock_emr currently calls get_response() directly, to support
-        old versions of boto. In real boto, the other methods call
-        get_object(), but in mockboto, this method fans out to
-        the other ones
+        old versions of boto.
 
         this can be removed in v0.5.0, when we use a newer version of
         boto (see #1081)
@@ -755,6 +753,23 @@ class MockEmrConnection(object):
             raise NotImplementedError(
                 'mockboto does not implement the %s API call' % action)
 
+
+    def get_status(self, action, params):
+        """mrjob._mock_emr currently calls get_status() directly, to support
+        old versions of boto.
+
+        this can be removed in v0.5.0, when we use a newer version of
+        boto (see #1081)
+        """
+        if action == 'AddTags':
+            resource_id = params.get('ResourceId')
+            tags = self._unpack_tag_list(self, params)
+
+            return self._add_tags(resource_id, tags)
+        else:
+            raise NotImplementedError(
+                'mockboto does not implement the %s API call' % action)
+
     def _unpack_datetime(self, iso_dt):
         """Undo conversion to ISO date. Remove in v0.5.0."""
         if iso_dt is None:
@@ -791,14 +806,65 @@ class MockEmrConnection(object):
         else:
             return None
 
+    def _unpack_tag_list(self, params):
+        idx_to_key = {}
+        idx_to_value = {}
+
+        for k, v in params.items():
+            parts = k.split('.')
+            if len(parts) != 4:
+                continue
+
+            if parts[0] == 'Tags' and parts[1] == 'member':
+                idx = int(parts[2])
+                if parts[3] == 'Key':
+                    idx_to_key[idx] = v
+                elif parts[3] == 'Value':
+                    idx_to_value[idx] = v
+                else:
+                    raise ValueError
+
+        return dict(
+            (key, idx_to_value.get(idx))
+            for idx, key in idx_to_key.values())
+
     def _get_mock_cluster(self, cluster_id):
         if not cluster_id in self.mock_emr_clusters:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
         return self.mock_emr_clusters[cluster_id]
 
-    # "cluster" API calls missing from boto 2.2.0.
+    # cluster and tags API calls missing from boto 2.2.0.
     # In v0.5.0, remove the underscores
+
+
+    def _add_tags(self, resource_id, tags):
+        """Simulate successful creation of new metadata tags for the specified
+        resource id.
+        """
+        self._enforce_strict_ssl()
+
+        cluster = self._get_mock_cluster()
+
+        if not tags:
+            raise boto.exception.EmrResponseError(
+                400, 'Bad Request', body=err_xml(
+                    'Tags cannot be null or empty.',
+                    code='InvalidRequestException'))
+
+        for key, value in sorted(tags.items()):
+            for tag_obj in cluster.tags:
+                if tag_obj.key == key:
+                    if value:
+                        tag_obj.value == value
+                    elif hasattr(tag_obj.value):
+                        del tag_obj.value
+                    break
+            else:
+                tags.append(MockEmrObject(
+                    key=key, value=(value or None)))
+
+        return True
 
     def _describe_cluster(self, cluster_id):
         self._enforce_strict_ssl()
@@ -1079,12 +1145,6 @@ class MockEmrConnection(object):
             cluster.status.statechangereason = MockEmrObject()
 
         return
-
-    def add_tags(self, resource_id, tags):
-        """Simulate successful creation of new metadata tags for the specified
-        resource id.
-        """
-        return bool(resource_id and tags)
 
 
 class MockEmrObject(object):

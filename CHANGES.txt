@@ -15,8 +15,11 @@ v0.4.5, 2015-07-28 -- DescribeJobFlows begone
  * EMR tools:
    * added switches for AWS connection options etc. (#1087)
    * mrboss is available from command line tool: mrjob boss [args]
-   * terminate_idle_job_flows less prone to race condition (#910)
-   * job flows stuck in STARTING state now considered long-running, not idle
+   * terminate_idle_job_flows:
+     * less prone to race condition (#910)
+     * prints results to stdout in dry_run mode (#1102)
+     * job flows stuck in STARTING state no longer considered idle
+   * report_long_jobs reports job flows stuck in STARTING state
    * collect_emr_stats and job_flow_pool are deprecated
  * more efficient decoding of bz2 files
  * mrjob.retry.RetryWrapper raises exception when out of tries (#1093)

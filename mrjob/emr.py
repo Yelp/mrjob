@@ -1600,7 +1600,7 @@ class EMRJobRunner(MRJobRunner):
         if tags:
             log.info('Setting EMR tags: %s' % ', '.join(
                 '%s=%s' % (tag, value) for tag, value in tags.items()))
-            emr_conn.add_tags(self._cluster_id, tags)
+            _boto_emr.add_tags(emr_conn, self._cluster_id, tags)
 
     # TODO: break this method up; it's too big to write tests for
     def _wait_for_job_to_complete(self):

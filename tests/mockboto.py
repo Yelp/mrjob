@@ -754,7 +754,7 @@ class MockEmrConnection(object):
                 'mockboto does not implement the %s API call' % action)
 
 
-    def get_status(self, action, params):
+    def get_status(self, action, params, verb='GET'):
         """mrjob._mock_emr currently calls get_status() directly, to support
         old versions of boto.
 
@@ -763,7 +763,7 @@ class MockEmrConnection(object):
         """
         if action == 'AddTags':
             resource_id = params.get('ResourceId')
-            tags = self._unpack_tag_list(self, params)
+            tags = self._unpack_tag_list(params)
 
             return self._add_tags(resource_id, tags)
         else:
@@ -786,7 +786,6 @@ class MockEmrConnection(object):
             items = [items]
         for i in range(1, len(items) + 1):
             params['%s.%d' % (label, i)] = items[i - 1]
-
 
     def _unpack_list_param(self, label, params):
         """Undo EmrConnection.build_list_params().
@@ -826,7 +825,7 @@ class MockEmrConnection(object):
 
         return dict(
             (key, idx_to_value.get(idx))
-            for idx, key in idx_to_key.values())
+            for idx, key in idx_to_key.items())
 
     def _get_mock_cluster(self, cluster_id):
         if not cluster_id in self.mock_emr_clusters:
@@ -837,14 +836,13 @@ class MockEmrConnection(object):
     # cluster and tags API calls missing from boto 2.2.0.
     # In v0.5.0, remove the underscores
 
-
     def _add_tags(self, resource_id, tags):
         """Simulate successful creation of new metadata tags for the specified
         resource id.
         """
         self._enforce_strict_ssl()
 
-        cluster = self._get_mock_cluster()
+        cluster = self._get_mock_cluster(resource_id)
 
         if not tags:
             raise boto.exception.EmrResponseError(
@@ -861,7 +859,7 @@ class MockEmrConnection(object):
                         del tag_obj.value
                     break
             else:
-                tags.append(MockEmrObject(
+                cluster.tags.append(MockEmrObject(
                     key=key, value=(value or None)))
 
         return True
@@ -1166,17 +1164,15 @@ class MockEmrObject(object):
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
-        my_items = self.__dict__.items()
-        other_items = other.__dict__.items()
 
-        if len(my_items) != len(other_items):
+        if len(self.__dict__) != len(other.__dict__):
             return False
 
-        for k, v in my_items:
-            if not k in other_items:
+        for k, v in self.__dict__.items():
+            if not k in other.__dict__:
                 return False
             else:
-                if v != other_items[k]:
+                if v != other.__dict__[k]:
                     return False
 
         return True

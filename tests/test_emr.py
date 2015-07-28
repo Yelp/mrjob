@@ -3555,19 +3555,24 @@ class EMRTagsTestCase(MockEMRAndS3TestCase):
                             {'tag_one': 'foo', 'tag_two': 'bar'})
 
     def test_emr_tags_get_created(self):
-        # use a Mock object for the 'add_tags' method in MockEmrConnection and
-        # add a __name__ attribute to it, in oder to avoid problems with
-        # mrjob's retry machinery
-        emr_add_tags_mock = Mock()
-        emr_add_tags_mock.__name__ = 'add_tags'
-        with patch.object(MockEmrConnection, 'add_tags', emr_add_tags_mock):
-            cluster = self.run_and_get_cluster('--emr-tag', 'tag_one=foo',
-                                               '--emr-tag', 'tag_two=bar')
+        cluster = self.run_and_get_cluster('--emr-tag', 'tag_one=foo',
+                                           '--emr-tag', 'tag_two=bar')
 
-            # assert that 'add_tags' was called once with the proper parameters
-            self.assertEqual(emr_add_tags_mock.call_count, 1)
-            emr_add_tags_mock.assert_called_with(
-                cluster.id, {'tag_one': 'foo', 'tag_two': 'bar'})
+        # tags should be in alphabetical order by key
+        self.assertEqual(cluster.tags, [
+            MockEmrObject(key='tag_one', value='foo'),
+            MockEmrObject(key='tag_two', value='bar'),
+        ])
+
+    def test_empty_tag_value(self):
+        cluster = self.run_and_get_cluster('--emr-tag', 'tag_one=foo',
+                                           '--emr-tag', 'tag_two=')
+
+        # tags should be in alphabetical order by key
+        self.assertEqual(cluster.tags, [
+            MockEmrObject(key='tag_one', value='foo'),
+            MockEmrObject(key='tag_two'),
+        ])
 
     def test_command_line_overrides_config(self):
         EMR_TAGS_MRJOB_CONF = {'runners': {'emr': {

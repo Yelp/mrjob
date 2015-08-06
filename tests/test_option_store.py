@@ -25,13 +25,17 @@ try:
 except ImportError:
     boto = None
 
+import mrjob.hadoop
 from mrjob.conf import dump_mrjob_conf
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
+from mrjob.emr import EMRRunnerOptionStore
+from mrjob.hadoop import HadoopRunnerOptionStore
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import log_to_stream
 
 from tests.py2 import TestCase
+from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -91,7 +95,6 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
     BASIC_CONF = {
         'runners': {
             'inline': {
-                'base_tmp_dir': '/tmp',
                 'cmdenv': {
                     'A_PATH': 'A',
                     'SOMETHING': 'X',
@@ -103,6 +106,7 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                 'jobconf': {
                     'lorax_speaks_for': 'trees',
                 },
+                'local_tmp_dir': '/tmp',
                 'python_bin': 'py3k',
                 'setup_scripts': ['/myscript.py'],
             }
@@ -114,7 +118,6 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
             'include': os.path.join(self.tmp_dir, 'mrjob.conf'),
             'runners': {
                 'inline': {
-                    'base_tmp_dir': '/var/tmp',
                     'bootstrap_mrjob': False,
                     'cmdenv': {
                         'A_PATH': 'B',
@@ -129,6 +132,7 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                         'lorax_speaks_for': 'mazda',
                         'dr_seuss_is': 'awesome',
                     },
+                    'local_tmp_dir': '/var/tmp',
                     'python_bin': 'py4k',
                     'setup_scripts': ['/yourscript.py'],
                 }
@@ -172,8 +176,8 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                          ['thing1', 'thing2'])
 
     def test_combine_paths(self):
-        self.assertEqual(self.opts_1['base_tmp_dir'], '/tmp')
-        self.assertEqual(self.opts_2['base_tmp_dir'], '/var/tmp')
+        self.assertEqual(self.opts_1['local_tmp_dir'], '/tmp')
+        self.assertEqual(self.opts_2['local_tmp_dir'], '/var/tmp')
 
     def test_combine_path_lists(self):
         self.assertEqual(self.opts_1['setup_scripts'], ['/myscript.py'])
@@ -201,7 +205,7 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
                           stderr.getvalue())
 
     def test_empty_runner_error(self):
-        conf = dict(runner=dict(local=dict(base_tmp_dir='/tmp')))
+        conf = dict(runner=dict(local=dict(local_tmp_dir='/tmp')))
         path = self.save_conf('basic', conf)
 
         stderr = StringIO()
@@ -222,7 +226,7 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
         conf = {
             'runners': {
                 'inline': {
-                    'base_tmp_dir': "include_file1_base_tmp_dir"
+                    'local_tmp_dir': "include_file1_local_tmp_dir"
                 }
             }
         }
@@ -233,7 +237,7 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
         conf = {
             'runners': {
                 'inline': {
-                    'base_tmp_dir': "include_file2_base_tmp_dir"
+                    'local_tmp_dir': "include_file2_local_tmp_dir"
                 }
             }
         }
@@ -315,6 +319,91 @@ class TestExtraKwargs(ConfigFilesTestCase):
     def test_extra_kwargs_passed_in_directly_okay(self):
         with logger_disabled('mrjob.runner'):
             opts = RunnerOptionStore(
-                'inline', {'base_tmp_dir': '/var/tmp', 'foo': 'bar'}, [])
-            self.assertEqual(opts['base_tmp_dir'], '/var/tmp')
+                'inline', {'local_tmp_dir': '/var/tmp', 'foo': 'bar'}, [])
+            self.assertEqual(opts['local_tmp_dir'], '/var/tmp')
             self.assertNotIn('bar', opts)
+
+
+class DeprecatedAliasesTestCase(ConfigFilesTestCase):
+
+    def test_runner_option_store(self):
+        stderr = StringIO()
+        with no_handlers_for_logger('mrjob.conf'):
+            log_to_stream('mrjob.conf', stderr)
+            opts = RunnerOptionStore(
+                'inline', dict(base_tmp_dir='/scratch'), [])
+
+            self.assertEqual(opts['local_tmp_dir'], '/scratch')
+            self.assertNotIn('base_tmp_dir', opts)
+            self.assertIn('Deprecated option base_tmp_dir has been renamed'
+                          ' to local_tmp_dir', stderr.getvalue())
+
+    def test_hadoop_runner_option_store(self):
+        stderr = StringIO()
+        with no_handlers_for_logger('mrjob.conf'):
+            log_to_stream('mrjob.conf', stderr)
+
+            # HadoopRunnerOptionStore really wants to find the streaming jar
+            with patch.object(mrjob.hadoop, 'find_hadoop_streaming_jar',
+                              return_value='found'):
+                opts = HadoopRunnerOptionStore(
+                    'hadoop',
+                    dict(base_tmp_dir='/scratch',
+                         hadoop_home='required',
+                         hdfs_scratch_dir='hdfs:///scratch'),
+                    [])
+
+            self.assertEqual(opts['local_tmp_dir'], '/scratch')
+            self.assertNotIn('base_tmp_dir', opts)
+            self.assertIn('Deprecated option base_tmp_dir has been renamed'
+                          ' to local_tmp_dir', stderr.getvalue())
+
+            self.assertEqual(opts['hadoop_tmp_dir'], 'hdfs:///scratch')
+            self.assertNotIn('hdfs_scratch_dir', opts)
+            self.assertIn('Deprecated option hdfs_scratch_dir has been renamed'
+                          ' to hadoop_tmp_dir', stderr.getvalue())
+
+    def test_emr_runner_option_store(self):
+        stderr = StringIO()
+        with no_handlers_for_logger('mrjob.conf'):
+            log_to_stream('mrjob.conf', stderr)
+
+            opts = EMRRunnerOptionStore(
+                'emr',
+                dict(base_tmp_dir='/scratch',
+                     s3_scratch_uri='s3://bucket/walrus'),
+                    [])
+
+            self.assertEqual(opts['local_tmp_dir'], '/scratch')
+            self.assertNotIn('base_tmp_dir', opts)
+            self.assertIn('Deprecated option base_tmp_dir has been renamed'
+                          ' to local_tmp_dir', stderr.getvalue())
+
+            self.assertEqual(opts['s3_tmp_dir'], 's3://bucket/walrus')
+            self.assertNotIn('s3_scratch_uri', opts)
+            self.assertIn('Deprecated option s3_scratch_uri has been renamed'
+                          ' to s3_tmp_dir', stderr.getvalue())
+
+    def test_cleanup_options(self):
+        stderr = StringIO()
+        with no_handlers_for_logger('mrjob.runner'):
+            log_to_stream('mrjob.runner', stderr)
+            opts = RunnerOptionStore(
+                'inline',
+                dict(cleanup=['LOCAL_SCRATCH', 'REMOTE_SCRATCH'],
+                     cleanup_on_failure=['SCRATCH']),
+                [])
+
+            self.assertEqual(opts['cleanup'], ['LOCAL_TMP', 'REMOTE_TMP'])
+            self.assertIn(
+                'Deprecated cleanup option LOCAL_SCRATCH has been renamed'
+                ' to LOCAL_TMP', stderr.getvalue())
+            self.assertIn(
+                'Deprecated cleanup option REMOTE_SCRATCH has been renamed'
+                ' to REMOTE_TMP', stderr.getvalue())
+
+            # should quietly convert string to list
+            self.assertEqual(opts['cleanup_on_failure'], ['TMP'])
+            self.assertIn(
+                'Deprecated cleanup_on_failure option SCRATCH has been renamed'
+                ' to TMP', stderr.getvalue())

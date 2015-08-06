@@ -258,7 +258,6 @@ def make_option_parser():
     add_emr_launch_opts(option_parser)
 
     alphabetize_options(option_parser)
-
     return option_parser
 
 

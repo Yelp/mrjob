@@ -99,13 +99,13 @@ def add_runner_opts(opt_group, default_runner='local'):
         opt_group.add_option(
             '--cleanup', dest='cleanup', default=None,
             help=('Comma-separated list of which directories to delete when'
-                  ' a job succeeds, e.g. SCRATCH,LOGS. Choices:'
+                  ' a job succeeds, e.g. TMP,LOGS. Choices:'
                   ' %s (default: ALL)' % ', '.join(CLEANUP_CHOICES))),
 
         opt_group.add_option(
             '--cleanup-on-failure', dest='cleanup_on_failure', default=None,
             help=('Comma-separated list of which directories to delete when'
-                  ' a job fails, e.g. SCRATCH,LOGS. Choices:'
+                  ' a job fails, e.g. TMP,LOGS. Choices:'
                   ' %s (default: NONE)' % ', '.join(CLEANUP_CHOICES))),
 
         opt_group.add_option(
@@ -269,9 +269,14 @@ def add_hadoop_opts(opt_group):
             help='Alternative to setting $HADOOP_HOME'),
 
         opt_group.add_option(
+            '--hadoop-tmp-dir', dest='hdfs_tmp_dir',
+            default=None,
+            help='Temp space on HDFS (default is tmp/mrjob)'),
+
+        opt_group.add_option(
             '--hdfs-scratch-dir', dest='hdfs_scratch_dir',
             default=None,
-            help='Scratch space on HDFS (default is tmp/)'),
+            help='Deprecated alias for --hadoop-tmp-dir'),
     ]
 
 
@@ -465,7 +470,7 @@ def add_emr_launch_opts(opt_group):
 
         opt_group.add_option(
             '--s3-scratch-uri', dest='s3_scratch_uri', default=None,
-            help='URI on S3 to use as our temp directory.'),
+            help='Deprecated alias for --s3-tmp-dir.'),
 
         opt_group.add_option(
             '--s3-sync-wait-time', dest='s3_sync_wait_time', default=None,
@@ -473,6 +478,10 @@ def add_emr_launch_opts(opt_group):
             help=('How long to wait for S3 to reach eventual consistency. This'
                   ' is typically less than a second (zero in us-west) but the'
                   ' default is 5.0 to be safe.')),
+
+        opt_group.add_option(
+            '--s3-tmp-dir', dest='s3_tmp_dir', default=None,
+            help='URI on S3 to use as our temp directory.'),
 
         opt_group.add_option(
             '--s3-upload-part-size', dest='s3_upload_part_size', default=None,

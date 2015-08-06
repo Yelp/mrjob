@@ -125,11 +125,15 @@ Options available to hadoop runner only
     Alternative to setting the :envvar:`HADOOP_HOME` environment variable.
 
 .. mrjob-opt::
-    :config: hdfs_scratch_dir
-    :switch: --hdfs-scratch-dir
+    :config: hadoop_tmp_dir
+    :switch: --hadoop-tmp-dir
     :type: :ref:`path <data-type-path>`
     :set: hadoop
-    :default: :file:`tmp/`
+    :default: :file:`tmp/mrjob`
 
     Scratch space on HDFS. This path does not need to be fully qualified with
     ``hdfs://`` URIs because it's understood that it has to be on HDFS.
+
+    .. versionchanged:: 0.5.0
+
+       This option used to be named ``hdfs_scratch_uri``.

@@ -2,8 +2,8 @@
 This extension allows you to define an option like this:
 
 .. mrjob-opt::
-    :config: base_tmp_dir
-    :switch: --base-tmp-dir
+    :config: local_tmp_dir
+    :switch: --local-tmp-dir
     :type: :ref:`path <data-type-path>`
     :set: all
     :default: value of :py:func:`tempfile.gettempdir`

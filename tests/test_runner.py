@@ -66,14 +66,14 @@ class WithStatementTestCase(TestCase):
     def test_cleanup_all(self):
         self._test_cleanup_after_with_statement(['ALL'], False)
 
-    def test_cleanup_scratch(self):
-        self._test_cleanup_after_with_statement(['SCRATCH'], False)
+    def test_cleanup_tmp(self):
+        self._test_cleanup_after_with_statement(['TMP'], False)
 
-    def test_cleanup_local_scratch(self):
-        self._test_cleanup_after_with_statement(['LOCAL_SCRATCH'], False)
+    def test_cleanup_local_tmp(self):
+        self._test_cleanup_after_with_statement(['LOCAL_TMP'], False)
 
-    def test_cleanup_remote_scratch(self):
-        self._test_cleanup_after_with_statement(['REMOTE_SCRATCH'], True)
+    def test_cleanup_remote_tmp(self):
+        self._test_cleanup_after_with_statement(['REMOTE_TMP'], True)
 
     def test_cleanup_none(self):
         self._test_cleanup_after_with_statement(['NONE'], True)
@@ -346,7 +346,7 @@ sys.exit(13)
             runner._invoke_sort([self.a], self.out)
             for key in environment_check_list:
                 self.assertEqual(environment_vars.get(key, None),
-                                 runner._opts['base_tmp_dir'])
+                                 runner._opts['local_tmp_dir'])
 
     def test_no_files(self):
         runner = MRJobRunner(conf_paths=[])
@@ -854,17 +854,18 @@ class BootstrapMRJobTestCase(TestCase):
     # actual testing of bootstrapping is in test_local
 
     def test_default(self):
-        runner = MRJobRunner()
+        runner = MRJobRunner(conf_paths=[])
         self.assertEqual(runner._bootstrap_mrjob(), True)
 
     def test_no_bootstrap_mrjob(self):
-        runner = MRJobRunner(bootstrap_mrjob=False)
+        runner = MRJobRunner(conf_paths=[], bootstrap_mrjob=False)
         self.assertEqual(runner._bootstrap_mrjob(), False)
 
     def test_interpreter(self):
-        runner = MRJobRunner(interpreter=['ruby'])
+        runner = MRJobRunner(conf_paths=[], interpreter=['ruby'])
         self.assertEqual(runner._bootstrap_mrjob(), False)
 
     def test_bootstrap_mrjob_overrides_interpreter(self):
-        runner = MRJobRunner(interpreter=['ruby'], bootstrap_mrjob=True)
+        runner = MRJobRunner(
+            conf_paths=[], interpreter=['ruby'], bootstrap_mrjob=True)
         self.assertEqual(runner._bootstrap_mrjob(), True)

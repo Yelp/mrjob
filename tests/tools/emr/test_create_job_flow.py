@@ -28,6 +28,7 @@ class JobFlowInspectionTestCase(ToolTestCase):
 
     def test_runner_kwargs(self):
         self.monkey_patch_argv('--quiet')
+
         self.assertEqual(
             runner_kwargs(),
             {'additional_emr_info': None,
@@ -71,6 +72,7 @@ class JobFlowInspectionTestCase(ToolTestCase):
              's3_log_uri': None,
              's3_scratch_uri': None,
              's3_sync_wait_time': None,
+             's3_tmp_dir': None,
              's3_upload_part_size': None,
              'visible_to_all_users': None,
              })
@@ -80,7 +82,7 @@ class JobFlowInspectionTestCase(ToolTestCase):
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '--s3-sync-wait-time', '0',
-            '--s3-scratch-uri', 's3://walrus/tmp')
+            '--s3-tmp-dir', 's3://walrus/tmp')
         self.monkey_patch_stdout()
         create_job_flow_main()
         self.assertEqual(list(self.mock_emr_clusters.keys()),

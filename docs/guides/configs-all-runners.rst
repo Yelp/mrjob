@@ -95,15 +95,6 @@ options related to file uploading.
 Temp files and cleanup
 ======================
 
-.. mrjob-opt::
-    :config: base_tmp_dir
-    :switch: --base-tmp-dir
-    :type: :ref:`path <data-type-path>`
-    :set: all
-    :default: value of :py:func:`tempfile.gettempdir`
-
-    Path to put local temp dirs inside.
-
 .. _configs-all-runners-cleanup:
 
 .. mrjob-opt::
@@ -116,16 +107,16 @@ Temp files and cleanup
     List of which kinds of directories to delete when a job succeeds. Valid
     choices are:
 
-    * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job flow
+    * ``'ALL'``: delete logs and local and remote temp files; stop job flow
         if on EMR and the job is not done when cleanup is run.
-    * ``'LOCAL_SCRATCH'``: delete local scratch only
-    * ``'LOGS'``: delete logs only
-    * ``'NONE'``: delete nothing
-    * ``'REMOTE_SCRATCH'``: delete remote scratch only
-    * ``'SCRATCH'``: delete local and remote scratch, but not logs
     * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
     * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
         on cleanup
+    * ``'LOCAL_TMP'``: delete local temp files only
+    * ``'LOGS'``: delete logs only
+    * ``'NONE'``: delete nothing
+    * ``'REMOTE_TMP'``: delete remote temp files only
+    * ``'TMP'``: delete local and remote temp files, but not logs
 
     In the config file::
 
@@ -134,6 +125,10 @@ Temp files and cleanup
     On the command line::
 
         --cleanup=LOGS,JOB
+
+    .. versionchanged:: 0.5.0
+
+       Options ending in ``TMP`` used to end in ``SCRATCH``
 
 .. mrjob-opt::
    :config: cleanup_on_failure
@@ -144,6 +139,22 @@ Temp files and cleanup
 
     Which kinds of directories to clean up when a job fails. Valid choices are
     the same as **cleanup**.
+
+.. mrjob-opt::
+    :config: local_tmp_dir
+    :type: :ref:`path <data-type-path>`
+    :set: all
+    :default: value of :py:func:`tempfile.gettempdir`
+
+    Alternate local temp directory.
+
+    There isn't a command-line switch for this option; just set
+    :envvar:`TMPDIR` or any other environment variable respected by
+    :py:func:`tempfile.gettempdir`.
+
+    .. versionchanged:: 0.5.0
+
+       This option used to be named ``base_tmp_dir``.
 
 .. mrjob-opt::
    :config: output_dir

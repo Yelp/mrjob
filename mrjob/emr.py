@@ -140,6 +140,9 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 # for new (since October 10, 2012) accounts (see #1025)
 _DEFAULT_AWS_REGION = 'us-west-2'
 
+# default AMI to use on EMR. This will be updated with each version
+_DEFAULT_AMI_VERSION = '3.7.0'
+
 
 def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
@@ -410,7 +413,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
-            'ami_version': '3.7.0',
+            'ami_version': _DEFAULT_AMI_VERSION,
             'aws_region': _DEFAULT_AWS_REGION,
             'check_emr_status_every': 30,
             'cleanup_on_failure': ['JOB'],

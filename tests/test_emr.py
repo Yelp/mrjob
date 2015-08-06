@@ -29,6 +29,7 @@ from io import BytesIO
 import mrjob
 import mrjob.emr
 from mrjob.emr import EMRJobRunner
+from mrjob.emr import _DEFAULT_AMI_VERSION
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
@@ -575,9 +576,8 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
     def test_default(self):
         with self.make_runner() as runner:
             runner.run()
-            # default is "latest"
-            self.assertEqual(runner.get_ami_version(), '2.4.2')
-            self.assertEqual(runner.get_hadoop_version(), '1.0.3')
+            self.assertEqual(runner.get_ami_version(), _DEFAULT_AMI_VERSION)
+            self.assertEqual(runner.get_hadoop_version(), '2.4.0')
 
     def test_ami_version_1_0_no_longer_supported(self):
         with self.make_runner('--ami-version', '1.0') as runner:
@@ -615,8 +615,9 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
         with logger_disabled('mrjob.emr'):
             with self.make_runner('--hadoop-version', '1.2.3.4') as runner:
                 runner.run()
-                self.assertEqual(runner.get_ami_version(), '2.4.2')
-                self.assertEqual(runner.get_hadoop_version(), '1.0.3')
+                self.assertEqual(runner.get_ami_version(),
+                                 _DEFAULT_AMI_VERSION)
+                self.assertEqual(runner.get_hadoop_version(), '2.4.0')
 
 
 class AvailabilityZoneTestCase(MockBotoTestCase):

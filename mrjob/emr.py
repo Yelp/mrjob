@@ -2101,7 +2101,10 @@ class EMRJobRunner(MRJobRunner):
 
         You can also fetch the job ID by calling self.get_emr_job_flow_id()
         """
-        # deprecated this in v0.5.0
+       log.warning(
+            'make_persistent_job_flow() has been renamed to'
+            ' make_persistent_cluster(). This alias will be removed in v0.6.0')
+
         return self.make_persistent_cluster()
 
     def make_persistent_cluster(self):
@@ -2123,7 +2126,10 @@ class EMRJobRunner(MRJobRunner):
         return self._cluster_id
 
     def get_emr_job_flow_id(self):
-        # deprecate this in v0.5.0
+        log.warning(
+            'get_emr_job_flow_id() has been renamed to get_cluster_id().'
+            ' This alias will be removed in v0.6.0')
+
         return self.get_cluster_id()
 
     # TODO: add to docs

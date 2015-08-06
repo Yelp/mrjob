@@ -141,18 +141,10 @@ class MockBotoTestCase(SandboxedTestCase):
         self.simulation_iterator = itertools.repeat(
             None, self.MAX_SIMULATION_STEPS)
 
-        p_s3 = patch.object(boto, 'connect_s3', self.connect_s3)
-        self.addCleanup(p_s3.stop)
-        p_s3.start()
-
-        p_iam = patch.object(boto, 'connect_iam', self.connect_iam)
-        self.addCleanup(p_iam.stop)
-        p_iam.start()
-
-        p_emr = patch.object(
-            boto.emr.connection, 'EmrConnection', self.connect_emr)
-        self.addCleanup(p_emr.stop)
-        p_emr.start()
+        self.start(patch.object(boto, 'connect_s3', self.connect_s3))
+        self.start(patch.object(boto, 'connect_iam', self.connect_iam))
+        self.start(patch.object(
+            boto.emr.connection, 'EmrConnection', self.connect_emr))
 
         super(MockBotoTestCase, self).setUp()
 
@@ -165,11 +157,12 @@ class MockBotoTestCase(SandboxedTestCase):
             EMRJobRunner, '_create_mrjob_tar_gz',
             fake_create_mrjob_tar_gz))
 
+        # TODO: why patch these, if sleep() is mocked out anyway?
         self.start(patch.object(
             EMRJobRunner, '_wait_for_s3_eventual_consistency'))
 
         self.start(patch.object(
-            EMRJobRunner, '_wait_for_job_flow_termination'))
+            EMRJobRunner, '_wait_for_cluster_to_terminate'))
 
         self.start(patch.object(time, 'sleep'))
 

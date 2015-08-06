@@ -93,104 +93,92 @@ class EstTimeToEndOfHourTestCase(TestCase):
 class TestPoolHashAndName(TestCase):
 
     def test_empty(self):
-        jf = MockEmrObject()
+        actions = []
 
-        self.assertEqual(pool_hash_and_name(jf), (None, None))
-
-    def test_empty_bootstrap_actions(self):
-        jf = MockEmrObject(bootstrapactions=[])
-
-        self.assertEqual(pool_hash_and_name(jf), (None, None))
+        self.assertEqual(_pool_hash_and_name(actions), (None, None))
 
     def test_pooled_job_flow(self):
-        jf = MockEmrObject(
-            bootstrapactions=[
-                MockEmrObject(args=[
-                    MockEmrObject(
-                        value='pool-0123456789abcdef0123456789abcdef'),
-                    MockEmrObject(value='reflecting'),
-                ], name='master'),
-            ])
+        actions = [
+            MockEmrObject(args=[
+                MockEmrObject(
+                    value='pool-0123456789abcdef0123456789abcdef'),
+                MockEmrObject(value='reflecting'),
+            ], name='master'),
+        ]
 
-        self.assertEqual(pool_hash_and_name(jf),
+        self.assertEqual(_pool_hash_and_name(actions),
                          ('0123456789abcdef0123456789abcdef', 'reflecting'))
 
     def test_pooled_job_flow_with_other_bootstrap_actions(self):
-        jf = MockEmrObject(
-            bootstrapactions=[
-                MockEmrObject(args=[], name='action 0'),
-                MockEmrObject(args=[], name='action 1'),
-                MockEmrObject(args=[
-                    MockEmrObject(
-                        value='pool-0123456789abcdef0123456789abcdef'),
-                    MockEmrObject(value='reflecting'),
-                ], name='master'),
-            ])
+        actions = [
+            MockEmrObject(args=[], name='action 0'),
+            MockEmrObject(args=[], name='action 1'),
+            MockEmrObject(args=[
+                MockEmrObject(
+                    value='pool-0123456789abcdef0123456789abcdef'),
+                MockEmrObject(value='reflecting'),
+            ], name='master'),
+        ]
 
-        self.assertEqual(pool_hash_and_name(jf),
+        self.assertEqual(_pool_hash_and_name(actions),
                          ('0123456789abcdef0123456789abcdef', 'reflecting'))
 
     def test_pooled_job_flow_with_max_hours_idle(self):
         # max hours idle is added AFTER the master bootstrap script,
         # which was a problem when we just look at the last action
-        jf = MockEmrObject(
-            bootstrapactions=[
-                MockEmrObject(args=[
-                    MockEmrObject(
-                        value='pool-0123456789abcdef0123456789abcdef'),
-                    MockEmrObject(value='reflecting'),
-                ], name='master'),
-                MockEmrObject(args=[
-                    MockEmrObject(value='900'),
-                    MockEmrObject(value='300'),
-                ], name='idle timeout'),
-            ])
+        actions = [
+            MockEmrObject(args=[
+                MockEmrObject(
+                    value='pool-0123456789abcdef0123456789abcdef'),
+                MockEmrObject(value='reflecting'),
+            ], name='master'),
+            MockEmrObject(args=[
+                MockEmrObject(value='900'),
+                MockEmrObject(value='300'),
+            ], name='idle timeout'),
+        ]
 
-        self.assertEqual(pool_hash_and_name(jf),
+        self.assertEqual(_pool_hash_and_name(actions),
                          ('0123456789abcdef0123456789abcdef', 'reflecting'))
 
     def test_first_arg_doesnt_start_with_pool(self):
-        jf = MockEmrObject(
-            bootstrapactions=[
-                MockEmrObject(args=[
-                    MockEmrObject(value='cowsay'),
-                    MockEmrObject(value='mrjob'),
-                ], name='master'),
-            ])
+        actions = [
+            MockEmrObject(args=[
+                MockEmrObject(value='cowsay'),
+                MockEmrObject(value='mrjob'),
+            ], name='master'),
+        ]
 
-        self.assertEqual(pool_hash_and_name(jf), (None, None))
+        self.assertEqual(_pool_hash_and_name(actions), (None, None))
 
     def test_too_many_args(self):
-        jf = MockEmrObject(
-            bootstrapactions=[
-                MockEmrObject(args=[
-                    MockEmrObject(value='cowsay'),
-                    MockEmrObject(value='-b'),
-                    MockEmrObject(value='mrjob'),
-                ], name='master'),
-            ])
+        actions = [
+            MockEmrObject(args=[
+                MockEmrObject(value='cowsay'),
+                MockEmrObject(value='-b'),
+                MockEmrObject(value='mrjob'),
+            ], name='master'),
+        ]
 
-        self.assertEqual(pool_hash_and_name(jf), (None, None))
+        self.assertEqual(_pool_hash_and_name(actions), (None, None))
 
     def test_too_few_args(self):
-        jf = MockEmrObject(
-            bootstrapactions=[
-                MockEmrObject(args=[
-                    MockEmrObject(
-                        value='pool-0123456789abcdef0123456789abcdef'),
-                ], name='master'),
-            ])
+        actions = [
+            MockEmrObject(args=[
+                MockEmrObject(
+                    value='pool-0123456789abcdef0123456789abcdef'),
+            ], name='master'),
+        ]
 
-        self.assertEqual(pool_hash_and_name(jf), (None, None))
+        self.assertEqual(_pool_hash_and_name(actions), (None, None))
 
     def test_bootstrap_action_isnt_named_master(self):
-        jf = MockEmrObject(
-            bootstrapactions=[
-                MockEmrObject(args=[
-                    MockEmrObject(
-                        value='pool-0123456789abcdef0123456789abcdef'),
-                    MockEmrObject(value='reflecting'),
-                ], name='apprentice'),
-            ])
+        actions = [
+            MockEmrObject(args=[
+                MockEmrObject(
+                    value='pool-0123456789abcdef0123456789abcdef'),
+                MockEmrObject(value='reflecting'),
+            ], name='apprentice'),
+        ]
 
-        self.assertEqual(pool_hash_and_name(jf), (None, None))
+        self.assertEqual(_pool_hash_and_name(actions), (None, None))

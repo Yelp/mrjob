@@ -826,7 +826,7 @@ class MockEmrConnection(object):
         return [
             MockEmrObject(name=action.name,
                           scriptpath=action.path,
-                          args=[MockEmrObject(value=unicode(v)) for v \
+                          args=[MockEmrObject(value=str(v)) for v \
                                 in action.bootstrap_action_args])
             for action in bootstrap_actions
         ]
@@ -848,7 +848,7 @@ class MockEmrConnection(object):
                 instancetype=instance_group.type,
                 market=instance_group.market,
                 name=instance_group.name,
-                requestedinstancecount=unicode(instance_group.num_instances),
+                requestedinstancecount=str(instance_group.num_instances),
                 runninginstancecount='0',
                 status=MockEmrObject(state='PROVISIONING'),
             )
@@ -1007,7 +1007,7 @@ class MockEmrConnection(object):
 
         Remove this in v0.5.0 (see #1081)
         """
-        if isinstance(items, (bytes, unicode)):
+        if isinstance(items, (bytes, str)):
             items = [items]
         for i in range(1, len(items) + 1):
             params['%s.%d' % (label, i)] = items[i - 1]

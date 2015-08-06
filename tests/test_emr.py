@@ -778,13 +778,13 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
         role_to_expected = {}
         for role, (num, instance_type, bid_price) in expected.items():
             info = dict(
-                bidprice=(unicode(bid_price) if bid_price else None),
-                instancetype=unicode(instance_type),
+                bidprice=(bid_price if bid_price else None),
+                instancetype=instance_type,
                 market=(u'SPOT' if bid_price else u'ON_DEMAND'),
-                requestedinstancecount=unicode(num),
+                requestedinstancecount=str(num),
             )
 
-            role_to_expected[unicode(role.upper())] = info
+            role_to_expected[role.upper()] = info
 
         self.assertEqual(role_to_actual, role_to_expected)
 

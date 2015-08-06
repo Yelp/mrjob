@@ -665,7 +665,7 @@ def print_help_for_groups(*args):
 
 
 def alphabetize_options(opt_group):
-    opt_group.option_list.sort(key=lambda opt: opt.dest)
+    opt_group.option_list.sort(key=lambda opt: opt.dest or '')
 
 
 def fix_custom_options(options, option_parser):

@@ -19,6 +19,8 @@
     number of Amazon EC2 instances used to execute these jobflows.
     The instance counts are not separated by instance type.
 
+    .. deprecated:: 0.4.5
+
 Usage::
 
     mrjob collect-emr-stats > report
@@ -45,7 +47,7 @@ from mrjob.emr import describe_all_job_flows
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 
-log = getLogger(__name__)
+log = getLogger('mrjob.tools.emr.collect_emr_stats')
 
 
 def main(args):
@@ -70,6 +72,10 @@ def main(args):
         option_parser.error('takes no arguments')
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
+
+    log.warning(
+        'collect_emr_stats is deprecated and will be removed in v0.5.0')
+
     log.info('collecting EMR active jobflows...')
     job_flows = collect_active_job_flows(options.conf_paths)
     log.info('compiling stats from collected jobflows...')

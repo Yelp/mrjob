@@ -1,4 +1,5 @@
 # Copyright 2009-2010 Yelp
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,16 +22,29 @@ Usage::
 Options::
 
   -h, --help            show this help message and exit
-  -v, --verbose         print more messages to stderr
-  -q, --quiet           Don't log status messages; just print the report.
-  -c CONF_PATH, --conf-path=CONF_PATH
+  --aws-region=AWS_REGION
+                        Region to connect to S3 and EMR on (e.g. us-west-1).
+  -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
+  --emr-endpoint=EMR_ENDPOINT
+                        Optional host to connect to when communicating with S3
+                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
+                        Default is to infer this from aws_region.
   --max-days-ago=MAX_DAYS_AGO
                         Max number of days ago to look at jobs. By default, we
                         go back as far as EMR supports (currently about 2
                         months)
+  -q, --quiet           Don't print anything to stderr
+  --s3-endpoint=S3_ENDPOINT
+                        Host to connect to when communicating with S3 (e.g. s3
+                        -us-west-1.amazonaws.com). Default is to infer this
+                        from region (see --aws-region).
+  -v, --verbose         print more messages to stderr
 """
+# This just approximates EMR billing rules. For the actual rules, see:
+#
+# http://aws.amazon.com/elasticmapreduce/faqs/
 from __future__ import print_function
 
 from datetime import datetime
@@ -39,10 +53,15 @@ import math
 import logging
 from optparse import OptionParser
 
+from mrjob import _boto_emr
 from mrjob.emr import EMRJobRunner
-from mrjob.emr import describe_all_job_flows
+from mrjob.emr import _yield_all_clusters
+from mrjob.emr import _yield_all_bootstrap_actions
+from mrjob.emr import _yield_all_steps
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
+from mrjob.options import add_emr_connect_opts
+from mrjob.options import alphabetize_options
 from mrjob.parse import JOB_KEY_RE
 from mrjob.parse import STEP_NAME_RE
 from mrjob.parse import iso8601_to_datetime
@@ -64,11 +83,11 @@ def main(args):
     now = datetime.utcnow()
 
     log.info('getting job flow history...')
-    job_flows = get_job_flows(
-        options.conf_paths, options.max_days_ago, now=now)
+    clusters = list(yield_clusters(
+        max_days_ago=options.max_days_ago, now=now, **runner_kwargs(options)))
 
     log.info('compiling job flow stats...')
-    stats = job_flows_to_stats(job_flows, now=now)
+    stats = clusters_to_stats(clusters, now=now)
 
     print_report(stats, now=now)
 
@@ -85,21 +104,33 @@ def make_option_parser():
               ' as far as EMR supports (currently about 2 months)'))
 
     add_basic_opts(option_parser)
+    add_emr_connect_opts(option_parser)
+
+    alphabetize_options(option_parser)
 
     return option_parser
 
 
-def job_flows_to_stats(job_flows, now=None):
+def runner_kwargs(options):
+    kwargs = options.__dict__.copy()
+    for unused_arg in ('quiet', 'verbose', 'max_days_ago'):
+        del kwargs[unused_arg]
+
+    return kwargs
+
+
+def clusters_to_stats(clusters, now=None):
     """Aggregate statistics for several job flows into a dictionary.
 
-    :param job_flows: a list of :py:class:`boto.emr.EmrObject`
+    :param clusters: a sequence of dicts with the keys ``bootstrap_actions``,
+                     ``cluster``, ``steps``.
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
 
     Returns a dictionary with many keys, including:
 
-    * *flows*: A list of dictionaries; the result of running
-      :py:func:`job_flow_to_full_summary` on each job flow.
+    * *summaries*: A list of dictionaries; the result of running
+      :py:func:`cluster_to_full_summary` on each job flow.
 
     total usage:
 
@@ -139,19 +170,24 @@ def job_flows_to_stats(job_flows, now=None):
     """
     s = {}  # stats for all job flows
 
-    s['flows'] = [job_flow_to_full_summary(job_flow, now=now)
-                  for job_flow in job_flows]
+    s['clusters'] = [cluster_to_full_summary(cluster, now=now)
+                     for cluster in clusters]
+
+    # from here on out, we only process s['clusters']
 
     # total usage
     for nih_type in ('nih_billed', 'nih_used', 'nih_bbnu'):
-        s[nih_type] = float(sum(jf[nih_type] for jf in s['flows']))
+        s[nih_type] = float(sum(
+            cs[nih_type] for cs in s['clusters']))
 
     # break down by usage/waste
     s['bootstrap_nih_used'] = float(sum(
-        jf['usage'][0]['nih_used'] for jf in s['flows'] if jf['usage']))
+        cs['usage'][0]['nih_used'] for cs in s['clusters']
+        if cs['usage']))
     s['job_nih_used'] = s['nih_used'] - s['bootstrap_nih_used']
     s['end_nih_bbnu'] = float(sum(
-        jf['usage'][-1]['nih_bbnu'] for jf in s['flows'] if jf['usage']))
+        cs['usage'][-1]['nih_bbnu'] for cs in s['clusters']
+        if cs['usage']))
     s['other_nih_bbnu'] = s['nih_bbnu'] - s['end_nih_bbnu']
 
     # stats by date/hour
@@ -159,8 +195,8 @@ def job_flows_to_stats(job_flows, now=None):
         for nih_type in ('nih_billed', 'nih_used', 'nih_bbnu'):
             key = '%s_to_%s' % (interval_type, nih_type)
             start_to_nih = {}
-            for jf in s['flows']:
-                for u in jf['usage']:
+            for cs in s['clusters']:
+                for u in cs['usage']:
                     for start, nih in u[key].items():
                         start_to_nih.setdefault(start, 0.0)
                         start_to_nih[start] += nih
@@ -170,8 +206,8 @@ def job_flows_to_stats(job_flows, now=None):
     for key in ('label', 'owner'):
         for nih_type in ('nih_used', 'nih_billed', 'nih_bbnu'):
             key_to_nih = {}
-            for jf in s['flows']:
-                for u in jf['usage']:
+            for cs in s['clusters']:
+                for u in cs['usage']:
                     key_to_nih.setdefault(u[key], 0.0)
                     key_to_nih[u[key]] += u[nih_type]
             s['%s_to_%s' % (key, nih_type)] = key_to_nih
@@ -180,12 +216,12 @@ def job_flows_to_stats(job_flows, now=None):
     for nih_type in ('nih_used', 'nih_billed', 'nih_bbnu'):
         job_step_to_nih = {}
         job_step_to_nih_no_pool = {}
-        for jf in s['flows']:
-            for u in jf['usage'][1:]:
+        for cs in s['clusters']:
+            for u in cs['usage'][1:]:
                 job_step = (u['label'], u['step_num'])
                 job_step_to_nih.setdefault(job_step, 0.0)
                 job_step_to_nih[job_step] += u[nih_type]
-                if not jf['pool']:
+                if not cs['pool']:
                     job_step_to_nih_no_pool.setdefault(job_step, 0.0)
                     job_step_to_nih_no_pool[job_step] += u[nih_type]
 
@@ -195,56 +231,56 @@ def job_flows_to_stats(job_flows, now=None):
     # break down by pool
     for nih_type in ('nih_used', 'nih_billed', 'nih_bbnu'):
         pool_to_nih = {}
-        for jf in s['flows']:
-            pool_to_nih.setdefault(jf['pool'], 0.0)
-            pool_to_nih[jf['pool']] += jf[nih_type]
+        for cs in s['clusters']:
+            pool_to_nih.setdefault(cs['pool'], 0.0)
+            pool_to_nih[cs['pool']] += cs[nih_type]
 
         s['pool_to_%s' % nih_type] = pool_to_nih
 
     return s
 
 
-def job_flow_to_full_summary(job_flow, now=None):
+def cluster_to_full_summary(cluster, now=None):
     """Convert a job flow to a full summary for use in creating a report,
     including billing/usage information.
 
-    :param job_flow: a :py:class:`boto.emr.EmrObject`
+    :param cluster: a :py:class:`boto.emr.EmrObject`
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
 
     Returns a dictionary with the keys from
-    :py:func:`job_flow_to_basic_summary` plus:
+    :py:func:`cluster_to_basic_summary` plus:
 
     * *nih_billed*: total normalized instances hours billed for this job flow
     * *nih_used*: total normalized instance hours actually used for
       bootstrapping and running jobs.
     * *nih_bbnu*: total usage billed but not used (`nih_billed - nih_used`)
     * *usage*: job-specific usage information, returned by
-      :py:func:`job_flow_to_usage_data`.
+      :py:func:`cluster_to_usage_data`.
     """
+    cs = cluster_to_basic_summary(cluster, now=now)
 
-    jf = job_flow_to_basic_summary(job_flow, now=now)
-
-    jf['usage'] = job_flow_to_usage_data(job_flow, basic_summary=jf, now=now)
+    cs['usage'] = cluster_to_usage_data(
+        cluster, basic_summary=cs, now=now)
 
     # add up billing info
-    if jf['end']:
+    if cs['end']:
         # avoid rounding errors if the job is done
-        jf['nih_billed'] = jf['nih']
+        cs['nih_billed'] = cs['nih']
     else:
-        jf['nih_billed'] = float(sum(u['nih_billed'] for u in jf['usage']))
+        cs['nih_billed'] = float(sum(u['nih_billed'] for u in cs['usage']))
 
     for nih_type in ('nih_used', 'nih_bbnu'):
-        jf[nih_type] = float(sum(u[nih_type] for u in jf['usage']))
+        cs[nih_type] = float(sum(u[nih_type] for u in cs['usage']))
 
-    return jf
+    return cs
 
 
-def job_flow_to_basic_summary(job_flow, now=None):
+def cluster_to_basic_summary(cluster, now=None):
     """Extract fields such as creation time, owner, etc. from the job flow,
     so we can safely reference them without using :py:func:`getattr`.
 
-    :param job_flow: a :py:class:`boto.emr.EmrObject`
+    :param cluster: a :py:class:`boto.emr.EmrObject`
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
 
@@ -270,58 +306,59 @@ def job_flow_to_basic_summary(job_flow, now=None):
       the job flow hasn't started.
     * *ready*: UTC `datetime.datetime` that the job flow finished
       bootstrapping, or ``None``
-    * *start*: UTC `datetime.datetime` that the job flow became available, or
-      ``None``
     * *state*: The job flow's state as a string (e.g. ``'RUNNING'``)
     """
     if now is None:
         now = datetime.utcnow()
 
-    jf = {}  # summary to fill in
+    bcs = {}  # basic cluster summary to fill in
 
-    jf['id'] = getattr(job_flow, 'jobflowid', None)
-    jf['name'] = getattr(job_flow, 'name', None)
+    bcs['id'] = getattr(cluster, 'id', None)
+    bcs['name'] = getattr(cluster, 'name', None)
 
-    jf['created'] = to_datetime(getattr(job_flow, 'creationdatetime', None))
-    jf['start'] = to_datetime(getattr(job_flow, 'startdatetime', None))
-    jf['ready'] = to_datetime(getattr(job_flow, 'readydatetime', None))
-    jf['end'] = to_datetime(getattr(job_flow, 'enddatetime', None))
+    status = getattr(cluster, 'status', None)
+    timeline = getattr(status, 'timeline', None)
 
-    if jf['start']:
-        jf['ran'] = (jf['end'] or now) - jf['start']
+    bcs['created'] = to_datetime(getattr(
+        timeline, 'creationdatetime', None))
+    bcs['ready'] = to_datetime(getattr(timeline, 'readydatetime', None))
+    bcs['end'] = to_datetime(getattr(timeline, 'enddatetime', None))
+
+    if bcs['created']:
+        bcs['ran'] = (bcs['end'] or now) - bcs['created']
     else:
-        jf['ran'] = timedelta(0)
+        bcs['ran'] = timedelta(0)
 
-    jf['state'] = getattr(job_flow, 'state', None)
+    bcs['state'] = getattr(status, 'state', None)
 
-    jf['num_steps'] = len(getattr(job_flow, 'steps', None) or ())
+    bcs['num_steps'] = len(getattr(cluster, 'steps', ()))
 
-    jf['pool'] = None
-    bootstrap_actions = getattr(job_flow, 'bootstrapactions', None)
+    bcs['pool'] = None
+    bootstrap_actions = getattr(cluster, 'bootstrapactions', None)
     if bootstrap_actions:
         args = [arg.value for arg in bootstrap_actions[-1].args]
         if len(args) == 2 and args[0].startswith('pool-'):
-            jf['pool'] = args[1]
+            bcs['pool'] = args[1]
 
-    m = JOB_KEY_RE.match(getattr(job_flow, 'name', ''))
+    m = JOB_KEY_RE.match(bcs['name'] or '')
     if m:
-        jf['label'], jf['owner'] = m.group(1), m.group(2)
+        bcs['label'], bcs['owner'] = m.group(1), m.group(2)
     else:
-        jf['label'], jf['owner'] = None, None
+        bcs['label'], bcs['owner'] = None, None
 
-    jf['nih'] = float(getattr(job_flow, 'normalizedinstancehours', '0'))
+    bcs['nih'] = float(getattr(cluster, 'normalizedinstancehours', '0'))
 
-    return jf
+    return bcs
 
 
-def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
+def cluster_to_usage_data(cluster, basic_summary=None, now=None):
     """Break billing/usage information for a job flow down by job.
 
-    :param job_flow: a :py:class:`boto.emr.EmrObject`
+    :param cluster: a :py:class:`boto.emr.EmrObject`
     :param basic_summary: a basic summary of the job flow, returned by
-                          :py:func:`job_flow_to_basic_summary`. If this
+                          :py:func:`cluster_to_basic_summary`. If this
                           is ``None``, we'll call
-                          :py:func:`job_flow_to_basic_summary` ourselves.
+                          :py:func:`cluster_to_basic_summary` ourselves.
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
 
@@ -353,52 +390,55 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
     * *start*: when the job or bootstrapping step started, as a
       :py:class:`datetime.datetime`
     """
-    jf = basic_summary or job_flow_to_basic_summary(job_flow)
+    bcs = basic_summary or cluster_to_basic_summary(cluster)
 
     if now is None:
         now = datetime.utcnow()
 
-    if not jf['start']:
+    if not bcs['created']:
         return []
 
     # Figure out billing rate per second for the job, given that
     # normalizedinstancehours is how much we're charged up until
     # the next full hour.
-    full_hours = math.ceil(to_secs(jf['ran']) / 60.0 / 60.0)
-    nih_per_sec = jf['nih'] / (full_hours * 3600.0)
+    full_hours = math.ceil(to_secs(bcs['ran']) / 60.0 / 60.0)
+    nih_per_sec = bcs['nih'] / (full_hours * 3600.0)
 
     # Don't actually count a step as billed for the full hour until
     # the job flow finishes. This means that our total "nih_billed"
     # will be less than normalizedinstancehours in the job flow, but it
     # also keeps stats stable for steps that have already finished.
-    if jf['end']:
-        jf_end_billing = jf['start'] + timedelta(hours=full_hours)
+    if bcs['end']:
+        cluster_end_billing = bcs['created'] + timedelta(hours=full_hours)
     else:
-        jf_end_billing = now
+        cluster_end_billing = now
 
     intervals = []
 
-    # add a fake step for the job that started the job flow, and credit
-    # it for time spent bootstrapping.
+    # make a fake step for cluster startup and bootstrapping, so we don't
+    # consider that wasted.
     intervals.append({
-        'label': jf['label'],
-        'owner': jf['owner'],
-        'start': jf['start'],
-        'end': jf['ready'] or now,
+        'label': bcs['label'],
+        'owner': bcs['owner'],
+        'start': bcs['created'],
+        'end': bcs['ready'] or bcs['end'] or now,
         'step_num': None,
     })
 
-    for step in (getattr(job_flow, 'steps', None) or ()):
+    for step in getattr(cluster, 'steps', ()):
+        step_status = getattr(step, 'status', None)
+        step_timeline = getattr(step_status, 'timeline', None)
+
         # we've reached the last step that's actually run
-        if not hasattr(step, 'startdatetime'):
+        if not hasattr(step_timeline, 'startdatetime'):
             break
 
-        step_start = to_datetime(step.startdatetime)
+        step_start = to_datetime(step_timeline.startdatetime)
 
-        step_end = to_datetime(getattr(step, 'enddatetime', None))
+        step_end = to_datetime(getattr(step_timeline, 'enddatetime', None))
         if step_end is None:
             # step started running and was cancelled. credit it for 0 usage
-            if jf['end']:
+            if bcs['end']:
                 step_end = step_start
             # step is still running
             else:
@@ -424,7 +464,7 @@ def job_flow_to_usage_data(job_flow, basic_summary=None, now=None):
     for i in range(len(intervals) - 1):
         intervals[i]['end_billing'] = intervals[i + 1]['start']
 
-    intervals[-1]['end_billing'] = jf_end_billing
+    intervals[-1]['end_billing'] = cluster_end_billing
 
     # fill normalized usage information
     for interval in intervals:
@@ -543,33 +583,42 @@ def subdivide_interval_by_hour(start, end):
     return hour_to_secs
 
 
-def get_job_flows(conf_paths, max_days_ago=None, now=None):
+def yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
     """Get relevant job flow information from EMR.
 
-    :param str conf_paths: List of alternate paths to read configs from, or
-                           ``[]`` to ignore all config files.
     :param float max_days_ago: If set, don't fetch job flows created longer
                                than this many days ago.
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
+    :param runner_kwargs: keyword args to pass through to
+                          :py:class:`~mrjob.emr.EMRJobRunner`
     """
     if now is None:
         now = datetime.utcnow()
 
-    emr_conn = EMRJobRunner(conf_paths=conf_paths).make_emr_conn()
+    emr_conn = EMRJobRunner(**runner_kwargs).make_emr_conn()
 
     # if --max-days-ago is set, only look at recent jobs
     created_after = None
     if max_days_ago is not None:
         created_after = now - timedelta(days=max_days_ago)
 
-    return describe_all_job_flows(emr_conn, created_after=created_after)
+    for cluster_summary in _yield_all_clusters(
+            emr_conn, created_after=created_after):
+        cluster_id = cluster_summary.id
+
+        cluster = _boto_emr.describe_cluster(emr_conn, cluster_id)
+        cluster.steps = list(_yield_all_steps(emr_conn, cluster_id))
+        cluster.bootstrapactions = list(
+            _yield_all_bootstrap_actions(emr_conn, cluster_id))
+
+        yield cluster
 
 
 def print_report(stats, now=None):
     """Print final report.
 
-    :param stats: a dictionary returned by :py:func:`job_flows_to_stats`
+    :param stats: a dictionary returned by :py:func:`clusters_to_stats`
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
     """
@@ -578,18 +627,18 @@ def print_report(stats, now=None):
 
     s = stats
 
-    if not s['flows']:
+    if not s['clusters']:
         print('No job flows created in the past two months!')
         return
 
-    print('Total  # of Job Flows: %d' % len(s['flows']))
+    print('Total  # of Job Flows: %d' % len(s['clusters']))
     print()
 
     print('* All times are in UTC.')
     print()
 
-    print('Min create time: %s' % min(jf['created'] for jf in s['flows']))
-    print('Max create time: %s' % max(jf['created'] for jf in s['flows']))
+    print('Min create time: %s' % min(cs['created'] for cs in s['clusters']))
+    print('Max create time: %s' % max(cs['created'] for cs in s['clusters']))
     print('   Current time: %s' % now.replace(microsecond=0))
     print()
 
@@ -711,34 +760,35 @@ def print_report(stats, now=None):
 
     # Top job flows
     print('All job flows, by total time billed:')
-    top_job_flows = sorted(s['flows'],
-                           key=lambda jf: (-jf['nih_billed'], jf['name']))
-    for jf in top_job_flows:
+    top_clusters = sorted(s['clusters'],
+                          key=lambda cs: (-cs['nih_billed'], cs['name']))
+    for cs in top_clusters:
         print('  %9.2f %-15s %s' % (
-            jf['nih_billed'], jf['id'], jf['name']))
+            cs['nih_billed'], cs['id'], cs['name']))
     print()
 
     print('All job flows, by time billed but not used:')
-    top_job_flows_bbnu = sorted(s['flows'],
-                                key=lambda jf: (-jf['nih_bbnu'], jf['name']))
-    for jf in top_job_flows_bbnu:
+    top_clusters_bbnu = sorted(
+        s['clusters'], key=lambda cs: (-cs['nih_bbnu'], cs['name']))
+    for cs in top_clusters_bbnu:
         print('  %9.2f %-15s %s' % (
-            jf['nih_bbnu'], jf['id'], jf['name']))
+            cs['nih_bbnu'], cs['id'], cs['name']))
     print()
 
     # Details
     print('Details for all job flows:')
     print()
-    print (' id              state         created             steps'
-           '        time ran     billed    waste   user   name')
+    print(' id              state                  created             steps'
+          '        time ran     billed    waste   user   name')
 
-    all_job_flows = sorted(s['flows'], key=lambda jf: jf['created'],
-                           reverse=True)
-    for jf in all_job_flows:
-        print(' %-15s %-13s %19s %3d %17s %9.2f %9.2f %8s %s' % (
-            jf['id'], jf['state'], jf['created'], jf['num_steps'],
-            strip_microseconds(jf['ran']), jf['nih_used'], jf['nih_bbnu'],
-            (jf['owner'] or ''), (jf['label'] or ('not started by mrjob'))))
+    all_clusters = sorted(s['clusters'], key=lambda cs: cs['created'],
+                          reverse=True)
+
+    for cs in all_clusters:
+        print(' %-15s %-22s %19s %3d %17s %9.2f %9.2f %8s %s' % (
+            cs['id'], cs['state'], cs['created'], cs['num_steps'],
+            strip_microseconds(cs['ran']), cs['nih_used'], cs['nih_bbnu'],
+            (cs['owner'] or ''), (cs['label'] or ('not started by mrjob'))))
 
 
 def to_secs(delta):

@@ -1,4 +1,5 @@
 # Copyright 2009-2013 Yelp, David Marin
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -148,7 +149,7 @@ class RetryWrapper(object):
                     return f(*args, **kwargs)
                 except Exception as ex:
                     if (self.__retry_if(ex) and
-                        (tries < self.__max_tries - 1 or 
+                        (tries < self.__max_tries - 1 or
                          not self.__max_tries)):
                         log.info('Got retriable error: %r' % ex)
                         log.info('Backing off for %.1f seconds' % backoff)

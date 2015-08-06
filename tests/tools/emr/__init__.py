@@ -1,4 +1,5 @@
 # Copyright 2009-2012 Yelp
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,7 +41,7 @@ class ToolTestCase(MockBotoTestCase):
         self.addCleanup(p.stop)
         p.start()
 
-    def make_job_flow(self, **kwargs):
+    def make_cluster(self, **kwargs):
         self.add_mock_s3_data({'walrus': {}})
         kwargs.update(dict(
             conf_paths=[],

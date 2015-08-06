@@ -334,6 +334,13 @@ def add_emr_run_opts(opt_group):
                   ' Rarely necessary.')),
 
         opt_group.add_option(
+            '--pool-wait-minutes', dest='pool_wait_minutes', default=0,
+            type='int',
+            help=('Wait for a number of minutes for a job flow to finish'
+                  ' if a job finishes, pick up their job flow. Otherwise'
+                  ' create a new one. (default 0)')),
+
+        opt_group.add_option(
             '--ssh-bin', dest='ssh_bin', default=None,
             help=("Name/path of ssh binary. Arguments are allowed (e.g."
                   " --ssh-bin 'ssh -v')")),
@@ -451,13 +458,6 @@ def add_emr_launch_opts(opt_group):
             default=None,
             help=('Specify a pool name to join. Set to "default" if not'
                   ' specified.')),
-
-        opt_group.add_option(
-            '--pool-wait-minutes', dest='pool_wait_minutes', default=0,
-            type='int',
-            help=('Wait for a number of minutes for a job flow to finish'
-                  ' if a job finishes, pick up their job flow. Otherwise'
-                  ' create a new one. (default 0)')),
 
         opt_group.add_option(
             '--s3-log-uri', dest='s3_log_uri', default=None,

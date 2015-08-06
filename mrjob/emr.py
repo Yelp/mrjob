@@ -190,6 +190,18 @@ def _yield_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
             yield group
 
 
+def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
+    """Get all steps for the cluster, making successive API calls
+    if necessary.
+
+    Calls :py:func:`_list_steps`, to work around `boto's startdatetime bug
+    <https://github.com/boto/boto/issues/3268>`__.
+    """
+    for resp in _repeat(_list_steps, emr_conn, cluster_id, *args, **kwargs):
+        for step in getattr(resp, 'steps', []):
+            yield step
+
+
 def _list_steps(emr_conn, cluster_id, *args, **kwargs):
     """Wrapper for :py:meth:`boto.emr.EmrConnection.list_steps()`
     that works around around `boto's startdatetime bug
@@ -208,13 +220,6 @@ def _list_steps(emr_conn, cluster_id, *args, **kwargs):
         ClusterTimeline.Fields = orig_fields
 
 
-def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
-    """Get all steps for the cluster, making successive API calls
-    if necessary.
-    """
-    for resp in _repeat(_list_steps, emr_conn, cluster_id, *args, **kwargs):
-        for step in getattr(resp, 'steps', []):
-            yield step
 
 
 def make_lock_uri(s3_tmp_dir, emr_job_flow_id, step_num):

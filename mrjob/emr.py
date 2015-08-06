@@ -190,9 +190,29 @@ def _yield_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
             yield group
 
 
+def _list_steps(emr_conn, cluster_id, *args, **kwargs):
+    """Wrapper for :py:meth:`boto.emr.EmrConnection.list_steps()`
+    that works around around `boto's startdatetime bug
+    <https://github.com/boto/boto/issues/3268>`__.
+    """
+    try:
+        # temporarily monkey-patch ClusterTimeline.Fields
+        # not using patch here because it's an external dependency
+        # in Python 2
+        orig_fields = ClusterTimeline.Fields
+        ClusterTimeline.Fields = (
+            ClusterTimeline.Fields | set(['StartDateTime']))
+
+        return emr_conn.list_steps(cluster_id, *args, **kwargs)
+    finally:
+        ClusterTimeline.Fields = orig_fields
+
+
 def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
-    for resp in _repeat(_boto_emr.list_steps,
-                        emr_conn, cluster_id, *args, **kwargs):
+    """Get all steps for the cluster, making successive API calls
+    if necessary.
+    """
+    for resp in _repeat(_list_steps, emr_conn, cluster_id, *args, **kwargs):
         for step in getattr(resp, 'steps', []):
             yield step
 

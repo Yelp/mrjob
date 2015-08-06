@@ -141,17 +141,16 @@ class MockBotoTestCase(SandboxedTestCase):
         self.simulation_iterator = itertools.repeat(
             None, self.MAX_SIMULATION_STEPS)
 
-        p_s3 = patch.object(boto, 'connect_s3', self._mock_boto_connect_s3)
+        p_s3 = patch.object(boto, 'connect_s3', self.connect_s3)
         self.addCleanup(p_s3.stop)
         p_s3.start()
 
-        p_iam = patch.object(boto, 'connect_iam', self._mock_boto_connect_iam)
+        p_iam = patch.object(boto, 'connect_iam', self.connect_iam)
         self.addCleanup(p_iam.stop)
         p_iam.start()
 
         p_emr = patch.object(
-            boto.emr.connection, 'EmrConnection',
-            self._mock_boto_emr_EmrConnection)
+            boto.emr.connection, 'EmrConnection', self.connect_emr)
         self.addCleanup(p_emr.stop)
         p_emr.start()
 

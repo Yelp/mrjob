@@ -109,7 +109,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
         # setup fake output
         self.mock_emr_output = {('j-MOCKCLUSTER0', 1): [
-            b'1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n']}
+            b'1\t"qux"\n2\t"bar"\n', b'2\t"foo"\n5\tnull\n']}
 
         mr_job = MRHadoopFormatJob(['-r', 'emr', '-v',
                                     '-', local_input_path, remote_input_path,
@@ -232,7 +232,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
     def _test_remote_scratch_cleanup(self, mode, scratch_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKCLUSTER0/1': b'1\n'}})
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '--s3-log-uri', 's3://walrus/logs',
@@ -310,7 +310,7 @@ class ExistingClusterTestCase(MockBotoTestCase):
             keep_alive=True, job_flow_role='fake-instance-profile',
             service_role='fake-service-role')
 
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
         self.mock_emr_output = {(cluster_id, 1): [
             b'1\t"bar"\n1\t"foo"\n2\tnull\n']}
 
@@ -1934,7 +1934,7 @@ class EMRNoMapperTest(MockBotoTestCase):
 
         # setup fake output
         self.mock_emr_output = {('j-MOCKCLUSTER0', 1): [
-            b'1\t"qux"\n2\t"bar"\n', '2\t"foo"\n5\tnull\n']}
+            b'1\t"qux"\n2\t"bar"\n', b'2\t"foo"\n5\tnull\n']}
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '-', local_input_path, remote_input_path])

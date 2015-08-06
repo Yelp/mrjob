@@ -39,7 +39,6 @@ from mrjob.emr import EMRJobRunner
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import RFC1123
-from mrjob.py2 import StringIO
 from mrjob.ssh import SSH_LOG_ROOT
 
 from tests.mockssh import create_mock_ssh_script
@@ -246,7 +245,7 @@ class MockBotoTestCase(SandboxedTestCase):
         with self.make_runner() as runner:
             ...
         """
-        stdin = StringIO('foo\nbar\n')
+        stdin = BytesIO(b'foo\nbar\n')
         mr_job = MRTwoStepJob(['-r', 'emr'] + list(args))
         mr_job.sandbox(stdin=stdin)
 

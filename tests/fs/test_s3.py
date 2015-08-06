@@ -1,4 +1,5 @@
 # Copyright 2009-2013 Yelp and Contributors
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import bz2
-import os
 
 try:
     import boto
@@ -23,11 +23,6 @@ except ImportError:
 from mrjob.fs.s3 import S3Filesystem
 
 from tests.compress import gzip_compress
-from tests.mockboto import MockS3Connection
-from tests.mockboto import add_mock_s3_data
-from tests.py2 import Mock
-from tests.py2 import TestCase
-from tests.py2 import patch
 from tests.mockboto import MockBotoTestCase
 
 

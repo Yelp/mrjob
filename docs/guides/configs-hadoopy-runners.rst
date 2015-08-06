@@ -18,11 +18,8 @@ some degree.
     :set: emr
     :default: inferred from environment/AWS
 
-    Set the version of Hadoop to use on EMR or simulate in the ``local``
-    runner. If using EMR, consider setting *ami_version* instead; only AMI
-    version 1.0 supports multiple versions of Hadoop anyway. If *ami_version*
-    is not set, we'll default to Hadoop 0.20 for backwards compatibility with
-    :py:mod:`mrjob` v0.3.0.
+    Set the version of Hadoop to simulate in the ``local`` or ``inline``
+    runner.
 
 .. mrjob-opt::
     :config: jobconf

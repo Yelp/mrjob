@@ -20,6 +20,8 @@ made public until at least 0.4 if not later or never.
 from optparse import OptionParser
 from optparse import SUPPRESS_USAGE
 
+from mrjob.parse import parse_key_value_list
+from mrjob.parse import parse_port_range_list
 from mrjob.runner import CLEANUP_CHOICES
 
 
@@ -264,7 +266,7 @@ def add_hadoop_opts(opt_group):
         opt_group.add_option(
             '--hadoop-home', dest='hadoop_home',
             default=None,
-            help='Alternative to setting the HADOOP_HOME environment variable.'),
+            help='Alternative to setting $HADOOP_HOME'),
 
         opt_group.add_option(
             '--hadoop-tmp-dir', dest='hdfs_tmp_dir',
@@ -280,23 +282,242 @@ def add_hadoop_opts(opt_group):
 
 def add_emr_opts(opt_group):
     """Options for ``emr`` runner"""
+    return (add_emr_connect_opts(opt_group) +
+            add_emr_launch_opts(opt_group) +
+            add_emr_run_opts(opt_group))
+
+
+def add_emr_connect_opts(opt_group):
+    """Options for connecting to the EMR API."""
+    return [
+        opt_group.add_option(
+            '--aws-region', dest='aws_region', default=None,
+            help=('Region to run EMR jobs in. Default is us-west-2')),
+
+        opt_group.add_option(
+            '--emr-endpoint', dest='emr_endpoint', default=None,
+            help=('Force mrjob to connect to EMR on this endpoint'
+                  ' (e.g. us-west-1.elasticmapreduce.amazonaws.com). Default'
+                  ' is to infer this from aws_region.')),
+
+        opt_group.add_option(
+            '--s3-endpoint', dest='s3_endpoint', default=None,
+            help=("Force mrjob to connect to S3 on this endpoint (e.g."
+                  " s3-us-west-1.amazonaws.com). You usually shouldn't"
+                  " set this; by default mrjob will choose the correct"
+                  " endpoint for each S3 bucket based on its location.")),
+    ]
+
+
+def add_emr_run_opts(opt_group):
+    """Options for running and monitoring a job on EMR."""
+    return [
+        opt_group.add_option(
+            '--check-emr-status-every', dest='check_emr_status_every',
+            default=None, type='int',
+            help='How often (in seconds) to check status of your EMR job'),
+
+        # --ec2-key-pair is used to launch the job, not to monitor it
+        opt_group.add_option(
+            '--ec2-key-pair-file', dest='ec2_key_pair_file', default=None,
+            help='Path to file containing SSH key for EMR'),
+
+        opt_group.add_option(
+            '--emr-action-on-failure', dest='emr_action_on_failure',
+            default=None,
+            help=('Action to take when a step fails'
+                  ' (e.g. TERMINATE_CLUSTER | CANCEL_AND_WAIT | CONTINUE)')),
+
+        opt_group.add_option(
+            '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
+            help='ID of an existing EMR job flow to use'),
+
+        opt_group.add_option(
+            '--hadoop-streaming-jar-on-emr',
+            dest='hadoop_streaming_jar_on_emr', default=None,
+            help=('Local path of the hadoop streaming jar on the EMR node.'
+                  ' Rarely necessary.')),
+
+        opt_group.add_option(
+            '--pool-wait-minutes', dest='pool_wait_minutes', default=0,
+            type='int',
+            help=('Wait for a number of minutes for a job flow to finish'
+                  ' if a job finishes, pick up their job flow. Otherwise'
+                  ' create a new one. (default 0)')),
+
+        opt_group.add_option(
+            '--ssh-bin', dest='ssh_bin', default=None,
+            help=("Name/path of ssh binary. Arguments are allowed (e.g."
+                  " --ssh-bin 'ssh -v')")),
+
+        opt_group.add_option(
+            '--ssh-bind-ports', dest='ssh_bind_ports', default=None,
+            help=('A list of port ranges that are safe to listen on, delimited'
+                  ' by colons and commas, with syntax like'
+                  ' 2000[:2001][,2003,2005:2008,etc].'
+                  ' Defaults to 40001:40840.')),
+
+        opt_group.add_option(
+            '--ssh-tunnel-is-closed', dest='ssh_tunnel_is_open',
+            default=None, action='store_false',
+            help='Make ssh tunnel accessible from localhost only'),
+
+        opt_group.add_option(
+            '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',
+            default=None, action='store_true',
+            help=('Make ssh tunnel accessible from remote hosts (not just'
+                  ' localhost).')),
+
+        opt_group.add_option(
+            '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
+            default=None, action='store_true',
+            help='Open up an SSH tunnel to the Hadoop job tracker'),
+    ]
+
+
+def add_emr_launch_opts(opt_group):
+    """Options for launching a cluster (including bootstrapping)."""
     return [
         opt_group.add_option(
             '--additional-emr-info', dest='additional_emr_info', default=None,
             help='A JSON string for selecting additional features on EMR'),
 
         opt_group.add_option(
-            '--ami-version', dest='ami_version', default=None,
-            help=('AMI Version to use, e.g. "2.4.11" (default "latest").')),
-
-        opt_group.add_option(
             '--aws-availability-zone', dest='aws_availability_zone',
             default=None,
-            help='Availability zone to run EMR jobs in.'),
+            help='Availability zone to run the job flow on'),
 
         opt_group.add_option(
-            '--aws-region', dest='aws_region', default=None,
-            help=('Region to run EMR jobs in. Default is us-west-2')),
+            '--ec2-key-pair', dest='ec2_key_pair', default=None,
+            help='Name of the SSH key pair you set up for EMR'),
+
+        opt_group.add_option(
+            '--emr-api-param', dest='emr_api_params',
+            default=[], action='append',
+            help='Additional parameters to pass directly to the EMR API '
+                 ' when creating a cluster. Should take the form KEY=VALUE.'
+                 ' You can use --emr-api-param multiple times.'
+        ),
+
+        opt_group.add_option(
+            '--emr-tag', dest='emr_tags',
+            default=[], action='append',
+            help='Metadata tags to apply to the EMR cluster; '
+                 'should take the form KEY=VALUE. You can use --emr-tag '
+                 'multiple times.'),
+
+        opt_group.add_option(
+            '--iam-endpoint', dest='iam_endpoint', default=None,
+            help=('Force mrjob to connect to IAM on this endpoint'
+                  ' (e.g. iam.us-gov.amazonaws.com)')),
+
+        opt_group.add_option(
+            '--iam-instance-profile', dest='iam_instance_profile',
+            default=None,
+            help=('EC2 instance profile to use for the EMR cluster - see'
+                  ' "Configure IAM Roles for Amazon EMR" in AWS docs')),
+
+        opt_group.add_option(
+            '--iam-service-role', dest='iam_service_role',
+            default=None,
+            help=('IAM Job flow role to use for the EMR cluster - see'
+                  ' "Configure IAM Roles for Amazon EMR" in AWS docs')),
+
+        opt_group.add_option(
+            '--max-hours-idle', dest='max_hours_idle',
+            default=None, type='float',
+            help=("If we create a persistent job flow, have it automatically"
+                  " terminate itself after it's been idle this many hours.")),
+
+        opt_group.add_option(
+            '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
+            default=None, type='float',
+            help=("If --max-hours-idle is set, control how close to the end"
+                  " of an EC2 billing hour the job flow can automatically"
+                  " terminate itself (default is 5 minutes).")),
+
+        opt_group.add_option(
+            '--no-bootstrap-python', dest='bootstrap_python',
+            action='store_false', default=None,
+            help=("Don't automatically try to install a compatible version"
+                  " of Python at bootstrap time.")),
+
+        opt_group.add_option(
+            '--no-pool-emr-job-flows', dest='pool_emr_job_flows',
+            action='store_false',
+            help="Don't try to run our job on a pooled job flow."),
+
+        opt_group.add_option(
+            '--pool-emr-job-flows', dest='pool_emr_job_flows',
+            action='store_true',
+            help='Add to an existing job flow or create a new one that does'
+                 ' not terminate when the job completes. Overrides other job'
+                 ' flow-related options including EC2 instance configuration.'
+                 ' Joins pool "default" if emr_job_flow_pool_name is not'
+                 ' specified. WARNING: do not run this without'
+                 ' mrjob.tools.emr.terminate_idle_job_flows in your crontab;'
+                 ' job flows left idle can quickly become expensive!'),
+
+        opt_group.add_option(
+            '--pool-name', dest='emr_job_flow_pool_name', action='store',
+            default=None,
+            help=('Specify a pool name to join. Set to "default" if not'
+                  ' specified.')),
+
+        opt_group.add_option(
+            '--s3-log-uri', dest='s3_log_uri', default=None,
+            help='URI on S3 to write logs into'),
+
+        opt_group.add_option(
+            '--s3-scratch-uri', dest='s3_scratch_uri', default=None,
+            help='Deprecated alias for --s3-tmp-dir.'),
+
+        opt_group.add_option(
+            '--s3-sync-wait-time', dest='s3_sync_wait_time', default=None,
+            type='float',
+            help=('How long to wait for S3 to reach eventual consistency. This'
+                  ' is typically less than a second (zero in us-west) but the'
+                  ' default is 5.0 to be safe.')),
+
+        opt_group.add_option(
+            '--s3-tmp-dir', dest='s3_tmp_dir', default=None,
+            help='URI on S3 to use as our temp directory.'),
+
+        opt_group.add_option(
+            '--s3-upload-part-size', dest='s3_upload_part_size', default=None,
+            type='float',
+            help=('Upload files to S3 in parts no bigger than this many'
+                  ' megabytes. Default is 100 MiB. Set to 0 to disable'
+                  ' multipart uploading entirely.')),
+
+        opt_group.add_option(
+            '--no-emr-api-param', dest='no_emr_api_params',
+            default=[], action='append',
+            help='Parameters to be unset when calling EMR API.'
+                 ' You can use --no-emr-api-param multiple times.'
+        ),
+
+        opt_group.add_option(
+            '--visible-to-all-users', dest='visible_to_all_users',
+            default=None, action='store_true',
+            help='Make your job flow is visible to all IAM users on the same'
+                 ' AWS account (the default).'
+        ),
+
+        opt_group.add_option(
+            '--no-visible-to-all-users', dest='visible_to_all_users',
+            default=None, action='store_false',
+            help='Hide your job flow from other IAM users on the same AWS'
+                 ' account.'
+        ),
+
+    ] + add_emr_bootstrap_opts(opt_group) + add_emr_instance_opts(opt_group)
+
+
+def add_emr_bootstrap_opts(opt_group):
+    """Add options having to do with bootstrapping (other than
+    :mrjob-opt:`bootstrap_mrjob`, which is shared with other runners)."""
+    return [
 
         opt_group.add_option(
             '--bootstrap', dest='bootstrap', action='append',
@@ -353,9 +574,30 @@ def add_emr_opts(opt_group):
                   ' --bootstrap-script more than once.')),
 
         opt_group.add_option(
-            '--check-emr-status-every', dest='check_emr_status_every',
-            default=None, type='int',
-            help='How often (in seconds) to check status of your EMR job'),
+            '--disable-emr-debugging', dest='enable_emr_debugging',
+            action='store_false',
+            help='Disable storage of Hadoop logs in SimpleDB'),
+
+        opt_group.add_option(
+            '--enable-emr-debugging', dest='enable_emr_debugging',
+            default=None, action='store_true',
+            help='Enable storage of Hadoop logs in SimpleDB'),
+    ]
+
+
+def add_emr_instance_opts(opt_group):
+    """Add options having to do with instance creation"""
+    return [
+        # AMI
+        opt_group.add_option(
+            '--ami-version', dest='ami_version', default=None,
+            help=('AMI Version to use, e.g. "2.4.11" (default "latest").')),
+
+        # instance types
+        opt_group.add_option(
+            '--ec2-core-instance-type', '--ec2-slave-instance-type',
+            dest='ec2_core_instance_type', default=None,
+            help='Type of EC2 instance for core (or "slave") nodes only'),
 
         opt_group.add_option(
             '--ec2-instance-type', dest='ec2_instance_type', default=None,
@@ -363,20 +605,6 @@ def add_emr_opts(opt_group):
                   ' c3.xlarge, r3.xlarge). See'
                   ' http://aws.amazon.com/ec2/instance-types/ for the full'
                   ' list.')),
-
-        opt_group.add_option(
-            '--ec2-key-pair', dest='ec2_key_pair', default=None,
-            help='Name of the SSH key pair you set up for EMR'),
-
-        opt_group.add_option(
-            '--ec2-key-pair-file', dest='ec2_key_pair_file', default=None,
-            help='Path to file containing SSH key for EMR'),
-
-        # EMR instance types
-        opt_group.add_option(
-            '--ec2-core-instance-type', '--ec2-slave-instance-type',
-            dest='ec2_core_instance_type', default=None,
-            help='Type of EC2 instance for core (or "slave") nodes only'),
 
         opt_group.add_option(
             '--ec2-master-instance-type', dest='ec2_master_instance_type',
@@ -388,7 +616,29 @@ def add_emr_opts(opt_group):
             default=None,
             help='Type of EC2 instance for task nodes only'),
 
-        # EMR instance bid prices
+        # instance number
+        opt_group.add_option(
+            '--num-ec2-instances', dest='num_ec2_instances', default=None,
+            type='int',
+            help='Total number of EC2 instances to launch '),
+
+        # NB: EMR instance counts are only applicable for slave/core and
+        # task, since a master count > 1 causes the EMR API to return the
+        # ValidationError "A master instance group must specify a single
+        # instance".
+        opt_group.add_option(
+            '--num-ec2-core-instances', dest='num_ec2_core_instances',
+            default=None, type='int',
+            help=('Number of EC2 instances to start as core (or "slave") '
+                  'nodes. Incompatible with --num-ec2-instances.')),
+
+        opt_group.add_option(
+            '--num-ec2-task-instances', dest='num_ec2_task_instances',
+            default=None, type='int',
+            help=('Number of EC2 instances to start as task '
+                  'nodes. Incompatible with --num-ec2-instances.')),
+
+        # bid price
         opt_group.add_option(
             '--ec2-core-instance-bid-price',
             dest='ec2_core_instance_bid_price', default=None,
@@ -414,223 +664,6 @@ def add_emr_opts(opt_group):
                 'Bid price to specify for task nodes when '
                 'setting them up as EC2 spot instances.')
         ),
-
-        opt_group.add_option(
-            '--emr-endpoint', dest='emr_endpoint', default=None,
-            help=('Force mrjob to connect to EMR on this endpoint'
-                  ' (e.g. us-west-1.elasticmapreduce.amazonaws.com). Default'
-                  ' is to infer this from aws_region.')),
-
-        opt_group.add_option(
-            '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
-            help='ID of an existing EMR job flow to use'),
-
-        opt_group.add_option(
-            '--emr-action-on-failure', dest='emr_action_on_failure',
-            default=None,
-            help=('Action to take when a step fails'
-                  ' (e.g. TERMINATE_CLUSTER | CANCEL_AND_WAIT | CONTINUE)')),
-
-        opt_group.add_option(
-            '--enable-emr-debugging', dest='enable_emr_debugging',
-            default=None, action='store_true',
-            help='Enable storage of Hadoop logs in SimpleDB'),
-
-        opt_group.add_option(
-            '--disable-emr-debugging', dest='enable_emr_debugging',
-            action='store_false',
-            help='Disable storage of Hadoop logs in SimpleDB'),
-
-        opt_group.add_option(
-            '--hadoop-streaming-jar-on-emr',
-            dest='hadoop_streaming_jar_on_emr', default=None,
-            help=('Local path of the hadoop streaming jar on the EMR node.'
-                  ' Rarely necessary.')),
-
-        opt_group.add_option(
-            '--iam-endpoint', dest='iam_endpoint', default=None,
-            help=('Force mrjob to connect to IAM on this endpoint'
-                  ' (e.g. iam.us-gov.amazonaws.com)')),
-
-        opt_group.add_option(
-            '--iam-instance-profile', dest='iam_instance_profile',
-            default=None,
-            help=('EC2 instance profile to use for the EMR cluster - see'
-                  ' "Configure IAM Roles for Amazon EMR" in AWS docs')),
-
-        opt_group.add_option(
-            '--iam-service-role', dest='iam_service_role',
-            default=None,
-            help=('IAM Job flow role to use for the EMR cluster - see'
-                  ' "Configure IAM Roles for Amazon EMR" in AWS docs')),
-
-        opt_group.add_option(
-            '--max-hours-idle', dest='max_hours_idle',
-            default=None, type='float',
-            help=("If we create a persistent job flow, have it automatically"
-                  " terminate itself after it's been idle this many hours.")),
-
-        opt_group.add_option(
-            '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
-            default=None, type='float',
-            help=("If --max-hours-idle is set, control how close to the end"
-                  " of an EC2 billing hour the job flow can automatically"
-                  " terminate itself (default is 5 minutes).")),
-
-        opt_group.add_option(
-            '--no-bootstrap-python', dest='bootstrap_python',
-            action='store_false', default=None,
-            help=("Don't automatically try to install a compatible version"
-                  " of Python at bootstrap time.")),
-
-        opt_group.add_option(
-            '--no-pool-emr-job-flows', dest='pool_emr_job_flows',
-            action='store_false',
-            help="Don't try to run our job on a pooled job flow."),
-
-        opt_group.add_option(
-            '--num-ec2-instances', dest='num_ec2_instances', default=None,
-            type='int',
-            help='Total number of EC2 instances to launch '),
-
-        # NB: EMR instance counts are only applicable for slave/core and
-        # task, since a master count > 1 causes the EMR API to return the
-        # ValidationError "A master instance group must specify a single
-        # instance".
-        opt_group.add_option(
-            '--num-ec2-core-instances', dest='num_ec2_core_instances',
-            default=None, type='int',
-            help=('Number of EC2 instances to start as core (or "slave") '
-                  'nodes. Incompatible with --num-ec2-instances.')),
-
-        opt_group.add_option(
-            '--num-ec2-task-instances', dest='num_ec2_task_instances',
-            default=None, type='int',
-            help=('Number of EC2 instances to start as task '
-                  'nodes. Incompatible with --num-ec2-instances.')),
-
-        opt_group.add_option(
-            '--pool-emr-job-flows', dest='pool_emr_job_flows',
-            action='store_true',
-            help='Add to an existing job flow or create a new one that does'
-                 ' not terminate when the job completes. Overrides other job'
-                 ' flow-related options including EC2 instance configuration.'
-                 ' Joins pool "default" if emr_job_flow_pool_name is not'
-                 ' specified. WARNING: do not run this without'
-                 ' mrjob.tools.emr.terminate_idle_job_flows in your crontab;'
-                 ' job flows left idle can quickly become expensive!'),
-
-        opt_group.add_option(
-            '--pool-name', dest='emr_job_flow_pool_name', action='store',
-            default=None,
-            help=('Specify a pool name to join. Set to "default" if not'
-                  ' specified.')),
-
-        opt_group.add_option(
-            '--pool-wait-minutes', dest='pool_wait_minutes', default=0,
-            type='int',
-            help=('Wait for a number of minutes for a job flow to finish'
-                  ' if a job finishes, pick up their job flow. Otherwise'
-                  ' create a new one. (default 0)')),
-
-        opt_group.add_option(
-            '--s3-endpoint', dest='s3_endpoint', default=None,
-            help=("Force mrjob to connect to S3 on this endpoint (e.g."
-                  " s3-us-west-1.amazonaws.com). You usually shouldn't"
-                  " set this; by default mrjob will choose the correct"
-                  " endpoint for each S3 bucket based on its location.")),
-
-        opt_group.add_option(
-            '--s3-log-uri', dest='s3_log_uri', default=None,
-            help='URI on S3 to write logs into'),
-
-        opt_group.add_option(
-            '--s3-scratch-uri', dest='s3_scratch_uri', default=None,
-            help='Deprecated alias for --s3-tmp-dir.'),
-
-        opt_group.add_option(
-            '--s3-sync-wait-time', dest='s3_sync_wait_time', default=None,
-            type='float',
-            help=('How long to wait for S3 to reach eventual consistency. This'
-                  ' is typically less than a second (zero in us-west) but the'
-                  ' default is 5.0 to be safe.')),
-
-        opt_group.add_option(
-            '--s3-tmp-dir', dest='s3_tmp_dir', default=None,
-            help='URI on S3 to use as our temp directory.'),
-
-        opt_group.add_option(
-            '--s3-upload-part-size', dest='s3_upload_part_size', default=None,
-            type='float',
-            help=('Upload files to S3 in parts no bigger than this many'
-                  ' megabytes. Default is 100 MiB. Set to 0 to disable'
-                  ' multipart uploading entirely.')),
-
-        opt_group.add_option(
-            '--ssh-bin', dest='ssh_bin', default=None,
-            help=("Name/path of ssh binary. Arguments are allowed (e.g."
-                  " --ssh-bin 'ssh -v')")),
-
-        opt_group.add_option(
-            '--ssh-bind-ports', dest='ssh_bind_ports', default=None,
-            help=('A list of port ranges that are safe to listen on, delimited'
-                  ' by colons and commas, with syntax like'
-                  ' 2000[:2001][,2003,2005:2008,etc].'
-                  ' Defaults to 40001:40840.')),
-
-        opt_group.add_option(
-            '--ssh-tunnel-is-closed', dest='ssh_tunnel_is_open',
-            default=None, action='store_false',
-            help='Make ssh tunnel accessible from localhost only'),
-
-        opt_group.add_option(
-            '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',
-            default=None, action='store_true',
-            help=('Make ssh tunnel accessible from remote hosts (not just'
-                  ' localhost).')),
-
-        opt_group.add_option(
-            '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
-            default=None, action='store_true',
-            help='Open up an SSH tunnel to the Hadoop job tracker'),
-
-        opt_group.add_option(
-            '--emr-api-param', dest='emr_api_params',
-            default=[], action='append',
-            help='Additional parameters to pass directly to the EMR API; '
-                 'should take the form KEY=VALUE. You can use --emr-api-param'
-                 ' multiple times.'
-        ),
-
-        opt_group.add_option(
-            '--no-emr-api-param', dest='no_emr_api_params',
-            default=[], action='append',
-            help='Parameters to be unset when calling EMR API.'
-                 ' You can use --no-emr-api-param multiple times.'
-        ),
-
-        opt_group.add_option(
-            '--visible-to-all-users', dest='visible_to_all_users',
-            default=None, action='store_true',
-            help='Make your job flow is visible to all IAM users on the same'
-                 ' AWS account (the default).'
-        ),
-
-        opt_group.add_option(
-            '--no-visible-to-all-users', dest='visible_to_all_users',
-            default=None, action='store_false',
-            help='Hide your job flow from other IAM users on the same AWS'
-                 ' account.'
-        ),
-
-        opt_group.add_option(
-            '--emr-tag', dest='emr_tags',
-            default=[], action='append',
-            help='Metadata tags to apply to the EMR cluster; '
-                 'should take the form KEY=VALUE. You can use --emr-tag '
-                 'multiple times.'
-        ),
-
     ]
 
 
@@ -638,3 +671,69 @@ def print_help_for_groups(*args):
     option_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
     option_parser.option_groups = args
     option_parser.print_help()
+
+
+def alphabetize_options(opt_group):
+    opt_group.option_list.sort(key=lambda opt: opt.dest or '')
+
+
+def fix_custom_options(options, option_parser):
+    """Update *options* to handle KEY=VALUE options, etc."""
+    if hasattr(options, 'cmdenv'):
+        cmdenv_err = '--cmdenv argument %r is not of the form KEY=VALUE'
+        options.cmdenv = parse_key_value_list(options.cmdenv,
+                                              cmdenv_err,
+                                              option_parser.error)
+
+    def parse_commas(cleanup_str):
+        cleanup_error = ('cleanup option %s is not one of ' +
+                         ', '.join(CLEANUP_CHOICES))
+        new_cleanup_options = []
+        for choice in cleanup_str.split(','):
+            if choice in CLEANUP_CHOICES:
+                new_cleanup_options.append(choice)
+            else:
+                option_parser.error(cleanup_error % choice)
+        if ('NONE' in new_cleanup_options and
+                len(set(new_cleanup_options)) > 1):
+            option_parser.error(
+                'Cannot clean up both nothing and something!')
+
+        return new_cleanup_options
+
+    if getattr(options, 'cleanup', None):
+        options.cleanup = parse_commas(options.cleanup)
+
+    if getattr(options, 'cleanup_on_failure', None):
+        options.cleanup_on_failure = parse_commas(options.cleanup_on_failure)
+
+    if hasattr(options, 'emr_api_params'):
+        emr_api_err = (
+            '--emr-api-params argument %r is not of the form KEY=VALUE')
+        options.emr_api_params = parse_key_value_list(options.emr_api_params,
+                                                      emr_api_err,
+                                                      option_parser.error)
+
+        if hasattr(options, 'no_emr_api_params'):
+                for param in options.no_emr_api_params:
+                    options.emr_api_params[param] = None
+
+    if hasattr(options, 'emr_tags'):
+        emr_tag_err = '--emr-tag argument %r is not of the form KEY=VALUE'
+        options.emr_tags = parse_key_value_list(options.emr_tags,
+                                                emr_tag_err,
+                                                option_parser.error)
+
+    if hasattr(options, 'jobconf'):
+        jobconf_err = '--jobconf argument %r is not of the form KEY=VALUE'
+        options.jobconf = parse_key_value_list(options.jobconf,
+                                               jobconf_err,
+                                               option_parser.error)
+
+    if getattr(options, 'ssh_bind_ports', None):
+        try:
+            ports = parse_port_range_list(options.ssh_bind_ports)
+        except ValueError as e:
+            option_parser.error('invalid port range list %r: \n%s' %
+                                (options.ssh_bind_ports, e.args[0]))
+            options.ssh_bind_ports = ports

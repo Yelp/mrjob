@@ -1,4 +1,5 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2012 Yelp
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,22 +12,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run a command on the master and all slaves. Store stdout and stderr for
+"""Run a command on every node of a cluster. Store stdout and stderr for
 results in OUTPUT_DIR.
 
 Usage::
 
     python -m mrjob.tools.emr.mrboss JOB_FLOW_ID [options] "command string"
+    mrjob boss JOB_FLOW_ID [options] "command string"
 
 Options::
 
-  -c CONF_PATH, --conf-path=CONF_PATH
+  -h, --help            show this help message and exit
+  --aws-region=AWS_REGION
+                        Region to connect to S3 and EMR on (e.g. us-west-1).
+  -c CONF_PATHS, --conf-path=CONF_PATHS
+                        Path to alternate mrjob.conf file to read from
+  --no-conf             Don't load mrjob.conf even if it's available
   --ec2-key-pair-file=EC2_KEY_PAIR_FILE
                         Path to file containing SSH key for EMR
-  -h, --help            show this help message and exit
-  --no-conf             Don't load mrjob.conf even if it's available
-  -o, --output-dir      Specify an output directory (default: JOB_FLOW_ID)
+  --emr-endpoint=EMR_ENDPOINT
+                        Optional host to connect to when communicating with S3
+                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
+                        Default is to infer this from aws_region.
+  -o OUTPUT_DIR, --output-dir=OUTPUT_DIR
+                        Specify an output directory (default: JOB_FLOW_ID)
   -q, --quiet           Don't print anything to stderr
+  --s3-endpoint=S3_ENDPOINT
+                        Host to connect to when communicating with S3 (e.g. s3
+                        -us-west-1.amazonaws.com). Default is to infer this
+                        from region (see --aws-region).
+  --ssh-bin=SSH_BIN     Name/path of ssh binary. Arguments are allowed (e.g.
+                        --ssh-bin 'ssh -v')
   -v, --verbose         print more messages to stderr
 """
 from __future__ import print_function
@@ -37,32 +53,32 @@ import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
+from mrjob.options import add_basic_opts
+from mrjob.options import add_emr_connect_opts
+from mrjob.options import alphabetize_options
 from mrjob.ssh import ssh_run_with_recursion
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import shlex_split
 
 
-def main():
+def main(cl_args=None):
     usage = 'usage: %prog JOB_FLOW_ID OUTPUT_DIR [options] "command string"'
     description = ('Run a command on the master and all slaves of an EMR job'
                    ' flow. Store stdout and stderr for results in OUTPUT_DIR.')
 
     option_parser = OptionParser(usage=usage, description=description)
-
-    assignments = {
-        option_parser: ('conf_paths', 'quiet', 'verbose',
-                        'ec2_key_pair_file')
-    }
-
     option_parser.add_option('-o', '--output-dir', dest='output_dir',
                              default=None,
                              help="Specify an output directory (default:"
                              " JOB_FLOW_ID)")
+    add_basic_opts(option_parser)
+    add_emr_connect_opts(option_parser)
+    scrape_options_into_new_groups(MRJob().all_option_groups(), {
+        option_parser: ('ec2_key_pair_file', 'ssh_bin'),
+    })
+    alphabetize_options(option_parser)
 
-    mr_job = MRJob()
-    scrape_options_into_new_groups(mr_job.all_option_groups(), assignments)
-
-    options, args = option_parser.parse_args()
+    options, args = option_parser.parse_args(cl_args)
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
@@ -92,7 +108,6 @@ def run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     You should probably have run :py:meth:`_enable_slave_ssh_access()` on the
     runner before calling this function.
     """
-
     master_addr = runner._address_of_master()
     addresses = [master_addr]
     if runner._opts['num_ec2_instances'] > 1:

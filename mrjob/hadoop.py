@@ -1,4 +1,4 @@
-# Copyright 2009-2014 Yelp and Contributors
+# Copyright 2009-2015 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -417,7 +417,7 @@ class HadoopJobRunner(MRJobRunner):
         if supports_new_distributed_cache_options(version):
             # set up uploading from HDFS to the working dir
             args.extend(
-                self._new_upload_args(self._upload_mgr))
+                self._upload_args(self._upload_mgr))
 
         # Add extra hadoop args first as hadoop args could be a hadoop
         # specific argument (e.g. -libjar) which must come before job
@@ -436,7 +436,7 @@ class HadoopJobRunner(MRJobRunner):
         if not supports_new_distributed_cache_options(version):
             # set up uploading from HDFS to the working dir
             args.extend(
-                self._old_upload_args(self._upload_mgr))
+                self._pre_0_20_upload_args(self._upload_mgr))
 
         mapper, combiner, reducer = (
             self._hadoop_streaming_commands(step_num))

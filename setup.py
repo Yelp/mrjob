@@ -1,4 +1,4 @@
-# Copyright 2009-2013 Yelp and Contributors
+# Copyright 2009-2015 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import platform
 import sys
 
 import mrjob
@@ -27,8 +26,8 @@ try:
         },
         'install_requires': [
             'boto>=2.35.0',
-            'PyYAML',
             'filechunkio',
+            'PyYAML',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',

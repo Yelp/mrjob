@@ -14,3 +14,4 @@ install:
   - "pip install .; pip install ujson || true"
 # command to run tests
 script: python setup.py test
+sudo: false

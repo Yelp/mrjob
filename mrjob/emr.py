@@ -1518,9 +1518,9 @@ class EMRJobRunner(MRJobRunner):
         tags = self._opts['emr_tags']
         if tags:
             log.info('Setting EMR tags: %s' %
-                ', '.join('%s=%s' % (tag, value) for tag, value in tags.items())
-            )
-            emr_conn.add_tags(self._emr_job_flow_id, tags)
+                    ', '.join('%s=%s' % (tag, value)
+                              for tag, value in tags.items()))
+            emr_conn.add_tags(self._cluster_id, tags)
 
     # TODO: break this method up; it's too big to write tests for
     def _wait_for_job_to_complete(self):

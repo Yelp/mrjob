@@ -361,7 +361,7 @@ def terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
             runner._lock_uri(cluster_id, num_steps),
             runner._opts['s3_sync_wait_time'],
             '%s (%s)' % (msg,
-                         runner._make_unique_job_name(label='terminate')),
+                         runner._make_unique_job_key(label='terminate')),
             mins_to_expiration=max_mins_locked,
         )
         if status:

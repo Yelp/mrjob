@@ -706,8 +706,14 @@ class MockEmrConnection(object):
                     'ServiceRole is required for creating cluster'))
 
         if visible_to_all_users is None:
-            visible_to_all_users = (
-                (api_params or {}).get('VisibleToAllUsers') == 'true')
+            if api_params and 'VisibleToAllUsers' in api_params:
+                if api_params['VisibleToAllUsers'] not in ('true', 'false'):
+                    raise boto.exception.EmrResponseError(
+                        400, 'Bad Request', err_xml(
+                            'boolean must follow xsd1.1 definition',
+                            code='MalformedInput'))
+                visible_to_all_users = (
+                    api_params['VisibleToAllUsers'] == 'true')
 
         # API no longer allows you to explicitly specify 1.x versions
         if ami_version and ami_version.startswith('1.'):

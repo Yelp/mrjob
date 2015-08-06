@@ -91,9 +91,6 @@ DEBUGGING_STEP = JarStep(
     jar=EmrConnection.DebuggingJar,
     step_args=EmrConnection.DebuggingArgs)
 
-# Don't run EMR simluation longer than this
-DEFAULT_MAX_SIMULATION_STEPS = 100
-
 
 ### Errors ###
 
@@ -602,7 +599,7 @@ class MockEmrConnection(object):
                  mock_s3_fs=None, mock_emr_clusters=None,
                  mock_emr_failures=None, mock_emr_output=None,
                  max_clusters_returned=DEFAULT_MAX_CLUSTERS_RETURNED,
-                 max_simulation_steps=None):
+                 simulation_iterator=None):
         """Create a mock version of EmrConnection. Most of these args are
         the same as for the real EmrConnection, and are ignored.
 
@@ -635,10 +632,9 @@ class MockEmrConnection(object):
         :type max_days_ago: int
         :param max_days_ago: the maximum amount of days that EMR will go back
                              in time
-
-        :type max_simulation_steps: int
-        :params max_simulation_steps: don't simulate progress in EMR more than
-                                      this many times
+        :param simulation_iterator: we call ``next()`` on this each time
+                                    we simulate progress. If there is
+                                    no next element, we bail out.
         """
         # check this now; strs will cause problems later in Python 3
         if mock_emr_output and any(
@@ -651,11 +647,6 @@ class MockEmrConnection(object):
         self.mock_emr_failures = combine_values({}, mock_emr_failures)
         self.mock_emr_output = combine_values({}, mock_emr_output)
         self.max_clusters_returned = max_clusters_returned
-
-        if max_simulation_steps is None:
-            self.simulation_steps_left = DEFAULT_MAX_SIMULATION_STEPS
-        else:
-            self.simulation_steps_left = max_simulation_steps
 
         if region is not None:
             self.host = region.endpoint
@@ -1250,11 +1241,12 @@ class MockEmrConnection(object):
             now = datetime.utcnow()
 
         # don't allow simulating forever
-        if self.simulation_steps_left <= 0:
-            raise AssertionError(
-                'Simulated progress too many times; bailing out')
-
-        self.simulation_steps_left -= 1
+        if self.simulation_iterator:
+            try:
+                next(self.simulation_iterator)
+            except StopIteration:
+                raise AssertionError(
+                    'Simulated progress too many times; bailing out')
 
         cluster = self._get_mock_cluster(cluster_id)
 

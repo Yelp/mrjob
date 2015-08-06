@@ -2869,17 +2869,17 @@ class JobWaitTestCase(MockBotoTestCase):
                 cluster_id = self.future_mock_cluster_ids.pop(0)
                 self.mock_cluster_ids.append(cluster_id)
 
-        self.simple_patch(EMRJobRunner, 'make_emr_conn')
-        self.simple_patch(S3Filesystem, 'make_s3_conn',
-                          side_effect=self.connect_s3)
-        self.simple_patch(EMRJobRunner, '_usable_clusters',
-            side_effect=side_effect_usable_clusters)
-        self.simple_patch(EMRJobRunner, '_lock_uri',
-            side_effect=side_effect_lock_uri)
-        self.simple_patch(mrjob.emr, 'attempt_to_acquire_lock',
-            side_effect=side_effect_acquire_lock)
-        self.simple_patch(time, 'sleep',
-            side_effect=side_effect_time_sleep)
+        self.start(patch.object(EMRJobRunner, 'make_emr_conn'))
+        self.start(patch.object(S3Filesystem, 'make_s3_conn',
+                                side_effect=self.connect_s3))
+        self.start(patch.object(EMRJobRunner, '_usable_clusters',
+                                side_effect=side_effect_usable_clusters))
+        self.start(patch.object(EMRJobRunner, '_lock_uri',
+                                side_effect=side_effect_lock_uri))
+        self.start(patch.object(mrjob.emr, 'attempt_to_acquire_lock',
+                                side_effect=side_effect_acquire_lock))
+        self.start(patch.object(time, 'sleep',
+                                side_effect=side_effect_time_sleep))
 
     def tearDown(self):
         super(JobWaitTestCase, self).tearDown()
@@ -2946,7 +2946,7 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
         self.start(patch.object(
             self.runner, '_get_streaming_jar', return_value=['streaming.jar']))
 
-        self.simple_patch(boto.emr, 'StreamingStep', dict)
+        self.start(patch.object(boto.emr, 'StreamingStep', dict))
         self.runner._hadoop_version = '0.20'
 
     def _assert_streaming_step(self, step, **kwargs):

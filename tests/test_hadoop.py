@@ -284,7 +284,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
         self.runner._hadoop_version='0.20.204'
         self.start(patch.object(self.runner, '_upload_args',
                                 return_value=['new_upload_args']))
-        self.start(patch.object(self.runner, '_pre_0_20__upload_args',
+        self.start(patch.object(self.runner, '_pre_0_20_upload_args',
                                 return_value=['old_upload_args']))
         self.start(patch.object(self.runner, '_hadoop_args_for_step',
                                 return_value=['hadoop_args_for_step']))

@@ -15,8 +15,8 @@
 from datetime import datetime
 from datetime import timedelta
 
-from mrjob.pool import est_time_to_hour
-from mrjob.pool import pool_hash_and_name
+from mrjob.pool import _est_time_to_hour
+from mrjob.pool import _pool_hash_and_name
 
 from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
@@ -26,57 +26,53 @@ from tests.py2 import TestCase
 class EstTimeToEndOfHourTestCase(TestCase):
 
     def test_empty(self):
-        jf = MockEmrObject()
-        self.assertEqual(est_time_to_hour(jf), timedelta(hours=1))
+        cs = MockEmrObject()
+        self.assertEqual(_est_time_to_hour(cs), timedelta(hours=1))
 
     def test_not_yet_started(self):
-        jf = MockEmrObject(
-            creationdatetime=to_iso8601(datetime(2010, 6, 6, 4)))
+        cs = MockEmrObject(
+            status=MockEmrObject(
+                timeline=MockEmrObject(
+                    creationdatetime=to_iso8601(datetime(2010, 6, 6, 4)))))
 
         self.assertEqual(
-            est_time_to_hour(jf, now=datetime(2010, 6, 6, 4, 35)),
+            _est_time_to_hour(cs, now=datetime(2010, 6, 6, 4, 35)),
             timedelta(minutes=25))
 
         self.assertEqual(
-            est_time_to_hour(jf, now=datetime(2010, 6, 6, 5, 20)),
+            _est_time_to_hour(cs, now=datetime(2010, 6, 6, 5, 20)),
             timedelta(minutes=40))
 
         self.assertEqual(
-            est_time_to_hour(jf, now=datetime(2010, 6, 6, 4)),
+            _est_time_to_hour(cs, now=datetime(2010, 6, 6, 4)),
             timedelta(minutes=60))
 
     def test_started(self):
-        jf = MockEmrObject(
-            creationdatetime=to_iso8601(datetime(2010, 6, 6, 4)),
-            startdatetime=to_iso8601(datetime(2010, 6, 6, 4, 26)))
+        cs = MockEmrObject(
+            status=MockEmrObject(
+                timeline=MockEmrObject(
+                    creationdatetime=to_iso8601(datetime(2010, 6, 6, 4, 26)),
+                    readydatetime=to_iso8601(datetime(2010, 6, 6, 4, 30)))))
 
         self.assertEqual(
-            est_time_to_hour(jf, now=datetime(2010, 6, 6, 4, 35)),
+            _est_time_to_hour(cs, now=datetime(2010, 6, 6, 4, 35)),
             timedelta(minutes=51))
 
         self.assertEqual(
-            est_time_to_hour(jf, now=datetime(2010, 6, 6, 5, 20)),
+            _est_time_to_hour(cs, now=datetime(2010, 6, 6, 5, 20)),
             timedelta(minutes=6))
 
         self.assertEqual(
-            est_time_to_hour(jf, now=datetime(2010, 6, 6, 6, 26)),
+            _est_time_to_hour(cs, now=datetime(2010, 6, 6, 6, 26)),
             timedelta(minutes=60))
 
     def test_now_is_automatically_set(self):
-        jf = MockEmrObject(
-            creationdatetime=to_iso8601(datetime.utcnow()))
+        cs = MockEmrObject(
+            status=MockEmrObject(
+                timeline=MockEmrObject(
+                    creationdatetime=to_iso8601(datetime.utcnow()))))
 
-        t = est_time_to_hour(jf)
-
-        self.assertLessEqual(t, timedelta(minutes=60))
-        self.assertGreater(t, timedelta(minutes=59))
-
-        jf2 = MockEmrObject(
-            creationdatetime=to_iso8601(
-                datetime.utcnow() - timedelta(minutes=1)),
-            startdatetime=to_iso8601(datetime.utcnow()))
-
-        t = est_time_to_hour(jf2)
+        t = _est_time_to_hour(cs)
 
         self.assertLessEqual(t, timedelta(minutes=60))
         self.assertGreater(t, timedelta(minutes=59))
@@ -84,12 +80,13 @@ class EstTimeToEndOfHourTestCase(TestCase):
     def test_clock_skew(self):
         # make sure something reasonable happens if now is before
         # the start time
-        jf = MockEmrObject(
-            creationdatetime=to_iso8601(datetime(2010, 6, 6, 4)),
-            startdatetime=to_iso8601(datetime(2010, 6, 6, 4, 26)))
+        cs = MockEmrObject(
+            status=MockEmrObject(
+                timeline=MockEmrObject(
+                    creationdatetime=to_iso8601(datetime(2010, 6, 6, 4, 26)))))
 
         self.assertEqual(
-            est_time_to_hour(jf, now=datetime(2010, 6, 6, 4, 25, 59)),
+            _est_time_to_hour(cs, now=datetime(2010, 6, 6, 4, 25, 59)),
             timedelta(seconds=1))
 
 

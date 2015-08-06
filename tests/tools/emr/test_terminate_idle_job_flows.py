@@ -404,6 +404,11 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
         else:
             return key.get_contents_as_string()
 
+    def assert_locked_by_terminate(self, mock_cluster, steps_ahead=1):
+        contents = self._lock_contents(mock_cluster, steps_ahead=steps_ahead)
+        self.assertIsNotNone(contents)
+        self.assertIn(b'terminate', contents)
+
     def assert_locked_by_something_else(self, mock_cluster, steps_ahead=1):
         contents = self._lock_contents(mock_cluster, steps_ahead=steps_ahead)
         self.assertIsNotNone(contents)

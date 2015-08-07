@@ -25,6 +25,7 @@ from io import BytesIO
 
 try:
     from boto.emr.connection import EmrConnection
+    from boto.emr.emrobject import ClusterTimeline
     from boto.emr.instance_group import InstanceGroup
     from boto.emr.step import JarStep
     import boto.exception
@@ -935,132 +936,13 @@ class MockEmrConnection(object):
 
         return self._build_instance_groups_from_list(instance_groups)
 
-    def get_object(self, action, params, cls):
-        """mrjob._mock_emr currently calls get_response() directly, to support
-        old versions of boto.
-
-        this can be removed in v0.5.0, when we use a newer version of
-        boto (see #1081)
-        """
-        # common to most calls
-        cluster_id = params.get('ClusterId')
-        marker = params.get('Marker')
-
-        if action == 'DescribeCluster':
-            return self._describe_cluster(cluster_id)
-
-        elif action == 'ListBootstrapActions':
-            return self._list_bootstrap_actions(cluster_id, marker=marker)
-
-        elif action == 'ListClusters':
-            created_after = self._unpack_datetime(params.get('CreatedAfter'))
-            created_before = self._unpack_datetime(params.get('CreatedBefore'))
-            cluster_states = self._unpack_list_param('ClusterStates.member',
-                                                     params)
-
-            return self._list_clusters(created_after=created_after,
-                                       created_before=created_before,
-                                       cluster_states=cluster_states,
-                                       marker=marker)
-
-        elif action == 'ListInstanceGroups':
-            return self._list_instance_groups(cluster_id, marker=marker)
-
-        elif action == 'ListSteps':
-            step_states = self._unpack_list_param('StepStateList.member',
-                                                  params)
-            return self._list_steps(cluster_id,
-                                    marker=marker,
-                                    step_states=step_states)
-
-        else:
-            raise NotImplementedError(
-                'mockboto does not implement the %s API call' % action)
-
-
-    def get_status(self, action, params, verb='GET'):
-        """mrjob._mock_emr currently calls get_status() directly, to support
-        old versions of boto.
-
-        this can be removed in v0.5.0, when we use a newer version of
-        boto (see #1081)
-        """
-        if action == 'AddTags':
-            resource_id = params.get('ResourceId')
-            tags = self._unpack_tag_list(params)
-
-            return self._add_tags(resource_id, tags)
-        else:
-            raise NotImplementedError(
-                'mockboto does not implement the %s API call' % action)
-
-    def _unpack_datetime(self, iso_dt):
-        """Undo conversion to ISO date. Remove in v0.5.0."""
-        if iso_dt is None:
-            return None
-
-        return datetime.strptime(iso_dt, boto.utils.ISO8601)
-
-    def build_list_params(self, params, items, label):
-        """Our _boto_emr shim needs this.
-
-        Remove this in v0.5.0 (see #1081)
-        """
-        if isinstance(items, (bytes, str)):
-            items = [items]
-        for i in range(1, len(items) + 1):
-            params['%s.%d' % (label, i)] = items[i - 1]
-
-    def _unpack_list_param(self, label, params):
-        """Undo EmrConnection.build_list_params().
-
-        Remove this in v0.5.0 (see #1081)
-        """
-        indexed_values = []  # tuples of (idx, value)
-
-        for k, v in params.items():
-            if k.startswith(label + '.'):
-                idx = int(k[len(label) + 1:])
-
-                indexed_values.append((idx, v))
-
-        if indexed_values:
-            return [v for idx, v in sorted(indexed_values)]
-        else:
-            return None
-
-    def _unpack_tag_list(self, params):
-        idx_to_key = {}
-        idx_to_value = {}
-
-        for k, v in params.items():
-            parts = k.split('.')
-            if len(parts) != 4:
-                continue
-
-            if parts[0] == 'Tags' and parts[1] == 'member':
-                idx = int(parts[2])
-                if parts[3] == 'Key':
-                    idx_to_key[idx] = v
-                elif parts[3] == 'Value':
-                    idx_to_value[idx] = v
-                else:
-                    raise ValueError
-
-        return dict(
-            (key, idx_to_value.get(idx))
-            for idx, key in idx_to_key.items())
-
     def _get_mock_cluster(self, cluster_id):
         if not cluster_id in self.mock_emr_clusters:
             raise boto.exception.S3ResponseError(404, 'Not Found')
 
         return self.mock_emr_clusters[cluster_id]
 
-    # cluster and tags API calls missing from boto 2.2.0.
-    # In v0.5.0, remove the underscores
-
-    def _add_tags(self, resource_id, tags):
+    def add_tags(self, resource_id, tags):
         """Simulate successful creation of new metadata tags for the specified
         resource id.
         """
@@ -1080,20 +962,21 @@ class MockEmrConnection(object):
             for tag_obj in cluster.tags:
                 if tag_obj.key == key:
                     tag_obj.value == value
+                    break
             else:
                 cluster.tags.append(MockEmrObject(
                     key=key, value=value))
 
         return True
 
-    def _describe_cluster(self, cluster_id):
+    def describe_cluster(self, cluster_id):
         self._enforce_strict_ssl()
 
         self.simulate_progress(cluster_id)
 
         return self._get_mock_cluster(cluster_id)
 
-    def _list_bootstrap_actions(self, cluster_id, marker=None):
+    def list_bootstrap_actions(self, cluster_id, marker=None):
         self._enforce_strict_ssl()
 
         if marker is not None:
@@ -1104,7 +987,7 @@ class MockEmrConnection(object):
 
         return MockEmrObject(actions=cluster._bootstrapactions)
 
-    def _list_clusters(self, created_after=None, created_before=None,
+    def list_clusters(self, created_after=None, created_before=None,
                       cluster_states=None, marker=None):
         self._enforce_strict_ssl()
 
@@ -1144,7 +1027,7 @@ class MockEmrConnection(object):
 
         return MockEmrObject(clusters=cluster_summaries, marker=cluster_id)
 
-    def _list_instance_groups(self, cluster_id, marker=None):
+    def list_instance_groups(self, cluster_id, marker=None):
         self._enforce_strict_ssl()
 
         if marker is not None:
@@ -1155,8 +1038,13 @@ class MockEmrConnection(object):
 
         return MockEmrObject(instancegroups=cluster._instancegroups)
 
-    def _list_steps(self, cluster_id, step_states=None, marker=None):
+    def list_steps(self, cluster_id, step_states=None, marker=None):
         self._enforce_strict_ssl()
+
+        # make sure that we only call list_steps() when we've patched
+        # around https://github.com/boto/boto/issues/3268
+        if 'StartDateTime' not in ClusterTimeline.Fields:
+            raise Exception('called un-patched version of list_steps()!')
 
         if marker is not None:
             raise NotImplementedError(
@@ -1366,12 +1254,6 @@ class MockEmrConnection(object):
             cluster.status.statechangereason = MockEmrObject()
 
         return
-
-    def add_tags(self, resource_id, tags):
-        """Simulate successful creation of new metadata tags for the specified
-        resource id.
-        """
-        return bool(resource_id and tags)
 
 
 class MockEmrObject(object):

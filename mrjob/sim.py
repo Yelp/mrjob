@@ -162,7 +162,7 @@ class SimMRJobRunner(MRJobRunner):
     def _run(self):
         self.warn_ignored_opts()
         _error_on_bad_paths(self.fs, self._input_paths)
-        self._create_setup_wrapper_script()
+        self._create_setup_wrapper_script(local=True)
         self._setup_output_dir()
 
         # run mapper, combiner, sort, reducer for each step

@@ -36,6 +36,7 @@ try:
     import boto.emr
     import boto.emr.connection
     import boto.emr.instance_group
+    import boto.emr.emrobject
     import boto.exception
     import boto.https_connection
     import boto.regioninfo
@@ -207,19 +208,17 @@ def _list_steps(emr_conn, cluster_id, *args, **kwargs):
     that works around around `boto's startdatetime bug
     <https://github.com/boto/boto/issues/3268>`__.
     """
+    Timeline = boto.emr.emrobject.ClusterTimeline
     try:
         # temporarily monkey-patch ClusterTimeline.Fields
         # not using patch here because it's an external dependency
         # in Python 2
-        orig_fields = ClusterTimeline.Fields
-        ClusterTimeline.Fields = (
-            ClusterTimeline.Fields | set(['StartDateTime']))
+        orig_fields = Timeline.Fields
+        Timeline.Fields = Timeline.Fields | set(['StartDateTime'])
 
         return emr_conn.list_steps(cluster_id, *args, **kwargs)
     finally:
-        ClusterTimeline.Fields = orig_fields
-
-
+        Timeline.Fields = orig_fields
 
 
 def make_lock_uri(s3_tmp_dir, emr_job_flow_id, step_num):

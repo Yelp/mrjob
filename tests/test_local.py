@@ -24,6 +24,7 @@ from io import BytesIO
 
 import mrjob
 from mrjob.local import LocalMRJobRunner
+
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import read_file
@@ -37,11 +38,14 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import TestCase
+from tests.py2 import call
+from tests.py2 import patch
 from tests.py2 import skipIf
+from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
-from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+from tests.sandbox import mrjob_conf_patcher
 from tests.test_inline import SimRunnerJobConfTestCase
 
 
@@ -692,3 +696,22 @@ class FilterTestCase(SandboxedTestCase):
 
             lines = [line.strip() for line in list(r.stream_output())]
             self.assertEqual(sorted(lines), [b'x$', b'y$', b'z$'])
+
+
+class SetupLineEncodingTestCase(TestCase):
+
+    def test_setup_wrapper_script_uses_local_line_endings(self):
+        job = MRTwoStepJob(['-r', 'local', '--setup', 'true'])
+        job.sandbox(stdin=BytesIO())
+
+        # tests #1071. Unfortunately, we mostly run these tests on machines
+        # that use unix line endings anyway. So monitor open() instead
+        with patch(
+                'mrjob.runner.open', create=True, side_effect=open) as m_open:
+            with logger_disabled('mrjob.local'):
+                with job.make_runner() as runner:
+                    runner.run()
+
+                    self.assertIn(
+                        call(runner._setup_wrapper_script_path, 'w'),
+                        m_open.mock_calls)

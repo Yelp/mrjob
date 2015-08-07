@@ -36,11 +36,11 @@ try:
     import boto.emr
     import boto.emr.connection
     import boto.emr.instance_group
+    import boto.emr.emrobject
     import boto.exception
     import boto.https_connection
     import boto.regioninfo
     import boto.utils
-    from mrjob import _boto_emr
     boto  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
@@ -169,32 +169,53 @@ def _repeat(api_call, *args, **kwargs):
 
 def _yield_all_clusters(emr_conn, *args, **kwargs):
     """Make successive API calls, yielding cluster summaries."""
-    for resp in _repeat(_boto_emr.list_clusters, emr_conn, *args, **kwargs):
+    for resp in _repeat(emr_conn.list_clusters, *args, **kwargs):
         for cluster in getattr(resp, 'clusters', []):
             yield cluster
 
 
 def _yield_all_bootstrap_actions(emr_conn, cluster_id, *args, **kwargs):
-    for resp in _repeat(
-            _boto_emr.list_bootstrap_actions,
-            emr_conn, cluster_id, *args, **kwargs):
+    for resp in _repeat(emr_conn.list_bootstrap_actions,
+                        cluster_id, *args, **kwargs):
         for action in getattr(resp, 'actions', []):
             yield action
 
 
 def _yield_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
-    for resp in _repeat(
-            _boto_emr.list_instance_groups,
-            emr_conn, cluster_id, *args, **kwargs):
+    for resp in _repeat(emr_conn.list_instance_groups,
+                        cluster_id, *args, **kwargs):
         for group in getattr(resp, 'instancegroups', []):
             yield group
 
 
 def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
-    for resp in _repeat(_boto_emr.list_steps,
-                        emr_conn, cluster_id, *args, **kwargs):
+    """Get all steps for the cluster, making successive API calls
+    if necessary.
+
+    Calls :py:func:`_list_steps`, to work around `boto's startdatetime bug
+    <https://github.com/boto/boto/issues/3268>`__.
+    """
+    for resp in _repeat(_list_steps, emr_conn, cluster_id, *args, **kwargs):
         for step in getattr(resp, 'steps', []):
             yield step
+
+
+def _list_steps(emr_conn, cluster_id, *args, **kwargs):
+    """Wrapper for :py:meth:`boto.emr.EmrConnection.list_steps()`
+    that works around around `boto's startdatetime bug
+    <https://github.com/boto/boto/issues/3268>`__.
+    """
+    Timeline = boto.emr.emrobject.ClusterTimeline
+    try:
+        # temporarily monkey-patch ClusterTimeline.Fields
+        # not using patch here because it's an external dependency
+        # in Python 2
+        orig_fields = Timeline.Fields
+        Timeline.Fields = Timeline.Fields | set(['StartDateTime'])
+
+        return emr_conn.list_steps(cluster_id, *args, **kwargs)
+    finally:
+        Timeline.Fields = orig_fields
 
 
 def make_lock_uri(s3_tmp_dir, emr_job_flow_id, step_num):
@@ -1171,7 +1192,7 @@ class EMRJobRunner(MRJobRunner):
         if tags:
             log.info('Setting EMR tags: %s' % ', '.join(
                 '%s=%s' % (tag, value or '') for tag, value in tags.items()))
-            _boto_emr.add_tags(emr_conn, emr_job_flow_id, tags)
+            emr_conn.add_tags(emr_job_flow_id, tags)
 
         return emr_job_flow_id
 
@@ -2328,7 +2349,7 @@ class EMRJobRunner(MRJobRunner):
 
         for cluster_summary in _yield_all_clusters(
                 emr_conn, cluster_states=['WAITING']):
-            cluster = _boto_emr.describe_cluster(emr_conn, cluster_summary.id)
+            cluster = emr_conn.describe_cluster(cluster_summary.id)
             add_if_match(cluster)
 
         return [(cluster_id, cluster_num_steps) for
@@ -2468,7 +2489,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()
-        return _boto_emr.describe_cluster(emr_conn, self._cluster_id)
+        return emr_conn.describe_cluster(self._cluster_id)
 
     def _list_steps_for_cluster(self):
         """Get all steps for our cluster, potentially making multiple API calls

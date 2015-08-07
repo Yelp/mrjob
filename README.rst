@@ -6,7 +6,7 @@ mrjob: the Python MapReduce library
 mrjob is a Python 2.6+ package that helps you write and run Hadoop Streaming
 jobs.
 
-`Stable version (v0.4.4) documentation <http://packages.python.org/mrjob/>`_
+`Stable version (v0.4.5) documentation <http://packages.python.org/mrjob/>`_
 
 `Development version documentation <http://mrjob.readthedocs.org/en/latest/>`_
 

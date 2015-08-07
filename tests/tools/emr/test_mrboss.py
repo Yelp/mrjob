@@ -1,5 +1,6 @@
-
-# Copyright 2011 Yelp
+# Copyright 2011-2012 Yelp
+# Copyright 2014 Yelp and Contributors
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,7 +40,7 @@ class MRBossTestCase(MockBotoTestCase):
         self.runner = EMRJobRunner(conf_paths=[])
         self.add_mock_s3_data({'walrus': {}})
         self.runner = EMRJobRunner(s3_sync_wait_time=0,
-                                   s3_scratch_uri='s3://walrus/tmp',
+                                   s3_tmp_dir='s3://walrus/tmp',
                                    conf_paths=[])
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
         self.prepare_runner_for_ssh(self.runner)

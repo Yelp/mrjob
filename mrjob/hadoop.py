@@ -1,4 +1,4 @@
-# Copyright 2009-2014 Yelp and Contributors
+# Copyright 2009-2015 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -105,13 +105,17 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'hadoop_bin',
         'hadoop_home',
-        'hdfs_scratch_dir',
+        'hadoop_tmp_dir',
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
         'hadoop_bin': combine_cmds,
         'hadoop_home': combine_paths,
-        'hdfs_scratch_dir': combine_paths,
+        'hadoop_tmp_dir': combine_paths,
+    })
+
+    DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
+        'hdfs_scratch_dir': 'hadoop_tmp_dir',
     })
 
     def __init__(self, alias, opts, conf_paths):
@@ -147,7 +151,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         super_opts = super(HadoopRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
             'hadoop_home': os.environ.get('HADOOP_HOME'),
-            'hdfs_scratch_dir': 'tmp/mrjob',
+            'hadoop_tmp_dir': 'tmp/mrjob',
         })
 
 
@@ -171,7 +175,7 @@ class HadoopJobRunner(MRJobRunner):
 
         self._hdfs_tmp_dir = fully_qualify_hdfs_path(
             posixpath.join(
-                self._opts['hdfs_scratch_dir'], self._job_key))
+                self._opts['hadoop_tmp_dir'], self._job_key))
 
         # Keep track of local files to upload to HDFS. We'll add them
         # to this manager just before we need them.
@@ -413,7 +417,7 @@ class HadoopJobRunner(MRJobRunner):
         if supports_new_distributed_cache_options(version):
             # set up uploading from HDFS to the working dir
             args.extend(
-                self._new_upload_args(self._upload_mgr))
+                self._upload_args(self._upload_mgr))
 
         # Add extra hadoop args first as hadoop args could be a hadoop
         # specific argument (e.g. -libjar) which must come before job
@@ -432,7 +436,7 @@ class HadoopJobRunner(MRJobRunner):
         if not supports_new_distributed_cache_options(version):
             # set up uploading from HDFS to the working dir
             args.extend(
-                self._old_upload_args(self._upload_mgr))
+                self._pre_0_20_upload_args(self._upload_mgr))
 
         mapper, combiner, reducer = (
             self._hadoop_streaming_commands(step_num))
@@ -499,8 +503,8 @@ class HadoopJobRunner(MRJobRunner):
             return posixpath.join(
                 self._hdfs_tmp_dir, 'step-output', str(step_num + 1))
 
-    def _cleanup_local_scratch(self):
-        super(HadoopJobRunner, self)._cleanup_local_scratch()
+    def _cleanup_local_tmp(self):
+        super(HadoopJobRunner, self)._cleanup_local_tmp()
 
         if self._hdfs_tmp_dir:
             log.info('deleting %s from HDFS' % self._hdfs_tmp_dir)

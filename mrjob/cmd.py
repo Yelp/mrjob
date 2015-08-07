@@ -1,5 +1,6 @@
 # Copyright 2012 Yelp
-# Copyright 2014 Yelp
+# Copyright 2014 Yelp and Contributors
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,9 +72,9 @@ def audit_usage(args):
     main(args)
 
 
-@command('collect-emr-active-stats', 'Collect EMR stats from active jobflows')
-def collect_emr_stats(args):
-    from mrjob.tools.emr.collect_emr_stats import main
+@command('boss', 'Run a command on every node of a cluster.')
+def mrboss(args):
+    from mrjob.tools.emr.mrboss import main
     main(args)
 
 

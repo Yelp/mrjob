@@ -26,7 +26,6 @@ import re
 import shutil
 import sys
 import tempfile
-from io import BytesIO
 from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
@@ -64,18 +63,36 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 #: cleanup options:
 #:
-#: * ``'ALL'``: delete local scratch, remote scratch, and logs; stop job flow
+#: * ``'ALL'``: delete logs and local and remote temp files; stop job flow
 #:   if on EMR and the job is not done when cleanup is run.
-#: * ``'LOCAL_SCRATCH'``: delete local scratch only
-#: * ``'LOGS'``: delete logs only
-#: * ``'NONE'``: delete nothing
-#: * ``'REMOTE_SCRATCH'``: delete remote scratch only
-#: * ``'SCRATCH'``: delete local and remote scratch, but not logs
 #: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
 #: * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
 #:    on cleanup
-CLEANUP_CHOICES = ['ALL', 'LOCAL_SCRATCH', 'LOGS', 'NONE', 'REMOTE_SCRATCH',
-                   'SCRATCH', 'JOB', 'JOB_FLOW']
+#: * ``'LOCAL_TMP'``: delete local temp files only
+#: * ``'LOGS'``: delete logs only
+#: * ``'NONE'``: delete nothing
+#: * ``'REMOTE_TMP'``: delete remote temp files only
+#: * ``'TMP'``: delete local and remote temp files, but not logs
+#:
+#: .. versionchanged:: 0.5.0
+#:
+#:     Options ending in ``TMP`` used to end in ``SCRATCH``.
+CLEANUP_CHOICES = [
+    'ALL',
+    'JOB',
+    'JOB_FLOW',
+    'LOCAL_TMP',
+    'LOGS',
+    'NONE',
+    'REMOTE_TMP',
+    'TMP',
+]
+
+_CLEANUP_DEPRECATED_ALIASES = {
+    'LOCAL_SCRATCH': 'LOCAL_TMP',
+    'REMOTE_SCRATCH': 'REMOTE_TMP',
+    'SCRATCH': 'TMP',
+}
 
 _STEP_RE = re.compile(r'^M?C?R?$')
 
@@ -89,7 +106,6 @@ class RunnerOptionStore(OptionStore):
     # tests.test_runner.
 
     ALLOWED_KEYS = OptionStore.ALLOWED_KEYS.union(set([
-        'base_tmp_dir',
         'bootstrap_mrjob',
         'check_input_paths',
         'cleanup',
@@ -101,6 +117,7 @@ class RunnerOptionStore(OptionStore):
         'interpreter',
         'jobconf',
         'label',
+        'local_tmp_dir',
         'owner',
         'python_archives',
         'python_bin',
@@ -116,11 +133,11 @@ class RunnerOptionStore(OptionStore):
     ]))
 
     COMBINERS = combine_dicts(OptionStore.COMBINERS, {
-        'base_tmp_dir': combine_paths,
         'cmdenv': combine_envs,
         'hadoop_extra_args': combine_lists,
         'interpreter': combine_cmds,
         'jobconf': combine_dicts,
+        'local_tmp_dir': combine_paths,
         'python_archives': combine_path_lists,
         'python_bin': combine_cmds,
         'setup': combine_lists,
@@ -133,36 +150,37 @@ class RunnerOptionStore(OptionStore):
         'upload_files': combine_path_lists,
     })
 
+    DEPRECATED_ALIASES = {
+        'base_tmp_dir': 'local_tmp_dir',
+    }
+
     def __init__(self, alias, opts, conf_paths):
         """
         :param alias: Runner alias (e.g. ``'local'``)
-        :param opts: Options from the command line
+        :param opts: Keyword args to runner's constructor (usually from the
+                     command line).
         :param conf_paths: An iterable of paths to config files
         """
         super(RunnerOptionStore, self).__init__()
 
         # sanitize incoming options and issue warnings for bad keys
-        opts = self.validated_options(
-            opts, 'Got unexpected keyword arguments: %s')
+        opts = self.validated_options(opts)
 
         unsanitized_opt_dicts = load_opts_from_mrjob_confs(
             alias, conf_paths=conf_paths)
 
         for path, mrjob_conf_opts in unsanitized_opt_dicts:
             self.cascading_dicts.append(self.validated_options(
-                mrjob_conf_opts,
-                'Got unexpected opts from %s: %%s' % path))
+                mrjob_conf_opts, from_where=('from %s' % path)))
 
         self.cascading_dicts.append(opts)
 
         if (len(self.cascading_dicts) > 2 and
                 all(len(d) == 0 for d in self.cascading_dicts[2:-1]) and
-                (len(conf_paths or []) > 0 or len(opts) == 0)):
+                (len(conf_paths or []) > 0)):
             log.warning('No configs specified for %s runner' % alias)
 
         self.populate_values_from_cascading_dicts()
-
-        self._validate_cleanup()
 
         log.debug('Active configuration:')
         log.debug(pprint.pformat(self))
@@ -176,40 +194,56 @@ class RunnerOptionStore(OptionStore):
             owner = None
 
         return combine_dicts(super_opts, {
-            'base_tmp_dir': tempfile.gettempdir(),
             'check_input_paths': True,
             'cleanup': ['ALL'],
             'cleanup_on_failure': ['NONE'],
             'hadoop_version': '0.20',
+            'local_tmp_dir': tempfile.gettempdir(),
             'owner': owner,
             'sh_bin': ['sh', '-ex'],
             'strict_protocols': True,
         })
 
-    def _validate_cleanup(self):
-        # old API accepts strings for cleanup
-        # new API wants lists
-        for opt_key in ('cleanup', 'cleanup_on_failure'):
-            if isinstance(self[opt_key], string_types):
-                self[opt_key] = [self[opt_key]]
+    def validated_options(self, opts, from_where=''):
+        opts = super(RunnerOptionStore, self).validated_options(
+            opts, from_where)
 
-        def validate_cleanup(error_str, opt_list):
-            for choice in opt_list:
-                if choice not in CLEANUP_CHOICES:
-                    raise ValueError(error_str % choice)
-            if 'NONE' in opt_list and len(set(opt_list)) > 1:
-                raise ValueError(
-                    'Cannot clean up both nothing and something!')
+        self._fix_cleanup_opt('cleanup', opts, from_where)
+        self._fix_cleanup_opt('cleanup_on_failure', opts, from_where)
 
-        cleanup_error = ('cleanup must be one of %s, not %%s' %
-                         ', '.join(CLEANUP_CHOICES))
-        validate_cleanup(cleanup_error, self['cleanup'])
+        return opts
 
-        cleanup_failure_error = (
-            'cleanup_on_failure must be one of %s, not %%s' %
-            ', '.join(CLEANUP_CHOICES))
-        validate_cleanup(cleanup_failure_error,
-                         self['cleanup_on_failure'])
+    def _fix_cleanup_opt(self, opt_key, opts, from_where=''):
+        if opts.get(opt_key) is None:
+            return
+
+        opt_list = opts[opt_key]
+
+        # runner expects list of string, not string
+        if isinstance(opt_list, string_types):
+            opt_list = [opt_list]
+
+        if 'NONE' in opt_list and len(set(opt_list)) > 1:
+            raise ValueError('Cannot clean up both nothing and something!')
+
+        def handle_cleanup_opt(opt):
+            if opt in CLEANUP_CHOICES:
+                return opt
+
+            if opt in _CLEANUP_DEPRECATED_ALIASES:
+                aliased_opt = _CLEANUP_DEPRECATED_ALIASES[opt]
+                log.warning(
+                    'Deprecated %s option %s%s has been renamed to %s' % (
+                        opt_key, opt, from_where, aliased_opt))
+                return aliased_opt
+
+            raise ValueError('%s must be one of %s, not %s' % (
+                opt_key, ', '.join(CLEANUP_CHOICES), opt))
+
+        opt_list = [handle_cleanup_opt(opt) for opt in opt_list]
+
+        opts[opt_key] = opt_list
+
 
 
 class MRJobRunner(object):
@@ -458,7 +492,7 @@ class MRJobRunner(object):
         else:
             return mode or self._opts['cleanup']
 
-    def _cleanup_local_scratch(self):
+    def _cleanup_local_tmp(self):
         """Cleanup any files/directories on the local machine we created while
         running this job. Should be safe to run this at any time, or multiple
         times.
@@ -466,7 +500,7 @@ class MRJobRunner(object):
         This particular function removes any local tmp directories
         added to the list self._local_tmp_dirs
 
-        This won't remove output_dir if it's outside of our scratch dir.
+        This won't remove output_dir if it's outside of our tmp dir.
         """
         if self._local_tmp_dir:
             log.info('removing tmp directory %s' % self._local_tmp_dir)
@@ -477,7 +511,7 @@ class MRJobRunner(object):
 
         self._local_tmp_dir = None
 
-    def _cleanup_remote_scratch(self):
+    def _cleanup_remote_tmp(self):
         """Cleanup any files/directories on the remote machine (S3) we created
         while running this job. Should be safe to run this at any time, or
         multiple times.
@@ -498,7 +532,7 @@ class MRJobRunner(object):
         pass  # this only happens on EMR
 
     def cleanup(self, mode=None):
-        """Clean up running jobs, scratch dirs, and logs, subject to the
+        """Clean up running jobs, temp files, and logs, subject to the
         *cleanup* option passed to the constructor.
 
         If you create your runner in a :keyword:`with` block,
@@ -524,11 +558,11 @@ class MRJobRunner(object):
             if mode_has('JOB', 'ALL'):
                 self._cleanup_job()
 
-        if mode_has('ALL', 'SCRATCH', 'LOCAL_SCRATCH'):
-            self._cleanup_local_scratch()
+        if mode_has('ALL', 'TMP', 'LOCAL_TMP'):
+            self._cleanup_local_tmp()
 
-        if mode_has('ALL', 'SCRATCH', 'REMOTE_SCRATCH'):
-            self._cleanup_remote_scratch()
+        if mode_has('ALL', 'TMP', 'REMOTE_TMP'):
+            self._cleanup_remote_tmp()
 
         if mode_has('ALL', 'LOGS'):
             self._cleanup_logs()
@@ -637,7 +671,7 @@ class MRJobRunner(object):
         """Create a tmp directory on the local filesystem that will be
         cleaned up by self.cleanup()"""
         if not self._local_tmp_dir:
-            path = os.path.join(self._opts['base_tmp_dir'], self._job_key)
+            path = os.path.join(self._opts['local_tmp_dir'], self._job_key)
             log.info('creating tmp directory %s' % path)
             if os.path.isdir(path):
                 shutil.rmtree(path)
@@ -1177,7 +1211,7 @@ class MRJobRunner(object):
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 
-    def _new_upload_args(self, upload_mgr):
+    def _upload_args(self, upload_mgr):
         args = []
 
         # TODO: does Hadoop have a way of coping with paths that have
@@ -1195,7 +1229,8 @@ class MRJobRunner(object):
 
         return args
 
-    def _old_upload_args(self, upload_mgr):
+    def _pre_0_20_upload_args(self, upload_mgr):
+        """-files/-archive args for Hadoop prior to 0.20.203"""
         args = []
 
         for file_hash in self._arg_hash_paths('file', upload_mgr):
@@ -1227,11 +1262,11 @@ class MRJobRunner(object):
         env = os.environ.copy()
         env['LC_ALL'] = 'C'
 
-        # Make sure that the base tmp dir environment variables are changed if
+        # Make sure that the tmp dir environment variables are changed if
         # the default is changed.
-        env['TMP'] = self._opts['base_tmp_dir']
-        env['TMPDIR'] = self._opts['base_tmp_dir']
-        env['TEMP'] = self._opts['base_tmp_dir']
+        env['TMP'] = self._opts['local_tmp_dir']
+        env['TMPDIR'] = self._opts['local_tmp_dir']
+        env['TEMP'] = self._opts['local_tmp_dir']
 
         log.info('writing to %s' % output_path)
 

@@ -1,4 +1,6 @@
-# Copyright 2010-2011 Yelp
+# Copyright 2010-2012 Yelp
+# Copyright 2013 David Marin and Steve Johnson
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,31 +33,32 @@ Usage::
 Options::
 
   -h, --help            show this help message and exit
-  -v, --verbose         Print more messages
-  -q, --quiet           Report only fatal errors.
-  -c CONF_PATH, --conf-path=CONF_PATH
+  --aws-region=AWS_REGION
+                        Region to connect to S3 and EMR on (e.g. us-west-1).
+  -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
+  -q, --quiet           Don't print anything to stderr
+  --s3-endpoint=S3_ENDPOINT
+                        Host to connect to when communicating with S3 (e.g. s3
+                        -us-west-1.amazonaws.com). Default is to infer this
+                        from region (see --aws-region).
   -t, --test            Don't actually delete any files; just log that we
                         would
-
+  -v, --verbose         print more messages to stderr
 """
 from datetime import datetime
 from datetime import timedelta
 import logging
 from optparse import OptionParser
 
-try:
-    import boto.utils
-    boto  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    boto = None
-
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import iso8601_to_datetime
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
+from mrjob.options import alphabetize_options
 from mrjob.parse import parse_s3_uri
+from mrjob.util import scrape_options_into_new_groups
 
 
 log = logging.getLogger(__name__)
@@ -75,16 +78,17 @@ def main(cl_args=None):
 
     for path in args[1:]:
         s3_cleanup(path, time_old,
-                   conf_paths=options.conf_paths,
-                   dry_run=options.test)
+                   dry_run=options.text,
+                   **runner_kwargs(options))
 
 
-def s3_cleanup(glob_path, time_old, dry_run=False, conf_paths=None):
+def s3_cleanup(glob_path, time_old, dry_run=False, **runner_kwargs):
     """Delete all files older than *time_old* in *path*.
-       If *dry_run* is ``True``, then just log the files that need to be
-       deleted without actually deleting them
-       """
-    runner = EMRJobRunner(conf_paths=conf_paths)
+
+    If *dry_run* is true, then just log the files that need to be
+    deleted without actually deleting them
+    """
+    runner = EMRJobRunner(**runner_kwargs)
 
     log.info('Deleting all files in %s that are older than %s' %
              (glob_path, time_old))
@@ -101,6 +105,15 @@ def s3_cleanup(glob_path, time_old, dry_run=False, conf_paths=None):
                 log.info('Deleting %s; is %s old' % (key.name, age))
                 if not dry_run:
                     key.delete()
+
+
+def runner_kwargs(options):
+    """Options to pass to the EMRJobRunner."""
+    kwargs = options.__dict__.copy()
+    for unused_arg in ('quiet', 'verbose', 'test'):
+        del kwargs[unused_arg]
+
+    return kwargs
 
 
 def process_time(time):
@@ -132,6 +145,11 @@ def make_option_parser():
         help="Don't actually delete any files; just log that we would")
 
     add_basic_opts(option_parser)
+    scrape_options_into_new_groups(MRJob().all_option_groups(), {
+        option_parser: ('aws_region', 's3_endpoint'),
+    })
+
+    alphabetize_options(option_parser)
 
     return option_parser
 

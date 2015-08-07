@@ -1,5 +1,5 @@
 # Copyright 2009-2012 Yelp
-# Copyright 2013-2014 Yelp and Contributors
+# Copyright 2013-2015 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ def _ssh_args(ssh_bin, address, ec2_key_pair_file):
     and adds the ``hadoop`` username.
     """
     if ec2_key_pair_file is None:
-        raise ValueError('SSH key file path cannot be None')
+        raise ValueError('SSH key file path is None')
     return ssh_bin + [
         '-i', ec2_key_pair_file,
         '-o', 'StrictHostKeyChecking=no',
@@ -71,8 +71,7 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     """Shortcut to call ssh on a Hadoop node via ``subprocess``.
 
     :param ssh_bin: Path to ``ssh`` binary
-    :param address: Address of your job's master node (obtained via
-                    :py:meth:`boto.emr.EmrConnection.describe_jobflow`)
+    :param address: Address of your job's master node
     :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
     :param cmd_args: The command you want to run
     :param stdin: String to pass to the process's standard input
@@ -151,8 +150,7 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     file doesn't exist or SSH access fails.
 
     :param ssh_bin: Path to ``ssh`` binary
-    :param address: Address of your job's master node (obtained via
-                    :py:meth:`boto.emr.EmrConnection.describe_jobflow`)
+    :param address: Address of your job's master node
     :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
     :param path: Path on the remote host to get
     :param keyfile: Name of the EMR private key file on the master node in case
@@ -170,8 +168,7 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     path doesn't exist or SSH access fails.
 
     :param ssh_bin: Path to ``ssh`` binary
-    :param address: Address of your job's master node (obtained via
-                    :py:meth:`boto.emr.EmrConnection.describe_jobflow`)
+    :param address: Address of your job's master node
     :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
     :param path: Path on the remote host to list
     :param keyfile: Name of the EMR private key file on the master node in case
@@ -192,8 +189,7 @@ def ssh_terminate_single_job(ssh_bin, address, ec2_key_pair_file):
     other error occurred.
 
     :param ssh_bin: Path to ``ssh`` binary
-    :param address: Address of your job's master node (obtained via
-                    :py:meth:`boto.emr.EmrConnection.describe_jobflow`)
+    :param address: Address of your job's master node
     :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
 
     :return: ``True`` if successful, ``False`` if no job was running

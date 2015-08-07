@@ -1,4 +1,6 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2012 Yelp
+# Copyright 2013 David Marin and Steve Johnson
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,18 +26,36 @@ Usage::
 
 Options::
 
-  -a, --cat             Cat log files MRJob finds relevant
+  -h, --help            show this help message and exit
+  --aws-region=AWS_REGION
+                        Region to connect to S3 and EMR on (e.g. us-west-1).
   -A, --cat-all         Cat all log files to JOB_FLOW_ID/
-  -c CONF_PATH, --conf-path=CONF_PATH
+  -a, --cat             Cat log files MRJob finds relevant
+  -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
-  --counters            Show counters from the job flow
+  --no-conf             Don't load mrjob.conf even if it's available
   --ec2-key-pair-file=EC2_KEY_PAIR_FILE
                         Path to file containing SSH key for EMR
-  -h, --help            show this help message and exit
-  -l, --list            List log files MRJob finds relevant
+  --emr-endpoint=EMR_ENDPOINT
+                        Optional host to connect to when communicating with S3
+                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
+                        Default is to infer this from aws_region.
+  -f, --find-failure    Search the logs for information about why the job
+                        failed
+  --counters            Show counters from the job flow
   -L, --list-all        List all log files
-  --no-conf             Don't load mrjob.conf even if it's available
+  -l, --list            List log files MRJob finds relevant
   -q, --quiet           Don't print anything to stderr
+  --s3-endpoint=S3_ENDPOINT
+                        Host to connect to when communicating with S3 (e.g. s3
+                        -us-west-1.amazonaws.com). Default is to infer this
+                        from region (see --aws-region).
+  --s3-sync-wait-time=S3_SYNC_WAIT_TIME
+                        How long to wait for S3 to reach eventual consistency.
+                        This is typically less than a second (zero in us-west)
+                        but the default is 5.0 to be safe.
+  --ssh-bin=SSH_BIN     Name/path of ssh binary. Arguments are allowed (e.g.
+                        --ssh-bin 'ssh -v')
   -s STEP_NUM, --step-num=STEP_NUM
                         Limit results to a single step. To be used with --list
                         and --cat.
@@ -45,7 +65,6 @@ from __future__ import print_function
 
 from optparse import OptionError
 from optparse import OptionParser
-import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import LogFetchError
@@ -54,6 +73,9 @@ from mrjob.logparsers import TASK_ATTEMPT_LOGS
 from mrjob.logparsers import STEP_LOGS
 from mrjob.logparsers import JOB_LOGS
 from mrjob.logparsers import NODE_LOGS
+from mrjob.options import add_basic_opts
+from mrjob.options import add_emr_connect_opts
+from mrjob.options import alphabetize_options
 from mrjob.util import scrape_options_into_new_groups
 
 
@@ -92,10 +114,12 @@ def perform_actions(options, runner):
         cat_all(runner)
 
     if options.get_counters:
-        desc = runner._describe_jobflow()
-        runner._set_s3_job_log_uri(desc)
+        cluster = runner._describe_cluster()
+        runner._set_s3_job_log_uri(cluster)
+
+        steps = runner._list_steps_for_cluster()
         runner._fetch_counters(
-            range(1, len(desc.steps) + 1), skip_s3_wait=True)
+            range(1, len(steps) + 1), skip_s3_wait=True)
         runner.print_counters()
 
     if options.find_failure:
@@ -139,6 +163,8 @@ def make_option_parser():
 
     option_parser = OptionParser(usage=usage, description=description)
 
+    add_basic_opts(option_parser)
+
     option_parser.add_option('-f', '--find-failure', dest='find_failure',
                              action='store_true', default=False,
                              help=('Search the logs for information about why'
@@ -167,17 +193,14 @@ def make_option_parser():
                              action='store_true', default=False,
                              help='Show counters from the job flow')
 
-    assignments = {
-        option_parser: ('conf_paths', 'quiet', 'verbose',
-                        'ec2_key_pair_file', 's3_sync_wait_time')
-    }
+    add_emr_connect_opts(option_parser)
 
-    mr_job = MRJob()
-    job_option_groups = (mr_job.option_parser, mr_job.mux_opt_group,
-                         mr_job.proto_opt_group, mr_job.runner_opt_group,
-                         mr_job.hadoop_emr_opt_group, mr_job.emr_opt_group,
-                         mr_job.hadoop_opts_opt_group)
-    scrape_options_into_new_groups(job_option_groups, assignments)
+    scrape_options_into_new_groups(MRJob().all_option_groups(), {
+        option_parser: ('ec2_key_pair_file', 's3_sync_wait_time', 'ssh_bin')
+    })
+
+    alphabetize_options(option_parser)
+
     return option_parser
 
 
@@ -273,12 +296,8 @@ def find_failure(runner, step_num):
     if step_num:
         step_nums = [step_num]
     else:
-        job_flow = runner._describe_jobflow()
-        if job_flow:
-            step_nums = range(1, len(job_flow.steps) + 1)
-        else:
-            print('You do not have access to that job flow.')
-            sys.exit(1)
+        steps = runner._list_steps_for_cluster()
+        step_nums = range(1, len(steps) + 1)
 
     cause = runner._find_probable_cause_of_failure(step_nums)
     if cause:

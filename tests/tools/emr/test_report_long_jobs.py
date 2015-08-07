@@ -1,4 +1,5 @@
-# Copyright 2011 Yelp
+# Copyright 2011-2012 Yelp
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,132 +17,210 @@ import sys
 from datetime import datetime
 from datetime import timedelta
 
-from mrjob.emr import EMRJobRunner
 from mrjob.py2 import StringIO
 from mrjob.tools.emr.report_long_jobs import find_long_running_jobs
 from mrjob.tools.emr.report_long_jobs import main
 
 from tests.mockboto import MockEmrObject
-from tests.py2 import TestCase
 from tests.mockboto import MockBotoTestCase
 
-JOB_FLOWS = [
+CLUSTERS = [
     MockEmrObject(
-        creationdatetime='2010-06-06T00:00:00Z',
-        jobflowid='j-BOOTSTRAPPING',
+        id='j-STARTING',
         name='mr_grieving',
-        startdatetime='2010-06-06T00:05:00Z',
-        state='BOOTSTRAPPING',
-        steps=[],
-    ),
-    MockEmrObject(
-        creationdatetime='2010-06-06T00:00:00Z',
-        jobflowid='j-RUNNING1STEP',
-        name='mr_grieving',
-        readydatetime='2010-06-06T00:15:00Z',
-        state='RUNNING',
-        steps=[
-            MockEmrObject(
-                name='mr_denial: Step 1 of 5',
-                startdatetime='2010-06-06T00:20:00Z',
-                state='RUNNING',
+        status=MockEmrObject(
+            state='STARTING',
+            timeline=MockEmrObject(
+                creationdatetime='2010-06-06T00:05:00Z',
             ),
-        ]
+        ),
+        _steps=[],
     ),
     MockEmrObject(
-        creationdatetime='2010-06-06T00:00:00Z',
-        jobflowid='j-RUNNING2STEPS',
+        id='j-BOOTSTRAPPING',
         name='mr_grieving',
-        readydatetime='2010-06-06T00:15:00Z',
-        state='RUNNING',
-        steps=[
+        status=MockEmrObject(
+            state='BOOTSTRAPPING',
+            timeline=MockEmrObject(
+                creationdatetime='2010-06-06T00:05:00Z',
+            ),
+        ),
+        _steps=[],
+    ),
+    MockEmrObject(
+        id='j-RUNNING1STEP',
+        name='mr_grieving',
+        status=MockEmrObject(
+            state='RUNNING',
+            timeline=MockEmrObject(
+                creationdatetime='2010-06-06T00:00:00Z',
+                readydatetime='2010-06-06T00:15:00Z',
+            ),
+        ),
+        _steps=[
             MockEmrObject(
-                enddatetime='2010-06-06T00:25:00Z',
                 name='mr_denial: Step 1 of 5',
-                startdatetime='2010-06-06T00:20:00Z',
-                state='COMPLETED',
+                status=MockEmrObject(
+                    state='RUNNING',
+                    timeline=MockEmrObject(
+                        startdatetime='2010-06-06T00:20:00Z',
+                    ),
+                ),
+            ),
+        ],
+    ),
+    MockEmrObject(
+        id='j-RUNNING2STEPS',
+        name='mr_grieving',
+        status=MockEmrObject(
+            state='RUNNING',
+            timeline=MockEmrObject(
+                creationdatetime='2010-06-06T00:00:00Z',
+                readydatetime='2010-06-06T00:15:00Z',
+            ),
+        ),
+        _steps=[
+            MockEmrObject(
+                name='mr_denial: Step 1 of 5',
+                status=MockEmrObject(
+                    state='COMPLETED',
+                    timeline=MockEmrObject(
+                        enddatetime='2010-06-06T00:25:00Z',
+                        startdatetime='2010-06-06T00:20:00Z',
+                    ),
+                ),
             ),
             MockEmrObject(
                 name='mr_anger: Step 2 of 5',
-                startdatetime='2010-06-06T00:30:00Z',
-                state='RUNNING',
+                status=MockEmrObject(
+                    state='RUNNING',
+                    timeline=MockEmrObject(
+                        startdatetime='2010-06-06T00:30:00Z',
+                    ),
+                ),
             ),
         ]
     ),
     MockEmrObject(
-        creationdatetime='2010-06-06T00:00:00Z',
-        jobflowid='j-RUNNINGANDPENDING',
+        id='j-RUNNINGANDPENDING',
         name='mr_grieving',
-        readydatetime='2010-06-06T00:15:00Z',
-        state='RUNNING',
-        steps=[
+        status=MockEmrObject(
+            state='RUNNING',
+            timeline=MockEmrObject(
+                creationdatetime='2010-06-06T00:00:00Z',
+                readydatetime='2010-06-06T00:15:00Z',
+            ),
+        ),
+        _steps=[
             MockEmrObject(
-                enddatetime='2010-06-06T00:25:00Z',
                 name='mr_denial: Step 1 of 5',
-                startdatetime='2010-06-06T00:20:00Z',
-                state='COMPLETED',
+                status=MockEmrObject(
+                    state='COMPLETED',
+                    timeline=MockEmrObject(
+                        enddatetime='2010-06-06T00:25:00Z',
+                        startdatetime='2010-06-06T00:20:00Z',
+                    ),
+                ),
             ),
             MockEmrObject(
                 name='mr_anger: Step 2 of 5',
-                startdatetime='2010-06-06T00:30:00Z',
-                state='RUNNING',
+                status=MockEmrObject(
+                    state='RUNNING',
+                    timeline=MockEmrObject(
+                        startdatetime='2010-06-06T00:30:00Z',
+                    ),
+                ),
             ),
             MockEmrObject(
                 name='mr_bargaining: Step 3 of 5',
-                state='PENDING',
-            ),
-        ]
-    ),
-    MockEmrObject(
-        creationdatetime='2010-06-06T00:00:00Z',
-        jobflowid='j-PENDING1STEP',
-        name='mr_grieving',
-        readydatetime='2010-06-06T00:15:00Z',
-        state='RUNNING',
-        steps=[
-            MockEmrObject(
-                name='mr_bargaining: Step 3 of 5',
-                state='PENDING',
+                status=MockEmrObject(
+                    state='PENDING',
+                ),
             ),
         ]
     ),
     MockEmrObject(
-        creationdatetime='2010-06-06T00:00:00Z',
-        jobflowid='j-PENDING2STEPS',
+        id='j-PENDING1STEP',
         name='mr_grieving',
-        readydatetime='2010-06-06T00:15:00Z',
-        state='RUNNING',
-        steps=[
+        status=MockEmrObject(
+            state='RUNNING',
+            timeline=MockEmrObject(
+                creationdatetime='2010-06-06T00:00:00Z',
+                readydatetime='2010-06-06T00:15:00Z',
+            ),
+        ),
+        _steps=[
             MockEmrObject(
-                enddatetime='2010-06-06T00:35:00Z',
                 name='mr_bargaining: Step 3 of 5',
-                state='COMPLETED',
-                startdatetime='2010-06-06T00:20:00Z',
+                status=MockEmrObject(
+                    state='PENDING',
+                ),
+            ),
+        ]
+    ),
+    MockEmrObject(
+        id='j-PENDING2STEPS',
+        name='mr_grieving',
+        status=MockEmrObject(
+            state='RUNNING',
+            timeline=MockEmrObject(
+                creationdatetime='2010-06-06T00:00:00Z',
+                readydatetime='2010-06-06T00:15:00Z',
+            ),
+        ),
+        _steps=[
+            MockEmrObject(
+                name='mr_bargaining: Step 3 of 5',
+                status=MockEmrObject(
+                    state='COMPLETED',
+                    timeline=MockEmrObject(
+                        enddatetime='2010-06-06T00:35:00Z',
+                        startdatetime='2010-06-06T00:20:00Z',
+                    ),
+                ),
             ),
             MockEmrObject(
                 name='mr_depression: Step 4 of 5',
-                state='PENDING',
+                status=MockEmrObject(
+                    state='PENDING',
+                ),
             ),
         ]
     ),
     MockEmrObject(
-        creationdatetime='2010-06-06T00:00:00Z',
-        jobflowid='j-COMPLETED',
+        id='j-COMPLETED',
         name='mr_grieving',
-        readydatetime='2010-06-06T00:15:00Z',
+        status=MockEmrObject(
+            state='COMPLETED',
+            timeline=MockEmrObject(
+                creationdatetime='2010-06-06T00:00:00Z',
+                readydatetime='2010-06-06T00:15:00Z',
+            ),
+        ),
         state='COMPLETED',
-        steps=[
+        _steps=[
             MockEmrObject(
-                enddatetime='2010-06-06T00:40:00Z',
-                startdatetime='2010-06-06T00:20:00Z',
                 name='mr_acceptance: Step 5 of 5',
-                state='COMPLETED',
+                status=MockEmrObject(
+                    state='COMPLETED',
+                    timeline=MockEmrObject(
+                        enddatetime='2010-06-06T00:40:00Z',
+                        startdatetime='2010-06-06T00:20:00Z',
+                    ),
+                ),
             ),
         ]
     ),
 ]
 
-JOB_FLOWS_BY_ID = dict((jf.jobflowid, jf) for jf in JOB_FLOWS)
+CLUSTERS_BY_ID = dict((cluster.id, cluster) for cluster in CLUSTERS)
+
+CLUSTER_SUMMARIES_BY_ID = dict(
+    (cluster.id, MockEmrObject(
+        id=cluster.id,
+        name=cluster.name,
+        status=cluster.status))
+    for cluster in CLUSTERS)
 
 
 class ReportLongJobsTestCase(MockBotoTestCase):
@@ -160,47 +239,80 @@ class ReportLongJobsTestCase(MockBotoTestCase):
     def test_with_no_job_flows(self):
         main(['-q', '--no-conf'])  # just make sure it doesn't crash
 
-    def test_with_all_job_flows(self):
-        self.mock_emr_job_flows.update(JOB_FLOWS_BY_ID)
-        emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-        emr_conn.run_jobflow('no name', log_uri=None)
+    def test_with_all_clusters(self):
+        for cluster in CLUSTERS:
+            self.add_mock_emr_cluster(cluster)
+
+        emr_conn = self.connect_emr()
+        emr_conn.run_jobflow('no name',
+                             job_flow_role='fake-instance-profile',
+                             service_role='fake-service-role')
         main(['-q', '--no-conf'])
+
         lines = [line for line in StringIO(self.stdout.getvalue())]
-        self.assertEqual(len(lines), len(JOB_FLOWS_BY_ID) - 1)
+        self.assertEqual(len(lines), len(CLUSTERS_BY_ID) - 1)
 
 
-class FindLongRunningJobsTestCase(TestCase):
+
+class FindLongRunningJobsTestCase(MockBotoTestCase):
 
     maxDiff = None  # show whole diff when tests fail
 
-    def test_bootstrapping(self):
+    def setUp(self):
+        super(FindLongRunningJobsTestCase, self).setUp()
+
+        for cluster in CLUSTERS:
+            self.add_mock_emr_cluster(cluster)
+
+    def find_long_running_jobs(self, cluster_summaries, min_time, now):
+        emr_conn = self.connect_emr()
+
+        return find_long_running_jobs(
+            emr_conn,
+            cluster_summaries,
+            min_time=min_time,
+            now=now)
+
+    def test_starting(self):
         self.assertEqual(
-            list(find_long_running_jobs(
-                [JOB_FLOWS_BY_ID['j-BOOTSTRAPPING']],
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-STARTING']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
-            [{'job_flow_id': 'j-BOOTSTRAPPING',
-              'name': 'mr_grieving',
-              'step_state': '',
+            [{'cluster_id': u'j-STARTING',
+              'name': u'mr_grieving',
+              'state': u'STARTING',
+              'time': timedelta(hours=3, minutes=55)}])
+
+    def test_bootstrapping(self):
+        self.assertEqual(
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-BOOTSTRAPPING']],
+                min_time=timedelta(hours=1),
+                now=datetime(2010, 6, 6, 4)
+            )),
+            [{'cluster_id': u'j-BOOTSTRAPPING',
+              'name': u'mr_grieving',
+              'state': u'BOOTSTRAPPING',
               'time': timedelta(hours=3, minutes=55)}])
 
     def test_running_one_step(self):
         self.assertEqual(
-            list(find_long_running_jobs(
-                [JOB_FLOWS_BY_ID['j-RUNNING1STEP']],
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-RUNNING1STEP']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
-            [{'job_flow_id': 'j-RUNNING1STEP',
-              'name': 'mr_denial: Step 1 of 5',
-              'step_state': 'RUNNING',
+            [{'cluster_id': u'j-RUNNING1STEP',
+              'name': u'mr_denial: Step 1 of 5',
+              'state': u'RUNNING',
               'time': timedelta(hours=3, minutes=40)}])
 
         # job hasn't been running for 1 day
         self.assertEqual(
-            list(find_long_running_jobs(
-                [JOB_FLOWS_BY_ID['j-RUNNING1STEP']],
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-RUNNING1STEP']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -208,20 +320,20 @@ class FindLongRunningJobsTestCase(TestCase):
 
     def test_running_two_steps(self):
         self.assertEqual(
-            list(find_long_running_jobs(
-                [JOB_FLOWS_BY_ID['j-RUNNING2STEPS']],
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-RUNNING2STEPS']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
-            [{'job_flow_id': 'j-RUNNING2STEPS',
-              'name': 'mr_anger: Step 2 of 5',
-              'step_state': 'RUNNING',
+            [{'cluster_id': u'j-RUNNING2STEPS',
+              'name': u'mr_anger: Step 2 of 5',
+              'state': u'RUNNING',
               'time': timedelta(hours=3, minutes=30)}])
 
         # job hasn't been running for 1 day
         self.assertEqual(
-            list(find_long_running_jobs(
-                [JOB_FLOWS_BY_ID['j-RUNNING2STEPS']],
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-RUNNING2STEPS']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -229,20 +341,20 @@ class FindLongRunningJobsTestCase(TestCase):
 
     def test_running_and_pending(self):
         self.assertEqual(
-            list(find_long_running_jobs(
-                [JOB_FLOWS_BY_ID['j-RUNNINGANDPENDING']],
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-RUNNINGANDPENDING']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
-            [{'job_flow_id': 'j-RUNNINGANDPENDING',
-              'name': 'mr_anger: Step 2 of 5',
-              'step_state': 'RUNNING',
+            [{'cluster_id': u'j-RUNNINGANDPENDING',
+              'name': u'mr_anger: Step 2 of 5',
+              'state': u'RUNNING',
               'time': timedelta(hours=3, minutes=30)}])
 
         # job hasn't been running for 1 day
         self.assertEqual(
-            list(find_long_running_jobs(
-                [JOB_FLOWS_BY_ID['j-RUNNINGANDPENDING']],
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-RUNNINGANDPENDING']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -250,20 +362,20 @@ class FindLongRunningJobsTestCase(TestCase):
 
     def test_pending_one_step(self):
         self.assertEqual(
-            list(find_long_running_jobs(
-                [JOB_FLOWS_BY_ID['j-PENDING1STEP']],
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-PENDING1STEP']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
-            [{'job_flow_id': 'j-PENDING1STEP',
-              'name': 'mr_bargaining: Step 3 of 5',
-              'step_state': 'PENDING',
+            [{'cluster_id': u'j-PENDING1STEP',
+              'name': u'mr_bargaining: Step 3 of 5',
+              'state': u'PENDING',
               'time': timedelta(hours=3, minutes=45)}])
 
         # job hasn't been running for 1 day
         self.assertEqual(
-            list(find_long_running_jobs(
-                [JOB_FLOWS_BY_ID['j-PENDING1STEP']],
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-PENDING1STEP']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -271,20 +383,20 @@ class FindLongRunningJobsTestCase(TestCase):
 
     def test_pending_two_steps(self):
         self.assertEqual(
-            list(find_long_running_jobs(
-                [JOB_FLOWS_BY_ID['j-PENDING2STEPS']],
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-PENDING2STEPS']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
-            [{'job_flow_id': 'j-PENDING2STEPS',
-              'name': 'mr_depression: Step 4 of 5',
-              'step_state': 'PENDING',
+            [{'cluster_id': u'j-PENDING2STEPS',
+              'name': u'mr_depression: Step 4 of 5',
+              'state': u'PENDING',
               'time': timedelta(hours=3, minutes=25)}])
 
         # job hasn't been running for 1 day
         self.assertEqual(
-            list(find_long_running_jobs(
-                [JOB_FLOWS_BY_ID['j-PENDING2STEPS']],
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-PENDING2STEPS']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -292,8 +404,8 @@ class FindLongRunningJobsTestCase(TestCase):
 
     def test_completed(self):
         self.assertEqual(
-            list(find_long_running_jobs(
-                [JOB_FLOWS_BY_ID['j-COMPLETED']],
+            list(self.find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-COMPLETED']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
@@ -302,32 +414,36 @@ class FindLongRunningJobsTestCase(TestCase):
 
     def test_all_together(self):
         self.assertEqual(
-            list(find_long_running_jobs(
-                JOB_FLOWS,
+            list(self.find_long_running_jobs(
+                CLUSTERS,
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
             )),
-            [{'job_flow_id': 'j-BOOTSTRAPPING',
-              'name': 'mr_grieving',
-              'step_state': '',
+            [{'cluster_id': u'j-STARTING',
+              'name': u'mr_grieving',
+              'state': u'STARTING',
               'time': timedelta(hours=3, minutes=55)},
-             {'job_flow_id': 'j-RUNNING1STEP',
-              'name': 'mr_denial: Step 1 of 5',
-              'step_state': 'RUNNING',
+             {'cluster_id': u'j-BOOTSTRAPPING',
+              'name': u'mr_grieving',
+              'state': u'BOOTSTRAPPING',
+              'time': timedelta(hours=3, minutes=55)},
+             {'cluster_id': u'j-RUNNING1STEP',
+              'name': u'mr_denial: Step 1 of 5',
+              'state': u'RUNNING',
               'time': timedelta(hours=3, minutes=40)},
-             {'job_flow_id': 'j-RUNNING2STEPS',
-              'name': 'mr_anger: Step 2 of 5',
-              'step_state': 'RUNNING',
+             {'cluster_id': u'j-RUNNING2STEPS',
+              'name': u'mr_anger: Step 2 of 5',
+              'state': u'RUNNING',
               'time': timedelta(hours=3, minutes=30)},
-             {'job_flow_id': 'j-RUNNINGANDPENDING',
-              'name': 'mr_anger: Step 2 of 5',
-              'step_state': 'RUNNING',
+             {'cluster_id': u'j-RUNNINGANDPENDING',
+              'name': u'mr_anger: Step 2 of 5',
+              'state': u'RUNNING',
               'time': timedelta(hours=3, minutes=30)},
-             {'job_flow_id': 'j-PENDING1STEP',
-              'name': 'mr_bargaining: Step 3 of 5',
-              'step_state': 'PENDING',
+             {'cluster_id': u'j-PENDING1STEP',
+              'name': u'mr_bargaining: Step 3 of 5',
+              'state': u'PENDING',
               'time': timedelta(hours=3, minutes=45)},
-             {'job_flow_id': 'j-PENDING2STEPS',
-              'name': 'mr_depression: Step 4 of 5',
-              'step_state': 'PENDING',
+             {'cluster_id': u'j-PENDING2STEPS',
+              'name': u'mr_depression: Step 4 of 5',
+              'state': u'PENDING',
               'time': timedelta(hours=3, minutes=25)}])

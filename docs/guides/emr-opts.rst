@@ -116,7 +116,7 @@ Job flow creation and configuration
     :default: ``'us-west-2'``
 
     region to run EMR jobs on (e.g.  ``us-west-1``). Also used by mrjob
-    to create temporary buckets if you don't set :mrjob-opt:`s3_scratch_uri`
+    to create temporary buckets if you don't set :mrjob-opt:`s3_tmp_dir`
     explicitly.
 
 .. mrjob-opt::
@@ -179,6 +179,39 @@ Job flow creation and configuration
     :set: emr
     :default: ``{}``
 
+    Metadata tags to apply to the EMR cluster after its
+    creation. See `Tagging Amazon EMR Clusters`_ for more information
+    on applying metadata tags to EMR clusters.
+
+    .. _`Tagging Amazon EMR Clusters`:
+        http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-plan-tags.html
+
+    Tag names and values are strings. On the command line, to set a tag
+    use ``--emr-tag KEY=VALUE``:
+
+    .. code-block:: sh
+
+        --emr-tag team=development
+
+    In the config file, ``emr_tags`` is a dict:
+
+    .. code-block:: yaml
+
+        runners:
+          emr:
+            emr_tags:
+              team: development
+              project: mrjob
+
+    .. versionadded:: 0.5.0
+
+.. mrjob-opt::
+    :config: emr_tags
+    :switch: --emr-tag
+    :type: :ref:`dict <data-type-plain-dict>`
+    :set: emr
+    :default: ``{}``
+
     Metadata tags to apply to the EMR cluster after creating a
     job flow. See `Tagging Amazon EMR Clusters`_ for more information
     on applying metadata tags to EMR clusters.
@@ -203,7 +236,7 @@ Job flow creation and configuration
               team: development
               project: mrjob
 
-    .. versionadded:: 0.5.0
+    .. versionadded:: 0.4.5
 
 .. mrjob-opt::
     :config: hadoop_streaming_jar_on_emr
@@ -675,7 +708,7 @@ MRJob uses boto to manipulate/access S3.
     :switch: --s3-log-uri
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: append ``logs`` to :mrjob-opt:`s3_scratch_uri`
+    :default: append ``logs`` to :mrjob-opt:`s3_tmp_dir`
 
     Where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for
     your job flow will go into a subdirectory, e.g.
@@ -683,19 +716,23 @@ MRJob uses boto to manipulate/access S3.
     s3://yourbucket/logs/j-YOURJOBID/).
 
 .. mrjob-opt::
-    :config: s3_scratch_uri
-    :switch: --s3-scratch-uri
+    :config: s3_tmp_dir
+    :switch: --s3-tmp-dir
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: (automatic)
 
-    S3 directory (URI ending in ``/``) to use as scratch space, e.g.
+    S3 directory (URI ending in ``/``) to use as temp space, e.g.
     ``s3://yourbucket/tmp/``.
 
     By default, mrjob looks for a bucket belong to you whose name starts with
     ``mrjob-`` and which matches :mrjob-opt:`aws_region`. If it can't find
     one, it creates one with a random name. This option is then set to `tmp/`
     in this bucket (e.g. ``s3://mrjob-01234567890abcdef/tmp/``).
+
+    .. versionchanged::
+
+       This option used to be called ``s3_tmp_dir``.
 
 .. mrjob-opt::
     :config: s3_sync_wait_time

@@ -1,6 +1,6 @@
 # Copyright 2009-2012 Yelp and Contributors
 # Copyright 2013 David Marin
-# Copyright 2014-2014 Yelp and Contributors
+# Copyright 2014-2015 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +32,8 @@ from mrjob.options import add_hadoop_emr_opts
 from mrjob.options import add_hadoop_shared_opts
 from mrjob.options import add_protocol_opts
 from mrjob.options import add_runner_opts
+from mrjob.options import alphabetize_options
+from mrjob.options import fix_custom_options
 from mrjob.options import print_help_for_groups
 from mrjob.parse import parse_key_value_list
 from mrjob.parse import parse_port_range_list
@@ -93,6 +95,9 @@ class MRJobLauncher(object):
                                           option_class=self.OPTION_CLASS,
                                           add_help_option=False)
         self.configure_options()
+
+        for opt_group in self.all_option_groups():
+            alphabetize_options(opt_group)
 
         # don't pass None to parse_args unless we're actually running
         # the MRJob script
@@ -433,70 +438,7 @@ class MRJobLauncher(object):
 
         self._process_args(args)
 
-        # parse custom options here to avoid setting a custom Option subclass
-        # and confusing users
-
-        if self.options.ssh_bind_ports:
-            try:
-                ports = parse_port_range_list(self.options.ssh_bind_ports)
-            except ValueError as e:
-                self.option_parser.error('invalid port range list "%s": \n%s' %
-                                         (self.options.ssh_bind_ports,
-                                          e.args[0]))
-            self.options.ssh_bind_ports = ports
-
-        cmdenv_err = 'cmdenv argument "%s" is not of the form KEY=VALUE'
-        self.options.cmdenv = parse_key_value_list(self.options.cmdenv,
-                                                   cmdenv_err,
-                                                   self.option_parser.error)
-
-        jobconf_err = 'jobconf argument "%s" is not of the form KEY=VALUE'
-        self.options.jobconf = parse_key_value_list(self.options.jobconf,
-                                                    jobconf_err,
-                                                    self.option_parser.error)
-
-        # emr_api_params
-        emr_api_err = (
-            'emr-api-params argument "%s" is not of the form KEY=VALUE')
-
-        self.options.emr_api_params = parse_key_value_list(
-            self.options.emr_api_params,
-            emr_api_err,
-            self.option_parser.error)
-
-        # no_emr_api_params just exists to modify emr_api_params
-        for param in self.options.no_emr_api_params:
-            self.options.emr_api_params[param] = None
-
-        # emr_tags
-        emr_tags_err = (
-            'emr-tag argument "%s" is not of the form KEY=VALUE')
-
-        self.options.emr_tags = parse_key_value_list(
-            self.options.emr_tags,
-            emr_tags_err,
-            self.option_parser.error)
-
-        def parse_commas(cleanup_str):
-            cleanup_error = ('cleanup option %s is not one of ' +
-                             ', '.join(CLEANUP_CHOICES))
-            new_cleanup_options = []
-            for choice in cleanup_str.split(','):
-                if choice in CLEANUP_CHOICES:
-                    new_cleanup_options.append(choice)
-                else:
-                    self.option_parser.error(cleanup_error % choice)
-            if ('NONE' in new_cleanup_options and
-                    len(set(new_cleanup_options)) > 1):
-                self.option_parser.error(
-                    'Cannot clean up both nothing and something!')
-            return new_cleanup_options
-
-        if self.options.cleanup is not None:
-            self.options.cleanup = parse_commas(self.options.cleanup)
-        if self.options.cleanup_on_failure is not None:
-            self.options.cleanup_on_failure = parse_commas(
-                self.options.cleanup_on_failure)
+        fix_custom_options(self.options, self.option_parser)
 
     def job_runner_kwargs(self):
         """Keyword arguments used to create runners when

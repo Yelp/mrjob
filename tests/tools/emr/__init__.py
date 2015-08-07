@@ -1,4 +1,5 @@
 # Copyright 2009-2012 Yelp
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,11 +41,11 @@ class ToolTestCase(MockBotoTestCase):
         self.addCleanup(p.stop)
         p.start()
 
-    def make_job_flow(self, **kwargs):
+    def make_cluster(self, **kwargs):
         self.add_mock_s3_data({'walrus': {}})
         kwargs.update(dict(
             conf_paths=[],
-            s3_scratch_uri='s3://walrus/',
+            s3_tmp_dir='s3://walrus/',
             s3_sync_wait_time=0))
         with EMRJobRunner(**kwargs) as runner:
             return runner.make_persistent_job_flow()

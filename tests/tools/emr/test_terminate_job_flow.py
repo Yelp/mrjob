@@ -1,4 +1,5 @@
 # Copyright 2009-2012 Yelp
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,11 +27,11 @@ class TerminateToolTestCase(ToolTestCase):
         self.assertEqual(True, True)
 
     def test_terminate_job_flow(self):
-        jf_id = self.make_job_flow(pool_emr_job_flows=True)
-        self.monkey_patch_argv('--quiet', '--no-conf', 'j-MOCKJOBFLOW0')
+        cluster_id = self.make_cluster(pool_emr_job_flows=True)
+        self.monkey_patch_argv('--quiet', '--no-conf', 'j-MOCKCLUSTER0')
 
         terminate_main()
 
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-        self.assertEqual(emr_conn.describe_jobflow(jf_id).state,
-                         'TERMINATED')
+        cluster = emr_conn.describe_cluster(cluster_id)
+        self.assertEqual(cluster.status.state, 'TERMINATED')

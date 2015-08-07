@@ -64,6 +64,7 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import TestCase
+from tests.py2 import call
 from tests.py2 import mock
 from tests.py2 import patch
 from tests.py2 import skipIf
@@ -3465,3 +3466,23 @@ class IAMEndpointTestCase(MockBotoTestCase):
         with mr_job.make_runner() as runner:
             iam_conn = runner.make_iam_conn()
             self.assertEqual(iam_conn.host, 'iam.us-gov.amazonaws.com')
+
+
+
+class SetupLineEncodingTestCase(MockBotoTestCase):
+
+    def test_setup_wrapper_script_uses_local_line_endings(self):
+        job = MRTwoStepJob(['-r', 'emr', '--setup', 'true'])
+        job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
+
+        # tests #1071. Unfortunately, we mostly run these tests on machines
+        # that use unix line endings anyway. So monitor open() instead
+        with patch(
+                'mrjob.runner.open', create=True, side_effect=open) as m_open:
+            with logger_disabled('mrjob.emr'):
+                with job.make_runner() as runner:
+                    runner.run()
+
+                    self.assertIn(
+                        call(runner._setup_wrapper_script_path, 'wb'),
+                        m_open.mock_calls)

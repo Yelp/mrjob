@@ -919,7 +919,8 @@ class MRJobRunner(object):
         else:
             return []
 
-    def _create_setup_wrapper_script(self, dest='setup-wrapper.sh'):
+    def _create_setup_wrapper_script(
+            self, dest='setup-wrapper.sh', local=False):
         """Create the wrapper script, and write it into our local temp
         directory (by default, to a file named wrapper.sh).
 
@@ -928,6 +929,9 @@ class MRJobRunner(object):
 
         This will do nothing if ``self._setup`` is empty or
         this method has already been called.
+
+        If *local* is true, use local line endings (e.g. Windows). Otherwise,
+        use UNIX line endings (see #1071).
         """
         if self._setup_wrapper_script_path:
             return
@@ -951,9 +955,14 @@ class MRJobRunner(object):
         for line in contents:
             log.debug('WRAPPER: ' + line.rstrip('\n'))
 
-        with open(path, 'w') as f:
-            for line in contents:
-                f.write(line)
+        if local:
+            with open(path, 'w') as f:
+                for line in contents:
+                    f.write(line)
+        else:
+            with open(path, 'wb') as f:
+                for line in contents:
+                    f.write(line.encode('utf-8'))
 
         self._setup_wrapper_script_path = path
         self._working_dir_mgr.add('file', self._setup_wrapper_script_path)

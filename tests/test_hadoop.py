@@ -35,6 +35,7 @@ from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
 from tests.py2 import TestCase
+from tests.py2 import call
 from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -513,3 +514,25 @@ class JarStepTestCase(MockHadoopTestCase):
                 streaming_input_arg = streaming_args[
                     streaming_args.index('-input') + 1]
                 self.assertEqual(jar_output_arg, streaming_input_arg)
+
+
+class SetupLineEncodingTestCase(MockHadoopTestCase):
+
+    def test_setup_wrapper_script_uses_local_line_endings(self):
+        job = MRTwoStepJob(['-r', 'hadoop', '--setup', 'true'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        add_mock_hadoop_output([b''])
+        add_mock_hadoop_output([b''])
+
+        # tests #1071. Unfortunately, we mostly run these tests on machines
+        # that use unix line endings anyway. So monitor open() instead
+        with patch(
+                'mrjob.runner.open', create=True, side_effect=open) as m_open:
+            with logger_disabled('mrjob.hadoop'):
+                with job.make_runner() as runner:
+                    runner.run()
+
+                    self.assertIn(
+                        call(runner._setup_wrapper_script_path, 'wb'),
+                        m_open.mock_calls)

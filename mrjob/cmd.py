@@ -78,12 +78,6 @@ def mrboss(args):
     main(args)
 
 
-@command('collect-emr-active-stats', 'Collect EMR stats from active jobflows')
-def collect_emr_stats(args):
-    from mrjob.tools.emr.collect_emr_stats import main
-    main(args)
-
-
 @command('create-job-flow', 'Create an EMR job flow')
 def create_jf(args):
     from mrjob.tools.emr.create_job_flow import main

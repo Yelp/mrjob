@@ -13,7 +13,6 @@ EMR Utilities
 
 .. automethod:: EMRJobRunner.make_emr_conn
 .. automethod:: EMRJobRunner.get_ami_version
-.. autofunction:: describe_all_job_flows
 
 S3 Utilities
 ------------

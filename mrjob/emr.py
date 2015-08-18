@@ -93,6 +93,7 @@ from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
+from mrjob.py2 import to_string
 from mrjob.py2 import urlopen
 from mrjob.retry import RetryGoRound
 from mrjob.runner import MRJobRunner
@@ -119,8 +120,11 @@ JOB_TRACKER_RE = re.compile(r'(\d{1,3}\.\d{2})%')
 LOG_GENERATING_STEP_NAME_RE = HADOOP_STREAMING_JAR_RE
 
 # the port to tunnel to
-EMR_JOB_TRACKER_PORT = 9100
-EMR_JOB_TRACKER_PATH = '/jobtracker.jsp'
+#EMR_JOB_TRACKER_PORT = 9100
+#EMR_JOB_TRACKER_PATH = '/jobtracker.jsp'
+EMR_JOB_TRACKER_PORT = 9026
+EMR_JOB_TRACKER_PATH = '/cluster'
+
 
 MAX_SSH_RETRIES = 20
 
@@ -954,6 +958,7 @@ class EMRJobRunner(MRJobRunner):
             else:
                 ssh_proc.stdin.close()
                 ssh_proc.stdout.close()
+                print('ssh stderr: ' + to_string(ssh_proc.stderr.read()))
                 ssh_proc.stderr.close()
 
         if not self._ssh_proc:

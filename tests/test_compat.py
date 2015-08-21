@@ -15,6 +15,7 @@
 """Test compatibility switching between different Hadoop versions"""
 
 import os
+from distutils.version import LooseVersion
 
 from mrjob.compat import jobconf_from_env
 from mrjob.compat import jobconf_from_dict
@@ -22,6 +23,7 @@ from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_generic_jobconf
+from mrjob.compat import _map_version
 
 from tests.py2 import TestCase
 from tests.py2 import patch
@@ -127,3 +129,41 @@ class CompatTestCase(TestCase):
         self.assertEqual(supports_new_distributed_cache_options('0.20'), False)
         self.assertEqual(
             supports_new_distributed_cache_options('0.20.203'), True)
+
+
+class MapVersionTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertRaises(ValueError, _map_version, None, '0.5.0')
+        self.assertRaises(ValueError, _map_version, {}, '0.5.0'),
+        self.assertRaises(ValueError, _map_version, [], '0.5.0')
+
+    def test_dict(self):
+        version_map = {
+            '1': 'foo',
+            '2': 'bar',
+            '3': 'baz',
+        }
+
+        self.assertEqual(_map_version(version_map, '1.1'), 'foo')
+        # test exact match
+        self.assertEqual(_map_version(version_map, '2'), 'bar')
+        # versions are just minimums
+        self.assertEqual(_map_version(version_map, '4.5'), 'baz')
+        # compare versions, not strings
+        self.assertEqual(_map_version(version_map, '11.11'), 'baz')
+        # fall back to lowest version
+        self.assertEqual(_map_version(version_map, '0.1'), 'foo')
+
+    def test_list_of_tuples(self):
+        version_map = [
+            (LooseVersion('1'), 'foo'),
+            (LooseVersion('2'), 'bar'),
+            (LooseVersion('3'), 'baz'),
+        ]
+
+        self.assertEqual(_map_version(version_map, '1.1'), 'foo')
+        self.assertEqual(_map_version(version_map, '2'), 'bar')
+        self.assertEqual(_map_version(version_map, '4.5'), 'baz')
+        self.assertEqual(_map_version(version_map, '11.11'), 'baz')
+        self.assertEqual(_map_version(version_map, '0.1'), 'foo')

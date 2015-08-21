@@ -608,8 +608,7 @@ def jobconf_from_dict(jobconf, name, default=None):
     ``mapreduce.map.input.file``), we'll automatically try all variants before
     giving up.
 
-    Return *default* if that jobconf variable isn't set.
-    """
+    Return *default* if that jobconf variable isn't set    """
     if name in jobconf:
         return jobconf[name]
 
@@ -621,24 +620,39 @@ def jobconf_from_dict(jobconf, name, default=None):
     return default
 
 
+def _map_version(version_map, version):
+    """Look up value in the given dictionary which maps versions
+    (as strings) to the value for that version and later.
+
+    For efficiency, version_map can also be a list of tuples of
+    (LooseVersion(version_as_string), value), with oldest versions first.
+
+    If there are no matches, use the value for the earliest version.
+    """
+    if not version_map:
+        raise ValueError
+
+    if isinstance(version_map, dict):
+        version_map = sorted((LooseVersion(k), v)
+                             for k, v in version_map.items())
+
+    req_version = LooseVersion(version)
+
+    for min_version, value in reversed(version_map):
+        if req_version >= min_version:
+            return value
+    else:
+        return version_map[0][1]
+
+
 def translate_jobconf(variable, version):
     """Translate *variable* to Hadoop version *version*. If it's not
     a variable we recognize, leave as-is.
     """
-    if variable not in _JOBCONF_MAP:
+    if variable in _JOBCONF_MAP:
+        return _map_version(_JOBCONF_MAP[variable], version)
+    else:
         return variable
-
-    req_version = LooseVersion(version)
-    possible_versions = sorted(_JOBCONF_MAP[variable].keys(),
-                               reverse=True,
-                               key=lambda v: LooseVersion(v))
-
-    for possible_version in possible_versions:
-        if req_version >= LooseVersion(possible_version):
-            return _JOBCONF_MAP[variable][possible_version]
-
-    # return oldest version if we don't find required version
-    return _JOBCONF_MAP[variable][possible_versions[-1]]
 
 
 def supports_combiners_in_hadoop_streaming(version):

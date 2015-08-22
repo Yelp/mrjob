@@ -586,8 +586,8 @@ def parse_hadoop_counters_from_line(line, hadoop_version=None):
 
 ### job tracker/resource manager ###
 
-_JOB_TRACKER_PERCENT_RE = re.compile(rb'\b(\d{1,3}\.\d{2})%')
-_RESOURCE_MANAGER_PERCENT_RE = re.compile(rb'style="width:(\d{1,3}.\d)%"')
+_JOB_TRACKER_PERCENT_RE = re.compile(br'\b(\d{1,3}\.\d{2})%')
+_RESOURCE_MANAGER_PERCENT_RE = re.compile(br'RUNNING.*:(\d{1,3}.\d)%"')
 
 def _parse_progress_from_job_tracker(html_bytes):
     """Pull (map_percent, reduce_percent) from job tracker HTML as floats,
@@ -598,6 +598,10 @@ def _parse_progress_from_job_tracker(html_bytes):
     else:
         return None, None
 
+
+# TODO: actual data is in an out-of-order JS data structure. Need to
+# parse pairs of (job_id, percent) and return percent from largest
+# (most recent) job ID.
 def _parse_progress_from_resource_manager(html_bytes):
     """Pull progress_precent from job tracker HTML, as a float, or return
     None."""

@@ -33,6 +33,8 @@ from mrjob.parse import parse_mr_job_stderr
 from mrjob.parse import parse_port_range_list
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
+from mrjob.parse import _parse_progress_from_job_tracker
+from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
 
@@ -566,3 +568,33 @@ class URITestCase(TestCase):
                          ('s3', 'bucket', '', '', '', ''))
         self.assertEqual(urlparse('s3://bucket/'),
                          ('s3', 'bucket', '/', '', '', ''))
+
+
+class JobTrackerProgressTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_parse_progress_from_job_tracker(b''), (None, None))
+
+    def test_on_html_snippet(self):
+        HTML = b"""
+<h2 id="running_jobs">Running Jobs</h2>
+<table border="1" cellpadding="5" cellspacing="0" class="sortable" style="margin-top: 10px">
+<thead><tr><td><b>Jobid</b></td><td><b>Started</b></td><td><b>Priority</b></td><td><b>User</b></td><td><b>Name</b></td><td><b>Map % Complete</b></td><td><b>Map Total</b></td><td><b>Maps Completed</b></td><td><b>Reduce % Complete</b></td><td><b>Reduce Total</b></td><td><b>Reduces Completed</b></td><td><b>Job Scheduling Information</b></td><td><b>Diagnostic Info </b></td></tr></thead>
+<tbody><tr><td id="job_0"><a href="http://localhost:40426/jobdetails.jsp?jobid=job_201508212327_0003&refresh=30">job_201508212327_0003</a></td><td id="started_0">Fri Aug 21 23:32:49 UTC 2015</td><td id="priority_0" sorttable_customkey="2">NORMAL</td><td id="user_0">hadoop</td><td id="name_0">streamjob7446105887001298606.jar</td><td>27.51%<table border="1px" width="80px"><tbody><tr><td cellspacing="0" class="perc_filled" width="50%"></td><td cellspacing="0" class="perc_nonfilled" width="50%"></td></tr></tbody></table></td><td>4</td><td>2</td><td>0.00%<table border="1px" width="80px"><tbody><tr><td cellspacing="0" class="perc_nonfilled" width="100%"></td></tr></tbody></table></td><td>1</td><td> 0</td><td>NA</td><td>NA</td></tr>
+</tbody><tfoot></tfoot></table>
+        """
+        self.assertEqual(_parse_progress_from_job_tracker(HTML),
+                         (27.51, 0))
+
+
+class ResourceManagerProgressTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_parse_progress_from_resource_manager(b''), None)
+
+    def test_on_html_snippet(self):
+        HTML = b"""
+            <span class="DataTables_sort_icon css_right ui-icon ui-icon-carat-2-n-s"></span></div></th></tr></thead>
+          <tbody role="alert" aria-live="polite" aria-relevant="all"><tr class="odd"><td class=" sorting_1"><a href="http://localhost:40344/cluster/app/application_1440199428349_0002">application_1440199428349_0002</a></td><td class="">hadoop</td><td class="">streamjob4113830892405300127.jar</td><td class="">MAPREDUCE</td><td class="">default</td><td class="">Fri, 21 Aug 2015 23:26:53 GMT</td><td class="">N/A</td><td class="">RUNNING</td><td class="">UNDEFINED</td><td class=""><br title="27.5"> <div class="ui-progressbar ui-widget ui-widget-content ui-corner-all" title="27.5%"> <div class="ui-progressbar-value ui-widget-header ui-corner-left" style="width:27.5%"> </div> </div></td><td class=""><a href="http://172.31.20.170:9046/proxy/application_1440199428349_0002/">ApplicationMaster</a></td></tr><tr class="even"><td class=
+        """
+        self.assertEqual(_parse_progress_from_resource_manager(HTML), 27.5)

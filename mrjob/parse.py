@@ -583,6 +583,31 @@ def parse_hadoop_counters_from_line(line, hadoop_version=None):
         counters[group][counter] += int(value)
     return counters, int(m.group('step_num'))
 
+
+### job tracker/resource manager ###
+
+_JOB_TRACKER_PERCENT_RE = re.compile(rb'\b(\d{1,3}\.\d{2})%')
+_RESOURCE_MANAGER_PERCENT_RE = re.compile(rb'style="width:(\d{1,3}.\d)%"')
+
+def _parse_progress_from_job_tracker(html_bytes):
+    """Pull (map_percent, reduce_percent) from job tracker HTML as floats,
+    or return (None, None)."""
+    matches = _JOB_TRACKER_PERCENT_RE.findall(html_bytes)
+    if len(matches) >= 2:
+        return float(matches[0]), float(matches[1])
+    else:
+        return None, None
+
+def _parse_progress_from_resource_manager(html_bytes):
+    """Pull progress_precent from job tracker HTML, as a float, or return
+    None."""
+    m = _RESOURCE_MANAGER_PERCENT_RE.search(html_bytes)
+    if m:
+        return float(m.group(1))
+    else:
+        return None
+
+
 ### AWS Date-time parsing ###
 
 # sometimes AWS gives us seconds as a decimal, which we can't parse

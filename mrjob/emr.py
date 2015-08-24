@@ -1595,7 +1595,7 @@ class EMRJobRunner(MRJobRunner):
                             progress = _parse_progress_from_resource_manager(
                                 tunnel_html)
                             if progress is not None:
-                                log.info('  progress: %3.1d%%')
+                                log.info(' %5.1f%% complete' % progress)
                     finally:
                         tunnel_handle.close()
 

@@ -592,16 +592,9 @@ class ResourceManagerProgressTestCase(TestCase):
     def test_empty(self):
         self.assertEqual(_parse_progress_from_resource_manager(b''), None)
 
-    def test_on_html_snippet(self):
-        HTML = b"""
-            <span class="DataTables_sort_icon css_right ui-icon ui-icon-carat-2-n-s"></span></div></th></tr></thead>
-          <tbody role="alert" aria-live="polite" aria-relevant="all"><tr class="odd"><td class=" sorting_1"><a href="http://localhost:40344/cluster/app/application_1440199428349_0002">application_1440199428349_0002</a></td><td class="">hadoop</td><td class="">streamjob4113830892405300127.jar</td><td class="">MAPREDUCE</td><td class="">default</td><td class="">Fri, 21 Aug 2015 23:26:53 GMT</td><td class="">N/A</td><td class="">RUNNING</td><td class="">UNDEFINED</td><td class=""><br title="27.5"> <div class="ui-progressbar ui-widget ui-widget-content ui-corner-all" title="27.5%"> <div class="ui-progressbar-value ui-widget-header ui-corner-left" style="width:27.5%"> </div> </div></td><td class=""><a href="http://172.31.20.170:9046/proxy/application_1440199428349_0002/">ApplicationMaster</a></td></tr><tr class="even"><td class=
-        """
-        self.assertEqual(_parse_progress_from_resource_manager(HTML), 27.5)
-
     def test_on_javascript_snippet(self):
         # the actual data is in JavaScript at the bottom of the page
-        JS = """
+        JS = b"""
 <script type="text/javascript">
               var appsTableData=[
 ["<a href='/cluster/app/application_1440199050012_0002'>application_1440199050012_0002</a>","hadoop","streamjob4609242403924457306.jar","MAPREDUCE","default","1440199276424","1440199351438","FINISHED","SUCCEEDED","<br title='100.0'> <div class='ui-progressbar ui-widget ui-widget-content ui-corner-all' title='100.0%'> <div class='ui-progressbar-value ui-widget-header ui-corner-left' style='width:100.0%'> </div> </div>","<a href='http://172.31.23.88:9046/proxy/application_1440199050012_0002/jobhistory/job/job_1440199050012_0002'>History</a>"],
@@ -616,3 +609,4 @@ class ResourceManagerProgressTestCase(TestCase):
   </table>
 </html>
         """
+        self.assertEqual(_parse_progress_from_resource_manager(JS), 5.0)

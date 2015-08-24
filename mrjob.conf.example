@@ -59,11 +59,11 @@ runners:
     # run Makefile.emr to compile C code (EMR has a different architecture,
     # so we can't just upload the .so files)
     - cd src-tree.tar.gz; make -f Makefile.emr
+    ssh_tunnel: true
     # generally, we run jobs on a Linux server separate from our desktop
     # machine. So the SSH tunnel needs to be open so a browser on our
     # desktop machine can connect to it.
     ssh_tunnel_is_open: true
-    ssh_tunnel_to_job_tracker: true
     # upload these particular files on the fly because they're different
     # between development and production
     upload_files: &upload_files

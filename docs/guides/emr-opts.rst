@@ -791,16 +791,20 @@ SSH access and tunneling
     colons separate range endpoints.
 
 .. mrjob-opt::
-    :config: ssh_tunnel_to_job_tracker
-    :switch: --ssh-tunnel-to-job-tracker
+   :config: ssh_tunnel
+    :switch: --ssh-tunnel, --no-ssh-tunnel
     :type: boolean
     :set: emr
     :default: ``False``
 
-    If True, create an ssh tunnel to the job tracker and listen on a randomly
-    chosen port. This requires you to set :mrjob-opt:`ec2_key_pair` and
-    :mrjob-opt:`ec2_key_pair_file`. See :ref:`ssh-tunneling` for detailed
-    instructions.
+    If True, create an ssh tunnel to the job tracker/resource manager and
+    listen on a randomly chosen port. This requires you to set
+    :mrjob-opt:`ec2_key_pair` and :mrjob-opt:`ec2_key_pair_file`. See
+    :ref:`ssh-tunneling` for detailed instructions.
+
+    .. versionchanged:: 0.5.0
+
+       This option used to be named ``ssh_tunnel_to_job_tracker``.
 
 .. mrjob-opt::
     :config: ssh_tunnel_is_open

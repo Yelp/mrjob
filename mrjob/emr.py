@@ -327,8 +327,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         's3_upload_part_size',
         'ssh_bin',
         'ssh_bind_ports',
+        'ssh_tunnel',
         'ssh_tunnel_is_open',
-        'ssh_tunnel_to_job_tracker',
         'visible_to_all_users',
     ]))
 
@@ -349,6 +349,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
         's3_scratch_uri': 's3_tmp_dir',
+        'ssh_tunnel_to_job_tracker': 'ssh_tunnel',
     })
 
     def __init__(self, alias, opts, conf_paths):
@@ -382,7 +383,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'sh_bin': ['/bin/sh', '-ex'],
             'ssh_bin': ['ssh'],
             'ssh_bind_ports': list(range(40001, 40841)),
-            'ssh_tunnel_to_job_tracker': False,
+            'ssh_tunnel': False,
             'ssh_tunnel_is_open': False,
             'visible_to_all_users': True,
         })
@@ -1602,7 +1603,7 @@ class EMRJobRunner(MRJobRunner):
                 # once a step is running, it's safe to set up the ssh tunnel to
                 # the job tracker
                 job_host = getattr(cluster, 'masterpublicdnsname', None)
-                if job_host and self._opts['ssh_tunnel_to_job_tracker']:
+                if job_host and self._opts['ssh_tunnel']:
                     self._set_up_ssh_tunnel(job_host)
 
             # other states include STARTING and SHUTTING_DOWN

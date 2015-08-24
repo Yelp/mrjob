@@ -339,6 +339,12 @@ def add_emr_run_opts(opt_group):
                   ' Rarely necessary.')),
 
         opt_group.add_option(
+            '--no-ssh-tunnel', dest='ssh_tunnel',
+            default=None, action='store_false',
+            help=("Don't open an SSH tunnel to the Hadoop job"
+                  " tracker/resource manager")),
+
+        opt_group.add_option(
             '--pool-wait-minutes', dest='pool_wait_minutes', default=0,
             type='int',
             help=('Wait for a number of minutes for a job flow to finish'
@@ -358,6 +364,12 @@ def add_emr_run_opts(opt_group):
                   ' Defaults to 40001:40840.')),
 
         opt_group.add_option(
+            '--ssh-tunnel', dest='ssh_tunnel',
+            default=None, action='store_true',
+            help=('Open an SSH tunnel to the Hadoop job tracker/resource'
+                  ' manager')),
+
+        opt_group.add_option(
             '--ssh-tunnel-is-closed', dest='ssh_tunnel_is_open',
             default=None, action='store_false',
             help='Make ssh tunnel accessible from localhost only'),
@@ -371,7 +383,7 @@ def add_emr_run_opts(opt_group):
         opt_group.add_option(
             '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
             default=None, action='store_true',
-            help='Open up an SSH tunnel to the Hadoop job tracker'),
+            help='Deprecated alias for --ssh-tunnel'),
     ]
 
 

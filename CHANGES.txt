@@ -20,6 +20,8 @@ v0.5.0, 2015-??-?? -- ???
        * connect to each S3 bucket on appropriate endpoint (#1028)
        * create/select temp bucket in same region as EMR jobs (#687)
      * added iam_endpoint option (#1067)
+     * SSH tunnel now works on 3.x AMIs (#1013)
+       * renamed ssh_tunnel_to_job_tracker option to ssh_tunnel
      * removed s3_conn args from methods in EMRJobRunner and S3Filesystem
      * removed iam_job_flow_role option (use iam_instance_profile)
      * removed support for _$folder$ keys, which EMR no longer creates

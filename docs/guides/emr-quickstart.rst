@@ -47,7 +47,7 @@ fetch error logs quickly.
       emr:
         ec2_key_pair: EMR
         ec2_key_pair_file: /path/to/EMR.pem # ~/ and $ENV_VARS allowed here
-        ssh_tunnel_to_job_tracker: true
+        ssh_tunnel: true
 
 .. _running-an-emr-job:
 

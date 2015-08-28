@@ -583,6 +583,44 @@ def parse_hadoop_counters_from_line(line, hadoop_version=None):
         counters[group][counter] += int(value)
     return counters, int(m.group('step_num'))
 
+
+### job tracker/resource manager ###
+
+_JOB_TRACKER_HTML_RE = re.compile(br'\b(\d{1,3}\.\d{2})%')
+_RESOURCE_MANAGER_JS_RE = re.compile(
+    br'.*(application_[_\d]+).*width:(\d{1,3}.\d)%')
+
+def _parse_progress_from_job_tracker(html_bytes):
+    """Pull (map_percent, reduce_percent) from job tracker HTML as floats,
+    or return (None, None)."""
+    matches = _JOB_TRACKER_HTML_RE.findall(html_bytes)
+    if len(matches) >= 2:
+        return float(matches[0]), float(matches[1])
+    else:
+        return None, None
+
+
+# TODO: actual data is in an out-of-order JS data structure. Need to
+# parse pairs of (job_id, percent) and return percent from largest
+# (most recent) job ID.
+def _parse_progress_from_resource_manager(html_bytes):
+    """Pull progress_precent from job tracker HTML, as a float, or return
+    None."""
+    # actual data is in an out-of-order JS data structure; need to find
+    # progress for all job IDs and then pick last one
+    app_id_percent_tuples = []
+
+    for line in html_bytes.splitlines():
+        m = _RESOURCE_MANAGER_JS_RE.match(line)
+        if m:
+            app_id_percent_tuples.append((m.group(1), float(m.group(2))))
+
+    if app_id_percent_tuples:
+        return sorted(app_id_percent_tuples)[-1][1]
+    else:
+        return None
+
+
 ### AWS Date-time parsing ###
 
 # sometimes AWS gives us seconds as a decimal, which we can't parse

@@ -67,14 +67,21 @@ class OptionStore(dict):
 
         for k, v in sorted(opts.items()):
             if k in self.DEPRECATED_ALIASES:
+                if v is None:
+                    continue
+
                 aliased_opt = self.DEPRECATED_ALIASES[k]
 
-                log.warning('Deprecated option %s%s has been renamed to %s' % (
+                log.warning('Deprecated option %s%s has been renamed to %s'
+                            ' and will be removed in v0.6.0' % (
                     k, from_where, aliased_opt))
+
                 if opts.get(aliased_opt) is None:
                     results[aliased_opt] = v
+
             elif k in self.ALLOWED_KEYS:
                 results[k] = v
+
             else:
                 log.warning('Unexpected option %s%s' % (k, from_where))
 

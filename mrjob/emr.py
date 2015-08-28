@@ -20,7 +20,6 @@ import os.path
 import pipes
 import posixpath
 import random
-import re
 import signal
 import socket
 import time
@@ -62,6 +61,7 @@ from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import random_identifier
 from mrjob.aws import s3_location_constraint_for_region
+from mrjob.compat import _map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -89,10 +89,13 @@ from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime
 from mrjob.parse import iso8601_to_timestamp
 from mrjob.parse import parse_s3_uri
+from mrjob.parse import _parse_progress_from_job_tracker
+from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
+from mrjob.py2 import to_string
 from mrjob.py2 import urlopen
 from mrjob.retry import RetryGoRound
 from mrjob.runner import MRJobRunner
@@ -112,15 +115,15 @@ from mrjob.util import shlex_split
 
 log = logging.getLogger(__name__)
 
-JOB_TRACKER_RE = re.compile(r'(\d{1,3}\.\d{2})%')
-
 # not all steps generate task attempt logs. for now, conservatively check for
 # streaming steps, which always generate them.
 LOG_GENERATING_STEP_NAME_RE = HADOOP_STREAMING_JAR_RE
 
-# the port to tunnel to
-EMR_JOB_TRACKER_PORT = 9100
-EMR_JOB_TRACKER_PATH = '/jobtracker.jsp'
+# how to set up the SSH tunnel for various AMI versions
+_AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
+    '2': dict(name='job tracker', path='/jobtracker.jsp', port=9100),
+    '3': dict(name='resource manager', path='/cluster', port=9026),
+}
 
 MAX_SSH_RETRIES = 20
 
@@ -324,8 +327,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         's3_upload_part_size',
         'ssh_bin',
         'ssh_bind_ports',
+        'ssh_tunnel',
         'ssh_tunnel_is_open',
-        'ssh_tunnel_to_job_tracker',
         'visible_to_all_users',
     ]))
 
@@ -346,6 +349,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
         's3_scratch_uri': 's3_tmp_dir',
+        'ssh_tunnel_to_job_tracker': 'ssh_tunnel',
     })
 
     def __init__(self, alias, opts, conf_paths):
@@ -379,7 +383,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'sh_bin': ['/bin/sh', '-ex'],
             'ssh_bin': ['ssh'],
             'ssh_bind_ports': list(range(40001, 40841)),
-            'ssh_tunnel_to_job_tracker': False,
+            'ssh_tunnel': False,
             'ssh_tunnel_is_open': False,
             'visible_to_all_users': True,
         })
@@ -607,8 +611,8 @@ class EMRJobRunner(MRJobRunner):
         self._address = None
         self._ssh_slave_addrs = None
 
-        # store the tracker URL for completion status
-        self._tracker_url = None
+        # store the (tunneled) URL of the job tracker/resource manager
+        self._tunnel_url = None
 
         # turn off tracker progress until tunnel is up
         self._show_tracker_progress = False
@@ -887,8 +891,18 @@ class EMRJobRunner(MRJobRunner):
 
         return True
 
-    def setup_ssh_tunnel_to_job_tracker(self, host):
-        """setup the ssh tunnel to the job tracker, if it's not currently
+    def _ssh_tunnel_config(self):
+        """Look up AMI version, and return a dict with the following keys:
+
+        name: "job tracker" or "resource manager"
+        path: path to start page of job tracker/resource manager
+        port: port job tracker/resource manager is running on.
+        """
+        return _map_version(_AMI_VERSION_TO_SSH_TUNNEL_CONFIG,
+                            self.get_ami_version())
+
+    def _set_up_ssh_tunnel(self, host):
+        """set up the ssh tunnel to the job tracker, if it's not currently
         running.
 
         Args:
@@ -899,7 +913,7 @@ class EMRJobRunner(MRJobRunner):
             if not self._opts[opt_name]:
                 if not self._gave_cant_ssh_warning:
                     log.warning(
-                        "You must set %s in order to ssh to the job tracker!" %
+                        "You must set %s in order to set up the SSH tunnel!" %
                         opt_name)
                     self._gave_cant_ssh_warning = True
                 return
@@ -914,7 +928,10 @@ class EMRJobRunner(MRJobRunner):
                             ' restarting...' % self._ssh_proc.returncode)
                 self._ssh_proc = None
 
-        log.info('Opening ssh tunnel to Hadoop job tracker')
+        # look up what we're supposed to do on this AMI version
+        tunnel_config = self._ssh_tunnel_config()
+
+        log.info('Opening ssh tunnel to %s' % tunnel_config['name'])
 
         # if ssh detects that a host key has changed, it will silently not
         # open the tunnel, so make a fake empty known_hosts file and use that.
@@ -935,7 +952,7 @@ class EMRJobRunner(MRJobRunner):
                 '-o', 'StrictHostKeyChecking=no',
                 '-o', 'ExitOnForwardFailure=yes',
                 '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
-                '-L', '%d:localhost:%d' % (bind_port, EMR_JOB_TRACKER_PORT),
+                '-L', '%d:%s:%d' % (bind_port, host, tunnel_config['port']),
                 '-N', '-q',  # no shell, no output
                 '-i', self._opts['ec2_key_pair_file'],
             ]
@@ -954,19 +971,22 @@ class EMRJobRunner(MRJobRunner):
             else:
                 ssh_proc.stdin.close()
                 ssh_proc.stdout.close()
+                print('ssh stderr: ' + to_string(ssh_proc.stderr.read()))
                 ssh_proc.stderr.close()
 
         if not self._ssh_proc:
-            log.warning('Failed to open ssh tunnel to job tracker')
+            log.warning(
+                'Failed to open ssh tunnel to %s' % tunnel_config['name'])
         else:
             if self._opts['ssh_tunnel_is_open']:
                 bind_host = socket.getfqdn()
             else:
                 bind_host = 'localhost'
-            self._tracker_url = 'http://%s:%d%s' % (
-                bind_host, bind_port, EMR_JOB_TRACKER_PATH)
+            self._tunnel_url = 'http://%s:%d%s' % (
+                bind_host, bind_port, tunnel_config['path'])
             self._show_tracker_progress = True
-            log.info('Connect to job tracker at: %s' % self._tracker_url)
+            log.info('Connect to %s at: %s' % (
+                tunnel_config['name'], self._tunnel_url))
 
     def _pick_ssh_bind_ports(self):
         """Pick a list of ports to try binding our SSH tunnel to.
@@ -1555,25 +1575,36 @@ class EMRJobRunner(MRJobRunner):
                          (running_time, job_state, reason, running_step_name))
 
                 if self._show_tracker_progress:
+                    tunnel_config = self._ssh_tunnel_config()
+
+                    tunnel_handle = None
                     try:
-                        tracker_handle = urlopen(self._tracker_url)
-                        tracker_page = ''.join(tracker_handle.readlines())
-                        tracker_handle.close()
-                        # first two formatted percentages, map then reduce
-                        map_complete, reduce_complete = [
-                            float(complete) for complete
-                            in JOB_TRACKER_RE.findall(tracker_page)[:2]]
-                        log.info(' map %3d%% reduce %3d%%' % (
-                                 map_complete, reduce_complete))
+                        tunnel_handle = urlopen(self._tunnel_url)
+                        tunnel_html = tunnel_handle.read()
                     except:
-                        log.error('Unable to load progress from job tracker')
-                        # turn off progress for rest of job
+                        log.error('Unable to connect to %s' %
+                                  tunnel_config['name'])
                         self._show_tracker_progress = False
+                    else:
+                        if tunnel_config['name'] == 'job tracker':
+                            map_progress, reduce_progress = (
+                                _parse_progress_from_job_tracker(tunnel_html))
+                            if map_progress is not None:
+                                log.info(' map %3d%% reduce %3d%%' % (
+                                    map_progress, reduce_progress))
+                        else:
+                            progress = _parse_progress_from_resource_manager(
+                                tunnel_html)
+                            if progress is not None:
+                                log.info(' %5.1f%% complete' % progress)
+                    finally:
+                        tunnel_handle.close()
+
                 # once a step is running, it's safe to set up the ssh tunnel to
                 # the job tracker
                 job_host = getattr(cluster, 'masterpublicdnsname', None)
-                if job_host and self._opts['ssh_tunnel_to_job_tracker']:
-                    self.setup_ssh_tunnel_to_job_tracker(job_host)
+                if job_host and self._opts['ssh_tunnel']:
+                    self._set_up_ssh_tunnel(job_host)
 
             # other states include STARTING and SHUTTING_DOWN
             elif reason:

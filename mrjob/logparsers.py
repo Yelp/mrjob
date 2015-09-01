@@ -55,6 +55,7 @@ EMR_JOB_LOG_URI_RE = re.compile(
     r'[_-]hadoop[_-]streamjob(\d+).jar'
     r'(-[A-Za-z0-9-]+\.jhist)?' # this happens on YARN
     r'$')
+# TODO: should update this too, or possibly merge with EMR_JOB_LOG_URI_RE
 HADOOP_JOB_LOG_URI_RE = re.compile(
     r'^.*?/job_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<mystery_string_1>\d+)'
     r'_(?P<user>.*?)_streamjob(?P<mystery_string_2>\d+).jar$')

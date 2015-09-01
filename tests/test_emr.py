@@ -1336,6 +1336,7 @@ class CounterFetchingTestCase(MockBotoTestCase):
         super(CounterFetchingTestCase, self).setUp()
         self.add_mock_s3_data({'walrus': {}})
         kwargs = {
+            'ami_version': '2.4.9',  # counters have different format in 3.x
             'conf_paths': [],
             's3_tmp_dir': 's3://walrus/',
             's3_sync_wait_time': 0}

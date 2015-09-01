@@ -307,6 +307,8 @@ class CounterTestCase(TestCase):
 
         b'" .')
 
+    TEST_COUNTERS_2_0 = b'{"type":"TASK_FINISHED","event":{"org.apache.hadoop.mapreduce.jobhistory.TaskFinished":{"taskid":"task_1441057410014_0001_r_000000","taskType":"REDUCE","finishTime":1441057603495,"status":"SUCCEEDED","counters":{"name":"COUNTERS","groups":[{"name":"org.apache.hadoop.mapreduce.FileSystemCounter","displayName":"File System Counters","counts":[{"name":"FILE_BYTES_READ","displayName":"FILE: Number of bytes read","value":83},{"name":"FILE_BYTES_WRITTEN","displayName":"FILE: Number of bytes written","value":103064}]},{"name":"org.apache.hadoop.mapreduce.lib.output.FileOutputFormatCounter","displayName":"File Output Format Counters ","counts":[{"name":"BYTES_WRITTEN","displayName":"Bytes Written","value":34}]}]},"successfulAttemptId":"attempt_1441057410014_0001_r_000000_0"}}}'  # noqa
+
     def test_find_counters_0_18_explicit(self):
         counters, step_num = parse_hadoop_counters_from_line(
             self.TEST_COUNTERS_0_18, hadoop_version='0.18')
@@ -323,6 +325,21 @@ class CounterTestCase(TestCase):
 
         self.assertIn('reducer time (processing): 2.51', counters['profile'])
         self.assertEqual(step_num, 3)
+
+    def test_find_counters_2_0_explicit(self):
+        counters, step_num = parse_hadoop_counters_from_line(
+            self.TEST_COUNTERS_2_0, hadoop_version='2.4.0')
+
+        self.assertEqual(step_num, 1)
+        self.assertEqual(counters, {
+            'File System Counters': {
+                'FILE: Number of bytes read': 83,
+                'FILE: Number of bytes written': 103064,
+            },
+            'File Output Format Counters ': {
+                'Bytes Written': 34,
+            }
+        })
 
     def test_find_weird_counters_0_20(self):
         counter_bits = [

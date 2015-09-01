@@ -14,14 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utilities for parsing errors, counters, and status messages."""
-from datetime import datetime
-from functools import wraps
+import json
 import logging
 import re
 import time
+from datetime import datetime
+from functools import wraps
 from io import BytesIO
 
 from mrjob.compat import uses_020_counters
+from mrjob.compat import version_gte
 from mrjob.py2 import PY2
 from mrjob.py2 import ParseResult
 from mrjob.py2 import to_string
@@ -546,6 +548,47 @@ def _parse_counters_0_20(counter_string):
             yield group_name, counter_name, int(counter_value)
 
 
+def _parse_counters_from_line_2_0(line):
+    """Parse counters from an Avro JSON. Unlike the other _parse_counters()
+    methods, this one operates on the line"""
+    try:
+        j = json.loads(line.decode('utf_8'))
+    except (ValueError, UnicodeDecodeError):
+        return None, None
+
+    # sample format of JSON appears in issue #888
+    if 'event' in j:
+        for d in j['event'].values():
+            if 'taskid' not in d:  # not "taskId", apparently!
+                continue
+
+            step_num = int(d['taskid'].split('_')[-3])
+            counters = {}
+
+            if 'counters' in d and 'groups' in d['counters']:
+                for g in d['counters']['groups']:
+                    if 'displayName' not in g:
+                        continue
+
+                    group = g['displayName']
+                    counters.setdefault(group, {})
+
+                    if 'counts' not in g:
+                        continue
+
+                    for c in g['counts']:
+                        name = c.get('displayName')  # not 'name'!
+                        value = c.get('value')
+
+                        if name is not None and value is not None:
+                            counters[group][name] = value
+
+            # only expect one event
+            return counters, step_num
+
+    return None, None
+
+
 def parse_hadoop_counters_from_line(line, hadoop_version=None):
     """Parse Hadoop counter values from a log line.
 
@@ -557,6 +600,18 @@ def parse_hadoop_counters_from_line(line, hadoop_version=None):
 
     :return: (counter_dict, step_num) or (None, None)
     """
+    # start with 2.x parsing, which parses the entire line as JSON
+    if (hadoop_version is None or
+        version_gte(hadoop_version, '2') or
+        (version_gte(hadoop_version, '0.21') and
+         not version_gte(hadoop_version, '1'))):
+
+        counters, step_num = _parse_counters_from_line_2_0(line)
+
+        # if we found something, or if hadoop_version isn't None, return it
+        if counters or hadoop_version:
+            return counters, step_num
+
     m = _COUNTER_LINE_RE.match(line)
     if not m:
         return None, None

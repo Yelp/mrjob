@@ -1436,6 +1436,10 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
 
         self.runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp')
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
+        # need this to make step mapping work
+        self.runner._step_ids_for_cluster = Mock(
+            return_value=['s-ONE', 's-TWO', 's-THREE', 's-FOUR'])
+
         self.prepare_runner_for_ssh(self.runner)
 
     def tearDown(self):
@@ -1447,13 +1451,13 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
         self.runner.cleanup()
 
     def test_ssh_comes_first(self):
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/s-ONE')
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/userlogs')
 
         # Put a log file and error into SSH
         ssh_lone_log_path = posixpath.join(
-            SSH_LOG_ROOT, 'steps', '1', 'syslog')
+            SSH_LOG_ROOT, 'steps', 's-ONE', 'syslog')
         mock_ssh_file('testmaster', ssh_lone_log_path,
                       HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n')
 
@@ -1473,7 +1477,7 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
     def test_ssh_works_with_slaves(self):
         self.add_slave()
 
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/s-ONE')
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
         mock_ssh_dir(
             'testmaster!testslave0',

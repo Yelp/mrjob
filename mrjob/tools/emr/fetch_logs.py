@@ -222,10 +222,12 @@ def _prettyprint_relevant(log_type_to_uri_list):
 
 
 def list_relevant(runner, step_nums):
+    cluster_step_ids = runner._step_ids_for_cluster()
+
     try:
         logs = {
             TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_ssh(step_nums),
-            STEP_LOGS: runner.ls_step_logs_ssh(step_nums),
+            STEP_LOGS: runner.ls_step_logs_ssh(step_nums, cluster_step_ids),
             JOB_LOGS: runner.ls_job_logs_ssh(step_nums),
             NODE_LOGS: runner.ls_node_logs_ssh(),
         }
@@ -233,7 +235,7 @@ def list_relevant(runner, step_nums):
     except LogFetchError:
         logs = {
             TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_s3(step_nums),
-            STEP_LOGS: runner.ls_step_logs_s3(step_nums),
+            STEP_LOGS: runner.ls_step_logs_s3(step_nums, cluster_step_ids),
             JOB_LOGS: runner.ls_job_logs_s3(step_nums),
             NODE_LOGS: runner.ls_node_logs_s3(),
         }

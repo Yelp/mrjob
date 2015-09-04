@@ -43,7 +43,11 @@ TASK_ATTEMPTS_LOG_URI_RE = re.compile(
 
 # regex for matching step log URIs
 STEP_LOG_URI_RE = re.compile(
-    r'^.*/(?P<step_id>s-[A-Z][0-9]+)/(?P<stream>syslog|stderr)$')
+    r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)$')
+
+# EMR uses step IDs rather than step numbers (see #1117)
+EMR_STEP_LOG_URI_RE = re.compile(
+    r'^.*/(?P<step_id>s-[A-Z0-9]+)/(?P<stream>syslog|stderr)$')
 
 # regex for matching job log URIs. There is some variety in how these are
 # formatted, so this expression is pretty general.
@@ -102,10 +106,11 @@ def _sorted_task_attempts(logs):
             info['node_num']))
 
 
+# TODO: this is wrong, and doesn't work on Hadoop
 def _sorted_steps(logs):
     return _filter_sort(
         logs,
-        [STEP_LOG_URI_RE],
+        [EMR_STEP_LOG_URI_RE],
         lambda info: (info['step_id'], info['stream'] == 'stderr'))
 
 

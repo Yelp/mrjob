@@ -79,7 +79,7 @@ from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
 from mrjob.logparsers import NODE_LOG_URI_RE
-from mrjob.logparsers import STEP_LOG_URI_RE
+from mrjob.logparsers import EMR_STEP_LOG_URI_RE
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import best_error_from_logs
 from mrjob.logparsers import scan_for_counters_in_files
@@ -1769,7 +1769,7 @@ class EMRJobRunner(MRJobRunner):
         self._enable_slave_ssh_access()
         return self._enforce_path_regexp(
             self._ls_ssh_logs('steps/'),
-            STEP_LOG_URI_RE,
+            EMR_STEP_LOG_URI_RE,
             filters=dict(step_id=step_ids))
 
     def ls_job_logs_ssh(self, step_nums):
@@ -1813,7 +1813,7 @@ class EMRJobRunner(MRJobRunner):
         step_ids = self._step_nums_to_ids(step_nums)
 
         return self._enforce_path_regexp(self._ls_s3_logs('steps/'),
-                                         STEP_LOG_URI_RE,
+                                         EMR_STEP_LOG_URI_RE,
                                          filters=dict(step_id=step_ids))
 
     def ls_job_logs_s3(self, step_nums):

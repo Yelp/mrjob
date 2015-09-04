@@ -1754,7 +1754,8 @@ class EMRJobRunner(MRJobRunner):
             step_ids = None
         else:
             step_ids = [cluster_step_ids[step_num - 1]
-                        for step_num in step_nums]
+                        for step_num in step_nums
+                        if step_num <= len(cluster_step_ids)]
 
         self._enable_slave_ssh_access()
         return self._enforce_path_regexp(
@@ -1805,7 +1806,8 @@ class EMRJobRunner(MRJobRunner):
         else:
             # step nums are 1-indexed
             step_ids = [cluster_step_ids[step_num - 1]
-                        for step_num in step_nums]
+                        for step_num in step_nums
+                        if step_num <= len(cluster_step_ids)]
 
         return self._enforce_path_regexp(self._ls_s3_logs('steps/'),
                                          EMR_STEP_LOG_URI_RE,

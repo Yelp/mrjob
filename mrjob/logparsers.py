@@ -125,7 +125,8 @@ def _sorted_steps_emr(logs, cluster_step_ids):
     return _filter_sort(
         logs,
         [EMR_STEP_LOG_URI_RE],
-        lambda info: (cluster_step_ids.index(info['step_id']),
+        lambda info: (cluster_step_ids.index(info['step_id'])
+                      if info['step_id'] in cluster_step_ids else -1,
                       info['stream'] == 'stderr'))
 
 

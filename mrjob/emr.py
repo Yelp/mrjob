@@ -1680,18 +1680,41 @@ class EMRJobRunner(MRJobRunner):
 
     ### LOG FETCHING/PARSING ###
 
-    def _enforce_path_regexp(self, paths, regexp, step_nums=None):
+    def _enforce_path_regexp(self, paths, regexp, filters=None):
         """Helper for log fetching functions to filter out unwanted
-        logs. Only pass ``step_nums`` if ``regexp`` has a ``step_nums`` group.
+        logs.
+
+        filters maps from regexp group to a list of thing to match
         """
+        filters = dict((group_name, set(str(v) for v in values))
+                       for group_name, values in (filters or {}).items()
+                       if values)
+
         for path in paths:
             m = regexp.match(path)
-            if (m and
-                (step_nums is None or
-                 int(m.group('step_num')) in step_nums)):
-                yield path
-            else:
-                log.debug('Ignore %s' % path)
+            if not m:
+                continue
+
+            if any(m.group(group_name) not in values
+                   for group_name, values in filters.items()):
+                continue
+
+            yield path
+
+    def _step_nums_to_ids(self, step_nums):
+        """Look up step IDs corresponding to the given step nums.
+
+        If step_nums is None, return None
+
+        (step_nums are 1-indexed)
+        """
+        if step_nums is None or self._cluster_id is None:
+            return None
+
+        steps = self._list_steps_for_cluster()
+
+        return [steps[step_num - 1].id for step_num in step_nums
+                if step_num <= len(steps)]
 
     ## SSH LOG FETCHING
 
@@ -1738,20 +1761,22 @@ class EMRJobRunner(MRJobRunner):
                 pass
         return self._enforce_path_regexp(all_paths,
                                          TASK_ATTEMPTS_LOG_URI_RE,
-                                         step_nums)
+                                         filters=dict(step_num=step_nums))
 
     def ls_step_logs_ssh(self, step_nums):
+        step_ids = self._step_nums_to_ids(step_nums)
+
         self._enable_slave_ssh_access()
         return self._enforce_path_regexp(
             self._ls_ssh_logs('steps/'),
             STEP_LOG_URI_RE,
-            step_nums)
+            filters=dict(step_id=step_ids))
 
     def ls_job_logs_ssh(self, step_nums):
         self._enable_slave_ssh_access()
         return self._enforce_path_regexp(self._ls_ssh_logs('history/'),
                                          EMR_JOB_LOG_URI_RE,
-                                         step_nums)
+                                         filters=dict(step_num=step_nums))
 
     def ls_node_logs_ssh(self):
         self._enable_slave_ssh_access()
@@ -1782,17 +1807,19 @@ class EMRJobRunner(MRJobRunner):
     def ls_task_attempt_logs_s3(self, step_nums):
         return self._enforce_path_regexp(self._ls_s3_logs('task-attempts/'),
                                          TASK_ATTEMPTS_LOG_URI_RE,
-                                         step_nums)
+                                         filters=dict(step_num=step_nums))
 
     def ls_step_logs_s3(self, step_nums):
+        step_ids = self._step_nums_to_ids(step_nums)
+
         return self._enforce_path_regexp(self._ls_s3_logs('steps/'),
                                          STEP_LOG_URI_RE,
-                                         step_nums)
+                                         filters=dict(step_id=step_ids))
 
     def ls_job_logs_s3(self, step_nums):
         return self._enforce_path_regexp(self._ls_s3_logs('jobs/'),
                                          EMR_JOB_LOG_URI_RE,
-                                         step_nums)
+                                         filters=dict(step_num=step_nums))
 
     def ls_node_logs_s3(self):
         return self._enforce_path_regexp(self._ls_s3_logs('node/'),

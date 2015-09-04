@@ -43,7 +43,7 @@ TASK_ATTEMPTS_LOG_URI_RE = re.compile(
 
 # regex for matching step log URIs
 STEP_LOG_URI_RE = re.compile(
-    r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)$')
+    r'^.*/(?P<step_id>s-[A-Z][0-9]+)/(?P<stream>syslog|stderr)$')
 
 # regex for matching job log URIs. There is some variety in how these are
 # formatted, so this expression is pretty general.
@@ -105,7 +105,7 @@ def _sorted_steps(logs):
     return _filter_sort(
         logs,
         [STEP_LOG_URI_RE],
-        lambda info: (info['step_num'], info['stream'] == 'stderr'))
+        lambda info: (info['step_id'], info['stream'] == 'stderr'))
 
 
 def _sorted_jobs(logs):

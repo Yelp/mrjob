@@ -1701,21 +1701,6 @@ class EMRJobRunner(MRJobRunner):
 
             yield path
 
-    def _step_nums_to_ids(self, step_nums):
-        """Look up step IDs corresponding to the given step nums.
-
-        If step_nums is None, return None
-
-        (step_nums are 1-indexed)
-        """
-        if step_nums is None or self._cluster_id is None:
-            return None
-
-        steps = self._list_steps_for_cluster()
-
-        return [steps[step_num - 1].id for step_num in step_nums
-                if step_num <= len(steps)]
-
     ## SSH LOG FETCHING
 
     def _ssh_path(self, relative):
@@ -1763,8 +1748,9 @@ class EMRJobRunner(MRJobRunner):
                                          TASK_ATTEMPTS_LOG_URI_RE,
                                          filters=dict(step_num=step_nums))
 
-    def ls_step_logs_ssh(self, step_nums):
-        step_ids = self._step_nums_to_ids(step_nums)
+    def ls_step_logs_ssh(self, step_nums, cluster_step_ids):
+        # step nums are 1-indexed
+        step_ids = [cluster_step_ids[step_num - 1] for step_num in step_nums]
 
         self._enable_slave_ssh_access()
         return self._enforce_path_regexp(
@@ -1809,8 +1795,9 @@ class EMRJobRunner(MRJobRunner):
                                          TASK_ATTEMPTS_LOG_URI_RE,
                                          filters=dict(step_num=step_nums))
 
-    def ls_step_logs_s3(self, step_nums):
-        step_ids = self._step_nums_to_ids(step_nums)
+    def ls_step_logs_s3(self, step_nums, cluster_step_ids):
+        # step nums are 1-indexed
+        step_ids = [cluster_step_ids[step_num - 1] for step_num in step_nums]
 
         return self._enforce_path_regexp(self._ls_s3_logs('steps/'),
                                          EMR_STEP_LOG_URI_RE,
@@ -1929,19 +1916,21 @@ class EMRJobRunner(MRJobRunner):
             step, the URI of the input file that caused the error
             (otherwise None)
         """
+        cluster_step_ids = self._step_ids_for_cluster()
+
         if self._opts['ec2_key_pair_file']:
             try:
                 return self._find_probable_cause_of_failure_ssh(
-                    step_nums, lg_step_nums)
+                    step_nums, cluster_step_ids, lg_step_nums)
             except LogFetchError:
                 return self._find_probable_cause_of_failure_s3(
-                    step_nums, lg_step_nums)
+                    step_nums, cluster_step_ids, lg_step_nums)
         else:
             log.info('ec2_key_pair_file not specified, going to S3')
             return self._find_probable_cause_of_failure_s3(
-                step_nums, lg_step_nums)
+                step_nums, cluster_step_ids, lg_step_nums)
 
-    def _find_probable_cause_of_failure_ssh(self, step_nums,
+    def _find_probable_cause_of_failure_ssh(self, step_nums, cluster_step_ids,
                                             lg_step_nums=None):
         # empty list is a valid value for lg_step_nums, but it is an optional
         # parameter
@@ -1951,28 +1940,32 @@ class EMRJobRunner(MRJobRunner):
         try:
             self._enable_slave_ssh_access()
             task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
-            step_logs = self.ls_step_logs_ssh(lg_step_nums)
+            step_logs = self.ls_step_logs_ssh(lg_step_nums, cluster_step_ids)
             job_logs = self.ls_job_logs_ssh(step_nums)
         except IOError as e:
             raise LogFetchError(e)
         log.info('Scanning SSH logs for probable cause of failure')
-        return best_error_from_logs(self, task_attempt_logs, step_logs,
-                                    job_logs)
+        return best_error_from_logs(
+            self.fs, task_attempt_logs, step_logs, job_logs,
+            cluster_step_ids=cluster_step_ids)
 
-    def _find_probable_cause_of_failure_s3(self, step_nums, lg_step_nums):
+    def _find_probable_cause_of_failure_s3(self, step_nums, cluster_step_ids,
+                                           lg_step_nums=None):
         # empty list is a valid value for lg_step_nums, but it is an optional
         # parameter
         if lg_step_nums is None:
             lg_step_nums = step_nums
+
         log.info('Scanning S3 logs for probable cause of failure')
         self._wait_for_s3_eventual_consistency()
         self._wait_for_cluster_to_terminate()
 
         task_attempt_logs = self.ls_task_attempt_logs_s3(step_nums)
-        step_logs = self.ls_step_logs_s3(step_nums)
+        step_logs = self.ls_step_logs_s3(step_nums, cluster_step_ids)
         job_logs = self.ls_job_logs_s3(lg_step_nums)
-        return best_error_from_logs(self, task_attempt_logs, step_logs,
-                                    job_logs)
+        return best_error_from_logs(
+            self.fs, task_attempt_logs, step_logs, job_logs,
+            cluster_step_ids=cluster_step_ids)
 
     ### Bootstrapping ###
 
@@ -2554,6 +2547,9 @@ class EMRJobRunner(MRJobRunner):
         """
         emr_conn = self.make_emr_conn()
         return list(_yield_all_steps(emr_conn, self._cluster_id))
+
+    def _step_ids_for_cluster(self):
+        return [step.id for step in self._list_steps_for_cluster()]
 
     def get_hadoop_version(self):
         if self._hadoop_version is None:

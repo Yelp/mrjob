@@ -1138,12 +1138,8 @@ class FindProbableCauseOfFailureTestCase(MockBotoTestCase):
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
 
         # need this to make step mapping work
-        self.runner._cluster_id = 'j-FAKE'
-        self.runner._list_steps_for_cluster = Mock(
-            return_value=[MockEmrObject(id='s-ONE'),
-                          MockEmrObject(id='s-TWO'),
-                          MockEmrObject(id='s-THREE'),
-                          MockEmrObject(id='s-FOUR')])
+        self.runner._step_ids_for_cluster = Mock(
+            return_value=['s-ONE', 's-TWO', 's-THREE', 's-FOUR'])
 
     def cleanup_runner(self):
         self.runner.cleanup()

@@ -42,7 +42,7 @@ TASK_ATTEMPTS_LOG_URI_RE = re.compile(
     r'(?P<stream>stderr|syslog)$')  # stderr
 
 # regex for matching step log URIs
-STEP_LOG_URI_RE = re.compile(
+HADOOP_STEP_LOG_URI_RE = re.compile(
     r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)$')
 
 # EMR uses step IDs rather than step numbers (see #1117)
@@ -107,11 +107,26 @@ def _sorted_task_attempts(logs):
 
 
 # TODO: this is wrong, and doesn't work on Hadoop
-def _sorted_steps(logs):
+def _sorted_steps(logs, cluster_step_ids=None):
+    if cluster_step_ids is None:
+        return _sorted_steps_hadoop(logs)
+    else:
+        return _sorted_steps_emr(logs, cluster_step_ids)
+
+
+def _sorted_steps_hadoop(logs):
+    return _filter_sort(
+        logs,
+        [HADOOP_STEP_LOG_URI_RE],
+        lambda info: (int(info['step_num']), info['stream'] == 'stderr'))
+
+
+def _sorted_steps_emr(logs, cluster_step_ids):
     return _filter_sort(
         logs,
         [EMR_STEP_LOG_URI_RE],
-        lambda info: (info['step_id'], info['stream'] == 'stderr'))
+        lambda info: (cluster_step_ids.index(info['step_id']),
+                      info['stream'] == 'stderr'))
 
 
 def _sorted_jobs(logs):
@@ -198,9 +213,10 @@ def _scan_for_input_uri(log_file_uri, runner):
         return None
 
 
-def best_error_from_logs(fs, task_attempts, steps, jobs):
+def best_error_from_logs(fs, task_attempts, steps, jobs,
+                         cluster_step_ids=None):
     task_attempts = _sorted_task_attempts(task_attempts)
-    steps = _sorted_steps(steps)
+    steps = _sorted_steps(steps, cluster_step_ids=cluster_step_ids)
     jobs = _sorted_jobs(jobs)
 
     val = _parse_task_attempts(fs, task_attempts)

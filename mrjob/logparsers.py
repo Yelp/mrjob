@@ -35,7 +35,7 @@ NODE_LOGS = 'NODE_LOGS'
 TASK_ATTEMPTS_LOG_URI_RE = re.compile(
     r'^.*/attempt_'                 # attempt_
     r'(?P<timestamp>\d+)_'          # 201203222119_
-    r'(?P<step_num>\d+)_'           # 0001_
+    r'0*(?P<step_num>\d+)_'         # 0001_
     r'(?P<node_type>\w)_'           # m_
     r'(?P<node_num>\d+)_'           # 000000_
     r'(?P<attempt_num>\d+)/'        # 3/
@@ -50,14 +50,15 @@ STEP_LOG_URI_RE = re.compile(
 EMR_JOB_LOG_URI_RE = re.compile(
     r'^.*?'     # sometimes there is a number at the beginning, and the
                 # containing directory can be almost anything.
-    r'job_(?P<timestamp>\d+)_(?P<step_num>\d+)'  # oh look, meaningful data!
+    r'job_(?P<timestamp>\d+)_0*(?P<step_num>\d+)'  # oh look, meaningful data!
     r'([_-]\d+)?'  # sometimes there is a number here.
     r'[_-]hadoop[_-]streamjob(\d+).jar'
     r'(-[A-Za-z0-9-]+\.jhist)?' # this happens on YARN
     r'$')
 # TODO: should update this too, or possibly merge with EMR_JOB_LOG_URI_RE
 HADOOP_JOB_LOG_URI_RE = re.compile(
-    r'^.*?/job_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<mystery_string_1>\d+)'
+    r'^.*?/job_(?P<timestamp>\d+)_0*(?P<step_num>\d+)'
+    r'_(?P<mystery_string_1>\d+)'
     r'_(?P<user>.*?)_streamjob(?P<mystery_string_2>\d+).jar$')
 
 # regex for matching slave log URIs

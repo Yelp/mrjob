@@ -1750,7 +1750,11 @@ class EMRJobRunner(MRJobRunner):
 
     def ls_step_logs_ssh(self, step_nums, cluster_step_ids):
         # step nums are 1-indexed
-        step_ids = [cluster_step_ids[step_num - 1] for step_num in step_nums]
+        if step_nums is None:
+            step_ids = None
+        else:
+            step_ids = [cluster_step_ids[step_num - 1]
+                        for step_num in step_nums]
 
         self._enable_slave_ssh_access()
         return self._enforce_path_regexp(
@@ -1796,8 +1800,12 @@ class EMRJobRunner(MRJobRunner):
                                          filters=dict(step_num=step_nums))
 
     def ls_step_logs_s3(self, step_nums, cluster_step_ids):
-        # step nums are 1-indexed
-        step_ids = [cluster_step_ids[step_num - 1] for step_num in step_nums]
+        if step_nums is None:
+            step_ids = None
+        else:
+            # step nums are 1-indexed
+            step_ids = [cluster_step_ids[step_num - 1]
+                        for step_num in step_nums]
 
         return self._enforce_path_regexp(self._ls_s3_logs('steps/'),
                                          EMR_STEP_LOG_URI_RE,

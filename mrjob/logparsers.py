@@ -39,15 +39,15 @@ TASK_ATTEMPTS_LOG_URI_RE = re.compile(
     r'(?P<node_type>\w)_'           # m_
     r'(?P<node_num>\d+)_'           # 000000_
     r'(?P<attempt_num>\d+)/'        # 3/
-    r'(?P<stream>stderr|syslog)$')  # stderr
+    r'(?P<stream>stderr|syslog)(\.gz)?$')  # stderr
 
 # regex for matching step log URIs
 HADOOP_STEP_LOG_URI_RE = re.compile(
-    r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)$')
+    r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)(\.gz)?$')
 
 # EMR uses step IDs rather than step numbers (see #1117)
 EMR_STEP_LOG_URI_RE = re.compile(
-    r'^.*/(?P<step_id>s-[A-Z0-9]+)/(?P<stream>syslog|stderr)$')
+    r'^.*/(?P<step_id>s-[A-Z0-9]+)/(?P<stream>syslog|stderr)(\.gz)?$')
 
 # regex for matching job log URIs. There is some variety in how these are
 # formatted, so this expression is pretty general.

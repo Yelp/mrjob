@@ -23,10 +23,6 @@ class CompositeFilesystem(Filesystem):
     """Combine multiple filesystem objects to allow access to a variety of
     storage locations such as the local filesystem, S3, a remote machine via
     SSH, or HDFS.
-
-    This class implements no filesystem functionality on its own other than
-    the convenience method ``cat()``, which is a simple wrapper around ``ls()``
-    and ``_cat_file()``.
     """
 
     def __init__(self, *filesystems):

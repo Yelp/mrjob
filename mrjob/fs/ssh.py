@@ -20,6 +20,7 @@ from mrjob.ssh import ssh_cat
 from mrjob.ssh import ssh_ls
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_URI_RE
+from mrjob.util import random_identifier
 from mrjob.util import read_file
 
 

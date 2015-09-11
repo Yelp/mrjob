@@ -59,7 +59,6 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
-from mrjob.aws import random_identifier
 from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import _map_version
 from mrjob.compat import version_gte
@@ -112,6 +111,7 @@ from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
+from mrjob.util import random_identifier
 
 
 log = logging.getLogger(__name__)

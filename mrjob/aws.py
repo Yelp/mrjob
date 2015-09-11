@@ -15,7 +15,6 @@
 """General information about Amazon Web Services, such as region-to-endpoint
 mappings.
 """
-import random
 
 ### EC2 Instances ###
 
@@ -220,8 +219,3 @@ def s3_location_constraint_for_region(region):
         return ''
     else:
         return region
-
-
-def random_identifier():
-    """Used to randomly name new buckets and roles."""
-    return '%016x' % random.randint(0, 2 ** 64 - 1)

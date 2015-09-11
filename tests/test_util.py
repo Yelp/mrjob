@@ -24,7 +24,6 @@ from io import BytesIO
 from subprocess import PIPE
 from subprocess import Popen
 
-from mrjob.aws import random_identifier
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.util import buffer_iterator_to_line_iterator
@@ -32,6 +31,7 @@ from mrjob.util import cmd_line
 from mrjob.util import file_ext
 from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
+from mrjob.util import random_identifier
 from mrjob.util import read_file
 from mrjob.util import read_input
 from mrjob.util import safeeval
@@ -587,3 +587,17 @@ class ReadFileTestCase(TestCase):
                 output.append(line)
 
         self.assertEqual(output, [b'bar\n', b'bar\n', b'foo\n'])
+
+
+class RandomIdentifierTestCase(TestCase):
+
+    def test_format(self):
+        with random_seed(0):
+            random_id = random_identifier()
+        self.assertEqual(len(random_id), 16)
+        self.assertFalse(set(random_id) - set('0123456789abcdef'))
+
+    def test_no_collisions_possible_ever(self):
+        # heh
+        with random_seed(0):
+            self.assertNotEqual(random_identifier(), random_identifier())

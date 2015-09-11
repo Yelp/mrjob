@@ -54,7 +54,7 @@ _NODE_LOG_RE = re.compile(
 
 # match a step log path (including s-AAAAAAA step IDs on EMR)
 _STEP_LOG_RE = re.compile(
-    r'^.*/((?P<step_num>\d+)|(?P<step_id>s-[A-Z0-9]+)'
+    r'^.*/((?P<step_num>\d+)|(?P<step_id>s-[A-Z0-9]+))'
     r'/(?P<stream>syslog|stderr)(\.gz)?$')
 
 # match a task attempt log path
@@ -78,7 +78,7 @@ _LOG_TYPE_TO_RE = {
 
 # where to look for logs when SSHing in
 # (either 'master', 'slaves', or both)
-_SSH_LOG_TYPE_TO_NODE_TYPES = {
+_SSH_LOG_TYPE_TO_LOCATIONS = {
     'job': ['master'],
     'node': ['slaves'],  # TODO: why not master?
     'step': ['master'],
@@ -181,8 +181,8 @@ def _candidate_log_subdirs(fs, log_type, log_dir, node_log_path, ssh_host):
     """
     # first, try SSH (most up-to-date)
     if ssh_host:
-        yield _ssh_log_subdirs(fs, log_type, log_dir=log_dir,
-                               node_log_path=node_log_path, ssh_host=ssh_host)
+        yield _ssh_log_subdirs(
+            fs, log_type, node_log_path=node_log_path, ssh_host=ssh_host)
 
     # then try the log directory
     if log_dir:
@@ -221,12 +221,12 @@ def _ssh_log_subdirs(fs, log_type, ssh_host, node_log_path):
 
     hosts = []
 
-    node_types = _SSH_LOG_TYPE_TO_NODE_TYPES.get(log_type, ())
+    log_locations = _SSH_LOG_TYPE_TO_LOCATIONS.get(log_type, ())
 
-    if 'master' in node_types:
+    if 'master' in log_locations:
         hosts.append(ssh_host)
 
-    if 'slaves' in node_types:
+    if 'slaves' in log_locations:
         try:
             slave_hosts = fs.ssh_slave_hosts(ssh_host)
         except NameError:  # TODO: IOError, once ssh_slave_hosts() is defined

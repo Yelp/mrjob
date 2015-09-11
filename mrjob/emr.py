@@ -77,6 +77,7 @@ from mrjob.iam import FALLBACK_INSTANCE_PROFILE
 from mrjob.iam import FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
+from mrjob.logs.ls import ls_logs
 from mrjob.logparsers import EMR_JOB_LOG_URI_RE
 from mrjob.logparsers import NODE_LOG_URI_RE
 from mrjob.logparsers import EMR_STEP_LOG_URI_RE
@@ -1767,9 +1768,7 @@ class EMRJobRunner(MRJobRunner):
 
     def ls_job_logs_ssh(self, step_nums):
         self._enable_slave_ssh_access()
-        return self._enforce_path_regexp(self._ls_ssh_logs('history/'),
-                                         EMR_JOB_LOG_URI_RE,
-                                         filters=dict(step_num=step_nums))
+        return ls_logs(self.fs, 'job', ssh_host=self._address_of_master())
 
     def ls_node_logs_ssh(self):
         self._enable_slave_ssh_access()

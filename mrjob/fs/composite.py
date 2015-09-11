@@ -36,6 +36,10 @@ class CompositeFilesystem(Filesystem):
                 return getattr(fs, name)
         raise AttributeError(name)
 
+    def can_handle_path(self, path):
+        """We can handle a path if any sub-filesystem can."""
+        return any(fs.can_handle_path(path) for fs in self.filesystems)
+
     def _do_action(self, action, path, *args, **kwargs):
         """Call **action** on each filesystem object in turn. If one raises an
         :py:class:`IOError`, save the exception and try the rest. If none

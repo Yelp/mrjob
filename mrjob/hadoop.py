@@ -37,7 +37,7 @@ from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
-from mrjob.logparsers import STEP_LOG_URI_RE
+from mrjob.logparsers import HADOOP_STEP_LOG_URI_RE
 from mrjob.logparsers import HADOOP_JOB_LOG_URI_RE
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import best_error_from_logs
@@ -570,7 +570,7 @@ class HadoopJobRunner(MRJobRunner):
                                                       TASK_ATTEMPTS_LOG_URI_RE,
                                                       step_nums)
         step_logs = self._enforce_path_regexp(self._ls_logs('steps/'),
-                                              STEP_LOG_URI_RE,
+                                              HADOOP_STEP_LOG_URI_RE,
                                               step_nums)
         job_logs = self._enforce_path_regexp(self._ls_logs('history/'),
                                              HADOOP_JOB_LOG_URI_RE,

@@ -35,29 +35,34 @@ NODE_LOGS = 'NODE_LOGS'
 TASK_ATTEMPTS_LOG_URI_RE = re.compile(
     r'^.*/attempt_'                 # attempt_
     r'(?P<timestamp>\d+)_'          # 201203222119_
-    r'(?P<step_num>\d+)_'           # 0001_
+    r'0*(?P<step_num>\d+)_'         # 0001_
     r'(?P<node_type>\w)_'           # m_
     r'(?P<node_num>\d+)_'           # 000000_
     r'(?P<attempt_num>\d+)/'        # 3/
-    r'(?P<stream>stderr|syslog)$')  # stderr
+    r'(?P<stream>stderr|syslog)(\.gz)?$')  # stderr
 
 # regex for matching step log URIs
-STEP_LOG_URI_RE = re.compile(
-    r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)$')
+HADOOP_STEP_LOG_URI_RE = re.compile(
+    r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)(\.gz)?$')
+
+# EMR uses step IDs rather than step numbers (see #1117)
+EMR_STEP_LOG_URI_RE = re.compile(
+    r'^.*/(?P<step_id>s-[A-Z0-9]+)/(?P<stream>syslog|stderr)(\.gz)?$')
 
 # regex for matching job log URIs. There is some variety in how these are
 # formatted, so this expression is pretty general.
 EMR_JOB_LOG_URI_RE = re.compile(
     r'^.*?'     # sometimes there is a number at the beginning, and the
                 # containing directory can be almost anything.
-    r'job_(?P<timestamp>\d+)_(?P<step_num>\d+)'  # oh look, meaningful data!
+    r'job_(?P<timestamp>\d+)_0*(?P<step_num>\d+)'  # oh look, meaningful data!
     r'([_-]\d+)?'  # sometimes there is a number here.
     r'[_-]hadoop[_-]streamjob(\d+).jar'
     r'(-[A-Za-z0-9-]+\.jhist)?' # this happens on YARN
     r'$')
 # TODO: should update this too, or possibly merge with EMR_JOB_LOG_URI_RE
 HADOOP_JOB_LOG_URI_RE = re.compile(
-    r'^.*?/job_(?P<timestamp>\d+)_(?P<step_num>\d+)_(?P<mystery_string_1>\d+)'
+    r'^.*?/job_(?P<timestamp>\d+)_0*(?P<step_num>\d+)'
+    r'_(?P<mystery_string_1>\d+)'
     r'_(?P<user>.*?)_streamjob(?P<mystery_string_2>\d+).jar$')
 
 # regex for matching slave log URIs
@@ -101,11 +106,28 @@ def _sorted_task_attempts(logs):
             info['node_num']))
 
 
-def _sorted_steps(logs):
+# TODO: this is wrong, and doesn't work on Hadoop
+def _sorted_steps(logs, cluster_step_ids=None):
+    if cluster_step_ids is None:
+        return _sorted_steps_hadoop(logs)
+    else:
+        return _sorted_steps_emr(logs, cluster_step_ids)
+
+
+def _sorted_steps_hadoop(logs):
     return _filter_sort(
         logs,
-        [STEP_LOG_URI_RE],
-        lambda info: (info['step_num'], info['stream'] == 'stderr'))
+        [HADOOP_STEP_LOG_URI_RE],
+        lambda info: (int(info['step_num']), info['stream'] == 'stderr'))
+
+
+def _sorted_steps_emr(logs, cluster_step_ids):
+    return _filter_sort(
+        logs,
+        [EMR_STEP_LOG_URI_RE],
+        lambda info: (cluster_step_ids.index(info['step_id'])
+                      if info['step_id'] in cluster_step_ids else -1,
+                      info['stream'] == 'stderr'))
 
 
 def _sorted_jobs(logs):
@@ -192,9 +214,10 @@ def _scan_for_input_uri(log_file_uri, runner):
         return None
 
 
-def best_error_from_logs(fs, task_attempts, steps, jobs):
+def best_error_from_logs(fs, task_attempts, steps, jobs,
+                         cluster_step_ids=None):
     task_attempts = _sorted_task_attempts(task_attempts)
-    steps = _sorted_steps(steps)
+    steps = _sorted_steps(steps, cluster_step_ids=cluster_step_ids)
     jobs = _sorted_jobs(jobs)
 
     val = _parse_task_attempts(fs, task_attempts)

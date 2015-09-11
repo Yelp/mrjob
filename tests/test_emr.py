@@ -1137,6 +1137,10 @@ class FindProbableCauseOfFailureTestCase(MockBotoTestCase):
                                    conf_paths=[])
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
 
+        # need this to make step mapping work
+        self.runner._step_ids_for_cluster = Mock(
+            return_value=['s-ONE', 's-TWO', 's-THREE', 's-FOUR'])
+
     def cleanup_runner(self):
         self.runner.cleanup()
 
@@ -1206,21 +1210,21 @@ class FindProbableCauseOfFailureTestCase(MockBotoTestCase):
         #
         # we include input.gz just to test that we DON'T check for it
         self.add_mock_s3_data({'walrus': {
-            LOG_DIR + 'steps/1/syslog':
+            LOG_DIR + 'steps/s-ONE/syslog':
                 GARBAGE +
                 HADOOP_ERR_LINE_PREFIX + BORING_HADOOP_ERROR + b'\n',
-            LOG_DIR + 'steps/2/syslog':
+            LOG_DIR + 'steps/s-TWO/syslog':
                 GARBAGE +
                 make_input_uri_line(BUCKET_URI + 'input.gz') +
                 HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n',
-            LOG_DIR + 'steps/3/syslog':
+            LOG_DIR + 'steps/s-THREE/syslog':
                 HADOOP_ERR_LINE_PREFIX + BORING_HADOOP_ERROR + b'\n',
         }})
 
         self.assertEqual(
             self.runner._find_probable_cause_of_failure([1, 2, 3]),
             {'lines': [(USEFUL_HADOOP_ERROR + b'\n').decode('ascii')],
-             'log_file_uri': BUCKET_URI + LOG_DIR + 'steps/2/syslog',
+             'log_file_uri': BUCKET_URI + LOG_DIR + 'steps/s-TWO/syslog',
              'input_uri': None})
 
     def test_later_task_attempt_steps_win(self):
@@ -1237,15 +1241,16 @@ class FindProbableCauseOfFailureTestCase(MockBotoTestCase):
                          'attempt_201007271720_0002_m_000004_0/syslog')
 
     def test_later_step_logs_win(self):
+        # TODO: we're currently just sorting alphabetically by step ID
         self.add_mock_s3_data({'walrus': {
-            LOG_DIR + 'steps/1/syslog':
+            LOG_DIR + 'steps/s-THREE/syslog':
                 HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n',
-            LOG_DIR + 'steps/2/syslog':
+            LOG_DIR + 'steps/s-FOUR/syslog':
                 HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n',
         }})
-        failure = self.runner._find_probable_cause_of_failure([1, 2])
+        failure = self.runner._find_probable_cause_of_failure([3, 4])
         self.assertEqual(failure['log_file_uri'],
-                         BUCKET_URI + LOG_DIR + 'steps/2/syslog')
+                         BUCKET_URI + LOG_DIR + 'steps/s-FOUR/syslog')
 
     def test_reducer_beats_mapper(self):
         # should look at reducers over mappers
@@ -1299,12 +1304,12 @@ class FindProbableCauseOfFailureTestCase(MockBotoTestCase):
         self.add_mock_s3_data({'walrus': {
             TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000126_0/stderr':
                 TRACEBACK_START + PY_EXCEPTION,
-            LOG_DIR + 'steps/1/syslog':
+            LOG_DIR + 'steps/s-ONE/syslog':
                 HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n',
         }})
         failure = self.runner._find_probable_cause_of_failure([1])
         self.assertEqual(failure['log_file_uri'],
-                         BUCKET_URI + LOG_DIR + 'steps/1/syslog')
+                         BUCKET_URI + LOG_DIR + 'steps/s-ONE/syslog')
 
     def test_ignore_errors_from_steps_that_later_succeeded(self):
         # This tests the fix for Issue #31
@@ -1431,6 +1436,10 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
 
         self.runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp')
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
+        # need this to make step mapping work
+        self.runner._step_ids_for_cluster = Mock(
+            return_value=['s-ONE', 's-TWO', 's-THREE', 's-FOUR'])
+
         self.prepare_runner_for_ssh(self.runner)
 
     def tearDown(self):
@@ -1442,13 +1451,13 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
         self.runner.cleanup()
 
     def test_ssh_comes_first(self):
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/s-ONE')
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/userlogs')
 
         # Put a log file and error into SSH
         ssh_lone_log_path = posixpath.join(
-            SSH_LOG_ROOT, 'steps', '1', 'syslog')
+            SSH_LOG_ROOT, 'steps', 's-ONE', 'syslog')
         mock_ssh_file('testmaster', ssh_lone_log_path,
                       HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n')
 
@@ -1468,7 +1477,7 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
     def test_ssh_works_with_slaves(self):
         self.add_slave()
 
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/1')
+        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/s-ONE')
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
         mock_ssh_dir(
             'testmaster!testslave0',

@@ -134,4 +134,4 @@ More Information
 * `Social Graph Analysis Using Elastic MapReduce and PyPy <http://postneo.com/2011/05/04/social-graph-analysis-using-elastic-mapreduce-and-pypy>`_
 
 Thanks to `Greg Killion <mailto:greg@blind-works.net>`_
-(`blind-works.net <http://www.blind-works.net/>`_) for the logo.
+(`ROMEO ECHO_DELTA <http://www.romeoechodelta.net/>`_) for the logo.

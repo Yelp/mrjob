@@ -1686,9 +1686,11 @@ class EMRJobRunner(MRJobRunner):
 
         filters maps from regexp group to a list of thing to match
         """
-        filters = dict((group_name, set(str(v) for v in values))
-                       for group_name, values in (filters or {}).items()
-                       if values)
+        # convert filters to a map from group_name to sets of strings
+        str_set_filters = {}
+        for group_name, values in (filters or {}).items():
+            if values:
+                str_set_filters[group_name] = set(str(v) for v in values)
 
         for path in paths:
             m = regexp.match(path)
@@ -1696,7 +1698,7 @@ class EMRJobRunner(MRJobRunner):
                 continue
 
             if any(m.group(group_name) not in values
-                   for group_name, values in filters.items()):
+                   for group_name, values in str_set_filters.items()):
                 continue
 
             yield path

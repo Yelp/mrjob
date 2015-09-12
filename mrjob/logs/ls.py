@@ -229,7 +229,7 @@ def _ssh_log_subdirs(fs, log_type, ssh_host, node_log_path):
     if 'slaves' in log_locations:
         try:
             slave_hosts = fs.ssh_slave_hosts(ssh_host)
-        except NameError:  # TODO: IOError, once ssh_slave_hosts() is defined
+        except IOError:
             log.warning('Could not get slave addresses for %s' % ssh_host)
         else:
             for slave_host in slave_hosts:

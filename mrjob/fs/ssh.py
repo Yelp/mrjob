@@ -19,6 +19,7 @@ from mrjob.fs.base import Filesystem
 from mrjob.ssh import ssh_cat
 from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_ls
+from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_URI_RE
 from mrjob.util import random_identifier
@@ -49,6 +50,9 @@ class SSHFilesystem(Filesystem):
         # keep track of which hosts we've copied our key to, and
         # what the (random) name of the key file is on that host
         self._host_to_key_filename = {}
+
+        # keep track of the slave hosts accessible through each host
+        self._host_to_slave_hosts = {}
 
     def can_handle_path(self, path):
         return SSH_URI_RE.match(path) is not None
@@ -143,3 +147,11 @@ class SSHFilesystem(Filesystem):
 
     def touchz(self, dest):
         raise IOError()  # not implemented
+
+    def ssh_slave_hosts(self, host, force=False):
+        """Get a list of the slave hosts reachable through *hosts*"""
+        if force or host not in self._host_to_slave_hosts:
+            self._host_to_slave_hosts[host] = ssh_slave_addresses(
+                self._ssh_bin, host, self._ec2_key_pair_file)
+
+        return self._host_to_slave_hosts[host]

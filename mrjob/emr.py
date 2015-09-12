@@ -106,7 +106,6 @@ from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
-from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.util import cmd_line
@@ -702,10 +701,6 @@ class EMRJobRunner(MRJobRunner):
         return s3_uri
 
     @property
-    def _ssh_key_name(self):
-        return self._job_key + '.pem'
-
-    @property
     def fs(self):
         """:py:class:`~mrjob.fs.base.Filesystem` object for SSH, S3, and the
         local filesystem.
@@ -720,8 +715,7 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['ec2_key_pair_file']:
                 self._ssh_fs = SSHFilesystem(
                     ssh_bin=self._opts['ssh_bin'],
-                    ec2_key_pair_file=self._opts['ec2_key_pair_file'],
-                    key_name=self._ssh_key_name)
+                    ec2_key_pair_file=self._opts['ec2_key_pair_file'])
 
                 self._fs = CompositeFilesystem(self._ssh_fs, self._s3_fs,
                                                LocalFilesystem())
@@ -1003,14 +997,6 @@ class EMRJobRunner(MRJobRunner):
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
         finally:
             random.setstate(random_state)
-
-    def _enable_slave_ssh_access(self):
-        if self._ssh_fs and not self._ssh_key_is_copied:
-            ssh_copy_key(
-                self._opts['ssh_bin'],
-                self._address_of_master(),
-                self._opts['ec2_key_pair_file'],
-                self._ssh_key_name)
 
     ### Running the job ###
 
@@ -1714,7 +1700,6 @@ class EMRJobRunner(MRJobRunner):
     def _ls_ssh_logs(self, relative_path):
         """List logs over SSH by path relative to log root directory"""
         try:
-            self._enable_slave_ssh_access()
             log.debug('Search %s for logs' % self._ssh_path(relative_path))
             return self.ls(self._ssh_path(relative_path))
         except IOError as e:
@@ -1723,7 +1708,6 @@ class EMRJobRunner(MRJobRunner):
     def _ls_slave_ssh_logs(self, addr, relative_path):
         """List logs over multi-hop SSH by path relative to log root directory
         """
-        self._enable_slave_ssh_access()
         root_path = '%s%s!%s%s' % (SSH_PREFIX,
                                    self._address_of_master(),
                                    addr,
@@ -1760,18 +1744,15 @@ class EMRJobRunner(MRJobRunner):
                         for step_num in step_nums
                         if step_num <= len(cluster_step_ids)]
 
-        self._enable_slave_ssh_access()
         return self._enforce_path_regexp(
             self._ls_ssh_logs('steps/'),
             EMR_STEP_LOG_URI_RE,
             filters=dict(step_id=step_ids))
 
     def ls_job_logs_ssh(self, step_nums):
-        self._enable_slave_ssh_access()
         return ls_logs(self.fs, 'job', ssh_host=self._address_of_master())
 
     def ls_node_logs_ssh(self):
-        self._enable_slave_ssh_access()
         all_paths = []
         for addr in self._addresses_of_slaves():
             logs = self._ls_slave_ssh_logs(addr, '')
@@ -1949,7 +1930,6 @@ class EMRJobRunner(MRJobRunner):
             lg_step_nums = step_nums
 
         try:
-            self._enable_slave_ssh_access()
             task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
             step_logs = self.ls_step_logs_ssh(lg_step_nums, cluster_step_ids)
             job_logs = self.ls_job_logs_ssh(step_nums)

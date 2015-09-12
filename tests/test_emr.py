@@ -1656,8 +1656,6 @@ class TestSSHLs(MockBotoTestCase):
             sorted(self.runner.ls('ssh://testmaster/test')),
             ['ssh://testmaster/test/one', 'ssh://testmaster/test/two'])
 
-        self.runner._enable_slave_ssh_access()
-
         self.assertEqual(
             list(self.runner.ls('ssh://testmaster!testslave0/test')),
             ['ssh://testmaster!testslave0/test/three'])

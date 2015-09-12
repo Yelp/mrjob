@@ -17,6 +17,7 @@ import posixpath
 from io import BytesIO
 from mrjob.fs.base import Filesystem
 from mrjob.ssh import ssh_cat
+from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_ls
 from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_URI_RE
@@ -34,21 +35,20 @@ class SSHFilesystem(Filesystem):
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
 
-    def __init__(self, ssh_bin, ec2_key_pair_file, key_name):
+    def __init__(self, ssh_bin, ec2_key_pair_file):
         """
         :param ssh_bin: path to ``ssh`` binary
         :param ec2_key_pair_file: path to an SSH keyfile
-        :param key_name: Name of keyfile existing on servers, used to access
-                         slaves after '!' in hostname. Generally set by
-                         :py:class:`~mrjob.emr.EMRJobRunner`, which copies the
-                         key itself, to use for log fetching.
         """
         super(SSHFilesystem, self).__init__()
         self._ssh_bin = ssh_bin
         self._ec2_key_pair_file = ec2_key_pair_file
-        self.ssh_key_name = key_name
         if self._ec2_key_pair_file is None:
             raise ValueError('ec2_key_pair_file must be a path')
+
+        # keep track of which hosts we've copied our key to, and
+        # what the (random) name of the key file is on that host
+        self._host_to_key_filename = {}
 
     def can_handle_path(self, path):
         return SSH_URI_RE.match(path) is not None
@@ -62,6 +62,27 @@ class SSHFilesystem(Filesystem):
                 yield item
             return
 
+    def _key_filename_for(self, addr):
+        """If *addr* is a !-separated pair of hosts like ``master!slave``,
+        get the name of the copy of our keypair file on ``master``. If there
+        isn't one, pick a random name, and copy the key file there.
+
+        Otherwise, return ``None``."""
+        # don't need to copy a key if we're SSHing directly
+        if '!' not in addr:
+            return None
+
+        host = addr.split('!')[0]
+
+        if host not in self._host_to_key_filename:
+            # copy the key if we haven't already
+            keyfile = 'mrjob-%s.pem' % random_identifier()
+            ssh_copy_key(self._ssh_bin, host, self._ec2_key_pair_file, keyfile)
+            # don't set above; ssh_copy_key() may throw an IOError
+            self._host_to_key_filename[host] = keyfile
+
+        return self._host_to_key_filename[host]
+
     def _ssh_ls(self, uri):
         """Helper for ls(); obeys globbing"""
         m = SSH_URI_RE.match(uri)
@@ -69,15 +90,14 @@ class SSHFilesystem(Filesystem):
         if not addr:
             raise ValueError
 
-        if '!' in addr and self.ssh_key_name is None:
-            raise ValueError('ssh_key_name must not be None')
+        keyfile = self._key_filename_for(addr)
 
         output = ssh_ls(
             self._ssh_bin,
             addr,
             self._ec2_key_pair_file,
             m.group('filesystem_path'),
-            self.ssh_key_name,
+            keyfile,
         )
 
         for line in output:
@@ -91,14 +111,15 @@ class SSHFilesystem(Filesystem):
     def _cat_file(self, filename):
         ssh_match = SSH_URI_RE.match(filename)
         addr = ssh_match.group('hostname') or self._address_of_master()
-        if '!' in addr and self.ssh_key_name is None:
-            raise ValueError('ssh_key_name must not be None')
+
+        keyfile = self._key_filename_for(addr)
+
         output = ssh_cat(
             self._ssh_bin,
             addr,
             self._ec2_key_pair_file,
             ssh_match.group('filesystem_path'),
-            self.ssh_key_name,
+            keyfile,
         )
         return read_file(filename, fileobj=BytesIO(output))
 

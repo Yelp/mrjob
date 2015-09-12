@@ -44,7 +44,6 @@ class MRBossTestCase(MockBotoTestCase):
                                    conf_paths=[])
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
         self.prepare_runner_for_ssh(self.runner)
-        self.runner._enable_slave_ssh_access()
         self.output_dir = tempfile.mkdtemp(prefix='mrboss_wd')
 
     def cleanup_runner(self):
@@ -74,7 +73,6 @@ class MRBossTestCase(MockBotoTestCase):
         mock_ssh_file('testmaster!testslave0', 'some_file', b'file contents 2')
 
         self.runner.fs  # force initialization of _ssh_fs
-        self.runner._enable_slave_ssh_access()
 
         run_on_all_nodes(self.runner, self.output_dir, ['cat', 'some_file'],
                          print_stderr=False)

@@ -138,7 +138,7 @@ def ls_logs(fs, log_type,
         log_paths = []
 
         for log_subdir in log_subdirs:
-            log.info('looking for %s logs in %' % (log_type, log_subdir))
+            log.info('looking for %s logs in %s' % (log_type, log_subdir))
             try:
                 for log_path in fs.ls(log_subdir):
                     m = log_re.match(log_path)

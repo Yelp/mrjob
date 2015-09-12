@@ -214,12 +214,7 @@ def _scan_for_input_uri(log_file_uri, runner):
         return None
 
 
-def best_error_from_logs(fs, task_attempts, steps, jobs,
-                         cluster_step_ids=None):
-    task_attempts = _sorted_task_attempts(task_attempts)
-    steps = _sorted_steps(steps, cluster_step_ids=cluster_step_ids)
-    jobs = _sorted_jobs(jobs)
-
+def best_error_from_logs(fs, task_attempts, steps, jobs):
     val = _parse_task_attempts(fs, task_attempts)
     if val:
         return val
@@ -241,8 +236,8 @@ def _timeout_error_wrapper(lines):
     return ['Task timeout after %d seconds\n' % n] if n else None
 
 
-def scan_for_counters_in_files(log_file_uris, runner, hadoop_version):
-    """Scan *log_file_uris* for counters, using *runner* for file system access
+def scan_for_counters_in_files(log_file_uris, fs, hadoop_version):
+    """Scan *log_file_uris* for counters, using *fs* for file system access
     """
     counters = {}
     relevant_logs = []  # list of (sort key, URI)
@@ -260,7 +255,7 @@ def scan_for_counters_in_files(log_file_uris, runner, hadoop_version):
     relevant_logs.sort()
 
     for _, log_file_uri in relevant_logs:
-        log_lines = runner.cat(log_file_uri)
+        log_lines = fs.cat(log_file_uri)
         if not log_lines:
             continue
 

@@ -19,20 +19,20 @@ from os.path import join
 from mrjob.parse import is_s3_uri
 
 # relative path to look for logs in
-_LOG_TYPE_TO_RELATIVE_PATH = {
-    'job': 'history',
-    'node': '',  # do these exist on Hadoop?
-    'step': 'steps',
-    'task': 'userlogs',
-}
+_LOG_TYPE_TO_RELATIVE_PATH = dict(
+    job='history',
+    node='',  # do these exist on Hadoop?
+    step='steps',
+    task='userlogs',
+)
 
 # alternate relative path for logs on S3 (EMR)
-_S3_LOG_TYPE_TO_RELATIVE_PATH = {
-    'job': 'jobs',
-    'node': 'node',
-    'steps': 'steps',
-    'task': 'task-attempts',
-}
+_S3_LOG_TYPE_TO_RELATIVE_PATH = dict(
+    job='jobs',
+    node='node',
+    steps='steps',
+    task='task-attempts',
+)
 
 # if we SSH into a node, default place to look for Hadoop logs
 _DEFAULT_NODE_LOG_PATH = '/mnt/var/log/hadoop'
@@ -69,21 +69,21 @@ _TASK_LOG_RE = re.compile(
     r'(?P<stream>stderr|syslog)(\.gz)?$')  # stderr
 
 # map from log type to a regex matching it
-_LOG_TYPE_TO_RE = {
-    'job': _JOB_LOG_RE,
-    'node': _NODE_LOG_RE,
-    'step': _STEP_LOG_RE,
-    'task': _TASK_LOG_RE,
-}
+_LOG_TYPE_TO_RE = dict(
+    job=_JOB_LOG_RE,
+    node=_NODE_LOG_RE,
+    step=_STEP_LOG_RE,
+    task=_TASK_LOG_RE,
+)
 
 # where to look for logs when SSHing in
 # (either 'master', 'slaves', or both)
-_SSH_LOG_TYPE_TO_LOCATIONS = {
-    'job': ['master'],
-    'node': ['slaves'],  # TODO: why not master?
-    'step': ['master'],
-    'task': ['master', 'slaves'],
-}
+_SSH_LOG_TYPE_TO_LOCATIONS = dict(
+    job=['master'],
+    node=['slaves'],  # TODO: why not master?
+    step=['master'],
+    task=['master', 'slaves'],
+)
 
 log = getLogger(__name__)
 

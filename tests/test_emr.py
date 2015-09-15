@@ -1407,10 +1407,10 @@ class CounterFetchingTestCase(MockBotoTestCase):
             self._mock_step(jar='x.jar'),
         ]
 
-        self.runner._fetch_counters_s3 = Mock(return_value={})
+        self.runner._ls_logs = Mock(return_value={})
 
         self.runner._wait_for_job_to_complete()
-        self.runner._fetch_counters_s3.assert_called_with([], False)
+        self.runner._ls_logs.assert_called_with('job', [])
 
     def test_interleaved_log_generating_steps(self):
         self.mock_cluster.status.state = 'TERMINATED'
@@ -1421,10 +1421,11 @@ class CounterFetchingTestCase(MockBotoTestCase):
             self._mock_step(jar='hadoop.streaming.jar'),
         ]
 
-        self.runner._fetch_counters_s3 = Mock(return_value={})
+        self.runner._ls_logs = Mock(return_value=[])
 
         self.runner._wait_for_job_to_complete()
-        self.runner._fetch_counters_s3.assert_called_with([1, 2], False)
+
+        self.runner._ls_logs.assert_called_with('job', [1, 2])
 
 
 class LogFetchingFallbackTestCase(MockBotoTestCase):

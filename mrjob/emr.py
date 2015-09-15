@@ -1670,31 +1670,6 @@ class EMRJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_key, step_num + 1)
 
-    ### LOG FETCHING/PARSING ###
-
-    def _enforce_path_regexp(self, paths, regexp, filters=None):
-        """Helper for log fetching functions to filter out unwanted
-        logs.
-
-        filters maps from regexp group to a list of thing to match
-        """
-        # convert filters to a map from group_name to sets of strings
-        str_set_filters = {}
-        for group_name, values in (filters or {}).items():
-            if values:
-                str_set_filters[group_name] = set(str(v) for v in values)
-
-        for path in paths:
-            m = regexp.match(path)
-            if not m:
-                continue
-
-            if any(m.group(group_name) not in values
-                   for group_name, values in str_set_filters.items()):
-                continue
-
-            yield path
-
     ## LOG PARSING ##
 
     def _fetch_counters(self, step_nums, lg_step_num_mapping=None,

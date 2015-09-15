@@ -40,6 +40,7 @@ _S3_LOG_TYPE_TO_RELATIVE_PATH = dict(
 _DEFAULT_NODE_LOG_PATH = '/mnt/var/log/hadoop'
 
 # match a job log path
+# TODO: is this really a timestamp on YARN?
 _JOB_LOG_RE = re.compile(
     r'^.*?'     # sometimes there is a number at the beginning, and the
                 # containing directory can be almost anything.

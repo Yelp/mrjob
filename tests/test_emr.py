@@ -1241,7 +1241,6 @@ class FindProbableCauseOfFailureTestCase(MockBotoTestCase):
                          'attempt_201007271720_0002_m_000004_0/syslog')
 
     def test_later_step_logs_win(self):
-        # TODO: we're currently just sorting alphabetically by step ID
         self.add_mock_s3_data({'walrus': {
             LOG_DIR + 'steps/s-THREE/syslog':
                 HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n',

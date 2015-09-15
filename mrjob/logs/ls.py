@@ -246,7 +246,7 @@ def _ssh_log_subdirs(fs, log_type, ssh_host, node_log_path):
 
 def _sorted_log_paths(log_paths, log_re, step_num_to_id=None):
     """Order log paths so that the ones most useful for diagnosing
-    failure (usually, the earliest ones) come first."""
+    failure (usually, the latest ones) come first."""
     step_id_to_num = dict((v, k) for k, v in (step_num_to_id or {}).items())
 
     def sort_key_for_m_group(m_groups, group_name):
@@ -280,4 +280,4 @@ def _sorted_log_paths(log_paths, log_re, step_num_to_id=None):
                  'yarn_attempt_num', 'stream', 'task_num',
                  'timestamp')] + [log_path]
 
-    return sorted(log_paths, key=sort_key)
+    return sorted(log_paths, key=sort_key, reverse=True)

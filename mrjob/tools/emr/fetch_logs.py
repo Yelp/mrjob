@@ -63,11 +63,9 @@ Options::
 """
 from __future__ import print_function
 
-from optparse import OptionError
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
-from mrjob.emr import LogFetchError
 from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 from mrjob.options import add_emr_connect_opts
@@ -217,21 +215,22 @@ def _prettyprint_relevant(log_type_to_uri_list):
 
 
 def list_relevant(runner, step_nums):
+    _prettyprint_relevant(_ls_logs(_RELEVANT_LOG_TYPES, step_nums))
+
+
+def _ls_logs(runner, log_types, step_nums=None):
+    """Return a map from log type to a list of log URIs."""
     # TODO: integrate this into EMRJobRunner
     step_num_to_id = runner._step_num_to_id()
 
-    logs = {}
-
-    for log_type in _RELEVANT_LOG_TYPES:
-        logs[log_type] = runner._ls_logs(log_type,
-                                         step_nums=step_nums,
-                                         step_num_to_id=step_num_to_id)
-
-    _prettyprint_relevant(logs)
+    return dict((log_type, runner._ls_logs(log_type,
+                                           step_nums=step_nums,
+                                           step_num_to_id=step_num_to_id))
+                for log_type in log_types)
 
 
 def list_all(runner):
-    prettyprint_paths(runner._ls_logs('all'))
+    prettyprint_paths(_ls_logs(runner, 'all')['all'])
 
 
 def cat_from_list(runner, path_list):
@@ -254,29 +253,12 @@ def _cat_from_relevant(runner, log_type_to_uri_list):
 
 
 def cat_relevant(runner, step_nums):
-    try:
-        logs = {
-            'task': runner.ls_task_attempt_logs_ssh(step_nums),
-            'step': runner.ls_step_logs_ssh(step_nums),
-            'job': runner.ls_job_logs_ssh(step_nums),
-            'node': runner.ls_node_logs_ssh(),
-        }
-        _cat_from_relevant(runner, logs)
-    except LogFetchError:
-        logs = {
-            'task': runner.ls_task_attempt_logs_s3(step_nums),
-            'step': runner.ls_step_logs_s3(step_nums),
-            'job': runner.ls_job_logs_s3(step_nums),
-            'node': runner.ls_node_logs_s3(),
-        }
-        _cat_from_relevant(runner, logs)
+    _cat_from_relevant(runner,
+                       _ls_logs(runner, _RELEVANT_LOG_TYPES, step_nums))
 
 
 def cat_all(runner):
-    try:
-        cat_from_list(runner, runner.ls_all_logs_ssh())
-    except LogFetchError:
-        cat_from_list(runner, runner.ls_all_logs_s3())
+    cat_from_list(runner, _ls_logs(runner, 'all')['all'])
 
 
 def find_failure(runner, step_num):

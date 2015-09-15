@@ -1500,7 +1500,7 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
 
     def test_ssh_fails_to_s3(self):
         # the runner will try to use SSH and find itself unable to do so,
-        # throwing a LogFetchError and triggering S3 fetching.
+        # triggering S3 fetching.
         self.runner._address = None
 
         # Put a different error into S3

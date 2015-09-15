@@ -267,10 +267,6 @@ def attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
     return _lock_acquire_step_2(key, job_key)
 
 
-class LogFetchError(Exception):
-    pass
-
-
 class EMRRunnerOptionStore(RunnerOptionStore):
 
     # documentation of these options is in docs/guides/emr-opts.rst

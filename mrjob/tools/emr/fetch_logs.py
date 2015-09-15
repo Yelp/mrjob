@@ -215,7 +215,7 @@ def _prettyprint_relevant(log_type_to_uri_list):
 
 
 def list_relevant(runner, step_nums):
-    _prettyprint_relevant(_ls_relevant_logs_by_type(step_nums))
+    _prettyprint_relevant(_ls_relevant_logs_by_type(runner, step_nums))
 
 def _ls_relevant_logs_by_type(runner, step_nums=None):
     # TODO: integrate this into EMRJobRunner

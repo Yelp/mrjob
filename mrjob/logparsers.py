@@ -16,12 +16,15 @@ import logging
 import posixpath
 import re
 
+from mrjob.logs.ls import _TASK_LOG_RE
 from mrjob.parse import find_hadoop_java_stack_trace
 from mrjob.parse import find_input_uri_for_mapper
 from mrjob.parse import find_interesting_hadoop_streaming_error
 from mrjob.parse import find_python_traceback
 from mrjob.parse import find_timeout_error
 from mrjob.parse import parse_hadoop_counters_from_line
+
+
 
 log = logging.getLogger(__name__)
 
@@ -151,11 +154,11 @@ def _parsed_error(fs, path, parse_func):
     return parse_func(lines)
 
 
-def _parse_simple_logs(fs, logs, parse_func):
+def _parse_simple_logs(fs, log_paths, parse_func):
     """Return the relevant lines of the first error in the files at *logs*, or
     None if none found.
     """
-    for _, path in logs:
+    for path in log_paths:
         lines = _parsed_error(fs, path, parse_func)
         if lines:
             return {
@@ -165,17 +168,24 @@ def _parse_simple_logs(fs, logs, parse_func):
             }
 
 
-def _parse_task_attempts(fs, logs):
+def _parse_task_attempts(fs, log_paths):
     """Like :py:func:`_parse_simple_logs()`, but with lots of special cases for
     task attempt logs
     """
     tasks_seen = set()
-    for info, path in logs:
-        task_info = (info['step_num'], info['node_type'],
-                     info['node_num'], info['stream'])
-        if task_info in tasks_seen:
+    for path in log_paths:
+        # skip subsequent logs for same task
+        m = _TASK_LOG_RE.match(path)
+        if not m:
             continue
-        tasks_seen.add(task_info)
+
+        m_groups = m.groupdict()
+        task_key = tuple(m_groups.get(k) for k in
+                         ['step_num', 'task_type', 'task_num', 'stream'])
+        if task_key in tasks_seen:
+            continue
+
+        tasks_seen.add(task_key)
 
         # Python tracebacks should win in a single file, but Java tracebacks
         # should win for later attempts
@@ -186,7 +196,9 @@ def _parse_task_attempts(fs, logs):
             lines = _parsed_error(fs, path, find_hadoop_java_stack_trace)
 
         if lines:
-            if info.get('node_type', None) == 'm':
+            task_num = int(m_groups['task_num'])
+            task_type = m_groups.get('task_type')
+            if task_num == 0 and task_type in ('m', None):
                 input_uri = _scan_for_input_uri(path, fs)
             else:
                 input_uri = None

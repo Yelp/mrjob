@@ -51,6 +51,8 @@ _JOB_LOG_RE = re.compile(
 
 # match a node log path
 # TODO: update this to match YARN too (use "application")
+# TODO: actually, that may be more like the task attempt logs?
+# TODO: not really sure what node logs are for
 _NODE_LOG_RE = re.compile(
     r'^.*?/hadoop-hadoop-(jobtracker|namenode).*.out$')
 
@@ -62,13 +64,13 @@ _STEP_LOG_RE = re.compile(
 # match a task attempt log path
 # TODO: this is different on 3.x AMIs (and maybe YARN)
 _TASK_LOG_RE = re.compile(
-    r'^.*/attempt_'                        # attempt_
-    r'(?P<timestamp>\d+)_'                 # 201203222119_
-    r'(?P<step_num>\d+)_'                  # 0001_
-    r'(?P<task_type>\w)_'                  # m_
-    r'(?P<task_num>\d+)_'                  # 000000_
-    r'(?P<attempt_num>\d+)/'               # 3/
-    r'(?P<stream>stderr|syslog)(\.gz)?$')  # stderr
+    r'^.*/(?:attempt|container)_'                        # attempt_
+    r'(?P<timestamp>\d+)_'                               # 201203222119_
+    r'(?P<step_num>\d+)_'                                # 0001_
+    r'(?:(?P<task_type>\w)|(?P<yarn_attempt_num>\d+))_'  # m_
+    r'(?P<task_num>\d+)'                                 # 000000_
+    r'(?:_(?P<attempt_num>\d+))?/'                       # 3/
+    r'(?P<stream>stderr|syslog)(\.gz)?$')                # stderr
 
 # map from log type to a regex matching it
 _LOG_TYPE_TO_RE = dict(
@@ -275,6 +277,7 @@ def _sorted_log_paths(log_paths, log_re, step_num_to_id=None):
         m_groups = m.groupdict()
         return [sort_key_for_m_group(m_groups, name) for name in
                 ('step_num', 'step_id', 'task_type', 'attempt_num',
-                 'stream', 'task_num', 'timestamp')] + [log_path]
+                 'yarn_attempt_num', 'stream', 'task_num',
+                 'timestamp')] + [log_path]
 
     return sorted(log_paths, key=sort_key)

@@ -76,8 +76,6 @@ from mrjob.util import scrape_options_into_new_groups
 
 _RELEVANT_LOG_TYPES = ['job', 'node', 'step', 'task']
 
-
-
 def main(args=None):
     option_parser = make_option_parser()
     options = parse_args(option_parser, args)
@@ -219,6 +217,7 @@ def _prettyprint_relevant(log_type_to_uri_list):
 
 
 def list_relevant(runner, step_nums):
+    # TODO: integrate this into EMRJobRunner
     step_num_to_id = runner._step_num_to_id()
 
     logs = {}
@@ -232,10 +231,7 @@ def list_relevant(runner, step_nums):
 
 
 def list_all(runner):
-    try:
-        prettyprint_paths(runner.ls_all_logs_ssh())
-    except LogFetchError:
-        prettyprint_paths(runner.ls_all_logs_s3())
+    prettyprint_paths(runner._ls_logs('all'))
 
 
 def cat_from_list(runner, path_list):

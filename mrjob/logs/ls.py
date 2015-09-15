@@ -20,6 +20,7 @@ from mrjob.parse import is_s3_uri
 
 # relative path to look for logs in
 _LOG_TYPE_TO_RELATIVE_PATH = dict(
+    all='',
     job='history',
     node='',  # do these exist on Hadoop?
     step='steps',
@@ -28,6 +29,7 @@ _LOG_TYPE_TO_RELATIVE_PATH = dict(
 
 # alternate relative path for logs on S3 (EMR)
 _S3_LOG_TYPE_TO_RELATIVE_PATH = dict(
+    all='',
     job='jobs',
     node='node',
     steps='steps',
@@ -70,6 +72,7 @@ _TASK_LOG_RE = re.compile(
 
 # map from log type to a regex matching it
 _LOG_TYPE_TO_RE = dict(
+    all=re.compile(r'.*'),
     job=_JOB_LOG_RE,
     node=_NODE_LOG_RE,
     step=_STEP_LOG_RE,
@@ -79,6 +82,7 @@ _LOG_TYPE_TO_RE = dict(
 # where to look for logs when SSHing in
 # (either 'master', 'slaves', or both)
 _SSH_LOG_TYPE_TO_LOCATIONS = dict(
+    all=['master', 'slaves'],
     job=['master'],
     node=['slaves'],  # TODO: why not master?
     step=['master'],
